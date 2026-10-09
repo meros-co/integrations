@@ -575,20 +575,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## disguise — disguise Designer
 
-- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:642](specs/disguise.yaml#L642))
-- [ ] Check that a Locator with only a name (no uid key) is accepted by every command that names a resource. ([specs/disguise.yaml:992](specs/disguise.yaml#L992))
-- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:1002](specs/disguise.yaml#L1002))
-- [ ] Check the status.code values Designer returns (4000 seen for a rejected play mode) and the shape of status.details. ([specs/disguise.yaml:987](specs/disguise.yaml#L987))
-- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:1003](specs/disguise.yaml#L1003))
+- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:748](specs/disguise.yaml#L748))
+- [ ] Check that a Locator with only a name (no uid key) is accepted by every command that names a resource. ([specs/disguise.yaml:1260](specs/disguise.yaml#L1260))
+- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:1270](specs/disguise.yaml#L1270))
+- [ ] Check the status.code values Designer returns (4000 seen for a rejected play mode) and the shape of status.details. ([specs/disguise.yaml:1255](specs/disguise.yaml#L1255))
+- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:1271](specs/disguise.yaml#L1271))
 - [ ] Check which Designer release added each endpoint used here; the Swagger documents carry no version markers. ([specs/disguise.yaml:115](specs/disguise.yaml#L115))
-- [ ] Check the health severity values (ready in the Swagger document, ok in the monitoring guide). ([specs/disguise.yaml:940](specs/disguise.yaml#L940))
-- [ ] Confirm /api/session/transport/transports lists every transport and /api/session/status/health every machine of the session: each poll replaces transports and machines. ([specs/disguise.yaml:648](specs/disguise.yaml#L648))
-- [ ] Confirm a successful request answers with status.code 0 written out (not left out as a proto3 default), and that empty lists (multitransports, actors, states) come as [] rather than being left out: every read-back and list replacement keys on them. ([specs/disguise.yaml:729](specs/disguise.yaml#L729))
-- [ ] Check how failover/understudytargets keys its understudies map (by machine name or uid), kept whole as JSON text. ([specs/disguise.yaml:847](specs/disguise.yaml#L847))
-- [ ] Confirm that runningAsMachine names the machine an understudy has taken over after a failover, and the machine itself otherwise. ([specs/disguise.yaml:933](specs/disguise.yaml#L933))
-- [ ] Confirm that transport/annotations accepts a track's uid in the query (uid=...), as the current track's annotations are read that way. ([specs/disguise.yaml:669](specs/disguise.yaml#L669))
-- [ ] Confirm that sequencing/indirectionresources accepts the indirection's uid in the query, and what resourceType holds (a type name such as VideoClip is assumed). ([specs/disguise.yaml:875](specs/disguise.yaml#L875))
-- [ ] Check whether changeindirections takes effect on every machine at once, as assumed. ([specs/disguise.yaml:1057](specs/disguise.yaml#L1057))
+- [ ] Check the health severity values (ready in the Swagger document, ok in the monitoring guide). ([specs/disguise.yaml:1171](specs/disguise.yaml#L1171))
+- [ ] Confirm /api/session/transport/transports lists every transport and /api/session/status/health every machine of the session: each poll replaces transports and machines. ([specs/disguise.yaml:754](specs/disguise.yaml#L754))
+- [ ] Confirm a successful request answers with status.code 0 written out (not left out as a proto3 default), and that empty lists (multitransports, actors, states) come as [] rather than being left out: every read-back and list replacement keys on them. ([specs/disguise.yaml:835](specs/disguise.yaml#L835))
+- [ ] Check how failover/understudytargets keys its understudies map (by machine name or uid), kept whole as JSON text. ([specs/disguise.yaml:953](specs/disguise.yaml#L953))
+- [ ] Confirm that runningAsMachine names the machine an understudy has taken over after a failover, and the machine itself otherwise. ([specs/disguise.yaml:1164](specs/disguise.yaml#L1164))
+- [ ] Confirm that transport/annotations accepts a track's uid in the query (uid=...), as the current track's annotations are read that way. ([specs/disguise.yaml:775](specs/disguise.yaml#L775))
+- [ ] Confirm that sequencing/indirectionresources accepts the indirection's uid in the query, and what resourceType holds (a type name such as VideoClip is assumed). ([specs/disguise.yaml:981](specs/disguise.yaml#L981))
+- [ ] Check whether changeindirections takes effect on every machine at once, as assumed. ([specs/disguise.yaml:1325](specs/disguise.yaml#L1325))
+- [ ] Confirm that renderstream/layerstatus and layerconfig accept a layer's uid in the query, as each layer is read that way. ([specs/disguise.yaml:1004](specs/disguise.yaml#L1004))
+- [ ] Check the words Designer uses for a workload instance's state and a stream's statusString, and the clock tNow, tLastDropped and tLastError are on. ([specs/disguise.yaml:1202](specs/disguise.yaml#L1202))
+- [ ] Check what renderstream/failover does (taken as failing a render node over to an understudy of its pool) and what failoverpool changes, as the Swagger summaries are brief. ([specs/disguise.yaml:700](specs/disguise.yaml#L700))
 
 ## emberplus — Ember+
 

@@ -122,7 +122,11 @@ models:
                get_understudy_targets,
                detect_systems, get_os_info, get_network_adapters, get_gpu_outputs, get_projects,
                start_project, quit_project, restart_project, force_quit_project,
-               get_indirections, get_indirection_resources, change_indirection, change_indirections]
+               get_indirections, get_indirection_resources, change_indirection, change_indirections,
+               get_renderstream_layers, get_renderstream_layer_status, get_renderstream_layer_config,
+               get_renderstream_pools, get_renderstream_assigners, start_renderstream_layer,
+               stop_renderstream_layer, restart_renderstream_layer, sync_renderstream_layer,
+               renderstream_failover_machine, renderstream_failover_pool]
     verification: none
 
 commands:
@@ -614,6 +618,105 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── RenderStream ─────────────────────────────────────────────────────────
+  get_renderstream_layers:
+    summary: Every RenderStream layer, by uid and name (renderstream/layers)
+    send: { method: GET, path: /api/session/renderstream/layers }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_layer_status:
+    summary: A RenderStream layer's workload, its instances' state and health, and its streams' status, by the layer's name (renderstream/layerstatus)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: GET, path: /api/session/renderstream/layerstatus, query: { name: "{layer}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_layer_config:
+    summary: A RenderStream layer's asset, cluster pool, channel mappings, default assigner and frame rate divisor, by the layer's name (renderstream/layerconfig)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: GET, path: /api/session/renderstream/layerconfig, query: { name: "{layer}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_pools:
+    summary: Every cluster pool with its machines, understudies and their network adapters (renderstream/pools)
+    send: { method: GET, path: /api/session/renderstream/pools }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_assigners:
+    summary: Every cluster assigner with its stream transport, format, bit depth, alpha, overlap, padding and preferred network (renderstream/assigners)
+    send: { method: GET, path: /api/session/renderstream/assigners }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  start_renderstream_layer:
+    summary: Start a RenderStream layer's workload on its cluster, by the layer's name (renderstream/startlayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/startlayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  stop_renderstream_layer:
+    summary: Stop a RenderStream layer's workload, by the layer's name (renderstream/stoplayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/stoplayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  restart_renderstream_layer:
+    summary: Restart a RenderStream layer's workload, by the layer's name (renderstream/restartlayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/restartlayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  sync_renderstream_layer:
+    summary: Sync a RenderStream layer's workload, sending the layer's current parameters to its render nodes, by the layer's name (renderstream/synclayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/synclayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  renderstream_failover_machine:
+    summary: Fail a RenderStream render node over to an understudy of its cluster pool, by the machine's name (renderstream/failover)
+    params:
+      machine: { type: string, max_length: 256, required: true,
+                 label: Machine,
+                 description: "Name of the render node to fail over." }
+    send: { method: POST, path: /api/session/renderstream/failover, body: '{"machine":{"name":{machine:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  renderstream_failover_pool:
+    summary: Update a RenderStream layer's cluster pool after a failover and restart its workload, by the layer's name (renderstream/failoverpool)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/failoverpool, body: '{"layer":{"name":{layer:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -624,6 +727,7 @@ telemetry:
       - { method: GET, path: /api/session/status/health }
       - { method: GET, path: /api/session/status/notifications }
       - { method: GET, path: /api/session/sequencing/indirections }
+      - { method: GET, path: /api/session/renderstream/layers }
   # What an operator changes in the project, and the machines' set-up, every
   # minute (and on connecting).
   subscribe:
@@ -635,6 +739,8 @@ telemetry:
       - { method: GET, path: /api/session/failover/understudytargets }
       - { method: GET, path: /api/session/transport/tracks }
       - { method: GET, path: /api/session/transport/setlists }
+      - { method: GET, path: /api/session/renderstream/pools }
+      - { method: GET, path: /api/session/renderstream/assigners }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -884,6 +990,131 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: /api/session/sequencing/indirections }
+    # RenderStream layers, and for each its status and configuration.
+    - path: "^/api/session/renderstream/layers$"
+      json_match: { "$.result": "^\\[" }
+      replace: renderstream.layers
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        renderstream.layers.{uid}.name: "{name}"
+      then_send:
+        - { method: GET, path: /api/session/renderstream/layerstatus, query: { uid: "{uid}" } }
+        - { method: GET, path: /api/session/renderstream/layerconfig, query: { uid: "{uid}" } }
+    - path: "^/api/session/renderstream/layerstatus\\?uid=([0-9]+)$"
+      json_match: { "$.result": "^\\{" }
+      replace: renderstream.status.{1}
+      json:
+        workload: "$.result.workload.name"
+        workload_uid: "$.result.workload.uid"
+        t_now: "$.result.reference.tNow"
+        asset_errors: "$.result.assetErrors"
+      state:
+        renderstream.status.{1}.workload: "{workload}"
+        renderstream.status.{1}.workload_uid: "{workload_uid}"
+        renderstream.status.{1}.t_now: "{t_now}"
+        renderstream.status.{1}.asset_errors: "{asset_errors}"
+    - path: "^/api/session/renderstream/layerstatus\\?uid=([0-9]+)$"
+      json_each: "$.result.workload.instances"
+      json:
+        machine: "$.machineName"
+        machine_uid: "$.machineUid"
+        state: "$.state"
+        health: "$.healthMessage"
+        details: "$.healthDetails"
+      state:
+        renderstream.status.{1}.instances.{index}.machine: "{machine}"
+        renderstream.status.{1}.instances.{index}.machine_uid: "{machine_uid}"
+        renderstream.status.{1}.instances.{index}.state: "{state}"
+        renderstream.status.{1}.instances.{index}.health: "{health}"
+        renderstream.status.{1}.instances.{index}.health_details: "{details}"
+    - path: "^/api/session/renderstream/layerstatus\\?uid=([0-9]+)$"
+      json_each: "$.result.streams"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        source: "$.sourceMachine"
+        receiver: "$.receiverMachine"
+        wanted: "$.status.subscriptionWanted"
+        subscribed: "$.status.subscribeSuccessful"
+        t_dropped: "$.status.tLastDropped"
+        t_error: "$.status.tLastError"
+        error: "$.status.lastErrorMessage"
+        status: "$.statusString"
+      state:
+        renderstream.status.{1}.streams.{index}.uid: "{uid}"
+        renderstream.status.{1}.streams.{index}.name: "{name}"
+        renderstream.status.{1}.streams.{index}.source: "{source}"
+        renderstream.status.{1}.streams.{index}.receiver: "{receiver}"
+        renderstream.status.{1}.streams.{index}.subscription_wanted: "{wanted}"
+        renderstream.status.{1}.streams.{index}.subscribed: "{subscribed}"
+        renderstream.status.{1}.streams.{index}.t_last_dropped: "{t_dropped}"
+        renderstream.status.{1}.streams.{index}.t_last_error: "{t_error}"
+        renderstream.status.{1}.streams.{index}.last_error: "{error}"
+        renderstream.status.{1}.streams.{index}.status: "{status}"
+    - path: "^/api/session/renderstream/layerconfig\\?uid=([0-9]+)$"
+      json_match: { "$.result": "^\\{" }
+      replace: renderstream.config.{1}
+      json:
+        asset: "$.result.asset.name"
+        pool: "$.result.pool.name"
+        assigner: "$.result.defaultAssigner.name"
+        divisor: "$.result.framerateFractionDivisor"
+        mappings: "$.result.channelMappings"
+      state:
+        renderstream.config.{1}.asset: "{asset}"
+        renderstream.config.{1}.pool: "{pool}"
+        renderstream.config.{1}.default_assigner: "{assigner}"
+        renderstream.config.{1}.framerate_divisor: "{divisor}"
+        renderstream.config.{1}.channel_mappings: "{mappings}"
+    - path: "^/api/session/renderstream/pools$"
+      json_match: { "$.result": "^\\[" }
+      replace: renderstream.pools
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", machines: "$.machines", understudies: "$.understudies" }
+      state:
+        renderstream.pools.{uid}.name: "{name}"
+        renderstream.pools.{uid}.machines: "{machines}"
+        renderstream.pools.{uid}.understudies: "{understudies}"
+    - path: "^/api/session/renderstream/assigners$"
+      json_match: { "$.result": "^\\[" }
+      replace: renderstream.assigners
+      json_each: "$.result"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        type: "$.transport.type"
+        format: "$.transport.format"
+        depth: "$.transport.bitDepth"
+        alpha: "$.alpha"
+        overlap: "$.overlapPixels"
+        padding: "$.paddingPixels"
+        ip: "$.preferredNetwork.ip"
+        network: "$.preferredNetwork.name"
+      state:
+        renderstream.assigners.{uid}.name: "{name}"
+        renderstream.assigners.{uid}.transport: "{type}"
+        renderstream.assigners.{uid}.format: "{format}"
+        renderstream.assigners.{uid}.bit_depth: "{depth}"
+        renderstream.assigners.{uid}.alpha: "{alpha}"
+        renderstream.assigners.{uid}.overlap_pixels: "{overlap}"
+        renderstream.assigners.{uid}.padding_pixels: "{padding}"
+        renderstream.assigners.{uid}.network_ip: "{ip}"
+        renderstream.assigners.{uid}.network: "{network}"
+    # A workload started, stopped, restarted, synced or failed over has the
+    # layers, and so their status, read again; a render node failover the
+    # machines' health too.
+    - path: "^/api/session/renderstream/(startlayers|stoplayers|restartlayers|synclayers|failoverpool|failover)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/renderstream/layers }
+    - path: "^/api/session/renderstream/failover$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/status/health }
+        - { method: GET, path: /api/session/renderstream/pools }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -961,6 +1192,43 @@ state:
   indirections.*.resource_uid:     { type: string, description: "uid of the resource the indirection points to now (change_indirection)" }
   indirections.*.resource:         { type: string, description: "Name of the resource the indirection points to now (change_indirection)" }
   indirection_resources.*.*:       { type: string, description: "A resource an indirection can point to, keyed by the indirection's uid then the resource's uid: its name" }
+  renderstream.layers.*.name:      { type: string, description: "RenderStream layer name, keyed by the layer's uid" }
+  renderstream.status.*.workload:  { type: string, description: "Name of the layer's workload, keyed by the layer's uid" }
+  renderstream.status.*.workload_uid: { type: string, description: "uid of the layer's workload, for Live Update's RenderStream subscriptions" }
+  renderstream.status.*.t_now:     { type: float, unit: s, description: "The layer's reference time when the status was read" }
+  renderstream.status.*.asset_errors: { type: string, description: "The layer's asset errors, as a JSON array of strings" }
+  renderstream.status.*.instances.*.machine:        { type: string, description: "A workload instance, numbered from 0: the render node it runs on" }
+  renderstream.status.*.instances.*.machine_uid:    { type: string, description: "uid of the instance's render node" }
+  renderstream.status.*.instances.*.state:          { type: string, description: "The instance's state, as Designer words it" }
+  renderstream.status.*.instances.*.health:         { type: string, description: "The instance's health message" }
+  renderstream.status.*.instances.*.health_details: { type: string, description: "The instance's health details" }
+  renderstream.status.*.streams.*.uid:                 { type: string, description: "A stream of the layer, numbered from 0: its uid" }
+  renderstream.status.*.streams.*.name:                { type: string, description: "The stream's name" }
+  renderstream.status.*.streams.*.source:              { type: string, description: "The render node sending the stream" }
+  renderstream.status.*.streams.*.receiver:            { type: string, description: "The machine receiving the stream" }
+  renderstream.status.*.streams.*.subscription_wanted: { type: bool, description: "The receiver wants the stream" }
+  renderstream.status.*.streams.*.subscribed:          { type: bool, description: "The receiver's subscription to the stream succeeded" }
+  renderstream.status.*.streams.*.t_last_dropped:      { type: float, unit: s, description: "When the stream last dropped a frame, on the reference clock" }
+  renderstream.status.*.streams.*.t_last_error:        { type: float, unit: s, description: "When the stream last had an error, on the reference clock" }
+  renderstream.status.*.streams.*.last_error:          { type: string, description: "The stream's last error message" }
+  renderstream.status.*.streams.*.status:              { type: string, description: "The stream's status, as Designer words it" }
+  renderstream.config.*.asset:             { type: string, description: "The layer's RenderStream asset, keyed by the layer's uid" }
+  renderstream.config.*.pool:              { type: string, description: "The layer's cluster pool" }
+  renderstream.config.*.default_assigner:  { type: string, description: "The layer's default cluster assigner" }
+  renderstream.config.*.framerate_divisor: { type: int, description: "The layer's frame rate fraction divisor" }
+  renderstream.config.*.channel_mappings:  { type: string, description: "The layer's channel mappings: a JSON array of {channel, mapping, assigner}" }
+  renderstream.pools.*.name:         { type: string, description: "Cluster pool name, keyed by the pool's uid" }
+  renderstream.pools.*.machines:     { type: string, description: "The pool's render nodes: a JSON array of {uid, name, preferredSyncAdapter, adapters}" }
+  renderstream.pools.*.understudies: { type: string, description: "The pool's understudies, in the same form" }
+  renderstream.assigners.*.name:           { type: string, description: "Cluster assigner name, keyed by the assigner's uid" }
+  renderstream.assigners.*.transport:      { type: string, description: "The assigner's stream transport type" }
+  renderstream.assigners.*.format:         { type: string, description: "The assigner's stream format" }
+  renderstream.assigners.*.bit_depth:      { type: int, description: "The assigner's stream bit depth" }
+  renderstream.assigners.*.alpha:          { type: bool, description: "The assigner's streams carry alpha" }
+  renderstream.assigners.*.overlap_pixels: { type: int, unit: px, description: "Overlap between the assigner's tiles" }
+  renderstream.assigners.*.padding_pixels: { type: int, unit: px, description: "Padding around the assigner's tiles" }
+  renderstream.assigners.*.network_ip:     { type: string, description: "Address of the assigner's preferred network" }
+  renderstream.assigners.*.network:        { type: string, description: "Name of the assigner's preferred network" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -1058,3 +1326,14 @@ quirks:
       the indirection shows, at once and on every machine. Indirections, and
       the resources each can point to, are read every 10 seconds; the API
       cannot create indirections or change which resources they offer.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_renderstream_layer and restart_renderstream_layer take the layer's
+      render nodes off the stage until the workload runs again;
+      renderstream_failover_machine and renderstream_failover_pool move a
+      workload to other machines and restart it. Every RenderStream layer, with
+      its status and configuration, is read every 10 seconds, and cluster pools
+      and assigners every minute. The API cannot create layers, change a layer's
+      asset, pool, mappings or assigners, or edit pools and assigners: those are
+      edited in Designer.

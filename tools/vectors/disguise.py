@@ -286,3 +286,73 @@ telemetry(DG, "indirection-resources", inbound_http={
 telemetry(DG, "indirection-change-reread", inbound_http={"path": "/api/session/sequencing/changeindirections",
                                                          "body": _ENV_OK},
           expect_then_send=[{"method": "GET", "target": "/api/session/sequencing/indirections"}], expect_state={})
+
+# ── RenderStream ──
+_RS = "/api/session/renderstream/"
+RS_LAYERS = [{"uid": "601", "name": "Unreal scene"}]
+_dg("get_renderstream_layers", {}, "GET", _RS + "layers",
+    http_reply={"status": 200, "body": _envelope(result=RS_LAYERS)},
+    expect_result={"ok": {"kind": "value", "value": RS_LAYERS}})
+_dg("get_renderstream_layer_status", {"layer": "Unreal scene"}, "GET", _RS + "layerstatus?name=Unreal%20scene")
+_dg("get_renderstream_layer_config", {"layer": "Unreal scene"}, "GET", _RS + "layerconfig?name=Unreal%20scene")
+_dg("get_renderstream_pools", {}, "GET", _RS + "pools")
+_dg("get_renderstream_assigners", {}, "GET", _RS + "assigners")
+for _cmd, _path in [("start_renderstream_layer", "startlayers"), ("stop_renderstream_layer", "stoplayers"),
+                    ("restart_renderstream_layer", "restartlayers"), ("sync_renderstream_layer", "synclayers")]:
+    _dg(_cmd, {"layer": "Unreal scene"}, "POST", _RS + _path, '{"layers":[{"name":"Unreal scene"}]}', **_OK)
+_dg("renderstream_failover_machine", {"machine": "rx-03"}, "POST", _RS + "failover",
+    '{"machine":{"name":"rx-03"}}', **_OK)
+_dg("renderstream_failover_pool", {"layer": "Unreal scene"}, "POST", _RS + "failoverpool",
+    '{"layer":{"name":"Unreal scene"}}', **_OK)
+telemetry(DG, "renderstream-layers", inbound_http={"path": _RS + "layers", "body": _envelope(result=RS_LAYERS)},
+          state_before={"renderstream": {"layers": {"600": {"name": "removed"}}}},
+          expect_then_send=[{"method": "GET", "target": _RS + "layerstatus?uid=601"},
+                            {"method": "GET", "target": _RS + "layerconfig?uid=601"}],
+          expect_state={"renderstream": {"layers": {"601": {"name": "Unreal scene"}}}})
+telemetry(DG, "renderstream-layer-status", inbound_http={"path": _RS + "layerstatus?uid=601", "body": _envelope(
+    result={"reference": {"tNow": 1234.5},
+            "workload": {"uid": "701", "name": "Unreal scene workload", "instances": [
+                {"machineUid": "801", "machineName": "rx-01", "state": "Running", "healthMessage": "OK",
+                 "healthDetails": ""}]},
+            "streams": [{"uid": "901", "name": "Unreal scene/rx-01", "sourceMachine": "rx-01",
+                         "receiverMachine": "vx4-01",
+                         "status": {"subscriptionWanted": True, "subscribeSuccessful": True, "tLastDropped": 1200.0,
+                                    "tLastError": 0.0, "lastErrorMessage": ""},
+                         "statusString": "Receiving"}],
+            "assetErrors": []})},
+    state_before={"renderstream": {"status": {"601": {"instances": {"1": {"machine": "rx-02"}}}}}},
+    expect_state={"renderstream": {"status": {"601": {
+        "workload": "Unreal scene workload", "workload_uid": "701", "t_now": 1234.5, "asset_errors": "[]",
+        "instances": {"0": {"machine": "rx-01", "machine_uid": "801", "state": "Running", "health": "OK",
+                            "health_details": ""}},
+        "streams": {"0": {"uid": "901", "name": "Unreal scene/rx-01", "source": "rx-01", "receiver": "vx4-01",
+                          "subscription_wanted": True, "subscribed": True, "t_last_dropped": 1200.0,
+                          "t_last_error": 0.0, "last_error": "", "status": "Receiving"}}}}}})
+MAPPINGS = [{"channel": "Default", "mapping": {"uid": "1001", "name": "LED wall"},
+             "assigner": {"uid": "1101", "name": "4 nodes"}}]
+telemetry(DG, "renderstream-layer-config", inbound_http={"path": _RS + "layerconfig?uid=601", "body": _envelope(
+    result={"framerateFractionDivisor": 1, "asset": {"uid": "1201", "name": "Scene.uproject"},
+            "pool": {"uid": "1301", "name": "rx pool"}, "channelMappings": MAPPINGS,
+            "defaultAssigner": {"uid": "1101", "name": "4 nodes"}})},
+    expect_state={"renderstream": {"config": {"601": {
+        "asset": "Scene.uproject", "pool": "rx pool", "default_assigner": "4 nodes", "framerate_divisor": 1,
+        "channel_mappings": _compact(MAPPINGS)}}}})
+POOL_MACHINES = [{"uid": "801", "name": "rx-01", "preferredSyncAdapter": "d3net",
+                  "adapters": [{"name": "d3net", "ipAddress": "10.0.0.11", "subnet": "255.255.255.0"}]}]
+telemetry(DG, "renderstream-pools", inbound_http={"path": _RS + "pools", "body": _envelope(result=[
+    {"uid": "1301", "name": "rx pool", "machines": POOL_MACHINES, "understudies": []}])},
+    expect_state={"renderstream": {"pools": {"1301": {"name": "rx pool", "machines": _compact(POOL_MACHINES),
+                                                      "understudies": "[]"}}}})
+telemetry(DG, "renderstream-assigners", inbound_http={"path": _RS + "assigners", "body": _envelope(result=[
+    {"uid": "1101", "name": "4 nodes", "transport": {"type": "NDI", "format": "RGBA", "bitDepth": 8},
+     "alpha": True, "overlapPixels": 16, "paddingPixels": 4,
+     "preferredNetwork": {"ip": "10.0.1.0", "name": "media"}}])},
+    expect_state={"renderstream": {"assigners": {"1101": {
+        "name": "4 nodes", "transport": "NDI", "format": "RGBA", "bit_depth": 8, "alpha": True,
+        "overlap_pixels": 16, "padding_pixels": 4, "network_ip": "10.0.1.0", "network": "media"}}}})
+telemetry(DG, "renderstream-command-reread", inbound_http={"path": _RS + "restartlayers", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _RS + "layers"}], expect_state={})
+telemetry(DG, "renderstream-failover-reread", inbound_http={"path": _RS + "failover", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _RS + "layers"},
+                            {"method": "GET", "target": "/api/session/status/health"},
+                            {"method": "GET", "target": _RS + "pools"}], expect_state={})
