@@ -420,3 +420,26 @@ telemetry(DG, "cdls", inbound_http={"path": "/api/session/colour/cdls", "body": 
                                     "power_g": 0.9, "power_b": 1.0, "saturation": 0.8}}})
 telemetry(DG, "cdl-reread", inbound_http={"path": "/api/session/colour/cdl", "body": _ENV_OK},
           expect_then_send=[{"method": "GET", "target": "/api/session/colour/cdls"}], expect_state={})
+
+# ── Notes ──
+NOTE = {"note": {"uid": "1701", "name": "running order"}, "text": "1. Intro\n2. Act 1"}
+_dg("get_notes", {}, "GET", "/api/session/notes?start=0&count=0")
+_dg("get_note", {"note": "running order"}, "GET", "/api/session/note?name=running%20order",
+    http_reply={"status": 200, "body": _envelope(result=NOTE)},
+    expect_result={"ok": {"kind": "value", "value": NOTE}})
+_dg("set_note", {"note": "running order", "text": "1. Intro\n2. Act 1"}, "POST", "/api/session/note",
+    '{"note":{"name":"running order"},"text":"1. Intro\\n2. Act 1"}',
+    http_reply={"status": 200, "body": _envelope(result=NOTE)},
+    expect_result={"ok": {"kind": "value", "value": NOTE}})
+telemetry(DG, "notes", inbound_http={"path": "/api/session/notes", "body": _envelope(result=[
+    NOTE, {"note": {"uid": "1702", "name": "contacts"}, "text": "FOH: ch 4"}])},
+    state_before={"notes": {"1700": {"name": "deleted", "text": ""}}},
+    expect_state={"notes": {"1701": {"name": "running order", "text": "1. Intro\n2. Act 1"},
+                            "1702": {"name": "contacts", "text": "FOH: ch 4"}}})
+telemetry(DG, "notes-page", inbound_http={"path": "/api/session/notes?start=1&count=1", "body": _envelope(result=[
+    {"note": {"uid": "1702", "name": "contacts"}, "text": "FOH: ch 5"}])},
+    state_before={"notes": {"1701": {"name": "running order", "text": "1. Intro"}}},
+    expect_state={"notes": {"1701": {"name": "running order", "text": "1. Intro"},
+                            "1702": {"name": "contacts", "text": "FOH: ch 5"}}})
+telemetry(DG, "note-written", inbound_http={"path": "/api/session/note", "body": _envelope(result=NOTE)},
+          expect_state={"notes": {"1701": {"name": "running order", "text": "1. Intro\n2. Act 1"}}})

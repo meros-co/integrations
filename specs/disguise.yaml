@@ -129,7 +129,8 @@ models:
                renderstream_failover_machine, renderstream_failover_pool,
                get_sockpuppet_patches, get_easing_functions, set_live_float, set_live_string,
                set_live_resource, send_live_changes,
-               get_cdls, set_cdl]
+               get_cdls, set_cdl,
+               get_notes, get_note, set_note]
     verification: none
 
 commands:
@@ -828,6 +829,43 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── Notes ────────────────────────────────────────────────────────────────
+  get_notes:
+    summary: The project's named notes with their text, a page at a time (notes); count 0 returns every note from start
+    params:
+      start: { type: int, min: 0, default: 0,
+               label: Start,
+               description: "Index of the first note to return, from 0." }
+      count: { type: int, min: 0, default: 0,
+               label: Count,
+               description: "Number of notes to return; 0 returns all of them." }
+    send: { method: GET, path: /api/session/notes, query: { start: "{start}", count: "{count}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_note:
+    summary: One note and its text, by the note's name (note)
+    params:
+      note: { type: string, max_length: 256, required: true,
+              label: Note,
+              description: "Name of the note resource as shown in Designer." }
+    send: { method: GET, path: /api/session/note, query: { name: "{note}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  set_note:
+    summary: Set a note's text, by the note's name, creating the note when there is none of that name (note)
+    params:
+      note: { type: string, max_length: 256, required: true,
+              label: Note,
+              description: "Name of the note resource as shown in Designer." }
+      text: { type: json, required: true,
+              label: Text,
+              description: "The note's new text as a JSON string (line breaks as \\n), which replaces the old." }
+    send: { method: POST, path: /api/session/note, body: '{"note":{"name":{note:json}},"text":{text}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -855,6 +893,7 @@ telemetry:
       - { method: GET, path: /api/session/renderstream/assigners }
       - { method: GET, path: /api/session/sockpuppet/easingfunctions }
       - { method: GET, path: /api/session/colour/cdls }
+      - { method: GET, path: /api/session/notes }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1316,6 +1355,24 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: /api/session/colour/cdls }
+    # Notes, keyed by uid: the whole list (asked with no page), or one note
+    # read or written.
+    - path: "^/api/session/notes$"
+      json_match: { "$.result": "^\\[" }
+      replace: notes
+      json: {}
+    - path: "^/api/session/notes(\\?|$)"
+      json_each: "$.result"
+      json: { uid: "$.note.uid", name: "$.note.name", text: "$.text" }
+      state:
+        notes.{uid}.name: "{name}"
+        notes.{uid}.text: "{text}"
+    - path: "^/api/session/note(\\?|$)"
+      json_match: { "$.result.note.uid": "^([0-9]+)$" }
+      json: { name: "$.result.note.name", text: "$.result.text" }
+      state:
+        notes.{2}.name: "{name}"
+        notes.{2}.text: "{text}"
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -1458,6 +1515,8 @@ state:
   cdls.*.power_g:    { type: float, description: "Green power" }
   cdls.*.power_b:    { type: float, description: "Blue power" }
   cdls.*.saturation: { type: float, description: "Saturation" }
+  notes.*.name: { type: string, description: "Note name, keyed by the note's uid" }
+  notes.*.text: { type: string, description: "The note's text (set_note)" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -1584,3 +1643,12 @@ quirks:
       are sent as the x, y and z of a vector, taken here as red, green and blue,
       which disguise's document does not state. CDLs are read every minute and
       after each set_cdl; the API cannot create or delete them.
+  - models: [all]
+    severity: info
+    text: >
+      Notes here are Designer's note resources (the notes endpoints), not the
+      notes on a track's timeline, which get_annotations reads and which the API
+      cannot edit. set_note creates a note when none has the name; the API
+      cannot delete one. Every note is read every minute, and a note read or
+      written is kept at once. set_note takes the text as a JSON string, since a
+      text parameter here cannot hold a line break.
