@@ -291,3 +291,42 @@ binary(W, "set_node", {"assignments": "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1"},
 _ts("param-enum", "/$ctl/user/1/1/enc/mode", "FX", {})
 _tf("param-float", "/cfg/mon/1/dim", "-20.0", 0.5, -20.0, {})
 _ti("param-int", "/ch/40/in/set/srcauto", 1, {})
+
+# ── EQ model, mix, frequencies, Qs, types and tilt; pre-send EQ (p.48-63) ─
+# Floats in their own unit as ,f; enumerations as ,s (p.22).
+for stem, node, n, nb, model, ltype in [("channel", "ch", 40, 4, "MACH4", "SHV"), ("aux", "aux", 8, 4, "PULSAR", "CUT"),
+                                        ("bus", "bus", 16, 6, "PIA", "LR48"), ("main", "main", 4, 6, "SOUL", "BW12"),
+                                        ("matrix", "mtx", 8, 6, "STD", "PEQ")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_eq_model", {stem: n, "model": model}, osc(f"/{node}/{n}/eq/mdl", ("s", model)))
+    binary(W, f"set_{stem}_eq_mix", {stem: 1, "mix": 100.0}, osc(f"/{node}/1/eq/mix", ("f", 100.0)))
+    binary(W, f"set_{stem}_eq_low_frequency", {stem: 1, "frequency_hz": 80.0}, osc(f"/{node}/1/eq/lf", ("f", 80.0)))
+    binary(W, f"set_{stem}_eq_low_q", {stem: 1, "q": 0.44}, osc(f"/{node}/1/eq/lq", ("f", 0.44)))
+    binary(W, f"set_{stem}_eq_low_type", {stem: 1, "type": ltype}, osc(f"/{node}/1/eq/leq", ("s", ltype)))
+    binary(W, f"set_{stem}_eq_high_frequency", {stem: 2, "frequency_hz": 12000.0}, osc(f"/{node}/2/eq/hf", ("f", 12000.0)))
+    binary(W, f"set_{stem}_eq_high_q", {stem: 2, "q": 10.0}, osc(f"/{node}/2/eq/hq", ("f", 10.0)))
+    binary(W, f"set_{stem}_eq_high_type", {stem: 2, "type": "PEQ"}, osc(f"/{node}/2/eq/heq", ("s", "PEQ")))
+    binary(W, f"set_{stem}_eq_band_frequency", {stem: 3, "band": nb, "frequency_hz": 1000.0},
+           osc(f"/{node}/3/eq/{nb}f", ("f", 1000.0)))
+    binary(W, f"set_{stem}_eq_band_q", {stem: 3, "band": 1, "q": 2.0}, osc(f"/{node}/3/eq/1q", ("f", 2.0)))
+    _ts(f"{stem}-eq-model", f"/{node}/1/eq/mdl", "STD", {P: {"1": {"eq": {"model": "STD"}}}})
+    _tf(f"{stem}-eq-mix", f"/{node}/1/eq/mix", "100", 0.8, 100.0, {P: {"1": {"eq": {"mix": 100.0}}}})
+    _tf(f"{stem}-eq-low-frequency", f"/{node}/1/eq/lf", "80.2", 0.3, 80.0, {P: {"1": {"eq": {"low_frequency": 80.0}}}})
+    _tf(f"{stem}-eq-low-q", f"/{node}/1/eq/lq", "1.00", 0.25, 1.0, {P: {"1": {"eq": {"low_q": 1.0}}}})
+    _ts(f"{stem}-eq-low-type", f"/{node}/1/eq/leq", "SHV", {P: {"1": {"eq": {"low_type": "SHV"}}}})
+    _tf(f"{stem}-eq-high-frequency", f"/{node}/1/eq/hf", "12k00", 0.75, 12000.0, {P: {"1": {"eq": {"high_frequency": 12000.0}}}})
+    _tf(f"{stem}-eq-high-q", f"/{node}/1/eq/hq", "1.00", 0.25, 1.0, {P: {"1": {"eq": {"high_q": 1.0}}}})
+    _ts(f"{stem}-eq-high-type", f"/{node}/1/eq/heq", "PEQ", {P: {"1": {"eq": {"high_type": "PEQ"}}}})
+    _tf(f"{stem}-eq-band-frequency", f"/{node}/2/eq/3f", "1k50", 0.5, 1500.0, {P: {"2": {"eq": {"bands": {"3": {"frequency": 1500.0}}}}}})
+    _tf(f"{stem}-eq-band-q", f"/{node}/2/eq/3q", "2.00", 0.5, 2.0, {P: {"2": {"eq": {"bands": {"3": {"q": 2.0}}}}}})
+    if nb == 6:
+        binary(W, f"set_{stem}_eq_tilt", {stem: n, "tilt_db": -6.0}, osc(f"/{node}/{n}/eq/tilt", ("f", -6.0)))
+        _tf(f"{stem}-eq-tilt", f"/{node}/1/eq/tilt", "1.50", 0.625, 1.5, {P: {"1": {"eq": {"tilt": 1.5}}}})
+binary(W, "set_channel_peq", {"channel": 40, "enabled": True}, osc("/ch/40/peq/on", ("i", 1)))
+binary(W, "set_channel_peq_band_gain", {"channel": 1, "band": 3, "gain_db": -15.0}, osc("/ch/1/peq/3g", ("f", -15.0)))
+binary(W, "set_channel_peq_band_frequency", {"channel": 1, "band": 1, "frequency_hz": 100.0}, osc("/ch/1/peq/1f", ("f", 100.0)))
+binary(W, "set_channel_peq_band_q", {"channel": 1, "band": 2, "q": 1.0}, osc("/ch/1/peq/2q", ("f", 1.0)))
+_ti("channel-peq-on", "/ch/5/peq/on", 1, {"channels": {"5": {"peq": {"on": True}}}})
+_tf("channel-peq-gain", "/ch/5/peq/1g", "3.0", 0.6, 3.0, {"channels": {"5": {"peq": {"bands": {"1": {"gain": 3.0}}}}}})
+_tf("channel-peq-frequency", "/ch/5/peq/2f", "999", 0.5, 999.0, {"channels": {"5": {"peq": {"bands": {"2": {"frequency": 999.0}}}}}})
+_tf("channel-peq-q", "/ch/5/peq/3q", "1.00", 0.25, 1.0, {"channels": {"5": {"peq": {"bands": {"3": {"q": 1.0}}}}}})

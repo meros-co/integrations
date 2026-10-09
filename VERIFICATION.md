@@ -196,17 +196,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## behringer-wing — Behringer WING
 
-- [ ] Confirm that solo, talkback on, monitor level, solo dim and mono, input gain and phantom ($-prefixed parameters) can be set over OSC. ([specs/behringer-wing.yaml:3344](specs/behringer-wing.yaml#L3344))
-- [ ] Check what gain and phantom sets do on a strip whose input source has no preamp. ([specs/behringer-wing.yaml:3351](specs/behringer-wing.yaml#L3351))
-- [ ] Find the separator between tags in a strip's tag string, so DCA assignment does not damage other tags. ([specs/behringer-wing.yaml:3368](specs/behringer-wing.yaml#L3368))
-- [ ] Find the tag names used for mute group assignment, which are not documented. ([specs/behringer-wing.yaml:3372](specs/behringer-wing.yaml#L3372))
-- [ ] Check what GONEXT and GOPREV do, since they are listed without description. ([specs/behringer-wing.yaml:3405](specs/behringer-wing.yaml#L3405))
-- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:3413](specs/behringer-wing.yaml#L3413))
-- [ ] Check which models allow set_monitor_level (settable on Compact and Rack, read-only on the full-size WING). ([specs/behringer-wing.yaml:3392](specs/behringer-wing.yaml#L3392))
-- [ ] On WING Rack, check whether main sends 5-8 (the headphone outputs) are reachable. ([specs/behringer-wing.yaml:3385](specs/behringer-wing.yaml#L3385))
-- [ ] Confirm the 9-second /*s renewal keeps the subscription alive and the connection open, and that another subscribing client takes changes away as described. ([specs/behringer-wing.yaml:3295](specs/behringer-wing.yaml#L3295))
-- [ ] Confirm set_node is answered on the node's address followed by * (/* for the root) with OK or one of the documented error strings, and that get_node's reply lists the node's children. ([specs/behringer-wing.yaml:3451](specs/behringer-wing.yaml#L3451))
-- [ ] Check on which address the console answers a query sent with a native hash (/#f50f69f8), which decides the key the params state uses for it, and whether a set of a [RO] parameter returns an error. ([specs/behringer-wing.yaml:3436](specs/behringer-wing.yaml#L3436))
+- [ ] Confirm that solo, talkback on, monitor level, solo dim and mono, input gain and phantom ($-prefixed parameters) can be set over OSC. ([specs/behringer-wing.yaml:3978](specs/behringer-wing.yaml#L3978))
+- [ ] Check what gain and phantom sets do on a strip whose input source has no preamp. ([specs/behringer-wing.yaml:3985](specs/behringer-wing.yaml#L3985))
+- [ ] Find the separator between tags in a strip's tag string, so DCA assignment does not damage other tags. ([specs/behringer-wing.yaml:4002](specs/behringer-wing.yaml#L4002))
+- [ ] Find the tag names used for mute group assignment, which are not documented. ([specs/behringer-wing.yaml:4006](specs/behringer-wing.yaml#L4006))
+- [ ] Check what GONEXT and GOPREV do, since they are listed without description. ([specs/behringer-wing.yaml:4039](specs/behringer-wing.yaml#L4039))
+- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:4047](specs/behringer-wing.yaml#L4047))
+- [ ] Check which models allow set_monitor_level (settable on Compact and Rack, read-only on the full-size WING). ([specs/behringer-wing.yaml:4026](specs/behringer-wing.yaml#L4026))
+- [ ] On WING Rack, check whether main sends 5-8 (the headphone outputs) are reachable. ([specs/behringer-wing.yaml:4019](specs/behringer-wing.yaml#L4019))
+- [ ] Confirm the 9-second /*s renewal keeps the subscription alive and the connection open, and that another subscribing client takes changes away as described. ([specs/behringer-wing.yaml:3929](specs/behringer-wing.yaml#L3929))
+- [ ] Confirm set_node is answered on the node's address followed by * (/* for the root) with OK or one of the documented error strings, and that get_node's reply lists the node's children. ([specs/behringer-wing.yaml:4085](specs/behringer-wing.yaml#L4085))
+- [ ] Check on which address the console answers a query sent with a native hash (/#f50f69f8), which decides the key the params state uses for it, and whether a set of a [RO] parameter returns an error. ([specs/behringer-wing.yaml:4070](specs/behringer-wing.yaml#L4070))
+- [ ] Check what the console does with STD-model EQ addresses (lf, 1q, heq ...) while another EQ model is loaded: ignored, an error, or applied to the hidden STD settings. ([specs/behringer-wing.yaml:4097](specs/behringer-wing.yaml#L4097))
+- [ ] Confirm the EQ mix range per strip (the document gives 0..125 for channels, auxes and matrices and 0..100 with 126 steps for buses and mains). ([specs/behringer-wing.yaml:4095](specs/behringer-wing.yaml#L4095))
 
 ## behringer-x32 — Behringer X32 / Midas M32
 
