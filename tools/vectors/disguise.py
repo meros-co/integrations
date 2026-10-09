@@ -457,3 +457,14 @@ telemetry(DG, "shot-recorders", inbound_http={"path": "/api/session/shotrecorder
           expect_state={"shot_recorders": {"main": {"recording": True, "slate": "scene 4", "take": 3}}})
 telemetry(DG, "shot-record-reread", inbound_http={"path": "/api/session/shotrecorder/record", "body": _ENV_OK},
           expect_then_send=[{"method": "GET", "target": "/api/session/shotrecorder/recorders"}], expect_state={})
+
+# ── Python ──
+PY_REPLY = {"status": {"code": 0, "message": "", "details": []}, "d3Log": "Executed in 0.4 ms\n",
+            "pythonLog": "", "returnValue": "\"track 1\""}
+_dg("execute_python", {"script": "return resourceManager.allResources(Track)[0].description"}, "POST",
+    "/api/session/python/execute",
+    '{"moduleName":"","script":"return resourceManager.allResources(Track)[0].description"}',
+    http_reply={"status": 200, "body": json.dumps(PY_REPLY)}, expect_result={"ok": {"kind": "value", "value": PY_REPLY}})
+_dg("register_python_module", {"module": "helpers", "contents": "from d3 import *\ndef tracks():\n    return 1\n"},
+    "POST", "/api/session/python/registermodule",
+    '{"moduleName":"helpers","contents":"from d3 import *\\ndef tracks():\\n    return 1\\n"}', **_OK)

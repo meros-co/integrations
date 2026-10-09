@@ -86,6 +86,15 @@ source:
       volume and brightness, which disguise's pages do not list; for gototime
       taking seconds and gototimecode HH:MM:SS:FF; and for status.code 4000 on a
       rejected play mode. No code taken.
+  - title: disguise Developer Portal, "Python Execution API"
+    author: disguise
+    url: https://developer.disguise.one/python-api/execution-api
+    note: >
+      Manufacturer document, retrieved 2026-10-07. execute {moduleName, script}
+      and registermodule {moduleName, contents}; Python 2.7 run as a function
+      body on Designer's main thread with d3 imported; d3Log, pythonLog and
+      returnValue; undo supported; pythonApiExecutionTimeout; not to be called
+      often or during a show.
 
 transport:
   type: http
@@ -131,7 +140,8 @@ models:
                set_live_resource, send_live_changes,
                get_cdls, set_cdl,
                get_notes, get_note, set_note,
-               get_shot_recorders, record_shot]
+               get_shot_recorders, record_shot,
+               execute_python, register_python_module]
     verification: none
 
 commands:
@@ -890,6 +900,35 @@ commands:
                   label: Take,
                   description: "Take number the shot is recorded under; send the recorder's current take to keep it." }
     send: { method: POST, path: /api/session/shotrecorder/record, body: '{"engage":{engage},"name":{recorder:json},"slate":{slate:json},"take":"{take}"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Python ───────────────────────────────────────────────────────────────
+  execute_python:
+    summary: >
+      Run a Python 2.7 script in Designer on the Director (python/execute);
+      returns {d3Log, pythonLog, returnValue}. See the critical quirk first
+    params:
+      script: { type: json, required: true,
+                label: Script,
+                description: "Python 2.7 code as a JSON string (lines joined with \\n), run as the body of a function with d3 imported; its return value comes back as returnValue." }
+      module: { type: string, max_length: 256, default: "",
+                label: Module,
+                description: "Registered module to run the script in; empty for a one-off script." }
+    send: { method: POST, path: /api/session/python/execute, body: '{"moduleName":{module:json},"script":{script}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
+    returns: value
+
+  register_python_module:
+    summary: Register a Python 2.7 module in Designer for later execute_python calls to run in (python/registermodule)
+    params:
+      module:   { type: string, max_length: 256, required: true,
+                  label: Module,
+                  description: "Name to register the module under." }
+      contents: { type: json, required: true,
+                  label: Contents,
+                  description: "The module's Python 2.7 source as a JSON string (lines joined with \\n), which imports d3 itself." }
+    send: { method: POST, path: /api/session/python/registermodule, body: '{"moduleName":{module:json},"contents":{contents}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
@@ -1706,3 +1745,16 @@ quirks:
       shot_recorders state) to stop it without changing them. Shot recorders are
       read every 10 seconds and after each record_shot. take is sent as a
       decimal string, as the document's int64 is written in JSON.
+  - models: [all]
+    severity: critical
+    text: >
+      execute_python runs arbitrary Python in Designer, on its main thread, with
+      full access to the project: it can change or delete anything, and a long
+      script stalls Designer's output until it ends or Designer's
+      pythonApiExecutionTimeout interrupts it. disguise does not support calling
+      it often or during a show. Scripts are Python 2.7, wrapped in a function, so they cannot
+      create globals or use "from x import *". Anyone who reaches the API port
+      can run it: there is no authentication. register_python_module replaces a
+      module of the same name. Nothing here reads state from Python: every
+      state key comes from the documented endpoints. The script and module source
+      are JSON strings, since a text parameter here cannot hold a line break.
