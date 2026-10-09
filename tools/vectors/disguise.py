@@ -594,3 +594,79 @@ telemetry(DG, "rigcheck-reread", inbound_http={"path": _OC + "rigcheck/acceptres
                             {"method": "GET", "target": _OC + "rigcheck/currentresult"},
                             {"method": "GET", "target": _OC + "rigcheck/currentfallbackresult"},
                             {"method": "GET", "target": _OC + "rigcheck/results"}], expect_state={})
+
+# ── Service API: VFCs and media ──
+_SV = "/api/service/"
+_dg("get_vfcs", {}, "GET", _SV + "system/vfcs")
+_dg("list_media", {"directory": "{project:my-show}/objects/VideoFile"}, "GET",
+    _SV + "media/list?directory=%7Bproject%3Amy-show%7D%2Fobjects%2FVideoFile")
+PROVISIONED = [{"taskUid": "t-1", "success": True, "errorMessage": {}, "taskType": "CopyTask",
+                "taskStatusStream": "ws://vx4-01:80/api/service/task/status"}]
+_dg("provision_media", {"media_path": "\\\\share/media/background.mov",
+                        "local_path": "{project:my-show}/objects/VideoFile/background.mov"},
+    "POST", _SV + "media/provision",
+    '{"mediaPath":"\\\\\\\\share/media/background.mov",'
+    '"localPath":["{project:my-show}/objects/VideoFile/background.mov"]}',
+    http_reply={"status": 200, "body": _envelope(result=PROVISIONED)},
+    expect_result={"ok": {"kind": "value", "value": PROVISIONED}})
+_dg("provision_media_transfers", {"transfers": [{"mediaPath": "http://media.local/a.mov",
+                                                 "localPath": ["{project:my-show}/objects/VideoFile/a.mov"]}]},
+    "POST", _SV + "media/provision",
+    '{"transfers":[{"mediaPath":"http://media.local/a.mov","localPath":["{project:my-show}/objects/VideoFile/a.mov"]}]}')
+_dg("remove_media", {"path": "{project:my-show}/objects/VideoFile/background.mov"}, "POST", _SV + "media/remove",
+    '{"path":["{project:my-show}/objects/VideoFile/background.mov"]}',
+    http_reply={"status": 200, "body": _envelope(taskUid="t-2")},
+    expect_result={"ok": {"kind": "value", "value": "t-2"}})
+telemetry(DG, "systems", inbound_http={"path": _SV + "system/detectsystems", "body": _envelope(result=[
+    {"hostname": "VX4-01", "type": "vx4", "version": {"major": 30, "minor": 8, "hotfix": 3, "revision": 191234},
+     "runningProject": "show/show.d3", "ipAddress": "10.0.0.11", "isDesignerRunning": True,
+     "isServiceRunning": True, "isManagerRunning": False, "isNotchHostRunning": False}])},
+    state_before={"service": {"systems": {"VX4-09": {"type": "vx4"}}}},
+    expect_state={"service": {"systems": {"VX4-01": {
+        "type": "vx4", "version": "30.8.3.191234", "running_project": "show/show.d3", "ip_address": "10.0.0.11",
+        "designer_running": True, "service_running": True, "manager_running": False,
+        "notch_host_running": False}}}})
+telemetry(DG, "os-info", inbound_http={"path": _SV + "system/osinfo", "body": _envelope(result=[
+    {"hostname": "VX4-01", "windowsVersion": "10.0.19044", "imageVersion": "R22.1"}])},
+    expect_state={"service": {"os": {"VX4-01": {"windows_version": "10.0.19044", "image_version": "R22.1"}}}})
+ADDRESSES = [{"address": "10.0.0.11", "subnet": "255.255.255.0", "family": "IPv4", "gateway": ""}]
+telemetry(DG, "network-adapters", inbound_http={"path": _SV + "system/networkadapters", "body": _envelope(result=[
+    {"hostname": "VX4-01", "netAdapters": [{"name": "d3net", "mac": "00:11:22:33:44:55", "enabled": True,
+                                            "dhcp": False, "status": "Up", "addresses": ADDRESSES}]}])},
+    expect_state={"service": {"adapters": {"VX4-01": {"0": {
+        "name": "d3net", "mac": "00:11:22:33:44:55", "enabled": True, "dhcp": False, "status": "Up",
+        "addresses": _compact(ADDRESSES)}}}}})
+telemetry(DG, "gpu-outputs", inbound_http={"path": _SV + "system/gpuoutputs", "body": _envelope(result=[
+    {"hostname": "VX4-01", "genlock": {"frequency": 50.0}, "gpuOutputs": [
+        {"gpuPort": 0, "genlockState": "Locked", "emulated": False, "resolution": {"width": 3840, "height": 2160},
+         "refreshRate": 50.0, "bitDepth": 10, "colourFormat": "RGB"}]}])},
+    expect_state={"service": {"gpu": {"VX4-01": {"genlock_frequency": 50.0, "outputs": {"0": {
+        "gpu_port": 0, "genlock_state": "Locked", "emulated": False, "width": 3840, "height": 2160,
+        "refresh_rate": 50.0, "bit_depth": 10, "colour_format": "RGB"}}}}}})
+telemetry(DG, "system-projects", inbound_http={"path": _SV + "system/projects", "body": _envelope(result=[
+    {"hostname": "VX4-01", "lastProject": "show/show.d3", "projects": [
+        {"path": "show/show.d3", "lastModified": "2026-09-30T18:00:00Z",
+         "version": {"major": 30, "minor": 8, "hotfix": 3, "revision": 191234}}]}])},
+    expect_state={"service": {"projects": {"VX4-01": {"last_project": "show/show.d3", "projects": {"0": {
+        "path": "show/show.d3", "last_modified": "2026-09-30T18:00:00Z", "version": "30.8.3.191234"}}}}}})
+PORTS = {"a": {"resolution": {"width": 3840, "height": 2160}, "RefreshRate": 50.0, "name": "A"}}
+telemetry(DG, "vfcs", inbound_http={"path": _SV + "system/vfcs", "body": _envelope(result=[
+    {"hostname": "VX4-01", "backplaneVersion": "BPv2", "cards": [
+        {"slot": 1, "type": "DP14_Passthrough", "firmwareVersion": "2.1", "fpgaVersion": "1.7",
+         "splitMode": "Quad4K", "generation": "Two", "ports": PORTS}]}])},
+    expect_state={"service": {"vfcs": {"VX4-01": {"backplane": "BPv2", "cards": {"0": {
+        "slot": 1, "type": "DP14_Passthrough", "firmware_version": "2.1", "fpga_version": "1.7",
+        "split_mode": "Quad4K", "generation": "Two", "ports": _compact(PORTS)}}}}}})
+telemetry(DG, "media-list", inbound_http={"path": _SV + "media/list?directory=%7Bprojects%7D", "body": _envelope(
+    files=[{"path": "C:/d3 Projects/show/objects/VideoFile/intro.mov", "size": "104857600",
+            "creationDate": "133700000000000000", "lastWriteDate": "133700000100000000"}])},
+    state_before={"media": {"files": {"1": {"path": "gone.mov"}}}},
+    expect_state={"media": {"files": {"0": {"path": "C:/d3 Projects/show/objects/VideoFile/intro.mov",
+                                            "size": 104857600, "created": 133700000000000000,
+                                            "last_written": 133700000100000000}}}})
+telemetry(DG, "media-change-reread", inbound_http={"path": _SV + "media/remove", "body": _envelope(taskUid="t-2")},
+          expect_then_send=[{"method": "GET", "target": _SV + "media/list?directory=%7Bprojects%7D"}],
+          expect_state={})
+telemetry(DG, "project-command-reread", inbound_http={"path": _SV + "project/startlocalproject", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _SV + "system/detectsystems"},
+                            {"method": "GET", "target": _SV + "system/projects"}], expect_state={})

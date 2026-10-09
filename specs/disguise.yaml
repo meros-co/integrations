@@ -107,6 +107,19 @@ source:
       statuses, scores of 10000 while running, comparing by omniCalScore, and
       that discovery must be off during a show. The RequestPlansFilter values
       are not listed.
+  - title: disguise Developer Portal, "Media" guide, "Media API" reference, "Paths" and "Task Status API"
+    author: disguise
+    url: https://developer.disguise.one/api/guides/media/
+    note: >
+      Manufacturer documents, retrieved 2026-10-07 (with
+      https://developer.disguise.one/api/service/media-reference/,
+      https://developer.disguise.one/api/paths/ and
+      https://developer.disguise.one/api/service/tasks/). media/list
+      ?directory, provision {mediaPath, localPath [..], transfers}, remove
+      {path}; the path symbols {projects}, {rs-assets}, {rs-engines} and
+      {project:<name>}, resolved by the media endpoints only; restricted paths
+      refused; provisioning tasks followed on ws://<host>/api/service/task/status
+      with policies.
 
 transport:
   type: http
@@ -126,6 +139,10 @@ settings:
   live_update_ms: { type: int, min: 40, max: 10000, default: 250,
                     label: Live update interval,
                     description: "Shortest time in milliseconds between Live Update values for a changing property." }
+  # The directory whose media listing is kept in state.
+  media_directory: { type: string, max_length: 1024, default: "{projects}",
+                     label: Media directory,
+                     description: "Directory whose files are listed every minute into media.files, absolute or a path symbol such as {projects} or {project:my-show}/objects/VideoFile." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -162,7 +179,8 @@ models:
                get_omnical_camera_discovery, set_omnical_camera_discovery, get_omnical_current_plan,
                get_omnical_plans, execute_rigcheck, get_rigcheck_result, accept_rigcheck_result,
                revert_rigcheck_result, get_rigcheck_current_result, get_rigcheck_fallback_result,
-               get_rigcheck_results, get_rigcheck_results_for_plan, delete_old_rigcheck_results]
+               get_rigcheck_results, get_rigcheck_results_for_plan, delete_old_rigcheck_results,
+               get_vfcs, list_media, provision_media, provision_media_transfers, remove_media]
     verification: none
 
 commands:
@@ -1193,6 +1211,59 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  get_vfcs:
+    summary: Each machine's VFC cards with slot, type, firmware and FPGA versions, split mode, generation and each port's resolution and refresh rate (system/vfcs); empty on non-disguise hardware
+    send: { method: GET, path: /api/service/system/vfcs }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  # ── Service API: media ───────────────────────────────────────────────────
+  list_media:
+    summary: Every file under a directory, recursively, with size and dates (media/list); the directory may use the path symbols {projects}, {rs-assets}, {rs-engines} and {project:<name>}
+    params:
+      directory: { type: string, max_length: 1024, required: true,
+                   label: Directory,
+                   description: "Absolute path of the directory, or a path symbol such as {projects} or {project:my-show}/objects/VideoFile, inside the d3 directories." }
+    send: { method: GET, path: /api/service/media/list, query: { directory: "{directory}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.files" }
+    returns: value
+
+  provision_media:
+    summary: Copy or download a file to a path on this machine, such as into a project's objects folder (media/provision); returns the task started
+    params:
+      media_path: { type: string, max_length: 2048, required: true,
+                    label: Source,
+                    description: "The file to copy or download: a network share path or an HTTP URL reachable from the machine." }
+      local_path: { type: string, max_length: 1024, required: true,
+                    label: Destination,
+                    description: "Where to put it, inside the d3 directories, with a path symbol such as {project:my-show}/objects/VideoFile/clip.mov." }
+    send: { method: POST, path: /api/service/media/provision, body: '{"mediaPath":{media_path:json},"localPath":[{local_path:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  provision_media_transfers:
+    summary: >
+      Copy or download several files in one request (media/provision,
+      mediaProvisionMediaRequest transfers): an array of {mediaPath, localPath
+      [..], uid}; returns one task per transfer
+    params:
+      transfers: { type: json, required: true,
+                   label: Transfers,
+                   description: "JSON array of {\"mediaPath\": source, \"localPath\": [destinations], \"uid\": optional id}." }
+    send: { method: POST, path: /api/service/media/provision, body: '{"transfers":{transfers}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  remove_media:
+    summary: Delete a file or folder on this machine, inside the d3 directories (media/remove); Designer unlocks a file of the running project first. Returns the task's uid
+    params:
+      path: { type: string, max_length: 1024, required: true,
+              label: Path,
+              description: "File or folder to delete, absolute or with a path symbol such as {project:my-show}/objects/VideoFile/clip.mov." }
+    send: { method: POST, path: /api/service/media/remove, body: '{"path":[{path:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.taskUid" }
+    returns: value
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -1234,6 +1305,13 @@ telemetry:
       - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
       - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
       - { method: GET, path: /api/session/omnical/rigcheck/results }
+      - { method: GET, path: /api/service/system/detectsystems }
+      - { method: GET, path: /api/service/system/osinfo }
+      - { method: GET, path: /api/service/system/networkadapters }
+      - { method: GET, path: /api/service/system/gpuoutputs }
+      - { method: GET, path: /api/service/system/projects }
+      - { method: GET, path: /api/service/system/vfcs }
+      - { method: GET, path: /api/service/media/list, query: { directory: "{settings.media_directory}" } }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1870,6 +1948,160 @@ telemetry:
         - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
         - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
         - { method: GET, path: /api/session/omnical/rigcheck/results }
+    # Service API: the machines on the network, keyed by host name.
+    - path: "^/api/service/system/detectsystems$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.systems
+      json_each: "$.result"
+      json:
+        host: "$.hostname"
+        type: "$.type"
+        major: "$.version.major"
+        minor: "$.version.minor"
+        hotfix: "$.version.hotfix"
+        revision: "$.version.revision"
+        project: "$.runningProject"
+        ip: "$.ipAddress"
+        designer: "$.isDesignerRunning"
+        service: "$.isServiceRunning"
+        manager: "$.isManagerRunning"
+        notch: "$.isNotchHostRunning"
+      state:
+        service.systems.{host}.type: "{type}"
+        service.systems.{host}.version: "{major}.{minor}.{hotfix}.{revision}"
+        service.systems.{host}.running_project: "{project}"
+        service.systems.{host}.ip_address: "{ip}"
+        service.systems.{host}.designer_running: "{designer}"
+        service.systems.{host}.service_running: "{service}"
+        service.systems.{host}.manager_running: "{manager}"
+        service.systems.{host}.notch_host_running: "{notch}"
+    - path: "^/api/service/system/osinfo$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.os
+      json_each: "$.result"
+      json: { host: "$.hostname", windows: "$.windowsVersion", image: "$.imageVersion" }
+      state:
+        service.os.{host}.windows_version: "{windows}"
+        service.os.{host}.image_version: "{image}"
+    - path: "^/api/service/system/networkadapters$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.adapters
+      json_each: "$.result[*].netAdapters"
+      json:
+        host: "$^.hostname"
+        name: "$.name"
+        mac: "$.mac"
+        enabled: "$.enabled"
+        dhcp: "$.dhcp"
+        status: "$.status"
+        addresses: "$.addresses"
+      state:
+        service.adapters.{host}.{index}.name: "{name}"
+        service.adapters.{host}.{index}.mac: "{mac}"
+        service.adapters.{host}.{index}.enabled: "{enabled}"
+        service.adapters.{host}.{index}.dhcp: "{dhcp}"
+        service.adapters.{host}.{index}.status: "{status}"
+        service.adapters.{host}.{index}.addresses: "{addresses}"
+    - path: "^/api/service/system/gpuoutputs$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.gpu
+      json_each: "$.result"
+      json: { host: "$.hostname", frequency: "$.genlock.frequency" }
+      state:
+        service.gpu.{host}.genlock_frequency: "{frequency}"
+    - path: "^/api/service/system/gpuoutputs$"
+      json_each: "$.result[*].gpuOutputs"
+      json:
+        host: "$^.hostname"
+        port: "$.gpuPort"
+        genlock: "$.genlockState"
+        emulated: "$.emulated"
+        width: "$.resolution.width"
+        height: "$.resolution.height"
+        rate: "$.refreshRate"
+        depth: "$.bitDepth"
+        colour: "$.colourFormat"
+      state:
+        service.gpu.{host}.outputs.{index}.gpu_port: "{port}"
+        service.gpu.{host}.outputs.{index}.genlock_state: "{genlock}"
+        service.gpu.{host}.outputs.{index}.emulated: "{emulated}"
+        service.gpu.{host}.outputs.{index}.width: "{width}"
+        service.gpu.{host}.outputs.{index}.height: "{height}"
+        service.gpu.{host}.outputs.{index}.refresh_rate: "{rate}"
+        service.gpu.{host}.outputs.{index}.bit_depth: "{depth}"
+        service.gpu.{host}.outputs.{index}.colour_format: "{colour}"
+    - path: "^/api/service/system/projects$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.projects
+      json_each: "$.result"
+      json: { host: "$.hostname", last: "$.lastProject" }
+      state:
+        service.projects.{host}.last_project: "{last}"
+    - path: "^/api/service/system/projects$"
+      json_each: "$.result[*].projects"
+      json:
+        host: "$^.hostname"
+        path: "$.path"
+        modified: "$.lastModified"
+        major: "$.version.major"
+        minor: "$.version.minor"
+        hotfix: "$.version.hotfix"
+        revision: "$.version.revision"
+      state:
+        service.projects.{host}.projects.{index}.path: "{path}"
+        service.projects.{host}.projects.{index}.last_modified: "{modified}"
+        service.projects.{host}.projects.{index}.version: "{major}.{minor}.{hotfix}.{revision}"
+    - path: "^/api/service/system/vfcs$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.vfcs
+      json_each: "$.result"
+      json: { host: "$.hostname", backplane: "$.backplaneVersion" }
+      state:
+        service.vfcs.{host}.backplane: "{backplane}"
+    - path: "^/api/service/system/vfcs$"
+      json_each: "$.result[*].cards"
+      json:
+        host: "$^.hostname"
+        slot: "$.slot"
+        type: "$.type"
+        firmware: "$.firmwareVersion"
+        fpga: "$.fpgaVersion"
+        split: "$.splitMode"
+        generation: "$.generation"
+        ports: "$.ports"
+      state:
+        service.vfcs.{host}.cards.{index}.slot: "{slot}"
+        service.vfcs.{host}.cards.{index}.type: "{type}"
+        service.vfcs.{host}.cards.{index}.firmware_version: "{firmware}"
+        service.vfcs.{host}.cards.{index}.fpga_version: "{fpga}"
+        service.vfcs.{host}.cards.{index}.split_mode: "{split}"
+        service.vfcs.{host}.cards.{index}.generation: "{generation}"
+        service.vfcs.{host}.cards.{index}.ports: "{ports}"
+    # The media listing: the setting's directory every minute, or the
+    # directory list_media last asked for.
+    - path: "^/api/service/media/list\\?"
+      json_match: { "$.files": "^\\[" }
+      replace: media.files
+      json_each: "$.files"
+      json: { path: "$.path", size: "$.size", created: "$.creationDate", modified: "$.lastWriteDate" }
+      state:
+        media.files.{index}.path: "{path}"
+        media.files.{index}.size: "{size}"
+        media.files.{index}.created: "{created}"
+        media.files.{index}.last_written: "{modified}"
+    - path: "^/api/service/media/(provision|remove)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/service/media/list, query: { directory: "{settings.media_directory}" } }
+    # Starting, quitting or restarting a project is read back from the
+    # machine list.
+    - path: "^/api/service/project/(startlocalproject|quitlocalproject|restartlocalproject|forcequitlocalproject)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/service/system/detectsystems }
+        - { method: GET, path: /api/service/system/projects }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -2050,6 +2282,47 @@ state:
   omnical.fallback_result:         { type: string, description: "Name of the fallback RigCheck Result (accept_rigcheck_result)" }
   omnical.fallback_result_uid:     { type: string, description: "uid of the fallback RigCheck Result" }
   omnical.results.*:               { type: string, description: "RigCheck Result in the project, keyed by its uid: its name" }
+  service.systems.*.type:               { type: string, description: "A disguise machine on the network, keyed by host name: its type" }
+  service.systems.*.version:            { type: string, description: "Its Designer version, major.minor.hotfix.revision" }
+  service.systems.*.running_project:    { type: string, description: "The project it is running, if any" }
+  service.systems.*.ip_address:         { type: string, description: "Its IP address" }
+  service.systems.*.designer_running:   { type: bool, description: "Designer is running on it" }
+  service.systems.*.service_running:    { type: bool, description: "d3service is running on it" }
+  service.systems.*.manager_running:    { type: bool, description: "d3Manager is running on it" }
+  service.systems.*.notch_host_running: { type: bool, description: "The Notch host is running on it" }
+  service.os.*.windows_version:         { type: string, description: "A machine's Windows version, keyed by host name" }
+  service.os.*.image_version:           { type: string, description: "A machine's disguise OS image version" }
+  service.adapters.*.*.name:            { type: string, description: "A network adapter, keyed by host name and numbered from 0: its name" }
+  service.adapters.*.*.mac:             { type: string, description: "The adapter's MAC address" }
+  service.adapters.*.*.enabled:         { type: bool, description: "The adapter is enabled" }
+  service.adapters.*.*.dhcp:            { type: bool, description: "The adapter takes its address by DHCP" }
+  service.adapters.*.*.status:          { type: string, description: "The adapter's status, as Windows words it" }
+  service.adapters.*.*.addresses:       { type: string, description: "The adapter's addresses: a JSON array of {address, subnet, family, gateway}" }
+  service.gpu.*.genlock_frequency:      { type: float, unit: Hz, description: "A machine's genlock frequency, keyed by host name" }
+  service.gpu.*.outputs.*.gpu_port:      { type: int, description: "A GPU output of the machine, numbered from 0: its port" }
+  service.gpu.*.outputs.*.genlock_state: { type: string, description: "The output's genlock state" }
+  service.gpu.*.outputs.*.emulated:      { type: bool, description: "The output is emulated" }
+  service.gpu.*.outputs.*.width:         { type: int, unit: px, description: "The output's width" }
+  service.gpu.*.outputs.*.height:        { type: int, unit: px, description: "The output's height" }
+  service.gpu.*.outputs.*.refresh_rate:  { type: float, unit: Hz, description: "The output's refresh rate" }
+  service.gpu.*.outputs.*.bit_depth:     { type: int, description: "The output's bit depth" }
+  service.gpu.*.outputs.*.colour_format: { type: string, description: "The output's colour format" }
+  service.projects.*.last_project:       { type: string, description: "The project a machine last ran, keyed by host name" }
+  service.projects.*.projects.*.path:          { type: string, description: "A project on the machine, numbered from 0: its path (start_project)" }
+  service.projects.*.projects.*.last_modified: { type: string, description: "When the project was last modified, as d3service gives it" }
+  service.projects.*.projects.*.version:       { type: string, description: "The Designer version that saved the project, major.minor.hotfix.revision" }
+  service.vfcs.*.backplane:             { type: string, description: "A machine's VFC backplane: BPv1, BPv2, NoBP or BPModel_Unknown" }
+  service.vfcs.*.cards.*.slot:             { type: int, description: "A VFC card, numbered from 0: its slot" }
+  service.vfcs.*.cards.*.type:             { type: string, description: "The card's type, such as DP14_Passthrough, QuadSDI, HDMI or IP" }
+  service.vfcs.*.cards.*.firmware_version: { type: string, description: "The card's firmware version" }
+  service.vfcs.*.cards.*.fpga_version:     { type: string, description: "The card's FPGA version" }
+  service.vfcs.*.cards.*.split_mode:       { type: string, description: "The card's split mode: Mirror, Dual, Quad, Quad4K or NoSwizzle" }
+  service.vfcs.*.cards.*.generation:       { type: string, description: "The card's generation: One or Two" }
+  service.vfcs.*.cards.*.ports:            { type: string, description: "The card's ports a to d: JSON {a: {resolution: {width, height}, RefreshRate, name}, ...}" }
+  media.files.*.path:                   { type: string, description: "A file of the last media listing, numbered from 0: its path" }
+  media.files.*.size:                   { type: int, unit: bytes, description: "The file's size" }
+  media.files.*.created:                { type: int, description: "When the file was created, as d3service gives it (a number whose epoch is not documented)" }
+  media.files.*.last_written:           { type: int, description: "When the file was last written, in the same form" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -2245,3 +2518,29 @@ quirks:
       not in the Session Swagger document. Their plans, results and
       resultsforplan endpoints take a filter whose values the page does not
       list, so these commands send none.
+  - models: [all]
+    severity: critical
+    text: >
+      remove_media deletes files and folders on the machine at once, unlocking a
+      file of the running project first, and cannot be undone. Both it and
+      provision_media work inside the d3
+      directories only ({projects}, {rs-assets}, {rs-engines}, {project:<name>});
+      any other path, or one leaving them with "..", is refused as restricted.
+      Path symbols are resolved only by the media endpoints.
+  - models: [all]
+    severity: info
+    text: >
+      Provisioning runs as a d3service task, whose progress d3service pushes on
+      its Task Status websocket (/api/service/task/status); this spec keeps one
+      push websocket, Live Update, so a task's progress is not followed: list
+      media again once it should be done. The media listing of the directory in
+      the media_directory setting is read every minute and after each provision
+      or remove, and list_media's own answer replaces it too, so media.files is
+      the last listing read. A large directory lists every file under it.
+  - models: [all]
+    severity: info
+    text: >
+      The Service API's machine lists (systems, OS, adapters, GPU outputs,
+      projects and VFCs) are read every minute, keyed by host name: a host name
+      holding a dot cannot be a state key and is left out. They are read-only:
+      network, GPU and VFC settings are changed in d3Manager or the OS.
