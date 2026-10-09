@@ -331,8 +331,13 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         }
     }
     // `expect_then_send`: the requests the message queued, sent at once or
-    // waiting behind the one in flight.
-    if let Some(expected) = v.get("expect_then_send") {
+    // waiting behind the one in flight; `expect_then_send_hex` for binary
+    // messages (OSC), framed as sent.
+    let then_send = v
+        .get("expect_then_send")
+        .map(|e| (e, false))
+        .or_else(|| v.get("expect_then_send_hex").map(|e| (e, true)));
+    if let Some((expected, hex)) = then_send {
         let mut sent = wire(&actions);
         let waiting: Vec<super::Job> = engine.queue.drain(..).collect();
         for job in waiting {
@@ -349,6 +354,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         }
         // Requests as expect_request gives them, or line messages as text.
         let key = match expected.get(0) {
+            _ if hex => "expect_wire_hex",
             Some(Value::String(_)) => "expect_wire",
             _ => "expect_request",
         };

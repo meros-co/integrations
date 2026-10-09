@@ -508,7 +508,7 @@
               "json_arg": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "With address and json: the string argument holding JSON (default 0)."
+                "description": "With address and json, json_match or json_each: the string argument holding JSON (default 0)."
               },
               "state": {
                 "type": "object",
@@ -576,7 +576,7 @@
               },
               "json_each": {
                 "type": "string",
-                "description": "With path or json_match, and json: a JSON path to an array; the rule matches once per element, json paths relative to it. [*] in the path goes through every element of an array on the way ($.data[*].ingest_streams); $^. names the element one level out, $^^. two, and {index} is the element's index in its array (SPEC.md §8)."
+                "description": "With path, json_match or address, and json: a JSON path to an array; the rule matches once per element, json paths relative to it. [*] in the path goes through every element of an array on the way ($.data[*].ingest_streams); $^. names the element one level out, $^^. two, and {index} is the element's index in its array (SPEC.md §8)."
               },
               "each_match": {
                 "type": "object",
@@ -597,7 +597,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "JSON path to an RE2-safe regex its value must match (a string as is, anything else as compact JSON). Alone: a JSON message on a websocket, an event stream, or a line of a line transport. With path: the JSON reply must match too. Captures are {1}, {2}, ... across the regexes in order, after the path's."
+                "description": "JSON path to an RE2-safe regex its value must match (a string as is, anything else as compact JSON). Alone: a JSON message on a websocket, an event stream, or a line of a line transport. With path: the JSON reply must match too. With address: the JSON in the string argument at json_arg must match. Captures are {1}, {2}, ... across the regexes in order, after the path's or the address's."
               },
               "request_match": {
                 "description": "With path: JSON path to an RE2-safe regex the JSON body of the request the reply answers must match, so replies sharing one path (JSON-RPC) can be told apart. Its captures come after the path's and before json_match's. With match, on a line transport: an RE2-safe regex over the text of the message the reply answers (the device answers one message at a time, in order), its captures numbered on after match's (SPEC.md §8, Replies and what they answer).",
@@ -699,8 +699,17 @@
                   "json_match"
                 ],
                 "not": {
-                  "required": [
-                    "path"
+                  "anyOf": [
+                    {
+                      "required": [
+                        "path"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "address"
+                      ]
+                    }
                   ]
                 }
               }
