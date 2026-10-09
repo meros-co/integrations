@@ -1,0 +1,43 @@
+spec: disguise
+telemetry: live-proof-of-play
+expect_connect_ws:
+- '{"subscribe":{"object":"transportmanager:default","properties":["{''playing'': object.player.playing,
+  ''time'': object.player.tRender, ''mode'': str(object.player.playMode.state), ''track'': str(object.player.track.description),
+  ''engaged'': object.engaged, ''volume'': object.volume, ''brightness'': object.brightness}"],"configuration":{"updateFrequencyMs":250}}}'
+- '{"subscribe":{"object":"subsystem:ProofOfPlaySubsystem","properties":["{''a'': ''active'', ''r'': ''recent'',
+  ''active'': (object.getRecords() if callable(object.getRecords) else object.getRecords), ''recent'':
+  object.getRecentRecords(50)}"],"configuration":{"updateFrequencyMs":1000}}}'
+inbound_ws: '{"valuesChanged": [{"id": 2, "value": {"a": "active", "r": "recent", "active": [{"layerName":
+  "video 1", "videoName": "intro.mov", "framesPlayed": 1500, "totalFrames": 3000, "loopCount": 0, "completedFullPlayback":
+  false, "startTime": "2026-10-07T18:00:00Z", "endTime": "2026-10-07T18:00:25Z", "active": true}], "recent":
+  [{"layerName": "video 1", "videoName": "logo.mov", "framesPlayed": 250, "totalFrames": 250, "loopCount":
+  1, "completedFullPlayback": true, "startTime": "2026-10-07T17:59:50Z", "endTime": "2026-10-07T18:00:00Z",
+  "active": false}]}, "changeTimestamp": 300.0, "messageTimestamp": 300.1}]}'
+state_before:
+  proof_of_play:
+    active:
+      '1':
+        layer: video 2
+        video: gone.mov
+expect_state:
+  proof_of_play:
+    active:
+      '0':
+        layer: video 1
+        video: intro.mov
+        frames_played: 1500
+        total_frames: 3000
+        loop_count: 0
+        complete: false
+        start_time: '2026-10-07T18:00:00Z'
+        end_time: '2026-10-07T18:00:25Z'
+    recent:
+      '0':
+        layer: video 1
+        video: logo.mov
+        frames_played: 250
+        total_frames: 250
+        loop_count: 1
+        complete: true
+        start_time: '2026-10-07T17:59:50Z'
+        end_time: '2026-10-07T18:00:00Z'

@@ -670,3 +670,42 @@ telemetry(DG, "media-change-reread", inbound_http={"path": _SV + "media/remove",
 telemetry(DG, "project-command-reread", inbound_http={"path": _SV + "project/startlocalproject", "body": _ENV_OK},
           expect_then_send=[{"method": "GET", "target": _SV + "system/detectsystems"},
                             {"method": "GET", "target": _SV + "system/projects"}], expect_state={})
+
+# ── Live Update: proof of play (Developer Portal "Proof of Play") ──
+POP_SUB = ('{"subscribe":{"object":"subsystem:ProofOfPlaySubsystem","properties":["{\'a\': \'active\', \'r\': \'recent\', \'active\': '
+           '(object.getRecords() if callable(object.getRecords) else object.getRecords), \'recent\': '
+           'object.getRecentRecords(50)}"],"configuration":{"updateFrequencyMs":1000}}}')
+ACTIVE_RECORD = {"layerName": "video 1", "videoName": "intro.mov", "framesPlayed": 1500, "totalFrames": 3000,
+                 "loopCount": 0, "completedFullPlayback": False, "startTime": "2026-10-07T18:00:00Z",
+                 "endTime": "2026-10-07T18:00:25Z", "active": True}
+RECENT_RECORD = {"layerName": "video 1", "videoName": "logo.mov", "framesPlayed": 250, "totalFrames": 250,
+                 "loopCount": 1, "completedFullPlayback": True, "startTime": "2026-10-07T17:59:50Z",
+                 "endTime": "2026-10-07T18:00:00Z", "active": False}
+for _v in V:
+    if _v.get("spec") == DG and _v.get("telemetry") == "live-transport":
+        _v["expect_connect_ws"] = [LIVE_SUB, POP_SUB]
+telemetry(DG, "live-proof-of-play", expect_connect_ws=[LIVE_SUB, POP_SUB],
+          inbound_ws=json.dumps({"valuesChanged": [{"id": 2, "value": {"a": "active", "r": "recent", "active": [ACTIVE_RECORD],
+                                                                       "recent": [RECENT_RECORD]},
+                                                    "changeTimestamp": 300.0, "messageTimestamp": 300.1}]}),
+          state_before={"proof_of_play": {"active": {"1": {"layer": "video 2", "video": "gone.mov"}}}},
+          expect_state={"proof_of_play": {
+              "active": {"0": {"layer": "video 1", "video": "intro.mov", "frames_played": 1500,
+                               "total_frames": 3000, "loop_count": 0, "complete": False,
+                               "start_time": "2026-10-07T18:00:00Z", "end_time": "2026-10-07T18:00:25Z"}},
+              "recent": {"0": {"layer": "video 1", "video": "logo.mov", "frames_played": 250,
+                               "total_frames": 250, "loop_count": 1, "complete": True,
+                               "start_time": "2026-10-07T17:59:50Z", "end_time": "2026-10-07T18:00:00Z"}}}})
+telemetry(DG, "live-proof-of-play-idle", inbound_ws=json.dumps(
+    {"valuesChanged": [{"id": 2, "value": {"a": "active", "r": "recent", "active": [], "recent": [RECENT_RECORD]}}]}),
+    state_before={"proof_of_play": {"active": {"0": {"layer": "video 1", "video": "intro.mov"}}}},
+    expect_state={"proof_of_play": {"recent": {"0": {
+        "layer": "video 1", "video": "logo.mov", "frames_played": 250, "total_frames": 250, "loop_count": 1,
+        "complete": True, "start_time": "2026-10-07T17:59:50Z", "end_time": "2026-10-07T18:00:00Z"}}}})
+telemetry(DG, "live-transport-keeps-proof-of-play", inbound_ws=json.dumps({"valuesChanged": [{"id": 1, "value": {
+    "playing": False, "time": 0.0, "mode": "Stop", "track": "track 1", "engaged": True, "volume": 1.0,
+    "brightness": 1.0}}]}),
+    state_before={"proof_of_play": {"active": {"0": {"layer": "video 1", "video": "intro.mov"}}}},
+    expect_state={"proof_of_play": {"active": {"0": {"layer": "video 1", "video": "intro.mov"}}},
+                  "live": {"playing": False, "time": 0.0, "play_mode": "Stop", "track": "track 1", "engaged": True,
+                           "volume": 1.0, "brightness": 1.0}})

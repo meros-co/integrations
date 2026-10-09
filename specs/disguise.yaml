@@ -14,9 +14,9 @@ category: playback
 # Transports and tracks are named by a Locator; this spec sends the name, which
 # Designer resolves to the first resource of that name.
 #
-# The playhead is pushed over the Live Update websocket on the same port, which
-# carries values only by subscription id. The subscription here asks for one
-# property, a dictionary of the transport's playback values, so each update
+# The playhead and proof of play are pushed over the Live Update websocket on
+# the same port, which carries values only by subscription id. Each
+# subscription here asks for one property, a dictionary, so each update
 # carries its own field names. Transport settings and machine health are read
 # over REST every 10 seconds, sparingly, as disguise asks.
 #
@@ -29,9 +29,21 @@ source:
     author: disguise
     url: https://developer.disguise.one/specs/session.swagger.json
     note: >
-      Manufacturer document, retrieved 2026-10-02, linked from
-      https://developer.disguise.one/api/openapi/ and rendered at
-      https://developer.disguise.one/api/session/transport/. Transport paths
+      Manufacturer document, retrieved 2026-10-02 and again 2026-10-07 (the
+      current version), linked from https://developer.disguise.one/api/openapi/
+      and rendered per area at https://developer.disguise.one/api/session/.
+      Every path is used: colour cdl and cdls; failover applydefaultrouting,
+      failovermachine, restoremachine, settings and understudytargets;
+      mixedreality cameras, captureobservation, captureprogress,
+      deleteallobservations, deleteobservations, enableobservations, mrsets,
+      selectcamera, selectspatialcalibration and spatialcalibrations; note
+      (GET, POST) and notes {start, count}; python execute and registermodule;
+      quickcal lineupcurrentpose, overwritemanualcalibration,
+      projectorcalibration, referencepoints and resetlineup; renderstream
+      assigners, failover, failoverpool, layerconfig, layers, layerstatus,
+      pools, restartlayers, startlayers, stoplayers and synclayers; sequencing
+      changeindirections, indirectionresources and indirections; shotrecorder
+      record and recorders; sockpuppet easingfunctions, live and patches. Transport paths
       play, playsection, playloopsection, stop, returntostart,
       gotonextsection, gotoprevsection, gotonexttrack, gotoprevtrack,
       gotosection, gototrack, gotonote, gototag, gototime, gotoframe,
@@ -46,8 +58,10 @@ source:
     author: disguise
     url: https://developer.disguise.one/specs/service.swagger.json
     note: >
-      Manufacturer document, retrieved 2026-10-02. system detectsystems, osinfo,
-      networkadapters, gpuoutputs and projects; project startlocalproject
+      Manufacturer document, retrieved 2026-10-02 and again 2026-10-07 (the
+      current version). Every path is used: system detectsystems, osinfo,
+      networkadapters, gpuoutputs, projects and vfcs; media list, provision and
+      remove (path an array of strings); project startlocalproject
       {projectPath, soloMode, allowUpgrade}, quitlocalproject,
       forcequitlocalproject and restartlocalproject.
   - title: disguise Developer Portal, "Error Handling", "Locator", "Working with Sessions", "Monitoring Machine Health"
@@ -120,6 +134,18 @@ source:
       {project:<name>}, resolved by the media endpoints only; restricted paths
       refused; provisioning tasks followed on ws://<host>/api/service/task/status
       with policies.
+  - title: disguise Developer Portal, "Proof of Play" and "Monitoring Machine Health"
+    author: disguise
+    url: https://developer.disguise.one/api/guides/proof-of-play/
+    note: >
+      Manufacturer documents, retrieved 2026-10-07 (with
+      https://developer.disguise.one/api/guides/monitoring/). The Live Update
+      object subsystem:ProofOfPlaySubsystem with object.getRecords (every clip
+      playing) and object.getRecentRecords(n) (the last n completed, at most
+      300, oldest first); the record fields layerName, videoName, framesPlayed,
+      totalFrames, loopCount, completedFullPlayback, startTime, endTime and
+      active. Frequent REST polling is discouraged; Live Update is advised for
+      monitoring.
 
 transport:
   type: http
@@ -143,6 +169,10 @@ settings:
   media_directory: { type: string, max_length: 1024, default: "{projects}",
                      label: Media directory,
                      description: "Directory whose files are listed every minute into media.files, absolute or a path symbol such as {projects} or {project:my-show}/objects/VideoFile." }
+  # How many completed proof of play records to keep.
+  proof_of_play_recent: { type: int, min: 1, max: 300, default: 50,
+                          label: Proof of play history,
+                          description: "Number of most recently completed clip playbacks Live Update reports into proof_of_play.recent, at most 300." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -1317,6 +1347,8 @@ telemetry:
     send:
       - >-
         {"subscribe":{"object":"transportmanager:{settings.live_transport}","properties":["{'playing': object.player.playing, 'time': object.player.tRender, 'mode': str(object.player.playMode.state), 'track': str(object.player.track.description), 'engaged': object.engaged, 'volume': object.volume, 'brightness': object.brightness}"],"configuration":{"updateFrequencyMs":{settings.live_update_ms}}}}
+      - >-
+        {"subscribe":{"object":"subsystem:ProofOfPlaySubsystem","properties":["{'a': 'active', 'r': 'recent', 'active': (object.getRecords() if callable(object.getRecords) else object.getRecords), 'recent': object.getRecentRecords({settings.proof_of_play_recent})}"],"configuration":{"updateFrequencyMs":1000}}}
   updates:
     # Every transport, and below every machine of the session: each read
     # replaces the last, so a removed transport or machine leaves.
@@ -2102,10 +2134,68 @@ telemetry:
       then_send:
         - { method: GET, path: /api/service/system/detectsystems }
         - { method: GET, path: /api/service/system/projects }
+    # Live Update: proof of play, one dictionary of the clips playing now
+    # and the last completed ones; each list replaces the last. The
+    # dictionary names its own lists ('a', 'r'), so the subtree to replace is
+    # rendered from the element and a transport's update, which has neither,
+    # replaces nothing.
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged"
+      each_match: { "$.value.active": "^\\[" }
+      json: { a: "$.value.a" }
+      replace: proof_of_play.{a}
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged[*].value.active"
+      json:
+        a: "$^.value.a"
+        layer: "$.layerName"
+        video: "$.videoName"
+        played: "$.framesPlayed"
+        total: "$.totalFrames"
+        loops: "$.loopCount"
+        complete: "$.completedFullPlayback"
+        start: "$.startTime"
+        end: "$.endTime"
+      state:
+        proof_of_play.{a}.{index}.layer: "{layer}"
+        proof_of_play.{a}.{index}.video: "{video}"
+        proof_of_play.{a}.{index}.frames_played: "{played}"
+        proof_of_play.{a}.{index}.total_frames: "{total}"
+        proof_of_play.{a}.{index}.loop_count: "{loops}"
+        proof_of_play.{a}.{index}.complete: "{complete}"
+        proof_of_play.{a}.{index}.start_time: "{start}"
+        proof_of_play.{a}.{index}.end_time: "{end}"
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged"
+      each_match: { "$.value.recent": "^\\[" }
+      json: { r: "$.value.r" }
+      replace: proof_of_play.{r}
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged[*].value.recent"
+      json:
+        r: "$^.value.r"
+        layer: "$.layerName"
+        video: "$.videoName"
+        played: "$.framesPlayed"
+        total: "$.totalFrames"
+        loops: "$.loopCount"
+        complete: "$.completedFullPlayback"
+        start: "$.startTime"
+        end: "$.endTime"
+      state:
+        proof_of_play.{r}.{index}.layer: "{layer}"
+        proof_of_play.{r}.{index}.video: "{video}"
+        proof_of_play.{r}.{index}.frames_played: "{played}"
+        proof_of_play.{r}.{index}.total_frames: "{total}"
+        proof_of_play.{r}.{index}.loop_count: "{loops}"
+        proof_of_play.{r}.{index}.complete: "{complete}"
+        proof_of_play.{r}.{index}.start_time: "{start}"
+        proof_of_play.{r}.{index}.end_time: "{end}"
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
       json_each: "$.valuesChanged"
+      each_match: { "$.value.playing": "^(true|false)$" }
       json:
         playing: "$.value.playing"
         time: "$.value.time"
@@ -2323,6 +2413,22 @@ state:
   media.files.*.size:                   { type: int, unit: bytes, description: "The file's size" }
   media.files.*.created:                { type: int, description: "When the file was created, as d3service gives it (a number whose epoch is not documented)" }
   media.files.*.last_written:           { type: int, description: "When the file was last written, in the same form" }
+  proof_of_play.active.*.layer:          { type: string, description: "A clip playing now, numbered from 0: the layer it plays on" }
+  proof_of_play.active.*.video:          { type: string, description: "The clip's file name" }
+  proof_of_play.active.*.frames_played:  { type: int, description: "Frames played so far, repeats from looping included" }
+  proof_of_play.active.*.total_frames:   { type: int, description: "Frames in the clip" }
+  proof_of_play.active.*.loop_count:     { type: int, description: "Complete loops played" }
+  proof_of_play.active.*.complete:       { type: bool, description: "Every frame of the clip has been shown at least once" }
+  proof_of_play.active.*.start_time:     { type: string, description: "When playback started, ISO 8601" }
+  proof_of_play.active.*.end_time:       { type: string, description: "When the clip was last active, ISO 8601" }
+  proof_of_play.recent.*.layer:          { type: string, description: "A completed playback, oldest first from 0: the layer it played on" }
+  proof_of_play.recent.*.video:          { type: string, description: "The clip's file name" }
+  proof_of_play.recent.*.frames_played:  { type: int, description: "Frames played, repeats from looping included" }
+  proof_of_play.recent.*.total_frames:   { type: int, description: "Frames in the clip" }
+  proof_of_play.recent.*.loop_count:     { type: int, description: "Complete loops played" }
+  proof_of_play.recent.*.complete:       { type: bool, description: "Every frame of the clip was shown at least once" }
+  proof_of_play.recent.*.start_time:     { type: string, description: "When playback started, ISO 8601" }
+  proof_of_play.recent.*.end_time:       { type: string, description: "When playback ended, ISO 8601" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -2330,7 +2436,7 @@ state:
   live.engaged:                    { type: bool, description: "The Live Update transport is engaged" }
   live.volume:                     { type: float, description: "Volume of the Live Update transport, 0.0 to 1.0" }
   live.brightness:                 { type: float, description: "Brightness of the Live Update transport, 0.0 to 1.0" }
-  live.error:                      { type: string, description: "The last error Live Update reported, such as a subscription it could not make" }
+  live.error:                      { type: string, description: "The last error Live Update reported, such as a subscription it could not make (the transport's or proof of play's)" }
 
 quirks:
   - models: [all]
@@ -2544,3 +2650,14 @@ quirks:
       projects and VFCs) are read every minute, keyed by host name: a host name
       holding a dot cannot be a state key and is left out. They are read-only:
       network, GPU and VFC settings are changed in d3Manager or the OS.
+  - models: [all]
+    severity: info
+    text: >
+      Proof of play comes over Live Update as one dictionary property of
+      subsystem:ProofOfPlaySubsystem: the clips playing now (getRecords, called
+      when it is a method, since disguise's page names it without brackets) and
+      the last proof_of_play_recent completed playbacks (getRecentRecords), at
+      most once a second. Each list is replaced whole. Live Update's set command,
+      which writes any subscribed property, is not offered: the push websocket
+      here carries no commands, and the Sockpuppet, sequencing and colour
+      endpoints cover documented live control.
