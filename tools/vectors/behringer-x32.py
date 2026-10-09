@@ -353,7 +353,7 @@ binary(X, "set_node", {"text": "ch/01/config Vox 1 RD 1"}, osc("/", ("s", "ch/01
        expect_result={"ok": {"kind": "ack"}})
 telemetry(X, "param-float", inbound_hex=hexs(osc("/ch/01/gate/thr", ("f", 0.5))),
           expect_state={"channels": {"1": {"gate": {"threshold": 0.5}}}})
-telemetry(X, "param-int", inbound_hex=hexs(osc("/-prefs/clocksource", ("i", 1))), expect_state={})
+telemetry(X, "param-int", inbound_hex=hexs(osc("/-prefs/rta/peakhold", ("i", 1))), expect_state={})
 telemetry(X, "param-string", inbound_hex=hexs(osc("/-prefs/style", ("s", "Patrick"))), expect_state={})
 
 
@@ -665,6 +665,102 @@ for lib, key in [("ch", "channel"), ("fx", "fx"), ("r", "routing"), ("mon", "dp4
               expect_state={"presets": {key: {"1": {"name": "Preset"}}}})
     telemetry(X, f"preset-{key}-has-data", inbound_hex=hexs(osc(f"/-libs/{lib}/100/hasdata", ("i", 1))),
               expect_state={"presets": {key: {"100": {"has_data": True}}}})
+
+
+# ── Effects sources, graphic EQ, preferences, status, recorders (p.24, p.39,
+# p.55-70, p.101) ──────────────────────────────────────────────────────────
+binary(X, "set_fx_source", {"slot": 4, "side": "r", "source": 17}, osc("/fx/4/source/r", ("i", 17)))
+binary(X, "set_fx_parameter_int", {"slot": 2, "parameter": 5, "value": 1}, osc("/fx/2/par/05", ("i", 1)))
+binary(X, "set_geq_band", {"slot": 1, "band": 31, "gain": 0.5}, osc("/fx/1/par/31", ("f", 0.5)))
+binary(X, "set_geq_band_b", {"slot": 1, "band": 1, "gain": 0.75}, osc("/fx/1/par/33", ("f", 0.75)))
+binary(X, "set_geq_master", {"slot": 8, "level": 0.5}, osc("/fx/8/par/32", ("f", 0.5)))
+binary(X, "set_geq_master_b", {"slot": 8, "level": 0.25}, osc("/fx/8/par/64", ("f", 0.25)))
+telemetry(X, "fx-source", inbound_hex=hexs(osc("/fx/1/source/l", ("i", 1))), expect_state={"fx": {"1": {"source": {"l": 1}}}})
+binary(X, "set_console_name", {"name": "FOH"}, osc("/-prefs/name", ("s", "FOH")))
+telemetry(X, "console-name", inbound_hex=hexs(osc("/-prefs/name", ("s", "X32-02-4A-53"))), expect_state={"console": {"name": "X32-02-4A-53"}})
+binary(X, "set_preference_switch", {"preference": "scene_advance", "enabled": True}, osc("/-prefs/scene_advance", ("i", 1)))
+telemetry(X, "preference-switch", inbound_hex=hexs(osc("/-prefs/hardmute", ("i", 1))), expect_state={"preferences": {"switches": {"hardmute": True}}})
+for cmd, inp, leaf, wire, pushed, value in [
+        ("set_show_control", {"mode": 1}, "show_control", ("i", 1), ("i", 2), 2),
+        ("set_sample_rate", {"rate": 0}, "clockrate", ("i", 0), ("i", 1), 1),
+        ("set_clock_source", {"source": 3}, "clocksource", ("i", 3), ("i", 1), 1),
+        ("set_clock_mode", {"mode": 1}, "clockmode", ("i", 1), ("i", 0), 0),
+        ("set_mute_led_mode", {"mode": 1}, "invertmutes", ("i", 1), ("i", 1), 1),
+        ("set_recorder_type", {"type": 1}, "rec_control", ("i", 1), ("i", 0), 0),
+        ("set_headamp_flags", {"flags": 15}, "haflags", ("i", 15), ("i", 2), 2),
+        ("set_screen_brightness", {"value": 1.0}, "bright", ("f", 1.0), ("f", 0.5), 0.5),
+        ("set_lcd_contrast", {"value": 0.5}, "lcdcont", ("f", 0.5), ("f", 0.25), 0.25),
+        ("set_led_brightness", {"value": 0.0}, "ledbright", ("f", 0.0), ("f", 1.0), 1.0),
+        ("set_lamp_level", {"value": 0.75}, "lamp", ("f", 0.75), ("f", 0.75), 0.75)]:
+    binary(X, cmd, inp, osc(f"/-prefs/{leaf}", wire))
+    telemetry(X, f"preference-{leaf.replace('_', '-')}", inbound_hex=hexs(osc(f"/-prefs/{leaf}", pushed)),
+              expect_state={"preferences": {leaf: value}})
+for cmd, inp, leaf, wire, key, pushed, value in [
+        ("set_remote_enable", {"enabled": True}, "enable", ("i", 1), "enabled", ("i", 1), True),
+        ("set_remote_protocol", {"protocol": 2}, "protocol", ("i", 2), "protocol", ("i", 1), 1),
+        ("set_remote_port", {"port": 2}, "port", ("i", 2), "port", ("i", 0), 0),
+        ("set_remote_io", {"features": 16383}, "ioenable", ("i", 16383), "io", ("i", 33), 33)]:
+    binary(X, cmd, inp, osc(f"/-prefs/remote/{leaf}", wire))
+    telemetry(X, f"remote-{key}", inbound_hex=hexs(osc(f"/-prefs/remote/{leaf}", pushed)), expect_state={"remote": {key: value}})
+binary(X, "select_strip", {"strip": 72}, osc("/-stat/selidx", ("i", 71)))
+telemetry(X, "selected-strip", inbound_hex=hexs(osc("/-stat/selidx", ("i", 0))), expect_state={"selected_strip": 0})
+for cmd, inp, leaf, wire, key, pushed, value in [
+        ("set_channel_fader_bank", {"bank": 3}, "chfaderbank", ("i", 3), "channel_fader_bank", ("i", 1), 1),
+        ("set_group_fader_bank", {"bank": 5}, "grpfaderbank", ("i", 5), "group_fader_bank", ("i", 0), 0),
+        ("set_bus_sends_bank", {"bank": 2}, "bussendbank", ("i", 2), "bus_sends_bank", ("i", 3), 3),
+        ("set_screen", {"screen": 9}, "screen/screen", ("i", 9), "screen", ("i", 10), 10),
+        ("set_eq_band_selection", {"band": 5}, "eqband", ("i", 5), "eq_band_selection", ("i", 0), 0),
+        ("set_sends_on_fader", {"enabled": True}, "sendsonfader", ("i", 1), "sendsonfader", ("i", 0), False)]:
+    binary(X, cmd, inp, osc(f"/-stat/{leaf}", wire))
+    telemetry(X, f"status-{key.replace('_', '-')}", inbound_hex=hexs(osc(f"/-stat/{leaf}", pushed)), expect_state={"status": {key: value}})
+binary(X, "set_screen_page", {"screen": "SCENE", "page": 5}, osc("/-stat/screen/SCENE/page", ("i", 5)))
+telemetry(X, "status-screen-page", inbound_hex=hexs(osc("/-stat/screen/CHAN/page", ("i", 4))),
+          expect_state={"status": {"screen_pages": {"CHAN": 4}}})
+for leaf, path, wire, value in [("userbank", {"user_controls": {"bank": 2}}, ("i", 2), None),
+                                ("usbmounted", {"usb": {"mounted": True}}, ("i", 1), None),
+                                ("xcardtype", {"status": {"card_type": 10}}, ("i", 10), None),
+                                ("autosave", {"status": {"autosave": False}}, ("i", 0), None),
+                                ("remote", {"status": {"daw_mode": True}}, ("i", 1), None),
+                                ("lock", {"status": {"lock": 1}}, ("i", 1), None)]:
+    telemetry(X, f"stat-{leaf}", inbound_hex=hexs(osc(f"/-stat/{leaf}", wire)), expect_state=path)
+telemetry(X, "user-button", inbound_hex=hexs(osc("/config/userctrl/A/btn/12", ("s", "O00"))),
+          expect_state={"user_controls": {"sets": {"A": {"buttons": {"12": "O00"}}}}})
+telemetry(X, "user-encoder", inbound_hex=hexs(osc("/config/userctrl/C/enc/4", ("s", "F70"))),
+          expect_state={"user_controls": {"sets": {"C": {"encoders": {"4": "F70"}}}}})
+telemetry(X, "user-set-color", inbound_hex=hexs(osc("/config/userctrl/B/color", ("i", 4))),
+          expect_state={"user_controls": {"sets": {"B": {"color": 4}}}})
+binary(X, "set_usb_recorder_state", {"state": 4}, osc("/-stat/tape/state", ("i", 4)))
+binary(X, "set_usb_recorder_gain", {"side": "R", "gain": 0.2}, osc("/config/tape/gainR", ("f", 0.2)))
+binary(X, "set_usb_recorder_autoplay", {"enabled": True}, osc("/config/tape/autoplay", ("i", 1)))
+binary(X, "usb_recorder_track", {"direction": -1}, osc("/-action/playtrack", ("i", -1)))
+binary(X, "usb_recorder_select", {"record": 6}, osc("/-action/recselect", ("i", 6)))
+for leaf, path, wire in [("/-stat/tape/state", {"usb_recorder": {"state": 2}}, ("i", 2)),
+                         ("/-stat/tape/file", {"usb_recorder": {"file": "/dir000/R_20130105-205752.wav"}}, ("s", "/dir000/R_20130105-205752.wav")),
+                         ("/-stat/tape/etime", {"usb_recorder": {"elapsed": 42}}, ("i", 42)),
+                         ("/-stat/tape/rtime", {"usb_recorder": {"remaining": -1}}, ("i", -1)),
+                         ("/config/tape/gainL", {"usb_recorder": {"gain": {"L": 0.5}}}, ("f", 0.5)),
+                         ("/config/tape/autoplay", {"usb_recorder": {"autoplay": False}}, ("i", 0)),
+                         ("/-usb/path", {"usb": {"path": "Dblues 48kHz"}}, ("s", "Dblues 48kHz")),
+                         ("/-usb/title", {"usb": {"title": "Candy-DB"}}, ("s", "Candy-DB")),
+                         ("/-usb/dir/maxpos", {"usb": {"entries": 16}}, ("i", 16)),
+                         ("/-usb/dir/006/name", {"usb": {"dir": {"6": {"name": "Candy.wav"}}}}, ("s", "Candy.wav")),
+                         ("/-stat/urec/state", {"xlive": {"state": 3}}, ("i", 3)),
+                         ("/-stat/urec/etime", {"xlive": {"elapsed": 869}}, ("i", 869)),
+                         ("/-stat/urec/rtime", {"xlive": {"remaining": 2615103}}, ("i", 2615103)),
+                         ("/-urec/sessionmax", {"xlive": {"sessions": 2}}, ("i", 2)),
+                         ("/-urec/markermax", {"xlive": {"markers": 3}}, ("i", 3)),
+                         ("/-urec/sessionpos", {"xlive": {"session": 6}}, ("i", 6)),
+                         ("/-urec/sessionlen", {"xlive": {"session_length": 4970}}, ("i", 4970))]:
+    telemetry(X, "rec" + leaf.replace("/", "-").replace("--", "-"), inbound_hex=hexs(osc(leaf, wire)), expect_state=path)
+binary(X, "set_xlive_state", {"state": 3}, osc("/-stat/urec/state", ("i", 3)))
+for cmd, leaf, n in [("select_xlive_session", "selsession", 6), ("delete_xlive_session", "delsession", 100),
+                     ("select_xlive_marker", "selmarker", 1), ("delete_xlive_marker", "delmarker", 2),
+                     ("save_xlive_marker", "savemarker", 3)]:
+    binary(X, cmd, {"index": n}, osc(f"/-action/{leaf}", ("i", n)))
+binary(X, "add_xlive_marker", {}, osc("/-action/addmarker", ("i", 1)))
+binary(X, "set_xlive_position", {"position": 86399999}, osc("/-action/setposition", ("i", 86399999)))
+binary(X, "clear_xlive_alert", {}, osc("/-action/clearalert", ("i", 1)))
+binary(X, "save_console_state", {}, osc("/-action/savestate", ("i", 1)))
 
 
 def _osc_args(packet):
