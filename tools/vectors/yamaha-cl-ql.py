@@ -71,6 +71,20 @@ def _yclql_vectors():
         ('stereo_matrix_send_on', 'MIXER:Current/St/ToMtrx/On', ('stereo', 3), ('matrix', 8), ('bool',), 'stereo.{x}.matrix_sends.{y}.on', False),
         ('stereo_matrix_send_pan', 'MIXER:Current/St/ToMtrx/Pan', ('stereo', 3), ('matrix', 8), ('pan',), 'stereo.{x}.matrix_sends.{y}.pan', False),
         ('stereo_matrix_send_pre', 'MIXER:Current/St/ToMtrx/PrePost', ('stereo', 3), ('matrix', 8), ('flag', 'pre', 'true = 1 (PRE), false = 0 (POST)'), 'stereo.{x}.matrix_sends.{y}.pre', False),
+        ('input_ha_gain', 'MIXER:Current/InCh/Port/HA/Gain', ('channel', 72), None, ('int', 'gain', -600, 6600, 'hundredths of a dB, -600 (-6 dB) to 6600 (+66 dB)'), 'inputs.{x}.ha_gain', False),
+        ('stereo_input_ha_gain', 'MIXER:Current/StInCh/Port/HA/Gain', ('stereo_input', 16), None, ('int', 'gain', -600, 6600, 'hundredths of a dB, -600 (-6 dB) to 6600 (+66 dB)'), 'stereo_inputs.{x}.ha_gain', False),
+        ('input_dynamics1_threshold', 'MIXER:Current/InCh/Dyna1/Threshold', ('channel', 72), None, ('int', 'threshold', -720, 0, 'tenths of a dB, -720 (-72 dB) to 0'), 'inputs.{x}.dynamics.1.threshold', False),
+        ('input_dynamics2_threshold', 'MIXER:Current/InCh/Dyna2/Threshold', ('channel', 72), None, ('int', 'threshold', -540, 0, 'tenths of a dB, -540 (-54 dB) to 0'), 'inputs.{x}.dynamics.2.threshold', False),
+        ('stereo_input_dynamics1_threshold', 'MIXER:Current/StInCh/Dyna1/Threshold', ('stereo_input', 16), None, ('int', 'threshold', -720, 0, 'tenths of a dB, -720 (-72 dB) to 0'), 'stereo_inputs.{x}.dynamics.1.threshold', False),
+        ('stereo_input_dynamics2_threshold', 'MIXER:Current/StInCh/Dyna2/Threshold', ('stereo_input', 16), None, ('int', 'threshold', -540, 0, 'tenths of a dB, -540 (-54 dB) to 0'), 'stereo_inputs.{x}.dynamics.2.threshold', False),
+        ('mix_dynamics1_threshold', 'MIXER:Current/Mix/Dyna1/Threshold', ('mix', 24), None, ('int', 'threshold', -540, 0, 'tenths of a dB, -540 (-54 dB) to 0'), 'mixes.{x}.dynamics.1.threshold', False),
+        ('matrix_dynamics1_threshold', 'MIXER:Current/Mtrx/Dyna1/Threshold', ('matrix', 8), None, ('int', 'threshold', -540, 0, 'tenths of a dB, -540 (-54 dB) to 0'), 'matrices.{x}.dynamics.1.threshold', False),
+        ('stereo_dynamics1_threshold', 'MIXER:Current/St/Dyna1/Threshold', ('stereo', 3), None, ('int', 'threshold', -540, 0, 'tenths of a dB, -540 (-54 dB) to 0'), 'stereo.{x}.dynamics.1.threshold', False),
+        ('input_dca_assign', 'MIXER:Current/InCh/DCA/Assign', ('channel', 72), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'inputs.{x}.dcas.{y}', False),
+        ('stereo_input_dca_assign', 'MIXER:Current/StInCh/DCA/Assign', ('stereo_input', 16), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'stereo_inputs.{x}.dcas.{y}', False),
+        ('mix_dca_assign', 'MIXER:Current/Mix/DCA/Assign', ('mix', 24), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'mixes.{x}.dcas.{y}', False),
+        ('matrix_dca_assign', 'MIXER:Current/Mtrx/DCA/Assign', ('matrix', 8), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'matrices.{x}.dcas.{y}', False),
+        ('stereo_dca_assign', 'MIXER:Current/St/DCA/Assign', ('stereo', 3), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'stereo.{x}.dcas.{y}', False),
     ]
 
     # Expected wire stated independently of the spec's templates: X and Y go

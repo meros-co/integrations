@@ -1457,14 +1457,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## yamaha-cl-ql — Yamaha CL / QL
 
-- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get and its reply, OK/OKm acknowledgements, ERROR codes, NOTIFY set pushes, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-cl-ql.yaml:3662](specs/yamaha-cl-ql.yaml#L3662))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-cl-ql.yaml:3725](specs/yamaha-cl-ql.yaml#L3725))
-- [ ] Confirm the sscurrent_ex reply form "OK sscurrent_ex MIXER:Lib/Scene <number> [modified|unmodified]", taken by analogy with the DME7. ([specs/yamaha-cl-ql.yaml:3762](specs/yamaha-cl-ql.yaml#L3762))
-- [ ] Confirm an out-of-range set is clamped and answered OKm. ([specs/yamaha-cl-ql.yaml:3707](specs/yamaha-cl-ql.yaml#L3707))
-- [ ] On a CL and a QL, confirm the fader level, ON, pan and balance addresses from the Companion parameter list (StInCh, Mix, Mtrx, St, DCA Fader/Level and Fader/On; StInCh and Mix ToSt/Pan; StInCh, Mix, Mtrx and St Out/Balance; MuteMaster/On), and that set, get and NOTIFY set use them. ([specs/yamaha-cl-ql.yaml:3675](specs/yamaha-cl-ql.yaml#L3675))
-- [ ] Confirm the numbering inferred from the list's counts: StInCh 1-16 as ST IN 1L to 8R, St 1-3 as ST L, ST R and MONO, St/Out/Balance 1-2, MuteMaster 1-8 as the mute groups. ([specs/yamaha-cl-ql.yaml:3686](specs/yamaha-cl-ql.yaml#L3686))
-- [ ] Confirm the Label/Name, Label/Color and Label/Icon addresses on every channel type, the 8-character name limit, and the colour and icon names (Companion's chColors and chIcons; its list spells one icon "Wedge " with a trailing space). ([specs/yamaha-cl-ql.yaml:3781](specs/yamaha-cl-ql.yaml#L3781))
-- [ ] Confirm the send addresses (InCh and StInCh ToMix and ToMtrx; Mix and St ToMtrx; Level, On, Pan, PrePost) and that PrePost 1 is PRE and 0 POST, as on RIVAGE PM. ([specs/yamaha-cl-ql.yaml:3789](specs/yamaha-cl-ql.yaml#L3789))
+- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get and its reply, OK/OKm acknowledgements, ERROR codes, NOTIFY set pushes, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-cl-ql.yaml:4352](specs/yamaha-cl-ql.yaml#L4352))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-cl-ql.yaml:4415](specs/yamaha-cl-ql.yaml#L4415))
+- [ ] Confirm the sscurrent_ex reply form "OK sscurrent_ex MIXER:Lib/Scene <number> [modified|unmodified]", taken by analogy with the DME7. ([specs/yamaha-cl-ql.yaml:4452](specs/yamaha-cl-ql.yaml#L4452))
+- [ ] Confirm an out-of-range set is clamped and answered OKm. ([specs/yamaha-cl-ql.yaml:4397](specs/yamaha-cl-ql.yaml#L4397))
+- [ ] On a CL and a QL, confirm the fader level, ON, pan and balance addresses from the Companion parameter list (StInCh, Mix, Mtrx, St, DCA Fader/Level and Fader/On; StInCh and Mix ToSt/Pan; StInCh, Mix, Mtrx and St Out/Balance; MuteMaster/On), and that set, get and NOTIFY set use them. ([specs/yamaha-cl-ql.yaml:4365](specs/yamaha-cl-ql.yaml#L4365))
+- [ ] Confirm the numbering inferred from the list's counts: StInCh 1-16 as ST IN 1L to 8R, St 1-3 as ST L, ST R and MONO, St/Out/Balance 1-2, MuteMaster 1-8 as the mute groups. ([specs/yamaha-cl-ql.yaml:4376](specs/yamaha-cl-ql.yaml#L4376))
+- [ ] Confirm the Label/Name, Label/Color and Label/Icon addresses on every channel type, the 8-character name limit, and the colour and icon names (Companion's chColors and chIcons; its list spells one icon "Wedge " with a trailing space). ([specs/yamaha-cl-ql.yaml:4471](specs/yamaha-cl-ql.yaml#L4471))
+- [ ] Confirm the send addresses (InCh and StInCh ToMix and ToMtrx; Mix and St ToMtrx; Level, On, Pan, PrePost) and that PrePost 1 is PRE and 0 POST, as on RIVAGE PM. ([specs/yamaha-cl-ql.yaml:4479](specs/yamaha-cl-ql.yaml#L4479))
+- [ ] Confirm Port/HA/Gain (hundredths of a dB, -6 to +66), the Dyna1/Dyna2 Threshold ranges (tenths of a dB) and DCA/Assign (Y = DCA 1-16) on every channel type. ([specs/yamaha-cl-ql.yaml:4487](specs/yamaha-cl-ql.yaml#L4487))
+- [ ] Check whether newer firmware adds EQ, HPF, phantom power, phase, delay, insert, dynamics type/ratio/attack/release, or mute group assignment to the RCP parameter list, which the recorded list lacks. ([specs/yamaha-cl-ql.yaml:4496](specs/yamaha-cl-ql.yaml#L4496))
 
 ## yamaha-dm3 — Yamaha DM3
 
