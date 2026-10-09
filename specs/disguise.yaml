@@ -128,7 +128,8 @@ models:
                stop_renderstream_layer, restart_renderstream_layer, sync_renderstream_layer,
                renderstream_failover_machine, renderstream_failover_pool,
                get_sockpuppet_patches, get_easing_functions, set_live_float, set_live_string,
-               set_live_resource, send_live_changes]
+               set_live_resource, send_live_changes,
+               get_cdls, set_cdl]
     verification: none
 
 commands:
@@ -800,6 +801,33 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── Colour: CDLs ─────────────────────────────────────────────────────────
+  get_cdls:
+    summary: Every colour decision list with its slope, offset and power per channel and its saturation (colour/cdls)
+    send: { method: GET, path: /api/session/colour/cdls }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  set_cdl:
+    summary: Set every value of a colour decision list, by its name (colour/cdl); the grade changes live at once
+    params:
+      cdl:        { type: string, max_length: 256, required: true,
+                    label: CDL,
+                    description: "Name of the CDL resource as shown in Designer." }
+      slope_r:    { type: float, min: 0.0, default: 1.0, label: Slope red, description: "Red slope (gain), 1.0 for none." }
+      slope_g:    { type: float, min: 0.0, default: 1.0, label: Slope green, description: "Green slope (gain), 1.0 for none." }
+      slope_b:    { type: float, min: 0.0, default: 1.0, label: Slope blue, description: "Blue slope (gain), 1.0 for none." }
+      offset_r:   { type: float, default: 0.0, label: Offset red, description: "Red offset (lift), 0.0 for none." }
+      offset_g:   { type: float, default: 0.0, label: Offset green, description: "Green offset (lift), 0.0 for none." }
+      offset_b:   { type: float, default: 0.0, label: Offset blue, description: "Blue offset (lift), 0.0 for none." }
+      power_r:    { type: float, min: 0.0, default: 1.0, label: Power red, description: "Red power (gamma), 1.0 for none." }
+      power_g:    { type: float, min: 0.0, default: 1.0, label: Power green, description: "Green power (gamma), 1.0 for none." }
+      power_b:    { type: float, min: 0.0, default: 1.0, label: Power blue, description: "Blue power (gamma), 1.0 for none." }
+      saturation: { type: float, min: 0.0, default: 1.0, label: Saturation, description: "Saturation, 1.0 for none and 0.0 for monochrome." }
+    send: { method: POST, path: /api/session/colour/cdl, body: '{"cdl":{"name":{cdl:json},"slope":{"x":{slope_r:.6f},"y":{slope_g:.6f},"z":{slope_b:.6f}},"offset":{"x":{offset_r:.6f},"y":{offset_g:.6f},"z":{offset_b:.6f}},"power":{"x":{power_r:.6f},"y":{power_g:.6f},"z":{power_b:.6f}},"saturation":{saturation:.6f}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -826,6 +854,7 @@ telemetry:
       - { method: GET, path: /api/session/renderstream/pools }
       - { method: GET, path: /api/session/renderstream/assigners }
       - { method: GET, path: /api/session/sockpuppet/easingfunctions }
+      - { method: GET, path: /api/session/colour/cdls }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1252,6 +1281,41 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: /api/session/sockpuppet/patches }
+    # Colour decision lists, keyed by uid.
+    - path: "^/api/session/colour/cdls$"
+      json_match: { "$.result": "^\\[" }
+      replace: cdls
+      json_each: "$.result"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        sr: "$.slope.x"
+        sg: "$.slope.y"
+        sb: "$.slope.z"
+        or: "$.offset.x"
+        og: "$.offset.y"
+        ob: "$.offset.z"
+        pr: "$.power.x"
+        pg: "$.power.y"
+        pb: "$.power.z"
+        sat: "$.saturation"
+      state:
+        cdls.{uid}.name: "{name}"
+        cdls.{uid}.slope_r: "{sr}"
+        cdls.{uid}.slope_g: "{sg}"
+        cdls.{uid}.slope_b: "{sb}"
+        cdls.{uid}.offset_r: "{or}"
+        cdls.{uid}.offset_g: "{og}"
+        cdls.{uid}.offset_b: "{ob}"
+        cdls.{uid}.power_r: "{pr}"
+        cdls.{uid}.power_g: "{pg}"
+        cdls.{uid}.power_b: "{pb}"
+        cdls.{uid}.saturation: "{sat}"
+    - path: "^/api/session/colour/cdl$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/colour/cdls }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -1383,6 +1447,17 @@ state:
   sockpuppet.patches.*.fields.*.resource_uid:  { type: string, description: "uid of the resource a resource field points to" }
   sockpuppet.patches.*.fields.*.resource_type: { type: string, description: "The type of resource a resource field takes" }
   sockpuppet.easing_functions:      { type: string, description: "The easing functions set_live_float takes, as a JSON array" }
+  cdls.*.name:       { type: string, description: "Colour decision list name, keyed by the CDL's uid" }
+  cdls.*.slope_r:    { type: float, description: "Red slope (set_cdl)" }
+  cdls.*.slope_g:    { type: float, description: "Green slope" }
+  cdls.*.slope_b:    { type: float, description: "Blue slope" }
+  cdls.*.offset_r:   { type: float, description: "Red offset" }
+  cdls.*.offset_g:   { type: float, description: "Green offset" }
+  cdls.*.offset_b:   { type: float, description: "Blue offset" }
+  cdls.*.power_r:    { type: float, description: "Red power" }
+  cdls.*.power_g:    { type: float, description: "Green power" }
+  cdls.*.power_b:    { type: float, description: "Blue power" }
+  cdls.*.saturation: { type: float, description: "Saturation" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -1501,3 +1576,11 @@ quirks:
       after it is read, so current_value lags it. The API cannot create patches
       or fields: they are set up in Designer. A patch is kept by its uid; a
       patch whose uid comes back empty is not kept.
+  - models: [all]
+    severity: warning
+    text: >
+      set_cdl replaces every value of the CDL at once, so a grade change sends
+      all ten; read the others from the cdls state first. Slope, offset and power
+      are sent as the x, y and z of a vector, taken here as red, green and blue,
+      which disguise's document does not state. CDLs are read every minute and
+      after each set_cdl; the API cannot create or delete them.

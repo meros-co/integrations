@@ -403,3 +403,20 @@ telemetry(DG, "easing-functions", inbound_http={"path": _SP + "easingfunctions",
           expect_state={"sockpuppet": {"easing_functions": '["linear","easeIn"]'}})
 telemetry(DG, "sockpuppet-live-reread", inbound_http={"path": _SP + "live", "body": _ENV_OK},
           expect_then_send=[{"method": "GET", "target": _SP + "patches"}], expect_state={})
+
+# ── Colour: CDLs ──
+_dg("get_cdls", {}, "GET", "/api/session/colour/cdls")
+_dg("set_cdl", {"cdl": "wall grade", "slope_r": 1.1, "offset_b": -0.02, "power_g": 0.9, "saturation": 0.8},
+    "POST", "/api/session/colour/cdl",
+    '{"cdl":{"name":"wall grade","slope":{"x":1.100000,"y":1.000000,"z":1.000000},'
+    '"offset":{"x":0.000000,"y":0.000000,"z":-0.020000},"power":{"x":1.000000,"y":0.900000,"z":1.000000},'
+    '"saturation":0.800000}}', **_OK)
+telemetry(DG, "cdls", inbound_http={"path": "/api/session/colour/cdls", "body": _envelope(result=[
+    {"uid": "1601", "name": "wall grade", "slope": {"x": 1.1, "y": 1.0, "z": 1.0},
+     "offset": {"x": 0.0, "y": 0.0, "z": -0.02}, "power": {"x": 1.0, "y": 0.9, "z": 1.0}, "saturation": 0.8}])},
+    state_before={"cdls": {"1600": {"name": "deleted"}}},
+    expect_state={"cdls": {"1601": {"name": "wall grade", "slope_r": 1.1, "slope_g": 1.0, "slope_b": 1.0,
+                                    "offset_r": 0.0, "offset_g": 0.0, "offset_b": -0.02, "power_r": 1.0,
+                                    "power_g": 0.9, "power_b": 1.0, "saturation": 0.8}}})
+telemetry(DG, "cdl-reread", inbound_http={"path": "/api/session/colour/cdl", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/colour/cdls"}], expect_state={})
