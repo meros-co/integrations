@@ -130,7 +130,8 @@ models:
                get_sockpuppet_patches, get_easing_functions, set_live_float, set_live_string,
                set_live_resource, send_live_changes,
                get_cdls, set_cdl,
-               get_notes, get_note, set_note]
+               get_notes, get_note, set_note,
+               get_shot_recorders, record_shot]
     verification: none
 
 commands:
@@ -866,6 +867,32 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
     returns: value
 
+  # ── Shot recorder ────────────────────────────────────────────────────────
+  get_shot_recorders:
+    summary: Every shot recorder, whether it is recording, and its slate and take (shotrecorder/recorders)
+    send: { method: GET, path: /api/session/shotrecorder/recorders }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.recorders" }
+    returns: value
+
+  record_shot:
+    summary: Start (engage true) or stop (engage false) a shot recorder, by its name, with the slate and take to record under (shotrecorder/record)
+    params:
+      recorder: { type: string, max_length: 256, required: true,
+                  label: Shot recorder,
+                  description: "Name of the shot recorder as shown in Designer." }
+      engage:   { type: bool, default: true,
+                  label: Record,
+                  description: "True starts recording; false stops it." }
+      slate:    { type: string, max_length: 256, required: true,
+                  label: Slate,
+                  description: "Slate name the shot is recorded under; send the recorder's current slate to keep it." }
+      take:     { type: int, min: 0, required: true,
+                  label: Take,
+                  description: "Take number the shot is recorded under; send the recorder's current take to keep it." }
+    send: { method: POST, path: /api/session/shotrecorder/record, body: '{"engage":{engage},"name":{recorder:json},"slate":{slate:json},"take":"{take}"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -878,6 +905,7 @@ telemetry:
       - { method: GET, path: /api/session/sequencing/indirections }
       - { method: GET, path: /api/session/renderstream/layers }
       - { method: GET, path: /api/session/sockpuppet/patches }
+      - { method: GET, path: /api/session/shotrecorder/recorders }
   # What an operator changes in the project, and the machines' set-up, every
   # minute (and on connecting).
   subscribe:
@@ -1373,6 +1401,21 @@ telemetry:
       state:
         notes.{2}.name: "{name}"
         notes.{2}.text: "{text}"
+    # Shot recorders, keyed by name.
+    - path: "^/api/session/shotrecorder/recorders$"
+      json_match: { "$.recorders": "^\\[" }
+      replace: shot_recorders
+      json_each: "$.recorders"
+      json: { name: "$.name", engaged: "$.engaged", slate: "$.slate", take: "$.take" }
+      state:
+        shot_recorders.{name}.recording: "{engaged}"
+        shot_recorders.{name}.slate: "{slate}"
+        shot_recorders.{name}.take: "{take}"
+    - path: "^/api/session/shotrecorder/record$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/shotrecorder/recorders }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -1517,6 +1560,9 @@ state:
   cdls.*.saturation: { type: float, description: "Saturation" }
   notes.*.name: { type: string, description: "Note name, keyed by the note's uid" }
   notes.*.text: { type: string, description: "The note's text (set_note)" }
+  shot_recorders.*.recording: { type: bool, description: "The shot recorder is recording, keyed by its name (record_shot)" }
+  shot_recorders.*.slate:     { type: string, description: "The slate the recorder records under" }
+  shot_recorders.*.take:      { type: int, description: "The take number the recorder records under" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -1652,3 +1698,11 @@ quirks:
       cannot delete one. Every note is read every minute, and a note read or
       written is kept at once. set_note takes the text as a JSON string, since a
       text parameter here cannot hold a line break.
+  - models: [all]
+    severity: info
+    text: >
+      record_shot always sends the slate and take with engage, since the request
+      carries all four; send the recorder's current slate and take (from the
+      shot_recorders state) to stop it without changing them. Shot recorders are
+      read every 10 seconds and after each record_shot. take is sent as a
+      decimal string, as the document's int64 is written in JSON.

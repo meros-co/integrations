@@ -443,3 +443,17 @@ telemetry(DG, "notes-page", inbound_http={"path": "/api/session/notes?start=1&co
                             "1702": {"name": "contacts", "text": "FOH: ch 5"}}})
 telemetry(DG, "note-written", inbound_http={"path": "/api/session/note", "body": _envelope(result=NOTE)},
           expect_state={"notes": {"1701": {"name": "running order", "text": "1. Intro\n2. Act 1"}}})
+
+# ── Shot recorder ──
+RECORDERS = [{"engaged": True, "name": "main", "slate": "scene 4", "take": "3"}]
+_dg("get_shot_recorders", {}, "GET", "/api/session/shotrecorder/recorders",
+    http_reply={"status": 200, "body": _envelope(recorders=RECORDERS)},
+    expect_result={"ok": {"kind": "value", "value": RECORDERS}})
+_dg("record_shot", {"recorder": "main", "slate": "scene 4", "take": 3}, "POST",
+    "/api/session/shotrecorder/record", '{"engage":true,"name":"main","slate":"scene 4","take":"3"}', **_OK)
+telemetry(DG, "shot-recorders", inbound_http={"path": "/api/session/shotrecorder/recorders",
+                                              "body": _envelope(recorders=RECORDERS)},
+          state_before={"shot_recorders": {"old": {"recording": False}}},
+          expect_state={"shot_recorders": {"main": {"recording": True, "slate": "scene 4", "take": 3}}})
+telemetry(DG, "shot-record-reread", inbound_http={"path": "/api/session/shotrecorder/record", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/shotrecorder/recorders"}], expect_state={})
