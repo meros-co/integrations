@@ -536,3 +536,61 @@ telemetry(DG, "reference-points", inbound_http={"path": _QC + "referencepoints",
     {"uid": "2001", "name": "corner A"}, {"uid": "2002", "name": "corner B"}])},
     state_before={"quickcal": {"reference_points": {"2000": "gone"}}},
     expect_state={"quickcal": {"reference_points": {"2001": "corner A", "2002": "corner B"}}})
+
+# ── OmniCal (Developer Portal "OmniCal API" page) ──
+_OC = "/api/session/omnical/"
+DISCOVERY = {"status": {"code": 0, "message": "", "details": []}, "enabled": True, "discovery": "RUNNING"}
+_dg("get_omnical_camera_discovery", {}, "GET", _OC + "cameradiscovery",
+    http_reply={"status": 200, "body": json.dumps(DISCOVERY)},
+    expect_result={"ok": {"kind": "value", "value": DISCOVERY}})
+_dg("set_omnical_camera_discovery", {"enabled": True}, "POST", _OC + "cameradiscovery", '{"enabled":true}',
+    http_reply={"status": 200, "body": json.dumps(DISCOVERY)}, expect_result={"ok": {"kind": "ack"}})
+_dg("get_omnical_current_plan", {}, "GET", _OC + "currentplan")
+_dg("get_omnical_plans", {}, "GET", _OC + "plans")
+_dg("execute_rigcheck", {}, "POST", _OC + "rigcheck/executeplan", "{}", **_OK)
+# The page's own example of a RigCheck still running.
+CHECK_RUNNING = {"status": {"code": 0, "message": "Most recent OmniCal task is real RigCheck Result: "
+                            "'plan 12mm_result_000'.\nExecute Plan Task state: complete=0, success=0, "
+                            "cancelled=0, fatalErrors=0, progress=0.57\n", "details": []},
+                 "result": {"status": "Amber", "feedback": "RigCheck still in progress.", "omniCalScore": 10000,
+                            "cameraRmsError": 10000, "projectorRmsError": 10000}}
+_dg("get_rigcheck_result", {}, "GET", _OC + "rigcheck/checkresult",
+    http_reply={"status": 200, "body": json.dumps(CHECK_RUNNING)},
+    expect_result={"ok": {"kind": "value", "value": CHECK_RUNNING}})
+_dg("accept_rigcheck_result", {}, "POST", _OC + "rigcheck/acceptresult", "{}", **_OK)
+_dg("revert_rigcheck_result", {}, "POST", _OC + "rigcheck/revertresult", "{}", **_OK)
+_dg("get_rigcheck_current_result", {}, "GET", _OC + "rigcheck/currentresult")
+_dg("get_rigcheck_fallback_result", {}, "GET", _OC + "rigcheck/currentfallbackresult")
+_dg("get_rigcheck_results", {}, "GET", _OC + "rigcheck/results")
+_dg("get_rigcheck_results_for_plan", {"plan": "plan 12mm"}, "GET", _OC + "rigcheck/resultsforplan?name=plan%2012mm")
+_dg("delete_old_rigcheck_results", {}, "POST", _OC + "rigcheck/deleteoldresults", "{}", **_OK)
+telemetry(DG, "omnical-discovery", inbound_http={"path": _OC + "cameradiscovery", "body": json.dumps(DISCOVERY)},
+          expect_state={"omnical": {"camera_discovery": True, "camera_discovery_state": "RUNNING"}})
+telemetry(DG, "omnical-plans", inbound_http={"path": _OC + "plans", "body": _envelope(
+    plans=[{"name": "plan 12mm", "uid": "2101"}])},
+    state_before={"omnical": {"plans": {"2100": "gone"}}},
+    expect_state={"omnical": {"plans": {"2101": "plan 12mm"}}})
+telemetry(DG, "omnical-current-plan", inbound_http={"path": _OC + "currentplan", "body": _envelope(
+    plan={"name": "plan 12mm", "uid": "2101"})},
+    expect_state={"omnical": {"current_plan": "plan 12mm", "current_plan_uid": "2101"}})
+telemetry(DG, "rigcheck-running", inbound_http={"path": _OC + "rigcheck/checkresult",
+                                                "body": json.dumps(CHECK_RUNNING)},
+          expect_state={"omnical": {"rigcheck": {
+              "status": "Amber", "feedback": "RigCheck still in progress.", "score": 10000.0,
+              "camera_rms_error": 10000.0, "projector_rms_error": 10000.0,
+              "progress": CHECK_RUNNING["status"]["message"]}}})
+telemetry(DG, "rigcheck-results", inbound_http={"path": _OC + "rigcheck/results", "body": _envelope(
+    results=[{"name": "plan 12mm_result_000", "uid": "2201"}])},
+    expect_state={"omnical": {"results": {"2201": "plan 12mm_result_000"}}})
+telemetry(DG, "rigcheck-current-result", inbound_http={"path": _OC + "rigcheck/currentresult", "body": _envelope(
+    result={"name": "plan 12mm_result_000", "uid": "2201"})},
+    expect_state={"omnical": {"current_result": "plan 12mm_result_000", "current_result_uid": "2201"}})
+telemetry(DG, "rigcheck-fallback-result", inbound_http={"path": _OC + "rigcheck/currentfallbackresult",
+                                                        "body": _envelope(result={"name": "plan 12mm_result_000",
+                                                                                  "uid": "2201"})},
+          expect_state={"omnical": {"fallback_result": "plan 12mm_result_000", "fallback_result_uid": "2201"}})
+telemetry(DG, "rigcheck-reread", inbound_http={"path": _OC + "rigcheck/acceptresult", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _OC + "rigcheck/checkresult"},
+                            {"method": "GET", "target": _OC + "rigcheck/currentresult"},
+                            {"method": "GET", "target": _OC + "rigcheck/currentfallbackresult"},
+                            {"method": "GET", "target": _OC + "rigcheck/results"}], expect_state={})

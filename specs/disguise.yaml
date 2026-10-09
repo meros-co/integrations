@@ -95,6 +95,18 @@ source:
       body on Designer's main thread with d3 imported; d3Log, pythonLog and
       returnValue; undo supported; pythonApiExecutionTimeout; not to be called
       often or during a show.
+  - title: disguise Developer Portal, "OmniCal API"
+    author: disguise
+    url: https://developer.disguise.one/api/session/omnical/
+    note: >
+      Manufacturer document, retrieved 2026-10-07; not in the Session Swagger
+      document. cameradiscovery (GET, and POST {enabled}), currentplan, plans,
+      rigcheck/executeplan, checkresult, acceptresult, revertresult,
+      currentresult, currentfallbackresult, results, resultsforplan and
+      deleteoldresults; the RigCheck workflow, the Green, Amber and Red
+      statuses, scores of 10000 while running, comparing by omniCalScore, and
+      that discovery must be off during a show. The RequestPlansFilter values
+      are not listed.
 
 transport:
   type: http
@@ -146,7 +158,11 @@ models:
                select_spatial_calibration, capture_observation, enable_observation, delete_observation,
                delete_all_observations,
                get_reference_points, get_projector_calibration, line_up_current_pose, reset_lineup,
-               overwrite_manual_calibration]
+               overwrite_manual_calibration,
+               get_omnical_camera_discovery, set_omnical_camera_discovery, get_omnical_current_plan,
+               get_omnical_plans, execute_rigcheck, get_rigcheck_result, accept_rigcheck_result,
+               revert_rigcheck_result, get_rigcheck_current_result, get_rigcheck_fallback_result,
+               get_rigcheck_results, get_rigcheck_results_for_plan, delete_old_rigcheck_results]
     verification: none
 
 commands:
@@ -1090,6 +1106,93 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── OmniCal and RigCheck ─────────────────────────────────────────────────
+  get_omnical_camera_discovery:
+    summary: Whether OmniCal camera discovery is enabled, and its state (omnical/cameradiscovery)
+    send: { method: GET, path: /api/session/omnical/cameradiscovery }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
+    returns: value
+
+  set_omnical_camera_discovery:
+    summary: Enable or disable OmniCal camera discovery (omnical/cameradiscovery); disable it before a show
+    params:
+      enabled: { type: bool, required: true,
+                 label: Discovery,
+                 description: "True starts looking for OmniCal cameras; false stops, freeing the Director's CPU and network." }
+    send: { method: POST, path: /api/session/omnical/cameradiscovery, body: '{"enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_omnical_current_plan:
+    summary: The OmniCal Plan set as current in Designer, if any (omnical/currentplan)
+    send: { method: GET, path: /api/session/omnical/currentplan }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.plan" }
+    returns: value
+
+  get_omnical_plans:
+    summary: Every OmniCal Plan in the project (omnical/plans)
+    send: { method: GET, path: /api/session/omnical/plans }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.plans" }
+    returns: value
+
+  execute_rigcheck:
+    summary: Run a RigCheck capture, calibration and alignment from the current OmniCal Plan into a new Result (omnical/rigcheck/executeplan)
+    send: { method: POST, path: /api/session/omnical/rigcheck/executeplan, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_rigcheck_result:
+    summary: The current RigCheck's progress and, once done, its status (Green, Amber, Red), feedback, OmniCal score and camera and projector RMS errors (omnical/rigcheck/checkresult)
+    send: { method: GET, path: /api/session/omnical/rigcheck/checkresult }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
+    returns: value
+
+  accept_rigcheck_result:
+    summary: Accept the current RigCheck Result as the new fallback (omnical/rigcheck/acceptresult)
+    send: { method: POST, path: /api/session/omnical/rigcheck/acceptresult, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  revert_rigcheck_result:
+    summary: Revert the current RigCheck Result and switch to the fallback Result (omnical/rigcheck/revertresult)
+    send: { method: POST, path: /api/session/omnical/rigcheck/revertresult, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_rigcheck_current_result:
+    summary: The RigCheck Result set as current, if any (omnical/rigcheck/currentresult)
+    send: { method: GET, path: /api/session/omnical/rigcheck/currentresult }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_rigcheck_fallback_result:
+    summary: The RigCheck Result set as the fallback, if any (omnical/rigcheck/currentfallbackresult)
+    send: { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_rigcheck_results:
+    summary: Every RigCheck Result in the project (omnical/rigcheck/results)
+    send: { method: GET, path: /api/session/omnical/rigcheck/results }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.results" }
+    returns: value
+
+  get_rigcheck_results_for_plan:
+    summary: The RigCheck Results run from an OmniCal Plan, by the plan's name (omnical/rigcheck/resultsforplan)
+    params:
+      plan: { type: string, max_length: 256, required: true,
+              label: Plan,
+              description: "Name of the OmniCal Plan as shown in Designer." }
+    send: { method: GET, path: /api/session/omnical/rigcheck/resultsforplan, query: { name: "{plan}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.results" }
+    returns: value
+
+  delete_old_rigcheck_results:
+    summary: Delete old RigCheck Results that are not in use, to free disk space (omnical/rigcheck/deleteoldresults)
+    send: { method: POST, path: /api/session/omnical/rigcheck/deleteoldresults, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -1124,6 +1227,13 @@ telemetry:
       - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
       - { method: GET, path: /api/session/mixedreality/captureprogress }
       - { method: GET, path: /api/session/quickcal/referencepoints }
+      - { method: GET, path: /api/session/omnical/cameradiscovery }
+      - { method: GET, path: /api/session/omnical/currentplan }
+      - { method: GET, path: /api/session/omnical/plans }
+      - { method: GET, path: /api/session/omnical/rigcheck/checkresult }
+      - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
+      - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
+      - { method: GET, path: /api/session/omnical/rigcheck/results }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1696,6 +1806,70 @@ telemetry:
       json: { uid: "$.uid", name: "$.name" }
       state:
         quickcal.reference_points.{uid}: "{name}"
+    # OmniCal: camera discovery, plans, and the RigCheck and its Results.
+    - path: "^/api/session/omnical/cameradiscovery$"
+      json_match: { "$.status.code": "^0$" }
+      json: { enabled: "$.enabled", discovery: "$.discovery" }
+      state:
+        omnical.camera_discovery: "{enabled}"
+        omnical.camera_discovery_state: "{discovery}"
+    - path: "^/api/session/omnical/currentplan$"
+      json_match: { "$.status.code": "^0$" }
+      json: { name: "$.plan.name", uid: "$.plan.uid" }
+      state:
+        omnical.current_plan: "{name}"
+        omnical.current_plan_uid: "{uid}"
+    - path: "^/api/session/omnical/plans$"
+      json_match: { "$.plans": "^\\[" }
+      replace: omnical.plans
+      json_each: "$.plans"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        omnical.plans.{uid}: "{name}"
+    - path: "^/api/session/omnical/rigcheck/checkresult$"
+      json_match: { "$.result.status": "^(.+)$" }
+      json:
+        feedback: "$.result.feedback"
+        score: "$.result.omniCalScore"
+        camera: "$.result.cameraRmsError"
+        projector: "$.result.projectorRmsError"
+        message: "$.status.message"
+      state:
+        omnical.rigcheck.status: "{1}"
+        omnical.rigcheck.feedback: "{feedback}"
+        omnical.rigcheck.score: "{score}"
+        omnical.rigcheck.camera_rms_error: "{camera}"
+        omnical.rigcheck.projector_rms_error: "{projector}"
+        omnical.rigcheck.progress: "{message}"
+    - path: "^/api/session/omnical/rigcheck/currentresult$"
+      json_match: { "$.status.code": "^0$" }
+      json: { name: "$.result.name", uid: "$.result.uid" }
+      state:
+        omnical.current_result: "{name}"
+        omnical.current_result_uid: "{uid}"
+    - path: "^/api/session/omnical/rigcheck/currentfallbackresult$"
+      json_match: { "$.status.code": "^0$" }
+      json: { name: "$.result.name", uid: "$.result.uid" }
+      state:
+        omnical.fallback_result: "{name}"
+        omnical.fallback_result_uid: "{uid}"
+    - path: "^/api/session/omnical/rigcheck/results$"
+      json_match: { "$.results": "^\\[" }
+      replace: omnical.results
+      json_each: "$.results"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        omnical.results.{uid}: "{name}"
+    # A RigCheck command is read back (set_omnical_camera_discovery's own
+    # answer carries the new discovery state).
+    - path: "^/api/session/omnical/rigcheck/(executeplan|acceptresult|revertresult|deleteoldresults)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/omnical/rigcheck/checkresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/results }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -1860,6 +2034,22 @@ state:
   mixed_reality.calibrations.*.observations.*.solved_pose:  { type: string, description: "The solved camera pose, in the same form" }
   mixed_reality.capturing:                     { type: bool, description: "An observation capture is running (capture_observation)" }
   quickcal.reference_points.*: { type: string, description: "QuickCal reference point, keyed by its uid: its name" }
+  omnical.camera_discovery:        { type: bool, description: "OmniCal camera discovery is enabled (set_omnical_camera_discovery)" }
+  omnical.camera_discovery_state:  { type: string, description: "Camera discovery's state as Designer words it" }
+  omnical.current_plan:            { type: string, description: "Name of the current OmniCal Plan" }
+  omnical.current_plan_uid:        { type: string, description: "uid of the current OmniCal Plan" }
+  omnical.plans.*:                 { type: string, description: "OmniCal Plan in the project, keyed by its uid: its name" }
+  omnical.rigcheck.status:         { type: string, description: "The latest RigCheck's status: Green (good), Amber (in progress or marginal) or Red (failed)" }
+  omnical.rigcheck.feedback:       { type: string, description: "The latest RigCheck's feedback text" }
+  omnical.rigcheck.score:          { type: float, description: "The latest RigCheck's OmniCal score; lower is better, 10000 while running or failed" }
+  omnical.rigcheck.camera_rms_error:    { type: float, description: "The latest RigCheck's aggregate camera RMS error" }
+  omnical.rigcheck.projector_rms_error: { type: float, description: "The latest RigCheck's aggregate projector RMS error" }
+  omnical.rigcheck.progress:       { type: string, description: "Designer's message on the most recent OmniCal task, with its progress while one runs" }
+  omnical.current_result:          { type: string, description: "Name of the RigCheck Result in use" }
+  omnical.current_result_uid:      { type: string, description: "uid of the RigCheck Result in use" }
+  omnical.fallback_result:         { type: string, description: "Name of the fallback RigCheck Result (accept_rigcheck_result)" }
+  omnical.fallback_result_uid:     { type: string, description: "uid of the fallback RigCheck Result" }
+  omnical.results.*:               { type: string, description: "RigCheck Result in the project, keyed by its uid: its name" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -2036,3 +2226,22 @@ quirks:
       state: get_projector_calibration reads it for a projector named by the
       caller. Reference points are read every minute. The units of a lineup
       position are not documented.
+  - models: [all]
+    severity: critical
+    text: >
+      execute_rigcheck recalibrates and realigns the projectors from the current
+      OmniCal Plan, and revert_rigcheck_result switches the calibration in use:
+      both change the picture on the stage. execute_rigcheck turns camera
+      discovery on when it is off; discovery uses the Director's CPU and network
+      and must be off during a show. A RigCheck takes a while: omnical.rigcheck
+      shows Amber while it runs. The OmniCal state is read every minute, and the
+      RigCheck at once after each RigCheck command. Compare Results by their OmniCal score
+      only; the RMS errors vary between runs. QuickAlign adjustments are not
+      available through the API.
+  - models: [all]
+    severity: info
+    text: >
+      The OmniCal endpoints are documented on disguise's OmniCal API page but are
+      not in the Session Swagger document. Their plans, results and
+      resultsforplan endpoints take a filter whose values the page does not
+      list, so these commands send none.
