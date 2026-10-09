@@ -1271,10 +1271,24 @@ offered to `path` rules, which match the request's path and query:
 | `path` + `json` + `json_match` | A JSON reply whose value at each JSON path matches its regex | the path's, then `json_match`'s, in order |
 | `path` + `json` + `request_match` | A JSON reply to a request whose JSON body matches | the path's, then `request_match`'s, then `json_match`'s |
 | `path` + `headers` | Any reply, JSON or not | `headers` names response header values, by header name in any case; with `json` too, both |
+| `path` + `match` | A text reply, by regex over the whole body | the path's, then the text's, numbered on after them |
 
 `request_match` is for protocols whose replies all arrive on one path and
 don't say what they answer, such as JSON-RPC: the rule looks at the request
 that the reply answers.
+
+A text reply is also offered to the plain `match` rules, which cannot tell
+which request it answers. Where replies to different requests share their
+words, `path` + `match` ties the rule to the request: Panasonic's
+`/cgi-bin/get_rtmp_status` and `/cgi-bin/get_srt_status` both answer
+`status=1`. `(?m)` lets `^` and `$` match at each line of a `key=value`
+reply:
+
+```yaml
+    - path: "^/cgi-bin/get_(rtmp|srt)_status$"
+      match: "(?m)^status\\s*=\\s*([01])\\s*$"
+      state: { "{1}.streaming": { value: "{2}", map: { "0": false, "1": true } } }
+```
 
 ```yaml
     - path: "^/$"
