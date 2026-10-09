@@ -1457,10 +1457,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## yamaha-cl-ql — Yamaha CL / QL
 
-- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get and its reply, OK/OKm acknowledgements, ERROR codes, NOTIFY set pushes, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-cl-ql.yaml:409](specs/yamaha-cl-ql.yaml#L409))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-cl-ql.yaml:451](specs/yamaha-cl-ql.yaml#L451))
-- [ ] Confirm the sscurrent_ex reply form "OK sscurrent_ex MIXER:Lib/Scene <number> [modified|unmodified]", taken by analogy with the DME7. ([specs/yamaha-cl-ql.yaml:485](specs/yamaha-cl-ql.yaml#L485))
-- [ ] Confirm an out-of-range set is clamped and answered OKm. ([specs/yamaha-cl-ql.yaml:433](specs/yamaha-cl-ql.yaml#L433))
+- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get and its reply, OK/OKm acknowledgements, ERROR codes, NOTIFY set pushes, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-cl-ql.yaml:1217](specs/yamaha-cl-ql.yaml#L1217))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-cl-ql.yaml:1280](specs/yamaha-cl-ql.yaml#L1280))
+- [ ] Confirm the sscurrent_ex reply form "OK sscurrent_ex MIXER:Lib/Scene <number> [modified|unmodified]", taken by analogy with the DME7. ([specs/yamaha-cl-ql.yaml:1317](specs/yamaha-cl-ql.yaml#L1317))
+- [ ] Confirm an out-of-range set is clamped and answered OKm. ([specs/yamaha-cl-ql.yaml:1262](specs/yamaha-cl-ql.yaml#L1262))
+- [ ] On a CL and a QL, confirm the fader level, ON, pan and balance addresses from the Companion parameter list (StInCh, Mix, Mtrx, St, DCA Fader/Level and Fader/On; StInCh and Mix ToSt/Pan; StInCh, Mix, Mtrx and St Out/Balance; MuteMaster/On), and that set, get and NOTIFY set use them. ([specs/yamaha-cl-ql.yaml:1230](specs/yamaha-cl-ql.yaml#L1230))
+- [ ] Confirm the numbering inferred from the list's counts: StInCh 1-16 as ST IN 1L to 8R, St 1-3 as ST L, ST R and MONO, St/Out/Balance 1-2, MuteMaster 1-8 as the mute groups. ([specs/yamaha-cl-ql.yaml:1241](specs/yamaha-cl-ql.yaml#L1241))
 
 ## yamaha-dm3 — Yamaha DM3
 

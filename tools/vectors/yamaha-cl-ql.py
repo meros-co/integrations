@@ -12,6 +12,23 @@ def _yclql_vectors():
         ('input_fader_level', 'MIXER:Current/InCh/Fader/Level', ('channel', 72), None, ('level', 1000), 'inputs.{x}.fader_level', False),
         ('input_on', 'MIXER:Current/InCh/Fader/On', ('channel', 72), None, ('bool',), 'inputs.{x}.on', False),
         ('input_stereo_pan', 'MIXER:Current/InCh/ToSt/Pan', ('channel', 72), None, ('pan',), 'inputs.{x}.stereo_pan', False),
+        ('stereo_input_fader_level', 'MIXER:Current/StInCh/Fader/Level', ('stereo_input', 16), None, ('level', 1000), 'stereo_inputs.{x}.fader_level', False),
+        ('stereo_input_on', 'MIXER:Current/StInCh/Fader/On', ('stereo_input', 16), None, ('bool',), 'stereo_inputs.{x}.on', False),
+        ('stereo_input_stereo_pan', 'MIXER:Current/StInCh/ToSt/Pan', ('stereo_input', 16), None, ('pan',), 'stereo_inputs.{x}.stereo_pan', False),
+        ('stereo_input_balance', 'MIXER:Current/StInCh/Out/Balance', ('stereo_input', 16), None, ('int', 'balance', -63, 63, '-63 (L63) to 63 (R63), 0 centre'), 'stereo_inputs.{x}.balance', False),
+        ('mix_fader_level', 'MIXER:Current/Mix/Fader/Level', ('mix', 24), None, ('level', 1000), 'mixes.{x}.fader_level', False),
+        ('mix_on', 'MIXER:Current/Mix/Fader/On', ('mix', 24), None, ('bool',), 'mixes.{x}.on', False),
+        ('mix_stereo_pan', 'MIXER:Current/Mix/ToSt/Pan', ('mix', 24), None, ('pan',), 'mixes.{x}.stereo_pan', False),
+        ('mix_balance', 'MIXER:Current/Mix/Out/Balance', ('mix', 24), None, ('int', 'balance', -63, 63, '-63 (L63) to 63 (R63), 0 centre'), 'mixes.{x}.balance', False),
+        ('matrix_fader_level', 'MIXER:Current/Mtrx/Fader/Level', ('matrix', 8), None, ('level', 1000), 'matrices.{x}.fader_level', False),
+        ('matrix_on', 'MIXER:Current/Mtrx/Fader/On', ('matrix', 8), None, ('bool',), 'matrices.{x}.on', False),
+        ('matrix_balance', 'MIXER:Current/Mtrx/Out/Balance', ('matrix', 8), None, ('int', 'balance', -63, 63, '-63 (L63) to 63 (R63), 0 centre'), 'matrices.{x}.balance', False),
+        ('stereo_fader_level', 'MIXER:Current/St/Fader/Level', ('stereo', 3), None, ('level', 1000), 'stereo.{x}.fader_level', False),
+        ('stereo_on', 'MIXER:Current/St/Fader/On', ('stereo', 3), None, ('bool',), 'stereo.{x}.on', False),
+        ('dca_fader_level', 'MIXER:Current/DCA/Fader/Level', ('dca', 16), None, ('level', 1000), 'dcas.{x}.fader_level', False),
+        ('dca_on', 'MIXER:Current/DCA/Fader/On', ('dca', 16), None, ('bool',), 'dcas.{x}.on', False),
+        ('stereo_balance', 'MIXER:Current/St/Out/Balance', ('stereo', 2), None, ('int', 'balance', -63, 63, '-63 (L63) to 63 (R63), 0 centre'), 'stereo.{x}.balance', False),
+        ('mute_group_on', 'MIXER:Current/MuteMaster/On', ('mute_group', 8), None, ('bool',), 'mute_groups.{x}.on', False),
     ]
 
     # Expected wire stated independently of the spec's templates: X and Y go
@@ -56,10 +73,10 @@ def _yclql_vectors():
         if y:
             yn = min(2, y[1]); inp[y[0]] = yn; yw = yn - 1
         val, wire, sval = sample(kind)
-        if "set_" + base not in done:
+        if set_only != "get" and "set_" + base not in done:
             text(S, "set_" + base, dict(inp, **{pname(kind): val}), f"set {addr} {xw} {yw} {wire}\n",
                  device_reply=f"OK set {addr} {xw} {yw} {wire}\n", expect_result={"ok": {"kind": "ack"}})
-        if not set_only and "get_" + base not in done:
+        if set_only is not True and "get_" + base not in done:
             plain = wire[1:-1] if wire.startswith('"') else wire
             text(S, "get_" + base, inp, f"get {addr} {xw} {yw}\n",
                  device_reply=f"OK get {addr} {xw} {yw} {wire}\n",
