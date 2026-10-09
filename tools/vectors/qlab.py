@@ -541,11 +541,63 @@ cue('set_cue_text_underline_style', 'text/format/underlineStyle', {'style': 'dou
 cue('set_cue_text_underline_style_live', 'text/format/underlineStyle/live', {'style': 'double'}, [('s', 'double')])
 cue('get_cue_text_underline_style', 'text/format/underlineStyle', {}, [])
 cue('get_cue_text_output_size', 'text/outputSize', {}, [])
+cue('set_cue_light_command_text', 'lightCommandText', {'text': 'front = 50'}, [('s', 'front = 50')])
+cue('get_cue_light_command_text', 'lightCommandText', {}, [])
+cue('set_cue_always_collate', 'alwaysCollate', {'enabled': True}, [('i', 1)])
+cue('get_cue_always_collate', 'alwaysCollate', {}, [])
+cue('set_cue_subcontroller', 'subcontroller', {'enabled': True}, [('i', 1)])
+cue('get_cue_subcontroller', 'subcontroller', {}, [])
+cue('collate_and_start_cue', 'collateAndStart', {}, [])
+cue('prune_cue_light_commands', 'pruneCommands', {}, [])
+cue('sort_cue_light_commands', 'safeSortCommands', {}, [])
+cue('set_cue_light', 'setLight', {'light': 'front', 'level': 75.0}, [('s', 'front'), ('f', 75.0)])
+cue('remove_cue_light_commands', 'removeLightCommandsMatching', {'command': 'front = 50'}, [('s', 'front = 50')])
+cue('replace_cue_light_command', 'replaceLightCommand', {'old_command': 'front = 50', 'new_command': 'front = 80'}, [('s', 'front = 50'), ('s', 'front = 80')])
+cue('update_cue_light_command_qlab4', 'updateLightCommand', {'light': 'front', 'level': 60.0}, [('s', 'front'), ('f', 60.0)], model="qlab-4")
+cue('set_cue_levels_mode', 'levelsMode', {'mode': 1}, [('i', 1)])
+cue('get_cue_levels_mode', 'levelsMode', {}, [])
+cue('set_cue_mode', 'mode', {'mode': 3}, [('i', 3)])
+cue('get_cue_mode', 'mode', {}, [])
+cue('set_cue_geo_mode', 'geoMode', {'mode': 0}, [('i', 0)])
+cue('get_cue_geo_mode', 'geoMode', {}, [])
+cue('set_cue_fade_type', 'fadeType', {'type': 1}, [('i', 1)])
+cue('get_cue_fade_type', 'fadeType', {}, [])
+cue('set_cue_stop_target_when_done', 'stopTargetWhenDone', {'enabled': True}, [('i', 1)])
+cue('get_cue_stop_target_when_done', 'stopTargetWhenDone', {}, [])
+cue('set_cue_do_opacity', 'doOpacity', {'enabled': True}, [('i', 1)])
+cue('get_cue_do_opacity', 'doOpacity', {}, [])
+cue('set_cue_do_rate', 'doRate', {'enabled': True}, [('i', 1)])
+cue('get_cue_do_rate', 'doRate', {}, [])
+cue('set_cue_do_rotation', 'doRotation', {'enabled': True}, [('i', 1)])
+cue('get_cue_do_rotation', 'doRotation', {}, [])
+cue('set_cue_do_scale', 'doScale', {'enabled': True}, [('i', 1)])
+cue('get_cue_do_scale', 'doScale', {}, [])
+cue('set_cue_do_translation', 'doTranslation', {'enabled': True}, [('i', 1)])
+cue('get_cue_do_translation', 'doTranslation', {}, [])
+cue('set_cue_do_level', 'doLevel/0/2', {'row': 0, 'column': 2, 'enabled': True}, [('i', 1)])
+cue('get_cue_do_level', 'doLevel/0/2', {'row': 0, 'column': 2}, [])
+cue('set_cue_will_fade', 'willFade/0/2', {'row': 0, 'column': 2, 'enabled': True}, [('i', 1)])
+cue('get_cue_will_fade', 'willFade/0/2', {'row': 0, 'column': 2}, [])
+cue('get_cue_do_levels', 'doLevel', {}, [])
+cue('set_cue_rotation', 'rotation', {'degrees': 90.0}, [('f', 90.0)])
+cue('get_cue_rotation', 'rotation', {}, [])
+cue('set_cue_rotation_type', 'rotationType', {'type': 3}, [('i', 3)])
+cue('get_cue_rotation_type', 'rotationType', {}, [])
+cue('set_cue_path_width', 'pathWidth', {'width': 100.0}, [('f', 100.0)])
+cue('get_cue_path_width', 'pathWidth', {}, [])
+cue('set_cue_path_height', 'pathHeight', {'height': 100.0}, [('f', 100.0)])
+cue('get_cue_path_height', 'pathHeight', {}, [])
+cue('set_cue_path_smooth', 'pathSmooth', {'enabled': True}, [('i', 1)])
+cue('get_cue_path_smooth', 'pathSmooth', {}, [])
+cue('set_cue_geometry_from_target', 'setGeometryFromTarget', {}, [])
+cue('set_cue_levels_from_target', 'setLevelsFromTarget', {}, [])
+cue('set_cue_audio_map_target_id', 'audioMapTargetID', {'map_id': '5E8F1C2A-0000-4000-8000-0000000000C1'}, [('s', '5E8F1C2A-0000-4000-8000-0000000000C1')])
+cue('get_cue_audio_map_target_id', 'audioMapTargetID', {}, [])
 
 # State. Workspace and cue IDs as QLab reports them (uniqueID, UUID strings).
 WS = UID
 L1, C1, G1, C2 = LIST_UID, CUE_UID, "6A000001-0000-4000-8000-0000000000C3", "6A000001-0000-4000-8000-0000000000C4"
-VFK = '["uniqueID","number","name","listName","displayName","type","colorName","colorName/live","secondColorName","useSecondColor","flagged","armed","notes","autoLoad","continueMode","preWait","postWait","duration","currentDuration","parent","cueTargetID","cueTargetNumber","fileTarget","targetMode","patchTargetID","duckOthers","duckLevel","duckTime","fadeAndStopOthers","fadeAndStopOthersTime","secondTriggerAction","secondTriggerOnRelease","skipIfDisarmed","rate","infiniteLoop","hasFileTargets","hasCueTargets","levels","sliderLevels","isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","startTime","endTime","playCount","lastSlicePlayCount","lastSliceInfiniteLoop","preservePitch","doPitchShift","doFade","lockFadeToCue","sliceMarkers","muteChannels","soloChannels","numChannelsIn","audioOutputPatchName","audioOutputPatchNumber","audioOutputPatchID","patch","audioMapID","objects","audioInputPatchName","audioInputPatchID","channelOffset","channels","anchor/x","anchor/y","blendMode","clockType","cropTop","cropBottom","cropLeft","cropRight","cueSize","fillStage","fullSurface","fillStyle","holdLastFrame","layer","opacity","preserveAspectRatio","quaternion","scale/x","scale/y","smooth","stageID","stageName","surfaceID","translation/x","translation/y","videoEffects","videoInputPatchName","videoInputPatchID","cameraPatch","text","fixedWidth","text/format","text/format/alignment","cueTargetId"]'
+VFK = '["uniqueID","number","name","listName","displayName","type","colorName","colorName/live","secondColorName","useSecondColor","flagged","armed","notes","autoLoad","continueMode","preWait","postWait","duration","currentDuration","parent","cueTargetID","cueTargetNumber","fileTarget","targetMode","patchTargetID","duckOthers","duckLevel","duckTime","fadeAndStopOthers","fadeAndStopOthersTime","secondTriggerAction","secondTriggerOnRelease","skipIfDisarmed","rate","infiniteLoop","hasFileTargets","hasCueTargets","levels","sliderLevels","isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","startTime","endTime","playCount","lastSlicePlayCount","lastSliceInfiniteLoop","preservePitch","doPitchShift","doFade","lockFadeToCue","sliceMarkers","muteChannels","soloChannels","numChannelsIn","audioOutputPatchName","audioOutputPatchNumber","audioOutputPatchID","patch","audioMapID","objects","audioInputPatchName","audioInputPatchID","channelOffset","channels","anchor/x","anchor/y","blendMode","clockType","cropTop","cropBottom","cropLeft","cropRight","cueSize","fillStage","fullSurface","fillStyle","holdLastFrame","layer","opacity","preserveAspectRatio","quaternion","scale/x","scale/y","smooth","stageID","stageName","surfaceID","translation/x","translation/y","videoEffects","videoInputPatchName","videoInputPatchID","cameraPatch","text","fixedWidth","text/format","text/format/alignment","lightCommandText","alwaysCollate","subcontroller","levelsMode","mode","geoMode","fadeType","stopTargetWhenDone","doOpacity","doRate","doRotation","doScale","doTranslation","doLevel","rotation","rotationType","pathWidth","pathHeight","pathSmooth","audioMapTargetID","cueTargetId"]'
 TIMING_KEYS = '["isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","currentDuration"]'
 
 
@@ -676,4 +728,9 @@ telemetry(Q, 'cue-values-video',
 telemetry(Q, 'cue-values-text',
           inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {'text': 'x', 'fixedWidth': 1.5, 'text/format': 'x', 'text/format/alignment': 'x'}),
           expect_state={"workspaces": {WS: {"cues": {C1: {'text': 'x', 'fixed_width': 1.5, 'text_format': 'x', 'text_alignment': 'x'}}}}})
+
+# The light keys of a cue's values (sample values by type).
+telemetry(Q, 'cue-values-light',
+          inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {'lightCommandText': 'x', 'alwaysCollate': True, 'subcontroller': True, 'levelsMode': 2, 'mode': 2, 'geoMode': 2, 'fadeType': 2, 'stopTargetWhenDone': True, 'doOpacity': True, 'doRate': True, 'doRotation': True, 'doScale': True, 'doTranslation': True, 'doLevel': 'x', 'rotation': 1.5, 'rotationType': 2, 'pathWidth': 1.5, 'pathHeight': 1.5, 'pathSmooth': True, 'audioMapTargetID': 'x'}),
+          expect_state={"workspaces": {WS: {"cues": {C1: {'light_command_text': 'x', 'always_collate': True, 'subcontroller': True, 'levels_mode': 2, 'mode': 2, 'geo_mode': 2, 'fade_type': 2, 'stop_target_when_done': True, 'do_opacity': True, 'do_rate': True, 'do_rotation': True, 'do_scale': True, 'do_translation': True, 'do_levels': 'x', 'rotation': 1.5, 'rotation_type': 2, 'path_width': 1.5, 'path_height': 1.5, 'path_smooth': True, 'audio_map_target_id': 'x'}}}}})
 
