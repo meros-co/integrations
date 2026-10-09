@@ -754,6 +754,86 @@ cue('set_cue_temp_cue_target_id_qlab4', 'tempCueTargetId', {'target_id': '0A1B2C
 cue('get_cue_temp_cue_target_id_qlab4', 'tempCueTargetId', {}, [], model="qlab-4")
 cue('get_cue_values_for_keys', 'valuesForKeys', {'keys': '["preWait","opacity"]'}, [('s', '["preWait","opacity"]')])
 cue('get_cue_values_for_keys_with_arguments', 'valuesForKeysWithArguments', {'keys': '{"level":[0,0]}'}, [('s', '{"level":[0,0]}')])
+q('set_always_audition', {'enabled': True}, '/alwaysAudition', ('i', 1))
+q('get_always_audition', {}, '/alwaysAudition')
+q('set_audition_monitors', {'enabled': True}, '/auditionMonitors', ('i', 1))
+q('get_audition_monitors', {}, '/auditionMonitors')
+q('toggle_audition_monitors', {}, '/toggleAuditionMonitors')
+q('set_audition_window', {'enabled': True}, '/auditionWindow', ('i', 1), model="qlab-4")
+q('get_audition_window', {}, '/auditionWindow', model="qlab-4")
+q('toggle_audition_window', {}, '/toggleAuditionWindow', model="qlab-4")
+q('set_full_screen', {'enabled': True}, '/fullScreen', ('i', 1))
+q('get_full_screen', {}, '/fullScreen')
+q('toggle_full_screen', {}, '/toggleFullScreen')
+q('set_light_dashboard', {'enabled': True}, '/lightDashboard', ('i', 1))
+q('get_light_dashboard', {}, '/lightDashboard')
+q('toggle_light_dashboard', {}, '/toggleLightDashboard')
+q('set_dashboard_mode', {'mode': 'Live'}, '/dashboard/mode', ('s', 'Live'))
+q('get_dashboard_mode', {}, '/dashboard/mode')
+q('set_override_window', {'enabled': True}, '/overrideWindow', ('i', 1))
+q('get_override_window', {}, '/overrideWindow')
+q('toggle_override_window', {}, '/toggleOverrideWindow')
+q('set_timecode_window', {'enabled': True}, '/timecodeWindow', ('i', 1))
+q('get_timecode_window', {}, '/timecodeWindow')
+q('toggle_timecode_window', {}, '/toggleTimecodeWindow')
+q('set_working_directory', {'path': '~/Shows/'}, '/workingDirectory', ('s', '~/Shows/'))
+q('get_working_directory', {}, '/workingDirectory')
+q('get_font_names', {}, '/fontNames')
+q('get_font_families_and_styles', {}, '/fontFamiliesAndStyles')
+q('set_min_go_time', {'seconds': 0.5}, '/settings/general/minGoTime', ('f', 0.5))
+q('get_min_go_time', {}, '/settings/general/minGoTime')
+q('set_general_selection_is_playhead', {'enabled': True}, '/settings/general/selectionIsPlayhead', ('i', 1))
+q('get_general_selection_is_playhead', {}, '/settings/general/selectionIsPlayhead')
+q('toggle_general_selection_is_playhead', {}, '/settings/general/toggleSelectionIsPlayhead')
+q('settings_general_undo', {}, '/settings/general/undo')
+q('settings_general_redo', {}, '/settings/general/redo')
+q('settings_audio_undo', {}, '/settings/audio/undo')
+q('settings_audio_redo', {}, '/settings/audio/redo')
+q('settings_light_undo', {}, '/settings/light/undo')
+q('settings_light_redo', {}, '/settings/light/redo')
+q('settings_mic_undo', {}, '/settings/mic/undo')
+q('settings_mic_redo', {}, '/settings/mic/redo')
+q('settings_midi_undo', {}, '/settings/midi/undo')
+q('settings_midi_redo', {}, '/settings/midi/redo')
+q('settings_network_undo', {}, '/settings/network/undo')
+q('settings_network_redo', {}, '/settings/network/redo')
+q('settings_video_undo', {}, '/settings/video/undo')
+q('settings_video_redo', {}, '/settings/video/redo')
+q('audio_maps_undo', {}, '/settings/audio/maps/undo')
+q('audio_maps_redo', {}, '/settings/audio/maps/redo')
+q('get_audio_min_volume', {}, '/settings/audio/minVolume')
+q('get_audio_max_volume', {}, '/settings/audio/maxVolume')
+q('get_audio_output_channel_names', {}, '/settings/audio/outputChannelNames')
+q('get_audio_cue_output_channel_counts', {}, '/settings/audio/cueOutputChannelCounts')
+q('get_audio_maps', {}, '/settings/audio/maps')
+q('get_audio_patch_list', {}, '/settings/audio/patchList')
+q('get_audio_patch', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1')
+q('set_audio_patch_cue_outputs', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'outputs': 16}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/cueOutputChannels', ('i', 16))
+q('get_audio_patch_cue_outputs', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/cueOutputChannels')
+q('set_audio_patch_level', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'input': 1, 'output': 2, 'level_db': -6.0}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/level/1/2', ('f', -6.0))
+q('set_audio_patch_level_live', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'input': 1, 'output': 2, 'level_db': -6.0}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/level/1/2/live', ('f', -6.0))
+q('get_audio_patch_level', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'input': 1, 'output': 2}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/level/1/2')
+q('set_audio_patch_mute', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'output': 3, 'muted': True}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/mute/3', ('i', 1))
+q('get_audio_patch_mute', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'output': 3}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/mute/3')
+q('set_audio_patch_solo', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'output': 3, 'soloed': True}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/solo/3', ('i', 1))
+q('get_audio_patch_solo', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'output': 3}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/solo/3')
+q('clear_audio_patch_mutes', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/mute/clear')
+q('clear_audio_patch_solos', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/solo/clear')
+q('get_audio_patch_mute_channels', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/muteChannels')
+q('get_audio_patch_solo_channels', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/soloChannels')
+q('get_audio_patch_routing', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/routing')
+q('set_audio_patch_name', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1', 'name': 'Main PA'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/name', ('s', 'Main PA'))
+q('reset_audio_patch', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/reset')
+q('reset_audio_patch_routing', {'patch_id': '5E8F1C2A-0000-4000-8000-0000000000B1'}, '/settings/audio/patchID/5E8F1C2A-0000-4000-8000-0000000000B1/routing/reset')
+q('get_light_patch', {}, '/settings/light/patch')
+q('get_mic_patch_list', {}, '/settings/mic/patchList')
+q('get_midi_patch_list', {}, '/settings/midi/patchList')
+q('get_network_patch_list', {}, '/settings/network/patchList')
+q('get_video_input_patch_list', {}, '/settings/video/inputPatchList')
+q('get_video_routes', {}, '/settings/video/routes')
+q('get_video_stages', {}, '/settings/video/stages')
+q('get_video_surfaces_qlab4', {}, '/settings/video/surfaces', model="qlab-4")
+q('set_video_stage_name', {'stage_id': '5E8F1C2A-0000-4000-8000-0000000000D1', 'name': 'Upstage'}, '/settings/video/stageID/5E8F1C2A-0000-4000-8000-0000000000D1/name', ('s', 'Upstage'))
 
 # State. Workspace and cue IDs as QLab reports them (uniqueID, UUID strings).
 WS = UID
@@ -775,9 +855,9 @@ def reply(address, data, status="ok", workspace=True):
 
 def workspace_reads(ws):
     """What a workspace's discovery or update reads, in the spec's order (QLab 5)."""
-    reads = [framed(f"/workspace/{ws}/{m}") for m in ['cueLists', 'showMode']]
-    reads += [framed(f"/{m}") for m in []]
-    if False:
+    reads = [framed(f"/workspace/{ws}/{m}") for m in ['cueLists', 'showMode', 'liveFadePreview', 'currentCueListID', 'alwaysAudition', 'auditionMonitors', 'fullScreen', 'lightDashboard', 'dashboard/mode', 'settings/general/minGoTime', 'settings/general/selectionIsPlayhead']]
+    reads += [framed(f"/{m}") for m in ['overrides/dmxOutputEnabled', 'overrides/midiInputEnabled', 'overrides/midiOutputEnabled', 'overrides/mscInputEnabled', 'overrides/mscOutputEnabled', 'overrides/sysexInputEnabled', 'overrides/sysexOutputEnabled', 'overrides/networkExternalInputEnabled', 'overrides/networkExternalOutputEnabled', 'overrides/networkLocalInputEnabled', 'overrides/networkLocalOutputEnabled', 'overrides/timecodeInputEnabled', 'overrides/timecodeOutputEnabled', 'overrideWindow', 'timecodeWindow']]
+    if True:
         reads.append(framed(f"/workspace/{ws}/settings/audio/patchList"))
     return reads
 
@@ -904,4 +984,46 @@ telemetry(Q, 'cue-values-network',
 telemetry(Q, 'cue-values-group',
           inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {'cartColumns': 2, 'cartRows': 2, 'cartPosition': 'x', 'isChildFlagged': True, 'playlist/currentCueID': 'x', 'playlist/doCrossfade': True, 'playlist/doLoop': True, 'playlist/doShuffle': True, 'playlist/crossfade/duration': 1.5, 'isCrossfadingOut': True, 'isNextInPlaylist': True, 'timecodeFreewheelTime': 1.5, 'timecodeLookbackTime': 1.5, 'timecodeSMPTEFormat': 2, 'timecodeStartBehavior': 2, 'timecodeStopBehavior': 2, 'timecodeSyncMode': 2, 'timecodeTrigger/text': 'x'}),
           expect_state={"workspaces": {WS: {"cues": {C1: {'cart_columns': 2, 'cart_rows': 2, 'cart_position': 'x', 'child_flagged': True, 'playlist_current_cue_id': 'x', 'playlist_crossfade': True, 'playlist_loop': True, 'playlist_shuffle': True, 'playlist_crossfade_duration': 1.5, 'crossfading_out': True, 'next_in_playlist': True, 'timecode_freewheel_time': 1.5, 'timecode_lookback_time': 1.5, 'timecode_smpte_format': 2, 'timecode_start_behavior': 2, 'timecode_stop_behavior': 2, 'timecode_sync_mode': 2, 'timecode_trigger': 'x'}}}}})
+
+# Workspace and application settings, read with each workspace: one rule each.
+for name, address, data, state, in_workspace in [
+    ('ws-liveFadePreview', f"/workspace/{WS}/liveFadePreview", 1, {"workspaces": {WS: {'live_fade_preview': True}}}, True),
+    ('ws-currentCueListID', f"/workspace/{WS}/currentCueListID", 'Live', {"workspaces": {WS: {'current_cue_list_id': 'Live'}}}, True),
+    ('ws-alwaysAudition', f"/workspace/{WS}/alwaysAudition", 1, {"workspaces": {WS: {'always_audition': True}}}, True),
+    ('ws-auditionMonitors', f"/workspace/{WS}/auditionMonitors", 1, {"workspaces": {WS: {'audition_monitors': True}}}, True),
+    ('ws-fullScreen', f"/workspace/{WS}/fullScreen", 1, {"workspaces": {WS: {'full_screen': True}}}, True),
+    ('ws-lightDashboard', f"/workspace/{WS}/lightDashboard", 1, {"workspaces": {WS: {'light_dashboard': True}}}, True),
+    ('ws-dashboard-mode', f"/workspace/{WS}/dashboard/mode", 'Live', {"workspaces": {WS: {'dashboard_mode': 'Live'}}}, True),
+    ('ws-settings-general-minGoTime', f"/workspace/{WS}/settings/general/minGoTime", 0.5, {"workspaces": {WS: {'min_go_time': 0.5}}}, True),
+    ('ws-settings-general-selectionIsPlayhead', f"/workspace/{WS}/settings/general/selectionIsPlayhead", 1, {"workspaces": {WS: {'selection_is_playhead': True}}}, True),
+    ('ws-selectionIsPlayhead', f"/workspace/{WS}/selectionIsPlayhead", 1, {"workspaces": {WS: {'selection_is_playhead': True}}}, True),
+    ('app-overrides-dmxOutputEnabled', "/overrides/dmxOutputEnabled", 1, {'overrides': {'dmx_output': True}}, False),
+    ('app-overrides-midiInputEnabled', "/overrides/midiInputEnabled", 1, {'overrides': {'midi_input': True}}, False),
+    ('app-overrides-midiOutputEnabled', "/overrides/midiOutputEnabled", 1, {'overrides': {'midi_output': True}}, False),
+    ('app-overrides-mscInputEnabled', "/overrides/mscInputEnabled", 1, {'overrides': {'msc_input': True}}, False),
+    ('app-overrides-mscOutputEnabled', "/overrides/mscOutputEnabled", 1, {'overrides': {'msc_output': True}}, False),
+    ('app-overrides-sysexInputEnabled', "/overrides/sysexInputEnabled", 1, {'overrides': {'sysex_input': True}}, False),
+    ('app-overrides-sysexOutputEnabled', "/overrides/sysexOutputEnabled", 1, {'overrides': {'sysex_output': True}}, False),
+    ('app-overrides-networkExternalInputEnabled', "/overrides/networkExternalInputEnabled", 1, {'overrides': {'network_external_input': True}}, False),
+    ('app-overrides-networkExternalOutputEnabled', "/overrides/networkExternalOutputEnabled", 1, {'overrides': {'network_external_output': True}}, False),
+    ('app-overrides-networkLocalInputEnabled', "/overrides/networkLocalInputEnabled", 1, {'overrides': {'network_local_input': True}}, False),
+    ('app-overrides-networkLocalOutputEnabled', "/overrides/networkLocalOutputEnabled", 1, {'overrides': {'network_local_output': True}}, False),
+    ('app-overrides-timecodeInputEnabled', "/overrides/timecodeInputEnabled", 1, {'overrides': {'timecode_input': True}}, False),
+    ('app-overrides-timecodeOutputEnabled', "/overrides/timecodeOutputEnabled", 1, {'overrides': {'timecode_output': True}}, False),
+    ('app-overrides-artNetEnabled', "/overrides/artNetEnabled", 1, {'overrides': {'art_net': True}}, False),
+    ('app-overrides-oscInputEnabled', "/overrides/oscInputEnabled", 1, {'overrides': {'osc_input': True}}, False),
+    ('app-overrides-oscOutputEnabled', "/overrides/oscOutputEnabled", 1, {'overrides': {'osc_output': True}}, False),
+    ('app-overrideWindow', "/overrideWindow", 1, {'windows': {'overrides': True}}, False),
+    ('app-timecodeWindow', "/timecodeWindow", 1, {'windows': {'timecode': True}}, False),
+    ('app-auditionWindow', "/auditionWindow", 1, {'windows': {'audition': True}}, False),
+]:
+    telemetry(Q, name, inbound_hex=reply(address, data, workspace=in_workspace), expect_state=state)
+
+telemetry(Q, "audio-patches",
+          inbound_hex=reply(f"/workspace/{WS}/settings/audio/patchList", [
+              {"name": "Main PA", "uniqueID": "P-1", "routing": [1, 2]}, {"name": "Monitors", "uniqueID": "P-2", "routing": []}]),
+          state_before={"workspaces": {WS: {"audio_patches": {"P-9": {"name": "Gone"}}}}},
+          expect_state={"workspaces": {WS: {"audio_patches": {
+              "P-1": {"name": "Main PA", "routing": "[1,2]", "index": 0},
+              "P-2": {"name": "Monitors", "routing": "[]", "index": 1}}}}})
 
