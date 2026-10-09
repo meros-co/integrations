@@ -698,11 +698,67 @@ cue('set_cue_stop_target_when_slice_ends', 'stopTargetWhenSliceEnds', {'enabled'
 cue('get_cue_stop_target_when_slice_ends', 'stopTargetWhenSliceEnds', {}, [])
 cue('get_cue_script_source', 'scriptSource', {}, [])
 cue('compile_cue_script', 'compileSource', {}, [])
+cue('get_cue_cart_columns', 'cartColumns', {}, [])
+cue('get_cue_cart_rows', 'cartRows', {}, [])
+cue('get_cue_cart_position', 'cartPosition', {}, [])
+cue('move_cart_cue', 'moveCartCue/3', {'child': '3', 'row': 2, 'column': 3}, [('i', 2), ('i', 3)])
+cue('collapse_cue', 'collapse', {}, [])
+cue('expand_cue', 'expand', {}, [])
+cue('shuffle_cue', 'shuffle', {}, [])
+cue('get_cue_current_timecode', 'currentTimecode', {}, [])
+cue('get_cue_current_timecode_text', 'currentTimecode/text', {}, [])
+cue('get_cue_is_child_auditioning', 'isChildAuditioning', {}, [])
+cue('get_cue_is_child_flagged', 'isChildFlagged', {}, [])
+cue('set_cue_playlist_current_cue', 'playlist/currentCue', {'child': '4'}, [('s', '4')])
+cue('get_cue_playlist_current_cue', 'playlist/currentCue', {}, [])
+cue('set_cue_playlist_current_cue_id', 'playlist/currentCueID', {'child_id': '0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F0'}, [('s', '0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F0')])
+cue('get_cue_playlist_current_cue_id', 'playlist/currentCueID', {}, [])
+cue('set_cue_playlist_crossfade', 'playlist/doCrossfade', {'enabled': True}, [('i', 1)])
+cue('get_cue_playlist_crossfade', 'playlist/doCrossfade', {}, [])
+cue('set_cue_playlist_loop', 'playlist/doLoop', {'enabled': True}, [('i', 1)])
+cue('get_cue_playlist_loop', 'playlist/doLoop', {}, [])
+cue('set_cue_playlist_shuffle', 'playlist/doShuffle', {'enabled': True}, [('i', 1)])
+cue('get_cue_playlist_shuffle', 'playlist/doShuffle', {}, [])
+cue('set_cue_playlist_crossfade_duration', 'playlist/crossfade/duration', {'seconds': 2.0}, [('f', 2.0)])
+cue('get_cue_playlist_crossfade_duration', 'playlist/crossfade/duration', {}, [])
+cue('get_cue_is_crossfading_out', 'isCrossfadingOut', {}, [])
+cue('get_cue_is_next_in_playlist', 'isNextInPlaylist', {}, [])
+cue('set_cue_timecode_freewheel_time', 'timecodeFreewheelTime', {'seconds': 0.5}, [('f', 0.5)])
+cue('get_cue_timecode_freewheel_time', 'timecodeFreewheelTime', {}, [])
+cue('set_cue_timecode_lookback_time', 'timecodeLookbackTime', {'seconds': 10.0}, [('f', 10.0)])
+cue('get_cue_timecode_lookback_time', 'timecodeLookbackTime', {}, [])
+cue('set_cue_timecode_smpte_format', 'timecodeSMPTEFormat', {'format': 1}, [('i', 1)])
+cue('get_cue_timecode_smpte_format', 'timecodeSMPTEFormat', {}, [])
+cue('set_cue_timecode_start_behavior', 'timecodeStartBehavior', {'behavior': 3}, [('i', 3)])
+cue('get_cue_timecode_start_behavior', 'timecodeStartBehavior', {}, [])
+cue('set_cue_timecode_stop_behavior', 'timecodeStopBehavior', {'behavior': 2}, [('i', 2)])
+cue('get_cue_timecode_stop_behavior', 'timecodeStopBehavior', {}, [])
+cue('set_cue_timecode_sync_mode', 'timecodeSyncMode', {'mode': 1}, [('i', 1)])
+cue('get_cue_timecode_sync_mode', 'timecodeSyncMode', {}, [])
+cue('get_cue_timecode_trigger', 'timecodeTrigger', {}, [])
+cue('set_cue_timecode_trigger_hours', 'timecodeTrigger/hours', {'value': 1}, [('i', 1)])
+cue('get_cue_timecode_trigger_hours', 'timecodeTrigger/hours', {}, [])
+cue('set_cue_timecode_trigger_minutes', 'timecodeTrigger/minutes', {'value': 0}, [('i', 0)])
+cue('get_cue_timecode_trigger_minutes', 'timecodeTrigger/minutes', {}, [])
+cue('set_cue_timecode_trigger_seconds', 'timecodeTrigger/seconds', {'value': 30}, [('i', 30)])
+cue('get_cue_timecode_trigger_seconds', 'timecodeTrigger/seconds', {}, [])
+cue('set_cue_timecode_trigger_frames', 'timecodeTrigger/frames', {'value': 12}, [('i', 12)])
+cue('get_cue_timecode_trigger_frames', 'timecodeTrigger/frames', {}, [])
+cue('set_cue_timecode_trigger_bits', 'timecodeTrigger/bits', {'value': 0}, [('i', 0)])
+cue('get_cue_timecode_trigger_bits', 'timecodeTrigger/bits', {}, [])
+cue('set_cue_timecode_trigger_text', 'timecodeTrigger/text', {'timecode': '01:00:30:12'}, [('s', '01:00:30:12')])
+cue('get_cue_timecode_trigger_text', 'timecodeTrigger/text', {}, [])
+cue('set_cue_temp_cue_target_id', 'tempCueTargetID', {'target_id': '0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F0'}, [('s', '0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F0')])
+cue('get_cue_temp_cue_target_id', 'tempCueTargetID', {}, [])
+cue('set_cue_temp_cue_target_id_qlab4', 'tempCueTargetId', {'target_id': '0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F0'}, [('s', '0A1B2C3D-4E5F-6071-8293-A4B5C6D7E8F0')], model="qlab-4")
+cue('get_cue_temp_cue_target_id_qlab4', 'tempCueTargetId', {}, [], model="qlab-4")
+cue('get_cue_values_for_keys', 'valuesForKeys', {'keys': '["preWait","opacity"]'}, [('s', '["preWait","opacity"]')])
+cue('get_cue_values_for_keys_with_arguments', 'valuesForKeysWithArguments', {'keys': '{"level":[0,0]}'}, [('s', '{"level":[0,0]}')])
 
 # State. Workspace and cue IDs as QLab reports them (uniqueID, UUID strings).
 WS = UID
 L1, C1, G1, C2 = LIST_UID, CUE_UID, "6A000001-0000-4000-8000-0000000000C3", "6A000001-0000-4000-8000-0000000000C4"
-VFK = '["uniqueID","number","name","listName","displayName","type","colorName","colorName/live","secondColorName","useSecondColor","flagged","armed","notes","autoLoad","continueMode","preWait","postWait","duration","currentDuration","parent","cueTargetID","cueTargetNumber","fileTarget","targetMode","patchTargetID","duckOthers","duckLevel","duckTime","fadeAndStopOthers","fadeAndStopOthersTime","secondTriggerAction","secondTriggerOnRelease","skipIfDisarmed","rate","infiniteLoop","hasFileTargets","hasCueTargets","levels","sliderLevels","isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","startTime","endTime","playCount","lastSlicePlayCount","lastSliceInfiniteLoop","preservePitch","doPitchShift","doFade","lockFadeToCue","sliceMarkers","muteChannels","soloChannels","numChannelsIn","audioOutputPatchName","audioOutputPatchNumber","audioOutputPatchID","patch","audioMapID","objects","audioInputPatchName","audioInputPatchID","channelOffset","channels","anchor/x","anchor/y","blendMode","clockType","cropTop","cropBottom","cropLeft","cropRight","cueSize","fillStage","fullSurface","fillStyle","holdLastFrame","layer","opacity","preserveAspectRatio","quaternion","scale/x","scale/y","smooth","stageID","stageName","surfaceID","translation/x","translation/y","videoEffects","videoInputPatchName","videoInputPatchID","cameraPatch","text","fixedWidth","text/format","text/format/alignment","lightCommandText","alwaysCollate","subcontroller","levelsMode","mode","geoMode","fadeType","stopTargetWhenDone","doOpacity","doRate","doRotation","doScale","doTranslation","doLevel","rotation","rotationType","pathWidth","pathHeight","pathSmooth","audioMapTargetID","customString","fadeEntries","fadeFrom","fadeTo","fadeNumberType","fps","message","messageError","networkPatchName","networkPatchID","parameterValues","parameterFadesEnabled","qlabCommand","qlabCueNumber","qlabCueParameters","udpString","messageType","status","channel","byte1","byte2","byteCombo","endValue","command","commandFormat","deviceID","controlNumber","controlValue","macro","qNumber","qList","qPath","hours","minutes","seconds","frames","subframes","timecodeFormat","timecodeString","rawString","midiPatchName","midiPatchID","framerate","outputType","ltcChannel","devampType","startNextCueWhenSliceEnds","stopTargetWhenSliceEnds","scriptSource","cueTargetId"]'
+VFK = '["uniqueID","number","name","listName","displayName","type","colorName","colorName/live","secondColorName","useSecondColor","flagged","armed","notes","autoLoad","continueMode","preWait","postWait","duration","currentDuration","parent","cueTargetID","cueTargetNumber","fileTarget","targetMode","patchTargetID","duckOthers","duckLevel","duckTime","fadeAndStopOthers","fadeAndStopOthersTime","secondTriggerAction","secondTriggerOnRelease","skipIfDisarmed","rate","infiniteLoop","hasFileTargets","hasCueTargets","levels","sliderLevels","isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","startTime","endTime","playCount","lastSlicePlayCount","lastSliceInfiniteLoop","preservePitch","doPitchShift","doFade","lockFadeToCue","sliceMarkers","muteChannels","soloChannels","numChannelsIn","audioOutputPatchName","audioOutputPatchNumber","audioOutputPatchID","patch","audioMapID","objects","audioInputPatchName","audioInputPatchID","channelOffset","channels","anchor/x","anchor/y","blendMode","clockType","cropTop","cropBottom","cropLeft","cropRight","cueSize","fillStage","fullSurface","fillStyle","holdLastFrame","layer","opacity","preserveAspectRatio","quaternion","scale/x","scale/y","smooth","stageID","stageName","surfaceID","translation/x","translation/y","videoEffects","videoInputPatchName","videoInputPatchID","cameraPatch","text","fixedWidth","text/format","text/format/alignment","lightCommandText","alwaysCollate","subcontroller","levelsMode","mode","geoMode","fadeType","stopTargetWhenDone","doOpacity","doRate","doRotation","doScale","doTranslation","doLevel","rotation","rotationType","pathWidth","pathHeight","pathSmooth","audioMapTargetID","customString","fadeEntries","fadeFrom","fadeTo","fadeNumberType","fps","message","messageError","networkPatchName","networkPatchID","parameterValues","parameterFadesEnabled","qlabCommand","qlabCueNumber","qlabCueParameters","udpString","messageType","status","channel","byte1","byte2","byteCombo","endValue","command","commandFormat","deviceID","controlNumber","controlValue","macro","qNumber","qList","qPath","hours","minutes","seconds","frames","subframes","timecodeFormat","timecodeString","rawString","midiPatchName","midiPatchID","framerate","outputType","ltcChannel","devampType","startNextCueWhenSliceEnds","stopTargetWhenSliceEnds","scriptSource","cartColumns","cartRows","cartPosition","isChildFlagged","playlist/currentCueID","playlist/doCrossfade","playlist/doLoop","playlist/doShuffle","playlist/crossfade/duration","isCrossfadingOut","isNextInPlaylist","timecodeFreewheelTime","timecodeLookbackTime","timecodeSMPTEFormat","timecodeStartBehavior","timecodeStopBehavior","timecodeSyncMode","timecodeTrigger/text","cueTargetId"]'
 TIMING_KEYS = '["isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","currentDuration"]'
 
 
@@ -843,4 +899,9 @@ telemetry(Q, 'cue-values-light',
 telemetry(Q, 'cue-values-network',
           inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {'customString': 'x', 'fadeEntries': 'x', 'fadeFrom': 1.5, 'fadeTo': 1.5, 'fadeNumberType': 2, 'fps': 2, 'message': 'x', 'messageError': 'x', 'networkPatchName': 'x', 'networkPatchID': 'x', 'parameterValues': 'x', 'parameterFadesEnabled': 'x', 'qlabCommand': 2, 'qlabCueNumber': 'x', 'qlabCueParameters': 'x', 'udpString': 'x', 'messageType': 2, 'status': 2, 'channel': 2, 'byte1': 2, 'byte2': 2, 'byteCombo': 2, 'endValue': 2, 'command': 2, 'commandFormat': 2, 'deviceID': 2, 'controlNumber': 2, 'controlValue': 2, 'macro': 2, 'qNumber': 'x', 'qList': 'x', 'qPath': 'x', 'hours': 2, 'minutes': 2, 'seconds': 2, 'frames': 2, 'subframes': 2, 'timecodeFormat': 2, 'timecodeString': 'x', 'rawString': 'x', 'midiPatchName': 'x', 'midiPatchID': 'x', 'framerate': 2, 'outputType': 2, 'ltcChannel': 2, 'devampType': 2, 'startNextCueWhenSliceEnds': True, 'stopTargetWhenSliceEnds': True, 'scriptSource': 'x'}),
           expect_state={"workspaces": {WS: {"cues": {C1: {'custom_string': 'x', 'fade_entries': 'x', 'fade_from': 1.5, 'fade_to': 1.5, 'fade_number_type': 2, 'fps': 2, 'message': 'x', 'message_error': 'x', 'network_patch_name': 'x', 'network_patch_id': 'x', 'parameter_values': 'x', 'parameter_fades_enabled': 'x', 'qlab_command': 2, 'qlab_cue_number': 'x', 'qlab_cue_parameters': 'x', 'udp_string': 'x', 'message_type': 2, 'midi_status': 2, 'midi_channel': 2, 'byte1': 2, 'byte2': 2, 'byte_combo': 2, 'end_value': 2, 'msc_command': 2, 'msc_command_format': 2, 'msc_device_id': 2, 'msc_control_number': 2, 'msc_control_value': 2, 'msc_macro': 2, 'msc_q_number': 'x', 'msc_q_list': 'x', 'msc_q_path': 'x', 'msc_hours': 2, 'msc_minutes': 2, 'msc_seconds': 2, 'msc_frames': 2, 'msc_subframes': 2, 'msc_timecode_format': 2, 'msc_timecode_string': 'x', 'raw_string': 'x', 'midi_patch_name': 'x', 'midi_patch_id': 'x', 'timecode_framerate': 2, 'timecode_output_type': 2, 'ltc_channel': 2, 'devamp_type': 2, 'start_next_cue_when_slice_ends': True, 'stop_target_when_slice_ends': True, 'script_source': 'x'}}}}})
+
+# The group keys of a cue's values (sample values by type).
+telemetry(Q, 'cue-values-group',
+          inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {'cartColumns': 2, 'cartRows': 2, 'cartPosition': 'x', 'isChildFlagged': True, 'playlist/currentCueID': 'x', 'playlist/doCrossfade': True, 'playlist/doLoop': True, 'playlist/doShuffle': True, 'playlist/crossfade/duration': 1.5, 'isCrossfadingOut': True, 'isNextInPlaylist': True, 'timecodeFreewheelTime': 1.5, 'timecodeLookbackTime': 1.5, 'timecodeSMPTEFormat': 2, 'timecodeStartBehavior': 2, 'timecodeStopBehavior': 2, 'timecodeSyncMode': 2, 'timecodeTrigger/text': 'x'}),
+          expect_state={"workspaces": {WS: {"cues": {C1: {'cart_columns': 2, 'cart_rows': 2, 'cart_position': 'x', 'child_flagged': True, 'playlist_current_cue_id': 'x', 'playlist_crossfade': True, 'playlist_loop': True, 'playlist_shuffle': True, 'playlist_crossfade_duration': 1.5, 'crossfading_out': True, 'next_in_playlist': True, 'timecode_freewheel_time': 1.5, 'timecode_lookback_time': 1.5, 'timecode_smpte_format': 2, 'timecode_start_behavior': 2, 'timecode_stop_behavior': 2, 'timecode_sync_mode': 2, 'timecode_trigger': 'x'}}}}})
 
