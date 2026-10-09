@@ -14,9 +14,9 @@ category: playback
 # Transports and tracks are named by a Locator; this spec sends the name, which
 # Designer resolves to the first resource of that name.
 #
-# The playhead is pushed over the Live Update websocket on the same port, which
-# carries values only by subscription id. The subscription here asks for one
-# property, a dictionary of the transport's playback values, so each update
+# The playhead and proof of play are pushed over the Live Update websocket on
+# the same port, which carries values only by subscription id. Each
+# subscription here asks for one property, a dictionary, so each update
 # carries its own field names. Transport settings and machine health are read
 # over REST every 10 seconds, sparingly, as disguise asks.
 #
@@ -29,9 +29,21 @@ source:
     author: disguise
     url: https://developer.disguise.one/specs/session.swagger.json
     note: >
-      Manufacturer document, retrieved 2026-10-02, linked from
-      https://developer.disguise.one/api/openapi/ and rendered at
-      https://developer.disguise.one/api/session/transport/. Transport paths
+      Manufacturer document, retrieved 2026-10-02 and again 2026-10-07 (the
+      current version), linked from https://developer.disguise.one/api/openapi/
+      and rendered per area at https://developer.disguise.one/api/session/.
+      Every path is used: colour cdl and cdls; failover applydefaultrouting,
+      failovermachine, restoremachine, settings and understudytargets;
+      mixedreality cameras, captureobservation, captureprogress,
+      deleteallobservations, deleteobservations, enableobservations, mrsets,
+      selectcamera, selectspatialcalibration and spatialcalibrations; note
+      (GET, POST) and notes {start, count}; python execute and registermodule;
+      quickcal lineupcurrentpose, overwritemanualcalibration,
+      projectorcalibration, referencepoints and resetlineup; renderstream
+      assigners, failover, failoverpool, layerconfig, layers, layerstatus,
+      pools, restartlayers, startlayers, stoplayers and synclayers; sequencing
+      changeindirections, indirectionresources and indirections; shotrecorder
+      record and recorders; sockpuppet easingfunctions, live and patches. Transport paths
       play, playsection, playloopsection, stop, returntostart,
       gotonextsection, gotoprevsection, gotonexttrack, gotoprevtrack,
       gotosection, gototrack, gotonote, gototag, gototime, gotoframe,
@@ -46,8 +58,10 @@ source:
     author: disguise
     url: https://developer.disguise.one/specs/service.swagger.json
     note: >
-      Manufacturer document, retrieved 2026-10-02. system detectsystems, osinfo,
-      networkadapters, gpuoutputs and projects; project startlocalproject
+      Manufacturer document, retrieved 2026-10-02 and again 2026-10-07 (the
+      current version). Every path is used: system detectsystems, osinfo,
+      networkadapters, gpuoutputs, projects and vfcs; media list, provision and
+      remove (path an array of strings); project startlocalproject
       {projectPath, soloMode, allowUpgrade}, quitlocalproject,
       forcequitlocalproject and restartlocalproject.
   - title: disguise Developer Portal, "Error Handling", "Locator", "Working with Sessions", "Monitoring Machine Health"
@@ -86,6 +100,52 @@ source:
       volume and brightness, which disguise's pages do not list; for gototime
       taking seconds and gototimecode HH:MM:SS:FF; and for status.code 4000 on a
       rejected play mode. No code taken.
+  - title: disguise Developer Portal, "Python Execution API"
+    author: disguise
+    url: https://developer.disguise.one/python-api/execution-api
+    note: >
+      Manufacturer document, retrieved 2026-10-07. execute {moduleName, script}
+      and registermodule {moduleName, contents}; Python 2.7 run as a function
+      body on Designer's main thread with d3 imported; d3Log, pythonLog and
+      returnValue; undo supported; pythonApiExecutionTimeout; not to be called
+      often or during a show.
+  - title: disguise Developer Portal, "OmniCal API"
+    author: disguise
+    url: https://developer.disguise.one/api/session/omnical/
+    note: >
+      Manufacturer document, retrieved 2026-10-07; not in the Session Swagger
+      document. cameradiscovery (GET, and POST {enabled}), currentplan, plans,
+      rigcheck/executeplan, checkresult, acceptresult, revertresult,
+      currentresult, currentfallbackresult, results, resultsforplan and
+      deleteoldresults; the RigCheck workflow, the Green, Amber and Red
+      statuses, scores of 10000 while running, comparing by omniCalScore, and
+      that discovery must be off during a show. The RequestPlansFilter values
+      are not listed.
+  - title: disguise Developer Portal, "Media" guide, "Media API" reference, "Paths" and "Task Status API"
+    author: disguise
+    url: https://developer.disguise.one/api/guides/media/
+    note: >
+      Manufacturer documents, retrieved 2026-10-07 (with
+      https://developer.disguise.one/api/service/media-reference/,
+      https://developer.disguise.one/api/paths/ and
+      https://developer.disguise.one/api/service/tasks/). media/list
+      ?directory, provision {mediaPath, localPath [..], transfers}, remove
+      {path}; the path symbols {projects}, {rs-assets}, {rs-engines} and
+      {project:<name>}, resolved by the media endpoints only; restricted paths
+      refused; provisioning tasks followed on ws://<host>/api/service/task/status
+      with policies.
+  - title: disguise Developer Portal, "Proof of Play" and "Monitoring Machine Health"
+    author: disguise
+    url: https://developer.disguise.one/api/guides/proof-of-play/
+    note: >
+      Manufacturer documents, retrieved 2026-10-07 (with
+      https://developer.disguise.one/api/guides/monitoring/). The Live Update
+      object subsystem:ProofOfPlaySubsystem with object.getRecords (every clip
+      playing) and object.getRecentRecords(n) (the last n completed, at most
+      300, oldest first); the record fields layerName, videoName, framesPlayed,
+      totalFrames, loopCount, completedFullPlayback, startTime, endTime and
+      active. Frequent REST polling is discouraged; Live Update is advised for
+      monitoring.
 
 transport:
   type: http
@@ -105,6 +165,14 @@ settings:
   live_update_ms: { type: int, min: 40, max: 10000, default: 250,
                     label: Live update interval,
                     description: "Shortest time in milliseconds between Live Update values for a changing property." }
+  # The directory whose media listing is kept in state.
+  media_directory: { type: string, max_length: 1024, default: "{projects}",
+                     label: Media directory,
+                     description: "Directory whose files are listed every minute into media.files, absolute or a path symbol such as {projects} or {project:my-show}/objects/VideoFile." }
+  # How many completed proof of play records to keep.
+  proof_of_play_recent: { type: int, min: 1, max: 300, default: 50,
+                          label: Proof of play history,
+                          description: "Number of most recently completed clip playbacks Live Update reports into proof_of_play.recent, at most 300." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -118,9 +186,31 @@ models:
                go_to_frame, go_to_timecode, set_engaged, set_volume, set_brightness,
                get_active_transport, get_transports, get_tracks, get_setlists, get_annotations,
                get_health, get_notifications, get_project, get_session, set_gui_mode,
-               get_failover_settings, failover_machine, restore_machine,
+               get_failover_settings, failover_machine, restore_machine, apply_default_routing,
+               get_understudy_targets,
                detect_systems, get_os_info, get_network_adapters, get_gpu_outputs, get_projects,
-               start_project, quit_project, restart_project, force_quit_project]
+               start_project, quit_project, restart_project, force_quit_project,
+               get_indirections, get_indirection_resources, change_indirection, change_indirections,
+               get_renderstream_layers, get_renderstream_layer_status, get_renderstream_layer_config,
+               get_renderstream_pools, get_renderstream_assigners, start_renderstream_layer,
+               stop_renderstream_layer, restart_renderstream_layer, sync_renderstream_layer,
+               renderstream_failover_machine, renderstream_failover_pool,
+               get_sockpuppet_patches, get_easing_functions, set_live_float, set_live_string,
+               set_live_resource, send_live_changes,
+               get_cdls, set_cdl,
+               get_notes, get_note, set_note,
+               get_shot_recorders, record_shot,
+               execute_python, register_python_module,
+               get_mr_cameras, get_mr_sets, get_spatial_calibrations, get_capture_progress, select_mr_camera,
+               select_spatial_calibration, capture_observation, enable_observation, delete_observation,
+               delete_all_observations,
+               get_reference_points, get_projector_calibration, line_up_current_pose, reset_lineup,
+               overwrite_manual_calibration,
+               get_omnical_camera_discovery, set_omnical_camera_discovery, get_omnical_current_plan,
+               get_omnical_plans, execute_rigcheck, get_rigcheck_result, accept_rigcheck_result,
+               revert_rigcheck_result, get_rigcheck_current_result, get_rigcheck_fallback_result,
+               get_rigcheck_results, get_rigcheck_results_for_plan, delete_old_rigcheck_results,
+               get_vfcs, list_media, provision_media, provision_media_transfers, remove_media]
     verification: none
 
 commands:
@@ -492,6 +582,18 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  apply_default_routing:
+    summary: Put the matrix feed routing back to its default after a machine is restored (failover/applydefaultrouting)
+    send: { method: POST, path: /api/session/failover/applydefaultrouting }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_understudy_targets:
+    summary: The machines each understudy can take over, keyed by understudy (failover/understudytargets)
+    send: { method: GET, path: /api/session/failover/understudytargets }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.understudies" }
+    returns: value
+
   # ── Service API: systems and projects ────────────────────────────────────
   detect_systems:
     summary: The disguise systems on the network, with type, version, running project and which services run (system/detectsystems)
@@ -557,18 +659,696 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── Sequencing: indirections ─────────────────────────────────────────────
+  get_indirections:
+    summary: Every indirection with its resource type and the resource it points to now (sequencing/indirections)
+    send: { method: GET, path: /api/session/sequencing/indirections }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_indirection_resources:
+    summary: The resources an indirection can point to, by the indirection's name (sequencing/indirectionresources)
+    params:
+      indirection: { type: string, max_length: 256, required: true,
+                     label: Indirection,
+                     description: "Indirection name as shown in Designer." }
+    send: { method: GET, path: /api/session/sequencing/indirectionresources, query: { name: "{indirection}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  change_indirection:
+    summary: Point an indirection at another resource, both by name (sequencing/changeindirections); the change is live at once
+    params:
+      indirection: { type: string, max_length: 256, required: true,
+                     label: Indirection,
+                     description: "Indirection name as shown in Designer." }
+      resource:    { type: string, max_length: 256, required: true,
+                     label: Resource,
+                     description: "Name of the resource to point the indirection at, one of those get_indirection_resources lists." }
+    send: { method: POST, path: /api/session/sequencing/changeindirections, body: '{"changes":[{"indirection":{"name":{indirection:json}},"resource":{"name":{resource:json}}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  change_indirections:
+    summary: >
+      Change several indirections in one request (sequencing/changeindirections,
+      sequencingChangeIndirectionsRequest): changes is an array of {indirection,
+      resource}, each a Locator {uid} or {name}
+    params:
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "JSON array of {\"indirection\": Locator, \"resource\": Locator}, each Locator {\"uid\": \"...\"} or {\"name\": \"...\"}." }
+    send: { method: POST, path: /api/session/sequencing/changeindirections, body: '{"changes":{changes}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── RenderStream ─────────────────────────────────────────────────────────
+  get_renderstream_layers:
+    summary: Every RenderStream layer, by uid and name (renderstream/layers)
+    send: { method: GET, path: /api/session/renderstream/layers }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_layer_status:
+    summary: A RenderStream layer's workload, its instances' state and health, and its streams' status, by the layer's name (renderstream/layerstatus)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: GET, path: /api/session/renderstream/layerstatus, query: { name: "{layer}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_layer_config:
+    summary: A RenderStream layer's asset, cluster pool, channel mappings, default assigner and frame rate divisor, by the layer's name (renderstream/layerconfig)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: GET, path: /api/session/renderstream/layerconfig, query: { name: "{layer}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_pools:
+    summary: Every cluster pool with its machines, understudies and their network adapters (renderstream/pools)
+    send: { method: GET, path: /api/session/renderstream/pools }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_renderstream_assigners:
+    summary: Every cluster assigner with its stream transport, format, bit depth, alpha, overlap, padding and preferred network (renderstream/assigners)
+    send: { method: GET, path: /api/session/renderstream/assigners }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  start_renderstream_layer:
+    summary: Start a RenderStream layer's workload on its cluster, by the layer's name (renderstream/startlayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/startlayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  stop_renderstream_layer:
+    summary: Stop a RenderStream layer's workload, by the layer's name (renderstream/stoplayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/stoplayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  restart_renderstream_layer:
+    summary: Restart a RenderStream layer's workload, by the layer's name (renderstream/restartlayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/restartlayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  sync_renderstream_layer:
+    summary: Sync a RenderStream layer's workload, sending the layer's current parameters to its render nodes, by the layer's name (renderstream/synclayers)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/synclayers, body: '{"layers":[{"name":{layer:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  renderstream_failover_machine:
+    summary: Fail a RenderStream render node over to an understudy of its cluster pool, by the machine's name (renderstream/failover)
+    params:
+      machine: { type: string, max_length: 256, required: true,
+                 label: Machine,
+                 description: "Name of the render node to fail over." }
+    send: { method: POST, path: /api/session/renderstream/failover, body: '{"machine":{"name":{machine:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  renderstream_failover_pool:
+    summary: Update a RenderStream layer's cluster pool after a failover and restart its workload, by the layer's name (renderstream/failoverpool)
+    params:
+      layer: { type: string, max_length: 256, required: true,
+               label: Layer,
+               description: "RenderStream layer name as shown in Designer." }
+    send: { method: POST, path: /api/session/renderstream/failoverpool, body: '{"layer":{"name":{layer:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Sockpuppet: live parameter control ───────────────────────────────────
+  get_sockpuppet_patches:
+    summary: Every HTTP Sockpuppet patch with its fields, their kinds, ranges and options, and the latest value of each (sockpuppet/patches)
+    send: { method: GET, path: /api/session/sockpuppet/patches }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_easing_functions:
+    summary: The easing functions a timed float change can use (sockpuppet/easingfunctions)
+    send: { method: GET, path: /api/session/sockpuppet/easingfunctions }
+    expect: { status: 200, json_path: "$.easingFunctions" }
+    returns: value
+
+  set_live_float:
+    summary: Set a float field of a Sockpuppet patch live, at once or eased over a duration (sockpuppet/live)
+    params:
+      patch:    { type: string, max_length: 1024, required: true,
+                  label: Patch address,
+                  description: "Address of the HTTP Sockpuppet patch, as get_sockpuppet_patches lists it." }
+      field:    { type: string, max_length: 256, required: true,
+                  label: Field,
+                  description: "Name of the field to set (not its display name)." }
+      value:    { type: float, required: true,
+                  label: Value,
+                  description: "New value, within the field's min and max." }
+      duration: { type: float, min: 0.0, default: 0.0,
+                  label: Duration,
+                  description: "Time in seconds to ease from the current value to the new one; 0 sets it at once." }
+      easing:   { type: string, max_length: 64, default: "",
+                  label: Easing,
+                  description: "Easing function for a timed change, one of get_easing_functions; empty for Designer's default." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":[{"address":{patch:json},"changes":[{"field":{field:json},"floatValue":{"value":{value:.6f},"duration":{duration:.3f},"easingFunction":{easing:json}}}]}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  set_live_string:
+    summary: Set a text or option field of a Sockpuppet patch live (sockpuppet/live)
+    params:
+      patch: { type: string, max_length: 1024, required: true,
+               label: Patch address,
+               description: "Address of the HTTP Sockpuppet patch, as get_sockpuppet_patches lists it." }
+      field: { type: string, max_length: 256, required: true,
+               label: Field,
+               description: "Name of the field to set (not its display name)." }
+      value: { type: string, max_length: 4096, required: true,
+               label: Value,
+               description: "New text; for a field with options, one of them." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":[{"address":{patch:json},"changes":[{"field":{field:json},"stringValue":{value:json}}]}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  set_live_resource:
+    summary: Point a resource field of a Sockpuppet patch (a video clip, a mesh) at another resource, by its name (sockpuppet/live)
+    params:
+      patch:    { type: string, max_length: 1024, required: true,
+                  label: Patch address,
+                  description: "Address of the HTTP Sockpuppet patch, as get_sockpuppet_patches lists it." }
+      field:    { type: string, max_length: 256, required: true,
+                  label: Field,
+                  description: "Name of the field to set (not its display name)." }
+      resource: { type: string, max_length: 1024, required: true,
+                  label: Resource,
+                  description: "Name of the resource to use, of the type the field takes." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":[{"address":{patch:json},"changes":[{"field":{field:json},"resourceValue":{"name":{resource:json}}}]}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  send_live_changes:
+    summary: >
+      Send several live changes to several Sockpuppet patches in one request
+      (sockpuppet/live, sockpuppetLiveRequest): patches is an array of {address
+      or uid, changes: [{field, floatValue {value, duration, easingFunction} |
+      stringValue | resourceValue Locator}]}
+    params:
+      patches: { type: json, required: true,
+                 label: Patches,
+                 description: "JSON array of sockpuppetLivePatch objects: {\"address\", \"changes\": [{\"field\", and one of floatValue, stringValue or resourceValue}]}." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":{patches}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Colour: CDLs ─────────────────────────────────────────────────────────
+  get_cdls:
+    summary: Every colour decision list with its slope, offset and power per channel and its saturation (colour/cdls)
+    send: { method: GET, path: /api/session/colour/cdls }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  set_cdl:
+    summary: Set every value of a colour decision list, by its name (colour/cdl); the grade changes live at once
+    params:
+      cdl:        { type: string, max_length: 256, required: true,
+                    label: CDL,
+                    description: "Name of the CDL resource as shown in Designer." }
+      slope_r:    { type: float, min: 0.0, default: 1.0, label: Slope red, description: "Red slope (gain), 1.0 for none." }
+      slope_g:    { type: float, min: 0.0, default: 1.0, label: Slope green, description: "Green slope (gain), 1.0 for none." }
+      slope_b:    { type: float, min: 0.0, default: 1.0, label: Slope blue, description: "Blue slope (gain), 1.0 for none." }
+      offset_r:   { type: float, default: 0.0, label: Offset red, description: "Red offset (lift), 0.0 for none." }
+      offset_g:   { type: float, default: 0.0, label: Offset green, description: "Green offset (lift), 0.0 for none." }
+      offset_b:   { type: float, default: 0.0, label: Offset blue, description: "Blue offset (lift), 0.0 for none." }
+      power_r:    { type: float, min: 0.0, default: 1.0, label: Power red, description: "Red power (gamma), 1.0 for none." }
+      power_g:    { type: float, min: 0.0, default: 1.0, label: Power green, description: "Green power (gamma), 1.0 for none." }
+      power_b:    { type: float, min: 0.0, default: 1.0, label: Power blue, description: "Blue power (gamma), 1.0 for none." }
+      saturation: { type: float, min: 0.0, default: 1.0, label: Saturation, description: "Saturation, 1.0 for none and 0.0 for monochrome." }
+    send: { method: POST, path: /api/session/colour/cdl, body: '{"cdl":{"name":{cdl:json},"slope":{"x":{slope_r:.6f},"y":{slope_g:.6f},"z":{slope_b:.6f}},"offset":{"x":{offset_r:.6f},"y":{offset_g:.6f},"z":{offset_b:.6f}},"power":{"x":{power_r:.6f},"y":{power_g:.6f},"z":{power_b:.6f}},"saturation":{saturation:.6f}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Notes ────────────────────────────────────────────────────────────────
+  get_notes:
+    summary: The project's named notes with their text, a page at a time (notes); count 0 returns every note from start
+    params:
+      start: { type: int, min: 0, default: 0,
+               label: Start,
+               description: "Index of the first note to return, from 0." }
+      count: { type: int, min: 0, default: 0,
+               label: Count,
+               description: "Number of notes to return; 0 returns all of them." }
+    send: { method: GET, path: /api/session/notes, query: { start: "{start}", count: "{count}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_note:
+    summary: One note and its text, by the note's name (note)
+    params:
+      note: { type: string, max_length: 256, required: true,
+              label: Note,
+              description: "Name of the note resource as shown in Designer." }
+    send: { method: GET, path: /api/session/note, query: { name: "{note}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  set_note:
+    summary: Set a note's text, by the note's name, creating the note when there is none of that name (note)
+    params:
+      note: { type: string, max_length: 256, required: true,
+              label: Note,
+              description: "Name of the note resource as shown in Designer." }
+      text: { type: json, required: true,
+              label: Text,
+              description: "The note's new text as a JSON string (line breaks as \\n), which replaces the old." }
+    send: { method: POST, path: /api/session/note, body: '{"note":{"name":{note:json}},"text":{text}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  # ── Shot recorder ────────────────────────────────────────────────────────
+  get_shot_recorders:
+    summary: Every shot recorder, whether it is recording, and its slate and take (shotrecorder/recorders)
+    send: { method: GET, path: /api/session/shotrecorder/recorders }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.recorders" }
+    returns: value
+
+  record_shot:
+    summary: Start (engage true) or stop (engage false) a shot recorder, by its name, with the slate and take to record under (shotrecorder/record)
+    params:
+      recorder: { type: string, max_length: 256, required: true,
+                  label: Shot recorder,
+                  description: "Name of the shot recorder as shown in Designer." }
+      engage:   { type: bool, default: true,
+                  label: Record,
+                  description: "True starts recording; false stops it." }
+      slate:    { type: string, max_length: 256, required: true,
+                  label: Slate,
+                  description: "Slate name the shot is recorded under; send the recorder's current slate to keep it." }
+      take:     { type: int, min: 0, required: true,
+                  label: Take,
+                  description: "Take number the shot is recorded under; send the recorder's current take to keep it." }
+    send: { method: POST, path: /api/session/shotrecorder/record, body: '{"engage":{engage},"name":{recorder:json},"slate":{slate:json},"take":"{take}"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Python ───────────────────────────────────────────────────────────────
+  execute_python:
+    summary: >
+      Run a Python 2.7 script in Designer on the Director (python/execute);
+      returns {d3Log, pythonLog, returnValue}. See the critical quirk first
+    params:
+      script: { type: json, required: true,
+                label: Script,
+                description: "Python 2.7 code as a JSON string (lines joined with \\n), run as the body of a function with d3 imported; its return value comes back as returnValue." }
+      module: { type: string, max_length: 256, default: "",
+                label: Module,
+                description: "Registered module to run the script in; empty for a one-off script." }
+    send: { method: POST, path: /api/session/python/execute, body: '{"moduleName":{module:json},"script":{script}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
+    returns: value
+
+  register_python_module:
+    summary: Register a Python 2.7 module in Designer for later execute_python calls to run in (python/registermodule)
+    params:
+      module:   { type: string, max_length: 256, required: true,
+                  label: Module,
+                  description: "Name to register the module under." }
+      contents: { type: json, required: true,
+                  label: Contents,
+                  description: "The module's Python 2.7 source as a JSON string (lines joined with \\n), which imports d3 itself." }
+    send: { method: POST, path: /api/session/python/registermodule, body: '{"moduleName":{module:json},"contents":{contents}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Mixed reality ────────────────────────────────────────────────────────
+  get_mr_cameras:
+    summary: The cameras on the current stage with the spatial calibration each uses (mixedreality/cameras)
+    send: { method: GET, path: /api/session/mixedreality/cameras }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_mr_sets:
+    summary: The mixed reality sets on the current stage with each one's current camera and whether it is overridden (mixedreality/mrsets)
+    send: { method: GET, path: /api/session/mixedreality/mrsets }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_spatial_calibrations:
+    summary: Every spatial calibration with its MR sets and observations (poses, zoom, focus, type, RMS error, enabled) (mixedreality/spatialcalibrations)
+    send: { method: GET, path: /api/session/mixedreality/spatialcalibrations }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_capture_progress:
+    summary: Whether an observation capture is running; only one runs at a time (mixedreality/captureprogress)
+    send: { method: GET, path: /api/session/mixedreality/captureprogress }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  select_mr_camera:
+    summary: Override the current camera of an MR set, both by name (mixedreality/selectcamera)
+    params:
+      mr_set: { type: string, max_length: 256, required: true,
+                label: MR set,
+                description: "Name of the mixed reality set as shown in Designer." }
+      camera: { type: string, max_length: 256, required: true,
+                label: Camera,
+                description: "Name of the camera the set is to use." }
+    send: { method: POST, path: /api/session/mixedreality/selectcamera, body: '{"mrSet":{"name":{mr_set:json}},"cameraOverride":{"name":{camera:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  select_spatial_calibration:
+    summary: Set the spatial calibration a camera uses, both by name (mixedreality/selectspatialcalibration)
+    params:
+      camera:      { type: string, max_length: 256, required: true,
+                     label: Camera,
+                     description: "Name of the camera as shown in Designer." }
+      calibration: { type: string, max_length: 256, required: true,
+                     label: Spatial calibration,
+                     description: "Name of the spatial calibration the camera is to use." }
+    send: { method: POST, path: /api/session/mixedreality/selectspatialcalibration, body: '{"camera":{"name":{camera:json}},"spatialCalibration":{"name":{calibration:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  capture_observation:
+    summary: Capture an observation on a camera into a spatial calibration, both by name (mixedreality/captureobservation); get_capture_progress tells when it is done
+    params:
+      camera:      { type: string, max_length: 256, required: true,
+                     label: Camera,
+                     description: "Name of the camera to capture on." }
+      calibration: { type: string, max_length: 256, required: true,
+                     label: Spatial calibration,
+                     description: "Name of the spatial calibration the observation is added to." }
+    send: { method: POST, path: /api/session/mixedreality/captureobservation, body: '{"camera":{"name":{camera:json}},"spatialCalibration":{"name":{calibration:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  enable_observation:
+    summary: Enable or disable one observation of a spatial calibration, by its uid (mixedreality/enableobservations)
+    params:
+      observation: { type: string, pattern: "^[0-9]{1,20}$", required: true,
+                     label: Observation,
+                     description: "uid of the observation, from the spatial_calibrations state." }
+      enable:      { type: bool, default: true,
+                     label: Enabled,
+                     description: "True uses the observation in the calibration; false leaves it out." }
+    send: { method: POST, path: /api/session/mixedreality/enableobservations, body: '{"observations":[{"uid":"{observation}","enable":{enable}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  delete_observation:
+    summary: Delete one observation of a spatial calibration, by its uid (mixedreality/deleteobservations)
+    params:
+      observation: { type: string, pattern: "^[0-9]{1,20}$", required: true,
+                     label: Observation,
+                     description: "uid of the observation to delete, from the spatial_calibrations state." }
+    send: { method: POST, path: /api/session/mixedreality/deleteobservations, body: '{"observations":["{observation}"]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  delete_all_observations:
+    summary: Delete every observation of a spatial calibration, by its name (mixedreality/deleteallobservations)
+    params:
+      calibration: { type: string, max_length: 256, required: true,
+                     label: Spatial calibration,
+                     description: "Name of the spatial calibration whose observations are all deleted." }
+    send: { method: POST, path: /api/session/mixedreality/deleteallobservations, body: '{"spatialCalibration":{"name":{calibration:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── QuickCal ─────────────────────────────────────────────────────────────
+  get_reference_points:
+    summary: Every QuickCal reference point (quickcal/referencepoints)
+    send: { method: GET, path: /api/session/quickcal/referencepoints }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_projector_calibration:
+    summary: A projector's current calibration (rest, reprojection and RMS errors, selected and used method, lineups required and made, fixed throw ratio), by the projector's name (quickcal/projectorcalibration)
+    params:
+      projector: { type: string, max_length: 256, required: true,
+                   label: Projector,
+                   description: "Name of the projector as shown in Designer." }
+    send: { method: GET, path: /api/session/quickcal/projectorcalibration, query: { name: "{projector}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.info" }
+    returns: value
+
+  line_up_current_pose:
+    summary: Line up a reference point for a projector at a position in its output, recalibrating the projector's current pose (quickcal/lineupcurrentpose)
+    params:
+      projector:       { type: string, max_length: 256, required: true,
+                         label: Projector,
+                         description: "Name of the projector as shown in Designer." }
+      reference_point: { type: string, max_length: 256, required: true,
+                         label: Reference point,
+                         description: "Name of the reference point to line up." }
+      x:               { type: float, required: true,
+                         label: X,
+                         description: "Horizontal position of the reference point in the projector's output, in the units Designer's QuickCal uses." }
+      y:               { type: float, required: true,
+                         label: Y,
+                         description: "Vertical position of the reference point in the projector's output, in the same units." }
+    send: { method: POST, path: /api/session/quickcal/lineupcurrentpose, body: '{"projector":{"name":{projector:json}},"referencePoint":{"name":{reference_point:json}},"position":{"x":{x:.6f},"y":{y:.6f}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  reset_lineup:
+    summary: Reset a projector's QuickCal lineup, by the projector's name (quickcal/resetlineup)
+    params:
+      projector: { type: string, max_length: 256, required: true,
+                   label: Projector,
+                   description: "Name of the projector as shown in Designer." }
+    send: { method: POST, path: /api/session/quickcal/resetlineup, body: '{"projector":{"name":{projector:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  overwrite_manual_calibration:
+    summary: Copy a projector's current calibrated parameters into its manual fields, by the projector's name (quickcal/overwritemanualcalibration)
+    params:
+      projector: { type: string, max_length: 256, required: true,
+                   label: Projector,
+                   description: "Name of the projector as shown in Designer." }
+    send: { method: POST, path: /api/session/quickcal/overwritemanualcalibration, body: '{"projector":{"name":{projector:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── OmniCal and RigCheck ─────────────────────────────────────────────────
+  get_omnical_camera_discovery:
+    summary: Whether OmniCal camera discovery is enabled, and its state (omnical/cameradiscovery)
+    send: { method: GET, path: /api/session/omnical/cameradiscovery }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
+    returns: value
+
+  set_omnical_camera_discovery:
+    summary: Enable or disable OmniCal camera discovery (omnical/cameradiscovery); disable it before a show
+    params:
+      enabled: { type: bool, required: true,
+                 label: Discovery,
+                 description: "True starts looking for OmniCal cameras; false stops, freeing the Director's CPU and network." }
+    send: { method: POST, path: /api/session/omnical/cameradiscovery, body: '{"enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_omnical_current_plan:
+    summary: The OmniCal Plan set as current in Designer, if any (omnical/currentplan)
+    send: { method: GET, path: /api/session/omnical/currentplan }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.plan" }
+    returns: value
+
+  get_omnical_plans:
+    summary: Every OmniCal Plan in the project (omnical/plans)
+    send: { method: GET, path: /api/session/omnical/plans }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.plans" }
+    returns: value
+
+  execute_rigcheck:
+    summary: Run a RigCheck capture, calibration and alignment from the current OmniCal Plan into a new Result (omnical/rigcheck/executeplan)
+    send: { method: POST, path: /api/session/omnical/rigcheck/executeplan, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_rigcheck_result:
+    summary: The current RigCheck's progress and, once done, its status (Green, Amber, Red), feedback, OmniCal score and camera and projector RMS errors (omnical/rigcheck/checkresult)
+    send: { method: GET, path: /api/session/omnical/rigcheck/checkresult }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
+    returns: value
+
+  accept_rigcheck_result:
+    summary: Accept the current RigCheck Result as the new fallback (omnical/rigcheck/acceptresult)
+    send: { method: POST, path: /api/session/omnical/rigcheck/acceptresult, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  revert_rigcheck_result:
+    summary: Revert the current RigCheck Result and switch to the fallback Result (omnical/rigcheck/revertresult)
+    send: { method: POST, path: /api/session/omnical/rigcheck/revertresult, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_rigcheck_current_result:
+    summary: The RigCheck Result set as current, if any (omnical/rigcheck/currentresult)
+    send: { method: GET, path: /api/session/omnical/rigcheck/currentresult }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_rigcheck_fallback_result:
+    summary: The RigCheck Result set as the fallback, if any (omnical/rigcheck/currentfallbackresult)
+    send: { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_rigcheck_results:
+    summary: Every RigCheck Result in the project (omnical/rigcheck/results)
+    send: { method: GET, path: /api/session/omnical/rigcheck/results }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.results" }
+    returns: value
+
+  get_rigcheck_results_for_plan:
+    summary: The RigCheck Results run from an OmniCal Plan, by the plan's name (omnical/rigcheck/resultsforplan)
+    params:
+      plan: { type: string, max_length: 256, required: true,
+              label: Plan,
+              description: "Name of the OmniCal Plan as shown in Designer." }
+    send: { method: GET, path: /api/session/omnical/rigcheck/resultsforplan, query: { name: "{plan}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.results" }
+    returns: value
+
+  delete_old_rigcheck_results:
+    summary: Delete old RigCheck Results that are not in use, to free disk space (omnical/rigcheck/deleteoldresults)
+    send: { method: POST, path: /api/session/omnical/rigcheck/deleteoldresults, body: '{}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_vfcs:
+    summary: Each machine's VFC cards with slot, type, firmware and FPGA versions, split mode, generation and each port's resolution and refresh rate (system/vfcs); empty on non-disguise hardware
+    send: { method: GET, path: /api/service/system/vfcs }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  # ── Service API: media ───────────────────────────────────────────────────
+  list_media:
+    summary: Every file under a directory, recursively, with size and dates (media/list); the directory may use the path symbols {projects}, {rs-assets}, {rs-engines} and {project:<name>}
+    params:
+      directory: { type: string, max_length: 1024, required: true,
+                   label: Directory,
+                   description: "Absolute path of the directory, or a path symbol such as {projects} or {project:my-show}/objects/VideoFile, inside the d3 directories." }
+    send: { method: GET, path: /api/service/media/list, query: { directory: "{directory}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.files" }
+    returns: value
+
+  provision_media:
+    summary: Copy or download a file to a path on this machine, such as into a project's objects folder (media/provision); returns the task started
+    params:
+      media_path: { type: string, max_length: 2048, required: true,
+                    label: Source,
+                    description: "The file to copy or download: a network share path or an HTTP URL reachable from the machine." }
+      local_path: { type: string, max_length: 1024, required: true,
+                    label: Destination,
+                    description: "Where to put it, inside the d3 directories, with a path symbol such as {project:my-show}/objects/VideoFile/clip.mov." }
+    send: { method: POST, path: /api/service/media/provision, body: '{"mediaPath":{media_path:json},"localPath":[{local_path:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  provision_media_transfers:
+    summary: >
+      Copy or download several files in one request (media/provision,
+      mediaProvisionMediaRequest transfers): an array of {mediaPath, localPath
+      [..], uid}; returns one task per transfer
+    params:
+      transfers: { type: json, required: true,
+                   label: Transfers,
+                   description: "JSON array of {\"mediaPath\": source, \"localPath\": [destinations], \"uid\": optional id}." }
+    send: { method: POST, path: /api/service/media/provision, body: '{"transfers":{transfers}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  remove_media:
+    summary: Delete a file or folder on this machine, inside the d3 directories (media/remove); Designer unlocks a file of the running project first. Returns the task's uid
+    params:
+      path: { type: string, max_length: 1024, required: true,
+              label: Path,
+              description: "File or folder to delete, absolute or with a path symbol such as {project:my-show}/objects/VideoFile/clip.mov." }
+    send: { method: POST, path: /api/service/media/remove, body: '{"path":[{path:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.taskUid" }
+    returns: value
+
 telemetry:
+  # What changes during a show, every 10 seconds.
   poll:
     every_ms: 10000
     send:
       - { method: GET, path: /api/session/transport/transports }
+      - { method: GET, path: /api/session/transport/activetransport }
       - { method: GET, path: /api/session/status/health }
+      - { method: GET, path: /api/session/status/notifications }
+      - { method: GET, path: /api/session/sequencing/indirections }
+      - { method: GET, path: /api/session/renderstream/layers }
+      - { method: GET, path: /api/session/sockpuppet/patches }
+      - { method: GET, path: /api/session/shotrecorder/recorders }
+  # What an operator changes in the project, and the machines' set-up, every
+  # minute (and on connecting).
+  subscribe:
+    every_ms: 60000
+    send:
       - { method: GET, path: /api/session/status/project }
+      - { method: GET, path: /api/session/status/session }
+      - { method: GET, path: /api/session/failover/settings }
+      - { method: GET, path: /api/session/failover/understudytargets }
+      - { method: GET, path: /api/session/transport/tracks }
+      - { method: GET, path: /api/session/transport/setlists }
+      - { method: GET, path: /api/session/renderstream/pools }
+      - { method: GET, path: /api/session/renderstream/assigners }
+      - { method: GET, path: /api/session/sockpuppet/easingfunctions }
+      - { method: GET, path: /api/session/colour/cdls }
+      - { method: GET, path: /api/session/notes }
+      - { method: GET, path: /api/session/mixedreality/cameras }
+      - { method: GET, path: /api/session/mixedreality/mrsets }
+      - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
+      - { method: GET, path: /api/session/mixedreality/captureprogress }
+      - { method: GET, path: /api/session/quickcal/referencepoints }
+      - { method: GET, path: /api/session/omnical/cameradiscovery }
+      - { method: GET, path: /api/session/omnical/currentplan }
+      - { method: GET, path: /api/session/omnical/plans }
+      - { method: GET, path: /api/session/omnical/rigcheck/checkresult }
+      - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
+      - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
+      - { method: GET, path: /api/session/omnical/rigcheck/results }
+      - { method: GET, path: /api/service/system/detectsystems }
+      - { method: GET, path: /api/service/system/osinfo }
+      - { method: GET, path: /api/service/system/networkadapters }
+      - { method: GET, path: /api/service/system/gpuoutputs }
+      - { method: GET, path: /api/service/system/projects }
+      - { method: GET, path: /api/service/system/vfcs }
+      - { method: GET, path: /api/service/media/list, query: { directory: "{settings.media_directory}" } }
   websocket:
     path: /api/session/liveupdate
     send:
       - >-
         {"subscribe":{"object":"transportmanager:{settings.live_transport}","properties":["{'playing': object.player.playing, 'time': object.player.tRender, 'mode': str(object.player.playMode.state), 'track': str(object.player.track.description), 'engaged': object.engaged, 'volume': object.volume, 'brightness': object.brightness}"],"configuration":{"updateFrequencyMs":{settings.live_update_ms}}}}
+      - >-
+        {"subscribe":{"object":"subsystem:ProofOfPlaySubsystem","properties":["{'a': 'active', 'r': 'recent', 'active': (object.getRecords() if callable(object.getRecords) else object.getRecords), 'recent': object.getRecentRecords({settings.proof_of_play_recent})}"],"configuration":{"updateFrequencyMs":1000}}}
   updates:
     # Every transport, and below every machine of the session: each read
     # replaces the last, so a removed transport or machine leaves.
@@ -595,6 +1375,72 @@ telemetry:
         transports.{uid}.current_track: "{track}"
         transports.{uid}.receiving_timecode: "{timecode}"
         transports.{uid}.setlist: "{setlist}"
+    # Each transport's current track has its notes, tags and sections read.
+    - path: "^/api/session/transport/transports$"
+      json_each: "$.transports"
+      each_match: { "$.currentTrack.uid": "^([0-9]+)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/transport/annotations, query: { uid: "{1}" } }
+    - path: "^/api/session/transport/transports$"
+      json_match: { "$.multitransports": "^\\[" }
+      replace: multitransports
+      json_each: "$.multitransports"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        engaged: "$.engaged"
+        members: "$.transports"
+      state:
+        multitransports.{uid}.name: "{name}"
+        multitransports.{uid}.engaged: "{engaged}"
+        multitransports.{uid}.transports: "{members}"
+    - path: "^/api/session/transport/activetransport$"
+      json_match: { "$.result": "^\\[" }
+      replace: active_transport
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        active_transport.{uid}.name: "{name}"
+    - path: "^/api/session/transport/tracks$"
+      json_match: { "$.result": "^\\[" }
+      replace: tracks
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", length: "$.length", crossfade: "$.crossfade" }
+      state:
+        tracks.{uid}.name: "{name}"
+        tracks.{uid}.length: "{length}"
+        tracks.{uid}.crossfade: "{crossfade}"
+    - path: "^/api/session/transport/setlists$"
+      json_match: { "$.result": "^\\[" }
+      replace: setlists
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        setlists.{uid}.name: "{name}"
+    - path: "^/api/session/transport/setlists$"
+      json_each: "$.result[*].tracks"
+      json: { setlist: "$^.uid", uid: "$.uid", name: "$.name" }
+      state:
+        setlists.{setlist}.tracks.{index}.uid: "{uid}"
+        setlists.{setlist}.tracks.{index}.name: "{name}"
+    # A track's annotations, whether the poll or get_annotations asked.
+    - path: "^/api/session/transport/annotations\\?"
+      json_match: { "$.result.uid": "^([0-9]+)$" }
+      json:
+        notes: "$.result.annotations.notes"
+        tags: "$.result.annotations.tags"
+        sections: "$.result.annotations.sections"
+      state:
+        annotations.{1}.notes: "{notes}"
+        annotations.{1}.tags: "{tags}"
+        annotations.{1}.sections: "{sections}"
+    # A transport command that succeeded has every transport read again.
+    - path: "^/api/session/transport/(play|playsection|playloopsection|stop|returntostart|goto[a-z]+|engaged|volume|brightness)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/transport/transports }
     - path: "^/api/session/status/health$"
       json_match: { "$.result": "^\\[" }
       replace: machines
@@ -602,14 +1448,37 @@ telemetry:
       json:
         machine: "$.machine.name"
         hostname: "$.machine.hostname"
+        running_as: "$.runningAsMachine.name"
         fps: "$.status.averageFPS"
         dropped: "$.status.videoDroppedFrames"
         missed: "$.status.videoMissedFrames"
       state:
         machines.{machine}.hostname: "{hostname}"
+        machines.{machine}.running_as: "{running_as}"
         machines.{machine}.average_fps: "{fps}"
         machines.{machine}.video_dropped_frames: "{dropped}"
         machines.{machine}.video_missed_frames: "{missed}"
+    - path: "^/api/session/status/health$"
+      json_each: "$.result[*].status.states"
+      json:
+        machine: "$^.machine.name"
+        name: "$.name"
+        detail: "$.detail"
+        category: "$.category"
+        severity: "$.severity"
+      state:
+        machines.{machine}.states.{index}.name: "{name}"
+        machines.{machine}.states.{index}.detail: "{detail}"
+        machines.{machine}.states.{index}.category: "{category}"
+        machines.{machine}.states.{index}.severity: "{severity}"
+    - path: "^/api/session/status/notifications$"
+      json_match: { "$.result": "^\\[" }
+      replace: notifications
+      json_each: "$.result[*].notifications"
+      json: { machine: "$^.machine.name", summary: "$.summary", detail: "$.detail" }
+      state:
+        notifications.{machine}.{index}.summary: "{summary}"
+        notifications.{machine}.{index}.detail: "{detail}"
     - path: "^/api/session/status/project$"
       json:
         path: "$.result.projectPath"
@@ -617,13 +1486,716 @@ telemetry:
         minor: "$.result.version.minor"
         hotfix: "$.result.version.hotfix"
         revision: "$.result.version.revision"
+        release: "$.result.version.releaseType"
       state:
         project.path: "{path}"
         project.version: "{major}.{minor}.{hotfix}.{revision}"
+        project.release_type: "{release}"
+    # The session: whether it runs solo, and its Director, actors and
+    # understudies by machine name.
+    - path: "^/api/session/status/session$"
+      json_match: { "$.result": "^\\{" }
+      replace: session.machines
+      json: { solo: "$.result.isRunningSolo", dedicated: "$.result.isDirectorDedicated" }
+      state:
+        session.solo: "{solo}"
+        session.director_dedicated: "{dedicated}"
+    - path: "^/api/session/status/session$"
+      json_match: { "$.result.director.name": "^(.+)$" }
+      json:
+        uid: "$.result.director.uid"
+        hostname: "$.result.director.hostname"
+        type: "$.result.director.type"
+        gui_mode: "$.result.director.guiMode"
+        gui_visible: "$.result.director.guiVisible"
+      state:
+        session.director: "{1}"
+        session.machines.{1}.role: director
+        session.machines.{1}.uid: "{uid}"
+        session.machines.{1}.hostname: "{hostname}"
+        session.machines.{1}.type: "{type}"
+        session.machines.{1}.gui_mode: "{gui_mode}"
+        session.machines.{1}.gui_visible: "{gui_visible}"
+    - path: "^/api/session/status/session$"
+      json_each: "$.result.actors"
+      json: { name: "$.name", uid: "$.uid", hostname: "$.hostname", type: "$.type", gui_mode: "$.guiMode", gui_visible: "$.guiVisible" }
+      state:
+        session.machines.{name}.role: actor
+        session.machines.{name}.uid: "{uid}"
+        session.machines.{name}.hostname: "{hostname}"
+        session.machines.{name}.type: "{type}"
+        session.machines.{name}.gui_mode: "{gui_mode}"
+        session.machines.{name}.gui_visible: "{gui_visible}"
+    - path: "^/api/session/status/session$"
+      json_each: "$.result.understudies"
+      json: { name: "$.name", uid: "$.uid", hostname: "$.hostname", type: "$.type", gui_mode: "$.guiMode", gui_visible: "$.guiVisible" }
+      state:
+        session.machines.{name}.role: understudy
+        session.machines.{name}.uid: "{uid}"
+        session.machines.{name}.hostname: "{hostname}"
+        session.machines.{name}.type: "{type}"
+        session.machines.{name}.gui_mode: "{gui_mode}"
+        session.machines.{name}.gui_visible: "{gui_visible}"
+    # A GUI mode set is read back.
+    - path: "^/api/session/status/setguimode$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/status/session }
+    - path: "^/api/session/failover/settings$"
+      json_match: { "$.status.code": "^0$" }
+      json: { timeout: "$.timeout", normal: "$.normalPreset", current: "$.currentPreset" }
+      state:
+        failover.timeout: "{timeout}"
+        failover.normal_preset: "{normal}"
+        failover.current_preset: "{current}"
+    - path: "^/api/session/failover/understudytargets$"
+      json_match: { "$.status.code": "^0$" }
+      json: { targets: "$.understudies" }
+      state:
+        failover.understudy_targets: "{targets}"
+    # A failover, a restore or the default routing changes which machine
+    # outputs: health, the session and the failover preset are read again.
+    - path: "^/api/session/failover/(failovermachine|restoremachine|applydefaultrouting)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/status/health }
+        - { method: GET, path: /api/session/status/session }
+        - { method: GET, path: /api/session/failover/settings }
+    # Indirections, and for each the resources it can point to.
+    - path: "^/api/session/sequencing/indirections$"
+      json_match: { "$.result": "^\\[" }
+      replace: indirections
+      json_each: "$.result"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        type: "$.resourceType"
+        resource_uid: "$.currentResource.uid"
+        resource_name: "$.currentResource.name"
+      state:
+        indirections.{uid}.name: "{name}"
+        indirections.{uid}.resource_type: "{type}"
+        indirections.{uid}.resource_uid: "{resource_uid}"
+        indirections.{uid}.resource: "{resource_name}"
+      then_send:
+        - { method: GET, path: /api/session/sequencing/indirectionresources, query: { uid: "{uid}" } }
+    - path: "^/api/session/sequencing/indirectionresources\\?uid=([0-9]+)$"
+      json_match: { "$.result": "^\\[" }
+      replace: indirection_resources.{1}
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        indirection_resources.{1}.{uid}: "{name}"
+    - path: "^/api/session/sequencing/changeindirections$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/sequencing/indirections }
+    # RenderStream layers, and for each its status and configuration.
+    - path: "^/api/session/renderstream/layers$"
+      json_match: { "$.result": "^\\[" }
+      replace: renderstream.layers
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        renderstream.layers.{uid}.name: "{name}"
+      then_send:
+        - { method: GET, path: /api/session/renderstream/layerstatus, query: { uid: "{uid}" } }
+        - { method: GET, path: /api/session/renderstream/layerconfig, query: { uid: "{uid}" } }
+    - path: "^/api/session/renderstream/layerstatus\\?uid=([0-9]+)$"
+      json_match: { "$.result": "^\\{" }
+      replace: renderstream.status.{1}
+      json:
+        workload: "$.result.workload.name"
+        workload_uid: "$.result.workload.uid"
+        t_now: "$.result.reference.tNow"
+        asset_errors: "$.result.assetErrors"
+      state:
+        renderstream.status.{1}.workload: "{workload}"
+        renderstream.status.{1}.workload_uid: "{workload_uid}"
+        renderstream.status.{1}.t_now: "{t_now}"
+        renderstream.status.{1}.asset_errors: "{asset_errors}"
+    - path: "^/api/session/renderstream/layerstatus\\?uid=([0-9]+)$"
+      json_each: "$.result.workload.instances"
+      json:
+        machine: "$.machineName"
+        machine_uid: "$.machineUid"
+        state: "$.state"
+        health: "$.healthMessage"
+        details: "$.healthDetails"
+      state:
+        renderstream.status.{1}.instances.{index}.machine: "{machine}"
+        renderstream.status.{1}.instances.{index}.machine_uid: "{machine_uid}"
+        renderstream.status.{1}.instances.{index}.state: "{state}"
+        renderstream.status.{1}.instances.{index}.health: "{health}"
+        renderstream.status.{1}.instances.{index}.health_details: "{details}"
+    - path: "^/api/session/renderstream/layerstatus\\?uid=([0-9]+)$"
+      json_each: "$.result.streams"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        source: "$.sourceMachine"
+        receiver: "$.receiverMachine"
+        wanted: "$.status.subscriptionWanted"
+        subscribed: "$.status.subscribeSuccessful"
+        t_dropped: "$.status.tLastDropped"
+        t_error: "$.status.tLastError"
+        error: "$.status.lastErrorMessage"
+        status: "$.statusString"
+      state:
+        renderstream.status.{1}.streams.{index}.uid: "{uid}"
+        renderstream.status.{1}.streams.{index}.name: "{name}"
+        renderstream.status.{1}.streams.{index}.source: "{source}"
+        renderstream.status.{1}.streams.{index}.receiver: "{receiver}"
+        renderstream.status.{1}.streams.{index}.subscription_wanted: "{wanted}"
+        renderstream.status.{1}.streams.{index}.subscribed: "{subscribed}"
+        renderstream.status.{1}.streams.{index}.t_last_dropped: "{t_dropped}"
+        renderstream.status.{1}.streams.{index}.t_last_error: "{t_error}"
+        renderstream.status.{1}.streams.{index}.last_error: "{error}"
+        renderstream.status.{1}.streams.{index}.status: "{status}"
+    - path: "^/api/session/renderstream/layerconfig\\?uid=([0-9]+)$"
+      json_match: { "$.result": "^\\{" }
+      replace: renderstream.config.{1}
+      json:
+        asset: "$.result.asset.name"
+        pool: "$.result.pool.name"
+        assigner: "$.result.defaultAssigner.name"
+        divisor: "$.result.framerateFractionDivisor"
+        mappings: "$.result.channelMappings"
+      state:
+        renderstream.config.{1}.asset: "{asset}"
+        renderstream.config.{1}.pool: "{pool}"
+        renderstream.config.{1}.default_assigner: "{assigner}"
+        renderstream.config.{1}.framerate_divisor: "{divisor}"
+        renderstream.config.{1}.channel_mappings: "{mappings}"
+    - path: "^/api/session/renderstream/pools$"
+      json_match: { "$.result": "^\\[" }
+      replace: renderstream.pools
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", machines: "$.machines", understudies: "$.understudies" }
+      state:
+        renderstream.pools.{uid}.name: "{name}"
+        renderstream.pools.{uid}.machines: "{machines}"
+        renderstream.pools.{uid}.understudies: "{understudies}"
+    - path: "^/api/session/renderstream/assigners$"
+      json_match: { "$.result": "^\\[" }
+      replace: renderstream.assigners
+      json_each: "$.result"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        type: "$.transport.type"
+        format: "$.transport.format"
+        depth: "$.transport.bitDepth"
+        alpha: "$.alpha"
+        overlap: "$.overlapPixels"
+        padding: "$.paddingPixels"
+        ip: "$.preferredNetwork.ip"
+        network: "$.preferredNetwork.name"
+      state:
+        renderstream.assigners.{uid}.name: "{name}"
+        renderstream.assigners.{uid}.transport: "{type}"
+        renderstream.assigners.{uid}.format: "{format}"
+        renderstream.assigners.{uid}.bit_depth: "{depth}"
+        renderstream.assigners.{uid}.alpha: "{alpha}"
+        renderstream.assigners.{uid}.overlap_pixels: "{overlap}"
+        renderstream.assigners.{uid}.padding_pixels: "{padding}"
+        renderstream.assigners.{uid}.network_ip: "{ip}"
+        renderstream.assigners.{uid}.network: "{network}"
+    # A workload started, stopped, restarted, synced or failed over has the
+    # layers, and so their status, read again; a render node failover the
+    # machines' health too.
+    - path: "^/api/session/renderstream/(startlayers|stoplayers|restartlayers|synclayers|failoverpool|failover)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/renderstream/layers }
+    - path: "^/api/session/renderstream/failover$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/status/health }
+        - { method: GET, path: /api/session/renderstream/pools }
+    # Sockpuppet patches, keyed by uid, with every field's latest value.
+    - path: "^/api/session/sockpuppet/patches$"
+      json_match: { "$.result": "^\\[" }
+      replace: sockpuppet.patches
+      json_each: "$.result"
+      json: { uid: "$.uid", address: "$.address", description: "$.description" }
+      state:
+        sockpuppet.patches.{uid}.address: "{address}"
+        sockpuppet.patches.{uid}.description: "{description}"
+    - path: "^/api/session/sockpuppet/patches$"
+      json_each: "$.result[*].fields"
+      json:
+        patch: "$^.uid"
+        name: "$.name"
+        display: "$.displayName"
+        type: "$.type"
+        value: "$.floatValue.value"
+        current: "$.floatValue.currentValue"
+        min: "$.floatMeta.min"
+        max: "$.floatMeta.max"
+        default: "$.floatMeta.defaultValue"
+        step: "$.floatMeta.step"
+        text: "$.stringValue"
+        options: "$.stringMeta.options"
+        resource: "$.resourceValue.name"
+        resource_uid: "$.resourceValue.uid"
+        resource_type: "$.resourceMeta.type"
+      state:
+        sockpuppet.patches.{patch}.fields.{index}.name: "{name}"
+        sockpuppet.patches.{patch}.fields.{index}.display_name: "{display}"
+        sockpuppet.patches.{patch}.fields.{index}.type: "{type}"
+        sockpuppet.patches.{patch}.fields.{index}.value: "{value}"
+        sockpuppet.patches.{patch}.fields.{index}.current_value: "{current}"
+        sockpuppet.patches.{patch}.fields.{index}.min: "{min}"
+        sockpuppet.patches.{patch}.fields.{index}.max: "{max}"
+        sockpuppet.patches.{patch}.fields.{index}.default: "{default}"
+        sockpuppet.patches.{patch}.fields.{index}.step: "{step}"
+        sockpuppet.patches.{patch}.fields.{index}.text: "{text}"
+        sockpuppet.patches.{patch}.fields.{index}.options: "{options}"
+        sockpuppet.patches.{patch}.fields.{index}.resource: "{resource}"
+        sockpuppet.patches.{patch}.fields.{index}.resource_uid: "{resource_uid}"
+        sockpuppet.patches.{patch}.fields.{index}.resource_type: "{resource_type}"
+    - path: "^/api/session/sockpuppet/easingfunctions$"
+      json_match: { "$.easingFunctions": "^\\[" }
+      json: { list: "$.easingFunctions" }
+      state:
+        sockpuppet.easing_functions: "{list}"
+    - path: "^/api/session/sockpuppet/live$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/sockpuppet/patches }
+    # Colour decision lists, keyed by uid.
+    - path: "^/api/session/colour/cdls$"
+      json_match: { "$.result": "^\\[" }
+      replace: cdls
+      json_each: "$.result"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        sr: "$.slope.x"
+        sg: "$.slope.y"
+        sb: "$.slope.z"
+        or: "$.offset.x"
+        og: "$.offset.y"
+        ob: "$.offset.z"
+        pr: "$.power.x"
+        pg: "$.power.y"
+        pb: "$.power.z"
+        sat: "$.saturation"
+      state:
+        cdls.{uid}.name: "{name}"
+        cdls.{uid}.slope_r: "{sr}"
+        cdls.{uid}.slope_g: "{sg}"
+        cdls.{uid}.slope_b: "{sb}"
+        cdls.{uid}.offset_r: "{or}"
+        cdls.{uid}.offset_g: "{og}"
+        cdls.{uid}.offset_b: "{ob}"
+        cdls.{uid}.power_r: "{pr}"
+        cdls.{uid}.power_g: "{pg}"
+        cdls.{uid}.power_b: "{pb}"
+        cdls.{uid}.saturation: "{sat}"
+    - path: "^/api/session/colour/cdl$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/colour/cdls }
+    # Notes, keyed by uid: the whole list (asked with no page), or one note
+    # read or written.
+    - path: "^/api/session/notes$"
+      json_match: { "$.result": "^\\[" }
+      replace: notes
+      json: {}
+    - path: "^/api/session/notes(\\?|$)"
+      json_each: "$.result"
+      json: { uid: "$.note.uid", name: "$.note.name", text: "$.text" }
+      state:
+        notes.{uid}.name: "{name}"
+        notes.{uid}.text: "{text}"
+    - path: "^/api/session/note(\\?|$)"
+      json_match: { "$.result.note.uid": "^([0-9]+)$" }
+      json: { name: "$.result.note.name", text: "$.result.text" }
+      state:
+        notes.{2}.name: "{name}"
+        notes.{2}.text: "{text}"
+    # Shot recorders, keyed by name.
+    - path: "^/api/session/shotrecorder/recorders$"
+      json_match: { "$.recorders": "^\\[" }
+      replace: shot_recorders
+      json_each: "$.recorders"
+      json: { name: "$.name", engaged: "$.engaged", slate: "$.slate", take: "$.take" }
+      state:
+        shot_recorders.{name}.recording: "{engaged}"
+        shot_recorders.{name}.slate: "{slate}"
+        shot_recorders.{name}.take: "{take}"
+    - path: "^/api/session/shotrecorder/record$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/shotrecorder/recorders }
+    # Mixed reality cameras, sets and spatial calibrations, keyed by uid.
+    - path: "^/api/session/mixedreality/cameras$"
+      json_match: { "$.result": "^\\[" }
+      replace: mixed_reality.cameras
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", calibration: "$.spatialCalibration.name" }
+      state:
+        mixed_reality.cameras.{uid}.name: "{name}"
+        mixed_reality.cameras.{uid}.spatial_calibration: "{calibration}"
+    - path: "^/api/session/mixedreality/mrsets$"
+      json_match: { "$.result": "^\\[" }
+      replace: mixed_reality.sets
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", camera: "$.currentCamera.name", override: "$.isCameraOverride" }
+      state:
+        mixed_reality.sets.{uid}.name: "{name}"
+        mixed_reality.sets.{uid}.current_camera: "{camera}"
+        mixed_reality.sets.{uid}.camera_override: "{override}"
+    - path: "^/api/session/mixedreality/spatialcalibrations$"
+      json_match: { "$.result": "^\\[" }
+      replace: mixed_reality.calibrations
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", sets: "$.mrsets" }
+      state:
+        mixed_reality.calibrations.{uid}.name: "{name}"
+        mixed_reality.calibrations.{uid}.mr_sets: "{sets}"
+    - path: "^/api/session/mixedreality/spatialcalibrations$"
+      json_each: "$.result[*].observations"
+      json:
+        calibration: "$^.uid"
+        uid: "$.uid"
+        name: "$.name"
+        enabled: "$.isEnabled"
+        zoom: "$.zoom"
+        focus: "$.focus"
+        type: "$.type"
+        rms: "$.rmsError"
+        tracked: "$.trackedPose"
+        solved: "$.solvedPose"
+      state:
+        mixed_reality.calibrations.{calibration}.observations.{uid}.name: "{name}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.enabled: "{enabled}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.zoom: "{zoom}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.focus: "{focus}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.type: "{type}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.rms_error: "{rms}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.tracked_pose: "{tracked}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.solved_pose: "{solved}"
+    - path: "^/api/session/mixedreality/captureprogress$"
+      json_match: { "$.status.code": "^0$" }
+      json: { busy: "$.result" }
+      state:
+        mixed_reality.capturing: "{busy}"
+    # A selection or an observation change is read back.
+    - path: "^/api/session/mixedreality/(selectcamera)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/mixedreality/mrsets }
+    - path: "^/api/session/mixedreality/selectspatialcalibration$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/mixedreality/cameras }
+    - path: "^/api/session/mixedreality/(captureobservation|enableobservations|deleteobservations|deleteallobservations)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/mixedreality/captureprogress }
+        - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
+    # QuickCal reference points, keyed by uid.
+    - path: "^/api/session/quickcal/referencepoints$"
+      json_match: { "$.result": "^\\[" }
+      replace: quickcal.reference_points
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        quickcal.reference_points.{uid}: "{name}"
+    # OmniCal: camera discovery, plans, and the RigCheck and its Results.
+    - path: "^/api/session/omnical/cameradiscovery$"
+      json_match: { "$.status.code": "^0$" }
+      json: { enabled: "$.enabled", discovery: "$.discovery" }
+      state:
+        omnical.camera_discovery: "{enabled}"
+        omnical.camera_discovery_state: "{discovery}"
+    - path: "^/api/session/omnical/currentplan$"
+      json_match: { "$.status.code": "^0$" }
+      json: { name: "$.plan.name", uid: "$.plan.uid" }
+      state:
+        omnical.current_plan: "{name}"
+        omnical.current_plan_uid: "{uid}"
+    - path: "^/api/session/omnical/plans$"
+      json_match: { "$.plans": "^\\[" }
+      replace: omnical.plans
+      json_each: "$.plans"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        omnical.plans.{uid}: "{name}"
+    - path: "^/api/session/omnical/rigcheck/checkresult$"
+      json_match: { "$.result.status": "^(.+)$" }
+      json:
+        feedback: "$.result.feedback"
+        score: "$.result.omniCalScore"
+        camera: "$.result.cameraRmsError"
+        projector: "$.result.projectorRmsError"
+        message: "$.status.message"
+      state:
+        omnical.rigcheck.status: "{1}"
+        omnical.rigcheck.feedback: "{feedback}"
+        omnical.rigcheck.score: "{score}"
+        omnical.rigcheck.camera_rms_error: "{camera}"
+        omnical.rigcheck.projector_rms_error: "{projector}"
+        omnical.rigcheck.progress: "{message}"
+    - path: "^/api/session/omnical/rigcheck/currentresult$"
+      json_match: { "$.status.code": "^0$" }
+      json: { name: "$.result.name", uid: "$.result.uid" }
+      state:
+        omnical.current_result: "{name}"
+        omnical.current_result_uid: "{uid}"
+    - path: "^/api/session/omnical/rigcheck/currentfallbackresult$"
+      json_match: { "$.status.code": "^0$" }
+      json: { name: "$.result.name", uid: "$.result.uid" }
+      state:
+        omnical.fallback_result: "{name}"
+        omnical.fallback_result_uid: "{uid}"
+    - path: "^/api/session/omnical/rigcheck/results$"
+      json_match: { "$.results": "^\\[" }
+      replace: omnical.results
+      json_each: "$.results"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        omnical.results.{uid}: "{name}"
+    # A RigCheck command is read back (set_omnical_camera_discovery's own
+    # answer carries the new discovery state).
+    - path: "^/api/session/omnical/rigcheck/(executeplan|acceptresult|revertresult|deleteoldresults)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/omnical/rigcheck/checkresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/results }
+    # Service API: the machines on the network, keyed by host name.
+    - path: "^/api/service/system/detectsystems$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.systems
+      json_each: "$.result"
+      json:
+        host: "$.hostname"
+        type: "$.type"
+        major: "$.version.major"
+        minor: "$.version.minor"
+        hotfix: "$.version.hotfix"
+        revision: "$.version.revision"
+        project: "$.runningProject"
+        ip: "$.ipAddress"
+        designer: "$.isDesignerRunning"
+        service: "$.isServiceRunning"
+        manager: "$.isManagerRunning"
+        notch: "$.isNotchHostRunning"
+      state:
+        service.systems.{host}.type: "{type}"
+        service.systems.{host}.version: "{major}.{minor}.{hotfix}.{revision}"
+        service.systems.{host}.running_project: "{project}"
+        service.systems.{host}.ip_address: "{ip}"
+        service.systems.{host}.designer_running: "{designer}"
+        service.systems.{host}.service_running: "{service}"
+        service.systems.{host}.manager_running: "{manager}"
+        service.systems.{host}.notch_host_running: "{notch}"
+    - path: "^/api/service/system/osinfo$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.os
+      json_each: "$.result"
+      json: { host: "$.hostname", windows: "$.windowsVersion", image: "$.imageVersion" }
+      state:
+        service.os.{host}.windows_version: "{windows}"
+        service.os.{host}.image_version: "{image}"
+    - path: "^/api/service/system/networkadapters$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.adapters
+      json_each: "$.result[*].netAdapters"
+      json:
+        host: "$^.hostname"
+        name: "$.name"
+        mac: "$.mac"
+        enabled: "$.enabled"
+        dhcp: "$.dhcp"
+        status: "$.status"
+        addresses: "$.addresses"
+      state:
+        service.adapters.{host}.{index}.name: "{name}"
+        service.adapters.{host}.{index}.mac: "{mac}"
+        service.adapters.{host}.{index}.enabled: "{enabled}"
+        service.adapters.{host}.{index}.dhcp: "{dhcp}"
+        service.adapters.{host}.{index}.status: "{status}"
+        service.adapters.{host}.{index}.addresses: "{addresses}"
+    - path: "^/api/service/system/gpuoutputs$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.gpu
+      json_each: "$.result"
+      json: { host: "$.hostname", frequency: "$.genlock.frequency" }
+      state:
+        service.gpu.{host}.genlock_frequency: "{frequency}"
+    - path: "^/api/service/system/gpuoutputs$"
+      json_each: "$.result[*].gpuOutputs"
+      json:
+        host: "$^.hostname"
+        port: "$.gpuPort"
+        genlock: "$.genlockState"
+        emulated: "$.emulated"
+        width: "$.resolution.width"
+        height: "$.resolution.height"
+        rate: "$.refreshRate"
+        depth: "$.bitDepth"
+        colour: "$.colourFormat"
+      state:
+        service.gpu.{host}.outputs.{index}.gpu_port: "{port}"
+        service.gpu.{host}.outputs.{index}.genlock_state: "{genlock}"
+        service.gpu.{host}.outputs.{index}.emulated: "{emulated}"
+        service.gpu.{host}.outputs.{index}.width: "{width}"
+        service.gpu.{host}.outputs.{index}.height: "{height}"
+        service.gpu.{host}.outputs.{index}.refresh_rate: "{rate}"
+        service.gpu.{host}.outputs.{index}.bit_depth: "{depth}"
+        service.gpu.{host}.outputs.{index}.colour_format: "{colour}"
+    - path: "^/api/service/system/projects$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.projects
+      json_each: "$.result"
+      json: { host: "$.hostname", last: "$.lastProject" }
+      state:
+        service.projects.{host}.last_project: "{last}"
+    - path: "^/api/service/system/projects$"
+      json_each: "$.result[*].projects"
+      json:
+        host: "$^.hostname"
+        path: "$.path"
+        modified: "$.lastModified"
+        major: "$.version.major"
+        minor: "$.version.minor"
+        hotfix: "$.version.hotfix"
+        revision: "$.version.revision"
+      state:
+        service.projects.{host}.projects.{index}.path: "{path}"
+        service.projects.{host}.projects.{index}.last_modified: "{modified}"
+        service.projects.{host}.projects.{index}.version: "{major}.{minor}.{hotfix}.{revision}"
+    - path: "^/api/service/system/vfcs$"
+      json_match: { "$.result": "^\\[" }
+      replace: service.vfcs
+      json_each: "$.result"
+      json: { host: "$.hostname", backplane: "$.backplaneVersion" }
+      state:
+        service.vfcs.{host}.backplane: "{backplane}"
+    - path: "^/api/service/system/vfcs$"
+      json_each: "$.result[*].cards"
+      json:
+        host: "$^.hostname"
+        slot: "$.slot"
+        type: "$.type"
+        firmware: "$.firmwareVersion"
+        fpga: "$.fpgaVersion"
+        split: "$.splitMode"
+        generation: "$.generation"
+        ports: "$.ports"
+      state:
+        service.vfcs.{host}.cards.{index}.slot: "{slot}"
+        service.vfcs.{host}.cards.{index}.type: "{type}"
+        service.vfcs.{host}.cards.{index}.firmware_version: "{firmware}"
+        service.vfcs.{host}.cards.{index}.fpga_version: "{fpga}"
+        service.vfcs.{host}.cards.{index}.split_mode: "{split}"
+        service.vfcs.{host}.cards.{index}.generation: "{generation}"
+        service.vfcs.{host}.cards.{index}.ports: "{ports}"
+    # The media listing: the setting's directory every minute, or the
+    # directory list_media last asked for.
+    - path: "^/api/service/media/list\\?"
+      json_match: { "$.files": "^\\[" }
+      replace: media.files
+      json_each: "$.files"
+      json: { path: "$.path", size: "$.size", created: "$.creationDate", modified: "$.lastWriteDate" }
+      state:
+        media.files.{index}.path: "{path}"
+        media.files.{index}.size: "{size}"
+        media.files.{index}.created: "{created}"
+        media.files.{index}.last_written: "{modified}"
+    - path: "^/api/service/media/(provision|remove)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/service/media/list, query: { directory: "{settings.media_directory}" } }
+    # Starting, quitting or restarting a project is read back from the
+    # machine list.
+    - path: "^/api/service/project/(startlocalproject|quitlocalproject|restartlocalproject|forcequitlocalproject)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/service/system/detectsystems }
+        - { method: GET, path: /api/service/system/projects }
+    # Live Update: proof of play, one dictionary of the clips playing now
+    # and the last completed ones; each list replaces the last. The
+    # dictionary names its own lists ('a', 'r'), so the subtree to replace is
+    # rendered from the element and a transport's update, which has neither,
+    # replaces nothing.
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged"
+      each_match: { "$.value.active": "^\\[" }
+      json: { a: "$.value.a" }
+      replace: proof_of_play.{a}
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged[*].value.active"
+      json:
+        a: "$^.value.a"
+        layer: "$.layerName"
+        video: "$.videoName"
+        played: "$.framesPlayed"
+        total: "$.totalFrames"
+        loops: "$.loopCount"
+        complete: "$.completedFullPlayback"
+        start: "$.startTime"
+        end: "$.endTime"
+      state:
+        proof_of_play.{a}.{index}.layer: "{layer}"
+        proof_of_play.{a}.{index}.video: "{video}"
+        proof_of_play.{a}.{index}.frames_played: "{played}"
+        proof_of_play.{a}.{index}.total_frames: "{total}"
+        proof_of_play.{a}.{index}.loop_count: "{loops}"
+        proof_of_play.{a}.{index}.complete: "{complete}"
+        proof_of_play.{a}.{index}.start_time: "{start}"
+        proof_of_play.{a}.{index}.end_time: "{end}"
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged"
+      each_match: { "$.value.recent": "^\\[" }
+      json: { r: "$.value.r" }
+      replace: proof_of_play.{r}
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged[*].value.recent"
+      json:
+        r: "$^.value.r"
+        layer: "$.layerName"
+        video: "$.videoName"
+        played: "$.framesPlayed"
+        total: "$.totalFrames"
+        loops: "$.loopCount"
+        complete: "$.completedFullPlayback"
+        start: "$.startTime"
+        end: "$.endTime"
+      state:
+        proof_of_play.{r}.{index}.layer: "{layer}"
+        proof_of_play.{r}.{index}.video: "{video}"
+        proof_of_play.{r}.{index}.frames_played: "{played}"
+        proof_of_play.{r}.{index}.total_frames: "{total}"
+        proof_of_play.{r}.{index}.loop_count: "{loops}"
+        proof_of_play.{r}.{index}.complete: "{complete}"
+        proof_of_play.{r}.{index}.start_time: "{start}"
+        proof_of_play.{r}.{index}.end_time: "{end}"
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
       json_each: "$.valuesChanged"
+      each_match: { "$.value.playing": "^(true|false)$" }
       json:
         playing: "$.value.playing"
         time: "$.value.time"
@@ -652,12 +2224,211 @@ state:
   transports.*.current_track:      { type: string, description: "Name of the transport's current track" }
   transports.*.receiving_timecode: { type: bool, description: "The transport is receiving timecode" }
   transports.*.setlist:            { type: string, description: "Name of the transport's set list" }
+  multitransports.*.name:          { type: string, description: "Multitransport name, keyed by its uid" }
+  multitransports.*.engaged:       { type: bool, description: "The multitransport is engaged" }
+  multitransports.*.transports:    { type: string, description: "The uids of the multitransport's transports, as a JSON array" }
+  active_transport.*.name:         { type: string, description: "A transport selected in Designer's state bar (every member when a multitransport is selected), keyed by uid" }
+  tracks.*.name:                   { type: string, description: "Track name, keyed by the track's uid" }
+  tracks.*.length:                 { type: float, unit: s, description: "Track length, as Designer reports it (seconds, which Designer also calls beats)" }
+  tracks.*.crossfade:              { type: string, description: "Track crossfade mode: Off, Fade, TrackSection or Unknown" }
+  setlists.*.name:                 { type: string, description: "Set list name, keyed by the set list's uid" }
+  setlists.*.tracks.*.uid:         { type: string, description: "uid of the set list's track at this position, from 0" }
+  setlists.*.tracks.*.name:        { type: string, description: "Name of the set list's track at this position, from 0" }
+  annotations.*.notes:             { type: string, description: "A track's notes, keyed by the track's uid: a JSON array of {time, text}. Read for each transport's current track, and for any track get_annotations asks for" }
+  annotations.*.tags:              { type: string, description: "A track's tags: a JSON array of {time, type (TC, MIDI or CUE), value}" }
+  annotations.*.sections:          { type: string, description: "A track's sections: a JSON array of {time, index}" }
   machines.*.hostname:             { type: string, description: "Machine host name, keyed by machine name" }
+  machines.*.running_as:           { type: string, description: "Name of the machine this one is running as: another's after it has taken over in a failover" }
   machines.*.average_fps:          { type: float, unit: fps, description: "Machine's average frame rate" }
   machines.*.video_dropped_frames: { type: float, description: "Dropped video frames reported by the machine" }
   machines.*.video_missed_frames:  { type: float, description: "Missed video frames reported by the machine" }
+  machines.*.states.*.name:        { type: string, description: "A health indicator state of the machine, numbered from 0: its name" }
+  machines.*.states.*.detail:      { type: string, description: "The health state's detail" }
+  machines.*.states.*.category:    { type: string, description: "The health indicator it belongs to: connection, output, genlock or devices" }
+  machines.*.states.*.severity:    { type: string, description: "Its severity: ready (or ok), warning, error, busy or offline" }
+  notifications.*.*.summary:       { type: string, description: "A notification of a machine, keyed by machine name and numbered from 0: its summary" }
+  notifications.*.*.detail:        { type: string, description: "The notification's detail" }
   project.path:                    { type: string, description: "Path of the running project" }
   project.version:                 { type: string, description: "Designer version, major.minor.hotfix.revision" }
+  project.release_type:            { type: string, description: "Designer release type: Pro or Starter" }
+  session.solo:                    { type: bool, description: "The project runs solo, on this machine alone rather than in a session" }
+  session.director_dedicated:      { type: bool, description: "The Director only controls the actors and does not output to the stage" }
+  session.director:                { type: string, description: "Name of the session's Director" }
+  session.machines.*.role:         { type: string, description: "The machine's role in the session, keyed by machine name: director, actor or understudy" }
+  session.machines.*.uid:          { type: string, description: "The machine's uid" }
+  session.machines.*.hostname:     { type: string, description: "The machine's host name" }
+  session.machines.*.type:         { type: string, description: "The machine's type as Designer names it, such as Designer, Vx4, Gx3, Rx or EX3" }
+  session.machines.*.gui_mode:     { type: string, description: "When the machine shows Designer's interface: OffWhenActor, AlwaysOn or AlwaysOff (set_gui_mode)" }
+  session.machines.*.gui_visible:  { type: bool, description: "The machine shows Designer's interface now" }
+  failover.timeout:                { type: float, unit: s, description: "Session failover timeout" }
+  failover.normal_preset:          { type: string, description: "The session's normal feed preset" }
+  failover.current_preset:         { type: string, description: "The feed preset in use now, which differs from the normal one after a failover" }
+  failover.understudy_targets:     { type: string, description: "The machines each understudy can take over: a JSON object keyed by understudy, each {targets: [{uid, name}]}" }
+  indirections.*.name:             { type: string, description: "Indirection name, keyed by the indirection's uid" }
+  indirections.*.resource_type:    { type: string, description: "Type of resource the indirection points to, as Designer names it" }
+  indirections.*.resource_uid:     { type: string, description: "uid of the resource the indirection points to now (change_indirection)" }
+  indirections.*.resource:         { type: string, description: "Name of the resource the indirection points to now (change_indirection)" }
+  indirection_resources.*.*:       { type: string, description: "A resource an indirection can point to, keyed by the indirection's uid then the resource's uid: its name" }
+  renderstream.layers.*.name:      { type: string, description: "RenderStream layer name, keyed by the layer's uid" }
+  renderstream.status.*.workload:  { type: string, description: "Name of the layer's workload, keyed by the layer's uid" }
+  renderstream.status.*.workload_uid: { type: string, description: "uid of the layer's workload, for Live Update's RenderStream subscriptions" }
+  renderstream.status.*.t_now:     { type: float, unit: s, description: "The layer's reference time when the status was read" }
+  renderstream.status.*.asset_errors: { type: string, description: "The layer's asset errors, as a JSON array of strings" }
+  renderstream.status.*.instances.*.machine:        { type: string, description: "A workload instance, numbered from 0: the render node it runs on" }
+  renderstream.status.*.instances.*.machine_uid:    { type: string, description: "uid of the instance's render node" }
+  renderstream.status.*.instances.*.state:          { type: string, description: "The instance's state, as Designer words it" }
+  renderstream.status.*.instances.*.health:         { type: string, description: "The instance's health message" }
+  renderstream.status.*.instances.*.health_details: { type: string, description: "The instance's health details" }
+  renderstream.status.*.streams.*.uid:                 { type: string, description: "A stream of the layer, numbered from 0: its uid" }
+  renderstream.status.*.streams.*.name:                { type: string, description: "The stream's name" }
+  renderstream.status.*.streams.*.source:              { type: string, description: "The render node sending the stream" }
+  renderstream.status.*.streams.*.receiver:            { type: string, description: "The machine receiving the stream" }
+  renderstream.status.*.streams.*.subscription_wanted: { type: bool, description: "The receiver wants the stream" }
+  renderstream.status.*.streams.*.subscribed:          { type: bool, description: "The receiver's subscription to the stream succeeded" }
+  renderstream.status.*.streams.*.t_last_dropped:      { type: float, unit: s, description: "When the stream last dropped a frame, on the reference clock" }
+  renderstream.status.*.streams.*.t_last_error:        { type: float, unit: s, description: "When the stream last had an error, on the reference clock" }
+  renderstream.status.*.streams.*.last_error:          { type: string, description: "The stream's last error message" }
+  renderstream.status.*.streams.*.status:              { type: string, description: "The stream's status, as Designer words it" }
+  renderstream.config.*.asset:             { type: string, description: "The layer's RenderStream asset, keyed by the layer's uid" }
+  renderstream.config.*.pool:              { type: string, description: "The layer's cluster pool" }
+  renderstream.config.*.default_assigner:  { type: string, description: "The layer's default cluster assigner" }
+  renderstream.config.*.framerate_divisor: { type: int, description: "The layer's frame rate fraction divisor" }
+  renderstream.config.*.channel_mappings:  { type: string, description: "The layer's channel mappings: a JSON array of {channel, mapping, assigner}" }
+  renderstream.pools.*.name:         { type: string, description: "Cluster pool name, keyed by the pool's uid" }
+  renderstream.pools.*.machines:     { type: string, description: "The pool's render nodes: a JSON array of {uid, name, preferredSyncAdapter, adapters}" }
+  renderstream.pools.*.understudies: { type: string, description: "The pool's understudies, in the same form" }
+  renderstream.assigners.*.name:           { type: string, description: "Cluster assigner name, keyed by the assigner's uid" }
+  renderstream.assigners.*.transport:      { type: string, description: "The assigner's stream transport type" }
+  renderstream.assigners.*.format:         { type: string, description: "The assigner's stream format" }
+  renderstream.assigners.*.bit_depth:      { type: int, description: "The assigner's stream bit depth" }
+  renderstream.assigners.*.alpha:          { type: bool, description: "The assigner's streams carry alpha" }
+  renderstream.assigners.*.overlap_pixels: { type: int, unit: px, description: "Overlap between the assigner's tiles" }
+  renderstream.assigners.*.padding_pixels: { type: int, unit: px, description: "Padding around the assigner's tiles" }
+  renderstream.assigners.*.network_ip:     { type: string, description: "Address of the assigner's preferred network" }
+  renderstream.assigners.*.network:        { type: string, description: "Name of the assigner's preferred network" }
+  sockpuppet.patches.*.address:     { type: string, description: "An HTTP Sockpuppet patch, keyed by its uid: the address the set_live_ commands name" }
+  sockpuppet.patches.*.description: { type: string, description: "The patch's description" }
+  sockpuppet.patches.*.fields.*.name:          { type: string, description: "A field of the patch, numbered from 0: the name the set_live_ commands take" }
+  sockpuppet.patches.*.fields.*.display_name:  { type: string, description: "The field's name as Designer shows it" }
+  sockpuppet.patches.*.fields.*.type:          { type: string, description: "The field's kind, as Designer names it (float, string or resource)" }
+  sockpuppet.patches.*.fields.*.value:         { type: float, description: "A float field's target value (set_live_float)" }
+  sockpuppet.patches.*.fields.*.current_value: { type: float, description: "A float field's value now, which moves towards the target during a timed change" }
+  sockpuppet.patches.*.fields.*.min:           { type: float, description: "A float field's minimum" }
+  sockpuppet.patches.*.fields.*.max:           { type: float, description: "A float field's maximum" }
+  sockpuppet.patches.*.fields.*.default:       { type: float, description: "A float field's default value" }
+  sockpuppet.patches.*.fields.*.step:          { type: float, description: "A float field's step" }
+  sockpuppet.patches.*.fields.*.text:          { type: string, description: "A string field's value (set_live_string)" }
+  sockpuppet.patches.*.fields.*.options:       { type: string, description: "A string field's options, as a JSON array; empty for free text" }
+  sockpuppet.patches.*.fields.*.resource:      { type: string, description: "Name of the resource a resource field points to (set_live_resource)" }
+  sockpuppet.patches.*.fields.*.resource_uid:  { type: string, description: "uid of the resource a resource field points to" }
+  sockpuppet.patches.*.fields.*.resource_type: { type: string, description: "The type of resource a resource field takes" }
+  sockpuppet.easing_functions:      { type: string, description: "The easing functions set_live_float takes, as a JSON array" }
+  cdls.*.name:       { type: string, description: "Colour decision list name, keyed by the CDL's uid" }
+  cdls.*.slope_r:    { type: float, description: "Red slope (set_cdl)" }
+  cdls.*.slope_g:    { type: float, description: "Green slope" }
+  cdls.*.slope_b:    { type: float, description: "Blue slope" }
+  cdls.*.offset_r:   { type: float, description: "Red offset" }
+  cdls.*.offset_g:   { type: float, description: "Green offset" }
+  cdls.*.offset_b:   { type: float, description: "Blue offset" }
+  cdls.*.power_r:    { type: float, description: "Red power" }
+  cdls.*.power_g:    { type: float, description: "Green power" }
+  cdls.*.power_b:    { type: float, description: "Blue power" }
+  cdls.*.saturation: { type: float, description: "Saturation" }
+  notes.*.name: { type: string, description: "Note name, keyed by the note's uid" }
+  notes.*.text: { type: string, description: "The note's text (set_note)" }
+  shot_recorders.*.recording: { type: bool, description: "The shot recorder is recording, keyed by its name (record_shot)" }
+  shot_recorders.*.slate:     { type: string, description: "The slate the recorder records under" }
+  shot_recorders.*.take:      { type: int, description: "The take number the recorder records under" }
+  mixed_reality.cameras.*.name:                { type: string, description: "Camera on the current stage, keyed by its uid: its name" }
+  mixed_reality.cameras.*.spatial_calibration: { type: string, description: "The spatial calibration the camera uses (select_spatial_calibration)" }
+  mixed_reality.sets.*.name:                   { type: string, description: "Mixed reality set on the current stage, keyed by its uid: its name" }
+  mixed_reality.sets.*.current_camera:         { type: string, description: "The set's current camera (select_mr_camera)" }
+  mixed_reality.sets.*.camera_override:        { type: bool, description: "The set's camera is overridden rather than chosen by the set" }
+  mixed_reality.calibrations.*.name:           { type: string, description: "Spatial calibration, keyed by its uid: its name" }
+  mixed_reality.calibrations.*.mr_sets:        { type: string, description: "The MR sets the calibration belongs to, as a JSON array of {uid, name}" }
+  mixed_reality.calibrations.*.observations.*.name:         { type: string, description: "An observation of the calibration, keyed by its uid: its name" }
+  mixed_reality.calibrations.*.observations.*.enabled:      { type: bool, description: "The observation is used in the calibration (enable_observation)" }
+  mixed_reality.calibrations.*.observations.*.zoom:         { type: float, description: "The lens zoom when the observation was captured" }
+  mixed_reality.calibrations.*.observations.*.focus:        { type: float, description: "The lens focus when the observation was captured" }
+  mixed_reality.calibrations.*.observations.*.type:         { type: string, description: "Primary or Secondary" }
+  mixed_reality.calibrations.*.observations.*.rms_error:    { type: float, description: "The observation's RMS error" }
+  mixed_reality.calibrations.*.observations.*.tracked_pose: { type: string, description: "The tracked camera pose: JSON {position: {x, y, z}, rotation: {x, y, z}}" }
+  mixed_reality.calibrations.*.observations.*.solved_pose:  { type: string, description: "The solved camera pose, in the same form" }
+  mixed_reality.capturing:                     { type: bool, description: "An observation capture is running (capture_observation)" }
+  quickcal.reference_points.*: { type: string, description: "QuickCal reference point, keyed by its uid: its name" }
+  omnical.camera_discovery:        { type: bool, description: "OmniCal camera discovery is enabled (set_omnical_camera_discovery)" }
+  omnical.camera_discovery_state:  { type: string, description: "Camera discovery's state as Designer words it" }
+  omnical.current_plan:            { type: string, description: "Name of the current OmniCal Plan" }
+  omnical.current_plan_uid:        { type: string, description: "uid of the current OmniCal Plan" }
+  omnical.plans.*:                 { type: string, description: "OmniCal Plan in the project, keyed by its uid: its name" }
+  omnical.rigcheck.status:         { type: string, description: "The latest RigCheck's status: Green (good), Amber (in progress or marginal) or Red (failed)" }
+  omnical.rigcheck.feedback:       { type: string, description: "The latest RigCheck's feedback text" }
+  omnical.rigcheck.score:          { type: float, description: "The latest RigCheck's OmniCal score; lower is better, 10000 while running or failed" }
+  omnical.rigcheck.camera_rms_error:    { type: float, description: "The latest RigCheck's aggregate camera RMS error" }
+  omnical.rigcheck.projector_rms_error: { type: float, description: "The latest RigCheck's aggregate projector RMS error" }
+  omnical.rigcheck.progress:       { type: string, description: "Designer's message on the most recent OmniCal task, with its progress while one runs" }
+  omnical.current_result:          { type: string, description: "Name of the RigCheck Result in use" }
+  omnical.current_result_uid:      { type: string, description: "uid of the RigCheck Result in use" }
+  omnical.fallback_result:         { type: string, description: "Name of the fallback RigCheck Result (accept_rigcheck_result)" }
+  omnical.fallback_result_uid:     { type: string, description: "uid of the fallback RigCheck Result" }
+  omnical.results.*:               { type: string, description: "RigCheck Result in the project, keyed by its uid: its name" }
+  service.systems.*.type:               { type: string, description: "A disguise machine on the network, keyed by host name: its type" }
+  service.systems.*.version:            { type: string, description: "Its Designer version, major.minor.hotfix.revision" }
+  service.systems.*.running_project:    { type: string, description: "The project it is running, if any" }
+  service.systems.*.ip_address:         { type: string, description: "Its IP address" }
+  service.systems.*.designer_running:   { type: bool, description: "Designer is running on it" }
+  service.systems.*.service_running:    { type: bool, description: "d3service is running on it" }
+  service.systems.*.manager_running:    { type: bool, description: "d3Manager is running on it" }
+  service.systems.*.notch_host_running: { type: bool, description: "The Notch host is running on it" }
+  service.os.*.windows_version:         { type: string, description: "A machine's Windows version, keyed by host name" }
+  service.os.*.image_version:           { type: string, description: "A machine's disguise OS image version" }
+  service.adapters.*.*.name:            { type: string, description: "A network adapter, keyed by host name and numbered from 0: its name" }
+  service.adapters.*.*.mac:             { type: string, description: "The adapter's MAC address" }
+  service.adapters.*.*.enabled:         { type: bool, description: "The adapter is enabled" }
+  service.adapters.*.*.dhcp:            { type: bool, description: "The adapter takes its address by DHCP" }
+  service.adapters.*.*.status:          { type: string, description: "The adapter's status, as Windows words it" }
+  service.adapters.*.*.addresses:       { type: string, description: "The adapter's addresses: a JSON array of {address, subnet, family, gateway}" }
+  service.gpu.*.genlock_frequency:      { type: float, unit: Hz, description: "A machine's genlock frequency, keyed by host name" }
+  service.gpu.*.outputs.*.gpu_port:      { type: int, description: "A GPU output of the machine, numbered from 0: its port" }
+  service.gpu.*.outputs.*.genlock_state: { type: string, description: "The output's genlock state" }
+  service.gpu.*.outputs.*.emulated:      { type: bool, description: "The output is emulated" }
+  service.gpu.*.outputs.*.width:         { type: int, unit: px, description: "The output's width" }
+  service.gpu.*.outputs.*.height:        { type: int, unit: px, description: "The output's height" }
+  service.gpu.*.outputs.*.refresh_rate:  { type: float, unit: Hz, description: "The output's refresh rate" }
+  service.gpu.*.outputs.*.bit_depth:     { type: int, description: "The output's bit depth" }
+  service.gpu.*.outputs.*.colour_format: { type: string, description: "The output's colour format" }
+  service.projects.*.last_project:       { type: string, description: "The project a machine last ran, keyed by host name" }
+  service.projects.*.projects.*.path:          { type: string, description: "A project on the machine, numbered from 0: its path (start_project)" }
+  service.projects.*.projects.*.last_modified: { type: string, description: "When the project was last modified, as d3service gives it" }
+  service.projects.*.projects.*.version:       { type: string, description: "The Designer version that saved the project, major.minor.hotfix.revision" }
+  service.vfcs.*.backplane:             { type: string, description: "A machine's VFC backplane: BPv1, BPv2, NoBP or BPModel_Unknown" }
+  service.vfcs.*.cards.*.slot:             { type: int, description: "A VFC card, numbered from 0: its slot" }
+  service.vfcs.*.cards.*.type:             { type: string, description: "The card's type, such as DP14_Passthrough, QuadSDI, HDMI or IP" }
+  service.vfcs.*.cards.*.firmware_version: { type: string, description: "The card's firmware version" }
+  service.vfcs.*.cards.*.fpga_version:     { type: string, description: "The card's FPGA version" }
+  service.vfcs.*.cards.*.split_mode:       { type: string, description: "The card's split mode: Mirror, Dual, Quad, Quad4K or NoSwizzle" }
+  service.vfcs.*.cards.*.generation:       { type: string, description: "The card's generation: One or Two" }
+  service.vfcs.*.cards.*.ports:            { type: string, description: "The card's ports a to d: JSON {a: {resolution: {width, height}, RefreshRate, name}, ...}" }
+  media.files.*.path:                   { type: string, description: "A file of the last media listing, numbered from 0: its path" }
+  media.files.*.size:                   { type: int, unit: bytes, description: "The file's size" }
+  media.files.*.created:                { type: int, description: "When the file was created, as d3service gives it (a number whose epoch is not documented)" }
+  media.files.*.last_written:           { type: int, description: "When the file was last written, in the same form" }
+  proof_of_play.active.*.layer:          { type: string, description: "A clip playing now, numbered from 0: the layer it plays on" }
+  proof_of_play.active.*.video:          { type: string, description: "The clip's file name" }
+  proof_of_play.active.*.frames_played:  { type: int, description: "Frames played so far, repeats from looping included" }
+  proof_of_play.active.*.total_frames:   { type: int, description: "Frames in the clip" }
+  proof_of_play.active.*.loop_count:     { type: int, description: "Complete loops played" }
+  proof_of_play.active.*.complete:       { type: bool, description: "Every frame of the clip has been shown at least once" }
+  proof_of_play.active.*.start_time:     { type: string, description: "When playback started, ISO 8601" }
+  proof_of_play.active.*.end_time:       { type: string, description: "When the clip was last active, ISO 8601" }
+  proof_of_play.recent.*.layer:          { type: string, description: "A completed playback, oldest first from 0: the layer it played on" }
+  proof_of_play.recent.*.video:          { type: string, description: "The clip's file name" }
+  proof_of_play.recent.*.frames_played:  { type: int, description: "Frames played, repeats from looping included" }
+  proof_of_play.recent.*.total_frames:   { type: int, description: "Frames in the clip" }
+  proof_of_play.recent.*.loop_count:     { type: int, description: "Complete loops played" }
+  proof_of_play.recent.*.complete:       { type: bool, description: "Every frame of the clip was shown at least once" }
+  proof_of_play.recent.*.start_time:     { type: string, description: "When playback started, ISO 8601" }
+  proof_of_play.recent.*.end_time:       { type: string, description: "When playback ended, ISO 8601" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -665,7 +2436,7 @@ state:
   live.engaged:                    { type: bool, description: "The Live Update transport is engaged" }
   live.volume:                     { type: float, description: "Volume of the Live Update transport, 0.0 to 1.0" }
   live.brightness:                 { type: float, description: "Brightness of the Live Update transport, 0.0 to 1.0" }
-  live.error:                      { type: string, description: "The last error Live Update reported, such as a subscription it could not make" }
+  live.error:                      { type: string, description: "The last error Live Update reported, such as a subscription it could not make (the transport's or proof of play's)" }
 
 quirks:
   - models: [all]
@@ -731,7 +2502,162 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      REST has no push and disguise discourages frequent polling, so transports,
-      machine health and the project are read every 10 seconds; the playhead of
-      the transport named by live_transport comes over Live Update. The Python
-      execution endpoints are not included: they run arbitrary code in Designer.
+      REST has no push and disguise discourages frequent polling. Transports,
+      the active transport, machine health and notifications are read every 10
+      seconds, with the notes, tags and sections of each transport's current
+      track; the project, the session, the failover settings and understudy
+      targets, tracks and set lists every minute. A command that succeeds has
+      what it changed read back at once. The playhead of the transport named by
+      live_transport comes over Live Update. Another track's annotations are
+      read only when get_annotations asks for them.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the Session API cannot create, rename or edit transports,
+      tracks, set lists or annotations, choose a transport's set list or the
+      active transport, or change the failover timeout and presets; it reads
+      them only. Those are edited in Designer. The understudy targets come keyed
+      as Designer keys them, which disguise does not document, so they are kept
+      whole as JSON text.
+  - models: [all]
+    severity: warning
+    text: >
+      change_indirection and change_indirections switch what every layer using
+      the indirection shows, at once and on every machine. Indirections, and
+      the resources each can point to, are read every 10 seconds; the API
+      cannot create indirections or change which resources they offer.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_renderstream_layer and restart_renderstream_layer take the layer's
+      render nodes off the stage until the workload runs again;
+      renderstream_failover_machine and renderstream_failover_pool move a
+      workload to other machines and restart it. Every RenderStream layer, with
+      its status and configuration, is read every 10 seconds, and cluster pools
+      and assigners every minute. The API cannot create layers, change a layer's
+      asset, pool, mappings or assigners, or edit pools and assigners: those are
+      edited in Designer.
+  - models: [all]
+    severity: warning
+    text: >
+      The set_live_ commands change what a Sockpuppet patch outputs at once,
+      over every source that drives it (an HTTP Sockpuppet patch is driven only
+      through this API). Patches and their fields' latest values are read every
+      10 seconds and after each live change; a timed float change keeps moving
+      after it is read, so current_value lags it. The API cannot create patches
+      or fields: they are set up in Designer. A patch is kept by its uid; a
+      patch whose uid comes back empty is not kept.
+  - models: [all]
+    severity: warning
+    text: >
+      set_cdl replaces every value of the CDL at once, so a grade change sends
+      all ten; read the others from the cdls state first. Slope, offset and power
+      are sent as the x, y and z of a vector, taken here as red, green and blue,
+      which disguise's document does not state. CDLs are read every minute and
+      after each set_cdl; the API cannot create or delete them.
+  - models: [all]
+    severity: info
+    text: >
+      Notes here are Designer's note resources (the notes endpoints), not the
+      notes on a track's timeline, which get_annotations reads and which the API
+      cannot edit. set_note creates a note when none has the name; the API
+      cannot delete one. Every note is read every minute, and a note read or
+      written is kept at once. set_note takes the text as a JSON string, since a
+      text parameter here cannot hold a line break.
+  - models: [all]
+    severity: info
+    text: >
+      record_shot always sends the slate and take with engage, since the request
+      carries all four; send the recorder's current slate and take (from the
+      shot_recorders state) to stop it without changing them. Shot recorders are
+      read every 10 seconds and after each record_shot. take is sent as a
+      decimal string, as the document's int64 is written in JSON.
+  - models: [all]
+    severity: critical
+    text: >
+      execute_python runs arbitrary Python in Designer, on its main thread, with
+      full access to the project: it can change or delete anything, and a long
+      script stalls Designer's output until it ends or Designer's
+      pythonApiExecutionTimeout interrupts it. disguise does not support calling
+      it often or during a show. Scripts are Python 2.7, wrapped in a function, so they cannot
+      create globals or use "from x import *". Anyone who reaches the API port
+      can run it: there is no authentication. register_python_module replaces a
+      module of the same name. Nothing here reads state from Python: every
+      state key comes from the documented endpoints. The script and module source
+      are JSON strings, since a text parameter here cannot hold a line break.
+  - models: [all]
+    severity: critical
+    text: >
+      delete_observation and delete_all_observations cannot be undone through
+      the API, and change a spatial calibration in use; select_mr_camera and
+      select_spatial_calibration change what an MR set shows at once. Cameras,
+      MR sets, spatial calibrations and capture progress are read every minute,
+      and again after each of these commands. The API has no way to clear a
+      camera override or to create cameras, sets or calibrations, and no
+      calibration solve: those are done in Designer.
+  - models: [all]
+    severity: critical
+    text: >
+      line_up_current_pose, reset_lineup and overwrite_manual_calibration change a
+      projector's calibration, and so the picture on the stage, at once;
+      overwrite_manual_calibration replaces the manual values it copies over.
+      The API lists no projectors, so a projector's calibration is not kept in
+      state: get_projector_calibration reads it for a projector named by the
+      caller. Reference points are read every minute. The units of a lineup
+      position are not documented.
+  - models: [all]
+    severity: critical
+    text: >
+      execute_rigcheck recalibrates and realigns the projectors from the current
+      OmniCal Plan, and revert_rigcheck_result switches the calibration in use:
+      both change the picture on the stage. execute_rigcheck turns camera
+      discovery on when it is off; discovery uses the Director's CPU and network
+      and must be off during a show. A RigCheck takes a while: omnical.rigcheck
+      shows Amber while it runs. The OmniCal state is read every minute, and the
+      RigCheck at once after each RigCheck command. Compare Results by their OmniCal score
+      only; the RMS errors vary between runs. QuickAlign adjustments are not
+      available through the API.
+  - models: [all]
+    severity: info
+    text: >
+      The OmniCal endpoints are documented on disguise's OmniCal API page but are
+      not in the Session Swagger document. Their plans, results and
+      resultsforplan endpoints take a filter whose values the page does not
+      list, so these commands send none.
+  - models: [all]
+    severity: critical
+    text: >
+      remove_media deletes files and folders on the machine at once, unlocking a
+      file of the running project first, and cannot be undone. Both it and
+      provision_media work inside the d3
+      directories only ({projects}, {rs-assets}, {rs-engines}, {project:<name>});
+      any other path, or one leaving them with "..", is refused as restricted.
+      Path symbols are resolved only by the media endpoints.
+  - models: [all]
+    severity: info
+    text: >
+      Provisioning runs as a d3service task, whose progress d3service pushes on
+      its Task Status websocket (/api/service/task/status); this spec keeps one
+      push websocket, Live Update, so a task's progress is not followed: list
+      media again once it should be done. The media listing of the directory in
+      the media_directory setting is read every minute and after each provision
+      or remove, and list_media's own answer replaces it too, so media.files is
+      the last listing read. A large directory lists every file under it.
+  - models: [all]
+    severity: info
+    text: >
+      The Service API's machine lists (systems, OS, adapters, GPU outputs,
+      projects and VFCs) are read every minute, keyed by host name: a host name
+      holding a dot cannot be a state key and is left out. They are read-only:
+      network, GPU and VFC settings are changed in d3Manager or the OS.
+  - models: [all]
+    severity: info
+    text: >
+      Proof of play comes over Live Update as one dictionary property of
+      subsystem:ProofOfPlaySubsystem: the clips playing now (getRecords, called
+      when it is a method, since disguise's page names it without brackets) and
+      the last proof_of_play_recent completed playbacks (getRecentRecords), at
+      most once a second. Each list is replaced whole. Live Update's set command,
+      which writes any subscribed property, is not offered: the push websocket
+      here carries no commands, and the Sockpuppet, sequencing and colour
+      endpoints cover documented live control.

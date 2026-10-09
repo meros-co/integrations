@@ -153,3 +153,559 @@ telemetry(DG, "live-transport", expect_connect_ws=[LIVE_SUB],
                                  "engaged": True, "volume": 1.0, "brightness": 0.75}})
 telemetry(DG, "live-error", inbound_ws='{"error":"Unable to subscribe to transportmanager:default"}',
           expect_state={"live": {"error": "Unable to subscribe to transportmanager:default"}})
+
+# ── Transports, status and failover: the rest of what they read ──
+_dg("apply_default_routing", {}, "POST", "/api/session/failover/applydefaultrouting", **_OK)
+UNDERSTUDIES = {"understudy-1": {"targets": [{"uid": "4411", "name": "actor-1"}, {"uid": "4412", "name": "actor-2"}]}}
+_dg("get_understudy_targets", {}, "GET", "/api/session/failover/understudytargets",
+    http_reply={"status": 200, "body": json.dumps({"status": {"code": 0, "message": ""},
+                                                   "understudies": UNDERSTUDIES})},
+    expect_result={"ok": {"kind": "value", "value": UNDERSTUDIES}})
+
+
+def _envelope(**fields):
+    return json.dumps({"status": {"code": 0, "message": "", "details": []}, **fields})
+
+
+def _compact(value):
+    return json.dumps(value, separators=(",", ":"))
+
+
+telemetry(DG, "transports-current-track-annotations", inbound_http={
+    "path": "/api/session/transport/transports", "body": json.dumps(TRANSPORTS)},
+    expect_then_send=[{"method": "GET", "target": "/api/session/transport/annotations?uid=123"}],
+    expect_state={"transports": {"2276480868532234653": {
+        "name": "default", "engaged": True, "volume": 0.5, "brightness": 1.0, "playmode": "Stop",
+        "current_track": "track 1", "receiving_timecode": False, "setlist": "Show"}}})
+telemetry(DG, "multitransports", inbound_http={"path": "/api/session/transport/transports", "body": _envelope(
+    transports=[], multitransports=[{"uid": "5001", "name": "All screens", "engaged": True,
+                                     "transports": ["2276480868532234653", "2276480868532234654"]}])},
+    state_before={"multitransports": {"5000": {"name": "old", "engaged": False}}},
+    expect_state={"multitransports": {"5001": {
+        "name": "All screens", "engaged": True,
+        "transports": '["2276480868532234653","2276480868532234654"]'}}})
+telemetry(DG, "active-transport", inbound_http={"path": "/api/session/transport/activetransport",
+                                                "body": _envelope(result=ACTIVE)},
+          state_before={"active_transport": {"99": {"name": "other"}}},
+          expect_state={"active_transport": {"2276480868532234653": {"name": "default"}}})
+telemetry(DG, "tracks", inbound_http={"path": "/api/session/transport/tracks", "body": _envelope(result=[
+    {"uid": "123", "name": "track 1", "length": 300.0, "crossfade": "Off"},
+    {"uid": "124", "name": "track 2", "length": 95.5, "crossfade": "Fade"}])},
+    state_before={"tracks": {"9": {"name": "deleted"}}},
+    expect_state={"tracks": {"123": {"name": "track 1", "length": 300.0, "crossfade": "Off"},
+                             "124": {"name": "track 2", "length": 95.5, "crossfade": "Fade"}}})
+telemetry(DG, "setlists", inbound_http={"path": "/api/session/transport/setlists", "body": _envelope(result=[
+    {"uid": "77", "name": "Show", "tracks": [{"uid": "123", "name": "track 1", "length": 300.0, "crossfade": "Off"},
+                                            {"uid": "124", "name": "track 2", "length": 95.5,
+                                             "crossfade": "Fade"}]}])},
+    state_before={"setlists": {"77": {"name": "Show", "tracks": {"2": {"uid": "125", "name": "cut"}}}}},
+    expect_state={"setlists": {"77": {"name": "Show", "tracks": {"0": {"uid": "123", "name": "track 1"},
+                                                                 "1": {"uid": "124", "name": "track 2"}}}}})
+ANNOTATIONS = {"notes": [{"time": 10.0, "text": "Act 1"}],
+               "tags": [{"time": 10.0, "type": "CUE", "value": "1.2.5"}],
+               "sections": [{"time": 0.0, "index": "0"}, {"time": 10.0, "index": "1"}]}
+telemetry(DG, "annotations", inbound_http={
+    "path": "/api/session/transport/annotations?uid=123", "body": _envelope(result={
+        "uid": "123", "name": "track 1", "annotations": ANNOTATIONS})},
+    expect_state={"annotations": {"123": {k: _compact(v) for k, v in ANNOTATIONS.items()}}})
+telemetry(DG, "transport-command-reread", inbound_http={"path": "/api/session/transport/gototrack",
+                                                        "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/transport/transports"}],
+          expect_state={})
+telemetry(DG, "health-states", inbound_http={"path": "/api/session/status/health", "body": _envelope(result=[
+    {"machine": {"uid": "2", "name": "understudy", "hostname": "VX4-02"},
+     "runningAsMachine": {"uid": "1", "name": "actor-1", "hostname": "VX4-01"},
+     "status": {"averageFPS": 60.0, "videoDroppedFrames": 0, "videoMissedFrames": 0, "states": [
+         {"name": "Genlock", "detail": "No reference", "category": "genlock", "severity": "warning"}]}}])},
+    expect_state={"machines": {"understudy": {
+        "hostname": "VX4-02", "running_as": "actor-1", "average_fps": 60.0, "video_dropped_frames": 0.0,
+        "video_missed_frames": 0.0, "states": {"0": {"name": "Genlock", "detail": "No reference",
+                                                     "category": "genlock", "severity": "warning"}}}}})
+telemetry(DG, "notifications", inbound_http={"path": "/api/session/status/notifications", "body": _envelope(result=[
+    {"machine": {"uid": "1", "name": "director", "hostname": "VX4-01"},
+     "notifications": [{"summary": "Missing media", "detail": "objects/videofile/intro.mov"}]}])},
+    state_before={"notifications": {"actor-1": {"0": {"summary": "gone", "detail": ""}}}},
+    expect_state={"notifications": {"director": {"0": {"summary": "Missing media",
+                                                       "detail": "objects/videofile/intro.mov"}}}})
+telemetry(DG, "session", inbound_http={"path": "/api/session/status/session", "body": _envelope(result={
+    "isRunningSolo": False, "isDirectorDedicated": True,
+    "director": {"uid": "11", "name": "director", "hostname": "VX4-01", "type": "Vx4", "guiMode": "AlwaysOn",
+                 "guiVisible": True},
+    "actors": [{"uid": "12", "name": "actor-1", "hostname": "VX4-02", "type": "Vx4", "guiMode": "OffWhenActor",
+                "guiVisible": False}],
+    "understudies": [{"uid": "13", "name": "understudy", "hostname": "VX4-03", "type": "Vx4",
+                      "guiMode": "AlwaysOff", "guiVisible": False}]})},
+    state_before={"session": {"machines": {"old-actor": {"role": "actor"}}}},
+    expect_state={"session": {"solo": False, "director_dedicated": True, "director": "director", "machines": {
+        "director": {"role": "director", "uid": "11", "hostname": "VX4-01", "type": "Vx4", "gui_mode": "AlwaysOn",
+                     "gui_visible": True},
+        "actor-1": {"role": "actor", "uid": "12", "hostname": "VX4-02", "type": "Vx4", "gui_mode": "OffWhenActor",
+                    "gui_visible": False},
+        "understudy": {"role": "understudy", "uid": "13", "hostname": "VX4-03", "type": "Vx4",
+                       "gui_mode": "AlwaysOff", "gui_visible": False}}}})
+telemetry(DG, "gui-mode-reread", inbound_http={"path": "/api/session/status/setguimode", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/status/session"}], expect_state={})
+telemetry(DG, "failover-settings", inbound_http={"path": "/api/session/failover/settings", "body": _envelope(
+    timeout=2.5, normalPreset="normal", currentPreset="failed over")},
+    expect_state={"failover": {"timeout": 2.5, "normal_preset": "normal", "current_preset": "failed over"}})
+telemetry(DG, "understudy-targets", inbound_http={"path": "/api/session/failover/understudytargets",
+                                                  "body": _envelope(understudies=UNDERSTUDIES)},
+          expect_state={"failover": {"understudy_targets": _compact(UNDERSTUDIES)}})
+telemetry(DG, "failover-reread", inbound_http={"path": "/api/session/failover/failovermachine", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/status/health"},
+                            {"method": "GET", "target": "/api/session/status/session"},
+                            {"method": "GET", "target": "/api/session/failover/settings"}], expect_state={})
+
+# ── Sequencing: indirections ──
+INDIRECTIONS = [{"uid": "301", "name": "main content", "resourceType": "VideoClip",
+                 "currentResource": {"uid": "401", "name": "intro.mov"}}]
+_dg("get_indirections", {}, "GET", "/api/session/sequencing/indirections",
+    http_reply={"status": 200, "body": _envelope(result=INDIRECTIONS)},
+    expect_result={"ok": {"kind": "value", "value": INDIRECTIONS}})
+_dg("get_indirection_resources", {"indirection": "main content"}, "GET",
+    "/api/session/sequencing/indirectionresources?name=main%20content")
+_dg("change_indirection", {"indirection": "main content", "resource": "act 2.mov"}, "POST",
+    "/api/session/sequencing/changeindirections",
+    '{"changes":[{"indirection":{"name":"main content"},"resource":{"name":"act 2.mov"}}]}', **_OK)
+_dg("change_indirections", {"changes": [{"indirection": {"uid": "301"}, "resource": {"uid": "402"}},
+                                        {"indirection": {"name": "logo"}, "resource": {"name": "logo b"}}]},
+    "POST", "/api/session/sequencing/changeindirections",
+    '{"changes":[{"indirection":{"uid":"301"},"resource":{"uid":"402"}},'
+    '{"indirection":{"name":"logo"},"resource":{"name":"logo b"}}]}', **_OK)
+telemetry(DG, "indirections", inbound_http={"path": "/api/session/sequencing/indirections",
+                                            "body": _envelope(result=INDIRECTIONS)},
+          state_before={"indirections": {"300": {"name": "removed"}}},
+          expect_then_send=[{"method": "GET", "target": "/api/session/sequencing/indirectionresources?uid=301"}],
+          expect_state={"indirections": {"301": {"name": "main content", "resource_type": "VideoClip",
+                                                 "resource_uid": "401", "resource": "intro.mov"}}})
+telemetry(DG, "indirection-resources", inbound_http={
+    "path": "/api/session/sequencing/indirectionresources?uid=301",
+    "body": _envelope(result=[{"uid": "401", "name": "intro.mov"}, {"uid": "402", "name": "act 2.mov"}])},
+    state_before={"indirection_resources": {"301": {"400": "old.mov"}}},
+    expect_state={"indirection_resources": {"301": {"401": "intro.mov", "402": "act 2.mov"}}})
+telemetry(DG, "indirection-change-reread", inbound_http={"path": "/api/session/sequencing/changeindirections",
+                                                         "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/sequencing/indirections"}], expect_state={})
+
+# ── RenderStream ──
+_RS = "/api/session/renderstream/"
+RS_LAYERS = [{"uid": "601", "name": "Unreal scene"}]
+_dg("get_renderstream_layers", {}, "GET", _RS + "layers",
+    http_reply={"status": 200, "body": _envelope(result=RS_LAYERS)},
+    expect_result={"ok": {"kind": "value", "value": RS_LAYERS}})
+_dg("get_renderstream_layer_status", {"layer": "Unreal scene"}, "GET", _RS + "layerstatus?name=Unreal%20scene")
+_dg("get_renderstream_layer_config", {"layer": "Unreal scene"}, "GET", _RS + "layerconfig?name=Unreal%20scene")
+_dg("get_renderstream_pools", {}, "GET", _RS + "pools")
+_dg("get_renderstream_assigners", {}, "GET", _RS + "assigners")
+for _cmd, _path in [("start_renderstream_layer", "startlayers"), ("stop_renderstream_layer", "stoplayers"),
+                    ("restart_renderstream_layer", "restartlayers"), ("sync_renderstream_layer", "synclayers")]:
+    _dg(_cmd, {"layer": "Unreal scene"}, "POST", _RS + _path, '{"layers":[{"name":"Unreal scene"}]}', **_OK)
+_dg("renderstream_failover_machine", {"machine": "rx-03"}, "POST", _RS + "failover",
+    '{"machine":{"name":"rx-03"}}', **_OK)
+_dg("renderstream_failover_pool", {"layer": "Unreal scene"}, "POST", _RS + "failoverpool",
+    '{"layer":{"name":"Unreal scene"}}', **_OK)
+telemetry(DG, "renderstream-layers", inbound_http={"path": _RS + "layers", "body": _envelope(result=RS_LAYERS)},
+          state_before={"renderstream": {"layers": {"600": {"name": "removed"}}}},
+          expect_then_send=[{"method": "GET", "target": _RS + "layerstatus?uid=601"},
+                            {"method": "GET", "target": _RS + "layerconfig?uid=601"}],
+          expect_state={"renderstream": {"layers": {"601": {"name": "Unreal scene"}}}})
+telemetry(DG, "renderstream-layer-status", inbound_http={"path": _RS + "layerstatus?uid=601", "body": _envelope(
+    result={"reference": {"tNow": 1234.5},
+            "workload": {"uid": "701", "name": "Unreal scene workload", "instances": [
+                {"machineUid": "801", "machineName": "rx-01", "state": "Running", "healthMessage": "OK",
+                 "healthDetails": ""}]},
+            "streams": [{"uid": "901", "name": "Unreal scene/rx-01", "sourceMachine": "rx-01",
+                         "receiverMachine": "vx4-01",
+                         "status": {"subscriptionWanted": True, "subscribeSuccessful": True, "tLastDropped": 1200.0,
+                                    "tLastError": 0.0, "lastErrorMessage": ""},
+                         "statusString": "Receiving"}],
+            "assetErrors": []})},
+    state_before={"renderstream": {"status": {"601": {"instances": {"1": {"machine": "rx-02"}}}}}},
+    expect_state={"renderstream": {"status": {"601": {
+        "workload": "Unreal scene workload", "workload_uid": "701", "t_now": 1234.5, "asset_errors": "[]",
+        "instances": {"0": {"machine": "rx-01", "machine_uid": "801", "state": "Running", "health": "OK",
+                            "health_details": ""}},
+        "streams": {"0": {"uid": "901", "name": "Unreal scene/rx-01", "source": "rx-01", "receiver": "vx4-01",
+                          "subscription_wanted": True, "subscribed": True, "t_last_dropped": 1200.0,
+                          "t_last_error": 0.0, "last_error": "", "status": "Receiving"}}}}}})
+MAPPINGS = [{"channel": "Default", "mapping": {"uid": "1001", "name": "LED wall"},
+             "assigner": {"uid": "1101", "name": "4 nodes"}}]
+telemetry(DG, "renderstream-layer-config", inbound_http={"path": _RS + "layerconfig?uid=601", "body": _envelope(
+    result={"framerateFractionDivisor": 1, "asset": {"uid": "1201", "name": "Scene.uproject"},
+            "pool": {"uid": "1301", "name": "rx pool"}, "channelMappings": MAPPINGS,
+            "defaultAssigner": {"uid": "1101", "name": "4 nodes"}})},
+    expect_state={"renderstream": {"config": {"601": {
+        "asset": "Scene.uproject", "pool": "rx pool", "default_assigner": "4 nodes", "framerate_divisor": 1,
+        "channel_mappings": _compact(MAPPINGS)}}}})
+POOL_MACHINES = [{"uid": "801", "name": "rx-01", "preferredSyncAdapter": "d3net",
+                  "adapters": [{"name": "d3net", "ipAddress": "10.0.0.11", "subnet": "255.255.255.0"}]}]
+telemetry(DG, "renderstream-pools", inbound_http={"path": _RS + "pools", "body": _envelope(result=[
+    {"uid": "1301", "name": "rx pool", "machines": POOL_MACHINES, "understudies": []}])},
+    expect_state={"renderstream": {"pools": {"1301": {"name": "rx pool", "machines": _compact(POOL_MACHINES),
+                                                      "understudies": "[]"}}}})
+telemetry(DG, "renderstream-assigners", inbound_http={"path": _RS + "assigners", "body": _envelope(result=[
+    {"uid": "1101", "name": "4 nodes", "transport": {"type": "NDI", "format": "RGBA", "bitDepth": 8},
+     "alpha": True, "overlapPixels": 16, "paddingPixels": 4,
+     "preferredNetwork": {"ip": "10.0.1.0", "name": "media"}}])},
+    expect_state={"renderstream": {"assigners": {"1101": {
+        "name": "4 nodes", "transport": "NDI", "format": "RGBA", "bit_depth": 8, "alpha": True,
+        "overlap_pixels": 16, "padding_pixels": 4, "network_ip": "10.0.1.0", "network": "media"}}}})
+telemetry(DG, "renderstream-command-reread", inbound_http={"path": _RS + "restartlayers", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _RS + "layers"}], expect_state={})
+telemetry(DG, "renderstream-failover-reread", inbound_http={"path": _RS + "failover", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _RS + "layers"},
+                            {"method": "GET", "target": "/api/session/status/health"},
+                            {"method": "GET", "target": _RS + "pools"}], expect_state={})
+
+# ── Sockpuppet ──
+_SP = "/api/session/sockpuppet/"
+_dg("get_sockpuppet_patches", {}, "GET", _SP + "patches")
+_dg("get_easing_functions", {}, "GET", _SP + "easingfunctions",
+    http_reply={"status": 200, "body": json.dumps({"easingFunctions": ["linear", "easeInOutQuad"]})},
+    expect_result={"ok": {"kind": "value", "value": ["linear", "easeInOutQuad"]}})
+_dg("set_live_float", {"patch": "/stage/wall", "field": "brightness", "value": 0.5, "duration": 2.0,
+                       "easing": "easeInOutQuad"}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"brightness","floatValue":{"value":0.500000,'
+    '"duration":2.000,"easingFunction":"easeInOutQuad"}}]}]}', **_OK)
+_dg("set_live_float", {"patch": "/stage/wall", "field": "x", "value": -12.25}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"x","floatValue":{"value":-12.250000,'
+    '"duration":0.000,"easingFunction":""}}]}]}', file="set_live_float_now")
+_dg("set_live_string", {"patch": "/stage/wall", "field": "blend", "value": "add"}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"blend","stringValue":"add"}]}]}', **_OK)
+_dg("set_live_resource", {"patch": "/stage/wall", "field": "video", "resource": "intro.mov"}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"video","resourceValue":{"name":"intro.mov"}}]}]}',
+    **_OK)
+_dg("send_live_changes", {"patches": [{"address": "/stage/wall", "changes": [{"field": "blend",
+                                                                              "stringValue": "add"}]}]},
+    "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"blend","stringValue":"add"}]}]}', **_OK)
+FIELDS = [
+    {"name": "brightness", "displayName": "Brightness", "type": "float",
+     "floatMeta": {"min": 0.0, "max": 1.0, "defaultValue": 1.0, "step": 0.01},
+     "floatValue": {"value": 0.5, "duration": 2.0, "easingFunction": "linear", "startValue": 1.0,
+                    "currentValue": 0.75}},
+    {"name": "blend", "displayName": "Blend mode", "type": "string",
+     "stringMeta": {"options": ["over", "add"]}, "stringValue": "add"},
+    {"name": "video", "displayName": "Video", "type": "resource", "resourceMeta": {"type": "VideoClip"},
+     "resourceValue": {"uid": "401", "name": "intro.mov"}}]
+telemetry(DG, "sockpuppet-patches", inbound_http={"path": _SP + "patches", "body": _envelope(result=[
+    {"address": "/stage/wall", "uid": "1501", "description": "LED wall", "fields": FIELDS}])},
+    state_before={"sockpuppet": {"patches": {"1500": {"address": "/old"}}}},
+    expect_state={"sockpuppet": {"patches": {"1501": {"address": "/stage/wall", "description": "LED wall", "fields": {
+        "0": {"name": "brightness", "display_name": "Brightness", "type": "float", "value": 0.5,
+              "current_value": 0.75, "min": 0.0, "max": 1.0, "default": 1.0, "step": 0.01},
+        "1": {"name": "blend", "display_name": "Blend mode", "type": "string", "text": "add",
+              "options": '["over","add"]'},
+        "2": {"name": "video", "display_name": "Video", "type": "resource", "resource": "intro.mov",
+              "resource_uid": "401", "resource_type": "VideoClip"}}}}}})
+telemetry(DG, "easing-functions", inbound_http={"path": _SP + "easingfunctions",
+                                                "body": json.dumps({"easingFunctions": ["linear", "easeIn"]})},
+          expect_state={"sockpuppet": {"easing_functions": '["linear","easeIn"]'}})
+telemetry(DG, "sockpuppet-live-reread", inbound_http={"path": _SP + "live", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _SP + "patches"}], expect_state={})
+
+# ── Colour: CDLs ──
+_dg("get_cdls", {}, "GET", "/api/session/colour/cdls")
+_dg("set_cdl", {"cdl": "wall grade", "slope_r": 1.1, "offset_b": -0.02, "power_g": 0.9, "saturation": 0.8},
+    "POST", "/api/session/colour/cdl",
+    '{"cdl":{"name":"wall grade","slope":{"x":1.100000,"y":1.000000,"z":1.000000},'
+    '"offset":{"x":0.000000,"y":0.000000,"z":-0.020000},"power":{"x":1.000000,"y":0.900000,"z":1.000000},'
+    '"saturation":0.800000}}', **_OK)
+telemetry(DG, "cdls", inbound_http={"path": "/api/session/colour/cdls", "body": _envelope(result=[
+    {"uid": "1601", "name": "wall grade", "slope": {"x": 1.1, "y": 1.0, "z": 1.0},
+     "offset": {"x": 0.0, "y": 0.0, "z": -0.02}, "power": {"x": 1.0, "y": 0.9, "z": 1.0}, "saturation": 0.8}])},
+    state_before={"cdls": {"1600": {"name": "deleted"}}},
+    expect_state={"cdls": {"1601": {"name": "wall grade", "slope_r": 1.1, "slope_g": 1.0, "slope_b": 1.0,
+                                    "offset_r": 0.0, "offset_g": 0.0, "offset_b": -0.02, "power_r": 1.0,
+                                    "power_g": 0.9, "power_b": 1.0, "saturation": 0.8}}})
+telemetry(DG, "cdl-reread", inbound_http={"path": "/api/session/colour/cdl", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/colour/cdls"}], expect_state={})
+
+# ── Notes ──
+NOTE = {"note": {"uid": "1701", "name": "running order"}, "text": "1. Intro\n2. Act 1"}
+_dg("get_notes", {}, "GET", "/api/session/notes?start=0&count=0")
+_dg("get_note", {"note": "running order"}, "GET", "/api/session/note?name=running%20order",
+    http_reply={"status": 200, "body": _envelope(result=NOTE)},
+    expect_result={"ok": {"kind": "value", "value": NOTE}})
+_dg("set_note", {"note": "running order", "text": "1. Intro\n2. Act 1"}, "POST", "/api/session/note",
+    '{"note":{"name":"running order"},"text":"1. Intro\\n2. Act 1"}',
+    http_reply={"status": 200, "body": _envelope(result=NOTE)},
+    expect_result={"ok": {"kind": "value", "value": NOTE}})
+telemetry(DG, "notes", inbound_http={"path": "/api/session/notes", "body": _envelope(result=[
+    NOTE, {"note": {"uid": "1702", "name": "contacts"}, "text": "FOH: ch 4"}])},
+    state_before={"notes": {"1700": {"name": "deleted", "text": ""}}},
+    expect_state={"notes": {"1701": {"name": "running order", "text": "1. Intro\n2. Act 1"},
+                            "1702": {"name": "contacts", "text": "FOH: ch 4"}}})
+telemetry(DG, "notes-page", inbound_http={"path": "/api/session/notes?start=1&count=1", "body": _envelope(result=[
+    {"note": {"uid": "1702", "name": "contacts"}, "text": "FOH: ch 5"}])},
+    state_before={"notes": {"1701": {"name": "running order", "text": "1. Intro"}}},
+    expect_state={"notes": {"1701": {"name": "running order", "text": "1. Intro"},
+                            "1702": {"name": "contacts", "text": "FOH: ch 5"}}})
+telemetry(DG, "note-written", inbound_http={"path": "/api/session/note", "body": _envelope(result=NOTE)},
+          expect_state={"notes": {"1701": {"name": "running order", "text": "1. Intro\n2. Act 1"}}})
+
+# ── Shot recorder ──
+RECORDERS = [{"engaged": True, "name": "main", "slate": "scene 4", "take": "3"}]
+_dg("get_shot_recorders", {}, "GET", "/api/session/shotrecorder/recorders",
+    http_reply={"status": 200, "body": _envelope(recorders=RECORDERS)},
+    expect_result={"ok": {"kind": "value", "value": RECORDERS}})
+_dg("record_shot", {"recorder": "main", "slate": "scene 4", "take": 3}, "POST",
+    "/api/session/shotrecorder/record", '{"engage":true,"name":"main","slate":"scene 4","take":"3"}', **_OK)
+telemetry(DG, "shot-recorders", inbound_http={"path": "/api/session/shotrecorder/recorders",
+                                              "body": _envelope(recorders=RECORDERS)},
+          state_before={"shot_recorders": {"old": {"recording": False}}},
+          expect_state={"shot_recorders": {"main": {"recording": True, "slate": "scene 4", "take": 3}}})
+telemetry(DG, "shot-record-reread", inbound_http={"path": "/api/session/shotrecorder/record", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/shotrecorder/recorders"}], expect_state={})
+
+# ── Python ──
+PY_REPLY = {"status": {"code": 0, "message": "", "details": []}, "d3Log": "Executed in 0.4 ms\n",
+            "pythonLog": "", "returnValue": "\"track 1\""}
+_dg("execute_python", {"script": "return resourceManager.allResources(Track)[0].description"}, "POST",
+    "/api/session/python/execute",
+    '{"moduleName":"","script":"return resourceManager.allResources(Track)[0].description"}',
+    http_reply={"status": 200, "body": json.dumps(PY_REPLY)}, expect_result={"ok": {"kind": "value", "value": PY_REPLY}})
+_dg("register_python_module", {"module": "helpers", "contents": "from d3 import *\ndef tracks():\n    return 1\n"},
+    "POST", "/api/session/python/registermodule",
+    '{"moduleName":"helpers","contents":"from d3 import *\\ndef tracks():\\n    return 1\\n"}', **_OK)
+
+# ── Mixed reality ──
+_MR = "/api/session/mixedreality/"
+_dg("get_mr_cameras", {}, "GET", _MR + "cameras")
+_dg("get_mr_sets", {}, "GET", _MR + "mrsets")
+_dg("get_spatial_calibrations", {}, "GET", _MR + "spatialcalibrations")
+_dg("get_capture_progress", {}, "GET", _MR + "captureprogress",
+    http_reply={"status": 200, "body": _envelope(result=True)}, expect_result={"ok": {"kind": "value", "value": True}})
+_dg("select_mr_camera", {"mr_set": "xr stage", "camera": "cam 2"}, "POST", _MR + "selectcamera",
+    '{"mrSet":{"name":"xr stage"},"cameraOverride":{"name":"cam 2"}}', **_OK)
+_dg("select_spatial_calibration", {"camera": "cam 2", "calibration": "cam 2 cal"}, "POST",
+    _MR + "selectspatialcalibration", '{"camera":{"name":"cam 2"},"spatialCalibration":{"name":"cam 2 cal"}}', **_OK)
+_dg("capture_observation", {"camera": "cam 2", "calibration": "cam 2 cal"}, "POST", _MR + "captureobservation",
+    '{"camera":{"name":"cam 2"},"spatialCalibration":{"name":"cam 2 cal"}}', **_OK)
+_dg("enable_observation", {"observation": "1901", "enable": False}, "POST", _MR + "enableobservations",
+    '{"observations":[{"uid":"1901","enable":false}]}', **_OK)
+_dg("delete_observation", {"observation": "1901"}, "POST", _MR + "deleteobservations",
+    '{"observations":["1901"]}', **_OK)
+_dg("delete_all_observations", {"calibration": "cam 2 cal"}, "POST", _MR + "deleteallobservations",
+    '{"spatialCalibration":{"name":"cam 2 cal"}}', **_OK)
+telemetry(DG, "mr-cameras", inbound_http={"path": _MR + "cameras", "body": _envelope(result=[
+    {"uid": "1801", "name": "cam 2", "spatialCalibration": {"uid": "1851", "name": "cam 2 cal"}}])},
+    state_before={"mixed_reality": {"cameras": {"1800": {"name": "gone"}}}},
+    expect_state={"mixed_reality": {"cameras": {"1801": {"name": "cam 2", "spatial_calibration": "cam 2 cal"}}}})
+telemetry(DG, "mr-sets", inbound_http={"path": _MR + "mrsets", "body": _envelope(result=[
+    {"uid": "1871", "name": "xr stage", "currentCamera": {"uid": "1801", "name": "cam 2"},
+     "isCameraOverride": True}])},
+    expect_state={"mixed_reality": {"sets": {"1871": {"name": "xr stage", "current_camera": "cam 2",
+                                                      "camera_override": True}}}})
+POSE = {"position": {"x": 1.0, "y": 2.0, "z": -3.5}, "rotation": {"x": 0.0, "y": 90.0, "z": 0.0}}
+telemetry(DG, "spatial-calibrations", inbound_http={"path": _MR + "spatialcalibrations", "body": _envelope(result=[
+    {"uid": "1851", "name": "cam 2 cal", "mrsets": [{"uid": "1871", "name": "xr stage"}],
+     "observations": [{"uid": "1901", "name": "obs 1", "trackedPose": POSE, "solvedPose": POSE, "isEnabled": True,
+                       "zoom": 0.25, "focus": 0.5, "type": "Primary", "rmsError": 0.8}]}])},
+    state_before={"mixed_reality": {"calibrations": {"1851": {"observations": {"1900": {"name": "deleted"}}}}}},
+    expect_state={"mixed_reality": {"calibrations": {"1851": {
+        "name": "cam 2 cal", "mr_sets": _compact([{"uid": "1871", "name": "xr stage"}]), "observations": {"1901": {
+            "name": "obs 1", "enabled": True, "zoom": 0.25, "focus": 0.5, "type": "Primary", "rms_error": 0.8,
+            "tracked_pose": _compact(POSE), "solved_pose": _compact(POSE)}}}}}})
+telemetry(DG, "capture-progress", inbound_http={"path": _MR + "captureprogress", "body": _envelope(result=False)},
+          expect_state={"mixed_reality": {"capturing": False}})
+telemetry(DG, "mr-select-camera-reread", inbound_http={"path": _MR + "selectcamera", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _MR + "mrsets"}], expect_state={})
+telemetry(DG, "mr-select-calibration-reread", inbound_http={"path": _MR + "selectspatialcalibration",
+                                                            "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _MR + "cameras"}], expect_state={})
+telemetry(DG, "mr-observations-reread", inbound_http={"path": _MR + "deleteobservations", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _MR + "captureprogress"},
+                            {"method": "GET", "target": _MR + "spatialcalibrations"}], expect_state={})
+
+# ── QuickCal ──
+_QC = "/api/session/quickcal/"
+_dg("get_reference_points", {}, "GET", _QC + "referencepoints")
+CAL = {"restError": 0.1, "reprojectionError": 0.4, "rmsError": 0.35, "selectedCalibrationMethod": "Auto",
+       "usedCalibrationMethod": "Zhang", "requiredLineups": "6", "currentLineups": "6", "fixedThrowRatio": False}
+_dg("get_projector_calibration", {"projector": "proj 1"}, "GET", _QC + "projectorcalibration?name=proj%201",
+    http_reply={"status": 200, "body": _envelope(info=CAL)}, expect_result={"ok": {"kind": "value", "value": CAL}})
+_dg("line_up_current_pose", {"projector": "proj 1", "reference_point": "corner A", "x": 0.125, "y": 0.75},
+    "POST", _QC + "lineupcurrentpose",
+    '{"projector":{"name":"proj 1"},"referencePoint":{"name":"corner A"},"position":{"x":0.125000,"y":0.750000}}',
+    **_OK)
+_dg("reset_lineup", {"projector": "proj 1"}, "POST", _QC + "resetlineup", '{"projector":{"name":"proj 1"}}', **_OK)
+_dg("overwrite_manual_calibration", {"projector": "proj 1"}, "POST", _QC + "overwritemanualcalibration",
+    '{"projector":{"name":"proj 1"}}', **_OK)
+telemetry(DG, "reference-points", inbound_http={"path": _QC + "referencepoints", "body": _envelope(result=[
+    {"uid": "2001", "name": "corner A"}, {"uid": "2002", "name": "corner B"}])},
+    state_before={"quickcal": {"reference_points": {"2000": "gone"}}},
+    expect_state={"quickcal": {"reference_points": {"2001": "corner A", "2002": "corner B"}}})
+
+# ── OmniCal (Developer Portal "OmniCal API" page) ──
+_OC = "/api/session/omnical/"
+DISCOVERY = {"status": {"code": 0, "message": "", "details": []}, "enabled": True, "discovery": "RUNNING"}
+_dg("get_omnical_camera_discovery", {}, "GET", _OC + "cameradiscovery",
+    http_reply={"status": 200, "body": json.dumps(DISCOVERY)},
+    expect_result={"ok": {"kind": "value", "value": DISCOVERY}})
+_dg("set_omnical_camera_discovery", {"enabled": True}, "POST", _OC + "cameradiscovery", '{"enabled":true}',
+    http_reply={"status": 200, "body": json.dumps(DISCOVERY)}, expect_result={"ok": {"kind": "ack"}})
+_dg("get_omnical_current_plan", {}, "GET", _OC + "currentplan")
+_dg("get_omnical_plans", {}, "GET", _OC + "plans")
+_dg("execute_rigcheck", {}, "POST", _OC + "rigcheck/executeplan", "{}", **_OK)
+# The page's own example of a RigCheck still running.
+CHECK_RUNNING = {"status": {"code": 0, "message": "Most recent OmniCal task is real RigCheck Result: "
+                            "'plan 12mm_result_000'.\nExecute Plan Task state: complete=0, success=0, "
+                            "cancelled=0, fatalErrors=0, progress=0.57\n", "details": []},
+                 "result": {"status": "Amber", "feedback": "RigCheck still in progress.", "omniCalScore": 10000,
+                            "cameraRmsError": 10000, "projectorRmsError": 10000}}
+_dg("get_rigcheck_result", {}, "GET", _OC + "rigcheck/checkresult",
+    http_reply={"status": 200, "body": json.dumps(CHECK_RUNNING)},
+    expect_result={"ok": {"kind": "value", "value": CHECK_RUNNING}})
+_dg("accept_rigcheck_result", {}, "POST", _OC + "rigcheck/acceptresult", "{}", **_OK)
+_dg("revert_rigcheck_result", {}, "POST", _OC + "rigcheck/revertresult", "{}", **_OK)
+_dg("get_rigcheck_current_result", {}, "GET", _OC + "rigcheck/currentresult")
+_dg("get_rigcheck_fallback_result", {}, "GET", _OC + "rigcheck/currentfallbackresult")
+_dg("get_rigcheck_results", {}, "GET", _OC + "rigcheck/results")
+_dg("get_rigcheck_results_for_plan", {"plan": "plan 12mm"}, "GET", _OC + "rigcheck/resultsforplan?name=plan%2012mm")
+_dg("delete_old_rigcheck_results", {}, "POST", _OC + "rigcheck/deleteoldresults", "{}", **_OK)
+telemetry(DG, "omnical-discovery", inbound_http={"path": _OC + "cameradiscovery", "body": json.dumps(DISCOVERY)},
+          expect_state={"omnical": {"camera_discovery": True, "camera_discovery_state": "RUNNING"}})
+telemetry(DG, "omnical-plans", inbound_http={"path": _OC + "plans", "body": _envelope(
+    plans=[{"name": "plan 12mm", "uid": "2101"}])},
+    state_before={"omnical": {"plans": {"2100": "gone"}}},
+    expect_state={"omnical": {"plans": {"2101": "plan 12mm"}}})
+telemetry(DG, "omnical-current-plan", inbound_http={"path": _OC + "currentplan", "body": _envelope(
+    plan={"name": "plan 12mm", "uid": "2101"})},
+    expect_state={"omnical": {"current_plan": "plan 12mm", "current_plan_uid": "2101"}})
+telemetry(DG, "rigcheck-running", inbound_http={"path": _OC + "rigcheck/checkresult",
+                                                "body": json.dumps(CHECK_RUNNING)},
+          expect_state={"omnical": {"rigcheck": {
+              "status": "Amber", "feedback": "RigCheck still in progress.", "score": 10000.0,
+              "camera_rms_error": 10000.0, "projector_rms_error": 10000.0,
+              "progress": CHECK_RUNNING["status"]["message"]}}})
+telemetry(DG, "rigcheck-results", inbound_http={"path": _OC + "rigcheck/results", "body": _envelope(
+    results=[{"name": "plan 12mm_result_000", "uid": "2201"}])},
+    expect_state={"omnical": {"results": {"2201": "plan 12mm_result_000"}}})
+telemetry(DG, "rigcheck-current-result", inbound_http={"path": _OC + "rigcheck/currentresult", "body": _envelope(
+    result={"name": "plan 12mm_result_000", "uid": "2201"})},
+    expect_state={"omnical": {"current_result": "plan 12mm_result_000", "current_result_uid": "2201"}})
+telemetry(DG, "rigcheck-fallback-result", inbound_http={"path": _OC + "rigcheck/currentfallbackresult",
+                                                        "body": _envelope(result={"name": "plan 12mm_result_000",
+                                                                                  "uid": "2201"})},
+          expect_state={"omnical": {"fallback_result": "plan 12mm_result_000", "fallback_result_uid": "2201"}})
+telemetry(DG, "rigcheck-reread", inbound_http={"path": _OC + "rigcheck/acceptresult", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _OC + "rigcheck/checkresult"},
+                            {"method": "GET", "target": _OC + "rigcheck/currentresult"},
+                            {"method": "GET", "target": _OC + "rigcheck/currentfallbackresult"},
+                            {"method": "GET", "target": _OC + "rigcheck/results"}], expect_state={})
+
+# ── Service API: VFCs and media ──
+_SV = "/api/service/"
+_dg("get_vfcs", {}, "GET", _SV + "system/vfcs")
+_dg("list_media", {"directory": "{project:my-show}/objects/VideoFile"}, "GET",
+    _SV + "media/list?directory=%7Bproject%3Amy-show%7D%2Fobjects%2FVideoFile")
+PROVISIONED = [{"taskUid": "t-1", "success": True, "errorMessage": {}, "taskType": "CopyTask",
+                "taskStatusStream": "ws://vx4-01:80/api/service/task/status"}]
+_dg("provision_media", {"media_path": "\\\\share/media/background.mov",
+                        "local_path": "{project:my-show}/objects/VideoFile/background.mov"},
+    "POST", _SV + "media/provision",
+    '{"mediaPath":"\\\\\\\\share/media/background.mov",'
+    '"localPath":["{project:my-show}/objects/VideoFile/background.mov"]}',
+    http_reply={"status": 200, "body": _envelope(result=PROVISIONED)},
+    expect_result={"ok": {"kind": "value", "value": PROVISIONED}})
+_dg("provision_media_transfers", {"transfers": [{"mediaPath": "http://media.local/a.mov",
+                                                 "localPath": ["{project:my-show}/objects/VideoFile/a.mov"]}]},
+    "POST", _SV + "media/provision",
+    '{"transfers":[{"mediaPath":"http://media.local/a.mov","localPath":["{project:my-show}/objects/VideoFile/a.mov"]}]}')
+_dg("remove_media", {"path": "{project:my-show}/objects/VideoFile/background.mov"}, "POST", _SV + "media/remove",
+    '{"path":["{project:my-show}/objects/VideoFile/background.mov"]}',
+    http_reply={"status": 200, "body": _envelope(taskUid="t-2")},
+    expect_result={"ok": {"kind": "value", "value": "t-2"}})
+telemetry(DG, "systems", inbound_http={"path": _SV + "system/detectsystems", "body": _envelope(result=[
+    {"hostname": "VX4-01", "type": "vx4", "version": {"major": 30, "minor": 8, "hotfix": 3, "revision": 191234},
+     "runningProject": "show/show.d3", "ipAddress": "10.0.0.11", "isDesignerRunning": True,
+     "isServiceRunning": True, "isManagerRunning": False, "isNotchHostRunning": False}])},
+    state_before={"service": {"systems": {"VX4-09": {"type": "vx4"}}}},
+    expect_state={"service": {"systems": {"VX4-01": {
+        "type": "vx4", "version": "30.8.3.191234", "running_project": "show/show.d3", "ip_address": "10.0.0.11",
+        "designer_running": True, "service_running": True, "manager_running": False,
+        "notch_host_running": False}}}})
+telemetry(DG, "os-info", inbound_http={"path": _SV + "system/osinfo", "body": _envelope(result=[
+    {"hostname": "VX4-01", "windowsVersion": "10.0.19044", "imageVersion": "R22.1"}])},
+    expect_state={"service": {"os": {"VX4-01": {"windows_version": "10.0.19044", "image_version": "R22.1"}}}})
+ADDRESSES = [{"address": "10.0.0.11", "subnet": "255.255.255.0", "family": "IPv4", "gateway": ""}]
+telemetry(DG, "network-adapters", inbound_http={"path": _SV + "system/networkadapters", "body": _envelope(result=[
+    {"hostname": "VX4-01", "netAdapters": [{"name": "d3net", "mac": "00:11:22:33:44:55", "enabled": True,
+                                            "dhcp": False, "status": "Up", "addresses": ADDRESSES}]}])},
+    expect_state={"service": {"adapters": {"VX4-01": {"0": {
+        "name": "d3net", "mac": "00:11:22:33:44:55", "enabled": True, "dhcp": False, "status": "Up",
+        "addresses": _compact(ADDRESSES)}}}}})
+telemetry(DG, "gpu-outputs", inbound_http={"path": _SV + "system/gpuoutputs", "body": _envelope(result=[
+    {"hostname": "VX4-01", "genlock": {"frequency": 50.0}, "gpuOutputs": [
+        {"gpuPort": 0, "genlockState": "Locked", "emulated": False, "resolution": {"width": 3840, "height": 2160},
+         "refreshRate": 50.0, "bitDepth": 10, "colourFormat": "RGB"}]}])},
+    expect_state={"service": {"gpu": {"VX4-01": {"genlock_frequency": 50.0, "outputs": {"0": {
+        "gpu_port": 0, "genlock_state": "Locked", "emulated": False, "width": 3840, "height": 2160,
+        "refresh_rate": 50.0, "bit_depth": 10, "colour_format": "RGB"}}}}}})
+telemetry(DG, "system-projects", inbound_http={"path": _SV + "system/projects", "body": _envelope(result=[
+    {"hostname": "VX4-01", "lastProject": "show/show.d3", "projects": [
+        {"path": "show/show.d3", "lastModified": "2026-09-30T18:00:00Z",
+         "version": {"major": 30, "minor": 8, "hotfix": 3, "revision": 191234}}]}])},
+    expect_state={"service": {"projects": {"VX4-01": {"last_project": "show/show.d3", "projects": {"0": {
+        "path": "show/show.d3", "last_modified": "2026-09-30T18:00:00Z", "version": "30.8.3.191234"}}}}}})
+PORTS = {"a": {"resolution": {"width": 3840, "height": 2160}, "RefreshRate": 50.0, "name": "A"}}
+telemetry(DG, "vfcs", inbound_http={"path": _SV + "system/vfcs", "body": _envelope(result=[
+    {"hostname": "VX4-01", "backplaneVersion": "BPv2", "cards": [
+        {"slot": 1, "type": "DP14_Passthrough", "firmwareVersion": "2.1", "fpgaVersion": "1.7",
+         "splitMode": "Quad4K", "generation": "Two", "ports": PORTS}]}])},
+    expect_state={"service": {"vfcs": {"VX4-01": {"backplane": "BPv2", "cards": {"0": {
+        "slot": 1, "type": "DP14_Passthrough", "firmware_version": "2.1", "fpga_version": "1.7",
+        "split_mode": "Quad4K", "generation": "Two", "ports": _compact(PORTS)}}}}}})
+telemetry(DG, "media-list", inbound_http={"path": _SV + "media/list?directory=%7Bprojects%7D", "body": _envelope(
+    files=[{"path": "C:/d3 Projects/show/objects/VideoFile/intro.mov", "size": "104857600",
+            "creationDate": "133700000000000000", "lastWriteDate": "133700000100000000"}])},
+    state_before={"media": {"files": {"1": {"path": "gone.mov"}}}},
+    expect_state={"media": {"files": {"0": {"path": "C:/d3 Projects/show/objects/VideoFile/intro.mov",
+                                            "size": 104857600, "created": 133700000000000000,
+                                            "last_written": 133700000100000000}}}})
+telemetry(DG, "media-change-reread", inbound_http={"path": _SV + "media/remove", "body": _envelope(taskUid="t-2")},
+          expect_then_send=[{"method": "GET", "target": _SV + "media/list?directory=%7Bprojects%7D"}],
+          expect_state={})
+telemetry(DG, "project-command-reread", inbound_http={"path": _SV + "project/startlocalproject", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _SV + "system/detectsystems"},
+                            {"method": "GET", "target": _SV + "system/projects"}], expect_state={})
+
+# ── Live Update: proof of play (Developer Portal "Proof of Play") ──
+POP_SUB = ('{"subscribe":{"object":"subsystem:ProofOfPlaySubsystem","properties":["{\'a\': \'active\', \'r\': \'recent\', \'active\': '
+           '(object.getRecords() if callable(object.getRecords) else object.getRecords), \'recent\': '
+           'object.getRecentRecords(50)}"],"configuration":{"updateFrequencyMs":1000}}}')
+ACTIVE_RECORD = {"layerName": "video 1", "videoName": "intro.mov", "framesPlayed": 1500, "totalFrames": 3000,
+                 "loopCount": 0, "completedFullPlayback": False, "startTime": "2026-10-07T18:00:00Z",
+                 "endTime": "2026-10-07T18:00:25Z", "active": True}
+RECENT_RECORD = {"layerName": "video 1", "videoName": "logo.mov", "framesPlayed": 250, "totalFrames": 250,
+                 "loopCount": 1, "completedFullPlayback": True, "startTime": "2026-10-07T17:59:50Z",
+                 "endTime": "2026-10-07T18:00:00Z", "active": False}
+for _v in V:
+    if _v.get("spec") == DG and _v.get("telemetry") == "live-transport":
+        _v["expect_connect_ws"] = [LIVE_SUB, POP_SUB]
+telemetry(DG, "live-proof-of-play", expect_connect_ws=[LIVE_SUB, POP_SUB],
+          inbound_ws=json.dumps({"valuesChanged": [{"id": 2, "value": {"a": "active", "r": "recent", "active": [ACTIVE_RECORD],
+                                                                       "recent": [RECENT_RECORD]},
+                                                    "changeTimestamp": 300.0, "messageTimestamp": 300.1}]}),
+          state_before={"proof_of_play": {"active": {"1": {"layer": "video 2", "video": "gone.mov"}}}},
+          expect_state={"proof_of_play": {
+              "active": {"0": {"layer": "video 1", "video": "intro.mov", "frames_played": 1500,
+                               "total_frames": 3000, "loop_count": 0, "complete": False,
+                               "start_time": "2026-10-07T18:00:00Z", "end_time": "2026-10-07T18:00:25Z"}},
+              "recent": {"0": {"layer": "video 1", "video": "logo.mov", "frames_played": 250,
+                               "total_frames": 250, "loop_count": 1, "complete": True,
+                               "start_time": "2026-10-07T17:59:50Z", "end_time": "2026-10-07T18:00:00Z"}}}})
+telemetry(DG, "live-proof-of-play-idle", inbound_ws=json.dumps(
+    {"valuesChanged": [{"id": 2, "value": {"a": "active", "r": "recent", "active": [], "recent": [RECENT_RECORD]}}]}),
+    state_before={"proof_of_play": {"active": {"0": {"layer": "video 1", "video": "intro.mov"}}}},
+    expect_state={"proof_of_play": {"recent": {"0": {
+        "layer": "video 1", "video": "logo.mov", "frames_played": 250, "total_frames": 250, "loop_count": 1,
+        "complete": True, "start_time": "2026-10-07T17:59:50Z", "end_time": "2026-10-07T18:00:00Z"}}}})
+telemetry(DG, "live-transport-keeps-proof-of-play", inbound_ws=json.dumps({"valuesChanged": [{"id": 1, "value": {
+    "playing": False, "time": 0.0, "mode": "Stop", "track": "track 1", "engaged": True, "volume": 1.0,
+    "brightness": 1.0}}]}),
+    state_before={"proof_of_play": {"active": {"0": {"layer": "video 1", "video": "intro.mov"}}}},
+    expect_state={"proof_of_play": {"active": {"0": {"layer": "video 1", "video": "intro.mov"}}},
+                  "live": {"playing": False, "time": 0.0, "play_mode": "Stop", "track": "track 1", "engaged": True,
+                           "volume": 1.0, "brightness": 1.0}})
