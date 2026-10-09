@@ -85,6 +85,21 @@ def _yclql_vectors():
         ('mix_dca_assign', 'MIXER:Current/Mix/DCA/Assign', ('mix', 24), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'mixes.{x}.dcas.{y}', False),
         ('matrix_dca_assign', 'MIXER:Current/Mtrx/DCA/Assign', ('matrix', 8), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'matrices.{x}.dcas.{y}', False),
         ('stereo_dca_assign', 'MIXER:Current/St/DCA/Assign', ('stereo', 3), ('dca', 16), ('flag', 'assigned', 'true = 1 (assigned), false = 0 (not assigned)'), 'stereo.{x}.dcas.{y}', False),
+        ('input_cue', 'MIXER:Current/Cue/InCh/On', ('channel', 72), None, ('bool',), 'inputs.{x}.cue', False),
+        ('stereo_input_cue', 'MIXER:Current/Cue/StInCh/On', ('stereo_input', 16), None, ('bool',), 'stereo_inputs.{x}.cue', False),
+        ('mix_cue', 'MIXER:Current/Cue/Mix/On', ('mix', 24), None, ('bool',), 'mixes.{x}.cue', False),
+        ('matrix_cue', 'MIXER:Current/Cue/Mtrx/On', ('matrix', 8), None, ('bool',), 'matrices.{x}.cue', False),
+        ('stereo_cue', 'MIXER:Current/Cue/St/On', ('stereo', 3), None, ('bool',), 'stereo.{x}.cue', False),
+        ('dca_cue', 'MIXER:Current/Cue/DCA/On', ('dca', 16), None, ('bool',), 'dcas.{x}.cue', False),
+        ('monitor_on', 'MIXER:Current/Monitor/On', None, None, ('bool',), 'monitor.on', False),
+        ('monitor_dimmer', 'MIXER:Current/Monitor/DimmerOn', None, None, ('bool',), 'monitor.dimmer', False),
+        ('monitor_cue_interruption', 'MIXER:Current/Monitor/CueInterruption', None, None, ('bool',), 'monitor.cue_interruption', False),
+        ('monitor_fader_level', 'MIXER:Current/Monitor/Fader/Level', None, None, ('level', 1000), 'monitor.fader_level', False),
+        ('cue_output', 'MIXER:Current/Cue/Output', None, None, ('bool',), 'cue.output_on', False),
+        ('cue_mode', 'MIXER:Current/Cue/CueMode', None, None, ('text',), 'cue.mode', False),
+        ('cue_fader_release', 'MIXER:Current/Cue/FaderCueRelease', None, None, ('bool',), 'cue.fader_cue_release', False),
+        ('cue_output_level', 'MIXER:Current/Cue/OutputLevel', None, None, ('level', 1000), 'cue.output_level', False),
+        ('cue_active', 'MIXER:Current/Cue/ActiveCue', None, None, ('text',), 'cue.active', 'get'),
     ]
 
     # Expected wire stated independently of the spec's templates: X and Y go
