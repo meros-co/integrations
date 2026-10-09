@@ -144,7 +144,9 @@ models:
                execute_python, register_python_module,
                get_mr_cameras, get_mr_sets, get_spatial_calibrations, get_capture_progress, select_mr_camera,
                select_spatial_calibration, capture_observation, enable_observation, delete_observation,
-               delete_all_observations]
+               delete_all_observations,
+               get_reference_points, get_projector_calibration, line_up_current_pose, reset_lineup,
+               overwrite_manual_calibration]
     verification: none
 
 commands:
@@ -1032,6 +1034,62 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── QuickCal ─────────────────────────────────────────────────────────────
+  get_reference_points:
+    summary: Every QuickCal reference point (quickcal/referencepoints)
+    send: { method: GET, path: /api/session/quickcal/referencepoints }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_projector_calibration:
+    summary: A projector's current calibration (rest, reprojection and RMS errors, selected and used method, lineups required and made, fixed throw ratio), by the projector's name (quickcal/projectorcalibration)
+    params:
+      projector: { type: string, max_length: 256, required: true,
+                   label: Projector,
+                   description: "Name of the projector as shown in Designer." }
+    send: { method: GET, path: /api/session/quickcal/projectorcalibration, query: { name: "{projector}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.info" }
+    returns: value
+
+  line_up_current_pose:
+    summary: Line up a reference point for a projector at a position in its output, recalibrating the projector's current pose (quickcal/lineupcurrentpose)
+    params:
+      projector:       { type: string, max_length: 256, required: true,
+                         label: Projector,
+                         description: "Name of the projector as shown in Designer." }
+      reference_point: { type: string, max_length: 256, required: true,
+                         label: Reference point,
+                         description: "Name of the reference point to line up." }
+      x:               { type: float, required: true,
+                         label: X,
+                         description: "Horizontal position of the reference point in the projector's output, in the units Designer's QuickCal uses." }
+      y:               { type: float, required: true,
+                         label: Y,
+                         description: "Vertical position of the reference point in the projector's output, in the same units." }
+    send: { method: POST, path: /api/session/quickcal/lineupcurrentpose, body: '{"projector":{"name":{projector:json}},"referencePoint":{"name":{reference_point:json}},"position":{"x":{x:.6f},"y":{y:.6f}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  reset_lineup:
+    summary: Reset a projector's QuickCal lineup, by the projector's name (quickcal/resetlineup)
+    params:
+      projector: { type: string, max_length: 256, required: true,
+                   label: Projector,
+                   description: "Name of the projector as shown in Designer." }
+    send: { method: POST, path: /api/session/quickcal/resetlineup, body: '{"projector":{"name":{projector:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  overwrite_manual_calibration:
+    summary: Copy a projector's current calibrated parameters into its manual fields, by the projector's name (quickcal/overwritemanualcalibration)
+    params:
+      projector: { type: string, max_length: 256, required: true,
+                   label: Projector,
+                   description: "Name of the projector as shown in Designer." }
+    send: { method: POST, path: /api/session/quickcal/overwritemanualcalibration, body: '{"projector":{"name":{projector:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -1065,6 +1123,7 @@ telemetry:
       - { method: GET, path: /api/session/mixedreality/mrsets }
       - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
       - { method: GET, path: /api/session/mixedreality/captureprogress }
+      - { method: GET, path: /api/session/quickcal/referencepoints }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1629,6 +1688,14 @@ telemetry:
       then_send:
         - { method: GET, path: /api/session/mixedreality/captureprogress }
         - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
+    # QuickCal reference points, keyed by uid.
+    - path: "^/api/session/quickcal/referencepoints$"
+      json_match: { "$.result": "^\\[" }
+      replace: quickcal.reference_points
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        quickcal.reference_points.{uid}: "{name}"
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -1792,6 +1859,7 @@ state:
   mixed_reality.calibrations.*.observations.*.tracked_pose: { type: string, description: "The tracked camera pose: JSON {position: {x, y, z}, rotation: {x, y, z}}" }
   mixed_reality.calibrations.*.observations.*.solved_pose:  { type: string, description: "The solved camera pose, in the same form" }
   mixed_reality.capturing:                     { type: bool, description: "An observation capture is running (capture_observation)" }
+  quickcal.reference_points.*: { type: string, description: "QuickCal reference point, keyed by its uid: its name" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -1958,3 +2026,13 @@ quirks:
       and again after each of these commands. The API has no way to clear a
       camera override or to create cameras, sets or calibrations, and no
       calibration solve: those are done in Designer.
+  - models: [all]
+    severity: critical
+    text: >
+      line_up_current_pose, reset_lineup and overwrite_manual_calibration change a
+      projector's calibration, and so the picture on the stage, at once;
+      overwrite_manual_calibration replaces the manual values it copies over.
+      The API lists no projectors, so a projector's calibration is not kept in
+      state: get_projector_calibration reads it for a projector named by the
+      caller. Reference points are read every minute. The units of a lineup
+      position are not documented.

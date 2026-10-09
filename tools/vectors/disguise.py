@@ -517,3 +517,22 @@ telemetry(DG, "mr-select-calibration-reread", inbound_http={"path": _MR + "selec
 telemetry(DG, "mr-observations-reread", inbound_http={"path": _MR + "deleteobservations", "body": _ENV_OK},
           expect_then_send=[{"method": "GET", "target": _MR + "captureprogress"},
                             {"method": "GET", "target": _MR + "spatialcalibrations"}], expect_state={})
+
+# ── QuickCal ──
+_QC = "/api/session/quickcal/"
+_dg("get_reference_points", {}, "GET", _QC + "referencepoints")
+CAL = {"restError": 0.1, "reprojectionError": 0.4, "rmsError": 0.35, "selectedCalibrationMethod": "Auto",
+       "usedCalibrationMethod": "Zhang", "requiredLineups": "6", "currentLineups": "6", "fixedThrowRatio": False}
+_dg("get_projector_calibration", {"projector": "proj 1"}, "GET", _QC + "projectorcalibration?name=proj%201",
+    http_reply={"status": 200, "body": _envelope(info=CAL)}, expect_result={"ok": {"kind": "value", "value": CAL}})
+_dg("line_up_current_pose", {"projector": "proj 1", "reference_point": "corner A", "x": 0.125, "y": 0.75},
+    "POST", _QC + "lineupcurrentpose",
+    '{"projector":{"name":"proj 1"},"referencePoint":{"name":"corner A"},"position":{"x":0.125000,"y":0.750000}}',
+    **_OK)
+_dg("reset_lineup", {"projector": "proj 1"}, "POST", _QC + "resetlineup", '{"projector":{"name":"proj 1"}}', **_OK)
+_dg("overwrite_manual_calibration", {"projector": "proj 1"}, "POST", _QC + "overwritemanualcalibration",
+    '{"projector":{"name":"proj 1"}}', **_OK)
+telemetry(DG, "reference-points", inbound_http={"path": _QC + "referencepoints", "body": _envelope(result=[
+    {"uid": "2001", "name": "corner A"}, {"uid": "2002", "name": "corner B"}])},
+    state_before={"quickcal": {"reference_points": {"2000": "gone"}}},
+    expect_state={"quickcal": {"reference_points": {"2001": "corner A", "2002": "corner B"}}})
