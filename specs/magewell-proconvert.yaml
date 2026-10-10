@@ -23,7 +23,16 @@ source:
       fail-over, the four transport flags of which at most one may be true,
       the multicast address, mask and TTL, discovery server and
       reference-level 20 (SMPTE) or 14 (EBU) (sections 9.1-9.2);
-      get-ndi-sources; get-tally and set-tally ext-tally (9.4-9.5).
+      get-ndi-sources; get-tally and set-tally ext-tally (9.4-9.5). Retrieved
+      again 2026-10-09 for the rest of the video configuration (the input and
+      output auto switches, colour space, quantization and saturation range,
+      aspect ratios, frame-rate conversion, ar-convertion, low-res-full-fr,
+      reset-video-config), the NDI vendor fields, get-ptz-config,
+      set-ptz-config and arrange-ptz-cameras, get-edid-config,
+      set-edid-config and set-default-edid, get-auto-reboot and
+      set-auto-reboot, get-eth-status and set-eth-config, get-net-access and
+      set-net-access, get-ntp-server and set-ntp-server, and the summary's
+      device, ethernet and ndi fields.
   - title: "Magewell Pro Convert Decoder API V1.3 (firmware V1.3), and v1.1"
     author: Magewell
     url: "https://www.magewell.com/api-docs/pro-convert-decoder-api/v1.3/"
@@ -42,7 +51,17 @@ source:
       set-playback-config buffer-duration (sections 10-11); get-ndi-config
       and set-ndi-config with enable-discovery, discovery-server and
       group-name (11.1-11.2). v1.1 adds Pro Convert for NDI to HDMI 4K to the
-      product list.
+      product list. Retrieved again 2026-10-09 for the rest of
+      get-video-config and set-video-config (vu-meter-mode, safe-area-mode,
+      ident-mode and ident-text, reset-source-on-boot, deinterlace-mode,
+      in-auto-color-fmt and in-color-fmt, follow-input-mode),
+      reset-video-config, get-video-format and set-video-format,
+      get-hdmi-output, the rest of get-audio-config and set-audio-config
+      (sample-rate, channels, ch0-ch15, check-pts, convert-mode),
+      modify-channel and clear-channels, get-playback-config, the rest of
+      get-ndi-config and set-ndi-config (mcast-subnets, low-bandwidth, the
+      transport flags, ignore-ndi-hx-video-pts, use-timecode-first), and the
+      same auto-reboot, network and NTP methods as the Encoder API.
   - title: "Magewell Pro Convert IP Decoder API V1.2 (firmware V1.2)"
     author: Magewell
     url: "https://www.magewell.com/api-docs/pro-convert-ip-decoder-api/latest/"
@@ -56,7 +75,15 @@ source:
       select and screen select (6); PTZ move, zoom, focus, auto focus and
       preset recall and store through the decoded NDI source (7);
       GET /api/signal/info (10); /api/ping without login and /api/reboot
-      (12).
+      (12). Retrieved again 2026-10-09 for the source list's shape and
+      /api/source/add, /del and /set; /api/video/config/get and /set with
+      their numbered values and the Common Types page; /api/video/mode/get
+      and /set and /api/video/screen/wakeup; /api/audio/config/get and /set;
+      /api/profile/list, /add, /del and /set; /api/settings/get,
+      /settings/mode/set, /settings/ndi/set, /settings/gui/set and the Zixi
+      ZEN Master get and set; and the base pages Get basic info
+      (POST /api/system/info, with the reboot schedule and NTP), Schedule
+      automatic reboots and Set device name.
   - title: "Pro Convert Decoder User Manual, and the Pro Convert knowledge base"
     author: Magewell
     url: "https://www.magewell.com/files/documents/User_Manual/ProConvert_Decoder-UserManual_en_US.pdf"
@@ -201,6 +228,26 @@ maps:
   reference_level: { smpte: "20", ebu: "14" }
   # Decoder API V1.3 section 7.3: the overlay switches of set-video-config.
   overlay_field: { title: show-title, tally: show-tally, vu-meter: show-vu-meter, center-cross: show-center-cross }
+  # Encoder API section 7: each "auto" switch of set-video-config.
+  video_auto_field: { input-aspect: in-auto-aspect, input-color-format: in-auto-color-fmt,
+                      input-quant-range: in-auto-quant-range, output-aspect: out-auto-aspect,
+                      output-color-format: out-auto-color-fmt, output-sat-range: out-auto-sat-range,
+                      output-quant-range: out-auto-quant-range }
+  # Decoder API V1.3 section 8.2: 0 follows the source.
+  sample_rate: { follow: "0", "32000": "32000", "44100": "44100", "48000": "48000", "88200": "88200", "96000": "96000" }
+  audio_channels: { follow: "0", "2": "2", "4": "4", "8": "8" }
+  # IP Decoder API V1.2, section 5 (convert-mode) and the video
+  # configuration's numbered values (section 4 and Common Types).
+  convert_mode_ip: { smpte: "0", ebu: "1" }
+  safe_area_ip: { none: "0", "4:3": "1", "80%": "2", square: "3" }
+  ar_convert_ip: { windowbox: "0", zoom: "1", full: "2" }
+  vu_scale_ip: { hide: "0", post-dbvu: "1", post-dbfs: "2" }
+  ident_ip: { none: "0", text: "1", source-name: "2" }
+  deinterlace_ip: { bob: "0", weave: "1", blend: "2" }
+  in_color_ip: { auto: "0", bt.601: "1", bt.709: "2", bt.2020: "3" }
+  hdr_output_ip: { auto: "0", disable: "1", hdr-pq: "2", hlg: "3" }
+  signal_loss_ip: { no-signal-image: "0", black: "1", last-frame: "2", output-off: "3" }
+  config_mode_ip: { simple: "1", profile: "2" }
 
 models:
   - id: hdmi-4k-plus
@@ -209,9 +256,16 @@ models:
       [ping, reboot, get_summary, get_caps, get_signal_info, get_video_config, get_ndi_config, get_ndi_sources,
        get_tally_config, set_ndi_enabled, set_ndi_source_name, set_ndi_groups, set_ndi_transport,
        set_ndi_multicast, set_ndi_discovery, set_ndi_failover, set_ndi_web_control, set_ndi_ptz_control,
-       set_reference_level, set_bitrate_ratio, set_brightness, set_contrast, set_hue, set_saturation,
-       set_deinterlace, set_output_flip, set_output_mirror, set_output_resolution, set_output_follows_input,
-       set_ext_tally]
+       set_reference_level, set_ndi_vendor, set_bitrate_ratio, set_brightness, set_contrast, set_hue,
+       set_saturation, set_deinterlace, set_output_flip, set_output_mirror, set_output_resolution,
+       set_output_follows_input, set_video_auto, set_input_color_format, set_input_quant_range,
+       set_input_aspect, set_output_aspect, set_output_color_format, set_output_sat_range,
+       set_output_quant_range, set_frame_rate_conversion, set_encoder_aspect_conversion,
+       set_low_res_full_frame_rate, reset_video_config, set_ext_tally, get_ptz_config, set_ptz_none,
+       set_ptz_serial, set_ptz_visca_udp, set_ptz_visca_bridge, set_ptz_limits, apply_ptz_config,
+       get_edid_config, set_edid_option, reset_edid, get_auto_reboot, set_auto_reboot, get_ntp_server,
+       set_ntp_server, get_net_access, set_ssdp, get_network_status, set_device_name, set_network_dhcp,
+       set_network_static]
     verification: none
     notes: >
       HDMI to full-bandwidth NDI encoder (Encoder API). The Module variant has
@@ -245,10 +299,17 @@ models:
     name: "Magewell Pro Convert for NDI to HDMI (and Module)"
     supports: &decoder
       [ping, reboot, get_summary, get_caps, get_signal_info, get_video_config, get_ndi_config, get_ndi_sources,
-       list_presets, get_current_source, select_ndi_source, select_preset, add_preset, delete_preset,
-       set_hdmi_output, get_video_modes, set_video_mode, get_audio_config, set_audio_gain, set_overlay,
-       set_switch_mode, set_aspect_conversion, set_decoder_flip, set_buffer_duration,
-       set_decoder_ndi_discovery, set_decoder_ndi_group]
+       list_presets, get_current_source, select_ndi_source, select_preset, add_preset, modify_preset,
+       delete_preset, clear_presets, get_hdmi_output, set_hdmi_output, get_video_modes, set_video_mode,
+       get_video_format, set_output_format, get_audio_config, set_audio_gain, set_audio_sample_rate,
+       set_audio_channels, set_audio_channel_map, set_audio_convert_mode, set_audio_check_pts, set_overlay,
+       set_vu_meter_mode, set_safe_area, set_ident, set_switch_mode, set_reset_source_on_boot,
+       set_aspect_conversion, set_decoder_flip, set_decoder_deinterlace, set_decoder_input_color_format,
+       set_decoder_input_color_auto, set_follow_input, reset_video_config, get_playback_config,
+       set_buffer_duration, set_decoder_ndi_discovery, set_decoder_ndi_group, set_decoder_ndi_transport,
+       set_decoder_low_bandwidth, set_decoder_mcast_subnets, set_decoder_ignore_hx_pts,
+       set_decoder_timecode_first, get_auto_reboot, set_auto_reboot, get_ntp_server, set_ntp_server,
+       get_net_access, set_ssdp, get_network_status, set_device_name, set_network_dhcp, set_network_static]
     verification: none
     notes: "First-generation NDI decoder (Decoder API V1.3)."
   - id: ndi-to-sdi
@@ -269,7 +330,17 @@ models:
     name: "Magewell Pro Convert IP to HDMI"
     supports: &ipdecoder
       [ping, reboot, get_summary, get_signal_info, get_sources, select_source, restart_source,
-       list_profiles, select_profile, select_screen_source, set_audio_gain, ptz_move, ptz_zoom, ptz_focus,
+       add_source_url, add_source, modify_source, delete_source, list_profiles, select_profile,
+       select_screen_source, add_profile, modify_profile, delete_profile, get_video_config, set_overlay,
+       set_vu_meter_scale, set_safe_area, set_ip_ident, set_decoder_flip, set_ip_deinterlace,
+       set_aspect_conversion, set_follow_input, set_output_format, set_ip_input_color_space,
+       set_hdr_output_mode, set_signal_loss_mode, set_screen_debug, set_webrtc_preview, get_video_modes,
+       set_ip_video_mode, wake_screen, get_audio_config, set_audio_gain, set_audio_sample_rate,
+       set_audio_channels, set_ip_audio_channel_map, set_audio_convert_mode, set_audio_check_pts,
+       get_settings, set_config_mode, set_decoder_ndi_discovery, set_decoder_ndi_group,
+       set_ndi_receive_transport, set_decoder_low_bandwidth, set_decoder_mcast_subnets, set_ndi_pts_mode,
+       set_ndi_default_buffer, set_ndi_extra_ips, set_gui_language, get_zen_master, set_zen_master,
+       get_system_info, set_auto_reboot_days, set_device_name, ptz_move, ptz_zoom, ptz_focus,
        ptz_auto_focus, ptz_recall_preset, ptz_store_preset]
     verification: none
     notes: >
@@ -320,8 +391,10 @@ commands:
     expect: *value
     returns: value
   get_video_config:
-    summary: "Video settings (get-video-config)"
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-video-config } }
+    summary: "Video settings (get-video-config, or GET /api/video/config/get)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-video-config } }
+      - { models: *ip, method: GET, path: /api/video/config/get }
     expect: *value
     returns: value
   get_ndi_config:
@@ -495,6 +568,180 @@ commands:
     send: { models: *mw, method: GET, path: /mwapi, query: { method: set-tally, ext-tally: "{enabled}" } }
     expect: *ok
     returns: ack
+  set_ndi_vendor:
+    summary: "NDI vendor name and id the source announces (set-ndi-config vendor-name, vendor-id)"
+    params:
+      name: { type: string, required: true, max_length: 63, label: Vendor name, description: "Vendor name announced with the NDI source, 1 to 63 characters." }
+      id: { type: string, required: true, max_length: 31, label: Vendor ID, description: "Vendor id announced with the NDI source, 1 to 31 characters." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, vendor-name: "{name}", vendor-id: "{id}" } }
+    expect: *ok
+    returns: ack
+  set_video_auto:
+    summary: "Detect an input or output property automatically, or use the value set (set-video-config in-auto-* and out-auto-*)"
+    params:
+      setting: { type: enum, values: [input-aspect, input-color-format, input-quant-range, output-aspect, output-color-format, output-sat-range, output-quant-range],
+        required: true, label: Setting, description: "The property: input or output aspect ratio, colour space, saturation range or quantization range." }
+      enabled: { type: bool, required: true, label: Automatic, description: "On detects the property from the signal; off uses the value set with its own command." }
+    send: { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-video-config&{setting:map.video_auto_field}={enabled}" }
+    expect: *ok
+    returns: ack
+  set_input_color_format:
+    summary: "Fixed input colour space (set-video-config in-auto-color-fmt=false, in-color-fmt)"
+    params:
+      format: { type: enum, values: [rgb, bt.601, bt.709, bt.2020], required: true, label: Input colour space, description: "The input's colour space, used instead of the one detected." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-color-fmt: "false", in-color-fmt: "{format}" } }
+    expect: *ok
+    returns: ack
+  set_input_quant_range:
+    summary: "Fixed input quantization range (set-video-config in-auto-quant-range=false, in-quant-range)"
+    params:
+      range: { type: enum, values: [full, limited], required: true, label: Input range, description: "Full (0-255) or limited (16-235) input levels, used instead of the ones detected." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-quant-range: "false", in-quant-range: "{range}" } }
+    expect: *ok
+    returns: ack
+  set_input_aspect:
+    summary: "Fixed input aspect ratio (set-video-config in-auto-aspect=false, in-aspect-x, in-aspect-y)"
+    params:
+      x: { type: int, min: 1, max: 255, required: true, label: Width, description: "Aspect ratio width, e.g. 16 for 16:9." }
+      y: { type: int, min: 1, max: 255, required: true, label: Height, description: "Aspect ratio height, e.g. 9 for 16:9." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-aspect: "false", in-aspect-x: "{x}", in-aspect-y: "{y}" } }
+    expect: *ok
+    returns: ack
+  set_output_aspect:
+    summary: "Fixed NDI output aspect ratio (set-video-config out-auto-aspect=false, out-aspect-x, out-aspect-y)"
+    params:
+      x: { type: int, min: 1, max: 255, required: true, label: Width, description: "Aspect ratio width, e.g. 16 for 16:9." }
+      y: { type: int, min: 1, max: 255, required: true, label: Height, description: "Aspect ratio height, e.g. 9 for 16:9." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-auto-aspect: "false", out-aspect-x: "{x}", out-aspect-y: "{y}" } }
+    expect: *ok
+    returns: ack
+  set_output_color_format:
+    summary: "Fixed NDI output colour space (set-video-config out-auto-color-fmt=false, out-color-fmt)"
+    params:
+      format: { type: enum, values: [bt.601, bt.709, bt.2020], required: true, label: Output colour space, description: "The colour space the stream is sent in, used instead of the automatic choice." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-auto-color-fmt: "false", out-color-fmt: "{format}" } }
+    expect: *ok
+    returns: ack
+  set_output_sat_range:
+    summary: "Fixed NDI output saturation range (set-video-config out-auto-sat-range=false, out-sat-range)"
+    params:
+      range: { type: enum, values: [full, limited, extended], required: true, label: Saturation range, description: "Output saturation range: full, limited or extended gamut." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-auto-sat-range: "false", out-sat-range: "{range}" } }
+    expect: *ok
+    returns: ack
+  set_output_quant_range:
+    summary: "Fixed NDI output quantization range (set-video-config out-auto-quant-range=false, out-quant-range)"
+    params:
+      range: { type: enum, values: [full, limited], required: true, label: Output range, description: "Full (0-255) or limited (16-235) output levels." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-auto-quant-range: "false", out-quant-range: "{range}" } }
+    expect: *ok
+    returns: ack
+  set_frame_rate_conversion:
+    summary: "NDI output frame rate relative to the input (set-video-config out-fr-convertion)"
+    params:
+      rate: { type: enum, values: [raw, half, one-third, quarter], required: true, label: Frame rate, description: "The input's rate (raw), or a half, third or quarter of it." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-fr-convertion: "{rate}" } }
+    expect: *ok
+    returns: ack
+  set_encoder_aspect_conversion:
+    summary: "How the encoder fits an input of another aspect ratio, an advanced setting (set-video-config ar-convertion)"
+    params:
+      mode: { type: enum, values: [ignore, cropping, padding], required: true, label: Aspect conversion, description: "Stretch (ignore), crop, or pad with borders." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, ar-convertion: "{mode}" } }
+    expect: *ok
+    returns: ack
+  set_low_res_full_frame_rate:
+    summary: "Full frame rate for the low-bandwidth stream (set-video-config low-res-full-fr)"
+    params:
+      enabled: { type: bool, required: true, label: Full frame rate, description: "On sends the low-bandwidth NDI stream at the full frame rate." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, low-res-full-fr: "{enabled}" } }
+    expect: *ok
+    returns: ack
+  reset_video_config:
+    summary: "Put every video setting back to its default; the picture changes at once (reset-video-config)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: reset-video-config } }
+    expect: *ok
+    returns: ack
+  get_ptz_config:
+    summary: "The PTZ camera link: protocol, camera id, baud rate, VISCA over IP address, inversion and limits (get-ptz-config)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-ptz-config } }
+    expect: *value
+    returns: value
+  set_ptz_none:
+    summary: "No PTZ camera attached (set-ptz-config proto=none)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ptz-config, proto: none } }
+    expect: *ok
+    returns: ack
+  set_ptz_serial:
+    summary: "Control a PTZ camera on the serial port with VISCA, PELCO-D or PELCO-P (set-ptz-config proto, index, baudrate, invert-pan, invert-tilt)"
+    params:
+      protocol: { type: enum, values: [visca, pelco-d, pelco-p], required: true, label: Protocol, description: "The camera's serial control protocol." }
+      camera: { type: int, min: 1, max: 7, default: 1, label: Camera ID, description: "The camera's address on the serial line, 1 to 7." }
+      baudrate: { type: enum, values: ["2400", "4800", "9600", "19200", "38400"], default: "9600", label: Baud rate, description: "Serial speed in bits per second; every camera on the line uses the same." }
+      invert_pan: { type: bool, default: false, label: Invert pan, description: "On reverses the pan direction." }
+      invert_tilt: { type: bool, default: false, label: Invert tilt, description: "On reverses the tilt direction." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ptz-config, proto: "{protocol}", index: "{camera}", baudrate: "{baudrate}", invert-pan: "{invert_pan}", invert-tilt: "{invert_tilt}" } }
+    expect: *ok
+    returns: ack
+  set_ptz_visca_udp:
+    summary: "Control a PTZ camera with VISCA over IP (set-ptz-config proto=visca-udp, index, ip-addr, port, visca-msg-hdr, invert-pan, invert-tilt)"
+    params:
+      camera: { type: int, min: 1, max: 7, default: 1, label: Camera ID, description: "The camera's VISCA address, 1 to 7." }
+      address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Camera address, description: "The camera's IPv4 address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "The camera's VISCA over IP UDP port, often 52381." }
+      header: { type: bool, default: false, label: VISCA header, description: "On wraps each command in the VISCA over IP message header." }
+      invert_pan: { type: bool, default: false, label: Invert pan, description: "On reverses the pan direction." }
+      invert_tilt: { type: bool, default: false, label: Invert tilt, description: "On reverses the tilt direction." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ptz-config, proto: visca-udp, index: "{camera}", ip-addr: "{address}", port: "{port}", visca-msg-hdr: "{header}", invert-pan: "{invert_pan}", invert-tilt: "{invert_tilt}" } }
+    expect: *ok
+    returns: ack
+  set_ptz_visca_bridge:
+    summary: "Pass VISCA over IP received on a UDP port to the serial port (set-ptz-config proto=visca-udp2rs232, baudrate, port)"
+    params:
+      baudrate: { type: enum, values: ["2400", "4800", "9600", "19200", "38400"], default: "9600", label: Baud rate, description: "Serial speed in bits per second." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "The UDP port the device listens on for VISCA over IP." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ptz-config, proto: visca-udp2rs232, baudrate: "{baudrate}", port: "{port}" } }
+    expect: *ok
+    returns: ack
+  set_ptz_limits:
+    summary: "PTZ travel limits and centre (set-ptz-config pan-*, tilt-*, zoom-out-limit, focus-near-limit, focus-far-limit)"
+    params:
+      pan_left: { type: int, min: -32768, max: 32767, required: true, label: Pan left, description: "Pan left limit in camera units." }
+      pan_center: { type: int, min: -32768, max: 32767, required: true, label: Pan centre, description: "Pan centre in camera units." }
+      pan_right: { type: int, min: -32768, max: 32767, required: true, label: Pan right, description: "Pan right limit in camera units." }
+      tilt_top: { type: int, min: -32768, max: 32767, required: true, label: Tilt top, description: "Tilt top limit in camera units." }
+      tilt_center: { type: int, min: -32768, max: 32767, required: true, label: Tilt centre, description: "Tilt centre in camera units." }
+      tilt_bottom: { type: int, min: -32768, max: 32767, required: true, label: Tilt bottom, description: "Tilt bottom limit in camera units." }
+      zoom_out: { type: int, min: 0, max: 32767, required: true, label: Zoom out limit, description: "Widest zoom position in camera units." }
+      focus_near: { type: int, min: 0, max: 65535, required: true, label: Focus near limit, description: "Nearest focus position in camera units." }
+      focus_far: { type: int, min: 0, max: 65535, required: true, label: Focus far limit, description: "Farthest focus position in camera units." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ptz-config, focus-near-limit: "{focus_near}", focus-far-limit: "{focus_far}", pan-left-limit: "{pan_left}", pan-center: "{pan_center}", pan-right-limit: "{pan_right}", tilt-top-limit: "{tilt_top}", tilt-center: "{tilt_center}", tilt-bottom-limit: "{tilt_bottom}", zoom-out-limit: "{zoom_out}" } }
+    expect: *ok
+    returns: ack
+  apply_ptz_config:
+    summary: "Apply the PTZ settings to the attached cameras (arrange-ptz-cameras)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: arrange-ptz-cameras } }
+    expect: *ok
+    returns: ack
+  get_edid_config:
+    summary: "Input EDID settings and the EDID in base64 (get-edid-config)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-edid-config } }
+    expect: *value
+    returns: value
+  set_edid_option:
+    summary: "One input EDID option: SmartEDID, keep the last loop-through EDID, force audio, or limit the pixel clock (set-edid-config)"
+    params:
+      option: { type: enum, values: [smart-edid, keep-last, add-audio, limit-pixel-clock], required: true, label: Option,
+        description: "SmartEDID, keep the last loop-through display's EDID, ask the source for audio, or keep the pixel clock within the device's limit." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On enables the option." }
+    send: { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-edid-config&{option}={enabled}" }
+    expect: *ok
+    returns: ack
+  reset_edid:
+    summary: "Put the input EDID back to its default; the source may re-read it (set-default-edid)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-default-edid } }
+    expect: *ok
+    returns: ack
 
   list_presets:
     summary: "Preset sources, each with name and url (list-channels)"
@@ -544,8 +791,10 @@ commands:
     expect: *ok
     returns: ack
   get_video_modes:
-    summary: "Video modes the connected display supports, with the current and preferred (get-supported-video-modes)"
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-supported-video-modes } }
+    summary: "Video modes the connected display supports, with the current and preferred (get-supported-video-modes, or GET /api/video/mode/get)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-supported-video-modes } }
+      - { models: *ip, method: GET, path: /api/video/mode/get }
     expect: *value
     returns: value
   set_video_mode:
@@ -560,8 +809,10 @@ commands:
     expect: *ok
     returns: ack
   get_audio_config:
-    summary: "Audio output settings: gain, sample rate, channels and mapping (get-audio-config)"
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-audio-config } }
+    summary: "Audio output settings: gain, sample rate, channels and mapping (get-audio-config, or GET /api/audio/config/get)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-audio-config } }
+      - { models: *ip, method: GET, path: /api/audio/config/get }
     expect: *value
     returns: value
   set_audio_gain:
@@ -574,11 +825,14 @@ commands:
     expect: *ok
     returns: ack
   set_overlay:
-    summary: "Show or hide an overlay on the decoded output: title, tally, VU meter or centre cross (set-video-config)"
+    summary: "Show or hide an overlay on the decoded output: title, tally, VU meter or centre cross (set-video-config, or /api/video/config/set)"
     params:
       overlay: { type: enum, values: [title, tally, vu-meter, center-cross], required: true, label: Overlay, description: "The source title, a tally border, audio meters, or a centre cross." }
       visible: { type: bool, required: true, label: Visible, description: "On shows the overlay." }
-    send: { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-video-config&{overlay:map.overlay_field}={visible}" }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-video-config&{overlay:map.overlay_field}={visible}" }
+      - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json,
+          body: '{"{overlay:map.overlay_field}":{visible}}' }
     expect: *ok
     returns: ack
   set_switch_mode:
@@ -589,18 +843,24 @@ commands:
     expect: *ok
     returns: ack
   set_aspect_conversion:
-    summary: "How a source of another aspect ratio is fitted (set-video-config ar-convert-mode)"
+    summary: "How a source of another aspect ratio is fitted (set-video-config ar-convert-mode, or /api/video/config/set ar-convert)"
     params:
       mode: { type: enum, values: [windowbox, full, zoom], required: true, label: Aspect conversion, description: "Letterbox or pillarbox (windowbox), stretch (full), or crop (zoom)." }
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, ar-convert-mode: "{mode}" } }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, ar-convert-mode: "{mode}" } }
+      - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json,
+          body: '{"ar-convert":{mode:map.ar_convert_ip}}' }
     expect: *ok
     returns: ack
   set_decoder_flip:
-    summary: "Flip the decoded output horizontally or vertically (set-video-config h-flip, v-flip)"
+    summary: "Flip the decoded output horizontally or vertically (set-video-config h-flip, v-flip, or /api/video/config/set)"
     params:
       horizontal: { type: bool, default: false, label: Horizontal flip, description: "On mirrors left to right." }
       vertical: { type: bool, default: false, label: Vertical flip, description: "On flips upside down." }
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, h-flip: "{horizontal}", v-flip: "{vertical}" } }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, h-flip: "{horizontal}", v-flip: "{vertical}" } }
+      - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json,
+          body: '{"h-flip":{horizontal},"v-flip":{vertical}}' }
     expect: *ok
     returns: ack
   set_buffer_duration:
@@ -611,18 +871,281 @@ commands:
     expect: *ok
     returns: ack
   set_decoder_ndi_discovery:
-    summary: "Use NDI discovery servers for finding sources (set-ndi-config enable-discovery, discovery-server)"
+    summary: "Use NDI discovery servers for finding sources (set-ndi-config enable-discovery, discovery-server, or /api/settings/ndi/set enable-d, d-server)"
     params:
       enabled: { type: bool, required: true, label: Discovery server, description: "On finds sources through the discovery servers given." }
       servers: { type: string, default: "", max_length: 255, label: Servers, description: "Discovery server IP addresses separated by commas; needed when on." }
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-discovery: "{enabled}", discovery-server: "{servers}" } }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-discovery: "{enabled}", discovery-server: "{servers}" } }
+      - { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json,
+          body: '{"enable-d":{enabled},"d-server":{servers:json}}' }
     expect: *ok
     returns: ack
   set_decoder_ndi_group:
-    summary: "NDI group the decoder finds sources in (set-ndi-config group-name)"
+    summary: "NDI groups the decoder finds sources in (set-ndi-config group-name, or /api/settings/ndi/set groups)"
     params:
       group: { type: string, required: true, max_length: 255, label: NDI group, description: "NDI group name; public is the default." }
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, group-name: "{group}" } }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, group-name: "{group}" } }
+      - { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json,
+          body: '{"groups":{group:json}}' }
+    expect: *ok
+    returns: ack
+  modify_preset:
+    summary: "Rename a preset source or change its URL (modify-channel)"
+    params:
+      name: { type: string, required: true, max_length: 120, label: Preset, description: "The preset to change, as list_presets lists it." }
+      new_name: { type: string, required: true, max_length: 120, label: New name, description: "Its new unique name, 1 to 120 characters; the same name keeps it." }
+      url: { type: string, required: true, max_length: 1024, label: URL, description: "Its source URL, in the form add_preset takes." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: modify-channel, name: "{name}", new-name: "{new_name}", url: "{url}" } }
+    expect: *ok
+    returns: ack
+  clear_presets:
+    summary: "Delete every preset source (clear-channels)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: clear-channels } }
+    expect: *ok
+    returns: ack
+  get_hdmi_output:
+    summary: "Whether the decoded picture is sent to the output (get-hdmi-output)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-hdmi-output } }
+    expect: *value
+    returns: value
+  get_video_format:
+    summary: "Output colour format and quantization range (get-video-format)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-video-format } }
+    expect: *value
+    returns: value
+  set_output_format:
+    summary: "Output colour format and quantization range (set-video-format, or /api/video/config/set color-format, quant-range)"
+    params:
+      color_format: { type: enum, values: [rgb, yuv444, yuv422], required: true, label: Colour format, description: "RGB, or YUV 4:4:4 or 4:2:2 on the output." }
+      quant_range: { type: enum, values: [limited, full], default: limited, label: Range, description: "Limited or full levels; applies to RGB only." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-format, color-format: "{color_format}", quant-range: "{quant_range}" } }
+      - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json,
+          body: '{"color-format":"{color_format}","quant-range":"{quant_range}"}' }
+    expect: *ok
+    returns: ack
+  set_audio_sample_rate:
+    summary: "Audio output sample rate, or the source's (set-audio-config sample-rate, or /api/audio/config/set)"
+    params:
+      rate: { type: enum, values: [follow, "32000", "44100", "48000", "88200", "96000"], required: true, label: Sample rate, description: "Output sample rate in Hz, or follow to keep the source's." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-audio-config, sample-rate: "{rate:map.sample_rate}" } }
+      - { models: *ip, method: POST, path: /api/audio/config/set, content_type: application/json, body: '{"sample-rate":{rate:map.sample_rate}}' }
+    expect: *ok
+    returns: ack
+  set_audio_channels:
+    summary: "Number of audio output channels, or the source's (set-audio-config channels, or /api/audio/config/set)"
+    params:
+      channels: { type: enum, values: [follow, "2", "4", "8"], required: true, label: Channels, description: "Output channel count, or follow to keep the source's." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-audio-config, channels: "{channels:map.audio_channels}" } }
+      - { models: *ip, method: POST, path: /api/audio/config/set, content_type: application/json, body: '{"channels":{channels:map.audio_channels}}' }
+    expect: *ok
+    returns: ack
+  set_audio_channel_map:
+    summary: "Which source channel an output channel carries, when the channel count is not follow (set-audio-config ch0-ch15)"
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Output channel, description: "Output channel, numbered from 1." }
+      source: { type: int, min: 1, max: 16, required: true, label: Source channel, description: "Source channel it carries, numbered from 1." }
+    send: { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-audio-config&ch{output:-1}={source:-1}" }
+    expect: *ok
+    returns: ack
+  set_audio_convert_mode:
+    summary: "NDI audio level standard, SMPTE or EBU (set-audio-config convert-mode, or /api/audio/config/set)"
+    params:
+      mode: { type: enum, values: [smpte, ebu], required: true, label: Level standard, description: "SMPTE or EBU alignment of the NDI audio level." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-audio-config, convert-mode: "{mode}" } }
+      - { models: *ip, method: POST, path: /api/audio/config/set, content_type: application/json, body: '{"convert-mode":{mode:map.convert_mode_ip}}' }
+    expect: *ok
+    returns: ack
+  set_audio_check_pts:
+    summary: "Check audio timestamps (set-audio-config check-pts, or /api/audio/config/set)"
+    params:
+      enabled: { type: bool, required: true, label: Check timestamps, description: "On checks the audio PTS against the video." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-audio-config, check-pts: "{enabled}" } }
+      - { models: *ip, method: POST, path: /api/audio/config/set, content_type: application/json, body: '{"check-pts":{enabled}}' }
+    expect: *ok
+    returns: ack
+  set_vu_meter_mode:
+    summary: "Scale of the VU meter overlay (set-video-config vu-meter-mode)"
+    params:
+      mode: { type: enum, values: [none, dbu, dbvu, dbfs, post-gain-dbu, post-gain-dbvu, post-gain-dbfs], required: true, label: Meter scale,
+        description: "dBu, dBVU or dBFS, before or after the audio gain (post-gain-), or none." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, vu-meter-mode: "{mode}" } }
+    expect: *ok
+    returns: ack
+  set_safe_area:
+    summary: "Safe area marker on the output (set-video-config safe-area-mode, or /api/video/config/set safe-area)"
+    params:
+      mode: { type: enum, values: [none, "4:3", "80%", square], required: true, label: Safe area, description: "A 4:3, 80% or square marker, or none." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, safe-area-mode: "{mode}" } }
+      - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"safe-area":{mode:map.safe_area_ip}}' }
+    expect: *ok
+    returns: ack
+  set_ident:
+    summary: "Ident overlay: none, a text, or the device name (set-video-config ident-mode, ident-text)"
+    params:
+      mode: { type: enum, values: [none, ident-text, device-name], required: true, label: Ident, description: "Show nothing, the text given, or the device name over the output." }
+      text: { type: string, default: "", max_length: 127, label: Text, description: "The ident text, up to 127 bytes; used with ident-text." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, ident-mode: "{mode}", ident-text: "{text}" } }
+    expect: *ok
+    returns: ack
+  set_reset_source_on_boot:
+    summary: "Clear the source on start and go back to NDI discovery (set-video-config reset-source-on-boot)"
+    params:
+      enabled: { type: bool, required: true, label: Reset on boot, description: "On clears the current source each time the device starts." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, reset-source-on-boot: "{enabled}" } }
+    expect: *ok
+    returns: ack
+  set_decoder_deinterlace:
+    summary: "Deinterlacing of an interlaced source (set-video-config deinterlace-mode)"
+    params:
+      mode: { type: enum, values: [bob, weave], required: true, label: Deinterlace, description: "Bob (line doubling each field) or weave (joining the fields)." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, deinterlace-mode: "{mode}" } }
+    expect: *ok
+    returns: ack
+  set_decoder_input_color_format:
+    summary: "Fixed source colour space (set-video-config in-auto-color-fmt=false, in-color-fmt)"
+    params:
+      format: { type: enum, values: [rgb, bt.601, bt.709, bt.2020, bt.2020c], required: true, label: Source colour space, description: "The source's colour space, used instead of BT.601 for SD and BT.709 for HD." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-color-fmt: "false", in-color-fmt: "{format}" } }
+    expect: *ok
+    returns: ack
+  set_decoder_input_color_auto:
+    summary: "Choose the source colour space automatically (set-video-config in-auto-color-fmt)"
+    params:
+      enabled: { type: bool, required: true, label: Automatic, description: "On uses BT.601 for SD and BT.709 for HD sources; off uses the colour space set." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-color-fmt: "{enabled}" } }
+    expect: *ok
+    returns: ack
+  set_follow_input:
+    summary: "Output resolution follows the source (set-video-config follow-input-mode, or /api/video/config/set follow-input)"
+    params:
+      enabled: { type: bool, required: true, label: Follow source, description: "On sets the output resolution to the source's; off uses the video mode set." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, follow-input-mode: "{enabled}" } }
+      - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"follow-input":{enabled}}' }
+    expect: *ok
+    returns: ack
+  get_playback_config:
+    summary: "Decoder buffer duration (get-playback-config)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-playback-config } }
+    expect: *value
+    returns: value
+  set_decoder_ndi_transport:
+    summary: "NDI receive transport: TCP (all flags off), multi-TCP, UDP, reliable UDP or multicast (set-ndi-config enable-tcp, enable-udp, enable-rudp, enable-mcast)"
+    params:
+      transport: { type: enum, values: [tcp, multi-tcp, udp, rudp, multicast], required: true, label: Transport,
+        description: "How the decoder asks sources to send; tcp is the single-connection mode with every flag off." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-mcast: "{transport:map.ndi_mcast}", enable-rudp: "{transport:map.ndi_rudp}", enable-tcp: "{transport:map.ndi_multi_tcp}", enable-udp: "{transport:map.ndi_udp}" } }
+    expect: *ok
+    returns: ack
+  set_decoder_low_bandwidth:
+    summary: "Receive the low-bandwidth NDI stream (set-ndi-config low-bandwidth, or /api/settings/ndi/set low-bw)"
+    params:
+      enabled: { type: bool, required: true, label: Low bandwidth, description: "On asks sources for their low-bandwidth stream." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, low-bandwidth: "{enabled}" } }
+      - { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json, body: '{"low-bw":{enabled}}' }
+    expect: *ok
+    returns: ack
+  set_decoder_mcast_subnets:
+    summary: "Networks NDI multicast may be received from (set-ndi-config mcast-subnets, or /api/settings/ndi/set)"
+    params:
+      subnets: { type: string, default: "", max_length: 255, label: Subnets, description: "CIDR ranges separated by commas, e.g. 192.168.1.0/24; empty allows any." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, mcast-subnets: "{subnets}" } }
+      - { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json, body: '{"mcast-subnets":{subnets:json}}' }
+    expect: *ok
+    returns: ack
+  set_decoder_ignore_hx_pts:
+    summary: "Ignore NDI|HX video timestamps (set-ndi-config ignore-ndi-hx-video-pts)"
+    params:
+      enabled: { type: bool, required: true, label: Ignore HX timestamps, description: "On ignores the video PTS of NDI|HX sources." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, ignore-ndi-hx-video-pts: "{enabled}" } }
+    expect: *ok
+    returns: ack
+  set_decoder_timecode_first:
+    summary: "Prefer NDI timecode when timing video (set-ndi-config use-timecode-first)"
+    params:
+      enabled: { type: bool, required: true, label: Timecode first, description: "On times video from the NDI timecode before its timestamps." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, use-timecode-first: "{enabled}" } }
+    expect: *ok
+    returns: ack
+
+  # Encoders and NDI decoders: system settings (Encoder API and Decoder API
+  # V1.3, sections Universal Interfaces and Network).
+  get_auto_reboot:
+    summary: "Scheduled reboot: on or off, days and UTC time (get-auto-reboot)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-auto-reboot } }
+    expect: *value
+    returns: value
+  set_auto_reboot:
+    summary: "Schedule a daily or weekly reboot, in UTC (set-auto-reboot)"
+    params:
+      enabled: { type: bool, required: true, label: Auto reboot, description: "On reboots the device at the time and on the days given." }
+      days: { type: int, min: 0, max: 127, default: 0, label: Days, description: "Sum of the day masks: Monday 1, Tuesday 2, Wednesday 4, Thursday 8, Friday 16, Saturday 32, and Sunday taken as 64 (the documents print 0)." }
+      hour: { type: int, min: 0, max: 23, default: 3, label: Hour, description: "Hour of the reboot in UTC, 0 to 23." }
+      minute: { type: int, min: 0, max: 59, default: 0, label: Minute, description: "Minute of the reboot, 0 to 59." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-auto-reboot, enable: "{enabled}", week-flags: "{days}", hour: "{hour}", min: "{minute}" } }
+    expect: *ok
+    returns: ack
+  get_ntp_server:
+    summary: "NTP server, administrators only (get-ntp-server)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-ntp-server } }
+    expect: *value
+    returns: value
+  set_ntp_server:
+    summary: "NTP server, administrators only (set-ntp-server)"
+    params:
+      server: { type: string, required: true, max_length: 255, label: NTP server, description: "Host name or address of the NTP server." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ntp-server, ntp-server: "{server}" } }
+    expect: *ok
+    returns: ack
+  get_net_access:
+    summary: "Whether SSDP discovery is on, administrators only (get-net-access)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-net-access } }
+    expect: *value
+    returns: value
+  set_ssdp:
+    summary: "Turn SSDP discovery on or off, administrators only (set-net-access use-ssdp)"
+    params:
+      enabled: { type: bool, required: true, label: SSDP, description: "On answers SSDP discovery on the network." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-net-access, use-ssdp: "{enabled}" } }
+    expect: *ok
+    returns: ack
+  get_network_status:
+    summary: "Ethernet settings and link: DHCP, device name, link speed, addresses, traffic; administrators only (get-eth-status)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-eth-status } }
+    expect: *value
+    returns: value
+  set_device_name:
+    summary: "Device name (set-eth-config name, or POST /api/system/set-device-name)"
+    params:
+      name: { type: string, required: true, max_length: 63, label: Device name, description: "The name the device shows and announces." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, name: "{name}" } }
+      - { models: *ip, method: POST, path: /api/system/set-device-name, content_type: application/json, body: '{"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  set_network_dhcp:
+    summary: "Take the Ethernet address from DHCP; the device may move to a new address (set-eth-config dhcp=true)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, dhcp: "true" } }
+    expect: *ok
+    returns: ack
+  set_network_static:
+    summary: "Fixed Ethernet address; the device moves to it (set-eth-config dhcp=false, addr, mask, gw-addr, dns-addr)"
+    params:
+      address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: IP address, description: "The device's new IPv4 address." }
+      netmask: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Subnet mask, description: "Subnet mask, e.g. 255.255.255.0." }
+      gateway: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Gateway, description: "Default gateway address." }
+      dns: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: DNS server, description: "DNS server address." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, dhcp: "false", addr: "{address}", mask: "{netmask}", gw-addr: "{gateway}", dns-addr: "{dns}" } }
     expect: *ok
     returns: ack
 
@@ -705,31 +1228,452 @@ commands:
     send: { models: *ip, method: POST, path: /api/ptz/preset/store, content_type: application/json, body: '{"number":{number}}' }
     expect: *ok
     returns: ack
+  add_source_url:
+    summary: "Add a stream source by URL: SRT, RIST, RTMP, RTSP, HTTP/HLS, UDP, RTP or Zixi (POST /api/source/add type 1)"
+    params:
+      name: { type: string, required: true, max_length: 120, label: Name, description: "The source's name." }
+      url: { type: string, required: true, max_length: 1024, label: URL,
+        description: "Source URL with the options the IP Decoder API documents, e.g. srt://10.0.0.5:9000?mode=caller&latency=120." }
+    send: { models: *ip, method: POST, path: /api/source/add, content_type: application/json, body: '{"name":{name:json},"type":1,"url":{url:json}}' }
+    expect: *ok
+    returns: ack
+  add_source:
+    summary: "Add a source in the IP Decoder API's Source Configuration shape: a URL source (type 1) or a custom NDI source (type 3) (POST /api/source/add)"
+    params:
+      config: { type: json, required: true, label: Configuration, description: "The source configuration object as IP Decoder API section 3 gives it." }
+    send: { models: *ip, method: POST, path: /api/source/add, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  modify_source:
+    summary: "Change a source's configuration (POST /api/source/set)"
+    params:
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
+      config: { type: json, required: true, label: Configuration, description: "The Source Configuration fields to change, as IP Decoder API section 3 gives them." }
+    send: { models: *ip, method: POST, path: /api/source/set, content_type: application/json, body: '{"id":{id},"config":{config}}' }
+    expect: *ok
+    returns: ack
+  delete_source:
+    summary: "Delete a source (POST /api/source/del)"
+    params:
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
+    send: { models: *ip, method: POST, path: /api/source/del, content_type: application/json, body: '{"id":[{id}]}' }
+    expect: *ok
+    returns: ack
+  add_profile:
+    summary: "Add a profile: name, view mode, audio screen, picture-in-picture and screens (POST /api/profile/add)"
+    params:
+      config: { type: json, required: true, label: Profile, description: "The Profile Configuration object as IP Decoder API section 6 gives it." }
+    send: { models: *ip, method: POST, path: /api/profile/add, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  modify_profile:
+    summary: "Change a profile; the default profile keeps one screen (POST /api/profile/set)"
+    params:
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Profile, description: "The profile id from list_profiles." }
+      config: { type: json, required: true, label: Configuration, description: "The Profile Configuration fields to change, as IP Decoder API section 6 gives them." }
+    send: { models: *ip, method: POST, path: /api/profile/set, content_type: application/json, body: '{"id":{id},"config":{config}}' }
+    expect: *ok
+    returns: ack
+  delete_profile:
+    summary: "Delete a profile; the default profile cannot be deleted (POST /api/profile/del)"
+    params:
+      id: { type: int, min: 1, max: 2147483647, required: true, label: Profile, description: "The profile id from list_profiles." }
+    send: { models: *ip, method: POST, path: /api/profile/del, content_type: application/json, body: '{"id":{id}}' }
+    expect: *ok
+    returns: ack
+  set_vu_meter_scale:
+    summary: "Scale of the volume bar overlay (POST /api/video/config/set vu-meter-mode)"
+    params:
+      scale: { type: enum, values: [hide, post-dbvu, post-dbfs], required: true, label: Meter scale, description: "Hide the scale, or dBVU (dBu) or dBFS after the gain." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"vu-meter-mode":{scale:map.vu_scale_ip}}' }
+    expect: *ok
+    returns: ack
+  set_ip_ident:
+    summary: "Ident overlay: none, a text, or the source name (POST /api/video/config/set ident-mode, ident-text)"
+    params:
+      mode: { type: enum, values: [none, text, source-name], required: true, label: Ident, description: "Show nothing, the text given, or the source name over the output." }
+      text: { type: string, default: "", max_length: 127, label: Text, description: "The ident text; used with text." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"ident-mode":{mode:map.ident_ip},"ident-text":{text:json}}' }
+    expect: *ok
+    returns: ack
+  set_ip_deinterlace:
+    summary: "Deinterlacing, and whether to deinterlace for an interlaced output too (POST /api/video/config/set deinterlace-mode, force-deint)"
+    params:
+      mode: { type: enum, values: [bob, weave, blend], required: true, label: Deinterlace, description: "Bob, weave or blend." }
+      force: { type: bool, default: false, label: Force, description: "On deinterlaces even when the output is interlaced." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"deinterlace-mode":{mode:map.deinterlace_ip},"force-deint":{force}}' }
+    expect: *ok
+    returns: ack
+  set_ip_input_color_space:
+    summary: "Source colour space, or automatic (POST /api/video/config/set in-color-fmt)"
+    params:
+      space: { type: enum, values: [auto, bt.601, bt.709, bt.2020], required: true, label: Source colour space, description: "The source's colour space, or auto." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"in-color-fmt":{space:map.in_color_ip}}' }
+    expect: *ok
+    returns: ack
+  set_hdr_output_mode:
+    summary: "HDR output: automatic or off; HDR PQ and HLG are listed as not yet supported (POST /api/video/config/set hdr-output-mode)"
+    params:
+      mode: { type: enum, values: [auto, disable, hdr-pq, hlg], required: true, label: HDR output, description: "auto follows the source and display, disable sends SDR; hdr-pq and hlg are documented as not yet supported." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"hdr-output-mode":{mode:map.hdr_output_ip}}' }
+    expect: *ok
+    returns: ack
+  set_signal_loss_mode:
+    summary: "What the output shows when the signal is lost (POST /api/video/config/set switch-mode)"
+    params:
+      mode: { type: enum, values: [no-signal-image, black, last-frame, output-off], required: true, label: On signal loss,
+        description: "The no-signal image, black, the last frame, or no output 30 seconds after the loss." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"switch-mode":{mode:map.signal_loss_ip}}' }
+    expect: *ok
+    returns: ack
+  set_screen_debug:
+    summary: "On-screen debugging information (POST /api/video/config/set screen-debug)"
+    params:
+      enabled: { type: bool, required: true, label: Debug overlay, description: "On shows debugging information on the output." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"screen-debug":{enabled}}' }
+    expect: *ok
+    returns: ack
+  set_webrtc_preview:
+    summary: "WebRTC preview in the web interface (POST /api/video/config/set enable-webrtc)"
+    params:
+      enabled: { type: bool, required: true, label: WebRTC preview, description: "On serves a live WebRTC preview; off a still image." }
+    send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"enable-webrtc":{enabled}}' }
+    expect: *ok
+    returns: ack
+  set_ip_video_mode:
+    summary: "Set the output video mode to one get_video_modes lists (POST /api/video/mode/set)"
+    params:
+      width: { type: int, min: 1, max: 4096, required: true, label: Width, description: "Width in pixels, from the modes list." }
+      height: { type: int, min: 1, max: 2160, required: true, label: Height, description: "Height in lines, from the modes list." }
+      interlaced: { type: bool, default: false, label: Interlaced, description: "On for an interlaced mode." }
+      frame_rate: { type: int, min: 1, max: 24000, required: true, label: Frame rate, description: "Frame rate times 100, as the modes list gives it, e.g. 5994." }
+      aspect_x: { type: int, min: 1, max: 255, required: true, label: Aspect width, description: "Aspect ratio width, e.g. 16." }
+      aspect_y: { type: int, min: 1, max: 255, required: true, label: Aspect height, description: "Aspect ratio height, e.g. 9." }
+    send: { models: *ip, method: POST, path: /api/video/mode/set, content_type: application/json,
+            body: '{"width":{width},"height":{height},"interlaced":{interlaced},"frame-rate":{frame_rate},"aspect-x":{aspect_x},"aspect-y":{aspect_y}}' }
+    expect: *ok
+    returns: ack
+  wake_screen:
+    summary: "Send a signal to wake a display that slept on signal loss (POST /api/video/screen/wakeup)"
+    send: { models: *ip, method: POST, path: /api/video/screen/wakeup }
+    expect: *ok
+    returns: ack
+  set_ip_audio_channel_map:
+    summary: "Output channel map, the whole array (POST /api/audio/config/set channel-map)"
+    params:
+      map: { type: json, required: true, label: Channel map, description: "Array of source channel indexes from 0, one per output channel, as get_audio_config's channel-map." }
+    send: { models: *ip, method: POST, path: /api/audio/config/set, content_type: application/json, body: '{"channel-map":{map}}' }
+    expect: *ok
+    returns: ack
+  get_settings:
+    summary: "System settings: configuration mode, NDI receive settings and GUI language (GET /api/settings/get)"
+    send: { models: *ip, method: GET, path: /api/settings/get }
+    expect: *value
+    returns: value
+  set_config_mode:
+    summary: "Simple mode (one source) or profile mode (layouts); the output changes at once (POST /api/settings/mode/set)"
+    params:
+      mode: { type: enum, values: [simple, profile], required: true, label: Mode, description: "simple selects a source directly; profile uses profiles and their screens." }
+    send: { models: *ip, method: POST, path: /api/settings/mode/set, content_type: application/json, body: '{"mode":{mode:map.config_mode_ip}}' }
+    expect: *ok
+    returns: ack
+  set_ndi_receive_transport:
+    summary: "NDI receive transport (POST /api/settings/ndi/set transport)"
+    params:
+      transport: { type: enum, values: [auto, rudp, udp, multicast, multi-tcp, tcp], required: true, label: Transport, description: "How sources are asked to send, or auto." }
+    send: { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json, body: '{"transport":"{transport}"}' }
+    expect: *ok
+    returns: ack
+  set_ndi_pts_mode:
+    summary: "Which NDI timing the decoder follows (POST /api/settings/ndi/set pts-mode)"
+    params:
+      mode: { type: enum, values: [auto, timecode, timestamp], required: true, label: Timing, description: "The NDI timecode, the timestamp, or auto." }
+    send: { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json, body: '{"pts-mode":"{mode}"}' }
+    expect: *ok
+    returns: ack
+  set_ndi_default_buffer:
+    summary: "Buffer for discovered NDI sources in milliseconds (POST /api/settings/ndi/set buffer-ms)"
+    params:
+      ms: { type: int, min: 0, max: 10000, required: true, label: Buffer, description: "Default buffer for discovered NDI sources, in milliseconds." }
+    send: { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json, body: '{"buffer-ms":{ms}}' }
+    expect: *ok
+    returns: ack
+  set_ndi_extra_ips:
+    summary: "Extra addresses to find NDI sources at (POST /api/settings/ndi/set extra-ips)"
+    params:
+      ips: { type: string, default: "", max_length: 255, label: Extra IPs, description: "IP addresses separated by commas; empty for none." }
+    send: { models: *ip, method: POST, path: /api/settings/ndi/set, content_type: application/json, body: '{"extra-ips":{ips:json}}' }
+    expect: *ok
+    returns: ack
+  set_gui_language:
+    summary: "Web interface language (POST /api/settings/gui/set lang)"
+    params:
+      language: { type: enum, values: [en, zh], required: true, label: Language, description: "English or Chinese." }
+    send: { models: *ip, method: POST, path: /api/settings/gui/set, content_type: application/json, body: '{"lang":"{language}"}' }
+    expect: *ok
+    returns: ack
+  get_zen_master:
+    summary: "Zixi ZEN Master connection settings and state (GET /api/settings/zixi/master/get)"
+    send: { models: *ip, method: GET, path: /api/settings/zixi/master/get }
+    expect: *value
+    returns: value
+  set_zen_master:
+    summary: "Connect to Zixi ZEN Master, or not (POST /api/settings/zixi/master/set)"
+    params:
+      enabled: { type: bool, required: true, label: ZEN Master, description: "On connects to the ZEN Master given." }
+      host: { type: string, default: "", max_length: 255, label: Host, description: "ZEN Master address." }
+      ssh_port: { type: int, min: 1, max: 65535, default: 22, label: SSH port, description: "ZEN Master SSH port." }
+      tunnel_port: { type: int, min: 1, max: 65535, required: true, label: Tunnel port, description: "The forwarding (remote source) port configured on ZEN Master." }
+      user: { type: string, default: "", max_length: 255, label: User name, description: "User name configured on ZEN Master." }
+    send: { models: *ip, method: POST, path: /api/settings/zixi/master/set, content_type: application/json,
+            body: '{"enable":{enabled},"host":{host:json},"ssh-port":{ssh_port},"tunnel-port":{tunnel_port},"user-name":{user:json}}' }
+    expect: *ok
+    returns: ack
+  get_system_info:
+    summary: "Device name, uptime, CPU, memory, date and time, NTP and the reboot schedule (POST /api/system/info)"
+    send: { models: *ip, method: POST, path: /api/system/info }
+    expect: *value
+    returns: value
+  set_auto_reboot_days:
+    summary: "Schedule a weekly reboot (POST /api/system/auto-reboot)"
+    params:
+      enabled: { type: bool, required: true, label: Auto reboot, description: "On reboots the device at the time and on the days given." }
+      hour: { type: int, min: 0, max: 23, default: 3, label: Hour, description: "Hour of the reboot, 0 to 23." }
+      minute: { type: int, min: 0, max: 59, default: 0, label: Minute, description: "Minute of the reboot, 0 to 59." }
+      days: { type: string, default: "", pattern: "^([1-7](,[1-7]){0,6})?$", label: Days,
+        description: "Days separated by commas, 1 Monday to 7 Sunday, e.g. 1,2,3,4,5." }
+    send: { models: *ip, method: POST, path: /api/system/auto-reboot, content_type: application/json,
+            body: '{"enable":{enabled},"hour":{hour},"min":{minute},"week":[{days}]}' }
+    expect: *ok
+    returns: ack
 
 state:
   device.model:          { type: string, description: "Model, e.g. HDMI 4K Plus, NDI to HDMI or Pro Convert IP to HDMI" }
   device.name:           { type: string, description: "Device name" }
   device.serial:         { type: string, description: "Serial number" }
   device.firmware:       { type: string, description: "Firmware version" }
+  device.firmware_up_to_date: { type: bool, description: "Encoders and NDI decoders: the firmware is the latest" }
+  device.hardware_revision: { type: string, description: "Hardware revision, A to Z" }
   device.temperature:    { type: float, description: "Core temperature, degrees Celsius" }
   device.uptime:         { type: int, description: "Seconds since start" }
+  device.cpu_usage:      { type: float, description: "Encoders and NDI decoders: CPU load, percent" }
+  device.memory_usage:   { type: float, description: "Encoders and NDI decoders: memory in use, percent" }
+  device.fan_rpm:        { type: int, description: "Fan speed in RPM, on models with a fan" }
+  device.board_id:       { type: int, description: "Encoders and NDI decoders: the rotary switch, 0 to 15" }
   device.input_state:    { type: string, description: "Encoder input: no-signal, locking, unsupported, or the format, e.g. 1920x1080p60" }
   device.output_state:   { type: string, description: "Output connection: e.g. connected, unconnected, active, or the IP decoder's HDMI state 0 disconnected, 1 working, 10 not supported" }
+  network.ethernet.state: { type: string, description: "Ethernet link: down, disconnected, or the speed such as 1000m" }
+  network.ethernet.mac:  { type: string, description: "Ethernet MAC address" }
+  network.ethernet.ip_address: { type: string, description: "Ethernet IP address in use" }
+  network.ethernet.netmask: { type: string, description: "Ethernet subnet mask in use" }
+  network.ethernet.gateway: { type: string, description: "Ethernet gateway in use" }
+  network.ethernet.dns:  { type: string, description: "DNS server in use" }
+  network.ethernet.dhcp: { type: bool, description: "Encoders and NDI decoders: the address comes from DHCP (get-eth-status, administrators only)" }
+  network.ethernet.tx_kbps: { type: int, description: "Ethernet send rate, kbit/s" }
+  network.ethernet.rx_kbps: { type: int, description: "Ethernet receive rate, kbit/s" }
+  network.ntp_server:    { type: string, description: "NTP server (administrators only on the encoders and NDI decoders)" }
+  network.ssdp:          { type: bool, description: "Encoders and NDI decoders: SSDP discovery answered (administrators only)" }
+  auto_reboot.enabled:   { type: bool, description: "Scheduled reboot on" }
+  auto_reboot.days:      { type: int, description: "Encoders and NDI decoders: sum of day masks, Monday 1 to Saturday 32 (week-flags)" }
+  auto_reboot.week:      { type: string, description: "IP decoders: reboot days as a JSON array, 1 Monday to 7 Sunday" }
+  auto_reboot.hour:      { type: int, description: "Reboot hour (UTC on the encoders and NDI decoders)" }
+  auto_reboot.minute:    { type: int, description: "Reboot minute" }
   ndi.name:              { type: string, description: "Encoder: the NDI source name sent; decoder: the NDI source decoded" }
   ndi.url:               { type: string, description: "Decoder: the current preset's URL, empty for a discovered source" }
+  ndi.enabled:           { type: bool, description: "Encoder: NDI output on (summary enabled); NDI decoder: NDI connected (summary connected)" }
   ndi.clients:           { type: int, description: "Encoder: receivers connected to the stream" }
   ndi.video:             { type: string, description: "Stream video as width x height, scan and field rate, e.g. 1920x1080 progressive 59.94" }
   ndi.video_kbps:        { type: int, description: "Stream video bitrate over the last second, kbit/s" }
+  ndi.audio_kbps:        { type: int, description: "Stream audio bitrate over the last second, kbit/s" }
+  ndi.video_drops:       { type: int, description: "Encoders and NDI decoders: video frames dropped in the last second" }
+  ndi.audio_drops:       { type: int, description: "Encoders and NDI decoders: audio frames dropped in the last second" }
+  ndi.audio_channels:    { type: int, description: "Stream audio channels" }
+  ndi.audio_sample_rate: { type: int, description: "Stream audio sample rate, Hz" }
+  ndi.source_name:       { type: string, description: "Encoder: the source name template set, e.g. #%board-id% (%serial-no%)" }
+  ndi.groups:            { type: string, description: "NDI groups, separated by commas (encoder: published in; decoder: searched)" }
+  ndi.web_control:       { type: bool, description: "Encoder: NDI receivers may open the web interface" }
+  ndi.ptz_control:       { type: bool, description: "Encoder: NDI receivers may control the attached PTZ camera" }
+  ndi.failover.enabled:  { type: bool, description: "Encoder: failover source named" }
+  ndi.failover.name:     { type: string, description: "Encoder: failover NDI source name" }
+  ndi.failover.address:  { type: string, description: "Encoder: failover NDI source address" }
+  ndi.transport:         { type: string, description: "NDI transport: tcp (every flag off), multi-tcp, udp, rudp or multicast; the IP decoders also auto" }
+  ndi.transport_flags.multicast: { type: bool, description: "Encoders and NDI decoders: enable-mcast" }
+  ndi.transport_flags.rudp: { type: bool, description: "Encoders and NDI decoders: enable-rudp" }
+  ndi.transport_flags.multi_tcp: { type: bool, description: "Encoders and NDI decoders: enable-tcp (multi-connection TCP)" }
+  ndi.transport_flags.udp: { type: bool, description: "Encoders and NDI decoders: enable-udp" }
+  ndi.multicast.address: { type: string, description: "Encoder: multicast base address" }
+  ndi.multicast.netmask: { type: string, description: "Encoder: multicast netmask" }
+  ndi.multicast.ttl:     { type: int, description: "Encoder: multicast time-to-live, hops" }
+  ndi.multicast_subnets: { type: string, description: "Decoders: CIDR ranges multicast is received from, empty for any" }
+  ndi.discovery.enabled: { type: bool, description: "NDI discovery servers in use" }
+  ndi.discovery.servers: { type: string, description: "Discovery server addresses, separated by commas" }
+  ndi.reference_level:   { type: string, description: "Encoder audio reference level: smpte (20) or ebu (14)" }
+  ndi.vendor_name:       { type: string, description: "Encoder: NDI vendor name" }
+  ndi.vendor_id:         { type: string, description: "Encoder: NDI vendor id" }
+  ndi.low_bandwidth:     { type: bool, description: "Decoders: low-bandwidth stream requested" }
+  ndi.ignore_hx_pts:     { type: bool, description: "NDI decoders: NDI|HX video timestamps ignored" }
+  ndi.timecode_first:    { type: bool, description: "NDI decoders: NDI timecode preferred for timing" }
+  ndi.pts_mode:          { type: string, description: "IP decoders: auto, timecode or timestamp" }
+  ndi.default_buffer_ms: { type: int, description: "IP decoders: buffer for discovered NDI sources, ms" }
+  ndi.extra_ips:         { type: string, description: "IP decoders: extra addresses NDI sources are looked for at" }
+  ndi.sources.*.name:    { type: string, description: "NDI source discovered on the network, by position in the list" }
+  ndi.sources.*.address: { type: string, description: "Its address and port; holding amc_id means multicast" }
   tally.preview:         { type: bool, description: "NDI tally: on preview at some receiver (encoder) or at the source (decoder)" }
   tally.program:         { type: bool, description: "NDI tally: on program" }
+  tally.user_controlled: { type: bool, description: "Encoder: the tally lights are user-controlled (ext-tally)" }
+  video.show_advanced:   { type: bool, description: "Encoder: advanced video settings shown (ar-convertion is reported only then)" }
+  video.brightness:      { type: int, description: "Encoder: brightness, -100 to 100" }
+  video.contrast:        { type: int, description: "Encoder: contrast, 50 to 200" }
+  video.hue:             { type: int, description: "Encoder: hue, -90 to 90" }
+  video.saturation:      { type: int, description: "Encoder: saturation, 0 to 200" }
+  video.deinterlace:     { type: string, description: "Encoder none, top-field or bottom-field; decoders bob, weave or (IP decoders) blend" }
+  video.force_deinterlace: { type: bool, description: "IP decoders: deinterlace even for an interlaced output" }
+  video.h_flip:          { type: bool, description: "Picture mirrored left to right (encoder out-mirror, decoder h-flip)" }
+  video.v_flip:          { type: bool, description: "Picture flipped upside down (encoder out-flip, decoder v-flip)" }
+  video.output_width:    { type: int, description: "Encoder: NDI output width set, pixels" }
+  video.output_height:   { type: int, description: "Encoder: NDI output height set, lines" }
+  video.output_follows_input: { type: bool, description: "Output resolution follows the input or source (encoder out-raw-resolution, decoder follow-input-mode)" }
+  video.follow_input_allowed: { type: bool, description: "IP decoders: the output resolution may be set to follow the source" }
+  video.bitrate_ratio:   { type: int, description: "Encoder: NDI bitrate, percent of the standard rate" }
+  video.input_aspect_auto: { type: bool, description: "Encoder: input aspect ratio detected" }
+  video.input_aspect:    { type: string, description: "Encoder: input aspect ratio set, e.g. 16:9" }
+  video.input_color_auto: { type: bool, description: "Input or source colour space chosen automatically" }
+  video.input_color_format: { type: string, description: "Input or source colour space set: rgb, bt.601, bt.709, bt.2020 or bt.2020c" }
+  video.input_quant_auto: { type: bool, description: "Encoder: input quantization range detected" }
+  video.input_quant_range: { type: string, description: "Encoder: input quantization range set, full or limited" }
+  video.aspect_conversion: { type: string, description: "Encoder ignore, cropping or padding; decoders windowbox, full or zoom" }
+  video.output_aspect_auto: { type: bool, description: "Encoder: output aspect ratio automatic" }
+  video.output_aspect:   { type: string, description: "Encoder: output aspect ratio set, e.g. 16:9" }
+  video.frame_rate_conversion: { type: string, description: "Encoder: raw, half, one-third or quarter of the input rate" }
+  video.output_color_auto: { type: bool, description: "Encoder: output colour space automatic" }
+  video.output_color_format: { type: string, description: "Output colour space or format: encoder bt.601, bt.709 or bt.2020; decoders rgb, yuv444 or yuv422" }
+  video.output_sat_auto: { type: bool, description: "Encoder: output saturation range automatic" }
+  video.output_sat_range: { type: string, description: "Encoder: output saturation range, full, limited or extended" }
+  video.output_quant_auto: { type: bool, description: "Encoder: output quantization range automatic" }
+  video.output_quant_range: { type: string, description: "Output quantization range, full or limited" }
+  video.low_res_full_frame_rate: { type: bool, description: "Encoder: low-bandwidth stream at the full frame rate" }
+  video.overlay.title:   { type: bool, description: "Decoders: source name and resolution shown" }
+  video.overlay.tally:   { type: bool, description: "Decoders: NDI tally shown" }
+  video.overlay.vu_meter: { type: bool, description: "Decoders: audio meters shown" }
+  video.overlay.center_cross: { type: bool, description: "Decoders: centre cross shown" }
+  video.vu_meter_mode:   { type: string, description: "Decoders: meter scale, as set_vu_meter_mode or set_vu_meter_scale names it" }
+  video.safe_area:       { type: string, description: "Decoders: safe area marker, none, 4:3, 80% or square" }
+  video.ident_mode:      { type: string, description: "Decoders: ident overlay, none, ident-text or device-name (IP decoders: none, text or source-name)" }
+  video.ident_text:      { type: string, description: "Decoders: ident text" }
+  video.switch_mode:     { type: string, description: "NDI decoders: blank or keep-last while switching; IP decoders on signal loss: no-signal-image, black, last-frame or output-off" }
+  video.reset_source_on_boot: { type: bool, description: "NDI decoders: source cleared on start" }
+  video.hdr_output_mode: { type: string, description: "IP decoders: auto, disable, hdr-pq or hlg" }
+  video.screen_debug:    { type: bool, description: "IP decoders: debugging information on the output" }
+  video.webrtc_preview:  { type: bool, description: "IP decoders: WebRTC preview on" }
+  video.view_mode:       { type: string, description: "IP decoders: single, pip or quad" }
+  output.enabled:        { type: bool, description: "NDI decoders: decoded picture sent to the output" }
+  output.mode.width:     { type: int, description: "Decoders: current output mode width, pixels" }
+  output.mode.height:    { type: int, description: "Decoders: current output mode height, lines" }
+  output.mode.interlaced: { type: bool, description: "Decoders: current output mode interlaced" }
+  output.mode.rate:      { type: int, description: "Decoders: current output mode field (NDI decoders) or frame (IP decoders) rate times 100" }
+  output.modes.*.width:  { type: int, description: "Decoders: a mode the display supports, by position; width in pixels" }
+  output.modes.*.height: { type: int, description: "Its height in lines" }
+  output.modes.*.interlaced: { type: bool, description: "Interlaced" }
+  output.modes.*.rate:   { type: int, description: "Field or frame rate times 100" }
+  output.modes.*.preferred: { type: bool, description: "The display's preferred mode" }
+  audio.gain:            { type: float, description: "Decoders: audio output gain, dB" }
+  audio.sample_rate:     { type: int, description: "Decoders: output sample rate, Hz; 0 follows the source" }
+  audio.channels:        { type: int, description: "Decoders: output channels; 0 follows the source" }
+  audio.convert_mode:    { type: string, description: "Decoders: NDI audio level standard, smpte or ebu" }
+  audio.check_pts:       { type: bool, description: "Decoders: audio timestamps checked" }
+  audio.map.*:           { type: int, description: "NDI decoders: the source channel (from 1) an output channel (from 1) carries" }
+  audio.channel_map:     { type: string, description: "IP decoders: the channel map as a JSON array of source indexes from 0" }
+  source.name:           { type: string, description: "NDI decoders: the source being decoded" }
+  source.ndi:            { type: bool, description: "NDI decoders: the source is a discovered NDI source (false: a preset)" }
+  source.selected_id:    { type: int, description: "IP decoders: the source selected, in simple mode" }
+  decoder.buffer_ms:     { type: int, description: "NDI decoders: decoder buffer, ms" }
+  presets.*.name:        { type: string, description: "NDI decoders: preset source by position in the list; its name" }
+  presets.*.url:         { type: string, description: "Its URL" }
+  presets.*.hotkey:      { type: string, description: "Its shortcut, when one is set" }
+  config.mode:           { type: string, description: "IP decoders: simple or profile mode" }
+  config.language:       { type: string, description: "IP decoders: web interface language" }
+  sources.*.name:        { type: string, description: "IP decoders: a source by id; its name" }
+  sources.*.kind:        { type: string, description: "static (added) or ndi (discovered)" }
+  sources.*.type:        { type: int, description: "Configuration type: 1 URL, 2 discovered NDI, 3 custom NDI" }
+  sources.*.protocol:    { type: string, description: "rtmp, srt, udp, rtp, rtsp, http, ndi, zixi or rist" }
+  sources.*.url:         { type: string, description: "Its URL (URL sources)" }
+  sources.*.ndi_name:    { type: string, description: "Its NDI name (NDI sources)" }
+  sources.*.ndi_url:     { type: string, description: "Its NDI address (NDI sources)" }
+  sources.*.hotkey:      { type: string, description: "Its shortcut" }
+  profile.current_id:    { type: int, description: "IP decoders: the profile selected" }
+  profiles.*.name:       { type: string, description: "IP decoders: a profile by id; its name" }
+  profiles.*.view_mode:  { type: string, description: "single, pip or quad" }
+  profiles.*.audio_screen: { type: int, description: "Screen whose audio is output, from 0" }
+  profiles.*.selected:   { type: bool, description: "The current profile" }
+  profiles.*.screens.*.source_id: { type: int, description: "Source on a screen, by screen index from 0" }
+  profiles.*.screens.*.source_name: { type: string, description: "That source's name" }
+  zen_master.enabled:    { type: bool, description: "IP decoders: connection to Zixi ZEN Master on" }
+  zen_master.host:       { type: string, description: "ZEN Master address" }
+  zen_master.ssh_port:   { type: int, description: "ZEN Master SSH port" }
+  zen_master.tunnel_port: { type: int, description: "ZEN Master forwarding port" }
+  zen_master.user:       { type: string, description: "ZEN Master user name" }
+  zen_master.state:      { type: string, description: "disabled, connected, connecting or failed" }
+  ptz.protocol:          { type: string, description: "Encoder: PTZ protocol: none, visca, visca-udp, visca-udp2rs232, pelco-d or pelco-p" }
+  ptz.state:             { type: string, description: "Encoder: PTZ camera link: unknown, connected or disconnected" }
+  ptz.camera:            { type: int, description: "Encoder: PTZ camera id, 1 to 7" }
+  ptz.baudrate:          { type: int, description: "Encoder: serial speed, bits per second" }
+  ptz.invert_pan:        { type: bool, description: "Encoder: pan reversed" }
+  ptz.invert_tilt:       { type: bool, description: "Encoder: tilt reversed" }
+  ptz.address:           { type: string, description: "Encoder: VISCA over IP camera address" }
+  ptz.port:              { type: int, description: "Encoder: VISCA over IP port" }
+  ptz.visca_header:      { type: bool, description: "Encoder: VISCA over IP message header used" }
+  ptz.limits.pan_left:   { type: int, description: "Encoder: pan left limit, camera units" }
+  ptz.limits.pan_center: { type: int, description: "Encoder: pan centre, camera units" }
+  ptz.limits.pan_right:  { type: int, description: "Encoder: pan right limit, camera units" }
+  ptz.limits.tilt_top:   { type: int, description: "Encoder: tilt top limit, camera units" }
+  ptz.limits.tilt_center: { type: int, description: "Encoder: tilt centre, camera units" }
+  ptz.limits.tilt_bottom: { type: int, description: "Encoder: tilt bottom limit, camera units" }
+  ptz.limits.zoom_out:   { type: int, description: "Encoder: zoom out limit, camera units" }
+  ptz.limits.focus_near: { type: int, description: "Encoder: focus near limit, camera units" }
+  ptz.limits.focus_far:  { type: int, description: "Encoder: focus far limit, camera units" }
+  ptz.enabled:           { type: bool, description: "IP decoders: the decoded source supports PTZ control" }
+  edid.smart:            { type: bool, description: "Encoder: SmartEDID on" }
+  edid.keep_last:        { type: bool, description: "Encoder: last loop-through EDID kept" }
+  edid.add_audio:        { type: bool, description: "Encoder: source asked for audio" }
+  edid.limit_pixel_clock: { type: bool, description: "Encoder: pixel clock kept within the device's limit" }
 
-# Nothing is pushed: the summary is polled.
+# Nothing is pushed. Status is polled every 2 seconds; settings are read on
+# connecting, every 30 seconds, and again after each command that changes
+# them (then_send).
 telemetry:
   poll:
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: get-summary-info } }
+      - { models: &dec [ndi-to-hdmi, ndi-to-sdi, ndi-to-aio, ndi-to-hdmi-4k], method: GET, path: /mwapi, query: { method: get-channel } }
       - { models: *ip, method: GET, path: /api/system/summary }
     every_ms: 2000
+  subscribe:
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-video-config } }
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-ndi-config } }
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-ndi-sources } }
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-auto-reboot } }
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-ntp-server } }
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-net-access } }
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-eth-status } }
+      - { models: &enc [hdmi-4k-plus, hdmi-plus, hdmi-tx, 12g-sdi-4k-plus, sdi-4k-plus, sdi-plus, sdi-tx], method: GET, path: /mwapi, query: { method: get-tally } }
+      - { models: *enc, method: GET, path: /mwapi, query: { method: get-ptz-config } }
+      - { models: *enc, method: GET, path: /mwapi, query: { method: get-edid-config } }
+      - { models: *dec, method: GET, path: /mwapi, query: { method: get-video-format } }
+      - { models: *dec, method: GET, path: /mwapi, query: { method: get-hdmi-output } }
+      - { models: *dec, method: GET, path: /mwapi, query: { method: get-supported-video-modes } }
+      - { models: *dec, method: GET, path: /mwapi, query: { method: get-audio-config } }
+      - { models: *dec, method: GET, path: /mwapi, query: { method: list-channels } }
+      - { models: *dec, method: GET, path: /mwapi, query: { method: get-playback-config } }
+      - { models: *ip, method: GET, path: /api/video/config/get }
+      - { models: *ip, method: GET, path: /api/video/mode/get }
+      - { models: *ip, method: GET, path: /api/audio/config/get }
+      - { models: *ip, method: GET, path: /api/source/list, query: { type: all } }
+      - { models: *ip, method: GET, path: /api/profile/list }
+      - { models: *ip, method: GET, path: /api/settings/get }
+      - { models: *ip, method: GET, path: /api/settings/zixi/master/get }
+      - { models: *ip, method: POST, path: /api/system/info }
+    every_ms: 30000
   updates:
     # Encoder API section 5.1, Decoder API V1.3 section 5.1.
     - path: "^/mwapi\\?method=get-summary-info$"
@@ -739,14 +1683,37 @@ telemetry:
         name: "$.device.name"
         serial: "$.device.serial-no"
         firmware: "$.device.fw-version"
+        up_to_date: "$.device.up-to-date"
+        hw: "$.device.hw-revision"
         temperature: "$.device.core-temp"
         uptime: "$.device.up-time"
+        cpu: "$.device.cpu-usage"
+        memory: "$.device.memory-usage"
+        fan: "$.device.fan-rpm"
+        board: "$.device.board-id"
         input: "$.device.input-state"
         output: "$.device.output-state"
+        ptz_proto: "$.device.ptz-proto"
+        ptz_state: "$.device.ptz-state"
+        eth_state: "$.ethernet.state"
+        mac: "$.ethernet.mac-addr"
+        ip: "$.ethernet.ip-addr"
+        mask: "$.ethernet.ip-mask"
+        gw: "$.ethernet.gw-addr"
+        dns: "$.ethernet.dns-addr"
+        tx: "$.ethernet.tx-speed-kbps"
+        rx: "$.ethernet.rx-speed-kbps"
         ndi_name: "$.ndi.name"
         url: "$.ndi.url"
+        enabled: "$.ndi.enabled"
+        connected: "$.ndi.connected"
         clients: "$.ndi.num-clients"
         kbps: "$.ndi.video-bit-rate"
+        akbps: "$.ndi.audio-bit-rate"
+        vdrops: "$.ndi.video-drop-frames"
+        adrops: "$.ndi.audio-drop-frames"
+        achannels: "$.ndi.audio-num-channels"
+        arate: "$.ndi.audio-sample-rate"
         width: "$.ndi.video-width"
         height: "$.ndi.video-height"
         scan: "$.ndi.video-scan"
@@ -758,17 +1725,44 @@ telemetry:
         device.name: "{name}"
         device.serial: "{serial}"
         device.firmware: "{firmware}"
+        device.firmware_up_to_date: "{up_to_date}"
+        device.hardware_revision: "{hw}"
         device.temperature: "{temperature}"
         device.uptime: "{uptime}"
+        device.cpu_usage: "{cpu}"
+        device.memory_usage: "{memory}"
+        device.fan_rpm: "{fan}"
+        device.board_id: "{board}"
         device.input_state: "{input}"
         device.output_state: "{output}"
+        ptz.protocol: "{ptz_proto}"
+        ptz.state: "{ptz_state}"
+        network.ethernet.state: "{eth_state}"
+        network.ethernet.mac: "{mac}"
+        network.ethernet.ip_address: "{ip}"
+        network.ethernet.netmask: "{mask}"
+        network.ethernet.gateway: "{gw}"
+        network.ethernet.dns: "{dns}"
+        network.ethernet.tx_kbps: "{tx}"
+        network.ethernet.rx_kbps: "{rx}"
         ndi.name: "{ndi_name}"
         ndi.url: "{url}"
+        ndi.enabled: "{enabled}"
         ndi.clients: "{clients}"
         ndi.video_kbps: "{kbps}"
+        ndi.audio_kbps: "{akbps}"
+        ndi.video_drops: "{vdrops}"
+        ndi.audio_drops: "{adrops}"
+        ndi.audio_channels: "{achannels}"
+        ndi.audio_sample_rate: "{arate}"
         ndi.video: "{width}x{height} {scan} {rate:.2f}"
         tally.preview: "{preview}"
         tally.program: "{program}"
+    # Decoder API V1.3 section 5.1: an NDI decoder reports connected for enabled.
+    - path: "^/mwapi\\?method=get-summary-info$"
+      json_match: { "$.status": "^0$" }
+      json: { connected: "$.ndi.connected" }
+      state: { ndi.enabled: "{connected}" }
     # IP Decoder API section 2: the first stream of the current profile.
     - path: "^/api/system/summary$"
       json_match: { "$.status": "^0$" }
@@ -777,47 +1771,713 @@ telemetry:
         name: "$.device-name"
         serial: "$.serial-number"
         firmware: "$.firmware-ver"
+        hw: "$.hardware-rev"
         temperature: "$.core-temp"
         uptime: "$.uptime"
+        fan: "$.fan-speed"
         hdmi: "$.hdmi-state"
         ndi_name: "$.profile.streams[0].name"
         kbps: "$.profile.streams[0].video.kbps"
+        akbps: "$.profile.streams[0].audio.kbps"
+        achannels: "$.profile.streams[0].audio.num-channels"
+        arate: "$.profile.streams[0].audio.sample-rate"
         preview: "$.profile.streams[0].extra.tally-preview"
         program: "$.profile.streams[0].extra.tally-program"
+        ptz: "$.ptz.enabled"
+        profile: "$.profile.id"
       state:
         device.model: "{model}"
         device.name: "{name}"
         device.serial: "{serial}"
         device.firmware: "{firmware}"
+        device.hardware_revision: "{hw}"
         device.temperature: "{temperature}"
         device.uptime: "{uptime}"
+        device.fan_rpm: "{fan}"
         device.output_state: "{hdmi}"
         ndi.name: "{ndi_name}"
         ndi.video_kbps: "{kbps}"
+        ndi.audio_kbps: "{akbps}"
+        ndi.audio_channels: "{achannels}"
+        ndi.audio_sample_rate: "{arate}"
         tally.preview: "{preview}"
         tally.program: "{program}"
+        ptz.enabled: "{ptz}"
+        profile.current_id: "{profile}"
+    - path: "^/api/system/summary$"
+      json_match: { "$.status": "^0$" }
+      json: { mode: "$.mode" }
+      state: { config.mode: { value: "{mode}", map: { "1": simple, "2": profile } } }
+
+    # Encoder API section 7.1 (get-video-config; reset-video-config answers
+    # the same fields).
+    - path: "^/mwapi\\?method=(get|reset)-video-config$"
+      json_match: { "$.status": "^0$", "$.out-raw-resolution": "^(true|false)$" }
+      json:
+        adv: "$.show-adv-ui"
+        brightness: "$.brightness"
+        contrast: "$.contrast"
+        hue: "$.hue"
+        saturation: "$.saturation"
+        deinterlace: "$.deinterlace"
+        flip: "$.out-flip"
+        mirror: "$.out-mirror"
+        cx: "$.out-cx"
+        cy: "$.out-cy"
+        raw: "$.out-raw-resolution"
+        ratio: "$.bit-rate-ratio"
+        in_aspect_auto: "$.in-auto-aspect"
+        in_x: "$.in-aspect-x"
+        in_y: "$.in-aspect-y"
+        in_color_auto: "$.in-auto-color-fmt"
+        in_color: "$.in-color-fmt"
+        in_quant_auto: "$.in-auto-quant-range"
+        in_quant: "$.in-quant-range"
+        ar: "$.ar-convertion"
+        out_aspect_auto: "$.out-auto-aspect"
+        out_x: "$.out-aspect-x"
+        out_y: "$.out-aspect-y"
+        fr: "$.out-fr-convertion"
+        out_color_auto: "$.out-auto-color-fmt"
+        out_color: "$.out-color-fmt"
+        sat_auto: "$.out-auto-sat-range"
+        sat: "$.out-sat-range"
+        out_quant_auto: "$.out-auto-quant-range"
+        out_quant: "$.out-quant-range"
+        low_res: "$.low-res-full-fr"
+      state:
+        video.show_advanced: "{adv}"
+        video.brightness: "{brightness}"
+        video.contrast: "{contrast}"
+        video.hue: "{hue}"
+        video.saturation: "{saturation}"
+        video.deinterlace: "{deinterlace}"
+        video.v_flip: "{flip}"
+        video.h_flip: "{mirror}"
+        video.output_width: "{cx}"
+        video.output_height: "{cy}"
+        video.output_follows_input: "{raw}"
+        video.bitrate_ratio: "{ratio}"
+        video.input_aspect_auto: "{in_aspect_auto}"
+        video.input_aspect: "{in_x}:{in_y}"
+        video.input_color_auto: "{in_color_auto}"
+        video.input_color_format: "{in_color}"
+        video.input_quant_auto: "{in_quant_auto}"
+        video.input_quant_range: "{in_quant}"
+        video.aspect_conversion: "{ar}"
+        video.output_aspect_auto: "{out_aspect_auto}"
+        video.output_aspect: "{out_x}:{out_y}"
+        video.frame_rate_conversion: "{fr}"
+        video.output_color_auto: "{out_color_auto}"
+        video.output_color_format: "{out_color}"
+        video.output_sat_auto: "{sat_auto}"
+        video.output_sat_range: "{sat}"
+        video.output_quant_auto: "{out_quant_auto}"
+        video.output_quant_range: "{out_quant}"
+        video.low_res_full_frame_rate: "{low_res}"
+    # Decoder API V1.3 section 7.1.
+    - path: "^/mwapi\\?method=(get|reset)-video-config$"
+      json_match: { "$.status": "^0$", "$.switch-mode": "." }
+      json:
+        title: "$.show-title"
+        tally: "$.show-tally"
+        vu: "$.show-vu-meter"
+        vu_mode: "$.vu-meter-mode"
+        cross: "$.show-center-cross"
+        safe: "$.safe-area-mode"
+        ident: "$.ident-mode"
+        ident_text: "$.ident-text"
+        h: "$.h-flip"
+        v: "$.v-flip"
+        switch: "$.switch-mode"
+        reset: "$.reset-source-on-boot"
+        deint: "$.deinterlace-mode"
+        color_auto: "$.in-auto-color-fmt"
+        color: "$.in-color-fmt"
+        ar: "$.ar-convert-mode"
+        follow: "$.follow-input-mode"
+      state:
+        video.overlay.title: "{title}"
+        video.overlay.tally: "{tally}"
+        video.overlay.vu_meter: "{vu}"
+        video.vu_meter_mode: "{vu_mode}"
+        video.overlay.center_cross: "{cross}"
+        video.safe_area: "{safe}"
+        video.ident_mode: "{ident}"
+        video.ident_text: "{ident_text}"
+        video.h_flip: "{h}"
+        video.v_flip: "{v}"
+        video.switch_mode: "{switch}"
+        video.reset_source_on_boot: "{reset}"
+        video.deinterlace: "{deint}"
+        video.input_color_auto: "{color_auto}"
+        video.input_color_format: "{color}"
+        video.aspect_conversion: "{ar}"
+        video.output_follows_input: "{follow}"
+    # IP Decoder API section 4.1: numbered values in the NDI decoders' words.
+    - path: "^/api/video/config/get$"
+      json_match: { "$.status": "^0$" }
+      json:
+        title: "$.show-title"
+        tally: "$.show-tally"
+        vu: "$.show-vu-meter"
+        vu_mode: "$.vu-meter-mode"
+        cross: "$.show-center-cross"
+        safe: "$.safe-area"
+        ident: "$.ident-mode"
+        ident_text: "$.ident-text"
+        h: "$.h-flip"
+        v: "$.v-flip"
+        deint: "$.deinterlace-mode"
+        force: "$.force-deint"
+        ar: "$.ar-convert"
+        follow: "$.follow-input"
+        follow_ok: "$.enable-follow-input"
+        color_format: "$.color-format"
+        quant: "$.quant-range"
+        switch: "$.switch-mode"
+        in_color: "$.in-color-fmt"
+        hdr: "$.hdr-output-mode"
+        debug: "$.screen-debug"
+        webrtc: "$.enable-webrtc"
+        view: "$.screen-mode"
+      state:
+        video.overlay.title: "{title}"
+        video.overlay.tally: "{tally}"
+        video.overlay.vu_meter: "{vu}"
+        video.vu_meter_mode: { value: "{vu_mode}", map: { "0": hide, "1": post-dbvu, "2": post-dbfs } }
+        video.overlay.center_cross: "{cross}"
+        video.safe_area: { value: "{safe}", map: { "0": none, "1": "4:3", "2": "80%", "3": square } }
+        video.ident_mode: { value: "{ident}", map: { "0": none, "1": text, "2": source-name } }
+        video.ident_text: "{ident_text}"
+        video.h_flip: "{h}"
+        video.v_flip: "{v}"
+        video.deinterlace: { value: "{deint}", map: { "0": bob, "1": weave, "2": blend } }
+        video.force_deinterlace: "{force}"
+        video.aspect_conversion: { value: "{ar}", map: { "0": windowbox, "1": zoom, "2": full } }
+        video.output_follows_input: "{follow}"
+        video.follow_input_allowed: "{follow_ok}"
+        video.output_color_format: "{color_format}"
+        video.output_quant_range: "{quant}"
+        video.switch_mode: { value: "{switch}", map: { "0": no-signal-image, "1": black, "2": last-frame, "3": output-off } }
+        video.input_color_auto: { value: "{in_color}", map: { "0": true, "1": false, "2": false, "3": false } }
+        video.input_color_format: { value: "{in_color}", map: { "1": bt.601, "2": bt.709, "3": bt.2020 } }
+        video.hdr_output_mode: { value: "{hdr}", map: { "0": auto, "1": disable, "2": hdr-pq, "3": hlg } }
+        video.screen_debug: "{debug}"
+        video.webrtc_preview: "{webrtc}"
+        video.view_mode: { value: "{view}", map: { "1": single, "2": pip, "4": quad } }
+    # Decoder API V1.3 sections 7.7-7.8 (set-video-format answers the same).
+    - path: "^/mwapi\\?method=(get|set)-video-format(&|$)"
+      json_match: { "$.status": "^0$" }
+      json: { format: "$.color-format", quant: "$.quant-range" }
+      state:
+        video.output_color_format: "{format}"
+        video.output_quant_range: "{quant}"
+    # Decoder API V1.3 section 7.9.
+    - path: "^/mwapi\\?method=get-hdmi-output$"
+      json_match: { "$.status": "^0$" }
+      json: { enabled: "$.enabled" }
+      state: { output.enabled: "{enabled}" }
+    # Decoder API V1.3 section 7.5 and IP Decoder API section 4.4: the list
+    # whole, and the mode in use.
+    - path: "^(/mwapi\\?method=get-supported-video-modes|/api/video/mode/get)$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.modes"
+      json: { width: "$.width", height: "$.height", interlaced: "$.interlaced", field: "$.field-rate", frame: "$.frame-rate", preferred: "$.pref-mode" }
+      replace: output.modes
+      state:
+        output.modes.{index}.width: "{width}"
+        output.modes.{index}.height: "{height}"
+        output.modes.{index}.interlaced: "{interlaced}"
+        output.modes.{index}.rate: "{field}"
+        output.modes.{index}.preferred: "{preferred}"
+    - path: "^/api/video/mode/get$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.modes"
+      json: { frame: "$.frame-rate" }
+      state: { "output.modes.{index}.rate": "{frame}" }
+    - path: "^(/mwapi\\?method=get-supported-video-modes|/api/video/mode/get)$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.modes"
+      each_match: { "$.curr-mode": "^true$" }
+      json: { width: "$.width", height: "$.height", interlaced: "$.interlaced", field: "$.field-rate", frame: "$.frame-rate" }
+      state:
+        output.mode.width: "{width}"
+        output.mode.height: "{height}"
+        output.mode.interlaced: "{interlaced}"
+        output.mode.rate: "{field}"
+    - path: "^/api/video/mode/get$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.modes"
+      each_match: { "$.curr-mode": "^true$" }
+      json: { frame: "$.frame-rate" }
+      state: { output.mode.rate: "{frame}" }
+    # Decoder API V1.3 section 8.1.
+    - path: "^/mwapi\\?method=get-audio-config$"
+      json_match: { "$.status": "^0$" }
+      json:
+        gain: "$.gain"
+        rate: "$.sample-rate"
+        channels: "$.channels"
+        mode: "$.convert-mode"
+        pts: "$.check-pts"
+        ch0: "$.ch0"
+        ch1: "$.ch1"
+        ch2: "$.ch2"
+        ch3: "$.ch3"
+        ch4: "$.ch4"
+        ch5: "$.ch5"
+        ch6: "$.ch6"
+        ch7: "$.ch7"
+        ch8: "$.ch8"
+        ch9: "$.ch9"
+        ch10: "$.ch10"
+        ch11: "$.ch11"
+        ch12: "$.ch12"
+        ch13: "$.ch13"
+        ch14: "$.ch14"
+        ch15: "$.ch15"
+      state:
+        audio.gain: "{gain}"
+        audio.sample_rate: "{rate}"
+        audio.channels: "{channels}"
+        audio.convert_mode: "{mode}"
+        audio.check_pts: "{pts}"
+        audio.map.1: "{ch0:+1}"
+        audio.map.2: "{ch1:+1}"
+        audio.map.3: "{ch2:+1}"
+        audio.map.4: "{ch3:+1}"
+        audio.map.5: "{ch4:+1}"
+        audio.map.6: "{ch5:+1}"
+        audio.map.7: "{ch6:+1}"
+        audio.map.8: "{ch7:+1}"
+        audio.map.9: "{ch8:+1}"
+        audio.map.10: "{ch9:+1}"
+        audio.map.11: "{ch10:+1}"
+        audio.map.12: "{ch11:+1}"
+        audio.map.13: "{ch12:+1}"
+        audio.map.14: "{ch13:+1}"
+        audio.map.15: "{ch14:+1}"
+        audio.map.16: "{ch15:+1}"
+    # IP Decoder API section 5.1.
+    - path: "^/api/audio/config/get$"
+      json_match: { "$.status": "^0$" }
+      json: { gain: "$.gain", rate: "$.sample-rate", channels: "$.channels", mode: "$.convert-mode", pts: "$.check-pts", map: "$.channel-map" }
+      state:
+        audio.gain: "{gain}"
+        audio.sample_rate: "{rate}"
+        audio.channels: "{channels}"
+        audio.convert_mode: { value: "{mode}", map: { "0": smpte, "1": ebu } }
+        audio.check_pts: "{pts}"
+        audio.channel_map: "{map}"
+    # Decoder API V1.3 sections 10.1-10.2.
+    - path: "^/mwapi\\?method=get-channel$"
+      json_match: { "$.status": "^0$" }
+      json: { name: "$.name", ndi: "$.ndi-name" }
+      state:
+        source.name: "{name}"
+        source.ndi: "{ndi}"
+    - path: "^/mwapi\\?method=list-channels$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.channels"
+      json: { name: "$.name", url: "$.url", hotkey: "$.hotkey" }
+      replace: presets
+      state:
+        presets.{index}.name: "{name}"
+        presets.{index}.url: "{url}"
+        presets.{index}.hotkey: "{hotkey}"
+    - path: "^/mwapi\\?method=get-playback-config$"
+      json_match: { "$.status": "^0$" }
+      json: { ms: "$.buffer-duration" }
+      state: { decoder.buffer_ms: "{ms}" }
+    # Encoder API section 9.1 and Decoder API V1.3 section 11.1 (each
+    # reports its own subset).
+    - path: "^/mwapi\\?method=get-ndi-config$"
+      json_match: { "$.status": "^0$" }
+      json:
+        enabled: "$.enable"
+        source_name: "$.source-name"
+        groups: "$.group-name"
+        web: "$.enable-web-control"
+        ptz: "$.enable-ptz-control"
+        fo: "$.enable-fail-over"
+        fo_name: "$.fail-over-ndi-name"
+        fo_ip: "$.fail-over-ip-addr"
+        mcast: "$.enable-mcast"
+        rudp: "$.enable-rudp"
+        tcp: "$.enable-tcp"
+        udp: "$.enable-udp"
+        addr: "$.mcast-addr"
+        mask: "$.mcast-mask"
+        ttl: "$.mcast-ttl"
+        subnets: "$.mcast-subnets"
+        disc: "$.enable-discovery"
+        servers: "$.discovery-server"
+        level: "$.reference-level"
+        vendor: "$.vendor-name"
+        vendor_id: "$.vendor-id"
+        low: "$.low-bandwidth"
+        hx: "$.ignore-ndi-hx-video-pts"
+        tc: "$.use-timecode-first"
+      state:
+        ndi.enabled: "{enabled}"
+        ndi.source_name: "{source_name}"
+        ndi.groups: "{groups}"
+        ndi.web_control: "{web}"
+        ndi.ptz_control: "{ptz}"
+        ndi.failover.enabled: "{fo}"
+        ndi.failover.name: "{fo_name}"
+        ndi.failover.address: "{fo_ip}"
+        ndi.transport_flags.multicast: "{mcast}"
+        ndi.transport_flags.rudp: "{rudp}"
+        ndi.transport_flags.multi_tcp: "{tcp}"
+        ndi.transport_flags.udp: "{udp}"
+        ndi.multicast.address: "{addr}"
+        ndi.multicast.netmask: "{mask}"
+        ndi.multicast.ttl: "{ttl}"
+        ndi.multicast_subnets: "{subnets}"
+        ndi.discovery.enabled: "{disc}"
+        ndi.discovery.servers: "{servers}"
+        ndi.reference_level: { value: "{level}", map: { "20": smpte, "14": ebu } }
+        ndi.vendor_name: "{vendor}"
+        ndi.vendor_id: "{vendor_id}"
+        ndi.low_bandwidth: "{low}"
+        ndi.ignore_hx_pts: "{hx}"
+        ndi.timecode_first: "{tc}"
+    # The transport as one value: the flag that is on, or tcp when all four
+    # are reported off.
+    - path: "^/mwapi\\?method=get-ndi-config$"
+      json_match: { "$.status": "^0$", "$.enable-mcast": "^true$" }
+      json: {}
+      state: { ndi.transport: multicast }
+    - path: "^/mwapi\\?method=get-ndi-config$"
+      json_match: { "$.status": "^0$", "$.enable-rudp": "^true$" }
+      json: {}
+      state: { ndi.transport: rudp }
+    - path: "^/mwapi\\?method=get-ndi-config$"
+      json_match: { "$.status": "^0$", "$.enable-tcp": "^true$" }
+      json: {}
+      state: { ndi.transport: multi-tcp }
+    - path: "^/mwapi\\?method=get-ndi-config$"
+      json_match: { "$.status": "^0$", "$.enable-udp": "^true$" }
+      json: {}
+      state: { ndi.transport: udp }
+    - path: "^/mwapi\\?method=get-ndi-config$"
+      json_match: { "$.status": "^0$", "$.enable-mcast": "^false$", "$.enable-rudp": "^false$", "$.enable-tcp": "^false$", "$.enable-udp": "^false$" }
+      json: {}
+      state: { ndi.transport: tcp }
+    - path: "^/mwapi\\?method=get-ndi-sources$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.sources"
+      json: { name: "$.ndi-name", address: "$.ip-addr" }
+      replace: ndi.sources
+      state:
+        ndi.sources.{index}.name: "{name}"
+        ndi.sources.{index}.address: "{address}"
+    # Encoder API section 9.4.
+    - path: "^/mwapi\\?method=get-tally$"
+      json_match: { "$.status": "^0$" }
+      json: { ext: "$.ext-tally" }
+      state: { tally.user_controlled: "{ext}" }
+    # Encoder API section PTZ, get-ptz-config.
+    - path: "^/mwapi\\?method=get-ptz-config$"
+      json_match: { "$.status": "^0$" }
+      json:
+        proto: "$.proto"
+        index: "$.index"
+        baud: "$.baudrate"
+        ip: "$.invert-pan"
+        it: "$.invert-tilt"
+        addr: "$.ip-addr"
+        port: "$.port"
+        hdr: "$.visca-msg-hdr"
+        pl: "$.pan-left-limit"
+        pc: "$.pan-center"
+        pr: "$.pan-right-limit"
+        tt: "$.tilt-top-limit"
+        tc: "$.tilt-center"
+        tb: "$.tilt-bottom-limit"
+        zo: "$.zoom-out-limit"
+        fn: "$.focus-near-limit"
+        ff: "$.focus-far-limit"
+      state:
+        ptz.protocol: "{proto}"
+        ptz.camera: "{index}"
+        ptz.baudrate: "{baud}"
+        ptz.invert_pan: "{ip}"
+        ptz.invert_tilt: "{it}"
+        ptz.address: "{addr}"
+        ptz.port: "{port}"
+        ptz.visca_header: "{hdr}"
+        ptz.limits.pan_left: "{pl}"
+        ptz.limits.pan_center: "{pc}"
+        ptz.limits.pan_right: "{pr}"
+        ptz.limits.tilt_top: "{tt}"
+        ptz.limits.tilt_center: "{tc}"
+        ptz.limits.tilt_bottom: "{tb}"
+        ptz.limits.zoom_out: "{zo}"
+        ptz.limits.focus_near: "{fn}"
+        ptz.limits.focus_far: "{ff}"
+    # Encoder API section EDID (set-default-edid answers the same fields).
+    - path: "^/mwapi\\?method=(get-edid-config|set-default-edid)$"
+      json_match: { "$.status": "^0$" }
+      json: { smart: "$.smart-edid", keep: "$.keep-last", audio: "$.add-audio", clock: "$.limit-pixel-clock" }
+      state:
+        edid.smart: "{smart}"
+        edid.keep_last: "{keep}"
+        edid.add_audio: "{audio}"
+        edid.limit_pixel_clock: "{clock}"
+    # Universal Interfaces and Network (both APIs on /mwapi).
+    - path: "^/mwapi\\?method=get-auto-reboot$"
+      json_match: { "$.status": "^0$" }
+      json: { enabled: "$.enable", days: "$.week-flags", hour: "$.hour", minute: "$.min" }
+      state:
+        auto_reboot.enabled: "{enabled}"
+        auto_reboot.days: "{days}"
+        auto_reboot.hour: "{hour}"
+        auto_reboot.minute: "{minute}"
+    - path: "^/mwapi\\?method=get-ntp-server$"
+      json_match: { "$.status": "^0$" }
+      json: { server: "$.ntp-server" }
+      state: { network.ntp_server: "{server}" }
+    - path: "^/mwapi\\?method=get-net-access$"
+      json_match: { "$.status": "^0$" }
+      json: { ssdp: "$.use-ssdp" }
+      state: { network.ssdp: "{ssdp}" }
+    - path: "^/mwapi\\?method=get-eth-status$"
+      json_match: { "$.status": "^0$" }
+      json: { dhcp: "$.use-dhcp", name: "$.device-name", state: "$.state", ip: "$.ip-addr", mask: "$.ip-mask", gw: "$.gw-addr", dns: "$.dns-addr" }
+      state:
+        network.ethernet.dhcp: "{dhcp}"
+        device.name: "{name}"
+        network.ethernet.state: "{state}"
+        network.ethernet.ip_address: "{ip}"
+        network.ethernet.netmask: "{mask}"
+        network.ethernet.gateway: "{gw}"
+        network.ethernet.dns: "{dns}"
+    # IP Decoder API section 3.1: both lists whole, keyed by source id.
+    - path: "^/api/source/list\\?type=all$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.static"
+      json: { id: "$.id", name: "$.config.name", type: "$.config.type", protocol: "$.protocol", url: "$.config.url",
+              ndi_name: "$.config.ndi.name", ndi_url: "$.config.ndi.url", hotkey: "$.config.hotkey" }
+      replace: sources
+      state: &source_state
+        sources.{id}.name: "{name}"
+        sources.{id}.type: "{type}"
+        sources.{id}.protocol: { value: "{protocol}", map: { "1": rtmp, "2": srt, "4": udp, "8": rtp, "16": rtsp, "32": http, "64": ndi, "128": zixi, "256": rist } }
+        sources.{id}.url: "{url}"
+        sources.{id}.ndi_name: "{ndi_name}"
+        sources.{id}.ndi_url: "{ndi_url}"
+        sources.{id}.hotkey: "{hotkey}"
+    - path: "^/api/source/list\\?type=all$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.static"
+      json: { id: "$.id" }
+      state: { "sources.{id}.kind": static }
+    - path: "^/api/source/list\\?type=all$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.ndi"
+      json: { id: "$.id", name: "$.config.name", type: "$.config.type", protocol: "$.protocol", url: "$.config.url",
+              ndi_name: "$.config.ndi.name", ndi_url: "$.config.ndi.url", hotkey: "$.config.hotkey" }
+      replace: sources
+      state: *source_state
+    - path: "^/api/source/list\\?type=all$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.ndi"
+      json: { id: "$.id" }
+      state: { "sources.{id}.kind": ndi }
+    - path: "^/api/source/list\\?type=all$"
+      json_match: { "$.status": "^0$" }
+      json: { selected: "$.selected" }
+      state: { source.selected_id: "{selected}" }
+    # IP Decoder API section 6.1: the profiles whole, keyed by id, with each
+    # profile's screens.
+    - path: "^/api/profile/list$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.profiles"
+      json: { id: "$.id", name: "$.name", mode: "$.mode", audio: "$.audio-idx", selected: "$.selected" }
+      replace: profiles
+      state:
+        profiles.{id}.name: "{name}"
+        profiles.{id}.view_mode: { value: "{mode}", map: { "1": single, "2": pip, "4": quad } }
+        profiles.{id}.audio_screen: "{audio}"
+        profiles.{id}.selected: "{selected}"
+    - path: "^/api/profile/list$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.profiles[*].screens"
+      json: { profile: "$^.id", source: "$.id", name: "$.name" }
+      state:
+        profiles.{profile}.screens.{index}.source_id: "{source}"
+        profiles.{profile}.screens.{index}.source_name: "{name}"
+    - path: "^/api/profile/list$"
+      json_match: { "$.status": "^0$" }
+      json: { current: "$.current-id" }
+      state: { profile.current_id: "{current}" }
+    # IP Decoder API section Settings.
+    - path: "^/api/settings/get$"
+      json_match: { "$.status": "^0$" }
+      json: { mode: "$.mode", lang: "$.gui.lang", disc: "$.ndi.enable-d", servers: "$.ndi.d-server", groups: "$.ndi.groups",
+              extra: "$.ndi.extra-ips", transport: "$.ndi.transport", subnets: "$.ndi.mcast-subnets", pts: "$.ndi.pts-mode",
+              low: "$.ndi.low-bw", buffer: "$.ndi.buffer-ms" }
+      state:
+        config.mode: { value: "{mode}", map: { "1": simple, "2": profile } }
+        config.language: "{lang}"
+        ndi.discovery.enabled: "{disc}"
+        ndi.discovery.servers: "{servers}"
+        ndi.groups: "{groups}"
+        ndi.extra_ips: "{extra}"
+        ndi.transport: "{transport}"
+        ndi.multicast_subnets: "{subnets}"
+        ndi.pts_mode: "{pts}"
+        ndi.low_bandwidth: "{low}"
+        ndi.default_buffer_ms: "{buffer}"
+    - path: "^/api/settings/zixi/master/get$"
+      json_match: { "$.status": "^0$" }
+      json: { enabled: "$.enable", host: "$.host", ssh: "$.ssh-port", tunnel: "$.tunnel-port", user: "$.user-name", state: "$.state" }
+      state:
+        zen_master.enabled: "{enabled}"
+        zen_master.host: "{host}"
+        zen_master.ssh_port: "{ssh}"
+        zen_master.tunnel_port: "{tunnel}"
+        zen_master.user: "{user}"
+        zen_master.state: "{state}"
+    # Base API, Get basic info.
+    - path: "^/api/system/info$"
+      json_match: { "$.status": "^0$" }
+      json: { name: "$.device-name", uptime: "$.uptime", ntp: "$.datetime.ntp-server1", enabled: "$.auto-reboot.enable",
+              hour: "$.auto-reboot.hour", minute: "$.auto-reboot.min", week: "$.auto-reboot.week" }
+      state:
+        device.name: "{name}"
+        device.uptime: "{uptime}"
+        network.ntp_server: "{ntp}"
+        auto_reboot.enabled: "{enabled}"
+        auto_reboot.hour: "{hour}"
+        auto_reboot.minute: "{minute}"
+        auto_reboot.week: "{week}"
+
+    # Re-reads after a change: the settings a command changed are read again
+    # as soon as the device accepts it.
+    - path: "^/mwapi\\?method=(set|reset)-video-config(&|$)"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-video-config } }]
+    - path: "^/mwapi\\?method=set-ndi-config&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-ndi-config } }]
+    - path: "^/mwapi\\?method=set-tally&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-tally } }]
+    - path: "^/mwapi\\?method=(set-ptz-config|arrange-ptz-cameras)(&|$)"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-ptz-config } }]
+    - path: "^/mwapi\\?method=set-edid-config&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-edid-config } }]
+    - path: "^/mwapi\\?method=set-auto-reboot&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-auto-reboot } }]
+    - path: "^/mwapi\\?method=set-ntp-server&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-ntp-server } }]
+    - path: "^/mwapi\\?method=set-net-access&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-net-access } }]
+    - path: "^/mwapi\\?method=set-eth-config&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-eth-status } }]
+    - path: "^/mwapi\\?method=set-hdmi-output&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-hdmi-output } }]
+    - path: "^/mwapi\\?method=set-video-mode&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-supported-video-modes } }]
+    - path: "^/mwapi\\?method=set-audio-config&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-audio-config } }]
+    - path: "^/mwapi\\?method=set-channel&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-channel } }]
+    - path: "^/mwapi\\?method=(add-channel|modify-channel|del-channel|clear-channels)(&|$)"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: list-channels } }]
+    - path: "^/mwapi\\?method=set-playback-config&"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /mwapi, query: { method: get-playback-config } }]
+    - path: "^/api/video/config/set$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/video/config/get }]
+    - path: "^/api/video/mode/set$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/video/mode/get }]
+    - path: "^/api/audio/config/set$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/audio/config/get }]
+    - path: "^/api/source/(add|del|set|select)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/source/list, query: { type: all } }]
+    - path: "^/api/profile/(add|del|set|select|screen/select)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/profile/list }]
+    - path: "^/api/settings/(mode|ndi|gui)/set$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/settings/get }]
+    - path: "^/api/settings/zixi/master/set$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/settings/zixi/master/get }]
+    - path: "^/api/system/(auto-reboot|set-device-name)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/system/info }]
 
 quirks:
   - models: [all]
     severity: critical
     text: >
-      select_ndi_source, select_preset, select_source, select_profile and
-      select_screen_source switch the decoded picture at once, and
-      ptz_recall_preset moves the camera at once; ptz_store_preset overwrites
-      a camera preset and reboot stops the output until the device is back.
-      None asks for confirmation.
+      select_ndi_source, select_preset, select_source, select_profile,
+      select_screen_source and set_config_mode switch the decoded picture at
+      once, and ptz_recall_preset moves the camera at once; ptz_store_preset
+      overwrites a camera preset, reboot stops the output until the device is
+      back, reset_video_config puts every video setting back to its default,
+      clear_presets, delete_source and delete_profile cannot be undone, and
+      set_network_static and set_network_dhcp move the device to another
+      address, where the core no longer reaches it. None asks for
+      confirmation.
 
   - models: [all]
     severity: warning
     text: >
-      The API has no push: state comes from polling the summary every 2
-      seconds. Opened for commands only, the core polls nothing and checks
-      the device with ping (which needs no login) when it has been quiet for 10
-      seconds. The core logs in before the first request that needs a session
-      and again whenever the device answers not logged in (status 37, or HTTP
-      401), repeating that request once; a refused login (status 36, 16 on the
-      IP decoders, or HTTP 401 or 403) is final until the settings are
-      corrected.
+      The API has no push. The status (the summary, and the NDI decoders'
+      current source) is polled every 2 seconds; every setting the API can
+      read is read on connecting and every 30 seconds, and the settings a
+      command changes are read again as soon as the device accepts it. Opened
+      for commands only, the core polls nothing and checks the device with
+      ping (which needs no login) when it has been quiet for 10 seconds. The
+      core logs in before the first request that needs a session and again
+      whenever the device answers not logged in (status 37, or HTTP 401),
+      repeating that request once; a refused login (status 36, 16 on the IP
+      decoders, or HTTP 401 or 403) is final until the settings are corrected.
 
   - models: [all]
     severity: info
@@ -826,6 +2486,18 @@ quirks:
       session ID arrives only in a Set-Cookie header; the core sends every
       cookie the login set back with each later request, one request at a
       time. ndi.video gives the field rate with two decimals (60.00).
+      get-eth-status, get-ntp-server, get-net-access and their setters need
+      an administrator login; for another user they fail and their state
+      stays empty.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not covered here, as administration rather than operation: user
+      accounts, firmware update, logs, reports, cloud registration, factory
+      reset, the USB (RNDIS) network, setting the clock (sync-time, whose
+      documented date format contradicts its example), certificates, and
+      importing or exporting EDIDs, presets and settings as files.
 
   - models: [ndi-to-hdmi, ndi-to-sdi, ndi-to-aio, ndi-to-hdmi-4k]
     severity: info
@@ -833,21 +2505,40 @@ quirks:
       Decoder API V1.3 and v1.1 differ in places (set-net-access names,
       the cloud API port); the commands here use only methods both share.
       The output flip, overlays and switch mode are set with
-      set-video-config, which takes any subset of its fields.
+      set-video-config, which takes any subset of its fields. The preset
+      list is kept by position (presets.0, presets.1, ...), since preset
+      names may hold dots; a preset's shortcut (hotkey) is read but not set
+      here. vu-meter-mode is documented as none, db, post-gain-db or
+      post-gain-dbfs when read and as none, dbu, dbvu, dbfs and their
+      post-gain- forms when set; set_vu_meter_mode sends the set forms and
+      the state keeps what the device reports.
 
   - models: [hdmi-4k-plus, hdmi-plus, hdmi-tx, 12g-sdi-4k-plus, sdi-4k-plus, sdi-plus, sdi-tx]
     severity: info
     text: >
       At most one NDI transport flag may be on; set_ndi_transport sends all
-      four, with only the chosen one true (tcp: all false). The encoders send
+      four, with only the chosen one true (tcp: all false). ndi.transport is
+      tcp only when the device reports all four flags off; the document's
+      example reply leaves enable-rudp and enable-tcp out, so the separate
+      flags (ndi.transport_flags) are the reliable reading. The encoders send
       full-bandwidth NDI only: bit-rate-ratio is the only bitrate control,
-      and there is no codec or H.26x setting.
+      and there is no codec or H.26x setting. ar-convertion is reported only
+      while the advanced settings are shown (video.show_advanced). The PTZ
+      settings describe the camera attached to the encoder; the encoder has
+      no command that moves it, which NDI receivers do through the stream
+      (set_ndi_ptz_control).
 
   - models: [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k]
     severity: warning
     text: >
       select_source works only in simple mode and select_profile only in
       profile mode (IP Decoder API section 3 and 6). The PTZ commands reach a
-      camera only when the decoded source is an NDI source that accepts PTZ.
-      The document does not give the IP decoders' default credentials;
-      Admin / Admin is assumed as on the other Pro Convert models.
+      camera only when the decoded source is an NDI source that accepts PTZ;
+      the API reads back neither the camera's position nor its presets. The
+      document does not give the IP decoders' default credentials; Admin /
+      Admin is assumed as on the other Pro Convert models. Numbered values
+      (safe area, ident, deinterlace, aspect conversion, signal loss, colour
+      space, HDR mode, view mode, configuration mode) are reported in the
+      words the commands take. The NDI settings are changed one field at a
+      time through /api/settings/ndi/set, whose document example sends every
+      field; the reboot schedule is read through /api/system/info, a POST.
