@@ -1241,8 +1241,15 @@ commands:
     expect: { status: 200, json_path: "$" }
     returns: value
 
+  # The reply's shape is not documented beyond "incl. its input parameters"
+  # (Boinx's reference); a JSON:API object is assumed, {"data": {"type":
+  # "layertypes", "id": TypeID, "attributes": {...}}}, with the type's inputs
+  # as a layer reports them (input-descriptions, and input-values holding the
+  # defaults). It is returned whole to the caller and not kept in state: the
+  # reply names the type only by its dotted identifier, which cannot be a
+  # state key, and cannot be matched to the type's position in the list.
   get_layer_type:
-    summary: "One layer type with its input parameters (GET /layertypes/(TypeID))"
+    summary: "One layer type with its input parameters, such as the descriptions and default values of its inputs, returned whole and not kept in state (GET /layertypes/(TypeID))"
     params:
       type_id: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer type", description: "The layer type's identifier from the layer type list, such as com.boinx.mimoLive.layer.lowerthird." }
     send: { method: GET, path: "/api/v1/layertypes/{type_id}" }
@@ -1473,11 +1480,13 @@ state:
   layers.*.active_variant: { type: string, description: "ID of the variant selected to go live" }
   layers.*.live_variant: { type: string, description: "ID of the variant on air, while the layer is live; not cleared when it goes off" }
   layers.*.input_values: { type: string, description: "The layer's input values (of its live, or else active, variant) as JSON text: an object of input keys and values" }
+  layers.*.input_descriptions: { type: string, description: "Descriptions of the layer's inputs (of its live, or else active, variant) as JSON text: an object keyed by input key, each with type (string, number, index, bool, color, image or structure), label, hidden, index and, where they apply, value-min, value-max, value-step, value-unit and value-list" }
   layers.*.output_values: { type: string, description: "The layer's output values from its last render cycle as JSON text, such as tvOut_SettingName" }
   variants.*.name: { type: string, description: "Variant name" }
   variants.*.live_state: { type: string, description: "live when its layer is live with this variant, otherwise off" }
   variants.*.layer: { type: string, description: "ID of the layer the variant belongs to" }
   variants.*.input_values: { type: string, description: "The variant's input values as JSON text: an object of input keys and values" }
+  variants.*.input_descriptions: { type: string, description: "Descriptions of the variant's inputs as JSON text: an object keyed by input key, each with type (string, number, index, bool, color, image or structure), label, hidden, index and, where they apply, value-min, value-max, value-step, value-unit and value-list" }
   variants.*.output_values: { type: string, description: "The variant's output values from its last render cycle as JSON text" }
   sources.*.name: { type: string, description: "Source name" }
   sources.*.tally_state: { type: string, description: "Highest use of the source: off, in-use, effect, preview or program" }
@@ -1491,6 +1500,7 @@ state:
   sources.*.document: { type: string, description: "ID of the document the source is in" }
   sources.*.composition_id: { type: string, description: "Composition identifier, for a source based on a composition" }
   sources.*.input_values: { type: string, description: "A composition source's input values as JSON text: an object of input keys and values" }
+  sources.*.input_descriptions: { type: string, description: "Descriptions of a composition source's inputs as JSON text: an object keyed by input key, each with type (string, number, index, bool, color, image or structure), label, hidden, index and, where they apply, value-min, value-max, value-step, value-unit and value-list" }
   sources.*.output_values: { type: string, description: "A composition source's output values from its last render cycle as JSON text" }
   sources.*.hidden: { type: bool, description: "The source's is-hidden flag, as mimoLive reports it" }
   sources.*.static: { type: bool, description: "The source's is-static flag, as mimoLive reports it" }
@@ -1512,6 +1522,7 @@ state:
   filters.*.composition_id: { type: string, description: "The filter's composition identifier" }
   filters.*.source: { type: string, description: "ID of the source the filter processes" }
   filters.*.input_values: { type: string, description: "The filter's input values as JSON text: an object of input keys and values" }
+  filters.*.input_descriptions: { type: string, description: "Descriptions of the filter's inputs as JSON text: an object keyed by input key, each with type (string, number, index, bool, color, image or structure), label, hidden, index and, where they apply, value-min, value-max, value-step, value-unit and value-list" }
   filters.*.output_values: { type: string, description: "The filter's output values from its last render cycle as JSON text" }
   output-destinations.*.title: { type: string, description: "Output destination name" }
   output-destinations.*.kind: { type: string, description: "Kind, as mimoLive names it: File Recording, Live Streaming, NDI®, Fullscreen and others" }
@@ -1543,7 +1554,7 @@ state:
   devices.*.input_channels: { type: string, description: "An audio device's input channel names as JSON text, such as [\"Ch. 1\", \"Ch. 2\"], which a source's channel map takes" }
   types.layers.*.id: { type: string, description: "A layer type's identifier, the composition-id add_layer takes, at this position in the layer type list (0 first)" }
   types.layers.*.name: { type: string, description: "The layer type's name, as the layer type list reports it" }
-  types.layers.*.attributes: { type: string, description: "Everything the layer type list reports for the type, as JSON text; get_layer_type gives its input parameters" }
+  types.layers.*.attributes: { type: string, description: "Everything the layer type list reports for the type, as JSON text (its inputs too, if the list carries them); get_layer_type gives its input parameters, which are not kept in state" }
   types.sources.*.id: { type: string, description: "A source type's identifier, the source-type add_source takes, at this position in the source type list (0 first)" }
   types.sources.*.name: { type: string, description: "The source type's name, as the source type list reports it" }
   types.sources.*.attributes: { type: string, description: "Everything the source type list reports for the type, as JSON text; get_source_type gives its settings" }
@@ -1641,6 +1652,7 @@ telemetry:
         show: "$.attributes.metadata.show"
         planned: "$.attributes.metadata.duration"
         inputs: "$.attributes.input-values"
+        input_descriptions: "$.attributes.input-descriptions"
         outputs: "$.attributes.output-values"
         hidden: "$.attributes.is-hidden"
         static: "$.attributes.is-static"
@@ -1709,6 +1721,7 @@ telemetry:
         "{type}.{id}.show_name": "{show}"
         "{type}.{id}.planned_duration": "{planned}"
         "{type}.{id}.input_values": "{inputs}"
+        "{type}.{id}.input_descriptions": "{input_descriptions}"
         "{type}.{id}.output_values": "{outputs}"
         "{type}.{id}.hidden": "{hidden}"
         "{type}.{id}.static": "{static}"
@@ -1790,6 +1803,7 @@ telemetry:
         show: "$.data.attributes.metadata.show"
         planned: "$.data.attributes.metadata.duration"
         inputs: "$.data.attributes.input-values"
+        input_descriptions: "$.data.attributes.input-descriptions"
         outputs: "$.data.attributes.output-values"
         hidden: "$.data.attributes.is-hidden"
         static: "$.data.attributes.is-static"
@@ -2094,8 +2108,9 @@ quirks:
       Input values written to a layer (set_layer_text, set_layer_number, set_layer_flag,
       set_layer_inputs) go to its live variant, or to its active variant while the layer is off,
       and some take effect only after another render cycle. Input keys are the layer's own
-      (tvGroup_Content__Subtitle and the like), listed with their types and ranges in the layer's
-      input-descriptions; signal IDs are the input-values keys ending in _TypeSignal.
+      (tvGroup_Content__Subtitle and the like), described with their types, labels and ranges in
+      the layer's input-descriptions, which state keeps (layers.<id>.input_descriptions); signal
+      IDs are the input-values keys ending in _TypeSignal.
 
   - models: [all]
     severity: info
@@ -2105,20 +2120,21 @@ quirks:
       mimoLive closes a quiet client after 15. The document list with each kind of object
       sideloaded is read on connecting and every minute. State is keyed by mimoLive's own type
       names and IDs (layers.<id>.live_state, output-destinations.<id>.live_state); a removed
-      object leaves state with everything under it. A layer's live_variant is not cleared when
-      the layer goes off, so its live_state is the one to read. Layer variants enter the state
-      from websocket events and get_layer replies, not from the poll, which cannot sideload them.
-      A layer set's entries are kept by position (layer-sets.<id>.layers.<index>.layer_id, action,
-      variant), replaced whole whenever an answer or a push carries the set's layers attribute
-      and left as they are when it does not; a pushed layer set and every layer set PATCH (name,
+      object leaves state with everything under it. A layer's live_variant is not cleared when the
+      layer goes off, so its live_state is the one to read. Layer variants enter the state from
+      websocket events and get_layer replies, not from the poll, which cannot sideload them. A
+      layer set's entries are kept by position (layer-sets.<id>.layers.<index>.layer_id, action,
+      variant), replaced whole whenever an answer or a push carries the set's layers attribute and
+      left as they are when it does not; a pushed layer set and every layer set PATCH (name,
       recall flags or layers) have the set read again, since what mimoLive pushes for layer sets
-      is not documented. Input and output values of layers, variants, sources and filters are
-      kept whole, as JSON text (layers.<id>.input_values), since their keys are each layer type's
-      own. Filters enter the state from list_filters, get_source and get_filter replies and from
-      the websocket, not from the poll. The devices, the logged-in accounts, the Zoom meeting's
-      participants and mlController's status are read every minute, each list replaced whole;
-      the participants are read again after each Zoom command, and talking and hand_raised are
-      only as current as that read. A device whose ID holds a dot is not kept in state.
+      is not documented. Input values, input descriptions and output values of layers, variants,
+      sources and filters are kept whole, as JSON text (layers.<id>.input_values,
+      input_descriptions, output_values), since their keys are each layer type's own. Filters
+      enter the state from list_filters, get_source and get_filter replies and from the websocket,
+      not from the poll. The devices, the logged-in accounts, the Zoom meeting's participants and
+      mlController's status are read every minute, each list replaced whole; the participants are
+      read again after each Zoom command, and talking and hand_raised are only as current as that
+      read. A device whose ID holds a dot is not kept in state.
 
   - models: [all]
     severity: info
@@ -2127,11 +2143,15 @@ quirks:
       /outputdestinationtypes) are read on connecting and every minute, each list replaced whole,
       and kept by position (types.sources.<index>.id, name, and everything else the list reports
       as JSON text in attributes), because type identifiers such as
-      com.boinx.mimoLive.sources.deviceVideoSource hold dots, which a state key cannot. The
-      shape of these lists is not documented beyond each type's id; the JSON:API form the rest of
-      the API answers with is assumed. A type's parameters and settings come from get_layer_type,
-      get_source_type and get_output_destination_type, which return them to the caller and are
-      not kept in state. add_output_destination takes the ten type identifiers the manual lists;
+      com.boinx.mimoLive.sources.deviceVideoSource hold dots, which a state key cannot. The shape
+      of these lists is not documented beyond each type's id; the JSON:API form the rest of the
+      API answers with is assumed. A type's parameters and settings come from get_layer_type,
+      get_source_type and get_output_destination_type, which return them to the caller and are not
+      kept in state: a GET of one type cannot be matched to the type's position in the list, and
+      its identifier cannot be a state key, so a layer type's inputs and their defaults are not in
+      state until the core can key state by identifiers that hold dots. A layer already in the
+      document reports its own (layers.<id>.input_descriptions and input_values).
+      add_output_destination takes the ten type identifiers the manual lists;
       add_output_destination_with_attributes takes any other the type list gives.
 
   - models: [all]

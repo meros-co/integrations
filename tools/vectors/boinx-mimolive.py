@@ -511,6 +511,63 @@ telemetry(ML, "pushed-layer-input-values", inbound_ws=json.dumps({
         "name": "Lower Third", "live_state": "live",
         "input_values": '{"tvIn_Title":"Jane Smith","tvIn_Visible":true}',
         "output_values": '{"tvOut_SettingName":"Lower Third"}'}}})
+# Input descriptions (the manual's Data Types: layers, variants, sources and
+# filters), kept whole as JSON text like the input values, from every place
+# the input values come from: sideloaded, a list, a GET of one object and a
+# push.
+_ML_DESC = {"tvIn_Title": {"hidden": False, "type": "string", "label": "Title", "index": 0},
+            "tvIn_Scale": {"hidden": False, "type": "number", "value-min": 0, "value-max": 2,
+                           "value-step": 1, "value-unit": "x", "label": "Scale", "index": 1},
+            "tvIn_Style": {"hidden": True, "type": "index", "value-list": ["Plain", "Boxed"],
+                           "label": "Style", "index": 2}}
+_ML_DESC_TEXT = json.dumps(_ML_DESC, separators=(",", ":"))
+telemetry(ML, "layer-input-descriptions-included", inbound_http={
+    "path": "/api/v1/documents?include=layers",
+    "body": json.dumps({"data": [], "included": [{"type": "layers", "id": _ML_LAYER, "attributes": {
+        "name": "Lower Third", "input-values": {"tvIn_Title": "John Doe"}, "input-descriptions": _ML_DESC}}]})},
+    expect_state={"layers": {_ML_LAYER: {"name": "Lower Third", "input_values": '{"tvIn_Title":"John Doe"}',
+                                         "input_descriptions": _ML_DESC_TEXT}}})
+telemetry(ML, "variant-input-descriptions-list", inbound_http={
+    "path": _ML_L + "/variants",
+    "body": json.dumps({"data": [{"type": "variants", "id": _ML_VAR, "attributes": {
+        "name": "Variant 1", "live-state": "off", "input-values": {"tvIn_Title": "A"},
+        "input-descriptions": _ML_DESC},
+        "relationships": {"layer": {"data": {"type": "layers", "id": _ML_LAYER}}}}]})},
+    expect_state={"variants": {_ML_VAR: {"name": "Variant 1", "live_state": "off", "layer": _ML_LAYER,
+                                         "input_values": '{"tvIn_Title":"A"}',
+                                         "input_descriptions": _ML_DESC_TEXT}}})
+telemetry(ML, "layer-input-descriptions-get", inbound_http={
+    "path": _ML_L,
+    "body": json.dumps({"data": {"type": "layers", "id": _ML_LAYER, "attributes": {
+        "name": "Lower Third", "input-descriptions": _ML_DESC}}})},
+    expect_state={"layers": {_ML_LAYER: {"name": "Lower Third", "input_descriptions": _ML_DESC_TEXT}}})
+telemetry(ML, "pushed-variant-input-descriptions", inbound_ws=json.dumps({
+    "event": "changed", "type": "variants", "id": _ML_VAR,
+    "data": {"type": "variants", "id": _ML_VAR, "attributes": {
+        "name": "Variant 1", "input-descriptions": _ML_DESC}}}),
+    expect_state={"variants": {_ML_VAR: {"name": "Variant 1", "input_descriptions": _ML_DESC_TEXT}}})
+telemetry(ML, "source-and-filter-input-descriptions", inbound_http={
+    "path": _ML_S,
+    "body": json.dumps({"data": {"type": "sources", "id": _ML_SRC, "attributes": {
+        "name": "Placeholder", "composition-id": "com.boinx.placeholder", "input-descriptions": _ML_DESC}},
+        "included": [{"type": "filters", "id": _ML_FLT, "attributes": {
+            "name": "Color Correction", "input-descriptions": {"tvIn_Amount": {
+                "hidden": False, "type": "number", "value-min": 0, "value-max": 1, "label": "Amount",
+                "index": 0}}}}]})},
+    expect_state={"sources": {_ML_SRC: {"name": "Placeholder", "composition_id": "com.boinx.placeholder",
+                                        "input_descriptions": _ML_DESC_TEXT}},
+                  "filters": {_ML_FLT: {"name": "Color Correction", "input_descriptions":
+                                        '{"tvIn_Amount":{"hidden":false,"type":"number","value-min":0,'
+                                        '"value-max":1,"label":"Amount","index":0}}'}}})
+# A GET of one layer type, with its inputs in the assumed shape, is returned
+# to the caller only: its dotted identifier cannot be a state key and the
+# reply cannot be matched to the type's position in the list.
+telemetry(ML, "one-layer-type-not-state", inbound_http={
+    "path": "/api/v1/layertypes/com.boinx.layer.lowerthird",
+    "body": json.dumps({"data": {"type": "layertypes", "id": "com.boinx.layer.lowerthird", "attributes": {
+        "name": "Lower Third", "input-values": {"tvIn_Title": ""}, "input-descriptions": _ML_DESC}}})},
+    state_before={"types": {"layers": {"0": {"id": "com.boinx.layer.lowerthird", "name": "Lower Third"}}}},
+    expect_state={"types": {"layers": {"0": {"id": "com.boinx.layer.lowerthird", "name": "Lower Third"}}}})
 # Zoom participant and mimoCall source attributes (the manual's mimoCall
 # source properties; Boinx's reference for the Zoom ones).
 telemetry(ML, "sources-zoom-and-mimocall", inbound_http={
