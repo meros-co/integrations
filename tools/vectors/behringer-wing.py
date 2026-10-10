@@ -291,3 +291,189 @@ binary(W, "set_node", {"assignments": "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1"},
 _ts("param-enum", "/$ctl/user/1/1/enc/mode", "FX", {})
 _tf("param-float", "/cfg/mon/1/dim", "-20.0", 0.5, -20.0, {})
 _ti("param-int", "/ch/40/in/set/srcauto", 1, {})
+
+# ── EQ model, mix, frequencies, Qs, types and tilt; pre-send EQ (p.48-63) ─
+# Floats in their own unit as ,f; enumerations as ,s (p.22).
+for stem, node, n, nb, model, ltype in [("channel", "ch", 40, 4, "MACH4", "SHV"), ("aux", "aux", 8, 4, "PULSAR", "CUT"),
+                                        ("bus", "bus", 16, 6, "PIA", "LR48"), ("main", "main", 4, 6, "SOUL", "BW12"),
+                                        ("matrix", "mtx", 8, 6, "STD", "PEQ")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_eq_model", {stem: n, "model": model}, osc(f"/{node}/{n}/eq/mdl", ("s", model)))
+    binary(W, f"set_{stem}_eq_mix", {stem: 1, "mix": 100.0}, osc(f"/{node}/1/eq/mix", ("f", 100.0)))
+    binary(W, f"set_{stem}_eq_low_frequency", {stem: 1, "frequency_hz": 80.0}, osc(f"/{node}/1/eq/lf", ("f", 80.0)))
+    binary(W, f"set_{stem}_eq_low_q", {stem: 1, "q": 0.44}, osc(f"/{node}/1/eq/lq", ("f", 0.44)))
+    binary(W, f"set_{stem}_eq_low_type", {stem: 1, "type": ltype}, osc(f"/{node}/1/eq/leq", ("s", ltype)))
+    binary(W, f"set_{stem}_eq_high_frequency", {stem: 2, "frequency_hz": 12000.0}, osc(f"/{node}/2/eq/hf", ("f", 12000.0)))
+    binary(W, f"set_{stem}_eq_high_q", {stem: 2, "q": 10.0}, osc(f"/{node}/2/eq/hq", ("f", 10.0)))
+    binary(W, f"set_{stem}_eq_high_type", {stem: 2, "type": "PEQ"}, osc(f"/{node}/2/eq/heq", ("s", "PEQ")))
+    binary(W, f"set_{stem}_eq_band_frequency", {stem: 3, "band": nb, "frequency_hz": 1000.0},
+           osc(f"/{node}/3/eq/{nb}f", ("f", 1000.0)))
+    binary(W, f"set_{stem}_eq_band_q", {stem: 3, "band": 1, "q": 2.0}, osc(f"/{node}/3/eq/1q", ("f", 2.0)))
+    _ts(f"{stem}-eq-model", f"/{node}/1/eq/mdl", "STD", {P: {"1": {"eq": {"model": "STD"}}}})
+    _tf(f"{stem}-eq-mix", f"/{node}/1/eq/mix", "100", 0.8, 100.0, {P: {"1": {"eq": {"mix": 100.0}}}})
+    _tf(f"{stem}-eq-low-frequency", f"/{node}/1/eq/lf", "80.2", 0.3, 80.0, {P: {"1": {"eq": {"low_frequency": 80.0}}}})
+    _tf(f"{stem}-eq-low-q", f"/{node}/1/eq/lq", "1.00", 0.25, 1.0, {P: {"1": {"eq": {"low_q": 1.0}}}})
+    _ts(f"{stem}-eq-low-type", f"/{node}/1/eq/leq", "SHV", {P: {"1": {"eq": {"low_type": "SHV"}}}})
+    _tf(f"{stem}-eq-high-frequency", f"/{node}/1/eq/hf", "12k00", 0.75, 12000.0, {P: {"1": {"eq": {"high_frequency": 12000.0}}}})
+    _tf(f"{stem}-eq-high-q", f"/{node}/1/eq/hq", "1.00", 0.25, 1.0, {P: {"1": {"eq": {"high_q": 1.0}}}})
+    _ts(f"{stem}-eq-high-type", f"/{node}/1/eq/heq", "PEQ", {P: {"1": {"eq": {"high_type": "PEQ"}}}})
+    _tf(f"{stem}-eq-band-frequency", f"/{node}/2/eq/3f", "1k50", 0.5, 1500.0, {P: {"2": {"eq": {"bands": {"3": {"frequency": 1500.0}}}}}})
+    _tf(f"{stem}-eq-band-q", f"/{node}/2/eq/3q", "2.00", 0.5, 2.0, {P: {"2": {"eq": {"bands": {"3": {"q": 2.0}}}}}})
+    if nb == 6:
+        binary(W, f"set_{stem}_eq_tilt", {stem: n, "tilt_db": -6.0}, osc(f"/{node}/{n}/eq/tilt", ("f", -6.0)))
+        _tf(f"{stem}-eq-tilt", f"/{node}/1/eq/tilt", "1.50", 0.625, 1.5, {P: {"1": {"eq": {"tilt": 1.5}}}})
+binary(W, "set_channel_peq", {"channel": 40, "enabled": True}, osc("/ch/40/peq/on", ("i", 1)))
+binary(W, "set_channel_peq_band_gain", {"channel": 1, "band": 3, "gain_db": -15.0}, osc("/ch/1/peq/3g", ("f", -15.0)))
+binary(W, "set_channel_peq_band_frequency", {"channel": 1, "band": 1, "frequency_hz": 100.0}, osc("/ch/1/peq/1f", ("f", 100.0)))
+binary(W, "set_channel_peq_band_q", {"channel": 1, "band": 2, "q": 1.0}, osc("/ch/1/peq/2q", ("f", 1.0)))
+_ti("channel-peq-on", "/ch/5/peq/on", 1, {"channels": {"5": {"peq": {"on": True}}}})
+_tf("channel-peq-gain", "/ch/5/peq/1g", "3.0", 0.6, 3.0, {"channels": {"5": {"peq": {"bands": {"1": {"gain": 3.0}}}}}})
+_tf("channel-peq-frequency", "/ch/5/peq/2f", "999", 0.5, 999.0, {"channels": {"5": {"peq": {"bands": {"2": {"frequency": 999.0}}}}}})
+_tf("channel-peq-q", "/ch/5/peq/3q", "1.00", 0.25, 1.0, {"channels": {"5": {"peq": {"bands": {"3": {"q": 1.0}}}}}})
+
+# ── Dynamics and gate (p.48-64) ───────────────────────────────────────────
+for stem, node, n in [("channel", "ch", 40), ("bus", "bus", 16), ("main", "main", 4), ("matrix", "mtx", 8)]:
+    P = _PLURAL[node]
+    ch = node == "ch"
+    for cmd, inp, leaf, wire in [
+            ("dyn_model", {"model": "CMB24" if ch else "CMB"}, "dyn/mdl", ("s", "CMB24" if ch else "CMB")),
+            ("dyn_mix", {"mix": 50.0}, "dyn/mix", ("f", 50.0)),
+            ("dyn_gain", {"gain_db": 12.0}, "dyn/gain", ("f", 12.0)),
+            ("dyn_threshold", {"threshold_db": -60.0}, "dyn/thr", ("f", -60.0)),
+            ("dyn_ratio", {"ratio": "4.0"} if ch else {"ratio": 100.0}, "dyn/ratio", ("s", "4.0") if ch else ("f", 100.0)),
+            ("dyn_knee", {"knee": 5}, "dyn/knee", ("i", 5)),
+            ("dyn_detector", {"detector": "RMS"}, "dyn/det", ("s", "RMS")),
+            ("dyn_attack", {"attack_ms": 120.0}, "dyn/att", ("f", 120.0)),
+            ("dyn_hold", {"hold_ms": 1.0}, "dyn/hld", ("f", 1.0)),
+            ("dyn_release", {"release_ms": 4000.0}, "dyn/rel", ("f", 4000.0)),
+            ("dyn_envelope", {"envelope": "LOG"}, "dyn/env", ("s", "LOG")),
+            ("dyn_auto", {"enabled": True}, "dyn/auto", ("i", 1)),
+            ("dyn_crossover_depth", {"depth_db": 6.0}, "dynxo/depth", ("f", 6.0)),
+            ("dyn_crossover_type", {"type": "HI12"}, "dynxo/type", ("s", "HI12")),
+            ("dyn_crossover_frequency", {"frequency_hz": 1000.0}, "dynxo/f", ("f", 1000.0)),
+            ("dyn_sidechain_type", {"type": "BP"}, "dynsc/type", ("s", "BP")),
+            ("dyn_sidechain_frequency", {"frequency_hz": 20000.0}, "dynsc/f", ("f", 20000.0)),
+            ("dyn_sidechain_q", {"q": 2.0}, "dynsc/q", ("f", 2.0)),
+            ("dyn_sidechain_source", {"source": "CH.40" if ch else "AUX.8"}, "dynsc/src", ("s", "CH.40" if ch else "AUX.8")),
+            ("dyn_sidechain_tap", {"tap": "POST" if ch else "INS2"}, "dynsc/tap", ("s", "POST" if ch else "INS2"))]:
+        binary(W, f"set_{stem}_{cmd}", {stem: n, **inp}, osc(f"/{node}/{n}/{leaf}", wire))
+    _ts(f"{stem}-dyn-model", f"/{node}/1/dyn/mdl", "COMP", {P: {"1": {"dynamics": {"model": "COMP"}}}})
+    for name, leaf, txt, raw, v, key in [("dyn-mix", "dyn/mix", "100", 1.0, 100.0, ["mix"]),
+                                          ("dyn-gain", "dyn/gain", "0.0", 0.3333, 0.0, ["gain"]),
+                                          ("dyn-threshold", "dyn/thr", "-10.0", 0.8333, -10.0, ["threshold"]),
+                                          ("dyn-attack", "dyn/att", "50", 0.4167, 50.0, ["attack"]),
+                                          ("dyn-hold", "dyn/hld", "20", 0.1, 20.0, ["hold"]),
+                                          ("dyn-release", "dyn/rel", "153", 0.5, 153.0, ["release"]),
+                                          ("dyn-crossover-depth", "dynxo/depth", "6.0", 0.3, 6.0, ["crossover", "depth"]),
+                                          ("dyn-crossover-frequency", "dynxo/f", "1k0", 0.5, 1000.0, ["crossover", "frequency"]),
+                                          ("dyn-sidechain-frequency", "dynsc/f", "1k0", 0.5, 1000.0, ["sidechain", "frequency"]),
+                                          ("dyn-sidechain-q", "dynsc/q", "2.00", 0.4, 2.0, ["sidechain", "q"])]:
+        st = {key[-1]: v}
+        if len(key) == 2:
+            st = {key[0]: st}
+        _tf(f"{stem}-{name}", f"/{node}/1/{leaf}", txt, raw, v, {P: {"1": {"dynamics": st}}})
+    if ch:
+        _ts(f"{stem}-dyn-ratio", "/ch/1/dyn/ratio", "3.0", {P: {"1": {"dynamics": {"ratio": "3.0"}}}})
+    else:
+        _tf(f"{stem}-dyn-ratio", f"/{node}/1/dyn/ratio", "3.0", 0.3, 3.0, {P: {"1": {"dynamics": {"ratio_value": 3.0}}}})
+    _ti(f"{stem}-dyn-knee", f"/{node}/1/dyn/knee", 3, {P: {"1": {"dynamics": {"knee": 3}}}})
+    _ts(f"{stem}-dyn-detector", f"/{node}/1/dyn/det", "RMS", {P: {"1": {"dynamics": {"detector": "RMS"}}}})
+    _ts(f"{stem}-dyn-envelope", f"/{node}/1/dyn/env", "LOG", {P: {"1": {"dynamics": {"envelope": "LOG"}}}})
+    _ti(f"{stem}-dyn-auto", f"/{node}/1/dyn/auto", 1, {P: {"1": {"dynamics": {"auto": True}}}})
+    _ts(f"{stem}-dyn-crossover-type", f"/{node}/1/dynxo/type", "OFF", {P: {"1": {"dynamics": {"crossover": {"type": "OFF"}}}}})
+    _ts(f"{stem}-dyn-sidechain-type", f"/{node}/1/dynsc/type", "LP12", {P: {"1": {"dynamics": {"sidechain": {"type": "LP12"}}}}})
+    _ts(f"{stem}-dyn-sidechain-source", f"/{node}/1/dynsc/src", "SELF", {P: {"1": {"dynamics": {"sidechain": {"source": "SELF"}}}}})
+    tap = "IN" if ch else "BUS"
+    _ts(f"{stem}-dyn-sidechain-tap", f"/{node}/1/dynsc/tap", tap, {P: {"1": {"dynamics": {"sidechain": {"tap": tap}}}}})
+for cmd, inp, leaf, wire in [("dyn_threshold", {"threshold_db": 12.0}, "dyn/thr", ("f", 12.0)),
+                             ("dyn_depth", {"depth_db": 20.0}, "dyn/depth", ("f", 20.0)),
+                             ("dyn_fast", {"enabled": True}, "dyn/fast", ("i", 1)),
+                             ("dyn_peak", {"enabled": False}, "dyn/peak", ("i", 0)),
+                             ("dyn_input_gain", {"gain": 100.0}, "dyn/ingain", ("f", 100.0)),
+                             ("dyn_peak_reduction", {"peak": 0.0}, "dyn/cpeak", ("f", 0.0)),
+                             ("dyn_mode", {"mode": "LIM"}, "dyn/cmode", ("s", "LIM"))]:
+    binary(W, f"set_aux_{cmd}", {"aux": 8, **inp}, osc(f"/aux/8/{leaf}", wire))
+_tf("aux-dyn-threshold", "/aux/2/dyn/thr", "-12.0", 0.5, -12.0, {"auxes": {"2": {"dynamics": {"threshold": -12.0}}}})
+_tf("aux-dyn-depth", "/aux/2/dyn/depth", "6.0", 0.3, 6.0, {"auxes": {"2": {"dynamics": {"depth": 6.0}}}})
+_ti("aux-dyn-fast", "/aux/2/dyn/fast", 1, {"auxes": {"2": {"dynamics": {"fast": True}}}})
+_ti("aux-dyn-peak", "/aux/2/dyn/peak", 0, {"auxes": {"2": {"dynamics": {"peak": False}}}})
+_tf("aux-dyn-input-gain", "/aux/2/dyn/ingain", "50", 0.5, 50.0, {"auxes": {"2": {"dynamics": {"input_gain": 50.0}}}})
+_tf("aux-dyn-peak-reduction", "/aux/2/dyn/cpeak", "25", 0.25, 25.0, {"auxes": {"2": {"dynamics": {"peak_reduction": 25.0}}}})
+_ts("aux-dyn-mode", "/aux/2/dyn/cmode", "COMP", {"auxes": {"2": {"dynamics": {"mode": "COMP"}}}})
+for cmd, inp, leaf, wire in [("gate_model", {"model": "DUCK"}, "gate/mdl", ("s", "DUCK")),
+                             ("gate_threshold", {"threshold_db": -80.0}, "gate/thr", ("f", -80.0)),
+                             ("gate_range", {"range_db": 60.0}, "gate/range", ("f", 60.0)),
+                             ("gate_attack", {"attack_ms": 0.0}, "gate/att", ("f", 0.0)),
+                             ("gate_hold", {"hold_ms": 200.0}, "gate/hld", ("f", 200.0)),
+                             ("gate_release", {"release_ms": 4.0}, "gate/rel", ("f", 4.0)),
+                             ("gate_accent", {"accent": 100.0}, "gate/acc", ("f", 100.0)),
+                             ("gate_ratio", {"ratio": "gate"}, "gate/ratio", ("s", "gate")),
+                             ("gate_sidechain_type", {"type": "HP12"}, "gatesc/type", ("s", "HP12")),
+                             ("gate_sidechain_frequency", {"frequency_hz": 20.0}, "gatesc/f", ("f", 20.0)),
+                             ("gate_sidechain_q", {"q": 10.0}, "gatesc/q", ("f", 10.0)),
+                             ("gate_sidechain_source", {"source": "CH.1"}, "gatesc/src", ("s", "CH.1")),
+                             ("gate_sidechain_tap", {"tap": "PFL"}, "gatesc/tap", ("s", "PFL"))]:
+    binary(W, f"set_channel_{cmd}", {"channel": 9, **inp}, osc(f"/ch/9/{leaf}", wire))
+_ts("channel-gate-model", "/ch/9/gate/mdl", "GATE", {"channels": {"9": {"gate": {"model": "GATE"}}}})
+for name, leaf, txt, raw, v, key in [("threshold", "thr", "-40.0", 0.5, -40.0, "threshold"), ("range", "range", "40.0", 0.65, 40.0, "range"),
+                                      ("attack", "att", "10", 0.08, 10.0, "attack"), ("hold", "hld", "10", 0.05, 10.0, "hold"),
+                                      ("release", "rel", "199", 0.5, 199.0, "release"), ("accent", "acc", "0", 0.0, 0.0, "accent")]:
+    _tf(f"channel-gate-{name}", f"/ch/9/gate/{leaf}", txt, raw, v, {"channels": {"9": {"gate": {key: v}}}})
+_ts("channel-gate-ratio", "/ch/9/gate/ratio", "1:3", {"channels": {"9": {"gate": {"ratio": "1:3"}}}})
+_ts("channel-gate-sidechain-type", "/ch/9/gatesc/type", "OFF", {"channels": {"9": {"gate": {"sidechain": {"type": "OFF"}}}}})
+_tf("channel-gate-sidechain-frequency", "/ch/9/gatesc/f", "1k0", 0.5, 1000.0, {"channels": {"9": {"gate": {"sidechain": {"frequency": 1000.0}}}}})
+_tf("channel-gate-sidechain-q", "/ch/9/gatesc/q", "2.00", 0.4, 2.0, {"channels": {"9": {"gate": {"sidechain": {"q": 2.0}}}}})
+_ts("channel-gate-sidechain-source", "/ch/9/gatesc/src", "SELF", {"channels": {"9": {"gate": {"sidechain": {"source": "SELF"}}}}})
+_ts("channel-gate-sidechain-tap", "/ch/9/gatesc/tap", "IN", {"channels": {"9": {"gate": {"sidechain": {"tap": "IN"}}}}})
+
+# ── Channel filters, inserts and effects slots (p.47-66) ──────────────────
+for cmd, inp, leaf, wire in [("low_cut", {"enabled": True}, "flt/lc", ("i", 1)),
+                             ("low_cut_frequency", {"frequency_hz": 100.0}, "flt/lcf", ("f", 100.0)),
+                             ("low_cut_slope", {"slope": "24"}, "flt/lcs", ("s", "24")),
+                             ("high_cut", {"enabled": False}, "flt/hc", ("i", 0)),
+                             ("high_cut_frequency", {"frequency_hz": 10000.0}, "flt/hcf", ("f", 10000.0)),
+                             ("high_cut_slope", {"slope": "6"}, "flt/hcs", ("s", "6")),
+                             ("tool_filter", {"enabled": True}, "flt/tf", ("i", 1)),
+                             ("filter_model", {"model": "AP2"}, "flt/mdl", ("s", "AP2")),
+                             ("filter_tilt", {"tilt_db": 6.0}, "flt/tilt", ("f", 6.0))]:
+    binary(W, f"set_channel_{cmd}", {"channel": 11, **inp}, osc(f"/ch/11/{leaf}", wire))
+_ti("channel-low-cut", "/ch/11/flt/lc", 0, {"channels": {"11": {"filter": {"low_cut": False}}}})
+_tf("channel-low-cut-frequency", "/ch/11/flt/lcf", "100.2", 0.25, 100.0, {"channels": {"11": {"filter": {"low_cut_frequency": 100.0}}}})
+_ts("channel-low-cut-slope", "/ch/11/flt/lcs", "24", {"channels": {"11": {"filter": {"low_cut_slope": "24"}}}})
+_ti("channel-high-cut", "/ch/11/flt/hc", 1, {"channels": {"11": {"filter": {"high_cut": True}}}})
+_tf("channel-high-cut-frequency", "/ch/11/flt/hcf", "10k02", 0.9, 10000.0, {"channels": {"11": {"filter": {"high_cut_frequency": 10000.0}}}})
+_ts("channel-high-cut-slope", "/ch/11/flt/hcs", "12", {"channels": {"11": {"filter": {"high_cut_slope": "12"}}}})
+_ti("channel-tool-filter", "/ch/11/flt/tf", 0, {"channels": {"11": {"filter": {"tool": False}}}})
+_ts("channel-filter-model", "/ch/11/flt/mdl", "TILT", {"channels": {"11": {"filter": {"model": "TILT"}}}})
+_tf("channel-filter-tilt", "/ch/11/flt/tilt", "0.00", 0.5, 0.0, {"channels": {"11": {"filter": {"tilt": 0.0}}}})
+for stem, node in [("channel", "ch"), ("aux", "aux"), ("bus", "bus"), ("main", "main"), ("matrix", "mtx")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_insert1", {stem: 1, "enabled": True}, osc(f"/{node}/1/preins/on", ("i", 1)))
+    binary(W, f"set_{stem}_insert1_slot", {stem: 1, "slot": "FX16"}, osc(f"/{node}/1/preins/ins", ("s", "FX16")))
+    _ti(f"{stem}-insert1", f"/{node}/2/preins/on", 1, {P: {"2": {"inserts": {"pre": {"on": True}}}}})
+    _ts(f"{stem}-insert1-slot", f"/{node}/2/preins/ins", "FX3", {P: {"2": {"inserts": {"pre": {"slot": "FX3"}}}}})
+    _ts(f"{stem}-insert1-status", f"/{node}/2/preins/$stat", "OK", {P: {"2": {"inserts": {"pre": {"status": "OK"}}}}})
+    if stem != "aux":
+        binary(W, f"set_{stem}_insert2", {stem: 1, "enabled": False}, osc(f"/{node}/1/postins/on", ("i", 0)))
+        binary(W, f"set_{stem}_insert2_slot", {stem: 1, "slot": "NONE"}, osc(f"/{node}/1/postins/ins", ("s", "NONE")))
+        _ti(f"{stem}-insert2", f"/{node}/2/postins/on", 0, {P: {"2": {"inserts": {"post": {"on": False}}}}})
+        _ts(f"{stem}-insert2-slot", f"/{node}/2/postins/ins", "FX1", {P: {"2": {"inserts": {"post": {"slot": "FX1"}}}}})
+        _ts(f"{stem}-insert2-status", f"/{node}/2/postins/$stat", "N/A", {P: {"2": {"inserts": {"post": {"status": "N/A"}}}}})
+binary(W, "set_channel_insert2_mode", {"channel": 1, "mode": "AUTO_X"}, osc("/ch/1/postins/mode", ("s", "AUTO_X")))
+binary(W, "set_channel_insert2_weight", {"channel": 1, "weight_db": -12.0}, osc("/ch/1/postins/w", ("f", -12.0)))
+_ts("channel-insert2-mode", "/ch/3/postins/mode", "FX", {"channels": {"3": {"inserts": {"post": {"mode": "FX"}}}}})
+_tf("channel-insert2-weight", "/ch/3/postins/w", "0.0", 0.5, 0.0, {"channels": {"3": {"inserts": {"post": {"weight": 0.0}}}}})
+# Effects: the document's own example, a PIA in slot 1 and its 125 Hz band (p.26).
+binary(W, "set_fx_model", {"slot": 1, "model": "PIA"}, osc("/fx/1/mdl", ("s", "PIA")))
+binary(W, "set_fx_mix", {"slot": 16, "mix": 100.0}, osc("/fx/16/fxmix", ("f", 100.0)))
+binary(W, "set_fx_parameter", {"slot": 1, "parameter": 3, "value": 10.0}, osc("/fx/1/3", ("f", 10.0)))
+binary(W, "set_fx_parameter_text", {"slot": 2, "parameter": 40, "value": "ON"}, osc("/fx/2/40", ("s", "ON")))
+_ts("fx-model", "/fx/1/mdl", "NONE", {"fx": {"1": {"model": "NONE"}}})
+_tf("fx-mix", "/fx/1/fxmix", "100", 1.0, 100.0, {"fx": {"1": {"mix": 100.0}}})
+_tf("fx-parameter-float", "/fx/1/3", "10.0", 0.9233, 10.0, {"fx": {"1": {"parameters": {"3": {"text": "10.0", "value": 10.0}}}}})
+_ti("fx-parameter-int", "/fx/4/7", 2, {"fx": {"4": {"parameters": {"7": {"text": "2", "value": 2.0}}}}})
+_ts("fx-parameter-text", "/fx/4/8", "ON", {"fx": {"4": {"parameters": {"8": {"text": "ON"}}}}})
+_ti("fx-source", "/fx/2/$esrc", 12, {"fx": {"2": {"source": 12}}})
+_ts("fx-mode", "/fx/2/$emode", "ST", {"fx": {"2": {"mode": "ST"}}})
+_ti("fx-assigned-strip", "/fx/2/$a_chn", 5, {"fx": {"2": {"assigned_strip": 5}}})
+_ti("fx-assigned-position", "/fx/2/$a_pos", 1, {"fx": {"2": {"assigned_position": 1}}})
