@@ -27,6 +27,15 @@ source:
       protocol-version split only: "HyperDeck Studio recorders with SSD slots
       use version 1.8. HyperDeck Studio Mini uses 1.11", and the play and
       shuttle speed limits of -1600 to 1600 and -5000 to 5000 (p.66-68)
+  - title: sofie-hyperdeck-connection (MIT)
+    url: https://github.com/Sofie-Automation/sofie-hyperdeck-connection
+    note: >
+      MIT licence (top-level LICENSE). Read, not copied, as corroboration of
+      what the document leaves out: the reply codes 218 to 222 (play on
+      startup, playrange, play option, cache info, dynamic range) and their
+      field names, and the 513 display timecode, 514 timeline position and
+      515 playrange notifications with their fields (src/codes.ts,
+      src/asyncHandlers, src/commands)
 
 transport:
   type: line-tcp
@@ -1953,17 +1962,56 @@ codes:
 telemetry:
   # The document defines the asynchronous messages 500 connection info (on
   # connect), 502 slot info, 508 transport info, 510 remote info and 511
-  # configuration, each carrying the same fields as its 2xx reply (p.11-23).
-  # One notify line per kind, so a deck lacking one still enables the rest.
-  # The queries ask once on connecting; after that the pushes keep state.
+  # configuration, each carrying the same fields as its 2xx reply (p.11-23),
+  # and 519 clips info (p.8). The other notifications are documented by their
+  # notify switch only; they are read by the field names the switches use
+  # (corroborated for display timecode, timeline position and playrange by
+  # Sofie's hyperdeck-connection, MIT). One notify line per kind, so a deck
+  # lacking one still enables the rest; a protocol 1.8 or 1.11 deck answers
+  # the later ones with an error, which changes nothing.
   subscribe:
     send:
       - "notify: transport: true"
       - "notify: slot: true"
       - "notify: remote: true"
       - "notify: configuration: true"
+      - "notify: display timecode: true"
+      - "notify: timeline position: true"
+      - "notify: dropped frames: true"
+      - "notify: playrange: true"
+      - "notify: cache: true"
+      - "notify: dynamic range: true"
+      - "notify: slate: true"
+      - "notify: clips: true"
+      - "notify: nas: true"
+  # Asked once on connecting; after that the pushes and the re-reads below
+  # keep state. Slots 1 to 4 are each asked for; a deck answers a slot it
+  # lacks with an error.
   poll:
-    send: ["device info", "transport info", "slot info", "remote", "configuration"]
+    send:
+      - "device info"
+      - "transport info"
+      - "slot info"
+      - "slot info: slot id: 1"
+      - "slot info: slot id: 2"
+      - "slot info: slot id: 3"
+      - "slot info: slot id: 4"
+      - "remote"
+      - "configuration"
+      - "notify"
+      - "clips get"
+      - "playrange"
+      - "play on startup"
+      - "play option"
+      - "cache info"
+      - "dynamic range"
+      - "slate clips"
+      - "slate project"
+      - "slate lens"
+      - "nas list"
+      - "nas selected"
+      - "external drive list"
+      - "external drive selected"
   updates:
     - header: "^500 connection info:$"
       fields:
@@ -1994,18 +2042,35 @@ telemetry:
         input video format: transport.input_video_format
         dynamic range: transport.dynamic_range
         reference locked: { path: transport.reference_locked, map: { "true": true, "false": false } }
-    - header: "^[25]02 slot info:$"
+    # Display timecode, timeline position and dropped frames notifications.
+    - header: "^5[0-9][0-9] [^:]*:$"
       fields:
-        slot id: slot_info.slot_id
-        slot name: slot_info.slot_name
-        device name: slot_info.device_name
-        status: slot_info.status
-        volume name: slot_info.volume_name
-        recording time: slot_info.recording_time
-        video format: slot_info.video_format
-        blocked: { path: slot_info.blocked, map: { "true": true, "false": false } }
-        remaining size: slot_info.remaining_size
-        total size: slot_info.total_size
+        display timecode: transport.display_timecode
+        timeline position: transport.timeline_position
+        dropped frames: transport.dropped_frames
+
+    # ── Slots, each by its slot id (202 replies and 502 pushes) ──────────
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^slot name: (.*?)$"
+      state: { "slots.{1}.name": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^device name: (.*?)$"
+      state: { "slots.{1}.device_name": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^status: (.*?)$"
+      state: { "slots.{1}.status": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^volume name: (.*?)$"
+      state: { "slots.{1}.volume_name": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^recording time: (\\d+)$"
+      state: { "slots.{1}.recording_time": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^video format: (.*?)$"
+      state: { "slots.{1}.video_format": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^blocked: (true|false)$"
+      state: { "slots.{1}.blocked": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^remaining size: (\\d+)$"
+      state: { "slots.{1}.remaining_size": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^total size: (\\d+)$"
+      state: { "slots.{1}.total_size": "{2}" }
+    - match: "(?ms)\\A[25]02 slot info:$.*?^slot id: (\\d+)$.*?^url: (.*?)$"
+      state: { "slots.{1}.url": "{2}" }
+
     - header: "^[25]10 remote info:$"
       fields:
         enabled: { path: remote.enabled, map: { "true": true, "false": false } }
@@ -2051,12 +2116,183 @@ telemetry:
         disk: { path: notify.disk, map: { "true": true, "false": false } }
         device info: { path: notify.device_info, map: { "true": true, "false": false } }
         nas: { path: notify.nas, map: { "true": true, "false": false } }
+
+    # ── Timeline clips (205 clips info) ───────────────────────────────────
+    # A whole-timeline "clips get" replaces the list; a get of one clip or a
+    # run of clips only updates those. Version 1 lines are id: name start
+    # duration; versions 2 and 3 id: start duration in out name (p.8, p.19).
     - header: "^214 clips count:$"
       fields:
         clip count: timeline.clip_count
+    - match: "(?m)\\A205 clips info:$(?s:.*?)^clip count: (\\d+)$"
+      request_match: "^clips get(?:: version: [123])?$"
+      replace: timeline.clips
+      state: { timeline.clip_count: "{1}" }
     - header: "^205 clips info:$"
       fields:
         clip count: timeline.clip_count
+    - header: "^205 clips info:$"
+      each_line: "^(\\d+): (.+) ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2})$"
+      state:
+        "timeline.clips.{1}.name": "{2}"
+        "timeline.clips.{1}.start_timecode": "{3}"
+        "timeline.clips.{1}.duration": "{4}"
+    - header: "^205 clips info:$"
+      each_line: "^(\\d+): ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}) (.+)$"
+      state:
+        "timeline.clips.{1}.start_timecode": "{2}"
+        "timeline.clips.{1}.duration": "{3}"
+        "timeline.clips.{1}.in_timecode": "{4}"
+        "timeline.clips.{1}.out_timecode": "{5}"
+        "timeline.clips.{1}.name": "{6}"
+    # An empty timeline answers 107 timeline empty.
+    - match: "^107 "
+      request_match: "^clips get(?:: version: [123])?$"
+      replace: timeline.clips
+      state: { timeline.clip_count: "0" }
+    # A timeline clips notification (519, an addition or a snapshot) has the
+    # whole timeline read again.
+    - match: "^519 "
+      then_send: ["clips get"]
+
+    # ── Playrange, play on startup, play option (219, 218, 220) ──────────
+    # Reply codes as Sofie's hyperdeck-connection gives them; a playrange
+    # report replaces the last, so a cleared range leaves state.
+    - header: "^(?:219|515) [^:]*:$"
+      replace: playrange
+      fields:
+        timeline in: playrange.timeline_in
+        timeline out: playrange.timeline_out
+    - header: "^218 [^:]*:$"
+      fields:
+        enable: { path: play_on_startup.enabled, map: { "true": true, "false": false } }
+        single clip: { path: play_on_startup.single_clip, map: { "true": true, "false": false } }
+    - header: "^220 [^:]*:$"
+      fields:
+        stop mode: play_option.stop_mode
+
+    # ── Cache, dynamic range, slate ───────────────────────────────────────
+    - header: "^(?:221 [^:]*|5[0-9][0-9] cache info):$"
+      fields:
+        status: cache.status
+        transferring slot id: cache.transferring_slot
+        recording time: cache.recording_time
+    # Dynamic range and slate field names belong to no other documented
+    # report, so any report holding them (2xx after 201, or 5xx) is read.
+    - header: "^(?:20[2-9]|2[1-9][0-9]|5[0-9][0-9]) [^:]*:$"
+      fields:
+        playback override: dynamic_range.playback_override
+        record override: dynamic_range.record_override
+        reel: slate.reel
+        scene id: slate.scene_id
+        shot type: slate.shot_type
+        take: slate.take
+        take scenario: slate.take_scenario
+        take auto inc: { path: slate.take_auto_inc, map: { "true": true, "false": false } }
+        good take: { path: slate.good_take, map: { "true": true, "false": false } }
+        environment: slate.environment
+        day night: slate.day_night
+        project name: slate.project_name
+        camera: slate.camera
+        director: slate.director
+        camera operator: slate.camera_operator
+        lens type: slate.lens_type
+        iris: slate.iris
+        focal length: slate.focal_length
+        distance: slate.distance
+        filter: slate.filter
+
+    # ── NAS and external drives, kept as the deck words them ──────────────
+    - match: "(?s)\\A2[0-9][0-9] [^\\n]*\\n?(.*)$"
+      request_match: "^nas list$"
+      state: { nas.bookmarks: "{1}" }
+    - match: "(?s)\\A2[0-9][0-9] [^\\n]*\\n?(.*)$"
+      request_match: "^nas selected$"
+      state: { nas.selected: "{1}" }
+    - match: "(?s)\\A2[0-9][0-9] [^\\n]*\\n?(.*)$"
+      request_match: "^external drive list$"
+      state: { external_drives.available: "{1}" }
+    - match: "(?s)\\A2[0-9][0-9] [^\\n]*\\n?(.*)$"
+      request_match: "^external drive selected$"
+      state: { external_drives.selected: "{1}" }
+
+    # ── Re-reads after this integration's own changes ─────────────────────
+    # Settings the deck sends no documented notification for, or not on every
+    # protocol version, are read again once the deck accepts a change.
+    - match: "^200 ok$"
+      request_match: "^playrange (?:set|clear)"
+      then_send: ["playrange"]
+    - match: "^200 ok$"
+      request_match: "^play on startup: "
+      then_send: ["play on startup"]
+    - match: "^200 ok$"
+      request_match: "^play option: "
+      then_send: ["play option"]
+    - match: "^200 ok$"
+      request_match: "^dynamic range: "
+      then_send: ["dynamic range"]
+    - match: "^200 ok$"
+      request_match: "^slate (clips|project|lens):"
+      then_send: ["slate {1}"]
+    - match: "^200 ok$"
+      request_match: "^nas (?:add|remove|select|deselect)"
+      then_send: ["nas list", "nas selected"]
+    - match: "^200 ok$"
+      request_match: "^external drive select: "
+      then_send: ["external drive selected"]
+    - match: "^200 ok$"
+      request_match: "^configuration: record cache: "
+      then_send: ["cache info"]
+    # A notify switch the deck accepted (200 ok) is as the request set it;
+    # the subscriptions on connecting set them too.
+    - match: "^200 ok$"
+      request_match: "^notify: transport: (true|false)$"
+      state: { notify.transport: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: slot: (true|false)$"
+      state: { notify.slot: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: remote: (true|false)$"
+      state: { notify.remote: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: configuration: (true|false)$"
+      state: { notify.configuration: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: dropped frames: (true|false)$"
+      state: { notify.dropped_frames: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: display timecode: (true|false)$"
+      state: { notify.display_timecode: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: timeline position: (true|false)$"
+      state: { notify.timeline_position: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: playrange: (true|false)$"
+      state: { notify.playrange: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: cache: (true|false)$"
+      state: { notify.cache: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: dynamic range: (true|false)$"
+      state: { notify.dynamic_range: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: slate: (true|false)$"
+      state: { notify.slate: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: clips: (true|false)$"
+      state: { notify.clips: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: disk: (true|false)$"
+      state: { notify.disk: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: device info: (true|false)$"
+      state: { notify.device_info: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^notify: nas: (true|false)$"
+      state: { notify.nas: { value: "{1}", map: { "true": true, "false": false } } }
+    - match: "^200 ok$"
+      request_match: "^(?:clips (?:add|remove|clear|rebuild)|slot select)"
+      then_send: ["clips get"]
 
 state:
   device.protocol_version:   { type: string, description: "Protocol version, from 500 connection info and 204 device info" }
@@ -2074,22 +2310,24 @@ state:
   transport.single_clip:     { type: bool, description: "Single-clip playback" }
   transport.loop:            { type: bool, description: "Loop playback" }
   transport.timecode:        { type: string, description: "Timecode within the timeline in playback, or the clip in record" }
-  transport.display_timecode: { type: string, description: "Timecode on the front panel" }
+  transport.display_timecode: { type: string, description: "Timecode on the front panel, from transport info and the display timecode notification" }
+  transport.timeline_position: { type: int, unit: frames, description: "Playback position in the timeline, from the timeline position notification" }
+  transport.dropped_frames:  { type: int, unit: frames, description: "Dropped frames, from the dropped frames notification (approximate, p.5)" }
   transport.video_format:    { type: string, description: "Video format, such as 1080p30" }
   transport.timeline:        { type: int, description: "Timeline value the deck reports (undefined in the document)" }
   transport.input_video_format: { type: string, description: "Video format at the input" }
   transport.dynamic_range:   { type: string, description: "off, Rec709, Rec2020_SDR, HLG, ST2084_300 to ST2084_4000, ST2048 or none" }
   transport.reference_locked: { type: bool, description: "Locked to the reference signal" }
-  slot_info.slot_id:         { type: int, description: "Slot the most recent slot info report describes; every slot_info value belongs to it" }
-  slot_info.slot_name:       { type: string, description: "Name of the reported slot" }
-  slot_info.device_name:     { type: string, description: "Identifying name of the disk device in the reported slot" }
-  slot_info.status:          { type: string, description: "empty, mounting, error or mounted" }
-  slot_info.volume_name:     { type: string, description: "Volume name" }
-  slot_info.recording_time:  { type: int, unit: s, description: "Recording time available" }
-  slot_info.video_format:    { type: string, description: "The disk's default video format" }
-  slot_info.blocked:         { type: bool, description: "Slot blocked" }
-  slot_info.remaining_size:  { type: int, unit: bytes, description: "Remaining space" }
-  slot_info.total_size:      { type: int, unit: bytes, description: "Total space" }
+  slots.*.name:              { type: string, description: "Slot name, keyed by slot id" }
+  slots.*.device_name:       { type: string, description: "Identifying name of the disk device in the slot" }
+  slots.*.status:            { type: string, description: "empty, mounting, error or mounted" }
+  slots.*.volume_name:       { type: string, description: "Volume name" }
+  slots.*.recording_time:    { type: int, unit: s, description: "Recording time available" }
+  slots.*.video_format:      { type: string, description: "The disk's default video format" }
+  slots.*.blocked:           { type: bool, description: "Slot blocked (unblock_slot clears it)" }
+  slots.*.remaining_size:    { type: int, unit: bytes, description: "Remaining space" }
+  slots.*.total_size:        { type: int, unit: bytes, description: "Total space" }
+  slots.*.url:               { type: string, description: "URL of the NAS share mounted in the network slot" }
   remote.enabled:            { type: bool, description: "Remote control enabled" }
   remote.override:           { type: bool, description: "Remote override active for this connection" }
   configuration.audio_input:  { type: string, description: "embedded, XLR or RCA" }
@@ -2130,6 +2368,43 @@ state:
   notify.device_info:        { type: bool, description: "Device info notifications enabled" }
   notify.nas:                { type: bool, description: "NAS notifications enabled" }
   timeline.clip_count:       { type: int, description: "Clips on the timeline, from clips count and clips get replies" }
+  timeline.clips.*.name:     { type: string, description: "Clip name, keyed by timeline clip id (with its folder path in response version 3)" }
+  timeline.clips.*.start_timecode: { type: string, description: "Start timecode: in version 1 a clip or timeline timecode as configuration timecode output sets, in versions 2 and 3 the clip's start" }
+  timeline.clips.*.duration: { type: string, description: "Duration as timecode" }
+  timeline.clips.*.in_timecode: { type: string, description: "In point (response versions 2 and 3)" }
+  timeline.clips.*.out_timecode: { type: string, description: "Out point (response versions 2 and 3)" }
+  playrange.timeline_in:     { type: int, unit: frames, description: "First timeline frame of the playrange; absent when none is set" }
+  playrange.timeline_out:    { type: int, unit: frames, description: "Last timeline frame of the playrange" }
+  play_on_startup.enabled:   { type: bool, description: "The deck plays on power-up (set_play_on_startup writes it)" }
+  play_on_startup.single_clip: { type: bool, description: "A single clip plays on power-up rather than all (set_play_on_startup_single_clip writes it)" }
+  play_option.stop_mode:     { type: string, description: "Output frame when playback stops: lastframe, nextframe or black (set_playback_stop_mode writes it)" }
+  cache.status:              { type: string, description: "Record cache status as the deck words it" }
+  cache.transferring_slot:   { type: int, description: "Slot the cache is transferring to" }
+  cache.recording_time:      { type: int, unit: s, description: "Recording time the cache holds" }
+  dynamic_range.playback_override: { type: string, description: "Playback dynamic range override (set_playback_dynamic_range writes it)" }
+  dynamic_range.record_override: { type: string, description: "Record dynamic range override (set_record_dynamic_range writes it)" }
+  slate.reel:                { type: int, description: "Slate reel number" }
+  slate.scene_id:            { type: string, description: "Slate scene id" }
+  slate.shot_type:           { type: string, description: "Slate shot type: WS, MS, CU, BCU, MCU, ECU or none" }
+  slate.take:                { type: int, description: "Slate take number" }
+  slate.take_scenario:       { type: string, description: "Slate take scenario: PU, VFX, SER or none" }
+  slate.take_auto_inc:       { type: bool, description: "Slate take auto-increment" }
+  slate.good_take:           { type: bool, description: "Slate take marked good" }
+  slate.environment:         { type: string, description: "interior or exterior" }
+  slate.day_night:           { type: string, description: "day or night" }
+  slate.project_name:        { type: string, description: "Slate project name" }
+  slate.camera:              { type: string, description: "Slate camera index" }
+  slate.director:            { type: string, description: "Slate director" }
+  slate.camera_operator:     { type: string, description: "Slate camera operator" }
+  slate.lens_type:           { type: string, description: "Slate lens type" }
+  slate.iris:                { type: string, description: "Slate iris" }
+  slate.focal_length:        { type: string, description: "Slate focal length" }
+  slate.distance:            { type: string, description: "Slate lens distance" }
+  slate.filter:              { type: string, description: "Slate lens filter" }
+  nas.bookmarks:             { type: string, description: "NAS share bookmarks, the nas list reply's lines as the deck gives them (add_nas and remove_nas change it)" }
+  nas.selected:              { type: string, description: "The selected NAS share, the nas selected reply's lines as the deck gives them; empty when none" }
+  external_drives.available: { type: string, description: "USB and network drives available to the external slot, the external drive list reply's lines" }
+  external_drives.selected:  { type: string, description: "The drive selected for the external slot, the external drive selected reply's lines" }
 
 quirks:
   - models: [all]
@@ -2152,18 +2427,39 @@ quirks:
     text: >
       Asynchronous 5xx messages can arrive at any time, starting with "500
       connection info:" on connect. They are not replies to the pending command
-      and are skipped when matching a response. Only 500, 502, 508, 510 and
-      511 are documented with their fields; the dropped frames, display
+      and are skipped when matching a response. Only 500, 502, 508, 510, 511
+      and 519 are documented with their codes; the dropped frames, display
       timecode, timeline position, playrange, cache, dynamic range, slate,
       device info and nas notifications are documented by their notify switch
-      only, so no state is taken from them.
+      only. They are read by field name (display timecode, timeline position,
+      dropped frames, the playrange's timeline in and out, the dynamic range
+      overrides, the slate fields), so any 5xx code carrying them is taken.
+      The reply codes of playrange (219), play on startup (218), play option
+      (220), cache info (221) and dynamic range (222), and the playrange push
+      (515), come from Sofie's hyperdeck-connection, not the document. Device
+      info and disk notifications are not subscribed: their content is
+      undocumented.
 
   - models: [all]
-    severity: warning
+    severity: info
     text: >
       A slot info report (202 or 502) describes one slot, named by its slot id
-      field, and the slot_info state holds the most recent report, whichever
-      slot it was. It is not a per-slot table.
+      field; state keeps each slot under its id. Slots 1 to 4 are asked for on
+      connecting, then slot notifications keep them current.
+
+  - models: [all]
+    severity: info
+    text: >
+      Settings without a documented notification on every protocol version
+      (play on startup, play option, playrange, dynamic range, slate, NAS,
+      external drive, record cache, the timeline after clip and slot changes)
+      are read again as soon as the deck answers 200 ok to a
+      change this integration makes; a change made elsewhere shows only on
+      the next connection unless the deck notifies it. The nas list, nas
+      selected and external drive replies are undocumented and kept as the
+      reply's text. Disk clip lists (disk list) are returned by their commands
+      and not kept in state: a 206 reply names its slot on a line of its own,
+      which a state rule cannot key by.
 
   - models: [all]
     severity: info

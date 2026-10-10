@@ -226,9 +226,10 @@ text(H, "select_nas", {"url": "smb://192.168.1.1/Main"}, "nas select:\r\nurl: sm
 
 # ── HyperDeck telemetry ──────────────────────────────────────────────────
 # One notify line per kind on connect (the first is shown; the rest are queued
-# behind its reply), then device info, transport info, slot info, remote and
-# configuration once. The 5xx pushes carry the same fields as the 2xx replies
-# (p.11-23).
+# behind its reply), then the queries once (device, transport, each slot,
+# remote, configuration, notify, timeline clips and the other settings). The
+# 5xx pushes carry the same fields as the 2xx replies (p.11-23); slot reports
+# are kept per slot id.
 telemetry(H, "transport", expect_connect_wire=["notify: transport: true\r\n"],
           inbound="508 transport info:\r\nstatus: play\r\nspeed: 100\r\nslot id: 1\r\nslot name: SD1\r\n"
           "device name: sd1\r\nclip id: 3\r\nsingle clip: false\r\ndisplay timecode: 01:00:10:00\r\n"
@@ -254,10 +255,12 @@ telemetry(H, "device", inbound="204 device info:\r\nprotocol version: 1.11\r\nmo
 telemetry(H, "slot", inbound="502 slot info:\r\nslot id: 2\r\nslot name: SD2\r\ndevice name: sd2\r\n"
           "status: mounted\r\nvolume name: Show\r\nrecording time: 3600\r\nvideo format: 1080p50\r\n"
           "blocked: false\r\nremaining size: 1000000000\r\ntotal size: 64000000000\r\n\r\n",
-          expect_state={"slot_info": {"slot_id": 2, "slot_name": "SD2", "device_name": "sd2",
-                                      "status": "mounted", "volume_name": "Show", "recording_time": 3600,
-                                      "video_format": "1080p50", "blocked": False,
-                                      "remaining_size": 1000000000, "total_size": 64000000000}})
+          state_before={"slots": {"1": {"name": "SD1", "status": "empty"}}},
+          expect_state={"slots": {"1": {"name": "SD1", "status": "empty"},
+                                  "2": {"name": "SD2", "device_name": "sd2", "status": "mounted",
+                                        "volume_name": "Show", "recording_time": 3600, "video_format": "1080p50",
+                                        "blocked": False, "remaining_size": 1000000000,
+                                        "total_size": 64000000000}}})
 telemetry(H, "remote", inbound="510 remote info:\r\nenabled: false\r\noverride: true\r\n\r\n",
           expect_state={"remote": {"enabled": False, "override": True}})
 telemetry(H, "configuration", inbound="511 configuration:\r\naudio input: XLR\r\naudio mapping: 0\r\n"
@@ -288,4 +291,111 @@ telemetry(H, "clip-count", inbound="214 clips count:\r\nclip count: 12\r\n\r\n",
           expect_state={"timeline": {"clip_count": 12}})
 telemetry(H, "clips-info", inbound="205 clips info:\r\nclip count: 2\r\n1: Intro.mov 00:00:00:00 00:00:10:00\r\n"
           "2: Outro.mov 00:00:10:00 00:00:05:00\r\n\r\n",
-          expect_state={"timeline": {"clip_count": 2}})
+          expect_state={"timeline": {"clip_count": 2, "clips": {
+              "1": {"name": "Intro.mov", "start_timecode": "00:00:00:00", "duration": "00:00:10:00"},
+              "2": {"name": "Outro.mov", "start_timecode": "00:00:10:00", "duration": "00:00:05:00"}}}})
+
+# A reply to "slot info" for the network slot carries the share's url (p.25).
+telemetry(H, "slot-network", inbound="202 slot info:\nslot id: 3\nslot name: Network\nstatus: mounted\n"
+          "url: smb://192.168.1.1/Main", request="slot info: slot id: 3",
+          expect_state={"slots": {"3": {"name": "Network", "status": "mounted", "url": "smb://192.168.1.1/Main"}}})
+# Notifications documented by their switch: read by field name, whatever the
+# 5xx code (513 and 514 are the codes Sofie's hyperdeck-connection gives).
+telemetry(H, "display-timecode", inbound="513 display timecode:\r\ndisplay timecode: 01:00:10:12\r\n\r\n",
+          expect_state={"transport": {"display_timecode": "01:00:10:12"}})
+telemetry(H, "timeline-position", inbound="514 timeline position:\r\ntimeline position: 262\r\n\r\n",
+          expect_state={"transport": {"timeline_position": 262}})
+telemetry(H, "dropped-frames", inbound="512 dropped frames:\r\ndropped frames: 3\r\n\r\n",
+          expect_state={"transport": {"dropped_frames": 3}})
+# A whole-timeline clips get replaces the list; version 2 lines carry in and
+# out points with the name last.
+telemetry(H, "clips-get", inbound="205 clips info:\nclip count: 1\n1: Intro.mov 00:00:00:00 00:00:10:00",
+          request="clips get", state_before={"timeline": {"clips": {"9": {"name": "Old.mov"}}}},
+          expect_state={"timeline": {"clip_count": 1, "clips": {
+              "1": {"name": "Intro.mov", "start_timecode": "00:00:00:00", "duration": "00:00:10:00"}}}})
+telemetry(H, "clips-get-v2", inbound="205 clips info:\nclip count: 1\n"
+          "1: 00:00:00:00 00:00:10:00 00:00:01:00 00:00:09:00 Folder/Intro Take 2.mov",
+          request="clips get: version: 2", state_before={"timeline": {"clips": {"2": {"name": "Old.mov"}}}},
+          expect_state={"timeline": {"clip_count": 1, "clips": {"1": {
+              "start_timecode": "00:00:00:00", "duration": "00:00:10:00", "in_timecode": "00:00:01:00",
+              "out_timecode": "00:00:09:00", "name": "Folder/Intro Take 2.mov"}}}})
+# One clip asked for updates that clip and keeps the rest.
+telemetry(H, "clips-get-one", inbound="205 clips info:\nclip count: 1\n2: Outro.mov 00:00:10:00 00:00:05:00",
+          request="clips get: clip id: 2", state_before={"timeline": {"clips": {"1": {"name": "Intro.mov"}}}},
+          expect_state={"timeline": {"clip_count": 1, "clips": {
+              "1": {"name": "Intro.mov"},
+              "2": {"name": "Outro.mov", "start_timecode": "00:00:10:00", "duration": "00:00:05:00"}}}})
+telemetry(H, "timeline-empty", inbound="107 timeline empty", request="clips get",
+          state_before={"timeline": {"clip_count": 2, "clips": {"1": {"name": "Intro.mov"}}}},
+          expect_state={"timeline": {"clip_count": 0}})
+# A timeline clips notification has the whole timeline read again.
+telemetry(H, "clips-notification", inbound="519 clips info:\r\n3: 00:00:20:00 00:00:05:00 00:00:00:00 "
+          "00:00:05:00 New.mov\r\n\r\n", expect_then_send=["clips get\r\n"], expect_state={})
+# Playrange (219 reply, 515 push): a report replaces the last.
+telemetry(H, "playrange", inbound="219 playrange info:\ntimeline in: 250\ntimeline out: 500", request="playrange",
+          expect_state={"playrange": {"timeline_in": 250, "timeline_out": 500}})
+telemetry(H, "playrange-cleared", inbound="515 playrange info:\r\n\r\n",
+          state_before={"playrange": {"timeline_in": 250, "timeline_out": 500}}, expect_state={})
+telemetry(H, "play-on-startup", inbound="218 play on startup:\nenable: true\nsingle clip: false",
+          request="play on startup",
+          expect_state={"play_on_startup": {"enabled": True, "single_clip": False}})
+telemetry(H, "play-option", inbound="220 play option:\nstop mode: black", request="play option",
+          expect_state={"play_option": {"stop_mode": "black"}})
+telemetry(H, "cache-info", inbound="221 cache info:\nstatus: idle\ntransferring slot id: 1\nrecording time: 120",
+          request="cache info",
+          expect_state={"cache": {"status": "idle", "transferring_slot": 1, "recording_time": 120}})
+telemetry(H, "dynamic-range", inbound="222 dynamic range:\nplayback override: off\nrecord override: Rec709",
+          request="dynamic range",
+          expect_state={"dynamic_range": {"playback_override": "off", "record_override": "Rec709"}})
+# Slate fields belong to no other report, so a slate notification is read
+# whatever its code.
+telemetry(H, "slate-clips", inbound="5xx slate clips:\r\nreel: 4\r\nscene id: 12A\r\nshot type: CU\r\ntake: 3\r\n"
+          "take scenario: none\r\ntake auto inc: true\r\ngood take: false\r\nenvironment: interior\r\n"
+          "day night: night\r\n\r\n".replace("5xx", "530"),
+          expect_state={"slate": {"reel": 4, "scene_id": "12A", "shot_type": "CU", "take": 3, "take_scenario": "none",
+                                  "take_auto_inc": True, "good_take": False, "environment": "interior",
+                                  "day_night": "night"}})
+telemetry(H, "slate-project", inbound="232 slate project:\nproject name: Pilot\ncamera: A\ndirector: J Doe\n"
+          "camera operator: K Roe", request="slate project",
+          expect_state={"slate": {"project_name": "Pilot", "camera": "A", "director": "J Doe",
+                                  "camera_operator": "K Roe"}})
+telemetry(H, "slate-lens", inbound="233 slate lens:\nlens type: Prime\niris: f2.8\nfocal length: 50mm\n"
+          "distance: 3m\nfilter: ND.6", request="slate lens",
+          expect_state={"slate": {"lens_type": "Prime", "iris": "f2.8", "focal_length": "50mm", "distance": "3m",
+                                  "filter": "ND.6"}})
+# The help text (201) is not read as slate values.
+telemetry(H, "help-not-slate", inbound="201 help:\nscene id: {id}\ncamera: {index}", request="help",
+          expect_state={})
+# NAS and external drive replies are undocumented: their lines are kept as text.
+telemetry(H, "nas-list", inbound="227 nas list:\nsmb://192.168.1.1/Main\nsmb://nas.local/Media", request="nas list",
+          expect_state={"nas": {"bookmarks": "smb://192.168.1.1/Main\nsmb://nas.local/Media"}})
+telemetry(H, "nas-list-empty", inbound="227 nas list:", request="nas list",
+          state_before={"nas": {"bookmarks": "smb://192.168.1.1/Main"}}, expect_state={"nas": {"bookmarks": ""}})
+telemetry(H, "nas-selected", inbound="228 nas selected:\nsmb://192.168.1.1/Main", request="nas selected",
+          expect_state={"nas": {"selected": "smb://192.168.1.1/Main"}})
+telemetry(H, "external-drives", inbound="226 external drive info:\ndevice: usb-1\ndevice: usb-2",
+          request="external drive list",
+          expect_state={"external_drives": {"available": "device: usb-1\ndevice: usb-2"}})
+telemetry(H, "external-drive-selected", inbound="226 external drive info:\ndevice: usb-1",
+          request="external drive selected", expect_state={"external_drives": {"selected": "device: usb-1"}})
+# Changes this integration makes are read again once the deck accepts them.
+for _name, _request, _reads in [
+    ("playrange", "playrange set: clip id: 2", ["playrange"]),
+    ("playrange-clear", "playrange clear", ["playrange"]),
+    ("play-on-startup", "play on startup: enable: true", ["play on startup"]),
+    ("play-option", "play option: stop mode: black", ["play option"]),
+    ("dynamic-range", "dynamic range: playback override: HLG", ["dynamic range"]),
+    ("slate", "slate project:\r\ndirector: J Doe\r\n", ["slate project"]),
+    ("nas", "nas add:\r\nurl: smb://192.168.1.1/Main\r\n", ["nas list", "nas selected"]),
+    ("external-drive", "external drive select: device: usb-1", ["external drive selected"]),
+    ("record-cache", "configuration: record cache: true", ["cache info"]),
+    ("clips", "clips add: name: Intro.mov", ["clips get"]),
+    ("slot-select", "slot select: slot id: 2", ["clips get"]),
+]:
+    telemetry(H, f"reread-{_name}", inbound="200 ok", request=_request,
+              expect_then_send=[r + "\r\n" for r in _reads], expect_state={})
+# A notify switch the deck accepted is as the request set it.
+telemetry(H, "notify-accepted", inbound="200 ok", request="notify: dropped frames: false",
+          expect_then_send=[], expect_state={"notify": {"dropped_frames": False}})
+# Playing reads nothing again: the transport notification reports it.
+telemetry(H, "play-no-reread", inbound="200 ok", request="play", expect_then_send=[], expect_state={})

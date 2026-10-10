@@ -1230,18 +1230,42 @@ commands:
     returns: ack
 
 telemetry:
-  # The controller does not push. Display parameters, display state, cabinet
-  # counts, controller information, monitoring (without cabinets) and audio
-  # are read every 10 seconds.
+  # The controller does not push. The values an operator changes live
+  # (brightness, colour temperature, gamma, blackout and freeze, mapping,
+  # layer sources, presets) and the controller's health are read every 10
+  # seconds; the rest of the configuration, the inputs, the cabinets, the
+  # per-cabinet monitoring and the multifunction cards every 60 seconds. A
+  # write this integration makes is read back at once (then_send below).
+  # Reads that list things (screens, layers, presets, schedules, inputs,
+  # cabinets, monitoring) replace their list, so what leaves the controller
+  # leaves state.
   poll:
     send:
       - { method: GET, path: /api/v1/screen/displayparams }
       - { method: GET, path: /api/v1/screen/output/display/state }
       - { method: GET, path: /api/v1/screen/cabinet/count }
+      - { method: GET, path: /api/v1/screen, raw_query: "isNeedCabinetInfo=1" }
+      - { method: GET, path: /api/v1/preset }
       - { method: GET, path: /api/v1/device/hw }
       - { method: GET, path: /api/v1/device/monitor/info, raw_query: "isNeedCabinetInfo=1" }
     every_ms: 10000
+  subscribe:
+    send:
+      - { method: GET, path: /api/v1/screen }
+      - { method: GET, path: /api/v1/screen/output }
+      - { method: GET, path: /api/v1/screen/base/info }
+      - { method: GET, path: /api/v1/screen/schedule/all }
+      - { method: GET, path: /api/v1/device/input/sources }
+      - { method: GET, path: /api/v1/device/input }
+      - { method: GET, path: /api/v1/device/cabinet }
+      - { method: GET, path: /api/v1/device/monitor/info, raw_query: "isNeedCabinetInfo=0" }
+      - { method: GET, path: /api/v1/device/audio }
+      - { method: GET, path: /api/v1/device/backup }
+      - { method: GET, path: /api/v1/device/snmpstate }
+      - { method: GET, path: /api/v1/device/multifunc-card/detailinfo }
+    every_ms: 60000
   updates:
+    # ── Display parameters, cabinet counts, display state ─────────────────
     - path: "^/api/v1/screen/displayparams$"
       json_each: "$.data.list"
       json: { id: "$.screenId", brightness: "$.brightness", kelvin: "$.colorTemperature", gamma: "$.gamma" }
@@ -1268,6 +1292,367 @@ telemetry:
       json: { id: "$.canvasID", enable: "$.enable" }
       state:
         "canvases.{id}.mapping": "{enable}"
+
+    # ── Screens: properties, canvases, layers (GET /api/v1/screen) ────────
+    # Each screen's canvases and layers are replaced by every read, with or
+    # without cabinets; the cabinet positions only by a read with them.
+    - path: "^/api/v1/screen(?:\\?isNeedCabinetInfo=[01])?$"
+      json_match: { "$.code": "^0$" }
+      json_each: "$.data.screens"
+      json:
+        id: "$.screenID"
+        name: "$.screenName"
+        mode: "$.workingMode"
+        low_latency: "$.lowLatency"
+        layout: "$.layoutMode"
+        number: "$.screenIndex"
+        group: "$.screenGroupID"
+        rate: "$.masterFrameRate"
+        p2p: "$.pixToPixMode"
+      replace: ["screens.{id}.canvases", "screens.{id}.working_modes"]
+      state:
+        "screens.{id}.name": "{name}"
+        "screens.{id}.working_mode": "{mode}"
+        "screens.{id}.low_latency": "{low_latency}"
+        "screens.{id}.layout_mode": "{layout}"
+        "screens.{id}.index": "{number}"
+        "screens.{id}.group": "{group}"
+        "screens.{id}.max_frame_rate": "{rate}"
+        "screens.{id}.pixel_to_pixel": { value: "{p2p}", map: { "0": false, "1": true } }
+    - path: "^/api/v1/screen(?:\\?isNeedCabinetInfo=[01])?$"
+      json_each: "$.data.screens[*].canvases"
+      json:
+        screen: "$^.screenID"
+        id: "$.canvasID"
+        card: "$.outputCardId"
+        x: "$.position.x"
+        y: "$.position.y"
+        width: "$.size.width"
+        height: "$.size.height"
+        rate: "$.maxFrameRate"
+        z: "$.zorder"
+        phase: "$.frequencyPhaseStatus"
+      state:
+        "screens.{screen}.canvases.{id}.output_card": "{card}"
+        "screens.{screen}.canvases.{id}.x": "{x}"
+        "screens.{screen}.canvases.{id}.y": "{y}"
+        "screens.{screen}.canvases.{id}.width": "{width}"
+        "screens.{screen}.canvases.{id}.height": "{height}"
+        "screens.{screen}.canvases.{id}.max_frame_rate": "{rate}"
+        "screens.{screen}.canvases.{id}.z_order": "{z}"
+        "screens.{screen}.canvases.{id}.in_phase": { value: "{phase}", map: { "0": true, "1": false } }
+    - path: "^/api/v1/screen(?:\\?isNeedCabinetInfo=0)?$"
+      json_match: { "$.code": "^0$" }
+      json_each: "$.data.screens"
+      json: { screen: "$.screenID" }
+      replace: "screens.{screen}.cabinet_positions"
+    - path: "^/api/v1/screen(?:\\?isNeedCabinetInfo=0)?$"
+      json_each: "$.data.screens[*].canvases[*].cabinets"
+      json:
+        screen: "$^^.screenID"
+        canvas: "$^.canvasID"
+        id: "$.cabinetID"
+        port: "$.outputID"
+        x: "$.position.x"
+        y: "$.position.y"
+        width: "$.size.width"
+        height: "$.size.height"
+        angle: "$.angle"
+      state:
+        "screens.{screen}.cabinet_positions.{id}.canvas": "{canvas}"
+        "screens.{screen}.cabinet_positions.{id}.output_port": "{port}"
+        "screens.{screen}.cabinet_positions.{id}.x": "{x}"
+        "screens.{screen}.cabinet_positions.{id}.y": "{y}"
+        "screens.{screen}.cabinet_positions.{id}.width": "{width}"
+        "screens.{screen}.cabinet_positions.{id}.height": "{height}"
+        "screens.{screen}.cabinet_positions.{id}.angle": "{angle}"
+    - path: "^/api/v1/screen(?:\\?isNeedCabinetInfo=[01])?$"
+      json_each: "$.data.screens[*].layersInWorkingMode"
+      json: { screen: "$^.screenID", mode: "$.workingMode", layout: "$.layerLayoutMode" }
+      state:
+        "screens.{screen}.working_modes.{mode}.layer_layout": "{layout}"
+    - path: "^/api/v1/screen(?:\\?isNeedCabinetInfo=[01])?$"
+      json_each: "$.data.screens[*].layersInWorkingMode[*].layers"
+      json:
+        screen: "$^^.screenID"
+        mode: "$^.workingMode"
+        id: "$.id"
+        number: "$.layerIndex"
+        source: "$.source"
+        x: "$.position.x"
+        y: "$.position.y"
+        width: "$.scaler.width"
+        height: "$.scaler.height"
+        z: "$.zOrder"
+        lock: "$.lock"
+        border: "$.border.enable"
+        border_width: "$.border.width"
+        crop: "$.cut.enable"
+        crop_x: "$.cut.rect.x"
+        crop_y: "$.cut.rect.y"
+        crop_width: "$.cut.rect.width"
+        crop_height: "$.cut.rect.height"
+      state:
+        "screens.{screen}.working_modes.{mode}.layers.{id}.index": "{number}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.source": "{source}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.x": "{x}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.y": "{y}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.width": "{width}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.height": "{height}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.z_order": "{z}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.locked": "{lock}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.border": "{border}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.border_width": "{border_width}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.crop": "{crop}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.crop_x": "{crop_x}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.crop_y": "{crop_y}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.crop_width": "{crop_width}"
+        "screens.{screen}.working_modes.{mode}.layers.{id}.crop_height": "{crop_height}"
+    - path: "^/api/v1/screen(?:\\?isNeedCabinetInfo=[01])?$"
+      json_match: { "$.code": "^0$" }
+      replace: screen_groups
+      json_each: "$.data.screenGroups"
+      json: { id: "$.screenGroupID", name: "$.name" }
+      state:
+        "screen_groups.{id}.name": "{name}"
+
+    # ── Presets (GET /api/v1/preset) ──────────────────────────────────────
+    # Each screen's preset list replaces the last; the current preset is the
+    # one whose state is true, and leaves when none is.
+    - path: "^/api/v1/preset$"
+      json_match: { "$.code": "^0$" }
+      json_each: "$.data.screenPresetList"
+      each_match: { "$.presetList": "^\\[" }
+      json: { screen: "$.screenID" }
+      replace: ["screens.{screen}.presets", "screens.{screen}.current_preset"]
+    - path: "^/api/v1/preset$"
+      json_each: "$.data.screenPresetList[*].presetList"
+      json:
+        screen: "$^.screenID"
+        id: "$.sequenceNumber"
+        name: "$.name"
+        applied: "$.state"
+        source: "$.sourceData"
+        processing: "$.processingData"
+        output: "$.outputData"
+        screen_data: "$.screenData"
+        black: "$.effectSwitch"
+      state:
+        "screens.{screen}.presets.{id}.name": "{name}"
+        "screens.{screen}.presets.{id}.applied": "{applied}"
+        "screens.{screen}.presets.{id}.source_data": "{source}"
+        "screens.{screen}.presets.{id}.processing_data": "{processing}"
+        "screens.{screen}.presets.{id}.output_data": "{output}"
+        "screens.{screen}.presets.{id}.screen_data": "{screen_data}"
+        "screens.{screen}.presets.{id}.through_black": { value: "{black}", map: { "0": false, "1": true } }
+    - path: "^/api/v1/preset$"
+      json_each: "$.data.screenPresetList[*].presetList"
+      each_match: { "$.state": "^true$" }
+      json: { screen: "$^.screenID", id: "$.sequenceNumber" }
+      state:
+        "screens.{screen}.current_preset": "{id}"
+
+    # ── Screen output (GET /api/v1/screen/output) ─────────────────────────
+    - path: "^/api/v1/screen/output$"
+      json_each: "$.data"
+      json:
+        id: "$.screenid"
+        low_latency: "$.lowDelay"
+        delay: "$.additionalFrameDelay"
+        depth: "$.outputBitDepth.bitDepth"
+        current_depth: "$.outputBitDepth.currentBitDepth"
+        three_d: "$.threeD.enable"
+        rate: "$.currentFrameRate"
+        genlock_group: "$.genlock.masterLayerGroupId"
+        genlock_type: "$.genlock.selectedType"
+        gamut: "$.gamutList.currentGamutName"
+      state:
+        "screens.{id}.output.low_latency": "{low_latency}"
+        "screens.{id}.output.additional_frame_delay": "{delay}"
+        "screens.{id}.output.bit_depth": "{depth}"
+        "screens.{id}.output.current_bit_depth": "{current_depth}"
+        "screens.{id}.output.three_d": "{three_d}"
+        "screens.{id}.output.frame_rate": "{rate}"
+        "screens.{id}.output.genlock_group": "{genlock_group}"
+        "screens.{id}.output.sync_type": "{genlock_type}"
+        "screens.{id}.output.gamut": "{gamut}"
+
+    # ── Screen properties and multi-modes (GET /api/v1/screen/base/info) ──
+    - path: "^/api/v1/screen/base/info$"
+      json: { calibrated: "$.data.characteristic" }
+      state:
+        device.screen_calibrated: "{calibrated}"
+    - path: "^/api/v1/screen/base/info$"
+      json_match: { "$.code": "^0$" }
+      json_each: "$.data.multiModeInfo"
+      json: { id: "$.screenID", current: "$.multiModeParam.currentModeId", cabinet: "$.multiModeParam.currentCfgParam.cabinetName" }
+      replace: "screens.{id}.multimodes"
+      state:
+        "screens.{id}.multimode": "{current}"
+        "screens.{id}.cabinet_file": "{cabinet}"
+    - path: "^/api/v1/screen/base/info$"
+      json_each: "$.data.multiModeInfo[*].multiModeParam.modeInfo"
+      json: { screen: "$^.screenID", id: "$.modeId", name: "$.modeName" }
+      state:
+        "screens.{screen}.multimodes.{id}.name": "{name}"
+
+    # ── Schedules (GET /api/v1/screen/schedule/all) ───────────────────────
+    - path: "^/api/v1/screen/schedule/all$"
+      json_match: { "$.code": "^0$" }
+      json_each: "$.data"
+      json: { id: "$.screenId", enable: "$.enable", mapping: "$.brightnessMappingMode" }
+      replace: ["screens.{id}.schedule.brightness_strategies", "screens.{id}.schedule.preset_strategies"]
+      state:
+        "screens.{id}.schedule.enabled": "{enable}"
+        "screens.{id}.schedule.brightness_mapping_mode": "{mapping}"
+    - path: "^/api/v1/screen/schedule/all$"
+      json_each: "$.data[*].brightnessStrategyList"
+      json:
+        screen: "$^.screenId"
+        id: "$.strategyId"
+        start: "$.startTime"
+        end: "$.endTime"
+        adjust: "$.adjustType"
+        ratio: "$.brightnessRatio"
+        nit: "$.brightnessNit"
+        repeat: "$.repeatEnable"
+      state:
+        "screens.{screen}.schedule.brightness_strategies.{id}.start": "{start}"
+        "screens.{screen}.schedule.brightness_strategies.{id}.end": "{end}"
+        "screens.{screen}.schedule.brightness_strategies.{id}.adjust_type": "{adjust}"
+        "screens.{screen}.schedule.brightness_strategies.{id}.brightness": "{ratio}"
+        "screens.{screen}.schedule.brightness_strategies.{id}.nits": "{nit}"
+        "screens.{screen}.schedule.brightness_strategies.{id}.repeat": "{repeat}"
+    - path: "^/api/v1/screen/schedule/all$"
+      json_each: "$.data[*].presetStrategyList"
+      json:
+        screen: "$^.screenId"
+        id: "$.strategyId"
+        start: "$.startTime"
+        preset: "$.presetNum"
+        name: "$.presetName"
+        repeat: "$.repeatEnable"
+      state:
+        "screens.{screen}.schedule.preset_strategies.{id}.start": "{start}"
+        "screens.{screen}.schedule.preset_strategies.{id}.preset": "{preset}"
+        "screens.{screen}.schedule.preset_strategies.{id}.preset_name": "{name}"
+        "screens.{screen}.schedule.preset_strategies.{id}.repeat": "{repeat}"
+
+    # ── Inputs: connectors and signal (GET /api/v1/device/input/sources) ──
+    - path: "^/api/v1/device/input/sources$"
+      json_match: { "$.code": "^0$" }
+      replace: inputs
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        group: "$.groupId"
+        type: "$.type"
+        name: "$.name"
+        status: "$.sourceStatus"
+        width: "$.actualResolution.width"
+        height: "$.actualResolution.height"
+        rate: "$.actualRefreshRate"
+        space: "$.colorSpace"
+        range: "$.range"
+        scan: "$.scanMode"
+        edid_width: "$.defaultEDID.resolution.width"
+        edid_height: "$.defaultEDID.resolution.height"
+        edid_rate: "$.defaultEDID.refreshRate"
+        edid_custom: "$.isEdidCustom"
+      state:
+        "inputs.{id}.group": "{group}"
+        "inputs.{id}.type": "{type}"
+        "inputs.{id}.name": "{name}"
+        "inputs.{id}.signal": { value: "{status}", map: { "0": false, "1": true } }
+        "inputs.{id}.width": "{width}"
+        "inputs.{id}.height": "{height}"
+        "inputs.{id}.refresh_rate": "{rate}"
+        "inputs.{id}.color_space": "{space}"
+        "inputs.{id}.range": "{range}"
+        "inputs.{id}.interlaced": { value: "{scan}", map: { "0": false, "1": true } }
+        "inputs.{id}.edid_width": "{edid_width}"
+        "inputs.{id}.edid_height": "{edid_height}"
+        "inputs.{id}.edid_refresh_rate": "{edid_rate}"
+        "inputs.{id}.edid_custom": "{edid_custom}"
+
+    # ── Inputs: configuration and test pattern (GET /api/v1/device/input) ─
+    - path: "^/api/v1/device/input$"
+      json:
+        mode: "$.data.testPattern.mode"
+        state: "$.data.testPattern.parameters.state"
+        red: "$.data.testPattern.parameters.red"
+        green: "$.data.testPattern.parameters.green"
+        blue: "$.data.testPattern.parameters.blue"
+        gray: "$.data.testPattern.parameters.gray"
+        grid: "$.data.testPattern.parameters.gridWidth"
+        speed: "$.data.testPattern.parameters.moveSpeed"
+        stretch: "$.data.testPattern.parameters.gradientStretch"
+      state:
+        test_pattern.mode: "{mode}"
+        test_pattern.on: { value: "{state}", map: { "0": false, "1": true } }
+        test_pattern.red: "{red}"
+        test_pattern.green: "{green}"
+        test_pattern.blue: "{blue}"
+        test_pattern.gray: "{gray}"
+        test_pattern.grid_width: "{grid}"
+        test_pattern.move_speed: "{speed}"
+        test_pattern.gradient_stretch: "{stretch}"
+    - path: "^/api/v1/device/input$"
+      json_match: { "$.code": "^0$" }
+      replace: input_config
+      json_each: "$.data.InputPortConfig"
+      json:
+        id: "$.logicId"
+        hue: "$.cscParameter.HueValue"
+        contrast: "$.cscParameter.ContrastValue"
+        saturation: "$.cscParameter.SaturationValue"
+        limit_to_full: "$.isLimitToFull"
+        range: "$.range"
+        space: "$.colorSpaceType"
+        gamut: "$.colorGamut"
+        hdr: "$.hdrParameter.overrideHdrType"
+        real_hdr: "$.hdrParameter.realHdrType"
+      state:
+        "input_config.{id}.hue": "{hue}"
+        "input_config.{id}.contrast": "{contrast}"
+        "input_config.{id}.saturation": "{saturation}"
+        "input_config.{id}.limit_to_full": "{limit_to_full}"
+        "input_config.{id}.range": "{range}"
+        "input_config.{id}.color_space": "{space}"
+        "input_config.{id}.color_gamut": "{gamut}"
+        "input_config.{id}.hdr_mode": "{hdr}"
+        "input_config.{id}.real_hdr_mode": "{real_hdr}"
+
+    # ── Cabinets (GET /api/v1/device/cabinet) ─────────────────────────────
+    - path: "^/api/v1/device/cabinet$"
+      json_match: { "$.code": "^0$" }
+      replace: cabinets
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        brightness: "$.brightness"
+        kelvin: "$.colorTemperature"
+        gamma_r: "$.gamma.r"
+        gamma_g: "$.gamma.g"
+        gamma_b: "$.gamma.b"
+        canvas: "$.canvasID"
+        card: "$.outputCardID"
+        port: "$.outputID"
+        width: "$.size.width"
+        height: "$.size.height"
+      state:
+        "cabinets.{id}.brightness": "{brightness}"
+        "cabinets.{id}.color_temperature": "{kelvin}"
+        "cabinets.{id}.gamma_red": "{gamma_r}"
+        "cabinets.{id}.gamma_green": "{gamma_g}"
+        "cabinets.{id}.gamma_blue": "{gamma_b}"
+        "cabinets.{id}.canvas": "{canvas}"
+        "cabinets.{id}.output_card": "{card}"
+        "cabinets.{id}.output_port": "{port}"
+        "cabinets.{id}.width": "{width}"
+        "cabinets.{id}.height": "{height}"
+
+    # ── Controller (GET /api/v1/device/hw) ────────────────────────────────
     - path: "^/api/v1/device/hw$"
       json:
         name: "$.data.name"
@@ -1289,9 +1674,12 @@ telemetry:
         device.firmware_version: "{hw}"
         device.software_version: "{sw}"
         device.working_mode: "{mode}"
+
+    # ── Monitoring (GET /api/v1/device/monitor/info) ──────────────────────
     - path: "^/api/v1/device/monitor/info"
       json:
         runtime: "$.data.runtime"
+        total: "$.data.totalRuntime"
         backup: "$.data.backupStatus"
         temp: "$.data.mainBoardTemperature.value"
         temp_status: "$.data.mainBoardTemperature.status"
@@ -1299,41 +1687,445 @@ telemetry:
         volt_status: "$.data.mainBoardVoltage.status"
       state:
         device.runtime: "{runtime}"
+        device.total_runtime: "{total}"
         device.backup_status: "{backup}"
         device.mainboard_temperature: "{temp}"
         device.mainboard_temperature_status: "{temp_status}"
         device.mainboard_voltage: "{volt}"
         device.mainboard_voltage_status: "{volt_status}"
+    - path: "^/api/v1/device/monitor/info"
+      json_match: { "$.code": "^0$", "$.data.fanInfos": "^\\[" }
+      replace: monitoring.fans
+      json_each: "$.data.fanInfos"
+      json: { speed: "$.fanSpeed", type: "$.fanType", status: "$.status" }
+      state:
+        "monitoring.fans.{index}.speed": "{speed}"
+        "monitoring.fans.{index}.type": "{type}"
+        "monitoring.fans.{index}.status": "{status}"
+    - path: "^/api/v1/device/monitor/info"
+      json_match: { "$.code": "^0$", "$.data.voltageInfos": "^\\[" }
+      replace: monitoring.voltages
+      json_each: "$.data.voltageInfos"
+      json: { value: "$.voltage", type: "$.voltageType", status: "$.status" }
+      state:
+        "monitoring.voltages.{index}.value": "{value}"
+        "monitoring.voltages.{index}.type": "{type}"
+        "monitoring.voltages.{index}.status": "{status}"
+    - path: "^/api/v1/device/monitor/info"
+      json_match: { "$.code": "^0$", "$.data.temperatureInfos": "^\\[" }
+      replace: monitoring.temperatures
+      json_each: "$.data.temperatureInfos"
+      json: { value: "$.temperature", type: "$.temperatureType", status: "$.status" }
+      state:
+        "monitoring.temperatures.{index}.value": "{value}"
+        "monitoring.temperatures.{index}.type": "{type}"
+        "monitoring.temperatures.{index}.status": "{status}"
+    - path: "^/api/v1/device/monitor/info"
+      json_match: { "$.code": "^0$", "$.data.controllerPortMonitorInfos": "^\\[" }
+      replace: monitoring.ports
+      json_each: "$.data.controllerPortMonitorInfos"
+      json: { id: "$.controllerPortID", status: "$.status" }
+      state:
+        "monitoring.ports.{id}.status": "{status}"
+    - path: "^/api/v1/device/monitor/info"
+      json_match: { "$.code": "^0$", "$.data.cardMonitorInfo": "^\\[" }
+      replace: monitoring.cards
+      json_each: "$.data.cardMonitorInfo"
+      json: { id: "$.cardID", type: "$.cardType", status: "$.status" }
+      state:
+        "monitoring.cards.{id}.type": "{type}"
+        "monitoring.cards.{id}.status": "{status}"
+    - path: "^/api/v1/device/monitor/info"
+      json_match: { "$.code": "^0$", "$.data.screenSourceStatus": "^\\[" }
+      replace: monitoring.sources
+      json_each: "$.data.screenSourceStatus"
+      json: { id: "$.portID", status: "$.status", card: "$.inputCardID" }
+      state:
+        "monitoring.sources.{id}.status": "{status}"
+        "monitoring.sources.{id}.input_card": "{card}"
+    - path: "^/api/v1/device/monitor/info"
+      json_match: { "$.code": "^0$", "$.data.outputStatus": "^\\[" }
+      replace: monitoring.outputs
+      json_each: "$.data.outputStatus"
+      json: { id: "$.outputID", type: "$.type", status: "$.status", card: "$.outputCardID" }
+      state:
+        "monitoring.outputs.{id}.type": "{type}"
+        "monitoring.outputs.{id}.status": "{status}"
+        "monitoring.outputs.{id}.output_card": "{card}"
+    # Per cabinet and receiving card: only the read with cabinets.
+    - path: "^/api/v1/device/monitor/info\\?isNeedCabinetInfo=0$"
+      json_match: { "$.code": "^0$", "$.data.cabinets": "^\\[" }
+      replace: monitoring.cabinets
+      json_each: "$.data.cabinets"
+      json:
+        id: "$.CabinetID"
+        port: "$.outPutID"
+        temp: "$.temperature.value"
+        temp_status: "$.temperature.status"
+        volt: "$.voltage.value"
+        volt_status: "$.voltage.status"
+      state:
+        "monitoring.cabinets.{id}.output_port": "{port}"
+        "monitoring.cabinets.{id}.temperature": "{temp}"
+        "monitoring.cabinets.{id}.temperature_status": "{temp_status}"
+        "monitoring.cabinets.{id}.voltage": "{volt}"
+        "monitoring.cabinets.{id}.voltage_status": "{volt_status}"
+    - path: "^/api/v1/device/monitor/info\\?isNeedCabinetInfo=0$"
+      json_each: "$.data.cabinets[*].rvCards"
+      json:
+        cabinet: "$^.CabinetID"
+        id: "$.rvCardID"
+        runtime: "$.runtime"
+        temp: "$.temperature.value"
+        temp_status: "$.temperature.status"
+        volt: "$.voltage.value"
+        volt_status: "$.voltage.status"
+        humidity: "$.humidity.value"
+        humidity_status: "$.humidity.status"
+        link: "$.nextCabinetLinkStatus.linkStatus"
+        link_status: "$.nextCabinetLinkStatus.status"
+      state:
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.runtime": "{runtime}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.temperature": "{temp}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.temperature_status": "{temp_status}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.voltage": "{volt}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.voltage_status": "{volt_status}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.humidity": "{humidity}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.humidity_status": "{humidity_status}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.next_link": "{link}"
+        "monitoring.cabinets.{cabinet}.receiving_cards.{id}.next_link_status": "{link_status}"
+
+    # ── Audio, backup, SNMP, multifunction cards ──────────────────────────
     - path: "^/api/v1/device/audio$"
       json: { enable: "$.data.enable", source: "$.data.source" }
       state:
         audio.enabled: "{enable}"
         audio.source: "{source}"
+    - path: "^/api/v1/device/backup$"
+      json: { master: "$.data.master", backup: "$.data.backup", master_name: "$.data.masterName", backup_name: "$.data.backupName" }
+      state:
+        backup.primary_mac: "{master}"
+        backup.backup_mac: "{backup}"
+        backup.primary_name: "{master_name}"
+        backup.backup_name: "{backup_name}"
+    - path: "^/api/v1/device/snmpstate$"
+      json: { state: "$.data.state" }
+      state:
+        snmp.enabled: "{state}"
+    - path: "^/api/v1/device/multifunc-card/detailinfo$"
+      json_match: { "$.code": "^0$" }
+      replace: multifunction_cards
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        name: "$.name"
+        firmware: "$.firmware"
+        link: "$.linkStatus"
+        power: "$.powerInfo.allPowerState"
+      state:
+        "multifunction_cards.{id}.name": "{name}"
+        "multifunction_cards.{id}.firmware": "{firmware}"
+        "multifunction_cards.{id}.connected": { value: "{link}", map: { "0": false, "1": true } }
+        "multifunction_cards.{id}.power": "{power}"
+    - path: "^/api/v1/device/multifunc-card/detailinfo$"
+      json_each: "$.data[*].lightSensorInfos"
+      json: { card: "$^.id", id: "$.peripheralIndex", status: "$.status", brightness: "$.brightness" }
+      state:
+        "multifunction_cards.{card}.light_sensors.{id}.ok": { value: "{status}", map: { "0": false, "1": true } }
+        "multifunction_cards.{card}.light_sensors.{id}.brightness": "{brightness}"
+    - path: "^/api/v1/device/multifunc-card/detailinfo$"
+      json_each: "$.data[*].environmentSensorInfos"
+      json: { card: "$^.id", id: "$.peripheralIndex", status: "$.status", temp: "$.temperature", humidity: "$.humidity" }
+      state:
+        "multifunction_cards.{card}.environment_sensors.{id}.ok": { value: "{status}", map: { "0": false, "1": true } }
+        "multifunction_cards.{card}.environment_sensors.{id}.temperature": "{temp}"
+        "multifunction_cards.{card}.environment_sensors.{id}.humidity": "{humidity}"
+
+    # ── Read-backs after this integration's own writes ────────────────────
+    # A write the controller accepted (code 0) has what it changed read again
+    # at once rather than at the next poll. Writes sharing a path with a read
+    # are told apart by their request body.
+    - path: "^/api/v1/screen/(?:brightness|gamma|colortemperature)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/screen/displayparams }
+    - path: "^/api/v1/(?:screen/output/displaymode|screen/output/canvas/mapping|device/displaymode|device/screen/displaymode)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/screen/output/display/state }
+    - path: "^/api/v1/(?:screen/output/(?:gamut|customgamut|threed/enable|bitdepth|sync/source)|device/screen/video/bitdepth)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/screen/output }
+    - path: "^/api/v1/screen/output/multimode$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/screen/base/info }
+    - path: "^/api/v1/(?:screen/layer/input|device/screen/input)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/screen, raw_query: "isNeedCabinetInfo=1" }
+    # Applying a preset can change brightness, layers, display and output.
+    - path: "^/api/v1/(?:preset/current/update|device/currentpreset)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/preset }
+        - { method: GET, path: /api/v1/screen, raw_query: "isNeedCabinetInfo=1" }
+        - { method: GET, path: /api/v1/screen/displayparams }
+        - { method: GET, path: /api/v1/screen/output/display/state }
+        - { method: GET, path: /api/v1/screen/output }
+    - path: "^/api/v1/preset/update$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/preset }
+    - path: "^/api/v1/screen/schedule/(?:enable/update|brightness-strategy/delete)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/screen/schedule/all }
+    - path: "^/api/v1/screen/cabinets$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/screen }
+    - path: "^/api/v1/device/(?:input/(?:internalsource|pattern/test|shadow|highlight|saturation|hue|reset|\\d+/(?:edid|hdrmode|colorspace|colourgamut|range))|screen/controller/pattern/test)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/device/input }
+        - { method: GET, path: /api/v1/device/input/sources }
+    - path: "^/api/v1/device/audio$"
+      request_match: { "$.enable": "." }
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/device/audio }
+    - path: "^/api/v1/device/hw/(?:customname|mode)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/device/hw }
+    - path: "^/api/v1/device/snmpstate$"
+      request_match: { "$.state": "." }
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/device/snmpstate }
+    - path: "^/api/v1/device/cabinet/(?:brightness|rgb/brightness|rgbwbrightness|colortemperature|gamma)$"
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/device/cabinet }
+    # A project import replaces the whole configuration.
+    - path: "^/api/v1/device/hw/deviceengineeringdocdata$"
+      request_match: { "$.backupFile": "." }
+      json_match: { "$.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/v1/device/hw }
+        - { method: GET, path: /api/v1/screen }
+        - { method: GET, path: /api/v1/preset }
+        - { method: GET, path: /api/v1/screen/displayparams }
+        - { method: GET, path: /api/v1/screen/output/display/state }
+        - { method: GET, path: /api/v1/screen/output }
+        - { method: GET, path: /api/v1/screen/base/info }
+        - { method: GET, path: /api/v1/screen/schedule/all }
+        - { method: GET, path: /api/v1/device/input }
+        - { method: GET, path: /api/v1/device/input/sources }
+        - { method: GET, path: /api/v1/device/cabinet }
 
 state:
   screens.*.brightness: { type: float, description: "Screen brightness, 0 to 1, keyed by screen ID" }
   screens.*.color_temperature: { type: int, unit: K, description: "Screen colour temperature" }
   screens.*.gamma: { type: float, description: "Screen gamma" }
   screens.*.cabinet_count: { type: int, description: "Online cabinets on the screen" }
-  canvases.*.display_mode: { type: int, description: "Canvas display mode as the controller reports it, keyed by canvas ID (the read documents 0 normal, 1 frozen, 2 blackout; the writes use 1 blackout, 2 freeze)" }
-  canvases.*.mapping: { type: bool, description: "Mapping overlay shown on the canvas" }
+  screens.*.name: { type: string, description: "Screen name (documented for internal use)" }
+  screens.*.working_mode: { type: int, description: "Screen working mode: 0 send-only controller, 1 all-in-one controller" }
+  screens.*.low_latency: { type: bool, description: "Low latency on for the screen" }
+  screens.*.layout_mode: { type: int, description: "Layout: 0 free, 1 1x1, 2 2x1, 3 1x2, 4 1x3, 5 3x1, 6 1x4, 7 4x1, 8 2x2" }
+  screens.*.index: { type: int, description: "Screen number" }
+  screens.*.group: { type: string, description: "ID of the screen group the screen belongs to" }
+  screens.*.max_frame_rate: { type: float, unit: Hz, description: "Screen's maximum frame rate" }
+  screens.*.pixel_to_pixel: { type: bool, description: "Pixel-to-pixel mode on" }
+  screens.*.canvases.*.output_card: { type: int, description: "Output card of the canvas, keyed by canvas ID" }
+  screens.*.canvases.*.x: { type: float, unit: px, description: "Canvas position, x" }
+  screens.*.canvases.*.y: { type: float, unit: px, description: "Canvas position, y" }
+  screens.*.canvases.*.width: { type: float, unit: px, description: "Canvas width" }
+  screens.*.canvases.*.height: { type: float, unit: px, description: "Canvas height" }
+  screens.*.canvases.*.max_frame_rate: { type: float, unit: Hz, description: "Canvas's maximum frame rate" }
+  screens.*.canvases.*.z_order: { type: int, description: "Canvas z-order" }
+  screens.*.canvases.*.in_phase: { type: bool, description: "Canvas in phase and at the same frequency" }
+  screens.*.cabinet_positions.*.canvas: { type: int, description: "Canvas the cabinet is on, keyed by cabinet ID (from a read with cabinets)" }
+  screens.*.cabinet_positions.*.output_port: { type: int, description: "Output port the cabinet is connected to" }
+  screens.*.cabinet_positions.*.x: { type: float, unit: px, description: "Cabinet position relative to the canvas origin, x (move_cabinets writes it)" }
+  screens.*.cabinet_positions.*.y: { type: float, unit: px, description: "Cabinet position relative to the canvas origin, y" }
+  screens.*.cabinet_positions.*.width: { type: float, unit: px, description: "Cabinet width" }
+  screens.*.cabinet_positions.*.height: { type: float, unit: px, description: "Cabinet height" }
+  screens.*.cabinet_positions.*.angle: { type: float, unit: deg, description: "Cabinet rotation" }
+  screens.*.working_modes.*.layer_layout: { type: int, description: "Layer layout of the screen in that working mode, keyed by working mode" }
+  screens.*.working_modes.*.layers.*.index: { type: int, description: "Layer number, keyed by layer ID (the layer of switch_layer_source)" }
+  screens.*.working_modes.*.layers.*.source: { type: int, description: "Source group on the layer (switch_layer_source writes it)" }
+  screens.*.working_modes.*.layers.*.x: { type: float, unit: px, description: "Layer window position, x" }
+  screens.*.working_modes.*.layers.*.y: { type: float, unit: px, description: "Layer window position, y" }
+  screens.*.working_modes.*.layers.*.width: { type: float, unit: px, description: "Layer window width" }
+  screens.*.working_modes.*.layers.*.height: { type: float, unit: px, description: "Layer window height" }
+  screens.*.working_modes.*.layers.*.z_order: { type: int, description: "Layer z-order" }
+  screens.*.working_modes.*.layers.*.locked: { type: bool, description: "Layer locked" }
+  screens.*.working_modes.*.layers.*.border: { type: bool, description: "Layer border on" }
+  screens.*.working_modes.*.layers.*.border_width: { type: float, unit: px, description: "Layer border width" }
+  screens.*.working_modes.*.layers.*.crop: { type: bool, description: "Layer cropping on" }
+  screens.*.working_modes.*.layers.*.crop_x: { type: float, unit: px, description: "Crop rectangle, x" }
+  screens.*.working_modes.*.layers.*.crop_y: { type: float, unit: px, description: "Crop rectangle, y" }
+  screens.*.working_modes.*.layers.*.crop_width: { type: float, unit: px, description: "Crop rectangle width" }
+  screens.*.working_modes.*.layers.*.crop_height: { type: float, unit: px, description: "Crop rectangle height" }
+  screen_groups.*.name: { type: string, description: "Screen group name, keyed by screen group ID" }
+  screens.*.presets.*.name: { type: string, description: "Preset name, keyed by sequence number (modify_preset writes it)" }
+  screens.*.presets.*.applied: { type: bool, description: "The preset is the one applied" }
+  screens.*.presets.*.source_data: { type: bool, description: "The preset holds source data" }
+  screens.*.presets.*.processing_data: { type: bool, description: "The preset holds processing data" }
+  screens.*.presets.*.output_data: { type: bool, description: "The preset holds output data" }
+  screens.*.presets.*.screen_data: { type: bool, description: "The preset holds screen data" }
+  screens.*.presets.*.through_black: { type: bool, description: "The preset's transition goes through black" }
+  screens.*.current_preset: { type: int, description: "Sequence number of the applied preset; absent when none is" }
+  screens.*.output.low_latency: { type: bool, description: "Output low latency on" }
+  screens.*.output.additional_frame_delay: { type: int, unit: frames, description: "Additional output latency" }
+  screens.*.output.bit_depth: { type: int, description: "Output bit depth setting: 0 8-bit, 1 10-bit, 2 12-bit, 255 follow the input" }
+  screens.*.output.current_bit_depth: { type: int, description: "Bit depth the receiving cards run at" }
+  screens.*.output.three_d: { type: bool, description: "3D output on" }
+  screens.*.output.frame_rate: { type: float, unit: Hz, description: "Current output frame rate" }
+  screens.*.output.genlock_group: { type: int, description: "Input source group of the main layer in all-in-one mode, as the genlock data reports it" }
+  screens.*.output.sync_type: { type: int, description: "Current output sync mode as the genlock data reports it (selectedType; values undocumented)" }
+  screens.*.output.gamut: { type: string, description: "Name of the colour gamut in use (set_gamut writes it)" }
+  device.screen_calibrated: { type: int, description: "Whether the screens have been calibrated, as the screen properties report it (characteristic)" }
+  screens.*.multimode: { type: int, description: "modeId of the current multi-mode (set_multimode writes it)" }
+  screens.*.cabinet_file: { type: string, description: "Name of the cabinet in the cabinet file in use" }
+  screens.*.multimodes.*.name: { type: string, description: "Multi-mode name, keyed by modeId" }
+  screens.*.schedule.enabled: { type: bool, description: "Screen schedule on (set_schedule_enabled writes it)" }
+  screens.*.schedule.brightness_mapping_mode: { type: int, description: "Brightness mapping mode: 0 specified brightness, 1 ambient brightness, 2 brightness when the light sensor fails" }
+  screens.*.schedule.brightness_strategies.*.start: { type: string, description: "Start time of the brightness strategy, keyed by strategy ID" }
+  screens.*.schedule.brightness_strategies.*.end: { type: string, description: "End time of the brightness strategy" }
+  screens.*.schedule.brightness_strategies.*.adjust_type: { type: int, description: "0 specified brightness, 1 ambient brightness" }
+  screens.*.schedule.brightness_strategies.*.brightness: { type: float, description: "Brightness ratio the strategy sets" }
+  screens.*.schedule.brightness_strategies.*.nits: { type: float, unit: nit, description: "Brightness the strategy sets, in nits" }
+  screens.*.schedule.brightness_strategies.*.repeat: { type: bool, description: "The strategy repeats" }
+  screens.*.schedule.preset_strategies.*.start: { type: string, description: "Start time of the preset strategy, keyed by strategy ID" }
+  screens.*.schedule.preset_strategies.*.preset: { type: int, description: "Preset number the strategy applies" }
+  screens.*.schedule.preset_strategies.*.preset_name: { type: string, description: "Name of the preset the strategy applies" }
+  screens.*.schedule.preset_strategies.*.repeat: { type: bool, description: "The strategy repeats" }
+  inputs.*.group: { type: int, description: "Source group ID of the input, keyed by source ID" }
+  inputs.*.type: { type: int, description: "Connector type: 0 DVI, 1 dual DVI, 2 HDMI 1.4, 3 HDMI 2.0, 4 DP 1.1, 5 DP 1.2, 6 DP 1.4, 7 3G-SDI, 8 6G-SDI, 9 12G-SDI, 10 PiP video, 16 HDMI 1.3, 17 HDMI 2.1, 18 PCIe, 19 SerDes, 20 LVDS, 21 V-by-One, 22 ST 2110, 192 DP 1.4 8K, 224 internal source" }
+  inputs.*.name: { type: string, description: "Input name" }
+  inputs.*.signal: { type: bool, description: "A signal is present (sourceStatus 1); false when nothing is plugged in" }
+  inputs.*.width: { type: int, unit: px, description: "Actual input resolution, width" }
+  inputs.*.height: { type: int, unit: px, description: "Actual input resolution, height" }
+  inputs.*.refresh_rate: { type: float, unit: Hz, description: "Actual input frame rate" }
+  inputs.*.color_space: { type: string, description: "Video format: 0 RGB, 1 YCbCr 4:2:2, 2 YCbCr 4:4:4, 3 YCbCr 4:2:0" }
+  inputs.*.range: { type: int, description: "Quantisation range of the signal: 0 limited, 1 full" }
+  inputs.*.interlaced: { type: bool, description: "The signal is interlaced" }
+  inputs.*.edid_width: { type: int, unit: px, description: "EDID resolution, width (set_edid and, for the internal source, set_internal_source write it)" }
+  inputs.*.edid_height: { type: int, unit: px, description: "EDID resolution, height" }
+  inputs.*.edid_refresh_rate: { type: float, unit: Hz, description: "EDID frame rate" }
+  inputs.*.edid_custom: { type: bool, description: "The EDID is custom rather than one from the supported list" }
+  input_config.*.hue: { type: int, description: "Input hue, keyed by the source's logic ID (set_input_hue writes it)" }
+  input_config.*.contrast: { type: int, description: "Input contrast (set_input_contrast writes it)" }
+  input_config.*.saturation: { type: int, description: "Input saturation (set_input_saturation writes it)" }
+  input_config.*.limit_to_full: { type: bool, description: "Limited-to-full conversion on" }
+  input_config.*.range: { type: int, description: "Quantisation range override: 0 limited, 1 full, 255 auto (set_input_range writes it)" }
+  input_config.*.color_space: { type: int, description: "Colour space override (set_input_color_space writes it)" }
+  input_config.*.color_gamut: { type: int, description: "Colour gamut override (set_input_gamut writes it)" }
+  input_config.*.hdr_mode: { type: int, description: "HDR mode override: 0 HDR10, 1 HLG, 2 SDR, 255 auto (set_hdr_mode writes it)" }
+  input_config.*.real_hdr_mode: { type: string, description: "HDR mode in effect: the input's own when the override is auto" }
+  test_pattern.mode: { type: int, description: "Sending card test pattern: 0 solid colour, 16-21 stripes and grids, 32-39 gradients, 48 lightning" }
+  test_pattern.on: { type: bool, description: "Internal source test pattern shown" }
+  test_pattern.red: { type: int, description: "Test pattern red level" }
+  test_pattern.green: { type: int, description: "Test pattern green level" }
+  test_pattern.blue: { type: int, description: "Test pattern blue level" }
+  test_pattern.gray: { type: int, description: "Test pattern grey level" }
+  test_pattern.grid_width: { type: int, description: "Test pattern stripe or grid width" }
+  test_pattern.move_speed: { type: int, description: "Test pattern movement speed" }
+  test_pattern.gradient_stretch: { type: int, description: "Test pattern gradient stretch" }
+  cabinets.*.brightness: { type: float, description: "Cabinet brightness, 0 to 1, keyed by cabinet ID (set_cabinet_brightness writes it)" }
+  cabinets.*.color_temperature: { type: int, unit: K, description: "Cabinet colour temperature (set_cabinet_color_temperature writes it)" }
+  cabinets.*.gamma_red: { type: float, description: "Cabinet red gamma (documented for internal use)" }
+  cabinets.*.gamma_green: { type: float, description: "Cabinet green gamma" }
+  cabinets.*.gamma_blue: { type: float, description: "Cabinet blue gamma" }
+  cabinets.*.canvas: { type: int, description: "Canvas the cabinet is on" }
+  cabinets.*.output_card: { type: int, description: "Output card the cabinet is on" }
+  cabinets.*.output_port: { type: int, description: "Ethernet port the cabinet is connected to" }
+  cabinets.*.width: { type: int, unit: px, description: "Cabinet size, width" }
+  cabinets.*.height: { type: int, unit: px, description: "Cabinet size, height" }
   device.name: { type: string, description: "Controller name" }
-  device.custom_name: { type: string, description: "Controller custom name" }
+  device.custom_name: { type: string, description: "Controller custom name (set_controller_name writes it)" }
   device.model_id: { type: int, description: "Controller model ID" }
   device.serial: { type: string, description: "Controller serial number" }
   device.mac: { type: string, description: "Controller MAC address" }
   device.ip: { type: string, description: "Controller IP address" }
   device.firmware_version: { type: string, description: "Firmware version" }
   device.software_version: { type: string, description: "Software version" }
-  device.working_mode: { type: int, description: "Working mode: 1 fibre converter, 2 sending card (send-only), 3 all-in-one" }
+  device.working_mode: { type: int, description: "Working mode: 1 fibre converter, 2 sending card (send-only), 3 all-in-one (set_working_mode writes it)" }
   device.runtime: { type: int, unit: s, description: "Controller uptime" }
+  device.total_runtime: { type: int, unit: s, description: "Controller total uptime" }
   device.backup_status: { type: int, description: "Backup status: 109 primary in use and backup standby, 110 both in use, 111 primary in use and backup failed, 112 primary failed and backup standby, 113 primary failed and backup in use, 114 and up further failure states" }
   device.mainboard_temperature: { type: float, unit: degC, description: "Main board temperature" }
   device.mainboard_temperature_status: { type: int, description: "Main board temperature status: 0 normal, 1 alarm, 2 fault" }
   device.mainboard_voltage: { type: float, unit: V, description: "Main board voltage" }
   device.mainboard_voltage_status: { type: int, description: "Main board voltage status: 0 normal, 1 alarm, 2 fault" }
-  audio.enabled: { type: bool, description: "SPDIF audio output on" }
-  audio.source: { type: int, description: "Audio source group ID" }
+  monitoring.fans.*.speed: { type: float, description: "Fan speed, keyed by position in the report from 0" }
+  monitoring.fans.*.type: { type: int, description: "Fan: 0 chassis, 1 front panel left, 2 front panel right, 3 FPGA A, 4 FPGA B" }
+  monitoring.fans.*.status: { type: int, description: "Fan status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.voltages.*.value: { type: float, unit: V, description: "Voltage, keyed by position in the report from 0" }
+  monitoring.voltages.*.type: { type: int, description: "Voltage: 0 ARM, 1 FPGA A, 2 FPGA B" }
+  monitoring.voltages.*.status: { type: int, description: "Voltage status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.temperatures.*.value: { type: float, unit: degC, description: "Temperature, keyed by position in the report from 0" }
+  monitoring.temperatures.*.type: { type: int, description: "Temperature: 0 ARM, 1 FPGA A, 2 FPGA B" }
+  monitoring.temperatures.*.status: { type: int, description: "Temperature status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.ports.*.status: { type: int, description: "Control port status, keyed by port number: 0 normal, 1 alarm, 2 fault" }
+  monitoring.cards.*.type: { type: int, description: "Card type, keyed by card ID: 0 input, 1 output, 2 expansion, 3 backplane" }
+  monitoring.cards.*.status: { type: int, description: "Card status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.sources.*.status: { type: int, description: "Active source status, keyed by source ID (values undocumented)" }
+  monitoring.sources.*.input_card: { type: int, description: "Input card of the source" }
+  monitoring.outputs.*.type: { type: int, description: "Output port type, keyed by output ID (values undocumented)" }
+  monitoring.outputs.*.status: { type: int, description: "Output port status (values undocumented)" }
+  monitoring.outputs.*.output_card: { type: int, description: "Output card of the port" }
+  monitoring.cabinets.*.output_port: { type: int, description: "Output port of the cabinet, keyed by cabinet ID" }
+  monitoring.cabinets.*.temperature: { type: float, unit: degC, description: "Cabinet temperature" }
+  monitoring.cabinets.*.temperature_status: { type: int, description: "Cabinet temperature status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.cabinets.*.voltage: { type: float, unit: V, description: "Cabinet voltage" }
+  monitoring.cabinets.*.voltage_status: { type: int, description: "Cabinet voltage status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.cabinets.*.receiving_cards.*.runtime: { type: int, unit: s, description: "Receiving card uptime, keyed by receiving card ID" }
+  monitoring.cabinets.*.receiving_cards.*.temperature: { type: float, unit: degC, description: "Receiving card temperature" }
+  monitoring.cabinets.*.receiving_cards.*.temperature_status: { type: int, description: "Receiving card temperature status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.cabinets.*.receiving_cards.*.voltage: { type: float, unit: V, description: "Receiving card voltage" }
+  monitoring.cabinets.*.receiving_cards.*.voltage_status: { type: int, description: "Receiving card voltage status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.cabinets.*.receiving_cards.*.humidity: { type: float, unit: "%", description: "Receiving card humidity" }
+  monitoring.cabinets.*.receiving_cards.*.humidity_status: { type: int, description: "Receiving card humidity status: 0 normal, 1 alarm, 2 fault" }
+  monitoring.cabinets.*.receiving_cards.*.next_link: { type: bool, description: "Disconnection state of the link to the next cabinet, as reported (linkStatus)" }
+  monitoring.cabinets.*.receiving_cards.*.next_link_status: { type: int, description: "Status of the link to the next cabinet: 0 normal, 1 alarm, 2 fault" }
+  audio.enabled: { type: bool, description: "S/PDIF audio output on (set_audio writes it)" }
+  audio.source: { type: int, description: "Audio source group ID (set_audio writes it)" }
+  backup.primary_mac: { type: string, description: "Primary controller MAC address" }
+  backup.backup_mac: { type: string, description: "Backup controller MAC address" }
+  backup.primary_name: { type: string, description: "Primary controller name" }
+  backup.backup_name: { type: string, description: "Backup controller name" }
+  snmp.enabled: { type: bool, description: "SNMP on (set_snmp writes it)" }
+  multifunction_cards.*.name: { type: string, description: "Multifunction card name, keyed by card ID" }
+  multifunction_cards.*.firmware: { type: string, description: "Multifunction card firmware version" }
+  multifunction_cards.*.connected: { type: bool, description: "Multifunction card connected" }
+  multifunction_cards.*.power: { type: bool, description: "Overall power state of the card's power channels" }
+  multifunction_cards.*.light_sensors.*.ok: { type: bool, description: "Light sensor normal, keyed by peripheral ID" }
+  multifunction_cards.*.light_sensors.*.brightness: { type: string, description: "Average ambient brightness the sensor reports" }
+  multifunction_cards.*.environment_sensors.*.ok: { type: bool, description: "Environment sensor normal, keyed by peripheral ID" }
+  multifunction_cards.*.environment_sensors.*.temperature: { type: float, unit: degC, description: "Environment sensor temperature" }
+  multifunction_cards.*.environment_sensors.*.humidity: { type: float, unit: "%", description: "Environment sensor humidity" }
+  canvases.*.display_mode: { type: int, description: "Canvas display mode as the controller reports it, keyed by canvas ID (the read documents 0 normal, 1 frozen, 2 blackout; the writes use 1 blackout, 2 freeze)" }
+  canvases.*.mapping: { type: bool, description: "Mapping overlay shown on the canvas" }
 
 quirks:
   - models: [all]
@@ -1400,6 +2192,45 @@ quirks:
       (a file download). set_custom_gamma, set_custom_gamut, the colour
       correction data commands and move_cabinets take the documented request
       body as JSON.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits, as documented: these settings can be written but the API
+      documents no read of them, so they are not in state: the brightness
+      limit (on, nits, ratio), custom gamma tables, 14-way colour correction
+      (on and data), the 3D LUT (strength, on), the 3D emitter, the
+      primary/backup verification mode, controller identify and mapping
+      identify, the system time, automatic time and time zone, the input
+      shadow, highlight and black level (the input read names blackLevelInfo
+      without its fields), and per cabinet the RGB and RGBW brightness, test
+      pattern, mapping, multi-mode, no-signal image, thermal compensation and
+      cabinet gamut. The output sync source set by set_sync_source is read
+      only as the genlock data reports it (genlock_group, sync_type).
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits, as documented: layers can only have their source switched.
+      Their window position, size, z-order, lock, border and crop are read
+      (GET /api/v1/screen) but the API documents no command to change them,
+      and none to create or remove a layer. Presets can be applied and
+      modified, not created or deleted; output latency and low latency are
+      read only.
+
+  - models: [all]
+    severity: info
+    text: >
+      The controller does not push. The live values (display parameters,
+      display state, layers, presets, controller and its health) are read every
+      10 seconds; configuration, inputs, cabinets, per-cabinet monitoring and
+      multifunction cards every 60 seconds; and what a write of this
+      integration changes is read again as soon as the controller accepts it.
+      The OpenAPI pages document each read's fields but not always the
+      envelope around a list; the state rules take the documented {code, data,
+      message} envelope with the list as data, or under data where the page
+      names a member (screens, list, screenPresetList, multiModeInfo,
+      InputPortConfig).
 
   - models: [all]
     severity: info
