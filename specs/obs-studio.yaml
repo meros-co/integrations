@@ -1094,14 +1094,41 @@ state:
   device.obs_version:          { type: string, description: "OBS Studio version" }
   device.websocket_version:    { type: string, description: "obs-websocket version" }
   device.platform:             { type: string, description: "Operating system OBS runs on" }
+  scene_collection:            { type: string, description: "Current scene collection, read on connect and from CurrentSceneCollectionChanged" }
+  scene_collections:           { type: array, description: "Scene collection names" }
+  profile:                     { type: string, description: "Current profile" }
+  profiles:                    { type: array, description: "Profile names" }
   program_scene:               { type: string, description: "Scene on program" }
   preview_scene:               { type: string, description: "Scene on preview; absent when studio mode is off" }
   studio_mode:                 { type: bool, description: "Studio mode" }
   scenes:                      { type: array, description: "Scene names, top of the list first" }
+  groups:                      { type: array, description: "Group names" }
+  scene_items.*.*.source:      { type: string, description: "Source shown by the item, keyed by scene (or group) name and scene item id" }
+  scene_items.*.*.source_type: { type: string, description: "Source type, such as OBS_SOURCE_TYPE_INPUT or OBS_SOURCE_TYPE_SCENE" }
+  scene_items.*.*.input_kind:  { type: string, description: "Input kind of the source, when it is an input" }
+  scene_items.*.*.is_group:    { type: bool, description: "The item is a group, when OBS says so" }
+  scene_items.*.*.enabled:     { type: bool, description: "Item visible (enabled), as set_scene_item_enabled sets it" }
+  scene_items.*.*.locked:      { type: bool, description: "Item locked" }
+  scene_items.*.*.index:       { type: int, description: "Item index in the scene, 0 at the bottom" }
+  scene_items.*.*.blend_mode:  { type: string, description: "Blend mode, such as OBS_BLEND_NORMAL; read back after set_scene_item_blend_mode" }
+  scene_items.*.*.transform:   { type: object, description: "Transform and crop as set_scene_item_transform takes it (positionX, scaleX, rotation, cropLeft, boundsType and the rest), published at most every 200 ms" }
+  scene_transitions.*.name:    { type: string, description: "Transition override of the scene, keyed by scene name; absent when the scene has none" }
+  scene_transitions.*.duration_ms: { type: int, unit: ms, description: "Duration of the scene's transition override; absent when it has none" }
+  filters.*.*.kind:            { type: string, description: "Filter kind, keyed by source (input, scene or group) name and filter name" }
+  filters.*.*.enabled:         { type: bool, description: "Filter enabled" }
+  filters.*.*.index:           { type: int, description: "Filter position in the source's filter list, 0 first" }
+  filters.*.*.settings:        { type: object, description: "Filter settings as set_source_filter_settings takes them" }
   transition.name:             { type: string, description: "Current scene transition" }
+  transition.kind:             { type: string, description: "Kind of the current transition, such as fade_transition" }
+  transition.fixed:            { type: bool, description: "The current transition has a fixed duration" }
+  transition.configurable:     { type: bool, description: "The current transition has settings" }
   transition.duration_ms:      { type: int, unit: ms, description: "Current transition duration, when the transition has one" }
+  transition.settings:         { type: object, description: "Settings of the current transition, as set_current_scene_transition_settings takes them" }
+  transition.active:           { type: bool, description: "A scene transition is running" }
+  transitions:                 { type: array, description: "Transitions available, each {name, kind, fixed, configurable}" }
   streaming.active:            { type: bool, description: "Streaming output running" }
   streaming.reconnecting:      { type: bool, description: "Streaming output reconnecting" }
+  streaming.timecode:          { type: string, description: "Stream time as HH:MM:SS.mmm, polled every 5 s" }
   streaming.duration_ms:       { type: int, unit: ms, description: "Time streaming, polled every 5 s" }
   streaming.congestion:        { type: float, description: "Output congestion, 0-1, polled" }
   streaming.bytes:             { type: int, unit: bytes, description: "Bytes sent, polled" }
@@ -1109,11 +1136,53 @@ state:
   streaming.total_frames:      { type: int, description: "Frames delivered by the output, polled" }
   recording.active:            { type: bool, description: "Recording output running" }
   recording.paused:            { type: bool, description: "Recording paused" }
+  recording.timecode:          { type: string, description: "Recording time as HH:MM:SS.mmm, polled every 5 s" }
   recording.duration_ms:       { type: int, unit: ms, description: "Time recording, polled" }
   recording.bytes:             { type: int, unit: bytes, description: "Bytes written, polled" }
+  recording.file:              { type: string, description: "File being written, known once the recording has been split (RecordFileChanged); removed when recording stops" }
+  recording.last_file:         { type: string, description: "File of the last recording, from the stop event" }
+  replay_buffer.active:        { type: bool, description: "Replay buffer running; absent when the profile has no replay buffer" }
+  replay_buffer.last_replay:   { type: string, description: "File of the last saved replay" }
   virtualcam.active:           { type: bool, description: "Virtual camera running" }
-  inputs.*.muted:              { type: bool, description: "Input muted, keyed by input name; audio inputs only" }
-  inputs.*.volume_db:          { type: float, unit: dB, description: "Input volume, keyed by input name; audio inputs only" }
+  outputs.*.kind:              { type: string, description: "Output kind, keyed by output name, polled every 5 s" }
+  outputs.*.active:            { type: bool, description: "Output running, polled" }
+  outputs.*.width:             { type: int, unit: px, description: "Output width, polled" }
+  outputs.*.height:            { type: int, unit: px, description: "Output height, polled" }
+  video.base_width:            { type: int, unit: px, description: "Base (canvas) width" }
+  video.base_height:           { type: int, unit: px, description: "Base (canvas) height" }
+  video.output_width:          { type: int, unit: px, description: "Output (scaled) width" }
+  video.output_height:         { type: int, unit: px, description: "Output (scaled) height" }
+  video.fps_numerator:         { type: int, description: "Frame rate numerator" }
+  video.fps_denominator:       { type: int, description: "Frame rate denominator" }
+  record_directory:            { type: string, description: "Directory recordings are written to" }
+  stream_service.type:         { type: string, description: "Stream service type, such as rtmp_common or rtmp_custom" }
+  stream_service.server:       { type: string, description: "Stream server URL; the stream key is never published" }
+  stats.cpu_percent:           { type: float, unit: "%", description: "OBS's CPU usage, polled every 5 s" }
+  stats.memory_mb:             { type: float, unit: MB, description: "Memory OBS uses, polled" }
+  stats.disk_free_mb:          { type: float, unit: MB, description: "Free space on the recording disk, polled" }
+  stats.active_fps:            { type: float, description: "Frames per second OBS is rendering, polled" }
+  stats.average_frame_render_ms: { type: float, unit: ms, description: "Average time to render a frame, polled" }
+  stats.render_skipped_frames: { type: int, description: "Frames skipped by the renderer, polled" }
+  stats.render_total_frames:   { type: int, description: "Frames rendered, polled" }
+  stats.output_skipped_frames: { type: int, description: "Frames skipped by the outputs, polled" }
+  stats.output_total_frames:   { type: int, description: "Frames output, polled" }
+  inputs.*.kind:               { type: string, description: "Input kind, keyed by input name" }
+  inputs.*.settings:           { type: object, description: "Input settings as set_input_settings takes them (only those differing from the defaults)" }
+  inputs.*.active:             { type: bool, description: "Input shown on program (video active)" }
+  inputs.*.showing:            { type: bool, description: "Input shown anywhere, such as preview or a projector" }
+  inputs.*.muted:              { type: bool, description: "Input muted; audio inputs only" }
+  inputs.*.volume_db:          { type: float, unit: dB, description: "Input volume; audio inputs only" }
+  inputs.*.volume_mul:         { type: float, description: "Input volume as a multiplier; audio inputs only" }
+  inputs.*.balance:            { type: float, description: "Audio balance, 0.0 left to 1.0 right, 0.5 centre" }
+  inputs.*.sync_offset_ms:     { type: int, unit: ms, description: "Audio sync offset" }
+  inputs.*.monitor_type:       { type: string, description: "Audio monitor type: OBS_MONITORING_TYPE_NONE, OBS_MONITORING_TYPE_MONITOR_ONLY or OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" }
+  inputs.*.tracks:             { type: object, description: "Audio track enable states keyed by track number \"1\" to \"6\"" }
+  inputs.*.levels:             { type: array, description: "Audio levels per channel, each {magnitude_db, peak_db, input_peak_db}, floored at -100 dB, published at most every 200 ms with the peaks held over that time; absent while the input is not active" }
+  inputs.*.deinterlace_mode:   { type: string, description: "Deinterlace mode, such as OBS_DEINTERLACE_MODE_DISABLE; asynchronous video inputs on obs-websocket 5.6 or later" }
+  inputs.*.deinterlace_field_order: { type: string, description: "Deinterlace field order: OBS_DEINTERLACE_FIELD_ORDER_TOP or OBS_DEINTERLACE_FIELD_ORDER_BOTTOM" }
+  inputs.*.media.state:        { type: string, description: "Media state, such as OBS_MEDIA_STATE_PLAYING; media, VLC and slide show inputs only" }
+  inputs.*.media.cursor_ms:    { type: int, unit: ms, description: "Media position, read every second while playing" }
+  inputs.*.media.duration_ms:  { type: int, unit: ms, description: "Media length" }
 
 quirks:
   - models: [all]
@@ -1134,8 +1203,36 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Inputs are keyed by name, and OBS lets a user rename them. A rename is
-      reported as the old name removed and the new name added.
+      Scenes, inputs, filters and outputs are keyed by name, and OBS lets a
+      user rename them. A rename is reported as the old name removed and the
+      new name added. Collections are replaced, not merged: whatever OBS no
+      longer lists is deleted from the state, and a change of scene collection
+      (or a new connection) clears scene items, filters, inputs, scene
+      transition overrides, groups and outputs and reads them again.
+
+  - models: [all]
+    severity: info
+    text: >
+      Monitored, the core subscribes to every event category but canvases, and
+      to the high-volume volume meters, input active and show states, and
+      scene item transforms. Volume meters (every 50 ms from OBS) and
+      transforms are published at most every 200 ms. OBS sends no event for a
+      media input's position, output statistics, other outputs, scene item
+      blend modes, deinterlacing, scene transition overrides, video settings,
+      the record directory or the stream service: media position is read every
+      second while it plays, status and statistics every 5 s, and the rest
+      after the command that sets them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not kept in state, as the API only reads them on request: persistent
+      data, profile parameters, hotkeys, the monitor list, output settings,
+      input kinds, filter kinds, the transition cursor and the T-bar position
+      (set_t_bar_position has no read-back). The stream service's settings
+      hold the stream key, so only its type and server are published.
+      Canvases (obs-websocket 5.7) other than the main one are not mirrored;
+      their commands work.
 
   - models: [all]
     severity: info
