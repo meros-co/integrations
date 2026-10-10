@@ -7,7 +7,8 @@ YTF = "yamaha-tf"
 def _ytf_vectors():
     S = YTF
     # (command base, RCP address, X (param, max) or None, Y (param, max) or None,
-    #  value kind, state path or None, set-only), transcribed from the document.
+    #  value kind, state path or None, set-only), transcribed from Yamaha's command list and the console's
+    #  own parameter list (prminfo answers, as the Companion module's schemas/TF Parameters-1.txt records them).
     rows = [
         ('input_fader_level', 'MIXER:Current/InCh/Fader/Level', ('channel', 40), None, ('level', 1000), 'inputs.{x}.fader_level', False),
         ('input_on', 'MIXER:Current/InCh/Fader/On', ('channel', 40), None, ('bool',), 'inputs.{x}.on', False),
@@ -177,7 +178,28 @@ _ytf_explicit("text", "recall_scene", {"bank": "a", "scene": 0}, "ssrecall_ex sc
               device_reply="OK ssrecall_ex scene_a 0\n", expect_result={"ok": {"kind": "ack"}})
 _ytf_explicit("text", "get_current_scene", {"bank": "b"}, "sscurrent_ex scene_b\n",
               device_reply="ERROR sscurrent_ex InvalidArgument\n", expect_result={"error": {"error": "device_error"}})
-_ytf_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex scene_b 1\n", expect_state={"scenes": {"b": {"current": 1}}})
+# A pushed scene change re-reads what is read on connecting (DME7 spec p.10: a recall is not notified
+# parameter by parameter). Address and channel count of each, in the order they are read.
+_YTF_REREAD = [f"get MIXER:Current/{a} {x} 0\n" for a, n in (
+    ("InCh/Fader/Level", 40), ("InCh/Fader/On", 40), ("InCh/ToSt/Pan", 40), ("StInCh/Fader/Level", 4),
+    ("StInCh/Fader/On", 4), ("StInCh/ToSt/Pan", 4), ("FxRtnCh/Fader/Level", 4), ("FxRtnCh/Fader/On", 4),
+    ("FxRtnCh/ToSt/Pan", 4), ("DCA/Fader/Level", 8), ("DCA/Fader/On", 8), ("Mix/Fader/Level", 20), ("Mix/Fader/On", 20),
+    ("Mtrx/Fader/Level", 4), ("Mtrx/Fader/On", 4), ("St/Fader/Level", 2), ("St/Fader/On", 2), ("Mono/Fader/Level", 1),
+    ("Mono/Fader/On", 1), ("MuteMaster/On", 6), ("InCh/Label/Name", 40), ("InCh/Label/Color", 40),
+    ("StInCh/Label/Name", 4), ("StInCh/Label/Color", 4), ("FxRtnCh/Label/Name", 4), ("FxRtnCh/Label/Color", 4),
+    ("DCA/Label/Name", 8), ("DCA/Label/Color", 8), ("Mix/Label/Name", 20), ("Mix/Label/Color", 20),
+    ("Mtrx/Label/Name", 4), ("Mtrx/Label/Color", 4), ("St/Label/Name", 2), ("St/Label/Color", 2),
+    ("Mono/Label/Name", 1), ("Mono/Label/Color", 1), ("MuteMaster/Label/Name", 6),
+) for x in range(n)]
+_ytf_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex scene_b 1\n", expect_state={"scenes": {"b": {"current": 1}}},
+              expect_then_send=_YTF_REREAD)
+_ytf_explicit("telemetry", "scene-current-reply", inbound="OK sscurrent_ex scene_a 3 unmodified\n",
+              expect_state={"scenes": {"a": {"current": 3, "modified": False}}})
+# Scene step events: the console's scninfo list (MIXER:Lib/Scene/RecallInc, RecallDec); event form as Yamaha's DM7 document.
+_ytf_explicit("text", "recall_next_scene", {}, "event MIXER:Lib/Scene/RecallInc\n",
+              device_reply="OK event MIXER:Lib/Scene/RecallInc\n", expect_result={"ok": {"kind": "ack"}})
+_ytf_explicit("text", "recall_previous_scene", {}, "event MIXER:Lib/Scene/RecallDec\n",
+              device_reply="OK event MIXER:Lib/Scene/RecallDec\n", expect_result={"ok": {"kind": "ack"}})
 _ytf_explicit("telemetry", "scene-modified", inbound="OK sscurrent_ex scene_a 3 unmodified\n",
               expect_state={"scenes": {"a": {"current": 3, "modified": False}}})
 _ytf_explicit("telemetry", "scene-recalled", inbound="OK ssrecall_ex scene_a 5\n", expect_state={"scenes": {"a": {"current": 5}}})
