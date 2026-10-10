@@ -1521,12 +1521,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## yamaha-tf — Yamaha TF
 
-- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-tf.yaml:1260](specs/yamaha-tf.yaml#L1260))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-tf.yaml:1322](specs/yamaha-tf.yaml#L1322))
-- [ ] Confirm get_current_scene (sscurrent_ex scene_a|scene_b) and its reply, and that the inactive list's query is answered with an error. ([specs/yamaha-tf.yaml:1355](specs/yamaha-tf.yaml#L1355))
-- [ ] Confirm the address uses "InCh" (the QLab guide prints "Inch"). ([specs/yamaha-tf.yaml:1370](specs/yamaha-tf.yaml#L1370))
-- [ ] On a TF, confirm the fader level and ON addresses of every channel type (InCh, StInCh, FxRtnCh, DCA, Mix, Mtrx, St, Mono), ToSt/Pan on InCh, StInCh and FxRtnCh, Mix and St Out/Balance, Mix/PanLink and MuteMaster/On, and that set, get and NOTIFY set use them. ([specs/yamaha-tf.yaml:1273](specs/yamaha-tf.yaml#L1273))
-- [ ] Confirm the numbering inferred from the list's counts: StInCh 1-4 as ST IN 1L, 1R, 2L, 2R; FxRtnCh 1-4 as FX1 L, FX1 R, FX2 L, FX2 R; St 1-2 as L and R; and whether ToStereo/Pan is an alias of ToSt/Pan. ([specs/yamaha-tf.yaml:1284](specs/yamaha-tf.yaml#L1284))
+- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-tf.yaml:2995](specs/yamaha-tf.yaml#L2995))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-tf.yaml:3057](specs/yamaha-tf.yaml#L3057))
+- [ ] Confirm get_current_scene (sscurrent_ex scene_a|scene_b) and its reply, and that the inactive list's query is answered with an error. ([specs/yamaha-tf.yaml:3090](specs/yamaha-tf.yaml#L3090))
+- [ ] Confirm the address uses "InCh" (the QLab guide prints "Inch"). ([specs/yamaha-tf.yaml:3105](specs/yamaha-tf.yaml#L3105))
+- [ ] On a TF, confirm the fader level and ON addresses of every channel type (InCh, StInCh, FxRtnCh, DCA, Mix, Mtrx, St, Mono), ToSt/Pan on InCh, StInCh and FxRtnCh, Mix and St Out/Balance, Mix/PanLink and MuteMaster/On, and that set, get and NOTIFY set use them. ([specs/yamaha-tf.yaml:3008](specs/yamaha-tf.yaml#L3008))
+- [ ] Confirm the numbering inferred from the list's counts: StInCh 1-4 as ST IN 1L, 1R, 2L, 2R; FxRtnCh 1-4 as FX1 L, FX1 R, FX2 L, FX2 R; St 1-2 as L and R; and whether ToStereo/Pan is an alias of ToSt/Pan. ([specs/yamaha-tf.yaml:3019](specs/yamaha-tf.yaml#L3019))
+- [ ] Confirm the Label/Name (up to 64 characters in the list), Label/Color, Label/Icon and Label/Category addresses, the colour and icon names, and the category names (the list types icon and category as binary). ([specs/yamaha-tf.yaml:3111](specs/yamaha-tf.yaml#L3111))
 
 ## youtube-live — YouTube Live
 
