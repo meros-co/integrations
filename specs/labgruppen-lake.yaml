@@ -42,6 +42,8 @@ settings:
                    description: "Milliseconds between meter and fault reads while monitored; 0 reads none." }
   parameter_poll_ms: { type: int, min: 0, max: 600000, default: 5000, label: Parameter interval,
                        description: "Milliseconds between rounds of parameter reads (power, mutes, gains, labels) while monitored; 0 reads them once." }
+  configuration_poll_ms: { type: int, min: 0, max: 3600000, default: 60000, label: Configuration interval,
+                           description: "Milliseconds between rounds of configuration reads (limiters, amplifier, routing, breaker, LoadPilot, GPIO, network) while monitored; 0 reads them once." }
 
 ports:
   - { port: 6016, protocol: udp, role: control, note: "dynamic answer port mode: the device answers the sender's port" }
@@ -163,7 +165,7 @@ models:
       set_output_delay, set_output_polarity, set_output_label, set_output_max_rms_level, set_output_max_rms_corner,
       set_output_max_rms_attack, set_output_max_rms_release, set_output_max_peak_level, get_output_parameter,
       get_output_channels, set_input_mute, set_input_gain, set_input_delay, set_input_polarity, set_input_label,
-      set_input_mixer_gain, set_module_label, set_module_selected, query, send_message]
+      set_input_mixer_gain, set_module_label, set_module_selected, set_output_route_lm, query, send_message]
     verification: none
     notes: LM Series processor, DLM version 2 (firmware 0.32 and later); modules A-B, no amplifier.
   - id: lm-26
@@ -344,6 +346,18 @@ commands:
       channel: { type: int, min: 1, max: 2, default: 1, label: Channel, description: "Input or probe channel, 1 or 2." }
       probe: { type: enum, values: [U, I], default: U, label: Probe, description: "For a probe: U for voltage, I for current." }
       power_channel: { type: int, min: 1, max: 4, default: 1, label: Power channel, description: "For a probe: the amplifier channel probed, 1 to 4." }
+    returns: ack
+  set_output_route_lm:
+    summary: "Route a source to the LM's analog, AES or Dante outputs (Dev.Out.Route=), one position per output"
+    params:
+      source: { type: enum, values: [PC, Analog, AES, Dante, Router], required: true, label: Source,
+                description: "A processing channel (PC), an analog, AES or Dante input, or an input router." }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel,
+                 description: "Source channel: 1-6 for PC and Router, 1-2 for Analog, 1-4 for AES and Dante." }
+      output_type: { type: enum, values: [Analog, AES, Dante], required: true, label: Output type,
+                     description: "The outputs routed: the six analog, or the eight AES or Dante outputs." }
+      outputs: { type: string, required: true, pattern: "^[X-]{6}([X-]{2})?$", label: Outputs,
+                 description: "One position per output, X routed and - not: six for Analog, eight for AES and Dante, e.g. XX----." }
     returns: ack
   set_router_input:
     summary: >
@@ -631,6 +645,49 @@ commands:
 
 state:
   device.frame_id:                  { type: string, description: "Frame id, xxxxxxxx:xxxxxxxx" }
+  device.subnet_mask:               { type: string, description: "Subnet mask" }
+  device.ip_config:                 { type: string, description: "IP configuration: zero_conf, dhcp or static (PLM 4.33, LM 2.30)" }
+  device.redundancy:                { type: bool, description: "Dual network redundancy enabled (PLM 4.33, LM 2.30)" }
+  device.dante_slave_only:          { type: bool, description: "Dante slave-only enabled" }
+  device.iso_float_grounded:        { type: bool, description: "ISO-float grounded (amplifiers)" }
+  device.iso_float_inputs_grounded: { type: bool, description: "Inputs grounded (LM)" }
+  device.iso_float_outputs_grounded: { type: bool, description: "Outputs grounded (LM)" }
+  device.aes_terminated:            { type: bool, description: "AES loop terminated (PLM+, PLM, LM)" }
+  device.breaker.nominal_current_a: { type: float, unit: A, description: "Breaker emulation nominal mains current" }
+  device.breaker.actual_current_a:  { type: float, unit: A, description: "Breaker emulation actual current, as Dev.Fuse.NominalCurrent answers it" }
+  device.breaker.type:              { type: string, description: "Breaker emulation type: conservative, fast or universal" }
+  power_channels.*.latency_ms:      { type: float, unit: ms, description: "Total latency of the power channel, amplifier and Lake" }
+  power_channels.*.speakers:        { type: int, description: "Loudspeakers on the power channel, for load monitoring" }
+  power_channels.*.load_pilot.enabled: { type: bool, description: "LoadPilot on (D Series and PLM+)" }
+  power_channels.*.load_pilot.tone_1_hz: { type: float, unit: Hz, description: "LoadPilot tone 1 frequency (10 Hz)" }
+  power_channels.*.load_pilot.tone_2_hz: { type: float, unit: Hz, description: "LoadPilot tone 2 frequency (24 kHz)" }
+  power_channels.*.load_pilot.tone_1_amplitude_v: { type: float, unit: V, description: "LoadPilot tone 1 amplitude" }
+  power_channels.*.load_pilot.tone_2_amplitude_v: { type: float, unit: V, description: "LoadPilot tone 2 amplitude" }
+  power_channels.*.load_pilot.tone_1_lower_ohm: { type: float, unit: ohm, description: "LoadPilot tone 1 lower impedance threshold" }
+  power_channels.*.load_pilot.tone_2_lower_ohm: { type: float, unit: ohm, description: "LoadPilot tone 2 lower impedance threshold" }
+  power_channels.*.load_pilot.tone_1_upper_ohm: { type: float, unit: ohm, description: "LoadPilot tone 1 upper impedance threshold" }
+  power_channels.*.load_pilot.tone_2_upper_ohm: { type: float, unit: ohm, description: "LoadPilot tone 2 upper impedance threshold" }
+  power_channels.*.load_pilot.tone_1_impedance_ohm: { type: float, unit: ohm, description: "LoadPilot tone 1 last impedance reading" }
+  power_channels.*.load_pilot.tone_2_impedance_ohm: { type: float, unit: ohm, description: "LoadPilot tone 2 last impedance reading" }
+  power_channels.*.load_pilot.tone_1_current_ma: { type: float, unit: mA, description: "LoadPilot tone 1 last current reading" }
+  power_channels.*.load_pilot.tone_2_current_ma: { type: float, unit: mA, description: "LoadPilot tone 2 last current reading" }
+  power_channels.*.pilot_tone.active: { type: bool, description: "Pilot tone generation on (PLM)" }
+  power_channels.*.pilot_tone.impedance_ohm: { type: float, unit: ohm, description: "Pilot tone load impedance, about 1.5 s average (PLM); absent while not measured" }
+  channel_pairs.*.bridged:          { type: bool, description: "Power channel pair 1 (1-2) or 2 (3-4) bridged" }
+  dante_break_in.*.source:          { type: string, description: "What a Dante transmitter 1-2 sends: Analog, AES, Probe or Empty" }
+  dante_break_in.*.channel:         { type: int, description: "Its input or probe channel" }
+  dante_break_in.*.probe:           { type: string, description: "For a probe: U voltage or I current" }
+  dante_break_in.*.power_channel:   { type: int, description: "For a probe: the power channel probed" }
+  dante_inputs.*.label:             { type: string, description: "Dante input 1-4 label, empty when unused (LM)" }
+  routing.*.*.Analog:               { type: string, description: "LM: the analog outputs a source (PC, Analog, AES, Dante, Router, then channel) feeds, X routed and - not, per output" }
+  routing.*.*.AES:                  { type: string, description: "LM: the AES outputs a source feeds, X routed and - not" }
+  routing.*.*.Dante:                { type: string, description: "LM: the Dante outputs a source feeds, X routed and - not" }
+  gpi.*.closed_action:              { type: string, description: "LM: what GPI 1-2 does when closed" }
+  gpi.*.opened_action:              { type: string, description: "LM: what GPI 1-2 does when opened" }
+  gpi.*.state:                      { type: string, description: "LM: GPI 1-2 Open or Closed" }
+  gpo.*.indication:                 { type: string, description: "LM: what GPO 1-2 closes on" }
+  gpo.*.state:                      { type: string, description: "LM: GPO 1-2 Open or Closed" }
+  input_sample_rates.*.*:           { type: float, unit: kHz, description: "Sample rate of an AES (or on LM, Dante) input, keyed AES or Dante then channel; 0 without input" }
   device.model_name:                { type: string, description: "Model name (Dev.ModelName, D Series and PLM+)" }
   device.bundle_version:            { type: string, description: "Firmware bundle version" }
   device.ip_address:                { type: string, description: "IP address" }
@@ -644,26 +701,36 @@ state:
   power_channels.*.attenuation_db:  { type: float, unit: dB, description: "Power channel attenuation, -100 to 0" }
   router_inputs.*.mute:             { type: bool, description: "Input router muted" }
   router_inputs.*.active_priority:  { type: int, description: "Input router's active priority, 1-4" }
+  router_inputs.*.forced_priority:  { type: int, description: "0 selects by priority automatically, 1-4 forces that priority" }
+  router_inputs.*.priorities.*.type: { type: string, description: "Source type at the priority 1-4: Analog, AES, Dante or Empty" }
+  router_inputs.*.priorities.*.channel: { type: int, description: "Source channel at the priority" }
+  router_inputs.*.priorities.*.sensitivity: { type: float, description: "Sensitivity at the priority, dBu for analog, dB for AES and Dante" }
+  router_inputs.*.priorities.*.dante_name: { type: string, description: "Dante channel name at the priority, when given" }
   modules.*.output_channels:        { type: int, description: "Module output channels, 1-6 (module A-D)" }
   modules.*.label:                  { type: string, description: "Module label" }
+  modules.*.selected:               { type: bool, description: "Module marked selected, as Lake Controller and the front panel show it" }
+  modules.*.input.mixer.*.gain_db:  { type: float, unit: dB, description: "Input mixer gain from input router 1-4 (D Series, PLM+, LM)" }
   modules.*.input.mute:             { type: bool, description: "Module input muted" }
   modules.*.input.gain_db:          { type: float, unit: dB, description: "Module input gain, -100 to 15" }
   modules.*.input.delay_ms:         { type: float, unit: ms, description: "Module input delay, 0 to 1800" }
-  modules.*.input.polarity_positive: { type: bool, description: "Module input polarity positive, after a set" }
-  modules.*.input.label:            { type: string, description: "Module input label, after a set" }
+  modules.*.input.polarity_positive: { type: bool, description: "Module input polarity positive" }
+  modules.*.input.label:            { type: string, description: "Module input label" }
   modules.*.outputs.*.mute:         { type: bool, description: "Module output channel muted" }
   modules.*.outputs.*.gain_db:      { type: float, unit: dB, description: "Module output channel gain, -100 to 20" }
   modules.*.outputs.*.delay_ms:     { type: float, unit: ms, description: "Module output channel delay, 0 to 100" }
   modules.*.outputs.*.label:        { type: string, description: "Module output channel label" }
-  modules.*.outputs.*.polarity_positive: { type: bool, description: "Output polarity positive, after a set" }
-  modules.*.outputs.*.max_rms_level_db: { type: float, unit: dB, description: "MaxRMS level, after a set" }
-  modules.*.outputs.*.max_rms_corner_db: { type: float, unit: dB, description: "MaxRMS corner, after a set" }
-  modules.*.outputs.*.max_rms_attack_ms: { type: float, unit: ms, description: "MaxRMS attack, after a set" }
-  modules.*.outputs.*.max_rms_release_ms: { type: float, unit: ms, description: "MaxRMS release, after a set" }
-  modules.*.outputs.*.max_peak_level_db: { type: float, unit: dB, description: "MaxPeak level, after a set" }
-  modules.*.outputs.*.amp_gain_db:  { type: int, unit: dB, description: "Amplifier gain, after a set" }
-  modules.*.outputs.*.vpl_v:        { type: float, unit: V, description: "Desired voltage peak limit, after a set" }
-  modules.*.outputs.*.vpl_profile:  { type: int, description: "VPL profile 0-5 (universal, sub/LF, sub, LF, MF, HF), after a set" }
+  modules.*.outputs.*.polarity_positive: { type: bool, description: "Output polarity positive" }
+  modules.*.outputs.*.polarity_locked: { type: bool, description: "Output polarity locked" }
+  modules.*.outputs.*.max_rms_level_db: { type: float, unit: dB, description: "MaxRMS level" }
+  modules.*.outputs.*.max_rms_corner_db: { type: float, unit: dB, description: "MaxRMS corner" }
+  modules.*.outputs.*.max_rms_attack_ms: { type: float, unit: ms, description: "MaxRMS attack" }
+  modules.*.outputs.*.max_rms_release_ms: { type: float, unit: ms, description: "MaxRMS release" }
+  modules.*.outputs.*.max_peak_level_db: { type: float, unit: dB, description: "MaxPeak level" }
+  modules.*.outputs.*.amp_gain_db:  { type: int, unit: dB, description: "Amplifier gain" }
+  modules.*.outputs.*.vpl_v:        { type: float, unit: V, description: "Desired voltage peak limit" }
+  modules.*.outputs.*.actual_vpl_v: { type: float, unit: V, description: "Actual voltage peak limit, as Mod.Out.AmpVPL answers it" }
+  modules.*.outputs.*.vpl_profile:  { type: int, description: "VPL profile 0-5 (universal, sub/LF, sub, LF, MF, HF)" }
+  modules.*.outputs.*.power_outputs.*: { type: bool, description: "The output channel feeds power output 1-4 (Dev.Route, amplifiers)" }
   meters.amp:                       { type: object, description: "Amp status (Appendix B 9.2.2.2): power_on, psu_failure, pal, audio_in_fault, psu_temperature and dsp_temperature (ok, warning, fault), load_monitor_active, protect, sense_warning" }
   meters.power_channels.*:          { type: object, description: "Per power channel 1-4: status flags (service, vhf, short_circuit, temperature, open_load, voltage_clip, current_clip, load_correct, load_wrong, load_not_verified, cal_active), voltage_rms_db, power_db, voltage_db and current_db relative to the channel's maximum, gain_reduction_db; peak and hold since the last read" }
   meters.status:                    { type: object, description: "The frame's status bits: network links, controller present, clock slips, Dante leader and Dante module faults (D Series and PLM+), protective mute, fan and temperature (LM)" }
@@ -707,11 +774,35 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Nothing is pushed. While monitored the module reads the meters and the fault flag every meter_poll_ms, and every
-      parameter_poll_ms the power state, frame label, power channel mutes and attenuations, input router mutes and
+      Nothing is pushed. While monitored the module reads the meters and the fault flag every meter_poll_ms; every
+      parameter_poll_ms the power state, frame label, latency match, power channel mutes and attenuations, LoadPilot
+      readings (D Series and PLM+) or pilot tone impedances (PLM), GPI and GPO states (LM), input router mutes and
       active priorities, and each module's label, input mute, gain and delay and each output channel's mute, gain,
-      delay and label (for the channel count Mod.Out.Chans gives). One request is in flight at a time, commands
-      ahead of polls; a round is not started while the last is still being read.
+      delay and label (for the channel count Mod.Out.Chans gives); and every configuration_poll_ms (a minute by
+      default) every other setting DLM can read: ISO-float, AES termination, redundancy, IP configuration, address
+      and mask, Dante slave-only, breaker current and type, per power channel latency, speaker count, LoadPilot
+      enable, signal and thresholds or pilot tone, bridge mode, Dante break-in, the LM's output routing, GPI and GPO
+      configuration and Dante input labels, every input router priority and forced priority, input sample rates,
+      and each module's selection, input polarity, label and mixer gains and each output channel's power routing,
+      polarity, limiters, amplifier gain, VPL and VPL profile. Sets update state when acknowledged. One request is
+      in flight at a time, commands ahead of polls; a round is not started while the last is still being read.
+  - models: [all]
+    severity: info
+    text: >
+      DLM v3.4 has no EQ, crossover, filter or speaker-preset command (8.2 lists every command: module outputs offer
+      gain, delay, polarity, label, the MaxRMS and MaxPeak limiters and the amplifier settings; module inputs gain,
+      delay, polarity, label and mixer gains). EQ and crossovers are set in Lake Controller only: an API limit.
+      Dev.Load.MaskNotVerified (PLM 2.94) is obsolete from Lake Controller 6.3, as the warning it masks was removed,
+      and Dev.Speakers is the older form of Dev.Load.Speakers; neither is offered beyond send_message. DLM cannot
+      read which frame preset is active (FAQ 9).
+  - models: [all]
+    severity: info
+    text: >
+      Several answers hold more than one value: Dev.Fuse.NominalCurrent the nominal and actual current, LoadPilot
+      four tones' values, Dev.Router.InputTypSel the type, channel, sensitivity and an optional Dante name,
+      Dev.Dante.BreakIn the type and channel (and probe and power channel for a probe), Mod.Out.Phase the polarity
+      and its lock, Mod.Out.AmpVPL the desired, minimum, maximum and actual VPL, and Dev.Route one X or dash per power
+      output. Each word is read into its own key, in the order the document gives; a dash is taken as not routed.
   - models: [all]
     severity: info
     text: >
