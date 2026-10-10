@@ -91,3 +91,72 @@ telemetry(TV1, "preset-list", inbound="Routing.Preset.PresetList[2]=side_by_side
           expect_state={"presets": {"2": {"name": "side_by_side", "canvas": "Canvas1", "duration": 3000}}})
 telemetry(TV1, "device", inbound="CORIOmax.Model_Name = CORIOmaster\r\nCORIOmax.Model_Number = C3-540\r\n",
           expect_state={"device": {"model_name": "CORIOmaster", "model_number": "C3-540"}})
+_tv("layout_alias", {"layout": 1, "alias": "Wall"}, "Layout1.Alias = Wall")
+_tv("storyboard_canvas", {"storyboard": 1, "canvas": 1}, "Stbds.Stbd1.Canvas = Canvas1")
+
+# Lists: each entry is read whole (Commands 411, Windows, Canvases, Layouts and Stbds lists).
+telemetry(TV1, "windows-list", inbound="Windows.Window3 = <...>\r\n", expect_state={},
+          expect_then_send=["Window3\r\n"])
+telemetry(TV1, "canvases-list", inbound="Routing.Canvases.Canvas2 = <...>\r\n", expect_state={},
+          expect_then_send=["Canvas2\r\n"])
+telemetry(TV1, "layouts-list", inbound="Layouts.Layout1 = <...>\r\n", expect_state={},
+          expect_then_send=["Layout1\r\n"])
+telemetry(TV1, "storyboards-list", inbound="Stbds.Stbd12 = <...>\r\n", expect_state={},
+          expect_then_send=["Stbds.Stbd12\r\n"])
+telemetry(TV1, "window-properties",
+          inbound="Window1.Status = FREE\r\nWindow1.RotateDeg = 90\r\nWindow1.WDPQ = 2048\r\nWindow1.BdrPixWidth = 1\r\n"
+                  "Window1.BdrRGB = 16711680\r\nWindow1.HFlip = On\r\nWindow1.VFlip = Off\r\nWindow1.FTB = 0\r\n"
+                  "Window1.SCFTB = Off\r\nWindow1.SCHShrink = On\r\nWindow1.SCVShrink = Off\r\nWindow1.SCSpin = -3\r\n"
+                  "Window1.KeyingLayer = 2\r\nWindow1.KeyingYMin = 0\r\nWindow1.KeyingYMax = 40\r\n"
+                  "Window1.KeyingYSoft = 5\r\nWindow1.Zorder = 1\r\nWindow1.Canvas = Canvas1\r\nWindow1.Alias = NULL\r\n",
+          expect_state={"windows": {"1": {
+              "status": "FREE", "rotation": 90, "quality": 2048, "border_width": 1, "border_color": 16711680,
+              "hflip": True, "vflip": False, "fade": 0, "animate_fade": False, "animate_hshrink": True,
+              "animate_vshrink": False, "animate_spin": -3, "keying_layer": 2, "luma_key_min": 0,
+              "luma_key_max": 40, "luma_key_softness": 5, "zorder": 1, "canvas": "Canvas1", "alias": "NULL"}}})
+telemetry(TV1, "canvas-properties",
+          inbound="Canvas1.Status = FREE\r\nCanvas1.Alias = Main\r\nCanvas1.WindowList = Window1,Window2\r\n"
+                  "Canvas1.LayoutList = Layout1\r\nCanvas1.StbdCurrent = NULL\r\nCanvas1.AudioFollowWindow = 0\r\n"
+                  "Canvas1.AudioMute = Off\r\nCanvas1.AudioSource = NULL\r\nCanvas1.AudioMode = FromSource\r\n"
+                  "Canvas1.AudioVolume = 100\r\n",
+          expect_state={"canvases": {"1": {
+              "status": "FREE", "alias": "Main", "windows": "Window1,Window2", "layouts": "Layout1",
+              "current_storyboard": "NULL", "audio_follow_window": 0, "audio_mute": False, "audio_source": "NULL",
+              "audio_mode": "FromSource", "audio_volume": 100}}})
+telemetry(TV1, "canvas-audio-mode-lower", inbound="canvas1.AudioMode = FollowWindow\r\n",
+          expect_state={"canvases": {"1": {"audio_mode": "FollowWindow"}}})
+telemetry(TV1, "layout-properties",
+          inbound="Layout1.Status = FREE\r\nLayout1.Alias = NULL\r\nLayout1.Canvas = Canvas1\r\n"
+                  "Layout1.CanWidth4kUnit = 4096\r\nLayout1.CanHeight4kUnit = 4096\r\nLayout1.CanXCentre = 0\r\n"
+                  "Layout1.CanYCentre = -10\r\nLayout1.StbdActive = No\r\nLayout1.OutputList = Slot13.Out1,Slot16.Out2\r\n"
+                  "Layout1.Mode = Normal\r\n",
+          expect_state={"layouts": {"1": {
+              "status": "FREE", "alias": "NULL", "canvas": "Canvas1", "width": 4096, "height": 4096, "x": 0, "y": -10,
+              "storyboard_active": False, "outputs": "Slot13.Out1,Slot16.Out2", "mode": "Normal"}}})
+telemetry(TV1, "storyboard-properties",
+          inbound="Stbds.Stbd1.Name = start\r\nStbds.Stbd1.Canvas = Canvas1\r\nStbds.Stbd1.IsCurrent = No\r\n",
+          expect_state={"storyboards": {"1": {"name": "start", "canvas": "Canvas1", "current": False}}})
+telemetry(TV1, "canvas-mute-event", inbound="!Event CANVAS,PROPERTY_CHANGED,Canvas1,AudioMute,On\r\n",
+          expect_state={"canvases": {"1": {"audio_mute": True}}})
+telemetry(TV1, "canvas-mode-event", inbound="!Event CANVAS,PROPERTY_CHANGED,Canvas1,AudioMode,FromSource\r\n",
+          expect_state={"canvases": {"1": {"audio_mode": "FromSource"}}})
+telemetry(TV1, "canvas-follow-event", inbound="!Event CANVAS,PROPERTY_CHANGED,Canvas1,AudioFollowWindow,Window1\r\n",
+          expect_state={"canvases": {"1": {"audio_follow_window": 1}}})
+telemetry(TV1, "canvas-source-event", inbound="!Event CANVAS,PROPERTY_CHANGED,Canvas1,AudioSource,Slot1.In1\r\n",
+          expect_state={"canvases": {"1": {"audio_source": "Slot1.In1"}}})
+telemetry(TV1, "canvas-volume-event", inbound="!Event CANVAS,PROPERTY_CHANGED,Canvas1,AudioVolume,50\r\n",
+          expect_state={"canvases": {"1": {"audio_volume": 50}}})
+telemetry(TV1, "canvas-storyboard-event", inbound="!Event CANVAS, STBDCURRENT_CHANGED,Canvas1,Stbd1,\r\n",
+          expect_state={"canvases": {"1": {"current_storyboard": "Stbd1"}}})
+telemetry(TV1, "preset-complete-event", inbound="!Event PRESET, COMPLETE,1\r\n",
+          expect_state={"preset": {"completed": 1}}, expect_then_send=["Windows\r\n"])
+telemetry(TV1, "storyboard-event-reread", inbound="!Event STBD,ISCURRENT_CHANGED,Stbd2,0\r\n",
+          expect_state={"storyboards": {"2": {"current": False}}}, expect_then_send=["Windows\r\n"])
+telemetry(TV1, "preset-save-event", inbound="!Event PRESET,SAVE,3\r\n", expect_state={},
+          expect_then_send=["Preset.PresetList()\r\n"])
+telemetry(TV1, "preset-remove-event", inbound="!Event PRESET, REMOVE,3\r\n",
+          state_before={"presets": {"3": {"name": "side_by_side", "canvas": "Canvas1", "duration": 3000},
+                                    "4": {"name": "two", "canvas": "Canvas1", "duration": 1000}}},
+          expect_state={"presets": {"4": {"name": "two", "canvas": "Canvas1", "duration": 1000}}})
+telemetry(TV1, "preset-edit-reread", inbound="Preset.NameRead = side_by_side\r\n", expect_state={},
+          expect_then_send=["Preset.PresetList()\r\n"])

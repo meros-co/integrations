@@ -1300,14 +1300,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-v60hd — Roland V-60HD
 
-- [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all). ([specs/roland-v60hd.yaml:463](specs/roland-v60hd.yaml#L463))
-- [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:476](specs/roland-v60hd.yaml#L476))
+- [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all) and the order of the QAL:13 frame (inputs 0-10, AUX, MASTER OUT assumed). ([specs/roland-v60hd.yaml:430](specs/roland-v60hd.yaml#L430))
+- [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:498](specs/roland-v60hd.yaml#L498))
 
 ## roland-vr400uhd — Roland VR-400UHD
 
-- [ ] Confirm the password prompt (a line containing "Enter") and greeting, and record what a wrong password produces. ([specs/roland-vr400uhd.yaml:443](specs/roland-vr400uhd.yaml#L443))
-- [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:454](specs/roland-vr400uhd.yaml#L454))
-- [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:465](specs/roland-vr400uhd.yaml#L465))
+- [ ] Confirm the password prompt (a line containing "Enter") and greeting, and record what a wrong password produces. ([specs/roland-vr400uhd.yaml:556](specs/roland-vr400uhd.yaml#L556))
+- [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:567](specs/roland-vr400uhd.yaml#L567))
+- [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:580](specs/roland-vr400uhd.yaml#L580))
+- [ ] Confirm get answers every parameter of the command list (OUTPUT FADE, DSK, LOGO, transition, MIC and LINE channels, outputs, auto mixing, audio follow video, reverb) with its current value, in the ranges set takes. ([specs/roland-vr400uhd.yaml:419](specs/roland-vr400uhd.yaml#L419))
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 
@@ -1316,13 +1317,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-xs62s — Roland XS-62S
 
-- [ ] Confirm the forms the manual leaves open: VOS with only the bus, IL2 with both a and b, the two TRS values, and VER's empty model field. ([specs/roland-xs62s.yaml:605](specs/roland-xs62s.yaml#L605))
+- [ ] Confirm the forms the manual leaves open: VOS with only the bus, IL2 with both a and b, the two TRS values, and VER's empty model field. ([specs/roland-xs62s.yaml:634](specs/roland-xs62s.yaml#L634))
+- [ ] Confirm QAL:14 answers fourteen levels (the manual's example shows thirteen), in the order inputs 0-10, MASTER OUT, PVW/2, AUX/3, and whether the input levels are the PGM/1 (IL1) or PVW/2 (IL2) bus levels. ([specs/roland-xs62s.yaml:569](specs/roland-xs62s.yaml#L569))
 
 ## roland-xs80h — Roland XS-82H/83H/84H
 
-- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:543](specs/roland-xs80h.yaml#L543))
-- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:544](specs/roland-xs80h.yaml#L544))
-- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:558](specs/roland-xs80h.yaml#L558))
+- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:551](specs/roland-xs80h.yaml#L551))
+- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:553](specs/roland-xs80h.yaml#L553))
+- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:567](specs/roland-xs80h.yaml#L567))
+- [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:497](specs/roland-xs80h.yaml#L497))
 
 ## ross-xpression — Ross XPression (TCP)
 
@@ -1551,12 +1554,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## tvone-coriomaster — tvONE CORIOmaster
 
-- [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:689](specs/tvone-coriomaster.yaml#L689))
-- [ ] Confirm that the unit greets a connection with a caret prompt that needs no reply, and that login() before any other command is enough. ([specs/tvone-coriomaster.yaml:55](specs/tvone-coriomaster.yaml#L55))
+- [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:1027](specs/tvone-coriomaster.yaml#L1027))
+- [ ] Confirm that the unit greets a connection with a caret prompt that needs no reply, and that login() before any other command is enough. ([specs/tvone-coriomaster.yaml:60](specs/tvone-coriomaster.yaml#L60))
 - [ ] Confirm that every command, including methods and StartBatch/EndBatch, ends with exactly one "!Done" line after its value lines. ([specs/tvone-coriomaster.yaml:46](specs/tvone-coriomaster.yaml#L46))
-- [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:567](specs/tvone-coriomaster.yaml#L567))
-- [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:681](specs/tvone-coriomaster.yaml#L681))
-- [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:199](specs/tvone-coriomaster.yaml#L199))
+- [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:816](specs/tvone-coriomaster.yaml#L816))
+- [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:1019](specs/tvone-coriomaster.yaml#L1019))
+- [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:264](specs/tvone-coriomaster.yaml#L264))
+- [ ] Confirm the Windows, Canvases, Layouts and Stbds lists answer one "Windows.Window<n> = <...>" line per entry, and record whether windows that are not in use (FREE) are listed too. ([specs/tvone-coriomaster.yaml:807](specs/tvone-coriomaster.yaml#L807))
+- [ ] Confirm a preset take or storyboard changes window properties without echoing them, and that PRESET COMPLETE follows every take (the windows are read again on it). ([specs/tvone-coriomaster.yaml:820](specs/tvone-coriomaster.yaml#L820))
+- [ ] Record the CANVAS PROPERTY_CHANGED value forms (AudioFollowWindow as Window1 or 1) and whether STBDCURRENT_CHANGED ends with a comma. ([specs/tvone-coriomaster.yaml:835](specs/tvone-coriomaster.yaml#L835))
+- [ ] Confirm a set echoes "<path> = <value>" before "!Done" for every window, canvas and layout property, so state follows this connection's commands without a read. ([specs/tvone-coriomaster.yaml:1066](specs/tvone-coriomaster.yaml#L1066))
+- [ ] Record the values Layout<n>.Mode takes (Normal shown, not documented). ([specs/tvone-coriomaster.yaml:940](specs/tvone-coriomaster.yaml#L940))
 
 ## twitch — Twitch
 

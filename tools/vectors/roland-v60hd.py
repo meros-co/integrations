@@ -63,7 +63,13 @@ telemetry(R60, "panel", inbound="\x02QPL:0,1,0,1,1,0,2047;",
                         "dsk": True, "output_fade": False, "fader": {"level": 2047}})
 telemetry(R60, "tally", inbound="\x02TLY:1, 2, 0, 0, 0, 0, 0, 0;",
           expect_state={"tally": "1, 2, 0, 0, 0, 0, 0, 0"})
-telemetry(R60, "audio-levels", inbound="\x02QAL:100,80,70,60,50,40,30,20,100,80,70,60,50;",
-          expect_state={"audio": {"levels": "100,80,70,60,50,40,30,20,100,80,70,60,50"}})
+# QAL:13 in the reply list's order (p.22): inputs 0-10, AUX, MASTER OUT.
+telemetry(R60, "audio-levels", inbound="\x02QAL:100,80,70,60,50,40,30,20,100,80,-801,-20,0;",
+          expect_state={"audio": {"levels": "100,80,70,60,50,40,30,20,100,80,-801,-20,0",
+                                  "inputs": {"0": {"level": 100}, "1": {"level": 80}, "2": {"level": 70},
+                                             "3": {"level": 60}, "4": {"level": 50}, "5": {"level": 40},
+                                             "6": {"level": 30}, "7": {"level": 20}, "8": {"level": 100},
+                                             "9": {"level": 80}, "10": {"level": -801}},
+                                  "aux_level": -20, "master_level": 0}})
 telemetry(R60, "version", inbound="\x02VER:V-60HD,3.10;",
           expect_state={"device": {"model": "V-60HD", "version": "3.10"}})

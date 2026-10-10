@@ -404,11 +404,14 @@ commands:
 telemetry:
   # With PANEL INFORMATION on (menu RS-232/GPI, p.11), the switcher sends
   # QPL with every value whenever the panel changes. The manual names the
-  # RS-232 connector for this, so the full status is also asked every second.
+  # RS-232 connector for this, so the full status, the tally and every
+  # audio level (QAL:13, the only reading of what the level commands set)
+  # are also asked every second. Nothing else the commands set can be read
+  # (see the quirks).
   subscribe:
     send: ["VER"]
   poll:
-    send: ["QPL:7", "TLY"]
+    send: ["QPL:7", "TLY", "QAL:13"]
     every_ms: 1000
   updates:
     - match: '^[\x02\x11\x13]*QPL:(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+);'
@@ -424,6 +427,22 @@ telemetry:
       state: { "tally": "{1}" }
     - match: '^[\x02\x11\x13]*QAL:(-?\d+(?:, ?-?\d+){12});'
       state: { "audio.levels": "{1}" }
+    # QAL:13 in the reply list's order (p.22): inputs 0-10, then AUX, then MASTER OUT.
+    - match: '^[\x02\x11\x13]*QAL:(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+);'
+      state:
+        "audio.inputs.0.level": "{1}"
+        "audio.inputs.1.level": "{2}"
+        "audio.inputs.2.level": "{3}"
+        "audio.inputs.3.level": "{4}"
+        "audio.inputs.4.level": "{5}"
+        "audio.inputs.5.level": "{6}"
+        "audio.inputs.6.level": "{7}"
+        "audio.inputs.7.level": "{8}"
+        "audio.inputs.8.level": "{9}"
+        "audio.inputs.9.level": "{10}"
+        "audio.inputs.10.level": "{11}"
+        "audio.aux_level": "{12}"
+        "audio.master_level": "{13}"
     - match: '^[\x02\x11\x13]*VER:([^,;]*),([^;]+);'
       state: { "device.model": "{1}", "device.version": "{2}" }
 
@@ -437,6 +456,9 @@ state:
   fader.level:   { type: int, description: "Video fade level, 0-2047" }
   tally:         { type: string, description: "Cross-point status of channels 1-8, comma-separated: 0 dark, 1 red, 2 green" }
   audio.levels:  { type: string, unit: "0.1 dB", description: "Every volume level from QAL:13, comma-separated in the manual's order (-801 is -INF)" }
+  audio.inputs.*.level: { type: int, unit: "0.1 dB", description: "Input audio level, keyed by the input number set_input_level takes (0 AUDIO IN 1 to 10 HDMI IN 6); -801 is -INF" }
+  audio.aux_level: { type: int, unit: "0.1 dB", description: "AUX bus audio level; -801 is -INF" }
+  audio.master_level: { type: int, unit: "0.1 dB", description: "Master out level; -801 is -INF" }
   device.model:  { type: string, description: "Model name from VER" }
   device.version: { type: string, description: "Version from VER" }
 
@@ -478,3 +500,15 @@ quirks:
       the RS-232 connector, and the XS-62S manual for both RS-232 and LAN.
       Whether the V-60HD also sends it over LAN is not stated, so the status
       is polled as well. No password protects the LAN port.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the only queries are QPL (panel status), QAL (audio
+      levels), TLY (tally) and VER (p.22-23), so state holds the cross-points,
+      the PinP/SPLIT, DSK and OUTPUT FADE buttons, the fade level, the tally
+      and the input, AUX and master levels. Nothing reads back the transition
+      effect and time, the PinP and split positions, the DSK source, level and
+      gain, the channel 6 connector, the output bus assignments, the audio
+      delays, the input mutes and solos, AUTO MIXING, HDCP, the test pattern
+      and tone or the memory last recalled; state does not keep them.
