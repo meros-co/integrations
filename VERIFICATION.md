@@ -254,16 +254,26 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## birddog — BirdDog
 
-- [ ] On 2.0 cameras, check whether a single-key POST is accepted or the whole object must be sent. ([specs/birddog.yaml:3178](specs/birddog.yaml#L3178))
-- [ ] Confirm a POST reply does or does not show the new value, so it is clear whether a following poll is needed. ([specs/birddog.yaml:3163](specs/birddog.yaml#L3163))
-- [ ] Check whether presets above 9 are accepted over REST on 2.1 cameras (2.0 gives 1-9, 2.1 gives no range). ([specs/birddog.yaml:3154](specs/birddog.yaml#L3154))
-- [ ] Confirm the document inconsistency resolutions: TWODNR key on X1, the Sil2 ModeSel values, /sil2codec and /sil2enc paths, /RestImage, NDIGrpName and NDIOffSnSrc spelling, Wi-Fi and DHCP values On/Off and dhcp/static. ([specs/birddog.yaml:3229](specs/birddog.yaml#L3229))
-- [ ] Check the ExpCompLvl range on P200 A2/A3 (0-14 or -128 to 127). ([specs/birddog.yaml:3245](specs/birddog.yaml#L3245))
-- [ ] Check whether AnalogAudiooutputselect exists on P200/A200/A300, P100/PF120 and P4K/P400, and whether P4K/P400 accept the videooutputinterface modes. ([specs/birddog.yaml:3247](specs/birddog.yaml#L3247))
-- [ ] Check MAKI Ultra tuning and WBSensitivity value forms (numbers or names such as "Middle"). ([specs/birddog.yaml:3242](specs/birddog.yaml#L3242))
-- [ ] Confirm the X1 pan POST range -12996 to 12208. ([specs/birddog.yaml:3212](specs/birddog.yaml#L3212))
-- [ ] Confirm the API needs no authentication on the firmware in use. ([specs/birddog.yaml:3143](specs/birddog.yaml#L3143))
-- [ ] On X5 Ultra and X4 Ultra, check the firmware version and which 2.1 endpoints it lacks. ([specs/birddog.yaml:3271](specs/birddog.yaml#L3271))
+- [ ] On 2.0 cameras, check whether a single-key POST is accepted or the whole object must be sent. ([specs/birddog.yaml:4278](specs/birddog.yaml#L4278))
+- [ ] Confirm a POST reply does or does not show the new value, so it is clear whether a following poll is needed. ([specs/birddog.yaml:4263](specs/birddog.yaml#L4263))
+- [ ] Check whether presets above 9 are accepted over REST on 2.1 cameras (2.0 gives 1-9, 2.1 gives no range). ([specs/birddog.yaml:4254](specs/birddog.yaml#L4254))
+- [ ] Confirm the document inconsistency resolutions: TWODNR key on X1, the Sil2 ModeSel values, /sil2codec and /sil2enc paths, /RestImage, NDIGrpName and NDIOffSnSrc spelling, Wi-Fi and DHCP values On/Off and dhcp/static. ([specs/birddog.yaml:4331](specs/birddog.yaml#L4331))
+- [ ] Check the ExpCompLvl range on P200 A2/A3 (0-14 or -128 to 127). ([specs/birddog.yaml:4348](specs/birddog.yaml#L4348))
+- [ ] Check whether AnalogAudiooutputselect exists on P200/A200/A300, P100/PF120 and P4K/P400, and whether P4K/P400 accept the videooutputinterface modes. ([specs/birddog.yaml:4349](specs/birddog.yaml#L4349))
+- [ ] Check MAKI Ultra tuning and WBSensitivity value forms (numbers or names such as "Middle"). ([specs/birddog.yaml:4344](specs/birddog.yaml#L4344))
+- [ ] Confirm the X1 pan POST range -12996 to 12208. ([specs/birddog.yaml:4314](specs/birddog.yaml#L4314))
+- [ ] Confirm the API needs no authentication on the firmware in use. ([specs/birddog.yaml:4244](specs/birddog.yaml#L4244))
+- [ ] On X5 Ultra and X4 Ultra, check the firmware version and which 2.1 endpoints it lacks. ([specs/birddog.yaml:4393](specs/birddog.yaml#L4393))
+- [ ] Confirm the 30-second reads of every endpoint a camera serves (up to 16 requests) and the 5-second polls do not disturb the camera, and that each model serves the endpoints its request list names. ([specs/birddog.yaml:3473](specs/birddog.yaml#L3473))
+- [ ] Confirm the 2.0 cameras answer GET /sil2codec per streaming protocol (HX, SRT, RTSP, RTMP, DISABLE) with each protocol's preset and Custom values, as the 2.0 example data shows. ([specs/birddog.yaml:3804](specs/birddog.yaml#L3804))
+- [ ] Confirm the 2.0 /sil2enc reply's value forms: Encryption as true/false (or 0/1), AuthEnable as 0/1, pbkeylen 16, 24 or 32. ([specs/birddog.yaml:3848](specs/birddog.yaml#L3848))
+- [ ] Confirm the 2.1 /secondary_protocol reply's encryption and authentication values are enable and disable, and record what it reports for unset fields (the document's POST reply shows %!s(<nil>)). ([specs/birddog.yaml:3879](specs/birddog.yaml#L3879))
+- [ ] Record the Wi-Fi Enable and DhcpEnable values the cameras report (documented On/Off and dhcp/static, the example shows 1; 1 is read as on and dhcp). ([specs/birddog.yaml:3917](specs/birddog.yaml#L3917))
+- [ ] Record what GET /Genlock_Failover_Source returns (the collection gives its keys but no example reply). ([specs/birddog.yaml:3934](specs/birddog.yaml#L3934))
+- [ ] Record the GET /connectTo reply per location once it is complete on the cameras (sourceHostname, sourceStreamName, sourceIP, sourcePort), and its status in encode mode. ([specs/birddog.yaml:3947](specs/birddog.yaml#L3947))
+- [ ] Confirm /operationmode answers exactly encode, decode or dual, and the P400/P4K /videooutputinterface exactly LowLatency or NormalMode, with nothing around them (read as plain text by their words). ([specs/birddog.yaml:3956](specs/birddog.yaml#L3956))
+- [ ] Confirm that reading an endpoint again straight after a POST reports the new value, and how long a camera takes to apply a change (some only after a reboot). ([specs/birddog.yaml:3964](specs/birddog.yaml#L3964))
+- [ ] Confirm a preset recall in Camera or Birddog preset mode restores the exposure, picture, white balance and colour settings that are read again after it. ([specs/birddog.yaml:3979](specs/birddog.yaml#L3979))
 
 ## birddog-converters — BirdDog converters and decoders
 

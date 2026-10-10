@@ -3450,12 +3450,14 @@ commands:
     returns: ack
 
 telemetry:
-  # The API has no push or subscription: state comes from polling the
-  # settings endpoints every camera serves, and from the reply to any get_ or
-  # set_ command on the endpoints below (POST replies carry the whole
-  # endpoint object). Tally, PTZ position, transport, audio, decoder and
-  # video output exist only on some cameras, so they update when their get_
-  # command is sent (see quirks).
+  # The API has no push or subscription. The status and the settings an
+  # operator changes most (about, encoder, exposure, picture, white balance,
+  # PTZ setup, and on the cameras that have them tally, PTZ position and the
+  # decoder's status) are polled every 5 seconds; every other endpoint the
+  # camera serves is read on connecting and every 30 seconds. Each item names
+  # the cameras that serve it. Replies to get_ and set_ commands go to the
+  # same rules (POST replies carry the whole endpoint object), and a POST
+  # with a JSON body has its endpoint read again at once (see quirks).
   poll:
     every_ms: 5000
     send:
@@ -3465,6 +3467,37 @@ telemetry:
       - { method: GET, path: /birddogpicsetup }
       - { method: GET, path: /birddogwbsetup }
       - { method: GET, path: /birddogptzsetup }
+      - { models: &v21 [x1, x1-ultra, max, x4-ultra, x5-ultra, maki-ultra], method: GET, path: /tally }
+      - { models: *v21, method: GET, path: /birddogptzcontrol }
+      - { models: &decoders [x1, x1-ultra, max, x5-ultra], method: GET, path: /decodestatus, query: { ChNum: "1" } }
+  subscribe:
+    every_ms: 30000
+    send:
+      - { method: GET, path: /encodeTransport }
+      - { method: GET, path: /NDIDisServer }
+      - { models: *v21, method: GET, path: /operationmode }
+      - { models: *v21, method: GET, path: /EthSetup }
+      - { models: *v21, method: GET, path: /secondary_protocol }
+      - { models: [x1, x1-ultra, max, x4-ultra, x5-ultra, maki-ultra, p400, p4k], method: GET, path: /videooutputinterface }
+      - { models: [x1, x1-ultra, x4-ultra], method: GET, path: /WifiSetup }
+      - { models: [x1, x1-ultra, x4-ultra, maki-ultra], method: GET, path: /NetworkSetup }
+      - { models: [x1, x1-ultra, max, x4-ultra, x5-ultra], method: GET, path: /Genlock_Failover_Source }
+      - { models: *decoders, method: GET, path: /decodesetup, query: { ChNum: "1" } }
+      - { models: *decoders, method: GET, path: /decodeTransport }
+      - { models: [x1, x1-ultra, x5-ultra], method: GET, path: /connectTo, query: { location: decoder } }
+      - { models: [x4-ultra, x5-ultra, maki-ultra, p200-a2a3, p200-a4a5, a200-gen1, a200-gen2, a300-gen1, a300-gen2,
+                   p100, pf120, p110, p120, p400, p4k, p240], method: GET, path: /analogaudiosetup }
+      - { models: [x1, x1-ultra, max, x4-ultra, x5-ultra, maki-ultra, p200-a2a3, p200-a4a5, a200-gen1, a200-gen2,
+                   a300-gen1, a300-gen2, p100, pf120, p110, p120, p240], method: GET, path: /sil2codec }
+      - { models: &sil2enc [p200-a2a3, p200-a4a5, a200-gen1, a200-gen2, a300-gen1, a300-gen2, p100, pf120, p110, p120, p240],
+          method: GET, path: /sil2enc }
+      - { models: &colour_matrix [x1, x1-ultra, max, x4-ultra, maki-ultra, p200-a2a3, p200-a4a5, a200-gen1, a200-gen2,
+                                  a300-gen1, a300-gen2, p100, pf120, p110, p120], method: GET, path: /birddogcmsetup }
+      - { models: &advanced [x1, x1-ultra, max, x4-ultra, maki-ultra, p200-a2a3, p200-a4a5, a200-gen1, a200-gen2,
+                             a300-gen1, a300-gen2], method: GET, path: /birddogadvancesetup }
+      - { models: [a200-gen1, a200-gen2, a300-gen1, a300-gen2], method: GET, path: /birddogexternalsetup }
+      - { models: &p400 [p400, p4k, p240], method: GET, path: /birddogdetsetup }
+      - { models: *p400, method: GET, path: /birddoggammasetup }
   updates:
     - path: "^/about$"
       json: { firmware: "$.FirmwareVersion", hardware: "$.HardwareVersion", hostname: "$.HostName", ip: "$.IPAddress",
@@ -3635,6 +3668,323 @@ telemetry:
       json: { protocol: "$.protocol" }
       state:
         encoder.secondary_protocol: "{protocol}"
+    # The rest of each endpoint the rules above read (2.0 tables and examples,
+    # 2.1 field lists).
+    - path: "^/about$"
+      json: { mcu: "$.MCUVersion", dns: "$.Dns", dns_maki: "$.DNS" }
+      state:
+        device.mcu_version: "{mcu}"
+        device.dns: "{dns}"
+    - path: "^/about$"
+      json: { dns: "$.DNS" }
+      state: { device.dns: "{dns}" }
+    - path: "^/encodesetup$"
+      json: { rate: "$.VideoSampleRate" }
+      state: { encoder.video_sample_rate: "{rate}" }
+    - path: "^/birddogexpsetup$"
+      json: { gp: "$.GainPoint", gpp: "$.GainPointPosition", sco: "$.ShutterControlOverwrite", sso: "$.ShutterSpeedOverwrite",
+              smax: "$.ShutterMaxSpeed", smin: "$.ShutterMinSpeed", ssl: "$.SlowShutterLimit", spot: "$.Spotlight" }
+      state:
+        exposure.gain_point: { value: "{gp}", map: { "On": true, "Off": false } }
+        exposure.gain_point_position: "{gpp}"
+        exposure.shutter_control_overwrite: { value: "{sco}", map: { "On": true, "Off": false } }
+        exposure.shutter_speed_overwrite: "{sso}"
+        exposure.shutter_max_speed: "{smax}"
+        exposure.shutter_min_speed: "{smin}"
+        exposure.slow_shutter_limit: "{ssl}"
+        exposure.spotlight: { value: "{spot}", map: { "On": true, "Off": false } }
+    - path: "^/birddogpicsetup$"
+      json: { mask: "$.HighlightCompMask", stab: "$.Stabilizer", stab_x5: "$.Stablizer", chroma: "$.ChromeSuppress",
+              ir: "$.IRCutFilter", latency: "$.LowLatency", nd: "$.NDFilter", wdr_level: "$.WideDynamicRange" }
+      state:
+        picture.highlight_comp_mask: "{mask}"
+        picture.stabilizer: { value: "{stab}", map: { "On": true, "Off": false } }
+        picture.stabilizer_x5: { value: "{stab_x5}", map: { "On": true, "Off": false } }
+        picture.chroma_suppress: "{chroma}"
+        picture.ir_cut_filter: "{ir}"
+        picture.low_latency: { value: "{latency}", map: { "On": true, "Off": false } }
+        picture.nd_filter: "{nd}"
+        picture.wide_dynamic_range: "{wdr_level}"
+    - path: "^/birddogwbsetup$"
+      json: { sens: "$.WBSensitivity", matrix: "$.Matrix", level: "$.Level", offset: "$.Offset", phase: "$.Phase",
+              select: "$.Select", speed: "$.Speed", rg: "$.RG", rb: "$.RB", gr: "$.GR", gb: "$.GB", br: "$.BR", bg: "$.BG" }
+      state:
+        white_balance.sensitivity: "{sens}"
+        white_balance.matrix: { value: "{matrix}", map: { "On": true, "Off": false } }
+        white_balance.level: "{level}"
+        white_balance.offset: "{offset}"
+        white_balance.phase: "{phase}"
+        white_balance.select: "{select}"
+        white_balance.speed: "{speed}"
+        white_balance.matrix_coefficients.rg: "{rg}"
+        white_balance.matrix_coefficients.rb: "{rb}"
+        white_balance.matrix_coefficients.gr: "{gr}"
+        white_balance.matrix_coefficients.gb: "{gb}"
+        white_balance.matrix_coefficients.br: "{br}"
+        white_balance.matrix_coefficients.bg: "{bg}"
+    - path: "^/birddogptzsetup$"
+      json: { slow: "$.PanTiltSlow", dzoom: "$.DZoomLimit" }
+      state:
+        ptz.pan_tilt_slow: { value: "{slow}", map: { "On": true, "Off": false } }
+        ptz.digital_zoom_limit: "{dzoom}"
+    - path: "^/birddogcmsetup$"
+      json: { rh: "$.RedHue", yh: "$.YellowHue", gh: "$.GreenHue", ch: "$.CyanHue", bh: "$.BlueHue", mh: "$.MagHue",
+              rg: "$.RedGain", yg: "$.YellowGain", gg: "$.GreenGain", cg: "$.CyanGain", bg: "$.BlueGain", mg: "$.MagGain",
+              gain: "$.ColourGain", phase: "$.HuePhase" }
+      state:
+        colour_matrix.red.hue: "{rh}"
+        colour_matrix.yellow.hue: "{yh}"
+        colour_matrix.green.hue: "{gh}"
+        colour_matrix.cyan.hue: "{ch}"
+        colour_matrix.blue.hue: "{bh}"
+        colour_matrix.magenta.hue: "{mh}"
+        colour_matrix.red.gain: "{rg}"
+        colour_matrix.yellow.gain: "{yg}"
+        colour_matrix.green.gain: "{gg}"
+        colour_matrix.cyan.gain: "{cg}"
+        colour_matrix.blue.gain: "{bg}"
+        colour_matrix.magenta.gain: "{mg}"
+        colour_matrix.colour_gain: "{gain}"
+        colour_matrix.hue_phase: "{phase}"
+    - path: "^/birddogadvancesetup$"
+      json: { af_mode: "$.AFMode", scene: "$.Scene", zone: "$.AFZone", sens: "$.AFSensitivity", tele: "$.teleconvert_mode",
+              ratio: "$.img_ratio", eptz: "$.eptz_switch", offset: "$.GammaOffset", hires: "$.HighResolution",
+              bcomp: "$.BrightnessComp", clevel: "$.CompLevel", bright: "$.Brightness", enh: "$.VideoEnhancement" }
+      state:
+        advanced.af_mode: "{af_mode}"
+        advanced.scene: "{scene}"
+        advanced.af_zone: "{zone}"
+        advanced.af_sensitivity: "{sens}"
+        advanced.teleconvert: { value: "{tele}", map: { "On": true, "Off": false } }
+        advanced.image_ratio: "{ratio}"
+        advanced.eptz: { value: "{eptz}", map: { "On": true, "Off": false } }
+        advanced.gamma_offset: "{offset}"
+        advanced.high_resolution: { value: "{hires}", map: { "On": true, "Off": false } }
+        advanced.brightness_comp: "{bcomp}"
+        advanced.comp_level: "{clevel}"
+        advanced.brightness: "{bright}"
+        advanced.video_enhancement: { value: "{enh}", map: { "On": true, "Off": false } }
+    - path: "^/birddogexternalsetup$"
+      json: { aux: "$.Aux", v12: "$.V12vOut", wiper: "$.RainWiper", defog: "$.DeFog" }
+      state:
+        external.aux: { value: "{aux}", map: { "On": true, "Off": false } }
+        external.v12_out: { value: "{v12}", map: { "On": true, "Off": false } }
+        external.rain_wiper: { value: "{wiper}", map: { "On": true, "Off": false } }
+        external.defog: { value: "{defog}", map: { "On": true, "Off": false } }
+    - path: "^/birddogdetsetup$"
+      json: { enabled: "$.Detail", level: "$.Level", bw: "$.Bandwidth", balance: "$.BwBalance", crisp: "$.Crispening",
+              hl: "$.HighLightDetail", hv: "$.HvBalance", limit: "$.Limit", low: "$.SuperLow" }
+      state:
+        detail.enabled: { value: "{enabled}", map: { "On": true, "Off": false } }
+        detail.level: "{level}"
+        detail.bandwidth: "{bw}"
+        detail.bw_balance: "{balance}"
+        detail.crispening: "{crisp}"
+        detail.highlight: "{hl}"
+        detail.hv_balance: "{hv}"
+        detail.limit: "{limit}"
+        detail.super_low: "{low}"
+    - path: "^/birddoggammasetup$"
+      json: { mode: "$.Settings", level: "$.Level", black_gamma: "$.BlackGammaLevel", black: "$.BlackLevel",
+              range: "$.BlackLevelRange", effect: "$.Effect", offset: "$.Offset", pattern: "$.Pattern",
+              fine: "$.PatternFine", ve: "$.VisibilityEnhancer" }
+      state:
+        gamma.mode: "{mode}"
+        gamma.level: "{level}"
+        gamma.black_gamma_level: "{black_gamma}"
+        gamma.black_level: "{black}"
+        gamma.black_level_range: "{range}"
+        gamma.effect: "{effect}"
+        gamma.offset: "{offset}"
+        gamma.pattern: "{pattern}"
+        gamma.pattern_fine: "{fine}"
+        gamma.visibility_enhancer: { value: "{ve}", map: { "On": true, "Off": false } }
+    # 2.0 /sil2codec: one block per streaming protocol, each with its preset
+    # (ModeSel) and the Custom preset's values.
+    - path: "^/sil2codec$"
+      json: { hx_ctl: "$.HX.BitrateControl", hx_mode: "$.HX.ModeSel", hx_rate: "$.HX.Custom.Bitrate", hx_gop: "$.HX.Custom.GOPSize",
+              hx_qi: "$.HX.Custom.QuantFactorI", hx_qp: "$.HX.Custom.QuantFactorP",
+              srt_ctl: "$.SRT.BitrateControl", srt_mode: "$.SRT.ModeSel", srt_rate: "$.SRT.Custom.Bitrate", srt_gop: "$.SRT.Custom.GOPSize",
+              srt_qi: "$.SRT.Custom.QuantFactorI", srt_qp: "$.SRT.Custom.QuantFactorP",
+              rtsp_ctl: "$.RTSP.BitrateControl", rtsp_mode: "$.RTSP.ModeSel", rtsp_rate: "$.RTSP.Custom.Bitrate", rtsp_gop: "$.RTSP.Custom.GOPSize",
+              rtsp_qi: "$.RTSP.Custom.QuantFactorI", rtsp_qp: "$.RTSP.Custom.QuantFactorP",
+              rtmp_ctl: "$.RTMP.BitrateControl", rtmp_mode: "$.RTMP.ModeSel", rtmp_rate: "$.RTMP.Custom.Bitrate", rtmp_gop: "$.RTMP.Custom.GOPSize",
+              rtmp_qi: "$.RTMP.Custom.QuantFactorI", rtmp_qp: "$.RTMP.Custom.QuantFactorP",
+              off_ctl: "$.DISABLE.BitrateControl", off_mode: "$.DISABLE.ModeSel", off_rate: "$.DISABLE.Custom.Bitrate", off_gop: "$.DISABLE.Custom.GOPSize",
+              off_qi: "$.DISABLE.Custom.QuantFactorI", off_qp: "$.DISABLE.Custom.QuantFactorP" }
+      state:
+        encoder.sil2.hx.bitrate_control: "{hx_ctl}"
+        encoder.sil2.hx.mode: "{hx_mode}"
+        encoder.sil2.hx.custom_bitrate: "{hx_rate}"
+        encoder.sil2.hx.custom_gop_size: "{hx_gop}"
+        encoder.sil2.hx.custom_quant_i: "{hx_qi}"
+        encoder.sil2.hx.custom_quant_p: "{hx_qp}"
+        encoder.sil2.srt.bitrate_control: "{srt_ctl}"
+        encoder.sil2.srt.mode: "{srt_mode}"
+        encoder.sil2.srt.custom_bitrate: "{srt_rate}"
+        encoder.sil2.srt.custom_gop_size: "{srt_gop}"
+        encoder.sil2.srt.custom_quant_i: "{srt_qi}"
+        encoder.sil2.srt.custom_quant_p: "{srt_qp}"
+        encoder.sil2.rtsp.bitrate_control: "{rtsp_ctl}"
+        encoder.sil2.rtsp.mode: "{rtsp_mode}"
+        encoder.sil2.rtsp.custom_bitrate: "{rtsp_rate}"
+        encoder.sil2.rtsp.custom_gop_size: "{rtsp_gop}"
+        encoder.sil2.rtsp.custom_quant_i: "{rtsp_qi}"
+        encoder.sil2.rtsp.custom_quant_p: "{rtsp_qp}"
+        encoder.sil2.rtmp.bitrate_control: "{rtmp_ctl}"
+        encoder.sil2.rtmp.mode: "{rtmp_mode}"
+        encoder.sil2.rtmp.custom_bitrate: "{rtmp_rate}"
+        encoder.sil2.rtmp.custom_gop_size: "{rtmp_gop}"
+        encoder.sil2.rtmp.custom_quant_i: "{rtmp_qi}"
+        encoder.sil2.rtmp.custom_quant_p: "{rtmp_qp}"
+        encoder.sil2.disable.bitrate_control: "{off_ctl}"
+        encoder.sil2.disable.mode: "{off_mode}"
+        encoder.sil2.disable.custom_bitrate: "{off_rate}"
+        encoder.sil2.disable.custom_gop_size: "{off_gop}"
+        encoder.sil2.disable.custom_quant_i: "{off_qi}"
+        encoder.sil2.disable.custom_quant_p: "{off_qp}"
+    # 2.0 /sil2enc: the streaming protocol and its settings. Passwords,
+    # passphrases and stream keys are left out of the state (see quirks).
+    - path: "^/sil2enc$"
+      json: { protocol: "$.StreamingProtocol", haivision: "$.HaiVisionPlayerSupport",
+              rtsp_auth: "$.RTSP.AuthEnable", rtsp_port: "$.RTSP.Port", rtsp_name: "$.RTSP.StreamName", rtsp_user: "$.RTSP.UserName",
+              rtsp_url: "$.RTSP.ConnectionURL",
+              srt_mode: "$.SRT.mode", srt_ip: "$.SRT.IPAddress", srt_port: "$.SRT.Port", srt_latency: "$.SRT.latency",
+              srt_enc: "$.SRT.Encryption", srt_key: "$.SRT.pbkeylen", srt_id: "$.SRT.streamid", srt_url: "$.SRT.ConnectionURL",
+              rtmp_sel: "$.RTMP.ServerSelection", rtmp_server: "$.RTMP.Server", rtmp_auth: "$.RTMP.AuthEnable",
+              rtmp_user: "$.RTMP.UserName", rtmp_url: "$.RTMP.ConnectionURL" }
+      state:
+        encoder.sil2_stream.protocol: "{protocol}"
+        encoder.sil2_stream.haivision_player: { value: "{haivision}", map: { "true": true, "false": false } }
+        encoder.sil2_stream.rtsp.authentication: { value: "{rtsp_auth}", map: { "1": true, "0": false } }
+        encoder.sil2_stream.rtsp.port: "{rtsp_port}"
+        encoder.sil2_stream.rtsp.stream_name: "{rtsp_name}"
+        encoder.sil2_stream.rtsp.user_name: "{rtsp_user}"
+        encoder.sil2_stream.rtsp.connection_url: "{rtsp_url}"
+        encoder.sil2_stream.srt.mode: "{srt_mode}"
+        encoder.sil2_stream.srt.ip_address: "{srt_ip}"
+        encoder.sil2_stream.srt.port: "{srt_port}"
+        encoder.sil2_stream.srt.latency: "{srt_latency}"
+        encoder.sil2_stream.srt.encryption: { value: "{srt_enc}", map: { "true": true, "false": false, "1": true, "0": false } }
+        encoder.sil2_stream.srt.key_length: "{srt_key}"
+        encoder.sil2_stream.srt.stream_id: "{srt_id}"
+        encoder.sil2_stream.srt.connection_url: "{srt_url}"
+        encoder.sil2_stream.rtmp.server_selection: "{rtmp_sel}"
+        encoder.sil2_stream.rtmp.server: "{rtmp_server}"
+        encoder.sil2_stream.rtmp.authentication: { value: "{rtmp_auth}", map: { "1": true, "0": false } }
+        encoder.sil2_stream.rtmp.user_name: "{rtmp_user}"
+        encoder.sil2_stream.rtmp.connection_url: "{rtmp_url}"
+    # 2.1 /secondary_protocol: each protocol's settings; passwords,
+    # passphrases and stream keys are left out of the state.
+    - path: "^/secondary_protocol$"
+      json: { srt_mode: "$.SRT.connection_type", srt_port: "$.SRT.port", srt_latency: "$.SRT.latency_ms", srt_enc: "$.SRT.encryption",
+              srt_len: "$.SRT.encryption_length", srt_url: "$.SRT.connection_url",
+              rtsp_name: "$.RTSP.stream_name", rtsp_port: "$.RTSP.port", rtsp_auth: "$.RTSP.authentication", rtsp_user: "$.RTSP.user_name",
+              rtsp_url: "$.RTSP.connection_url",
+              rtmp_sel: "$.RTMP.server_selection", rtmp_server: "$.RTMP.server_url", rtmp_auth: "$.RTMP.authentication",
+              rtmp_url: "$.RTMP.connection_url" }
+      state:
+        encoder.secondary.srt.mode: "{srt_mode}"
+        encoder.secondary.srt.port: "{srt_port}"
+        encoder.secondary.srt.latency: "{srt_latency}"
+        encoder.secondary.srt.encryption: { value: "{srt_enc}", map: { "enable": true, "disable": false } }
+        encoder.secondary.srt.encryption_length: "{srt_len}"
+        encoder.secondary.srt.connection_url: "{srt_url}"
+        encoder.secondary.rtsp.stream_name: "{rtsp_name}"
+        encoder.secondary.rtsp.port: "{rtsp_port}"
+        encoder.secondary.rtsp.authentication: { value: "{rtsp_auth}", map: { "enable": true, "disable": false } }
+        encoder.secondary.rtsp.user_name: "{rtsp_user}"
+        encoder.secondary.rtsp.connection_url: "{rtsp_url}"
+        encoder.secondary.rtmp.server_selection: "{rtmp_sel}"
+        encoder.secondary.rtmp.server_url: "{rtmp_server}"
+        encoder.secondary.rtmp.authentication: { value: "{rtmp_auth}", map: { "enable": true, "disable": false } }
+        encoder.secondary.rtmp.connection_url: "{rtmp_url}"
+    # 2.1 Network Settings.
+    - path: "^/EthSetup$"
+      json: { mode: "$.IpMode", ip: "$.IpAddr", mask: "$.NetMask", gw: "$.GateWayIp", dns1: "$.DnsSvrIpFirst", dns2: "$.DnsSvrIpSecond",
+              timeout: "$.DhcpTimeout", fb_ip: "$.DhcpFallbackIPAddr", fb_mask: "$.DhcpFallbackNetMask", fb_gw: "$.DhcpFallbackGateWayIp" }
+      state:
+        network.ethernet.ip_mode: "{mode}"
+        network.ethernet.ip_address: "{ip}"
+        network.ethernet.netmask: "{mask}"
+        network.ethernet.gateway: "{gw}"
+        network.ethernet.dns_primary: "{dns1}"
+        network.ethernet.dns_secondary: "{dns2}"
+        network.ethernet.dhcp_timeout: "{timeout}"
+        network.ethernet.fallback_ip: "{fb_ip}"
+        network.ethernet.fallback_netmask: "{fb_mask}"
+        network.ethernet.fallback_gateway: "{fb_gw}"
+    - path: "^/WifiSetup$"
+      json: { enabled: "$.Enable", dhcp: "$.DhcpEnable", enc: "$.EncryptMode", ssid: "$.Ssid", ip: "$.IpAddr", mask: "$.NetMask",
+              gw: "$.GateWayIp", dns: "$.Dns" }
+      state:
+        network.wifi.enabled: { value: "{enabled}", map: { "On": true, "Off": false, "1": true, "0": false } }
+        network.wifi.dhcp: { value: "{dhcp}", map: { "dhcp": true, "static": false, "1": true, "0": false } }
+        network.wifi.encryption: "{enc}"
+        network.wifi.ssid: "{ssid}"
+        network.wifi.ip_address: "{ip}"
+        network.wifi.netmask: "{mask}"
+        network.wifi.gateway: "{gw}"
+        network.wifi.dns: "{dns}"
+    - path: "^/NetworkSetup$"
+      json: { nic: "$.PreferredNIC", dante: "$.Dante" }
+      state:
+        network.preferred_nic: "{nic}"
+        network.dante: { value: "{dante}", map: { "On": true, "Off": false } }
+    - path: "^/Genlock_Failover_Source$"
+      json: { genlock: "$.GenlockSource", failover: "$.FailoverSource" }
+      state:
+        ndi.genlock_source: "{genlock}"
+        ndi.failover_source: "{failover}"
+    # Decoder Settings.
+    - path: "^/decodesetup\\?ChNum=1$"
+      json: { audio: "$.NDIAudio", screensaver: "$.ScreenSaverMode", colour: "$.ColorSpace", tally: "$.TallyMode" }
+      state:
+        decoder.ndi_audio: "{audio}"
+        decoder.screensaver: "{screensaver}"
+        decoder.color_space: "{colour}"
+        decoder.tally_mode: "{tally}"
+    - path: "^/connectTo\\?location=([A-Za-z]+)$"
+      json: { host: "$.sourceHostname", stream: "$.sourceStreamName", ip: "$.sourceIP", port: "$.sourcePort" }
+      state:
+        connections.{1}.hostname: "{host}"
+        connections.{1}.stream_name: "{stream}"
+        connections.{1}.ip_address: "{ip}"
+        connections.{1}.port: "{port}"
+    # Plain-text replies told apart by their words: the operation mode, and
+    # the P400 and P4K output mode.
+    - match: "^(encode|decode|dual)$"
+      state: { device.operation_mode: "{1}" }
+    - match: "^(LowLatency|NormalMode)$"
+      state: { video_output.mode: "{1}" }
+
+    # Re-reads: a POST with a JSON body has its endpoint read again, since
+    # the reply can still show the old value (see quirks). A GET carries no
+    # body, so its reply never asks again.
+    - path: "^/(encodesetup|birddogexpsetup|birddogpicsetup|birddogwbsetup|birddogptzsetup|birddogcmsetup|birddogadvancesetup|birddogexternalsetup|birddogdetsetup|birddoggammasetup|encodeTransport|decodeTransport|NDIDisServer|analogaudiosetup|videooutputinterface|sil2codec|sil2enc|secondary_protocol|EthSetup|WifiSetup|NetworkSetup|Genlock_Failover_Source|tally|birddogptzcontrol)$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: "/{1}" }]
+    - path: "^/decodesetup\\?ChNum=1$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: /decodesetup, query: { ChNum: "1" } }]
+    - path: "^/connectTo\\?location=([A-Za-z]+)$"
+      request_match: { "$": "^\\{" }
+      json: {}
+      then_send: [{ method: GET, path: /connectTo, query: { location: "{1}" } }]
+    # A preset recall moves the camera and, in Camera or Birddog preset mode,
+    # restores its picture settings; an image reset changes every image
+    # setting.
+    - path: "^/(recall|RestImage)$"
+      json: {}
+      then_send:
+        - { method: GET, path: /birddogexpsetup }
+        - { method: GET, path: /birddogpicsetup }
+        - { method: GET, path: /birddogwbsetup }
+        - { models: *v21, method: GET, path: /birddogptzcontrol }
+        - { models: *colour_matrix, method: GET, path: /birddogcmsetup }
+        - { models: *advanced, method: GET, path: /birddogadvancesetup }
 
 state:
   device.firmware:              { type: string, description: "Installed firmware version" }
@@ -3744,6 +4094,148 @@ state:
   video_output.interface:       { type: string, description: "hdmi or sdi" }
   video_output.frequency:       { type: string, description: "X5 Ultra output frequency: 60, 59.94 or 50" }
   video_output.hdmi1_decoder:   { type: bool, description: "X5 Ultra HDMI 1 shows the decoder" }
+  device.mcu_version:           { type: string, description: "MCU firmware version (2.1)" }
+  device.dns:                   { type: string, description: "DNS server in use (2.1)" }
+  device.operation_mode:        { type: string, description: "encode, decode, or dual on X5 Ultra (2.1, plain-text /operationmode)" }
+  encoder.video_sample_rate:    { type: string, description: "P400/P4K chroma sampling: 420 or 422" }
+  encoder.sil2.*.bitrate_control: { type: string, description: "2.0 Silicon2 codec, per streaming protocol (hx, srt, rtsp, rtmp, disable): cbr or vbr" }
+  encoder.sil2.*.mode:          { type: string, description: "2.0 Silicon2 preset for that protocol: Custom, low, med, high or ultra" }
+  encoder.sil2.*.custom_bitrate: { type: int, description: "2.0 Custom preset bitrate for that protocol, 1-80" }
+  encoder.sil2.*.custom_gop_size: { type: int, description: "2.0 Custom preset GOP size for that protocol" }
+  encoder.sil2.*.custom_quant_i: { type: int, description: "2.0 Custom preset I-frame quantization factor, 18-47" }
+  encoder.sil2.*.custom_quant_p: { type: int, description: "2.0 Custom preset P-frame quantization factor, 18-47" }
+  encoder.sil2_stream.protocol: { type: string, description: "2.0 Silicon2 streaming protocol: SRT, RTSP, RTMP, HX or DISABLE" }
+  encoder.sil2_stream.haivision_player: { type: bool, description: "2.0 Haivision Play Pro support" }
+  encoder.sil2_stream.rtsp.authentication: { type: bool, description: "2.0 RTSP authentication on" }
+  encoder.sil2_stream.rtsp.port: { type: int, description: "2.0 RTSP port" }
+  encoder.sil2_stream.rtsp.stream_name: { type: string, description: "2.0 RTSP stream name" }
+  encoder.sil2_stream.rtsp.user_name: { type: string, description: "2.0 RTSP user name" }
+  encoder.sil2_stream.rtsp.connection_url: { type: string, description: "2.0 RTSP URL to connect to" }
+  encoder.sil2_stream.srt.mode: { type: string, description: "2.0 SRT mode: caller, listener or rendezvous" }
+  encoder.sil2_stream.srt.ip_address: { type: string, description: "2.0 SRT destination address (caller)" }
+  encoder.sil2_stream.srt.port: { type: int, description: "2.0 SRT port" }
+  encoder.sil2_stream.srt.latency: { type: int, description: "2.0 SRT latency, ms" }
+  encoder.sil2_stream.srt.encryption: { type: bool, description: "2.0 SRT encryption on" }
+  encoder.sil2_stream.srt.key_length: { type: int, description: "2.0 SRT key length in bytes: 16, 24 or 32" }
+  encoder.sil2_stream.srt.stream_id: { type: string, description: "2.0 SRT stream id" }
+  encoder.sil2_stream.srt.connection_url: { type: string, description: "2.0 SRT URL to connect to" }
+  encoder.sil2_stream.rtmp.server_selection: { type: string, description: "2.0 RTMP server: local or remote" }
+  encoder.sil2_stream.rtmp.server: { type: string, description: "2.0 RTMP remote server URL" }
+  encoder.sil2_stream.rtmp.authentication: { type: bool, description: "2.0 RTMP authentication on" }
+  encoder.sil2_stream.rtmp.user_name: { type: string, description: "2.0 RTMP user name" }
+  encoder.sil2_stream.rtmp.connection_url: { type: string, description: "2.0 RTMP URL to connect to" }
+  encoder.secondary.srt.mode:   { type: string, description: "2.1 secondary SRT connection type: listener or caller" }
+  encoder.secondary.srt.port:   { type: int, description: "2.1 secondary SRT port" }
+  encoder.secondary.srt.latency: { type: int, description: "2.1 secondary SRT latency, ms" }
+  encoder.secondary.srt.encryption: { type: bool, description: "2.1 secondary SRT encryption on" }
+  encoder.secondary.srt.encryption_length: { type: string, description: "2.1 secondary SRT encryption: AES-128, AES-192, AES-256 or none" }
+  encoder.secondary.srt.connection_url: { type: string, description: "2.1 secondary SRT URL to connect to in listener mode" }
+  encoder.secondary.rtsp.stream_name: { type: string, description: "2.1 secondary RTSP stream name" }
+  encoder.secondary.rtsp.port:  { type: int, description: "2.1 secondary RTSP port" }
+  encoder.secondary.rtsp.authentication: { type: bool, description: "2.1 secondary RTSP authentication on" }
+  encoder.secondary.rtsp.user_name: { type: string, description: "2.1 secondary RTSP user name" }
+  encoder.secondary.rtsp.connection_url: { type: string, description: "2.1 secondary RTSP URL for clients" }
+  encoder.secondary.rtmp.server_selection: { type: string, description: "2.1 secondary RTMP server: local or remote" }
+  encoder.secondary.rtmp.server_url: { type: string, description: "2.1 secondary RTMP remote server URL" }
+  encoder.secondary.rtmp.authentication: { type: bool, description: "2.1 secondary RTMP authentication on" }
+  encoder.secondary.rtmp.connection_url: { type: string, description: "2.1 secondary RTMP URL for local connections" }
+  exposure.gain_point:          { type: bool, description: "Gain point on (P400/P4K/P240)" }
+  exposure.gain_point_position: { type: int, description: "Gain point position (P400/P4K/P240)" }
+  exposure.shutter_control_overwrite: { type: bool, description: "Shutter control overwrite on (P100/PF120/P110/P120)" }
+  exposure.shutter_speed_overwrite: { type: int, description: "Overwritten shutter speed (P100/PF120/P110/P120)" }
+  exposure.shutter_max_speed:   { type: int, description: "Auto shutter maximum, an index (P400/P4K/P240)" }
+  exposure.shutter_min_speed:   { type: int, description: "Auto shutter minimum, an index (P400/P4K/P240)" }
+  exposure.slow_shutter_limit:  { type: int, description: "Slow shutter limit, an index (2.0)" }
+  exposure.spotlight:           { type: bool, description: "Spotlight compensation on (P400/P4K/P240)" }
+  picture.highlight_comp_mask:  { type: int, description: "Highlight compensation mask level (P200/A200/A300)" }
+  picture.stabilizer:           { type: bool, description: "Image stabiliser on (Stabilizer, 2.0)" }
+  picture.stabilizer_x5:        { type: bool, description: "X5 Ultra image stabiliser on (Stablizer)" }
+  picture.chroma_suppress:      { type: string, description: "Chroma suppression: OFF, LOW, MEDIUM or HIGH (2.0)" }
+  picture.ir_cut_filter:        { type: string, description: "IR cut filter: Auto, On or Off (2.0)" }
+  picture.low_latency:          { type: bool, description: "Low latency picture processing (P200 A4/A5)" }
+  picture.nd_filter:            { type: int, description: "ND filter position 0-3 (P4K)" }
+  picture.wide_dynamic_range:   { type: string, description: "Wide dynamic range level: Off or 1-6 (P100/PF120), 0-8 (MAKI Ultra)" }
+  white_balance.sensitivity:    { type: string, description: "White balance sensitivity (MAKI Ultra; set as 0-2, reported as a word such as Middle)" }
+  white_balance.matrix:         { type: bool, description: "White balance matrix on (P400/P4K/P240)" }
+  white_balance.level:          { type: int, description: "White balance level 0-14 (P400/P4K/P240)" }
+  white_balance.offset:         { type: int, description: "White balance offset 0-14 (P400/P4K/P240)" }
+  white_balance.phase:          { type: int, description: "White balance phase 0-14 (P400/P4K/P240)" }
+  white_balance.select:         { type: string, description: "Matrix select: FL LIGHT, STD, OFF or HIGH SAT (P400/P4K/P240)" }
+  white_balance.speed:          { type: int, description: "Auto white balance speed 1-5 (P400/P4K/P240)" }
+  white_balance.matrix_coefficients.*: { type: int, description: "Matrix coefficient rg, rb, gr, gb, br or bg, -99 to 99 (P400/P4K/P240)" }
+  ptz.pan_tilt_slow:            { type: bool, description: "X5 Ultra slow pan and tilt on" }
+  ptz.digital_zoom_limit:       { type: string, description: "MAKI Ultra digital zoom limit: Off, x2, x4, x8 or x16" }
+  colour_matrix.*.hue:          { type: int, description: "Colour matrix hue of red, yellow, green, cyan, blue or magenta; scale per model" }
+  colour_matrix.*.gain:         { type: int, description: "Colour matrix gain of that colour (2.0); scale per model" }
+  colour_matrix.colour_gain:    { type: int, description: "Overall colour gain 0-255 (P200/A200/A300)" }
+  colour_matrix.hue_phase:      { type: int, description: "Hue phase 0-255 (P200/A200/A300)" }
+  advanced.af_mode:             { type: string, description: "Auto focus mode: AUTO or MANUAL (X4 Ultra, MAKI Ultra)" }
+  advanced.scene:               { type: string, description: "Scene preset as reported" }
+  advanced.af_zone:             { type: string, description: "Auto focus zone as reported" }
+  advanced.af_sensitivity:      { type: string, description: "Auto focus sensitivity: High, Middle or Low" }
+  advanced.teleconvert:         { type: bool, description: "MAKI Ultra tele-convert on" }
+  advanced.image_ratio:         { type: string, description: "MAKI Ultra image ratio: 16:9 or 9:16" }
+  advanced.eptz:                { type: bool, description: "MAKI Ultra electronic PTZ on" }
+  advanced.gamma_offset:        { type: int, description: "Gamma offset -16 to 64 (P200/A200/A300)" }
+  advanced.high_resolution:     { type: bool, description: "High resolution on (P200/A200/A300)" }
+  advanced.brightness_comp:     { type: string, description: "Brightness compensation: VERY DARK, DARK, STANDARD or BRIGHT (P200/A200/A300)" }
+  advanced.comp_level:          { type: string, description: "Compensation level: LOW, MID or HIGH (P200/A200/A300)" }
+  advanced.brightness:          { type: int, description: "Brightness 0-6 (P200/A200/A300)" }
+  advanced.video_enhancement:   { type: bool, description: "Video enhancement on (P200/A200/A300)" }
+  external.aux:                 { type: bool, description: "Aux output on (A200/A300)" }
+  external.v12_out:             { type: bool, description: "12 V output on (A200/A300)" }
+  external.rain_wiper:          { type: bool, description: "Rain wiper on (A300)" }
+  external.defog:               { type: bool, description: "Defog on (A200)" }
+  detail.enabled:               { type: bool, description: "Detail on (P400/P4K/P240)" }
+  detail.level:                 { type: int, description: "Detail level 0-15" }
+  detail.bandwidth:             { type: string, description: "Detail bandwidth: DEFAULT, LOW, MIDDLE, HIGH or WIDE" }
+  detail.bw_balance:            { type: string, description: "Detail balance: TYPE1 to TYPE5" }
+  detail.crispening:            { type: int, description: "Crispening 0-7" }
+  detail.highlight:             { type: int, description: "Highlight detail 0-4" }
+  detail.hv_balance:            { type: int, description: "Horizontal/vertical balance -2 to 2" }
+  detail.limit:                 { type: int, description: "Detail limit 0-7" }
+  detail.super_low:             { type: int, description: "Super low 0-7" }
+  gamma.mode:                   { type: string, description: "Gamma: PATTERN, STANDARD or STRAIGHT (P400/P4K/P240)" }
+  gamma.level:                  { type: int, description: "Gamma level 0-14" }
+  gamma.black_gamma_level:      { type: int, description: "Black gamma level 0-14" }
+  gamma.black_level:            { type: int, description: "Black level 0-96" }
+  gamma.black_level_range:      { type: string, description: "Black level range: LOW, MID or HIGH" }
+  gamma.effect:                 { type: int, description: "Gamma effect -3 to 3" }
+  gamma.offset:                 { type: int, description: "Gamma curve offset -64 to 64" }
+  gamma.pattern:                { type: int, description: "Gamma pattern 0-512" }
+  gamma.pattern_fine:           { type: int, description: "Gamma pattern fine 0-9" }
+  gamma.visibility_enhancer:    { type: bool, description: "Visibility enhancer on" }
+  network.ethernet.ip_mode:     { type: string, description: "dhcp or static (2.1)" }
+  network.ethernet.ip_address:  { type: string, description: "Ethernet IP address (2.1)" }
+  network.ethernet.netmask:     { type: string, description: "Ethernet subnet mask (2.1)" }
+  network.ethernet.gateway:     { type: string, description: "Ethernet gateway (2.1)" }
+  network.ethernet.dns_primary: { type: string, description: "First DNS server (2.1)" }
+  network.ethernet.dns_secondary: { type: string, description: "Second DNS server (2.1)" }
+  network.ethernet.dhcp_timeout: { type: int, description: "Seconds before the DHCP fallback address is used (2.1)" }
+  network.ethernet.fallback_ip: { type: string, description: "DHCP fallback IP address (2.1)" }
+  network.ethernet.fallback_netmask: { type: string, description: "DHCP fallback subnet mask (2.1)" }
+  network.ethernet.fallback_gateway: { type: string, description: "DHCP fallback gateway (2.1)" }
+  network.wifi.enabled:         { type: bool, description: "Wi-Fi on (X1, X1 Ultra, X4 Ultra)" }
+  network.wifi.dhcp:            { type: bool, description: "Wi-Fi address from DHCP" }
+  network.wifi.encryption:      { type: string, description: "Wi-Fi encryption as reported" }
+  network.wifi.ssid:            { type: string, description: "Wi-Fi network name" }
+  network.wifi.ip_address:      { type: string, description: "Wi-Fi IP address" }
+  network.wifi.netmask:         { type: string, description: "Wi-Fi subnet mask" }
+  network.wifi.gateway:         { type: string, description: "Wi-Fi gateway" }
+  network.wifi.dns:             { type: string, description: "Wi-Fi DNS server" }
+  network.preferred_nic:        { type: string, description: "Preferred interface: Ethernet or WiFi" }
+  network.dante:                { type: bool, description: "X4 Ultra Dante audio on" }
+  ndi.genlock_source:           { type: string, description: "NDI genlock source, or None (2.1)" }
+  ndi.failover_source:          { type: string, description: "NDI failover source, or None (2.1)" }
+  decoder.ndi_audio:            { type: string, description: "Decoder audio as reported: NDIAudioEn, NDIAudioDis or NDIAudioAnalog" }
+  decoder.screensaver:          { type: string, description: "Decoder screensaver: BirdDogSS or BlackSS" }
+  decoder.color_space:          { type: string, description: "Decoder colour space as reported, such as RGB" }
+  decoder.tally_mode:           { type: string, description: "Decoder tally mode as reported" }
+  connections.*.hostname:       { type: string, description: "Source connected at a location (decoder): its host name, or None" }
+  connections.*.stream_name:    { type: string, description: "That source's NDI stream name" }
+  connections.*.ip_address:     { type: string, description: "That source's address" }
+  connections.*.port:           { type: int, description: "That source's NDI port" }
+  video_output.mode:            { type: string, description: "P400/P4K output mode: LowLatency or NormalMode (plain text)" }
 
 quirks:
   - models: [all]
@@ -3772,7 +4264,8 @@ quirks:
       documents' example replies often still show the old value (the reply
       to {"Flip":"On"} shows "Flip":"On", but the reply to a GainLimit change
       does not), so a POST's acknowledgement does not prove the setting took;
-      the next poll or get_ command reports the camera's value. A refused
+      the core reads the endpoint again after every POST with a JSON body,
+      and that reply, like the next poll, reports the camera's value. A refused
       request answers 500 with {"error": "..."} (connectTo in encode mode),
       {"status": "Invalid Command"} (X-Axis without Y-Axis) or plain text
       "Invalid API command" (MAKI Ultra NDIGrpName POST); commands fail on a
@@ -3863,16 +4356,36 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      The camera pushes nothing; the six settings endpoints every camera
-      serves are polled every 5 seconds. Tally (2.1), PTZ position, NDI
-      transport, discovery server, audio, decoder, video output, Sil2 and
-      secondary protocol state update from their get_ commands only, because
-      a poll list is shared by every model and those endpoints exist only on
-      some. The plain-text replies (version, hostname, operation mode, NDI
-      groups, off-subnet list, P400/P4K output mode) are not in the state.
-      Keys some cameras report but neither document defines (FreeD,
-      SmartExposure, DRC, NearLimit, Portrait, GTuning and others) are not
-      settable here except through the set_<endpoint> JSON commands.
+      The camera pushes nothing. About, encoder, exposure, picture, white
+      balance and PTZ setup are polled every 5 seconds on every camera, and
+      tally, PTZ position and decoder status every 5 seconds on the cameras
+      that serve them; every other endpoint a camera serves (transport,
+      discovery server, audio, video output, operation mode, Sil2, secondary
+      protocol, colour matrix, advanced, external, detail, gamma, network,
+      Wi-Fi, genlock and failover, decoder setup, the decoder's connection) is
+      read on connecting and every 30 seconds, each request naming the cameras
+      that serve it. A POST with a JSON body has its endpoint read again at
+      once; a preset recall and an image reset read exposure, picture, white
+      balance, colour matrix, advanced and PTZ position again. The operation
+      mode and the P400/P4K output mode are plain text, read by their words.
+      The other plain-text replies (version, hostname, NDI group names,
+      off-subnet list) and the NDI source list (an object keyed by source
+      name) are not in the state: the format cannot read a plain-text HTTP
+      reply by its path, nor the members of a JSON object, so they stay
+      available through their get_ commands. Keys some cameras report but
+      neither document defines (FreeD, SmartExposure, DRC, NearLimit,
+      Portrait, GTuning and others) are not settable here except through the
+      set_<endpoint> JSON commands.
+
+  - models: [all]
+    severity: info
+    text: >
+      Passwords, SRT passphrases and RTMP stream keys are readable through
+      the Sil2 encode and secondary protocol endpoints, and settable, but are
+      not kept in the state, which every consumer of a device can see; read
+      them with get_sil2_encode or get_secondary_protocol. The camera does
+      not report which preset was recalled last, and presets cannot be read
+      back (API limit); recall_preset and save_preset therefore have no state.
 
   - models: [x5-ultra, x4-ultra]
     severity: info

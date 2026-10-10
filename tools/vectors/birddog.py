@@ -496,7 +496,7 @@ _tel("about", "/about",
      {"device": {"firmware": "BirdDog X1 Ultra 5.6.057", "hardware": "BirdDog X1 Ultra", "hostname": "birddog-608F9",
                  "ip_address": "192.168.23.75", "netmask": "255.255.255.0", "gateway": "192.168.23.1",
                  "network_method": "static", "serial": "8027b62608f9", "status": "Active", "stream_name": "CAM HX",
-                 "fallback_ip": "192.168.100.100"}})
+                 "fallback_ip": "192.168.100.100", "mcu_version": "5", "dns": ""}})
 _tel("encodesetup", "/encodesetup",
      '{"ChNum":"1","VideoFormat":"1080p59.94","VideoSampleRate":"420","StreamName":"CAM","NDIAudio":"NDIAudioAnalog",'
      '"ScreenSaverMode":"CaptureSS","BandwidthMode":"NDIManaged","BandwidthSelect":"120","TallyMode":"TallyOn",'
@@ -505,7 +505,7 @@ _tel("encodesetup", "/encodesetup",
      {"encoder": {"video_format": "1080p59.94", "compression": "H265", "stream_protocol": "NDI|HX_UVC",
                   "stream_name": "CAM", "stream_to_network": True, "screensaver": "CaptureSS", "ndi_group": False,
                   "ndi_group_name": "BirdDog", "ndi_audio": "NDIAudioAnalog", "tally_mode": "TallyOn",
-                  "bandwidth_mode": "NDIManaged", "bandwidth": 120}})
+                  "bandwidth_mode": "NDIManaged", "bandwidth": 120, "video_sample_rate": "420"}})
 _tel("exposure", "/birddogexpsetup",
      '{"ExpMode":"IRIS-PRI","ExpCompLvl":"-1","GainLevel":"2","GainLimit":"3","ExpCompEn":"1","BackLight":"Off",'
      '"IrisLevel":"17","ShutterSpeed":"4","BrightLevel":"8","SmartExposure":"Off","Meter":"0","DRC":"2"}',
@@ -524,7 +524,9 @@ _tel("exposure-p", "/birddogexpsetup",
      '"ShutterSpeed":"16","ShutterSpeedOverwrite":"30","SlowShutterEn":"Off","SlowShutterLimit":"13","Spotlight":"Off"}',
      {"exposure": {"mode": "FULL-AUTO", "compensation": False, "compensation_level": -123, "gain": 4, "gain_limit": 11,
                    "shutter": "16", "iris": "21", "bright": 24, "backlight": False, "high_sensitivity": False,
-                   "slow_shutter": False, "ae_response": 1}})
+                   "slow_shutter": False, "ae_response": 1, "gain_point": False, "gain_point_position": 10,
+                   "shutter_control_overwrite": True, "shutter_speed_overwrite": 30, "shutter_max_speed": 29,
+                   "shutter_min_speed": 16, "slow_shutter_limit": 13, "spotlight": False}})
 _tel("picture", "/birddogpicsetup",
      '{"Flip":"Off","Mirror":"Off","Effect":"Off","WDREnable":"Off","WideDynamicRange":"0","Gamma":"default",'
      '"BackLightCom":"Off","DeFlicker":"50Hz","HighlightComp":"Off","Portrait":"Off","Brightness":"50","Color":"50",'
@@ -532,7 +534,7 @@ _tel("picture", "/birddogpicsetup",
      {"picture": {"flip": False, "mirror": False, "effect": "Off", "wdr": False, "gamma": "default",
                   "backlight_comp": False, "deflicker": "50Hz", "highlight_comp": "Off", "brightness": 50, "color": 50,
                   "saturation": 50, "hue": 50, "contrast": 50, "sharpness": 50, "noise_reduction_2d": "30",
-                  "noise_reduction_3d": "30"}})
+                  "noise_reduction_3d": "30", "wide_dynamic_range": "0"}})
 _tel("picture-maki", "/birddogpicsetup",
      '{"Saturation":"8","Flip":"On","Hue":"7","Mirror":"Off","TwoDNR":"6","ThreeDNR":"9","Contrast":"7",'
      '"Gamma":"default","Sharpness":"4","WideDynamicRange":"0","BackLightCom":"Off","Brightness":"7",'
@@ -540,12 +542,12 @@ _tel("picture-maki", "/birddogpicsetup",
      {"picture": {"saturation": 8, "flip": True, "hue": 7, "mirror": False, "noise_reduction_2d_maki": "6",
                   "noise_reduction_3d": "9", "contrast": 7, "gamma": "default", "sharpness": 4,
                   "backlight_comp": False, "brightness": 7, "deflicker": "default", "bw_mode": False, "wdr": True,
-                  "highlight_comp": "Off"}})
+                  "highlight_comp": "Off", "wide_dynamic_range": "0"}})
 _tel("white-balance", "/birddogwbsetup",
      '{"WbMode":"AUTO","OnePushTrigger":"None","RedGain":"128","BlueGain":"128","WBSensitivity":"Middle",'
      '"ColorTemp":"5600","GTuning":"50","RTuning":"50","BTuning":"50"}',
      {"white_balance": {"mode": "AUTO", "red_gain": 128, "blue_gain": 128, "color_temp": 5600, "red_tuning": 50,
-                        "blue_tuning": 50}})
+                        "blue_tuning": 50, "sensitivity": "Middle"}})
 _tel("ptz-setup", "/birddogptzsetup",
      '{"FocusMode":"AUTO","Freed":"Off","FreedIpAddr":"192.168.2.100","FreedPort":"5555","PanSpeed":"24",'
      '"Preset":"Camera","PresetSpeed":"14","SpeedControl":"standard","TiltSpeed":"20","ZoomSpeed":"7"}',
@@ -582,4 +584,182 @@ _tel("sil2-codec", "/sil2codec", '{"BitrateControl":"cbr","ModeSel":"high","GOPS
 _tel("secondary-protocol", "/secondary_protocol",
      '{"RTMP":{"authentication":"disable","server_selection":"remote"},"RTSP":{"port":"554"},'
      '"SRT":{"connection_type":"listener","latency_ms":"120"},"protocol":"disable"}',
-     {"encoder": {"secondary_protocol": "disable"}})
+     {"encoder": {"secondary_protocol": "disable",
+                  "secondary": {"rtmp": {"authentication": False, "server_selection": "remote"},
+                                "rtsp": {"port": 554}, "srt": {"mode": "listener", "latency": 120}}}})
+
+# Full control: every other endpoint the cameras read, from the documents'
+# example replies (2.0 Example data, 2.1 example responses).
+_tel("about-maki", "/about",
+     '{"FallbackIP":"192.168.100.100","FirmwareVersion":"5.6.123","Format":"CAM","GateWay":"192.168.1.1",'
+     '"HardwareVersion":"MAKI Ultra","HostName":"MAKI-12X-04E60","IPAddress":"192.168.1.20",'
+     '"NetworkConfigMethod":"dhcp","NetworkMask":"255.255.255.0","SerialNumber":"0123456789","Status":"Active",'
+     '"DNS":"9.9.9.9"}',
+     {"device": {"firmware": "5.6.123", "hardware": "MAKI Ultra", "hostname": "MAKI-12X-04E60",
+                 "ip_address": "192.168.1.20", "netmask": "255.255.255.0", "gateway": "192.168.1.1",
+                 "network_method": "dhcp", "serial": "0123456789", "status": "Active", "stream_name": "CAM",
+                 "fallback_ip": "192.168.100.100", "dns": "9.9.9.9"}})
+_tel("picture-p", "/birddogpicsetup",
+     '{"BackLightCom":"On","ChromeSuppress":"OFF","Color":"8","Contrast":"1","Effect":"BW","Flip":"Off","Gamma":"1",'
+     '"HighlightComp":"On","HighlightCompMask":"3","Hue":"7","IRCutFilter":"Off","Mirror":"Off","NoiseReduction":"Off",'
+     '"Sharpness":"122","Stabilizer":"Off","TWODNR":"2","ThreeDNR":"2","WideDynamicRange":"Off","LowLatency":"Off",'
+     '"NDFilter":"2"}',
+     {"picture": {"backlight_comp": True, "chroma_suppress": "OFF", "color": 8, "contrast": 1, "effect": "BW",
+                  "flip": False, "gamma": "1", "highlight_comp": "On", "highlight_comp_mask": 3, "hue": 7,
+                  "ir_cut_filter": "Off", "mirror": False, "noise_reduction": "Off", "sharpness": 122,
+                  "stabilizer": False, "noise_reduction_2d": "2", "noise_reduction_3d": "2",
+                  "wide_dynamic_range": "Off", "low_latency": False, "nd_filter": 2}})
+_tel("picture-x5", "/birddogpicsetup", '{"Flip":"Off","Mirror":"On","Stablizer":"On"}',
+     {"picture": {"flip": False, "mirror": True, "stabilizer_x5": True}})
+_tel("white-balance-p", "/birddogwbsetup",
+     '{"BG":"0","BR":"-2","BlueGain":"174","ColorTemp":"2800","GB":"0","GR":"3","Level":"4","Matrix":"Off",'
+     '"Offset":"7","Phase":"7","RB":"0","RG":"1","RedGain":"179","Select":"OFF","Speed":"3","WbMode":"AUTO"}',
+     {"white_balance": {"blue_gain": 174, "color_temp": 2800, "level": 4, "matrix": False, "offset": 7, "phase": 7,
+                        "red_gain": 179, "select": "OFF", "speed": 3, "mode": "AUTO",
+                        "matrix_coefficients": {"bg": 0, "br": -2, "gb": 0, "gr": 3, "rb": 0, "rg": 1}}})
+_tel("ptz-setup-x5", "/birddogptzsetup", '{"PanSpeed":"50","TiltSpeed":"50","ZoomSpeed":"4","PanTiltSlow":"On"}',
+     {"ptz": {"pan_speed": 50, "tilt_speed": 50, "zoom_speed": 4, "pan_tilt_slow": True}})
+_tel("ptz-setup-maki", "/birddogptzsetup",
+     '{"FocusMode":"AUTO","ZoomSpeed":"5","PresetSpeed":"100","Preset":"Camera","DZoomLimit":"x4"}',
+     {"ptz": {"focus_mode": "AUTO", "zoom_speed": 5, "preset_speed": 100, "preset_mode": "Camera",
+              "digital_zoom_limit": "x4"}})
+_tel("colour-matrix", "/birddogcmsetup",
+     '{"BlueGain":"32","BlueHue":"30","ColourGain":"128","CyanGain":"33","CyanHue":"32","GreenGain":"34",'
+     '"GreenHue":"32","HuePhase":"120","MagGain":"35","MagHue":"31","RedGain":"36","RedHue":"29","YellowGain":"37",'
+     '"YellowHue":"28"}',
+     {"colour_matrix": {"blue": {"gain": 32, "hue": 30}, "cyan": {"gain": 33, "hue": 32},
+                        "green": {"gain": 34, "hue": 32}, "magenta": {"gain": 35, "hue": 31},
+                        "red": {"gain": 36, "hue": 29}, "yellow": {"gain": 37, "hue": 28},
+                        "colour_gain": 128, "hue_phase": 120}})
+_tel("advanced", "/birddogadvancesetup", '{"AFMode":"AUTO","Scene":"Normal","AFZone":"Center","AFSensitivity":"High"}',
+     {"advanced": {"af_mode": "AUTO", "scene": "Normal", "af_zone": "Center", "af_sensitivity": "High"}})
+_tel("advanced-p", "/birddogadvancesetup",
+     '{"Brightness":"2","BrightnessComp":"STANDARD","CompLevel":"LOW","GammaOffset":"16","HighResolution":"Off",'
+     '"VideoEnhancement":"On"}',
+     {"advanced": {"brightness": 2, "brightness_comp": "STANDARD", "comp_level": "LOW", "gamma_offset": 16,
+                   "high_resolution": False, "video_enhancement": True}})
+_tel("advanced-maki", "/birddogadvancesetup",
+     '{"Scene":"Clarity","AFMode":"MANUAL","AFZone":"All","NearLimit":"1m","AFSensitivity":"Low","SmartFocus":"Off",'
+     '"teleconvert_mode":"On","img_ratio":"9:16","eptz_switch":"Off"}',
+     {"advanced": {"scene": "Clarity", "af_mode": "MANUAL", "af_zone": "All", "af_sensitivity": "Low",
+                   "teleconvert": True, "image_ratio": "9:16", "eptz": False}})
+_tel("external", "/birddogexternalsetup", '{"Aux":"Off","RainWiper":"On","V12vOut":"Off","DeFog":"On"}',
+     {"external": {"aux": False, "rain_wiper": True, "v12_out": False, "defog": True}})
+_tel("detail", "/birddogdetsetup",
+     '{"Bandwidth":"DEFAULT","BwBalance":"TYPE1","Crispening":"0","Detail":"On","HighLightDetail":"0","HvBalance":"-2",'
+     '"Level":"3","Limit":"3","SuperLow":"0"}',
+     {"detail": {"bandwidth": "DEFAULT", "bw_balance": "TYPE1", "crispening": 0, "enabled": True, "highlight": 0,
+                 "hv_balance": -2, "level": 3, "limit": 3, "super_low": 0}})
+_tel("gamma", "/birddoggammasetup",
+     '{"BlackGammaLevel":"7","BlackLevel":"0","BlackLevelRange":"LOW","Effect":"0","Level":"7","Offset":"0",'
+     '"Pattern":"51","PatternFine":"2","Settings":"STANDARD","VisibilityEnhancer":"Off"}',
+     {"gamma": {"black_gamma_level": 7, "black_level": 0, "black_level_range": "LOW", "effect": 0, "level": 7,
+                "offset": 0, "pattern": 51, "pattern_fine": 2, "mode": "STANDARD", "visibility_enhancer": False}})
+_SIL2_PRESETS = ('"high":{"Bitrate":"10","GOPSize":"30","QuantFactorI":"30","QuantFactorP":"30"},'
+                 '"low":{"Bitrate":"3","GOPSize":"60","QuantFactorI":"30","QuantFactorP":"30"}')
+_tel("sil2-codec-2-0", "/sil2codec",
+     '{' + ','.join(
+         f'"{p}":{{"BitrateControl":"cbr","Custom":{{"Bitrate":"{b}","GOPSize":"{g}","QuantFactorI":"30",'
+         f'"QuantFactorP":"31"}},"ModeSel":"{m}",{_SIL2_PRESETS}}}'
+         for p, b, g, m in [("DISABLE", 3, 60, "Custom"), ("HX", 3, 60, "high"), ("RTMP", 3, 59, "Custom"),
+                            ("RTSP", 4, 59, "Custom"), ("SRT", 5, 59, "low")]) + '}',
+     {"encoder": {"sil2": {
+         k: {"bitrate_control": "cbr", "mode": m, "custom_bitrate": b, "custom_gop_size": g, "custom_quant_i": 30,
+             "custom_quant_p": 31}
+         for k, b, g, m in [("disable", 3, 60, "Custom"), ("hx", 3, 60, "high"), ("rtmp", 3, 59, "Custom"),
+                            ("rtsp", 4, 59, "Custom"), ("srt", 5, 59, "low")]}}})
+_tel("sil2-encode", "/sil2enc",
+     '{"HaiVisionPlayerSupport":"true","RTMP":{"AuthEnable":"0","ConnectionURL":"rtmp://192.168.2.197:1935/bdlive/birddogkey",'
+     '"Password":"testpwd","Server":"TestUrl","ServerSelection":"local","StreamKeyLocal":"birddogkey",'
+     '"StreamKeyRemote":"remotekey","UserName":"testuser"},"RTSP":{"AuthEnable":"1",'
+     '"ConnectionURL":"rtsp://192.168.2.197:3489/birddog-stream","Password":"","Port":"3489",'
+     '"StreamName":"birddog-stream","UserName":""},"SRT":{"ConnectionURL":"srt://192.168.2.197:7900?mode=listener&latency=120",'
+     '"Encryption":"false","IPAddress":"","Port":"7900","latency":"120","mode":"caller","passphrase":"",'
+     '"pbkeylen":"32","streamid":"21"},"StreamingProtocol":"SRT"}',
+     {"encoder": {"sil2_stream": {
+         "protocol": "SRT", "haivision_player": True,
+         "rtmp": {"authentication": False, "connection_url": "rtmp://192.168.2.197:1935/bdlive/birddogkey",
+                  "server": "TestUrl", "server_selection": "local", "user_name": "testuser"},
+         "rtsp": {"authentication": True, "connection_url": "rtsp://192.168.2.197:3489/birddog-stream", "port": 3489,
+                  "stream_name": "birddog-stream", "user_name": ""},
+         "srt": {"connection_url": "srt://192.168.2.197:7900?mode=listener&latency=120", "encryption": False,
+                 "ip_address": "", "port": 7900, "latency": 120, "mode": "caller", "key_length": 32,
+                 "stream_id": "21"}}}})
+_tel("secondary-protocol-full", "/secondary_protocol",
+     '{"RTMP":{"authentication":"disable","connection_url":"rtmp://192.168.1.100:8899/live/huyalive",'
+     '"server_selection":"remote","server_url":"rtmp://192.168.1.100:8899/live","stream_key":""},'
+     '"RTSP":{"authentication":"enable","connection_url":"rtsp://192.168.20.46:554/live/av0","password":"birddog",'
+     '"port":"554","stream_name":"live/av0","user_name":"admin"},"SRT":{"connection_type":"listener",'
+     '"connection_url":"srt://192.168.20.46:9000?mode=caller&latency=120","encryption":"disable",'
+     '"encryption_length":"AES-128","latency_ms":"120","passphrase":"","port":"9000"},"protocol":"SRT"}',
+     {"encoder": {"secondary_protocol": "SRT", "secondary": {
+         "rtmp": {"authentication": False, "connection_url": "rtmp://192.168.1.100:8899/live/huyalive",
+                  "server_selection": "remote", "server_url": "rtmp://192.168.1.100:8899/live"},
+         "rtsp": {"authentication": True, "connection_url": "rtsp://192.168.20.46:554/live/av0", "port": 554,
+                  "stream_name": "live/av0", "user_name": "admin"},
+         "srt": {"mode": "listener", "connection_url": "srt://192.168.20.46:9000?mode=caller&latency=120",
+                 "encryption": False, "encryption_length": "AES-128", "latency": 120, "port": 9000}}}})
+_tel("ethernet", "/EthSetup",
+     '{"IpMode":"dhcp","IpAddr":"192.168.20.46","NetMask":"255.255.255.0","GateWayIp":"192.168.20.20",'
+     '"DnsSvrIpFirst":"9.9.9.9","DnsSvrIpSecond":"1.1.1.1","DhcpTimeout":"30","DhcpFallbackIPAddr":"192.168.100.100",'
+     '"DhcpFallbackNetMask":"255.255.255.0","DhcpFallbackGateWayIp":"192.168.1.1"}',
+     {"network": {"ethernet": {"ip_mode": "dhcp", "ip_address": "192.168.20.46", "netmask": "255.255.255.0",
+                               "gateway": "192.168.20.20", "dns_primary": "9.9.9.9", "dns_secondary": "1.1.1.1",
+                               "dhcp_timeout": 30, "fallback_ip": "192.168.100.100",
+                               "fallback_netmask": "255.255.255.0", "fallback_gateway": "192.168.1.1"}}})
+_tel("wifi", "/WifiSetup",
+     '{"Enable":"1","DhcpEnable":"1","EncryptMode":"None","Ssid":"","IpAddr":"192.168.100.101",'
+     '"NetMask":"255.255.255.0","GateWayIp":"192.168.1.1","Dns":"9.9.9.9"}',
+     {"network": {"wifi": {"enabled": True, "dhcp": True, "encryption": "None", "ssid": "",
+                           "ip_address": "192.168.100.101", "netmask": "255.255.255.0", "gateway": "192.168.1.1",
+                           "dns": "9.9.9.9"}}})
+_tel("network-setup", "/NetworkSetup", '{"PreferredNIC":"Ethernet","Dante":"Off"}',
+     {"network": {"preferred_nic": "Ethernet", "dante": False}})
+_tel("genlock-failover", "/Genlock_Failover_Source", '{"GenlockSource":"BIRDDOG-046CE (CAM)","FailoverSource":"None"}',
+     {"ndi": {"genlock_source": "BIRDDOG-046CE (CAM)", "failover_source": "None"}})
+_tel("decode-setup", "/decodesetup?ChNum=1",
+     '{"ColorSpace":"RGB","NDIAudio":"NDIAudioAnalog","ScreenSaverMode":"BirdDogSS","TallyMode":"TallyOff"}',
+     {"decoder": {"color_space": "RGB", "ndi_audio": "NDIAudioAnalog", "screensaver": "BirdDogSS",
+                  "tally_mode": "TallyOff"}})
+_tel("connect-to", "/connectTo?location=decoder",
+     '{"sourceHostname":"BirdDog-12345","sourceStreamName":"CAM","sourceIP":"192.168.100.61","sourcePort":"5961"}',
+     {"connections": {"decoder": {"hostname": "BirdDog-12345", "stream_name": "CAM", "ip_address": "192.168.100.61",
+                                  "port": 5961}}})
+_tel("operation-mode", "/operationmode", "dual", {"device": {"operation_mode": "dual"}})
+_tel("video-output-p400", "/videooutputinterface", "NormalMode", {"video_output": {"mode": "NormalMode"}})
+
+# Re-reads: a POST with a JSON body has its endpoint read again; its GET
+# reply does not.
+telemetry(BD, "reread-exposure", inbound_http={
+    "path": "/birddogexpsetup", "request": {"GainLimit": "11"},
+    "body": '{"ExpMode":"MANUAL","GainLimit":"10"}'},
+    expect_then_send=[{"method": "GET", "target": "/birddogexpsetup"}],
+    expect_state={"exposure": {"mode": "MANUAL", "gain_limit": 10}})
+telemetry(BD, "reread-exposure-get", inbound_http={
+    "path": "/birddogexpsetup", "body": '{"ExpMode":"MANUAL"}'},
+    expect_then_send=[], expect_state={"exposure": {"mode": "MANUAL"}})
+telemetry(BD, "reread-secondary", inbound_http={
+    "path": "/secondary_protocol", "request": {"SRT": {"latency_ms": "222"}}, "body": '{"protocol":"SRT"}'},
+    expect_then_send=[{"method": "GET", "target": "/secondary_protocol"}],
+    expect_state={"encoder": {"secondary_protocol": "SRT"}})
+telemetry(BD, "reread-tally", inbound_http={
+    "path": "/tally", "request": {"tally_state": "On"}, "body": '{"tally_rest_state":"Off","tally_state":"On"}'},
+    expect_then_send=[{"method": "GET", "target": "/tally"}],
+    expect_state={"tally": {"on": True, "rest_state": "Off"}})
+telemetry(BD, "reread-decode-setup", inbound_http={
+    "path": "/decodesetup?ChNum=1", "request": {"NDIAudio": "NDIAudioEn"}, "body": '{"NDIAudio":"NDIAudioEn"}'},
+    expect_then_send=[{"method": "GET", "target": "/decodesetup?ChNum=1"}],
+    expect_state={"decoder": {"ndi_audio": "NDIAudioEn"}})
+telemetry(BD, "reread-connect-to", inbound_http={
+    "path": "/connectTo?location=Genlock", "request": {"sourceHostname": "BirdDog-12345", "sourceStreamName": "CAM"},
+    "body": '{"sourceName":"None"}'},
+    expect_then_send=[{"method": "GET", "target": "/connectTo?location=Genlock"}], expect_state={})
+telemetry(BD, "reread-recall", inbound_http={"path": "/recall", "request": {"Preset": "Preset-1"},
+                                             "body": '{"Preset":"Preset-1"}'},
+          expect_then_send=[{"method": "GET", "target": "/birddogexpsetup"},
+                            {"method": "GET", "target": "/birddogpicsetup"},
+                            {"method": "GET", "target": "/birddogwbsetup"},
+                            {"method": "GET", "target": "/birddogptzcontrol"},
+                            {"method": "GET", "target": "/birddogcmsetup"},
+                            {"method": "GET", "target": "/birddogadvancesetup"}],
+          expect_state={})
