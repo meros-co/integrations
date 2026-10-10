@@ -90,5 +90,46 @@ telemetry(SC, "push", inbound="#00007=12321\r#00324=00128\r#10000=65535\r",
           expect_state={"controllers": {"7": {"value": 12321}, "324": {"value": 128}, "10000": {"value": 65535}}})
 telemetry(SC, "missing-controller", inbound="#00011=-0001\r",
           expect_state={"controllers": {"11": {"value": -1}}})
-telemetry(SC, "gs2-answer", inbound="368 47114\r",
+telemetry(SC, "gs2-answer", inbound="368 47114\r", request="GS2 368",
           expect_state={"controllers": {"368": {"value": 47114}}})
+# Answers other than push data are read with the request they answer.
+telemetry(SC, "gs-answer", inbound="65535\r", request="GS 12",
+          expect_state={"controllers": {"12": {"value": 65535}}})
+telemetry(SC, "set-reads-back", inbound="ACK\r", request="CS 12 754",
+          expect_state={}, expect_then_send=["GS2 12\r"])
+telemetry(SC, "increment-reads-back", inbound="ACK\r", request="CC 7 1 780",
+          expect_state={}, expect_then_send=["GS2 7\r"])
+# GPR: four digits, 0 when no preset has been loaded (p.9).
+telemetry(SC, "preset", inbound="0007\r", request="GPR", expect_state={"preset": {"current": 7}})
+telemetry(SC, "preset-none", inbound="0000\r", request="GPR", expect_state={"preset": {"current": 0}})
+telemetry(SC, "preset-load-reads-back", inbound="ACK\r", request="LP 3",
+          expect_state={}, expect_then_send=["GPR\r"])
+telemetry(SC, "matrix-get", inbound="-4.50\r", request="CMV Get 0.1.CPGain.I3O6",
+          expect_state={"matrix": {"0": {"1": {"CPGain": {"I3O6": -4.5}}}}})
+# Verbose mode puts the parameter first (p.23).
+telemetry(SC, "matrix-get-verbose", inbound="0.1.IPan.I2=25.00%\r", request="CMV Get 0.1.IPan.I2",
+          expect_state={"matrix": {"0": {"1": {"IPan": {"I2": 25.0}}}}})
+telemetry(SC, "matrix-change-reads-back", inbound="ACK\r", request="CMV Set 0.1.OMute.O2 1.00",
+          expect_state={}, expect_then_send=["CMV Get 0.1.OMute.O2\r"])
+telemetry(SC, "matrix-range-not-read-back", inbound="ACK\r", request="CMV Set 0.1.CPGain.{I1O1:I3O4} 0.00",
+          expect_state={})
+telemetry(SC, "matrix-changes", inbound="42\r", request="GSYSC 0.3060.-1,0",
+          expect_state={"matrix_changes": {"0": 42}})
+telemetry(SC, "speed-dial-name", inbound="Acme Inc.\r", request="GSYSS 1.1001.2.0.0",
+          expect_state={"speed_dials": {"1": {"0": {"2": {"name": "Acme Inc."}}}}})
+telemetry(SC, "speed-dial-number", inbound="0800123\r", request="GSYSS 1.1000.19.3.0",
+          expect_state={"speed_dials": {"1": {"3": {"19": {"number": "0800123"}}}}})
+telemetry(SC, "call-status", inbound="In Call: 5551234\r", request="GSYSS 1.1005.0.3.1",
+          expect_state={"calls": {"1": {"3": {"1": {"status": "In Call: 5551234"}}}}})
+telemetry(SC, "caller-id", inbound="5551234\r", request="GSYSS 2.1003.0.3.1",
+          expect_state={"calls": {"2": {"3": {"1": {"caller_id": "5551234"}}}}})
+telemetry(SC, "dialed-number", inbound="14257787728\r", request="GSYSS 1.1002.0.3.0",
+          expect_state={"calls": {"1": {"3": {"0": {"dialed_number": "14257787728"}}}}})
+telemetry(SC, "call-elapsed", inbound="Time 0:00:35\r", request="GSYSS 1.1006.0.3.0",
+          expect_state={"calls": {"1": {"3": {"0": {"elapsed": "Time 0:00:35"}}}}})
+telemetry(SC, "dial-number", inbound="14257787728\r", request="GSYSS 1.1004.0.3.0",
+          expect_state={"dial_numbers": {"1": {"3": "14257787728"}}})
+# NAK is the failure, not a string.
+telemetry(SC, "string-nak", inbound="NAK\r", request="GSYSS 1.1005.0.3.1", expect_state={})
+telemetry(SC, "string-set-reads-back", inbound="ACK\r", request="SSYSS 1.1001.11.3.0=Conference Rm 1",
+          expect_state={}, expect_then_send=["GSYSS 1.1001.11.3.0\r"])
