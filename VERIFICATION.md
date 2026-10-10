@@ -822,17 +822,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 
-- [ ] Confirm a frame answers `Dev.Network.ID?` sent to its address with the broadcast id and class 0, and that the answer's source id is its frame id. ([specs/labgruppen-lake.yaml:701](specs/labgruppen-lake.yaml#L701))
-- [ ] Confirm dynamic port mode: a packet to UDP 6016 is answered to the sending port, so the core works beside Lake Controller. ([specs/labgruppen-lake.yaml:696](specs/labgruppen-lake.yaml#L696))
-- [ ] Record the exact text of a get's answer (the value alone, or the command echoed) for one-value and several-value gets, such as `Mod.Out.Gain?A 1` and `Dev.LoadPilot.Readings?1`. ([specs/labgruppen-lake.yaml:715](specs/labgruppen-lake.yaml#L715))
-- [ ] Check labels and preset names with spaces are accepted as the last argument (`Mod.Out.Label=A 1 Main Left`, `Dev.Preset.Store!1 Show A`). ([specs/labgruppen-lake.yaml:676](specs/labgruppen-lake.yaml#L676))
-- [ ] Check the acknowledgement codes a frame really sends for a bad parameter and an unknown path (-3 to -6 in the document's misaligned table). ([specs/labgruppen-lake.yaml:728](specs/labgruppen-lake.yaml#L728))
-- [ ] Check `Dev.MD.FullBin?3` answers with the 108-byte version 3 structure as the payload alone, with no text before it, and the same for `?2` on a PLM and the LM structure. ([specs/labgruppen-lake.yaml:721](specs/labgruppen-lake.yaml#L721))
-- [ ] Check the RMS gain reduction scale (0.1 dB a step, as read here, or 0.5 dB as one table says). ([specs/labgruppen-lake.yaml:721](specs/labgruppen-lake.yaml#L721))
-- [ ] Confirm the D 10:4L, D 20:4L and D 40:4L answer DLM as the other D Series, and note their model names from `Dev.ModelName?`. ([specs/labgruppen-lake.yaml:747](specs/labgruppen-lake.yaml#L747))
-- [ ] Check whether `Dev.NetworkIPConf?` (as the document spells it) or `Dev.Network.IPConf?` answers, and whether the PLM 20000Q takes `Dev.PTG2.Active` (the example) or `Dev.PTG.Active` (the heading). ([specs/labgruppen-lake.yaml:741](specs/labgruppen-lake.yaml#L741))
-- [ ] Note how many polled requests a second a frame takes before it falls behind, and whether a full parameter round every 5 s disturbs Lake Controller. ([specs/labgruppen-lake.yaml:707](specs/labgruppen-lake.yaml#L707))
-- [ ] Confirm a frame does not reset on any typed command on firmware before 2.50 (the Lake Controller 8 known issue about invalid DLM messages). ([specs/labgruppen-lake.yaml:683](specs/labgruppen-lake.yaml#L683))
+- [ ] Confirm a frame answers `Dev.Network.ID?` sent to its address with the broadcast id and class 0, and that the answer's source id is its frame id. ([specs/labgruppen-lake.yaml:768](specs/labgruppen-lake.yaml#L768))
+- [ ] Confirm dynamic port mode: a packet to UDP 6016 is answered to the sending port, so the core works beside Lake Controller. ([specs/labgruppen-lake.yaml:763](specs/labgruppen-lake.yaml#L763))
+- [ ] Record the exact text of a get's answer (the value alone, or the command echoed) for one-value and several-value gets, such as `Mod.Out.Gain?A 1` and `Dev.LoadPilot.Readings?1`. ([specs/labgruppen-lake.yaml:806](specs/labgruppen-lake.yaml#L806))
+- [ ] Check labels and preset names with spaces are accepted as the last argument (`Mod.Out.Label=A 1 Main Left`, `Dev.Preset.Store!1 Show A`). ([specs/labgruppen-lake.yaml:743](specs/labgruppen-lake.yaml#L743))
+- [ ] Check the acknowledgement codes a frame really sends for a bad parameter and an unknown path (-3 to -6 in the document's misaligned table). ([specs/labgruppen-lake.yaml:819](specs/labgruppen-lake.yaml#L819))
+- [ ] Check `Dev.MD.FullBin?3` answers with the 108-byte version 3 structure as the payload alone, with no text before it, and the same for `?2` on a PLM and the LM structure. ([specs/labgruppen-lake.yaml:812](specs/labgruppen-lake.yaml#L812))
+- [ ] Check the RMS gain reduction scale (0.1 dB a step, as read here, or 0.5 dB as one table says). ([specs/labgruppen-lake.yaml:812](specs/labgruppen-lake.yaml#L812))
+- [ ] Confirm the D 10:4L, D 20:4L and D 40:4L answer DLM as the other D Series, and note their model names from `Dev.ModelName?`. ([specs/labgruppen-lake.yaml:838](specs/labgruppen-lake.yaml#L838))
+- [ ] Check whether `Dev.NetworkIPConf?` (as the document spells it) or `Dev.Network.IPConf?` answers, and whether the PLM 20000Q takes `Dev.PTG2.Active` (the example) or `Dev.PTG.Active` (the heading), for the set and the configuration round's read. ([specs/labgruppen-lake.yaml:832](specs/labgruppen-lake.yaml#L832))
+- [ ] Note how many polled requests a second a frame takes before it falls behind, and whether a full parameter round every 5 s, and the configuration round (about 300 reads on a D Series with six channels a module) every minute, disturb Lake Controller. ([specs/labgruppen-lake.yaml:774](specs/labgruppen-lake.yaml#L774))
+- [ ] Confirm a frame does not reset on any typed command on firmware before 2.50 (the Lake Controller 8 known issue about invalid DLM messages). ([specs/labgruppen-lake.yaml:750](specs/labgruppen-lake.yaml#L750))
+- [ ] Record the answers of the several-value gets and check their word order: `Dev.Fuse.NominalCurrent?` (nominal, actual), `Dev.LoadPilot.Signal?`, `Threshold?` and `Readings?`, `Dev.Router.InputTypSel?` with a Dante name holding spaces, `Dev.Dante.BreakIn?` for a probe, `Mod.Out.Phase?` (polarity, lock) and `Mod.Out.AmpVPL?` (desired, minimum, maximum, actual). ([specs/labgruppen-lake.yaml:798](specs/labgruppen-lake.yaml#L798))
+- [ ] Record `Dev.Route?` and the LM's `Dev.Out.Route?` answers: the character for a position not routed (read as anything but X), and whether `Dev.Route?` separates positions with spaces. ([specs/labgruppen-lake.yaml:798](specs/labgruppen-lake.yaml#L798))
+- [ ] Check `Dev.PTG.Impedance?` without a channel answers all four impedances on a PLM, with `?` for a channel not measured. ([specs/labgruppen-lake.yaml:798](specs/labgruppen-lake.yaml#L798))
+- [ ] Check `Dev.Out.Route=` on an LM takes - for a position not routed, as `set_output_route_lm` sends it. ([specs/labgruppen-lake.yaml:350](specs/labgruppen-lake.yaml#L350))
+- [ ] Check which models answer `Dev.AesLoopTermination?` (the document lists PLM+, PLM and LM, not D Series), `Dev.Dante.SlaveOnly?` and `Dev.Network.Redund?` (PLM 4.33, LM 2.30), and what an older firmware answers to a read it lacks. ([specs/labgruppen-lake.yaml:774](specs/labgruppen-lake.yaml#L774))
 
 ## labgruppen-nlb60e — Lab.gruppen NLB 60E (NomadLink)
 
@@ -1452,7 +1457,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-amp150 — Turtle AV 150W Dante amplifier
 
-- [ ] Check the master volume and mute reply texts (assumed Master volume: 50 and Master mute: on), the line ending, and that port 8000 needs no login. ([specs/turtleav-amp150.yaml:165](specs/turtleav-amp150.yaml#L165))
+- [ ] Check the master volume and mute reply texts (assumed Master volume: 50 and Master mute on), the line ending, and that port 8000 needs no login. ([specs/turtleav-amp150.yaml:682](specs/turtleav-amp150.yaml#L682))
+- [ ] Record the line and Dante wordings of the input and output replies (the document shows only Input line volume: 50 and Output speaker volume: 50), and whether they are capitalised. ([specs/turtleav-amp150.yaml:692](specs/turtleav-amp150.yaml#L692))
+- [ ] Check the LCD and ID LED timed forms: s lcd on 15 (this document's example) or s lcd 15 (the 30W amplifier's), and the replies to r lcd and r idled. ([specs/turtleav-amp150.yaml:72](specs/turtleav-amp150.yaml#L72))
+- [ ] Check the TCP port command's spelling: s tcp/ipport 8000 (the example, sent) or s tcp/ip port 8000 (the command column). ([specs/turtleav-amp150.yaml:346](specs/turtleav-amp150.yaml#L346))
+- [ ] Record r fan's reply when the two fans differ, r auto stb's reply with auto standby off, and r trigger's with the trigger off. ([specs/turtleav-amp150.yaml:682](specs/turtleav-amp150.yaml#L682))
+- [ ] Check what a graphic EQ value means: 0-20 with 10 the default, read here as the device's number, possibly -10 to +10 dB. ([specs/turtleav-amp150.yaml:243](specs/turtleav-amp150.yaml#L243))
+- [ ] Check how many lines a network change answers (the value and the net reboot reminder) and that later reads stay in step. ([specs/turtleav-amp150.yaml:692](specs/turtleav-amp150.yaml#L692))
 
 ## turtleav-avoip-control — Turtle AV DARWIN and CHAZY controllers
 
@@ -1462,18 +1473,36 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-bt-wallplate — Turtle AV Dante Bluetooth wall plate
 
-- [ ] Check the line ending, which port carries the commands (8000 or 23), and the get bt mute reply text. ([specs/turtleav-bt-wallplate.yaml:156](specs/turtleav-bt-wallplate.yaml#L156))
+- [ ] Check the line ending, which port carries the commands (8000 or 23), and the get bt mute reply text. ([specs/turtleav-bt-wallplate.yaml:479](specs/turtleav-bt-wallplate.yaml#L479))
+- [ ] Check that get bt name answers with the name alone, and that set bt name takes the name in angle brackets as the example shows. ([specs/turtleav-bt-wallplate.yaml:489](specs/turtleav-bt-wallplate.yaml#L489))
+- [ ] Record the reply to set 1 eq 1 typ ...: whether it is one line naming the channel and band (read into state) or several. ([specs/turtleav-bt-wallplate.yaml:489](specs/turtleav-bt-wallplate.yaml#L489))
+- [ ] Record get 1 eq's reply: one line for the channel (Bluetooth input left EQ: on) or one per band. ([specs/turtleav-bt-wallplate.yaml:501](specs/turtleav-bt-wallplate.yaml#L501))
+- [ ] Record get artist, get album and get track with nothing playing, and get bt format with no device connected. ([specs/turtleav-bt-wallplate.yaml:479](specs/turtleav-bt-wallplate.yaml#L479))
 
 ## turtleav-dante — Turtle AV Dante bridges, Downtown and 30W amplifier
 
-- [ ] Check the line ending (CR LF sent), that port 8000 is a raw socket with the same commands as Telnet 23, and that no login is asked. ([specs/turtleav-dante.yaml:429](specs/turtleav-dante.yaml#L429))
-- [ ] Check the real channel ranges and get type strings of Mineola 4x4, 8x8 and 16x16 (their manuals copy the 2x2's). ([specs/turtleav-dante.yaml:436](specs/turtleav-dante.yaml#L436))
-- [ ] Check the reply to an error, and Downtown's auto event report format. ([specs/turtleav-dante.yaml:444](specs/turtleav-dante.yaml#L444))
+- [ ] Check the line ending (CR LF sent), that port 8000 is a raw socket with the same commands as Telnet 23, and that no login is asked. ([specs/turtleav-dante.yaml:2550](specs/turtleav-dante.yaml#L2550))
+- [ ] Check the real channel ranges and get type strings of Mineola 4x4, 8x8 and 16x16 (their manuals copy the 2x2's), which the reads assume are 4, 8 and 16. ([specs/turtleav-dante.yaml:2576](specs/turtleav-dante.yaml#L2576))
+- [ ] Check the reply to an error, and Downtown's auto event report format. ([specs/turtleav-dante.yaml:2592](specs/turtleav-dante.yaml#L2592))
+- [ ] Check every model answers get master vol with Master volume: <n> and get power with Power: on or off, since those replies queue the model's other reads. ([specs/turtleav-dante.yaml:2540](specs/turtleav-dante.yaml#L2540))
+- [ ] Check set master member takes the digits in angle brackets (set master member <11>, as the examples show) and the reply's form. ([specs/turtleav-dante.yaml:217](specs/turtleav-dante.yaml#L217))
+- [ ] Record the reply to set input/output x eq y typ ...: one line (XLR IN1 EQ : Type: 2, ...) as read here, and the 30W amplifier's with the band. ([specs/turtleav-dante.yaml:2567](specs/turtleav-dante.yaml#L2567))
+- [ ] Record get input/output x eq on each model: one line for the channel or one per band, and how far the extra lines put later replies out of step. ([specs/turtleav-dante.yaml:2558](specs/turtleav-dante.yaml#L2558))
+- [ ] Check the Phoenix's phantom power and input sensitivity commands (in its manual, not on its front panel) and the Phoenix output level range 1-5. ([specs/turtleav-dante.yaml:344](specs/turtleav-dante.yaml#L344))
+- [ ] Record the 30W amplifier's LCD, ID LED and trigger replies (its manual is partly scanned; the 150W amplifier's wording is assumed) and whether set lcd 15 or set lcd on 15 is right. ([specs/turtleav-dante.yaml:637](specs/turtleav-dante.yaml#L637))
+- [ ] Record the 30W amplifier's ducking reply (the manual shows it with and without with) and get output x from with several sources. ([specs/turtleav-dante.yaml:595](specs/turtleav-dante.yaml#L595))
+- [ ] Check Downtown takes 1 and 0 for its master mute, upmixer and virtualizer, and the bare temperature and uptime replies. ([specs/turtleav-dante.yaml:2583](specs/turtleav-dante.yaml#L2583))
+- [ ] Check Downtown's TCP port command: set tcp/ip port 8000, or set tcp/ipport 8000 as its example shows. ([specs/turtleav-dante.yaml:1084](specs/turtleav-dante.yaml#L1084))
 
 ## turtleav-matrix — Turtle AV 4K60 video wall, matrix and multiviewer
 
-- [ ] Check which port carries the s/r commands (23 or 8000), whether a CR LF after ! is accepted, and the replies' line ending. ([specs/turtleav-matrix.yaml:353](specs/turtleav-matrix.yaml#L353))
-- [ ] Check that r output 0 in source! reads every output, and the 4x4's error replies. ([specs/turtleav-matrix.yaml:361](specs/turtleav-matrix.yaml#L361))
+- [ ] Check which port carries the s/r commands (23 or 8000), whether a CR LF after ! is accepted, and the replies' line ending. ([specs/turtleav-matrix.yaml:1238](specs/turtleav-matrix.yaml#L1238))
+- [ ] Check r power! and r lock! answer power on/off and panel button lock on/off, since those replies queue the other reads, and the 4x4's error replies. ([specs/turtleav-matrix.yaml:1246](specs/turtleav-matrix.yaml#L1246))
+- [ ] Record the lines of r fw version! and r vw info! and check the later reads stay in step after them. ([specs/turtleav-matrix.yaml:1257](specs/turtleav-matrix.yaml#L1257))
+- [ ] Record the 4x4 multiviewer layout replies other than single screen, and the r dual/triple/quad/user mode! replies. ([specs/turtleav-matrix.yaml:1277](specs/turtleav-matrix.yaml#L1277))
+- [ ] Record r mx preset z!, r vw preset z! and r preset z! replies, which the documents give only as video/audio crosspoint. ([specs/turtleav-matrix.yaml:1266](specs/turtleav-matrix.yaml#L1266))
+- [ ] Record the 8x8 mirror reply for each mode and whether the 8x8 answers the 4x4's hmirror and vmirror. ([specs/turtleav-matrix.yaml:1266](specs/turtleav-matrix.yaml#L1266))
+- [ ] Check what s reset! keeps: whether the network settings survive a factory reset. ([specs/turtleav-matrix.yaml:1229](specs/turtleav-matrix.yaml#L1229))
 
 ## tvone-coriomaster — tvONE CORIOmaster
 

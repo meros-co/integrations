@@ -24,7 +24,8 @@
 //!   the answer's source id.
 //! - Nothing is pushed: state is read by polling (meters with
 //!   `Dev.MD.FullBin`, a binary structure per family, Appendix B; parameters
-//!   with gets).
+//!   with gets, and every other readable setting in a slower configuration
+//!   round). DLM v3.4 has no EQ or crossover command, so neither is read.
 //!
 //! One request is in flight at a time, commands ahead of polls. Three
 //! requests in a row without an answer drop the connection, which is probed
@@ -49,6 +50,7 @@ const REPLY: Key = "reply";
 const RETRY: Key = "retry";
 const METERS: Key = "meters";
 const PARAMETERS: Key = "parameters";
+const CONFIGURATION: Key = "configuration";
 const LIVENESS: Key = "liveness";
 
 const HEADER: usize = 28;
@@ -148,8 +150,85 @@ enum Parse {
     Bool,
     Number,
     Int,
+    /// The whole text; within `Words`, every word from there on.
     Text,
+    /// The first word, as text.
+    Word,
+    /// The first word looked up in a table of the document's codes.
+    Map(&'static [(&'static str, &'static str)]),
+    /// `X` routed, anything else (the document's dash) not.
+    Routed,
+    /// One value per word, each under its own key (dotted for depth); an
+    /// empty key skips the word (a limit the answer gives after the value).
+    Words(&'static [(&'static str, Parse)]),
 }
+
+/// Dev.Fuse.Type (8.3).
+const FUSE_TYPES: &[(&str, &str)] = &[("0", "conservative"), ("1", "fast"), ("2", "universal")];
+/// Dev.NetworkIPConf (8.3).
+const IP_CONFIGS: &[(&str, &str)] = &[("0", "zero_conf"), ("1", "dhcp"), ("2", "static")];
+const NOMINAL_CURRENT: &[(&str, Parse)] = &[
+    ("nominal_current_a", Parse::Number),
+    ("actual_current_a", Parse::Number),
+];
+const POWER_OUTPUTS: &[(&str, Parse)] = &[
+    ("power_outputs.1", Parse::Routed),
+    ("power_outputs.2", Parse::Routed),
+    ("power_outputs.3", Parse::Routed),
+    ("power_outputs.4", Parse::Routed),
+];
+const GPI_CONFIG: &[(&str, Parse)] = &[
+    ("closed_action", Parse::Word),
+    ("opened_action", Parse::Word),
+];
+const BREAK_IN: &[(&str, Parse)] = &[
+    ("source", Parse::Word),
+    ("channel", Parse::Int),
+    ("probe", Parse::Word),
+    ("power_channel", Parse::Int),
+];
+const ROUTER_PRIORITY: &[(&str, Parse)] = &[
+    ("type", Parse::Word),
+    ("channel", Parse::Int),
+    ("sensitivity", Parse::Number),
+    ("dante_name", Parse::Text),
+];
+const LOAD_PILOT_SIGNAL: &[(&str, Parse)] = &[
+    ("tone_1_hz", Parse::Number),
+    ("tone_2_hz", Parse::Number),
+    ("tone_1_amplitude_v", Parse::Number),
+    ("tone_2_amplitude_v", Parse::Number),
+];
+const LOAD_PILOT_THRESHOLD: &[(&str, Parse)] = &[
+    ("tone_1_lower_ohm", Parse::Number),
+    ("tone_2_lower_ohm", Parse::Number),
+    ("tone_1_upper_ohm", Parse::Number),
+    ("tone_2_upper_ohm", Parse::Number),
+];
+const LOAD_PILOT_READINGS: &[(&str, Parse)] = &[
+    ("tone_1_impedance_ohm", Parse::Number),
+    ("tone_2_impedance_ohm", Parse::Number),
+    ("tone_1_current_ma", Parse::Number),
+    ("tone_2_current_ma", Parse::Number),
+];
+/// Dev.PTG.Impedance? without a channel: all four, `?` where none is measured.
+const PTG_IMPEDANCES: &[(&str, Parse)] = &[
+    ("1.pilot_tone.impedance_ohm", Parse::Number),
+    ("2.pilot_tone.impedance_ohm", Parse::Number),
+    ("3.pilot_tone.impedance_ohm", Parse::Number),
+    ("4.pilot_tone.impedance_ohm", Parse::Number),
+];
+const OUTPUT_PHASE: &[(&str, Parse)] = &[
+    ("polarity_positive", Parse::Bool),
+    ("polarity_locked", Parse::Bool),
+];
+/// Mod.Out.AmpVPL?: desired, minimum, maximum and actual VPL.
+const AMP_VPL: &[(&str, Parse)] = &[
+    ("vpl_v", Parse::Number),
+    ("", Parse::Number),
+    ("", Parse::Number),
+    ("actual_vpl_v", Parse::Number),
+];
 
 #[derive(Debug, Clone, PartialEq)]
 enum Expect {
@@ -167,9 +246,20 @@ enum Expect {
 enum Why {
     Probe,
     Liveness,
-    Command { id: CommandId, expect: Expect },
-    Read { path: Vec<String>, parse: Parse },
-    Channels { module: usize },
+    Command {
+        id: CommandId,
+        expect: Expect,
+    },
+    /// A poll read; `config` for the configuration round, else the
+    /// parameter round (or the identity and meter reads).
+    Read {
+        path: Vec<String>,
+        parse: Parse,
+        config: bool,
+    },
+    Channels {
+        module: usize,
+    },
     Meters(Meters),
 }
 
@@ -194,6 +284,7 @@ pub(crate) struct LakeDlm {
     monitor: bool,
     meter_poll: Millis,
     parameter_poll: Millis,
+    configuration_poll: Millis,
     /// The device's frame id, given or learnt from its answer.
     frame_id: Option<(u32, u32)>,
     connected: bool,
@@ -234,6 +325,7 @@ impl LakeDlm {
             monitor: ctx.monitor,
             meter_poll: ms("meter_poll_ms", 1_000),
             parameter_poll: ms("parameter_poll_ms", 5_000),
+            configuration_poll: ms("configuration_poll_ms", 60_000),
             frame_id,
             connected: false,
             socket_open: false,
@@ -283,14 +375,304 @@ impl LakeDlm {
     }
 
     fn read(&mut self, text: String, path: &[&str], parse: Parse) {
+        self.queue_read(text, path, parse, false);
+    }
+
+    /// A read of the configuration round.
+    fn config_read(&mut self, text: String, path: &[&str], parse: Parse) {
+        self.queue_read(text, path, parse, true);
+    }
+
+    fn queue_read(&mut self, text: String, path: &[&str], parse: Parse, config: bool) {
         self.reads.push_back(Request {
             text,
             why: Why::Read {
                 path: path.iter().map(|s| s.to_string()).collect(),
                 parse,
+                config,
             },
             timeout: REPLY_TIMEOUT,
         });
+    }
+
+    /// The PLM 20000Q's pilot tone is the second generator (PTG2).
+    fn ptg(&self) -> &'static str {
+        if self.model == "plm-20000q" {
+            "PTG2"
+        } else {
+            "PTG"
+        }
+    }
+
+    /// Whether the frame has breaker emulation: D Series, PLM+ and the PLM
+    /// 20000Q (Dev.Fuse, 8.3).
+    fn has_breaker(&self) -> bool {
+        self.family == Family::Plus || self.model == "plm-20000q"
+    }
+
+    /// Whether the frame has an AES loop termination: PLM+, PLM and LM, not
+    /// D Series (Dev.AesLoopTermination, 8.3).
+    fn has_aes_termination(&self) -> bool {
+        self.model.starts_with("plm-") || self.family == Family::Lm
+    }
+
+    /// AES inputs whose sample rate Dev.Route.InputSR reads, and the LM's
+    /// Dante inputs.
+    fn sample_rate_inputs(&self) -> Vec<(&'static str, u32)> {
+        match self.family {
+            Family::Plus => vec![("AES", 4)],
+            Family::Legacy => vec![("AES", 2)],
+            Family::Lm if self.model == "lm-44" => vec![("AES", 8), ("Dante", 4)],
+            Family::Lm => vec![("AES", 4), ("Dante", 4)],
+        }
+    }
+
+    /// The configuration round: every setting DLM can read that the
+    /// parameter round does not, read slowly (configuration_poll_ms).
+    fn configuration(&mut self) {
+        let amp = self.family != Family::Lm;
+        if amp {
+            self.config_read(
+                "Dev.IsoFloat?".into(),
+                &["device", "iso_float_grounded"],
+                Parse::Bool,
+            );
+        } else {
+            self.config_read(
+                "Dev.IsoFloatInputs?".into(),
+                &["device", "iso_float_inputs_grounded"],
+                Parse::Bool,
+            );
+            self.config_read(
+                "Dev.IsoFloatOutputs?".into(),
+                &["device", "iso_float_outputs_grounded"],
+                Parse::Bool,
+            );
+        }
+        if self.has_aes_termination() {
+            self.config_read(
+                "Dev.AesLoopTermination?".into(),
+                &["device", "aes_terminated"],
+                Parse::Bool,
+            );
+        }
+        self.config_read(
+            "Dev.Network.Redund?".into(),
+            &["device", "redundancy"],
+            Parse::Bool,
+        );
+        self.config_read(
+            "Dev.NetworkIPConf?".into(),
+            &["device", "ip_config"],
+            Parse::Map(IP_CONFIGS),
+        );
+        self.config_read(
+            "Dev.Network.IPAddr?".into(),
+            &["device", "ip_address"],
+            Parse::Text,
+        );
+        self.config_read(
+            "Dev.Network.SubMask?".into(),
+            &["device", "subnet_mask"],
+            Parse::Text,
+        );
+        self.config_read(
+            "Dev.Dante.SlaveOnly?".into(),
+            &["device", "dante_slave_only"],
+            Parse::Bool,
+        );
+        if self.has_breaker() {
+            self.config_read(
+                "Dev.Fuse.NominalCurrent?".into(),
+                &["device", "breaker"],
+                Parse::Words(NOMINAL_CURRENT),
+            );
+            self.config_read(
+                "Dev.Fuse.Type?".into(),
+                &["device", "breaker", "type"],
+                Parse::Map(FUSE_TYPES),
+            );
+        }
+        if amp {
+            for pc in 1..=self.family.power_channels() {
+                let n = pc.to_string();
+                self.config_read(
+                    format!("Dev.Latency?{pc}"),
+                    &["power_channels", &n, "latency_ms"],
+                    Parse::Number,
+                );
+                self.config_read(
+                    format!("Dev.Load.Speakers?{pc}"),
+                    &["power_channels", &n, "speakers"],
+                    Parse::Int,
+                );
+                if self.family == Family::Plus {
+                    self.config_read(
+                        format!("Dev.LoadPilot.Enable?{pc}"),
+                        &["power_channels", &n, "load_pilot", "enabled"],
+                        Parse::Bool,
+                    );
+                    self.config_read(
+                        format!("Dev.LoadPilot.Signal?{pc}"),
+                        &["power_channels", &n, "load_pilot"],
+                        Parse::Words(LOAD_PILOT_SIGNAL),
+                    );
+                    self.config_read(
+                        format!("Dev.LoadPilot.Threshold?{pc}"),
+                        &["power_channels", &n, "load_pilot"],
+                        Parse::Words(LOAD_PILOT_THRESHOLD),
+                    );
+                } else {
+                    let ptg = self.ptg();
+                    self.config_read(
+                        format!("Dev.{ptg}.Active?{pc}"),
+                        &["power_channels", &n, "pilot_tone", "active"],
+                        Parse::Bool,
+                    );
+                }
+            }
+            for pair in 1..=2 {
+                self.config_read(
+                    format!("Dev.BridgeMode?{pair}"),
+                    &["channel_pairs", &pair.to_string(), "bridged"],
+                    Parse::Bool,
+                );
+            }
+            for tx in 1..=2 {
+                self.config_read(
+                    format!("Dev.Dante.BreakIn?{tx}"),
+                    &["dante_break_in", &tx.to_string()],
+                    Parse::Words(BREAK_IN),
+                );
+            }
+        } else {
+            for (source, count) in [
+                ("PC", 6),
+                ("Analog", 2),
+                ("AES", 4),
+                ("Dante", 4),
+                ("Router", 6),
+            ] {
+                for ch in 1..=count {
+                    for out in ["Analog", "AES", "Dante"] {
+                        self.config_read(
+                            format!("Dev.Out.Route?{source} {ch} {out}"),
+                            &["routing", source, &ch.to_string(), out],
+                            Parse::Text,
+                        );
+                    }
+                }
+            }
+            for n in 1..=2 {
+                let k = n.to_string();
+                self.config_read(
+                    format!("Dev.GPI.Config?{n}"),
+                    &["gpi", &k],
+                    Parse::Words(GPI_CONFIG),
+                );
+                self.config_read(
+                    format!("Dev.GPO.Config?{n}"),
+                    &["gpo", &k, "indication"],
+                    Parse::Word,
+                );
+            }
+            for n in 1..=4 {
+                self.config_read(
+                    format!("Dev.Dante.In.Label?{n}"),
+                    &["dante_inputs", &n.to_string(), "label"],
+                    Parse::Text,
+                );
+            }
+        }
+        for input in 1..=self.family.router_inputs() {
+            let n = input.to_string();
+            for prio in 1..=4 {
+                self.config_read(
+                    format!("Dev.Router.InputTypSel?{input} {prio}"),
+                    &["router_inputs", &n, "priorities", &prio.to_string()],
+                    Parse::Words(ROUTER_PRIORITY),
+                );
+            }
+            self.config_read(
+                format!("Dev.Router.ForceInputPriority?{input}"),
+                &["router_inputs", &n, "forced_priority"],
+                Parse::Int,
+            );
+        }
+        for (kind, count) in self.sample_rate_inputs() {
+            for ch in 1..=count {
+                self.config_read(
+                    format!("Dev.Route.InputSR?{kind} {ch}"),
+                    &["input_sample_rates", kind, &ch.to_string()],
+                    Parse::Number,
+                );
+            }
+        }
+        let mixer = self.family != Family::Legacy;
+        for (i, m) in self.family.modules().iter().enumerate() {
+            self.config_read(
+                format!("Mod.Mod.Selected?{m}"),
+                &["modules", m, "selected"],
+                Parse::Bool,
+            );
+            self.config_read(
+                format!("Mod.In.Phase?{m}"),
+                &["modules", m, "input", "polarity_positive"],
+                Parse::Bool,
+            );
+            self.config_read(
+                format!("Mod.In.Label?{m}"),
+                &["modules", m, "input", "label"],
+                Parse::Text,
+            );
+            if mixer {
+                for router in 1..=4 {
+                    self.config_read(
+                        format!("Mod.In.MixerGain?{m} {router}"),
+                        &[
+                            "modules",
+                            m,
+                            "input",
+                            "mixer",
+                            &router.to_string(),
+                            "gain_db",
+                        ],
+                        Parse::Number,
+                    );
+                }
+            }
+            for ch in 1..=self.channels[i] {
+                let c = ch.to_string();
+                let out = ["modules", m, "outputs", &c];
+                let mut reads = vec![
+                    ("Mod.Out.Phase", "", Parse::Words(OUTPUT_PHASE)),
+                    ("Mod.Out.MaxRMSLvl", "max_rms_level_db", Parse::Number),
+                    ("Mod.Out.MaxRMSCor", "max_rms_corner_db", Parse::Number),
+                    ("Mod.Out.MaxRMSAtk", "max_rms_attack_ms", Parse::Number),
+                    ("Mod.Out.MaxRMSRel", "max_rms_release_ms", Parse::Number),
+                    ("Mod.Out.MaxPeakLvl", "max_peak_level_db", Parse::Number),
+                ];
+                if amp {
+                    reads.extend([
+                        ("Mod.Out.AmpGain", "amp_gain_db", Parse::Int),
+                        ("Mod.Out.AmpVPL", "", Parse::Words(AMP_VPL)),
+                        ("Mod.Out.VPLProfile", "vpl_profile", Parse::Int),
+                    ]);
+                    self.config_read(
+                        format!("Dev.Route?{m} {ch}"),
+                        &out,
+                        Parse::Words(POWER_OUTPUTS),
+                    );
+                }
+                for (path, field, parse) in reads {
+                    let mut at = out.to_vec();
+                    if !field.is_empty() {
+                        at.push(field);
+                    }
+                    self.config_read(format!("{path}?{m} {ch}"), &at, parse);
+                }
+            }
+        }
     }
 
     fn probe(&mut self, cx: &mut Cx) {
@@ -365,6 +747,36 @@ impl LakeDlm {
                 &["power_channels", &n, "attenuation_db"],
                 Parse::Number,
             );
+            if self.family == Family::Plus {
+                self.read(
+                    format!("Dev.LoadPilot.Readings?{pc}"),
+                    &["power_channels", &n, "load_pilot"],
+                    Parse::Words(LOAD_PILOT_READINGS),
+                );
+            }
+        }
+        if self.family == Family::Legacy {
+            let ptg = self.ptg();
+            self.read(
+                format!("Dev.{ptg}.Impedance?"),
+                &["power_channels"],
+                Parse::Words(PTG_IMPEDANCES),
+            );
+        }
+        if self.family == Family::Lm {
+            for n in 1..=2 {
+                let k = n.to_string();
+                self.read(
+                    format!("Dev.GPI.State?{n}"),
+                    &["gpi", &k, "state"],
+                    Parse::Word,
+                );
+                self.read(
+                    format!("Dev.GPO.State?{n}"),
+                    &["gpo", &k, "state"],
+                    Parse::Word,
+                );
+            }
         }
         for input in 1..=self.family.router_inputs() {
             let n = input.to_string();
@@ -458,7 +870,7 @@ impl LakeDlm {
             }
         }
         self.reads.clear();
-        for key in [REPLY, METERS, PARAMETERS, LIVENESS] {
+        for key in [REPLY, METERS, PARAMETERS, CONFIGURATION, LIVENESS] {
             cx.cancel_timer(key);
         }
         cx.connection(Connection::Disconnected {
@@ -482,8 +894,10 @@ impl LakeDlm {
             if self.meter_poll > 0 {
                 cx.set_timer(METERS, self.meter_poll);
             }
-            // The first parameter round follows the channel counts.
+            // The first parameter and configuration rounds follow the
+            // channel counts.
             cx.set_timer(PARAMETERS, 0);
+            cx.set_timer(CONFIGURATION, 0);
         }
     }
 
@@ -507,7 +921,7 @@ impl LakeDlm {
                     }
                 }
             }
-            Why::Read { path, parse } => {
+            Why::Read { path, parse, .. } => {
                 if let Reply::Text { text, .. } = &reply {
                     if let Some(v) = parse_value(&strip_echo(&request.text, text), parse) {
                         cx.state(nest(&path, v));
@@ -732,7 +1146,50 @@ fn parse_value(text: &str, parse: Parse) -> Option<Value> {
             .ok()
             .filter(|n| n.is_finite())
             .map(|n| json!(n)),
+        Parse::Word => first.map(|w| json!(w)),
+        Parse::Map(table) => table
+            .iter()
+            .find(|(code, _)| Some(*code) == first)
+            .map(|(_, name)| json!(name)),
+        Parse::Routed => first.map(|w| json!(w.eq_ignore_ascii_case("X"))),
+        Parse::Words(fields) => {
+            let words: Vec<&str> = text.split_whitespace().collect();
+            let mut out = Value::Object(Map::new());
+            let mut any = false;
+            for (i, (key, kind)) in fields.iter().enumerate() {
+                if key.is_empty() || i >= words.len() {
+                    continue;
+                }
+                let piece = if *kind == Parse::Text {
+                    words[i..].join(" ")
+                } else {
+                    words[i].to_string()
+                };
+                if let Some(v) = parse_value(&piece, *kind) {
+                    put(&mut out, key.split('.'), v);
+                    any = true;
+                }
+            }
+            any.then_some(out)
+        }
     }
+}
+
+/// Set `value` at a dotted path inside `into`, keeping what is there.
+fn put<'a>(into: &mut Value, mut keys: impl Iterator<Item = &'a str>, value: Value) {
+    let Some(key) = keys.next() else {
+        *into = value;
+        return;
+    };
+    if !into.is_object() {
+        *into = Value::Object(Map::new());
+    }
+    let child = into
+        .as_object_mut()
+        .expect("an object")
+        .entry(key)
+        .or_insert(Value::Null);
+    put(child, keys, value);
 }
 
 /// `{"a": {"b": value}}` from a path.
@@ -1070,6 +1527,8 @@ impl LakeDlm {
     /// The text a command sends and what it expects back.
     fn command_text(&self, name: &str, p: &Params) -> Result<(String, Expect), CommandError> {
         let ack = |text: String| Ok((text, Expect::Ack(None)));
+        // A set whose new value is known: applied once acknowledged.
+        let set = |text: String, patch: Value| Ok((text, Expect::Ack(Some(patch))));
         let get = |text: String| Ok((text, Expect::Value));
         let set_out = |path: &str, value: String, field: &str, state: Value| {
             let (target, at) = self.output(p)?;
@@ -1111,26 +1570,53 @@ impl LakeDlm {
                     Expect::Ack(Some(json!({"device": {"frame_label": l}}))),
                 ))
             }
-            "set_redundancy" => ack(format!("Dev.Network.Redund={}", b01(flag(p, "enabled")))),
+            "set_redundancy" => {
+                let on = flag(p, "enabled");
+                set(
+                    format!("Dev.Network.Redund={}", b01(on)),
+                    json!({"device": {"redundancy": on}}),
+                )
+            }
             "factory_reset" => ack("Dev.Reset.Factory!".into()),
             "soft_reset" => ack("Dev.Reset.Soft!".into()),
             "reset_to_contour" => ack("Dev.Reset.Contour!".into()),
             "reset_to_mesa" => ack("Dev.Reset.Mesa!".into()),
-            "set_iso_float" => ack(format!("Dev.IsoFloat={}", b01(flag(p, "grounded")))),
+            "set_iso_float" => {
+                let g = flag(p, "grounded");
+                set(
+                    format!("Dev.IsoFloat={}", b01(g)),
+                    json!({"device": {"iso_float_grounded": g}}),
+                )
+            }
             "set_iso_float_inputs" => {
-                ack(format!("Dev.IsoFloatInputs={}", b01(flag(p, "grounded"))))
+                let g = flag(p, "grounded");
+                set(
+                    format!("Dev.IsoFloatInputs={}", b01(g)),
+                    json!({"device": {"iso_float_inputs_grounded": g}}),
+                )
             }
             "set_iso_float_outputs" => {
-                ack(format!("Dev.IsoFloatOutputs={}", b01(flag(p, "grounded"))))
+                let g = flag(p, "grounded");
+                set(
+                    format!("Dev.IsoFloatOutputs={}", b01(g)),
+                    json!({"device": {"iso_float_outputs_grounded": g}}),
+                )
             }
-            "set_aes_termination" => ack(format!(
-                "Dev.AesLoopTermination={}",
-                b01(flag(p, "terminated"))
-            )),
-            "set_breaker_current" => ack(format!(
-                "Dev.Fuse.NominalCurrent={:.1}",
-                num(p, "current_a")?
-            )),
+            "set_aes_termination" => {
+                let t = flag(p, "terminated");
+                set(
+                    format!("Dev.AesLoopTermination={}", b01(t)),
+                    json!({"device": {"aes_terminated": t}}),
+                )
+            }
+            "set_breaker_current" => {
+                // Sent with one decimal: the state holds what was sent.
+                let a = (num(p, "current_a")? * 10.0).round() / 10.0;
+                set(
+                    format!("Dev.Fuse.NominalCurrent={a:.1}"),
+                    json!({"device": {"breaker": {"nominal_current_a": a}}}),
+                )
+            }
             "set_breaker_type" => {
                 let t = match word_param(p, "type")? {
                     "conservative" => 0,
@@ -1138,7 +1624,10 @@ impl LakeDlm {
                     "universal" => 2,
                     other => return Err(invalid(format!("unknown breaker type '{other}'"))),
                 };
-                ack(format!("Dev.Fuse.Type={t}"))
+                set(
+                    format!("Dev.Fuse.Type={t}"),
+                    json!({"device": {"breaker": {"type": word_param(p, "type")?}}}),
+                )
             }
             "set_latency_match" => {
                 let on = flag(p, "enabled");
@@ -1153,11 +1642,13 @@ impl LakeDlm {
                 get(format!("Dev.Route?{m} {}", int(p, "channel")?))
             }
             "get_bridge_mode" => get(format!("Dev.BridgeMode?{}", int(p, "pair")?)),
-            "set_load_speakers" => ack(format!(
-                "Dev.Load.Speakers={} {}",
-                int(p, "power_channel")?,
-                int(p, "count")?
-            )),
+            "set_load_speakers" => {
+                let (pc, n) = (int(p, "power_channel")?, int(p, "count")?);
+                set(
+                    format!("Dev.Load.Speakers={pc} {n}"),
+                    json!({"power_channels": {pc.to_string(): {"speakers": n}}}),
+                )
+            }
             "set_power_channel_attenuation" => {
                 let pc = int(p, "power_channel")?;
                 let db = num(p, "attenuation_db")?;
@@ -1199,17 +1690,20 @@ impl LakeDlm {
                         ));
                     }
                 }
-                ack(format!(
-                    "Dev.GPI.Config={} {closed} {opened}",
-                    int(p, "gpi")?
-                ))
+                let gpi = int(p, "gpi")?;
+                set(
+                    format!("Dev.GPI.Config={gpi} {closed} {opened}"),
+                    json!({"gpi": {gpi.to_string(): {"closed_action": closed, "opened_action": opened}}}),
+                )
             }
             "get_gpi_state" => get(format!("Dev.GPI.State?{}", int(p, "gpi")?)),
-            "set_gpo_config" => ack(format!(
-                "Dev.GPO.Config={} {}",
-                int(p, "gpo")?,
-                word_param(p, "indication")?
-            )),
+            "set_gpo_config" => {
+                let (gpo, ind) = (int(p, "gpo")?, word_param(p, "indication")?);
+                set(
+                    format!("Dev.GPO.Config={gpo} {ind}"),
+                    json!({"gpo": {gpo.to_string(): {"indication": ind}}}),
+                )
+            }
             "get_gpo_state" => get(format!("Dev.GPO.State?{}", int(p, "gpo")?)),
             "set_dante_break_in" => {
                 let tx = int(p, "transmitter")?;
@@ -1244,11 +1738,13 @@ impl LakeDlm {
                 int(p, "input")?,
                 int(p, "priority")?
             )),
-            "force_input_priority" => ack(format!(
-                "Dev.Router.ForceInputPriority={} {}",
-                int(p, "input")?,
-                int(p, "priority")?
-            )),
+            "force_input_priority" => {
+                let (input, prio) = (int(p, "input")?, int(p, "priority")?);
+                set(
+                    format!("Dev.Router.ForceInputPriority={input} {prio}"),
+                    json!({"router_inputs": {input.to_string(): {"forced_priority": prio}}}),
+                )
+            }
             "set_router_input_mute" => {
                 let input = int(p, "input")?;
                 let muted = flag(p, "muted");
@@ -1269,11 +1765,13 @@ impl LakeDlm {
                 Ok((text.into(), Expect::Meters(kind)))
             }
             "get_no_faults" => get("Dev.MD.NoFaults?".into()),
-            "set_load_pilot" => ack(format!(
-                "Dev.LoadPilot.Enable={} {}",
-                int(p, "power_channel")?,
-                b01(flag(p, "enabled"))
-            )),
+            "set_load_pilot" => {
+                let (pc, on) = (int(p, "power_channel")?, flag(p, "enabled"));
+                set(
+                    format!("Dev.LoadPilot.Enable={pc} {}", b01(on)),
+                    json!({"power_channels": {pc.to_string(): {"load_pilot": {"enabled": on}}}}),
+                )
+            }
             "get_load_pilot_readings" => get(format!(
                 "Dev.LoadPilot.Readings?{}",
                 int(p, "power_channel")?
@@ -1292,25 +1790,40 @@ impl LakeDlm {
                 num(p, "tone_1_upper_ohm")?,
                 num(p, "tone_2_upper_ohm")?
             )),
-            "set_pilot_tone" => {
-                // PLM 20000Q uses the second pilot tone generator (PTG2).
-                let ptg = if self.model == "plm-20000q" {
-                    "PTG2"
-                } else {
-                    "PTG"
+            "set_output_route_lm" => {
+                let source = word_param(p, "source")?;
+                let ch = int(p, "channel")?;
+                let out = word_param(p, "output_type")?;
+                let routed = word_param(p, "outputs")?;
+                let max_ch = match source {
+                    "PC" | "Router" => 6,
+                    "Analog" => 2,
+                    _ => 4,
                 };
-                ack(format!(
-                    "Dev.{ptg}.Active={} {}",
-                    int(p, "power_channel")?,
-                    b01(flag(p, "active"))
-                ))
+                let width = if out == "Analog" { 6 } else { 8 };
+                if ch > max_ch {
+                    return Err(invalid(format!("{source} has channels 1 to {max_ch}")));
+                }
+                if routed.len() != width {
+                    return Err(invalid(format!(
+                        "{out} outputs take {width} positions of X or -"
+                    )));
+                }
+                set(
+                    format!("Dev.Out.Route={source} {ch} {out} {routed}"),
+                    json!({"routing": {source: {ch.to_string(): {out: routed}}}}),
+                )
+            }
+            "set_pilot_tone" => {
+                let ptg = self.ptg();
+                let (pc, on) = (int(p, "power_channel")?, flag(p, "active"));
+                set(
+                    format!("Dev.{ptg}.Active={pc} {}", b01(on)),
+                    json!({"power_channels": {pc.to_string(): {"pilot_tone": {"active": on}}}}),
+                )
             }
             "get_pilot_tone_impedance" => {
-                let ptg = if self.model == "plm-20000q" {
-                    "PTG2"
-                } else {
-                    "PTG"
-                };
+                let ptg = self.ptg();
                 get(format!("Dev.{ptg}.Impedance?{}", int(p, "power_channel")?))
             }
 
@@ -1446,11 +1959,14 @@ impl LakeDlm {
                 set_in("Mod.In.Label", l.to_string(), "label", json!(l))
             }
             "set_input_mixer_gain" => {
-                let (target, _) = self.module_target(p)?;
-                ack(format!(
-                    "Mod.In.MixerGain={target} {} {:.2}",
-                    int(p, "router")?,
-                    num(p, "gain_db")?
+                let (target, at) = self.module_target(p)?;
+                let (router, g) = (int(p, "router")?, num(p, "gain_db")?);
+                let patch = at.map(|m| {
+                    json!({"modules": {m: {"input": {"mixer": {router.to_string(): {"gain_db": g}}}}}})
+                });
+                Ok((
+                    format!("Mod.In.MixerGain={target} {router} {g:.2}"),
+                    Expect::Ack(patch),
                 ))
             }
             "set_module_label" => {
@@ -1460,10 +1976,12 @@ impl LakeDlm {
                 Ok((format!("Mod.Mod.Label={target} {l}"), Expect::Ack(patch)))
             }
             "set_module_selected" => {
-                let (target, _) = self.module_target(p)?;
-                ack(format!(
-                    "Mod.Mod.Selected={target} {}",
-                    b01(flag(p, "selected"))
+                let (target, at) = self.module_target(p)?;
+                let on = flag(p, "selected");
+                let patch = at.map(|m| json!({"modules": {m: {"selected": on}}}));
+                Ok((
+                    format!("Mod.Mod.Selected={target} {}", b01(on)),
+                    Expect::Ack(patch),
                 ))
             }
 
@@ -1604,10 +2122,12 @@ impl Module for LakeDlm {
                 }
                 // A round still being read (or the identity, which gives the
                 // channel counts) is not doubled: look again shortly.
-                let pending = self
-                    .reads
-                    .iter()
-                    .any(|r| matches!(r.why, Why::Read { .. } | Why::Channels { .. }));
+                let pending = self.reads.iter().any(|r| {
+                    matches!(
+                        r.why,
+                        Why::Read { config: false, .. } | Why::Channels { .. }
+                    )
+                });
                 if pending {
                     cx.set_timer(PARAMETERS, 500);
                     return;
@@ -1616,6 +2136,23 @@ impl Module for LakeDlm {
                 self.pump(cx);
                 if self.parameter_poll > 0 {
                     cx.set_timer(PARAMETERS, self.parameter_poll);
+                }
+            }
+            CONFIGURATION => {
+                if !self.connected {
+                    return;
+                }
+                let pending = self.reads.iter().any(|r| {
+                    matches!(r.why, Why::Read { config: true, .. } | Why::Channels { .. })
+                });
+                if pending {
+                    cx.set_timer(CONFIGURATION, 500);
+                    return;
+                }
+                self.configuration();
+                self.pump(cx);
+                if self.configuration_poll > 0 {
+                    cx.set_timer(CONFIGURATION, self.configuration_poll);
                 }
             }
             _ => {}
@@ -1956,6 +2493,264 @@ mod tests {
         let mut cx = Cx::new(105);
         m.datagram(&mut cx, SOCKET, from(), &answer(msg_id(&first), b"1\0"));
         assert!(state(&cx.take()).contains(&json!({"device": {"power": true}})));
+    }
+
+    /// Answer the identity reads (two output channels a module) and run a
+    /// configuration round: the texts it queues.
+    fn configuration_round(model: &str) -> (LakeDlm, Vec<String>) {
+        let (mut m, a) = found(model, true);
+        assert!(a.contains(&Action::SetTimer {
+            key: CONFIGURATION,
+            after: 0
+        }));
+        let mut last = sent(&a)[0].1.clone();
+        for t in 0..20 {
+            let mut cx = Cx::new(10 + t);
+            let reply: &[u8] = if text_of(&last).starts_with("Mod.Out.Chans") {
+                b"2\0"
+            } else {
+                b"x\0"
+            };
+            m.datagram(&mut cx, SOCKET, from(), &answer(msg_id(&last), reply));
+            let Some((_, next)) = sent(&cx.take()).into_iter().next() else {
+                break;
+            };
+            last = next;
+        }
+        let mut cx = Cx::new(100);
+        m.timer(&mut cx, CONFIGURATION);
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: CONFIGURATION,
+            after: 60_000
+        }));
+        let mut texts: Vec<String> = sent(&a).iter().map(|(_, p)| text_of(p)).collect();
+        texts.extend(m.reads.iter().map(|r| r.text.clone()));
+        (m, texts)
+    }
+
+    #[test]
+    fn the_configuration_round_reads_every_setting_an_amplifier_can_read() {
+        let (mut m, texts) = configuration_round("d-80-4l");
+        for t in [
+            "Dev.IsoFloat?",
+            "Dev.Network.Redund?",
+            "Dev.NetworkIPConf?",
+            "Dev.Dante.SlaveOnly?",
+            "Dev.Fuse.NominalCurrent?",
+            "Dev.Fuse.Type?",
+            "Dev.Latency?4",
+            "Dev.Load.Speakers?1",
+            "Dev.LoadPilot.Enable?2",
+            "Dev.LoadPilot.Signal?3",
+            "Dev.LoadPilot.Threshold?4",
+            "Dev.BridgeMode?2",
+            "Dev.Dante.BreakIn?2",
+            "Dev.Router.InputTypSel?4 4",
+            "Dev.Router.ForceInputPriority?1",
+            "Dev.Route.InputSR?AES 4",
+            "Mod.Mod.Selected?D",
+            "Mod.In.Phase?A",
+            "Mod.In.Label?B",
+            "Mod.In.MixerGain?C 4",
+            "Dev.Route?D 2",
+            "Mod.Out.Phase?A 1",
+            "Mod.Out.MaxRMSLvl?A 2",
+            "Mod.Out.MaxRMSCor?B 1",
+            "Mod.Out.MaxRMSAtk?C 1",
+            "Mod.Out.MaxRMSRel?D 1",
+            "Mod.Out.MaxPeakLvl?D 2",
+            "Mod.Out.AmpGain?A 1",
+            "Mod.Out.AmpVPL?B 2",
+            "Mod.Out.VPLProfile?C 2",
+        ] {
+            assert!(texts.iter().any(|x| x == t), "{t} not read");
+        }
+        // D Series has no AES termination, GPIO or pilot tone of its own.
+        for t in [
+            "Dev.AesLoopTermination?",
+            "Dev.GPI.Config?1",
+            "Dev.PTG.Active?1",
+        ] {
+            assert!(!texts.iter().any(|x| x == t), "{t} read");
+        }
+        assert!(!texts.iter().any(|x| x == "Mod.Out.Gain?A 3"));
+        // The parameter round is not held back by the configuration round.
+        let mut cx = Cx::new(200);
+        m.timer(&mut cx, PARAMETERS);
+        assert!(m.reads.iter().any(|r| r.text == "Dev.LoadPilot.Readings?4"));
+        assert!(!cx.take().contains(&Action::SetTimer {
+            key: PARAMETERS,
+            after: 500
+        }));
+    }
+
+    #[test]
+    fn the_configuration_round_reads_the_processors_routing_and_gpio() {
+        let (_, texts) = configuration_round("lm-44");
+        for t in [
+            "Dev.IsoFloatInputs?",
+            "Dev.IsoFloatOutputs?",
+            "Dev.AesLoopTermination?",
+            "Dev.Out.Route?PC 1 Analog",
+            "Dev.Out.Route?Router 6 Dante",
+            "Dev.Out.Route?Analog 2 AES",
+            "Dev.GPI.Config?2",
+            "Dev.GPO.Config?1",
+            "Dev.Dante.In.Label?4",
+            "Dev.Route.InputSR?AES 8",
+            "Dev.Route.InputSR?Dante 4",
+            "Mod.In.MixerGain?B 1",
+        ] {
+            assert!(texts.iter().any(|x| x == t), "{t} not read");
+        }
+        for t in [
+            "Dev.Fuse.Type?",
+            "Dev.Latency?1",
+            "Mod.Out.AmpGain?A 1",
+            "Dev.Route?A 1",
+        ] {
+            assert!(!texts.iter().any(|x| x == t), "{t} read");
+        }
+        let (_, plm) = configuration_round("plm-20000q");
+        for t in [
+            "Dev.PTG2.Active?3",
+            "Dev.Fuse.Type?",
+            "Dev.AesLoopTermination?",
+        ] {
+            assert!(plm.iter().any(|x| x == t), "{t} not read");
+        }
+        assert!(!plm.iter().any(|x| x.starts_with("Mod.In.MixerGain")));
+    }
+
+    #[test]
+    fn answers_of_several_values_become_state() {
+        assert_eq!(
+            parse_value("10 24000 0.050 0.030", Parse::Words(LOAD_PILOT_SIGNAL)),
+            Some(json!({"tone_1_hz": 10.0, "tone_2_hz": 24000.0,
+                        "tone_1_amplitude_v": 0.05, "tone_2_amplitude_v": 0.03}))
+        );
+        assert_eq!(
+            parse_value("X - X -", Parse::Words(POWER_OUTPUTS)),
+            Some(json!({"power_outputs": {"1": true, "2": false, "3": true, "4": false}}))
+        );
+        assert_eq!(
+            parse_value("Dante 3 -6.00 Stage Left", Parse::Words(ROUTER_PRIORITY)),
+            Some(json!({"type": "Dante", "channel": 3, "sensitivity": -6.0,
+                        "dante_name": "Stage Left"}))
+        );
+        assert_eq!(
+            parse_value("Analog 1 26.00", Parse::Words(ROUTER_PRIORITY)),
+            Some(json!({"type": "Analog", "channel": 1, "sensitivity": 26.0}))
+        );
+        // A `?` is a channel without a measurement.
+        assert_eq!(
+            parse_value("7.3 ? 8.1 ?", Parse::Words(PTG_IMPEDANCES)),
+            Some(json!({"1": {"pilot_tone": {"impedance_ohm": 7.3}},
+                        "3": {"pilot_tone": {"impedance_ohm": 8.1}}}))
+        );
+        assert_eq!(
+            parse_value("120.0 17.8 193.0 98.5", Parse::Words(AMP_VPL)),
+            Some(json!({"vpl_v": 120.0, "actual_vpl_v": 98.5}))
+        );
+        assert_eq!(
+            parse_value("16.0 15.2", Parse::Words(NOMINAL_CURRENT)),
+            Some(json!({"nominal_current_a": 16.0, "actual_current_a": 15.2}))
+        );
+        assert_eq!(
+            parse_value("2", Parse::Map(FUSE_TYPES)),
+            Some(json!("universal"))
+        );
+        assert_eq!(parse_value("7", Parse::Map(IP_CONFIGS)), None);
+        assert_eq!(
+            parse_value("Mute Unmute", Parse::Words(GPI_CONFIG)),
+            Some(json!({"closed_action": "Mute", "opened_action": "Unmute"}))
+        );
+
+        // A configuration read's answer lands under its path.
+        let (mut m, _) = found("d-80-4l", false);
+        m.config_read(
+            "Dev.LoadPilot.Threshold?2".into(),
+            &["power_channels", "2", "load_pilot"],
+            Parse::Words(LOAD_PILOT_THRESHOLD),
+        );
+        let mut cx = Cx::new(10);
+        m.pump(&mut cx);
+        let (_, pkt) = sent(&cx.take()).remove(0);
+        let mut cx = Cx::new(12);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &answer(msg_id(&pkt), b"0.80 0.80 330.00 330.00\0"),
+        );
+        assert!(
+            state(&cx.take()).contains(&json!({"power_channels": {"2": {"load_pilot": {
+            "tone_1_lower_ohm": 0.8, "tone_2_lower_ohm": 0.8,
+            "tone_1_upper_ohm": 330.0, "tone_2_upper_ohm": 330.0}}}}))
+        );
+    }
+
+    #[test]
+    fn settings_written_are_kept_in_state() {
+        let (mut m, _) = found("d-80-4l", false);
+        for (n, (name, params, text, patch)) in [
+            (
+                "set_breaker_type",
+                json!({"type": "fast"}),
+                "Dev.Fuse.Type=1",
+                json!({"device": {"breaker": {"type": "fast"}}}),
+            ),
+            (
+                "set_iso_float",
+                json!({"grounded": true}),
+                "Dev.IsoFloat=1",
+                json!({"device": {"iso_float_grounded": true}}),
+            ),
+            (
+                "force_input_priority",
+                json!({"input": 2, "priority": 0}),
+                "Dev.Router.ForceInputPriority=2 0",
+                json!({"router_inputs": {"2": {"forced_priority": 0}}}),
+            ),
+            (
+                "set_input_mixer_gain",
+                json!({"module": "C", "router": 3, "gain_db": -6.0}),
+                "Mod.In.MixerGain=C 3 -6.00",
+                json!({"modules": {"C": {"input": {"mixer": {"3": {"gain_db": -6.0}}}}}}),
+            ),
+            (
+                "set_module_selected",
+                json!({"module": "B", "selected": true}),
+                "Mod.Mod.Selected=B 1",
+                json!({"modules": {"B": {"selected": true}}}),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut cx = Cx::new(10);
+            m.command(&mut cx, n as u64, name, params.as_object().unwrap());
+            let (_, pkt) = sent(&cx.take()).remove(0);
+            assert_eq!(text_of(&pkt), text);
+            let mut cx = Cx::new(11);
+            m.datagram(&mut cx, SOCKET, from(), &ack(msg_id(&pkt), ACK_SUCCESS));
+            assert!(state(&cx.take()).contains(&patch), "{name}");
+        }
+
+        let (mut lm, _) = found("lm-26", false);
+        let mut cx = Cx::new(10);
+        let p = json!({"source": "PC", "channel": 1, "output_type": "Analog", "outputs": "XX----"});
+        lm.command(&mut cx, 1, "set_output_route_lm", p.as_object().unwrap());
+        let (_, pkt) = sent(&cx.take()).remove(0);
+        assert_eq!(text_of(&pkt), "Dev.Out.Route=PC 1 Analog XX----");
+        let p = json!({"source": "AES", "channel": 1, "output_type": "AES", "outputs": "XX----"});
+        let mut cx = Cx::new(11);
+        lm.command(&mut cx, 2, "set_output_route_lm", p.as_object().unwrap());
+        assert!(matches!(
+            completed(&cx.take())[0].1,
+            Err(CommandError::InvalidParams { .. })
+        ));
     }
 
     #[test]
