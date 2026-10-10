@@ -54,12 +54,37 @@ source:
     note: >
       Manufacturer document. Commands and ranges from chapter 9; menu table chapter 8. The AW-UE4 has no
       mechanical pan, tilt, focus or iris: #APC, #AXF and #AXI answer with fixed values.
+  - title: "Integrated Camera Interface Specifications, Supplement for Web Control: AW-UE160 (Ver.1.09)"
+    author: Panasonic Corporation
+    url: https://eww.pass.panasonic.co.jp/pro-av/support/content/guide/DEF/UE160_CGI/Supplement_for_Web_Control-UE160E.pdf
+    note: >
+      Manufacturer document. CGI requests, access levels and replies: basic and streaming mode settings
+      (3.1), clock (3.2), video over IP (3.3), audio (3.4), network (3.5), restart (3.7), information
+      acquisition (chapter 4), TSL 5.0 (6), mDNS (7), RTMP (8), MPEG2-TS over UDP (9), SRT (10), timecode SEI
+      (11), ST 2110, PTP and NMOS (12).
+  - title: "Integrated Camera Interface Specifications, Supplement for Web Control: AW-UE100 (Ver.01.54)"
+    author: Panasonic Connect Co., Ltd.
+    url: https://eww.pass.panasonic.co.jp/pro-av/support/content/guide/DEF/UE100_CGI/Supplement_for_Web_Control-UE100E.pdf
+    note: >
+      Manufacturer document; the same CGIs as the AW-UE160 supplement without ST 2110, timecode SEI and the
+      SFP+ interfaces.
+  - title: "Integrated Camera Interface Specifications, Supplement for Web Control: AW-UE150 (Ver.1.08)"
+    author: Panasonic Connect Co., Ltd.
+    url: https://eww.pass.panasonic.co.jp/pro-av/support/content/guide/DEF/UE150_CGI/IntegratedCamera_InterfaceSpecifications_Supplement_for_Web_Control-V1.00E.pdf
+    note: >
+      Manufacturer document: streaming mode, RTMP, audio, network and restart CGIs. Applied to the AW-UE155
+      and AW-HE145 as well.
+  - title: "Integrated Camera Interface Specifications, Supplement for Web Control: AW-UE4, AW-HE20/UE20, AW-UE5"
+    author: Panasonic Co., Ltd.
+    url: https://eww.pass.panasonic.co.jp/pro-av/support/content/guide/DEF/UE20_CGI/Supplement_for_Web_Control-E.pdf
+    note: >
+      Manufacturer document: priority mode, NDI|HX, network, restart and RTMP CGIs.
 
 transport:
   type: http
   port: 80
   scheme: http
-  auth: none
+  auth: { setting: auth }
   timeout_ms: 4000
   probe:
     method: GET
@@ -73,9 +98,20 @@ extension: panasonic-update-notification
 
 # The AW-UE160 writes format codes as two hex digits (OSA:87:01).
 maps:
+  h264_suffix: { "1": "", "2": "_2", "3": "_3", "4": "_4" }
+  h265_suffix: { "1": "", "2": "_2" }
   format_two_digit: { "0": "00", "1": "01", "2": "02", "3": "03", "4": "04", "5": "05", "7": "07", "8": "08", "A": "0A", "10": "10", "11": "11", "14": "14", "15": "15", "16": "16", "17": "17", "18": "18", "19": "19", "1A": "1A", "1B": "1B", "20": "20", "21": "21", "22": "22", "23": "23", "24": "24", "25": "25", "26": "26", "27": "27" }
 
 settings:
+  auth: { type: enum, values: [none, digest, basic], default: none,
+          label: Credential type,
+          description: "none while the camera's user authentication is off and only camera control is needed; digest (or basic for older firmware) with an administrator to change Web settings (streaming, network) or when user authentication is on." }
+  username: { type: string, max_length: 32, default: "",
+              label: User,
+              description: "The camera's administrator (or a camera-control user for Live-level requests), sent when the credential type is digest or basic." }
+  password: { type: string, secret: true, max_length: 32, default: "",
+              label: Password,
+              description: "That user's password, sent when the credential type is digest or basic." }
   notify_port: { type: int, min: 1, max: 65535, default: 31004, label: Notification port, description: "TCP port on this host that the camera connects to, once registered, to push each changed setting." }
 
 ports:
@@ -730,7 +766,11 @@ models:
       crop_v_position_mg, get_crop_v_position_mg, crop_position_speed, crop_position_speed_yl,
       crop_position_speed_g, crop_position_speed_mg, crop_position_speed_all, get_crop_positions, preset_crop,
       get_preset_crop, smart_picture_flip, get_smart_picture_flip, flip_detect_angle, get_flip_detect_angle,
-      get_flip_status]
+      get_flip_status, get_device_info, web_camera_title, get_web_basic, stream_mode, get_stream_mode,
+      rtmp_start, rtmp_stop, get_rtmp_status, rtmp_server, rtmp_server_url, get_rtmp_server, ip_audio,
+      ip_audio_bitrate, get_ip_audio, h264_transmit, h264_resolution, h264_framerate, h264_bitrate,
+      h264_delivery, get_video_over_ip, get_rtsp, rtsp_port, get_network, network_ipv4, http_port, restart,
+      ntp, get_ntp, date_time, get_date_time]
     verification: none
     notes: >
       From the AW-UE150/AW-HE145 interface specification.
@@ -838,7 +878,11 @@ models:
       crop_v_position_mg, get_crop_v_position_mg, crop_position_speed, crop_position_speed_yl,
       crop_position_speed_g, crop_position_speed_mg, crop_position_speed_all, get_crop_positions, preset_crop,
       get_preset_crop, smart_picture_flip, get_smart_picture_flip, flip_detect_angle, get_flip_detect_angle,
-      get_flip_status]
+      get_flip_status, get_device_info, web_camera_title, get_web_basic, stream_mode, get_stream_mode,
+      rtmp_start, rtmp_stop, get_rtmp_status, rtmp_server, rtmp_server_url, get_rtmp_server, ip_audio,
+      ip_audio_bitrate, get_ip_audio, h264_transmit, h264_resolution, h264_framerate, h264_bitrate,
+      h264_delivery, get_video_over_ip, get_rtsp, rtsp_port, get_network, network_ipv4, http_port, restart,
+      ntp, get_ntp, date_time, get_date_time]
     verification: none
     notes: >
       Same firmware and command set as the AW-UE150 (AW-UE150 firmware notes); not separately documented.
@@ -929,7 +973,11 @@ models:
       knee_slope, get_knee_slope, hlg_knee, get_hlg_knee, hlg_knee_point, get_hlg_knee_point, hlg_knee_slope,
       get_hlg_knee_slope, shooting_mode, get_shooting_mode, fan2, get_fan2, get_fan2_status, sdi_hdr_output,
       get_sdi_hdr_output, hdmi_hdr_output, get_hdmi_hdr_output, smart_picture_flip, get_smart_picture_flip,
-      flip_detect_angle, get_flip_detect_angle, get_flip_status]
+      flip_detect_angle, get_flip_detect_angle, get_flip_status, get_device_info, web_camera_title,
+      get_web_basic, stream_mode, get_stream_mode, rtmp_start, rtmp_stop, get_rtmp_status, rtmp_server,
+      rtmp_server_url, get_rtmp_server, ip_audio, ip_audio_bitrate, get_ip_audio, h264_transmit,
+      h264_resolution, h264_framerate, h264_bitrate, h264_delivery, get_video_over_ip, get_rtsp, rtsp_port,
+      get_network, network_ipv4, http_port, restart, ntp, get_ntp, date_time, get_date_time]
     verification: none
     notes: >
       The HD model of the AW-UE150/AW-HE145 document: no 12G-SDI, MONI, V-Log, crop or down-converter
@@ -1039,7 +1087,15 @@ models:
       crop_zoom_speed_yl, crop_zoom_speed_g, crop_zoom_speed_mg, crop_zoom_speed_all, crop_zoom_ratios,
       get_crop_zoom_ratios, crop_position_zoom_speed, get_crop_positions_and_zoom, preset_crop,
       get_preset_crop, smart_picture_flip, get_smart_picture_flip, flip_detect_angle, get_flip_detect_angle,
-      get_flip_status]
+      get_flip_status, get_device_info, web_camera_title, get_web_basic, stream_mode, get_stream_mode,
+      rtmp_start, rtmp_stop, get_rtmp_status, rtmp_server, rtmp_server_url, get_rtmp_server, srt_start,
+      srt_stop, get_srt_status, ts_start, ts_stop, get_ts_status, srt_settings, get_srt_settings,
+      ts_udp_settings, get_ts_udp_settings, ndi_hx_settings, get_ndi_hx_settings, ndi_settings,
+      get_ndi_settings, ip_audio, ip_audio_bitrate, get_ip_audio, h264_transmit, h264_resolution,
+      h264_framerate, h264_bitrate, h264_delivery, get_video_over_ip, h265_transmit, h265_resolution,
+      h265_framerate, get_rtsp, rtsp_port, get_network, network_ipv4, http_port, restart, get_active_network,
+      tsl_settings, get_tsl_settings, mdns_host_name, get_mdns_host_name, ntp, get_ntp, date_time,
+      get_date_time]
     verification: none
     notes: >
       From the AW-UE100 interface specification.
@@ -1230,7 +1286,17 @@ models:
       get_white_shading_v_saw_b, white_shading_v_para_r, get_white_shading_v_para_r, white_shading_v_para_g,
       get_white_shading_v_para_g, white_shading_v_para_b, get_white_shading_v_para_b, menu_key_up,
       menu_key_down, menu_key_right, menu_key_left, camera_number, get_camera_number, camera_title_hex,
-      get_camera_title_hex]
+      get_camera_title_hex, get_device_info, web_camera_title, get_web_basic, stream_mode, get_stream_mode,
+      rtmp_start, rtmp_stop, get_rtmp_status, rtmp_server, rtmp_server_url, get_rtmp_server, srt_start,
+      srt_stop, get_srt_status, ts_start, ts_stop, get_ts_status, srt_settings, get_srt_settings,
+      ts_udp_settings, get_ts_udp_settings, ndi_hx_settings, get_ndi_hx_settings, ndi_settings,
+      get_ndi_settings, ip_audio, ip_audio_bitrate, get_ip_audio, h264_transmit, h264_resolution,
+      h264_framerate, h264_bitrate, h264_delivery, get_video_over_ip, h265_transmit, h265_resolution,
+      h265_framerate, get_rtsp, rtsp_port, get_network, network_ipv4_interface, http_port, restart,
+      get_active_network, tsl_settings, get_tsl_settings, mdns_host_name, get_mdns_host_name, ntp, get_ntp,
+      date_time, get_date_time, timecode_sei, get_timecode_sei, st2110, get_st2110, st2110_video_tx,
+      get_st2110_video_tx, st2110_audio_tx, get_st2110_audio_tx, st2110_video_rx, get_st2110_video_rx,
+      get_st2110_rx_status, ptp_domain, get_ptp, nmos, nmos_rediscover, get_nmos]
     verification: none
     notes: >
       From the AW-UE160 interface specification. Many paint settings have their own command (OSL family)
@@ -1263,7 +1329,11 @@ models:
       get_model, get_software_version, power, get_power, serial_baud_rate, get_serial_baud_rate, detail_level,
       get_detail_level, contrast, get_contrast, chroma_step, get_chroma_step, slow_shutter, get_slow_shutter,
       language, get_language, serial_protocol, get_serial_protocol, serial_connector, get_serial_connector,
-      serial_camera_address, get_serial_camera_address]
+      serial_camera_address, get_serial_camera_address, web_camera_title, get_web_basic, priority_mode,
+      get_priority_mode, rtmp_start, rtmp_stop, get_rtmp_status, rtmp_server, rtmp_server_url,
+      get_rtmp_server, ndi_hx_settings, get_ndi_hx_settings, get_video_over_ip, h265_transmit,
+      h265_resolution, h265_framerate, h264_transmit_single, h264_resolution_single, h264_framerate_single,
+      get_network, network_ipv4, http_port, restart]
     verification: none
     notes: >
       From the AW-UE20/AW-HE20 interface specification.
@@ -1295,7 +1365,11 @@ models:
       get_model, get_software_version, power, get_power, serial_baud_rate, get_serial_baud_rate, detail_level,
       get_detail_level, contrast, get_contrast, chroma_step, get_chroma_step, slow_shutter, get_slow_shutter,
       language, get_language, serial_protocol, get_serial_protocol, serial_connector, get_serial_connector,
-      serial_camera_address, get_serial_camera_address]
+      serial_camera_address, get_serial_camera_address, web_camera_title, get_web_basic, priority_mode,
+      get_priority_mode, rtmp_start, rtmp_stop, get_rtmp_status, rtmp_server, rtmp_server_url,
+      get_rtmp_server, ndi_hx_settings, get_ndi_hx_settings, get_video_over_ip, h265_transmit,
+      h265_resolution, h265_framerate, h264_transmit_single, h264_resolution_single, h264_framerate_single,
+      get_network, network_ipv4, http_port, restart]
     verification: none
     notes: >
       The HD model of the AW-UE20/AW-HE20 document.
@@ -1315,7 +1389,12 @@ models:
       get_preset_entries, get_last_preset, menu, get_menu, menu_cancel, menu_enter, menu_up, menu_down,
       menu_right, menu_left, get_model, get_software_version, power, get_power, detail_level,
       get_detail_level, contrast, get_contrast, chroma_step, get_chroma_step, slow_shutter, get_slow_shutter,
-      language, get_language, mirror, get_mirror, lens_distortion_correction, get_lens_distortion_correction]
+      language, get_language, mirror, get_mirror, lens_distortion_correction, get_lens_distortion_correction,
+      get_device_info, web_camera_title, get_web_basic, priority_mode, get_priority_mode, rtmp_start,
+      rtmp_stop, get_rtmp_status, rtmp_server, rtmp_server_url, get_rtmp_server, ndi_hx_settings,
+      get_ndi_hx_settings, get_video_over_ip, h265_transmit, h265_resolution, h265_framerate,
+      h264_transmit_single, h264_resolution_single, h264_framerate_single, get_network, network_ipv4,
+      http_port, restart]
     verification: none
     notes: >
       From the AW-UE4 interface specification: a fixed wide-angle camera whose pan, tilt and zoom are
@@ -8269,6 +8348,611 @@ commands:
     expect: { status: 200, matches: "^OVP:05:([0-7])$" }
     returns: value
 
+  get_device_info:
+    summary: "Query the MAC address, serial number, firmware version and model name (Live access)"
+    send: { method: GET, path: /cgi-bin/getinfo, query: { FILE: "1" } }
+    expect: { status: 200 }
+    returns: text
+
+  web_camera_title:
+    summary: "Set the camera title of the Web settings (up to 20 double-byte characters) (Admin access)"
+    params:
+      title: { type: string, max_length: 40, required: true, label: Camera title, description: "Camera title, up to 20 double-byte characters." }
+    send: { method: GET, path: /cgi-bin/set_basic, query: { cam_title: "{title}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_web_basic:
+    summary: "Query the camera title of the Web settings (Live access)"
+    send: { method: GET, path: /cgi-bin/get_basic }
+    expect: { status: 200 }
+    returns: text
+
+  stream_mode:
+    summary: "Set the streaming mode, which decides which IP streams the camera can send (Admin access)"
+    params:
+      mode: { type: enum, values: ["h264", "h264_uhd", "h265", "h265_uhd", "rtmp", "rtmp_uhd", "jpeg_uhd", "srt_h264", "srt_h264_uhd", "srt_h265", "srt_h265_uhd", "ndi_hx", "ndi_hx_v2", "ndi_hx_v2_uhd", "ndi", "ts_udp"], required: true, label: Streaming mode, description: "h264, h264_uhd (4K), h265, h265_uhd, rtmp, rtmp_uhd, jpeg_uhd, srt_h264, srt_h264_uhd, srt_h265, srt_h265_uhd, ndi_hx (AW-UE150), ndi_hx_v2, ndi_hx_v2_uhd, ndi (high bandwidth) or ts_udp; which a model offers depends on the model and its options." }
+    send: { method: GET, path: /cgi-bin/set_stream_mode, query: { mode: "{mode}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_stream_mode:
+    summary: "Query the streaming mode (Live access)"
+    send: { method: GET, path: /cgi-bin/get_stream_mode }
+    expect: { status: 200 }
+    returns: text
+
+  priority_mode:
+    summary: "Set the priority mode, which decides the outputs and streams (Admin access)"
+    params:
+      mode: { type: enum, values: ["ip", "usb", "ip_4k", "usb_4k", "hdmi_4k", "usb_video_conference", "4k_hfr", "eptz_ai"], required: true, label: Priority mode, description: "ip, usb (HDMI/USB), ip_4k, usb_4k, hdmi_4k, usb_video_conference, 4k_hfr (4K high frame rate) or eptz_ai." }
+    send: { method: GET, path: /cgi-bin/set_priority_mode, query: { mode: "{mode}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_priority_mode:
+    summary: "Query the priority mode (Live access)"
+    send: { method: GET, path: /cgi-bin/get_priority_mode }
+    expect: { status: 200 }
+    returns: text
+
+  rtmp_start:
+    summary: "Start the RTMP stream (Live access)"
+    send: { method: GET, path: /cgi-bin/rtmp_ctrl, query: { cmd: "start" } }
+    expect: { status: 200 }
+    returns: ack
+
+  rtmp_stop:
+    summary: "Stop the RTMP stream (Live access)"
+    send: { method: GET, path: /cgi-bin/rtmp_ctrl, query: { cmd: "stop" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_rtmp_status:
+    summary: "Query whether the RTMP stream is running (Live access)"
+    send: { method: GET, path: /cgi-bin/get_rtmp_status }
+    expect: { status: 200 }
+    returns: text
+
+  rtmp_server:
+    summary: "Set the RTMP server URL and stream key (Admin access)"
+    params:
+      url: { type: string, max_length: 256, required: true, label: Server URL, description: "RTMP server URL, such as rtmp://a.rtmp.example/live2." }
+      key: { type: string, max_length: 256, required: true, label: Stream key, description: "Stream key given by the service." }
+    send: { method: GET, path: /cgi-bin/set_rtmp_param, query: { type: "1", url: "{url}", key: "{key}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  rtmp_server_url:
+    summary: "Set the RTMP server URL with the stream key in it (Admin access)"
+    params:
+      url: { type: string, max_length: 512, required: true, label: Server URL, description: "RTMP URL including the stream key." }
+    send: { method: GET, path: /cgi-bin/set_rtmp_param, query: { type: "0", url: "{url}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_rtmp_server:
+    summary: "Query the RTMP server settings (the stream key is not kept in state) (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_rtmp_param }
+    expect: { status: 200 }
+    returns: text
+
+  srt_start:
+    summary: "Start the SRT stream (Live access)"
+    send: { method: GET, path: /cgi-bin/srt_ctrl, query: { cmd: "start" } }
+    expect: { status: 200 }
+    returns: ack
+
+  srt_stop:
+    summary: "Stop the SRT stream (Live access)"
+    send: { method: GET, path: /cgi-bin/srt_ctrl, query: { cmd: "stop" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_srt_status:
+    summary: "Query whether the SRT stream is running (Live access)"
+    send: { method: GET, path: /cgi-bin/get_srt_status }
+    expect: { status: 200 }
+    returns: text
+
+  ts_start:
+    summary: "Start the MPEG2-TS over UDP stream (Live access)"
+    send: { method: GET, path: /cgi-bin/ts_ctrl, query: { cmd: "start" } }
+    expect: { status: 200 }
+    returns: ack
+
+  ts_stop:
+    summary: "Stop the MPEG2-TS over UDP stream (Live access)"
+    send: { method: GET, path: /cgi-bin/ts_ctrl, query: { cmd: "stop" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_ts_status:
+    summary: "Query whether the MPEG2-TS over UDP stream is running (Live access)"
+    send: { method: GET, path: /cgi-bin/get_ts_status }
+    expect: { status: 200 }
+    returns: text
+
+  srt_settings:
+    summary: "Set the SRT streaming settings (Admin access)"
+    params:
+      mode: { type: enum, values: ["0", "1"], required: true, label: Mode, description: "0 caller (client), 1 listener." }
+      destination: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Destination, description: "Destination IPv4 address, for caller mode." }
+      destination_port: { type: int, min: 1, max: 65535, required: true, label: Destination port, description: "Destination port, for caller mode." }
+      listen_port: { type: int, min: 1, max: 65535, required: true, label: Listening port, description: "Port the camera listens on, for listener mode." }
+      ttl: { type: int, min: 1, max: 255, required: true, label: TTL, description: "Time to live of the packets." }
+      latency: { type: int, min: 0, max: 65535, required: true, label: Latency, description: "SRT latency in milliseconds." }
+      encryption: { type: enum, values: ["0", "1", "2"], required: true, label: Encryption, description: "0 off, 1 AES-128, 2 AES-256." }
+      passphrase: { type: string, pattern: "^[A-Za-z0-9_-]{10,79}$", required: true, label: Passphrase, description: "10 to 79 letters, digits, _ and -; required with encryption." }
+    send: { method: GET, path: /cgi-bin/set_srt_info, query: { mode: "{mode}", dip_addr: "{destination}", dport: "{destination_port}", lport: "{listen_port}", ttl: "{ttl}", latency: "{latency}", encryption: "{encryption}", passphrase: "{passphrase}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_srt_settings:
+    summary: "Query the SRT streaming settings (the passphrase is not kept in state) (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_srt_info }
+    expect: { status: 200 }
+    returns: text
+
+  ts_udp_settings:
+    summary: "Set the MPEG2-TS over UDP destination (Admin access)"
+    params:
+      transmission: { type: enum, values: ["0", "1"], required: true, label: Transmission, description: "0 unicast, 1 multicast." }
+      unicast_address: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Unicast address, description: "Destination unicast IPv4 address." }
+      unicast_port: { type: int, min: 1, max: 65535, required: true, label: Unicast port, description: "Destination unicast port." }
+      multicast_address: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Multicast address, description: "Destination multicast IPv4 address." }
+      multicast_port: { type: int, min: 1, max: 65535, required: true, label: Multicast port, description: "Destination multicast port." }
+      push: { type: bool, required: true, label: Push, description: "On sends the stream (push 0), off does not (push 1)." }
+    send: { method: GET, path: /cgi-bin/set_ts_udp_info, query: { transmission: "{transmission}", uni_addr: "{unicast_address}", uni_port: "{unicast_port}", multi_addr: "{multicast_address}", multi_port: "{multicast_port}", push: "{push:bool10}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_ts_udp_settings:
+    summary: "Query the MPEG2-TS over UDP destination (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_ts_udp_info }
+    expect: { status: 200 }
+    returns: text
+
+  ndi_hx_settings:
+    summary: "Set the NDI|HX settings (Admin access)"
+    params:
+      protocol: { type: enum, values: ["tcp", "udp", "rudp"], required: true, label: Unicast protocol, description: "tcp, udp, or rudp (AW-UE20/HE20/UE4)." }
+      multicast: { type: bool, required: true, label: Multicast, description: "On sends multicast." }
+      multicast_address: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Multicast address, description: "Multicast IPv4 address." }
+      multicast_subnet: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Multicast subnet, description: "Multicast subnet mask." }
+      ttl: { type: int, min: 1, max: 254, required: true, label: Multicast TTL, description: "Multicast TTL, 1 to 254 (1 to 128 on AW-UE20/HE20/UE4)." }
+      use_groups: { type: bool, required: true, label: Use groups, description: "On puts the source in the named NDI groups." }
+      groups: { type: string, pattern: "^[A-Za-z0-9,]*$", max_length: 64, required: true, label: Groups, description: "NDI group names, letters and digits." }
+      use_discovery_server: { type: bool, required: true, label: Use discovery server, description: "On registers with an NDI discovery server." }
+      discovery_server: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Discovery server, description: "NDI discovery server IPv4 address." }
+      source_name: { type: string, pattern: "^[A-Za-z0-9 _-]*$", max_length: 64, required: true, label: Source name, description: "NDI source name: letters, digits, -, _ and space." }
+    send: { method: GET, path: /cgi-bin/set_ndi_hx_info, query: { unicast_protocol: "{protocol}", multicast_transmit: "{multicast:bool01}", multicast_addr: "{multicast_address}", multicast_subnet: "{multicast_subnet}", multicast_ttl: "{ttl}", group_uses: "{use_groups:bool01}", group_name: "{groups}", server_uses: "{use_discovery_server:bool01}", server_addr: "{discovery_server}", source_name: "{source_name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_ndi_hx_settings:
+    summary: "Query the NDI|HX settings (Live access)"
+    send: { method: GET, path: /cgi-bin/get_ndi_hx_info }
+    expect: { status: 200 }
+    returns: text
+
+  ndi_settings:
+    summary: "Set the high bandwidth NDI settings (Admin access)"
+    params:
+      protocol: { type: enum, values: ["tcp", "udp"], required: true, label: Unicast protocol, description: "tcp, udp, or rudp (AW-UE20/HE20/UE4)." }
+      multicast: { type: bool, required: true, label: Multicast, description: "On sends multicast." }
+      multicast_address: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Multicast address, description: "Multicast IPv4 address." }
+      multicast_subnet: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Multicast subnet, description: "Multicast subnet mask." }
+      ttl: { type: int, min: 1, max: 254, required: true, label: Multicast TTL, description: "Multicast TTL, 1 to 254 (1 to 128 on AW-UE20/HE20/UE4)." }
+      use_groups: { type: bool, required: true, label: Use groups, description: "On puts the source in the named NDI groups." }
+      groups: { type: string, pattern: "^[A-Za-z0-9,]*$", max_length: 64, required: true, label: Groups, description: "NDI group names, letters and digits." }
+      use_discovery_server: { type: bool, required: true, label: Use discovery server, description: "On registers with an NDI discovery server." }
+      discovery_server: { type: string, pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Discovery server, description: "NDI discovery server IPv4 address." }
+      source_name: { type: string, pattern: "^[A-Za-z0-9 _-]*$", max_length: 64, required: true, label: Source name, description: "NDI source name: letters, digits, -, _ and space." }
+    send: { method: GET, path: /cgi-bin/set_ndi_info, query: { unicast_protocol: "{protocol}", multicast_transmit: "{multicast:bool01}", multicast_addr: "{multicast_address}", multicast_subnet: "{multicast_subnet}", multicast_ttl: "{ttl}", group_uses: "{use_groups:bool01}", group_name: "{groups}", server_uses: "{use_discovery_server:bool01}", server_addr: "{discovery_server}", source_name: "{source_name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_ndi_settings:
+    summary: "Query the high bandwidth NDI settings (Live access)"
+    send: { method: GET, path: /cgi-bin/get_ndi_info }
+    expect: { status: 200 }
+    returns: text
+
+  ip_audio:
+    summary: "Set whether IP streams carry audio (Admin access)"
+    params:
+      enabled: { type: bool, required: true, label: Audio over IP, description: "On sends the AUDIO IN signal with the IP streams." }
+    send: { method: GET, path: /cgi-bin/set_audio, query: { audio_transmit: "{enabled:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  ip_audio_bitrate:
+    summary: "Set the bit rate of the audio in IP streams (Admin access)"
+    params:
+      bitrate: { type: enum, values: ["64", "96", "128", "256"], required: true, label: Bit rate, description: "Audio bit rate in kbps: 64, 96, 128, or 256 (AW-UE160)." }
+    send: { method: GET, path: /cgi-bin/set_audio, query: { audio_bitrate: "{bitrate}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_ip_audio:
+    summary: "Query the audio of the IP streams (Live access)"
+    send: { method: GET, path: /cgi-bin/get_audio }
+    expect: { status: 200 }
+    returns: text
+
+  h264_transmit:
+    summary: "Set the H.264 transmit of an H.264 stream (1-4) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 4, required: true, label: Stream, description: "H.264 stream 1 to 4 (4 on AW-UE100/UE160; 3 on others)." }
+      enabled: { type: bool, required: true, label: Transmit, description: "On sends the stream." }
+    send: { method: GET, path: "/cgi-bin/set_h264{stream:map.h264_suffix}", query: { h264_transmit: "{enabled:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h264_resolution:
+    summary: "Set the H.264 resolution of an H.264 stream (1-4) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 4, required: true, label: Stream, description: "H.264 stream 1 to 4 (4 on AW-UE100/UE160; 3 on others)." }
+      width: { type: enum, values: ["320", "640", "1280", "1920", "3840"], required: true, label: Resolution, description: "Width: 320, 640, 1280, 1920 or 3840 (stream 1 only); which apply depends on the stream and the streaming mode." }
+    send: { method: GET, path: "/cgi-bin/set_h264{stream:map.h264_suffix}", query: { h264_resolution: "{width}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h264_framerate:
+    summary: "Set framerate of an H.264 stream (1-4) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 4, required: true, label: Stream, description: "H.264 stream 1 to 4 (4 on AW-UE100/UE160; 3 on others)." }
+      rate: { type: enum, values: ["5", "15", "24", "30", "60"], required: true, label: Frame rate, description: "Frames per second: 5, 15, 24, 30 or 60 (12.5, 25 or 50 at 50 Hz, sent as 15, 30, 60)." }
+    send: { method: GET, path: "/cgi-bin/set_h264{stream:map.h264_suffix}", query: { framerate: "{rate}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h264_bitrate:
+    summary: "Set the H.264 bandwidth of an H.264 stream (1-4) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 4, required: true, label: Stream, description: "H.264 stream 1 to 4 (4 on AW-UE100/UE160; 3 on others)." }
+      kbps: { type: int, min: 512, max: 76800, required: true, label: Bit rate, description: "Bit rate in kbps, such as 8192 (the camera takes 2048, 4096, 8192, 10240, 12800, 14336, 16384, 20480, 24576, 25600, 51200 or 76800 depending on the stream)." }
+    send: { method: GET, path: "/cgi-bin/set_h264{stream:map.h264_suffix}", query: { h264_bandwidth: "{kbps}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h264_delivery:
+    summary: "Set the H.264 unimulti of an H.264 stream (1-4) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 4, required: true, label: Stream, description: "H.264 stream 1 to 4 (4 on AW-UE100/UE160; 3 on others)." }
+      delivery: { type: enum, values: ["uni", "uni_manual", "multi"], required: true, label: Delivery, description: "uni unicast (auto port), uni_manual unicast (manual port), multi multicast." }
+    send: { method: GET, path: "/cgi-bin/set_h264{stream:map.h264_suffix}", query: { h264_unimulti: "{delivery}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_video_over_ip:
+    summary: "Query the IP stream settings (JPEG, H.264, H.265) (Live access)"
+    send: { method: GET, path: /cgi-bin/get_video_over_ip }
+    expect: { status: 200 }
+    returns: text
+
+  h265_transmit:
+    summary: "Set the H.265 transmit of an H.265 stream (1-2) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 2, required: true, label: Stream, description: "H.265 stream 1 or 2 (1 on AW-UE20/HE20/UE4)." }
+      enabled: { type: bool, required: true, label: Transmit, description: "On sends the stream." }
+    send: { method: GET, path: "/cgi-bin/set_h265{stream:map.h265_suffix}", query: { h265_transmit: "{enabled:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h265_resolution:
+    summary: "Set the H.265 resolution of an H.265 stream (1-2) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 2, required: true, label: Stream, description: "H.265 stream 1 or 2 (1 on AW-UE20/HE20/UE4)." }
+      width: { type: enum, values: ["640", "1280", "1920", "3840"], required: true, label: Resolution, description: "Width: 640, 1280, 1920 or 3840 (stream 1 only)." }
+    send: { method: GET, path: "/cgi-bin/set_h265{stream:map.h265_suffix}", query: { h265_resolution: "{width}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h265_framerate:
+    summary: "Set framerate of an H.265 stream (1-2) (Admin access)"
+    params:
+      stream: { type: int, min: 1, max: 2, required: true, label: Stream, description: "H.265 stream 1 or 2 (1 on AW-UE20/HE20/UE4)." }
+      rate: { type: enum, values: ["24", "30", "60"], required: true, label: Frame rate, description: "Frames per second: 24, 30 or 60 (25, 50 at 50 Hz, sent as 30, 60)." }
+    send: { method: GET, path: "/cgi-bin/set_h265{stream:map.h265_suffix}", query: { framerate: "{rate}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h264_transmit_single:
+    summary: "Set the H.264 transmit of the H.264 stream (Admin access)"
+    params:
+      enabled: { type: bool, required: true, label: Transmit, description: "On sends the stream." }
+    send: { method: GET, path: /cgi-bin/set_h264, query: { h264_transmit: "{enabled:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h264_resolution_single:
+    summary: "Set the H.264 resolution of the H.264 stream (Admin access)"
+    params:
+      width: { type: enum, values: ["640", "1280", "1920", "3840"], required: true, label: Resolution, description: "Width: 640, 1280, 1920 or 3840 (not AW-HE20)." }
+    send: { method: GET, path: /cgi-bin/set_h264, query: { h264_resolution: "{width}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  h264_framerate_single:
+    summary: "Set framerate of the H.264 stream (Admin access)"
+    params:
+      rate: { type: enum, values: ["5", "10", "15", "25", "30", "50", "60"], required: true, label: Frame rate, description: "Frames per second: 5, 15, 30 or 60 (5, 10, 25, 50 at 50 Hz)." }
+    send: { method: GET, path: /cgi-bin/set_h264, query: { framerate: "{rate}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_rtsp:
+    summary: "Query the RTSP port and the stream URIs (Live access)"
+    send: { method: GET, path: /cgi-bin/get_rtsp }
+    expect: { status: 200 }
+    returns: text
+
+  rtsp_port:
+    summary: "Set the RTSP server port (554 by default) (Admin access)"
+    params:
+      port: { type: int, min: 1, max: 65535, required: true, label: RTSP port, description: "RTSP server port." }
+    send: { method: GET, path: /cgi-bin/set_rtsp, query: { rtsp_port: "{port}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_network:
+    summary: "Query the network settings (the Gigabit Ethernet port on AW-UE160) (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_network }
+    expect: { status: 200 }
+    returns: text
+
+  network_ipv4:
+    summary: "Set the IPv4 address, subnet mask and gateway (or DHCP); the camera moves to the new address (Admin access)"
+    params:
+      dhcp: { type: bool, required: true, label: DHCP, description: "On takes the address from DHCP; off uses the static address below." }
+      ip1: { type: int, min: 0, max: 255, required: true, label: IP address first, description: "IP address first octet, 0 to 255." }
+      ip2: { type: int, min: 0, max: 255, required: true, label: IP address second, description: "IP address second octet, 0 to 255." }
+      ip3: { type: int, min: 0, max: 255, required: true, label: IP address third, description: "IP address third octet, 0 to 255." }
+      ip4: { type: int, min: 0, max: 255, required: true, label: IP address fourth, description: "IP address fourth octet, 0 to 255." }
+      mask1: { type: int, min: 0, max: 255, required: true, label: Subnet mask first, description: "Subnet mask first octet, 0 to 255." }
+      mask2: { type: int, min: 0, max: 255, required: true, label: Subnet mask second, description: "Subnet mask second octet, 0 to 255." }
+      mask3: { type: int, min: 0, max: 255, required: true, label: Subnet mask third, description: "Subnet mask third octet, 0 to 255." }
+      mask4: { type: int, min: 0, max: 255, required: true, label: Subnet mask fourth, description: "Subnet mask fourth octet, 0 to 255." }
+      gw1: { type: int, min: 0, max: 255, required: true, label: Gateway first, description: "Gateway first octet, 0 to 255." }
+      gw2: { type: int, min: 0, max: 255, required: true, label: Gateway second, description: "Gateway second octet, 0 to 255." }
+      gw3: { type: int, min: 0, max: 255, required: true, label: Gateway third, description: "Gateway third octet, 0 to 255." }
+      gw4: { type: int, min: 0, max: 255, required: true, label: Gateway fourth, description: "Gateway fourth octet, 0 to 255." }
+    send: { method: GET, path: /cgi-bin/network, query: { dhcp: "{dhcp:bool01}", IP_addr1: "{ip1}", IP_addr2: "{ip2}", IP_addr3: "{ip3}", IP_addr4: "{ip4}", netmask1: "{mask1}", netmask2: "{mask2}", netmask3: "{mask3}", netmask4: "{mask4}", gateway1: "{gw1}", gateway2: "{gw2}", gateway3: "{gw3}", gateway4: "{gw4}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  network_ipv4_interface:
+    summary: "Set the IPv4 settings of one network interface (or DHCP); the camera moves to the new address (Admin access)"
+    params:
+      interface: { type: enum, values: ["lan0", "lan1", "usb0"], required: true, label: Interface, description: "lan0 Gigabit Ethernet (RJ45), lan1 10G (SFP+), usb0 USB." }
+      metric: { type: int, min: 100, max: 110, required: true, label: Metric, description: "Routing metric, 100 to 110." }
+      dhcp: { type: bool, required: true, label: DHCP, description: "On takes the address from DHCP; off uses the static address below." }
+      ip1: { type: int, min: 0, max: 255, required: true, label: IP address first, description: "IP address first octet, 0 to 255." }
+      ip2: { type: int, min: 0, max: 255, required: true, label: IP address second, description: "IP address second octet, 0 to 255." }
+      ip3: { type: int, min: 0, max: 255, required: true, label: IP address third, description: "IP address third octet, 0 to 255." }
+      ip4: { type: int, min: 0, max: 255, required: true, label: IP address fourth, description: "IP address fourth octet, 0 to 255." }
+      mask1: { type: int, min: 0, max: 255, required: true, label: Subnet mask first, description: "Subnet mask first octet, 0 to 255." }
+      mask2: { type: int, min: 0, max: 255, required: true, label: Subnet mask second, description: "Subnet mask second octet, 0 to 255." }
+      mask3: { type: int, min: 0, max: 255, required: true, label: Subnet mask third, description: "Subnet mask third octet, 0 to 255." }
+      mask4: { type: int, min: 0, max: 255, required: true, label: Subnet mask fourth, description: "Subnet mask fourth octet, 0 to 255." }
+      gw1: { type: int, min: 0, max: 255, required: true, label: Gateway first, description: "Gateway first octet, 0 to 255." }
+      gw2: { type: int, min: 0, max: 255, required: true, label: Gateway second, description: "Gateway second octet, 0 to 255." }
+      gw3: { type: int, min: 0, max: 255, required: true, label: Gateway third, description: "Gateway third octet, 0 to 255." }
+      gw4: { type: int, min: 0, max: 255, required: true, label: Gateway fourth, description: "Gateway fourth octet, 0 to 255." }
+    send: { method: GET, path: /cgi-bin/network, query: { interface: "{interface}", metric: "{metric}", dhcp: "{dhcp:bool01}", IP_addr1: "{ip1}", IP_addr2: "{ip2}", IP_addr3: "{ip3}", IP_addr4: "{ip4}", netmask1: "{mask1}", netmask2: "{mask2}", netmask3: "{mask3}", netmask4: "{mask4}", gateway1: "{gw1}", gateway2: "{gw2}", gateway3: "{gw3}", gateway4: "{gw4}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  http_port:
+    summary: "Set the HTTP port of the camera; the camera then answers on the new port (Admin access)"
+    params:
+      port: { type: int, min: 1, max: 65535, required: true, label: HTTP port, description: "HTTP port, 80 by default." }
+    send: { method: GET, path: /cgi-bin/network, query: { port: "{port}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  restart:
+    summary: "Restart the camera (Admin access)"
+    params:
+      nonce: { type: string, pattern: "^[0-9A-Fa-f]{1,16}$", default: "0123456789ABCDEF", label: Random number, description: "A 16-digit hex string the request carries; any value." }
+    send: { method: GET, path: /cgi-bin/initial, query: { cmd: "reset", Randomnum: "{nonce}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_active_network:
+    summary: "Query the addresses the camera is using now (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_active_network }
+    expect: { status: 200 }
+    returns: text
+
+  tsl_settings:
+    summary: "Set the TSL 5.0 tally index and port (Admin access)"
+    params:
+      index: { type: int, min: 0, max: 65534, required: true, label: Index, description: "TSL 5.0 display index, 0 to 65534." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "TSL 5.0 UDP port." }
+    send: { method: GET, path: /cgi-bin/set_tsl_info, query: { index: "{index}", port: "{port}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_tsl_settings:
+    summary: "Query the TSL 5.0 tally index and port (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_tsl_info }
+    expect: { status: 200 }
+    returns: text
+
+  mdns_host_name:
+    summary: "Set the mDNS host name (Admin access)"
+    params:
+      name: { type: string, pattern: "^[A-Za-z0-9-]{1,63}$", max_length: 63, required: true, label: Host name, description: "mDNS host name: letters, digits and -." }
+    send: { method: GET, path: /cgi-bin/set_mdns_host, query: { host_name: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_mdns_host_name:
+    summary: "Query the mDNS host name (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_mdns_host }
+    expect: { status: 200 }
+    returns: text
+
+  ntp:
+    summary: "Set the clock to follow an NTP server or be set by hand (Admin access)"
+    params:
+      ntp: { type: bool, required: true, label: NTP, description: "On follows the NTP server, off keeps the clock set by hand." }
+      from_dhcp: { type: bool, required: true, label: Server from DHCP, description: "On takes the NTP server address from DHCP." }
+      server: { type: string, max_length: 128, required: true, label: NTP server, description: "NTP server address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: NTP port, description: "NTP port, usually 123." }
+      interval: { type: int, min: 1, max: 24, required: true, label: Interval, description: "Synchronisation interval in hours, 1 to 24." }
+    send: { method: GET, path: /cgi-bin/time, query: { time_adjust: "{ntp:bool01}", ntp_addr_dhcp: "{from_dhcp:bool01}", ntp_addr: "{server}", ntp_port: "{port}", ntp_interval: "{interval}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_ntp:
+    summary: "Query the NTP settings (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_time }
+    expect: { status: 200 }
+    returns: text
+
+  date_time:
+    summary: "Set the camera clock (Admin access)"
+    params:
+      display: { type: bool, required: true, label: Display, description: "On shows the clock on screen." }
+      year: { type: int, min: 2013, max: 2035, required: true, label: Year, description: "Year, 2013 to 2035." }
+      month: { type: int, min: 1, max: 12, required: true, label: Month, description: "Month, 1 to 12." }
+      day: { type: int, min: 1, max: 31, required: true, label: Day, description: "Day, 1 to 31." }
+      hour: { type: int, min: 0, max: 23, required: true, label: Hour, description: "Hour, 0 to 23." }
+      minute: { type: int, min: 0, max: 59, required: true, label: Minute, description: "Minute, 0 to 59." }
+      second: { type: int, min: 0, max: 59, required: true, label: Second, description: "Second, 0 to 59." }
+      timezone: { type: int, min: 1, max: 75, required: true, label: Time zone, description: "Time zone number, 1 to 75, as in the Web menu." }
+    send: { method: GET, path: /cgi-bin/date_time, query: { display: "{display:bool01}", date_year: "{year}", date_month: "{month}", date_day: "{day}", date_hour: "{hour}", date_min: "{minute}", date_sec: "{second}", timezone: "{timezone}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_date_time:
+    summary: "Query the camera clock (Live access)"
+    send: { method: GET, path: /cgi-bin/get_date_time }
+    expect: { status: 200 }
+    returns: text
+
+  timecode_sei:
+    summary: "Set whether the H.264/H.265 streams carry timecode SEI (Admin access)"
+    params:
+      enabled: { type: bool, required: true, label: Timecode SEI, description: "On adds timecode SEI." }
+    send: { method: GET, path: /cgi-bin/set_timecode_overlay, query: { mode: "{enabled:bool01}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_timecode_sei:
+    summary: "Query timecode SEI (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_timecode_overlay }
+    expect: { status: 200 }
+    returns: text
+
+  st2110:
+    summary: "Set ST 2110 on or off and its port (Admin access)"
+    params:
+      enabled: { type: bool, required: true, label: ST 2110, description: "On enables ST 2110." }
+      port: { type: int, min: 1024, max: 65535, required: true, label: Port, description: "Port, 1024 to 65535." }
+    send: { method: GET, path: /cgi-bin/set_st2110_info, query: { enable: "{enabled:bool01}", port: "{port}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_st2110:
+    summary: "Query ST 2110 (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_st2110_info }
+    expect: { status: 200 }
+    returns: text
+
+  st2110_video_tx:
+    summary: "Set the destination of an ST 2110 video TX channel (Admin access)"
+    params:
+      channel: { type: int, min: 0, max: 2, required: true, label: Channel, description: "Channel 0 to 2." }
+      address: { type: string, max_length: 128, required: true, label: Address, description: "Destination address, a.b.c.d or a.b.c.d/mask length." }
+      port: { type: int, min: 1024, max: 65535, required: true, label: Port, description: "Port, 1024 to 65535." }
+    send: { method: GET, path: /cgi-bin/set_moip_video_tx, raw_query: "ch{channel}_ip_addr={address:url}&ch{channel}_port={port}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_st2110_video_tx:
+    summary: "Query the ST 2110 video TX channels (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_moip_video_tx }
+    expect: { status: 200 }
+    returns: text
+
+  st2110_audio_tx:
+    summary: "Set the destination of an ST 2110 audio TX channel (Admin access)"
+    params:
+      channel: { type: int, min: 0, max: 2, required: true, label: Channel, description: "Channel 0 to 2." }
+      address: { type: string, max_length: 128, required: true, label: Address, description: "Destination address, a.b.c.d or a.b.c.d/mask length." }
+      port: { type: int, min: 1024, max: 65535, required: true, label: Port, description: "Port, 1024 to 65535." }
+    send: { method: GET, path: /cgi-bin/set_moip_audio_tx, raw_query: "ch{channel}_ip_addr={address:url}&ch{channel}_port={port}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_st2110_audio_tx:
+    summary: "Query the ST 2110 audio TX channels (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_moip_audio_tx }
+    expect: { status: 200 }
+    returns: text
+
+  st2110_video_rx:
+    summary: "Set the ST 2110 return video receive address (Admin access)"
+    params:
+      multicast_address: { type: string, max_length: 128, required: true, label: Multicast address, description: "Multicast address to receive." }
+      source_address: { type: string, max_length: 128, required: true, label: Source address, description: "Source address to accept." }
+      port: { type: int, min: 1024, max: 65535, required: true, label: Port, description: "Port, 1024 to 65535." }
+    send: { method: GET, path: /cgi-bin/set_moip_video_rx, query: { ch0_multicast_addr: "{multicast_address}", ch0_source_addr: "{source_address}", ch0_port: "{port}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_st2110_video_rx:
+    summary: "Query the ST 2110 return video receive address (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_moip_video_rx }
+    expect: { status: 200 }
+    returns: text
+
+  get_st2110_rx_status:
+    summary: "Query the ST 2110 return video reception (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_moip_rx_state }
+    expect: { status: 200 }
+    returns: text
+
+  ptp_domain:
+    summary: "Set the PTP domain (Admin access)"
+    params:
+      domain: { type: int, min: 0, max: 127, required: true, label: Domain, description: "PTP domain, 0 to 127." }
+    send: { method: GET, path: /cgi-bin/set_ptp_info, query: { domain: "{domain}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  get_ptp:
+    summary: "Query PTP lock status and settings (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_ptp_info }
+    expect: { status: 200 }
+    returns: text
+
+  nmos:
+    summary: "Set NMOS on or off and its port (Admin access)"
+    params:
+      enabled: { type: bool, required: true, label: NMOS, description: "On enables NMOS IS-04/IS-05." }
+      port: { type: int, min: 1024, max: 65535, required: true, label: Port, description: "Port, 1024 to 65535." }
+    send: { method: GET, path: /cgi-bin/set_nmos_info, query: { control: "{enabled:bool01}", port: "{port}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  nmos_rediscover:
+    summary: "Discover the NMOS registry again (Admin access)"
+    send: { method: GET, path: /cgi-bin/nmos_rediscovery }
+    expect: { status: 200 }
+    returns: ack
+
+  get_nmos:
+    summary: "Query NMOS (Admin access)"
+    send: { method: GET, path: /cgi-bin/get_nmos_info }
+    expect: { status: 200 }
+    returns: text
+
 state:
   scene: { type: int, description: "Selected scene file, 1-3 Scene1-3, 4 Full Auto (Scene4 on AW-HE120/HE130/UE150/HE145/UE100); 1-8 Scene1-8 and 9 off on AW-UE160" }
   exposure.picture_level: { type: string, description: "Picture level as the camera sends it, hex 00-64 for -50 to +50" }
@@ -8785,6 +9469,156 @@ state:
   serial.protocol: { type: string, description: "Serial protocol: panasonic or standard" }
   serial.connector: { type: string, description: "Serial connector: rs422 or rs232c" }
   serial.camera_address: { type: int, description: "Serial camera address, 1-7, 0 auto" }
+  device.mac: { type: string, description: "MAC address, XX-XX-XX-XX-XX-XX" }
+  device.serial: { type: string, description: "Serial number" }
+  device.version: { type: string, description: "Firmware version" }
+  device.name: { type: string, description: "Model name, such as AW-UE160" }
+  web.camera_title: { type: string, description: "Camera title of the Web settings" }
+  streaming.mode: { type: string, description: "Streaming mode, as set_stream_mode names it" }
+  streaming.priority_mode: { type: string, description: "Priority mode, as priority_mode names it" }
+  streaming.rtmp.active: { type: bool, description: "The RTMP stream is running" }
+  streaming.rtmp.key_in_url: { type: bool, description: "The RTMP URL carries the stream key (type 0)" }
+  streaming.rtmp.url: { type: string, description: "RTMP server URL" }
+  streaming.srt.active: { type: bool, description: "The SRT stream is running" }
+  streaming.ts.active: { type: bool, description: "The MPEG2-TS over UDP stream is running" }
+  streaming.srt.mode: { type: string, description: "SRT mode: caller or listener" }
+  streaming.srt.destination: { type: string, description: "SRT destination address" }
+  streaming.srt.destination_port: { type: int, description: "SRT destination port" }
+  streaming.srt.listen_port: { type: int, description: "SRT listening port" }
+  streaming.srt.ttl: { type: int, description: "SRT TTL" }
+  streaming.srt.latency: { type: int, description: "SRT latency in milliseconds" }
+  streaming.srt.encryption: { type: string, description: "SRT encryption: off, aes128, aes256" }
+  streaming.ts.multicast: { type: bool, description: "MPEG2-TS goes to the multicast address (otherwise unicast)" }
+  streaming.ts.unicast_address: { type: string, description: "MPEG2-TS unicast address" }
+  streaming.ts.unicast_port: { type: int, description: "MPEG2-TS unicast port" }
+  streaming.ts.multicast_address: { type: string, description: "MPEG2-TS multicast address" }
+  streaming.ts.multicast_port: { type: int, description: "MPEG2-TS multicast port" }
+  streaming.ts.push: { type: bool, description: "MPEG2-TS push is enabled" }
+  ndi_hx.image_size: { type: string, description: "NDI|HX picture size and rate, such as 1080_5994" }
+  ndi_hx.protocol: { type: string, description: "NDI|HX unicast protocol: tcp, udp or rudp" }
+  ndi_hx.multicast: { type: bool, description: "NDI|HX is sent multicast" }
+  ndi_hx.multicast_address: { type: string, description: "NDI|HX multicast address" }
+  ndi_hx.multicast_subnet: { type: string, description: "NDI|HX multicast subnet mask" }
+  ndi_hx.multicast_ttl: { type: int, description: "NDI|HX multicast TTL" }
+  ndi_hx.use_groups: { type: bool, description: "NDI|HX groups are used" }
+  ndi_hx.groups: { type: string, description: "NDI|HX group names" }
+  ndi_hx.use_discovery_server: { type: bool, description: "NDI|HX registers with a discovery server" }
+  ndi_hx.discovery_server: { type: string, description: "NDI|HX discovery server address" }
+  ndi_hx.source_name: { type: string, description: "NDI|HX source name" }
+  ndi.image_size: { type: string, description: "high bandwidth NDI picture size and rate, such as 1080_5994" }
+  ndi.protocol: { type: string, description: "high bandwidth NDI unicast protocol: tcp, udp or rudp" }
+  ndi.multicast: { type: bool, description: "high bandwidth NDI is sent multicast" }
+  ndi.multicast_address: { type: string, description: "high bandwidth NDI multicast address" }
+  ndi.multicast_subnet: { type: string, description: "high bandwidth NDI multicast subnet mask" }
+  ndi.multicast_ttl: { type: int, description: "high bandwidth NDI multicast TTL" }
+  ndi.use_groups: { type: bool, description: "high bandwidth NDI groups are used" }
+  ndi.groups: { type: string, description: "high bandwidth NDI group names" }
+  ndi.use_discovery_server: { type: bool, description: "high bandwidth NDI registers with a discovery server" }
+  ndi.discovery_server: { type: string, description: "high bandwidth NDI discovery server address" }
+  ndi.source_name: { type: string, description: "high bandwidth NDI source name" }
+  ip_audio.enabled: { type: bool, description: "IP streams carry audio" }
+  ip_audio.bitrate: { type: int, description: "Audio bit rate in kbps" }
+  h264.streams.1.transmit: { type: bool, description: "H.264 stream is sent, by stream 1-4" }
+  h264.streams.1.resolution: { type: int, description: "H.264 stream width in pixels, by stream 1-4" }
+  h264.streams.1.framerate: { type: string, description: "H.264 stream frame rate, such as 30(25), by stream 1-4" }
+  h264.streams.1.bitrate: { type: int, description: "H.264 stream bit rate in kbps, by stream 1-4" }
+  h264.streams.1.delivery: { type: string, description: "H.264 stream delivery: uni, uni_manual or multi, by stream 1-4" }
+  h264.streams.2.transmit: { type: bool, description: "H.264 stream is sent, by stream 1-4" }
+  h264.streams.2.resolution: { type: int, description: "H.264 stream width in pixels, by stream 1-4" }
+  h264.streams.2.framerate: { type: string, description: "H.264 stream frame rate, such as 30(25), by stream 1-4" }
+  h264.streams.2.bitrate: { type: int, description: "H.264 stream bit rate in kbps, by stream 1-4" }
+  h264.streams.2.delivery: { type: string, description: "H.264 stream delivery: uni, uni_manual or multi, by stream 1-4" }
+  h264.streams.3.transmit: { type: bool, description: "H.264 stream is sent, by stream 1-4" }
+  h264.streams.3.resolution: { type: int, description: "H.264 stream width in pixels, by stream 1-4" }
+  h264.streams.3.framerate: { type: string, description: "H.264 stream frame rate, such as 30(25), by stream 1-4" }
+  h264.streams.3.bitrate: { type: int, description: "H.264 stream bit rate in kbps, by stream 1-4" }
+  h264.streams.3.delivery: { type: string, description: "H.264 stream delivery: uni, uni_manual or multi, by stream 1-4" }
+  h264.streams.4.transmit: { type: bool, description: "H.264 stream is sent, by stream 1-4" }
+  h264.streams.4.resolution: { type: int, description: "H.264 stream width in pixels, by stream 1-4" }
+  h264.streams.4.framerate: { type: string, description: "H.264 stream frame rate, such as 30(25), by stream 1-4" }
+  h264.streams.4.bitrate: { type: int, description: "H.264 stream bit rate in kbps, by stream 1-4" }
+  h264.streams.4.delivery: { type: string, description: "H.264 stream delivery: uni, uni_manual or multi, by stream 1-4" }
+  h265.streams.1.transmit: { type: bool, description: "H.265 stream is sent, by stream 1-2" }
+  h265.streams.1.resolution: { type: int, description: "H.265 stream width in pixels, by stream 1-2" }
+  h265.streams.1.framerate: { type: string, description: "H.265 stream frame rate, such as 30(25), by stream 1-2" }
+  h265.streams.2.transmit: { type: bool, description: "H.265 stream is sent, by stream 1-2" }
+  h265.streams.2.resolution: { type: int, description: "H.265 stream width in pixels, by stream 1-2" }
+  h265.streams.2.framerate: { type: string, description: "H.265 stream frame rate, such as 30(25), by stream 1-2" }
+  rtsp.port: { type: int, description: "RTSP server port" }
+  rtsp.h264_uri_1: { type: string, description: "RTSP URI of H.264 stream 1" }
+  rtsp.h264_uri_2: { type: string, description: "RTSP URI of H.264 stream 2" }
+  rtsp.h264_uri_3: { type: string, description: "RTSP URI of H.264 stream 3" }
+  rtsp.h264_uri_4: { type: string, description: "RTSP URI of H.264 stream 4" }
+  rtsp.h265_uri_1: { type: string, description: "RTSP URI of H.265 stream 1" }
+  rtsp.h265_uri_2: { type: string, description: "RTSP URI of H.265 stream 2" }
+  network.dhcp: { type: bool, description: "DHCP is on" }
+  network.ip_address: { type: string, description: "IPv4 address" }
+  network.netmask: { type: string, description: "IPv4 subnet mask" }
+  network.gateway: { type: string, description: "IPv4 default gateway" }
+  network.dns: { type: string, description: "DNS: auto or manual" }
+  network.dns_primary: { type: string, description: "Primary DNS server" }
+  network.dns_secondary: { type: string, description: "Secondary DNS server" }
+  network.ipv6_address: { type: string, description: "IPv6 address" }
+  network.http_port: { type: int, description: "HTTP port" }
+  network.active.ip_address: { type: string, description: "IPv4 address in use" }
+  network.active.netmask: { type: string, description: "IPv4 subnet mask in use" }
+  network.active.gateway: { type: string, description: "IPv4 gateway in use" }
+  tsl.index: { type: int, description: "TSL 5.0 display index" }
+  tsl.port: { type: int, description: "TSL 5.0 port" }
+  network.mdns_host_name: { type: string, description: "mDNS host name" }
+  clock.ntp: { type: bool, description: "The clock follows NTP" }
+  clock.ntp_from_dhcp: { type: bool, description: "The NTP server comes from DHCP" }
+  clock.ntp_server: { type: string, description: "NTP server address" }
+  clock.ntp_port: { type: int, description: "NTP port" }
+  clock.ntp_interval: { type: int, description: "NTP interval in hours" }
+  clock.year: { type: int, description: "Clock year" }
+  clock.month: { type: int, description: "Clock month" }
+  clock.day: { type: int, description: "Clock day" }
+  clock.hour: { type: int, description: "Clock hour" }
+  clock.minute: { type: int, description: "Clock minute" }
+  clock.second: { type: int, description: "Clock second" }
+  clock.timezone: { type: int, description: "Time zone number" }
+  clock.display: { type: bool, description: "The clock is shown on screen" }
+  timecode_sei: { type: bool, description: "IP streams carry timecode SEI" }
+  st2110.enabled: { type: bool, description: "ST 2110 is enabled" }
+  st2110.port: { type: int, description: "ST 2110 port" }
+  st2110.video_tx.0.enabled: { type: bool, description: "ST 2110 video TX channel is enabled, by channel" }
+  st2110.video_tx.0.name: { type: string, description: "ST 2110 video TX channel name, by channel" }
+  st2110.video_tx.0.address: { type: string, description: "ST 2110 video TX destination, by channel" }
+  st2110.video_tx.0.port: { type: int, description: "ST 2110 video TX port, by channel" }
+  st2110.video_tx.1.enabled: { type: bool, description: "ST 2110 video TX channel is enabled, by channel" }
+  st2110.video_tx.1.name: { type: string, description: "ST 2110 video TX channel name, by channel" }
+  st2110.video_tx.1.address: { type: string, description: "ST 2110 video TX destination, by channel" }
+  st2110.video_tx.1.port: { type: int, description: "ST 2110 video TX port, by channel" }
+  st2110.video_tx.2.enabled: { type: bool, description: "ST 2110 video TX channel is enabled, by channel" }
+  st2110.video_tx.2.name: { type: string, description: "ST 2110 video TX channel name, by channel" }
+  st2110.video_tx.2.address: { type: string, description: "ST 2110 video TX destination, by channel" }
+  st2110.video_tx.2.port: { type: int, description: "ST 2110 video TX port, by channel" }
+  st2110.audio_tx.0.enabled: { type: bool, description: "ST 2110 audio TX channel is enabled, by channel" }
+  st2110.audio_tx.0.name: { type: string, description: "ST 2110 audio TX channel name, by channel" }
+  st2110.audio_tx.0.address: { type: string, description: "ST 2110 audio TX destination, by channel" }
+  st2110.audio_tx.0.port: { type: int, description: "ST 2110 audio TX port, by channel" }
+  st2110.audio_tx.1.enabled: { type: bool, description: "ST 2110 audio TX channel is enabled, by channel" }
+  st2110.audio_tx.1.name: { type: string, description: "ST 2110 audio TX channel name, by channel" }
+  st2110.audio_tx.1.address: { type: string, description: "ST 2110 audio TX destination, by channel" }
+  st2110.audio_tx.1.port: { type: int, description: "ST 2110 audio TX port, by channel" }
+  st2110.audio_tx.2.enabled: { type: bool, description: "ST 2110 audio TX channel is enabled, by channel" }
+  st2110.audio_tx.2.name: { type: string, description: "ST 2110 audio TX channel name, by channel" }
+  st2110.audio_tx.2.address: { type: string, description: "ST 2110 audio TX destination, by channel" }
+  st2110.audio_tx.2.port: { type: int, description: "ST 2110 audio TX port, by channel" }
+  st2110.video_rx.enabled: { type: bool, description: "ST 2110 return video receive is enabled" }
+  st2110.video_rx.multicast_address: { type: string, description: "ST 2110 return video multicast address" }
+  st2110.video_rx.source_address: { type: string, description: "ST 2110 return video source address" }
+  st2110.video_rx.port: { type: int, description: "ST 2110 return video port" }
+  st2110.video_rx.detect: { type: string, description: "Return video: undetected, detected or disable" }
+  st2110.video_rx.state: { type: string, description: "Return video state: No signal, Active, Active(ptp unlocked), Unsupported format, Packet loss" }
+  ptp.status: { type: string, description: "PTP status: locked, unlocked or not used" }
+  ptp.domain: { type: int, description: "PTP domain" }
+  ptp.grandmaster_id: { type: string, description: "PTP grandmaster identity" }
+  nmos.enabled: { type: bool, description: "NMOS is enabled" }
+  nmos.status: { type: string, description: "NMOS status as the camera words it" }
+  nmos.registry_address: { type: string, description: "NMOS registry address" }
+  nmos.registry_port: { type: int, description: "NMOS registry port" }
 
 telemetry:
   # Asked once on connecting; the camera pushes later changes as update
@@ -9285,6 +10119,19 @@ telemetry:
       - { models: [aw-ue20, aw-he20], method: GET, path: /cgi-bin/aw_cam, query: { cmd: "QVP:02", res: "1" } }
       - { models: [aw-ue20, aw-he20], method: GET, path: /cgi-bin/aw_cam, query: { cmd: "QVP:03", res: "1" } }
       - { models: [aw-ue20, aw-he20], method: GET, path: /cgi-bin/aw_cam, query: { cmd: "QVP:05", res: "1" } }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160, aw-ue4], method: GET, path: /cgi-bin/getinfo, query: { FILE: "1" } }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160, aw-ue20, aw-he20, aw-ue4], method: GET, path: /cgi-bin/get_basic }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160], method: GET, path: /cgi-bin/get_stream_mode }
+      - { models: [aw-ue20, aw-he20, aw-ue4], method: GET, path: /cgi-bin/get_priority_mode }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160, aw-ue20, aw-he20, aw-ue4], method: GET, path: /cgi-bin/get_rtmp_status }
+      - { models: [aw-ue100, aw-ue160], method: GET, path: /cgi-bin/get_srt_status }
+      - { models: [aw-ue100, aw-ue160], method: GET, path: /cgi-bin/get_ts_status }
+      - { models: [aw-ue100, aw-ue160, aw-ue20, aw-he20, aw-ue4], method: GET, path: /cgi-bin/get_ndi_hx_info }
+      - { models: [aw-ue100, aw-ue160], method: GET, path: /cgi-bin/get_ndi_info }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160], method: GET, path: /cgi-bin/get_audio }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160, aw-ue20, aw-he20, aw-ue4], method: GET, path: /cgi-bin/get_video_over_ip }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160], method: GET, path: /cgi-bin/get_rtsp }
+      - { models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160], method: GET, path: /cgi-bin/get_date_time }
   updates:
     - match: "^XSF:([1-9])$"
       state:
@@ -10942,6 +11789,606 @@ telemetry:
     - match: "^OVP:05:([0-7])$"
       state:
         "serial.camera_address": "{1}"
+    - path: "^/cgi-bin/getinfo(?:\\?|$)"
+      match: "(?m)^MAC\\s*=\\s*(.*?)\\s*$"
+      state:
+        "device.mac": "{1}"
+    - path: "^/cgi-bin/getinfo(?:\\?|$)"
+      match: "(?m)^SERIAL\\s*=\\s*(.*?)\\s*$"
+      state:
+        "device.serial": "{1}"
+    - path: "^/cgi-bin/getinfo(?:\\?|$)"
+      match: "(?m)^VERSION\\s*=\\s*(.*?)\\s*$"
+      state:
+        "device.version": "{1}"
+    - path: "^/cgi-bin/getinfo(?:\\?|$)"
+      match: "(?m)^NAME\\s*=\\s*(.*?)\\s*$"
+      state:
+        "device.name": "{1}"
+    - path: "^/cgi-bin/get_basic(?:\\?|$)"
+      match: "(?m)^cam_title\\s*=\\s*(.*?)\\s*$"
+      state:
+        "web.camera_title": "{1}"
+    - path: "^/cgi-bin/get_stream_mode(?:\\?|$)"
+      match: "(?m)^(?:stream|strean|priority)_mode\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.mode": "{1}"
+    - path: "^/cgi-bin/get_priority_mode(?:\\?|$)"
+      match: "(?m)^priority_mode\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.priority_mode": "{1}"
+    - path: "^/cgi-bin/get_rtmp_status(?:\\?|$)"
+      match: "(?m)^status\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.rtmp.active": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_rtmp_param(?:\\?|$)"
+      match: "(?m)^type\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.rtmp.key_in_url": { value: "{1}", map: { "0": true, "1": false } }
+    - path: "^/cgi-bin/get_rtmp_param(?:\\?|$)"
+      match: "(?m)^url\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.rtmp.url": "{1}"
+    - path: "^/cgi-bin/get_srt_status(?:\\?|$)"
+      match: "(?m)^status\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.active": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ts_status(?:\\?|$)"
+      match: "(?m)^status\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.ts.active": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_srt_info(?:\\?|$)"
+      match: "(?m)^mode\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.mode": { value: "{1}", map: { "0": "caller", "1": "listener" } }
+    - path: "^/cgi-bin/get_srt_info(?:\\?|$)"
+      match: "(?m)^dip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.destination": "{1}"
+    - path: "^/cgi-bin/get_srt_info(?:\\?|$)"
+      match: "(?m)^dport\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.destination_port": "{1}"
+    - path: "^/cgi-bin/get_srt_info(?:\\?|$)"
+      match: "(?m)^lport\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.listen_port": "{1}"
+    - path: "^/cgi-bin/get_srt_info(?:\\?|$)"
+      match: "(?m)^ttl\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.ttl": "{1}"
+    - path: "^/cgi-bin/get_srt_info(?:\\?|$)"
+      match: "(?m)^latency\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.latency": "{1}"
+    - path: "^/cgi-bin/get_srt_info(?:\\?|$)"
+      match: "(?m)^(?:encryption|encrtyption)\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.srt.encryption": { value: "{1}", map: { "0": "off", "1": "aes128", "2": "aes256" } }
+    - path: "^/cgi-bin/get_ts_udp_info(?:\\?|$)"
+      match: "(?m)^(?:transmission|transmisiion)\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.ts.multicast": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ts_udp_info(?:\\?|$)"
+      match: "(?m)^uni_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.ts.unicast_address": "{1}"
+    - path: "^/cgi-bin/get_ts_udp_info(?:\\?|$)"
+      match: "(?m)^uni_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.ts.unicast_port": "{1}"
+    - path: "^/cgi-bin/get_ts_udp_info(?:\\?|$)"
+      match: "(?m)^multi_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.ts.multicast_address": "{1}"
+    - path: "^/cgi-bin/get_ts_udp_info(?:\\?|$)"
+      match: "(?m)^multi_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.ts.multicast_port": "{1}"
+    - path: "^/cgi-bin/get_ts_udp_info(?:\\?|$)"
+      match: "(?m)^push\\s*=\\s*(.*?)\\s*$"
+      state:
+        "streaming.ts.push": { value: "{1}", map: { "0": true, "1": false } }
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^image_size\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.image_size": "{1}"
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^unicast_protocol\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.protocol": "{1}"
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^multicast_transmit\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.multicast": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^multicast_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.multicast_address": "{1}"
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^multicast_subnet\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.multicast_subnet": "{1}"
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^multicast_ttl\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.multicast_ttl": "{1}"
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^group_uses\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.use_groups": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^group_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.groups": "{1}"
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^server_uses\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.use_discovery_server": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^server_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.discovery_server": "{1}"
+    - path: "^/cgi-bin/get_ndi_hx_info(?:\\?|$)"
+      match: "(?m)^source_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi_hx.source_name": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^image_size\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.image_size": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^unicast_protocol\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.protocol": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^multicast_transmit\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.multicast": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^multicast_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.multicast_address": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^multicast_subnet\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.multicast_subnet": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^multicast_ttl\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.multicast_ttl": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^group_uses\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.use_groups": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^group_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.groups": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^server_uses\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.use_discovery_server": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^server_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.discovery_server": "{1}"
+    - path: "^/cgi-bin/get_ndi_info(?:\\?|$)"
+      match: "(?m)^source_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ndi.source_name": "{1}"
+    - path: "^/cgi-bin/get_audio(?:\\?|$)"
+      match: "(?m)^audio_transmit\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ip_audio.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_audio(?:\\?|$)"
+      match: "(?m)^audio_bitrate\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ip_audio.bitrate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_transmit_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.1.transmit": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_resolution_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.1.resolution": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_framerate_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.1.framerate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_bandwidth_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.1.bitrate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_unimulti_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.1.delivery": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_transmit_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.2.transmit": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_resolution_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.2.resolution": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_framerate_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.2.framerate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_bandwidth_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.2.bitrate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_unimulti_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.2.delivery": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_transmit_ch3\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.3.transmit": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_resolution_ch3\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.3.resolution": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_framerate_ch3\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.3.framerate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_bandwidth_ch3\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.3.bitrate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_unimulti_ch3\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.3.delivery": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_transmit_ch4\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.4.transmit": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_resolution_ch4\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.4.resolution": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_framerate_ch4\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.4.framerate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_bandwidth_ch4\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.4.bitrate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h264_unimulti_ch4\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h264.streams.4.delivery": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h265_transmit_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h265.streams.1.transmit": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h265_resolution_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h265.streams.1.resolution": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h265_framerate_ch1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h265.streams.1.framerate": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h265_transmit_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h265.streams.2.transmit": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h265_resolution_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h265.streams.2.resolution": "{1}"
+    - path: "^/cgi-bin/get_video_over_ip(?:\\?|$)"
+      match: "(?m)^h265_framerate_ch2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "h265.streams.2.framerate": "{1}"
+    - path: "^/cgi-bin/get_rtsp(?:\\?|$)"
+      match: "(?m)^rtsp_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "rtsp.port": "{1}"
+    - path: "^/cgi-bin/get_rtsp(?:\\?|$)"
+      match: "(?m)^h264_rtsp_req_uri1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "rtsp.h264_uri_1": "{1}"
+    - path: "^/cgi-bin/get_rtsp(?:\\?|$)"
+      match: "(?m)^h264_rtsp_req_uri2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "rtsp.h264_uri_2": "{1}"
+    - path: "^/cgi-bin/get_rtsp(?:\\?|$)"
+      match: "(?m)^h264_rtsp_req_uri3\\s*=\\s*(.*?)\\s*$"
+      state:
+        "rtsp.h264_uri_3": "{1}"
+    - path: "^/cgi-bin/get_rtsp(?:\\?|$)"
+      match: "(?m)^h264_rtsp_req_uri4\\s*=\\s*(.*?)\\s*$"
+      state:
+        "rtsp.h264_uri_4": "{1}"
+    - path: "^/cgi-bin/get_rtsp(?:\\?|$)"
+      match: "(?m)^h265_rtsp_req_uri1\\s*=\\s*(.*?)\\s*$"
+      state:
+        "rtsp.h265_uri_1": "{1}"
+    - path: "^/cgi-bin/get_rtsp(?:\\?|$)"
+      match: "(?m)^h265_rtsp_req_uri2\\s*=\\s*(.*?)\\s*$"
+      state:
+        "rtsp.h265_uri_2": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^ip4_dhcp\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.dhcp": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^ip4_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.ip_address": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^ip4_netmask\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.netmask": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^ip4_gateway\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.gateway": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^dns\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.dns": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^ip4_pri_server\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.dns_primary": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^ip4_sec_server\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.dns_secondary": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^ip6_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.ipv6_address": "{1}"
+    - path: "^/cgi-bin/get_network(?:\\?|$)"
+      match: "(?m)^port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.http_port": "{1}"
+    - path: "^/cgi-bin/get_active_network(?:\\?|$)"
+      match: "(?m)^ip4_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.active.ip_address": "{1}"
+    - path: "^/cgi-bin/get_active_network(?:\\?|$)"
+      match: "(?m)^ip4_netmask\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.active.netmask": "{1}"
+    - path: "^/cgi-bin/get_active_network(?:\\?|$)"
+      match: "(?m)^ip4_gateway\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.active.gateway": "{1}"
+    - path: "^/cgi-bin/get_tsl_info(?:\\?|$)"
+      match: "(?m)^index\\s*=\\s*(.*?)\\s*$"
+      state:
+        "tsl.index": "{1}"
+    - path: "^/cgi-bin/get_tsl_info(?:\\?|$)"
+      match: "(?m)^port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "tsl.port": "{1}"
+    - path: "^/cgi-bin/get_mdns_host(?:\\?|$)"
+      match: "(?m)^(?:index|host_name)\\s*=\\s*(.*?)\\s*$"
+      state:
+        "network.mdns_host_name": "{1}"
+    - path: "^/cgi-bin/get_time(?:\\?|$)"
+      match: "(?m)^time_adjust\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.ntp": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_time(?:\\?|$)"
+      match: "(?m)^ntp_addr_dhcp\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.ntp_from_dhcp": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_time(?:\\?|$)"
+      match: "(?m)^ntp_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.ntp_server": "{1}"
+    - path: "^/cgi-bin/get_time(?:\\?|$)"
+      match: "(?m)^ntp_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.ntp_port": "{1}"
+    - path: "^/cgi-bin/get_time(?:\\?|$)"
+      match: "(?m)^ntp_interval\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.ntp_interval": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^date_year\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.year": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^date_month\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.month": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^date_day\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.day": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^date_hour\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.hour": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^date_min\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.minute": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^date_sec\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.second": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^timezone\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.timezone": "{1}"
+    - path: "^/cgi-bin/get_date_time(?:\\?|$)"
+      match: "(?m)^display\\s*=\\s*(.*?)\\s*$"
+      state:
+        "clock.display": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_timecode_overlay(?:\\?|$)"
+      match: "(?m)^mode\\s*=\\s*(.*?)\\s*$"
+      state:
+        "timecode_sei": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_st2110_info(?:\\?|$)"
+      match: "(?m)^enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_st2110_info(?:\\?|$)"
+      match: "(?m)^port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.port": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch0_enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.0.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch0_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.0.name": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch0_ip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.0.address": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch0_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.0.port": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch1_enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.1.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch1_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.1.name": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch1_ip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.1.address": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch1_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.1.port": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch2_enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.2.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch2_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.2.name": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch2_ip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.2.address": "{1}"
+    - path: "^/cgi-bin/get_moip_video_tx(?:\\?|$)"
+      match: "(?m)^ch2_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_tx.2.port": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch0_enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.0.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch0_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.0.name": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch0_ip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.0.address": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch0_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.0.port": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch1_enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.1.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch1_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.1.name": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch1_ip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.1.address": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch1_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.1.port": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch2_enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.2.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch2_name\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.2.name": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch2_ip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.2.address": "{1}"
+    - path: "^/cgi-bin/get_moip_audio_tx(?:\\?|$)"
+      match: "(?m)^ch2_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.audio_tx.2.port": "{1}"
+    - path: "^/cgi-bin/get_moip_video_rx(?:\\?|$)"
+      match: "(?m)^ch0_enable\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_rx.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_moip_video_rx(?:\\?|$)"
+      match: "(?m)^ch0_multicast_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_rx.multicast_address": "{1}"
+    - path: "^/cgi-bin/get_moip_video_rx(?:\\?|$)"
+      match: "(?m)^ch0_source_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_rx.source_address": "{1}"
+    - path: "^/cgi-bin/get_moip_video_rx(?:\\?|$)"
+      match: "(?m)^ch0_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_rx.port": "{1}"
+    - path: "^/cgi-bin/get_moip_rx_state(?:\\?|$)"
+      match: "(?m)^video_rx_ch0_detect\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_rx.detect": "{1}"
+    - path: "^/cgi-bin/get_moip_rx_state(?:\\?|$)"
+      match: "(?m)^video_rx_ch0_state\\s*=\\s*(.*?)\\s*$"
+      state:
+        "st2110.video_rx.state": "{1}"
+    - path: "^/cgi-bin/get_ptp_info(?:\\?|$)"
+      match: "(?m)^status\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ptp.status": "{1}"
+    - path: "^/cgi-bin/get_ptp_info(?:\\?|$)"
+      match: "(?m)^domain\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ptp.domain": "{1}"
+    - path: "^/cgi-bin/get_ptp_info(?:\\?|$)"
+      match: "(?m)^grandmaster_id\\s*=\\s*(.*?)\\s*$"
+      state:
+        "ptp.grandmaster_id": "{1}"
+    - path: "^/cgi-bin/get_nmos_info(?:\\?|$)"
+      match: "(?m)^control\\s*=\\s*(.*?)\\s*$"
+      state:
+        "nmos.enabled": { value: "{1}", map: { "0": false, "1": true } }
+    - path: "^/cgi-bin/get_nmos_info(?:\\?|$)"
+      match: "(?m)^status\\s*=\\s*(.*?)\\s*$"
+      state:
+        "nmos.status": "{1}"
+    - path: "^/cgi-bin/get_nmos_info(?:\\?|$)"
+      match: "(?m)^rds_ip_addr\\s*=\\s*(.*?)\\s*$"
+      state:
+        "nmos.registry_address": "{1}"
+    - path: "^/cgi-bin/get_nmos_info(?:\\?|$)"
+      match: "(?m)^rds_port\\s*=\\s*(.*?)\\s*$"
+      state:
+        "nmos.registry_port": "{1}"
 
 quirks:
   - models: [all]
@@ -11117,3 +12564,29 @@ quirks:
       supported (OAS answers ER3). The scene numbers differ: AW-UE20/HE20 1 Scene1, 2 Scene2, 3 Full Auto;
       AW-UE4 1 Full Auto, 2 Shutter Priority, 3 Manual. The AW-UE4 answers #APC, #AXF and #AXI with fixed
       values and sets the iris to auto (ORS:1) always.
+
+  - models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160, aw-ue20, aw-he20, aw-ue4]
+    severity: warning
+    text: >
+      The Web settings (set_* CGIs, streaming and network) need administrator credentials: set the
+      credential type to digest (basic for older firmware) with the administrator. With the type none, or
+      a wrong user or password, the camera answers 401 and the connection reports the credential refused
+      until the settings change; camera control (aw_cam, aw_ptz) needs credentials only while user
+      authentication is on.
+
+  - models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160, aw-ue20, aw-he20, aw-ue4]
+    severity: critical
+    text: >
+      network_ipv4, network_ipv4_interface and http_port move the camera to another address or port, and
+      restart restarts it; the camera is unreachable at the old address until it is opened again. They
+      cannot be undone live.
+
+  - models: [aw-ue150, aw-ue155, aw-he145, aw-ue100, aw-ue160, aw-ue20, aw-he20, aw-ue4]
+    severity: info
+    text: >
+      The CGIs answer key=value lines; replies are read with path rules, one per key. Which CGIs and
+      values apply depends on the model and on its streaming or priority mode (an IP stream that the mode
+      does not allow is refused). The stream key, SRT passphrase and credentials are never kept in state.
+      Still pictures (/cgi-bin/camera, view.cgi), preset thumbnails and the MJPEG, H.264 and RTSP media
+      themselves are binary media the spec engine does not carry. None of these models records to SD
+      (getinfo reports SDrec disable).
