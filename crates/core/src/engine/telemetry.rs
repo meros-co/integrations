@@ -91,6 +91,11 @@ enum Matcher {
     /// The XML reply to an HTTP request whose path matches; every element
     /// named `element` is one match, its attributes the captures.
     HttpXml { path: Regex, element: String },
+    /// The text reply to an HTTP request whose path matches, matched by
+    /// `match`: the path's captures, then the text's, numbered on after
+    /// them. For CGI devices that answer `key=value` lines whose keys other
+    /// replies share (Panasonic's `status=1` from both RTMP and SRT).
+    HttpText { path: Regex, re: Regex },
 }
 
 /// One element `json_each` reaches: the element, its index in its array,
@@ -486,7 +491,12 @@ impl Telemetry {
             {
                 assigns.push(assign(path, v)?);
             }
-            let matcher = if let Some(m) = rule.get("match") {
+            let matcher = if let (Some(p), Some(m)) = (rule.get("path"), rule.get("match")) {
+                Matcher::HttpText {
+                    path: regex(p, "path")?,
+                    re: regex(m, "match")?,
+                }
+            } else if let Some(m) = rule.get("match") {
                 Matcher::Message {
                     re: regex(m, "match")?,
                     request: match rule.get("request_match") {
@@ -814,6 +824,31 @@ impl Telemetry {
                         }
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
+                }
+                (
+                    Matcher::HttpText {
+                        path: re,
+                        re: text_re,
+                    },
+                    Inbound::Http { path, body, .. },
+                ) => {
+                    let Some(caps) = re.captures(path) else {
+                        continue;
+                    };
+                    let Ok(text) = std::str::from_utf8(body) else {
+                        continue;
+                    };
+                    let Some(text_caps) = text_re.captures(text.trim_end()) else {
+                        continue;
+                    };
+                    let mut values = captures(&caps);
+                    let offset = caps.len() - 1;
+                    for (i, v) in captures(&text_caps) {
+                        let n: usize = i.parse().unwrap_or(0);
+                        values.push(((n + offset).to_string(), v));
+                    }
+                    self.clear(rule, &values, cleared);
+                    any |= self.matched(rule, &values, &mut patch, triggers);
                 }
                 (Matcher::HttpXml { path: re, element }, Inbound::Http { path, body, .. }) => {
                     let Some(caps) = re.captures(path) else {
@@ -1776,6 +1811,42 @@ mod tests {
             }),
             Some(json!({"stream": {"name": "CAM (1)"}, "rate": 42}))
         );
+    }
+
+    #[test]
+    fn a_text_reply_is_matched_with_its_path() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/cgi-bin/get_(rtmp|srt)_status$", "match": "(?m)^status\\s*=\\s*([01])$",
+                 "state": {"{1}.streaming": {"value": "{2}", "map": {"0": false, "1": true}}}},
+            ]})),
+            &state(json!({
+                "rtmp.streaming": {"type": "bool", "description": "x"},
+                "srt.streaming": {"type": "bool", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let reply = |path: &'static str, body: &'static [u8]| {
+            t.apply(&Inbound::Http {
+                path,
+                headers: &[],
+                body,
+                request: None,
+            })
+        };
+        assert_eq!(
+            reply("/cgi-bin/get_srt_status", b"status=1\r\n"),
+            Some(json!({"srt": {"streaming": true}}))
+        );
+        assert_eq!(
+            reply("/cgi-bin/get_rtmp_status", b"status = 0\r\n"),
+            Some(json!({"rtmp": {"streaming": false}}))
+        );
+        // The same text from another path is not this rule's, and a plain
+        // text message never reaches a path rule.
+        assert_eq!(reply("/cgi-bin/get_ts_status", b"status=1\r\n"), None);
+        assert_eq!(t.apply(&Inbound::Text("status=1")), None);
     }
 
     #[test]

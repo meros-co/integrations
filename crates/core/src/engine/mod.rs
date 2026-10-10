@@ -371,6 +371,25 @@ fn for_model(item: &Value, model: &str) -> bool {
     }
 }
 
+/// The telemetry with only the update rules for the device's model, when a
+/// rule names `models` (SPEC.md §8, "Rules per model"); `None` when every
+/// rule applies to every model, so the spec's own telemetry is used as it is.
+fn rules_for_model(telemetry: Option<&Value>, model: &str) -> Option<Value> {
+    let rules = telemetry?.get("updates")?.as_array()?;
+    if !rules.iter().any(|r| r.get("models").is_some()) {
+        return None;
+    }
+    let mut t = telemetry?.clone();
+    t["updates"] = Value::Array(
+        rules
+            .iter()
+            .filter(|r| for_model(r, model))
+            .cloned()
+            .collect(),
+    );
+    Some(t)
+}
+
 /// The websocket a spec on another transport takes pushed state from.
 #[derive(Debug)]
 struct Push {
@@ -1125,8 +1144,9 @@ impl SpecEngine {
             }
             Some(s) => Some(SessionSpec::parse(s, &ctx.model)?),
         };
+        let rules = rules_for_model(spec.telemetry.as_ref(), &ctx.model);
         let telemetry = telemetry::Telemetry::shared(
-            spec.telemetry.as_ref(),
+            rules.as_ref().or(spec.telemetry.as_ref()),
             &spec.state,
             spec.conversions.as_ref(),
         )?;
@@ -3599,6 +3619,29 @@ mod tests {
     /// A rule carrying only `replace` and the plain rule writing the values
     /// both match one reply, and the removal goes out first although the
     /// replacing rule comes second (Planning Center's items).
+    #[test]
+    fn update_rules_naming_models_apply_to_those_models_only() {
+        let t = json!({"poll": {"send": ["Q"]}, "updates": [
+            {"match": "^A$", "state": {}},
+            {"models": ["m1"], "match": "^B$", "state": {}},
+            {"models": ["m2", "m3"], "match": "^C$", "state": {}},
+        ]});
+        let matches = |model: &str| -> Vec<String> {
+            rules_for_model(Some(&t), model).unwrap()["updates"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| r["match"].as_str().unwrap().to_string())
+                .collect()
+        };
+        assert_eq!(matches("m1"), ["^A$", "^B$"]);
+        assert_eq!(matches("m3"), ["^A$", "^C$"]);
+        assert_eq!(rules_for_model(Some(&t), "m1").unwrap()["poll"], t["poll"]);
+        let plain = json!({"updates": [{"match": "^A$", "state": {}}]});
+        assert!(rules_for_model(Some(&plain), "m1").is_none());
+        assert!(rules_for_model(None, "m1").is_none());
+    }
+
     #[test]
     fn a_replace_only_rule_clears_before_its_neighbour_writes() {
         let spec = Catalog::source_tree()

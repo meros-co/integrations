@@ -924,9 +924,10 @@ to every model. This is decided from the model the device was opened as,
 before anything is sent, like `when_set` (§2), never from what the device
 says. It applies to the object messages of `send` (HTTP requests and OSC
 messages), telemetry `poll` and `subscribe` items, `on_connect` steps, the
-`probe` (a list whose first message for the model is used) and a session's
-`login`. `tools/validate.py` checks that every model a command `supports`
-has a message.
+`probe` (a list whose first message for the model is used), a session's
+`login` and telemetry `updates` rules (§8, "Rules per model").
+`tools/validate.py` checks that every model a command `supports` has a
+message, and that every model a message or rule names exists.
 
 ### OSC commands
 
@@ -1270,10 +1271,24 @@ offered to `path` rules, which match the request's path and query:
 | `path` + `json` + `json_match` | A JSON reply whose value at each JSON path matches its regex | the path's, then `json_match`'s, in order |
 | `path` + `json` + `request_match` | A JSON reply to a request whose JSON body matches | the path's, then `request_match`'s, then `json_match`'s |
 | `path` + `headers` | Any reply, JSON or not | `headers` names response header values, by header name in any case; with `json` too, both |
+| `path` + `match` | A text reply, by regex over the whole body | the path's, then the text's, numbered on after them |
 
 `request_match` is for protocols whose replies all arrive on one path and
 don't say what they answer, such as JSON-RPC: the rule looks at the request
 that the reply answers.
+
+A text reply is also offered to the plain `match` rules, which cannot tell
+which request it answers. Where replies to different requests share their
+words, `path` + `match` ties the rule to the request: Panasonic's
+`/cgi-bin/get_rtmp_status` and `/cgi-bin/get_srt_status` both answer
+`status=1`. `(?m)` lets `^` and `$` match at each line of a `key=value`
+reply:
+
+```yaml
+    - path: "^/cgi-bin/get_(rtmp|srt)_status$"
+      match: "(?m)^status\\s*=\\s*([01])\\s*$"
+      state: { "{1}.streaming": { value: "{2}", map: { "0": false, "1": true } } }
+```
 
 ```yaml
     - path: "^/$"
@@ -1316,6 +1331,26 @@ that shrinks (a tag list) is better kept whole, as JSON text.
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`, plus `request` (the JSON request body) for a `request_match` rule
 and `headers` (name to value) for a `headers` rule.
+
+#### Rules per model
+
+A family whose models give the same reply different meanings names the
+`models` a rule is for, as a message does (§4, "Messages per model"). The
+O.I.S. setting of a Panasonic AW-UE80 answers `OIS:2` for O.I.S. on pan and
+tilt, an AW-UE100 the same text for its hybrid stabiliser:
+
+```yaml
+    - models: [aw-ue80]
+      match: "^OIS:([0-2])$"
+      state: { "ois": { value: "{1}", map: { "0": "off", "1": "stable", "2": "pan_tilt" } } }
+    - models: [aw-ue100]
+      match: "^OIS:([0-3])$"
+      state: { "ois": { value: "{1}", map: { "0": "off", "1": "ois", "2": "hybrid_stable", "3": "hybrid_pan_tilt" } } }
+```
+
+A rule naming `models` is left out for any other model, decided from the
+model the device was opened as; one without applies to every model. A
+telemetry vector for such a rule gives the `model` to open the device as.
 
 #### Replies and what they answer
 

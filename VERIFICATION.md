@@ -991,9 +991,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## panasonic-ptz — Panasonic PTZ
 
-- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:4325](specs/panasonic-ptz.yaml#L4325))
-- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:4331](specs/panasonic-ptz.yaml#L4331))
-- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:4310](specs/panasonic-ptz.yaml#L4310))
+- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:12471](specs/panasonic-ptz.yaml#L12471))
+- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:12477](specs/panasonic-ptz.yaml#L12477))
+- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:12456](specs/panasonic-ptz.yaml#L12456))
+- [ ] Confirm the AW-UE155 answers the AW-UE150 command set (assumed from the shared firmware; there is no AW-UE155 interface specification). ([specs/panasonic-ptz.yaml:777](specs/panasonic-ptz.yaml#L777))
+- [ ] Confirm the AW-UE150 pan/tilt speed modes: the document lists 0 Normal (60 deg/s), 1 Fast (180), 2 Quick (60), where the other documents give 0 normal 60, 1 fast1 90, 2 fast2 180. ([specs/panasonic-ptz.yaml:9117](specs/panasonic-ptz.yaml#L9117))
+- [ ] Confirm what awb_color_temperature (OSJ:4A) takes on AW-UE150/HE145/UE100: the usage example sends OSJ:4A:0, the command column OSJ:4A:[Data1]:[Data2]. ([specs/panasonic-ptz.yaml:1780](specs/panasonic-ptz.yaml#L1780))
+- [ ] Confirm flip_detect_angle sends #FDA (the AW-UE150 usage example shows #SPF5A). ([specs/panasonic-ptz.yaml:5285](specs/panasonic-ptz.yaml#L5285))
+- [ ] Confirm the AW-UE160 scene and user file name commands take OSL:91:[file]:[30 hex digits] (the usage examples send 32 hex digits without a file number). ([specs/panasonic-ptz.yaml:7937](specs/panasonic-ptz.yaml#L7937))
+- [ ] Confirm the AW-UE160 takes the format code as two digits (OSA:87:01) and answers it the same way; the state rule accepts both. ([specs/panasonic-ptz.yaml:12551](specs/panasonic-ptz.yaml#L12551))
+- [ ] Confirm awb_color_temperature and color_temperature_bch on the AW-UE160 take a trailing :0 (OSJ:4A:007D0:0, OSL:2F:007D0:0 in the usage examples). ([specs/panasonic-ptz.yaml:6108](specs/panasonic-ptz.yaml#L6108))
+- [ ] Confirm OSD:3A answers 01 and 02 on the AW-UE160 both meaning on, as the document lists, and what ODT 2 means there. ([specs/panasonic-ptz.yaml:10303](specs/panasonic-ptz.yaml#L10303))
+- [ ] Confirm the AW-UE160 custom iris window corners are single digits (OSL:CD:0:0:8:4 in the usage example, 00h-08h in the table). ([specs/panasonic-ptz.yaml:6007](specs/panasonic-ptz.yaml#L6007))
+- [ ] Confirm SDR convert gain (OSI:43) takes every value from 74 to 80; the document lists 74 (-12 dB), 7B (-5 dB) and 80 (0 dB). ([specs/panasonic-ptz.yaml:7684](specs/panasonic-ptz.yaml#L7684))
+- [ ] Confirm the AW-UE20/HE20/UE4 #TAA reply: Data1 is the tally LED and Data3 the command tally; the state reads Data1 as tally.red. ([specs/panasonic-ptz.yaml:12559](specs/panasonic-ptz.yaml#L12559))
+- [ ] Confirm the streaming mode CGIs are set_stream_mode and get_stream_mode (the usage examples call set_priority_mode, and the AW-UE160 get reply is worded strean_mode). ([specs/panasonic-ptz.yaml:8371](specs/panasonic-ptz.yaml#L8371))
+- [ ] Confirm each set_* CGI accepts a single parameter (the documents list all of a CGI's parameters together; the usage examples send some alone). ([specs/panasonic-ptz.yaml:12584](specs/panasonic-ptz.yaml#L12584))
+- [ ] Confirm the Web CGIs of the AW-HE145 and AW-UE155 match the AW-UE150 supplement (only the AW-UE150 is documented). ([specs/panasonic-ptz.yaml:71](specs/panasonic-ptz.yaml#L71))
+- [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8476](specs/panasonic-ptz.yaml#L8476))
+- [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:107](specs/panasonic-ptz.yaml#L107))
 
 ## pjlink — PJLink
 

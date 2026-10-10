@@ -170,7 +170,12 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     let spec = catalog
         .device(spec_id)
         .ok_or(format!("unknown spec {spec_id}"))?;
-    let model = &spec.models[0];
+    // The model the device is opened as: the first, or the one the vector
+    // names for rules that apply to some models only (SPEC.md §8).
+    let model = match v.get("model").and_then(Value::as_str) {
+        Some(m) => spec.model(m).ok_or(format!("unknown model {m}"))?,
+        None => &spec.models[0],
+    };
     // Optional device settings, as for a command vector: a spec whose
     // telemetry names a required setting (the plan to follow) needs them.
     let settings = v
