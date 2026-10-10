@@ -51,6 +51,217 @@ telemetry(TD, "output-volume", inbound="XLR OUT5 volume: 50\r\n", expect_state={
 telemetry(TD, "output-delay", inbound="XLR OUT5 delay: 50ms\r\n", expect_state={"outputs": {"5": {"delay_ms": 50}}})
 telemetry(TD, "preset", inbound="Recall preset 1\r\n", expect_state={"preset": {"recalled": 1}})
 
+# Full control: every setting each model's API writes, and its read-back.
+td("set_master_mute_downtown", {"muted": True}, "set master mute 1", **DT)
+td("set_master_member", {"members": "11"}, "set master member <11>")
+td("clear_preset", {"preset": 1}, "set preset clear 1")
+td("set_preset_name", {"preset": 1, "name": "MeetingRoom 1"}, "set preset 1 name MeetingRoom 1", **DT)
+td("set_standby_mode", {"mode": 2}, "set standby 2")
+td("set_auto_standby", {"minutes": 10}, "set auto stb 10")
+td("step_input_gain", {"input": 1, "direction": "+", "step": 5.0}, "set input 1 gain+5.0")
+td("set_input_stereo", {"pair": 1, "state": "on"}, "set input 1 stereo on", **A30)
+td("set_input_eq_preset", {"input": 1, "preset": 2}, "set input 1 eq preset 2")
+td("set_input_eq_band_enabled", {"input": 1, "band": 0, "state": "on"}, "set input 1 eq 0 on")
+td("set_input_eq_stereo", {"pair": 1, "state": "on"}, "set input 1 eq stereo on")
+td("set_input_eq_band", {"input": 1, "band": 1, "type": 1, "frequency": 200, "gain": -12.5, "q": 0.7},
+   "set input 1 eq 1 typ 1 frq 200 val -12.5 q 0.70")
+td("clear_input_eq", {"input": 1}, "set input 1 eq clear")
+td("step_output_volume", {"output": 5, "direction": "-", "step": 5}, "set output 5 vol-5")
+td("set_output_stereo", {"pair": 1, "state": "on"}, "set output 1 stereo on", **A30)
+td("set_output_eq_preset", {"output": 1, "preset": 2}, "set output 1 eq preset 2")
+td("set_output_eq_band_enabled", {"output": 1, "band": 3, "state": "off"}, "set output 1 eq 3 off")
+td("set_output_eq_stereo", {"pair": 1, "state": "on"}, "set output 1 eq stereo on")
+td("set_output_eq_band", {"output": 1, "band": 2, "type": 4, "frequency": 1000, "gain": 3.0, "q": 1.4},
+   "set output 1 eq 2 typ 4 frq 1000 val 3.0 q 1.40")
+td("clear_output_eq", {"output": 1}, "set output 1 eq clear")
+td("copy_eq", {"from_kind": "input", "from": 1, "to_kind": "output", "to": 2}, "set input 1 eq copy to output 2")
+td("copy_output_eq", {"from": 1, "to": 2}, "set output 1 eq copy to 2", **A30)
+td("remove_output_route", {"output": 5, "source": 1}, "set output 5 remove from 1", **A30)
+td("set_mixer", {"mixer": 2, "levels": "-14 off -14 off"}, "set mixer 2 from <-14 off -14 off>", **A30)
+td("set_output_ducking", {"output": 2, "source": 1, "level": -9, "threshold": -12, "attack": 100, "hold": 1000,
+                          "release": 100}, "set output 2 duck on 1 lv -9 th -12 at 100 ht 1000 rt 100", **A30)
+td("set_output_ducking_off", {"output": 1}, "set output 1 duck off", **A30)
+td("set_amp_mode", {"mode": 2}, "set amp mode 2", **A30)
+td("set_front_key", {"state": "off"}, "set key off", **A30)
+td("set_lcd", {"mode": "15"}, "set lcd 15", **A30)
+td("set_id_led", {"mode": "on"}, "set idled on", **A30)
+td("set_trigger", {"mode": "on 1"}, "set trigger on 1", **A30)
+td("set_baud_rate", {"baud": "115200"}, "set rsb 115200", **A30)
+td("set_output_audio", {"mode": 2}, "set output 1 audio 2", **DT)
+td("set_output_hdcp", {"mode": 1}, "set output 1 hdcp 1", **DT)
+td("set_output_name", {"name": "Sony TV"}, "set output 1 name Sony TV", **DT)
+td("set_input_name", {"name": "MacBook"}, "set input 1 name MacBook", **DT)
+td("set_input_edid", {"edid": 1}, "set input 1 edid 1", **DT)
+_edid = " ".join(["00", "FF", "FF", "FF", "FF", "FF", "FF", "00"] + ["00"] * 120)
+td("set_user_edid", {"slot": 1, "data": _edid}, f"set user edid 1 <{_edid}>", **DT)
+td("get_edid_data", {"source": 1}, "get edid data 1", device_reply="HDMI input 1 EDID data\r\n",
+   expect_result={"ok": {"kind": "value", "value": "HDMI input 1 EDID data"}}, **DT)
+td("set_input_hdcp", {"enabled": True}, "set input 1 hdcp 1", **DT)
+td("set_pattern", {"resolution": 1, "pattern": 1}, "set pattern 1 1", **DT)
+td("set_master_include", {"output": 0}, "set master include 0", **DT)
+td("set_master_remove", {"output": 2}, "set master remove 2", **DT)
+td("set_upmixer", {"enabled": True}, "set upmixer 1", **DT)
+td("set_virtualizer", {"enabled": False}, "set virtualizer 0", **DT)
+td("set_audio_out_source", {"out": 1, "source": 2}, "set audio out 1 source 2", **DT)
+td("set_speaker_bass", {"out": 1, "speaker": 1, "enabled": True}, "set audio out 1 speaker 1 bass 1", **DT)
+td("set_speaker_delay", {"out": 1, "speaker": 1, "ms": 20}, "set audio out 1 speaker 1 delay 20", **DT)
+td("set_speaker_gain", {"out": 1, "speaker": 3, "gain": -6.5}, "set audio out 1 speaker 3 gain -6.5", **DT)
+td("set_speaker_mute", {"out": 2, "speaker": 1, "muted": True}, "set audio out 2 speaker 1 mute 1", **DT)
+td("reset_speakers", {"out": 1}, "set audio out 1 speaker reset", **DT)
+td("set_crossover", {"out": 1, "hz": 100}, "set audio out 1 crossover 100", **DT)
+td("set_downmix_include", {"out": 1, "downmix": 1, "channels": "10111010"},
+   "set audio out 1 downmix 1 include <10111010>", **DT)
+td("set_downmix_mono", {"out": 1, "downmix": 1, "enabled": True}, "set audio out 1 downmix 1 mono 1", **DT)
+td("set_speaker_eq_band_enabled", {"out": 1, "speaker": 1, "band": 1, "state": "on"},
+   "set audio out 1 speaker 1 eq 1 on", **DT)
+td("set_speaker_eq_band", {"out": 1, "speaker": 1, "band": 1, "type": 1, "frequency": 200, "gain": -15.0, "q": 0.02},
+   "set audio out 1 speaker 1 eq 1 typ 1 frq 200 val -15.0 q 0.02", **DT)
+td("clear_speaker_eq", {"out": 1, "speaker": 1}, "set audio out 1 speaker 1 eq clear", **DT)
+td("copy_speaker_eq", {"from_out": 1, "from_speaker": 1, "to_out": 2, "to_speaker": 2},
+   "set audio out 1 speaker 1 eq copy to 2 2", **DT)
+td("set_front_lock", {"locked": False}, "set front button 0", **DT)
+td("set_ir", {"enabled": True}, "set ir 1", **DT)
+td("set_baud", {"rate": 6}, "set baud 6", **DT)
+td("set_auto_event_report", {"enabled": True}, "set auto event report 1", **DT)
+td("set_network_ip_mode", {"network": "pri", "mode": 0}, "set pri ip mode 0")
+td("set_network_ip_address", {"network": "sec", "address": "192.168.1.100"}, "set sec ip addr 192.168.1.100")
+td("set_network_subnet", {"network": "pri", "mask": "255.255.255.0"}, "set pri subnet 255.255.255.0")
+td("set_network_gateway", {"network": "pri", "gateway": "192.168.1.1"}, "set pri gateway 192.168.1.1")
+td("set_ip_mode", {"mode": 1}, "set ip mode 1", **A30)
+td("set_ip_address", {"address": "192.168.1.100"}, "set ip addr 192.168.1.100", **A30)
+td("set_subnet", {"mask": "255.255.255.0"}, "set subnet 255.255.255.0", **A30)
+td("set_gateway", {"gateway": "192.168.1.1"}, "set gateway 192.168.1.1", **A30)
+td("set_tcp_port", {"port": 8000}, "set tcp/ip port 8000")
+td("set_telnet_port", {"port": 23}, "set telnet port 23")
+td("set_hostname", {"hostname": "Bridge-1"}, "set net hostname Bridge-1", **PH)
+td("net_reboot", {}, "set net reboot")
+
+
+def tdt(name, inbound, state, **extra):
+    telemetry(TD, name, inbound=inbound + "\r\n", expect_state=state, **extra)
+
+
+tdt("master-member", "Set master member: 11", {"master": {"member": "11"}})
+tdt("output-volume-step", "Increase XLR OUT5 volume: 51", {"outputs": {"5": {"volume": 51}}})
+tdt("input-phantom", "XLR IN3 phantom power: on", {"inputs": {"3": {"phantom": True}}})
+tdt("input-sensitivity", "XLR IN3 sensitivity: +24dBu", {"inputs": {"3": {"sensitivity": 1}}})
+tdt("output-level", "LINE OUT3 sensitivity: -18dBV", {"outputs": {"3": {"level": 5}}})
+tdt("input-eq-preset", "XLR IN1 PEQ: Custom1", {"inputs": {"1": {"eq": {"preset": 2}}}})
+tdt("input-eq", "XLR IN1 EQ all: on", {"inputs": {"1": {"eq": {"enabled": True}}}})
+tdt("output-eq-band", "LINE OUT1 EQ 4: off", {"outputs": {"1": {"eq": {"bands": {"4": {"enabled": False}}}}}})
+tdt("input-eq-band", "XLR IN2 EQ 1: on", {"inputs": {"2": {"eq": {"bands": {"1": {"enabled": True}}}}}})
+tdt("output-eq-preset", "Speaker Out CH1 PEQ: Flat", {"outputs": {"5": {"eq": {"preset": 1}}}})
+tdt("output-eq", "XLR OUT1 EQ: off", {"outputs": {"1": {"eq": {"enabled": False}}}})
+tdt("input-eq-stereo", "XLR IN1/2 EQ stereo mode: on",
+    {"inputs": {"1": {"eq": {"stereo": True}}, "2": {"eq": {"stereo": True}}}})
+tdt("output-eq-stereo", "LINE OUT3/4 EQ stereo mode: off",
+    {"outputs": {"3": {"eq": {"stereo": False}}, "4": {"eq": {"stereo": False}}}})
+tdt("amp-output-eq-stereo", "Line Out CH1/2 EQ stereo mode: on",
+    {"outputs": {"3": {"eq": {"stereo": True}}, "4": {"eq": {"stereo": True}}}})
+tdt("amp-output-stereo", "Speaker Out 1/2 stereo mode: on",
+    {"outputs": {"5": {"stereo": True}, "6": {"stereo": True}}})
+tdt("amp-input-stereo", "Mic/Line In CH1/2 stereo mode: off",
+    {"inputs": {"3": {"stereo": False}, "4": {"stereo": False}}})
+tdt("amp-input-gain", "Mic/Line In CH2 gain: -3.5dB", {"inputs": {"4": {"gain": -3.5}}})
+tdt("amp-input-mute", "Dante In CH1 mute: on", {"inputs": {"1": {"mute": True}}})
+tdt("amp-input-phantom", "Mic/Line In CH1 phantom power: on", {"inputs": {"3": {"phantom": True}}})
+tdt("amp-output-volume", "Speaker Out CH1 volume: 50", {"outputs": {"5": {"volume": 50}}})
+tdt("amp-output-mute", "Line Out CH2 mute: off", {"outputs": {"4": {"mute": False}}})
+tdt("amp-output-delay", "Dante Out CH2 delay: 20ms", {"outputs": {"2": {"delay_ms": 20}}})
+tdt("eq-band-setting", "XLR IN1 EQ : Type: 2, Frequency: 1000Hz, Value: 12dB, Q: 1.4",
+    {"inputs": {"1": {"eq": {"bands": {"3": {"type": 2, "frequency": 1000.0, "gain": 12.0, "q": 1.4}}}}}},
+    request="set input 1 eq 3 typ 2 frq 1000 val 12.0 q 1.40")
+tdt("amp-eq-band-setting", "Dante Out CH1 EQ 1: Type: 3, Frequency: 200Hz, Value: -18dB, Q: 0.02",
+    {"outputs": {"1": {"eq": {"bands": {"1": {"type": 3, "frequency": 200.0, "gain": -18.0, "q": 0.02}}}}}},
+    request="set output 1 eq 1 typ 3 frq 200 val -18.0 q 0.02")
+tdt("amp-from", "Speaker Out CH1 from: Dante In CH1", {"outputs": {"5": {"from": "Dante In CH1"}}})
+tdt("amp-ducking-off", "Dante Out CH1 ducking: off", {"outputs": {"1": {"ducking": {"enabled": False}}}})
+tdt("amp-ducking", "Dante Out CH2 ducking: Mic/Line In CH1, duck level: -9dB, threshold: -12dB, attack time: 100ms, "
+    "hold time: 1000ms, release time: 100ms",
+    {"outputs": {"2": {"ducking": {"enabled": True, "source": 1, "level": -9, "threshold": -12, "attack_ms": 100,
+                                   "hold_ms": 1000, "release_ms": 100}}}})
+tdt("amp-mixer", "Mixer 2: <-14 off -14 off>", {"mixers": {"2": {"levels": "-14 off -14 off"}}})
+tdt("amp-mode", "AMP power mode: PoE Class 0", {"amp_mode": "PoE Class 0"})
+tdt("amp-key", "Key: off", {"front_key": False})
+tdt("amp-lcd", "LCD light on 15s", {"lcd": "on 15s"})
+tdt("amp-id-led", "ID LED light always on", {"id_led": "always on"})
+tdt("amp-trigger", "Trigger on with high level", {"trigger": "high"})
+tdt("amp-trigger-off", "Trigger off", {"trigger": "off"})
+tdt("amp-baud", "Baud rate: 115200", {"baud": 115200})
+tdt("power", "Power: off", {"power": False})
+tdt("standby", "Standby mode: sleep", {"standby_mode": "sleep"})
+tdt("auto-standby", "Auto standby time: 10mins", {"auto_standby_min": 10})
+tdt("preset-downtown", "Preset 2: recall", {"preset": {"recalled": 2}})
+tdt("preset-name", "Preset 1 name: MeetingRoom 1", {"presets": {"1": {"name": "MeetingRoom 1"}}})
+tdt("front-button", "Button: locked", {"front_locked": True})
+tdt("ir", "IR: on", {"ir": True})
+tdt("baudrate", "Baudrate: 115200", {"baud": 115200})
+tdt("temperature", "65C", {"temperature_c": 65}, request="get temp")
+tdt("uptime", "000:00:13:04", {"uptime": "000:00:13:04"}, request="get uptime")
+tdt("auto-event", "Auto event report: on", {"auto_event_report": True})
+tdt("hdmi-name", "HDMI output 1 name: Sony TV", {"hdmi": {"output": {"name": "Sony TV"}}})
+tdt("hdmi-connected", "HDMI input 1: connected", {"hdmi": {"input": {"connected": True}}})
+tdt("hdmi-edid", "HDMI input 1 EDID: auto", {"hdmi": {"input": {"edid": "auto"}}})
+tdt("hdmi-input-hdcp", "HDMI input 1 HDCP: on", {"hdmi": {"input": {"hdcp": True}}})
+tdt("hdmi-output-hdcp", "HDMI output1 HDCP: auto (followsink)", {"hdmi": {"output": {"hdcp": "auto (followsink)"}}})
+tdt("hdmi-video", "HDMI output1 video: bypass", {"hdmi": {"output": {"video": "bypass"}}})
+tdt("hdmi-audio", "HDMI output 1 audio: bypass", {"hdmi": {"output": {"audio": "bypass"}}})
+tdt("pattern", "Pattern: 8K30Hz color bar", {"pattern": "8K30Hz color bar"})
+tdt("audio-source", "Audio source: HDMI input 1", {"audio_source": "HDMI input 1"})
+tdt("master-include", "Master include: all outputs", {"master": {"include": "all outputs"}})
+tdt("drc", "DRC: on", {"drc": "on"})
+tdt("upmixer", "Upmixer: on", {"upmixer": True})
+tdt("virtualizer", "Virtualizer: off", {"virtualizer": False})
+tdt("speaker-mode", "Speaker mode 1: 2.0CH", {"speaker_mode": 1, "speaker_layout": "2.0CH"})
+tdt("audio-out-source", "Line out source: active input", {"audio_out": {"Line": {"source": "active input"}}})
+tdt("crossover", "Dante out crossover: 100Hz", {"audio_out": {"Dante": {"crossover_hz": 100}}})
+tdt("downmix-include", "Line out downmix L: 10111010",
+    {"audio_out": {"Line": {"downmix": {"L": {"include": "10111010"}}}}})
+tdt("downmix-mono", "Line out downmixL mono: on", {"audio_out": {"Line": {"downmix": {"L": {"mono": True}}}}})
+tdt("speaker-bass", "Line out speaker L bass: on", {"audio_out": {"Line": {"speakers": {"L": {"bass": True}}}}})
+tdt("speaker-delay", "Line out speaker Ltm/DL delay: 20ms",
+    {"audio_out": {"Line": {"speakers": {"Ltm/DL": {"delay_ms": 20}}}}})
+tdt("speaker-gain", "Dante out speaker Sub gain: -3.5dB", {"audio_out": {"Dante": {"speakers": {"Sub": {"gain": -3.5}}}}})
+tdt("speaker-mute", "Line out speaker C mute: on", {"audio_out": {"Line": {"speakers": {"C": {"mute": True}}}}})
+tdt("speaker-eq-band", "Line out speaker L EQ 1: on",
+    {"audio_out": {"Line": {"speakers": {"L": {"eq": {"bands": {"1": {"enabled": True}}}}}}}})
+tdt("speaker-eq-setting", "Line out speaker L EQ 1 TYP 1 FRQ 200 VAL -18 Q 0.02",
+    {"audio_out": {"Line": {"speakers": {"L": {"eq": {"bands": {"1": {
+        "type": 1, "frequency": 200.0, "gain": -18.0, "q": 0.02}}}}}}}})
+tdt("primary-ip-mode", "Primary IP mode: DHCP", {"network": {"primary": {"ip_mode": "dhcp"}}})
+tdt("primary-ip", "Primary IP: 192.168.0.100", {"network": {"primary": {"ip": "192.168.0.100"}}})
+tdt("secondary-subnet", "Secondary Subnet Mask: 255.255.255.0", {"network": {"secondary": {"subnet": "255.255.255.0"}}})
+tdt("secondary-gateway", "Secondary Gateway: 192.168.1.1", {"network": {"secondary": {"gateway": "192.168.1.1"}}})
+tdt("primary-mac", "Primary MAC: 6C:DF:FB:0C:B3:8E", {"network": {"primary": {"mac": "6C:DF:FB:0C:B3:8E"}}})
+tdt("amp-ip", "IP: 192.168.62.106", {"network": {"primary": {"ip": "192.168.62.106"}}}, model="amp-30w")
+tdt("amp-ip-mode", "IP mode: Static", {"network": {"primary": {"ip_mode": "static"}}}, model="amp-30w")
+tdt("amp-subnet", "Subnet Mask: 255.255.255.0", {"network": {"primary": {"subnet": "255.255.255.0"}}}, model="amp-30w")
+tdt("amp-gateway", "Gateway: 192.168.1.1", {"network": {"primary": {"gateway": "192.168.1.1"}}}, model="amp-30w")
+tdt("amp-mac", "MAC: 6C:DF:FB:0C:83:8E", {"network": {"primary": {"mac": "6C:DF:FB:0C:83:8E"}}}, model="amp-30w")
+tdt("tcp-port", "TCP/IP port: 8000", {"network": {"tcp_port": 8000}})
+tdt("telnet-port", "Telnet port: 23", {"network": {"telnet_port": 23}})
+tdt("hostname", "Hostname: IP-Module-333", {"network": {"hostname": "IP-Module-333"}})
+# The two common reads queue each model's own reads.
+tdt("fast-reads", "Master volume: 50", {"master": {"volume": 50}}, request="get master vol", model="mineola-2x2",
+    expect_then_send=[x + "\r\n" for x in [
+        "get master mute", "get input 1 gain", "get input 1 mute", "get input 2 gain", "get input 2 mute",
+        "get output 1 vol", "get output 1 mute", "get output 2 vol", "get output 2 mute"]])
+tdt("fast-reads-downtown", "Master volume: 50", {"master": {"volume": 50}}, request="get master vol", model="downtown",
+    expect_then_send=[x + "\r\n" for x in [
+        "get master mute", "get audio source", "get input 1 connected", "get output 1 connected"]])
+tdt("slow-reads", "Power: on", {"power": True}, request="get power", model="mineola-2x2",
+    expect_then_send=[x + "\r\n" for x in [
+        "get standby", "get auto stb", "get master member",
+        "get input 1 sensitivity", "get input 1 phantom power", "get input 1 eq preset", "get input 1 eq",
+        "get input 2 sensitivity", "get input 2 phantom power", "get input 2 eq preset", "get input 2 eq",
+        "get input 1 eq stereo",
+        "get output 1 gain", "get output 1 delay", "get output 1 eq preset", "get output 1 eq",
+        "get output 2 gain", "get output 2 delay", "get output 2 eq preset", "get output 2 eq",
+        "get output 1 eq stereo",
+        "get pri ip mode", "get pri ip addr", "get pri subnet", "get pri gateway", "get pri mac addr",
+        "get sec ip mode", "get sec ip addr", "get sec subnet", "get sec gateway", "get sec mac addr",
+        "get tcp/ip port", "get telnet port"]])
+
 TB = "turtleav-bt-wallplate"
 
 

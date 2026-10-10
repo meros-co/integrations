@@ -1441,9 +1441,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-dante — Turtle AV Dante bridges, Downtown and 30W amplifier
 
-- [ ] Check the line ending (CR LF sent), that port 8000 is a raw socket with the same commands as Telnet 23, and that no login is asked. ([specs/turtleav-dante.yaml:429](specs/turtleav-dante.yaml#L429))
-- [ ] Check the real channel ranges and get type strings of Mineola 4x4, 8x8 and 16x16 (their manuals copy the 2x2's). ([specs/turtleav-dante.yaml:436](specs/turtleav-dante.yaml#L436))
-- [ ] Check the reply to an error, and Downtown's auto event report format. ([specs/turtleav-dante.yaml:444](specs/turtleav-dante.yaml#L444))
+- [ ] Check the line ending (CR LF sent), that port 8000 is a raw socket with the same commands as Telnet 23, and that no login is asked. ([specs/turtleav-dante.yaml:2550](specs/turtleav-dante.yaml#L2550))
+- [ ] Check the real channel ranges and get type strings of Mineola 4x4, 8x8 and 16x16 (their manuals copy the 2x2's), which the reads assume are 4, 8 and 16. ([specs/turtleav-dante.yaml:2576](specs/turtleav-dante.yaml#L2576))
+- [ ] Check the reply to an error, and Downtown's auto event report format. ([specs/turtleav-dante.yaml:2592](specs/turtleav-dante.yaml#L2592))
+- [ ] Check every model answers get master vol with Master volume: <n> and get power with Power: on or off, since those replies queue the model's other reads. ([specs/turtleav-dante.yaml:2540](specs/turtleav-dante.yaml#L2540))
+- [ ] Check set master member takes the digits in angle brackets (set master member <11>, as the examples show) and the reply's form. ([specs/turtleav-dante.yaml:217](specs/turtleav-dante.yaml#L217))
+- [ ] Record the reply to set input/output x eq y typ ...: one line (XLR IN1 EQ : Type: 2, ...) as read here, and the 30W amplifier's with the band. ([specs/turtleav-dante.yaml:2567](specs/turtleav-dante.yaml#L2567))
+- [ ] Record get input/output x eq on each model: one line for the channel or one per band, and how far the extra lines put later replies out of step. ([specs/turtleav-dante.yaml:2558](specs/turtleav-dante.yaml#L2558))
+- [ ] Check the Phoenix's phantom power and input sensitivity commands (in its manual, not on its front panel) and the Phoenix output level range 1-5. ([specs/turtleav-dante.yaml:344](specs/turtleav-dante.yaml#L344))
+- [ ] Record the 30W amplifier's LCD, ID LED and trigger replies (its manual is partly scanned; the 150W amplifier's wording is assumed) and whether set lcd 15 or set lcd on 15 is right. ([specs/turtleav-dante.yaml:637](specs/turtleav-dante.yaml#L637))
+- [ ] Record the 30W amplifier's ducking reply (the manual shows it with and without with) and get output x from with several sources. ([specs/turtleav-dante.yaml:595](specs/turtleav-dante.yaml#L595))
+- [ ] Check Downtown takes 1 and 0 for its master mute, upmixer and virtualizer, and the bare temperature and uptime replies. ([specs/turtleav-dante.yaml:2583](specs/turtleav-dante.yaml#L2583))
+- [ ] Check Downtown's TCP port command: set tcp/ip port 8000, or set tcp/ipport 8000 as its example shows. ([specs/turtleav-dante.yaml:1084](specs/turtleav-dante.yaml#L1084))
 
 ## turtleav-matrix — Turtle AV 4K60 video wall, matrix and multiviewer
 
