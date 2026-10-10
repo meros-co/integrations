@@ -425,3 +425,55 @@ _tf("channel-gate-sidechain-frequency", "/ch/9/gatesc/f", "1k0", 0.5, 1000.0, {"
 _tf("channel-gate-sidechain-q", "/ch/9/gatesc/q", "2.00", 0.4, 2.0, {"channels": {"9": {"gate": {"sidechain": {"q": 2.0}}}}})
 _ts("channel-gate-sidechain-source", "/ch/9/gatesc/src", "SELF", {"channels": {"9": {"gate": {"sidechain": {"source": "SELF"}}}}})
 _ts("channel-gate-sidechain-tap", "/ch/9/gatesc/tap", "IN", {"channels": {"9": {"gate": {"sidechain": {"tap": "IN"}}}}})
+
+# ── Channel filters, inserts and effects slots (p.47-66) ──────────────────
+for cmd, inp, leaf, wire in [("low_cut", {"enabled": True}, "flt/lc", ("i", 1)),
+                             ("low_cut_frequency", {"frequency_hz": 100.0}, "flt/lcf", ("f", 100.0)),
+                             ("low_cut_slope", {"slope": "24"}, "flt/lcs", ("s", "24")),
+                             ("high_cut", {"enabled": False}, "flt/hc", ("i", 0)),
+                             ("high_cut_frequency", {"frequency_hz": 10000.0}, "flt/hcf", ("f", 10000.0)),
+                             ("high_cut_slope", {"slope": "6"}, "flt/hcs", ("s", "6")),
+                             ("tool_filter", {"enabled": True}, "flt/tf", ("i", 1)),
+                             ("filter_model", {"model": "AP2"}, "flt/mdl", ("s", "AP2")),
+                             ("filter_tilt", {"tilt_db": 6.0}, "flt/tilt", ("f", 6.0))]:
+    binary(W, f"set_channel_{cmd}", {"channel": 11, **inp}, osc(f"/ch/11/{leaf}", wire))
+_ti("channel-low-cut", "/ch/11/flt/lc", 0, {"channels": {"11": {"filter": {"low_cut": False}}}})
+_tf("channel-low-cut-frequency", "/ch/11/flt/lcf", "100.2", 0.25, 100.0, {"channels": {"11": {"filter": {"low_cut_frequency": 100.0}}}})
+_ts("channel-low-cut-slope", "/ch/11/flt/lcs", "24", {"channels": {"11": {"filter": {"low_cut_slope": "24"}}}})
+_ti("channel-high-cut", "/ch/11/flt/hc", 1, {"channels": {"11": {"filter": {"high_cut": True}}}})
+_tf("channel-high-cut-frequency", "/ch/11/flt/hcf", "10k02", 0.9, 10000.0, {"channels": {"11": {"filter": {"high_cut_frequency": 10000.0}}}})
+_ts("channel-high-cut-slope", "/ch/11/flt/hcs", "12", {"channels": {"11": {"filter": {"high_cut_slope": "12"}}}})
+_ti("channel-tool-filter", "/ch/11/flt/tf", 0, {"channels": {"11": {"filter": {"tool": False}}}})
+_ts("channel-filter-model", "/ch/11/flt/mdl", "TILT", {"channels": {"11": {"filter": {"model": "TILT"}}}})
+_tf("channel-filter-tilt", "/ch/11/flt/tilt", "0.00", 0.5, 0.0, {"channels": {"11": {"filter": {"tilt": 0.0}}}})
+for stem, node in [("channel", "ch"), ("aux", "aux"), ("bus", "bus"), ("main", "main"), ("matrix", "mtx")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_insert1", {stem: 1, "enabled": True}, osc(f"/{node}/1/preins/on", ("i", 1)))
+    binary(W, f"set_{stem}_insert1_slot", {stem: 1, "slot": "FX16"}, osc(f"/{node}/1/preins/ins", ("s", "FX16")))
+    _ti(f"{stem}-insert1", f"/{node}/2/preins/on", 1, {P: {"2": {"inserts": {"pre": {"on": True}}}}})
+    _ts(f"{stem}-insert1-slot", f"/{node}/2/preins/ins", "FX3", {P: {"2": {"inserts": {"pre": {"slot": "FX3"}}}}})
+    _ts(f"{stem}-insert1-status", f"/{node}/2/preins/$stat", "OK", {P: {"2": {"inserts": {"pre": {"status": "OK"}}}}})
+    if stem != "aux":
+        binary(W, f"set_{stem}_insert2", {stem: 1, "enabled": False}, osc(f"/{node}/1/postins/on", ("i", 0)))
+        binary(W, f"set_{stem}_insert2_slot", {stem: 1, "slot": "NONE"}, osc(f"/{node}/1/postins/ins", ("s", "NONE")))
+        _ti(f"{stem}-insert2", f"/{node}/2/postins/on", 0, {P: {"2": {"inserts": {"post": {"on": False}}}}})
+        _ts(f"{stem}-insert2-slot", f"/{node}/2/postins/ins", "FX1", {P: {"2": {"inserts": {"post": {"slot": "FX1"}}}}})
+        _ts(f"{stem}-insert2-status", f"/{node}/2/postins/$stat", "N/A", {P: {"2": {"inserts": {"post": {"status": "N/A"}}}}})
+binary(W, "set_channel_insert2_mode", {"channel": 1, "mode": "AUTO_X"}, osc("/ch/1/postins/mode", ("s", "AUTO_X")))
+binary(W, "set_channel_insert2_weight", {"channel": 1, "weight_db": -12.0}, osc("/ch/1/postins/w", ("f", -12.0)))
+_ts("channel-insert2-mode", "/ch/3/postins/mode", "FX", {"channels": {"3": {"inserts": {"post": {"mode": "FX"}}}}})
+_tf("channel-insert2-weight", "/ch/3/postins/w", "0.0", 0.5, 0.0, {"channels": {"3": {"inserts": {"post": {"weight": 0.0}}}}})
+# Effects: the document's own example, a PIA in slot 1 and its 125 Hz band (p.26).
+binary(W, "set_fx_model", {"slot": 1, "model": "PIA"}, osc("/fx/1/mdl", ("s", "PIA")))
+binary(W, "set_fx_mix", {"slot": 16, "mix": 100.0}, osc("/fx/16/fxmix", ("f", 100.0)))
+binary(W, "set_fx_parameter", {"slot": 1, "parameter": 3, "value": 10.0}, osc("/fx/1/3", ("f", 10.0)))
+binary(W, "set_fx_parameter_text", {"slot": 2, "parameter": 40, "value": "ON"}, osc("/fx/2/40", ("s", "ON")))
+_ts("fx-model", "/fx/1/mdl", "NONE", {"fx": {"1": {"model": "NONE"}}})
+_tf("fx-mix", "/fx/1/fxmix", "100", 1.0, 100.0, {"fx": {"1": {"mix": 100.0}}})
+_tf("fx-parameter-float", "/fx/1/3", "10.0", 0.9233, 10.0, {"fx": {"1": {"parameters": {"3": {"text": "10.0", "value": 10.0}}}}})
+_ti("fx-parameter-int", "/fx/4/7", 2, {"fx": {"4": {"parameters": {"7": {"text": "2", "value": 2.0}}}}})
+_ts("fx-parameter-text", "/fx/4/8", "ON", {"fx": {"4": {"parameters": {"8": {"text": "ON"}}}}})
+_ti("fx-source", "/fx/2/$esrc", 12, {"fx": {"2": {"source": 12}}})
+_ts("fx-mode", "/fx/2/$emode", "ST", {"fx": {"2": {"mode": "ST"}}})
+_ti("fx-assigned-strip", "/fx/2/$a_chn", 5, {"fx": {"2": {"assigned_strip": 5}}})
+_ti("fx-assigned-position", "/fx/2/$a_pos", 1, {"fx": {"2": {"assigned_position": 1}}})
