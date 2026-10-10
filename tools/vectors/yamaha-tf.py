@@ -7,11 +7,95 @@ YTF = "yamaha-tf"
 def _ytf_vectors():
     S = YTF
     # (command base, RCP address, X (param, max) or None, Y (param, max) or None,
-    #  value kind, state path or None, set-only), transcribed from the document.
+    #  value kind, state path or None, set-only), transcribed from Yamaha's command list and the console's
+    #  own parameter list (prminfo answers, as the Companion module's schemas/TF Parameters-1.txt records them).
     rows = [
         ('input_fader_level', 'MIXER:Current/InCh/Fader/Level', ('channel', 40), None, ('level', 1000), 'inputs.{x}.fader_level', False),
         ('input_on', 'MIXER:Current/InCh/Fader/On', ('channel', 40), None, ('bool',), 'inputs.{x}.on', False),
         ('input_stereo_pan', 'MIXER:Current/InCh/ToSt/Pan', ('channel', 40), None, ('pan',), 'inputs.{x}.stereo_pan', False),
+        ('stereo_input_fader_level', 'MIXER:Current/StInCh/Fader/Level', ('stereo_input', 4), None, ('level', 1000), 'stereo_inputs.{x}.fader_level', False),
+        ('stereo_input_on', 'MIXER:Current/StInCh/Fader/On', ('stereo_input', 4), None, ('bool',), 'stereo_inputs.{x}.on', False),
+        ('stereo_input_stereo_pan', 'MIXER:Current/StInCh/ToSt/Pan', ('stereo_input', 4), None, ('pan',), 'stereo_inputs.{x}.stereo_pan', False),
+        ('fx_return_fader_level', 'MIXER:Current/FxRtnCh/Fader/Level', ('fx_return', 4), None, ('level', 1000), 'fx_returns.{x}.fader_level', False),
+        ('fx_return_on', 'MIXER:Current/FxRtnCh/Fader/On', ('fx_return', 4), None, ('bool',), 'fx_returns.{x}.on', False),
+        ('fx_return_stereo_pan', 'MIXER:Current/FxRtnCh/ToSt/Pan', ('fx_return', 4), None, ('pan',), 'fx_returns.{x}.stereo_pan', False),
+        ('dca_fader_level', 'MIXER:Current/DCA/Fader/Level', ('dca', 8), None, ('level', 1000), 'dcas.{x}.fader_level', False),
+        ('dca_on', 'MIXER:Current/DCA/Fader/On', ('dca', 8), None, ('bool',), 'dcas.{x}.on', False),
+        ('mix_fader_level', 'MIXER:Current/Mix/Fader/Level', ('mix', 20), None, ('level', 1000), 'mixes.{x}.fader_level', False),
+        ('mix_on', 'MIXER:Current/Mix/Fader/On', ('mix', 20), None, ('bool',), 'mixes.{x}.on', False),
+        ('mix_balance', 'MIXER:Current/Mix/Out/Balance', ('mix', 20), None, ('int', 'balance', -63, 63, '-63 (L63) to 63 (R63), 0 centre'), 'mixes.{x}.balance', False),
+        ('matrix_fader_level', 'MIXER:Current/Mtrx/Fader/Level', ('matrix', 4), None, ('level', 1000), 'matrices.{x}.fader_level', False),
+        ('matrix_on', 'MIXER:Current/Mtrx/Fader/On', ('matrix', 4), None, ('bool',), 'matrices.{x}.on', False),
+        ('stereo_fader_level', 'MIXER:Current/St/Fader/Level', ('stereo', 2), None, ('level', 1000), 'stereo.{x}.fader_level', False),
+        ('stereo_on', 'MIXER:Current/St/Fader/On', ('stereo', 2), None, ('bool',), 'stereo.{x}.on', False),
+        ('stereo_balance', 'MIXER:Current/St/Out/Balance', ('stereo', 2), None, ('int', 'balance', -63, 63, '-63 (L63) to 63 (R63), 0 centre'), 'stereo.{x}.balance', False),
+        ('mix_pan_link', 'MIXER:Current/Mix/PanLink', ('mix', 20), None, ('bool',), 'mixes.{x}.pan_link', False),
+        ('mono_fader_level', 'MIXER:Current/Mono/Fader/Level', None, None, ('level', 1000), 'mono.fader_level', False),
+        ('mono_on', 'MIXER:Current/Mono/Fader/On', None, None, ('bool',), 'mono.on', False),
+        ('mute_group_on', 'MIXER:Current/MuteMaster/On', ('mute_group', 6), None, ('bool',), 'mute_groups.{x}.on', False),
+        ('input_name', 'MIXER:Current/InCh/Label/Name', ('channel', 40), None, ('name', 64), 'inputs.{x}.name', False),
+        ('input_color', 'MIXER:Current/InCh/Label/Color', ('channel', 40), None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'inputs.{x}.color', False),
+        ('input_icon', 'MIXER:Current/InCh/Label/Icon', ('channel', 40), None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'inputs.{x}.icon', False),
+        ('input_category', 'MIXER:Current/InCh/Label/Category', ('channel', 40), None, ('text',), 'inputs.{x}.category', False),
+        ('stereo_input_name', 'MIXER:Current/StInCh/Label/Name', ('stereo_input', 4), None, ('name', 64), 'stereo_inputs.{x}.name', False),
+        ('stereo_input_color', 'MIXER:Current/StInCh/Label/Color', ('stereo_input', 4), None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'stereo_inputs.{x}.color', False),
+        ('stereo_input_icon', 'MIXER:Current/StInCh/Label/Icon', ('stereo_input', 4), None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'stereo_inputs.{x}.icon', False),
+        ('stereo_input_category', 'MIXER:Current/StInCh/Label/Category', ('stereo_input', 4), None, ('text',), 'stereo_inputs.{x}.category', False),
+        ('fx_return_name', 'MIXER:Current/FxRtnCh/Label/Name', ('fx_return', 4), None, ('name', 64), 'fx_returns.{x}.name', False),
+        ('fx_return_color', 'MIXER:Current/FxRtnCh/Label/Color', ('fx_return', 4), None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'fx_returns.{x}.color', False),
+        ('fx_return_icon', 'MIXER:Current/FxRtnCh/Label/Icon', ('fx_return', 4), None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'fx_returns.{x}.icon', False),
+        ('fx_return_category', 'MIXER:Current/FxRtnCh/Label/Category', ('fx_return', 4), None, ('text',), 'fx_returns.{x}.category', False),
+        ('dca_name', 'MIXER:Current/DCA/Label/Name', ('dca', 8), None, ('name', 64), 'dcas.{x}.name', False),
+        ('dca_color', 'MIXER:Current/DCA/Label/Color', ('dca', 8), None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'dcas.{x}.color', False),
+        ('dca_icon', 'MIXER:Current/DCA/Label/Icon', ('dca', 8), None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'dcas.{x}.icon', False),
+        ('dca_category', 'MIXER:Current/DCA/Label/Category', ('dca', 8), None, ('text',), 'dcas.{x}.category', False),
+        ('mix_name', 'MIXER:Current/Mix/Label/Name', ('mix', 20), None, ('name', 64), 'mixes.{x}.name', False),
+        ('mix_color', 'MIXER:Current/Mix/Label/Color', ('mix', 20), None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'mixes.{x}.color', False),
+        ('mix_icon', 'MIXER:Current/Mix/Label/Icon', ('mix', 20), None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'mixes.{x}.icon', False),
+        ('mix_category', 'MIXER:Current/Mix/Label/Category', ('mix', 20), None, ('text',), 'mixes.{x}.category', False),
+        ('matrix_name', 'MIXER:Current/Mtrx/Label/Name', ('matrix', 4), None, ('name', 64), 'matrices.{x}.name', False),
+        ('matrix_color', 'MIXER:Current/Mtrx/Label/Color', ('matrix', 4), None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'matrices.{x}.color', False),
+        ('matrix_icon', 'MIXER:Current/Mtrx/Label/Icon', ('matrix', 4), None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'matrices.{x}.icon', False),
+        ('matrix_category', 'MIXER:Current/Mtrx/Label/Category', ('matrix', 4), None, ('text',), 'matrices.{x}.category', False),
+        ('stereo_name', 'MIXER:Current/St/Label/Name', ('stereo', 2), None, ('name', 64), 'stereo.{x}.name', False),
+        ('stereo_color', 'MIXER:Current/St/Label/Color', ('stereo', 2), None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'stereo.{x}.color', False),
+        ('stereo_icon', 'MIXER:Current/St/Label/Icon', ('stereo', 2), None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'stereo.{x}.icon', False),
+        ('stereo_category', 'MIXER:Current/St/Label/Category', ('stereo', 2), None, ('text',), 'stereo.{x}.category', False),
+        ('mono_name', 'MIXER:Current/Mono/Label/Name', None, None, ('name', 64), 'mono.name', False),
+        ('mono_color', 'MIXER:Current/Mono/Label/Color', None, None, ('enum', ('Blue', 'Orange', 'Yellow', 'Purple', 'SkyBlue', 'Pink', 'Red', 'Green', 'Off')), 'mono.color', False),
+        ('mono_icon', 'MIXER:Current/Mono/Label/Icon', None, None, ('enum', ('Kick', 'Snare', 'Hi-Hat', 'FloorTom', 'Drumkit', 'Perc.', 'A.Bass', 'E.Bass', 'BassAmp', 'A.Guitar', 'E.Guitar', 'GuitarAmp', 'Trumpet', 'Trombone', 'Saxophone', 'Strings', 'Piano', 'Organ', 'Keyboard', 'Male', 'Female', 'Choir', 'DynamicMic', 'CondenserMic', 'WirelessMic', 'SpeechMic', 'Speaker', 'Wedge', 'In-Ear', 'Effect', 'Processor', 'Media1', 'Media2', 'Video', 'Mixer', 'PC', 'Audience', 'Star1', 'Star2', 'Blank')), 'mono.icon', False),
+        ('mono_category', 'MIXER:Current/Mono/Label/Category', None, None, ('text',), 'mono.category', False),
+        ('mute_group_name', 'MIXER:Current/MuteMaster/Label/Name', ('mute_group', 6), None, ('name', 8), 'mute_groups.{x}.name', False),
+        ('input_mix_send_level', 'MIXER:Current/InCh/ToMix/Level', ('channel', 40), ('mix', 20), ('level', 1000), 'inputs.{x}.mix_sends.{y}.level', False),
+        ('input_mix_send_on', 'MIXER:Current/InCh/ToMix/On', ('channel', 40), ('mix', 20), ('bool',), 'inputs.{x}.mix_sends.{y}.on', False),
+        ('input_mix_send_pan', 'MIXER:Current/InCh/ToMix/Pan', ('channel', 40), ('mix', 20), ('pan',), 'inputs.{x}.mix_sends.{y}.pan', False),
+        ('input_mix_send_pre', 'MIXER:Current/InCh/ToMix/PrePost', ('channel', 40), ('mix', 20), ('flag', 'pre', 'true = 1 (PRE), false = 0 (POST)'), 'inputs.{x}.mix_sends.{y}.pre', False),
+        ('input_fx_send_level', 'MIXER:Current/InCh/ToFx/Level', ('channel', 40), ('fx', 2), ('level', 1000), 'inputs.{x}.fx_sends.{y}.level', False),
+        ('input_fx_send_on', 'MIXER:Current/InCh/ToFx/On', ('channel', 40), ('fx', 2), ('bool',), 'inputs.{x}.fx_sends.{y}.on', False),
+        ('input_fx_send_pre', 'MIXER:Current/InCh/ToFx/PrePost', ('channel', 40), ('fx', 2), ('flag', 'pre', 'true = 1 (PRE), false = 0 (POST)'), 'inputs.{x}.fx_sends.{y}.pre', False),
+        ('input_mono_send_level', 'MIXER:Current/InCh/ToMono/Level', ('channel', 40), None, ('level', 1000), 'inputs.{x}.mono_send.level', False),
+        ('input_mono_send_on', 'MIXER:Current/InCh/ToMono/On', ('channel', 40), None, ('bool',), 'inputs.{x}.mono_send.on', False),
+        ('stereo_input_mix_send_level', 'MIXER:Current/StInCh/ToMix/Level', ('stereo_input', 4), ('mix', 20), ('level', 1000), 'stereo_inputs.{x}.mix_sends.{y}.level', False),
+        ('stereo_input_mix_send_on', 'MIXER:Current/StInCh/ToMix/On', ('stereo_input', 4), ('mix', 20), ('bool',), 'stereo_inputs.{x}.mix_sends.{y}.on', False),
+        ('stereo_input_mix_send_pan', 'MIXER:Current/StInCh/ToMix/Pan', ('stereo_input', 4), ('mix', 20), ('pan',), 'stereo_inputs.{x}.mix_sends.{y}.pan', False),
+        ('stereo_input_mix_send_pre', 'MIXER:Current/StInCh/ToMix/PrePost', ('stereo_input', 4), ('mix', 20), ('flag', 'pre', 'true = 1 (PRE), false = 0 (POST)'), 'stereo_inputs.{x}.mix_sends.{y}.pre', False),
+        ('stereo_input_fx_send_level', 'MIXER:Current/StInCh/ToFx/Level', ('stereo_input', 4), ('fx', 2), ('level', 1000), 'stereo_inputs.{x}.fx_sends.{y}.level', False),
+        ('stereo_input_fx_send_on', 'MIXER:Current/StInCh/ToFx/On', ('stereo_input', 4), ('fx', 2), ('bool',), 'stereo_inputs.{x}.fx_sends.{y}.on', False),
+        ('stereo_input_fx_send_pre', 'MIXER:Current/StInCh/ToFx/PrePost', ('stereo_input', 4), ('fx', 2), ('flag', 'pre', 'true = 1 (PRE), false = 0 (POST)'), 'stereo_inputs.{x}.fx_sends.{y}.pre', False),
+        ('stereo_input_mono_send_level', 'MIXER:Current/StInCh/ToMono/Level', ('stereo_input', 4), None, ('level', 1000), 'stereo_inputs.{x}.mono_send.level', False),
+        ('stereo_input_mono_send_on', 'MIXER:Current/StInCh/ToMono/On', ('stereo_input', 4), None, ('bool',), 'stereo_inputs.{x}.mono_send.on', False),
+        ('fx_return_mix_send_level', 'MIXER:Current/FxRtnCh/ToMix/Level', ('fx_return', 4), ('mix', 20), ('level', 1000), 'fx_returns.{x}.mix_sends.{y}.level', False),
+        ('fx_return_mix_send_on', 'MIXER:Current/FxRtnCh/ToMix/On', ('fx_return', 4), ('mix', 20), ('bool',), 'fx_returns.{x}.mix_sends.{y}.on', False),
+        ('fx_return_mix_send_pan', 'MIXER:Current/FxRtnCh/ToMix/Pan', ('fx_return', 4), ('mix', 20), ('pan',), 'fx_returns.{x}.mix_sends.{y}.pan', False),
+        ('fx_return_mix_send_pre', 'MIXER:Current/FxRtnCh/ToMix/PrePost', ('fx_return', 4), ('mix', 20), ('flag', 'pre', 'true = 1 (PRE), false = 0 (POST)'), 'fx_returns.{x}.mix_sends.{y}.pre', False),
+        ('fx_return_mono_send_level', 'MIXER:Current/FxRtnCh/ToMono/Level', ('fx_return', 4), None, ('level', 1000), 'fx_returns.{x}.mono_send.level', False),
+        ('fx_return_mono_send_on', 'MIXER:Current/FxRtnCh/ToMono/On', ('fx_return', 4), None, ('bool',), 'fx_returns.{x}.mono_send.on', False),
+        ('mix_matrix_send_level', 'MIXER:Current/Mix/ToMtrx/Level', ('mix', 20), ('matrix', 4), ('level', 1000), 'mixes.{x}.matrix_sends.{y}.level', False),
+        ('mix_matrix_send_on', 'MIXER:Current/Mix/ToMtrx/On', ('mix', 20), ('matrix', 4), ('bool',), 'mixes.{x}.matrix_sends.{y}.on', False),
+        ('stereo_matrix_send_level', 'MIXER:Current/St/ToMtrx/Level', ('stereo', 2), ('matrix', 4), ('level', 1000), 'stereo.{x}.matrix_sends.{y}.level', False),
+        ('stereo_matrix_send_on', 'MIXER:Current/St/ToMtrx/On', ('stereo', 2), ('matrix', 4), ('bool',), 'stereo.{x}.matrix_sends.{y}.on', False),
+        ('mono_matrix_send_level', 'MIXER:Current/Mono/ToMtrx/Level', None, ('matrix', 4), ('level', 1000), 'mono.matrix_sends.{y}.level', False),
+        ('mono_matrix_send_on', 'MIXER:Current/Mono/ToMtrx/On', None, ('matrix', 4), ('bool',), 'mono.matrix_sends.{y}.on', False),
     ]
 
     # Expected wire stated independently of the spec's templates: X and Y go
@@ -94,7 +178,31 @@ _ytf_explicit("text", "recall_scene", {"bank": "a", "scene": 0}, "ssrecall_ex sc
               device_reply="OK ssrecall_ex scene_a 0\n", expect_result={"ok": {"kind": "ack"}})
 _ytf_explicit("text", "get_current_scene", {"bank": "b"}, "sscurrent_ex scene_b\n",
               device_reply="ERROR sscurrent_ex InvalidArgument\n", expect_result={"error": {"error": "device_error"}})
-_ytf_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex scene_b 1\n", expect_state={"scenes": {"b": {"current": 1}}})
+# A pushed scene change re-reads what is read on connecting (DME7 spec p.10: a recall is not notified
+# parameter by parameter). Address and channel count of each, in the order they are read.
+_YTF_REREAD = [f"get MIXER:Current/{a} {x} 0\n" for a, n in (
+    ("InCh/Fader/Level", 40), ("InCh/Fader/On", 40), ("InCh/ToSt/Pan", 40), ("StInCh/Fader/Level", 4),
+    ("StInCh/Fader/On", 4), ("StInCh/ToSt/Pan", 4), ("FxRtnCh/Fader/Level", 4), ("FxRtnCh/Fader/On", 4),
+    ("FxRtnCh/ToSt/Pan", 4), ("DCA/Fader/Level", 8), ("DCA/Fader/On", 8), ("Mix/Fader/Level", 20), ("Mix/Fader/On", 20),
+    ("Mtrx/Fader/Level", 4), ("Mtrx/Fader/On", 4), ("St/Fader/Level", 2), ("St/Fader/On", 2), ("Mono/Fader/Level", 1),
+    ("Mono/Fader/On", 1), ("MuteMaster/On", 6), ("InCh/Label/Name", 40), ("InCh/Label/Color", 40),
+    ("StInCh/Label/Name", 4), ("StInCh/Label/Color", 4), ("FxRtnCh/Label/Name", 4), ("FxRtnCh/Label/Color", 4),
+    ("DCA/Label/Name", 8), ("DCA/Label/Color", 8), ("Mix/Label/Name", 20), ("Mix/Label/Color", 20),
+    ("Mtrx/Label/Name", 4), ("Mtrx/Label/Color", 4), ("St/Label/Name", 2), ("St/Label/Color", 2),
+    ("Mono/Label/Name", 1), ("Mono/Label/Color", 1), ("MuteMaster/Label/Name", 6),
+) for x in range(n)]
+_ytf_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex scene_b 1\n", expect_state={"scenes": {"b": {"current": 1}}},
+              expect_then_send=_YTF_REREAD)
+_ytf_explicit("telemetry", "scene-current-reply", inbound="OK sscurrent_ex scene_a 3 unmodified\n",
+              expect_state={"scenes": {"a": {"current": 3, "modified": False}}})
+# Scene step events: the console's scninfo list (MIXER:Lib/Scene/RecallInc, RecallDec); event form as Yamaha's DM7 document.
+_ytf_explicit("text", "recall_next_scene", {}, "event MIXER:Lib/Scene/RecallInc\n",
+              device_reply="OK event MIXER:Lib/Scene/RecallInc\n", expect_result={"ok": {"kind": "ack"}})
+# Scene store: the console's scninfo list names MIXER:Lib/Bank/Scene/Store; the command form is the Companion module's.
+_ytf_explicit("text", "store_scene", {"bank": "b", "scene": 7}, "ssupdate_ex scene_b 7\n",
+              device_reply="OK ssupdate_ex scene_b 7\n", expect_result={"ok": {"kind": "ack"}})
+_ytf_explicit("text", "recall_previous_scene", {},"event MIXER:Lib/Scene/RecallDec\n",
+              device_reply="OK event MIXER:Lib/Scene/RecallDec\n", expect_result={"ok": {"kind": "ack"}})
 _ytf_explicit("telemetry", "scene-modified", inbound="OK sscurrent_ex scene_a 3 unmodified\n",
               expect_state={"scenes": {"a": {"current": 3, "modified": False}}})
 _ytf_explicit("telemetry", "scene-recalled", inbound="OK ssrecall_ex scene_a 5\n", expect_state={"scenes": {"a": {"current": 5}}})
