@@ -1305,9 +1305,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-vr400uhd — Roland VR-400UHD
 
-- [ ] Confirm the password prompt (a line containing "Enter") and greeting, and record what a wrong password produces. ([specs/roland-vr400uhd.yaml:443](specs/roland-vr400uhd.yaml#L443))
-- [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:454](specs/roland-vr400uhd.yaml#L454))
-- [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:465](specs/roland-vr400uhd.yaml#L465))
+- [ ] Confirm the password prompt (a line containing "Enter") and greeting, and record what a wrong password produces. ([specs/roland-vr400uhd.yaml:556](specs/roland-vr400uhd.yaml#L556))
+- [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:567](specs/roland-vr400uhd.yaml#L567))
+- [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:580](specs/roland-vr400uhd.yaml#L580))
+- [ ] Confirm get answers every parameter of the command list (OUTPUT FADE, DSK, LOGO, transition, MIC and LINE channels, outputs, auto mixing, audio follow video, reverb) with its current value, in the ranges set takes. ([specs/roland-vr400uhd.yaml:419](specs/roland-vr400uhd.yaml#L419))
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 

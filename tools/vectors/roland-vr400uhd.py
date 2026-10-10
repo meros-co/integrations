@@ -52,7 +52,45 @@ telemetry(RV4, "program-scene", inbound="set,97,46,0,9\n",
           expect_state={"program": {"scene": 10}, "parameters": {"97-46-0": 9}})
 telemetry(RV4, "preset-scene", inbound="ack,97,46,1,0\n",
           expect_state={"preset": {"scene": 1}, "parameters": {"97-46-1": 0}})
-telemetry(RV4, "parameter", inbound="ack,97,140,3,-50\n",
-          expect_state={"parameters": {"97-140-3": -50}})
+telemetry(RV4, "parameter", inbound="ack,99,1,0,5\n",
+          expect_state={"parameters": {"99-1-0": 5}})
 telemetry(RV4, "version", inbound="ver,VR-400UHD,1.20\n",
           expect_state={"device": {"model": "VR-400UHD", "version": "1.20"}})
+
+# Every parameter of the command list (p.3), read with get and answered as a
+# set line, or acknowledged with the value set; 0-based wire numbers.
+def _rv4(name, line, state):
+    category, pid, sub, value = line.split(",")[1:]
+    telemetry(RV4, name, inbound=line + "\n",
+              expect_state={**state, "parameters": {f"{category}-{pid}-{sub}": int(value)}})
+
+
+_rv4("output-fade-pgm2", "set,97,25,1,1", {"programs": {"2": {"output_fade": True}}})
+_rv4("dsk", "set,97,79,0,1", {"dsk": True})
+_rv4("logo", "ack,97,63,0,0", {"logo": False})
+_rv4("transition-type", "set,97,48,0,1", {"transition": {"type": 1}})
+_rv4("wipe-pattern", "set,97,49,0,3", {"transition": {"wipe_pattern": 4}})
+_rv4("transition-time", "set,97,18,0,20", {"transition": {"time": 20}})
+_rv4("auto-transition", "set,97,19,0,1", {"transition": {"auto": True}})
+_rv4("mic-mute", "set,97,137,5,1", {"mics": {"6": {"mute": True}}})
+_rv4("mic-solo", "set,97,138,0,0", {"mics": {"1": {"solo": False}}})
+_rv4("mic-level", "set,97,139,2,100", {"mics": {"3": {"level": 100}}})
+_rv4("mic-pan", "ack,97,140,3,-50", {"mics": {"4": {"pan": -50}}})
+_rv4("mic-reverb", "set,97,141,1,64", {"mics": {"2": {"reverb_send": 64}}})
+_rv4("mic-usb", "set,97,143,4,1", {"mics": {"5": {"usb_send": True}}})
+_rv4("mic-aux", "set,97,144,0,127", {"mics": {"1": {"aux_send": 127}}})
+_rv4("mic-aux-post", "set,97,145,0,1", {"mics": {"1": {"aux_post": True}}})
+_rv4("line-mute", "set,97,171,3,1", {"lines": {"4": {"mute": True}}})
+_rv4("line-solo", "set,97,172,2,1", {"lines": {"3": {"solo": True}}})
+_rv4("line-level", "set,97,173,0,90", {"lines": {"1": {"level": 90}}})
+_rv4("line-pan", "set,97,174,1,25", {"lines": {"2": {"pan": 25}}})
+_rv4("line-reverb", "set,97,175,0,10", {"lines": {"1": {"reverb_send": 10}}})
+_rv4("line-usb", "set,97,177,2,0", {"lines": {"3": {"usb_send": False}}})
+_rv4("line-aux", "set,97,178,3,40", {"lines": {"4": {"aux_send": 40}}})
+_rv4("line-aux-post", "set,97,179,1,0", {"lines": {"2": {"aux_post": False}}})
+_rv4("output-mute", "set,97,180,0,1", {"outputs": {"1": {"mute": True}}})
+_rv4("output-solo", "set,97,181,1,0", {"outputs": {"2": {"solo": False}}})
+_rv4("output-level", "set,97,182,3,110", {"outputs": {"4": {"level": 110}}})
+_rv4("auto-mixing", "set,97,265,0,1", {"audio": {"auto_mixing": True}})
+_rv4("follow-video", "set,97,217,0,2", {"audio": {"follow_video": 2}})
+_rv4("reverb", "set,97,216,0,70", {"audio": {"reverb": 70}})

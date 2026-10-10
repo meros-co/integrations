@@ -8,7 +8,8 @@ category: switcher
 # "set,category,ID,sub-ID,value", "get,category,ID,sub-ID" and "ver", each
 # ended by LF, answered "ack,..." or "err,...". The Remote Control Guide lists
 # only set commands; get is documented in the command format for any
-# parameter, so it is offered as get_parameter.
+# parameter, so it is offered as get_parameter, and every parameter the
+# listed commands set is read with it into named state.
 source:
   - title: "VR-400UHD Remote Control Guide, edition 01 (© 2023, PDF dated 2023-06-20)"
     author: Roland Corporation
@@ -415,10 +416,32 @@ commands:
     returns: ack
 
 telemetry:
-  # No pushes are documented. The program and preset scenes are asked every
-  # second; every ack and set line also lands in state.
+  # No pushes are documented. get answers any parameter by its category, ID
+  # and sub-ID (p.2), so every parameter the commands here set is asked by
+  # name: on connecting and every ten seconds, and the program and preset
+  # scenes every second. A set is acknowledged with the value it set
+  # ("ack,..."), which lands in state too.
   subscribe:
-    send: ["ver"]
+    send: [
+      "ver", "get,97,25,0", "get,97,25,1", "get,97,79,0", "get,97,63,0", "get,97,48,0", "get,97,49,0",
+      "get,97,18,0", "get,97,19,0", "get,97,265,0", "get,97,217,0", "get,97,216,0", "get,97,137,0",
+      "get,97,137,1", "get,97,137,2", "get,97,137,3", "get,97,137,4", "get,97,137,5", "get,97,138,0",
+      "get,97,138,1", "get,97,138,2", "get,97,138,3", "get,97,138,4", "get,97,138,5", "get,97,139,0",
+      "get,97,139,1", "get,97,139,2", "get,97,139,3", "get,97,139,4", "get,97,139,5", "get,97,140,0",
+      "get,97,140,1", "get,97,140,2", "get,97,140,3", "get,97,140,4", "get,97,140,5", "get,97,141,0",
+      "get,97,141,1", "get,97,141,2", "get,97,141,3", "get,97,141,4", "get,97,141,5", "get,97,143,0",
+      "get,97,143,1", "get,97,143,2", "get,97,143,3", "get,97,143,4", "get,97,143,5", "get,97,144,0",
+      "get,97,144,1", "get,97,144,2", "get,97,144,3", "get,97,144,4", "get,97,144,5", "get,97,145,0",
+      "get,97,145,1", "get,97,145,2", "get,97,145,3", "get,97,145,4", "get,97,145,5", "get,97,171,0",
+      "get,97,171,1", "get,97,171,2", "get,97,171,3", "get,97,172,0", "get,97,172,1", "get,97,172,2",
+      "get,97,172,3", "get,97,173,0", "get,97,173,1", "get,97,173,2", "get,97,173,3", "get,97,174,0",
+      "get,97,174,1", "get,97,174,2", "get,97,174,3", "get,97,175,0", "get,97,175,1", "get,97,175,2",
+      "get,97,175,3", "get,97,177,0", "get,97,177,1", "get,97,177,2", "get,97,177,3", "get,97,178,0",
+      "get,97,178,1", "get,97,178,2", "get,97,178,3", "get,97,179,0", "get,97,179,1", "get,97,179,2",
+      "get,97,179,3", "get,97,182,0", "get,97,182,1", "get,97,182,2", "get,97,182,3", "get,97,181,0",
+      "get,97,181,1", "get,97,181,2", "get,97,181,3", "get,97,180,0", "get,97,180,1", "get,97,180,2",
+      "get,97,180,3"]
+    every_ms: 10000
   poll:
     send: ["get,97,46,0", "get,97,46,1"]
     every_ms: 1000
@@ -427,17 +450,104 @@ telemetry:
       state: { "program.scene": "{1:+1}" }
     - match: '^(?:ack|set),97,46,1,(\d+)$'
       state: { "preset.scene": "{1:+1}" }
+    - match: '^(?:ack|set),97,25,([01]),(-?\d+)$'
+      state: { "programs.{1:+1}.output_fade": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,79,0,(-?\d+)$'
+      state: { "dsk": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,63,0,(-?\d+)$'
+      state: { "logo": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,48,0,(-?\d+)$'
+      state: { "transition.type": "{1}" }
+    - match: '^(?:ack|set),97,49,0,(-?\d+)$'
+      state: { "transition.wipe_pattern": "{1:+1}" }
+    - match: '^(?:ack|set),97,18,0,(-?\d+)$'
+      state: { "transition.time": "{1}" }
+    - match: '^(?:ack|set),97,19,0,(-?\d+)$'
+      state: { "transition.auto": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,265,0,(-?\d+)$'
+      state: { "audio.auto_mixing": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,217,0,(-?\d+)$'
+      state: { "audio.follow_video": "{1}" }
+    - match: '^(?:ack|set),97,216,0,(-?\d+)$'
+      state: { "audio.reverb": "{1}" }
+    - match: '^(?:ack|set),97,137,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.mute": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,138,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.solo": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,139,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.level": "{2}" }
+    - match: '^(?:ack|set),97,140,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.pan": "{2}" }
+    - match: '^(?:ack|set),97,141,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.reverb_send": "{2}" }
+    - match: '^(?:ack|set),97,143,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.usb_send": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,144,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.aux_send": "{2}" }
+    - match: '^(?:ack|set),97,145,([0-5]),(-?\d+)$'
+      state: { "mics.{1:+1}.aux_post": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,171,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.mute": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,172,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.solo": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,173,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.level": "{2}" }
+    - match: '^(?:ack|set),97,174,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.pan": "{2}" }
+    - match: '^(?:ack|set),97,175,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.reverb_send": "{2}" }
+    - match: '^(?:ack|set),97,177,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.usb_send": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,178,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.aux_send": "{2}" }
+    - match: '^(?:ack|set),97,179,([0-3]),(-?\d+)$'
+      state: { "lines.{1:+1}.aux_post": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,182,([0-3]),(-?\d+)$'
+      state: { "outputs.{1:+1}.level": "{2}" }
+    - match: '^(?:ack|set),97,181,([0-3]),(-?\d+)$'
+      state: { "outputs.{1:+1}.solo": { value: "{2}", map: { "1": true, "0": false } } }
+    - match: '^(?:ack|set),97,180,([0-3]),(-?\d+)$'
+      state: { "outputs.{1:+1}.mute": { value: "{2}", map: { "1": true, "0": false } } }
     - match: '^(?:ack|set),(\d+),(\d+),(\d+),(-?\d+)$'
       state: { "parameters.{1}-{2}-{3}": "{4}" }
     - match: '^ver,([^,]+),(.+)$'
       state: { "device.model": "{1}", "device.version": "{2}" }
 
 state:
-  program.scene:  { type: int, description: "Program scene (PGM1 in DUAL mode), 1-64 for 1-1 to 8-8" }
-  preset.scene:   { type: int, description: "Preset scene (PGM2 in DUAL mode), 1-64 for 1-1 to 8-8" }
-  parameters.*:   { type: int, description: "Last value seen for a parameter, keyed category-ID-sub-ID as on the wire (97-46-0 is the program scene, 0-based)" }
-  device.model:   { type: string, description: "Model name from ver" }
-  device.version: { type: string, description: "Version from ver" }
+  program.scene:            { type: int, description: "Program scene (PGM1 in DUAL mode), 1-64 for 1-1 to 8-8" }
+  preset.scene:             { type: int, description: "Preset scene (PGM2 in DUAL mode), 1-64 for 1-1 to 8-8" }
+  programs.*.output_fade:   { type: bool, description: "OUTPUT FADE on: program 1 is PGM (PGM1 in DUAL mode), 2 is PGM2 in DUAL mode" }
+  dsk:                      { type: bool, description: "[DSK] button on" }
+  logo:                     { type: bool, description: "[LOGO] button on" }
+  transition.type:          { type: int, description: "Transition: 0 MIX, 1 WIPE" }
+  transition.wipe_pattern:  { type: int, description: "WIPE pattern, 1-4" }
+  transition.time:          { type: int, unit: "0.1 s", description: "Transition time, 0-20 tenths of a second" }
+  transition.auto:          { type: bool, description: "[AUTO TRANSITION] button on" }
+  mics.*.level:             { type: int, description: "MIC1-MIC6 channel volume, 0-127" }
+  mics.*.mute:              { type: bool, description: "MIC channel muted" }
+  mics.*.solo:              { type: bool, description: "MIC channel soloed" }
+  mics.*.pan:               { type: int, description: "MIC channel pan, -50 (L) to 50 (R)" }
+  mics.*.aux_send:          { type: int, description: "MIC channel AUX send level, 0-127" }
+  mics.*.aux_post:          { type: bool, description: "MIC channel AUX send post-fader (false: pre)" }
+  mics.*.reverb_send:       { type: int, description: "MIC channel reverb send level, 0-127" }
+  mics.*.usb_send:          { type: bool, description: "MIC channel sent to USB" }
+  lines.*.level:            { type: int, description: "Channel volume, 0-127: 1 LINE1, 2 LINE2, 3 HDMI, 4 USB" }
+  lines.*.mute:             { type: bool, description: "Channel muted" }
+  lines.*.solo:             { type: bool, description: "Channel soloed" }
+  lines.*.pan:              { type: int, description: "Channel pan, -50 (L) to 50 (R)" }
+  lines.*.aux_send:         { type: int, description: "Channel AUX send level, 0-127" }
+  lines.*.aux_post:         { type: bool, description: "Channel AUX send post-fader (false: pre)" }
+  lines.*.reverb_send:      { type: int, description: "Channel reverb send level, 0-127" }
+  lines.*.usb_send:         { type: bool, description: "Channel sent to USB" }
+  outputs.*.level:          { type: int, description: "Output volume, 0-127: 1 MAIN, 2 AUX, 3 USB, 4 HDMI" }
+  outputs.*.mute:           { type: bool, description: "Output muted" }
+  outputs.*.solo:           { type: bool, description: "Output soloed" }
+  audio.auto_mixing:        { type: bool, description: "Auto mixing on" }
+  audio.follow_video:       { type: int, description: "Audio follow video: 0 OFF, 1 VFA, 2 AFV" }
+  audio.reverb:             { type: int, description: "Reverb amount, 0-127" }
+  parameters.*:             { type: int, description: "Last value seen for any parameter, keyed category-ID-sub-ID as on the wire (97-46-0 is the program scene, 0-based), for those get_parameter reads" }
+  device.model:             { type: string, description: "Model name from ver" }
+  device.version:           { type: string, description: "Version from ver" }
 
 quirks:
   - models: [all]
@@ -458,9 +568,11 @@ quirks:
       A failed command is answered "err," followed by the command as sent.
       get is answered with the value as "set,category,ID,sub-ID,value" (p.2);
       the guide does not say whether an ack line accompanies it, and this
-      spec completes a get on its ack. If the mixer sends only the set line,
-      get_parameter and the scene poll time out, though the value still lands
-      in state.
+      spec completes a get on its ack (Bitfocus companion-module-roland-vr400uhd
+      also waits for an ack after each get). If the mixer sends only the set
+      line, get_parameter and every read time out, though the values still
+      land in state. About a hundred reads go every ten seconds, behind any
+      command; every value read also lands in parameters.*.
 
   - models: [all]
     severity: info
