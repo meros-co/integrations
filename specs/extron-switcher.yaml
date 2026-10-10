@@ -13,12 +13,19 @@ category: switcher
 # each model supports only the forms its own guide documents. Page numbers are
 # the guides' printed page numbers.
 #
+# Every setting a command here writes is read back into state: on connecting
+# (the part number query N is answered, and each family's rule then queues
+# that family's queries), from the tagged replies and change reports of
+# verbose mode 3, and by re-reads after an input switch, a preset recall and
+# an Auto-Image, which change settings the unit does not report one by one.
+#
 # Not here: EDID import/export and assignment, logos and audio files (file
-# names on the unit), CEC, serial port and IP settings, passwords, firmware,
-# backup/restore and resets (Esc ZXXX/ZQQQ/ZY reset settings or the network
-# and passwords), pixel-level analog input timing (HSRT, VSRT, PHAS, TPIX,
-# APIX, ALIN on IN1606/IN1608), DTP remote power and twisted-pair format
-# (wrong DTP2 power can damage a DTP endpoint, IN1808 guide p.80).
+# names on the unit), preset names, CEC, serial port and IP settings, unit
+# name, passwords, firmware, backup/restore and resets (Esc ZXXX/ZQQQ/ZY reset
+# settings or the network and passwords), pixel-level analog input timing
+# (HSRT, VSRT, PHAS, TPIX, APIX, ALIN on IN1606/IN1608), DTP remote power and
+# twisted-pair format (wrong DTP2 power can damage a DTP endpoint, IN1808
+# guide p.80).
 source:
   - title: "IN1806 and IN1808 Series Scaling Presentation Switchers User Guide, 68-3131-01 Rev. B"
     author: Extron Electronics
@@ -71,7 +78,8 @@ transport:
   reply: expected
   # Every response shape the commands here can get; the banner, its date line,
   # "Password:", "Login ...", "Reconfig" and "HplgO" never match.
-  reply_match: '^(E\d\d$|In|Vmt|Exe|Frz|Img|Cont|Brit|Hdet|Colr|Tint|Hctr|Vctr|Hsiz|Vsiz|Ximg|Rate|Vtpo|Psav|Swef|Aspr|Ausw|Afmt|Grpm|Ds[GMZ]|Knob|\dRpr|\dSpr|Prst|Pnam|Amem|Test|Hdcp|Lout|Vnam|Nmi|Nam|Mdur|Ssav|Play|Vrb|Ver|Bld|Pno|Inf|Vid|20Stat|Film|Typ|Vtyp|\d)'
+  # A bare value (a query answered in verbose mode 0 or 1 form) starts with a digit or a sign.
+  reply_match: '^(E\d\d$|In|Vmt|Exe|Frz|Img|Cont|Brit|Hdet|Colr|Tint|Hctr|Vctr|Hsiz|Vsiz|Ximg|Rate|Vtpo|Psav|Swef|Aspr|Ausw|Afmt|Anam|Alvl|Oscn|Grpm|Ds[GMZH]|Knob|\dRpr|\dSpr|Prst|Pnam|Amem|Test|Hdcp|Lout|Vnam|Nmi|Nam|Mdur|Ssav|Play|Vrb|Ver|Bld|Pno|Inf|Vid|20Stat|Film|Typ|Vtyp|\d|[-+]\d)'
   # Q (firmware version) keeps the Telnet session from timing out (5 minutes by default).
   probe: "Q"
 
@@ -116,7 +124,11 @@ models:
        get_switch_effect, get_signal_status, set_front_panel_lock, get_front_panel_lock,
        set_output_hdcp_mode, get_output_hdcp_mode, set_hdcp_notification, get_hdcp_notification,
        get_input_hdcp_status, get_output_hdcp_status, get_input_info, get_model_name, get_firmware,
-       get_firmware_full, get_part_number, get_temperature, set_verbose_mode, get_verbose_mode]
+       get_firmware_full, get_part_number, get_temperature, set_verbose_mode, get_verbose_mode,
+       set_auto_switch_priority, get_auto_switch_priority, get_input_video_format, set_screen_saver_mode,
+       get_screen_saver_mode, set_screen_saver_timeout, get_screen_saver_timeout, get_screen_saver_status,
+       get_phantom_power, set_dsp_embedded_gain, get_dsp_embedded_gain, set_audio_input_name,
+       get_audio_input_name, set_audio_output_name, get_audio_output_name]
     verification: none
     notes: >
       DisplayPort input 1, HDMI inputs 2-6, DTP2/XTP inputs 7 and 8 (IN1808 Series only), aux audio 9;
@@ -147,7 +159,10 @@ models:
        set_output_hdcp_mode_in1600, get_output_hdcp_mode_in1600, set_hdcp_notification_in1600,
        get_hdcp_notification_in1600, get_input_hdcp_status, get_output_hdcp_status, get_info_in1600,
        get_firmware, get_firmware_full, get_part_number, get_temperature, set_verbose_mode,
-       get_verbose_mode]
+       get_verbose_mode, set_input_video_format_in1600, get_input_video_format_in1600,
+       set_screen_saver_mode_in1600, get_screen_saver_mode_in1600, set_screen_saver_color_in1600,
+       set_screen_saver_timeout_in1600, get_screen_saver_timeout_in1600, get_screen_saver_status_in1600,
+       set_auto_image_threshold, get_auto_image_threshold, set_overscan, get_overscan]
     verification: none
     notes: >
       Inputs 1-6 (IN1606) or 1-8 (IN1608 Series), analog on inputs 1 and 2; outputs HDMI A (1), HDMI B (2)
@@ -457,6 +472,85 @@ commands:
     summary: Get the auto-input switch timeout in seconds (Esc TAUSW)
     send: "\x1bTAUSW"
     expect: { matches: '^(?:AuswT\s*)?0*(\d+)$' }
+    returns: value
+  set_auto_switch_priority:
+    summary: Set the user priority order for auto-input switching, every input once, highest first, such as "8 7 1 2 3 4 5 6" (Esc P... AUSW); E13 unless every input is given
+    params:
+      order: { type: string, pattern: '^[1-8]( [1-8]){5,7}$', required: true,
+               label: Priority order,
+               description: "Every input number once, separated by spaces, highest priority first: six on an IN1806, eight on an IN1808." }
+    send: "\x1bP{order}AUSW"
+    expect: { matches: '^AuswP\s*[1-8](?: [1-8])+$' }
+    returns: ack
+  get_auto_switch_priority:
+    summary: Get the user priority order, highest first, as space-separated input numbers (Esc PAUSW)
+    send: "\x1bPAUSW"
+    expect: { matches: '^(?:AuswP\s*)?([1-8](?: [1-8])+)$' }
+    returns: value
+  get_input_video_format:
+    summary: "Get the digital video format detected on an input: 0 no signal, 1 DVI, 2 HDMI, 3 DisplayPort (X!*\\)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+    send: "{input}*\\"
+    expect: { matches: '^(?:Vtyp\s*\d+\*)?([0-3])$' }
+    returns: value
+  set_input_video_format_in1600:
+    summary: "Set an input's video format: 1 RGB, 2 YUV, 3 RGBcvS, 4 S-video, 5 composite, 6 HDMI (X!*X#\\); analog formats on inputs 1 and 2"
+    params:
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      format: { type: int, min: 1, max: 6, required: true,
+                label: Video format,
+                description: "1 RGB, 2 YUV, 3 RGBcvS, 4 S-video, 5 composite, 6 HDMI (the default for inputs 3 and higher)." }
+    send: "{input}*{format}\\"
+    expect: { matches: '^Typ\s*\d+\s*\*\s*[1-6]$' }
+    returns: ack
+  get_input_video_format_in1600:
+    summary: Get an input's video format setting (X!\\)
+    params:
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+    send: "{input}\\"
+    expect: { matches: '^(?:Typ\s*\d+\s*\*\s*)?([1-6])$' }
+    returns: value
+  set_auto_image_threshold:
+    summary: Set the luminosity Auto-Image takes as active video, 0 black to 100 white (25 default) (Esc nALVL)
+    params:
+      level: { type: int, min: 0, max: 100, required: true,
+               label: Threshold,
+               description: "Luminosity Auto-Image takes as active video, from 0 (black) to 100 (white); 25 is the default." }
+    send: "\x1b{level}ALVL"
+    expect: { matches: '^Alvl\s*\d+$' }
+    returns: ack
+  get_auto_image_threshold:
+    summary: Get the Auto-Image threshold (Esc ALVL)
+    send: "\x1bALVL"
+    expect: { matches: '^(?:Alvl\s*)?0*(\d+)$' }
+    returns: value
+  set_overscan:
+    summary: "Set the overscan of an input video format (SMPTE rates only): 0 0%, 1 2.5%, 2 5% (Esc X#*nOSCN)"
+    params:
+      format: { type: int, min: 1, max: 6, required: true,
+                label: Video format,
+                description: "Input video format the overscan applies to: 1 RGB, 2 YUV, 3 RGBcvS, 4 S-video, 5 composite, 6 HDMI." }
+      overscan: { type: int, min: 0, max: 2, required: true,
+                  label: Overscan,
+                  description: "0 is 0% (default for RGB and HDMI), 1 is 2.5% (default for the others), 2 is 5%." }
+    send: "\x1b{format}*{overscan}OSCN"
+    expect: { matches: '^Oscn\s*[1-6]\s*\*\s*[0-2]$' }
+    returns: ack
+  get_overscan:
+    summary: Get the overscan of an input video format (Esc X#OSCN)
+    params:
+      format: { type: int, min: 1, max: 6, required: true,
+                label: Video format,
+                description: "Input video format: 1 RGB, 2 YUV, 3 RGBcvS, 4 S-video, 5 composite, 6 HDMI." }
+    send: "\x1b{format}OSCN"
+    expect: { matches: '^(?:Oscn\s*[1-6]\s*\*\s*)?([0-2])$' }
     returns: value
 
   # ── Picture (IN1808 p.66-68; IN1608 p.54-55, p.60) ──────────────────────
@@ -774,6 +868,81 @@ commands:
     send: "\x1bMDUR"
     expect: { matches: '^(?:Mdur\s*)?0*(\d+)$' }
     returns: value
+  set_screen_saver_mode:
+    summary: "Set what the output shows with no active input: 1 black, 2 blue with OSD text, 3 user image on black (Esc M1*nSSAV)"
+    params:
+      mode: { type: int, min: 1, max: 3, required: true,
+              label: Screen saver,
+              description: "What the output shows with no active input: 1 black screen, 2 blue screen with OSD text, 3 user image on black." }
+    send: "\x1bM1*{mode}SSAV"
+    expect: { matches: '^Ssav\s*M\s*1\s*\*\s*[1-3]$' }
+    returns: ack
+  get_screen_saver_mode:
+    summary: Get the screen saver mode (Esc M1SSAV)
+    send: "\x1bM1SSAV"
+    expect: { matches: '^(?:Ssav\s*M\s*1\s*\*\s*)?([1-3])$' }
+    returns: value
+  set_screen_saver_timeout:
+    summary: Set the seconds without an active input before output sync is disabled, 0 at once, 1-500, 501 never (Esc T1*nSSAV)
+    params:
+      seconds: { type: int, min: 0, max: 501, required: true,
+                 label: Sync timeout,
+                 description: "Seconds without an active input before output sync is disabled: 0 at once, 1 to 500, 501 never." }
+    send: "\x1bT1*{seconds}SSAV"
+    expect: { matches: '^Ssav\s*T\s*1\s*\*\s*\d+$' }
+    returns: ack
+  get_screen_saver_timeout:
+    summary: Get the screen saver timeout in seconds (Esc T1SSAV)
+    send: "\x1bT1SSAV"
+    expect: { matches: '^(?:Ssav\s*T\s*1\s*\*\s*)?0*(\d+)$' }
+    returns: value
+  get_screen_saver_status:
+    summary: "Get the screen saver status: 0 active input, 1 no input and the timer running, 2 timer expired and sync off (Esc S1SSAV)"
+    send: "\x1bS1SSAV"
+    expect: { matches: '^(?:Ssav\s*S\s*1\s*\*\s*)?([0-2])$' }
+    returns: value
+  set_screen_saver_mode_in1600:
+    summary: "Set what the outputs show with no active input: 0 the custom color, 1 black, 2 blue (Esc MnSSAV)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Screen saver,
+              description: "What the outputs show with no active input: 0 the custom color, 1 black, 2 blue." }
+    send: "\x1bM{mode}SSAV"
+    expect: { matches: '^Ssav\s*M\s*[0-2]$' }
+    returns: ack
+  get_screen_saver_mode_in1600:
+    summary: Get the screen saver mode (Esc MSSAV)
+    send: "\x1bMSSAV"
+    expect: { matches: '^(?:Ssav\s*M\s*)?([0-2])$' }
+    returns: value
+  set_screen_saver_color_in1600:
+    summary: Set the custom screen saver color as six hex digits, such as FF0000 for red (Esc ChexSSAV); the guide documents no query for it
+    params:
+      color: { type: string, pattern: '^[0-9A-Fa-f]{6}$', required: true,
+               label: Color,
+               description: "Custom screen saver color as HTML-style hexadecimal RGB, 000000 black to FFFFFF white." }
+    send: "\x1bC{color}SSAV"
+    expect: { matches: '^Ssav\s*C\s*[0-9A-Fa-f]{6}$' }
+    returns: ack
+  set_screen_saver_timeout_in1600:
+    summary: Set the seconds without an active input before output sync is disabled, 0 at once, 1-500, 501 never (Esc TnSSAV)
+    params:
+      seconds: { type: int, min: 0, max: 501, required: true,
+                 label: Sync timeout,
+                 description: "Seconds without an active input before output sync is disabled: 0 at once, 1 to 500, 501 never." }
+    send: "\x1bT{seconds}SSAV"
+    expect: { matches: '^Ssav\s*T\s*\d+$' }
+    returns: ack
+  get_screen_saver_timeout_in1600:
+    summary: Get the screen saver timeout in seconds (Esc TSSAV)
+    send: "\x1bTSSAV"
+    expect: { matches: '^(?:Ssav\s*T\s*)?0*(\d+)$' }
+    returns: value
+  get_screen_saver_status_in1600:
+    summary: "Get the screen saver status: 0 active input, 1 no input and the timer running, 2 timer expired and sync off (Esc SSSAV)"
+    send: "\x1bSSSAV"
+    expect: { matches: '^(?:Ssav\s*S\s*)?([0-2])$' }
+    returns: value
 
   # ── Presets (IN1808 p.74; IN1608 p.59) ──────────────────────────────────
   recall_input_preset:
@@ -976,6 +1145,78 @@ commands:
     send: "\x1bZ{oid}*{enabled:bool01}AU"
     expect: { matches: '^DsZ\s*\d+\*[01]$' }
     returns: ack
+  get_phantom_power:
+    summary: Get whether 48 V phantom power is on for mic/line input 1 (OID 40000) or 2 (40001) (Esc ZoidAU)
+    params:
+      oid: { type: enum, values: ["40000", "40001"], required: true,
+             label: Mic input,
+             description: "Mic/line input by object ID: 40000 is input 1, 40001 input 2." }
+    send: "\x1bZ{oid}AU"
+    expect: { matches: '^(?:DsZ\s*\d+\*)?([01])$' }
+    returns: value
+  set_dsp_embedded_gain:
+    summary: Set the gain of the embedded HDMI LPCM-2Ch audio on DTP input 7 (OIDs 30012, 30013) or 8 (30014, 30015), in tenths of a dB (Esc Hoid*nAU)
+    params:
+      oid: { type: enum, values: ["30012", "30013", "30014", "30015"], required: true,
+             label: Object ID,
+             description: "DTP input channel by object ID: 30012 and 30013 input 7, 30014 and 30015 input 8 (the guide's example takes 30012 as the right channel)." }
+      level: { type: int, min: -1000, max: 800, required: true,
+               label: Level,
+               description: "Gain in tenths of a dB, e.g. 120 for +12.0 dB; the block's own range applies." }
+    send: "\x1bH{oid}*{level}AU"
+    expect: { matches: '^DsH\s*\d+\*[-+]?\d+$' }
+    returns: ack
+  get_dsp_embedded_gain:
+    summary: Get the embedded audio gain of a DTP input channel in tenths of a dB (Esc HoidAU)
+    params:
+      oid: { type: enum, values: ["30012", "30013", "30014", "30015"], required: true,
+             label: Object ID,
+             description: "DTP input channel by object ID: 30012 and 30013 input 7, 30014 and 30015 input 8." }
+    send: "\x1bH{oid}AU"
+    expect: { matches: '^(?:DsH\s*\d+\*)?([-+]?\d+)$' }
+    returns: value
+  set_audio_input_name:
+    summary: Name an audio input, up to 32 characters; a single space restores the default (Esc IX$*name ANAM)
+    params:
+      input: { type: int, min: 1, max: 15, required: true,
+               label: Audio input,
+               description: "1 DP 1, 2-6 HDMI 2-6, 7-8 TP 7-8, 9 Aux In, 10-11 Mic/Line 1-2, 12-13 Line In 3-4, 14-15 File Playback L and R." }
+      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true,
+              label: Name,
+              description: "Name to give, without commas, asterisks or |; a single space restores the default." }
+    send: "\x1bI{input}*{name}ANAM"
+    expect: { matches: '^AnamI' }
+    returns: ack
+  get_audio_input_name:
+    summary: Get an audio input's name (Esc IX$ANAM)
+    params:
+      input: { type: int, min: 1, max: 15, required: true,
+               label: Audio input,
+               description: "1 DP 1, 2-6 HDMI 2-6, 7-8 TP 7-8, 9 Aux In, 10-11 Mic/Line 1-2, 12-13 Line In 3-4, 14-15 File Playback L and R." }
+    send: "\x1bI{input}ANAM"
+    expect: { matches: '^(?:AnamI\s*\d+\*)?(.*)$' }
+    returns: value
+  set_audio_output_name:
+    summary: Name an audio output, up to 32 characters; a single space restores the default (Esc OX%*name ANAM)
+    params:
+      output: { type: int, min: 1, max: 7, required: true,
+                label: Audio output,
+                description: "1 HDMI 1A, 2 TP 1B, 3 Over DTP Analog, 4-7 Line Out 1-4." }
+      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true,
+              label: Name,
+              description: "Name to give, without commas, asterisks or |; a single space restores the default." }
+    send: "\x1bO{output}*{name}ANAM"
+    expect: { matches: '^AnamO' }
+    returns: ack
+  get_audio_output_name:
+    summary: Get an audio output's name (Esc OX%ANAM)
+    params:
+      output: { type: int, min: 1, max: 7, required: true,
+                label: Audio output,
+                description: "1 HDMI 1A, 2 TP 1B, 3 Over DTP Analog, 4-7 Line Out 1-4." }
+    send: "\x1bO{output}ANAM"
+    expect: { matches: '^(?:AnamO\s*\d+\*)?(.*)$' }
+    returns: value
   set_volume_knob_group:
     summary: Choose what the front panel volume knob controls, 1 program, 3 mic or 8 output volume (Esc 1*nKNOB)
     params:
@@ -1262,7 +1503,8 @@ quirks:
       DSP object IDs (IN1808 guide p.88): line input gain 30000-30017 (two per input, DisplayPort 1 to aux),
       mic/line inputs 40000-40003, file player 40004-40005, output attenuation 60000-60011 (HDMI, DTP2/XTP/HDBT,
       DTP analog, line outputs 1-4, amplifier). Gains are in tenths of a dB within each block's range. DTP
-      inputs 7 and 8 take their embedded audio gain with H in place of G (p.92), which is not offered here.
+      inputs 7 and 8 take their embedded HDMI audio gain with H in place of G (p.92: set_dsp_embedded_gain),
+      G there being the over-DTP analog audio. Every OID listed is read on connecting.
   - models: [in1608-series]
     severity: info
     text: >
@@ -1292,6 +1534,24 @@ quirks:
   - models: [all]
     severity: info
     text: >
+      Every setting is read once on connecting, after the unit answers the part number query (N): about
+      225 queries on an IN1806/IN1808 and 140 on an IN1606/IN1608, one at a time behind any command, so the
+      state fills over a few seconds. get_part_number queues them again. An IN1806 or IN1606 is asked about
+      inputs 7 and 8 too and answers those with an error. After that, verbose mode 3's change reports keep
+      the state current; an input switch (IN1608 picture controls follow the current input), an input or
+      user preset recall and an Auto-Image are followed by a re-read of the picture and image settings they
+      change, which the unit does not report one by one.
+  - models: [in1608-series]
+    severity: info
+    text: >
+      API limits: the custom screen saver color (Esc C SSAV) has no query, so screen_saver.color holds the
+      color the unit last reported setting, from this or another connection, and is unknown until then.
+      The current-input picture queries (Esc CONT, BRIT, HDET, COLR, TINT) name no input; state takes their
+      values from the tagged replies of verbose mode 3 (Cont3*060), and a bare reply is not assigned. Detail,
+      image position and size, freeze, color and tint are readable for the current input only.
+  - models: [all]
+    severity: info
+    text: >
       Model-specific numbering: group masters are 1-10 on IN1808 and 1-8 on IN1608, with different meanings
       (see each model's notes), and HDCP status 1 and 2 mean the opposite on the two families (IN1808 guide
       p.79: 1 no HDCP, 2 HDCP; IN1608 guide p.61: 1 HDCP, 2 no HDCP). State keeps the numbers as sent.
@@ -1299,27 +1559,46 @@ quirks:
 state:
   device.model:                 { type: string, description: "Model from the copyright banner, such as IN1808 IPCP SA" }
   device.firmware:              { type: string, description: "Firmware version from the copyright banner" }
-  device.part_number:           { type: string, description: "Part number from the copyright banner, such as 60-1615-02" }
+  device.part_number:           { type: string, description: "Part number from the copyright banner or the N query, such as 60-1615-02" }
   device.login:                 { type: string, description: "Access level granted at login: Administrator or User" }
-  input:                      { type: int, description: "Input whose video and audio go to the output (In X! All), numbered from 1" }
+  input:                        { type: int, description: "Input whose video and audio go to the output (In X! All), numbered from 1" }
   video_input:                  { type: int, description: "Input whose video goes to the output, numbered from 1" }
   audio_input:                  { type: int, description: "Input whose audio goes to the output, numbered from 1; 9 is the IN1808 aux input" }
   loop_out_input:               { type: int, description: "Input on the IN1808 loop output" }
   outputs.*.video_mute:         { type: int, description: "Video mute of an output: 0 unmuted, 1 video muted to black, 2 video and sync muted" }
   outputs.*.name:               { type: string, description: "Output name (IN1808)" }
   outputs.*.hdcp_status:        { type: int, description: "Output HDCP status as the unit codes it (see quirks)" }
-  video_mute_all:               { type: int, description: "Mute last set on every output at once (0-2)" }
+  outputs.*.hdmi_format:        { type: int, description: "HDMI output format and colour space code, 0 auto (see set_hdmi_output_format)" }
+  outputs.*.hdcp_mode:          { type: int, description: "IN1808 output HDCP mode 0-4 (see set_output_hdcp_mode)" }
+  video_mute_all:               { type: int, description: "IN1608: 0 every output unmuted, 1 at least one muted, 2 at least one with sync off; either family: the mute last set on every output at once" }
   inputs.*.name:                { type: string, description: "Input name" }
   inputs.*.signal:              { type: bool, description: "Video signal present on the input" }
   inputs.*.audio_format:        { type: int, description: "Audio input format 0-5 (see set_audio_input_format)" }
   inputs.*.hdcp_status:         { type: int, description: "Input HDCP status as the unit codes it (see quirks)" }
   inputs.*.hdcp_authorized:     { type: bool, description: "HDCP content allowed on the input" }
   inputs.*.aspect_ratio:        { type: int, description: "1 fill, 2 follow" }
+  inputs.*.film_mode:           { type: bool, description: "3:2, 2:2 and 24:1 film mode detection on (auto)" }
+  inputs.*.auto_memory:         { type: bool, description: "Auto Memory on: per-signal input presets saved and recalled automatically" }
+  inputs.*.auto_image:          { type: bool, description: "IN1608: Auto-Image runs automatically on the input" }
+  inputs.*.detected_format:     { type: int, description: "IN1808: digital format detected on the input, 0 no signal, 1 DVI, 2 HDMI, 3 DisplayPort" }
+  inputs.*.video_format:        { type: int, description: "IN1608: the input's video format setting, 1 RGB, 2 YUV, 3 RGBcvS, 4 S-video, 5 composite, 6 HDMI" }
   inputs.*.contrast:            { type: int, description: "Contrast 0-127" }
   inputs.*.brightness:          { type: int, description: "Brightness 0-127" }
+  inputs.*.detail:              { type: int, description: "IN1608: detail filter 0-127" }
+  inputs.*.color:               { type: int, description: "IN1608: color level 0-127 (NTSC, PAL and SECAM inputs)" }
+  inputs.*.tint:                { type: int, description: "IN1608: tint 0-127 (NTSC inputs)" }
+  detail:                       { type: int, description: "IN1808: detail (sharpness) of the current input, 0-127" }
+  image.horizontal:             { type: int, unit: px, description: "Horizontal position of the scaled image; negative is left" }
+  image.vertical:               { type: int, unit: px, description: "Vertical position of the scaled image; negative is up" }
+  image.width:                  { type: int, unit: px, description: "Width of the scaled image" }
+  image.height:                 { type: int, unit: px, description: "Height of the scaled image" }
   groups.*.value:               { type: int, description: "Group master value as sent: tenths of a dB for a volume, bass or treble group, 0 or 1 for a mute group" }
   dsp.*.gain:                   { type: int, description: "Gain or attenuation of a DSP block, keyed by object ID, in tenths of a dB" }
   dsp.*.mute:                   { type: bool, description: "Mute of a DSP block, keyed by object ID" }
+  dsp.*.phantom_power:          { type: bool, description: "IN1808: 48 V phantom power on mic/line input 40000 or 40001" }
+  dsp.*.embedded_gain:          { type: int, description: "IN1808: embedded HDMI audio gain of a DTP input channel (30012-30015), in tenths of a dB" }
+  audio_inputs.*.name:          { type: string, description: "IN1808: audio input name, 1-15 as for set_audio_input_name" }
+  audio_outputs.*.name:         { type: string, description: "IN1808: audio output name, 1-7 as for set_audio_output_name" }
   freeze:                       { type: bool, description: "Output (IN1808) or current input (IN1608) frozen" }
   front_panel_lock:             { type: int, description: "Front panel lock mode (0 off)" }
   power_save:                   { type: int, description: "Power save mode (0 full power)" }
@@ -1327,74 +1606,388 @@ state:
   test_pattern:                 { type: int, description: "Test pattern code (0 off)" }
   switch_effect:                { type: int, description: "Switch effect code" }
   auto_switch_mode:             { type: int, description: "Auto-input switch mode (0 manual)" }
+  auto_switch_timeout:          { type: int, unit: s, description: "IN1808: seconds without video before auto-input switching moves on" }
+  auto_switch_priority:         { type: string, description: "IN1808: user priority order, input numbers highest first, separated by spaces" }
+  auto_image_threshold:         { type: int, description: "IN1608: luminosity Auto-Image takes as active video, 0-100" }
+  overscan.*:                   { type: int, description: "IN1608: overscan of an input video format (1-6), 0 0%, 1 2.5%, 2 5%" }
+  hdcp_mode:                    { type: int, description: "IN1608: HDCP mode of the HDMI outputs, 0-4 (see set_output_hdcp_mode_in1600)" }
+  hdcp_notification:            { type: int, description: "What a non-HDCP display shows for HDCP content: IN1808 0 black, 1 green screen, 2 user image; IN1608 0 black, 1 green screen" }
+  osd_duration:                 { type: int, unit: s, description: "Seconds the OSD menu (IN1808) or input bug (IN1608) shows; IN1608 0 never, 501 always" }
+  screen_saver.mode:            { type: int, description: "What the output shows with no active input: IN1808 1 black, 2 blue, 3 user image; IN1608 0 custom color, 1 black, 2 blue" }
+  screen_saver.timeout:         { type: int, unit: s, description: "Seconds without an active input before output sync is disabled; 501 never" }
+  screen_saver.status:          { type: int, description: "0 active input, 1 no input and the timer running, 2 timer expired and sync disabled" }
+  screen_saver.color:           { type: string, description: "IN1608: custom screen saver color as six hex digits, as the unit last reported it (no query exists)" }
+  volume_knob_group:            { type: int, description: "IN1608: group the front panel volume knob controls, 1 program, 3 mic, 8 output" }
   verbose_mode:                 { type: int, description: "Verbose mode 0-3 (3 set on connecting)" }
-  audio_playback_slot:          { type: int, description: "Audio file slot last reported playing (IN1808)" }
+  audio_playback_slot:          { type: int, description: "Audio file slot last reported playing (IN1808); 0 none" }
   audio_playing:                { type: bool, description: "The slot in audio_playback_slot is playing" }
 
 telemetry:
   # Verbose mode 3 (set on connecting) makes the unit report every change, from any source, in the
-  # tagged form of a reply, and tag the replies to queries, so the same rules read both. Signal
-  # presence is read once on connecting; changes to it are pushed (IN1808 guide p.53).
+  # tagged form of a reply, and tag the replies to queries, so the same rules read both. Rules with
+  # request_match also read a query's bare reply, tied to the query it answers. Signal presence is
+  # read on connecting, and changes to it are pushed (IN1808 guide p.53). N (the part number) is
+  # asked by both families; its reply queues the family's own queries for every other setting.
   poll:
-    send: ["\x1b0LS", "X", "\x1bPSAV"]
+    send: ["\x1b0LS", "X", "\x1bPSAV", "N"]
   updates:
     # The copyright banner sent on connecting (IN1808 guide p.52, IN1608 guide p.42).
     - match: '^\(c\) Copyright \d{4}, Extron Electronics,? (.+?), V(\d+\.\d+), (60-\d+-\d+)$'
       state: { device.model: "{1}", device.firmware: "{2}", device.part_number: "{3}" }
     - match: '^Login (Administrator|User)$'
       state: { device.login: "{1}" }
+    # Every setting the commands write, read on connecting: one query per setting, input, output,
+    # group and DSP block the family's guide documents.
+    - models: [in1808-series]
+      match: '^(?:Pno)?(60-\d+-\d+)$'
+      request_match: '^N$'
+      state: { device.part_number: "{1}" }
+      then_send: [
+        "1!", "1%", "1$", "\x1bLOUT", "\x1bI1VNAM", "\x1bE1HDCP", "\x1b1ASPR", "\x1b1FILM", "\x1b1CONT",
+        "\x1b1BRIT", "\x1b1AMEM", "\x1bI1AFMT", "\x1bI1HDCP", "1*\\", "\x1bI2VNAM", "\x1bE2HDCP", "\x1b2ASPR",
+        "\x1b2FILM", "\x1b2CONT", "\x1b2BRIT", "\x1b2AMEM", "\x1bI2AFMT", "\x1bI2HDCP", "2*\\", "\x1bI3VNAM",
+        "\x1bE3HDCP", "\x1b3ASPR", "\x1b3FILM", "\x1b3CONT", "\x1b3BRIT", "\x1b3AMEM", "\x1bI3AFMT",
+        "\x1bI3HDCP", "3*\\", "\x1bI4VNAM", "\x1bE4HDCP", "\x1b4ASPR", "\x1b4FILM", "\x1b4CONT", "\x1b4BRIT",
+        "\x1b4AMEM", "\x1bI4AFMT", "\x1bI4HDCP", "4*\\", "\x1bI5VNAM", "\x1bE5HDCP", "\x1b5ASPR", "\x1b5FILM",
+        "\x1b5CONT", "\x1b5BRIT", "\x1b5AMEM", "\x1bI5AFMT", "\x1bI5HDCP", "5*\\", "\x1bI6VNAM", "\x1bE6HDCP",
+        "\x1b6ASPR", "\x1b6FILM", "\x1b6CONT", "\x1b6BRIT", "\x1b6AMEM", "\x1bI6AFMT", "\x1bI6HDCP", "6*\\",
+        "\x1bI7VNAM", "\x1bE7HDCP", "\x1b7ASPR", "\x1b7FILM", "\x1b7CONT", "\x1b7BRIT", "\x1b7AMEM",
+        "\x1bI7AFMT", "\x1bI7HDCP", "7*\\", "\x1bI8VNAM", "\x1bE8HDCP", "\x1b8ASPR", "\x1b8FILM", "\x1b8CONT",
+        "\x1b8BRIT", "\x1b8AMEM", "\x1bI8AFMT", "\x1bI8HDCP", "8*\\", "\x1bI9AFMT", "\x1bO1VNAM", "1*B",
+        "\x1b1VTPO", "\x1bS1HDCP", "\x1bO1HDCP", "\x1bO2VNAM", "2*B", "\x1b2VTPO", "\x1bS2HDCP", "\x1bO2HDCP",
+        "\x1bO3VNAM", "3*B", "\x1b3VTPO", "\x1bS3HDCP", "\x1bO3HDCP", "\x1bAUSW", "\x1bTAUSW", "\x1bPAUSW",
+        "1F", "\x1b1HDET", "\x1b1XIMG", "\x1b1RATE", "\x1bMDUR", "\x1bM1SSAV", "\x1bT1SSAV", "\x1bS1SSAV",
+        "\x1b1TEST", "\x1bO1SWEF", "\x1bN1HDCP", "\x1bPLAY", "\x1bCV", "\x1bD1GRPM", "\x1bD2GRPM",
+        "\x1bD3GRPM", "\x1bD4GRPM", "\x1bD5GRPM", "\x1bD6GRPM", "\x1bD7GRPM", "\x1bD8GRPM", "\x1bD9GRPM",
+        "\x1bD10GRPM", "\x1bG30000AU", "\x1bG30001AU", "\x1bG30002AU", "\x1bG30003AU", "\x1bG30004AU",
+        "\x1bG30005AU", "\x1bG30006AU", "\x1bG30007AU", "\x1bG30008AU", "\x1bG30009AU", "\x1bG30010AU",
+        "\x1bG30011AU", "\x1bG30012AU", "\x1bG30013AU", "\x1bG30014AU", "\x1bG30015AU", "\x1bG30016AU",
+        "\x1bG30017AU", "\x1bG40000AU", "\x1bG40001AU", "\x1bG40002AU", "\x1bG40003AU", "\x1bG40004AU",
+        "\x1bG40005AU", "\x1bG60000AU", "\x1bG60001AU", "\x1bG60002AU", "\x1bG60003AU", "\x1bG60004AU",
+        "\x1bG60005AU", "\x1bG60006AU", "\x1bG60007AU", "\x1bG60008AU", "\x1bG60009AU", "\x1bG60010AU",
+        "\x1bG60011AU", "\x1bM30000AU", "\x1bM30001AU", "\x1bM30002AU", "\x1bM30003AU", "\x1bM30004AU",
+        "\x1bM30005AU", "\x1bM30006AU", "\x1bM30007AU", "\x1bM30008AU", "\x1bM30009AU", "\x1bM30010AU",
+        "\x1bM30011AU", "\x1bM30012AU", "\x1bM30013AU", "\x1bM30014AU", "\x1bM30015AU", "\x1bM30016AU",
+        "\x1bM30017AU", "\x1bM40000AU", "\x1bM40001AU", "\x1bM40002AU", "\x1bM40003AU", "\x1bM40004AU",
+        "\x1bM40005AU", "\x1bM60000AU", "\x1bM60001AU", "\x1bM60002AU", "\x1bM60003AU", "\x1bM60004AU",
+        "\x1bM60005AU", "\x1bM60006AU", "\x1bM60007AU", "\x1bM60008AU", "\x1bM60009AU", "\x1bM60010AU",
+        "\x1bM60011AU", "\x1bZ40000AU", "\x1bZ40001AU", "\x1bH30012AU", "\x1bH30013AU", "\x1bH30014AU",
+        "\x1bH30015AU", "\x1bI1ANAM", "\x1bI2ANAM", "\x1bI3ANAM", "\x1bI4ANAM", "\x1bI5ANAM", "\x1bI6ANAM",
+        "\x1bI7ANAM", "\x1bI8ANAM", "\x1bI9ANAM", "\x1bI10ANAM", "\x1bI11ANAM", "\x1bI12ANAM", "\x1bI13ANAM",
+        "\x1bI14ANAM", "\x1bI15ANAM", "\x1bO1ANAM", "\x1bO2ANAM", "\x1bO3ANAM", "\x1bO4ANAM", "\x1bO5ANAM",
+        "\x1bO6ANAM", "\x1bO7ANAM"]
+    - models: [in1608-series]
+      match: '^(?:Pno)?(60-\d+-\d+)$'
+      request_match: '^N$'
+      state: { device.part_number: "{1}" }
+      then_send: [
+        "!", "&", "$", "\x1b1NI", "1A", "\x1bE1HDCP", "\x1b1ASPR", "\x1b1FILM", "\x1b1AMEM", "\x1bI1AFMT",
+        "\x1bI1HDCP", "1\\", "\x1b2NI", "2A", "\x1bE2HDCP", "\x1b2ASPR", "\x1b2FILM", "\x1b2AMEM",
+        "\x1bI2AFMT", "\x1bI2HDCP", "2\\", "\x1b3NI", "3A", "\x1bE3HDCP", "\x1b3ASPR", "\x1b3FILM",
+        "\x1b3AMEM", "\x1bI3AFMT", "\x1bI3HDCP", "3\\", "\x1b4NI", "4A", "\x1bE4HDCP", "\x1b4ASPR",
+        "\x1b4FILM", "\x1b4AMEM", "\x1bI4AFMT", "\x1bI4HDCP", "4\\", "\x1b5NI", "5A", "\x1bE5HDCP",
+        "\x1b5ASPR", "\x1b5FILM", "\x1b5AMEM", "\x1bI5AFMT", "\x1bI5HDCP", "5\\", "\x1b6NI", "6A",
+        "\x1bE6HDCP", "\x1b6ASPR", "\x1b6FILM", "\x1b6AMEM", "\x1bI6AFMT", "\x1bI6HDCP", "6\\", "\x1b7NI",
+        "7A", "\x1bE7HDCP", "\x1b7ASPR", "\x1b7FILM", "\x1b7AMEM", "\x1bI7AFMT", "\x1bI7HDCP", "7\\",
+        "\x1b8NI", "8A", "\x1bE8HDCP", "\x1b8ASPR", "\x1b8FILM", "\x1b8AMEM", "\x1bI8AFMT", "\x1bI8HDCP",
+        "8\\", "\x1bCONT", "\x1bBRIT", "\x1bHDET", "\x1bCOLR", "\x1bTINT", "\x1bXIMG", "F", "1*B", "\x1b1VTPO",
+        "\x1bO1HDCP", "2*B", "\x1b2VTPO", "\x1bO2HDCP", "3*B", "\x1b3VTPO", "\x1bO3HDCP", "\x1bAUSW",
+        "\x1bRATE", "\x1bMDUR", "\x1bMSSAV", "\x1bTSSAV", "\x1bSSSAV", "\x1bTEST", "\x1bSWEF", "\x1bSHDCP",
+        "\x1bNHDCP", "\x1b1KNOB", "\x1bALVL", "\x1bCV", "\x1b1OSCN", "\x1b2OSCN", "\x1b3OSCN", "\x1b4OSCN",
+        "\x1b5OSCN", "\x1b6OSCN", "\x1bD1GRPM", "\x1bD2GRPM", "\x1bD3GRPM", "\x1bD4GRPM", "\x1bD5GRPM",
+        "\x1bD6GRPM", "\x1bD7GRPM", "\x1bD8GRPM", "\x1bG40100AU", "\x1bG40101AU", "\x1bG60000AU",
+        "\x1bG60002AU", "\x1bG60004AU", "\x1bG60005AU", "\x1bG60006AU", "\x1bG60007AU", "\x1bG60008AU",
+        "\x1bG60009AU", "\x1bM40000AU", "\x1bM40001AU", "\x1bM60000AU", "\x1bM60002AU", "\x1bM60004AU",
+        "\x1bM60005AU", "\x1bM60006AU", "\x1bM60007AU", "\x1bM60008AU", "\x1bM60009AU"]
+    # The IN1606/IN1608 picture controls, image and freeze follow the current input: read again
+    # after a switch. Both families: a preset recall or an Auto-Image changes the picture and image
+    # without reporting each setting.
+    - models: [in1608-series]
+      match: '^In\s*0*\d+\s*(?:All|RGB)$'
+      then_send: [
+        "\x1bCONT", "\x1bBRIT", "\x1bHDET", "\x1bCOLR", "\x1bTINT", "\x1bXIMG", "F"]
+    - models: [in1608-series]
+      match: '^(?:[12]Rpr\s*\d+|Img[0-2])$'
+      then_send: [
+        "\x1bCONT", "\x1bBRIT", "\x1bHDET", "\x1bCOLR", "\x1bTINT", "\x1bXIMG", "F"]
+    - models: [in1808-series]
+      match: '^(?:In\s*0*\d+\*1\s*(?:All|Vid)|Img1\*[0-2])$'
+      then_send: ["\x1b1HDET", "\x1b1XIMG"]
+    - models: [in1808-series]
+      match: '^2Rpr\s*\d+$'
+      then_send: [
+        "\x1b1HDET", "\x1b1XIMG", "\x1b1CONT", "\x1b1BRIT", "\x1b1FILM", "\x1b2CONT", "\x1b2BRIT", "\x1b2FILM",
+        "\x1b3CONT", "\x1b3BRIT", "\x1b3FILM", "\x1b4CONT", "\x1b4BRIT", "\x1b4FILM", "\x1b5CONT", "\x1b5BRIT",
+        "\x1b5FILM", "\x1b6CONT", "\x1b6BRIT", "\x1b6FILM", "\x1b7CONT", "\x1b7BRIT", "\x1b7FILM", "\x1b8CONT",
+        "\x1b8BRIT", "\x1b8FILM"]
     - match: '^In\s*0*(\d+)(?:\*1)?\s*All$'
       state: { input: "{1}", video_input: "{1}", audio_input: "{1}" }
     - match: '^In\s*0*(\d+)(?:\*1)?\s*(?:Vid|RGB)$'
       state: { video_input: "{1}" }
     - match: '^In\s*0*(\d+)(?:\*1)?\s*Aud$'
       state: { audio_input: "{1}" }
+    - match: '^0*(\d+)$'
+      request_match: '^1?!$'
+      state: { input: "{1}", video_input: "{1}", audio_input: "{1}" }
+    - match: '^0*(\d+)$'
+      request_match: '^(?:1%|&)$'
+      state: { video_input: "{1}" }
+    - match: '^0*(\d+)$'
+      request_match: '^1?\$$'
+      state: { audio_input: "{1}" }
+    - match: '^(?:Lout\s*)?0*(\d+)$'
+      request_match: '^\x1bLOUT$'
+      state: { loop_out_input: "{1}" }
     - match: '^Lout\s*0*(\d+)$'
       state: { loop_out_input: "{1}" }
     - match: '^Vmt\s*0*([1-3])\*([0-2])$'
       state: { "outputs.{1}.video_mute": "{2}" }
+    - match: '^([0-2])$'
+      request_match: '^([1-3])\*B$'
+      state: { "outputs.{2}.video_mute": "{1}" }
     - match: '^Vmt([0-2])$'
       state: { video_mute_all: "{1}" }
+    # IN1808: B answers one digit per output.
+    - match: '^(?:Vmt)?([0-2]) ([0-2]) ([0-2])$'
+      state: { outputs.1.video_mute: "{1}", outputs.2.video_mute: "{2}", outputs.3.video_mute: "{3}" }
     - match: '^VnamI\s*0*(\d+)\*(.*)$'
       state: { "inputs.{1}.name": "{2}" }
     - match: '^VnamO\s*0*(\d+)\*(.*)$'
       state: { "outputs.{1}.name": "{2}" }
     - match: '^Nmi\s*0*(\d+),(.*)$'
       state: { "inputs.{1}.name": "{2}" }
+    - match: '^AnamI\s*0*(\d+)\*(.*)$'
+      state: { "audio_inputs.{1}.name": "{2}" }
+    - match: '^AnamO\s*0*(\d+)\*(.*)$'
+      state: { "audio_outputs.{1}.name": "{2}" }
     - match: '^AfmtI\s*0*(\d+)\*([0-5])$'
       state: { "inputs.{1}.audio_format": "{2}" }
+    - match: '^([0-5])$'
+      request_match: '^\x1bI(\d+)AFMT$'
+      state: { "inputs.{2}.audio_format": "{1}" }
     - match: '^HdcpI\s*0*(\d+)\*([0-2])$'
       state: { "inputs.{1}.hdcp_status": "{2}" }
+    - match: '^([0-2])$'
+      request_match: '^\x1bI(\d+)HDCP$'
+      state: { "inputs.{2}.hdcp_status": "{1}" }
     - match: '^HdcpO\s*0*(\d+)\*([0-2])$'
       state: { "outputs.{1}.hdcp_status": "{2}" }
+    - match: '^([0-2])$'
+      request_match: '^\x1bO(\d+)HDCP$'
+      state: { "outputs.{2}.hdcp_status": "{1}" }
     - match: '^HdcpE\s*0*(\d+)\*([01])$'
       state: { "inputs.{1}.hdcp_authorized": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^\x1bE(\d+)HDCP$'
+      state: { "inputs.{2}.hdcp_authorized": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^HdcpS\s*0*([1-3])\s*\*\s*([0-4])$'
+      state: { "outputs.{1}.hdcp_mode": "{2}" }
+    - models: [in1808-series]
+      match: '^([0-4])$'
+      request_match: '^\x1bS([1-3])HDCP$'
+      state: { "outputs.{2}.hdcp_mode": "{1}" }
+    - models: [in1608-series]
+      match: '^([0-4])$'
+      request_match: '^\x1bSHDCP$'
+      state: { hdcp_mode: "{1}" }
+    - models: [in1608-series]
+      match: '^HdcpS\s*([0-4])$'
+      state: { hdcp_mode: "{1}" }
+    - match: '^HdcpN\s*1\s*\*\s*([0-2])$'
+      state: { hdcp_notification: "{1}" }
+    - match: '^HdcpN\s*([01])$'
+      state: { hdcp_notification: "{1}" }
+    - match: '^([0-2])$'
+      request_match: '^\x1bN1?HDCP$'
+      state: { hdcp_notification: "{1}" }
     - match: '^Aspr\s*0*(\d+)\s*\*\s*([12])$'
       state: { "inputs.{1}.aspect_ratio": "{2}" }
+    - match: '^([12])$'
+      request_match: '^\x1b(\d+)ASPR$'
+      state: { "inputs.{2}.aspect_ratio": "{1}" }
+    - match: '^Film\s*0*(\d+)\s*\*\s*([01])$'
+      state: { "inputs.{1}.film_mode": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^\x1b(\d+)FILM$'
+      state: { "inputs.{2}.film_mode": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Amem\s*0*(\d+)\s*\*\s*([01])$'
+      state: { "inputs.{1}.auto_memory": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^\x1b(\d+)AMEM$'
+      state: { "inputs.{2}.auto_memory": { value: "{1}", map: { "0": false, "1": true } } }
+    # IN1606/IN1608 automatic Auto-Image per input (Img X!*1); the IN1808's Img1*n reports an
+    # Auto-Image run, not a setting.
+    - models: [in1608-series]
+      match: '^Img\s*0*(\d+)\s*\*\s*([01])$'
+      state: { "inputs.{1}.auto_image": { value: "{2}", map: { "0": false, "1": true } } }
+    - models: [in1608-series]
+      match: '^([01])$'
+      request_match: '^(\d+)A$'
+      state: { "inputs.{2}.auto_image": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Vtyp\s*0*(\d+)\s*\*\s*([0-3])$'
+      state: { "inputs.{1}.detected_format": "{2}" }
+    - match: '^([0-3])$'
+      request_match: '^(\d+)\*\\$'
+      state: { "inputs.{2}.detected_format": "{1}" }
+    - match: '^Typ\s*0*(\d+)\s*\*\s*([1-6])$'
+      state: { "inputs.{1}.video_format": "{2}" }
+    - match: '^([1-6])$'
+      request_match: '^(\d+)\\$'
+      state: { "inputs.{2}.video_format": "{1}" }
     - match: '^Cont\s*0*(\d+)\*0*(\d+)$'
       state: { "inputs.{1}.contrast": "{2}" }
+    - models: [in1808-series]
+      match: '^0*(\d+)$'
+      request_match: '^\x1b(\d)CONT$'
+      state: { "inputs.{2}.contrast": "{1}" }
     - match: '^Brit\s*0*(\d+)\*0*(\d+)$'
       state: { "inputs.{1}.brightness": "{2}" }
+    - models: [in1808-series]
+      match: '^0*(\d+)$'
+      request_match: '^\x1b(\d)BRIT$'
+      state: { "inputs.{2}.brightness": "{1}" }
+    - models: [in1808-series]
+      match: '^(?:Hdet1\*)?0*(\d+)$'
+      request_match: '^\x1b1(?:\*\d+)?HDET$'
+      state: { detail: "{1}" }
+    - models: [in1808-series]
+      match: '^Hdet1\*0*(\d+)$'
+      state: { detail: "{1}" }
+    - models: [in1608-series]
+      match: '^Hdet\s*0*(\d+)\s*\*\s*0*(\d+)$'
+      state: { "inputs.{1}.detail": "{2}" }
+    - match: '^Colr\s*0*(\d+)\*0*(\d+)$'
+      state: { "inputs.{1}.color": "{2}" }
+    - match: '^Tint\s*0*(\d+)\*0*(\d+)$'
+      state: { "inputs.{1}.tint": "{2}" }
+    - match: '^Ximg(?:1,)?([-+]?\d+)\*([-+]?\d+)\*(\d+)\*(\d+)$'
+      state: { image.horizontal: "{1}", image.vertical: "{2}", image.width: "{3}", image.height: "{4}" }
+    - match: '^([-+]?\d+)\*([-+]?\d+)\*(\d+)\*(\d+)$'
+      request_match: '^\x1b1?XIMG$'
+      state: { image.horizontal: "{1}", image.vertical: "{2}", image.width: "{3}", image.height: "{4}" }
+    - match: '^Hctr(?:I1\*)?\s*([-+]?\d+)$'
+      state: { image.horizontal: "{1}" }
+    - match: '^Vctr(?:I1\*)?\s*([-+]?\d+)$'
+      state: { image.vertical: "{1}" }
+    - match: '^Hsiz(?:I1\*)?\s*0*(\d+)$'
+      state: { image.width: "{1}" }
+    - match: '^Vsiz(?:I1\*)?\s*0*(\d+)$'
+      state: { image.height: "{1}" }
+    - match: '^Vtpo\s*0*([1-3])\s*\*\s*(\d)$'
+      state: { "outputs.{1}.hdmi_format": "{2}" }
+    - match: '^(\d)$'
+      request_match: '^\x1b([1-3])VTPO$'
+      state: { "outputs.{2}.hdmi_format": "{1}" }
     - match: '^GrpmD\s*0*(\d+)\*([-+]?\d+)$'
       state: { "groups.{1}.value": "{2}" }
+    - match: '^([-+]?\d+)$'
+      request_match: '^\x1bD(\d+)GRPM$'
+      state: { "groups.{2}.value": "{1}" }
     - match: '^DsG\s*(\d+)\*([-+]?\d+)$'
       state: { "dsp.{1}.gain": "{2}" }
+    - match: '^([-+]?\d+)$'
+      request_match: '^\x1bG(\d+)AU$'
+      state: { "dsp.{2}.gain": "{1}" }
     - match: '^DsM\s*(\d+)\*([01])$'
       state: { "dsp.{1}.mute": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^\x1bM(\d+)AU$'
+      state: { "dsp.{2}.mute": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^DsZ\s*(\d+)\*([01])$'
+      state: { "dsp.{1}.phantom_power": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^\x1bZ(\d+)AU$'
+      state: { "dsp.{2}.phantom_power": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^DsH\s*(\d+)\*([-+]?\d+)$'
+      state: { "dsp.{1}.embedded_gain": "{2}" }
+    - match: '^([-+]?\d+)$'
+      request_match: '^\x1bH(\d+)AU$'
+      state: { "dsp.{2}.embedded_gain": "{1}" }
+    - match: '^(?:Knob1\*)?0*(\d+)$'
+      request_match: '^\x1b1(?:\*\d+)?KNOB$'
+      state: { volume_knob_group: "{1}" }
+    - match: '^Knob1\*0*(\d+)$'
+      state: { volume_knob_group: "{1}" }
     - match: '^Frz(?:1\*)?([01])$'
       state: { freeze: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^1?F$'
+      state: { freeze: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:Exe)?([0-4])$'
+      request_match: '^X$'
+      state: { front_panel_lock: "{1}" }
     - match: '^Exe([0-4])$'
       state: { front_panel_lock: "{1}" }
+    - match: '^(?:Psav)?([0-2])$'
+      request_match: '^\x1bPSAV$'
+      state: { power_save: "{1}" }
     - match: '^Psav([0-2])$'
       state: { power_save: "{1}" }
-    - match: '^Rate(?:1\*)?0*(\d+)$'
+    - match: '^(?:Rate(?:1\*)?\s*)?0*(\d+)$'
+      request_match: '^\x1b1?RATE$'
       state: { output_rate: "{1}" }
-    - match: '^Test(?:1\*)?0*(\d+)$'
+    - match: '^Rate(?:1\*)?\s*0*(\d+)$'
+      state: { output_rate: "{1}" }
+    - match: '^(?:Test(?:1\*)?\s*)?0*(\d+)$'
+      request_match: '^\x1b1?TEST$'
       state: { test_pattern: "{1}" }
+    - match: '^Test(?:1\*)?\s*0*(\d+)$'
+      state: { test_pattern: "{1}" }
+    - match: '^(?:Swef(?:O1\*)?)?([0-3])$'
+      request_match: '^\x1b(?:O1)?SWEF$'
+      state: { switch_effect: "{1}" }
     - match: '^Swef(?:O1\*)?([0-3])$'
       state: { switch_effect: "{1}" }
+    - match: '^(?:Ausw)?([0-2])$'
+      request_match: '^\x1bAUSW$'
+      state: { auto_switch_mode: "{1}" }
     - match: '^Ausw([0-2])$'
       state: { auto_switch_mode: "{1}" }
+    - match: '^(?:AuswT\s*)?0*(\d+)$'
+      request_match: '^\x1bTAUSW$'
+      state: { auto_switch_timeout: "{1}" }
+    - match: '^AuswT\s*0*(\d+)$'
+      state: { auto_switch_timeout: "{1}" }
+    - match: '^(?:AuswP\s*)?([1-8](?: [1-8])+)$'
+      request_match: '^\x1bPAUSW$'
+      state: { auto_switch_priority: "{1}" }
+    - match: '^AuswP\s*([1-8](?: [1-8])+)$'
+      state: { auto_switch_priority: "{1}" }
+    - match: '^(?:Alvl\s*)?0*(\d+)$'
+      request_match: '^\x1bALVL$'
+      state: { auto_image_threshold: "{1}" }
+    - match: '^Alvl\s*0*(\d+)$'
+      state: { auto_image_threshold: "{1}" }
+    - match: '^Oscn\s*([1-6])\s*\*\s*([0-2])$'
+      state: { "overscan.{1}": "{2}" }
+    - match: '^([0-2])$'
+      request_match: '^\x1b([1-6])OSCN$'
+      state: { "overscan.{2}": "{1}" }
+    - match: '^(?:Mdur\s*)?0*(\d+)$'
+      request_match: '^\x1bMDUR$'
+      state: { osd_duration: "{1}" }
+    - match: '^Mdur\s*0*(\d+)$'
+      state: { osd_duration: "{1}" }
+    - match: '^Ssav\s*M\s*(?:1\s*\*\s*)?([0-3])$'
+      state: { screen_saver.mode: "{1}" }
+    - match: '^([0-3])$'
+      request_match: '^\x1bM1?SSAV$'
+      state: { screen_saver.mode: "{1}" }
+    - match: '^Ssav\s*T\s*(?:1\s*\*\s*)?0*(\d+)$'
+      state: { screen_saver.timeout: "{1}" }
+    - match: '^0*(\d+)$'
+      request_match: '^\x1bT1?SSAV$'
+      state: { screen_saver.timeout: "{1}" }
+    - match: '^Ssav\s*S\s*(?:1\s*\*\s*)?([0-2])$'
+      state: { screen_saver.status: "{1}" }
+    - match: '^([0-2])$'
+      request_match: '^\x1bS1?SSAV$'
+      state: { screen_saver.status: "{1}" }
+    - match: '^Ssav\s*C\s*([0-9A-Fa-f]{6})$'
+      state: { screen_saver.color: "{1}" }
+    - match: '^(?:Vrb)?([0-3])$'
+      request_match: '^\x1bCV$'
+      state: { verbose_mode: "{1}" }
     - match: '^Vrb([0-3])$'
       state: { verbose_mode: "{1}" }
     - match: '^Play0*(\d+)\*([01])$'

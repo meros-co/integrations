@@ -686,12 +686,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## extron-switcher — Extron IN-series scaling presentation switchers
 
-- [ ] Record the tagged reply forms in verbose mode 3 (In X!*1 All, VnamI, Inf00, GrpmD padding). ([specs/extron-switcher.yaml:1031](specs/extron-switcher.yaml#L1031))
-- [ ] Confirm that a CR after a simple command (1*3!, 2B, 1X) is ignored. ([specs/extron-switcher.yaml:1025](specs/extron-switcher.yaml#L1025))
-- [ ] Check how often a change report arrives while a command waits. ([specs/extron-switcher.yaml:1009](specs/extron-switcher.yaml#L1009))
-- [ ] On IN1606/IN1608, check whether the unsolicited signal message (IN00 ...) is sent, as on IN1808. ([specs/extron-switcher.yaml:1063](specs/extron-switcher.yaml#L1063))
-- [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([specs/extron-switcher.yaml:1070](specs/extron-switcher.yaml#L1070))
-- [ ] Record what a wrong password produces (the prompt again assumed). ([specs/extron-switcher.yaml:1018](specs/extron-switcher.yaml#L1018))
+- [ ] Record the tagged reply forms in verbose mode 3 (In X!*1 All, VnamI, Inf00, GrpmD padding). ([specs/extron-switcher.yaml:1497](specs/extron-switcher.yaml#L1497))
+- [ ] Confirm that a CR after a simple command (1*3!, 2B, 1X) is ignored. ([specs/extron-switcher.yaml:1491](specs/extron-switcher.yaml#L1491))
+- [ ] Check how often a change report arrives while a command waits. ([specs/extron-switcher.yaml:1475](specs/extron-switcher.yaml#L1475))
+- [ ] On IN1606/IN1608, check whether the unsolicited signal message (IN00 ...) is sent, as on IN1808. ([specs/extron-switcher.yaml:1530](specs/extron-switcher.yaml#L1530))
+- [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([specs/extron-switcher.yaml:1555](specs/extron-switcher.yaml#L1555))
+- [ ] Record what a wrong password produces (the prompt again assumed). ([specs/extron-switcher.yaml:97](specs/extron-switcher.yaml#L97))
+- [ ] Confirm both families answer N with the part number, the IN1808 tagged (Pno60-1615-02) and the IN1606/IN1608 bare, so the reads on connecting are queued. ([specs/extron-switcher.yaml:1642](specs/extron-switcher.yaml#L1642))
+- [ ] On an IN1606/IN1608, record whether the current-input picture queries (Esc CONT, BRIT, HDET, COLR, TINT) answer tagged with the input (Cont3*060) in verbose mode 3; a bare value is not kept. ([specs/extron-switcher.yaml:1549](specs/extron-switcher.yaml#L1549))
+- [ ] Confirm an IN1806 or IN1606 answers queries about inputs 7 and 8 with an error rather than ignoring them (which would hold the reads for the timeout). ([specs/extron-switcher.yaml:1540](specs/extron-switcher.yaml#L1540))
+- [ ] Record the screen saver reply forms on both families (SsavM1*2, SsavT1*501, SsavS1*0 on IN1808; SsavM0, SsavCFF0000, SsavT030 on IN1608), and confirm the IN1608 custom color has no query. ([specs/extron-switcher.yaml:871](specs/extron-switcher.yaml#L871))
+- [ ] Confirm the IN1808 B query answers one digit per output separated by spaces (Vmt0 1 0). ([specs/extron-switcher.yaml:1750](specs/extron-switcher.yaml#L1750))
+- [ ] Record the change reports for the IN1608 settings added here: automatic Auto-Image (Img4*1), video format (Typ1*2), overscan (Oscn2*1) and the Auto-Image threshold (Alvl025); and the IN1808 detected format (Vtyp3*2) and audio names (AnamI10*name). ([specs/extron-switcher.yaml:1818](specs/extron-switcher.yaml#L1818))
+- [ ] Check whether an input or user preset recall and an Auto-Image report each picture and image setting they change; if they do, the re-reads after them can go. ([specs/extron-switcher.yaml:1702](specs/extron-switcher.yaml#L1702))
+- [ ] Confirm the auto-switch priority order is sent and answered with spaces between the inputs (Esc P8 7 1 2 3 4 5 6AUSW). ([specs/extron-switcher.yaml:476](specs/extron-switcher.yaml#L476))
+- [ ] Confirm the image position and size replies carry signed, zero-padded positions (Ximg1,-0010*+0020*01920*01080; IN1608 without 1,) and the shift replies HctrI1*-0002 and Hctr+0012. ([specs/extron-switcher.yaml:1863](specs/extron-switcher.yaml#L1863))
+- [ ] Confirm the embedded-audio OIDs 30012-30015 with H: which of each pair is the left channel (the guide's example takes 30012 as the right). ([specs/extron-switcher.yaml:1157](specs/extron-switcher.yaml#L1157))
 
 ## facebook-account — Facebook account (a user's Pages and Page access tokens)
 
