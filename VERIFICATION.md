@@ -973,6 +973,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off). ([specs/novastar-h.yaml:152](specs/novastar-h.yaml#L152))
 - [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:280](specs/novastar-h.yaml#L280))
 
+## obs-studio — OBS Studio (obs-websocket 5)
+
+- [ ] Record the fields of the scene item, filter, input, transition and output objects in GetSceneItemList, GetSourceFilterList, GetInputList, GetSceneTransitionList and GetOutputList replies (sceneItemId, sceneItemBlendMode, filterSettings, unversionedInputKind, transitionFixed, outputWidth and the rest): the protocol description names the arrays but not their members. ([specs/obs-studio.yaml:1106](specs/obs-studio.yaml#L1106))
+- [ ] Check that InputVolumeMeters arrives every 50 ms listing only active inputs, including when none is active, since an input it stops listing loses its levels. ([specs/obs-studio.yaml:1180](specs/obs-studio.yaml#L1180))
+- [ ] Check which input kinds answer GetMediaInputStatus (the media source, VLC source and image slide show are assumed) and what other inputs reply. ([specs/obs-studio.yaml:1183](specs/obs-studio.yaml#L1183))
+- [ ] Check that RecordStateChanged carries outputPath only on stop, and that RecordFileChanged fires on each split. ([specs/obs-studio.yaml:1142](specs/obs-studio.yaml#L1142))
+- [ ] Check GetReplayBufferStatus's refusal when the profile has no replay buffer, and that the replay buffer state is read again after a profile change. ([specs/obs-studio.yaml:1144](specs/obs-studio.yaml#L1144))
+- [ ] Check that the stream service settings name the server "server" for both rtmp_common and rtmp_custom. ([specs/obs-studio.yaml:1159](specs/obs-studio.yaml#L1159))
+- [ ] Check the units of GetStats' memoryUsage and availableDiskSpace (MB assumed). ([specs/obs-studio.yaml:1161](specs/obs-studio.yaml#L1161))
+- [ ] Check that no event follows set_scene_item_blend_mode, set_input_deinterlace_mode, set_scene_scene_transition_override or set_video_settings, which are read back after the command instead. ([specs/obs-studio.yaml:1216](specs/obs-studio.yaml#L1216))
+
 ## obsidian-onyx — Obsidian ONYX (Telnet)
 
 - [ ] Record ONYX's own Telnet server's replies (banner, success, error) for GQL, SQL and an unknown command, which Obsidian does not document. ([specs/obsidian-onyx.yaml:296](specs/obsidian-onyx.yaml#L296))
@@ -1083,8 +1094,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## propresenter — ProPresenter
 
-- [ ] Confirm the network API port in use (50001 assumed). ([specs/propresenter.yaml:1534](specs/propresenter.yaml#L1534))
-- [ ] Confirm /v1/timers/current lists every configured timer: each poll replaces timers, so a deleted timer leaves. ([specs/propresenter.yaml:1788](specs/propresenter.yaml#L1788))
+- [ ] Confirm the network API port in use (50001 assumed). ([specs/propresenter.yaml:2381](specs/propresenter.yaml#L2381))
+- [ ] Confirm /v1/timers/current lists every configured timer: each poll replaces timers, so a deleted timer leaves. ([specs/propresenter.yaml:1934](specs/propresenter.yaml#L1934))
+- [ ] Record what /v1/transport/{layer}/current and /time, /v1/presentation/slide_index, /v1/announcement/slide_index, /v1/presentation/focused and the active and focused playlist endpoints answer when nothing is on the layer or active (empty values, null or an error status): a value a reply leaves out keeps what it had. ([specs/propresenter.yaml:2288](specs/propresenter.yaml#L2288))
+- [ ] Confirm that the id of a look, macro, prop, message, clear group, timer, library, mask, group and stage layout is an object with uuid, name and index, as the document's examples show (its schema gives the field by reference only). ([specs/propresenter.yaml:2070](specs/propresenter.yaml#L2070))
+- [ ] Confirm the stage layout map's screen and layout are id objects with a uuid. ([specs/propresenter.yaml:1995](specs/propresenter.yaml#L1995))
+- [ ] Check that media and audio playlist folders list their contents under children, and playlist folders under playlists, and how deep folders nest (three levels are read). ([specs/propresenter.yaml:2119](specs/propresenter.yaml#L2119))
+- [ ] Check the units of a timer's countdown duration, time of day and elapsed start and end times (seconds assumed). ([specs/propresenter.yaml:2303](specs/propresenter.yaml#L2303))
+- [ ] Check that ProPresenter answers about 31 status requests a second without slowing playback, and whether a slower poll should be used on older computers. ([specs/propresenter.yaml:2403](specs/propresenter.yaml#L2403))
+- [ ] Confirm that /v1/status/updates streams one JSON object per change in a chunked reply, for a future streaming transport. ([specs/propresenter.yaml:2418](specs/propresenter.yaml#L2418))
 
 ## ptzoptics — PTZOptics
 
