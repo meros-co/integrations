@@ -318,16 +318,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-hyperdeck — Blackmagic HyperDeck
 
-- [ ] Record the reply shape that carries the format token after format_prepare. ([specs/blackmagic-hyperdeck.yaml:2207](specs/blackmagic-hyperdeck.yaml#L2207))
-- [ ] Record the fields of the asynchronous notifications documented only by their notify switch (dropped frames, display timecode, timeline position, playrange, cache, dynamic range, slate, device info, nas). ([specs/blackmagic-hyperdeck.yaml:2146](specs/blackmagic-hyperdeck.yaml#L2146))
-- [ ] Check how protocol secure mode is reached, so credentials need not travel in plain text on 9993. ([specs/blackmagic-hyperdeck.yaml:2232](specs/blackmagic-hyperdeck.yaml#L2232))
-- [ ] Check which dynamic range spelling the deck accepts and reports (ST2084 or ST2048). ([specs/blackmagic-hyperdeck.yaml:2255](specs/blackmagic-hyperdeck.yaml#L2255))
-- [ ] Check whether "slate clips:" needs the colon (the table prints it without). ([specs/blackmagic-hyperdeck.yaml:2221](specs/blackmagic-hyperdeck.yaml#L2221))
-- [ ] Check what the combined goto forms with relative offsets are relative to. ([specs/blackmagic-hyperdeck.yaml:2170](specs/blackmagic-hyperdeck.yaml#L2170))
-- [ ] On protocol 1.8 and 1.11 decks, check which other documented commands work. ([specs/blackmagic-hyperdeck.yaml:2262](specs/blackmagic-hyperdeck.yaml#L2262))
-- [ ] Check how many clients may connect at once. ([specs/blackmagic-hyperdeck.yaml:2191](specs/blackmagic-hyperdeck.yaml#L2191))
+- [ ] Record the reply shape that carries the format token after format_prepare. ([specs/blackmagic-hyperdeck.yaml:2510](specs/blackmagic-hyperdeck.yaml#L2510))
+- [ ] Record the codes and fields of the notifications documented only by their notify switch (dropped frames, display timecode, timeline position, playrange, cache, dynamic range, slate, device info, nas); state reads them by the field names the switches use. ([specs/blackmagic-hyperdeck.yaml:2430](specs/blackmagic-hyperdeck.yaml#L2430))
+- [ ] Check how protocol secure mode is reached, so credentials need not travel in plain text on 9993. ([specs/blackmagic-hyperdeck.yaml:2539](specs/blackmagic-hyperdeck.yaml#L2539))
+- [ ] Check which dynamic range spelling the deck accepts and reports (ST2084 or ST2048). ([specs/blackmagic-hyperdeck.yaml:2562](specs/blackmagic-hyperdeck.yaml#L2562))
+- [ ] Check whether "slate clips:" needs the colon (the table prints it without). ([specs/blackmagic-hyperdeck.yaml:2526](specs/blackmagic-hyperdeck.yaml#L2526))
+- [ ] Check what the combined goto forms with relative offsets are relative to. ([specs/blackmagic-hyperdeck.yaml:2474](specs/blackmagic-hyperdeck.yaml#L2474))
+- [ ] On protocol 1.8 and 1.11 decks, check which other documented commands work. ([specs/blackmagic-hyperdeck.yaml:2569](specs/blackmagic-hyperdeck.yaml#L2569))
+- [ ] Check how many clients may connect at once. ([specs/blackmagic-hyperdeck.yaml:2498](specs/blackmagic-hyperdeck.yaml#L2498))
 - [ ] Confirm the deck advertises `_hyperdeck_ctrl._tcp` (Companion's HyperDeck module browses it), that its SRV port is 9993, and whether it also advertises `_blackmagic._tcp` and with which TXT `class`. ([crates/core/src/mdns.rs:135](crates/core/src/mdns.rs#L135))
 - [ ] Record the TXT keys `_hyperdeck_ctrl._tcp` carries; if one names the model, discovery could narrow `models`, which it now never does for a HyperDeck. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
+- [ ] Confirm the display timecode, timeline position and dropped frames notifications carry fields named "display timecode", "timeline position" and "dropped frames", and that timeline position and dropped frames are whole numbers. ([specs/blackmagic-hyperdeck.yaml:2046](specs/blackmagic-hyperdeck.yaml#L2046))
+- [ ] Confirm every slot info report lists slot id before its other fields, as the document prints it; a field before it is not read. ([specs/blackmagic-hyperdeck.yaml:2053](specs/blackmagic-hyperdeck.yaml#L2053))
+- [ ] Check how a deck answers "slot info: slot id: n" for a slot it lacks (slots 1 to 4 are asked for on connecting). ([specs/blackmagic-hyperdeck.yaml:1998](specs/blackmagic-hyperdeck.yaml#L1998))
+- [ ] Confirm the playrange reply (219) and push (515) codes and their "timeline in" and "timeline out" fields, and what a clip or timecode playrange and a cleared one report. ([specs/blackmagic-hyperdeck.yaml:2161](specs/blackmagic-hyperdeck.yaml#L2161))
+- [ ] Confirm the reply codes and fields of play on startup (218: enable, single clip) and play option (220: stop mode). ([specs/blackmagic-hyperdeck.yaml:2166](specs/blackmagic-hyperdeck.yaml#L2166))
+- [ ] Confirm the cache info reply (221: status, transferring slot id, recording time) and the code and header text of the cache notification. ([specs/blackmagic-hyperdeck.yaml:2175](specs/blackmagic-hyperdeck.yaml#L2175))
+- [ ] Confirm the field names of the dynamic range reply (playback override, record override) and of the slate replies and notifications (the multiline command's parameter names). ([specs/blackmagic-hyperdeck.yaml:2182](specs/blackmagic-hyperdeck.yaml#L2182))
+- [ ] Record the reply shapes of nas list, nas selected, external drive list and external drive selected, kept as text. ([specs/blackmagic-hyperdeck.yaml:2207](specs/blackmagic-hyperdeck.yaml#L2207))
+- [ ] Check that a timeline clips notification is 519 (p.8) and whether an addition and a snapshot can be told apart. ([specs/blackmagic-hyperdeck.yaml:2155](specs/blackmagic-hyperdeck.yaml#L2155))
+- [ ] Check that clips get on an empty timeline answers 107 timeline empty rather than a 205 with clip count 0. ([specs/blackmagic-hyperdeck.yaml:2149](specs/blackmagic-hyperdeck.yaml#L2149))
+- [ ] Check that version 1 clips get lines are "id: name start duration" with the name able to hold spaces. ([specs/blackmagic-hyperdeck.yaml:2135](specs/blackmagic-hyperdeck.yaml#L2135))
 
 ## blackmagic-multiview — Blackmagic MultiView 16 / MultiView 4
 
