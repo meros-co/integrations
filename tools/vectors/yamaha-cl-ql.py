@@ -228,7 +228,10 @@ _yclql_explicit("telemetry", "scene-current-reply", inbound="OK sscurrent_ex MIX
 # Scene step events: the console's scninfo list (MIXER:Lib/Scene/RecallInc, RecallDec); event form as Yamaha's DM7 document.
 _yclql_explicit("text", "recall_next_scene", {}, "event MIXER:Lib/Scene/RecallInc\n",
                 device_reply="OK event MIXER:Lib/Scene/RecallInc\n", expect_result={"ok": {"kind": "ack"}})
-_yclql_explicit("text", "recall_previous_scene", {}, "event MIXER:Lib/Scene/RecallDec\n",
+# Scene store: the console's scninfo list names MIXER:Lib/Scene/Store; the command form is the Companion module's.
+_yclql_explicit("text", "store_scene", {"scene": 12}, "ssupdate_ex MIXER:Lib/Scene 12\n",
+                device_reply="OK ssupdate_ex MIXER:Lib/Scene 12\n", expect_result={"ok": {"kind": "ack"}})
+_yclql_explicit("text", "recall_previous_scene", {},"event MIXER:Lib/Scene/RecallDec\n",
                 device_reply="OK event MIXER:Lib/Scene/RecallDec\n", expect_result={"ok": {"kind": "ack"}})
 _yclql_explicit("telemetry", "scene-modified", inbound="OK sscurrent_ex MIXER:Lib/Scene 12 modified\n",
                 expect_state={"scene": {"current": 12, "modified": True}})

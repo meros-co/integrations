@@ -315,6 +315,7 @@ models:
       - recall_previous_scene
       - recall_scene
       - get_current_scene
+      - store_scene
       - set_parameter
       - set_parameter_text
       - get_parameter
@@ -548,6 +549,7 @@ models:
       - recall_previous_scene
       - recall_scene
       - get_current_scene
+      - store_scene
       - set_parameter
       - set_parameter_text
       - get_parameter
@@ -781,6 +783,7 @@ models:
       - recall_previous_scene
       - recall_scene
       - get_current_scene
+      - store_scene
       - set_parameter
       - set_parameter_text
       - get_parameter
@@ -1004,6 +1007,7 @@ models:
       - recall_previous_scene
       - recall_scene
       - get_current_scene
+      - store_scene
       - set_parameter
       - set_parameter_text
       - get_parameter
@@ -1227,6 +1231,7 @@ models:
       - recall_previous_scene
       - recall_scene
       - get_current_scene
+      - store_scene
       - set_parameter
       - set_parameter_text
       - get_parameter
@@ -5588,6 +5593,21 @@ commands:
     expect:
       matches: ^OK sscurrent_ex MIXER:Lib/Scene (\d+)
     returns: value
+  store_scene:
+    summary: 'Store the console''s current settings as a scene, 1-300 (scene #001-#300), overwriting it
+      (ssupdate_ex MIXER:Lib/Scene)'
+    params:
+      scene:
+        type: int
+        min: 1
+        max: 300
+        required: true
+        label: Scene
+        description: "Scene number to store to, from 1 to 300 as scene #001 to #300; whatever the scene held is replaced."
+    send: ssupdate_ex MIXER:Lib/Scene {scene}
+    expect:
+      matches: ^OK ssupdate_ex MIXER:Lib/Scene
+    returns: ack
   recall_next_scene:
     summary: Recall the scene after the current one (event MIXER:Lib/Scene/RecallInc)
     send: event MIXER:Lib/Scene/RecallInc
@@ -5937,11 +5957,13 @@ quirks:
       channel state.
   - models:
       - all
-    severity: warning
+    severity: critical
     text: >-
-      Scene store is not typed: the console's scninfo list names MIXER:Lib/Scene/Store, and the
-      Companion module sends it as ssupdate_ex MIXER:Lib/Scene <number>, but no Yamaha document
-      describes a store command or its reply.
+      store_scene (ssupdate_ex MIXER:Lib/Scene <number>) overwrites the scene at once with the console's
+      current settings, and the scene's previous contents cannot be recovered over RCP. The console's own
+      scninfo list names MIXER:Lib/Scene/Store with the range 0-300; the command form is the Companion module's,
+      not a Yamaha document's, and its reply is taken to repeat the command after OK. Scene #000 is the
+      console's read-only initial scene, so the range here starts at 1.
 
 state:
   inputs.*.fader_level:
