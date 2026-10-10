@@ -1551,12 +1551,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## tvone-coriomaster — tvONE CORIOmaster
 
-- [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:689](specs/tvone-coriomaster.yaml#L689))
-- [ ] Confirm that the unit greets a connection with a caret prompt that needs no reply, and that login() before any other command is enough. ([specs/tvone-coriomaster.yaml:55](specs/tvone-coriomaster.yaml#L55))
+- [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:1027](specs/tvone-coriomaster.yaml#L1027))
+- [ ] Confirm that the unit greets a connection with a caret prompt that needs no reply, and that login() before any other command is enough. ([specs/tvone-coriomaster.yaml:60](specs/tvone-coriomaster.yaml#L60))
 - [ ] Confirm that every command, including methods and StartBatch/EndBatch, ends with exactly one "!Done" line after its value lines. ([specs/tvone-coriomaster.yaml:46](specs/tvone-coriomaster.yaml#L46))
-- [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:567](specs/tvone-coriomaster.yaml#L567))
-- [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:681](specs/tvone-coriomaster.yaml#L681))
-- [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:199](specs/tvone-coriomaster.yaml#L199))
+- [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:816](specs/tvone-coriomaster.yaml#L816))
+- [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:1019](specs/tvone-coriomaster.yaml#L1019))
+- [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:264](specs/tvone-coriomaster.yaml#L264))
+- [ ] Confirm the Windows, Canvases, Layouts and Stbds lists answer one "Windows.Window<n> = <...>" line per entry, and record whether windows that are not in use (FREE) are listed too. ([specs/tvone-coriomaster.yaml:807](specs/tvone-coriomaster.yaml#L807))
+- [ ] Confirm a preset take or storyboard changes window properties without echoing them, and that PRESET COMPLETE follows every take (the windows are read again on it). ([specs/tvone-coriomaster.yaml:820](specs/tvone-coriomaster.yaml#L820))
+- [ ] Record the CANVAS PROPERTY_CHANGED value forms (AudioFollowWindow as Window1 or 1) and whether STBDCURRENT_CHANGED ends with a comma. ([specs/tvone-coriomaster.yaml:835](specs/tvone-coriomaster.yaml#L835))
+- [ ] Confirm a set echoes "<path> = <value>" before "!Done" for every window, canvas and layout property, so state follows this connection's commands without a read. ([specs/tvone-coriomaster.yaml:1066](specs/tvone-coriomaster.yaml#L1066))
+- [ ] Record the values Layout<n>.Mode takes (Normal shown, not documented). ([specs/tvone-coriomaster.yaml:940](specs/tvone-coriomaster.yaml#L940))
 
 ## twitch — Twitch
 
