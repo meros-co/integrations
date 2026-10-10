@@ -7,7 +7,8 @@ YCLQL = "yamaha-cl-ql"
 def _yclql_vectors():
     S = YCLQL
     # (command base, RCP address, X (param, max) or None, Y (param, max) or None,
-    #  value kind, state path or None, set-only), transcribed from the document.
+    #  value kind, state path or None, set-only (True) or read-only ('get')), transcribed from the console's
+    #  own parameter list (prminfo answers, as the Companion module's schemas/CLQL Parameters-1.txt records them).
     rows = [
         ('input_fader_level', 'MIXER:Current/InCh/Fader/Level', ('channel', 72), None, ('level', 1000), 'inputs.{x}.fader_level', False),
         ('input_on', 'MIXER:Current/InCh/Fader/On', ('channel', 72), None, ('bool',), 'inputs.{x}.on', False),
@@ -207,7 +208,28 @@ _yclql_explicit("text", "recall_scene", {"scene": 1}, "ssrecall_ex MIXER:Lib/Sce
                 device_reply="OK ssrecall_ex MIXER:Lib/Scene 1\n", expect_result={"ok": {"kind": "ack"}})
 _yclql_explicit("text", "get_current_scene", {}, "sscurrent_ex MIXER:Lib/Scene\n",
                 device_reply="OK sscurrent_ex MIXER:Lib/Scene 12 modified\n", expect_result={"ok": {"kind": "value", "value": "12"}})
-_yclql_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex MIXER:Lib/Scene 12\n", expect_state={"scene": {"current": 12}})
+# A pushed scene change re-reads what is read on connecting (DME7 spec p.10: a recall is not notified
+# parameter by parameter). Address and channel count of each, in the order they are read.
+_YCLQL_REREAD = [f"get MIXER:Current/{a} {x} 0\n" for a, n in (
+    ("InCh/Fader/Level", 72), ("InCh/Fader/On", 72), ("InCh/ToSt/Pan", 72), ("StInCh/Fader/Level", 16),
+    ("StInCh/Fader/On", 16), ("Mix/Fader/Level", 24), ("Mix/Fader/On", 24), ("Mtrx/Fader/Level", 8),
+    ("Mtrx/Fader/On", 8), ("St/Fader/Level", 3), ("St/Fader/On", 3), ("DCA/Fader/Level", 16), ("DCA/Fader/On", 16),
+    ("MuteMaster/On", 8), ("InCh/Label/Name", 72), ("InCh/Label/Color", 72), ("StInCh/Label/Name", 16),
+    ("StInCh/Label/Color", 16), ("Mix/Label/Name", 24), ("Mix/Label/Color", 24), ("Mtrx/Label/Name", 8),
+    ("Mtrx/Label/Color", 8), ("St/Label/Name", 3), ("St/Label/Color", 3), ("DCA/Label/Name", 16),
+    ("DCA/Label/Color", 16), ("MuteMaster/Label/Name", 8), ("InCh/Port/HA/Gain", 72), ("StInCh/Port/HA/Gain", 16),
+    ("Monitor/On", 1), ("Monitor/DimmerOn", 1), ("Monitor/CueInterruption", 1), ("Monitor/Fader/Level", 1),
+    ("Cue/Output", 1), ("Cue/CueMode", 1), ("Cue/FaderCueRelease", 1), ("Cue/OutputLevel", 1), ("Cue/ActiveCue", 1),
+) for x in range(n)]
+_yclql_explicit("telemetry", "scene-current", inbound="NOTIFY sscurrent_ex MIXER:Lib/Scene 12\n", expect_state={"scene": {"current": 12}},
+                expect_then_send=_YCLQL_REREAD)
+_yclql_explicit("telemetry", "scene-current-reply", inbound="OK sscurrent_ex MIXER:Lib/Scene 4 unmodified\n",
+                expect_state={"scene": {"current": 4, "modified": False}})
+# Scene step events: the console's scninfo list (MIXER:Lib/Scene/RecallInc, RecallDec); event form as Yamaha's DM7 document.
+_yclql_explicit("text", "recall_next_scene", {}, "event MIXER:Lib/Scene/RecallInc\n",
+                device_reply="OK event MIXER:Lib/Scene/RecallInc\n", expect_result={"ok": {"kind": "ack"}})
+_yclql_explicit("text", "recall_previous_scene", {}, "event MIXER:Lib/Scene/RecallDec\n",
+                device_reply="OK event MIXER:Lib/Scene/RecallDec\n", expect_result={"ok": {"kind": "ack"}})
 _yclql_explicit("telemetry", "scene-modified", inbound="OK sscurrent_ex MIXER:Lib/Scene 12 modified\n",
                 expect_state={"scene": {"current": 12, "modified": True}})
 _yclql_explicit("telemetry", "scene-recalled", inbound="OK ssrecall_ex MIXER:Lib/Scene 7\n", expect_state={"scene": {"current": 7}})
