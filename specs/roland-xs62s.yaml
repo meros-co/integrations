@@ -531,11 +531,16 @@ telemetry:
   # With RS-232 PNL INFO on (menu RS-232/GPIO, p.14) the mixer sends the QPL
   # all-items frame from the RS-232 and CONTROL (LAN) connectors whenever the
   # cross-point or other status changes. The status is also asked every
-  # second, for installations that leave it off.
+  # second, for installations that leave it off, with the tally and every
+  # audio level (QAL:14). The settings the other queries read (scaler
+  # resolution, channel 6 connector, video and audio output buses) are asked
+  # on connecting and every ten seconds. Nothing else the commands set can
+  # be read (see the quirks).
   subscribe:
-    send: ["VER"]
+    send: ["VER", "QVR", "QIP", "QVS:0", "QVS:1", "QVS:2", "QVS:3", "QVS:4", "QAS:0", "QAS:1", "QAS:2"]
+    every_ms: 10000
   poll:
-    send: ["QPL:7", "TLY"]
+    send: ["QPL:7", "TLY", "QAL:14"]
     every_ms: 1000
   updates:
     - match: '^[\x02\x11\x13]*QPL:(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+);'
@@ -561,6 +566,23 @@ telemetry:
       state: { "tally": "{1}" }
     - match: '^[\x02\x11\x13]*QAL:(-?\d+(?:, ?-?\d+){13});'
       state: { "audio.levels": "{1}" }
+    # QAL:14 in the parameter list's order (p.28): inputs 0-10, MASTER OUT, PVW/2, AUX/3.
+    - match: '^[\x02\x11\x13]*QAL:(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+), ?(-?\d+);'
+      state:
+        "audio.inputs.0.level": "{1}"
+        "audio.inputs.1.level": "{2}"
+        "audio.inputs.2.level": "{3}"
+        "audio.inputs.3.level": "{4}"
+        "audio.inputs.4.level": "{5}"
+        "audio.inputs.5.level": "{6}"
+        "audio.inputs.6.level": "{7}"
+        "audio.inputs.7.level": "{8}"
+        "audio.inputs.8.level": "{9}"
+        "audio.inputs.9.level": "{10}"
+        "audio.inputs.10.level": "{11}"
+        "audio.master_level": "{12}"
+        "audio.pvw_level": "{13}"
+        "audio.aux_level": "{14}"
     - match: '^[\x02\x11\x13]*VER:([^,;]*),([^;]+);'
       state: { "device.model": "{1}", "device.version": "{2}" }
 
@@ -579,6 +601,10 @@ state:
   audio_outputs.*.bus: { type: int, description: "Bus of an audio output, keyed by wire index (0 XLR, 1 RCA, 2 PHONES): 0 PGM/1, 1 PVW/2, 2 AUX/3" }
   tally:               { type: string, description: "Cross-point status of channels 1-8, comma-separated: 0 dark, 1 red, 2 green" }
   audio.levels:        { type: string, unit: "0.1 dB", description: "Every volume level from QAL:14, comma-separated: inputs 0-10, MASTER OUT, PVW/2, AUX/3 (-801 is -INF)" }
+  audio.inputs.*.level: { type: int, unit: "0.1 dB", description: "Input audio level from QAL, keyed by the input number the level commands take (0 AUDIO IN 1 to 10 HDMI IN 6); -801 is -INF" }
+  audio.master_level:  { type: int, unit: "0.1 dB", description: "Master out level; -801 is -INF" }
+  audio.pvw_level:     { type: int, unit: "0.1 dB", description: "PVW/2 bus output level; -801 is -INF" }
+  audio.aux_level:     { type: int, unit: "0.1 dB", description: "AUX/3 bus output level; -801 is -INF" }
   device.model:        { type: string, description: "Model field of VER (printed empty in the manual)" }
   device.version:      { type: string, description: "Version from VER" }
 
@@ -611,3 +637,18 @@ quirks:
       with both, as IL1; TRS lists 0 and 1 both as MIX; VER is printed
       "stxVER:,a;" with an empty model field. No password protects the LAN
       port.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the queries are QPL (panel status), QVC (bus channels), QVR
+      (scaler resolution), QIP (channel 6 connector), QVS (video output
+      buses), QAL (audio levels), QAS (audio output buses), TLY and VER
+      (p.27-29); state keeps all of them. QAL documents one level per input,
+      without saying whether it is the PGM/1 (IL1) or PVW/2 (IL2) bus level.
+      Nothing reads back the transition effect and time, PinP and SPLIT
+      PVW/PGM state (QPL gives only which is on), the DSK preview, AUTO
+      MIXING, the EDIDs, input and scaler scaling, the HDMI color space and
+      signal, the PinP and split positions, the DSK source, level and gain,
+      the audio delays, the input mutes and solos, HDCP, the test pattern
+      and tone, the memory last recalled, the GPOs or the operation mode.

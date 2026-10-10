@@ -76,6 +76,12 @@ telemetry(R62, "ch6-input", inbound="\x02QIP:2;", expect_state={"ch6_input": 2})
 telemetry(R62, "output-bus", inbound="\x02QVS:4,3;", expect_state={"video_outputs": {"4": {"bus": 3}}})
 telemetry(R62, "audio-output-bus", inbound="\x02QAS:0,2;", expect_state={"audio_outputs": {"0": {"bus": 2}}})
 telemetry(R62, "tally", inbound="\x02TLY:1,2,0,0,0,0,0,0;", expect_state={"tally": "1,2,0,0,0,0,0,0"})
+# QAL:14 in the parameter list's order (p.28): inputs 0-10, MASTER OUT, PVW/2, AUX/3.
 telemetry(R62, "audio-levels", inbound="\x02QAL:-801, 80, 70, 60, 50, 40, 30, 20, 100, 80, 70, 60, 50, 0;",
-          expect_state={"audio": {"levels": "-801, 80, 70, 60, 50, 40, 30, 20, 100, 80, 70, 60, 50, 0"}})
+          expect_state={"audio": {"levels": "-801, 80, 70, 60, 50, 40, 30, 20, 100, 80, 70, 60, 50, 0",
+                                  "inputs": {"0": {"level": -801}, "1": {"level": 80}, "2": {"level": 70},
+                                             "3": {"level": 60}, "4": {"level": 50}, "5": {"level": 40},
+                                             "6": {"level": 30}, "7": {"level": 20}, "8": {"level": 100},
+                                             "9": {"level": 80}, "10": {"level": 70}},
+                                  "master_level": 60, "pvw_level": 50, "aux_level": 0}})
 telemetry(R62, "version", inbound="\x02VER:,3.10;", expect_state={"device": {"model": "", "version": "3.10"}})
