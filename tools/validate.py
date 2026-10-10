@@ -610,7 +610,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
 
     for i, rule in enumerate(telemetry.get("updates", [])):
         where = f"telemetry.updates[{i}]"
-        for key in ("match", "header", "each_line", "address", "path"):
+        for key in ("match", "match_each", "header", "each_line", "address", "path"):
             if key in rule:
                 try:
                     re.compile(rule[key])
@@ -625,6 +625,8 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 errors.append(f"{where}.request_match: {e}")
             if "match" not in rule or transport_type not in ("line-tcp", "line-udp"):
                 errors.append(f"{where}: a request_match regex goes with match, on a line transport")
+        if "match_each" in rule and ("match" not in rule or "path" in rule):
+            errors.append(f"{where}: match_each reads the rest of a message a match rule matched")
         if "each_match" in rule and "json_each" not in rule:
             errors.append(f"{where}: each_match selects elements of json_each")
         for key in ("json_match", "request_match", "each_match"):

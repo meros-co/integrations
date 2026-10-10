@@ -1378,6 +1378,28 @@ With `then_send` (below, "Re-reads on a push"), a reply can have more read: the 
 names each amplifier, and each name has that amplifier's status, power and
 mutes read in turn.
 
+#### Lists on one line
+
+Some line devices answer a list on one line: Christie Spyder answers its
+register list `RRL 4 -1` with `0 2 1 Look%201 7 Wide`, the result code, a
+count, then an ID and a name for each register. `match_each`, an RE2-safe
+regex, is applied along the rest of the message after what `match` matched,
+and the rule matches once for each match of it: its captures are numbered on
+after `match`'s and `request_match`'s, and `{index}` is the item's place, from
+0. `replace` and `then_send` work as for any rule, so the list is replaced
+whole and each item can have more read:
+
+```yaml
+    - match: "^0 \\d+(?: |$)"
+      request_match: '^RRL (\d+) -1$'
+      match_each: '(\d+) (\S+)'
+      replace: "registers.{1}"
+      state: { "registers.{1}.{2}.name": "{3}" }
+```
+
+The message must match `match` for the rule to apply at all, so an empty list
+(`0 0`) still replaces what was there.
+
 #### Poll replies on another address
 
 An OSC query is answered on its own address by most devices. ETC Eos answers
