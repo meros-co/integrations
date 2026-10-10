@@ -1300,8 +1300,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-v60hd — Roland V-60HD
 
-- [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all). ([specs/roland-v60hd.yaml:463](specs/roland-v60hd.yaml#L463))
-- [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:476](specs/roland-v60hd.yaml#L476))
+- [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all) and the order of the QAL:13 frame (inputs 0-10, AUX, MASTER OUT assumed). ([specs/roland-v60hd.yaml:430](specs/roland-v60hd.yaml#L430))
+- [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:498](specs/roland-v60hd.yaml#L498))
 
 ## roland-vr400uhd — Roland VR-400UHD
 
