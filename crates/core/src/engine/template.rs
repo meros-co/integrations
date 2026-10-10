@@ -305,6 +305,9 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                     width = Some(w.parse().map_err(|_| format!("bad directive ':{d}'"))?);
                 } else if *d == "signed" {
                     signed = true;
+                } else if *d == "url_decode" {
+                    // A name that is all digits arrives as a number: there
+                    // is nothing to decode.
                 } else if let Some(places) = d.strip_prefix('.').and_then(|r| r.strip_suffix('f')) {
                     // A whole number a device sent where a decimal is shown
                     // (60 for a 60.00 Hz field rate): fixed decimals too.
@@ -399,6 +402,9 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                     "json" => Value::String(s).to_string(),
                     // Percent-encoded, for a raw_query.
                     "url" => percent_encode(&s),
+                    // Percent-decoded: a name a device sends encoded
+                    // (Spyder's `Camera%201`).
+                    "url_decode" => percent_decode(&s),
                     // A password a device takes hashed (Magewell's login).
                     "md5" => {
                         use md5::Digest;
@@ -466,10 +472,53 @@ pub(crate) fn percent_encode(s: &str) -> String {
     out
 }
 
+/// RFC 3986 percent-decoding: each `%XX` becomes its byte, and a `%` not
+/// followed by two hex digits is kept as it is. Bytes that are not UTF-8 are
+/// replaced.
+pub(crate) fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let hex = |i: usize| b.get(i).and_then(|c| (*c as char).to_digit(16));
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' {
+            if let (Some(h), Some(l)) = (hex(i + 1), hex(i + 2)) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn url_decode_reverses_percent_encoding() {
+        assert_eq!(percent_decode("Camera%201"), "Camera 1");
+        assert_eq!(percent_decode("caf%C3%A9%2Fx"), "café/x");
+        assert_eq!(percent_decode("100%"), "100%");
+        assert_eq!(percent_decode("%zz%4"), "%zz%4");
+        assert_eq!(percent_decode(&percent_encode("A b/ü")), "A b/ü");
+        assert_eq!(
+            go(
+                "{name:url_decode}",
+                json!({"name": "Look%201"}),
+                "name: {type: string}"
+            ),
+            Ok("Look 1".into())
+        );
+        assert_eq!(
+            go("{n:url_decode}", json!({"n": 7}), "n: {type: int}"),
+            Ok("7".into())
+        );
+    }
 
     fn values(params: Value, specs: &str) -> (Params, BTreeMap<String, ParamSpec>) {
         (

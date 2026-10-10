@@ -1683,7 +1683,7 @@ mod tests {
                 {"match": "^0 (\\d+)(?: |$)", "request_match": "^RRL (\\d+) -1$",
                  "match_each": "(\\d+) (\\S+)",
                  "replace": "registers.{2}",
-                 "state": {"registers.{2}.{3}.name": "{4}",
+                 "state": {"registers.{2}.{3}.name": "{4:url_decode}",
                            "registers.{2}.{3}.place": "{index}"},
                  "then_send": ["SCR {3} R"]},
             ]})),
@@ -1707,7 +1707,7 @@ mod tests {
         assert_eq!(
             patch,
             Some(json!({"registers": {"4": {
-                "1": {"name": "Look%201", "place": 0},
+                "1": {"name": "Look 1", "place": 0},
                 "7": {"name": "Wide", "place": 1}}}}))
         );
         // The list is replaced whole, and each item asks for its own re-read.

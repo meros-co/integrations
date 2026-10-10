@@ -33,6 +33,7 @@ DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
     (re.compile(r"^\.\d+f$"), {"float"}),               # fixed decimals
     (re.compile(r"^(on_off|bool01|bool10)$"), {"bool"}),
     (re.compile(r"^(upper|lower|json|url)$"), {"string", "enum"}),
+    (re.compile(r"^url_decode$"), {"string", "int"}),      # a percent-encoded name a device sends
     (re.compile(r"^(md5|sha256)$"), {"string"}),         # a hashed password, lowercase hex
     (re.compile(r"^(to|from)\.[a-z0-9_]+$"), {"int", "float"}),  # a named conversion
     (re.compile(r"^map\.[a-z0-9_]+$"), {"enum", "bool", "int", "string"}),  # a value table

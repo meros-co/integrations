@@ -835,6 +835,7 @@ The directive set is closed.
 | `upper`, `lower` | String case |
 | `json` | String as a JSON string literal, quotes and escapes included: `{text:json}` → `"Say \"hi\""`. For JSON request bodies |
 | `url` | String percent-encoded, RFC 3986 unreserved characters kept: `{name:url}` → `Cam%201`. For free text in a `raw_query` |
+| `url_decode` | String percent-decoded, each `%XX` the byte it stands for: `{2:url_decode}` → `Camera 1` for `Camera%201`. For a telemetry value a device sends encoded (Spyder's names); a `%` not followed by two hex digits is kept, and a name that is all digits, which arrives as a number, is left as it is |
 | `-1`, `+1`, … | Integer offset applied before formatting; combines as `{preset:-1:02d}` |
 | `signed` | Integer with an explicit leading sign: `7` → `+7`, `-7` → `-7` |
 | `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75`. In a telemetry value, a whole number a device sends where it means a decimal is shown the same way (`60` → `60.00`) |
@@ -1394,7 +1395,7 @@ whole and each item can have more read:
       request_match: '^RRL (\d+) -1$'
       match_each: '(\d+) (\S+)'
       replace: "registers.{1}"
-      state: { "registers.{1}.{2}.name": "{3}" }
+      state: { "registers.{1}.{2}.name": "{3:url_decode}" }
 ```
 
 The message must match `match` for the rule to apply at all, so an empty list
