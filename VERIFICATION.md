@@ -1433,7 +1433,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-bt-wallplate — Turtle AV Dante Bluetooth wall plate
 
-- [ ] Check the line ending, which port carries the commands (8000 or 23), and the get bt mute reply text. ([specs/turtleav-bt-wallplate.yaml:156](specs/turtleav-bt-wallplate.yaml#L156))
+- [ ] Check the line ending, which port carries the commands (8000 or 23), and the get bt mute reply text. ([specs/turtleav-bt-wallplate.yaml:479](specs/turtleav-bt-wallplate.yaml#L479))
+- [ ] Check that get bt name answers with the name alone, and that set bt name takes the name in angle brackets as the example shows. ([specs/turtleav-bt-wallplate.yaml:489](specs/turtleav-bt-wallplate.yaml#L489))
+- [ ] Record the reply to set 1 eq 1 typ ...: whether it is one line naming the channel and band (read into state) or several. ([specs/turtleav-bt-wallplate.yaml:489](specs/turtleav-bt-wallplate.yaml#L489))
+- [ ] Record get 1 eq's reply: one line for the channel (Bluetooth input left EQ: on) or one per band. ([specs/turtleav-bt-wallplate.yaml:501](specs/turtleav-bt-wallplate.yaml#L501))
+- [ ] Record get artist, get album and get track with nothing playing, and get bt format with no device connected. ([specs/turtleav-bt-wallplate.yaml:479](specs/turtleav-bt-wallplate.yaml#L479))
 
 ## turtleav-dante — Turtle AV Dante bridges, Downtown and 30W amplifier
 

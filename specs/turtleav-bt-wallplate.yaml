@@ -11,9 +11,10 @@ source:
     note: >
       Manufacturer-documented, free download. The EU manual (28750) has the same table.
       Telnet port 23 in the header and TCP/IP port 8000 in get ipconfig; Bluetooth name,
-      pairing, volume (Bluetooth volume: 50), mute, audio bridging, connection, transport
-      and metadata commands; input gain and mute (Bluetooth input left gain: 10dB); EQ and
-      network commands.
+      pairing, pairing window, volume (Bluetooth volume: 50), mute, audio bridging,
+      connection, device names, format, transport and metadata commands; input stereo
+      link, gain and mute (Bluetooth input left gain: 10dB); 8-band parametric EQ and
+      network commands, with their replies.
 
 transport:
   type: line-tcp
@@ -31,18 +32,41 @@ models:
   - id: bt-wallplate
     name: Turtle AV Dante Bluetooth Wall Plate (US and EU)
     supports:
-      [set_bt_volume, set_bt_mute, set_bt_pairing, clear_bt_pairing, bt_transport,
-       set_input_gain, set_input_mute, get_bt_connection, reboot]
+      [set_bt_name, set_bt_volume, step_bt_volume, set_bt_mute, set_bt_pairing,
+       set_bt_window_time, set_bt_window_switch, set_bt_audio_bridging, clear_bt_pairing,
+       bt_transport, get_bt_connection, get_bt_device, set_input_stereo, set_input_gain,
+       step_input_gain, set_input_mute, set_eq_band_enabled, set_eq_stereo, set_eq_band,
+       clear_eq, copy_eq, set_ip_mode, set_ip_address, set_subnet, set_gateway,
+       set_tcp_port, set_telnet_port, set_hostname, net_reboot, reboot]
     verification: none
     notes: >
       Bluetooth audio to Dante; it reports its type as WPD20BUS.
 
 commands:
+  set_bt_name:
+    summary: Set the name the wall plate shows to phones and laptops
+    params:
+      name: {type: string, max_length: 24, pattern: '^[^<>]{1,24}$', required: true, label: Bluetooth name, description: 'Bluetooth device name, up to 24 bytes, without angle brackets.'}
+    send: set bt name <{name}>
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
   set_bt_volume:
     summary: Set the Bluetooth volume, 0-100
     params:
       volume: {type: int, min: 0, max: 100, required: true, label: Volume, description: Bluetooth audio volume from 0 to 100.}
     send: set bt vol {volume}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  step_bt_volume:
+    summary: Raise or lower the Bluetooth volume by a step
+    params:
+      direction: {type: enum, values: [+, '-'], required: true, label: Direction, description: '+ raises, - lowers.'}
+      step: {type: int, min: 1, max: 100, default: 1, label: Step, description: 'Volume steps, 1 to 100.'}
+    send: set bt vol{direction}{step}
     expect: {not_contains: rror}
     returns: ack
     # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
@@ -65,6 +89,33 @@ commands:
     returns: ack
     # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
 
+  set_bt_window_time:
+    summary: Set how long the pairing window stays open
+    params:
+      seconds: {type: int, min: 30, max: 300, required: true, label: Window time, description: 'Pairing window length in seconds, 30 to 300.'}
+    send: set bt window time {seconds}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_bt_window_switch:
+    summary: Turn the timed pairing window on or off
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on limits pairing to the window time; off leaves it open.}
+    send: set bt window switch {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_bt_audio_bridging:
+    summary: Choose whether calls, media or both are bridged to Dante
+    params:
+      mode: {type: int, min: 1, max: 3, required: true, label: Bridging, description: '1 call, 2 media, 3 call and media.'}
+    send: set bt audio bridging {mode}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
   clear_bt_pairing:
     summary: Forget a paired device, or all
     params:
@@ -83,12 +134,46 @@ commands:
     returns: ack
     # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
 
+  get_bt_connection:
+    summary: Which paired devices are connected
+    send: get bt connection
+    expect: {matches: (.+)}
+    returns: value
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  get_bt_device:
+    summary: The names of the connected devices
+    send: get bt device
+    expect: {matches: (.+)}
+    returns: value
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_input_stereo:
+    summary: Link the left and right Bluetooth channels so one gain sets both
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on links the channels; off sets them separately.}
+    send: set input 1 stereo {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
   set_input_gain:
     summary: Set a Bluetooth channel's gain, -12 to +12 dB
     params:
       input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
       gain: {type: float, min: -12.0, max: 12.0, required: true, label: Gain, description: 'Gain in dB, -12.0 to +12.0.'}
     send: set input {input} gain {gain:.1f}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  step_input_gain:
+    summary: Raise or lower a Bluetooth channel's gain by a step
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
+      direction: {type: enum, values: [+, '-'], required: true, label: Direction, description: '+ raises, - lowers.'}
+      step: {type: float, min: 0.1, max: 24.0, default: 1.0, label: Step, description: 'Step in dB, 0.1 to 24.0.'}
+    send: set input {input} gain{direction}{step:.1f}
     expect: {not_contains: rror}
     returns: ack
     # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
@@ -103,11 +188,127 @@ commands:
     returns: ack
     # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
 
-  get_bt_connection:
-    summary: Which paired devices are connected
-    send: get bt connection
-    expect: {matches: (.+)}
-    returns: value
+  set_eq_band_enabled:
+    summary: Turn one band of a channel's EQ, or every band, on or off
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
+      band: {type: int, min: 0, max: 8, required: true, label: Band, description: 'EQ band 1 to 8; 0 every band.'}
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: set {input} eq {band} {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_eq_stereo:
+    summary: Link the left and right EQ so both use the same settings
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on links the two channels' EQ.}
+    send: set 1 eq stereo {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_eq_band:
+    summary: Set one EQ band's type, frequency, gain and Q
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
+      band: {type: int, min: 0, max: 8, required: true, label: Band, description: 'EQ band 1 to 8; 0 every band.'}
+      type: {type: int, min: 1, max: 5, required: true, label: Filter type, description: '1 parametric, 2 low-pass, 3 high-pass, 4 low shelf, 5 high shelf.'}
+      frequency: {type: int, min: 20, max: 20000, required: true, label: Frequency, description: 'Centre or corner frequency in Hz, 20 to 20000.'}
+      gain: {type: float, min: -15.0, max: 15.0, required: true, label: Gain, description: 'Band gain in dB, -15.0 to +15.0 in 0.1 dB steps.'}
+      q: {type: float, min: 0.02, max: 16.0, required: true, label: Q, description: 'Bandwidth Q, 0.02 to 16.00.'}
+    send: set {input} eq {band} typ {type} frq {frequency} val {gain:.1f} q {q:.2f}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  clear_eq:
+    summary: Clear a channel's EQ settings
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
+    send: set {input} eq clear
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  copy_eq:
+    summary: Copy one channel's EQ to the other
+    params:
+      from: {type: int, min: 1, max: 2, required: true, label: From, description: '1 Bluetooth left, 2 Bluetooth right.'}
+      to: {type: int, min: 0, max: 2, required: true, label: To, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
+    send: set {from} eq copy to {to}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_ip_mode:
+    summary: Use a static address or DHCP; applies after net_reboot
+    params:
+      mode: {type: int, min: 0, max: 1, required: true, label: IP mode, description: '0 static, 1 DHCP.'}
+    send: set ip mode {mode}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_ip_address:
+    summary: Set the static IP address; applies after net_reboot
+    params:
+      address: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: IP address, description: 'Static IPv4 address, e.g. 192.168.1.100.'}
+    send: set ip addr {address}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_subnet:
+    summary: Set the static subnet mask; applies after net_reboot
+    params:
+      mask: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: Subnet mask, description: 'Subnet mask, e.g. 255.255.255.0.'}
+    send: set subnet {mask}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_gateway:
+    summary: Set the static gateway; applies after net_reboot
+    params:
+      gateway: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: Gateway, description: 'Gateway IPv4 address, e.g. 192.168.1.1.'}
+    send: set gateway {gateway}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_tcp_port:
+    summary: Set the TCP/IP control port
+    params:
+      port: {type: int, min: 1, max: 65535, required: true, label: Port, description: 'TCP control port, 8000 by default.'}
+    send: set tcp/ipport {port}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_telnet_port:
+    summary: Set the Telnet port
+    params:
+      port: {type: int, min: 1, max: 65535, required: true, label: Port, description: 'Telnet port, 23 by default.'}
+    send: set telnet port {port}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_hostname:
+    summary: Set the network host name
+    params:
+      hostname: {type: string, pattern: '^[A-Za-z0-9-]{1,32}$', required: true, label: Host name, description: 'Host name, up to 32 letters, digits and hyphens.'}
+    send: set net hostname {hostname}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  net_reboot:
+    summary: Restart the network module to apply new network settings
+    send: set net reboot
+    expect: {not_contains: rror}
+    returns: ack
     # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
 
   reboot:
@@ -123,6 +324,35 @@ telemetry:
     send:
     - get bt vol
     - get bt mute
+    - get input 1 gain
+    - get input 2 gain
+    - get input 1 mute
+    - get input 2 mute
+    - get bt discoverable/pairing
+    - get artist
+    - get album
+    - get track
+    - get bt connection
+  subscribe:
+    every_ms: 60000
+    send:
+    - get input 1 stereo
+    - get bt name
+    - get bt window time
+    - get bt window switch
+    - get bt audio bridging
+    - get bt format
+    - get 1 eq
+    - get 2 eq
+    - get 1 eq stereo
+    - get ip mode
+    - get ip addr
+    - get subnet
+    - get gateway
+    - get tcp/ipport
+    - get telnet port
+    - get mac addr
+    - get net hostname
   updates:
     - match: '^Bluetooth volume: ?(\d+)$'
       state:
@@ -130,28 +360,150 @@ telemetry:
     - match: '^Bluetooth mute: ?(on|off)$'
       state:
         bt.mute: {value: '{1}', map: {'on': true, 'off': false}}
-    - match: '^Bluetooth input (left|right) gain: (-?[0-9.]+) ?dB$'
+    - match: '^([^:]+)$'
+      request_match: '^get bt name$'
       state:
-        inputs.{1}.gain: '{2}'
-    - match: '^Bluetooth input (left|right) mute: (on|off)$'
+        bt.name: '{1}'
+    - match: '^Set Bluetooth device name to (.+)$'
       state:
-        inputs.{1}.mute: {value: '{2}', map: {'on': true, 'off': false}}
+        bt.name: '{1}'
+    - match: '^Bluetooth discoverable/pairing (on|off)\b'
+      state:
+        bt.pairing: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^Bluetooth window time: (\d+) ?s$'
+      state:
+        bt.window_s: '{1}'
+    - match: '^Bluetooth window switch: (on|off)$'
+      state:
+        bt.window_switch: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^Bluetooth audio bridging: (Call|Media|Call & Media) bridging$'
+      state:
+        bt.bridging: {value: '{1}', map: {Call: 1, call: 1, Media: 2, media: 2, Call & Media: 3, call & media: 3}}
     - match: '^Connected device(\d): (Connected|Disconnected)$'
       state:
         bt.devices.{1}.connected: {value: '{2}', map: {Connected: true, Disconnected: false}}
+    - match: '^Bluetooth format: (.+)$'
+      state:
+        bt.format: '{1}'
+    - match: '^Artist: (.*)$'
+      state:
+        bt.artist: '{1}'
+    - match: '^Album: (.*)$'
+      state:
+        bt.album: '{1}'
+    - match: '^Track: (.*)$'
+      state:
+        bt.track: '{1}'
+    - match: '^Bluetooth input left/right stereo mode: (on|off)$'
+      state:
+        stereo.gain_linked: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^Bluetooth input (left|right) gain: (-?[0-9.]+) ?dB$'
+      state:
+        inputs.{1}.gain: '{2}'
+    - match: '(?i)^Bluetooth input (left|right) mute: (on|off)$'
+      state:
+        inputs.{1}.mute: {value: '{2}', map: {'on': true, 'off': false}}
+    - match: '(?i)^Bluetooth input (left|right) EQ(?: all)?: (on|off)$'
+      state:
+        inputs.{1}.eq.enabled: {value: '{2}', map: {'on': true, 'off': false}}
+    - match: '(?i)^Bluetooth input (left|right) EQ ([1-8]): (on|off)$'
+      state:
+        inputs.{1}.eq.bands.{2}.enabled: {value: '{3}', map: {'on': true, 'off': false}}
+    - match: '(?i)^Bluetooth input left/right EQ stereo mode: (on|off)$'
+      state:
+        stereo.eq_linked: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^Bluetooth input (left|right) EQ ([1-8]): ?Type: ([1-5]), Frequency: ([0-9.]+) ?Hz, Value: (-?[0-9.]+) ?dB, Q: ([0-9.]+)$'
+      state:
+        inputs.{1}.eq.bands.{2}.type: '{3}'
+        inputs.{1}.eq.bands.{2}.frequency: '{4}'
+        inputs.{1}.eq.bands.{2}.gain: '{5}'
+        inputs.{1}.eq.bands.{2}.q: '{6}'
+    - match: '(?i)^IP mode: (Static|DHCP)$'
+      state:
+        network.ip_mode: {value: '{1}', map: {Static: static, static: static, DHCP: dhcp, dhcp: dhcp}}
+    - match: '^IP(?: address)?: ([0-9.]+)$'
+      state:
+        network.ip: '{1}'
+    - match: '(?i)^subnet mask: ([0-9.]+)$'
+      state:
+        network.subnet: '{1}'
+    - match: '(?i)^gateway: ([0-9.]+)$'
+      state:
+        network.gateway: '{1}'
+    - match: '^TCP/IP port: (\d+)$'
+      state:
+        network.tcp_port: '{1}'
+    - match: '(?i)^telnet port: (\d+)$'
+      state:
+        network.telnet_port: '{1}'
+    - match: '^MAC: ([0-9A-Fa-f:]+)$'
+      state:
+        network.mac: '{1}'
+    - match: '^Hostname: (.+)$'
+      state:
+        network.hostname: '{1}'
 
 state:
+  bt.name:                 {type: string, description: Bluetooth device name}
   bt.volume:               {type: int, description: 'Bluetooth volume, 0-100'}
   bt.mute:                 {type: bool, description: Bluetooth audio muted}
+  bt.pairing:              {type: bool, description: Discoverable for pairing}
+  bt.window_s:             {type: int, unit: s, description: Pairing window length in seconds}
+  bt.window_switch:        {type: bool, description: Timed pairing window on}
+  bt.bridging:             {type: int, description: 'Audio bridging: 1 call, 2 media, 3 call and media'}
   bt.devices.*.connected:  {type: bool, description: Paired device 1 or 2 connected}
-  inputs.*.gain:           {type: float, description: 'Channel gain in dB, keyed left or right'}
+  bt.format:               {type: string, description: 'Bluetooth audio format, e.g. SBC'}
+  bt.artist:               {type: string, description: Artist of the playing track}
+  bt.album:                {type: string, description: Album of the playing track}
+  bt.track:                {type: string, description: Title of the playing track}
+  stereo.gain_linked:           {type: bool, description: Left and right gain linked}
+  stereo.eq_linked:        {type: bool, description: Left and right EQ linked}
+  inputs.*.gain:           {type: float, unit: dB, description: 'Channel gain in dB, keyed left or right'}
   inputs.*.mute:           {type: bool, description: 'Channel muted, keyed left or right'}
+  inputs.*.eq.enabled:     {type: bool, description: 'EQ on or off as the device reports it for the whole channel'}
+  inputs.*.eq.bands.*.enabled:   {type: bool, description: 'EQ band on, keyed by band 1-8'}
+  inputs.*.eq.bands.*.type:      {type: int, description: 'Filter type: 1 parametric, 2 low-pass, 3 high-pass, 4 low shelf, 5 high shelf'}
+  inputs.*.eq.bands.*.frequency: {type: float, unit: Hz, description: Band frequency in Hz}
+  inputs.*.eq.bands.*.gain:      {type: float, unit: dB, description: Band gain in dB}
+  inputs.*.eq.bands.*.q:         {type: float, description: Band Q}
+  network.ip_mode:         {type: string, description: 'static or dhcp'}
+  network.ip:              {type: string, description: IPv4 address}
+  network.subnet:          {type: string, description: Subnet mask}
+  network.gateway:         {type: string, description: Gateway}
+  network.tcp_port:        {type: int, description: TCP/IP control port}
+  network.telnet_port:     {type: int, description: Telnet port}
+  network.mac:             {type: string, description: MAC address}
+  network.hostname:        {type: string, description: Network host name}
 
 quirks:
   - models: [all]
     severity: warning
     text: >
-      Nothing is pushed: the Bluetooth volume and mute are polled every 5 seconds; other
-      values update from command replies. The documents state no line ending (CR LF is
-      sent) and no login. The mute reply's exact text is not shown in the document
-      (Bluetooth mute: on is assumed).
+      Nothing is pushed. The Bluetooth volume, mute, pairing, connection and track
+      metadata and both channels' gain and mute are polled every 5 seconds; the name,
+      pairing window, bridging, format, stereo link, EQ on/off and the network are read on
+      connecting and every minute. Replies to this session's commands update state at
+      once. The documents state no line ending (CR LF is sent) and no login. The mute
+      reply's exact text is not shown in the document (Bluetooth mute: on is assumed).
+
+  - models: [all]
+    severity: warning
+    text: >
+      get bt name answers with the name alone, so it is read as the reply to that request,
+      and only when it holds no colon (a colon marks every other reply).
+      get bt device answers Connected device1: <name>, the same words get bt connection
+      uses for Connected and Disconnected, so device names are left to get_bt_device and
+      not kept in state. get 1 eq setting answers each band on a line of its own without
+      the channel's name, which the spec format cannot tie to the channel (one message
+      at a time, no state between lines): band settings are kept in state only from the
+      replies to set_eq_band, which name the channel and band.
+
+  - models: [all]
+    severity: info
+    text: >
+      Some replies are documented as several lines (get bt connection, a network change
+      with its reminder to run net_reboot); the extra lines can be taken as the answers to
+      the next queued reads, which only delays state. Not offered: set reset and set reset
+      all, which ask for yes at a further prompt, and the admin and user password commands,
+      which the API answers in clear text. The network commands take effect after
+      net_reboot or a power cycle.

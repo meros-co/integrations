@@ -73,6 +73,61 @@ telemetry(TB, "volume", inbound="Bluetooth volume: 50\r\n", expect_state={"bt": 
 telemetry(TB, "input", inbound="Bluetooth input left gain: 10dB\r\n", expect_state={"inputs": {"left": {"gain": 10.0}}})
 telemetry(TB, "connection", inbound="Connected device2: Disconnected\r\n",
           expect_state={"bt": {"devices": {"2": {"connected": False}}}})
+tb("set_bt_name", {"name": "ABC"}, "set bt name <ABC>", device_reply="Set Bluetooth device name to ABC\r\n",
+   expect_result={"ok": {"kind": "ack"}})
+tb("step_bt_volume", {"direction": "+", "step": 5}, "set bt vol+5")
+tb("set_bt_window_time", {"seconds": 60}, "set bt window time 60")
+tb("set_bt_window_switch", {"state": "on"}, "set bt window switch on")
+tb("set_bt_audio_bridging", {"mode": 1}, "set bt audio bridging 1")
+tb("get_bt_device", {}, "get bt device", device_reply="Connected device1: HUAWEI P30 Pro\r\n",
+   expect_result={"ok": {"kind": "value", "value": "Connected device1: HUAWEI P30 Pro"}})
+tb("set_input_stereo", {"state": "on"}, "set input 1 stereo on")
+tb("step_input_gain", {"input": 1, "direction": "-", "step": 5.0}, "set input 1 gain-5.0")
+tb("set_eq_band_enabled", {"input": 1, "band": 0, "state": "on"}, "set 1 eq 0 on")
+tb("set_eq_stereo", {"state": "on"}, "set 1 eq stereo on")
+tb("set_eq_band", {"input": 1, "band": 1, "type": 1, "frequency": 200, "gain": -15.0, "q": 0.02},
+   "set 1 eq 1 typ 1 frq 200 val -15.0 q 0.02")
+tb("clear_eq", {"input": 1}, "set 1 eq clear")
+tb("copy_eq", {"from": 1, "to": 2}, "set 1 eq copy to 2")
+tb("set_ip_mode", {"mode": 0}, "set ip mode 0")
+tb("set_ip_address", {"address": "192.168.1.100"}, "set ip addr 192.168.1.100")
+tb("set_subnet", {"mask": "255.255.255.0"}, "set subnet 255.255.255.0")
+tb("set_gateway", {"gateway": "192.168.1.1"}, "set gateway 192.168.1.1")
+tb("set_tcp_port", {"port": 8000}, "set tcp/ipport 8000")
+tb("set_telnet_port", {"port": 23}, "set telnet port 23")
+tb("set_hostname", {"hostname": "WallPlate-1"}, "set net hostname WallPlate-1")
+tb("net_reboot", {}, "set net reboot")
+telemetry(TB, "mute", inbound="Bluetooth mute: on\r\n", expect_state={"bt": {"mute": True}})
+telemetry(TB, "name", request="get bt name", inbound="Bluetooth Adapter-123456\r\n",
+          expect_state={"bt": {"name": "Bluetooth Adapter-123456"}})
+telemetry(TB, "name-set", inbound="Set Bluetooth device name to ABC\r\n", expect_state={"bt": {"name": "ABC"}})
+telemetry(TB, "pairing", inbound="Bluetooth discoverable/pairing on (60s)\r\n", expect_state={"bt": {"pairing": True}})
+telemetry(TB, "window-time", inbound="Bluetooth window time: 60s\r\n", expect_state={"bt": {"window_s": 60}})
+telemetry(TB, "window-switch", inbound="Bluetooth window switch: on\r\n", expect_state={"bt": {"window_switch": True}})
+telemetry(TB, "bridging", inbound="Bluetooth audio bridging: Call bridging\r\n", expect_state={"bt": {"bridging": 1}})
+telemetry(TB, "format", inbound="Bluetooth format: SBC\r\n", expect_state={"bt": {"format": "SBC"}})
+telemetry(TB, "artist", inbound="Artist: Someone\r\n", expect_state={"bt": {"artist": "Someone"}})
+telemetry(TB, "album", inbound="Album: Something\r\n", expect_state={"bt": {"album": "Something"}})
+telemetry(TB, "track", inbound="Track: A Song\r\n", expect_state={"bt": {"track": "A Song"}})
+telemetry(TB, "stereo", inbound="Bluetooth input left/right stereo mode: on\r\n",
+          expect_state={"stereo": {"gain_linked": True}})
+telemetry(TB, "input-mute", inbound="Bluetooth input right mute: on\r\n", expect_state={"inputs": {"right": {"mute": True}}})
+telemetry(TB, "eq", inbound="Bluetooth input left EQ: on\r\n", expect_state={"inputs": {"left": {"eq": {"enabled": True}}}})
+telemetry(TB, "eq-band", inbound="Bluetooth input left EQ 3: off\r\n",
+          expect_state={"inputs": {"left": {"eq": {"bands": {"3": {"enabled": False}}}}}})
+telemetry(TB, "eq-stereo", inbound="Bluetooth input left/right EQ stereo mode: on\r\n",
+          expect_state={"stereo": {"eq_linked": True}})
+telemetry(TB, "eq-band-setting", inbound="Bluetooth input left EQ 1: Type: 3, Frequency: 200Hz, Value: -15dB, Q: 0.02\r\n",
+          expect_state={"inputs": {"left": {"eq": {"bands": {"1": {
+              "type": 3, "frequency": 200.0, "gain": -15.0, "q": 0.02}}}}}})
+telemetry(TB, "ip-mode", inbound="IP mode: Static\r\n", expect_state={"network": {"ip_mode": "static"}})
+telemetry(TB, "ip", inbound="IP: 192.168.0.100\r\n", expect_state={"network": {"ip": "192.168.0.100"}})
+telemetry(TB, "subnet", inbound="Subnet mask: 255.255.255.0\r\n", expect_state={"network": {"subnet": "255.255.255.0"}})
+telemetry(TB, "gateway", inbound="Gateway: 192.168.1.1\r\n", expect_state={"network": {"gateway": "192.168.1.1"}})
+telemetry(TB, "tcp-port", inbound="TCP/IP port: 8000\r\n", expect_state={"network": {"tcp_port": 8000}})
+telemetry(TB, "telnet-port", inbound="Telnet port: 23\r\n", expect_state={"network": {"telnet_port": 23}})
+telemetry(TB, "mac", inbound="MAC: 6C:DF:FB:00:03:56\r\n", expect_state={"network": {"mac": "6C:DF:FB:00:03:56"}})
+telemetry(TB, "hostname", inbound="Hostname: 1234\r\n", expect_state={"network": {"hostname": "1234"}})
 
 TP = "turtleav-amp150"
 
