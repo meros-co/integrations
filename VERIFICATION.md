@@ -1322,9 +1322,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-xs80h — Roland XS-82H/83H/84H
 
-- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:543](specs/roland-xs80h.yaml#L543))
-- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:544](specs/roland-xs80h.yaml#L544))
-- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:558](specs/roland-xs80h.yaml#L558))
+- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:551](specs/roland-xs80h.yaml#L551))
+- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:553](specs/roland-xs80h.yaml#L553))
+- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:567](specs/roland-xs80h.yaml#L567))
+- [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:497](specs/roland-xs80h.yaml#L497))
 
 ## ross-xpression — Ross XPression (TCP)
 

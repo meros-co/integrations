@@ -488,9 +488,15 @@ commands:
     returns: ack
 telemetry:
   # Nothing is pushed. The cross-points of outputs 1-4 are asked every second
-  # (the XS-82H and XS-83H answer the outputs they lack with an error).
+  # (the XS-82H and XS-83H answer the outputs they lack with an error). The
+  # settings the other status queries read (every input's type, color space,
+  # HDCP and aspect, every output's select, resolution, HDCP, color space and
+  # signal, and the key lock) are asked on connecting and every ten seconds.
+  # Nothing else the commands set can be read (see the quirks).
   subscribe:
-    send: ["VER;"]
+    send: ["VER;", "ITS:0;", "ITS:1;", "ITS:2;", "ITS:3;", "ITS:4;", "ITS:5;", "ITS:6;", "ITS:7;",
+           "OTS:0;", "OTS:1;", "OTS:2;", "OTS:3;", "KLS;"]
+    every_ms: 10000
   poll:
     send: ["CTS:0;", "CTS:1;", "CTS:2;", "CTS:3;"]
     every_ms: 1000
@@ -560,3 +566,12 @@ quirks:
       the reply's comma list as one value; the parts are in state. Over
       RS-232C the menu RS-232C FUNCTION must be RECEIVER; no setting is
       documented for LAN control, and no password.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the only status queries are ITS, OTS, CTS, KLS and VER
+      (p.22-24), and state keeps every value they give. Nothing reads back
+      the audio levels and mutes (IDL, IAL, OAL, IDM, IAM, OAM), the audio
+      delays, the OUTPUT1-4 send levels, the EDIDs, the video output mode or
+      the preset last recalled; state does not keep them.
