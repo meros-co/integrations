@@ -1521,19 +1521,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## yamaha-tf — Yamaha TF
 
-- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-tf.yaml:4581](specs/yamaha-tf.yaml#L4581))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-tf.yaml:4643](specs/yamaha-tf.yaml#L4643))
-- [ ] Confirm get_current_scene (sscurrent_ex scene_a|scene_b) and its reply, and that the inactive list's query is answered with an error. ([specs/yamaha-tf.yaml:4674](specs/yamaha-tf.yaml#L4674))
-- [ ] Confirm the address uses "InCh" (the QLab guide prints "Inch"). ([specs/yamaha-tf.yaml:4689](specs/yamaha-tf.yaml#L4689))
-- [ ] On a TF, confirm the fader level and ON addresses of every channel type (InCh, StInCh, FxRtnCh, DCA, Mix, Mtrx, St, Mono), ToSt/Pan on InCh, StInCh and FxRtnCh, Mix and St Out/Balance, Mix/PanLink and MuteMaster/On, and that set, get and NOTIFY set use them. ([specs/yamaha-tf.yaml:4594](specs/yamaha-tf.yaml#L4594))
-- [ ] Confirm the numbering inferred from the list's counts: StInCh 1-4 as ST IN 1L, 1R, 2L, 2R; FxRtnCh 1-4 as FX1 L, FX1 R, FX2 L, FX2 R; St 1-2 as L and R; and whether ToStereo/Pan is an alias of ToSt/Pan. ([specs/yamaha-tf.yaml:4605](specs/yamaha-tf.yaml#L4605))
-- [ ] Confirm the Label/Name (up to 64 characters in the list), Label/Color, Label/Icon and Label/Category addresses, the colour and icon names, and the category names (the list types icon and category as binary). ([specs/yamaha-tf.yaml:4695](specs/yamaha-tf.yaml#L4695))
-- [ ] Confirm the send addresses (InCh and StInCh ToMix, ToFx, ToMono; FxRtnCh ToMix and ToMono; Mix, St and Mono ToMtrx), and that PrePost 1 is PRE and 0 POST. ([specs/yamaha-tf.yaml:4704](specs/yamaha-tf.yaml#L4704))
-- [ ] Check whether newer TF firmware adds head-amp, EQ, dynamics, DCA or mute group assignment to the RCP parameter list, which the recorded list lacks. ([specs/yamaha-tf.yaml:4711](specs/yamaha-tf.yaml#L4711))
-- [ ] Confirm event MIXER:Lib/Scene/RecallInc and RecallDec on TF (scninfo lists them) and their replies. ([specs/yamaha-tf.yaml:4720](specs/yamaha-tf.yaml#L4720))
-- [ ] Record what NOTIFY sscurrent_ex looks like after a scene recall from the surface, which now triggers a re-read of the connect-time settings. ([specs/yamaha-tf.yaml:4728](specs/yamaha-tf.yaml#L4728))
-- [ ] Check whether the console answers prmnum and prminfo <index> as the DME7 document describes, and whether the list differs by firmware and model. ([specs/yamaha-tf.yaml:4737](specs/yamaha-tf.yaml#L4737))
-- [ ] Check whether scene store (ssupdate_ex scene_a|scene_b <n>, from the Companion module) works and what it replies. ([specs/yamaha-tf.yaml:4748](specs/yamaha-tf.yaml#L4748))
+- [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-tf.yaml:4608](specs/yamaha-tf.yaml#L4608))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-tf.yaml:4670](specs/yamaha-tf.yaml#L4670))
+- [ ] Confirm get_current_scene (sscurrent_ex scene_a|scene_b) and its reply, and that the inactive list's query is answered with an error. ([specs/yamaha-tf.yaml:4701](specs/yamaha-tf.yaml#L4701))
+- [ ] Confirm the address uses "InCh" (the QLab guide prints "Inch"). ([specs/yamaha-tf.yaml:4716](specs/yamaha-tf.yaml#L4716))
+- [ ] On a TF, confirm the fader level and ON addresses of every channel type (InCh, StInCh, FxRtnCh, DCA, Mix, Mtrx, St, Mono), ToSt/Pan on InCh, StInCh and FxRtnCh, Mix and St Out/Balance, Mix/PanLink and MuteMaster/On, and that set, get and NOTIFY set use them. ([specs/yamaha-tf.yaml:4621](specs/yamaha-tf.yaml#L4621))
+- [ ] Confirm the numbering inferred from the list's counts: StInCh 1-4 as ST IN 1L, 1R, 2L, 2R; FxRtnCh 1-4 as FX1 L, FX1 R, FX2 L, FX2 R; St 1-2 as L and R; and whether ToStereo/Pan is an alias of ToSt/Pan. ([specs/yamaha-tf.yaml:4632](specs/yamaha-tf.yaml#L4632))
+- [ ] Confirm the Label/Name (up to 64 characters in the list), Label/Color, Label/Icon and Label/Category addresses, the colour and icon names, and the category names (the list types icon and category as binary). ([specs/yamaha-tf.yaml:4722](specs/yamaha-tf.yaml#L4722))
+- [ ] Confirm the send addresses (InCh and StInCh ToMix, ToFx, ToMono; FxRtnCh ToMix and ToMono; Mix, St and Mono ToMtrx), and that PrePost 1 is PRE and 0 POST. ([specs/yamaha-tf.yaml:4731](specs/yamaha-tf.yaml#L4731))
+- [ ] Check whether newer TF firmware adds head-amp, EQ, dynamics, DCA or mute group assignment to the RCP parameter list, which the recorded list lacks. ([specs/yamaha-tf.yaml:4738](specs/yamaha-tf.yaml#L4738))
+- [ ] Confirm event MIXER:Lib/Scene/RecallInc and RecallDec on TF (scninfo lists them) and their replies. ([specs/yamaha-tf.yaml:4747](specs/yamaha-tf.yaml#L4747))
+- [ ] Record what NOTIFY sscurrent_ex looks like after a scene recall from the surface, which now triggers a re-read of the connect-time settings. ([specs/yamaha-tf.yaml:4755](specs/yamaha-tf.yaml#L4755))
+- [ ] Check whether the console answers prmnum and prminfo <index> as the DME7 document describes, and whether the list differs by firmware and model. ([specs/yamaha-tf.yaml:4764](specs/yamaha-tf.yaml#L4764))
+- [ ] Confirm store_scene: the command form ssupdate_ex scene_a|scene_b <n> comes from the Companion module, while the console's own scninfo list names MIXER:Lib/Bank/Scene/Store (two lists, 0-100); record its reply and whether scene 0 is refused. ([specs/yamaha-tf.yaml:4775](specs/yamaha-tf.yaml#L4775))
 
 ## youtube-live — YouTube Live
 

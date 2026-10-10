@@ -198,7 +198,10 @@ _ytf_explicit("telemetry", "scene-current-reply", inbound="OK sscurrent_ex scene
 # Scene step events: the console's scninfo list (MIXER:Lib/Scene/RecallInc, RecallDec); event form as Yamaha's DM7 document.
 _ytf_explicit("text", "recall_next_scene", {}, "event MIXER:Lib/Scene/RecallInc\n",
               device_reply="OK event MIXER:Lib/Scene/RecallInc\n", expect_result={"ok": {"kind": "ack"}})
-_ytf_explicit("text", "recall_previous_scene", {}, "event MIXER:Lib/Scene/RecallDec\n",
+# Scene store: the console's scninfo list names MIXER:Lib/Bank/Scene/Store; the command form is the Companion module's.
+_ytf_explicit("text", "store_scene", {"bank": "b", "scene": 7}, "ssupdate_ex scene_b 7\n",
+              device_reply="OK ssupdate_ex scene_b 7\n", expect_result={"ok": {"kind": "ack"}})
+_ytf_explicit("text", "recall_previous_scene", {},"event MIXER:Lib/Scene/RecallDec\n",
               device_reply="OK event MIXER:Lib/Scene/RecallDec\n", expect_result={"ok": {"kind": "ack"}})
 _ytf_explicit("telemetry", "scene-modified", inbound="OK sscurrent_ex scene_a 3 unmodified\n",
               expect_state={"scenes": {"a": {"current": 3, "modified": False}}})
