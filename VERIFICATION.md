@@ -968,19 +968,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## panasonic-ptz — Panasonic PTZ
 
-- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:10731](specs/panasonic-ptz.yaml#L10731))
-- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:10737](specs/panasonic-ptz.yaml#L10737))
-- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:10716](specs/panasonic-ptz.yaml#L10716))
-- [ ] Confirm the AW-UE155 answers the AW-UE150 command set (assumed from the shared firmware; there is no AW-UE155 interface specification). ([specs/panasonic-ptz.yaml:726](specs/panasonic-ptz.yaml#L726))
-- [ ] Confirm the AW-UE150 pan/tilt speed modes: the document lists 0 Normal (60 deg/s), 1 Fast (180), 2 Quick (60), where the other documents give 0 normal 60, 1 fast1 90, 2 fast2 180. ([specs/panasonic-ptz.yaml:8197](specs/panasonic-ptz.yaml#L8197))
-- [ ] Confirm what awb_color_temperature (OSJ:4A) takes on AW-UE150/HE145/UE100: the usage example sends OSJ:4A:0, the command column OSJ:4A:[Data1]:[Data2]. ([specs/panasonic-ptz.yaml:1605](specs/panasonic-ptz.yaml#L1605))
-- [ ] Confirm flip_detect_angle sends #FDA (the AW-UE150 usage example shows #SPF5A). ([specs/panasonic-ptz.yaml:5110](specs/panasonic-ptz.yaml#L5110))
-- [ ] Confirm the AW-UE160 scene and user file name commands take OSL:91:[file]:[30 hex digits] (the usage examples send 32 hex digits without a file number). ([specs/panasonic-ptz.yaml:7762](specs/panasonic-ptz.yaml#L7762))
-- [ ] Confirm the AW-UE160 takes the format code as two digits (OSA:87:01) and answers it the same way; the state rule accepts both. ([specs/panasonic-ptz.yaml:10811](specs/panasonic-ptz.yaml#L10811))
-- [ ] Confirm awb_color_temperature and color_temperature_bch on the AW-UE160 take a trailing :0 (OSJ:4A:007D0:0, OSL:2F:007D0:0 in the usage examples). ([specs/panasonic-ptz.yaml:5933](specs/panasonic-ptz.yaml#L5933))
-- [ ] Confirm OSD:3A answers 01 and 02 on the AW-UE160 both meaning on, as the document lists, and what ODT 2 means there. ([specs/panasonic-ptz.yaml:9194](specs/panasonic-ptz.yaml#L9194))
-- [ ] Confirm the AW-UE160 custom iris window corners are single digits (OSL:CD:0:0:8:4 in the usage example, 00h-08h in the table). ([specs/panasonic-ptz.yaml:5832](specs/panasonic-ptz.yaml#L5832))
-- [ ] Confirm SDR convert gain (OSI:43) takes every value from 74 to 80; the document lists 74 (-12 dB), 7B (-5 dB) and 80 (0 dB). ([specs/panasonic-ptz.yaml:7509](specs/panasonic-ptz.yaml#L7509))
+- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:11024](specs/panasonic-ptz.yaml#L11024))
+- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:11030](specs/panasonic-ptz.yaml#L11030))
+- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:11009](specs/panasonic-ptz.yaml#L11009))
+- [ ] Confirm the AW-UE155 answers the AW-UE150 command set (assumed from the shared firmware; there is no AW-UE155 interface specification). ([specs/panasonic-ptz.yaml:737](specs/panasonic-ptz.yaml#L737))
+- [ ] Confirm the AW-UE150 pan/tilt speed modes: the document lists 0 Normal (60 deg/s), 1 Fast (180), 2 Quick (60), where the other documents give 0 normal 60, 1 fast1 90, 2 fast2 180. ([specs/panasonic-ptz.yaml:8433](specs/panasonic-ptz.yaml#L8433))
+- [ ] Confirm what awb_color_temperature (OSJ:4A) takes on AW-UE150/HE145/UE100: the usage example sends OSJ:4A:0, the command column OSJ:4A:[Data1]:[Data2]. ([specs/panasonic-ptz.yaml:1701](specs/panasonic-ptz.yaml#L1701))
+- [ ] Confirm flip_detect_angle sends #FDA (the AW-UE150 usage example shows #SPF5A). ([specs/panasonic-ptz.yaml:5206](specs/panasonic-ptz.yaml#L5206))
+- [ ] Confirm the AW-UE160 scene and user file name commands take OSL:91:[file]:[30 hex digits] (the usage examples send 32 hex digits without a file number). ([specs/panasonic-ptz.yaml:7858](specs/panasonic-ptz.yaml#L7858))
+- [ ] Confirm the AW-UE160 takes the format code as two digits (OSA:87:01) and answers it the same way; the state rule accepts both. ([specs/panasonic-ptz.yaml:11104](specs/panasonic-ptz.yaml#L11104))
+- [ ] Confirm awb_color_temperature and color_temperature_bch on the AW-UE160 take a trailing :0 (OSJ:4A:007D0:0, OSL:2F:007D0:0 in the usage examples). ([specs/panasonic-ptz.yaml:6029](specs/panasonic-ptz.yaml#L6029))
+- [ ] Confirm OSD:3A answers 01 and 02 on the AW-UE160 both meaning on, as the document lists, and what ODT 2 means there. ([specs/panasonic-ptz.yaml:9456](specs/panasonic-ptz.yaml#L9456))
+- [ ] Confirm the AW-UE160 custom iris window corners are single digits (OSL:CD:0:0:8:4 in the usage example, 00h-08h in the table). ([specs/panasonic-ptz.yaml:5928](specs/panasonic-ptz.yaml#L5928))
+- [ ] Confirm SDR convert gain (OSI:43) takes every value from 74 to 80; the document lists 74 (-12 dB), 7B (-5 dB) and 80 (0 dB). ([specs/panasonic-ptz.yaml:7605](specs/panasonic-ptz.yaml#L7605))
+- [ ] Confirm the AW-UE20/HE20/UE4 #TAA reply: Data1 is the tally LED and Data3 the command tally; the state reads Data1 as tally.red. ([specs/panasonic-ptz.yaml:11112](specs/panasonic-ptz.yaml#L11112))
 
 ## pjlink — PJLink
 
