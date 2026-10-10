@@ -1417,7 +1417,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-amp150 — Turtle AV 150W Dante amplifier
 
-- [ ] Check the master volume and mute reply texts (assumed Master volume: 50 and Master mute: on), the line ending, and that port 8000 needs no login. ([specs/turtleav-amp150.yaml:165](specs/turtleav-amp150.yaml#L165))
+- [ ] Check the master volume and mute reply texts (assumed Master volume: 50 and Master mute on), the line ending, and that port 8000 needs no login. ([specs/turtleav-amp150.yaml:682](specs/turtleav-amp150.yaml#L682))
+- [ ] Record the line and Dante wordings of the input and output replies (the document shows only Input line volume: 50 and Output speaker volume: 50), and whether they are capitalised. ([specs/turtleav-amp150.yaml:692](specs/turtleav-amp150.yaml#L692))
+- [ ] Check the LCD and ID LED timed forms: s lcd on 15 (this document's example) or s lcd 15 (the 30W amplifier's), and the replies to r lcd and r idled. ([specs/turtleav-amp150.yaml:72](specs/turtleav-amp150.yaml#L72))
+- [ ] Check the TCP port command's spelling: s tcp/ipport 8000 (the example, sent) or s tcp/ip port 8000 (the command column). ([specs/turtleav-amp150.yaml:346](specs/turtleav-amp150.yaml#L346))
+- [ ] Record r fan's reply when the two fans differ, r auto stb's reply with auto standby off, and r trigger's with the trigger off. ([specs/turtleav-amp150.yaml:682](specs/turtleav-amp150.yaml#L682))
+- [ ] Check what a graphic EQ value means: 0-20 with 10 the default, read here as the device's number, possibly -10 to +10 dB. ([specs/turtleav-amp150.yaml:243](specs/turtleav-amp150.yaml#L243))
+- [ ] Check how many lines a network change answers (the value and the net reboot reminder) and that later reads stay in step. ([specs/turtleav-amp150.yaml:692](specs/turtleav-amp150.yaml#L692))
 
 ## turtleav-avoip-control — Turtle AV DARWIN and CHAZY controllers
 

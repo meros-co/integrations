@@ -10,10 +10,11 @@ source:
     url: https://turtleav.com/download/179/user-guide/28565/150w-dante-power-amp-user-guide.pdf
     note: >
       Manufacturer-documented, free download. Serial 115200 8N1 and TCP/IP port 8000 with
-      the s and r commands: system, input select and volume (Set input: Line, Input line
+      the s and r commands and their replies: system (power, auto standby, LCD, ID LED,
+      trigger, baud rate, fans), input select, volume and mute (Set input: Line, Input line
       volume: 50), master member, volume and mute, output volume, mute, mix, delay and
-      31-band EQ, presets, network and passwords; default LAN IP 192.168.0.200; it reports
-      its type as HDP-PA150D.
+      31-band graphic EQ, presets and their names, network and passwords; default LAN IP
+      192.168.0.200; it reports its type as HDP-PA150D.
 
 transport:
   type: line-tcp
@@ -31,27 +32,85 @@ models:
   - id: amp-150w
     name: Turtle AV 150W Dante power amplifier
     supports:
-      [set_master_volume, set_master_mute, select_input, set_input_volume,
-       set_output_volume, set_output_mute, recall_preset, save_preset, set_power, reboot]
+      [set_power, reboot, set_auto_standby, set_lcd, set_id_led, set_trigger, set_baud_rate,
+       set_fan, select_input, set_input_volume, step_input_volume, set_input_mute,
+       set_master_member, set_master_volume, step_master_volume, set_master_mute,
+       set_output_volume, step_output_volume, set_output_mute, set_output_mix,
+       set_output_delay, set_output_geq, set_output_geq_preset, clear_output_geq,
+       recall_preset, save_preset, clear_preset, set_preset_name, set_ip_mode,
+       set_ip_address, set_subnet, set_gateway, set_tcp_port, set_telnet_port, net_reboot]
     verification: none
     notes: >
       Line and Dante inputs; speaker, line and Dante outputs.
 
 commands:
-  set_master_volume:
-    summary: Set the master volume, 0-100
+  set_power:
+    summary: Power on, or off into standby
     params:
-      volume: {type: int, min: 0, max: 100, required: true, label: Master volume, description: Master volume from 0 to 100.}
-    send: s master vol {volume}
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: s power {state}
     expect: {not_contains: rror}
     returns: ack
     # 150W Dante Power Amp user manual, §8
 
-  set_master_mute:
-    summary: Mute or unmute the master output
+  reboot:
+    summary: Reboot the amplifier; audio stops until it is back
+    send: s reboot
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_auto_standby:
+    summary: Set the auto standby time, or turn it off
     params:
-      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
-    send: s master mute {state}
+      minutes: {type: int, min: 0, max: 120, required: true, label: Auto standby, description: 'Minutes without signal before standby, 1 to 120; 0 turns auto standby off.'}
+    send: s auto stb {minutes}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_lcd:
+    summary: Set when the volume LCD is lit
+    params:
+      mode: {type: enum, values: ['on', 'off', on 15, on 30, on 60], required: true, label: LCD, description: 'on always lit, off always dark, or on for 15, 30 or 60 seconds after use.'}
+    send: s lcd {mode}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_id_led:
+    summary: Set when the ID LED is lit
+    params:
+      mode: {type: enum, values: ['on', 'off', on 15, on 30, on 60], required: true, label: ID LED, description: 'on always lit, off always dark, or on for 15, 30 or 60 seconds.'}
+    send: s idled {mode}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_trigger:
+    summary: Set the trigger input that mutes the outputs
+    params:
+      mode: {type: enum, values: ['off', on 0, on 1], required: true, label: Trigger, description: 'off ignores the trigger; on 0 mutes the outputs at a low level (0 V), on 1 at a high level (5-12 V).'}
+    send: s trigger {mode}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_baud_rate:
+    summary: Set the RS-232 port's baud rate
+    params:
+      baud: {type: enum, values: ['115200', '57600', '38400', '19200', '9600', '4800'], required: true, label: Baud rate, description: Serial port speed in bits per second.}
+    send: s rsb {baud}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_fan:
+    summary: Let a fan turn on automatically, or keep it off
+    params:
+      fan: {type: int, min: 0, max: 2, required: true, label: Fan, description: 'Fan 1 or 2; 0 both.'}
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on lets the fan turn on as needed; off keeps it off.}
+    send: s fan {fan} {state}
     expect: {not_contains: rror}
     returns: ack
     # 150W Dante Power Amp user manual, §8
@@ -75,6 +134,62 @@ commands:
     returns: ack
     # 150W Dante Power Amp user manual, §8
 
+  step_input_volume:
+    summary: Raise or lower an input's volume by one step
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 line, 2 Dante; 0 both.'}
+      direction: {type: enum, values: [+, '-'], required: true, label: Direction, description: '+ raises, - lowers.'}
+    send: s input {input} vol{direction}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_input_mute:
+    summary: Mute or unmute an input
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 line, 2 Dante; 0 both.'}
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: s input {input} mute {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_master_member:
+    summary: Choose which outputs the master volume and mute act on
+    params:
+      members: {type: string, pattern: '^[01]{3}$', required: true, label: Members, description: 'Three digits, 1 to include and 0 to exclude, for the speaker, line and Dante outputs in that order, e.g. 110.'}
+    send: s master member {members}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_master_volume:
+    summary: Set the master volume, 0-100
+    params:
+      volume: {type: int, min: 0, max: 100, required: true, label: Master volume, description: Master volume from 0 to 100.}
+    send: s master vol {volume}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  step_master_volume:
+    summary: Raise or lower the master volume by one step
+    params:
+      direction: {type: enum, values: [+, '-'], required: true, label: Direction, description: '+ raises, - lowers.'}
+    send: s master vol{direction}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_master_mute:
+    summary: Mute or unmute the master output
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: s master mute {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
   set_output_volume:
     summary: Set an output's volume, 0-100
     params:
@@ -85,12 +200,72 @@ commands:
     returns: ack
     # 150W Dante Power Amp user manual, §8
 
+  step_output_volume:
+    summary: Raise or lower an output's volume by one step
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+      direction: {type: enum, values: [+, '-'], required: true, label: Direction, description: '+ raises, - lowers.'}
+    send: s output {output} vol{direction}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
   set_output_mute:
     summary: Mute or unmute an output
     params:
       output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
       state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
     send: s output {output} mute {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_output_mix:
+    summary: Set which input channels an output carries
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+      mix: {type: int, min: 1, max: 4, required: true, label: Mix, description: '1 stereo, 2 left, 3 right, 4 left and right summed.'}
+    send: s output {output} mix {mix}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_output_delay:
+    summary: Set an output's delay, 0-50 ms
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+      ms: {type: int, min: 0, max: 50, required: true, label: Delay, description: 'Output delay in milliseconds, 0 to 50.'}
+    send: s output {output} delay {ms}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_output_geq:
+    summary: Set one band of an output's 31-band graphic EQ
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+      band: {type: int, min: 1, max: 31, required: true, label: Band, description: 'Graphic EQ band, 1 (lowest) to 31.'}
+      value: {type: int, min: 0, max: 20, required: true, label: Value, description: 'Band value 0 to 20 as the device states it in dB; 10 is the default.'}
+    send: s output {output} eq {band} val {value}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_output_geq_preset:
+    summary: Load a graphic EQ preset on an output
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+      preset: {type: int, min: 1, max: 3, required: true, label: EQ preset, description: '1 flat, 2 custom 1, 3 custom 2.'}
+    send: s output {output} eq preset {preset}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  clear_output_geq:
+    summary: Clear an output's graphic EQ
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+    send: s output {output} eq clear
     expect: {not_contains: rror}
     returns: ack
     # 150W Dante Power Amp user manual, §8
@@ -113,18 +288,82 @@ commands:
     returns: ack
     # 150W Dante Power Amp user manual, §8
 
-  set_power:
-    summary: Power on, or off into standby
+  clear_preset:
+    summary: Clear a preset
     params:
-      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
-    send: s power {state}
+      preset: {type: int, min: 1, max: 5, required: true, label: Preset, description: Preset 1 to 5.}
+    send: s preset clear {preset}
     expect: {not_contains: rror}
     returns: ack
     # 150W Dante Power Amp user manual, §8
 
-  reboot:
-    summary: Reboot the amplifier; audio stops until it is back
-    send: s reboot
+  set_preset_name:
+    summary: Name a preset
+    params:
+      preset: {type: int, min: 1, max: 5, required: true, label: Preset, description: Preset 1 to 5.}
+      name: {type: string, max_length: 16, pattern: '^[ -~]{1,16}$', required: true, label: Name, description: 'Preset name, up to 16 printable ASCII characters.'}
+    send: s preset {preset} name {name}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_ip_mode:
+    summary: Use a static address or DHCP; applies after net_reboot
+    params:
+      mode: {type: int, min: 0, max: 1, required: true, label: IP mode, description: '0 static, 1 DHCP.'}
+    send: s ip mode {mode}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_ip_address:
+    summary: Set the static IP address; applies after net_reboot
+    params:
+      address: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: IP address, description: 'Static IPv4 address, e.g. 192.168.1.100.'}
+    send: s ip addr {address}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_subnet:
+    summary: Set the static subnet mask; applies after net_reboot
+    params:
+      mask: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: Subnet mask, description: 'Subnet mask, e.g. 255.255.255.0.'}
+    send: s subnet {mask}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_gateway:
+    summary: Set the static gateway; applies after net_reboot
+    params:
+      gateway: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: Gateway, description: 'Gateway IPv4 address, e.g. 192.168.1.1.'}
+    send: s gateway {gateway}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_tcp_port:
+    summary: Set the TCP/IP control port
+    params:
+      port: {type: int, min: 1, max: 65535, required: true, label: Port, description: 'TCP control port, 8000 by default.'}
+    send: s tcp/ipport {port}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_telnet_port:
+    summary: Set the Telnet port
+    params:
+      port: {type: int, min: 1, max: 65535, required: true, label: Port, description: 'Telnet port, 23 by default.'}
+    send: s telnet port {port}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  net_reboot:
+    summary: Restart the network module to apply new network settings
+    send: s net reboot
     expect: {not_contains: rror}
     returns: ack
     # 150W Dante Power Amp user manual, §8
@@ -136,33 +375,333 @@ telemetry:
     - r master vol
     - r master mute
     - r input
+    - r input 1 vol
+    - r input 2 vol
+    - r input 1 mute
+    - r input 2 mute
+    - r output 1 vol
+    - r output 2 vol
+    - r output 3 vol
+    - r output 1 mute
+    - r output 2 mute
+    - r output 3 mute
+  subscribe:
+    every_ms: 60000
+    send:
+    - r power
+    - r auto stb
+    - r lcd
+    - r idled
+    - r trigger
+    - r rsb
+    - r fan
+    - r master member
+    - r output 1 mix
+    - r output 1 delay
+    - r output 1 eq preset
+    - r output 1 eq 1 val
+    - r output 1 eq 2 val
+    - r output 1 eq 3 val
+    - r output 1 eq 4 val
+    - r output 1 eq 5 val
+    - r output 1 eq 6 val
+    - r output 1 eq 7 val
+    - r output 1 eq 8 val
+    - r output 1 eq 9 val
+    - r output 1 eq 10 val
+    - r output 1 eq 11 val
+    - r output 1 eq 12 val
+    - r output 1 eq 13 val
+    - r output 1 eq 14 val
+    - r output 1 eq 15 val
+    - r output 1 eq 16 val
+    - r output 1 eq 17 val
+    - r output 1 eq 18 val
+    - r output 1 eq 19 val
+    - r output 1 eq 20 val
+    - r output 1 eq 21 val
+    - r output 1 eq 22 val
+    - r output 1 eq 23 val
+    - r output 1 eq 24 val
+    - r output 1 eq 25 val
+    - r output 1 eq 26 val
+    - r output 1 eq 27 val
+    - r output 1 eq 28 val
+    - r output 1 eq 29 val
+    - r output 1 eq 30 val
+    - r output 1 eq 31 val
+    - r output 2 mix
+    - r output 2 delay
+    - r output 2 eq preset
+    - r output 2 eq 1 val
+    - r output 2 eq 2 val
+    - r output 2 eq 3 val
+    - r output 2 eq 4 val
+    - r output 2 eq 5 val
+    - r output 2 eq 6 val
+    - r output 2 eq 7 val
+    - r output 2 eq 8 val
+    - r output 2 eq 9 val
+    - r output 2 eq 10 val
+    - r output 2 eq 11 val
+    - r output 2 eq 12 val
+    - r output 2 eq 13 val
+    - r output 2 eq 14 val
+    - r output 2 eq 15 val
+    - r output 2 eq 16 val
+    - r output 2 eq 17 val
+    - r output 2 eq 18 val
+    - r output 2 eq 19 val
+    - r output 2 eq 20 val
+    - r output 2 eq 21 val
+    - r output 2 eq 22 val
+    - r output 2 eq 23 val
+    - r output 2 eq 24 val
+    - r output 2 eq 25 val
+    - r output 2 eq 26 val
+    - r output 2 eq 27 val
+    - r output 2 eq 28 val
+    - r output 2 eq 29 val
+    - r output 2 eq 30 val
+    - r output 2 eq 31 val
+    - r output 3 mix
+    - r output 3 delay
+    - r output 3 eq preset
+    - r output 3 eq 1 val
+    - r output 3 eq 2 val
+    - r output 3 eq 3 val
+    - r output 3 eq 4 val
+    - r output 3 eq 5 val
+    - r output 3 eq 6 val
+    - r output 3 eq 7 val
+    - r output 3 eq 8 val
+    - r output 3 eq 9 val
+    - r output 3 eq 10 val
+    - r output 3 eq 11 val
+    - r output 3 eq 12 val
+    - r output 3 eq 13 val
+    - r output 3 eq 14 val
+    - r output 3 eq 15 val
+    - r output 3 eq 16 val
+    - r output 3 eq 17 val
+    - r output 3 eq 18 val
+    - r output 3 eq 19 val
+    - r output 3 eq 20 val
+    - r output 3 eq 21 val
+    - r output 3 eq 22 val
+    - r output 3 eq 23 val
+    - r output 3 eq 24 val
+    - r output 3 eq 25 val
+    - r output 3 eq 26 val
+    - r output 3 eq 27 val
+    - r output 3 eq 28 val
+    - r output 3 eq 29 val
+    - r output 3 eq 30 val
+    - r output 3 eq 31 val
+    - r preset 1 name
+    - r preset 2 name
+    - r preset 3 name
+    - r preset 4 name
+    - r preset 5 name
+    - r ip mode
+    - r ip addr
+    - r subnet
+    - r gateway
+    - r tcp/ipport
+    - r telnet port
+    - r mac addr
   updates:
-    - match: '^(?:Increase |Decrease )?[Mm]aster volume: (\d+)$'
+    - match: '^(?:Set |Increase |Decrease )?[Mm]aster volume: (\d+)$'
       state:
         master.volume: '{1}'
-    - match: ^Master mute:? (on|off)$
+    - match: '^(?:Set )?[Mm]aster mute:? (on|off)$'
       state:
         master.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^(?:Set )?[Mm]aster member: ?([01](?: ?[01])*)$'
+      state:
+        master.member: '{1}'
     - match: '^(?:Set )?[Ii]nput: (Line|Dante)$'
       state:
         input: '{1}'
+    - match: '(?i)^(?:Set |Increase |Decrease )?input line volume: (\d+)$'
+      state:
+        inputs.1.volume: '{1}'
+    - match: '(?i)^(?:Set )?input line mute:? (on|off)$'
+      state:
+        inputs.1.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^(?:Set |Increase |Decrease )?input dante volume: (\d+)$'
+      state:
+        inputs.2.volume: '{1}'
+    - match: '(?i)^(?:Set )?input dante mute:? (on|off)$'
+      state:
+        inputs.2.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^(?:Set |Increase |Decrease )?output speaker volume: (\d+)$'
+      state:
+        outputs.1.volume: '{1}'
+    - match: '(?i)^(?:Set )?output speaker mute:? (on|off)$'
+      state:
+        outputs.1.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^(?:Set )?output speaker mix: (Stereo|Left|Right|Left and Right)$'
+      state:
+        outputs.1.mix: {value: '{1}', map: {Stereo: 1, stereo: 1, Left: 2, left: 2, Right: 3, right: 3, Left and Right: 4, left and right: 4}}
+    - match: '(?i)^(?:Set )?output speaker delay: (\d+) ?ms$'
+      state:
+        outputs.1.delay_ms: '{1}'
+    - match: '(?i)^(?:Set )?output speaker GEQ index (\d+): (\d+) ?dB$'
+      state:
+        outputs.1.geq.{1}: '{2}'
+    - match: '(?i)^(?:Set )?output speaker GEQ: (Flat|Custom1|Custom2)$'
+      state:
+        outputs.1.geq_preset: {value: '{1}', map: {Flat: 1, flat: 1, Custom1: 2, custom1: 2, Custom2: 3, custom2: 3}}
+    - match: '(?i)^(?:Set |Increase |Decrease )?output line volume: (\d+)$'
+      state:
+        outputs.2.volume: '{1}'
+    - match: '(?i)^(?:Set )?output line mute:? (on|off)$'
+      state:
+        outputs.2.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^(?:Set )?output line mix: (Stereo|Left|Right|Left and Right)$'
+      state:
+        outputs.2.mix: {value: '{1}', map: {Stereo: 1, stereo: 1, Left: 2, left: 2, Right: 3, right: 3, Left and Right: 4, left and right: 4}}
+    - match: '(?i)^(?:Set )?output line delay: (\d+) ?ms$'
+      state:
+        outputs.2.delay_ms: '{1}'
+    - match: '(?i)^(?:Set )?output line GEQ index (\d+): (\d+) ?dB$'
+      state:
+        outputs.2.geq.{1}: '{2}'
+    - match: '(?i)^(?:Set )?output line GEQ: (Flat|Custom1|Custom2)$'
+      state:
+        outputs.2.geq_preset: {value: '{1}', map: {Flat: 1, flat: 1, Custom1: 2, custom1: 2, Custom2: 3, custom2: 3}}
+    - match: '(?i)^(?:Set |Increase |Decrease )?output dante volume: (\d+)$'
+      state:
+        outputs.3.volume: '{1}'
+    - match: '(?i)^(?:Set )?output dante mute:? (on|off)$'
+      state:
+        outputs.3.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^(?:Set )?output dante mix: (Stereo|Left|Right|Left and Right)$'
+      state:
+        outputs.3.mix: {value: '{1}', map: {Stereo: 1, stereo: 1, Left: 2, left: 2, Right: 3, right: 3, Left and Right: 4, left and right: 4}}
+    - match: '(?i)^(?:Set )?output dante delay: (\d+) ?ms$'
+      state:
+        outputs.3.delay_ms: '{1}'
+    - match: '(?i)^(?:Set )?output dante GEQ index (\d+): (\d+) ?dB$'
+      state:
+        outputs.3.geq.{1}: '{2}'
+    - match: '(?i)^(?:Set )?output dante GEQ: (Flat|Custom1|Custom2)$'
+      state:
+        outputs.3.geq_preset: {value: '{1}', map: {Flat: 1, flat: 1, Custom1: 2, custom1: 2, Custom2: 3, custom2: 3}}
+    - match: '(?i)^Power:? (on|off)$'
+      state:
+        power: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '(?i)^(?:Set )?auto standby time: (\d+) ?mins?$'
+      state:
+        auto_standby_min: '{1}'
+    - match: '(?i)^(?:Set )?LCD light (always on|always off|on \d+s)$'
+      state:
+        lcd: '{1}'
+    - match: '(?i)^(?:Set )?ID L[EC]D light (always on|always off|on \d+s)$'
+      state:
+        id_led: '{1}'
+    - match: '(?i)^(?:Set )?trigger on with (high|low) level$'
+      state:
+        trigger: {value: '{1}', map: {high: high, High: high, low: low, Low: low}}
+    - match: '(?i)^(?:Set )?trigger (off)$'
+      state:
+        trigger: {value: '{1}', map: {'off': 'off', 'Off': 'off'}}
+    - match: '(?i)^(?:Set )?baud rate(?: to)? (\d+)$'
+      state:
+        baud: '{1}'
+    - match: '(?i)^(?:Set )?all fan (on|off)$'
+      state:
+        fans_auto: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^(?:Set )?[Pp]reset ([1-5]) name: (.*)$'
+      state:
+        presets.{1}.name: '{2}'
+    - match: '^Recall preset ([1-5])$'
+      state:
+        preset.recalled: '{1}'
+    - match: '(?i)^IP mode: (Static|DHCP)$'
+      state:
+        network.ip_mode: {value: '{1}', map: {Static: static, static: static, DHCP: dhcp, dhcp: dhcp}}
+    - match: '^IP(?: address)?: ([0-9.]+)$'
+      state:
+        network.ip: '{1}'
+    - match: '(?i)^subnet mask: ([0-9.]+)$'
+      state:
+        network.subnet: '{1}'
+    - match: '(?i)^gateway: ([0-9.]+)$'
+      state:
+        network.gateway: '{1}'
+    - match: '^TCP/IP port: (\d+)$'
+      state:
+        network.tcp_port: '{1}'
+    - match: '(?i)^telnet port: (\d+)$'
+      state:
+        network.telnet_port: '{1}'
+    - match: '^MAC: ([0-9A-Fa-f:]+)$'
+      state:
+        network.mac: '{1}'
 
 state:
-  master.volume:  {type: int, description: 'Master volume, 0-100'}
-  master.mute:    {type: bool, description: Master output muted}
-  input:          {type: string, description: 'Selected input: Line or Dante'}
+  power:              {type: bool, description: Amplifier powered on}
+  auto_standby_min:   {type: int, unit: min, description: 'Auto standby time in minutes'}
+  lcd:                {type: string, description: 'When the volume LCD is lit, as the device words it: always on, always off, on 15s'}
+  id_led:             {type: string, description: 'When the ID LED is lit, as the device words it'}
+  trigger:            {type: string, description: 'Trigger mute: off, low (0 V mutes) or high (5-12 V mutes)'}
+  baud:               {type: int, description: RS-232 baud rate}
+  fans_auto:          {type: bool, description: 'Fans turn on as needed (true) or are kept off'}
+  input:              {type: string, description: 'Selected input: Line or Dante'}
+  inputs.*.volume:    {type: int, description: 'Input volume 0-100; 1 line, 2 Dante'}
+  inputs.*.mute:      {type: bool, description: 'Input muted; 1 line, 2 Dante'}
+  master.volume:      {type: int, description: 'Master volume, 0-100'}
+  master.mute:        {type: bool, description: Master output muted}
+  master.member:      {type: string, description: 'Outputs the master acts on, as the device shows the digits (speaker, line, Dante; 1 included)'}
+  outputs.*.volume:   {type: int, description: 'Output volume 0-100; 1 speaker, 2 line, 3 Dante'}
+  outputs.*.mute:     {type: bool, description: Output muted}
+  outputs.*.mix:      {type: int, description: 'Output mix: 1 stereo, 2 left, 3 right, 4 left and right'}
+  outputs.*.delay_ms: {type: int, unit: ms, description: Output delay in milliseconds}
+  outputs.*.geq.*:    {type: int, description: 'Graphic EQ band value 0-20, keyed by band 1-31'}
+  outputs.*.geq_preset: {type: int, description: 'Graphic EQ preset: 1 flat, 2 custom 1, 3 custom 2'}
+  presets.*.name:     {type: string, description: 'Preset name, keyed by preset 1-5'}
+  preset.recalled:    {type: int, description: 'The preset last recalled, as the device reported it'}
+  network.ip_mode:    {type: string, description: 'static or dhcp'}
+  network.ip:         {type: string, description: IPv4 address}
+  network.subnet:     {type: string, description: Subnet mask}
+  network.gateway:    {type: string, description: Gateway}
+  network.tcp_port:   {type: int, description: TCP/IP control port}
+  network.telnet_port: {type: int, description: Telnet port}
+  network.mac:        {type: string, description: MAC address}
 
 quirks:
   - models: [all]
     severity: critical
     text: >
       recall_preset changes the amplifier's settings at once and reboot or power off stops
-      the audio. Neither asks for confirmation.
+      the audio. Neither asks for confirmation. The network commands take effect after
+      net_reboot or a power cycle, and a wrong address leaves the amplifier unreachable.
 
   - models: [all]
     severity: warning
     text: >
-      Nothing is pushed: master volume, mute and input are polled every 5 seconds. The
-      master volume and mute reply texts are assumed to match the other Turtle Dante
-      devices (Master volume: 50); the document shows only the input's. The documents
+      Nothing is pushed. Master, input and output volumes and mutes and the selected input
+      are polled every 5 seconds; every other setting the API reads (power, standby, LCD,
+      ID LED, trigger, baud rate, fans, master member, output mix, delay, every graphic EQ
+      band and preset, preset names and the network) is read on connecting and every
+      minute. Replies to this session's commands update state at once. The documents
       state no line ending (CR LF is sent) and no login.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Reply texts are taken from the document's examples, which show only the speaker
+      output's and line input's wording (Output speaker volume: 50, Input line mute on);
+      the line and Dante wordings are assumed to follow them. Some replies are documented
+      as several lines (a network change adds a reminder to run net_reboot); the extra
+      lines can be taken as the answers to the next queued reads, which only delays state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not offered: s reset and s reset all, which ask for Yes at a further prompt, and the
+      admin and user password commands, which the API answers in clear text. The status
+      report (r status) is a multi-line table not read into state; its amplifier mode,
+      L/R inverter and EQ fields have no command of their own (an API limit).
