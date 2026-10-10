@@ -290,7 +290,7 @@ binary(W, "set_node", {"assignments": "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1"},
        device_reply_hex=hexs(osc("/*", ("s", "OK"))), expect_result={"ok": {"kind": "ack"}}, file="set_node-root")
 _ts("param-enum", "/$ctl/user/1/1/enc/mode", "FX", {})
 _tf("param-float", "/cfg/mon/1/dim", "-20.0", 0.5, -20.0, {})
-_ti("param-int", "/ch/40/in/set/srcauto", 1, {})
+_ti("param-int", "/ch/40/$muteovr", 1, {})
 
 # ── EQ model, mix, frequencies, Qs, types and tilt; pre-send EQ (p.48-63) ─
 # Floats in their own unit as ,f; enumerations as ,s (p.22).
@@ -477,3 +477,83 @@ _ti("fx-source", "/fx/2/$esrc", 12, {"fx": {"2": {"source": 12}}})
 _ts("fx-mode", "/fx/2/$emode", "ST", {"fx": {"2": {"mode": "ST"}}})
 _ti("fx-assigned-strip", "/fx/2/$a_chn", 5, {"fx": {"2": {"assigned_strip": 5}}})
 _ti("fx-assigned-position", "/fx/2/$a_pos", 1, {"fx": {"2": {"assigned_position": 1}}})
+
+# ── Sends, delay and strip settings (p.47-65) ─────────────────────────────
+for stem, node in [("channel", "ch"), ("aux", "aux")]:
+    P = _PLURAL[node]
+    for cs, dkey, x, xs, key in [("send", "bus", 16, "16", "sends"), ("matrix_send", "matrix", 8, "MX8", "matrix_sends")]:
+        binary(W, f"set_{stem}_{cs}_pre_always", {stem: 1, dkey: x, "enabled": True}, osc(f"/{node}/1/send/{xs}/pon", ("i", 1)))
+        binary(W, f"set_{stem}_{cs}_mode", {stem: 1, dkey: x, "mode": "GRP"}, osc(f"/{node}/1/send/{xs}/mode", ("s", "GRP")))
+        binary(W, f"set_{stem}_{cs}_pan_link", {stem: 1, dkey: x, "enabled": False}, osc(f"/{node}/1/send/{xs}/plink", ("i", 0)))
+        binary(W, f"set_{stem}_{cs}_pan", {stem: 1, dkey: x, "pan": -100.0}, osc(f"/{node}/1/send/{xs}/pan", ("f", -100.0)))
+        y = "9" if dkey == "bus" else "MX1"
+        _ti(f"{stem}-{cs.replace('_', '-')}-pre-always", f"/{node}/2/send/{y}/pon", 0, {P: {"2": {key: {y.replace('MX', ''): {"pre_always": False}}}}})
+        _ts(f"{stem}-{cs.replace('_', '-')}-mode", f"/{node}/2/send/{y}/mode", "PRE", {P: {"2": {key: {y.replace('MX', ''): {"mode": "PRE"}}}}})
+        _ti(f"{stem}-{cs.replace('_', '-')}-pan-link", f"/{node}/2/send/{y}/plink", 1, {P: {"2": {key: {y.replace('MX', ''): {"pan_link": True}}}}})
+        _tf(f"{stem}-{cs.replace('_', '-')}-pan", f"/{node}/2/send/{y}/pan", "25", 0.625, 25.0, {P: {"2": {key: {y.replace('MX', ''): {"pan": 25.0}}}}})
+for stem, node in [("channel", "ch"), ("aux", "aux"), ("bus", "bus")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_main_send_pre", {stem: 1, "main": 4, "enabled": True}, osc(f"/{node}/1/main/4/pre", ("i", 1)))
+    _ti(f"{stem}-main-send-pre", f"/{node}/3/main/1/pre", 0, {P: {"3": {"main_sends": {"1": {"pre": False}}}}})
+binary(W, "set_bus_send_pre", {"bus": 2, "destination": 3, "enabled": True}, osc("/bus/2/send/3/pre", ("i", 1)))
+_ti("bus-send-pre", "/bus/1/send/2/pre", 1, {"buses": {"1": {"sends": {"2": {"pre": True}}}}})
+for stem, node in [("bus", "bus"), ("main", "main")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_matrix_send_pre", {stem: 1, "matrix": 8, "enabled": False}, osc(f"/{node}/1/send/MX8/pre", ("i", 0)))
+    _ti(f"{stem}-matrix-send-pre", f"/{node}/1/send/MX3/pre", 1, {P: {"1": {"matrix_sends": {"3": {"pre": True}}}}})
+for stem, node, on, mode, val in [("channel", "ch", "in/set/dlyon", "in/set/dlymode", "in/set/dly"),
+                                  ("aux", "aux", "in/set/dlyon", "in/set/dlymode", "in/set/dly"),
+                                  ("bus", "bus", "dly/on", "dly/mode", "dly/dly"), ("main", "main", "dly/on", "dly/mode", "dly/dly"),
+                                  ("matrix", "mtx", "dly/on", "dly/mode", "dly/dly")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_delay", {stem: 1, "enabled": True}, osc(f"/{node}/1/{on}", ("i", 1)))
+    binary(W, f"set_{stem}_delay_mode", {stem: 1, "mode": "MS"}, osc(f"/{node}/1/{mode}", ("s", "MS")))
+    binary(W, f"set_{stem}_delay_time", {stem: 1, "delay": 500.0}, osc(f"/{node}/1/{val}", ("f", 500.0)))
+    _ti(f"{stem}-delay", f"/{node}/1/{on}", 0, {P: {"1": {"delay": {"on": False}}}})
+    _ts(f"{stem}-delay-mode", f"/{node}/1/{mode}", "M", {P: {"1": {"delay": {"mode": "M"}}}})
+    _tf(f"{stem}-delay-time", f"/{node}/1/{val}", "0.1", 0.0, _f32(0.1), {P: {"1": {"delay": {"time": _f32(0.1)}}}})
+for stem, node in [("channel", "ch"), ("aux", "aux"), ("bus", "bus"), ("main", "main"), ("matrix", "mtx"), ("dca", "dca")]:
+    P = _PLURAL[node]
+    binary(W, f"set_{stem}_icon", {stem: 1, "icon": 999}, osc(f"/{node}/1/icon", ("i", 999)))
+    binary(W, f"set_{stem}_scribble_light", {stem: 1, "enabled": False}, osc(f"/{node}/1/led", ("i", 0)))
+    binary(W, f"set_{stem}_monitor_bus", {stem: 1, "monitor": "A+B"}, osc(f"/{node}/1/mon", ("s", "A+B")))
+    _ti(f"{stem}-icon", f"/{node}/1/icon", 12, {P: {"1": {"icon": 12}}})
+    _ti(f"{stem}-scribble-light", f"/{node}/1/led", 1, {P: {"1": {"scribble_light": True}}})
+    _ts(f"{stem}-monitor-bus", f"/{node}/1/mon", "A", {P: {"1": {"monitor_bus": "A"}}})
+    if stem != "dca":
+        binary(W, f"set_{stem}_width", {stem: 1, "width": -150.0}, osc(f"/{node}/1/wid", ("f", -150.0)))
+        binary(W, f"set_{stem}_balance", {stem: 1, "balance_db": 9.0}, osc(f"/{node}/1/in/set/bal", ("f", 9.0)))
+        _tf(f"{stem}-width", f"/{node}/1/wid", "100", 0.8333, 100.0, {P: {"1": {"width": 100.0}}})
+        _tf(f"{stem}-balance", f"/{node}/1/in/set/bal", "0.0", 0.5, 0.0, {P: {"1": {"input": {"balance": 0.0}}}})
+    if stem in ("bus", "main", "matrix"):
+        binary(W, f"set_{stem}_mono", {stem: 1, "enabled": True}, osc(f"/{node}/1/busmono", ("i", 1)))
+        binary(W, f"set_{stem}_trim", {stem: 1, "trim_db": -18.0}, osc(f"/{node}/1/in/set/trim", ("f", -18.0)))
+        binary(W, f"set_{stem}_invert", {stem: 1, "enabled": True}, osc(f"/{node}/1/in/set/inv", ("i", 1)))
+        _ti(f"{stem}-mono", f"/{node}/1/busmono", 0, {P: {"1": {"mono": False}}})
+        _tf(f"{stem}-trim", f"/{node}/1/in/set/trim", "6.0", 0.6667, 6.0, {P: {"1": {"input": {"trim": 6.0}}}})
+        _ti(f"{stem}-invert", f"/{node}/1/in/set/inv", 1, {P: {"1": {"input": {"invert": True}}}})
+    if stem in ("channel", "aux"):
+        binary(W, f"set_{stem}_solo_safe", {stem: 1, "enabled": True}, osc(f"/{node}/1/solosafe", ("i", 1)))
+        binary(W, f"set_{stem}_auto_source", {stem: 1, "enabled": False}, osc(f"/{node}/1/in/set/srcauto", ("i", 0)))
+        binary(W, f"set_{stem}_alt_input", {stem: 1, "enabled": True}, osc(f"/{node}/1/in/set/altsrc", ("i", 1)))
+        binary(W, f"set_{stem}_custom_link", {stem: 1, "enabled": False}, osc(f"/{node}/1/clink", ("i", 0)))
+        binary(W, f"set_{stem}_alt_source", {stem: 2, "group": "USB", "input": 47},
+               [osc(f"/{node}/2/in/conn/altgrp", ("s", "USB")), osc(f"/{node}/2/in/conn/altin", ("i", 47))])
+        _ti(f"{stem}-solo-safe", f"/{node}/1/solosafe", 1, {P: {"1": {"solo_safe": True}}})
+        _ti(f"{stem}-auto-source", f"/{node}/1/in/set/srcauto", 0, {P: {"1": {"input": {"auto_source": False}}}})
+        _ti(f"{stem}-alt-input", f"/{node}/1/in/set/altsrc", 1, {P: {"1": {"input": {"alt": True}}}})
+        _ti(f"{stem}-custom-link", f"/{node}/1/clink", 1, {P: {"1": {"custom_link": True}}})
+        _ts(f"{stem}-alt-source-group", f"/{node}/1/in/conn/altgrp", "OFF", {P: {"1": {"input": {"alt_source_group": "OFF"}}}})
+        _ti(f"{stem}-alt-source-input", f"/{node}/1/in/conn/altin", 1, {P: {"1": {"input": {"alt_source_input": 1}}}})
+binary(W, "set_channel_process_order", {"channel": 1, "order": "IDGE"}, osc("/ch/1/proc", ("s", "IDGE")))
+binary(W, "set_channel_send_tap", {"channel": 1, "tap": "POST"}, osc("/ch/1/ptap", ("s", "POST")))
+_ts("channel-process-order", "/ch/1/proc", "GEDI", {"channels": {"1": {"process_order": "GEDI"}}})
+_ts("channel-send-tap", "/ch/1/ptap", "5", {"channels": {"1": {"send_tap": "5"}}})
+binary(W, "set_matrix_direct_input", {"matrix": 8, "enabled": True}, osc("/mtx/8/dir/on", ("i", 1)))
+binary(W, "set_matrix_direct_input_level", {"matrix": 8, "level_db": -144.0}, osc("/mtx/8/dir/lvl", ("f", -144.0)))
+binary(W, "set_matrix_direct_input_invert", {"matrix": 8, "enabled": False}, osc("/mtx/8/dir/inv", ("i", 0)))
+binary(W, "set_matrix_direct_input_source", {"matrix": 8, "source": "MON.BUS"}, osc("/mtx/8/dir/in", ("s", "MON.BUS")))
+_ti("matrix-direct-input", "/mtx/1/dir/on", 0, {"matrices": {"1": {"direct_input": {"on": False}}}})
+_tf("matrix-direct-input-level", "/mtx/1/dir/lvl", "0.0", 0.75, 0.0, {"matrices": {"1": {"direct_input": {"level": 0.0}}}})
+_ti("matrix-direct-input-invert", "/mtx/1/dir/inv", 1, {"matrices": {"1": {"direct_input": {"invert": True}}}})
+_ts("matrix-direct-input-source", "/mtx/1/dir/in", "AES", {"matrices": {"1": {"direct_input": {"source": "AES"}}}})

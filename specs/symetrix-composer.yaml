@@ -415,18 +415,106 @@ commands:
 state:
   controllers.*.value:
     type: int
-    description: "A controller's position, 0-65535, keyed by controller number, from push data, GSB2 block reads and GS2 answers; -1 when a block read names a controller that does not exist. Faders are linear in dB (usually -72 to +12 dB), buttons and LEDs 0 or 65535"
+    description: "A controller's position, 0-65535, keyed by controller number, from push data, GSB2 block reads and GS and GS2 answers; -1 when a block read names a controller that does not exist. Faders are linear in dB (usually -72 to +12 dB), buttons and LEDs 0 or 65535"
+  preset.current:
+    type: int
+    description: "The last preset loaded, 1-1000, 0 when none has been since power-up (GPR, polled, and read again after load_preset)"
+  matrix.*.*.*.*:
+    type: float
+    description: "A Super Matrix parameter in its native unit (dB for gains, 0 or 1 for switches, ms for delay, % for pan), keyed by unit, module, feature (CPGain, IMute, ...) and enumerator (I3O6, I2, O1), from CMV Get answers and read again after each CMV change to a single enumerator"
+  matrix_changes.*:
+    type: int
+    description: "The Super Matrix change counter of a unit (0 for the one addressed), which rises with every change by any means (GSYSC <unit>.3060)"
+  speed_dials.*.*.*.number:
+    type: string
+    description: "A speed dial's number, keyed by unit, card (0-3 for A-D) and entry (0-19 for speed dials 1-20), from GSYSS answers and read again after it is set"
+  speed_dials.*.*.*.name:
+    type: string
+    description: "A speed dial's name, keyed as speed_dials.*.*.*.number"
+  dial_numbers.*.*:
+    type: string
+    description: "The number a VoIP card dials next, keyed by unit and card (GSYSS resource 1004)"
+  calls.*.*.*.status:
+    type: string
+    description: "A call appearance's status as the card words it (Idle, Dialing, Ringing, In Call: <number>, Hold, Busy, ...; Ready, Outgoing Call, Incoming Call, ... on analog telephony cards), keyed by unit, card and channel (GSYSS resource 1005)"
+  calls.*.*.*.caller_id:
+    type: string
+    description: "Caller ID of a call appearance, keyed as calls.*.*.*.status (GSYSS resource 1003)"
+  calls.*.*.*.dialed_number:
+    type: string
+    description: "The number dialed on a call appearance (GSYSS resource 1002)"
+  calls.*.*.*.elapsed:
+    type: string
+    description: "Elapsed time of a call as the unit words it, such as \"Time 0:00:35\" (GSYSS resource 1006)"
 
 telemetry:
   # Push is on at power-up for every controller (p.15); turn it on again in
   # case another control system turned it off, and ask for every value now.
+  # The preset is not pushed: it is polled. Answers that are not push data
+  # carry no marker of what they answer, so each is read with its request.
   subscribe:
     send: ["PU 1", "PUR"]
+  poll:
+    send: ["GPR"]
+    every_ms: 10000
   updates:
     - match: '^#(\d+)=(-?\d+)\s*$'
       state: { "controllers.{1}.value": "{2}" }
     - match: '^\s*(\d+)\s+(\d+)\s*$'
+      request_match: '^GS2 \d+$'
       state: { "controllers.{1}.value": "{2}" }
+    - match: '^\s*(\d+)\s*$'
+      request_match: '^GS (\d+)$'
+      state: { "controllers.{2}.value": "{1}" }
+    # A change set here is read back: only push-enabled controllers are
+    # pushed.
+    - match: '^ACK\s*$'
+      request_match: '^(?:CS|CSQ|CC) (\d+) '
+      then_send: ["GS2 {1}"]
+    # GPR answers four digits, 0 for none (p.9).
+    - match: '^0*(\d+)\s*$'
+      request_match: '^GPR$'
+      state: { preset.current: "{1}" }
+    - match: '^ACK\s*$'
+      request_match: '^LP \d+$'
+      then_send: ["GPR"]
+    # Quiet mode answers a Get with the value alone, verbose mode with the
+    # parameter and "=" before it (p.23).
+    - match: '^(?:[^=]*=)?\s*(-?[0-9.]+)%?\s*$'
+      request_match: '^CMV Get (\d+)\.(\d+)\.(\w+)\.(I\d+O\d+|I\d+|O\d+)$'
+      state: { "matrix.{2}.{3}.{4}.{5}": "{1}" }
+    - match: '^ACK\s*$'
+      request_match: '^CMV (?:Set|Modify|Toggle|Reset) (\d+)\.(\d+)\.(\w+)\.(I\d+O\d+|I\d+|O\d+)(?: |$)'
+      then_send: ["CMV Get {1}.{2}.{3}.{4}"]
+    - match: '^\s*(\d+)\s*$'
+      request_match: '^GSYSC (\d+)\.3060\.-1,0$'
+      state: { "matrix_changes.{2}": "{1}" }
+    # A string answer has no marker; the bare "NAK" is the failure (p.12).
+    - match: '^(|[^N].*|N|N[^A].*|NA|NA[^K].*|NAK.+)$'
+      request_match: '^GSYSS (\d+)\.1000\.(\d+)\.(\d+)\.\d+$'
+      state: { "speed_dials.{2}.{4}.{3}.number": "{1}" }
+    - match: '^(|[^N].*|N|N[^A].*|NA|NA[^K].*|NAK.+)$'
+      request_match: '^GSYSS (\d+)\.1001\.(\d+)\.(\d+)\.\d+$'
+      state: { "speed_dials.{2}.{4}.{3}.name": "{1}" }
+    - match: '^(|[^N].*|N|N[^A].*|NA|NA[^K].*|NAK.+)$'
+      request_match: '^GSYSS (\d+)\.1002\.\d+\.(\d+)\.(\d+)$'
+      state: { "calls.{2}.{3}.{4}.dialed_number": "{1}" }
+    - match: '^(|[^N].*|N|N[^A].*|NA|NA[^K].*|NAK.+)$'
+      request_match: '^GSYSS (\d+)\.1003\.\d+\.(\d+)\.(\d+)$'
+      state: { "calls.{2}.{3}.{4}.caller_id": "{1}" }
+    - match: '^(|[^N].*|N|N[^A].*|NA|NA[^K].*|NAK.+)$'
+      request_match: '^GSYSS (\d+)\.1004\.\d+\.(\d+)\.\d+$'
+      state: { "dial_numbers.{2}.{3}": "{1}" }
+    - match: '^(|[^N].*|N|N[^A].*|NA|NA[^K].*|NAK.+)$'
+      request_match: '^GSYSS (\d+)\.1005\.\d+\.(\d+)\.(\d+)$'
+      state: { "calls.{2}.{3}.{4}.status": "{1}" }
+    - match: '^(|[^N].*|N|N[^A].*|NA|NA[^K].*|NAK.+)$'
+      request_match: '^GSYSS (\d+)\.1006\.\d+\.(\d+)\.(\d+)$'
+      state: { "calls.{2}.{3}.{4}.elapsed": "{1}" }
+    # A string set here is read back.
+    - match: '^ACK\s*$'
+      request_match: '^SSYSS (\d+)\.(\d+)\.(\d+)\.(\d+)\.(\d+)='
+      then_send: ["GSYSS {1}.{2}.{3}.{4}.{5}"]
 
 quirks:
   - models: [all]
@@ -472,6 +560,29 @@ quirks:
       A string answer (GSYSS) is returned as text, with no marker of its own;
       a name that is literally "NAK" is reported as a failure. GSYSS
       call-status values follow the VoIP or analog telephony card (p.12).
+  - models: [all]
+    severity: info
+    text: >
+      The current preset is polled every 10 seconds (GPR) and read again
+      after load_preset. Speed dials, the number to dial, call status, caller
+      ID, dialed number and call time are kept from GSYSS answers (the get_
+      commands) and read again after an SSYSS change; Super Matrix values from
+      matrix_get answers, read again after a change to a single crosspoint,
+      input or output (a range or set is not read back); the matrix change
+      counter from get_matrix_change_count. The protocol cannot list a site's
+      units, cards or call appearances, so none of these is polled: a control
+      system asks for the lines it uses. Composer's "Enable System String
+      Pushing" makes the unit push string changes, but the protocol document
+      does not give their format, so they are not read; call state that
+      Composer exposes as push-enabled controllers (LEDs, buttons) reaches
+      controllers.* like any controller.
+  - models: [all]
+    severity: info
+    text: >
+      A controller changed with set_controller, set_controller_quick,
+      increment_controller or decrement_controller (and the fader and button
+      commands) is read back with GS2, since only controllers with push
+      enabled in Composer are pushed.
   - models: [all]
     severity: info
     text: >
