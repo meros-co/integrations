@@ -33,8 +33,16 @@ struct Assign {
 enum Matcher {
     /// The whole message matches; captures are `{1}`, `{2}`, ... With
     /// `request` (`request_match`), only a reply whose request's text
-    /// matches it too, its captures numbered on after the message's.
-    Message { re: Regex, request: Option<Regex> },
+    /// matches it too, its captures numbered on after the message's. With
+    /// `each` (`match_each`), the rule matches once for each match of that
+    /// regex along the rest of the message, after what `re` matched: a
+    /// list on one line (Spyder's `0 2 1 Preset%201 4 Wide`), each item's
+    /// captures numbered on after the others and `{index}` its place, from 0.
+    Message {
+        re: Regex,
+        request: Option<Regex>,
+        each: Option<Regex>,
+    },
     /// The first line matches `header`; `line` is applied to every other line.
     Lines { header: Regex, line: Regex },
     /// The first line matches `header`; the other lines are `name: value`.
@@ -503,6 +511,10 @@ impl Telemetry {
                         Some(r @ Value::String(_)) => Some(regex(r, "request_match")?),
                         _ => None,
                     },
+                    each: match rule.get("match_each") {
+                        Some(r) => Some(regex(r, "match_each")?),
+                        None => None,
+                    },
                 }
             } else if let Some(a) = rule.get("address") {
                 Matcher::Osc {
@@ -723,23 +735,48 @@ impl Telemetry {
         let mut any = false;
         for rule in &self.rules {
             match (&rule.matcher, message) {
-                (Matcher::Message { re, request: asked }, Inbound::Text(text)) => {
-                    let Some(caps) = re.captures(text.trim_end()) else {
+                (
+                    Matcher::Message {
+                        re,
+                        request: asked,
+                        each,
+                    },
+                    Inbound::Text(text),
+                ) => {
+                    let text = text.trim_end();
+                    let Some(caps) = re.captures(text) else {
                         continue;
                     };
                     let mut values = captures(&caps);
+                    let mut numbered = caps.len() - 1;
                     if let Some(asked) = asked {
                         let Some(request_caps) = request.and_then(|r| asked.captures(r)) else {
                             continue;
                         };
-                        let offset = caps.len() - 1;
                         for (i, v) in captures(&request_caps) {
                             let n: usize = i.parse().unwrap_or(0);
-                            values.push(((n + offset).to_string(), v));
+                            values.push(((n + numbered).to_string(), v));
                         }
+                        numbered += request_caps.len() - 1;
                     }
                     self.clear(rule, &values, cleared);
-                    any |= self.matched(rule, &values, &mut patch, triggers);
+                    match each {
+                        None => any |= self.matched(rule, &values, &mut patch, triggers),
+                        // Each item along the rest of the message, after
+                        // what `match` matched.
+                        Some(each) => {
+                            let rest = &text[caps.get(0).map_or(0, |m| m.end())..];
+                            for (index, item) in each.captures_iter(rest).enumerate() {
+                                let mut values = values.clone();
+                                for (i, v) in captures(&item) {
+                                    let n: usize = i.parse().unwrap_or(0);
+                                    values.push(((n + numbered).to_string(), v));
+                                }
+                                values.push(("index".to_string(), Value::from(index)));
+                                any |= self.matched(rule, &values, &mut patch, triggers);
+                            }
+                        }
+                    }
                 }
                 (Matcher::Lines { header, line }, Inbound::Text(text)) => {
                     let mut lines = text.lines();
@@ -1637,6 +1674,58 @@ mod tests {
         // Without its request, a bare value is nothing.
         assert_eq!(t.apply(&Inbound::Text("1")), None);
         assert_eq!(answer("1", "Subnet.Status ?").0, None);
+    }
+
+    #[test]
+    fn a_list_on_one_line_is_read_item_by_item() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"match": "^0 (\\d+)(?: |$)", "request_match": "^RRL (\\d+) -1$",
+                 "match_each": "(\\d+) (\\S+)",
+                 "replace": "registers.{2}",
+                 "state": {"registers.{2}.{3}.name": "{4:url_decode}",
+                           "registers.{2}.{3}.place": "{index}"},
+                 "then_send": ["SCR {3} R"]},
+            ]})),
+            &state(json!({
+                "registers.*.*.name": {"type": "string", "description": "x"},
+                "registers.*.*.place": {"type": "int", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let mut triggers = Vec::new();
+        let mut cleared = json!({});
+        let patch = t.apply_into(
+            &Inbound::Answer {
+                text: "0 2 1 Look%201 7 Wide",
+                request: "RRL 4 -1",
+            },
+            &mut triggers,
+            &mut cleared,
+        );
+        assert_eq!(
+            patch,
+            Some(json!({"registers": {"4": {
+                "1": {"name": "Look 1", "place": 0},
+                "7": {"name": "Wide", "place": 1}}}}))
+        );
+        // The list is replaced whole, and each item asks for its own re-read.
+        assert_eq!(cleared, json!({"registers": {"4": null}}));
+        assert_eq!(triggers.len(), 2);
+        assert_eq!(triggers[1].params["3"], json!(7));
+        // An empty list clears and assigns nothing.
+        let mut cleared = json!({});
+        let patch = t.apply_into(
+            &Inbound::Answer {
+                text: "0 0",
+                request: "RRL 4 -1",
+            },
+            &mut Vec::new(),
+            &mut cleared,
+        );
+        assert_eq!(patch, None);
+        assert_eq!(cleared, json!({"registers": {"4": null}}));
     }
 
     #[test]

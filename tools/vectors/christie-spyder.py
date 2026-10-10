@@ -120,3 +120,87 @@ _sp("get_connection_status", {"layer": 2}, "RCS 2", device_reply="0 2 1 1", expe
 _sp("get_pixelspaces", {}, "RPD")
 _sp("get_io_status", {}, "RPS")
 _sp("get_aspect_ratio", {"source": "Camera%201"}, "RAR Camera%201")
+
+# State: Spyder never pushes and its answers do not name what they answer, so
+# each answer is read with the query it answers (`request`, header included).
+_KF = ("0 0.5 0.25 100 50 960 540 4 255 0 0 2 2 10 0 f 6 6 128 20 64 1 0.5 0.1 0 0.25 0 1 "
+       "0 2 -100 0 1 0")
+_KF_STATE = {
+    "h_position_relative": 0.5, "v_position_relative": 0.25, "x": 100.0, "y": 50.0,
+    "width": 960.0, "height": 540.0,
+    "border": {"thickness": 4.0, "red": 255.0, "green": 0.0, "blue": 0.0, "h_bevel": 2.0, "v_bevel": 2.0,
+               "inside_softness": 10.0, "outside_softness": 0.0, "outside_edges": "f"},
+    "shadow": {"h_offset": 6.0, "v_offset": 6.0, "size": 128.0, "softness": 20.0, "transparency": 64.0},
+    "clone": {"mode": "offset", "offset": 0.5},
+    "crop": {"left": 0.1, "right": 0.0, "top": 0.25, "bottom": 0.0, "anchor": "window_center"},
+    "aspect_offset": 0.0, "zoom": 2.0, "h_pan": -100.0, "v_pan": 0.0, "pixelspace": 1,
+    "transparency": 0.0}
+
+
+def _spt(name, inbound, request, **extra):
+    telemetry(CSP, name, inbound=inbound, request=_SPH + request, **extra)
+
+
+# RLK: the keyframe of an existing layer, then the next layer, and this
+# layer's source and aspect ratio (X80 TR p.32).
+_spt("layer-keyframe", _KF, "RLK 2", expect_state={"layers": {"2": _KF_STATE}},
+     expect_then_send=[_SPH + "RLK 3", _SPH + "RLS 2", _SPH + "RAR 2"])
+# Values appended by a later version are ignored.
+_spt("layer-keyframe-longer", _KF + " 7 8", "RLK 4", expect_state={"layers": {"4": _KF_STATE}},
+     expect_then_send=[_SPH + "RLK 5", _SPH + "RLS 4", _SPH + "RAR 4"])
+# Past the last layer the answer is an error code: the walk ends.
+_spt("layer-keyframe-past-the-end", "4", "RLK 20", expect_state={}, expect_then_send=[])
+_spt("layer-source", "0 Camera%201 12", "RLS 2",
+     expect_state={"layers": {"2": {"source": "Camera 1", "source_register": 12}}})
+# X80 TR p.33: an empty layer answers the Empty code with no parameters.
+_spt("layer-source-empty", "1", "RLS 3",
+     state_before={"layers": {"3": {"source": "PC", "source_register": 4, "x": 0.0}}},
+     expect_state={"layers": {"3": {"x": 0.0}}})
+_spt("layer-aspect-ratio", "0 1.778", "RAR 2", expect_state={"layers": {"2": {"aspect_ratio": 1.778}}})
+# RCS answers its layer: the next layer is asked in turn.
+_spt("connection-status", "0 2 1 1", "RCS 2",
+     expect_state={"layers": {"2": {"connector": "dvi", "connection": "connected"}}},
+     expect_then_send=[_SPH + "RCS 3"])
+_spt("layer-count", "0 18", "RLC", expect_state={"layer_count": 18})
+_spt("basic-presets", "0 2 1 Opening%20Look 2 Keynote", "RBL",
+     state_before={"basic_presets": {"9": {"name": "Old"}}},
+     expect_state={"basic_preset_count": 2,
+                   "basic_presets": {"1": {"name": "Opening Look"}, "2": {"name": "Keynote"}}})
+_spt("basic-presets-empty", "0 0", "RBL", state_before={"basic_presets": {"9": {"name": "Old"}}},
+     expect_state={"basic_preset_count": 0})
+# Command keys: each register's script cue is asked for.
+_spt("registers-command-keys", "0 2 1 Look%201 1002 Wide", "RRL 4 -1",
+     expect_state={"registers": {"4": {"count": 2, "1": {"name": "Look 1"}, "1002": {"name": "Wide"}}}},
+     expect_then_send=[_SPH + "SCR 1 R", _SPH + "SCR 1002 R"])
+_spt("registers-sources", "0 1 3 Camera%201", "RRL 6 -1",
+     state_before={"registers": {"6": {"count": 4, "9": {"name": "Gone"}}, "5": {"count": 1}}},
+     expect_state={"registers": {"6": {"count": 1, "3": {"name": "Camera 1"}}, "5": {"count": 1}}})
+_spt("register-cue", "0 3", "SCR 1002 R", expect_state={"registers": {"4": {"1002": {"cue": 3}}}})
+_spt("pixelspaces", "0 2 0 Main bg.png next.png 0 0 1920 1080 1 1 Side bg2.png bg3.png 1920 0 1280 720 1", "RPD",
+     expect_state={"pixelspace_count": 2, "pixelspaces": {
+         "0": {"name": "Main", "current_background": "bg.png", "next_background": "next.png",
+               "x": 0.0, "y": 0.0, "width": 1920.0, "height": 1080.0, "renewal_group": 1},
+         "1": {"name": "Side", "current_background": "bg2.png", "next_background": "bg3.png",
+               "x": 1920.0, "y": 0.0, "width": 1280.0, "height": 720.0, "renewal_group": 1}}})
+_spt("source-names", "0 Camera%201 PC", "RSN", state_before={"source_names": {"2": "Old"}},
+     expect_state={"source_names": {"0": "Camera 1", "1": "PC"}})
+# X80 TR p.34: idle answers 0 with an empty message, or 101 and Ready.
+_spt("io-status", "0 42 Loading%20still", "RPS", expect_state={"io": {"progress": 42, "status": "Loading still"}})
+_spt("io-status-idle", "0 101 Ready", "RPS", expect_state={"io": {"progress": 101, "status": "Ready"}})
+_spt("router-crosspoints", "0 0 0:3 1:-1", "QRC 0",
+     expect_state={"routers": {"0": {"outputs": {"0": {"input": 3}, "1": {"input": -1}}}}})
+# Writes are read back: layer changes walk the layers again, others re-read
+# their own list.
+_spt("reread-after-source-apply", "0", "SRA Camera%201 2 3", expect_state={},
+     expect_then_send=[_SPH + "RLK 2"])
+_spt("reread-after-preset-learn", "0", "BPL 7", expect_state={}, expect_then_send=[_SPH + "RBL"])
+_spt("reread-after-command-key-learn", "0 12 10", "LCK 0 Look%201 4 3 0", expect_state={},
+     expect_then_send=[_SPH + "RRL 4 -1"])
+_spt("reread-after-cue-recall", "0", "RSC 10 1 S", expect_state={},
+     expect_then_send=[_SPH + "RLK 2", _SPH + "RRL 4 -1"])
+_spt("reread-after-treatment-learn", "0", "KTL -1 2", expect_state={}, expect_then_send=[_SPH + "RRL 5 -1"])
+_spt("reread-after-background-load", "0", "BLD bg.png 0 0", expect_state={},
+     expect_then_send=[_SPH + "RPD", _SPH + "RPS"])
+_spt("reread-after-router-switch", "0", "RCR 2 L 3 7", expect_state={}, expect_then_send=[_SPH + "QRC 2"])
+# A failed write is not read back.
+_spt("no-reread-after-failure", "4", "SRA Nope 2", expect_state={}, expect_then_send=[])

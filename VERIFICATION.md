@@ -564,10 +564,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm that answers come back to the sending port with no "spyder" header, the result code first. ([specs/christie-spyder.yaml:46](specs/christie-spyder.yaml#L46))
 - [ ] Record the exact answers to RLC, RSN, RBL, RRL, RLK and RCS (spacing, trailing characters), which the get_ commands return as text. ([specs/christie-spyder.yaml:731](specs/christie-spyder.yaml#L731))
-- [ ] Check that Spyder decodes percent-encoding other than %20 in names (such as %28 for a parenthesis). ([specs/christie-spyder.yaml:846](specs/christie-spyder.yaml#L846))
+- [ ] Check that Spyder decodes percent-encoding other than %20 in names (such as %28 for a parenthesis). ([specs/christie-spyder.yaml:1090](specs/christie-spyder.yaml#L1090))
 - [ ] Check what learn_command_key answers (command key ID and script ID) on X20 and X80. ([specs/christie-spyder.yaml:146](specs/christie-spyder.yaml#L146))
 - [ ] Check whether an X20 accepts ILA with the fifth (gamma) argument, which only the X80 reference lists. ([specs/christie-spyder.yaml:384](specs/christie-spyder.yaml#L384))
-- [ ] Check how often UDP commands or answers are lost on a busy network, and whether a repeated command is harmless. ([specs/christie-spyder.yaml:890](specs/christie-spyder.yaml#L890))
+- [ ] Check how often UDP commands or answers are lost on a busy network, and whether a repeated command is harmless. ([specs/christie-spyder.yaml:1134](specs/christie-spyder.yaml#L1134))
+- [ ] Record an RLK answer: whether its values are integers or decimals, how Outside Edges is written in hexadecimal (f, 0xF), and that the 33 values come in the documented order. ([specs/christie-spyder.yaml:915](specs/christie-spyder.yaml#L915))
+- [ ] Check that RLK answers an error code (not 0) for a layer past the last one, which ends the layer walk, and never for an existing layer. ([specs/christie-spyder.yaml:916](specs/christie-spyder.yaml#L916))
+- [ ] Check that clone mode and crop anchor in RLK are written 0, 1, 2 (not 0.0), as the state maps them. ([specs/christie-spyder.yaml:938](specs/christie-spyder.yaml#L938))
+- [ ] Check that an empty layer answers RLS with the code 1 alone, and what a layer with no source register answers. ([specs/christie-spyder.yaml:961](specs/christie-spyder.yaml#L961))
+- [ ] Check that "more than once per second" for RCS is per input, so walking every layer's RCS once each 10-second poll does not degrade the system, and that a layer with no input answers 0 rather than an error. ([specs/christie-spyder.yaml:969](specs/christie-spyder.yaml#L969))
+- [ ] Check that RBL and RRL ... -1 without start and count arguments return the whole list in one datagram, even for long lists. ([specs/christie-spyder.yaml:983](specs/christie-spyder.yaml#L983))
+- [ ] Record an RPD answer: whether an empty background is sent as a word (which keeps the nine values per PixelSpace) or left out, which would misread the list. ([specs/christie-spyder.yaml:1007](specs/christie-spyder.yaml#L1007))
+- [ ] Check that router IDs are small numbers from 0, as the poll of routers 0 to 3 assumes, and that QRC for a router that does not exist answers an error. ([specs/christie-spyder.yaml:893](specs/christie-spyder.yaml#L893))
+- [ ] Check that the layer state an RLK walk reads after a recall or transition shows the new layout once the command's answer arrives, rather than only after the transition's duration. ([specs/christie-spyder.yaml:1034](specs/christie-spyder.yaml#L1034))
 
 ## cockos-reaper — Cockos REAPER (OSC)
 
