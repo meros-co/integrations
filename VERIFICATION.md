@@ -1437,8 +1437,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-matrix — Turtle AV 4K60 video wall, matrix and multiviewer
 
-- [ ] Check which port carries the s/r commands (23 or 8000), whether a CR LF after ! is accepted, and the replies' line ending. ([specs/turtleav-matrix.yaml:353](specs/turtleav-matrix.yaml#L353))
-- [ ] Check that r output 0 in source! reads every output, and the 4x4's error replies. ([specs/turtleav-matrix.yaml:361](specs/turtleav-matrix.yaml#L361))
+- [ ] Check which port carries the s/r commands (23 or 8000), whether a CR LF after ! is accepted, and the replies' line ending. ([specs/turtleav-matrix.yaml:1238](specs/turtleav-matrix.yaml#L1238))
+- [ ] Check r power! and r lock! answer power on/off and panel button lock on/off, since those replies queue the other reads, and the 4x4's error replies. ([specs/turtleav-matrix.yaml:1246](specs/turtleav-matrix.yaml#L1246))
+- [ ] Record the lines of r fw version! and r vw info! and check the later reads stay in step after them. ([specs/turtleav-matrix.yaml:1257](specs/turtleav-matrix.yaml#L1257))
+- [ ] Record the 4x4 multiviewer layout replies other than single screen, and the r dual/triple/quad/user mode! replies. ([specs/turtleav-matrix.yaml:1277](specs/turtleav-matrix.yaml#L1277))
+- [ ] Record r mx preset z!, r vw preset z! and r preset z! replies, which the documents give only as video/audio crosspoint. ([specs/turtleav-matrix.yaml:1266](specs/turtleav-matrix.yaml#L1266))
+- [ ] Record the 8x8 mirror reply for each mode and whether the 8x8 answers the 4x4's hmirror and vmirror. ([specs/turtleav-matrix.yaml:1266](specs/turtleav-matrix.yaml#L1266))
+- [ ] Check what s reset! keeps: whether the network settings survive a factory reset. ([specs/turtleav-matrix.yaml:1229](specs/turtleav-matrix.yaml#L1229))
 
 ## tvone-coriomaster — tvONE CORIOmaster
 

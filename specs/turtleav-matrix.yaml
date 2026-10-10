@@ -19,9 +19,10 @@ source:
     url: https://turtleav.com/download/179/user-guide/28522/8x8-videowall-user-guide.pdf
     note: >
       Manufacturer-documented, free download. The 8x8 differences: indexes 0-8, the
-      24-entry resolution list, HDCP user mode, matrix presets (save/recall/clear mx
-      preset), the redesigned video wall (vw group, vw preset), error codes E00 unknown
-      command, E01 parameter out of range, E02 EDID error.
+      24-entry resolution list, HDCP user mode, four-way mirror, baud rate, fans, serial
+      number, matrix presets (save/recall/clear/read mx preset), the redesigned video wall
+      (create vw screen, vw group, vw info, vw preset), error codes E00 unknown command,
+      E01 parameter out of range, E02 EDID error.
 
 transport:
   type: line-tcp
@@ -39,10 +40,17 @@ models:
   - id: mx44vw
     name: Turtle AV 4x4 4K60 Videowall, Matrix and Multiview (TAV-MX44VW)
     supports:
-      [set_power, route, get_route, recall_preset, save_preset, set_display_mode,
-       set_output_resolution, set_output_hdcp, set_input_edid, set_multiview_layout,
-       set_window_source, set_wall_layout, set_wall_group_input, route_ext_audio,
-       cec_input, cec_output, set_panel_lock, reboot]
+      [set_power, route, get_route, recall_preset, save_preset, clear_preset, get_preset,
+       set_display_mode, set_output_resolution, set_output_hdcp, set_output_csc,
+       set_output_hmirror, set_output_vmirror, set_output_stream, set_output_background,
+       set_input_edid, set_input_audio_source, set_multiview_layout, set_window_source,
+       set_pip_position, set_pip_size, set_dual_mode, set_triple_mode, set_quad_mode,
+       set_user_mode, set_window_aspect, set_multiview_audio, set_multiview_resolution,
+       set_wall_layout, set_wall_group_input, set_wall_h_bezel, set_wall_v_bezel,
+       set_wall_resolution, route_ext_audio, set_output_exa, set_exa_mode, cec_input,
+       cec_output, set_panel_lock, set_beep, set_lcd_time, set_logo, reboot, factory_reset,
+       set_ip_mode, set_ip_address, set_subnet, set_gateway, set_tcp_port, set_telnet_port,
+       net_reboot]
     verification: none
     notes: >
       Four HDMI inputs and outputs: matrix, 2x2 and other video walls, and multiviewer.
@@ -50,13 +58,19 @@ models:
     name: Turtle AV 8x8 4K60 Videowall, Matrix and Multiview (TAV-MX88VW)
     supports:
       [set_power, route_8x8, get_route, recall_matrix_preset, save_matrix_preset,
-       recall_wall_preset, set_display_mode_8x8, set_output_resolution_8x8,
-       set_output_hdcp_8x8, set_input_edid_8x8, set_wall_group_source_8x8, route_ext_audio,
-       cec_input, cec_output, set_panel_lock, reboot]
+       clear_matrix_preset, get_matrix_preset, recall_wall_preset, save_wall_preset,
+       clear_wall_preset, get_wall_preset, set_display_mode_8x8, set_output_resolution_8x8,
+       set_output_hdcp_8x8, set_output_csc, set_output_mirror_8x8, set_output_stream,
+       set_output_background, set_input_edid_8x8, set_wall_group_source_8x8,
+       create_wall_screen, set_screen_output, set_wall_group_size, set_wall_group_screens,
+       set_wall_group_h_bezel, set_wall_group_v_bezel, set_wall_group_resolution,
+       delete_wall_group, route_ext_audio, set_output_exa, set_exa_mode, cec_input, cec_output,
+       set_panel_lock, set_beep, set_lcd_time, set_logo, set_baud_rate, set_fan, reboot,
+       factory_reset, set_ip_mode, set_ip_address, set_subnet, set_gateway, set_tcp_port,
+       set_telnet_port, net_reboot]
     verification: none
     notes: >
-      Eight HDMI inputs and outputs: matrix and video wall; it reports itself as
-      HDP-MXB88VW.
+      Eight HDMI inputs and outputs: matrix and video wall; it reports itself as HDP-MXB88VW.
 
 commands:
   set_power:
@@ -66,8 +80,7 @@ commands:
     send: s power {powered:bool01}!
     expect: {not_contains: E0}
     returns: ack
-    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60
-    # 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
   route:
     summary: Route an input to an output (4x4); output 0 routes it to every output
@@ -96,8 +109,7 @@ commands:
     send: r output {output} in source!
     expect: {matches: '(?i)input ?(\d+)'}
     returns: value
-    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60
-    # 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
   recall_preset:
     summary: Recall a routing preset (4x4); the outputs change at once
@@ -115,6 +127,24 @@ commands:
     send: s save preset {preset}!
     expect: {not_contains: E0}
     returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  clear_preset:
+    summary: Clear a preset (4x4)
+    params:
+      preset: {type: int, min: 1, max: 8, required: true, label: Preset, description: Preset 1 to 8.}
+    send: s clear preset {preset}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  get_preset:
+    summary: Read what a preset (4x4) holds, as the matrix words it
+    params:
+      preset: {type: int, min: 1, max: 8, required: true, label: Preset, description: Preset 1 to 8.}
+    send: r preset {preset}!
+    expect: {not_contains: E0}
+    returns: text
     # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
 
   recall_matrix_preset:
@@ -135,6 +165,24 @@ commands:
     returns: ack
     # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
+  clear_matrix_preset:
+    summary: Clear a matrix preset (8x8)
+    params:
+      preset: {type: int, min: 1, max: 8, required: true, label: Preset, description: Preset 1 to 8.}
+    send: clear mx preset {preset}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  get_matrix_preset:
+    summary: Read what a matrix preset (8x8) holds, as the matrix words it
+    params:
+      preset: {type: int, min: 1, max: 8, required: true, label: Preset, description: Preset 1 to 8.}
+    send: r mx preset {preset}!
+    expect: {not_contains: E0}
+    returns: text
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
   recall_wall_preset:
     summary: Recall a video wall preset (8x8); the wall changes at once
     params:
@@ -142,6 +190,33 @@ commands:
     send: recall vw preset {preset}!
     expect: {not_contains: E0}
     returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  save_wall_preset:
+    summary: Save the video wall to a preset (8x8), overwriting it
+    params:
+      preset: {type: int, min: 1, max: 8, required: true, label: Preset, description: Preset 1 to 8.}
+    send: save vw preset {preset}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  clear_wall_preset:
+    summary: Clear a video wall preset (8x8)
+    params:
+      preset: {type: int, min: 1, max: 8, required: true, label: Preset, description: Preset 1 to 8.}
+    send: clear vw preset {preset}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  get_wall_preset:
+    summary: Read what a video wall preset (8x8) holds, as the matrix words it
+    params:
+      preset: {type: int, min: 1, max: 8, required: true, label: Preset, description: Preset 1 to 8.}
+    send: r vw preset {preset}!
+    expect: {not_contains: E0}
+    returns: text
     # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
   set_display_mode:
@@ -202,6 +277,65 @@ commands:
     returns: ack
     # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
+  set_output_csc:
+    summary: Set an output's colour space
+    params:
+      output: {type: int, min: 0, max: 8, required: true, label: Output, description: 'HDMI output 1 to 8 (1 to 4 on the 4x4); 0 addresses every output.'}
+      csc: {type: int, min: 1, max: 4, required: true, label: Colour space, description: '1 RGB 4:4:4, 2 YCbCr 4:4:4, 3 YCbCr 4:2:2, 4 YCbCr 4:2:0.'}
+    send: s output {output} csc {csc}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_output_hmirror:
+    summary: Mirror a 4x4 output horizontally, or stop
+    params:
+      output: {type: int, min: 0, max: 4, required: true, label: Output, description: HDMI output 1 to 4; 0 addresses every output.}
+      enabled: {type: bool, required: true, label: Mirror, description: True mirrors the picture left to right.}
+    send: s output {output} hmirror {enabled:bool01}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_output_vmirror:
+    summary: Mirror a 4x4 output vertically, or stop
+    params:
+      output: {type: int, min: 0, max: 4, required: true, label: Output, description: HDMI output 1 to 4; 0 addresses every output.}
+      enabled: {type: bool, required: true, label: Mirror, description: True flips the picture top to bottom.}
+    send: s output {output} vmirror {enabled:bool01}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_output_mirror_8x8:
+    summary: Set an 8x8 output's mirroring
+    params:
+      output: {type: int, min: 0, max: 8, required: true, label: Output, description: HDMI output 1 to 8; 0 addresses every output.}
+      mode: {type: int, min: 0, max: 3, required: true, label: Mirror, description: '0 off, 1 horizontal, 2 vertical, 3 horizontal and vertical.'}
+    send: s output {output} mirror {mode}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_output_stream:
+    summary: Enable or disable an output's stream
+    params:
+      output: {type: int, min: 0, max: 8, required: true, label: Output, description: 'HDMI output 1 to 8 (1 to 4 on the 4x4); 0 addresses every output.'}
+      enabled: {type: bool, required: true, label: Stream, description: True enables the output's video.}
+    send: s output {output} stream {enabled:bool01}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_output_background:
+    summary: Set what outputs show with no signal
+    params:
+      mode: {type: int, min: 1, max: 6, required: true, label: Background, description: '1 black, 2 blue, 3 colour bar, 4 grey scale, 5 cross, 6 cross hatch.'}
+    send: s output bg {mode}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
   set_input_edid:
     summary: Set a 4x4 input's EDID
     params:
@@ -222,6 +356,16 @@ commands:
     returns: ack
     # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
+  set_input_audio_source:
+    summary: 'Choose a 4x4 input''s audio: HDMI or the embedded analog input'
+    params:
+      input: {type: int, min: 0, max: 4, required: true, label: Input, description: HDMI input 1 to 4; 0 for every input.}
+      source: {type: int, min: 0, max: 1, required: true, label: Audio, description: '0 the HDMI audio, 1 the analog audio embedded in its place.'}
+    send: s input {input} as {source}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
   set_multiview_layout:
     summary: Set the 4x4 multiviewer layout
     params:
@@ -237,6 +381,87 @@ commands:
       window: {type: int, min: 0, max: 4, required: true, label: Window, description: Multiviewer window 1 to 4; 0 for every window.}
       input: {type: int, min: 1, max: 4, required: true, label: Input, description: HDMI input 1 to 4.}
     send: s window {window} in {input}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_pip_position:
+    summary: Place the 4x4's picture-in-picture window
+    params:
+      position: {type: int, min: 1, max: 4, required: true, label: Position, description: '1 upper left, 2 lower left, 3 upper right, 4 lower right.'}
+    send: s pip position{position}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_pip_size:
+    summary: Size the 4x4's picture-in-picture window
+    params:
+      size: {type: int, min: 1, max: 3, required: true, label: Size, description: '1 small, 2 middle, 3 large.'}
+    send: s pip size {size}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_dual_mode:
+    summary: Set the 4x4's dual-window arrangement
+    params:
+      mode: {type: int, min: 1, max: 1, required: true, label: Dual mode, description: 'Dual mode 1, the only one documented.'}
+    send: s dual {mode} mode!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_triple_mode:
+    summary: Set the 4x4's triple-window arrangement
+    params:
+      mode: {type: int, min: 1, max: 3, required: true, label: Triple mode, description: '1 triple 1, 2 two PIPs left, 3 two PIPs right.'}
+    send: s triple {mode} mode!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_quad_mode:
+    summary: Set the 4x4's quad-window arrangement
+    params:
+      mode: {type: int, min: 1, max: 3, required: true, label: Quad mode, description: Quad mode 1 to 3.}
+    send: s quad {mode} mode!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_user_mode:
+    summary: Set the 4x4's user-defined window arrangement
+    params:
+      mode: {type: int, min: 1, max: 3, required: true, label: User mode, description: User-defined mode 1 to 3.}
+    send: s user {mode} mode!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_window_aspect:
+    summary: Set the 4x4 multiviewer windows' aspect ratio
+    params:
+      aspect: {type: int, min: 1, max: 2, required: true, label: Aspect, description: '1 full screen, 2 16:9.'}
+    send: s aspect {aspect}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_multiview_audio:
+    summary: Choose the 4x4 multiviewer's output audio
+    params:
+      source: {type: int, min: 0, max: 4, required: true, label: Audio, description: '0 follow window 1''s source; 1-4 input 1-4 audio.'}
+    send: s mv output audio {source}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_multiview_resolution:
+    summary: Set the 4x4 multiviewer's output resolution
+    params:
+      code: {type: int, min: 1, max: 15, required: true, label: Resolution, description: 'Codes 1 to 15 as set_output_resolution, without auto.'}
+    send: s mv res {code}!
     expect: {not_contains: E0}
     returns: ack
     # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
@@ -260,6 +485,33 @@ commands:
     returns: ack
     # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
 
+  set_wall_h_bezel:
+    summary: Set the 4x4 video wall's horizontal bezel compensation
+    params:
+      bezel: {type: enum, values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', +, '-'], required: true, label: Bezel, description: 'Bezel compensation 0 to 10, or + and - to step it.'}
+    send: s tw h bezel {bezel}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_wall_v_bezel:
+    summary: Set the 4x4 video wall's vertical bezel compensation
+    params:
+      bezel: {type: enum, values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', +, '-'], required: true, label: Bezel, description: 'Bezel compensation 0 to 10, or + and - to step it.'}
+    send: s tw v bezel {bezel}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
+  set_wall_resolution:
+    summary: Set the 4x4 video wall's output resolution
+    params:
+      code: {type: int, min: 1, max: 15, required: true, label: Resolution, description: 'Codes 1 to 15 as set_output_resolution, without auto.'}
+    send: s tw res {code}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command
+
   set_wall_group_source_8x8:
     summary: Set the input of an 8x8 video wall group
     params:
@@ -270,16 +522,114 @@ commands:
     returns: ack
     # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
+  create_wall_screen:
+    summary: Lay out the 8x8's video wall screens in rows and columns
+    params:
+      rows: {type: int, min: 1, max: 8, required: true, label: Rows, description: Screen rows 1 to 8.}
+      cols: {type: int, min: 1, max: 8, required: true, label: Columns, description: Screen columns 1 to 8.}
+    send: create vw screen row {rows} col {cols}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_screen_output:
+    summary: Assign an 8x8 HDMI output to a video wall screen
+    params:
+      screen: {type: int, min: 1, max: 8, required: true, label: Screen, description: Wall screen 1 to 8.}
+      output: {type: int, min: 1, max: 8, required: true, label: Output, description: HDMI output 1 to 8.}
+    send: s screen {screen} output {output}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_wall_group_size:
+    summary: Set an 8x8 video wall group's rows and columns
+    params:
+      group: {type: int, min: 1, max: 4, required: true, label: Group, description: Video wall group 1 to 4.}
+      rows: {type: int, min: 1, max: 8, required: true, label: Rows, description: 'Rows 1 to 8; rows times columns at most 8.'}
+      cols: {type: int, min: 1, max: 8, required: true, label: Columns, description: 'Columns 1 to 8; rows times columns at most 8.'}
+    send: s vw group {group} row {rows} col {cols}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_wall_group_screens:
+    summary: Set which screens make up an 8x8 video wall group
+    params:
+      group: {type: int, min: 1, max: 4, required: true, label: Group, description: Video wall group 1 to 4.}
+      screens: {type: string, pattern: '^[1-8]{1,8}$', required: true, label: Screens, description: 'Screen numbers 1 to 8 written together, e.g. 2367.'}
+    send: s vw group {group} screen {screens}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_wall_group_h_bezel:
+    summary: Set an 8x8 video wall group's horizontal bezel compensation
+    params:
+      group: {type: int, min: 1, max: 4, required: true, label: Group, description: Video wall group 1 to 4.}
+      bezel: {type: int, min: 0, max: 10, required: true, label: Bezel, description: Bezel compensation 0 to 10.}
+    send: s vw group {group} hbezel {bezel}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_wall_group_v_bezel:
+    summary: Set an 8x8 video wall group's vertical bezel compensation
+    params:
+      group: {type: int, min: 1, max: 4, required: true, label: Group, description: Video wall group 1 to 4.}
+      bezel: {type: int, min: 0, max: 10, required: true, label: Bezel, description: Bezel compensation 0 to 10.}
+    send: s vw group {group} vbezel {bezel}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_wall_group_resolution:
+    summary: Set an 8x8 video wall group's output resolution
+    params:
+      group: {type: int, min: 1, max: 4, required: true, label: Group, description: Video wall group 1 to 4.}
+      code: {type: int, min: 1, max: 23, required: true, label: Resolution, description: 'Codes 1 to 23 as set_output_resolution_8x8, without auto.'}
+    send: s vw group {group} out res {code}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  delete_wall_group:
+    summary: Delete an 8x8 video wall group
+    params:
+      group: {type: int, min: 1, max: 4, required: true, label: Group, description: Video wall group 1 to 4.}
+    send: delete vw group {group}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
   route_ext_audio:
     summary: Route an input's audio to an output's analog audio out
     params:
-      output: {type: int, min: 0, max: 8, required: true, label: Output, description: HDMI output 1 to 8; 0 addresses every output.}
+      output: {type: int, min: 0, max: 8, required: true, label: Output, description: 'HDMI output 1 to 8 (1 to 4 on the 4x4); 0 addresses every output.'}
       input: {type: int, min: 1, max: 8, required: true, label: Input, description: HDMI input 1 to 8.}
     send: s output {output} exa in source {input}!
     expect: {not_contains: E0}
     returns: ack
-    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60
-    # 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_output_exa:
+    summary: Enable or disable an output's analog audio out
+    params:
+      output: {type: int, min: 0, max: 8, required: true, label: Output, description: 'HDMI output 1 to 8 (1 to 4 on the 4x4); 0 addresses every output.'}
+      enabled: {type: bool, required: true, label: Analog audio, description: True enables the output's analog audio out.}
+    send: s output {output} exa {enabled:bool01}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_exa_mode:
+    summary: Choose how the analog audio outs follow the video
+    params:
+      mode: {type: int, min: 0, max: 2, required: true, label: Mode, description: '0 bind to input, 1 bind to output, 2 matrix (route_ext_audio).'}
+    send: s output exa mode {mode}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
   cec_input:
     summary: Send a CEC command to an input's source
@@ -289,19 +639,17 @@ commands:
     send: s cec in {input} {action}!
     expect: {not_contains: E0}
     returns: ack
-    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60
-    # 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
   cec_output:
     summary: Send a CEC command to an output's display
     params:
-      output: {type: int, min: 0, max: 8, required: true, label: Output, description: HDMI output 1 to 8; 0 addresses every output.}
+      output: {type: int, min: 0, max: 8, required: true, label: Output, description: 'HDMI output 1 to 8 (1 to 4 on the 4x4); 0 addresses every output.'}
       action: {type: enum, values: ['on', 'off', mute, vol-, vol+, active], required: true, label: Action, description: The CEC command to send to the display.}
     send: s cec hdmi out {output} {action}!
     expect: {not_contains: E0}
     returns: ack
-    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60
-    # 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
   set_panel_lock:
     summary: Lock or unlock the front panel buttons
@@ -310,42 +658,582 @@ commands:
     send: s lock {locked:bool01}!
     expect: {not_contains: E0}
     returns: ack
-    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60
-    # 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_beep:
+    summary: Turn the buzzer on or off
+    params:
+      enabled: {type: bool, required: true, label: Beep, description: True turns the buzzer on.}
+    send: s beep {enabled:bool01}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_lcd_time:
+    summary: Set how long the front LCD stays lit
+    params:
+      mode: {type: int, min: 0, max: 4, required: true, label: LCD, description: '0 off, 1 always on, 2 15 s, 3 30 s, 4 60 s.'}
+    send: s lcd on time {mode}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_logo:
+    summary: Set the text on the front LCD's first line
+    params:
+      text: {type: string, max_length: 16, pattern: '^[ -~]{1,16}$', required: true, label: Logo, description: 'Up to 16 printable ASCII characters.'}
+    send: s logo1 {text}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_baud_rate:
+    summary: Set the 8x8's RS-232 baud rate
+    params:
+      rate: {type: int, min: 1, max: 6, required: true, label: Baud rate, description: '1 115200, 2 57600, 3 38400, 4 19200, 5 9600, 6 4800.'}
+    send: s baud rate {rate}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_fan:
+    summary: Turn the 8x8's fans on or off
+    params:
+      fans: {type: int, min: 0, max: 2, required: true, label: Fans, description: '1 side fans, 2 top fans; 0 all.'}
+      enabled: {type: bool, required: true, label: Running, description: True runs the fans.}
+    send: s fan {fans} {enabled:bool01}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
   reboot:
     summary: Reboot the matrix; outputs drop until it is back
     send: s reboot!
     expect: {not_contains: E0}
     returns: ack
-    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60
-    # 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  factory_reset:
+    summary: Reset the matrix to factory defaults
+    send: s reset!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_ip_mode:
+    summary: Use a static address or DHCP; applies after net_reboot
+    params:
+      mode: {type: int, min: 0, max: 1, required: true, label: IP mode, description: '0 static, 1 DHCP.'}
+    send: s ip mode {mode}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_ip_address:
+    summary: Set the static IP address; applies after net_reboot
+    params:
+      address: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: IP address, description: 'Static IPv4 address, e.g. 192.168.0.100.'}
+    send: s ip addr {address}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_subnet:
+    summary: Set the static subnet mask; applies after net_reboot
+    params:
+      mask: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: Subnet mask, description: 'Subnet mask, e.g. 255.255.255.0.'}
+    send: s subnet {mask}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_gateway:
+    summary: Set the static gateway; applies after net_reboot
+    params:
+      gateway: {type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true, label: Gateway, description: 'Gateway IPv4 address, e.g. 192.168.0.1.'}
+    send: s gateway {gateway}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_tcp_port:
+    summary: Set the TCP/IP control port
+    params:
+      port: {type: int, min: 1, max: 65535, required: true, label: Port, description: 'TCP control port, 8000 by default.'}
+    send: s tcp/ipport {port}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  set_telnet_port:
+    summary: Set the Telnet port
+    params:
+      port: {type: int, min: 1, max: 65535, required: true, label: Port, description: 'Telnet port, 23 by default.'}
+    send: s telnet port {port}!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
+
+  net_reboot:
+    summary: Restart the network module to apply new network settings
+    send: s net reboot!
+    expect: {not_contains: E0}
+    returns: ack
+    # 4X4 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §13 RS-232 Control Command, 8x8 4K60 4:4:4 Videowall, Matrix and Multiview user manual, §10 RS-232 Control Command
 
 telemetry:
+  # r power! is polled and r lock! read each minute; their replies queue each
+  # model's own reads (then_send), so a model is asked only for what it has.
   poll:
     every_ms: 10000
     send:
-    - r output 0 in source!
     - r power!
+  subscribe:
+    every_ms: 60000
+    send:
+    - r lock!
   updates:
-    - match: (?i)^output ?(\d+) ?-> ?input ?(\d+)$
+    - match: '(?i)^output ?(\d+) ?-> ?input ?(\d+)$'
       state:
         outputs.{1}.input: '{2}'
-    - match: (?i)^power (on|off)$
+    - match: '(?i)^power (on|off)$'
       state:
         power: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^beep (on|off)$'
+      state:
+        beep: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^panel button lock (on|off)$'
+      state:
+        panel_locked: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^lcd (always on|off|on \d+ seconds)$'
+      state:
+        lcd: '{1}'
+    - match: '^logo1 ?: ?(.*)$'
+      state:
+        logo: '{1}'
+    - match: '^serial number ?: ?(\S+)$'
+      state:
+        serial: '{1}'
+    - match: '^mcu fw ?version ?: ?(\S+)$'
+      state:
+        firmware.mcu: '{1}'
+    - match: '^web gui(?: version)? ?: ?(\S+)$'
+      state:
+        firmware.web: '{1}'
+    - match: '^(cpld|audio|key)(?: fw)?(?: version)? ?: ?(\S+)$'
+      state:
+        firmware.{1}: '{2}'
+    - match: '^display mode: (.+)$'
+      state:
+        display_mode: '{1}'
+    - match: '^output ?(\d+) resolution: ?(\S+)$'
+      state:
+        outputs.{1}.resolution: '{2}'
+    - match: '^output ?(\d+) csc: ?(\S+)$'
+      state:
+        outputs.{1}.csc: '{2}'
+    - match: '^output ?(\d+) hdcp: ?(.+)$'
+      state:
+        outputs.{1}.hdcp: '{2}'
+    - models: [mx44vw]
+      match: '^output ?(\d+) h mirror (on|off)(?:, ?v mirror (on|off))?$'
+      state:
+        outputs.{1}.h_mirror: {value: '{2}', map: {'on': true, 'off': false}}
+        outputs.{1}.v_mirror: {value: '{3}', map: {'on': true, 'off': false}}
+    - models: [mx44vw]
+      match: '^output ?(\d+) v mirror (on|off)$'
+      state:
+        outputs.{1}.v_mirror: {value: '{2}', map: {'on': true, 'off': false}}
+    - models: [mx88vw]
+      match: '^output ?(\d+) ((?:h\+v |h |v )?mirror (?:on|off))$'
+      state:
+        outputs.{1}.mirror: '{2}'
+    - match: '^output ?(\d+) stream: ?(enable|disable)$'
+      state:
+        outputs.{1}.stream: {value: '{2}', map: {enable: true, disable: false}}
+    - match: '^output background: (.+)$'
+      state:
+        background: '{1}'
+    - match: '^input ?(\d+) edid: ?(.+)$'
+      state:
+        inputs.{1}.edid: '{2}'
+    - match: '^input ?(\d+) select (hdmi original|embed analog) audio$'
+      state:
+        inputs.{1}.audio_source: {value: '{2}', map: {hdmi original: hdmi, embed analog: analog}}
+    - match: '^output ?(\d+) ext-audio: ?(enable|disable)$'
+      state:
+        outputs.{1}.exa: {value: '{2}', map: {enable: true, disable: false}}
+    - match: '^output ?(\d+) ext-audio ?-> ?input ?(\d+)$'
+      state:
+        outputs.{1}.exa_input: '{2}'
+    - match: '^output ext-audio mo(?:d)?e: (.+)$'
+      state:
+        exa_mode: '{1}'
+    - match: '^recall from preset (\d+)$'
+      state:
+        preset.recalled: '{1}'
+    - match: '^tv wall mode: (.+)$'
+      state:
+        wall.layout: '{1}'
+    - match: '^tv wall horizontal bezel: (\d+)$'
+      state:
+        wall.h_bezel: '{1}'
+    - match: '^tv wall vertical bezel: (\d+)$'
+      state:
+        wall.v_bezel: '{1}'
+    - match: '^tv wall group (\d) input: hdmi input (\d)$'
+      state:
+        wall.groups.{1}.input: '{2}'
+    - match: '^tv wall resolution: (\S+)$'
+      state:
+        wall.resolution: '{1}'
+    - models: [mx44vw]
+      match: '^(single|pip|dual|triple|quad|user) screen$'
+      state:
+        multiview.layout: '{1}'
+    - match: '^window (\d) select hdmi (\d)$'
+      state:
+        multiview.windows.{1}.input: '{2}'
+    - match: '^pip on (upper left|lower left|upper right|lower right)$'
+      state:
+        multiview.pip_position: '{1}'
+    - match: '^pip size: (small|middle|large)$'
+      state:
+        multiview.pip_size: '{1}'
+    - match: '^(dual|triple|quad|user) (\d) mode$'
+      state:
+        multiview.{1}_mode: '{2}'
+    - match: '^aspect: (.+)$'
+      state:
+        multiview.aspect: '{1}'
+    - match: '^output audio: (.+)$'
+      state:
+        multiview.audio: '{1}'
+    - match: '^multi-viewer resolution: (\S+)$'
+      state:
+        multiview.resolution: '{1}'
+    - match: '^create vw screen (\d)x(\d)$'
+      state:
+        wall.rows: '{1}'
+        wall.cols: '{2}'
+    - models: [mx88vw]
+      match: '^row ?: ?(\d)$'
+      state:
+        wall.rows: '{1}'
+    - models: [mx88vw]
+      match: '^col ?: ?(\d)$'
+      state:
+        wall.cols: '{1}'
+    - match: '^hdmi output ?(\d) ?-> ?screen ?(\d)$'
+      state:
+        wall.screens.{2}.output: '{1}'
+    - match: '^vw group (\d) row (\d) col (\d)!?$'
+      state:
+        wall.groups.{1}.rows: '{2}'
+        wall.groups.{1}.cols: '{3}'
+    - match: '^vw group (\d) screen ([1-8]+)!?$'
+      state:
+        wall.groups.{1}.screens: '{2}'
+    - match: '^vw group (\d) source (\d)!?$'
+      state:
+        wall.groups.{1}.input: '{2}'
+    - match: '^video wall group (\d) h bezel: (\d+)$'
+      state:
+        wall.groups.{1}.h_bezel: '{2}'
+    - match: '^video wall group (\d) v bezel: (\d+)$'
+      state:
+        wall.groups.{1}.v_bezel: '{2}'
+    - match: '^video wall group (\d) resolution: (\S+)$'
+      state:
+        wall.groups.{1}.resolution: '{2}'
+    - match: '^delete vw group (\d)!?$'
+      state:
+        wall.groups.{1}: {delete: true}
+    - match: '^(side|top) fans ?: ?(on|off)$'
+      state:
+        fans.{1}: {value: '{2}', map: {'on': true, 'off': false}}
+    - match: '^set (side|top) fans (on|off)$'
+      state:
+        fans.{1}: {value: '{2}', map: {'on': true, 'off': false}}
+    - match: '^(?:set )?ip mode: ?(static|dhcp)\.?$'
+      state:
+        network.ip_mode: '{1}'
+    - match: '^(?:set )?ip(?: address)?: ?([0-9.]+)$'
+      state:
+        network.ip: '{1}'
+    - match: '^(?:set )?subnet mask: ?([0-9.]+)$'
+      state:
+        network.subnet: '{1}'
+    - match: '^(?:set )?gateway: ?([0-9.]+)$'
+      state:
+        network.gateway: '{1}'
+    - match: '^(?:set )?tcp/ip ?port ?[:=] ?(\d+)$'
+      state:
+        network.tcp_port: '{1}'
+    - match: '^(?:set )?telnet port ?[:=] ?(\d+)$'
+      state:
+        network.telnet_port: '{1}'
+    - match: '^mac address: ?([0-9A-Fa-f:]+)$'
+      state:
+        network.mac: '{1}'
+    - models: [mx44vw]
+      match: '(?i)^power (?:on|off)$'
+      request_match: '^r power!$'
+      then_send:
+      - 'r output 1 in source!'
+      - 'r output 2 in source!'
+      - 'r output 3 in source!'
+      - 'r output 4 in source!'
+      - 'r display mode!'
+    - models: [mx88vw]
+      match: '(?i)^power (?:on|off)$'
+      request_match: '^r power!$'
+      then_send:
+      - 'r output 1 in source!'
+      - 'r output 2 in source!'
+      - 'r output 3 in source!'
+      - 'r output 4 in source!'
+      - 'r output 5 in source!'
+      - 'r output 6 in source!'
+      - 'r output 7 in source!'
+      - 'r output 8 in source!'
+      - 'r display mode!'
+    - match: '^(.+)$'
+      request_match: '^r type!$'
+      state:
+        model_name: '{1}'
+    - models: [mx44vw]
+      match: '^panel button lock (?:on|off)$'
+      request_match: '^r lock!$'
+      then_send:
+      - 'r type!'
+      - 'r beep!'
+      - 'r lcd mode!'
+      - 'r output 1 res!'
+      - 'r output 1 csc!'
+      - 'r output 1 hdcp!'
+      - 'r output 1 mirror!'
+      - 'r output 1 stream!'
+      - 'r output 1 exa!'
+      - 'r output 1 exa in source!'
+      - 'r output 2 res!'
+      - 'r output 2 csc!'
+      - 'r output 2 hdcp!'
+      - 'r output 2 mirror!'
+      - 'r output 2 stream!'
+      - 'r output 2 exa!'
+      - 'r output 2 exa in source!'
+      - 'r output 3 res!'
+      - 'r output 3 csc!'
+      - 'r output 3 hdcp!'
+      - 'r output 3 mirror!'
+      - 'r output 3 stream!'
+      - 'r output 3 exa!'
+      - 'r output 3 exa in source!'
+      - 'r output 4 res!'
+      - 'r output 4 csc!'
+      - 'r output 4 hdcp!'
+      - 'r output 4 mirror!'
+      - 'r output 4 stream!'
+      - 'r output 4 exa!'
+      - 'r output 4 exa in source!'
+      - 'r output bg!'
+      - 'r output exa mode!'
+      - 'r input 1 edid!'
+      - 'r input 2 edid!'
+      - 'r input 3 edid!'
+      - 'r input 4 edid!'
+      - 'r input 1 as!'
+      - 'r input 2 as!'
+      - 'r input 3 as!'
+      - 'r input 4 as!'
+      - 'r tw mode!'
+      - 'r tw h bezel!'
+      - 'r tw v bezel!'
+      - 'r tw group 1 source!'
+      - 'r tw group 2 source!'
+      - 'r tw group 3 source!'
+      - 'r tw group 4 source!'
+      - 'r tw res!'
+      - 'r multiview!'
+      - 'r window 1 in!'
+      - 'r window 2 in!'
+      - 'r window 3 in!'
+      - 'r window 4 in!'
+      - 'r pip position!'
+      - 'r pip size!'
+      - 'r dual mode!'
+      - 'r triple mode!'
+      - 'r quad mode!'
+      - 'r aspect!'
+      - 'r user mode!'
+      - 'r mv output audio!'
+      - 'r mv res!'
+      - 'r ip mode!'
+      - 'r ip addr!'
+      - 'r subnet!'
+      - 'r gateway!'
+      - 'r tcp/ipport!'
+      - 'r telnet port!'
+      - 'r mac addr!'
+      - 'r fw version!'
+    - models: [mx88vw]
+      match: '^panel button lock (?:on|off)$'
+      request_match: '^r lock!$'
+      then_send:
+      - 'r type!'
+      - 'r beep!'
+      - 'r lcd mode!'
+      - 'r output 1 res!'
+      - 'r output 1 csc!'
+      - 'r output 1 hdcp!'
+      - 'r output 1 mirror!'
+      - 'r output 1 stream!'
+      - 'r output 1 exa!'
+      - 'r output 1 exa in source!'
+      - 'r output 2 res!'
+      - 'r output 2 csc!'
+      - 'r output 2 hdcp!'
+      - 'r output 2 mirror!'
+      - 'r output 2 stream!'
+      - 'r output 2 exa!'
+      - 'r output 2 exa in source!'
+      - 'r output 3 res!'
+      - 'r output 3 csc!'
+      - 'r output 3 hdcp!'
+      - 'r output 3 mirror!'
+      - 'r output 3 stream!'
+      - 'r output 3 exa!'
+      - 'r output 3 exa in source!'
+      - 'r output 4 res!'
+      - 'r output 4 csc!'
+      - 'r output 4 hdcp!'
+      - 'r output 4 mirror!'
+      - 'r output 4 stream!'
+      - 'r output 4 exa!'
+      - 'r output 4 exa in source!'
+      - 'r output 5 res!'
+      - 'r output 5 csc!'
+      - 'r output 5 hdcp!'
+      - 'r output 5 mirror!'
+      - 'r output 5 stream!'
+      - 'r output 5 exa!'
+      - 'r output 5 exa in source!'
+      - 'r output 6 res!'
+      - 'r output 6 csc!'
+      - 'r output 6 hdcp!'
+      - 'r output 6 mirror!'
+      - 'r output 6 stream!'
+      - 'r output 6 exa!'
+      - 'r output 6 exa in source!'
+      - 'r output 7 res!'
+      - 'r output 7 csc!'
+      - 'r output 7 hdcp!'
+      - 'r output 7 mirror!'
+      - 'r output 7 stream!'
+      - 'r output 7 exa!'
+      - 'r output 7 exa in source!'
+      - 'r output 8 res!'
+      - 'r output 8 csc!'
+      - 'r output 8 hdcp!'
+      - 'r output 8 mirror!'
+      - 'r output 8 stream!'
+      - 'r output 8 exa!'
+      - 'r output 8 exa in source!'
+      - 'r output bg!'
+      - 'r output exa mode!'
+      - 'r input 1 edid!'
+      - 'r input 2 edid!'
+      - 'r input 3 edid!'
+      - 'r input 4 edid!'
+      - 'r input 5 edid!'
+      - 'r input 6 edid!'
+      - 'r input 7 edid!'
+      - 'r input 8 edid!'
+      - 'r device sn!'
+      - 'r ip mode!'
+      - 'r ip addr!'
+      - 'r subnet!'
+      - 'r gateway!'
+      - 'r tcp/ipport!'
+      - 'r telnet port!'
+      - 'r mac addr!'
+      - 'r fw version!'
+      - 'r vw info!'
 
 state:
-  outputs.*.input:  {type: int, description: 'Input shown on the output, keyed by output number'}
-  power:            {type: bool, description: Matrix powered on}
+  power:                 {type: bool, description: Matrix powered on}
+  model_name:            {type: string, description: 'The model the matrix reports (HDP-MXB88VW, 4x4 hdmi seamless matrix)'}
+  serial:                {type: string, description: Serial number (8x8)}
+  firmware.mcu:          {type: string, description: MCU firmware version}
+  firmware.web:          {type: string, description: Web interface version}
+  firmware.cpld:         {type: string, description: CPLD firmware version (8x8)}
+  firmware.audio:        {type: string, description: Audio firmware version (8x8)}
+  firmware.key:          {type: string, description: Key board firmware version (8x8)}
+  beep:                  {type: bool, description: Buzzer on}
+  panel_locked:          {type: bool, description: Front panel buttons locked}
+  lcd:                   {type: string, description: 'How long the LCD stays lit, as the matrix words it (lcd always on, lcd on 30 seconds)'}
+  logo:                  {type: string, description: Text on the LCD's first line}
+  display_mode:          {type: string, description: 'Display mode as the matrix words it: matrix, video wall or multi-viewer'}
+  background:            {type: string, description: 'No-signal background, as the matrix words it (black screen)'}
+  exa_mode:              {type: string, description: 'How the analog audio outs follow the video, as the matrix words it (bind to input)'}
+  preset.recalled:       {type: int, description: 'The preset last recalled, as the matrix reported it'}
+  outputs.*.input:       {type: int, description: 'Input shown on the output, keyed by output number'}
+  outputs.*.resolution:  {type: string, description: 'Output resolution, e.g. 3840x2160p60'}
+  outputs.*.csc:         {type: string, description: 'Output colour space: rgb444, ycbcr444, ycbcr422 or ycbcr420'}
+  outputs.*.hdcp:        {type: string, description: 'Output HDCP mode, as the matrix words it (hdcp 1.4, follow sink)'}
+  outputs.*.h_mirror:    {type: bool, description: Output mirrored left to right (4x4)}
+  outputs.*.v_mirror:    {type: bool, description: Output flipped top to bottom (4x4)}
+  outputs.*.mirror:      {type: string, description: 'Output mirroring, as the 8x8 words it (mirror off, h mirror on, h+v mirror on)'}
+  outputs.*.stream:      {type: bool, description: Output video enabled}
+  outputs.*.exa:         {type: bool, description: Output's analog audio out enabled}
+  outputs.*.exa_input:   {type: int, description: Input whose audio the output's analog out carries}
+  inputs.*.edid:         {type: string, description: 'Input EDID, as the matrix words it (4k60, 2.0ch)'}
+  inputs.*.audio_source: {type: string, description: 'Input audio (4x4): hdmi, or analog embedded in its place'}
+  wall.layout:           {type: string, description: 'The 4x4 video wall layout, as it words it (2x2)'}
+  wall.h_bezel:          {type: int, description: The 4x4 video wall's horizontal bezel compensation}
+  wall.v_bezel:          {type: int, description: The 4x4 video wall's vertical bezel compensation}
+  wall.resolution:       {type: string, description: The 4x4 video wall's resolution}
+  wall.rows:             {type: int, description: Video wall screen rows (8x8)}
+  wall.cols:             {type: int, description: Video wall screen columns (8x8)}
+  wall.screens.*.output: {type: int, description: 'HDMI output assigned to a wall screen, keyed by screen (8x8)'}
+  wall.groups.*.input:   {type: int, description: 'Input a video wall group shows, keyed by group 1-4'}
+  wall.groups.*.rows:    {type: int, description: Group rows (8x8)}
+  wall.groups.*.cols:    {type: int, description: Group columns (8x8)}
+  wall.groups.*.screens: {type: string, description: 'Screens in the group, written together (2367) (8x8)'}
+  wall.groups.*.h_bezel: {type: int, description: Group horizontal bezel compensation (8x8)}
+  wall.groups.*.v_bezel: {type: int, description: Group vertical bezel compensation (8x8)}
+  wall.groups.*.resolution: {type: string, description: Group output resolution (8x8)}
+  multiview.layout:      {type: string, description: 'Multiviewer layout (4x4): single, pip, dual, triple, quad or user'}
+  multiview.windows.*.input: {type: int, description: 'Input in a multiviewer window, keyed by window 1-4'}
+  multiview.pip_position: {type: string, description: 'Picture-in-picture position: upper left, lower left, upper right, lower right'}
+  multiview.pip_size:    {type: string, description: 'Picture-in-picture size: small, middle or large'}
+  multiview.dual_mode:   {type: int, description: Dual-window arrangement}
+  multiview.triple_mode: {type: int, description: Triple-window arrangement}
+  multiview.quad_mode:   {type: int, description: Quad-window arrangement}
+  multiview.user_mode:   {type: int, description: User-defined arrangement}
+  multiview.aspect:      {type: string, description: 'Window aspect ratio, as the matrix words it (full screen)'}
+  multiview.audio:       {type: string, description: 'Multiviewer output audio, as the matrix words it (follow window 1 selected source)'}
+  multiview.resolution:  {type: string, description: Multiviewer output resolution}
+  fans.side:             {type: bool, description: Side fans on (8x8)}
+  fans.top:              {type: bool, description: Top fans on (8x8)}
+  network.ip_mode:       {type: string, description: 'static or dhcp'}
+  network.ip:            {type: string, description: IPv4 address}
+  network.subnet:        {type: string, description: Subnet mask}
+  network.gateway:       {type: string, description: Gateway}
+  network.tcp_port:      {type: int, description: TCP/IP control port}
+  network.telnet_port:   {type: int, description: Telnet port}
+  network.mac:           {type: string, description: MAC address}
 
 quirks:
   - models: [all]
     severity: critical
     text: >
-      route, the preset recalls, set_display_mode and the video wall commands change what
-      the displays show at once, and reboot drops every output until the matrix is back.
-      None asks for confirmation.
+      route, the preset recalls, set_display_mode and the video wall and multiviewer
+      commands change what the displays show at once; reboot drops every output until the
+      matrix is back, and factory_reset also clears routing, EDID, presets and the network.
+      None asks for confirmation. The network commands take effect after net_reboot or a
+      power cycle, and a wrong address leaves the matrix unreachable.
 
   - models: [all]
     severity: warning
@@ -358,13 +1246,38 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Nothing is pushed: routing and power are polled every 10 seconds with r output 0 in
-      source! and r power!. Whether output 0 reads every output is not documented; the
-      reply lines (output1->input1) update state whichever way they come. Only the 8x8
-      documents error codes (E00, E01, E02); a 4x4 error reply is not documented.
+      Nothing is pushed. r power! is polled every 10 seconds and its reply queues each
+      output's routing and the display mode; r lock! (the panel lock) is read every minute
+      and its reply queues every other setting the model reads (model name, output
+      resolution, colour space, HDCP, mirror, stream, analog audio, input EDID, beep, LCD,
+      background, video wall and multiviewer settings, serial number, network, firmware).
+      Replies to this session's commands update state at once. Only the 8x8 documents
+      error codes (E00, E01, E02); a 4x4 error reply is not documented.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Some replies are several lines (r fw version!, r vw info!, an output or input 0 for
+      all, a network change with its reminder to run s net reboot!). Replies are taken in
+      order, so the extra lines can be taken as the answers to the next queued reads; the
+      multi-line reads are queued last, and every line that names its output, input or
+      setting still updates state.
+
+  - models: [mx88vw]
+    severity: info
+    text: >
+      r vw info! gives the wall's output and input assignment and each mosaic's screens on
+      lines of their own after a label line (output:, then 12345678), which the spec format
+      cannot tie to the label (one message at a time, no state between lines); only its
+      row and col lines are read. Video wall groups are kept from the replies to the vw
+      group commands. The preset reads (get_matrix_preset, get_wall_preset) answer in an
+      undocumented multi-line form and are offered as commands returning the first line,
+      not kept in state. The baud rate has no read (an API limit).
 
   - models: [mx44vw]
     severity: info
     text: >
-      route_ext_audio, cec_input and cec_output take indexes up to 8 for both models; the
-      4x4 has 4 inputs and outputs.
+      route_ext_audio, set_output_csc, set_output_stream, set_output_exa, cec_input and
+      cec_output take indexes up to 8 for both models; the 4x4 has 4 inputs and outputs.
+      The multiviewer layout reply is documented only for single (single screen). get_preset
+      answers in an undocumented multi-line form and returns the first line.
