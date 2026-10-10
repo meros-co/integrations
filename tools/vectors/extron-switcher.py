@@ -253,3 +253,222 @@ telemetry(K, "signal-six", inbound="In00 0*1*0*0*0*1\r\n",
           expect_state={"inputs": {"1": {"signal": False}, "2": {"signal": True}, "3": {"signal": False},
                                    "4": {"signal": False}, "5": {"signal": False}, "6": {"signal": True}}})
 telemetry(K, "reconfig", inbound="Reconfig\r\n", expect_state={})
+
+# Settings read back (IN1808 p.63-84, IN1608 p.50-63).
+text(K, "set_auto_switch_priority", {"order": "8 7 1 2 3 4 5 6"}, E + "P8 7 1 2 3 4 5 6AUSW\r",
+     device_reply="AuswP8 7 1 2 3 4 5 6\r\n", expect_result=ACK, **N8)
+text(K, "get_auto_switch_priority", {}, E + "PAUSW\r", device_reply="1 2 3 4 5 6 7 8\r\n",
+     expect_result=val("1 2 3 4 5 6 7 8"), **N8)
+text(K, "get_input_video_format", {"input": 2}, "2*\\\r", device_reply="Vtyp2*2\r\n", expect_result=val("2"), **N8)
+text(K, "set_input_video_format_in1600", {"input": 1, "format": 2}, "1*2\\\r", device_reply="Typ1*2\r\n",
+     expect_result=ACK, **N6)
+text(K, "get_input_video_format_in1600", {"input": 1}, "1\\\r", device_reply="2\r\n", expect_result=val("2"), **N6)
+text(K, "set_screen_saver_mode", {"mode": 2}, E + "M1*2SSAV\r", device_reply="SsavM1*2\r\n", expect_result=ACK, **N8)
+text(K, "get_screen_saver_mode", {}, E + "M1SSAV\r", device_reply="1\r\n", expect_result=val("1"), **N8)
+text(K, "set_screen_saver_timeout", {"seconds": 501}, E + "T1*501SSAV\r", device_reply="SsavT1*501\r\n",
+     expect_result=ACK, **N8)
+text(K, "get_screen_saver_timeout", {}, E + "T1SSAV\r", device_reply="SsavT1*060\r\n", expect_result=val("60"), **N8)
+text(K, "get_screen_saver_status", {}, E + "S1SSAV\r", device_reply="SsavS1*0\r\n", expect_result=val("0"), **N8)
+text(K, "set_screen_saver_mode_in1600", {"mode": 0}, E + "M0SSAV\r", device_reply="SsavM0\r\n",
+     expect_result=ACK, **N6)
+text(K, "get_screen_saver_mode_in1600", {}, E + "MSSAV\r", device_reply="SsavM1\r\n", expect_result=val("1"), **N6)
+text(K, "set_screen_saver_color_in1600", {"color": "FF0000"}, E + "CFF0000SSAV\r", device_reply="SsavCFF0000\r\n",
+     expect_result=ACK, **N6)
+text(K, "set_screen_saver_timeout_in1600", {"seconds": 30}, E + "T30SSAV\r", device_reply="SsavT030\r\n",
+     expect_result=ACK, **N6)
+text(K, "get_screen_saver_timeout_in1600", {}, E + "TSSAV\r", device_reply="501\r\n", expect_result=val("501"), **N6)
+text(K, "get_screen_saver_status_in1600", {}, E + "SSSAV\r", device_reply="2\r\n", expect_result=val("2"), **N6)
+text(K, "set_auto_image_threshold", {"level": 25}, E + "25ALVL\r", device_reply="Alvl025\r\n", expect_result=ACK, **N6)
+text(K, "get_auto_image_threshold", {}, E + "ALVL\r", device_reply="Alvl025\r\n", expect_result=val("25"), **N6)
+text(K, "set_overscan", {"format": 2, "overscan": 1}, E + "2*1OSCN\r", device_reply="Oscn2*1\r\n",
+     expect_result=ACK, **N6)
+text(K, "get_overscan", {"format": 6}, E + "6OSCN\r", device_reply="0\r\n", expect_result=val("0"), **N6)
+text(K, "get_phantom_power", {"oid": "40001"}, E + "Z40001AU\r", device_reply="DsZ40001*1\r\n",
+     expect_result=val("1"), **N8)
+text(K, "set_dsp_embedded_gain", {"oid": "30012", "level": 120}, E + "H30012*120AU\r",
+     device_reply="DsH30012*120\r\n", expect_result=ACK, **N8)
+text(K, "get_dsp_embedded_gain", {"oid": "30014"}, E + "H30014AU\r", device_reply="DsH30014*-50\r\n",
+     expect_result=val("-50"), **N8)
+text(K, "set_audio_input_name", {"input": 10, "name": "Lectern Mic"}, E + "I10*Lectern MicANAM\r",
+     device_reply="AnamI10*Lectern Mic\r\n", expect_result=ACK, **N8)
+text(K, "get_audio_input_name", {"input": 10}, E + "I10ANAM\r", device_reply="AnamI10*Lectern Mic\r\n",
+     expect_result=val("Lectern Mic"), **N8)
+text(K, "set_audio_output_name", {"output": 4, "name": "Ceiling"}, E + "O4*CeilingANAM\r",
+     device_reply="AnamO4*Ceiling\r\n", expect_result=ACK, **N8)
+text(K, "get_audio_output_name", {"output": 4}, E + "O4ANAM\r", device_reply="AnamO04*Ceiling\r\n",
+     expect_result=val("Ceiling"), **N8)
+
+
+# What each family is asked on connecting, once the part number query (N) is answered.
+def _reads_in1808():
+    r = ["1!", "1%", "1$", E + "LOUT"]
+    for n in range(1, 9):
+        r += [E + f"I{n}VNAM", E + f"E{n}HDCP", E + f"{n}ASPR", E + f"{n}FILM", E + f"{n}CONT", E + f"{n}BRIT",
+              E + f"{n}AMEM", E + f"I{n}AFMT", E + f"I{n}HDCP", f"{n}*\\"]
+    r += [E + "I9AFMT"]
+    for n in range(1, 4):
+        r += [E + f"O{n}VNAM", f"{n}*B", E + f"{n}VTPO", E + f"S{n}HDCP", E + f"O{n}HDCP"]
+    r += [E + "AUSW", E + "TAUSW", E + "PAUSW", "1F", E + "1HDET", E + "1XIMG", E + "1RATE", E + "MDUR",
+          E + "M1SSAV", E + "T1SSAV", E + "S1SSAV", E + "1TEST", E + "O1SWEF", E + "N1HDCP", E + "PLAY", E + "CV"]
+    r += [E + f"D{g}GRPM" for g in range(1, 11)]
+    oids = list(range(30000, 30018)) + list(range(40000, 40006)) + list(range(60000, 60012))
+    r += [E + f"G{o}AU" for o in oids] + [E + f"M{o}AU" for o in oids]
+    r += [E + f"Z{o}AU" for o in (40000, 40001)] + [E + f"H{o}AU" for o in range(30012, 30016)]
+    r += [E + f"I{n}ANAM" for n in range(1, 16)] + [E + f"O{n}ANAM" for n in range(1, 8)]
+    return [m + "\r" for m in r]
+
+
+_PICTURE_IN1600 = [E + "CONT\r", E + "BRIT\r", E + "HDET\r", E + "COLR\r", E + "TINT\r", E + "XIMG\r", "F\r"]
+
+
+def _reads_in1608():
+    r = ["!", "&", "$"]
+    for n in range(1, 9):
+        r += [E + f"{n}NI", f"{n}A", E + f"E{n}HDCP", E + f"{n}ASPR", E + f"{n}FILM", E + f"{n}AMEM",
+              E + f"I{n}AFMT", E + f"I{n}HDCP", f"{n}\\"]
+    r = [m + "\r" for m in r] + _PICTURE_IN1600
+    s = []
+    for n in range(1, 4):
+        s += [f"{n}*B", E + f"{n}VTPO", E + f"O{n}HDCP"]
+    s += [E + "AUSW", E + "RATE", E + "MDUR", E + "MSSAV", E + "TSSAV", E + "SSSAV", E + "TEST", E + "SWEF",
+          E + "SHDCP", E + "NHDCP", E + "1KNOB", E + "ALVL", E + "CV"]
+    s += [E + f"{f}OSCN" for f in range(1, 7)] + [E + f"D{g}GRPM" for g in range(1, 9)]
+    s += [E + f"G{o}AU" for o in (40100, 40101, 60000, 60002, 60004, 60005, 60006, 60007, 60008, 60009)]
+    s += [E + f"M{o}AU" for o in (40000, 40001, 60000, 60002, 60004, 60005, 60006, 60007, 60008, 60009)]
+    return r + [m + "\r" for m in s]
+
+
+telemetry(K, "reads-in1808", inbound="Pno60-1615-02\r\n", request="N", model="in1808-series",
+          expect_state={"device": {"part_number": "60-1615-02"}}, expect_then_send=_reads_in1808())
+telemetry(K, "reads-in1608", inbound="60-1340-01\r\n", request="N", model="in1608-series",
+          expect_state={"device": {"part_number": "60-1340-01"}}, expect_then_send=_reads_in1608())
+telemetry(K, "reads-not-pushed", inbound="60-1340-01\r\n", model="in1608-series", expect_state={},
+          expect_then_send=[])
+telemetry(K, "reread-input-in1608", inbound="In4 All\r\n", model="in1608-series",
+          expect_state={"input": 4, "video_input": 4, "audio_input": 4}, expect_then_send=_PICTURE_IN1600)
+telemetry(K, "reread-preset-in1608", inbound="1Rpr02\r\n", model="in1608-series", expect_state={},
+          expect_then_send=_PICTURE_IN1600)
+telemetry(K, "reread-auto-image-in1608", inbound="Img1\r\n", model="in1608-series", expect_state={},
+          expect_then_send=_PICTURE_IN1600)
+telemetry(K, "reread-input-in1808", inbound="In03*1 Vid\r\n", model="in1808-series",
+          expect_state={"video_input": 3}, expect_then_send=[E + "1HDET\r", E + "1XIMG\r"])
+telemetry(K, "reread-preset-in1808", inbound="2Rpr004\r\n", model="in1808-series", expect_state={},
+          expect_then_send=[E + "1HDET\r", E + "1XIMG\r"]
+          + [E + f"{n}{k}\r" for n in range(1, 9) for k in ("CONT", "BRIT", "FILM")])
+
+# Bare replies, tied to the query they answer.
+telemetry(K, "bare-video-input", inbound="05\r\n", request="1%", expect_state={"video_input": 5})
+telemetry(K, "bare-input-in1600", inbound="3\r\n", request="!",
+          expect_state={"input": 3, "video_input": 3, "audio_input": 3})
+telemetry(K, "bare-loop-out", inbound="02\r\n", request=E + "LOUT", expect_state={"loop_out_input": 2})
+telemetry(K, "bare-video-mute", inbound="1\r\n", request="2*B", expect_state={"outputs": {"2": {"video_mute": 1}}})
+telemetry(K, "video-mute-each", inbound="Vmt0 1 2\r\n",
+          expect_state={"outputs": {"1": {"video_mute": 0}, "2": {"video_mute": 1}, "3": {"video_mute": 2}}})
+telemetry(K, "bare-audio-format", inbound="4\r\n", request=E + "I9AFMT",
+          expect_state={"inputs": {"9": {"audio_format": 4}}})
+telemetry(K, "bare-hdcp-input", inbound="2\r\n", request=E + "I3HDCP",
+          expect_state={"inputs": {"3": {"hdcp_status": 2}}})
+telemetry(K, "bare-hdcp-output", inbound="1\r\n", request=E + "O2HDCP",
+          expect_state={"outputs": {"2": {"hdcp_status": 1}}})
+telemetry(K, "bare-hdcp-authorized", inbound="0\r\n", request=E + "E4HDCP",
+          expect_state={"inputs": {"4": {"hdcp_authorized": False}}})
+telemetry(K, "hdcp-mode-output", inbound="HdcpS2*3\r\n", expect_state={"outputs": {"2": {"hdcp_mode": 3}}})
+telemetry(K, "bare-hdcp-mode-output", inbound="1\r\n", request=E + "S1HDCP", model="in1808-series",
+          expect_state={"outputs": {"1": {"hdcp_mode": 1}}})
+telemetry(K, "hdcp-mode-in1600", inbound="HdcpS4\r\n", model="in1608-series", expect_state={"hdcp_mode": 4})
+telemetry(K, "bare-hdcp-mode-in1600", inbound="0\r\n", request=E + "SHDCP", model="in1608-series",
+          expect_state={"hdcp_mode": 0})
+telemetry(K, "hdcp-notification", inbound="HdcpN1*2\r\n", expect_state={"hdcp_notification": 2})
+telemetry(K, "hdcp-notification-in1600", inbound="HdcpN0\r\n", expect_state={"hdcp_notification": 0})
+telemetry(K, "bare-hdcp-notification", inbound="1\r\n", request=E + "NHDCP", expect_state={"hdcp_notification": 1})
+telemetry(K, "bare-aspect", inbound="2\r\n", request=E + "5ASPR", expect_state={"inputs": {"5": {"aspect_ratio": 2}}})
+telemetry(K, "film", inbound="Film05*0\r\n", expect_state={"inputs": {"5": {"film_mode": False}}})
+telemetry(K, "bare-film", inbound="1\r\n", request=E + "6FILM", expect_state={"inputs": {"6": {"film_mode": True}}})
+telemetry(K, "auto-memory", inbound="Amem03*0\r\n", expect_state={"inputs": {"3": {"auto_memory": False}}})
+telemetry(K, "bare-auto-memory", inbound="1\r\n", request=E + "2AMEM",
+          expect_state={"inputs": {"2": {"auto_memory": True}}})
+telemetry(K, "auto-image-in1600", inbound="Img4*1\r\n", model="in1608-series",
+          expect_state={"inputs": {"4": {"auto_image": True}}})
+telemetry(K, "auto-image-run-in1808", inbound="Img1*1\r\n", model="in1808-series", expect_state={},
+          expect_then_send=[E + "1HDET\r", E + "1XIMG\r"])
+telemetry(K, "bare-auto-image-in1600", inbound="0\r\n", request="5A", model="in1608-series",
+          expect_state={"inputs": {"5": {"auto_image": False}}})
+telemetry(K, "detected-format", inbound="Vtyp03*2\r\n", expect_state={"inputs": {"3": {"detected_format": 2}}})
+telemetry(K, "bare-detected-format", inbound="3\r\n", request="1*\\",
+          expect_state={"inputs": {"1": {"detected_format": 3}}})
+telemetry(K, "video-format-in1600", inbound="Typ1*2\r\n", expect_state={"inputs": {"1": {"video_format": 2}}})
+telemetry(K, "bare-video-format-in1600", inbound="6\r\n", request="4\\",
+          expect_state={"inputs": {"4": {"video_format": 6}}})
+telemetry(K, "bare-contrast", inbound="070\r\n", request=E + "2CONT", model="in1808-series",
+          expect_state={"inputs": {"2": {"contrast": 70}}})
+telemetry(K, "bare-brightness", inbound="064\r\n", request=E + "7BRIT", model="in1808-series",
+          expect_state={"inputs": {"7": {"brightness": 64}}})
+telemetry(K, "detail-in1808", inbound="Hdet1*080\r\n", model="in1808-series", expect_state={"detail": 80})
+telemetry(K, "bare-detail-in1808", inbound="064\r\n", request=E + "1HDET", model="in1808-series",
+          expect_state={"detail": 64})
+telemetry(K, "detail-in1600", inbound="Hdet1*050\r\n", model="in1608-series",
+          expect_state={"inputs": {"1": {"detail": 50}}})
+telemetry(K, "color", inbound="Colr1*064\r\n", expect_state={"inputs": {"1": {"color": 64}}})
+telemetry(K, "tint", inbound="Tint1*060\r\n", expect_state={"inputs": {"1": {"tint": 60}}})
+telemetry(K, "image-in1808", inbound="Ximg1,-0010*+0020*01920*01080\r\n",
+          expect_state={"image": {"horizontal": -10, "vertical": 20, "width": 1920, "height": 1080}})
+telemetry(K, "image-in1600", inbound="Ximg+0000*-0005*01280*00720\r\n",
+          expect_state={"image": {"horizontal": 0, "vertical": -5, "width": 1280, "height": 720}})
+telemetry(K, "bare-image", inbound="+0016*+0000*01904*01080\r\n", request=E + "1XIMG",
+          expect_state={"image": {"horizontal": 16, "vertical": 0, "width": 1904, "height": 1080}})
+telemetry(K, "image-shift-in1808", inbound="HctrI1*-0002\r\n", expect_state={"image": {"horizontal": -2}})
+telemetry(K, "image-shift-in1600", inbound="Vctr+0012\r\n", expect_state={"image": {"vertical": 12}})
+telemetry(K, "image-width", inbound="HsizI1*01922\r\n", expect_state={"image": {"width": 1922}})
+telemetry(K, "image-height", inbound="Vsiz00721\r\n", expect_state={"image": {"height": 721}})
+telemetry(K, "hdmi-format", inbound="Vtpo1*3\r\n", expect_state={"outputs": {"1": {"hdmi_format": 3}}})
+telemetry(K, "bare-hdmi-format", inbound="0\r\n", request=E + "2VTPO",
+          expect_state={"outputs": {"2": {"hdmi_format": 0}}})
+telemetry(K, "bare-group", inbound="-00263\r\n", request=E + "D3GRPM", expect_state={"groups": {"3": {"value": -263}}})
+telemetry(K, "bare-dsp-gain", inbound="-55\r\n", request=E + "G60000AU",
+          expect_state={"dsp": {"60000": {"gain": -55}}})
+telemetry(K, "bare-dsp-mute", inbound="1\r\n", request=E + "M40001AU", expect_state={"dsp": {"40001": {"mute": True}}})
+telemetry(K, "phantom", inbound="DsZ40000*1\r\n", expect_state={"dsp": {"40000": {"phantom_power": True}}})
+telemetry(K, "bare-phantom", inbound="0\r\n", request=E + "Z40001AU",
+          expect_state={"dsp": {"40001": {"phantom_power": False}}})
+telemetry(K, "embedded-gain", inbound="DsH30012*120\r\n", expect_state={"dsp": {"30012": {"embedded_gain": 120}}})
+telemetry(K, "bare-embedded-gain", inbound="-30\r\n", request=E + "H30015AU",
+          expect_state={"dsp": {"30015": {"embedded_gain": -30}}})
+telemetry(K, "audio-input-name", inbound="AnamI10*Lectern Mic\r\n",
+          expect_state={"audio_inputs": {"10": {"name": "Lectern Mic"}}})
+telemetry(K, "audio-output-name", inbound="AnamO04*Ceiling\r\n",
+          expect_state={"audio_outputs": {"4": {"name": "Ceiling"}}})
+telemetry(K, "knob", inbound="Knob1*3\r\n", expect_state={"volume_knob_group": 3})
+telemetry(K, "bare-knob", inbound="8\r\n", request=E + "1KNOB", expect_state={"volume_knob_group": 8})
+telemetry(K, "bare-freeze", inbound="1\r\n", request="F", expect_state={"freeze": True})
+telemetry(K, "bare-front-panel", inbound="2\r\n", request="X", expect_state={"front_panel_lock": 2})
+telemetry(K, "bare-power-save", inbound="1\r\n", request=E + "PSAV", expect_state={"power_save": 1})
+telemetry(K, "bare-rate", inbound="073\r\n", request=E + "RATE", expect_state={"output_rate": 73})
+telemetry(K, "bare-test-pattern", inbound="00\r\n", request=E + "1TEST", expect_state={"test_pattern": 0})
+telemetry(K, "bare-switch-effect", inbound="2\r\n", request=E + "O1SWEF", expect_state={"switch_effect": 2})
+telemetry(K, "bare-auto-switch", inbound="0\r\n", request=E + "AUSW", expect_state={"auto_switch_mode": 0})
+telemetry(K, "auto-switch-timeout", inbound="AuswT010\r\n", expect_state={"auto_switch_timeout": 10})
+telemetry(K, "bare-auto-switch-timeout", inbound="003\r\n", request=E + "TAUSW",
+          expect_state={"auto_switch_timeout": 3})
+telemetry(K, "auto-switch-priority", inbound="AuswP8 7 1 2 3 4 5 6\r\n",
+          expect_state={"auto_switch_priority": "8 7 1 2 3 4 5 6"})
+telemetry(K, "bare-auto-switch-priority", inbound="1 2 3 4 5 6\r\n", request=E + "PAUSW",
+          expect_state={"auto_switch_priority": "1 2 3 4 5 6"})
+telemetry(K, "auto-image-threshold", inbound="Alvl030\r\n", expect_state={"auto_image_threshold": 30})
+telemetry(K, "bare-auto-image-threshold", inbound="025\r\n", request=E + "ALVL",
+          expect_state={"auto_image_threshold": 25})
+telemetry(K, "overscan", inbound="Oscn2*1\r\n", expect_state={"overscan": {"2": 1}})
+telemetry(K, "bare-overscan", inbound="0\r\n", request=E + "6OSCN", expect_state={"overscan": {"6": 0}})
+telemetry(K, "osd-duration", inbound="Mdur060\r\n", expect_state={"osd_duration": 60})
+telemetry(K, "bare-osd-duration", inbound="003\r\n", request=E + "MDUR", expect_state={"osd_duration": 3})
+telemetry(K, "screen-saver-mode", inbound="SsavM1*2\r\n", expect_state={"screen_saver": {"mode": 2}})
+telemetry(K, "screen-saver-mode-in1600", inbound="SsavM0\r\n", expect_state={"screen_saver": {"mode": 0}})
+telemetry(K, "bare-screen-saver-mode", inbound="1\r\n", request=E + "MSSAV",
+          expect_state={"screen_saver": {"mode": 1}})
+telemetry(K, "screen-saver-timeout", inbound="SsavT1*501\r\n", expect_state={"screen_saver": {"timeout": 501}})
+telemetry(K, "bare-screen-saver-timeout", inbound="030\r\n", request=E + "TSSAV",
+          expect_state={"screen_saver": {"timeout": 30}})
+telemetry(K, "screen-saver-status", inbound="SsavS1*1\r\n", expect_state={"screen_saver": {"status": 1}})
+telemetry(K, "bare-screen-saver-status", inbound="2\r\n", request=E + "S1SSAV",
+          expect_state={"screen_saver": {"status": 2}})
+telemetry(K, "screen-saver-color", inbound="SsavCFF0000\r\n", expect_state={"screen_saver": {"color": "FF0000"}})
+telemetry(K, "bare-verbose", inbound="3\r\n", request=E + "CV", expect_state={"verbose_mode": 3})
