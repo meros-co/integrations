@@ -1364,13 +1364,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## resolume — Resolume Arena / Avenue
 
-- [ ] Record the shape of the composition message pushed on the websocket (bare object or wrapped as {"type", "value"}). ([specs/resolume.yaml:964](specs/resolume.yaml#L964))
-- [ ] Confirm that layer, column, deck and group positions reported in state match the order in the composition list Resolume sends. ([specs/resolume.yaml:875](specs/resolume.yaml#L875))
-- [ ] Confirm that setters sending only the changed property leave other properties unchanged. ([specs/resolume.yaml:911](specs/resolume.yaml#L911))
-- [ ] Check what Resolume does with a speed, crossfader phase or tempo value outside the parameter's min and max. ([specs/resolume.yaml:921](specs/resolume.yaml#L921))
-- [ ] Confirm opacity and master levels are 0.0 to 1.0 over REST. ([specs/resolume.yaml:918](specs/resolume.yaml#L918))
-- [ ] Confirm a deck switch, deck open and deck close bring no new composition on the websocket (so the REST read is needed). ([specs/resolume.yaml:954](specs/resolume.yaml#L954))
-- [ ] On Avenue, check whether get_deck, replace_deck and deck delete and duplicate answer 402. ([specs/resolume.yaml:996](specs/resolume.yaml#L996))
+- [ ] Record the shape of the composition message pushed on the websocket (bare object or wrapped as {"type", "value"}). ([specs/resolume.yaml:3370](specs/resolume.yaml#L3370))
+- [ ] Confirm that layer, column, deck and group positions reported in state match the order in the composition list Resolume sends. ([specs/resolume.yaml:3262](specs/resolume.yaml#L3262))
+- [ ] Confirm that setters sending only the changed property leave other properties unchanged. ([specs/resolume.yaml:3297](specs/resolume.yaml#L3297))
+- [ ] Check what Resolume does with a speed, crossfader phase or tempo value outside the parameter's min and max. ([specs/resolume.yaml:3310](specs/resolume.yaml#L3310))
+- [ ] Confirm opacity and master levels are 0.0 to 1.0 over REST. ([specs/resolume.yaml:3308](specs/resolume.yaml#L3308))
+- [ ] Confirm a deck switch, deck open and deck close bring no new composition on the websocket (so the REST read is needed). ([specs/resolume.yaml:3356](specs/resolume.yaml#L3356))
+- [ ] On Avenue, check whether get_deck, replace_deck and deck delete and duplicate answer 402. ([specs/resolume.yaml:3402](specs/resolume.yaml#L3402))
+- [ ] Confirm effect chain offsets (add at, move to, delete, rename at) count from 1, matching effects.*.position. ([specs/resolume.yaml:3417](specs/resolume.yaml#L3417))
+- [ ] Confirm a move body of effects/by-id/<id> (no leading slash, as the document's example) moves an effect from any chain. ([specs/resolume.yaml:3414](specs/resolume.yaml#L3414))
+- [ ] Confirm an effect name with a space is accepted percent-encoded in effect:///video/<name>, and that /<preset> takes the preset's name. ([specs/resolume.yaml:3412](specs/resolume.yaml#L3412))
+- [ ] Confirm choice parameters (crossfader side, blend mode, play direction, colour and the rest) are set by sending the option name as value. ([specs/resolume.yaml:3426](specs/resolume.yaml#L3426))
+- [ ] Record the units and ranges of audio volume and pan, a layer's transition duration and a clip's speed, position and duration. ([specs/resolume.yaml:3439](specs/resolume.yaml#L3439))
+- [ ] Check whether adding, moving or removing an effect, or moving a layer or clip, resends the composition on the websocket (the extension reads it again after its own). ([specs/resolume.yaml:3359](specs/resolume.yaml#L3359))
+- [ ] Measure how often a playing clip's transport position is pushed, and whether effect parameters subscribe by /parameter/by-id/<id> like the rest. ([specs/resolume.yaml:3346](specs/resolume.yaml#L3346))
 
 ## restream — Restream
 

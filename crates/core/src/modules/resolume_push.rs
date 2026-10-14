@@ -65,7 +65,8 @@ const REOPEN_MIN: Millis = 1_000;
 const REOPEN_MAX: Millis = 30_000;
 /// Commands after which the composition is read again: they change its
 /// structure, and the article names only layers and columns added or
-/// removed as changes that resend it.
+/// removed as changes that resend it. Effect chains, reordering, decks and
+/// clip content are not named, and a display name is not a parameter.
 const STRUCTURAL: &[&str] = &[
     "add_deck",
     "open_deck",
@@ -75,6 +76,113 @@ const STRUCTURAL: &[&str] = &[
     "new_composition",
     "undo",
     "redo",
+    // Clip content: a clip's effects and transport come with what it holds.
+    "open_clip",
+    "clear_clip",
+    "clear_layer_clips",
+    // Effect chains, moves and swaps, deck structure and clip content.
+    "add_effect_to_composition",
+    "add_effect_to_composition_at",
+    "move_effect_to_composition",
+    "move_effect_to_composition_at",
+    "delete_composition_effect",
+    "rename_composition_effect",
+    "copy_effects_to_composition",
+    "add_effect_to_layer",
+    "add_effect_to_layer_at",
+    "move_effect_to_layer",
+    "move_effect_to_layer_at",
+    "delete_layer_effect",
+    "rename_layer_effect",
+    "copy_effects_to_layer",
+    "add_effect_to_layer_by_id",
+    "add_effect_to_layer_at_by_id",
+    "move_effect_to_layer_by_id",
+    "move_effect_to_layer_at_by_id",
+    "delete_layer_effect_by_id",
+    "copy_effects_to_layer_by_id",
+    "add_effect_to_selected_layer",
+    "add_effect_to_selected_layer_at",
+    "delete_selected_layer_effect",
+    "copy_effects_to_selected_layer",
+    "add_effect_to_group",
+    "add_effect_to_group_at",
+    "move_effect_to_group",
+    "move_effect_to_group_at",
+    "delete_group_effect",
+    "rename_group_effect",
+    "copy_effects_to_group",
+    "add_effect_to_group_by_id",
+    "add_effect_to_group_at_by_id",
+    "move_effect_to_group_by_id",
+    "move_effect_to_group_at_by_id",
+    "delete_group_effect_by_id",
+    "copy_effects_to_group_by_id",
+    "add_effect_to_selected_group",
+    "add_effect_to_selected_group_at",
+    "delete_selected_group_effect",
+    "copy_effects_to_selected_group",
+    "add_effect_to_clip",
+    "add_effect_to_clip_at",
+    "move_effect_to_clip",
+    "move_effect_to_clip_at",
+    "delete_clip_effect",
+    "rename_clip_effect",
+    "copy_effects_to_clip",
+    "add_effect_to_clip_by_id",
+    "add_effect_to_clip_at_by_id",
+    "move_effect_to_clip_by_id",
+    "move_effect_to_clip_at_by_id",
+    "delete_clip_effect_by_id",
+    "copy_effects_to_clip_by_id",
+    "add_effect_to_selected_clip",
+    "add_effect_to_selected_clip_at",
+    "delete_selected_clip_effect",
+    "copy_effects_to_selected_clip",
+    "rename_effect",
+    "insert_column_move",
+    "swap_columns",
+    "insert_column_move_by_id",
+    "swap_columns_by_id",
+    "insert_column_move_at_selected",
+    "move_layer",
+    "move_layer_by_id",
+    "move_layer_to_end",
+    "move_layer_to_end_by_id",
+    "move_layer_into_group",
+    "move_layer_into_group_by_id",
+    "remove_layer_from_group",
+    "remove_layer_from_group_by_id",
+    "clear_layer_clips_by_id",
+    "clear_selected_layer_clips",
+    "move_group",
+    "move_group_before_layer",
+    "move_group_to_end",
+    "move_group_by_id",
+    "move_group_to_end_by_id",
+    "delete_deck",
+    "delete_deck_by_id",
+    "duplicate_deck",
+    "duplicate_deck_by_id",
+    "add_deck_before",
+    "add_deck_before_by_id",
+    "select_deck_by_id",
+    "open_deck_by_id",
+    "close_deck_by_id",
+    "open_clip_by_id",
+    "open_selected_clip",
+    "clear_clip_by_id",
+    "clear_selected_clip",
+    "remove_clip_audio_track",
+    "remove_clip_video_track",
+    "insert_into_clip",
+    "remove_clip_audio_track_by_id",
+    "remove_clip_video_track_by_id",
+    "insert_into_clip_by_id",
+    "merge_clip",
+    "merge_clip_by_id",
+    "swap_clips",
+    "swap_clips_by_id",
 ];
 
 /// What a subscribed parameter's value changes.
@@ -82,6 +190,9 @@ const STRUCTURAL: &[&str] = &[
 enum Target {
     /// One state path, set to the value.
     Path(String),
+    /// One state path given segment by segment, for an effect parameter's
+    /// value: its name is Resolume's and may hold a dot.
+    Segments(Vec<String>),
     /// A clip's name: `clips.<id>.name`, and its layer's active clip name.
     ClipName(u64),
     /// A clip's connection state: `clips.<id>.connected`, and its layer's
@@ -107,6 +218,7 @@ struct Model {
     columns: BTreeSet<u64>,
     decks: BTreeSet<u64>,
     groups: BTreeSet<u64>,
+    effects: BTreeSet<u64>,
     clips: BTreeMap<u64, Clip>,
     /// Each layer's clips, in column order.
     layer_clips: BTreeMap<u64, Vec<u64>>,
@@ -115,10 +227,33 @@ struct Model {
     selected_deck: Option<u64>,
 }
 
+/// What is read beyond the composition's structure, from the settings.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Options {
+    /// Each clip's transport position, which moves while a clip plays.
+    clip_positions: bool,
+    /// Each effect's parameters and mixer parameters.
+    effect_parameters: bool,
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options {
+            clip_positions: true,
+            effect_parameters: true,
+        }
+    }
+}
+
 /// Put `value` at a dotted path in a nested JSON object.
 fn set(patch: &mut Value, path: &str, value: Value) {
+    set_segments(patch, path.split('.'), value);
+}
+
+/// Put `value` at a path, given segment by segment, in a nested JSON object.
+fn set_segments<'s>(patch: &mut Value, path: impl IntoIterator<Item = &'s str>, value: Value) {
     let mut node = patch;
-    let mut parts = path.split('.').peekable();
+    let mut parts = path.into_iter().peekable();
     while let Some(part) = parts.next() {
         if !node.is_object() {
             *node = Value::Object(Map::new());
@@ -206,9 +341,142 @@ fn subscription(action: &str, id: u64) -> String {
 struct Reader<'a> {
     model: &'a mut Model,
     patch: &'a mut Value,
+    options: Options,
 }
 
+/// The fields of a parameter object kept in state for an effect parameter,
+/// so a consumer can set it by id and offer its range or options.
+const PARAMETER_FIELDS: &[&str] = &["id", "valuetype", "value", "min", "max", "options"];
+
 impl Reader<'_> {
+    /// An audio track's volume and pan, under `at`.
+    fn audio(&mut self, a: Option<&Value>, at: &str) {
+        let Some(a) = a.filter(|a| a.is_object()) else {
+            return;
+        };
+        self.plain(a.get("volume"), format!("{at}.volume"));
+        self.plain(a.get("pan"), format!("{at}.pan"));
+    }
+
+    /// The video and audio effect chains of `owner`, into `effects.<id>`.
+    fn effects(&mut self, owner: &Value, kind: &str, owner_id: Option<u64>) {
+        for (chain, list) in [
+            ("video", owner.pointer("/video/effects")),
+            ("audio", owner.pointer("/audio/effects")),
+        ] {
+            let list = list
+                .and_then(Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            for (i, effect) in list.iter().enumerate() {
+                let Some(id) = id_of(effect.get("id")) else {
+                    continue;
+                };
+                if !self.model.effects.insert(id) {
+                    continue;
+                }
+                let at = format!("effects.{id}");
+                set(self.patch, &format!("{at}.chain"), json!(chain));
+                // An effect moved keeps its id: what its last owner gave
+                // and its new one does not is removed (null).
+                set(self.patch, &format!("{at}.owner"), json!(kind));
+                set(self.patch, &format!("{at}.owner_id"), json!(owner_id));
+                set(self.patch, &format!("{at}.position"), json!(i + 1));
+                for field in ["name", "display_name"] {
+                    let v = effect.get(field).filter(|v| v.is_string()).cloned();
+                    set(
+                        self.patch,
+                        &format!("{at}.{field}"),
+                        v.unwrap_or(Value::Null),
+                    );
+                }
+                if let Some(v) = effect.get("is_user_removable").filter(|v| v.is_boolean()) {
+                    set(self.patch, &format!("{at}.removable"), v.clone());
+                }
+                self.plain(effect.get("bypassed"), format!("{at}.bypassed"));
+                if self.options.effect_parameters {
+                    for section in ["params", "mixer"] {
+                        let Some(params) = effect.get(section).and_then(Value::as_object) else {
+                            continue;
+                        };
+                        for (name, p) in params {
+                            self.effect_parameter(id, section, name, p);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// A clip's transport, audio volume, video opacity and trigger settings,
+    /// under `at`.
+    fn clip_settings(&mut self, clip: &Value, at: &str) {
+        for (key, field) in [
+            ("transporttype", "transport_type"),
+            ("triggerstyle", "trigger_style"),
+            ("target", "target"),
+            ("beatsnap", "beat_snap"),
+            ("colorid", "color"),
+        ] {
+            self.plain(clip.get(key), format!("{at}.{field}"));
+        }
+        self.plain(clip.pointer("/audio/volume"), format!("{at}.volume"));
+        self.plain(clip.pointer("/video/opacity"), format!("{at}.opacity"));
+        let Some(transport) = clip.get("transport").filter(|t| t.is_object()) else {
+            return;
+        };
+        let position = transport.get("position");
+        if self.options.clip_positions {
+            self.plain(position, format!("{at}.transport_position"));
+        }
+        if let Some(max) = position
+            .and_then(|p| p.get("max"))
+            .filter(|v| v.is_number())
+        {
+            set(
+                self.patch,
+                &format!("{at}.transport_position_max"),
+                max.clone(),
+            );
+        }
+        let control = |k: &str| transport.get("controls").and_then(|c| c.get(k));
+        for (key, field) in [
+            ("speed", "speed"),
+            ("playdirection", "play_direction"),
+            ("playmode", "play_mode"),
+            ("duration", "duration"),
+        ] {
+            self.plain(control(key), format!("{at}.{field}"));
+        }
+    }
+
+    /// One parameter of an effect: its id, type, value and range or options
+    /// at `effects.<id>.<section>.<name>`, its value subscribed.
+    fn effect_parameter(&mut self, effect: u64, section: &str, name: &str, p: &Value) {
+        let Some(obj) = p.as_object() else { return };
+        let effect = effect.to_string();
+        let kept: Map<String, Value> = obj
+            .iter()
+            .filter(|(k, v)| PARAMETER_FIELDS.contains(&k.as_str()) && !v.is_null())
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        if kept.is_empty() {
+            return;
+        }
+        set_segments(
+            self.patch,
+            ["effects", effect.as_str(), section, name],
+            Value::Object(kept),
+        );
+        if let Some(id) = id_of(obj.get("id")) {
+            let path = ["effects", effect.as_str(), section, name, "value"];
+            self.model.params.insert(
+                id,
+                Target::Segments(path.iter().map(|s| s.to_string()).collect()),
+            );
+        }
+    }
+
     /// A parameter object: its value into state at `path`, and its id
     /// subscribed with `target`.
     fn param(&mut self, p: Option<&Value>, path: &str, target: Target) {
@@ -253,6 +521,18 @@ impl Reader<'_> {
         self.event_id(tc("resync"), "tempo.resync_parameter");
         self.event_id(tc("tempo_push"), "tempo.push_parameter");
         self.event_id(tc("tempo_pull"), "tempo.pull_parameter");
+        for (key, path) in [
+            ("description", "composition.description"),
+            ("highdetail", "composition.high_detail"),
+            ("framerate", "composition.frame_rate"),
+            ("cliptarget", "composition.clip_target"),
+            ("cliptriggerstyle", "composition.clip_trigger_style"),
+            ("clipbeatsnap", "composition.clip_beat_snap"),
+        ] {
+            self.plain(c.get(key), path.into());
+        }
+        self.audio(c.get("audio"), "composition");
+        self.effects(c, "composition", None);
 
         let array = |k: &str| array(c, k);
         let columns: Vec<u64> = array("columns")
@@ -269,6 +549,8 @@ impl Reader<'_> {
             self.plain(col.get("name"), format!("{at}.name"));
             self.plain(col.get("connected"), format!("{at}.connected"));
             self.plain(col.get("selected"), format!("{at}.selected"));
+            self.plain(col.get("colorid"), format!("{at}.color"));
+            self.plain(col.get("beatsnap"), format!("{at}.beat_snap"));
         }
         for (i, deck) in array("decks").iter().enumerate() {
             let Some(id) = id_of(deck.get("id")) else {
@@ -278,6 +560,7 @@ impl Reader<'_> {
             let at = format!("decks.{id}");
             set(self.patch, &format!("{at}.position"), json!(i + 1));
             self.plain(deck.get("name"), format!("{at}.name"));
+            self.plain(deck.get("colorid"), format!("{at}.color"));
             self.param(
                 deck.get("selected"),
                 &format!("{at}.selected"),
@@ -306,6 +589,18 @@ impl Reader<'_> {
             self.plain(group.get("bypassed"), format!("{at}.bypassed"));
             self.plain(group.get("solo"), format!("{at}.solo"));
             self.plain(group.get("selected"), format!("{at}.selected"));
+            self.plain(group.get("speed"), format!("{at}.speed"));
+            self.plain(
+                group.get("crossfadergroup"),
+                format!("{at}.crossfader_group"),
+            );
+            self.plain(
+                group.get("ignorecolumntrigger"),
+                format!("{at}.ignore_column_trigger"),
+            );
+            self.plain(group.get("colorid"), format!("{at}.color"));
+            self.audio(group.get("audio"), &at);
+            self.effects(group, "group", Some(id));
             for layer in group
                 .get("layers")
                 .and_then(Value::as_array)
@@ -350,6 +645,25 @@ impl Reader<'_> {
             layer.get("crossfadergroup"),
             format!("{at}.crossfader_group"),
         );
+        for (key, field) in [
+            ("maskmode", "mask_mode"),
+            ("ignorecolumntrigger", "ignore_column_trigger"),
+            ("faderstart", "fader_start"),
+            ("colorid", "color"),
+        ] {
+            self.plain(layer.get(key), format!("{at}.{field}"));
+        }
+        self.audio(layer.get("audio"), &at);
+        let transition = layer.get("transition");
+        self.plain(
+            transition.and_then(|t| t.get("duration")),
+            format!("{at}.transition_duration"),
+        );
+        self.plain(
+            transition.and_then(|t| t.get("blend_mode")),
+            format!("{at}.transition_blend_mode"),
+        );
+        self.effects(layer, "layer", Some(id));
 
         let mut clips = Vec::new();
         for (i, clip) in layer
@@ -377,6 +691,8 @@ impl Reader<'_> {
                 &format!("{cat}.connected"),
                 Target::ClipConnected(cid),
             );
+            self.clip_settings(clip, &cat);
+            self.effects(clip, "clip", Some(cid));
             let value = |k: &str| clip.get(k).and_then(|p| p.get("value")).cloned();
             self.model.clips.insert(
                 cid,
@@ -411,12 +727,13 @@ impl Reader<'_> {
 
 impl Model {
     /// The state and model a composition gives.
-    fn read(composition: &Value) -> (Model, Value) {
+    fn read(composition: &Value, options: Options) -> (Model, Value) {
         let mut model = Model::default();
         let mut patch = json!({});
         Reader {
             model: &mut model,
             patch: &mut patch,
+            options,
         }
         .composition(composition);
         (model, patch)
@@ -459,6 +776,7 @@ impl Model {
         gone(&self.columns, &next.columns, "columns", patch);
         gone(&self.decks, &next.decks, "decks", patch);
         gone(&self.groups, &next.groups, "groups", patch);
+        gone(&self.effects, &next.effects, "effects", patch);
         for id in self.clips.keys().filter(|c| !next.clips.contains_key(c)) {
             set(patch, &format!("clips.{id}"), Value::Null);
         }
@@ -474,6 +792,9 @@ impl Model {
         let mut switched = false;
         match target {
             Target::Path(path) => set(&mut patch, &path, value),
+            Target::Segments(path) => {
+                set_segments(&mut patch, path.iter().map(String::as_str), value)
+            }
             Target::ClipName(clip) => {
                 set(&mut patch, &format!("clips.{clip}.name"), value.clone());
                 let c = self.clips.get_mut(&clip)?;
@@ -530,6 +851,7 @@ pub(crate) struct ResolumePush {
     refresh_every: Millis,
     /// Commands in flight that change the structure.
     structural: HashMap<CommandId, String>,
+    options: Options,
 }
 
 impl ResolumePush {
@@ -551,6 +873,16 @@ impl ResolumePush {
             .get("composition_refresh_s")
             .and_then(Value::as_u64)
             .unwrap_or(DEFAULT_REFRESH_S);
+        let flag = |name: &str| {
+            ctx.settings
+                .get(name)
+                .and_then(Value::as_bool)
+                .unwrap_or(true)
+        };
+        let options = Options {
+            clip_positions: flag("clip_positions"),
+            effect_parameters: flag("effect_parameters"),
+        };
         ResolumePush {
             engine,
             ws: WsRequest {
@@ -568,6 +900,7 @@ impl ResolumePush {
             refreshing: None,
             refresh_every: refresh_s.saturating_mul(1000),
             structural: HashMap::new(),
+            options,
         }
     }
 
@@ -628,7 +961,7 @@ impl ResolumePush {
     /// A composition, from the websocket or a refresh: into state, and the
     /// subscriptions brought into line with it.
     fn composition(&mut self, cx: &mut Cx, doc: &Value) {
-        let (next, mut patch) = Model::read(doc);
+        let (next, mut patch) = Model::read(doc, self.options);
         if let Some(last) = &self.model {
             last.removed(&next, &mut patch);
         }
@@ -1046,7 +1379,7 @@ mod tests {
 
     #[test]
     fn the_composition_is_read_into_state() {
-        let (model, state) = Model::read(&composition(false));
+        let (model, state) = Model::read(&composition(false), Options::default());
         assert_eq!(
             state["composition"],
             json!({"name": "Show", "master": 1.0, "speed": 1.0, "bypassed": false, "opacity": 0.5})
@@ -1118,7 +1451,18 @@ mod tests {
             .keys()
             .map(|k| k.split('.').map(str::to_string).collect())
             .collect();
-        let (_, state) = Model::read(&composition(true));
+        // An object-typed path holds its fields: they are its, not declared.
+        let objects: Vec<Vec<String>> = spec
+            .state
+            .iter()
+            .filter(|(_, d)| d.kind == "object")
+            .map(|(k, _)| k.split('.').map(str::to_string).collect())
+            .collect();
+        let mut state = Model::read(&composition(true), Options::default()).1;
+        merge_patch(
+            &mut state,
+            &Model::read(&rich_composition(), Options::default()).1,
+        );
         fn leaves(v: &Value, at: Vec<String>, out: &mut Vec<Vec<String>>) {
             match v {
                 Value::Object(m) => {
@@ -1133,13 +1477,202 @@ mod tests {
         }
         let mut paths = Vec::new();
         leaves(&state, Vec::new(), &mut paths);
+        let matches = |d: &Vec<String>, path: &[String]| {
+            d.len() == path.len() && d.iter().zip(path).all(|(a, b)| a == "*" || a == b)
+        };
         for path in paths {
+            let in_object = objects
+                .iter()
+                .any(|o| path.len() > o.len() && matches(o, &path[..o.len()]));
             assert!(
-                declared.iter().any(|d| d.len() == path.len()
-                    && d.iter().zip(&path).all(|(a, b)| a == "*" || a == b)),
+                in_object || declared.iter().any(|d| matches(d, &path)),
                 "{} is not declared",
                 path.join(".")
             );
+        }
+    }
+
+    /// A composition with what the full-control state reads: effect chains
+    /// on the composition, a layer and a clip, audio tracks, a layer
+    /// transition and a clip's transport.
+    fn rich_composition() -> Value {
+        let effect = |id: u64, name: &str| {
+            json!({
+                "id": id, "name": name, "display_name": name, "is_user_removable": true,
+                "bypassed": p(id * 10 + 1, json!(false)),
+                "params": {
+                    "Amount": { "id": id * 10 + 2, "valuetype": "ParamRange", "min": 0.0, "max": 1.0,
+                                "value": 0.5, "view": { "suffix": "" } },
+                    "Mode.Fast": { "id": id * 10 + 3, "valuetype": "ParamChoice", "value": "On",
+                                   "index": 1, "options": ["Off", "On"] },
+                },
+                "mixer": { "Blend Mode": { "id": id * 10 + 4, "valuetype": "ParamChoice", "value": "Add",
+                                           "options": ["Add", "Alpha"] } },
+            })
+        };
+        json!({
+            "description": p(21, json!("Opening")),
+            "highdetail": p(22, json!(false)),
+            "framerate": p(23, json!(60.0)),
+            "cliptarget": p(24, json!("Layer")),
+            "cliptriggerstyle": p(25, json!("Normal")),
+            "clipbeatsnap": p(26, json!("None")),
+            "audio": { "volume": p(27, json!(0.0)), "pan": p(28, json!(0.0)),
+                       "effects": [ effect(7001, "EQ-3") ] },
+            "video": { "opacity": p(5, json!(1.0)), "effects": [ effect(7002, "Blow") ] },
+            "layers": [ {
+                "id": 1101,
+                "name": p(11011, json!("Main")),
+                "maskmode": p(11012, json!("No Mask")),
+                "ignorecolumntrigger": p(11013, json!(false)),
+                "faderstart": p(11014, json!(true)),
+                "colorid": p(11015, json!("Red")),
+                "audio": { "volume": p(11016, json!(-6.0)), "pan": p(11017, json!(0.25)) },
+                "video": { "opacity": p(11018, json!(1.0)), "effects": [ effect(7003, "Transform") ] },
+                "transition": { "duration": p(11019, json!(1.5)), "blend_mode": p(11020, json!("Alpha")) },
+                "clips": [ {
+                    "id": 4101,
+                    "name": p(41011, json!("Clouds")),
+                    "connected": p(41012, json!("Connected")),
+                    "transporttype": p(41013, json!("Timeline")),
+                    "triggerstyle": p(41014, json!("Toggle")),
+                    "target": p(41015, json!("Own Layer")),
+                    "beatsnap": p(41016, json!("None")),
+                    "colorid": p(41017, json!("Blue")),
+                    "audio": { "volume": p(41018, json!(0.0)) },
+                    "video": { "opacity": p(41019, json!(1.0)), "effects": [ effect(7004, "Hue Rotate") ] },
+                    "transport": {
+                        "position": { "id": 41020, "valuetype": "ParamRange", "min": 0.0, "max": 19269.25,
+                                      "value": 1250.0 },
+                        "controls": { "speed": p(41021, json!(1.0)), "playdirection": p(41022, json!(">")),
+                                      "playmode": p(41023, json!("Loop")),
+                                      "duration": p(41024, json!(19.269)) },
+                    },
+                } ],
+            } ],
+            "columns": [ { "id": 2101, "name": p(21011, json!("A")), "colorid": p(21012, json!("Green")),
+                           "beatsnap": p(21013, json!("1 Bar")) } ],
+            "decks": [ { "id": 3101, "name": p(31011, json!("D")), "colorid": p(31012, json!("Grey")),
+                         "selected": p(31013, json!(true)) } ],
+            "layergroups": [ { "id": 5101, "name": p(51011, json!("G")), "speed": p(51012, json!(1.0)),
+                               "crossfadergroup": p(51013, json!("A")),
+                               "ignorecolumntrigger": p(51014, json!(false)),
+                               "colorid": p(51015, json!("Red")),
+                               "audio": { "volume": p(51016, json!(0.0)), "pan": p(51017, json!(0.0)) },
+                               "video": { "effects": [ effect(7005, "Mirror") ] },
+                               "layers": [] } ],
+        })
+    }
+
+    #[test]
+    fn effects_transport_and_settings_are_read_and_subscribed() {
+        let (model, state) = Model::read(&rich_composition(), Options::default());
+        assert_eq!(state["composition"]["description"], "Opening");
+        assert_eq!(state["composition"]["frame_rate"], 60.0);
+        assert_eq!(state["composition"]["volume"], 0.0);
+        let layer = &state["layers"]["1101"];
+        assert_eq!(layer["volume"], -6.0);
+        assert_eq!(layer["pan"], 0.25);
+        assert_eq!(layer["transition_duration"], 1.5);
+        assert_eq!(layer["transition_blend_mode"], "Alpha");
+        assert_eq!(layer["mask_mode"], "No Mask");
+        assert_eq!(layer["color"], "Red");
+        let clip = &state["clips"]["4101"];
+        assert_eq!(clip["transport_position"], 1250.0);
+        assert_eq!(clip["transport_position_max"], 19269.25);
+        assert_eq!(clip["speed"], 1.0);
+        assert_eq!(clip["play_direction"], ">");
+        assert_eq!(clip["play_mode"], "Loop");
+        assert_eq!(clip["duration"], 19.269);
+        assert_eq!(clip["transport_type"], "Timeline");
+        assert_eq!(state["groups"]["5101"]["crossfader_group"], "A");
+        assert_eq!(state["columns"]["2101"]["beat_snap"], "1 Bar");
+        assert_eq!(state["decks"]["3101"]["color"], "Grey");
+
+        // Effects: each chain's effects, keyed by id, with owner and place.
+        let eq = &state["effects"]["7001"];
+        assert_eq!(eq["chain"], "audio");
+        assert_eq!(eq["owner"], "composition");
+        assert_eq!(eq["owner_id"], Value::Null);
+        assert_eq!(eq["position"], 1);
+        let hue = &state["effects"]["7004"];
+        assert_eq!(hue["owner"], "clip");
+        assert_eq!(hue["owner_id"], 4101);
+        assert_eq!(hue["chain"], "video");
+        assert_eq!(hue["display_name"], "Hue Rotate");
+        assert_eq!(hue["bypassed"], false);
+        assert_eq!(hue["removable"], true);
+        assert_eq!(
+            hue["params"]["Amount"],
+            json!({"id": 70042, "valuetype": "ParamRange", "min": 0.0, "max": 1.0, "value": 0.5})
+        );
+        // A parameter name holding a dot stays one key.
+        assert_eq!(hue["params"]["Mode.Fast"]["options"], json!(["Off", "On"]));
+        assert_eq!(hue["mixer"]["Blend Mode"]["value"], "Add");
+        assert_eq!(state["effects"]["7005"]["owner"], "group");
+        assert_eq!(state["effects"]["7003"]["owner_id"], 1101);
+        assert_eq!(
+            model.params.get(&70043),
+            Some(&Target::Segments(
+                ["effects", "7004", "params", "Mode.Fast", "value"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            ))
+        );
+        assert_eq!(
+            model.params.get(&41020),
+            Some(&Target::Path("clips.4101.transport_position".into()))
+        );
+        assert_eq!(
+            model.params.get(&11016),
+            Some(&Target::Path("layers.1101.volume".into()))
+        );
+
+        // An update to an effect parameter changes only its value.
+        let mut model = model;
+        let mut state = state;
+        let (patch, _) = model
+            .update(&json!({"type": "parameter_update", "path": "/parameter/by-id/70043", "value": "Off"}))
+            .unwrap();
+        merge_patch(&mut state, &patch);
+        assert_eq!(
+            state["effects"]["7004"]["params"]["Mode.Fast"]["value"],
+            "Off"
+        );
+
+        // The effect leaves when a composition no longer holds it.
+        let mut next = rich_composition();
+        next["layers"][0]["clips"][0]["video"]["effects"] = json!([]);
+        let (after, _) = Model::read(&next, Options::default());
+        let mut patch = json!({});
+        model.removed(&after, &mut patch);
+        assert_eq!(patch["effects"]["7004"], Value::Null);
+        assert!(patch["effects"].get("7003").is_none());
+    }
+
+    #[test]
+    fn positions_and_effect_parameters_can_be_left_out() {
+        let options = Options {
+            clip_positions: false,
+            effect_parameters: false,
+        };
+        let (model, state) = Model::read(&rich_composition(), options);
+        assert!(state["clips"]["4101"].get("transport_position").is_none());
+        assert_eq!(state["clips"]["4101"]["speed"], 1.0);
+        assert!(state["effects"]["7004"].get("params").is_none());
+        assert_eq!(state["effects"]["7004"]["bypassed"], false);
+        assert!(!model.params.contains_key(&41020));
+        assert!(!model.params.contains_key(&70042));
+        assert!(model.params.contains_key(&70041));
+    }
+
+    #[test]
+    fn structural_commands_are_spec_commands() {
+        let catalog = Catalog::embedded();
+        let spec = catalog.device("resolume").unwrap();
+        for name in STRUCTURAL {
+            assert!(spec.commands.contains_key(*name), "{name} is not a command");
         }
     }
 
