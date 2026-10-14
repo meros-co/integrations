@@ -15,7 +15,8 @@ source:
       scripts as GET with typed query parameters; the Titan-specific types Level, Level Delta,
       TitanId and User Number; "If you send an invalid request, the console will return an error
       message ... For a successful request the console will return the result, or if there is no
-      result it will return a blank page"; handle requests /titan/handles, /titan/handles/<group>
+      result it will return a blank page"; a property set as a POST to /titan/set/... whose body is
+      the value as text (the example sets ShowDmxAddress with the body False); handle requests /titan/handles, /titan/handles/<group>
       and /titan/handles/<group>/<page> (pages from 0, group names case sensitive) returning JSON
       handle records (handleLocation group, index and page, properties, titanId, type, Active,
       Legend); the Playbacks and Titan providers.
@@ -53,6 +54,19 @@ source:
       CurrentWorldName), System (ToggleMode, SoftwareVersion, DeskMode), Show.ShowName,
       Titan (DmxOutputEnabled, DeviceInfo), Command.CommandLineText. The script/2 form is
       documented from V14.0; V10.0 to V12.0 document only the older typed-parameter form.
+      Retrieved again 2026-10-14 for the full-control commands: Playbacks (StoreCue,
+      SetRecordType), Palette (StoreCurrentPalette, StoreCurrentPaletteReplace,
+      DeleteCurrentPalette, CurrentPaletteNumber, CurrentPaletteName, StorePaletteMode), Group
+      (StoreGroup, StoreGroupReplace, DeleteGroup, SetGroupFaderLevel,
+      SetGroupHandleFaderLevel), Programmer.Editor (Clear, ClearSelectedFixtures, ClearEffects,
+      Clear.Selected, Fixtures.SetColourControlValues), Timecode (SetTimecodeSource,
+      SetTimecodePort, TimecodeOne to TimecodeFour SetSource, Play, Pause, Reset, SetStartTime,
+      Source, LiveTime, Paused, StartTime), Timelines (PlayTimelineFromTime and ById,
+      PlayTimelineFromCursor, PlayResetTimeline, Play, Pause, Stop and ResetTimelineById,
+      SetTimelineFaderLevel, SetTimelineHandleFaderLevel), Masters.SetMasterLevel, and Handles
+      (HandleKeyAction, HandleFaderAction). Each gives its signature and HTTP form; none gives
+      the wire form of AcwHSI, AcwRecordMask, AcwShapeType, MenuEventTypes, AcwTimecodeSource or
+      TimecodeTime.
   - title: Bitfocus Companion module companion-module-avolites-titan (community, MIT)
     author: Bitfocus AS and contributors
     url: https://github.com/bitfocus/companion-module-avolites-titan
@@ -64,7 +78,9 @@ source:
       polls /titan/handles and get/2 System/SoftwareVersion, Masters/IsDeskBlackedOut,
       Programmer/BlindActive and Programmer/Editor/Fixtures/Highlight every 5 s, and reads
       handle records with lower-case legend, titanId, type, userNumber (hashCode, userNumbers)
-      and icon.
+      and icon. Read again 2026-10-14 (src/actions.ts, src/fields.ts): timecode timers addressed
+      as Timecode/TimecodeOne to TimecodeFour with SetSource?source= Internal, UsbExpert (MIDI),
+      Winamp, System (clock) or Smpte, and Play, Pause and Reset.
 
 # HTTP on port 4430, no authentication. Every request is a GET to /titan/script/2/...,
 # /titan/get/2/... or /titan/handles...; Titan answers 200 with the result, an empty page when
@@ -83,234 +99,276 @@ ports:
 models:
   - id: diamond-9
     name: Avolites Diamond 9
-    supports: [
-      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
-      kill_all_playbacks, release_playback, release_all_playbacks,
-      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
-      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
-      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
-      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
-      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
-      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
-      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
-      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
-      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
-      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
-      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
-      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
-      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
-      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
-      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
-      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
-      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
-      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
-      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
-      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
-      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
-      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
-      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
-      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
-      get_command_line, get_current_world, get_device_info, get_property, get_handles,
-      get_group_handles, get_page_handles
-    ]
+    supports: [fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+               kill_all_playbacks, release_playback, release_all_playbacks, release_all_playbacks_by_priority,
+               flash_playback, clear_flash_playback, flash_timed_playback, clear_flash_timed_playback,
+               swop_playback, clear_swop_playback, toggle_latch_playback, toggle_blind_playback,
+               clear_all_blind_playbacks, preload_playback, set_manual_crossfade_level, tap_tempo,
+               set_effect_speed_multiplier, set_cue_legend, cuelist_go, cuelist_go_with_time, cuelist_go_back,
+               cuelist_resume, cuelist_pause, cuelist_flash_and_go, cuelist_set_next_cue,
+               cuelist_advance_next_step, cuelist_decrement_next_step, cuelist_reset_next_step,
+               cuelist_next_step, cuelist_review, cuelist_snap_back, cuelist_cut_next_cue_to_live,
+               pause_connected_chase, play_connected_chase, chase_go, chase_pause, chase_go_back,
+               chase_set_next_cue, chase_next_step, chase_set_crossfade, set_desk_blackout, set_grand_master,
+               dead_blackout, master_flash, master_clear_flash, master_latch, master_take, reset_master,
+               reset_all_masters, master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette,
+               apply_timed_palette, apply_quick_palette, apply_palette_number, apply_palette_to_playback,
+               set_palette_fade_time, recall_group, recall_group_number, group_flash, group_swop,
+               clear_programmer, release_programmer, locate_selected_fixtures, set_selected_dimmer,
+               set_selected_attribute, toggle_highlight, flash_selected_on, flash_selected_out,
+               clear_selected_flash, select_fixture, clear_selection, pattern_next, pattern_previous,
+               invert_pattern, set_blind, try_cue, flash_fixture, clear_flash_fixture, swop_fixture,
+               clear_swop_fixture, timeline_play, timeline_pause, timeline_play_pause, timeline_stop,
+               timeline_reset, timeline_release, timeline_toggle_latch, timeline_skip, timeline_flash,
+               release_all_timelines, set_timecode_enabled, timecode_play, timecode_pause, timecode_restart,
+               set_dmx_frozen, set_group_page, toggle_desk_mode, get_software_version, get_show_name,
+               get_desk_mode, get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+               get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+               get_command_line, get_current_world, get_device_info, get_property, get_handles,
+               get_group_handles, get_page_handles, store_cue, set_record_type, set_palette_number,
+               set_palette_name, set_palette_shared, store_palette, store_palette_replace,
+               delete_current_palette, store_group, store_group_replace, delete_group, set_selected_colour_hsi,
+               clear_programmer_masked, clear_selected_fixtures_masked, set_clear_selected_only, clear_effects,
+               set_timer_source, timer_play, timer_pause, timer_reset, set_timer_start_time,
+               set_timecode_source_by_id, set_timecode_port, timeline_play_from_time,
+               timeline_play_from_time_by_id, timeline_play_from_cursor, timeline_play_reset,
+               timeline_play_by_id, timeline_pause_by_id, timeline_stop_by_id, timeline_reset_by_id,
+               set_timeline_level, set_timeline_fader_level, set_master_level, set_master_level_delta,
+               set_group_fader_level, set_group_level, handle_key_action, handle_fader_action]
     verification: none
   - id: sapphire-touch
     name: Avolites Sapphire Touch
-    supports: [
-      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
-      kill_all_playbacks, release_playback, release_all_playbacks,
-      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
-      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
-      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
-      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
-      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
-      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
-      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
-      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
-      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
-      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
-      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
-      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
-      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
-      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
-      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
-      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
-      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
-      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
-      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
-      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
-      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
-      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
-      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
-      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
-      get_command_line, get_current_world, get_device_info, get_property, get_handles,
-      get_group_handles, get_page_handles
-    ]
+    supports: [fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+               kill_all_playbacks, release_playback, release_all_playbacks, release_all_playbacks_by_priority,
+               flash_playback, clear_flash_playback, flash_timed_playback, clear_flash_timed_playback,
+               swop_playback, clear_swop_playback, toggle_latch_playback, toggle_blind_playback,
+               clear_all_blind_playbacks, preload_playback, set_manual_crossfade_level, tap_tempo,
+               set_effect_speed_multiplier, set_cue_legend, cuelist_go, cuelist_go_with_time, cuelist_go_back,
+               cuelist_resume, cuelist_pause, cuelist_flash_and_go, cuelist_set_next_cue,
+               cuelist_advance_next_step, cuelist_decrement_next_step, cuelist_reset_next_step,
+               cuelist_next_step, cuelist_review, cuelist_snap_back, cuelist_cut_next_cue_to_live,
+               pause_connected_chase, play_connected_chase, chase_go, chase_pause, chase_go_back,
+               chase_set_next_cue, chase_next_step, chase_set_crossfade, set_desk_blackout, set_grand_master,
+               dead_blackout, master_flash, master_clear_flash, master_latch, master_take, reset_master,
+               reset_all_masters, master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette,
+               apply_timed_palette, apply_quick_palette, apply_palette_number, apply_palette_to_playback,
+               set_palette_fade_time, recall_group, recall_group_number, group_flash, group_swop,
+               clear_programmer, release_programmer, locate_selected_fixtures, set_selected_dimmer,
+               set_selected_attribute, toggle_highlight, flash_selected_on, flash_selected_out,
+               clear_selected_flash, select_fixture, clear_selection, pattern_next, pattern_previous,
+               invert_pattern, set_blind, try_cue, flash_fixture, clear_flash_fixture, swop_fixture,
+               clear_swop_fixture, timeline_play, timeline_pause, timeline_play_pause, timeline_stop,
+               timeline_reset, timeline_release, timeline_toggle_latch, timeline_skip, timeline_flash,
+               release_all_timelines, set_timecode_enabled, timecode_play, timecode_pause, timecode_restart,
+               set_dmx_frozen, set_group_page, toggle_desk_mode, get_software_version, get_show_name,
+               get_desk_mode, get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+               get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+               get_command_line, get_current_world, get_device_info, get_property, get_handles,
+               get_group_handles, get_page_handles, store_cue, set_record_type, set_palette_number,
+               set_palette_name, set_palette_shared, store_palette, store_palette_replace,
+               delete_current_palette, store_group, store_group_replace, delete_group, set_selected_colour_hsi,
+               clear_programmer_masked, clear_selected_fixtures_masked, set_clear_selected_only, clear_effects,
+               set_timer_source, timer_play, timer_pause, timer_reset, set_timer_start_time,
+               set_timecode_source_by_id, set_timecode_port, timeline_play_from_time,
+               timeline_play_from_time_by_id, timeline_play_from_cursor, timeline_play_reset,
+               timeline_play_by_id, timeline_pause_by_id, timeline_stop_by_id, timeline_reset_by_id,
+               set_timeline_level, set_timeline_fader_level, set_master_level, set_master_level_delta,
+               set_group_fader_level, set_group_level, handle_key_action, handle_fader_action]
     verification: none
   - id: arena
     name: Avolites Arena
-    supports: [
-      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
-      kill_all_playbacks, release_playback, release_all_playbacks,
-      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
-      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
-      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
-      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
-      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
-      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
-      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
-      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
-      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
-      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
-      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
-      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
-      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
-      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
-      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
-      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
-      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
-      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
-      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
-      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
-      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
-      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
-      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
-      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
-      get_command_line, get_current_world, get_device_info, get_property, get_handles,
-      get_group_handles, get_page_handles
-    ]
+    supports: [fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+               kill_all_playbacks, release_playback, release_all_playbacks, release_all_playbacks_by_priority,
+               flash_playback, clear_flash_playback, flash_timed_playback, clear_flash_timed_playback,
+               swop_playback, clear_swop_playback, toggle_latch_playback, toggle_blind_playback,
+               clear_all_blind_playbacks, preload_playback, set_manual_crossfade_level, tap_tempo,
+               set_effect_speed_multiplier, set_cue_legend, cuelist_go, cuelist_go_with_time, cuelist_go_back,
+               cuelist_resume, cuelist_pause, cuelist_flash_and_go, cuelist_set_next_cue,
+               cuelist_advance_next_step, cuelist_decrement_next_step, cuelist_reset_next_step,
+               cuelist_next_step, cuelist_review, cuelist_snap_back, cuelist_cut_next_cue_to_live,
+               pause_connected_chase, play_connected_chase, chase_go, chase_pause, chase_go_back,
+               chase_set_next_cue, chase_next_step, chase_set_crossfade, set_desk_blackout, set_grand_master,
+               dead_blackout, master_flash, master_clear_flash, master_latch, master_take, reset_master,
+               reset_all_masters, master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette,
+               apply_timed_palette, apply_quick_palette, apply_palette_number, apply_palette_to_playback,
+               set_palette_fade_time, recall_group, recall_group_number, group_flash, group_swop,
+               clear_programmer, release_programmer, locate_selected_fixtures, set_selected_dimmer,
+               set_selected_attribute, toggle_highlight, flash_selected_on, flash_selected_out,
+               clear_selected_flash, select_fixture, clear_selection, pattern_next, pattern_previous,
+               invert_pattern, set_blind, try_cue, flash_fixture, clear_flash_fixture, swop_fixture,
+               clear_swop_fixture, timeline_play, timeline_pause, timeline_play_pause, timeline_stop,
+               timeline_reset, timeline_release, timeline_toggle_latch, timeline_skip, timeline_flash,
+               release_all_timelines, set_timecode_enabled, timecode_play, timecode_pause, timecode_restart,
+               set_dmx_frozen, set_group_page, toggle_desk_mode, get_software_version, get_show_name,
+               get_desk_mode, get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+               get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+               get_command_line, get_current_world, get_device_info, get_property, get_handles,
+               get_group_handles, get_page_handles, store_cue, set_record_type, set_palette_number,
+               set_palette_name, set_palette_shared, store_palette, store_palette_replace,
+               delete_current_palette, store_group, store_group_replace, delete_group, set_selected_colour_hsi,
+               clear_programmer_masked, clear_selected_fixtures_masked, set_clear_selected_only, clear_effects,
+               set_timer_source, timer_play, timer_pause, timer_reset, set_timer_start_time,
+               set_timecode_source_by_id, set_timecode_port, timeline_play_from_time,
+               timeline_play_from_time_by_id, timeline_play_from_cursor, timeline_play_reset,
+               timeline_play_by_id, timeline_pause_by_id, timeline_stop_by_id, timeline_reset_by_id,
+               set_timeline_level, set_timeline_fader_level, set_master_level, set_master_level_delta,
+               set_group_fader_level, set_group_level, handle_key_action, handle_fader_action]
     verification: none
   - id: tiger-touch
     name: Avolites Tiger Touch II and Tiger Touch Pro
-    supports: [
-      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
-      kill_all_playbacks, release_playback, release_all_playbacks,
-      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
-      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
-      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
-      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
-      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
-      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
-      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
-      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
-      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
-      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
-      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
-      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
-      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
-      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
-      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
-      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
-      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
-      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
-      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
-      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
-      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
-      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
-      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
-      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
-      get_command_line, get_current_world, get_device_info, get_property, get_handles,
-      get_group_handles, get_page_handles
-    ]
+    supports: [fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+               kill_all_playbacks, release_playback, release_all_playbacks, release_all_playbacks_by_priority,
+               flash_playback, clear_flash_playback, flash_timed_playback, clear_flash_timed_playback,
+               swop_playback, clear_swop_playback, toggle_latch_playback, toggle_blind_playback,
+               clear_all_blind_playbacks, preload_playback, set_manual_crossfade_level, tap_tempo,
+               set_effect_speed_multiplier, set_cue_legend, cuelist_go, cuelist_go_with_time, cuelist_go_back,
+               cuelist_resume, cuelist_pause, cuelist_flash_and_go, cuelist_set_next_cue,
+               cuelist_advance_next_step, cuelist_decrement_next_step, cuelist_reset_next_step,
+               cuelist_next_step, cuelist_review, cuelist_snap_back, cuelist_cut_next_cue_to_live,
+               pause_connected_chase, play_connected_chase, chase_go, chase_pause, chase_go_back,
+               chase_set_next_cue, chase_next_step, chase_set_crossfade, set_desk_blackout, set_grand_master,
+               dead_blackout, master_flash, master_clear_flash, master_latch, master_take, reset_master,
+               reset_all_masters, master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette,
+               apply_timed_palette, apply_quick_palette, apply_palette_number, apply_palette_to_playback,
+               set_palette_fade_time, recall_group, recall_group_number, group_flash, group_swop,
+               clear_programmer, release_programmer, locate_selected_fixtures, set_selected_dimmer,
+               set_selected_attribute, toggle_highlight, flash_selected_on, flash_selected_out,
+               clear_selected_flash, select_fixture, clear_selection, pattern_next, pattern_previous,
+               invert_pattern, set_blind, try_cue, flash_fixture, clear_flash_fixture, swop_fixture,
+               clear_swop_fixture, timeline_play, timeline_pause, timeline_play_pause, timeline_stop,
+               timeline_reset, timeline_release, timeline_toggle_latch, timeline_skip, timeline_flash,
+               release_all_timelines, set_timecode_enabled, timecode_play, timecode_pause, timecode_restart,
+               set_dmx_frozen, set_group_page, toggle_desk_mode, get_software_version, get_show_name,
+               get_desk_mode, get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+               get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+               get_command_line, get_current_world, get_device_info, get_property, get_handles,
+               get_group_handles, get_page_handles, store_cue, set_record_type, set_palette_number,
+               set_palette_name, set_palette_shared, store_palette, store_palette_replace,
+               delete_current_palette, store_group, store_group_replace, delete_group, set_selected_colour_hsi,
+               clear_programmer_masked, clear_selected_fixtures_masked, set_clear_selected_only, clear_effects,
+               set_timer_source, timer_play, timer_pause, timer_reset, set_timer_start_time,
+               set_timecode_source_by_id, set_timecode_port, timeline_play_from_time,
+               timeline_play_from_time_by_id, timeline_play_from_cursor, timeline_play_reset,
+               timeline_play_by_id, timeline_pause_by_id, timeline_stop_by_id, timeline_reset_by_id,
+               set_timeline_level, set_timeline_fader_level, set_master_level, set_master_level_delta,
+               set_group_fader_level, set_group_level, handle_key_action, handle_fader_action]
     verification: none
   - id: quartz
     name: Avolites Quartz
-    supports: [
-      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
-      kill_all_playbacks, release_playback, release_all_playbacks,
-      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
-      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
-      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
-      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
-      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
-      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
-      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
-      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
-      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
-      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
-      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
-      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
-      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
-      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
-      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
-      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
-      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
-      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
-      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
-      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
-      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
-      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
-      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
-      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
-      get_command_line, get_current_world, get_device_info, get_property, get_handles,
-      get_group_handles, get_page_handles
-    ]
+    supports: [fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+               kill_all_playbacks, release_playback, release_all_playbacks, release_all_playbacks_by_priority,
+               flash_playback, clear_flash_playback, flash_timed_playback, clear_flash_timed_playback,
+               swop_playback, clear_swop_playback, toggle_latch_playback, toggle_blind_playback,
+               clear_all_blind_playbacks, preload_playback, set_manual_crossfade_level, tap_tempo,
+               set_effect_speed_multiplier, set_cue_legend, cuelist_go, cuelist_go_with_time, cuelist_go_back,
+               cuelist_resume, cuelist_pause, cuelist_flash_and_go, cuelist_set_next_cue,
+               cuelist_advance_next_step, cuelist_decrement_next_step, cuelist_reset_next_step,
+               cuelist_next_step, cuelist_review, cuelist_snap_back, cuelist_cut_next_cue_to_live,
+               pause_connected_chase, play_connected_chase, chase_go, chase_pause, chase_go_back,
+               chase_set_next_cue, chase_next_step, chase_set_crossfade, set_desk_blackout, set_grand_master,
+               dead_blackout, master_flash, master_clear_flash, master_latch, master_take, reset_master,
+               reset_all_masters, master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette,
+               apply_timed_palette, apply_quick_palette, apply_palette_number, apply_palette_to_playback,
+               set_palette_fade_time, recall_group, recall_group_number, group_flash, group_swop,
+               clear_programmer, release_programmer, locate_selected_fixtures, set_selected_dimmer,
+               set_selected_attribute, toggle_highlight, flash_selected_on, flash_selected_out,
+               clear_selected_flash, select_fixture, clear_selection, pattern_next, pattern_previous,
+               invert_pattern, set_blind, try_cue, flash_fixture, clear_flash_fixture, swop_fixture,
+               clear_swop_fixture, timeline_play, timeline_pause, timeline_play_pause, timeline_stop,
+               timeline_reset, timeline_release, timeline_toggle_latch, timeline_skip, timeline_flash,
+               release_all_timelines, set_timecode_enabled, timecode_play, timecode_pause, timecode_restart,
+               set_dmx_frozen, set_group_page, toggle_desk_mode, get_software_version, get_show_name,
+               get_desk_mode, get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+               get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+               get_command_line, get_current_world, get_device_info, get_property, get_handles,
+               get_group_handles, get_page_handles, store_cue, set_record_type, set_palette_number,
+               set_palette_name, set_palette_shared, store_palette, store_palette_replace,
+               delete_current_palette, store_group, store_group_replace, delete_group, set_selected_colour_hsi,
+               clear_programmer_masked, clear_selected_fixtures_masked, set_clear_selected_only, clear_effects,
+               set_timer_source, timer_play, timer_pause, timer_reset, set_timer_start_time,
+               set_timecode_source_by_id, set_timecode_port, timeline_play_from_time,
+               timeline_play_from_time_by_id, timeline_play_from_cursor, timeline_play_reset,
+               timeline_play_by_id, timeline_pause_by_id, timeline_stop_by_id, timeline_reset_by_id,
+               set_timeline_level, set_timeline_fader_level, set_master_level, set_master_level_delta,
+               set_group_fader_level, set_group_level, handle_key_action, handle_fader_action]
     verification: none
   - id: titan-mobile
     name: Avolites Titan Mobile
-    supports: [
-      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
-      kill_all_playbacks, release_playback, release_all_playbacks,
-      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
-      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
-      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
-      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
-      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
-      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
-      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
-      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
-      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
-      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
-      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
-      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
-      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
-      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
-      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
-      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
-      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
-      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
-      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
-      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
-      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
-      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
-      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
-      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
-      get_command_line, get_current_world, get_device_info, get_property, get_handles,
-      get_group_handles, get_page_handles
-    ]
+    supports: [fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+               kill_all_playbacks, release_playback, release_all_playbacks, release_all_playbacks_by_priority,
+               flash_playback, clear_flash_playback, flash_timed_playback, clear_flash_timed_playback,
+               swop_playback, clear_swop_playback, toggle_latch_playback, toggle_blind_playback,
+               clear_all_blind_playbacks, preload_playback, set_manual_crossfade_level, tap_tempo,
+               set_effect_speed_multiplier, set_cue_legend, cuelist_go, cuelist_go_with_time, cuelist_go_back,
+               cuelist_resume, cuelist_pause, cuelist_flash_and_go, cuelist_set_next_cue,
+               cuelist_advance_next_step, cuelist_decrement_next_step, cuelist_reset_next_step,
+               cuelist_next_step, cuelist_review, cuelist_snap_back, cuelist_cut_next_cue_to_live,
+               pause_connected_chase, play_connected_chase, chase_go, chase_pause, chase_go_back,
+               chase_set_next_cue, chase_next_step, chase_set_crossfade, set_desk_blackout, set_grand_master,
+               dead_blackout, master_flash, master_clear_flash, master_latch, master_take, reset_master,
+               reset_all_masters, master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette,
+               apply_timed_palette, apply_quick_palette, apply_palette_number, apply_palette_to_playback,
+               set_palette_fade_time, recall_group, recall_group_number, group_flash, group_swop,
+               clear_programmer, release_programmer, locate_selected_fixtures, set_selected_dimmer,
+               set_selected_attribute, toggle_highlight, flash_selected_on, flash_selected_out,
+               clear_selected_flash, select_fixture, clear_selection, pattern_next, pattern_previous,
+               invert_pattern, set_blind, try_cue, flash_fixture, clear_flash_fixture, swop_fixture,
+               clear_swop_fixture, timeline_play, timeline_pause, timeline_play_pause, timeline_stop,
+               timeline_reset, timeline_release, timeline_toggle_latch, timeline_skip, timeline_flash,
+               release_all_timelines, set_timecode_enabled, timecode_play, timecode_pause, timecode_restart,
+               set_dmx_frozen, set_group_page, toggle_desk_mode, get_software_version, get_show_name,
+               get_desk_mode, get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+               get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+               get_command_line, get_current_world, get_device_info, get_property, get_handles,
+               get_group_handles, get_page_handles, store_cue, set_record_type, set_palette_number,
+               set_palette_name, set_palette_shared, store_palette, store_palette_replace,
+               delete_current_palette, store_group, store_group_replace, delete_group, set_selected_colour_hsi,
+               clear_programmer_masked, clear_selected_fixtures_masked, set_clear_selected_only, clear_effects,
+               set_timer_source, timer_play, timer_pause, timer_reset, set_timer_start_time,
+               set_timecode_source_by_id, set_timecode_port, timeline_play_from_time,
+               timeline_play_from_time_by_id, timeline_play_from_cursor, timeline_play_reset,
+               timeline_play_by_id, timeline_pause_by_id, timeline_stop_by_id, timeline_reset_by_id,
+               set_timeline_level, set_timeline_fader_level, set_master_level, set_master_level_delta,
+               set_group_fader_level, set_group_level, handle_key_action, handle_fader_action]
     verification: none
   - id: titan-pc
     name: Titan on a PC (Titan Go, Titan PC with a T2, T3 or Titan Net Processor)
-    supports: [
-      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
-      kill_all_playbacks, release_playback, release_all_playbacks,
-      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
-      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
-      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
-      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
-      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
-      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
-      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
-      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
-      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
-      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
-      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
-      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
-      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
-      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
-      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
-      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
-      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
-      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
-      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
-      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
-      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
-      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
-      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
-      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
-      get_command_line, get_current_world, get_device_info, get_property, get_handles,
-      get_group_handles, get_page_handles
-    ]
+    supports: [fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+               kill_all_playbacks, release_playback, release_all_playbacks, release_all_playbacks_by_priority,
+               flash_playback, clear_flash_playback, flash_timed_playback, clear_flash_timed_playback,
+               swop_playback, clear_swop_playback, toggle_latch_playback, toggle_blind_playback,
+               clear_all_blind_playbacks, preload_playback, set_manual_crossfade_level, tap_tempo,
+               set_effect_speed_multiplier, set_cue_legend, cuelist_go, cuelist_go_with_time, cuelist_go_back,
+               cuelist_resume, cuelist_pause, cuelist_flash_and_go, cuelist_set_next_cue,
+               cuelist_advance_next_step, cuelist_decrement_next_step, cuelist_reset_next_step,
+               cuelist_next_step, cuelist_review, cuelist_snap_back, cuelist_cut_next_cue_to_live,
+               pause_connected_chase, play_connected_chase, chase_go, chase_pause, chase_go_back,
+               chase_set_next_cue, chase_next_step, chase_set_crossfade, set_desk_blackout, set_grand_master,
+               dead_blackout, master_flash, master_clear_flash, master_latch, master_take, reset_master,
+               reset_all_masters, master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette,
+               apply_timed_palette, apply_quick_palette, apply_palette_number, apply_palette_to_playback,
+               set_palette_fade_time, recall_group, recall_group_number, group_flash, group_swop,
+               clear_programmer, release_programmer, locate_selected_fixtures, set_selected_dimmer,
+               set_selected_attribute, toggle_highlight, flash_selected_on, flash_selected_out,
+               clear_selected_flash, select_fixture, clear_selection, pattern_next, pattern_previous,
+               invert_pattern, set_blind, try_cue, flash_fixture, clear_flash_fixture, swop_fixture,
+               clear_swop_fixture, timeline_play, timeline_pause, timeline_play_pause, timeline_stop,
+               timeline_reset, timeline_release, timeline_toggle_latch, timeline_skip, timeline_flash,
+               release_all_timelines, set_timecode_enabled, timecode_play, timecode_pause, timecode_restart,
+               set_dmx_frozen, set_group_page, toggle_desk_mode, get_software_version, get_show_name,
+               get_desk_mode, get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+               get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+               get_command_line, get_current_world, get_device_info, get_property, get_handles,
+               get_group_handles, get_page_handles, store_cue, set_record_type, set_palette_number,
+               set_palette_name, set_palette_shared, store_palette, store_palette_replace,
+               delete_current_palette, store_group, store_group_replace, delete_group, set_selected_colour_hsi,
+               clear_programmer_masked, clear_selected_fixtures_masked, set_clear_selected_only, clear_effects,
+               set_timer_source, timer_play, timer_pause, timer_reset, set_timer_start_time,
+               set_timecode_source_by_id, set_timecode_port, timeline_play_from_time,
+               timeline_play_from_time_by_id, timeline_play_from_cursor, timeline_play_reset,
+               timeline_play_by_id, timeline_pause_by_id, timeline_stop_by_id, timeline_reset_by_id,
+               set_timeline_level, set_timeline_fader_level, set_master_level, set_master_level_delta,
+               set_group_fader_level, set_group_level, handle_key_action, handle_fader_action]
     verification: none
 
 commands:
@@ -1341,6 +1399,371 @@ commands:
     expect: { status: 200, json_path: "$" }
     returns: value
 
+  # ── Recording ────────────────────────────────────────────────────────────
+  store_cue:
+    summary: "Record a cue from the programmer onto a playback handle, by handle group and index, with the current record mode (Playbacks.StoreCue)"
+    params:
+      group: { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,31}$', required: true, label: Handle group, description: "Handle group to record on, as Titan names it (case sensitive), such as PlaybackWindow." }
+      index: { type: int, min: 0, max: 9999, required: true, label: Handle index, description: "Index of the handle in the group, as the handle records give it in handleLocation.index." }
+      update_only: { type: bool, default: false, label: Update only, description: "On only updates an existing cue, off records a new one." }
+    send: { method: GET, path: /titan/script/2/Playbacks/StoreCue, raw_query: "group={group}&index={index}&updateOnly={update_only}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_record_type:
+    summary: "Set the type of playback the next record makes (Playbacks.SetRecordType)"
+    params:
+      record_type: { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,31}$', required: true, label: Record type, description: "Playback type in Titan's own name for it, such as CueList or Chase; the documentation lists no values." }
+    send: { method: GET, path: /titan/script/2/Playbacks/SetRecordType, raw_query: "recordType={record_type}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_palette_number:
+    summary: "Set the user number the next stored palette takes (POST to Palette.CurrentPaletteNumber)"
+    params:
+      user_number: { type: float, min: 0, max: 99999, required: true, label: Palette number, description: "User number of the palette to store, as shown on the console." }
+    send: { method: POST, path: /titan/set/2/Palette/CurrentPaletteNumber, body: "{user_number:.3f}", content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+
+  set_palette_name:
+    summary: "Set the legend the next stored or updated palette takes (POST to Palette.CurrentPaletteName)"
+    params:
+      name: { type: string, max_length: 64, required: true, label: Palette legend, description: "Legend to store on the next palette." }
+    send: { method: POST, path: /titan/set/2/Palette/CurrentPaletteName, body: "{name}", content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+
+  set_palette_shared:
+    summary: "Store the next palette as a shared palette or not (POST to Palette.StorePaletteMode)"
+    params:
+      shared: { type: bool, default: true, label: Shared, description: "On stores the next palette as shared, off as normal." }
+    send: { method: POST, path: /titan/set/2/Palette/StorePaletteMode, body: "{shared}", content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+
+  store_palette:
+    summary: "Store the selected fixtures' programmer values as a new palette, numbered as set_palette_number set (Palette.StoreCurrentPalette)"
+    send: { method: GET, path: /titan/script/2/Palette/StoreCurrentPalette }
+    expect: { status: 200 }
+    returns: ack
+
+  store_palette_replace:
+    summary: "Store the current palette, replacing any palette with the same number (Palette.StoreCurrentPaletteReplace)"
+    send: { method: GET, path: /titan/script/2/Palette/StoreCurrentPaletteReplace }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_current_palette:
+    summary: "Delete the current palette and its handles (Palette.DeleteCurrentPalette)"
+    send: { method: GET, path: /titan/script/2/Palette/DeleteCurrentPalette }
+    expect: { status: 200 }
+    returns: ack
+
+  store_group:
+    summary: "Store the selected fixtures as a group, by user number (Group.StoreGroup)"
+    params:
+      user_number: { type: float, min: 0, max: 99999, required: true, label: Group number, description: "User number of the group to store, as shown on the console." }
+    send: { method: GET, path: /titan/script/2/Group/StoreGroup, raw_query: "userNumber={user_number:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  store_group_replace:
+    summary: "Store the current group, replacing any group with the same number (Group.StoreGroupReplace)"
+    params:
+      group_id: { type: int, min: 1, max: 2147483647, required: true, label: Group id, description: "Titan id of the group to replace." }
+    send: { method: GET, path: /titan/script/2/Group/StoreGroupReplace, raw_query: "groupId={group_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_group:
+    summary: "Delete a group and its handles, by Titan id (Group.DeleteGroup)"
+    params:
+      titan_id: { type: int, min: 1, max: 2147483647, required: true, label: Group id, description: "Titan id of the group, as the handle records give it." }
+    send: { method: GET, path: /titan/script/2/Group/DeleteGroup, raw_query: "titanId={titan_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Programmer: colour, masked clears and effects ────────────────────────
+  set_selected_colour_hsi:
+    summary: "Set the selected fixtures' colour mix to recreate a hue, saturation and intensity (Programmer.Editor.Fixtures.SetColourControlValues); the HSI's wire form is not documented, see quirks"
+    params:
+      hue: { type: float, min: 0, max: 360, required: true, label: Hue, description: "Hue in degrees, 0 to 360." }
+      saturation: { type: float, min: 0, max: 1, required: true, label: Saturation, description: "Saturation as a fraction, 0 (white) to 1 (full colour)." }
+      intensity: { type: float, min: 0, max: 1, required: true, label: Intensity, description: "Intensity as a fraction, 0 to 1." }
+      programmer: { type: bool, default: true, label: Into programmer, description: "On puts the colour attributes into the programmer." }
+      restore_point: { type: bool, default: true, label: Restore point, description: "On makes a programmer restore point first." }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/SetColourControlValues, raw_query: "hsi_hue={hue:.2f}&hsi_saturation={saturation:.3f}&hsi_intensity={intensity:.3f}&programmer={programmer}&createRestorePoint={restore_point}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_programmer_masked:
+    summary: "Clear the given attribute groups from the programmer and the selection (Programmer.Editor.Clear with a record mask)"
+    params:
+      mask: { type: string, pattern: '^[A-Za-z0-9]{1,32}(,[A-Za-z0-9]{1,32}){0,15}$', required: true, label: Attribute groups, description: "Titan's record mask: attribute group names separated by commas, such as Intensity,Colour, or its number; the documentation gives no values." }
+      presets: { type: bool, default: false, label: Presets, description: "On also clears preset fader levels." }
+      all_programmers: { type: bool, default: false, label: All programmers, description: "On clears every user's programmer, off only this one." }
+      fade_time: { type: float, min: 0, max: 3600, default: 0, label: Fade time, description: "Seconds over which intensity values clear." }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Clear, raw_query: "mask={mask}&presets={presets}&clearAllProgrammers={all_programmers}&fadeTime={fade_time:.2f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_selected_fixtures_masked:
+    summary: "Clear the given attribute groups of the selected fixtures from the programmer (Programmer.Editor.ClearSelectedFixtures)"
+    params:
+      mask: { type: string, pattern: '^[A-Za-z0-9]{1,32}(,[A-Za-z0-9]{1,32}){0,15}$', required: true, label: Attribute groups, description: "Titan's record mask: attribute group names separated by commas, such as Intensity,Colour, or its number; the documentation gives no values." }
+      presets: { type: bool, default: false, label: Presets, description: "On also sets preset fader levels to zero." }
+      fade_time: { type: float, min: 0, max: 3600, default: 0, label: Fade time, description: "Seconds over which intensity values clear." }
+      clear_selection: { type: bool, default: false, label: Clear selection, description: "On lets the selection clear as the user's Clear Actions setting says; off keeps it." }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/ClearSelectedFixtures, raw_query: "mask={mask}&presets={presets}&fadeTime={fade_time:.2f}&clearSelection={clear_selection}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_clear_selected_only:
+    summary: "Make programmer clears act on the selected fixtures only, or on all (POST to Programmer.Editor.Clear.Selected)"
+    params:
+      selected_only: { type: bool, default: true, label: Selected only, description: "On clears only selected fixtures, off clears all." }
+    send: { method: POST, path: /titan/set/2/Programmer/Editor/Clear/Selected, body: "{selected_only}", content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_effects:
+    summary: "Clear every programmer effect of the given types (Programmer.Editor.ClearEffects)"
+    params:
+      effect_mask: { type: string, pattern: '^[A-Za-z0-9]{1,32}(,[A-Za-z0-9]{1,32}){0,15}$', required: true, label: Effect types, description: "Titan's shape type mask: effect type names separated by commas, or its number; the documentation gives no values." }
+      selected: { type: bool, default: false, label: Selected only, description: "On clears only the selected fixtures' effects (or all when none are selected), off clears every fixture's." }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/ClearEffects, raw_query: "effectMask={effect_mask}&selected={selected}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Timecode timers ──────────────────────────────────────────────────────
+  set_timer_source:
+    summary: "Set the source of one of the four timecode timers (Timecode.<timer>.SetSource)"
+    params:
+      timer: &timer { type: enum, values: [TimecodeOne, TimecodeTwo, TimecodeThree, TimecodeFour], required: true, label: Timer, description: "Which of Titan's four timecode timers." }
+      source: { type: enum, values: [Internal, UsbExpert, Winamp, System, Smpte], required: true, label: Source, description: "Internal, UsbExpert (MIDI), Winamp, System (the clock) or Smpte." }
+    send: { method: GET, path: "/titan/script/2/Timecode/{timer}/SetSource", raw_query: "source={source}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timer_play:
+    summary: "Start one of the four timecode timers (Timecode.<timer>.Play)"
+    params:
+      timer: *timer
+    send: { method: GET, path: "/titan/script/2/Timecode/{timer}/Play" }
+    expect: { status: 200 }
+    returns: ack
+
+  timer_pause:
+    summary: "Pause one of the four timecode timers (Timecode.<timer>.Pause)"
+    params:
+      timer: *timer
+    send: { method: GET, path: "/titan/script/2/Timecode/{timer}/Pause" }
+    expect: { status: 200 }
+    returns: ack
+
+  timer_reset:
+    summary: "Reset one of the four timecode timers to zero (Timecode.<timer>.Reset)"
+    params:
+      timer: *timer
+    send: { method: GET, path: "/titan/script/2/Timecode/{timer}/Reset" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_timer_start_time:
+    summary: "Set the time one of the four timecode timers starts counting at (Timecode.<timer>.SetStartTime); the time's wire form is not documented, see quirks"
+    params:
+      timer: *timer
+      time: &tc_time { type: string, pattern: '^[0-9]{1,2}:[0-9]{2}:[0-9]{2}([:.][0-9]{1,3})?$', required: true, label: Time, description: "Time as hours:minutes:seconds:frames, such as 01:00:00:00." }
+    send: { method: GET, path: "/titan/script/2/Timecode/{timer}/SetStartTime", raw_query: "time={time}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_timecode_source_by_id:
+    summary: "Set a timecode timer's source by its id (Timecode.SetTimecodeSource)"
+    params:
+      timecode: { type: int, min: 0, max: 2147483647, required: true, label: Timecode id, description: "Id of the timecode timer, as timecode_play takes it." }
+      source: { type: enum, values: [Internal, UsbExpert, Winamp, System, Smpte], required: true, label: Source, description: "Internal, UsbExpert (MIDI), Winamp, System (the clock) or Smpte." }
+    send: { method: GET, path: /titan/script/2/Timecode/SetTimecodeSource, raw_query: "timecodeId={timecode}&source={source}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_timecode_port:
+    summary: "Set the input port of a timecode timer's source (Timecode.SetTimecodePort)"
+    params:
+      timecode: { type: int, min: 0, max: 2147483647, required: true, label: Timecode id, description: "Id of the timecode timer, as timecode_play takes it." }
+      port: { type: int, min: 0, max: 255, required: true, label: Port, description: "Index of the port of the selected source, from 0." }
+    send: { method: GET, path: /titan/script/2/Timecode/SetTimecodePort, raw_query: "timecodeId={timecode}&port={port}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Timelines: from a time, by id, levels ────────────────────────────────
+  timeline_play_from_time:
+    summary: "Play a timeline from a time (Timelines.PlayTimelineFromTime); the time's wire form is not documented, see quirks"
+    params:
+      by: &tl_by { type: enum, values: [userNumber, titanId, location], default: userNumber, label: Address by, description: "How the timeline is given: userNumber as shown on the console, titanId, or location such as playback_2_1." }
+      handle: &tl_handle { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true, label: Timeline, description: "The timeline's user number, Titan id or location, as chosen in Address by." }
+      time: *tc_time
+    send: { method: GET, path: /titan/script/2/Timelines/PlayTimelineFromTime, raw_query: "handle_{by}={handle}&time={time}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_play_from_time_by_id:
+    summary: "Play a timeline from a time, by the timeline's Titan id (Timelines.PlayTimelineFromTimeById)"
+    params:
+      timeline_id: &tl_id { type: int, min: 1, max: 2147483647, required: true, label: Timeline id, description: "Titan id of the timeline, as the handle records give it." }
+      time: *tc_time
+    send: { method: GET, path: /titan/script/2/Timelines/PlayTimelineFromTimeById, raw_query: "timelineId={timeline_id}&time={time}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_play_from_cursor:
+    summary: "Play a timeline from its editor cursor (Timelines.PlayTimelineFromCursor)"
+    params:
+      by: *tl_by
+      handle: *tl_handle
+    send: { method: GET, path: /titan/script/2/Timelines/PlayTimelineFromCursor, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_play_reset:
+    summary: "Play a timeline, or reset it if it is already playing (Timelines.PlayResetTimeline)"
+    params:
+      by: *tl_by
+      handle: *tl_handle
+    send: { method: GET, path: /titan/script/2/Timelines/PlayResetTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_play_by_id:
+    summary: "Play a timeline, by Titan id (Timelines.PlayTimelineById)"
+    params:
+      timeline_id: *tl_id
+    send: { method: GET, path: /titan/script/2/Timelines/PlayTimelineById, raw_query: "timelineId={timeline_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_pause_by_id:
+    summary: "Pause a timeline, by Titan id (Timelines.PauseTimelineById)"
+    params:
+      timeline_id: *tl_id
+    send: { method: GET, path: /titan/script/2/Timelines/PauseTimelineById, raw_query: "timelineId={timeline_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_stop_by_id:
+    summary: "Stop a timeline, by Titan id (Timelines.StopTimelineById)"
+    params:
+      timeline_id: *tl_id
+    send: { method: GET, path: /titan/script/2/Timelines/StopTimelineById, raw_query: "timelineId={timeline_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_reset_by_id:
+    summary: "Reset a timeline, by Titan id (Timelines.ResetTimelineById)"
+    params:
+      timeline_id: *tl_id
+    send: { method: GET, path: /titan/script/2/Timelines/ResetTimelineById, raw_query: "timelineId={timeline_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_timeline_level:
+    summary: "Set a timeline's fader level 0-1, by handle (Timelines.SetTimelineHandleFaderLevel)"
+    params:
+      by: *tl_by
+      handle: *tl_handle
+      level: &frac_level { type: float, min: 0, max: 1, required: true, label: Level, description: "Level as a fraction, 0 (off) to 1 (full); 0.5 is 50%." }
+    send: { method: GET, path: /titan/script/2/Timelines/SetTimelineHandleFaderLevel, raw_query: "handle_{by}={handle}&value_level={level:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Fader levels by handle group and index ───────────────────────────────
+  set_timeline_fader_level:
+    summary: "Set the level 0-1 of the timeline on a fader, by handle group and index (Timelines.SetTimelineFaderLevel)"
+    params:
+      group: &fader_group { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,31}$', required: true, label: Handle group, description: "Handle group of the fader, as Titan names it (case sensitive), such as PlaybackWindow." }
+      index: &fader_index { type: int, min: 0, max: 9999, required: true, label: Index, description: "Index of the fader's handle in the group, from 0." }
+      level: *frac_level
+      accuracy: &accuracy { type: float, min: 0, max: 1, default: 1, label: Accuracy, description: "Accuracy for level matching; the introduction's example sends 1.0." }
+    send: { method: GET, path: /titan/script/2/Timelines/SetTimelineFaderLevel, raw_query: "group={group}&index={index}&value_level={level:.3f}&accuracy={accuracy:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_master_level:
+    summary: "Set the level 0-1 of a master on a fader, by handle group and index, as a fader move (Masters.SetMasterLevel)"
+    params:
+      group: *fader_group
+      index: *fader_index
+      level: *frac_level
+      accuracy: *accuracy
+      initialise: { type: bool, default: false, label: Initialise, description: "On initialises the master to the level rather than moving it; the introduction's example sends false." }
+    send: { method: GET, path: /titan/script/2/Masters/SetMasterLevel, raw_query: "group={group}&index={index}&value_level={level:.3f}&accuracy={accuracy:.3f}&initialise={initialise}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_master_level_delta:
+    summary: "Change the level of a master on a fader by -1 to 1, by handle group and index (Masters.SetMasterLevel with value_leveldelta)"
+    params:
+      group: *fader_group
+      index: *fader_index
+      delta: &frac_delta { type: float, min: -1, max: 1, required: true, label: Level change, description: "Change to add to the current level, -1 to 1; 0.1 adds 10%." }
+      accuracy: *accuracy
+    send: { method: GET, path: /titan/script/2/Masters/SetMasterLevel, raw_query: "group={group}&index={index}&value_leveldelta={delta:.3f}&accuracy={accuracy:.3f}&initialise=false" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_fader_level:
+    summary: "Set the intensity of a group's fixtures from a fader level 0-1, by handle group and index (Group.SetGroupFaderLevel)"
+    params:
+      group: *fader_group
+      index: *fader_index
+      level: *frac_level
+      accuracy: *accuracy
+    send: { method: GET, path: /titan/script/2/Group/SetGroupFaderLevel, raw_query: "group={group}&index={index}&value_level={level:.3f}&accuracy={accuracy:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_level:
+    summary: "Set the level 0-1 of a group handle (Group.SetGroupHandleFaderLevel)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber, label: Address by, description: "How the group is given: userNumber as shown on the console, titanId, or location such as groups_1_1." }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true, label: Group, description: "The group's user number, Titan id or location, as chosen in Address by." }
+      level: *frac_level
+      accuracy: *accuracy
+    send: { method: GET, path: /titan/script/2/Group/SetGroupHandleFaderLevel, raw_query: "handle_{by}={handle}&value_level={level:.3f}&accuracy={accuracy:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Handle key and fader events ──────────────────────────────────────────
+  handle_key_action:
+    summary: "Send a key event to a handle as the console's own key would (Handles.HandleKeyAction); the event types are not documented, see quirks"
+    params:
+      key_class: { type: string, max_length: 64, required: true, label: Key class, description: "Key class in Titan's own name for it, such as PlaybackWindow or FixtureTouch." }
+      event_type: &event_type { type: string, pattern: '^[A-Za-z]{1,32}$', required: true, label: Event type, description: "Titan's menu event type name, such as Press or Release; the documentation lists no values." }
+      key_group: { type: string, max_length: 64, required: true, label: Key group, description: "Handle group the key belongs to, as Titan names it (case sensitive)." }
+      key_index: { type: int, min: 0, max: 9999, required: true, label: Key index, description: "Index of the key in its group, from 0." }
+      key_name: { type: string, max_length: 64, default: "", label: Key name, description: "Name of the key or item to process; empty for none." }
+    send:
+      method: GET
+      path: /titan/script/2/Handles/HandleKeyAction
+      query: { keyClass: "{key_class}", eventType: "{event_type}", keyGroup: "{key_group}", keyIndex: "{key_index}", keyName: "{key_name}", timeStamp: "" }
+    expect: { status: 200 }
+    returns: ack
+
+  handle_fader_action:
+    summary: "Send a fader move to a handle as a physical fader would, level 0-1 (Handles.HandleFaderAction); the event types are not documented, see quirks"
+    params:
+      event_type: *event_type
+      handle_group: *fader_group
+      handle_index: *fader_index
+      level: *frac_level
+    send:
+      method: GET
+      path: /titan/script/2/Handles/HandleFaderAction
+      query: { eventType: "{event_type}", handleGroup: "{handle_group}", handleIndex: "{handle_index}", timeStamp: "", level_level: "{level:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
 quirks:
   - models: [all]
     severity: warning
@@ -1369,10 +1792,13 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Titan pushes nothing over the WebAPI. /titan/handles and four properties (software version,
-      desk blackout, blind and highlight) are polled every 5 s, the interval the community
-      Companion module uses, so playback active state lags by up to 5 s plus the console's reply
-      time. On a show with many handles the handles reply is large.
+      Titan pushes nothing over the WebAPI. /titan/handles and the properties that move during a
+      show (software version, desk blackout, blind, highlight, grand master output, live and
+      next cue numbers, command line, and each timecode timer's live time and pause) are polled
+      every 5 s, the interval the community Companion module uses, so playback active state lags
+      by up to 5 s plus the console's reply time; the show name, desk mode, DMX output, timecode
+      enable, handle world, palette record settings, clear mode and each timer's source and start
+      time every 30 s. On a show with many handles the handles reply is large.
 
   - models: [all]
     severity: warning
@@ -1407,15 +1833,42 @@ quirks:
       undone from here; toggle_desk_mode switches the console between run and program mode.
 
   - models: [all]
+    severity: warning
+    text: >
+      Some parameters have types the documentation names without a wire example, and are built
+      from the documented signatures: AcwHSI (set_selected_colour_hsi) is sent as hsi_hue,
+      hsi_saturation and hsi_intensity, after the documented parameter_field form of Handle
+      (handle_titanId) and LevelAdjust (value_level), with hue in degrees and saturation and
+      intensity as fractions; AcwRecordMask and AcwShapeType (clear_programmer_masked,
+      clear_selected_fixtures_masked, clear_effects) as the names or number the caller gives;
+      MenuEventTypes (handle_key_action, handle_fader_action) as its name; TimecodeTime
+      (set_timer_start_time, timeline_play_from_time) as hours:minutes:seconds:frames; and the
+      TimeSpan timeStamp of the handle events empty, as the community Companion module sends
+      tap tempo's. AcwTimecodeSource takes the five names the Companion module sends (Internal,
+      UsbExpert, Winamp, System, Smpte). Avolites lists no values for any of them; a value Titan
+      cannot read is refused or ignored, which the reply may not show (see above).
+
+  - models: [all]
+    severity: critical
+    text: >
+      Recording and deleting on a live console cannot be undone from here: store_cue (with the
+      record type and mode the console has, recording into the handle given), store_palette and
+      store_group (new items), store_palette_replace and store_group_replace (replacing what has
+      the same number), delete_current_palette and delete_group. store_palette stores the
+      selected fixtures' programmer values under the number set with set_palette_number, so a
+      wrong selection records the wrong fixtures. Set the palette number, legend and shared mode
+      first, and read them back in state (palette.*).
+
+  - models: [all]
     severity: info
     text: >
-      Methods whose parameters use types the documentation gives no wire example for
-      (AcwRecordMask, AcwShapeType, AcwHSI, MenuEventTypes, AcwTimecodeSource, TimecodeTime and
-      some Int32 index arguments typed {titanId}) are not offered: the programmer clear with a
-      mask, effect clearing, HSI colour, handle key and fader events, timecode source selection,
-      playing a timeline from a time, and fader-group levels by index. Recording (StoreCue and
-      the Palette and Group store methods) is left out because recording on a live console cannot
-      be undone.
+      Fader levels can be set by handle (set_timeline_level, set_group_level, and
+      set_playback_level for playbacks) or by a fader's handle group and index
+      (set_timeline_fader_level, set_master_level, set_group_fader_level), as the fader itself
+      moves them; handle_fader_action injects a physical fader move. The WebAPI documents no
+      read of a playback's, master's or group's current level, so levels are not in state; a
+      playback's state is its Active flag in the handle records. Titan.DeviceInfo is JSON of
+      every connection and is read with get_device_info, not kept in state.
 
 state:
   "handles.*.legend": { type: string, description: "Handle legend, by Titan id, from /titan/handles (legend or Legend)" }
@@ -1429,17 +1882,119 @@ state:
   masters.desk_blackout: { type: bool, description: "Desk blacked out, from Masters.IsDeskBlackedOut" }
   programmer.blind: { type: bool, description: "Programmer blind mode active, from Programmer.BlindActive" }
   programmer.highlight: { type: bool, description: "Fixture highlight on, from Programmer.Editor.Fixtures.Highlight" }
+  masters.grand_master_output: { type: float, description: "Grand master's actual intensity output level, as Titan reports it (Masters.GrandMasterOutputLevel)" }
+  cue_lists.live_cue_number: { type: string, description: "Live cue number of the connected cue list (CueLists.LiveCueNumber)" }
+  cue_lists.next_cue_number: { type: string, description: "Next cue number of the connected cue list (CueLists.NextCueNumber)" }
+  command.line: { type: string, description: "Command line text being typed or edited (Command.CommandLineText)" }
+  show.name: { type: string, description: "Show name (Show.ShowName)" }
+  system.desk_mode: { type: string, description: "Desk run mode, as Titan reports it (System.DeskMode)" }
+  titan.dmx_output_enabled: { type: bool, description: "DMX output enabled (Titan.DmxOutputEnabled)" }
+  timecode.enabled: { type: bool, description: "Timers (timecode) enabled (Timecode.Enabled)" }
+  handles_world.name: { type: string, description: "Name of the current handle world (Handles.CurrentWorldName)" }
+  palette.current_number: { type: float, description: "User number the next stored palette takes (Palette.CurrentPaletteNumber)" }
+  palette.current_name: { type: string, description: "Legend the next stored palette takes (Palette.CurrentPaletteName)" }
+  palette.store_shared: { type: bool, description: "Next palette stored as shared (Palette.StorePaletteMode)" }
+  programmer.clear_selected_only: { type: bool, description: "Programmer clears act on selected fixtures only (Programmer.Editor.Clear.Selected)" }
+  timecode.timers.*.live_time: { type: string, description: "Live time of a timecode timer (TimecodeOne to TimecodeFour), as Titan shows it in its menu" }
+  timecode.timers.*.paused: { type: bool, description: "Timecode timer paused" }
+  timecode.timers.*.source: { type: string, description: "Timecode timer source, such as Internal or Smpte" }
+  timecode.timers.*.start_time: { type: string, description: "Time the timecode timer starts at, as Titan shows it" }
 
 telemetry:
   poll:
-    send:
-      - { method: GET, path: /titan/get/2/System/SoftwareVersion }
-      - { method: GET, path: /titan/get/2/Masters/IsDeskBlackedOut }
-      - { method: GET, path: /titan/get/2/Programmer/BlindActive }
-      - { method: GET, path: /titan/get/2/Programmer/Editor/Fixtures/Highlight }
-      - { method: GET, path: /titan/handles }
-    every_ms: 5000
+    # What moves during a show: handles, cues, masters, the command line and
+    # the four timecode timers.
+    - every_ms: 5000
+      send:
+        - { method: GET, path: /titan/get/2/System/SoftwareVersion }
+        - { method: GET, path: /titan/get/2/Masters/IsDeskBlackedOut }
+        - { method: GET, path: /titan/get/2/Programmer/BlindActive }
+        - { method: GET, path: /titan/get/2/Programmer/Editor/Fixtures/Highlight }
+        - { method: GET, path: /titan/handles }
+        - { method: GET, path: /titan/get/2/Masters/GrandMasterOutputLevel }
+        - { method: GET, path: /titan/get/2/CueLists/LiveCueNumber }
+        - { method: GET, path: /titan/get/2/CueLists/NextCueNumber }
+        - { method: GET, path: /titan/get/2/Command/CommandLineText }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeOne/LiveTime }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeTwo/LiveTime }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeThree/LiveTime }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeFour/LiveTime }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeOne/Paused }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeTwo/Paused }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeThree/Paused }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeFour/Paused }
+    # What an operator configures.
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /titan/get/2/Show/ShowName }
+        - { method: GET, path: /titan/get/2/System/DeskMode }
+        - { method: GET, path: /titan/get/2/Titan/DmxOutputEnabled }
+        - { method: GET, path: /titan/get/2/Timecode/Enabled }
+        - { method: GET, path: /titan/get/2/Handles/CurrentWorldName }
+        - { method: GET, path: /titan/get/2/Palette/CurrentPaletteNumber }
+        - { method: GET, path: /titan/get/2/Palette/CurrentPaletteName }
+        - { method: GET, path: /titan/get/2/Palette/StorePaletteMode }
+        - { method: GET, path: /titan/get/2/Programmer/Editor/Clear/Selected }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeOne/Source }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeTwo/Source }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeThree/Source }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeFour/Source }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeOne/StartTime }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeTwo/StartTime }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeThree/StartTime }
+        - { method: GET, path: /titan/get/2/Timecode/TimecodeFour/StartTime }
   updates:
+    - path: "^/titan/get/2/Masters/GrandMasterOutputLevel$"
+      json: { value: "$" }
+      state: { masters.grand_master_output: "{value}" }
+    - path: "^/titan/get/2/CueLists/LiveCueNumber$"
+      json: { value: "$" }
+      state: { cue_lists.live_cue_number: "{value}" }
+    - path: "^/titan/get/2/CueLists/NextCueNumber$"
+      json: { value: "$" }
+      state: { cue_lists.next_cue_number: "{value}" }
+    - path: "^/titan/get/2/Command/CommandLineText$"
+      json: { value: "$" }
+      state: { command.line: "{value}" }
+    - path: "^/titan/get/2/Show/ShowName$"
+      json: { value: "$" }
+      state: { show.name: "{value}" }
+    - path: "^/titan/get/2/System/DeskMode$"
+      json: { value: "$" }
+      state: { system.desk_mode: "{value}" }
+    - path: "^/titan/get/2/Titan/DmxOutputEnabled$"
+      json: { value: "$" }
+      state: { titan.dmx_output_enabled: "{value}" }
+    - path: "^/titan/get/2/Timecode/Enabled$"
+      json: { value: "$" }
+      state: { timecode.enabled: "{value}" }
+    - path: "^/titan/get/2/Handles/CurrentWorldName$"
+      json: { value: "$" }
+      state: { handles_world.name: "{value}" }
+    - path: "^/titan/get/2/Palette/CurrentPaletteNumber$"
+      json: { value: "$" }
+      state: { palette.current_number: "{value}" }
+    - path: "^/titan/get/2/Palette/CurrentPaletteName$"
+      json: { value: "$" }
+      state: { palette.current_name: "{value}" }
+    - path: "^/titan/get/2/Palette/StorePaletteMode$"
+      json: { value: "$" }
+      state: { palette.store_shared: "{value}" }
+    - path: "^/titan/get/2/Programmer/Editor/Clear/Selected$"
+      json: { value: "$" }
+      state: { programmer.clear_selected_only: "{value}" }
+    - path: "^/titan/get/2/Timecode/(TimecodeOne|TimecodeTwo|TimecodeThree|TimecodeFour)/LiveTime$"
+      json: { value: "$" }
+      state: { "timecode.timers.{1}.live_time": "{value}" }
+    - path: "^/titan/get/2/Timecode/(TimecodeOne|TimecodeTwo|TimecodeThree|TimecodeFour)/Paused$"
+      json: { value: "$" }
+      state: { "timecode.timers.{1}.paused": "{value}" }
+    - path: "^/titan/get/2/Timecode/(TimecodeOne|TimecodeTwo|TimecodeThree|TimecodeFour)/Source$"
+      json: { value: "$" }
+      state: { "timecode.timers.{1}.source": "{value}" }
+    - path: "^/titan/get/2/Timecode/(TimecodeOne|TimecodeTwo|TimecodeThree|TimecodeFour)/StartTime$"
+      json: { value: "$" }
+      state: { "timecode.timers.{1}.start_time": "{value}" }
     - path: "^/titan/get/2/System/SoftwareVersion$"
       json: { version: "$" }
       state: { system.software_version: "{version}" }

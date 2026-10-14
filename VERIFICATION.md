@@ -157,35 +157,54 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-picturall — Analog Way Picturall
 
-- [ ] Check whether control status messages separate controls with the literal string "\n" or with real line breaks. ([specs/analogway-picturall.yaml:240](specs/analogway-picturall.yaml#L240))
-- [ ] Confirm unquoted set values are accepted. ([specs/analogway-picturall.yaml:246](specs/analogway-picturall.yaml#L246))
-- [ ] Check what media_end_action values mean and which playback commands besides go exist. ([specs/analogway-picturall.yaml:251](specs/analogway-picturall.yaml#L251))
+- [ ] Check whether control status messages separate controls with the literal string "\n" or with real line breaks, and that they end with "\n)" as the manual's example does (the per-control state reads them so). ([specs/analogway-picturall.yaml:527](specs/analogway-picturall.yaml#L527))
+- [ ] Confirm unquoted set values are accepted. ([specs/analogway-picturall.yaml:533](specs/analogway-picturall.yaml#L533))
+- [ ] Check what media_end_action values mean and which playback commands besides go exist. ([specs/analogway-picturall.yaml:538](specs/analogway-picturall.yaml#L538))
+- [ ] Check that the server sends a control status message for every object on ctrl_status, so objects.*.controls.* fills for all of them, and how large it is on a big show. ([specs/analogway-picturall.yaml:443](specs/analogway-picturall.yaml#L443))
+- [ ] Confirm the object list message ends each entry with a colon (id:name:) as the D.e.e example shows. ([specs/analogway-picturall.yaml:449](specs/analogway-picturall.yaml#L449))
+- [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
+- [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
 
 ## avolites-titan — Avolites Titan
 
-- [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1353](specs/avolites-titan.yaml#L1353))
-- [ ] Confirm the handle record field names on Titan 19 (Active or active, Legend or legend, userNumber.hashCode) and that `active` reflects a running playback. ([specs/avolites-titan.yaml:1377](specs/avolites-titan.yaml#L1377))
-- [ ] Confirm that times sent with two decimals (fadeTime=5.00) and levels with three (level_level=1.000) are accepted like the documentation's whole numbers. ([specs/avolites-titan.yaml:1385](specs/avolites-titan.yaml#L1385))
-- [ ] Check the grand master value range (0-100 as sent here, or 0-1). ([specs/avolites-titan.yaml:1387](specs/avolites-titan.yaml#L1387))
-- [ ] Check that an empty panelTimeStamp works for tap tempo and an empty oldValue for the grand master. ([specs/avolites-titan.yaml:1395](specs/avolites-titan.yaml#L1395))
-- [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1345](specs/avolites-titan.yaml#L1345))
-- [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1369](specs/avolites-titan.yaml#L1369))
-- [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1210](specs/avolites-titan.yaml#L1210))
-- [ ] Confirm /titan/handles lists every programmed handle on the console in one answer: each poll replaces the handles state. ([specs/avolites-titan.yaml:1459](specs/avolites-titan.yaml#L1459))
+- [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1779](specs/avolites-titan.yaml#L1779))
+- [ ] Confirm the handle record field names on Titan 19 (Active or active, Legend or legend, userNumber.hashCode) and that `active` reflects a running playback. ([specs/avolites-titan.yaml:1806](specs/avolites-titan.yaml#L1806))
+- [ ] Confirm that times sent with two decimals (fadeTime=5.00) and levels with three (level_level=1.000) are accepted like the documentation's whole numbers. ([specs/avolites-titan.yaml:1814](specs/avolites-titan.yaml#L1814))
+- [ ] Check the grand master value range (0-100 as sent here, or 0-1). ([specs/avolites-titan.yaml:1816](specs/avolites-titan.yaml#L1816))
+- [ ] Check that an empty panelTimeStamp works for tap tempo and an empty oldValue for the grand master. ([specs/avolites-titan.yaml:1824](specs/avolites-titan.yaml#L1824))
+- [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1771](specs/avolites-titan.yaml#L1771))
+- [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1801](specs/avolites-titan.yaml#L1801))
+- [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1271](specs/avolites-titan.yaml#L1271))
+- [ ] Confirm /titan/handles lists every programmed handle on the console in one answer: each poll replaces the handles state. ([specs/avolites-titan.yaml:2014](specs/avolites-titan.yaml#L2014))
+- [ ] Find the wire form of AcwHSI for set_selected_colour_hsi (hsi_hue, hsi_saturation and hsi_intensity assumed) and the ranges of hue, saturation and intensity. ([specs/avolites-titan.yaml:1839](specs/avolites-titan.yaml#L1839))
+- [ ] Find the values AcwRecordMask and AcwShapeType take in a query (names, comma-separated names or a number) for the masked clears and clear_effects. ([specs/avolites-titan.yaml:1842](specs/avolites-titan.yaml#L1842))
+- [ ] Find the MenuEventTypes names handle_key_action and handle_fader_action take (Press, Release, Move assumed), and whether an empty timeStamp is accepted. ([specs/avolites-titan.yaml:1844](specs/avolites-titan.yaml#L1844))
+- [ ] Find the text form of TimecodeTime (hh:mm:ss:ff assumed) for set_timer_start_time and timeline_play_from_time. ([specs/avolites-titan.yaml:1845](specs/avolites-titan.yaml#L1845))
+- [ ] Confirm the AcwTimecodeSource names (Internal, UsbExpert, Winamp, System, Smpte) against Titan 19. ([specs/avolites-titan.yaml:1847](specs/avolites-titan.yaml#L1847))
+- [ ] Check whether the WebAPI has any read of a playback's or master's current level, for per-handle levels in state. ([specs/avolites-titan.yaml:1868](specs/avolites-titan.yaml#L1868))
+- [ ] Confirm a property set takes its value as the POST body text (the introduction's False), for set_palette_number, set_palette_name and the other set_ commands, and the record types set_record_type takes. ([specs/avolites-titan.yaml:1429](specs/avolites-titan.yaml#L1429))
+- [ ] Check that store_cue's group and index are a handle's group and handleLocation.index, and what the Int32 it returns is. ([specs/avolites-titan.yaml:1857](specs/avolites-titan.yaml#L1857))
 
 ## avstumpfl-pixera — AV Stumpfl PIXERA
 
-- [ ] Confirm that replies and pushed monEvent messages on a JSON/TCP (dl) access point end with 0xPX, and what setMonitoringHasDelimiter changes (26.1 lists it without a description). ([specs/avstumpfl-pixera.yaml:690](specs/avstumpfl-pixera.yaml#L690))
-- [ ] Check how a PIXERA before 26.1 answers setMonitoringHasDelimiter (an error reply is assumed) and that monitoring still works there. ([specs/avstumpfl-pixera.yaml:691](specs/avstumpfl-pixera.yaml#L691))
-- [ ] Confirm that setMonitoringEventMode all pushes timelineTransport, timelinePositions and timelineCountdowns with the same entry shapes as pollMonitoring, with id -1, and how often positions arrive. ([specs/avstumpfl-pixera.yaml:682](specs/avstumpfl-pixera.yaml#L682))
-- [ ] Check that a reply carries the request's id (1) as "id":1, so that pushed messages (id -1) are not taken as replies. ([specs/avstumpfl-pixera.yaml:94](specs/avstumpfl-pixera.yaml#L94))
-- [ ] Check the error object PIXERA sends for an unknown method, wrong parameter names, an unknown timeline or cue name, and an invalid handle. ([specs/avstumpfl-pixera.yaml:139](specs/avstumpfl-pixera.yaml#L139))
-- [ ] Check what a name or path containing the text 0xPX does to framing. ([specs/avstumpfl-pixera.yaml:668](specs/avstumpfl-pixera.yaml#L668))
-- [ ] Confirm the default API port (1400 assumed from AV Stumpfl's examples; none is documented) and whether a disabled API (25.2 default) refuses the connection or answers -32602. ([specs/avstumpfl-pixera.yaml:660](specs/avstumpfl-pixera.yaml#L660))
-- [ ] Check whether handles stay valid after reloading the project or restarting PIXERA. ([specs/avstumpfl-pixera.yaml:685](specs/avstumpfl-pixera.yaml#L685))
-- [ ] Confirm the Compound time methods take "name" in 26.1 and "timelineName" before it, and which revision changed it. ([specs/avstumpfl-pixera.yaml:69](specs/avstumpfl-pixera.yaml#L69))
-- [ ] Check whether load_project discards unsaved changes silently. ([specs/avstumpfl-pixera.yaml:696](specs/avstumpfl-pixera.yaml#L696))
-- [ ] Check the format of getCurrentHMSFOfTimeline (hh:mm:ss:ff assumed) and what getCurrentCountdownOfTimeline returns when no cue is ahead. ([specs/avstumpfl-pixera.yaml:305](specs/avstumpfl-pixera.yaml#L305))
+- [ ] Confirm that replies and pushed monEvent messages on a JSON/TCP (dl) access point end with 0xPX, and what setMonitoringHasDelimiter changes (26.1 lists it without a description). ([specs/avstumpfl-pixera.yaml:6725](specs/avstumpfl-pixera.yaml#L6725))
+- [ ] Check how a PIXERA before 26.1 answers setMonitoringHasDelimiter (an error reply is assumed) and that monitoring still works there. ([specs/avstumpfl-pixera.yaml:6726](specs/avstumpfl-pixera.yaml#L6726))
+- [ ] Confirm that setMonitoringEventMode all pushes timelineTransport, timelinePositions and timelineCountdowns with the same entry shapes as pollMonitoring, with id -1, and how often positions arrive. ([specs/avstumpfl-pixera.yaml:6718](specs/avstumpfl-pixera.yaml#L6718))
+- [ ] Check that a reply carries the request's id (1) as "id":1, so that pushed messages (id -1) are not taken as replies. ([specs/avstumpfl-pixera.yaml:104](specs/avstumpfl-pixera.yaml#L104))
+- [ ] Check the error object PIXERA sends for an unknown method, wrong parameter names, an unknown timeline or cue name, and an invalid handle. ([specs/avstumpfl-pixera.yaml:427](specs/avstumpfl-pixera.yaml#L427))
+- [ ] Check what a name or path containing the text 0xPX does to framing. ([specs/avstumpfl-pixera.yaml:6703](specs/avstumpfl-pixera.yaml#L6703))
+- [ ] Confirm the default API port (1400 assumed from AV Stumpfl's examples; none is documented) and whether a disabled API (25.2 default) refuses the connection or answers -32602. ([specs/avstumpfl-pixera.yaml:6695](specs/avstumpfl-pixera.yaml#L6695))
+- [ ] Check whether handles stay valid after reloading the project or restarting PIXERA. ([specs/avstumpfl-pixera.yaml:6720](specs/avstumpfl-pixera.yaml#L6720))
+- [ ] Confirm the Compound time methods take "name" in 26.1 and "timelineName" before it, and which revision changed it. ([specs/avstumpfl-pixera.yaml:79](specs/avstumpfl-pixera.yaml#L79))
+- [ ] Check whether load_project discards unsaved changes silently. ([specs/avstumpfl-pixera.yaml:6731](specs/avstumpfl-pixera.yaml#L6731))
+- [ ] Check the format of getCurrentHMSFOfTimeline (hh:mm:ss:ff assumed) and what getCurrentCountdownOfTimeline returns when no cue is ahead. ([specs/avstumpfl-pixera.yaml:651](specs/avstumpfl-pixera.yaml#L651))
+- [ ] Confirm the handle-based requests answer as the 26.1 reference shows, and how a setter whose arguments the reference marks optional treats each one left out. ([specs/avstumpfl-pixera.yaml:6778](specs/avstumpfl-pixera.yaml#L6778))
+- [ ] Record the units of the arguments the reference does not state (positions, rotations, layer opacity and volume, cue wait and blend durations, clip times) against PIXERA's user interface. ([specs/avstumpfl-pixera.yaml:6782](specs/avstumpfl-pixera.yaml#L6782))
+- [ ] Check which handle-based, Session, Resources and LiveSystems methods PIXERA before 26.1 has, to list them for pixera-legacy. ([specs/avstumpfl-pixera.yaml:6791](specs/avstumpfl-pixera.yaml#L6791))
+- [ ] Record the words getLiveSystemState, getRemoteSystemState and LiveSystem.getState answer, and the numbers getBackupRole answers. ([specs/avstumpfl-pixera.yaml:6808](specs/avstumpfl-pixera.yaml#L6808))
+- [ ] Check how audio master channels are numbered (0 or 1 for the master) for live_system_get_audio_master_volume and mute. ([specs/avstumpfl-pixera.yaml:6805](specs/avstumpfl-pixera.yaml#L6805))
+- [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
+- [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
 ## barco-eventmaster — Barco Event Master
 
@@ -915,11 +934,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## h2r-graphics — H2R Graphics
 
-- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:352](specs/h2r-graphics.yaml#L352))
-- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:391](specs/h2r-graphics.yaml#L391))
-- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:398](specs/h2r-graphics.yaml#L398))
-- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:401](specs/h2r-graphics.yaml#L401))
-- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:383](specs/h2r-graphics.yaml#L383))
+- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:519](specs/h2r-graphics.yaml#L519))
+- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:569](specs/h2r-graphics.yaml#L569))
+- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:575](specs/h2r-graphics.yaml#L575))
+- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:578](specs/h2r-graphics.yaml#L578))
+- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:557](specs/h2r-graphics.yaml#L557))
+- [ ] Confirm H2R serves Socket.IO 4 (Engine.IO 4) on the HTTP API's port in versions 2 and 3, and that updateFrontend comes on connecting and after every change without a request. ([specs/h2r-graphics.yaml:530](specs/h2r-graphics.yaml#L530))
+- [ ] Record the timer fields H2R sends (state values, duration, startedAt and endAt in milliseconds, endTime's format) and whether duration is a number or text. ([specs/h2r-graphics.yaml:538](specs/h2r-graphics.yaml#L538))
+- [ ] Check that a list's selected row (dynamicLists, row 0 cell 0) counts as select_list_row does, and how several projects' lists are numbered. ([specs/h2r-graphics.yaml:534](specs/h2r-graphics.yaml#L534))
+- [ ] Confirm that a graphic with no status field is off air. ([specs/h2r-graphics.yaml:537](specs/h2r-graphics.yaml#L537))
 
 ## highend-hog4 — High End Systems Hog 4 / Hog OS
 
@@ -1385,13 +1408,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## resolume — Resolume Arena / Avenue
 
-- [ ] Record the shape of the composition message pushed on the websocket (bare object or wrapped as {"type", "value"}). ([specs/resolume.yaml:964](specs/resolume.yaml#L964))
-- [ ] Confirm that layer, column, deck and group positions reported in state match the order in the composition list Resolume sends. ([specs/resolume.yaml:875](specs/resolume.yaml#L875))
-- [ ] Confirm that setters sending only the changed property leave other properties unchanged. ([specs/resolume.yaml:911](specs/resolume.yaml#L911))
-- [ ] Check what Resolume does with a speed, crossfader phase or tempo value outside the parameter's min and max. ([specs/resolume.yaml:921](specs/resolume.yaml#L921))
-- [ ] Confirm opacity and master levels are 0.0 to 1.0 over REST. ([specs/resolume.yaml:918](specs/resolume.yaml#L918))
-- [ ] Confirm a deck switch, deck open and deck close bring no new composition on the websocket (so the REST read is needed). ([specs/resolume.yaml:954](specs/resolume.yaml#L954))
-- [ ] On Avenue, check whether get_deck, replace_deck and deck delete and duplicate answer 402. ([specs/resolume.yaml:996](specs/resolume.yaml#L996))
+- [ ] Record the shape of the composition message pushed on the websocket (bare object or wrapped as {"type", "value"}). ([specs/resolume.yaml:3370](specs/resolume.yaml#L3370))
+- [ ] Confirm that layer, column, deck and group positions reported in state match the order in the composition list Resolume sends. ([specs/resolume.yaml:3262](specs/resolume.yaml#L3262))
+- [ ] Confirm that setters sending only the changed property leave other properties unchanged. ([specs/resolume.yaml:3297](specs/resolume.yaml#L3297))
+- [ ] Check what Resolume does with a speed, crossfader phase or tempo value outside the parameter's min and max. ([specs/resolume.yaml:3310](specs/resolume.yaml#L3310))
+- [ ] Confirm opacity and master levels are 0.0 to 1.0 over REST. ([specs/resolume.yaml:3308](specs/resolume.yaml#L3308))
+- [ ] Confirm a deck switch, deck open and deck close bring no new composition on the websocket (so the REST read is needed). ([specs/resolume.yaml:3356](specs/resolume.yaml#L3356))
+- [ ] On Avenue, check whether get_deck, replace_deck and deck delete and duplicate answer 402. ([specs/resolume.yaml:3402](specs/resolume.yaml#L3402))
+- [ ] Confirm effect chain offsets (add at, move to, delete, rename at) count from 1, matching effects.*.position. ([specs/resolume.yaml:3417](specs/resolume.yaml#L3417))
+- [ ] Confirm a move body of effects/by-id/<id> (no leading slash, as the document's example) moves an effect from any chain. ([specs/resolume.yaml:3414](specs/resolume.yaml#L3414))
+- [ ] Confirm an effect name with a space is accepted percent-encoded in effect:///video/<name>, and that /<preset> takes the preset's name. ([specs/resolume.yaml:3412](specs/resolume.yaml#L3412))
+- [ ] Confirm choice parameters (crossfader side, blend mode, play direction, colour and the rest) are set by sending the option name as value. ([specs/resolume.yaml:3426](specs/resolume.yaml#L3426))
+- [ ] Record the units and ranges of audio volume and pan, a layer's transition duration and a clip's speed, position and duration. ([specs/resolume.yaml:3439](specs/resolume.yaml#L3439))
+- [ ] Check whether adding, moving or removing an effect, or moving a layer or clip, resends the composition on the websocket (the extension reads it again after its own). ([specs/resolume.yaml:3359](specs/resolume.yaml#L3359))
+- [ ] Measure how often a playing clip's transport position is pushed, and whether effect parameters subscribe by /parameter/by-id/<id> like the rest. ([specs/resolume.yaml:3346](specs/resolume.yaml#L3346))
 
 ## restream — Restream
 

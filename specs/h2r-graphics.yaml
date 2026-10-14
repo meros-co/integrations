@@ -8,8 +8,9 @@ category: other
 # http://<host>:4001/api/<project-id>/... The project id is a setting, because
 # one installation can hold several projects (Pro) and every command names one.
 # The application reports its state (rundown, graphic status, variables, timers)
-# only over a socket.io websocket on the same port, which the format has no
-# transport for and H2R does not document, so this spec has no telemetry.
+# only over Socket.IO on the same port, which H2R does not document: the spec
+# reads it with telemetry.websocket.socketio, from the updateFrontend event
+# H2R's own Companion module reads.
 
 source:
   - title: H2R Graphics docs, API > HTTP (current, for H2R Graphics 3.4)
@@ -78,7 +79,19 @@ source:
       id is text.N, and supplies the one wire detail the documents leave out:
       the API's toggle is the update body {"status": "toggle"}
       (toggle_graphic). It also shows that state comes over socket.io
-      (event updateFrontend), not HTTP.
+      (event updateFrontend), not HTTP. Read again 2026-10-14 (v3.10.0,
+      src/tcp.js, src/timer.js, src/feedback.js, index.js, package.json) for
+      the state, the one thing the documents do not cover: a Socket.IO 4
+      client (socket.io-client ^4.6.0) on the port the HTTP API uses (4001
+      default), websocket transport, default namespace, nothing emitted;
+      the updateFrontend event's data.projects.<project-id> with cues (each
+      graphic's id, type, label, status, playing, timer state, duration,
+      startedAt, endAt, endTime, length, playedAt, onEnd, line_one to
+      line_three, and outputOne to outputFour and outputUtility),
+      dynamicText (text variables by id) and dynamicLists (the selected row
+      on row 0, cell 0); the six status values cued, coming, onair, going,
+      cuedoff and offair, with coming, onair and going on air, and an
+      absent status off air. No code taken.
 
 transport:
   type: http
@@ -99,6 +112,7 @@ settings:
 
 ports:
   - { port: 4001, protocol: http, role: control }
+  - { port: 4001, protocol: ws, role: push }
 
 models:
   - id: h2r-graphics-v2
@@ -401,6 +415,94 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+telemetry:
+  # Socket.IO 4 on the HTTP API's port, default namespace; H2R emits
+  # updateFrontend with every project whenever something changes, and the
+  # client sends nothing (H2R's Companion module, src/tcp.js).
+  websocket:
+    path: /socket.io/
+    socketio: true
+  updates:
+    - json_match: { "$.event": "^updateFrontend$" }
+      json_each: "$.data.projects.*.cues"
+      json:
+        id: "$.id"
+        type: "$.type"
+        label: "$.label"
+        status: "$.status"
+        playing: "$.playing"
+        timer_state: "$.state"
+        duration: "$.duration"
+        started_at: "$.startedAt"
+        end_at: "$.endAt"
+        end_time: "$.endTime"
+        on_end: "$.onEnd"
+        length: "$.length"
+        played_at: "$.playedAt"
+        line_one: "$.line_one"
+        line_two: "$.line_two"
+        line_three: "$.line_three"
+        output_1: "$.outputOne"
+        output_2: "$.outputTwo"
+        output_3: "$.outputThree"
+        output_4: "$.outputFour"
+        output_utility: "$.outputUtility"
+      replace: graphics
+      state:
+        "graphics.{id:key}.type": "{type}"
+        "graphics.{id:key}.label": "{label}"
+        "graphics.{id:key}.status": "{status}"
+        "graphics.{id:key}.on_air":
+          { value: "{status}", map: { cued: false, coming: true, onair: true, going: true, cuedoff: false, offair: false } }
+        "graphics.{id:key}.playing": "{playing}"
+        "graphics.{id:key}.timer_state": "{timer_state}"
+        "graphics.{id:key}.duration_ms": "{duration}"
+        "graphics.{id:key}.started_at": "{started_at}"
+        "graphics.{id:key}.end_at": "{end_at}"
+        "graphics.{id:key}.end_time": "{end_time}"
+        "graphics.{id:key}.on_end": "{on_end}"
+        "graphics.{id:key}.length_s": "{length}"
+        "graphics.{id:key}.played_at": "{played_at}"
+        "graphics.{id:key}.line_one": "{line_one}"
+        "graphics.{id:key}.line_two": "{line_two}"
+        "graphics.{id:key}.line_three": "{line_three}"
+        "graphics.{id:key}.outputs.1": "{output_1}"
+        "graphics.{id:key}.outputs.2": "{output_2}"
+        "graphics.{id:key}.outputs.3": "{output_3}"
+        "graphics.{id:key}.outputs.4": "{output_4}"
+        "graphics.{id:key}.outputs.utility": "{output_utility}"
+    - json_match: { "$.event": "^updateFrontend$" }
+      json_each: "$.data.projects.*.dynamicText.*"
+      json: { value: "$" }
+      replace: variables
+      state: { "variables.{key:key}": "{value}" }
+    - json_match: { "$.event": "^updateFrontend$" }
+      json_each: "$.data.projects.*.dynamicLists"
+      json: { selected: "$[0][0].selected" }
+      replace: lists
+      state: { "lists.{index:+1}.selected_row": "{selected}" }
+
+state:
+  graphics.*.type: { type: string, description: "Graphic type in H2R's own words (lower_third, time_countdown, video, score, social and so on), keyed by graphic id" }
+  graphics.*.label: { type: string, description: "Graphic label as shown in the Rundown" }
+  graphics.*.status: { type: string, description: "Graphic status: cued, coming, onair, going, cuedoff or offair; absent when off air" }
+  graphics.*.on_air: { type: bool, description: "Graphic on air, coming or going; absent when the status is" }
+  graphics.*.playing: { type: bool, description: "Video or audio graphic playing" }
+  graphics.*.timer_state: { type: string, description: "Timer graphic's state in H2R's words, such as running, paused or reset" }
+  graphics.*.duration_ms: { type: int, unit: ms, description: "Timer graphic's duration" }
+  graphics.*.started_at: { type: int, unit: ms, description: "When a count-up timer started, in milliseconds since 1970-01-01 UTC" }
+  graphics.*.end_at: { type: int, unit: ms, description: "When a running countdown ends, in milliseconds since 1970-01-01 UTC" }
+  graphics.*.end_time: { type: string, description: "Time of day a time-to-time-of-day graphic counts to, as H2R holds it" }
+  graphics.*.on_end: { type: string, description: "What a countdown does at zero, such as hold" }
+  graphics.*.length_s: { type: float, unit: s, description: "Length of a video or audio graphic's media" }
+  graphics.*.played_at: { type: int, unit: ms, description: "When a video or audio graphic started playing, in milliseconds since 1970-01-01 UTC" }
+  graphics.*.line_one: { type: string, description: "Lower third's first line, as entered (variables not replaced)" }
+  graphics.*.line_two: { type: string, description: "Lower third's second line, as entered" }
+  graphics.*.line_three: { type: string, description: "Lower third's third line, as entered" }
+  graphics.*.outputs.*: { type: bool, description: "Whether the graphic shows on output 1 to 4 or the utility output, where the graphic sets it; output 1 is on and the others off when not set" }
+  variables.*: { type: string, description: "Text variable's value, keyed by its id such as text.1" }
+  lists.*.selected_row: { type: int, description: "Selected row of list N, numbered as select_list_row takes it" }
+
 quirks:
   - models: [all]
     severity: warning
@@ -422,13 +524,23 @@ quirks:
       succeeded and did nothing.
 
   - models: [all]
-    severity: info
+    severity: warning
     text: >
-      The HTTP API has no authentication and no read endpoints. The
-      application pushes its state (each graphic's status, contents, text and
-      list variables, timer times) only over a socket.io websocket on port
-      4001, which H2R does not document and this spec does not use, so no
-      state is reported.
+      The HTTP API has no authentication and no read endpoints. State comes
+      from the Socket.IO connection H2R's Companion module uses on the same
+      port, which H2R does not document: each updateFrontend event carries
+      every project, and graphics, text variables and lists are read from
+      all of them, keyed by graphic id, variable id and list number (a
+      project's name is not kept, so with several projects their graphics
+      share one list, and list numbers can collide). Each event replaces the
+      lists, so a graphic or variable removed in H2R leaves state. A graphic
+      with no status is off air, as the Companion module reads it; its
+      on_air is then absent. Timers are reported as H2R holds them (state,
+      duration in milliseconds, start and end times in milliseconds since
+      1970), not counted down: the remaining time is end_at minus the
+      present for a running countdown, as the Companion module computes it.
+      Scores are not kept (each team's levels are an array in an array), nor
+      a graphic's other fields, which depend on its type.
 
   - models: [all]
     severity: info
