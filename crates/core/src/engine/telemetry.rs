@@ -116,13 +116,29 @@ enum Matcher {
 /// One element `json_each` reaches: the element, its index in its array
 /// (or its place among its object's members), the member's name when it is
 /// an object's member, and the elements it lies in, outermost first (the
-/// document, then each `[*]` or `.*` level's element).
+/// document, then each `[*]` or `.*` level's element), each with its own
+/// place (none for the document).
 struct EachItem<'a> {
     item: &'a Value,
     index: usize,
     key: Option<&'a str>,
-    outer: Vec<&'a Value>,
+    outer: Vec<(&'a Value, Option<Place<'a>>)>,
 }
+
+/// Where an element `json_each` went through lies: its index in its array,
+/// or its place among its object's members and the member's name.
+#[derive(Clone, Copy)]
+struct Place<'a> {
+    index: usize,
+    key: Option<&'a str>,
+}
+
+/// An element reached so far, with its place and the elements it lies in.
+type Reached<'a> = (
+    &'a Value,
+    Option<Place<'a>>,
+    Vec<(&'a Value, Option<Place<'a>>)>,
+);
 
 /// The steps of a `json_each` path: each a JSON path, from the element the
 /// step before reached, to an array whose elements it goes through, or with
@@ -174,12 +190,12 @@ fn path_of(part: &str, start: bool) -> String {
 fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
     let steps = each_steps(each);
     // Elements reached so far, each with the elements it lies in.
-    let mut level: Vec<(&Value, Vec<&Value>)> = vec![(doc, Vec::new())];
+    let mut level: Vec<Reached> = vec![(doc, None, Vec::new())];
     let last = steps.len() - 1;
     let mut out = Vec::new();
     for (i, (path, members)) in steps.iter().enumerate() {
         let mut next = Vec::new();
-        for (node, outer) in level {
+        for (node, place, outer) in level {
             let Some(at) = super::expect::json_path(node, path) else {
                 continue;
             };
@@ -189,7 +205,7 @@ fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
                 _ => continue,
             };
             let mut within = outer.clone();
-            within.push(node);
+            within.push((node, place));
             for (index, (key, item)) in found.into_iter().enumerate() {
                 if i == last {
                     out.push(EachItem {
@@ -199,7 +215,7 @@ fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
                         outer: within.clone(),
                     });
                 } else {
-                    next.push((item, within.clone()));
+                    next.push((item, Some(Place { index, key }), within.clone()));
                 }
             }
         }
@@ -217,7 +233,7 @@ fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
     match up {
         0 => super::expect::json_path(e.item, path),
         n => {
-            let node = e.outer.len().checked_sub(n).map(|i| e.outer[i])?;
+            let node = e.outer.len().checked_sub(n).map(|i| e.outer[i].0)?;
             super::expect::json_path(node, &format!("${}", &path[1 + n..]))
         }
     }
@@ -227,7 +243,9 @@ fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
 /// selectors'), then its `json` names. With `json_each`, once per element
 /// that `each_match` selects (its captures numbered on after `base`'s):
 /// `json` paths are the element's, `$^.` names the element one level out
-/// (`$^^.` two), and `{index}` is the element's index in its array.
+/// (`$^^.` two), and `{index}` is the element's index in its array. Of the
+/// elements it lies in, `{^index}` and `{^key}` are the place and member name
+/// of the one a level out, `{^^index}` and `{^^key}` two, and so on.
 fn each_values(
     doc: &Value,
     each: Option<&str>,
@@ -270,6 +288,17 @@ fn each_values(
             // `.*`: the member's name.
             if let Some(key) = e.key {
                 values.push(("key".to_string(), Value::String(key.to_string())));
+            }
+            // The elements it lies in, a level out at a time.
+            for (n, (_, place)) in e.outer.iter().rev().enumerate() {
+                let Some(place) = place else {
+                    continue;
+                };
+                let up = "^".repeat(n + 1);
+                values.push((format!("{up}index"), Value::from(place.index)));
+                if let Some(key) = place.key {
+                    values.push((format!("{up}key"), Value::String(key.to_string())));
+                }
             }
             for (name, path) in json {
                 if let Some(v) = present(element_path(&e, path)) {
@@ -2288,6 +2317,57 @@ mod tests {
         assert_eq!(
             t.apply(&Inbound::Json(&tags)),
             Some(json!({"tags": {"0": "English", "1": "Music"}}))
+        );
+    }
+
+    #[test]
+    fn an_outer_elements_place_keys_the_inner_ones() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                // Each slide of each group, keyed by both positions.
+                {"path": "^/active$", "json_each": "$.*.groups[*].slides",
+                 "json": {"text": "$.text"},
+                 "state": {"p.groups.{^index}.slides.{index:+1}.text": "{text}"}},
+                // Members, then arrays in arrays: each level's place and name.
+                {"json_match": {"$.event": "^update$"}, "json_each": "$.data.projects.*.cues[*].scores[*]",
+                 "json": {"id": "$^^.id", "score": "$.score"},
+                 "state": {"scores.{^^^key}.{id}.{^index:+1}.{index:+1}": "{score}",
+                           "cue_place.{id}": "{^^index}"}},
+            ]})),
+            &state(json!({
+                "p.groups.*.slides.*.text": {"type": "string", "description": "x"},
+                "scores.*.*.*.*": {"type": "int", "description": "x"},
+                "cue_place.*": {"type": "int", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = br#"{"presentation": {"groups": [
+            {"slides": [{"text": "a"}, {"text": "b"}]},
+            {"slides": []},
+            {"slides": [{"text": "c"}]}]}}"#;
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/active",
+                headers: &[],
+                body,
+                request: None
+            }),
+            Some(json!({"p": {"groups": {
+                "0": {"slides": {"1": {"text": "a"}, "2": {"text": "b"}}},
+                "2": {"slides": {"1": {"text": "c"}}}}}}))
+        );
+        let event = json!({"event": "update", "data": {"projects": {
+            "ABCD": {"cues": [{"id": "lt"}, {"id": "sc", "scores": [
+                [{"score": 3}, {"score": 1}], [{"score": 7}]]}]},
+            "EFGH": {"cues": [{"id": "s2", "scores": [[{"score": 9}]]}]}}}});
+        assert_eq!(
+            t.apply(&Inbound::Json(&event)),
+            Some(json!({
+                "scores": {
+                    "ABCD": {"sc": {"1": {"1": 3, "2": 1}, "2": {"1": 7}}},
+                    "EFGH": {"s2": {"1": {"1": 9}}}},
+                "cue_place": {"sc": 1, "s2": 0}}))
         );
     }
 

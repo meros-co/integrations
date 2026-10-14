@@ -1506,6 +1506,23 @@ array, for state keyed by position where the elements have no id:
       state: { "live_videos.{video}.ingest_streams.{stream}.video_bitrate": "{bitrate}" }
 ```
 
+The elements a match lies in have places too: `{^index}` is the index of
+the element one level out (the one `$^.` names), `{^^index}` two, and so
+on, so elements numbered only within their own array are keyed by both
+positions. ProPresenter numbers each slide within its group:
+
+```yaml
+    - path: "^/v1/(presentation|announcement)/active$"
+      json_each: "$.*.groups[*].slides"
+      json: { text: "$.text" }
+      state: { "{1}.groups.{^index}.slides.{index}.text": "{text}" }
+```
+
+An element reached through `.*` gives its member name as `{^key}` (one
+level out), `{^^key}` (two) and so on, beside `{key}` for the match itself.
+A level with no place (the document, or an array reached without `[*]`)
+gives neither.
+
 A device that lists things as an object's members, keyed by name, rather
 than as an array (BirdDog's NDI sources, `{"CAM 1 (BirdDog)":
 "10.0.0.5:5961", ...}`) is gone through with `.*`: `json_each: "$.*"` is

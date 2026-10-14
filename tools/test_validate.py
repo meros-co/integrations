@@ -63,6 +63,10 @@ class Templates(unittest.TestCase):
         self.assertEqual(validate.check_template("text", r"\{VC}", {}, {}, "c"), [])
         self.assertTrue(validate.check_template("text", "{VC}", {}, {}, "c"))
 
+    def test_an_outer_elements_place_is_a_placeholder(self):
+        names = [m.group(1) for m in validate.PLACEHOLDER.finditer("g.{^index}.s.{index:+1}.{^^key:key}")]
+        self.assertEqual(names, ["^index", "index", "^^key"])
+
 
 if __name__ == "__main__":
     unittest.main()

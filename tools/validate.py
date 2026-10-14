@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FAST_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 # {name} or {name:directive:directive...}; SPEC.md §4, "Templates".
-PLACEHOLDER = re.compile(r"""(?<!\\)\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
+PLACEHOLDER = re.compile(r"""(?<!\\)\{(\^*[A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
 
 # The closed directive set, keyed by the parameter types each one accepts.
 DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
@@ -826,7 +826,8 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 name = m.group(1)
                 if name.startswith("settings."):
                     errors += check_template(context, m.group(0), {}, settings, f"{where}.then_send")
-                elif not (name.isdigit() or name in captures or name.startswith("arg")):
+                elif not (name.isdigit() or name in captures or name.startswith("arg")
+                          or re.fullmatch(r"\^*(index|key)", name)):
                     errors.append(f"{where}.then_send: '{{{name}}}' is not one of the rule's captures")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
