@@ -1632,9 +1632,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## turtleav-avoip-control — Turtle AV DARWIN and CHAZY controllers
 
-- [ ] Check the line ending (CR LF sent), whether Telnet on port 23 negotiates options, prints a banner or asks for a login, and whether it echoes commands. ([specs/turtleav-avoip-control.yaml:588](specs/turtleav-avoip-control.yaml#L588))
-- [ ] Check CHAZY Control Pro's acknowledgement texts: whether they start with [SUCCESS] and [ERROR]. ([specs/turtleav-avoip-control.yaml:598](specs/turtleav-avoip-control.yaml#L598))
-- [ ] Check whether the status blocks between = lines end in a way a client can find, so state could be read rather than kept from replies. ([specs/turtleav-avoip-control.yaml:579](specs/turtleav-avoip-control.yaml#L579))
+- [ ] Check the line ending (CR LF sent), whether Telnet on port 23 negotiates options, prints a banner or asks for a login, and whether it echoes commands. ([specs/turtleav-avoip-control.yaml:676](specs/turtleav-avoip-control.yaml#L676))
+- [ ] Check CHAZY Control Pro's acknowledgement texts: whether they start with [SUCCESS] and [ERROR]. ([specs/turtleav-avoip-control.yaml:686](specs/turtleav-avoip-control.yaml#L686))
+- [ ] Check whether the status blocks between = lines end in a way a client can find, so state could be read rather than kept from replies. ([specs/turtleav-avoip-control.yaml:665](specs/turtleav-avoip-control.yaml#L665))
+- [ ] Capture GET STATUS on a DARWIN Control and a CHAZY Control and confirm the block opens and ends with lines of = signs as the documents' examples show (DARWIN with two opening lines), with nothing after the closing line, so it frames as one message. ([specs/turtleav-avoip-control.yaml:59](specs/turtleav-avoip-control.yaml#L59))
+- [ ] Confirm the status tables' columns are separated by spaces as the examples print them (the encoder and decoder rows read here: In/ENC, EDID, IP, NET/Sig and Out/DEC, FromIn/From, IP, NET/HDMI, Res, Mode, Osp), that EDID names always start with a letter, and that the IP addresses are zero-padded with no spaces; the columns are parsed from the documents' examples only. ([specs/turtleav-avoip-control.yaml:570](specs/turtleav-avoip-control.yaml#L570))
+- [ ] Confirm reading GET STATUS every 10 seconds is acceptable on a controller with many encoders and decoders, and record how long the block takes to arrive. ([specs/turtleav-avoip-control.yaml:552](specs/turtleav-avoip-control.yaml#L552))
 
 ## turtleav-bt-wallplate — Turtle AV Dante Bluetooth wall plate
 

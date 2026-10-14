@@ -74,3 +74,60 @@ telemetry(TA, "output", inbound="[SUCCESS]Set decoder 001 output mute on.\r\n",
 telemetry(TA, "rotate", inbound="[SUCCESS]Set decoder 001 rotate 90 degree.\r\n",
           expect_state={"decoders": {"1": {"rotation": 90}}})
 telemetry(TA, "wall", inbound="[SUCCESS]Apply preset: Preset 1.\r\n", expect_state={"walls": {"last_preset": "Preset 1"}})
+
+# ── Telemetry: the GET STATUS block (DARWIN §2.2 and CHAZY §2.2 examples) ──
+_FENCE = "=" * 64
+_DARWIN_LINES = [
+    "              IP Control Box DARWIN CONTROL Status Info",
+    "              FW Version: 2.03.19",
+    " ",
+    "Power   IR      Baud",
+    "On      On      57600",
+    " ",
+    "In      EDID    IP               NET/Sig  AudioFormat",
+    "001     DF000   169.254.010.001  On /Off   PCM",
+    "002     DF000   169.254.010.002  Off/Off   PCM",
+    " ",
+    "Out     FromIn  IP               NET/HDMI  Res  Mode  Osp",
+    "001     001     169.254.020.001  Off/Off   01   MX    SNK",
+    "003     002     169.254.006.003  On /Off   01   MX    SNK",
+    "LAN     DHCP    IP              Gateway         SubnetMask",
+    "01_POE  Off     169.254.008.100 169.254.008.001 255.255.000.000",
+    "Domain Name",
+    "Controller.local",
+]
+# DARWIN opens its status with two fence lines.
+_DARWIN_STATUS = "".join(line + "\r\n" for line in [_FENCE, _FENCE, *_DARWIN_LINES, _FENCE])
+telemetry(TA, "status-darwin", inbound=_DARWIN_STATUS, model="darwin-control", expect_state={
+    "controller": {"firmware": "2.03.19", "power": True, "ir": True, "baud": 57600},
+    "encoders": {"1": {"edid": "DF000", "ip": "169.254.010.001", "online": True, "signal": False, "audio_format": "PCM"},
+                 "2": {"edid": "DF000", "ip": "169.254.010.002", "online": False, "signal": False, "audio_format": "PCM"}},
+    "decoders": {"1": {"source": 1, "ip": "169.254.020.001", "online": False, "hdmi": False, "resolution": 1,
+                       "mode": "MX", "osp": "SNK"},
+                 "3": {"source": 2, "ip": "169.254.006.003", "online": True, "hdmi": False, "resolution": 1,
+                       "mode": "MX", "osp": "SNK"}}})
+_CHAZY_LINES = [
+    "              CHAZY CONTROL Status Info",
+    "              FW Version: 1.00.17",
+    " ",
+    "Power   IR      Baud",
+    "On      On      57600",
+    " ",
+    "ENC     Type    EDID    IP               NET/Sig",
+    "013     Gen 2   DF000   169.254.010.013  On /On",
+    " ",
+    "DEC     Type    From    IP               NET/HDMI  Res  Mode",
+    "001     Gen 2   013     169.254.020.001  On /Off   00   MX",
+    "002     Gen 2   013     169.254.020.002  On /Off   00   MX",
+]
+_CHAZY_STATUS = "".join(line + "\r\n" for line in [" ", _FENCE, *_CHAZY_LINES, _FENCE])
+telemetry(TA, "status-chazy", inbound=_CHAZY_STATUS, model="chazy-control", expect_state={
+    "controller": {"firmware": "1.00.17", "power": True, "ir": True, "baud": 57600},
+    "encoders": {"13": {"type": "Gen 2", "edid": "DF000", "ip": "169.254.010.013", "online": True, "signal": True}},
+    "decoders": {"1": {"type": "Gen 2", "source": 13, "ip": "169.254.020.001", "online": True, "hdmi": False,
+                       "resolution": 0, "mode": "MX"},
+                 "2": {"type": "Gen 2", "source": 13, "ip": "169.254.020.002", "online": True, "hdmi": False,
+                       "resolution": 0, "mode": "MX"}}})
+# The block is one reply, its fences left out.
+ta("get_status", {}, "GET STATUS", **DW, device_reply=_DARWIN_STATUS,
+   expect_result={"ok": {"kind": "value", "value": "\n".join(_DARWIN_LINES)}})
