@@ -498,3 +498,41 @@ _bt("focus-assist", "/monitoring/focusAssist", '{"mode":"Peak","color":"Green","
 _bt("frame-guide-ratio", "/monitoring/frameGuideRatio", '{"ratio":"2.39:1"}', {"monitoring": {"frame_guide_ratio": "2.39:1"}})
 _bt("safe-area-percent", "/monitoring/safeAreaPercent", '{"percent":90}', {"monitoring": {"safe_area_percent": 90}})
 _bt("display-eye", "/immersive/display/LCD/eye", '{"eye":"Right"}', {"immersive": {"displays": {"LCD": {"eye": "Right"}}}})
+
+# ── The notification websocket (p.71-75): the subscription sent when it opens,
+# and a propertyValueChanged event re-reading its property's path ──
+_BC_SUBS = ["/transports/0", "/transports/0/record", "/transports/0/play", "/transports/0/stop",
+            "/transports/0/playback", "/transports/0/timecode", "/transports/0/timecode/source",
+            "/transports/0/clipIndex", "/camera/tallyStatus", "/camera/power", "/camera/power/displayMode",
+            "/camera/colorBars", "/camera/programFeedDisplay", "/camera/timingReferenceLock",
+            "/lens/iris", "/lens/zoom", "/lens/focus", "/video/iso", "/video/gain", "/video/whiteBalance",
+            "/video/whiteBalanceTint", "/video/ndFilter", "/video/ndFilter/displayMode", "/video/shutter",
+            "/video/shutter/measurement", "/video/autoExposure", "/video/detailSharpening",
+            "/video/detailSharpeningLevel", "/colorCorrection/lift", "/colorCorrection/gamma",
+            "/colorCorrection/gain", "/colorCorrection/offset", "/colorCorrection/contrast",
+            "/colorCorrection/color", "/colorCorrection/lumaContribution", "/presets/active", "/media/active",
+            "/media/workingset", "/system/codecFormat", "/system/videoFormat", "/system/format",
+            "/slates/nextClip", "/monitoring/focusAssist", "/monitoring/frameGuideRatio",
+            "/monitoring/safeAreaPercent"] + [
+    f"/audio/channel/{c}/{x}" for c in (0, 1)
+    for x in ("level", "input", "phantomPower", "padding", "lowCutFilter", "available")]
+_BC_SUB = json.dumps({"type": "request", "data": {"action": "subscribe", "properties": _BC_SUBS}},
+                     separators=(",", ":"))
+
+
+def _bc_event(prop, value):
+    return json.dumps({"type": "event", "data": {"action": "propertyValueChanged", "property": prop,
+                                                 "value": value}}, separators=(",", ":"))
+
+
+telemetry(BC, "event-depth-1", expect_connect_ws=[_BC_SUB], inbound_ws=_bc_event("/system", {}),
+          expect_then_send=[{"method": "GET", "target": _BA + "/system"}], expect_state={})
+telemetry(BC, "event-iris", inbound_ws=_bc_event("/lens/iris", {"apertureStop": 2.8}),
+          expect_then_send=[{"method": "GET", "target": _BA + "/lens/iris"}], expect_state={})
+telemetry(BC, "event-display-zebra", inbound_ws=_bc_event("/monitoring/LCD/zebra", {"enabled": True}),
+          expect_then_send=[{"method": "GET", "target": _BA + "/monitoring/LCD/zebra"}], expect_state={})
+telemetry(BC, "event-timecode-source", inbound_ws=_bc_event("/transports/0/timecode/source", {"timecode": "Clip"}),
+          expect_then_send=[{"method": "GET", "target": _BA + "/transports/0/timecode/source"}], expect_state={})
+# The websocketOpened event re-reads nothing.
+telemetry(BC, "event-opened", inbound_ws='{"type":"event","data":{"action":"websocketOpened"}}',
+          expect_then_send=[], expect_state={})
