@@ -58,5 +58,11 @@ class Binary(unittest.TestCase):
         self.assertIn("c: header Content-Type is set by the core, not by the spec", errors)
 
 
+class Templates(unittest.TestCase):
+    def test_an_escaped_brace_is_no_placeholder(self):
+        self.assertEqual(validate.check_template("text", r"\{VC}", {}, {}, "c"), [])
+        self.assertTrue(validate.check_template("text", "{VC}", {}, {}, "c"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -584,7 +584,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 13] = [
+    const SUCCESS: [&str; 14] = [
         "200 ok",
         "~01@ok",
         "ACK;",
@@ -600,6 +600,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "!Done ok",
         // Turtle AV's acknowledgement.
         "[SUCCESS]ok",
+        // Lightware LW2: every answer is in round brackets.
+        "(ok)",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {

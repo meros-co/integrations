@@ -202,6 +202,33 @@ pub(crate) fn render(
     values: &Values,
     escape: fn(&str) -> String,
 ) -> Result<String, String> {
+    // `\{` and `\}` are literal braces (SPEC.md §4, Templates): the text
+    // between them is rendered on its own, so an escaped brace never opens
+    // or closes a placeholder, and a bare word in braces (Lightware's
+    // `\{VC}`) is sent as it is.
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(at) = escaped_brace(rest) {
+        out.push_str(&render_unescaped(&rest[..at], values, escape)?);
+        out.push_str(&rest[at + 1..at + 2]);
+        rest = &rest[at + 2..];
+    }
+    out.push_str(&render_unescaped(rest, values, escape)?);
+    Ok(out)
+}
+
+/// Where the first `\{` or `\}` in `text` starts.
+fn escaped_brace(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    (0..bytes.len().saturating_sub(1))
+        .find(|&i| bytes[i] == b'\\' && (bytes[i + 1] == b'{' || bytes[i + 1] == b'}'))
+}
+
+fn render_unescaped(
+    template: &str,
+    values: &Values,
+    escape: fn(&str) -> String,
+) -> Result<String, String> {
     let mut out = String::with_capacity(template.len());
     let mut last = 0;
     for caps in placeholder().captures_iter(template) {
@@ -521,6 +548,25 @@ pub(crate) fn percent_decode(s: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn escaped_braces_are_literal() {
+        let spec = "layer: {type: string}";
+        // A bare word in braces, with one or both braces escaped.
+        assert_eq!(go(r"\{VC}", json!({}), spec), Ok("{VC}".into()));
+        assert_eq!(go(r"\{VC\}", json!({}), spec), Ok("{VC}".into()));
+        // Around a placeholder, and a backslash before anything else kept.
+        assert_eq!(
+            go(r"\{VC {layer}\} a\b", json!({"layer": "V"}), spec),
+            Ok(r"{VC V} a\b".into())
+        );
+        // An escaped brace never opens a placeholder.
+        assert_eq!(
+            go(r"\{layer}", json!({"layer": "V"}), spec),
+            Ok("{layer}".into())
+        );
+        assert_eq!(go(r"x\", json!({}), spec), Ok(r"x\".into()));
+    }
 
     #[test]
     fn url_decode_reverses_percent_encoding() {
