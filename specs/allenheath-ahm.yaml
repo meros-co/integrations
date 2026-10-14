@@ -14,11 +14,20 @@ reason: >
   them. Reading the processor's state means hundreds of paced requests.
 
 source:
+  - title: "AHM TCP/IP Protocol, Firmware V1.5 (Issue 1)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2024/10/AHM-TCP-Protocol-V1.5.pdf"
+    note: >
+      Manufacturer document, 6 pages, the latest Allen & Heath publishes (no V1.6 issue was published
+      with firmware V1.60/V1.61). The same messages as V1.4, regrouped (send level increment/decrement
+      beside the send level, p.3), with one change: audio playback's PlaybackChannel 02 is stereo
+      playback, where V1.4 said the channel is ignored for stereo (p.4). Its reference table is an
+      image without text; the V1.4 table below is used for the values.
   - title: "AHM TCP/IP Protocol, Firmware V1.4 (Issue 2; reference table v1.10)"
     author: "Allen & Heath"
     url: "https://www.allen-heath.com/content/uploads/2023/11/AHM-TCP-Protocol-V1.4.pdf"
     note: >
-      Manufacturer document, 7 pages. TCP 51325, TLS 51327; functions; TLS authentication; channel selection
+      Manufacturer document, 7 pages, superseded by V1.5 but kept for its reference table. TCP 51325, TLS 51327; functions; TLS authentication; channel selection
       by MIDI channel (inputs 0, zones 1, control groups 2, rooms 3) and note; SysEx header
       F0 00 00 1A 50 12 01 00 (p.1). Mute on/off and received velocities; get mute; level NRPN 17 and get;
       level increment/decrement NRPN 20 (p.2). Input trim NRPN 18 (-24 to +24 dB = 00-7F), preamp gain
@@ -28,6 +37,13 @@ source:
       selection and the get reply; room source selector (0D); room combiners (0E) (p.5). Name get (09, reply
       0A) and colour get (0B, reply 0C) (p.6). Reference table: presets, channels, characters, colours,
       source numbers and the channel level table with its formula [(Gain + 48) / 58] * 127 (p.7).
+  - title: "AHM Release Notes, Firmware and System Manager V1.61 (January 2026)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2026/01/AHM-Release-Notes-V1.61.pdf"
+    note: >
+      Manufacturer document. V1.60 (October 2025): channel names up to 16 characters (p.2); one track per
+      playback channel from V1.52 (p.3); room combining in the external control protocol (V1.3x notes).
+      No external control protocol change is listed for V1.60 or V1.61.
   - title: "Allen & Heath for IT managers (white paper, updated 2026-03-30)"
     author: "Allen & Heath"
     url: "https://support.allen-heath.com/hc/en-gb/articles/37287399691409-Allen-Heath-for-IT-managers"
@@ -208,14 +224,14 @@ commands:
                 description: "Preset number, 1 to 500 as in System Manager." }
     returns: none
   play_track:
-    summary: "Play an audio file (SysEx 00 06 PlaybackChannel TrackID, p.5); the channel is ignored for stereo playback"
+    summary: "Play an audio file (SysEx 00 06 PlaybackChannel TrackID, V1.5 p.4) on mono playback channel 1 or 2, or the stereo one"
     params:
       track_id: { type: int, min: 0, max: 127, required: true,
                   label: Track,
                   description: "Track ID of the audio file to play, 0 to 127." }
-      playback_channel: { type: enum, values: [mono_1, mono_2], default: mono_1,
+      playback_channel: { type: enum, values: [mono_1, mono_2, stereo], default: mono_1,
                           label: Playback channel,
-                          description: "Mono playback channel 1 or 2; ignored for stereo playback." }
+                          description: "Playback channel to play on: mono 1 (00), mono 2 (01) or stereo (02), as V1.5 numbers them." }
     returns: none
   select_source:
     summary: "Select a zone's source selector source 1-20 (SysEx 00 08 CH SourceNumber, p.5)"
@@ -249,7 +265,7 @@ commands:
                  description: "True divides the two rooms, false combines them." }
     returns: none
   get_channel_name:
-    summary: "Read a name (SysEx 0N 09 CH, reply 0N 0A CH Name, up to 8 characters, p.6)"
+    summary: "Read a name (SysEx 0N 09 CH, reply 0N 0A CH Name, p.6; up to 8 characters in the document, 16 from firmware V1.60)"
     params:
       channel_type: &named_type { type: enum, values: [input, zone, control_group, room], required: true,
                                   label: Channel type,
@@ -325,7 +341,7 @@ state:
   channels.*.*.mute: { type: bool, description: "Mute; keyed by 'input', 'zone' or 'control_group', then number" }
   channels.*.*.level_raw: { type: int, description: "Level, raw 0-127 (0 is -inf)" }
   channels.*.*.level_db: { type: float, unit: dB, description: "Level in dB; absent at -inf" }
-  channels.*.*.name: { type: string, description: "Name, up to 8 characters" }
+  channels.*.*.name: { type: string, description: "Name as the processor reports it: up to 8 characters in the protocol document, up to 16 from firmware V1.60" }
   channels.*.*.colour: { type: string, description: "'off', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan' or 'white'" }
   channels.input.*.trim_raw: { type: int, description: "Input trim, raw 0-127" }
   channels.input.*.trim_db: { type: float, unit: dB, description: "Input trim, -24 to +24" }

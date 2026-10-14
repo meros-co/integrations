@@ -83,12 +83,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## allenheath-ahm — Allen & Heath AHM
 
-- [ ] Confirm the login encoding on the TLS port 51327: profile sent as one byte followed by the password's UTF-8 bytes, with no ", " separator or terminator, answered by AuthOK. ([specs/allenheath-ahm.yaml:227](specs/allenheath-ahm.yaml#L227))
-- [ ] Check whether the processor transmits changes other than preset recall, source selection and room combination (mutes, levels) when they are made on it. ([specs/allenheath-ahm.yaml:240](specs/allenheath-ahm.yaml#L240))
-- [ ] Confirm that -48 dB sent as 01 sets -48 dB, and that received levels read back as the expected dB. ([specs/allenheath-ahm.yaml:245](specs/allenheath-ahm.yaml#L245))
-- [ ] Check trim (-24 to +24 dB) and preamp gain (+5 to +60 dB) at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-ahm.yaml:248](specs/allenheath-ahm.yaml#L248))
-- [ ] Confirm the source selector get is answered when sent with N = 1, and that its reply is told apart from the message sent on a selection. ([specs/allenheath-ahm.yaml:253](specs/allenheath-ahm.yaml#L253))
-- [ ] Confirm room numbers in the room combiner message are 00-0F for rooms 1-16. ([specs/allenheath-ahm.yaml:257](specs/allenheath-ahm.yaml#L257))
+- [ ] Confirm the login encoding on the TLS port 51327: profile sent as one byte followed by the password's UTF-8 bytes, with no ", " separator or terminator, answered by AuthOK. ([specs/allenheath-ahm.yaml:243](specs/allenheath-ahm.yaml#L243))
+- [ ] Check whether the processor transmits changes other than preset recall, source selection and room combination (mutes, levels) when they are made on it. ([specs/allenheath-ahm.yaml:256](specs/allenheath-ahm.yaml#L256))
+- [ ] Confirm that -48 dB sent as 01 sets -48 dB, and that received levels read back as the expected dB. ([specs/allenheath-ahm.yaml:261](specs/allenheath-ahm.yaml#L261))
+- [ ] Check trim (-24 to +24 dB) and preamp gain (+5 to +60 dB) at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-ahm.yaml:264](specs/allenheath-ahm.yaml#L264))
+- [ ] Confirm the source selector get is answered when sent with N = 1, and that its reply is told apart from the message sent on a selection. ([specs/allenheath-ahm.yaml:269](specs/allenheath-ahm.yaml#L269))
+- [ ] Confirm room numbers in the room combiner message are 00-0F for rooms 1-16. ([specs/allenheath-ahm.yaml:273](specs/allenheath-ahm.yaml#L273))
+- [ ] Confirm that playback channel 02 plays on the stereo playback channel (V1.5), on firmware V1.5x and V1.6x. ([specs/allenheath-ahm.yaml:232](specs/allenheath-ahm.yaml#L232))
+- [ ] On firmware V1.60 or later, check that a name longer than 8 characters comes back whole in the name reply. ([specs/allenheath-ahm.yaml:344](specs/allenheath-ahm.yaml#L344))
 
 ## allenheath-cq — Allen & Heath CQ
 
