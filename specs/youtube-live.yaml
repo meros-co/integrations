@@ -99,12 +99,59 @@ source:
     author: Google
     url: https://developers.google.com/youtube/v3/determine_quota_cost
     note: >
-      Manufacturer document, retrieved 2026-10-04. Every list costs 1 unit;
-      insert, update, delete, bind, transition and cuepoint on
-      liveBroadcasts, insert, update and delete on liveStreams, and
-      liveChatMessages and liveChatBans inserts and deletes cost 50. The
+      Manufacturer document, retrieved again 2026-10-14 (the table changed
+      since 2026-10-04). Every liveBroadcasts and liveStreams method (list,
+      insert, update, delete, bind, transition, insertCuepoint) costs 1
+      unit; liveChatMessages list 5, insert, delete and transition 20;
+      liveChatBans insert and delete 200; liveChatModerators list 50,
+      insert and delete 200; superChatEvents.list, videos.list and
+      videoCategories.list 1; videos.update and thumbnails.set 50. The
       default quota is 10,000 units a day per project, reset at midnight
       Pacific Time.
+  - title: YouTube Data API reference, videos.update
+    author: Google
+    url: https://developers.google.com/youtube/v3/docs/videos/update
+    note: >
+      Manufacturer document, retrieved 2026-10-14. PUT /youtube/v3/videos
+      with part; writable snippet.title and snippet.categoryId (both
+      required when the snippet is updated), snippet.defaultLanguage,
+      snippet.description, snippet.tags[], status.embeddable,
+      status.license, status.privacyStatus, status.publicStatsViewable,
+      status.publishAt, status.selfDeclaredMadeForKids,
+      status.containsSyntheticMedia, recordingDetails.recordingDate and
+      localizations; a property left out of the request that has a value is
+      deleted. 50 units.
+  - title: YouTube Live Streaming API reference, liveChatModerators (list, insert, delete)
+    author: Google
+    url: https://developers.google.com/youtube/v3/live/docs/liveChatModerators
+    note: >
+      Manufacturer document, retrieved 2026-10-14. GET, POST and DELETE
+      /youtube/v3/liveChat/moderators; list with liveChatId, part id,snippet
+      and maxResults 0 to 50 (default 5); insert body
+      snippet.liveChatId and snippet.moderatorDetails.channelId; delete with
+      the moderator resource's id. Owner of the chat's channel only.
+  - title: YouTube Live Streaming API reference, superChatEvents (list)
+    author: Google
+    url: https://developers.google.com/youtube/v3/live/docs/superChatEvents
+    note: >
+      Manufacturer document, retrieved 2026-10-14. GET
+      /youtube/v3/superChatEvents, part snippet, maxResults 1 to 50
+      (default 5): the channel's Super Chats and Super Stickers of the last
+      30 days, with supporterDetails, commentText, createdAt, amountMicros,
+      currency, displayString, messageType (the tier) and
+      isSuperStickerEvent.
+  - title: YouTube Live Streaming API reference, liveChatMessages (insert pollEvent, transition)
+    author: Google
+    url: https://developers.google.com/youtube/v3/live/docs/liveChatMessages/transition
+    note: >
+      Manufacturer document, retrieved 2026-10-14. insert with snippet.type
+      pollEvent and snippet.pollDetails.metadata.questionText and options
+      (2 to 4, each optionText) adds a poll; one pinned active poll at a
+      time (preconditionCheckFailed). POST
+      /youtube/v3/liveChat/messages/transition with id, status closed and
+      part ends the poll and answers the message with its tallies
+      (pollDetails.metadata.options[].tally, to the owner only; status
+      unknown, active or closed). 20 units each.
 
 transport:
   type: http
@@ -159,7 +206,10 @@ models:
                bind_stream, unbind_stream, insert_ad_break, insert_broadcast, update_broadcast,
                delete_broadcast, list_streams, get_stream, insert_stream, update_stream,
                delete_stream, get_live_details, list_chat_messages, send_chat_message,
-               delete_chat_message, ban_chat_user, ban_chat_user_temporarily, unban_chat_user]
+               delete_chat_message, ban_chat_user, ban_chat_user_temporarily, unban_chat_user,
+               get_video, update_video, update_video_snippet, update_video_status, list_video_categories,
+               list_chat_moderators, add_chat_moderator, remove_chat_moderator, list_super_chat_events,
+               create_chat_poll, close_chat_poll]
     verification: none
     notes: >
       Live streaming must be enabled on the channel. The integration follows
@@ -197,7 +247,7 @@ commands:
     returns: value
 
   start_testing:
-    summary: Start the broadcast's test, visible only to the channel on its monitor stream (liveBroadcasts.transition to testing; 50 quota units)
+    summary: Start the broadcast's test, visible only to the channel on its monitor stream (liveBroadcasts.transition to testing; 1 quota unit)
     params:
       broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                       label: Broadcast ID,
@@ -208,7 +258,7 @@ commands:
     returns: value
 
   go_live:
-    summary: Make the broadcast public, live to viewers (liveBroadcasts.transition to live; 50 quota units)
+    summary: Make the broadcast public, live to viewers (liveBroadcasts.transition to live; 1 quota unit)
     params:
       broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                       label: Broadcast ID,
@@ -219,7 +269,7 @@ commands:
     returns: value
 
   complete_broadcast:
-    summary: End the broadcast for good (liveBroadcasts.transition to complete; 50 quota units)
+    summary: End the broadcast for good (liveBroadcasts.transition to complete; 1 quota unit)
     params:
       broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                       label: Broadcast ID,
@@ -230,7 +280,7 @@ commands:
     returns: value
 
   bind_stream:
-    summary: Bind a stream (an ingest point and key) to the broadcast (liveBroadcasts.bind; 50 quota units)
+    summary: Bind a stream (an ingest point and key) to the broadcast (liveBroadcasts.bind; 1 quota unit)
     params:
       broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                       label: Broadcast ID,
@@ -244,7 +294,7 @@ commands:
     returns: value
 
   unbind_stream:
-    summary: Remove the broadcast's stream binding (liveBroadcasts.bind without streamId; 50 quota units)
+    summary: Remove the broadcast's stream binding (liveBroadcasts.bind without streamId; 1 quota unit)
     params:
       broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                       label: Broadcast ID,
@@ -255,7 +305,7 @@ commands:
     returns: value
 
   insert_ad_break:
-    summary: Insert an ad break into the live broadcast now (liveBroadcasts.cuepoint, cueType cueTypeAd; 50 quota units)
+    summary: Insert an ad break into the live broadcast now (liveBroadcasts.cuepoint, cueType cueTypeAd; 1 quota unit)
     params:
       broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                       label: Broadcast ID,
@@ -269,7 +319,7 @@ commands:
     returns: value
 
   insert_broadcast:
-    summary: Create a broadcast from a liveBroadcast resource with snippet.title, snippet.scheduledStartTime and status.privacyStatus (liveBroadcasts.insert; 50 quota units)
+    summary: Create a broadcast from a liveBroadcast resource with snippet.title, snippet.scheduledStartTime and status.privacyStatus (liveBroadcasts.insert; 1 quota unit)
     params:
       broadcast: { type: json, required: true,
                    label: Broadcast,
@@ -280,7 +330,7 @@ commands:
     returns: value
 
   update_broadcast:
-    summary: Replace a broadcast's snippet, contentDetails and status with a liveBroadcast resource; properties left out are deleted (liveBroadcasts.update; 50 quota units)
+    summary: Replace a broadcast's snippet, contentDetails and status with a liveBroadcast resource; properties left out are deleted (liveBroadcasts.update; 1 quota unit)
     params:
       broadcast: { type: json, required: true,
                    label: Broadcast,
@@ -291,7 +341,7 @@ commands:
     returns: value
 
   delete_broadcast:
-    summary: Delete a broadcast (liveBroadcasts.delete; 50 quota units)
+    summary: Delete a broadcast (liveBroadcasts.delete; 1 quota unit)
     params:
       broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                       label: Broadcast ID,
@@ -323,7 +373,7 @@ commands:
     returns: value
 
   insert_stream:
-    summary: Create a stream from a liveStream resource with snippet.title and cdn (liveStreams.insert; 50 quota units)
+    summary: Create a stream from a liveStream resource with snippet.title and cdn (liveStreams.insert; 1 quota unit)
     params:
       stream: { type: json, required: true,
                 label: Stream,
@@ -334,7 +384,7 @@ commands:
     returns: value
 
   update_stream:
-    summary: Replace a stream's snippet and cdn with a liveStream resource (liveStreams.update; 50 quota units)
+    summary: Replace a stream's snippet and cdn with a liveStream resource (liveStreams.update; 1 quota unit)
     params:
       stream: { type: json, required: true,
                 label: Stream,
@@ -345,7 +395,7 @@ commands:
     returns: value
 
   delete_stream:
-    summary: Delete a stream and its stream key (liveStreams.delete; 50 quota units)
+    summary: Delete a stream and its stream key (liveStreams.delete; 1 quota unit)
     params:
       stream_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 128, required: true,
                    label: Stream ID,
@@ -367,7 +417,7 @@ commands:
 
   # ── Live chat ────────────────────────────────────────────────────────────
   list_chat_messages:
-    summary: A live chat's messages, oldest first, with nextPageToken and pollingIntervalMillis (liveChatMessages.list; 1 quota unit)
+    summary: A live chat's messages, oldest first, with nextPageToken and pollingIntervalMillis (liveChatMessages.list; 5 quota units)
     params:
       live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
                       label: Live chat ID,
@@ -378,7 +428,7 @@ commands:
     returns: value
 
   send_chat_message:
-    summary: Post a text message to a live chat as the channel (liveChatMessages.insert; 50 quota units)
+    summary: Post a text message to a live chat as the channel (liveChatMessages.insert; 20 quota units)
     params:
       live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
                       label: Live chat ID,
@@ -393,7 +443,7 @@ commands:
     returns: value
 
   delete_chat_message:
-    summary: Delete a live chat message (liveChatMessages.delete; 50 quota units)
+    summary: Delete a live chat message (liveChatMessages.delete; 20 quota units)
     params:
       message_id: { type: string, pattern: "^[A-Za-z0-9_.-]+$", max_length: 256, required: true,
                     label: Message ID,
@@ -403,7 +453,7 @@ commands:
     returns: ack
 
   ban_chat_user:
-    summary: Ban a viewer from a live chat permanently (liveChatBans.insert, type permanent; 50 quota units)
+    summary: Ban a viewer from a live chat permanently (liveChatBans.insert, type permanent; 200 quota units)
     params:
       live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
                       label: Live chat ID,
@@ -418,7 +468,7 @@ commands:
     returns: value
 
   ban_chat_user_temporarily:
-    summary: Time a viewer out of a live chat (liveChatBans.insert, type temporary; 50 quota units)
+    summary: Time a viewer out of a live chat (liveChatBans.insert, type temporary; 200 quota units)
     params:
       live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
                       label: Live chat ID,
@@ -436,7 +486,7 @@ commands:
     returns: value
 
   unban_chat_user:
-    summary: Lift a live chat ban (liveChatBans.delete; 50 quota units)
+    summary: Lift a live chat ban (liveChatBans.delete; 200 quota units)
     params:
       ban_id: { type: string, pattern: "^[A-Za-z0-9_.-]+$", max_length: 256, required: true,
                 label: Ban ID,
@@ -444,6 +494,136 @@ commands:
     send: { method: DELETE, path: /youtube/v3/liveChat/bans, query: { id: "{ban_id}" } }
     expect: { status: 204 }
     returns: ack
+
+  list_chat_moderators:
+    summary: A live chat's moderators, kept in state (liveChatModerators.list; 50 quota units)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+    send: { method: GET, path: /youtube/v3/liveChat/moderators,
+            query: { liveChatId: "{live_chat_id}", part: "id,snippet", maxResults: "50" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  add_chat_moderator:
+    summary: Make a viewer a moderator of a live chat (liveChatModerators.insert; 200 quota units)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+      channel_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                    label: Viewer channel ID,
+                    description: "The new moderator's channel id, a chat message's authorDetails.channelId." }
+    send: { method: POST, path: /youtube/v3/liveChat/moderators, query: { part: snippet },
+            body: '{"snippet":{"liveChatId":{live_chat_id:json},"moderatorDetails":{"channelId":{channel_id:json}}}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  remove_chat_moderator:
+    summary: Take a moderator's role in a live chat away (liveChatModerators.delete; 200 quota units)
+    params:
+      moderator_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Moderator ID,
+                      description: "The moderator resource's id, from chat_moderators in state or list_chat_moderators (not the channel id)." }
+    send: { method: DELETE, path: /youtube/v3/liveChat/moderators, query: { id: "{moderator_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  create_chat_poll:
+    summary: Pin a poll in a live chat; one active poll at a time (liveChatMessages.insert, type pollEvent; 20 quota units)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+      question: { type: string, pattern: "\\S", max_length: 200, required: true,
+                  label: Question,
+                  description: "The poll's question." }
+      options: { type: json, required: true,
+                 label: Options,
+                 description: "A JSON array of 2 to 4 objects as YouTube documents them, each {\"optionText\": \"...\"}, shown in that order." }
+    send: { method: POST, path: /youtube/v3/liveChat/messages, query: { part: snippet },
+            body: '{"snippet":{"liveChatId":{live_chat_id:json},"type":"pollEvent","pollDetails":{"metadata":{"questionText":{question:json},"options":{options}}}}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  close_chat_poll:
+    summary: Close a live chat poll, answering its final tallies (liveChatMessages.transition, status closed; 20 quota units)
+    params:
+      message_id: { type: string, pattern: "^[A-Za-z0-9_.-]+$", max_length: 256, required: true,
+                    label: Poll message ID,
+                    description: "The poll's chat message id, chat_poll.message_id in state." }
+    send: { method: POST, path: /youtube/v3/liveChat/messages/transition,
+            query: { id: "{message_id}", status: closed, part: "id,snippet" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_super_chat_events:
+    summary: The channel's Super Chats and Super Stickers of the last 30 days, newest first, kept in state (superChatEvents.list; 1 quota unit)
+    params:
+      max_results: { type: int, min: 1, max: 50, default: 50,
+                     label: Events,
+                     description: "How many events to return, 1 to 50." }
+    send: { method: GET, path: /youtube/v3/superChatEvents, query: { part: snippet, maxResults: "{max_results}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  # ── The broadcast's video ────────────────────────────────────────────────
+  get_video:
+    summary: A broadcast's video metadata (category, tags, description, made-for-kids, embedding, licence) with its live details and statistics (videos.list part snippet, status, liveStreamingDetails, statistics; 1 quota unit)
+    params:
+      video_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                  label: Video ID,
+                  description: "The broadcast's id, which is also its video id." }
+    send: { method: GET, path: /youtube/v3/videos,
+            query: { part: "snippet,status,liveStreamingDetails,statistics", id: "{video_id}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  update_video:
+    summary: Replace a video's snippet and status with a video resource; properties left out are deleted (videos.update part snippet,status; 50 quota units)
+    params:
+      video: { type: json, required: true,
+               label: Video,
+               description: "A video resource as YouTube documents it, with id, snippet (title and categoryId required, description, tags, defaultLanguage) and status (privacyStatus, selfDeclaredMadeForKids, embeddable, publicStatsViewable, license, containsSyntheticMedia)." }
+    send: { method: PUT, path: /youtube/v3/videos, query: { part: "snippet,status" },
+            body: '{video}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  update_video_snippet:
+    summary: Replace a video's title, category, description, tags and language with a video resource's snippet; what is left out is deleted (videos.update part snippet; 50 quota units)
+    params:
+      video: { type: json, required: true,
+               label: Video,
+               description: "A video resource with id and the whole snippet: title and categoryId required, and every description, tags and defaultLanguage to keep." }
+    send: { method: PUT, path: /youtube/v3/videos, query: { part: snippet },
+            body: '{video}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  update_video_status:
+    summary: Replace a video's privacy, made-for-kids declaration, embedding, public statistics and licence with a video resource's status (videos.update part status; 50 quota units)
+    params:
+      video: { type: json, required: true,
+               label: Video,
+               description: "A video resource with id and the whole status: privacyStatus, selfDeclaredMadeForKids, embeddable, publicStatsViewable, license and containsSyntheticMedia to keep." }
+    send: { method: PUT, path: /youtube/v3/videos, query: { part: status },
+            body: '{video}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_video_categories:
+    summary: The video categories that can be assigned in a region, for a video's snippet.categoryId (videoCategories.list; 1 quota unit)
+    params:
+      region_code: { type: string, pattern: "^[A-Z]{2}$", default: "US",
+                     label: Region,
+                     description: "An ISO 3166-1 alpha-2 country code such as US or GB." }
+    send: { method: GET, path: /youtube/v3/videoCategories, query: { part: snippet, regionCode: "{region_code}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
 
 quirks:
   - models: [all]
@@ -495,8 +675,12 @@ quirks:
     text: >
       Every request spends the consumer's Google Cloud project quota, by
       default 10,000 units a day shared by every user of that project and
-      reset at midnight Pacific Time. Lists cost 1 unit; transitions, binds,
-      ad breaks, inserts, updates, deletes, chat messages and bans cost 50.
+      reset at midnight Pacific Time. Every broadcast and stream method costs
+      1 unit (transitions, binds and ad breaks included); reading chat costs
+      5, posting or deleting a chat message, a poll or closing one 20, a ban
+      or unban 200, listing chat moderators 50 and adding or removing one
+      200, and a video metadata update 50. Google changes these costs: its
+      quota table is the reference.
       State is polled once a minute with three lists (the broadcast, the
       channel's streams and the broadcast's video details): 3 units a minute,
       180 an hour, 4,320 a day if left open. Open the integration with
@@ -551,11 +735,62 @@ quirks:
     severity: info
     text: >
       Live chat is read with list_chat_messages, which the consumer polls at
-      the reply's pollingIntervalMillis (1 unit each), passing nothing back:
+      the reply's pollingIntervalMillis (5 units each), passing nothing back:
       the format has no page-token chaining, so each call returns the chat
       from the start. YouTube's streaming liveChatMessages.streamList is a
       server-streamed gRPC-style call the core does not speak. Chat is not
       polled into state.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A broadcast's category, tags, description, language, made-for-kids
+      declaration, embedding, public statistics and licence belong to its
+      video, and are read once a minute with the video's live details at no
+      extra cost (broadcasts.<id>.category_id and the rest). videos.update
+      replaces a whole part: the snippet (title and categoryId are required)
+      or the status. Whatever the body leaves out is deleted, so one value
+      cannot be changed alone; build the body from the current values in
+      state and change the one wanted. Title and privacy are the
+      broadcast's as well: liveBroadcasts and videos share them. made_for_kids
+      is YouTube's own decision and may differ from the channel's
+      declaration (self_declared_made_for_kids), the only one that can be
+      set. YouTube leaves tags out of the video when there are none, so after
+      every tag is removed state keeps the last list. A video's thumbnail is
+      set with thumbnails.set, which takes the
+      image file as the request body: the format sends only text bodies, so
+      it is not offered here.
+
+  - models: [all]
+    severity: info
+    text: >
+      Chat moderators (chat_moderators.<id>) are kept from the replies of
+      list_chat_moderators, which replaces them when the chat has 50 or
+      fewer, and of add_chat_moderator and remove_chat_moderator; they are
+      not polled (50 units a list). The moderator id that
+      remove_chat_moderator takes is the moderator resource's id, not the
+      channel id. Only the owner of the chat's channel may change them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Recent Super Chats and Super Stickers (super_chats.<id>) are kept from
+      list_super_chat_events, each reply replacing them: the newest up to 50
+      of the last 30 days. They are not polled; a consumer showing them live
+      calls it on its own cadence (1 unit a call). amount_micros is the
+      amount in millionths of the currency; display_string is YouTube's
+      formatted amount. YouTube offers no way to change or refund them.
+
+  - models: [all]
+    severity: info
+    text: >
+      A live chat poll (chat_poll) is a chat message of type pollEvent with
+      2 to 4 options; one active poll may be pinned at a time, and another
+      is refused (preconditionCheckFailed) until it is closed. The poll is
+      kept from create_chat_poll's reply, close_chat_poll's reply (with the
+      final tallies) and any list_chat_messages reply that holds it. Tallies
+      are given to the channel owner only, and while open only when the
+      chat is read. YouTube's polls cannot be edited once posted.
 
 state:
   broadcasts.*.title:               { type: string, description: "Broadcast title (snippet.title), keyed by broadcast id" }
@@ -578,6 +813,34 @@ state:
   broadcasts.*.view_count:          { type: int, description: "Video views (video statistics.viewCount)" }
   broadcasts.*.like_count:          { type: int, description: "Video likes (video statistics.likeCount)" }
   broadcasts.*.comment_count:       { type: int, description: "Video comments (video statistics.commentCount)" }
+  broadcasts.*.description:         { type: string, description: "The video's description (video snippet.description)" }
+  broadcasts.*.category_id:         { type: string, description: "The video's category id, from list_video_categories (video snippet.categoryId)" }
+  broadcasts.*.tags:                { type: string, description: "The video's tags as a JSON array (video snippet.tags)" }
+  broadcasts.*.default_language:    { type: string, description: "The language of the title and description (video snippet.defaultLanguage)" }
+  broadcasts.*.made_for_kids:       { type: bool, description: "YouTube treats the video as made for kids (video status.madeForKids, read-only)" }
+  broadcasts.*.self_declared_made_for_kids: { type: bool, description: "The channel declared the video made for kids (video status.selfDeclaredMadeForKids)" }
+  broadcasts.*.embeddable:          { type: bool, description: "The video can be embedded on other sites (video status.embeddable)" }
+  broadcasts.*.public_stats_viewable: { type: bool, description: "Viewers can see the video's statistics (video status.publicStatsViewable)" }
+  broadcasts.*.license:             { type: string, description: "youtube or creativeCommon (video status.license)" }
+  broadcasts.*.contains_synthetic_media: { type: bool, description: "The video is declared as holding altered or synthetic content (video status.containsSyntheticMedia)" }
+  chat_moderators.*.live_chat_id:   { type: string, description: "The chat a moderator moderates, keyed by moderator resource id" }
+  chat_moderators.*.channel_id:     { type: string, description: "The moderator's channel id" }
+  chat_moderators.*.display_name:   { type: string, description: "The moderator's channel name" }
+  super_chats.*.supporter_name:     { type: string, description: "Who sent the Super Chat or Super Sticker, keyed by event id" }
+  super_chats.*.supporter_channel_id: { type: string, description: "The sender's channel id" }
+  super_chats.*.comment:            { type: string, description: "The message sent with it" }
+  super_chats.*.amount_micros:      { type: int, description: "The amount in millionths of the currency (amountMicros)" }
+  super_chats.*.currency:           { type: string, description: "ISO 4217 currency code" }
+  super_chats.*.display_string:     { type: string, description: "The amount as YouTube shows it, such as $1.00" }
+  super_chats.*.tier:               { type: int, description: "The paid message's tier (messageType)" }
+  super_chats.*.sticker:            { type: bool, description: "A Super Sticker rather than a Super Chat" }
+  super_chats.*.created_at:         { type: string, description: "When it was sent, ISO 8601" }
+  chat_poll.message_id:             { type: string, description: "The live chat poll's message id" }
+  chat_poll.live_chat_id:           { type: string, description: "The chat the poll is in" }
+  chat_poll.question:               { type: string, description: "The poll's question" }
+  chat_poll.status:                 { type: string, description: "active, closed or unknown" }
+  chat_poll.options.*.text:         { type: string, description: "An option's text; options are numbered from 0 in order" }
+  chat_poll.options.*.tally:        { type: int, description: "Votes for the option, to the channel owner only" }
   streams.*.title:                  { type: string, description: "Stream title (snippet.title), keyed by stream id" }
   streams.*.stream_status:          { type: string, description: "active (receiving data), inactive, ready, created or error (status.streamStatus)" }
   streams.*.health:                 { type: string, description: "good, ok, bad or noData (status.healthStatus.status)" }
@@ -599,7 +862,7 @@ telemetry:
       - { method: GET, path: /youtube/v3/liveStreams,
           query: { part: "id,snippet,cdn,status", mine: "true", maxResults: "50" } }
       - { method: GET, path: /youtube/v3/videos,
-          query: { part: "liveStreamingDetails,statistics", id: "{settings.broadcast_id}" } }
+          query: { part: "snippet,status,liveStreamingDetails,statistics", id: "{settings.broadcast_id}" } }
   updates:
     - path: '^/youtube/v3/liveBroadcasts\?'
       json_each: "$.items"
@@ -685,3 +948,123 @@ telemetry:
         broadcasts.{id}.view_count: "{views}"
         broadcasts.{id}.like_count: "{likes}"
         broadcasts.{id}.comment_count: "{comments}"
+    # The video's metadata: from the poll and get_video (part snippet and
+    # status), and from an update's reply (the video resource itself).
+    - path: '^/youtube/v3/videos\?'
+      json_each: "$.items"
+      json: &video
+        id: "$.id"
+        description: "$.snippet.description"
+        category: "$.snippet.categoryId"
+        tags: "$.snippet.tags"
+        language: "$.snippet.defaultLanguage"
+        kids: "$.status.madeForKids"
+        self_kids: "$.status.selfDeclaredMadeForKids"
+        embeddable: "$.status.embeddable"
+        stats: "$.status.publicStatsViewable"
+        license: "$.status.license"
+        synthetic: "$.status.containsSyntheticMedia"
+      state: &video_state
+        broadcasts.{id}.description: "{description}"
+        broadcasts.{id}.category_id: "{category}"
+        broadcasts.{id}.tags: "{tags}"
+        broadcasts.{id}.default_language: "{language}"
+        broadcasts.{id}.made_for_kids: "{kids}"
+        broadcasts.{id}.self_declared_made_for_kids: "{self_kids}"
+        broadcasts.{id}.embeddable: "{embeddable}"
+        broadcasts.{id}.public_stats_viewable: "{stats}"
+        broadcasts.{id}.license: "{license}"
+        broadcasts.{id}.contains_synthetic_media: "{synthetic}"
+    - path: '^/youtube/v3/videos\?'
+      json_match: { "$.kind": "^youtube#video$" }
+      json: *video
+      state: *video_state
+
+    # Chat moderators: a list of 50 or fewer is the whole list.
+    - path: '^/youtube/v3/liveChat/moderators\?'
+      json_each: "$.items"
+      json: { id: "$.id", chat: "$.snippet.liveChatId", channel: "$.snippet.moderatorDetails.channelId",
+              name: "$.snippet.moderatorDetails.displayName" }
+      state:
+        chat_moderators.{id}.live_chat_id: "{chat}"
+        chat_moderators.{id}.channel_id: "{channel}"
+        chat_moderators.{id}.display_name: "{name}"
+    - path: '^/youtube/v3/liveChat/moderators\?liveChatId=[^&]+&part=[^&]*&maxResults=50$'
+      json_match: { "$.pageInfo.totalResults": '^(?:[0-9]|[1-4][0-9]|50)$', "$.items": '^\[' }
+      json: {}
+      replace: chat_moderators
+    - path: '^/youtube/v3/liveChat/moderators\?part=snippet$'
+      json_match: { "$.kind": "^youtube#liveChatModerator$" }
+      json: { id: "$.id", chat: "$.snippet.liveChatId", channel: "$.snippet.moderatorDetails.channelId",
+              name: "$.snippet.moderatorDetails.displayName" }
+      state:
+        chat_moderators.{id}.live_chat_id: "{chat}"
+        chat_moderators.{id}.channel_id: "{channel}"
+        chat_moderators.{id}.display_name: "{name}"
+    - path: '^/youtube/v3/liveChat/moderators\?id=([A-Za-z0-9_-]+)$'
+      json: {}
+      state: { "chat_moderators.{1}": { delete: true } }
+
+    # Super Chats: each list replaces the recent ones.
+    - path: '^/youtube/v3/superChatEvents\?'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        name: "$.snippet.supporterDetails.displayName"
+        channel: "$.snippet.supporterDetails.channelId"
+        comment: "$.snippet.commentText"
+        micros: "$.snippet.amountMicros"
+        currency: "$.snippet.currency"
+        display: "$.snippet.displayString"
+        tier: "$.snippet.messageType"
+        sticker: "$.snippet.isSuperStickerEvent"
+        at: "$.snippet.createdAt"
+      replace: super_chats
+      state:
+        super_chats.{id}.supporter_name: "{name}"
+        super_chats.{id}.supporter_channel_id: "{channel}"
+        super_chats.{id}.comment: "{comment}"
+        super_chats.{id}.amount_micros: "{micros}"
+        super_chats.{id}.currency: "{currency}"
+        super_chats.{id}.display_string: "{display}"
+        super_chats.{id}.tier: "{tier}"
+        super_chats.{id}.sticker: "{sticker}"
+        super_chats.{id}.created_at: "{at}"
+
+    # A live chat poll: the insert's or transition's reply (the message), or
+    # a chat list that holds it.
+    - path: '^/youtube/v3/liveChat/messages(/transition)?\?'
+      json_match: { "$.kind": "^youtube#liveChatMessage$", "$.snippet.type": "^pollEvent$" }
+      json: { id: "$.id", chat: "$.snippet.liveChatId", question: "$.snippet.pollDetails.metadata.questionText",
+              status: "$.snippet.pollDetails.metadata.status" }
+      replace: chat_poll
+      state:
+        chat_poll.message_id: "{id}"
+        chat_poll.live_chat_id: "{chat}"
+        chat_poll.question: "{question}"
+        chat_poll.status: "{status}"
+    - path: '^/youtube/v3/liveChat/messages(/transition)?\?'
+      json_match: { "$.kind": "^youtube#liveChatMessage$", "$.snippet.type": "^pollEvent$" }
+      json_each: "$.snippet.pollDetails.metadata.options"
+      json: { text: "$.optionText", tally: "$.tally" }
+      state:
+        chat_poll.options.{index}.text: "{text}"
+        chat_poll.options.{index}.tally: "{tally}"
+    - path: '^/youtube/v3/liveChat/messages\?'
+      json_each: "$.items"
+      each_match: { "$.snippet.type": "^pollEvent$" }
+      json: { id: "$.id", chat: "$.snippet.liveChatId", question: "$.snippet.pollDetails.metadata.questionText",
+              status: "$.snippet.pollDetails.metadata.status" }
+      replace: chat_poll
+      state:
+        chat_poll.message_id: "{id}"
+        chat_poll.live_chat_id: "{chat}"
+        chat_poll.question: "{question}"
+        chat_poll.status: "{status}"
+    - path: '^/youtube/v3/liveChat/messages\?'
+      json_each: "$.items[*].snippet.pollDetails.metadata.options"
+      each_match: { "$^.snippet.type": "^pollEvent$" }
+      json: { text: "$.optionText", tally: "$.tally" }
+      state:
+        chat_poll.options.{index}.text: "{text}"
+        chat_poll.options.{index}.tally: "{tally}"

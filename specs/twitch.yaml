@@ -51,7 +51,41 @@ source:
       Get Channel Followers (GET /channels/followers; total is returned with
       any valid token). Create Clip (POST /clips, clips:edit, 202). Every
       endpoint's 401 includes a Client-Id that does not match the token's
-      client.
+      client. Retrieved again 2026-10-14 for: Create Poll, End Poll and Get
+      Polls (/polls; title 60, 2 to 5 choices of 25, duration 15 to 1800,
+      channel_points_per_vote 1 to 1000000; newest first); Create
+      Prediction, End Prediction (LOCKED, RESOLVED with winning_outcome_id,
+      CANCELED) and Get Predictions (title 45, 2 to 10 outcomes,
+      prediction_window 30 to 1800); Ban User and Unban User
+      (/moderation/bans, data.user_id, duration 1 to 1209600, reason 500),
+      Get Banned Users, Warn Chat User, Delete Chat Messages (message_id
+      optional: all messages), Get and Update Shield Mode Status (PUT,
+      is_active), Get, Add and Remove Channel Moderator and VIP (204; 10
+      per 10 s), Get, Add and Remove Blocked Terms, Send a Shoutout (204;
+      once per 2 minutes, once per hour per channel); Create, Get, Update
+      and Delete Custom Reward and Get and Update Redemption Status (only
+      the creating client id may change a reward or its redemptions); Get
+      Channel Stream Schedule (any token; 404 with no schedule; vacation
+      null when off), Update Channel Stream Schedule (vacation fields as
+      query parameters, 204), Create, Update and Delete Channel Stream
+      Schedule Segment (duration a string, 30 to 1380); Get Clips, Get
+      Videos and Delete Videos. A missing scope is listed under 401 for
+      every one of them.
+  - title: Twitch EventSub subscription types
+    author: Twitch
+    url: https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types
+    note: >
+      Manufacturer document, retrieved 2026-10-14. channel.poll.begin,
+      progress and end (v1, channel:read:polls; end status completed,
+      terminated or archived), channel.prediction.begin, progress, lock and
+      end (v1, channel:read:predictions; outcome colors blue and pink, end
+      status resolved or canceled), channel.shield_mode.begin and end (v1,
+      condition with moderator_user_id, moderator:read:shield_mode),
+      channel.channel_points_custom_reward_redemption.add and update (v1,
+      channel:read:redemptions), channel.moderator.add and remove (v1,
+      moderation:read) and channel.vip.add and remove (v1,
+      channel:read:vips). Create EventSub Subscription answers a missing
+      scope with 403.
   - title: Twitch API guide (Twitch API rate limits)
     author: Twitch
     url: https://dev.twitch.tv/docs/api/guide
@@ -166,7 +200,17 @@ models:
                get_stream_markers, create_clip, start_commercial, get_ad_schedule, snooze_next_ad,
                start_raid, cancel_raid, get_chat_settings, update_chat_settings, slow_mode_on,
                slow_mode_off, follower_mode_on, follower_mode_off, subscriber_mode, emote_mode,
-               unique_chat_mode, chat_delay_on, chat_delay_off, send_announcement, send_chat_message]
+               unique_chat_mode, chat_delay_on, chat_delay_off, send_announcement, send_chat_message,
+               create_poll, create_poll_with_channel_points, end_poll, get_polls,
+               create_prediction, lock_prediction, resolve_prediction, cancel_prediction, get_predictions,
+               ban_user, timeout_user, unban_user, get_banned_users, warn_user, delete_chat_message, clear_chat,
+               get_shield_mode, set_shield_mode, get_moderators, add_moderator, remove_moderator,
+               get_vips, add_vip, remove_vip, get_blocked_terms, add_blocked_term, remove_blocked_term,
+               send_shoutout, get_custom_rewards, create_custom_reward, update_custom_reward,
+               set_reward_enabled, set_reward_paused, delete_custom_reward, get_redemptions,
+               update_redemption_status, get_schedule, create_schedule_segment, update_schedule_segment,
+               cancel_schedule_segment, delete_schedule_segment, set_vacation, end_vacation,
+               get_clips, get_clips_between, get_clip, get_videos, get_video, delete_video]
     verification: none
     notes: >
       Acts for the channel named by broadcaster_id, as the signed-in user,
@@ -529,6 +573,597 @@ commands:
     expect: { status: 200, json_path: "$.data" }
     returns: value
 
+  # ── Polls ────────────────────────────────────────────────────────────────
+  create_poll:
+    summary: Start a poll viewers vote on, one vote each; it runs at once and only one runs at a time (Create Poll; channel:manage:polls)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 60, required: true,
+               label: Question,
+               description: "The question viewers vote on, up to 60 characters." }
+      choices: { type: json, required: true,
+                 label: Choices,
+                 description: "A JSON array of 2 to 5 objects as Twitch documents them, each {\"title\": \"...\"} of up to 25 characters." }
+      duration: { type: int, min: 15, max: 1800, default: 60,
+                  label: Duration,
+                  description: "Seconds the poll runs, 15 to 1800 (30 minutes)." }
+    send: { method: POST, path: /helix/polls, content_type: application/json,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"title":{title:json},"choices":{choices},"duration":{duration}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  create_poll_with_channel_points:
+    summary: Start a poll in which viewers may buy extra votes with Channel Points (Create Poll with channel_points_voting_enabled; channel:manage:polls)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 60, required: true,
+               label: Question,
+               description: "The question viewers vote on, up to 60 characters." }
+      choices: { type: json, required: true,
+                 label: Choices,
+                 description: "A JSON array of 2 to 5 objects as Twitch documents them, each {\"title\": \"...\"} of up to 25 characters." }
+      duration: { type: int, min: 15, max: 1800, default: 60,
+                  label: Duration,
+                  description: "Seconds the poll runs, 15 to 1800 (30 minutes)." }
+      points_per_vote: { type: int, min: 1, max: 1000000, default: 100,
+                         label: Points per extra vote,
+                         description: "Channel Points a viewer spends for each vote beyond the first, 1 to 1,000,000." }
+    send: { method: POST, path: /helix/polls, content_type: application/json,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"title":{title:json},"choices":{choices},"duration":{duration},"channel_points_voting_enabled":true,"channel_points_per_vote":{points_per_vote}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  end_poll:
+    summary: End the running poll now, leaving its result on show or archiving it (End Poll; channel:manage:polls)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Poll ID,
+            description: "The running poll's id, poll.id in state." }
+      status: { type: enum, values: [TERMINATED, ARCHIVED], default: TERMINATED,
+                label: End as,
+                description: "TERMINATED keeps the result visible to viewers; ARCHIVED hides it from the channel." }
+    send: { method: PATCH, path: /helix/polls, content_type: application/json,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"id":{id:json},"status":{status:json}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_polls:
+    summary: The channel's polls of the last 90 days, newest first; the newest is kept in state (Get Polls; channel:read:polls)
+    params:
+      first: { type: int, min: 1, max: 20, default: 1,
+               label: Results,
+               description: "How many polls to return, newest first, 1 to 20." }
+    send: { method: GET, path: /helix/polls, query: { broadcaster_id: "{settings.broadcaster_id}", first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  # ── Predictions ──────────────────────────────────────────────────────────
+  create_prediction:
+    summary: Start a Channel Points prediction; it runs at once and only one runs at a time (Create Prediction; channel:manage:predictions)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 45, required: true,
+               label: Question,
+               description: "The question viewers predict the answer to, up to 45 characters." }
+      outcomes: { type: json, required: true,
+                  label: Outcomes,
+                  description: "A JSON array of 2 to 10 objects as Twitch documents them, each {\"title\": \"...\"} of up to 25 characters." }
+      prediction_window: { type: int, min: 30, max: 1800, default: 120,
+                           label: Window,
+                           description: "Seconds viewers may predict before it locks, 30 to 1800." }
+    send: { method: POST, path: /helix/predictions, content_type: application/json,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"title":{title:json},"outcomes":{outcomes},"prediction_window":{prediction_window}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  lock_prediction:
+    summary: Stop viewers predicting before the window ends (End Prediction, status LOCKED; channel:manage:predictions)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Prediction ID,
+            description: "The running prediction's id, prediction.id in state." }
+    send: { method: PATCH, path: /helix/predictions, content_type: application/json,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"id":{id:json},"status":"LOCKED"}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  resolve_prediction:
+    summary: Name the winning outcome and pay out the Channel Points (End Prediction, status RESOLVED; channel:manage:predictions)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Prediction ID,
+            description: "The active or locked prediction's id, prediction.id in state." }
+      winning_outcome_id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+                            label: Winning outcome ID,
+                            description: "The id of the outcome that happened, from prediction.outcomes in state." }
+    send: { method: PATCH, path: /helix/predictions, content_type: application/json,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"id":{id:json},"status":"RESOLVED","winning_outcome_id":{winning_outcome_id:json}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  cancel_prediction:
+    summary: Cancel the prediction and refund every viewer's Channel Points (End Prediction, status CANCELED; channel:manage:predictions)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Prediction ID,
+            description: "The active or locked prediction's id, prediction.id in state." }
+    send: { method: PATCH, path: /helix/predictions, content_type: application/json,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"id":{id:json},"status":"CANCELED"}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_predictions:
+    summary: The channel's predictions, newest first; the newest is kept in state (Get Predictions; channel:read:predictions)
+    params:
+      first: { type: int, min: 1, max: 25, default: 1,
+               label: Results,
+               description: "How many predictions to return, newest first, 1 to 25." }
+    send: { method: GET, path: /helix/predictions, query: { broadcaster_id: "{settings.broadcaster_id}", first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  # ── Moderation ───────────────────────────────────────────────────────────
+  ban_user:
+    summary: Ban a user from the channel's chat until unbanned (Ban User without duration; moderator:manage:banned_users)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the chatter to ban, from get_users_by_login." }
+      reason: { type: string, max_length: 500, default: "",
+                label: Reason,
+                description: "Why the user is banned, up to 500 characters; shown to moderators." }
+    send: { method: POST, path: /helix/moderation/bans, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"data":{"user_id":{user_id:json},"reason":{reason:json}}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  timeout_user:
+    summary: Keep a user out of chat for a while, or change the length of their timeout (Ban User with duration; moderator:manage:banned_users)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the chatter to time out." }
+      duration: { type: int, min: 1, max: 1209600, default: 600,
+                  label: Duration,
+                  description: "Seconds the timeout lasts, 1 to 1,209,600 (two weeks); 1 ends a timeout early." }
+      reason: { type: string, max_length: 500, default: "",
+                label: Reason,
+                description: "Why the user is timed out, up to 500 characters." }
+    send: { method: POST, path: /helix/moderation/bans, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"data":{"user_id":{user_id:json},"duration":{duration},"reason":{reason:json}}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  unban_user:
+    summary: Lift a user's ban or timeout (Unban User; moderator:manage:banned_users)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the banned or timed-out chatter." }
+    send: { method: DELETE, path: /helix/moderation/bans,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", user_id: "{user_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  get_banned_users:
+    summary: The users banned or timed out in the channel, up to 100, kept in state (Get Banned Users; moderation:read or moderator:manage:banned_users)
+    send: { method: GET, path: /helix/moderation/banned, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  warn_user:
+    summary: Warn a chatter, who can't chat until they acknowledge it (Warn Chat User; moderator:manage:warnings)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the chatter to warn." }
+      reason: { type: string, pattern: "\\S", max_length: 500, required: true,
+                label: Reason,
+                description: "The warning the chatter sees, up to 500 characters." }
+    send: { method: POST, path: /helix/moderation/warnings, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"data":{"user_id":{user_id:json},"reason":{reason:json}}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  delete_chat_message:
+    summary: Remove one chat message, less than 6 hours old and not the broadcaster's or a moderator's (Delete Chat Messages with message_id; moderator:manage:chat_messages)
+    params:
+      message_id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+                    label: Message ID,
+                    description: "The chat message's id, as the chat message event or IRC id tag gives it." }
+    send: { method: DELETE, path: /helix/moderation/chat,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", message_id: "{message_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  clear_chat:
+    summary: Remove every message in the channel's chat (Delete Chat Messages without message_id; moderator:manage:chat_messages)
+    send: { method: DELETE, path: /helix/moderation/chat,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  get_shield_mode:
+    summary: Whether Shield Mode is on, and when it was last turned on (Get Shield Mode Status; moderator:read:shield_mode)
+    send: { method: GET, path: /helix/moderation/shield_mode,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  set_shield_mode:
+    summary: Turn Shield Mode on, applying the channel's configured protections against chat abuse, or off (Update Shield Mode Status; moderator:manage:shield_mode)
+    params:
+      active: { type: bool, required: true,
+                label: Shield Mode,
+                description: "On applies the Shield Mode settings configured on Twitch; off returns chat to normal." }
+    send: { method: PUT, path: /helix/moderation/shield_mode, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"is_active":{active}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_moderators:
+    summary: The channel's moderators, up to 100, kept in state (Get Moderators; moderation:read or channel:manage:moderators)
+    send: { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  add_moderator:
+    summary: Make a user a moderator of the channel (Add Channel Moderator; channel:manage:moderators)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the user to make a moderator." }
+    send: { method: POST, path: /helix/moderation/moderators,
+            query: { broadcaster_id: "{settings.broadcaster_id}", user_id: "{user_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  remove_moderator:
+    summary: Take a user's moderator role away (Remove Channel Moderator; channel:manage:moderators)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the moderator to remove." }
+    send: { method: DELETE, path: /helix/moderation/moderators,
+            query: { broadcaster_id: "{settings.broadcaster_id}", user_id: "{user_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  get_vips:
+    summary: The channel's VIPs, up to 100, kept in state (Get VIPs; channel:read:vips or channel:manage:vips)
+    send: { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  add_vip:
+    summary: Make a user a VIP of the channel (Add Channel VIP; channel:manage:vips)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the user to make a VIP." }
+    send: { method: POST, path: /helix/channels/vips,
+            query: { broadcaster_id: "{settings.broadcaster_id}", user_id: "{user_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  remove_vip:
+    summary: Take a user's VIP status away (Remove Channel VIP; channel:manage:vips)
+    params:
+      user_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: User ID,
+                 description: "The numeric user ID of the VIP to remove." }
+    send: { method: DELETE, path: /helix/channels/vips,
+            query: { broadcaster_id: "{settings.broadcaster_id}", user_id: "{user_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  get_blocked_terms:
+    summary: The words and phrases blocked in chat, up to 100, kept in state (Get Blocked Terms; moderator:read:blocked_terms)
+    send: { method: GET, path: /helix/moderation/blocked_terms,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", first: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  add_blocked_term:
+    summary: Block a word or phrase in chat (Add Blocked Term; moderator:manage:blocked_terms)
+    params:
+      text: { type: string, pattern: "\\S", max_length: 500, required: true,
+              label: Term,
+              description: "The word or phrase to block, 2 to 500 characters; a * at the start or end of a word is a wildcard." }
+    send: { method: POST, path: /helix/moderation/blocked_terms, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"text":{text:json}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  remove_blocked_term:
+    summary: Allow a blocked word or phrase again (Remove Blocked Term; moderator:manage:blocked_terms)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Term ID,
+            description: "The blocked term's id, from moderation.blocked_terms in state." }
+    send: { method: DELETE, path: /helix/moderation/blocked_terms,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", id: "{id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  send_shoutout:
+    summary: Give another channel a Shoutout in chat, while live with viewers; once every 2 minutes, and once an hour per channel (Send a Shoutout; moderator:manage:shoutouts)
+    params:
+      to_broadcaster_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                           label: Channel ID,
+                           description: "The numeric user ID of the channel to give the Shoutout to." }
+    send: { method: POST, path: /helix/chat/shoutouts,
+            query: { from_broadcaster_id: "{settings.broadcaster_id}", to_broadcaster_id: "{to_broadcaster_id}",
+                     moderator_id: "{settings.broadcaster_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Channel Points ───────────────────────────────────────────────────────
+  get_custom_rewards:
+    summary: The channel's custom Channel Points rewards, kept in state (Get Custom Reward; channel:read:redemptions)
+    params:
+      only_manageable: { type: bool, default: false,
+                         label: Only this application's,
+                         description: "On to list only the rewards this application created, the only ones it may change." }
+    send: { method: GET, path: /helix/channel_points/custom_rewards,
+            query: { broadcaster_id: "{settings.broadcaster_id}", only_manageable_rewards: "{only_manageable}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  create_custom_reward:
+    summary: Create a custom Channel Points reward, Partners and Affiliates only, at most 50 a channel, with a Create Custom Rewards body (title, cost, prompt, is_enabled, background_color, is_user_input_required, the per-stream, per-user and cooldown limits, should_redemptions_skip_request_queue; channel:manage:redemptions)
+    params:
+      reward: { type: json, required: true,
+                label: Reward,
+                description: "A JSON object with at least title (up to 45 characters, unique) and cost (Channel Points, at least 1), and any other field Twitch documents." }
+    send: { method: POST, path: /helix/channel_points/custom_rewards, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}" }, body: '{reward}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  update_custom_reward:
+    summary: Change a reward this application created with an Update Custom Reward body (the create fields and is_paused; channel:manage:redemptions)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Reward ID,
+            description: "The reward's id, from channel_points.rewards in state." }
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object of only the fields to change, as Twitch documents them." }
+    send: { method: PATCH, path: /helix/channel_points/custom_rewards, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", id: "{id}" }, body: '{changes}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  set_reward_enabled:
+    summary: Show a reward to viewers or hide it (Update Custom Reward is_enabled; channel:manage:redemptions)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Reward ID,
+            description: "The reward's id, from channel_points.rewards in state." }
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "On shows the reward to viewers; off hides it." }
+    send: { method: PATCH, path: /helix/channel_points/custom_rewards, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", id: "{id}" }, body: '{"is_enabled":{enabled}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  set_reward_paused:
+    summary: Pause a reward so viewers see it but can't redeem it, or resume it (Update Custom Reward is_paused; channel:manage:redemptions)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Reward ID,
+            description: "The reward's id, from channel_points.rewards in state." }
+      paused: { type: bool, required: true,
+                label: Paused,
+                description: "On stops redemptions while the reward stays visible; off allows them again." }
+    send: { method: PATCH, path: /helix/channel_points/custom_rewards, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", id: "{id}" }, body: '{"is_paused":{paused}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  delete_custom_reward:
+    summary: Delete a reward this application created; its unfulfilled redemptions are marked fulfilled (Delete Custom Reward; channel:manage:redemptions)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Reward ID,
+            description: "The reward's id, from channel_points.rewards in state." }
+    send: { method: DELETE, path: /helix/channel_points/custom_rewards,
+            query: { broadcaster_id: "{settings.broadcaster_id}", id: "{id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  get_redemptions:
+    summary: Redemptions of a reward this application created, oldest first; unfulfilled ones are kept in state (Get Custom Reward Redemption; channel:read:redemptions)
+    params:
+      reward_id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+                   label: Reward ID,
+                   description: "The reward whose redemptions to list." }
+      status: { type: enum, values: [UNFULFILLED, FULFILLED, CANCELED], default: UNFULFILLED,
+                label: Status,
+                description: "Which redemptions to list: those waiting in the queue, or those fulfilled or canceled in the last few days." }
+      first: { type: int, min: 1, max: 50, default: 50,
+               label: Results,
+               description: "How many redemptions to return, 1 to 50." }
+    send: { method: GET, path: /helix/channel_points/custom_rewards/redemptions,
+            query: { broadcaster_id: "{settings.broadcaster_id}", reward_id: "{reward_id}", status: "{status}", first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  update_redemption_status:
+    summary: Mark a waiting redemption fulfilled, or cancel it and refund the viewer's points (Update Redemption Status; channel:manage:redemptions)
+    params:
+      reward_id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+                   label: Reward ID,
+                   description: "The reward that was redeemed." }
+      id: { type: string, pattern: "^[A-Za-z0-9-]+$", max_length: 64, required: true,
+            label: Redemption ID,
+            description: "The redemption's id, from channel_points.redemptions in state." }
+      status: { type: enum, values: [FULFILLED, CANCELED], required: true,
+                label: Status,
+                description: "FULFILLED completes the redemption; CANCELED refunds the viewer's Channel Points." }
+    send: { method: PATCH, path: /helix/channel_points/custom_rewards/redemptions, content_type: application/json,
+            query: { id: "{id}", broadcaster_id: "{settings.broadcaster_id}", reward_id: "{reward_id}" },
+            body: '{"status":{status:json}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  # ── Schedule ─────────────────────────────────────────────────────────────
+  get_schedule:
+    summary: The next 25 broadcasts of the channel's stream schedule and its vacation, kept in state (Get Channel Stream Schedule)
+    send: { method: GET, path: /helix/schedule, query: { broadcaster_id: "{settings.broadcaster_id}", first: "25" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  create_schedule_segment:
+    summary: Add a one-off or weekly broadcast to the schedule with a Create Channel Stream Schedule Segment body (start_time, timezone, duration, is_recurring, category_id, title; channel:manage:schedule)
+    params:
+      segment: { type: json, required: true,
+                 label: Broadcast,
+                 description: "A JSON object with start_time (RFC 3339), timezone (IANA, such as Europe/London) and duration (minutes as a string, 30 to 1380), and optionally is_recurring, category_id and title." }
+    send: { method: POST, path: /helix/schedule/segment, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}" }, body: '{segment}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  update_schedule_segment:
+    summary: Change a scheduled broadcast with an Update Channel Stream Schedule Segment body (start_time, duration, category_id, title, is_canceled, timezone); for a weekly one, every week changes (channel:manage:schedule)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9+/=_-]+$", max_length: 512, required: true,
+            label: Broadcast ID,
+            description: "The scheduled broadcast's id, from schedule.segments in state." }
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object of only the fields to change, as Twitch documents them." }
+    send: { method: PATCH, path: /helix/schedule/segment, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", id: "{id}" }, body: '{changes}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  cancel_schedule_segment:
+    summary: Cancel a scheduled broadcast, or restore it; for a weekly one Twitch cancels the next occurrence (Update Channel Stream Schedule Segment is_canceled; channel:manage:schedule)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9+/=_-]+$", max_length: 512, required: true,
+            label: Broadcast ID,
+            description: "The scheduled broadcast's id, from schedule.segments in state." }
+      canceled: { type: bool, default: true,
+                  label: Canceled,
+                  description: "On cancels the broadcast; off restores it." }
+    send: { method: PATCH, path: /helix/schedule/segment, content_type: application/json,
+            query: { broadcaster_id: "{settings.broadcaster_id}", id: "{id}" }, body: '{"is_canceled":{canceled}}' }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  delete_schedule_segment:
+    summary: Remove a broadcast from the schedule; for a weekly one, every week is removed (Delete Channel Stream Schedule Segment; channel:manage:schedule)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9+/=_-]+$", max_length: 512, required: true,
+            label: Broadcast ID,
+            description: "The scheduled broadcast's id, from schedule.segments in state." }
+    send: { method: DELETE, path: /helix/schedule/segment, query: { broadcaster_id: "{settings.broadcaster_id}", id: "{id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  set_vacation:
+    summary: Schedule a vacation, during which the schedule shows no broadcasts (Update Channel Stream Schedule; channel:manage:schedule)
+    params:
+      start_time: { type: string, pattern: "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(\\.\\d+)?Z$", required: true,
+                    label: Starts,
+                    description: "When the vacation starts, RFC 3339 UTC, such as 2026-12-20T00:00:00Z." }
+      end_time: { type: string, pattern: "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(\\.\\d+)?Z$", required: true,
+                  label: Ends,
+                  description: "When the vacation ends, RFC 3339 UTC, later than the start." }
+      timezone: { type: string, pattern: "^[A-Za-z_]+(/[A-Za-z0-9_+-]+)*$", max_length: 64, required: true,
+                  label: Time zone,
+                  description: "The IANA time zone the channel broadcasts from, such as America/New_York." }
+    send: { method: PATCH, path: /helix/schedule/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", is_vacation_enabled: "true",
+                     vacation_start_time: "{start_time}", vacation_end_time: "{end_time}", timezone: "{timezone}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  end_vacation:
+    summary: Cancel the scheduled vacation (Update Channel Stream Schedule is_vacation_enabled false; channel:manage:schedule)
+    send: { method: PATCH, path: /helix/schedule/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", is_vacation_enabled: "false" } }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Clips and videos ─────────────────────────────────────────────────────
+  get_clips:
+    summary: The channel's clips, most viewed first (Get Clips by broadcaster_id)
+    params:
+      first: { type: int, min: 1, max: 100, default: 20,
+               label: Results,
+               description: "How many clips to return, 1 to 100." }
+    send: { method: GET, path: /helix/clips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_clips_between:
+    summary: The channel's clips made between two times, most viewed first (Get Clips with started_at and ended_at)
+    params:
+      started_at: { type: string, pattern: "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(\\.\\d+)?Z$", required: true,
+                    label: From,
+                    description: "The earliest clip time, RFC 3339 UTC." }
+      ended_at: { type: string, pattern: "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(\\.\\d+)?Z$", required: true,
+                  label: To,
+                  description: "The latest clip time, RFC 3339 UTC." }
+      first: { type: int, min: 1, max: 100, default: 20,
+               label: Results,
+               description: "How many clips to return, 1 to 100." }
+    send: { method: GET, path: /helix/clips,
+            query: { broadcaster_id: "{settings.broadcaster_id}", started_at: "{started_at}", ended_at: "{ended_at}", first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_clip:
+    summary: One clip by its id, such as the one create_clip made, with its URL once Twitch has made it (Get Clips by id)
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 128, required: true,
+            label: Clip ID,
+            description: "The clip's id, as create_clip returns it." }
+    send: { method: GET, path: /helix/clips, query: { id: "{id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_videos:
+    summary: The channel's videos (past broadcasts, highlights, uploads), newest first (Get Videos by user_id)
+    params:
+      type: { type: enum, values: [all, archive, highlight, upload], default: all,
+              label: Type,
+              description: "Which videos: all, archive (past broadcasts, the VODs), highlight or upload." }
+      first: { type: int, min: 1, max: 100, default: 20,
+               label: Results,
+               description: "How many videos to return, 1 to 100." }
+    send: { method: GET, path: /helix/videos,
+            query: { user_id: "{settings.broadcaster_id}", type: "{type}", sort: time, first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_video:
+    summary: One video by its id (Get Videos by id)
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+            label: Video ID,
+            description: "The video's numeric id, from get_videos." }
+    send: { method: GET, path: /helix/videos, query: { id: "{id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  delete_video:
+    summary: Delete one of the channel's videos for good (Delete Videos; channel:manage:videos)
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+            label: Video ID,
+            description: "The video's numeric id, from get_videos." }
+    send: { method: DELETE, path: /helix/videos, query: { id: "{id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
 quirks:
   - models: [all]
     severity: info
@@ -621,7 +1256,9 @@ quirks:
       websocket open (wss://eventsub.wss.twitch.tv/ws, keepalives every 30
       seconds, reopened after 45 silent ones), and on each welcome subscribes
       that session to stream.online, stream.offline, channel.update and
-      channel.follow for the broadcaster, within the 10 seconds Twitch allows.
+      channel.follow for the broadcaster, and to the poll, prediction,
+      Shield Mode, redemption, moderator and VIP events, within the 10
+      seconds Twitch allows (19 requests).
       Going live or offline and title, category and language changes then
       show at once; a new follower has the follower count read again. Twitch
       drops a session's subscriptions when its websocket closes; a reopened
@@ -665,6 +1302,108 @@ quirks:
       in state only when Twitch returns it. Update Chat Settings answers
       with the new settings, which update state at once.
 
+  - models: [all]
+    severity: critical
+    text: >
+      Twitch answers a token that lacks a command's scope with 401, as it
+      answers a revoked token, and the core takes every 401 as a refused
+      token: it refreshes once and, when the new token is refused too,
+      reports unauthorized and sends nothing more until new tokens arrive.
+      A consumer must therefore ask at sign-in for the scope of every
+      command it offers (each command's summary names it), and never offer a
+      command whose scope the user did not grant. The polls, predictions,
+      Shield Mode, rewards, moderators, VIPs, bans and blocked terms are
+      for that reason never polled: they need scopes a consumer may not ask
+      for. EventSub subscriptions are different: one whose scope is missing
+      is answered 403 and only logged.
+
+  - models: [all]
+    severity: info
+    text: >
+      The running or most recent poll and prediction are kept in state
+      (poll.*, prediction.*). They are filled from the replies of
+      create_poll, end_poll, get_polls and the prediction commands, and kept
+      current by EventSub when the token has channel:read:polls and
+      channel:read:predictions (or the manage scopes): a poll's begin,
+      progress and end, a prediction's begin, progress, lock and end. Votes
+      and Channel Points per choice and outcome follow the progress events.
+      Twitch runs one poll and one prediction at a time; a new one replaces
+      the old in state. Without those scopes, a poll or prediction started
+      elsewhere (on Twitch itself) shows only after get_polls or
+      get_predictions. EventSub's poll events give ends_at, which Helix
+      replies do not; Helix replies give duration instead.
+
+  - models: [all]
+    severity: critical
+    text: >
+      resolve_prediction pays out the Channel Points to the viewers who
+      chose the winning outcome, and cancel_prediction refunds everyone;
+      neither can be undone. Twitch cancels a prediction left unresolved 24
+      hours after it locks. clear_chat removes every message in chat for
+      everyone, and delete_video deletes a video (a VOD, highlight or upload)
+      for good. ban_user lasts until unban_user, while a timeout ends by
+      itself; a banned user cannot be timed out instead without an unban.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Custom Channel Points rewards are for Partners and Affiliates. Only
+      the application (client id) that created a reward may change or
+      delete it, or read and update its redemptions: rewards made on Twitch
+      itself, or by another application, are listed by get_custom_rewards
+      but are refused with 403 by every change. A channel has at most 50
+      rewards. channel_points.redemptions holds the redemptions waiting in
+      the queue (unfulfilled): EventSub adds each new one (for every reward,
+      with channel:read:redemptions) and removes it when it is fulfilled or
+      canceled, and update_redemption_status and get_redemptions keep it
+      current for this application's rewards. A reward set to skip the
+      queue is fulfilled at once and never listed.
+
+  - models: [all]
+    severity: info
+    text: >
+      Moderators, VIPs, banned users and blocked terms are kept in state
+      once read (get_moderators, get_vips, get_banned_users,
+      get_blocked_terms), up to the first 100 of each: a longer list shows
+      its first page only. Each change the integration makes reads its list
+      again, and EventSub's moderator and VIP events (moderation:read,
+      channel:read:vips) read those lists again after a change made
+      elsewhere. Bans and blocked terms changed elsewhere show at the next
+      read. Twitch limits adding and removing moderators and VIPs to 10
+      each in 10 seconds.
+
+  - models: [all]
+    severity: info
+    text: >
+      Shield Mode (moderation.shield_mode) is read by get_shield_mode,
+      changed by set_shield_mode, whose reply updates state, and kept
+      current by EventSub's shield mode begin and end events with
+      moderator:read:shield_mode. Which protections Shield Mode applies is
+      configured on Twitch only: the API can only turn it on and off.
+
+  - models: [all]
+    severity: info
+    text: >
+      The stream schedule's next 25 broadcasts and its vacation are polled
+      every 30 seconds with the others (Get Channel Stream Schedule needs no
+      scope) and read again after each change the integration makes. A
+      channel with no schedule answers that poll with 404, which is logged.
+      For a weekly broadcast, changing its title, category, duration or time
+      zone, or deleting it, applies to every week; canceling cancels the
+      next occurrence only. Only Partners and Affiliates may add one-off
+      broadcasts or move one's start time. Twitch's segment ids are opaque
+      base64 text. A vacation is set and cleared as a whole.
+
+  - models: [all]
+    severity: info
+    text: >
+      Clips and videos are read on demand (get_clips, get_clips_between,
+      get_clip, get_videos, get_video) and not kept in state. Get Clips
+      without a time range returns the most viewed clips of all time, and
+      paging over clips stops at about 1,000. A clip made with create_clip
+      takes a few seconds to appear in get_clip. The API cannot edit a
+      video's title or description, or download one.
+
 state:
   user.login:                  { type: string, description: "The signed-in user's login name (Get Users)" }
   user.display_name:           { type: string, description: "The signed-in user's display name (Get Users)" }
@@ -693,6 +1432,79 @@ state:
   chat.unique_chat_mode:       { type: bool, description: "A message repeating one already sent is refused (unique_chat_mode)" }
   chat.non_moderator_chat_delay: { type: bool, description: "Non-moderators' messages are held back (non_moderator_chat_delay; returned to moderators only)" }
   chat.non_moderator_chat_delay_duration: { type: int, unit: s, description: "Seconds non-moderators' messages are held (non_moderator_chat_delay_duration)" }
+  poll.id:                     { type: string, description: "The running or most recent poll's id" }
+  poll.title:                  { type: string, description: "The poll's question" }
+  poll.status:                 { type: string, description: "ACTIVE, COMPLETED, TERMINATED, ARCHIVED, MODERATED or INVALID" }
+  poll.duration:               { type: int, unit: s, description: "How long the poll runs (Helix replies only)" }
+  poll.started_at:             { type: string, description: "When the poll began, RFC 3339 UTC" }
+  poll.ends_at:                { type: string, description: "When the poll is due to end, RFC 3339 UTC (EventSub only)" }
+  poll.ended_at:               { type: string, description: "When the poll ended, RFC 3339 UTC; absent while it runs" }
+  poll.channel_points_voting:  { type: bool, description: "Viewers may buy extra votes with Channel Points" }
+  poll.channel_points_per_vote: { type: int, description: "Channel Points per extra vote" }
+  poll.choices.*.id:           { type: string, description: "The choice's id; choices are numbered from 0 in the poll's order" }
+  poll.choices.*.title:        { type: string, description: "The choice's text" }
+  poll.choices.*.votes:        { type: int, description: "Votes for the choice, Channel Points votes included" }
+  poll.choices.*.channel_points_votes: { type: int, description: "Votes for the choice bought with Channel Points" }
+  prediction.id:               { type: string, description: "The running or most recent prediction's id" }
+  prediction.title:            { type: string, description: "The prediction's question" }
+  prediction.status:           { type: string, description: "ACTIVE, LOCKED, RESOLVED or CANCELED" }
+  prediction.winning_outcome_id: { type: string, description: "The winning outcome's id once RESOLVED" }
+  prediction.prediction_window: { type: int, unit: s, description: "Seconds viewers may predict (Helix replies only)" }
+  prediction.created_at:       { type: string, description: "When the prediction began, RFC 3339 UTC" }
+  prediction.locks_at:         { type: string, description: "When predicting is due to close, RFC 3339 UTC (EventSub only)" }
+  prediction.locked_at:        { type: string, description: "When predicting closed, RFC 3339 UTC" }
+  prediction.ended_at:         { type: string, description: "When the prediction was resolved or canceled, RFC 3339 UTC" }
+  prediction.outcomes.*.id:    { type: string, description: "The outcome's id; outcomes are numbered from 0 in the prediction's order" }
+  prediction.outcomes.*.title: { type: string, description: "The outcome's text" }
+  prediction.outcomes.*.color: { type: string, description: "BLUE or PINK, as Twitch shows the outcome" }
+  prediction.outcomes.*.users: { type: int, description: "Viewers who chose the outcome" }
+  prediction.outcomes.*.channel_points: { type: int, description: "Channel Points spent on the outcome" }
+  moderation.shield_mode:      { type: bool, description: "Shield Mode is on (is_active)" }
+  moderation.shield_mode_last_activated_at: { type: string, description: "When Shield Mode was last turned on, RFC 3339 UTC" }
+  moderation.moderators.*.login: { type: string, description: "A moderator's login name, keyed by user id" }
+  moderation.moderators.*.name: { type: string, description: "A moderator's display name" }
+  moderation.vips.*.login:     { type: string, description: "A VIP's login name, keyed by user id" }
+  moderation.vips.*.name:      { type: string, description: "A VIP's display name" }
+  moderation.banned.*.login:   { type: string, description: "A banned or timed-out user's login name, keyed by user id" }
+  moderation.banned.*.name:    { type: string, description: "The user's display name" }
+  moderation.banned.*.expires_at: { type: string, description: "When a timeout ends, RFC 3339 UTC; empty for a ban" }
+  moderation.banned.*.reason:  { type: string, description: "The reason given" }
+  moderation.banned.*.moderator_name: { type: string, description: "The moderator who banned the user" }
+  moderation.blocked_terms.*.text: { type: string, description: "A blocked word or phrase, keyed by its id" }
+  moderation.blocked_terms.*.expires_at: { type: string, description: "When the block lapses, RFC 3339 UTC; empty for never" }
+  channel_points.rewards.*.title: { type: string, description: "A custom reward's title, keyed by reward id" }
+  channel_points.rewards.*.cost: { type: int, description: "The reward's cost in Channel Points" }
+  channel_points.rewards.*.prompt: { type: string, description: "The prompt shown when redeeming" }
+  channel_points.rewards.*.enabled: { type: bool, description: "Viewers see the reward (is_enabled)" }
+  channel_points.rewards.*.paused: { type: bool, description: "Redemptions are paused (is_paused)" }
+  channel_points.rewards.*.in_stock: { type: bool, description: "The reward can be redeemed now: not over a limit nor cooling down (is_in_stock)" }
+  channel_points.rewards.*.background_color: { type: string, description: "The reward's colour, #RRGGBB" }
+  channel_points.rewards.*.user_input_required: { type: bool, description: "The viewer must type text to redeem" }
+  channel_points.rewards.*.skip_queue: { type: bool, description: "Redemptions are fulfilled at once (should_redemptions_skip_request_queue)" }
+  channel_points.rewards.*.max_per_stream_enabled: { type: bool, description: "Redemptions per stream are limited" }
+  channel_points.rewards.*.max_per_stream: { type: int, description: "Redemptions allowed per stream" }
+  channel_points.rewards.*.max_per_user_per_stream_enabled: { type: bool, description: "Redemptions per viewer per stream are limited" }
+  channel_points.rewards.*.max_per_user_per_stream: { type: int, description: "Redemptions allowed per viewer per stream" }
+  channel_points.rewards.*.global_cooldown_enabled: { type: bool, description: "A cooldown follows each redemption" }
+  channel_points.rewards.*.global_cooldown_seconds: { type: int, unit: s, description: "The cooldown after each redemption" }
+  channel_points.rewards.*.redemptions_this_stream: { type: int, description: "Redemptions in the current stream, when live (redemptions_redeemed_current_stream)" }
+  channel_points.rewards.*.cooldown_expires_at: { type: string, description: "When the cooldown ends, RFC 3339 UTC, while cooling down" }
+  channel_points.redemptions.*.reward_id: { type: string, description: "The reward redeemed, for a redemption waiting in the queue, keyed by redemption id" }
+  channel_points.redemptions.*.reward_title: { type: string, description: "The reward's title" }
+  channel_points.redemptions.*.user_id: { type: string, description: "The viewer's user id" }
+  channel_points.redemptions.*.user_name: { type: string, description: "The viewer's display name" }
+  channel_points.redemptions.*.user_input: { type: string, description: "The text the viewer typed, when the reward asks for it" }
+  channel_points.redemptions.*.redeemed_at: { type: string, description: "When it was redeemed, RFC 3339 UTC" }
+  schedule.vacation:           { type: bool, description: "A vacation is scheduled" }
+  schedule.vacation_start_time: { type: string, description: "When the vacation starts, RFC 3339 UTC; empty when none" }
+  schedule.vacation_end_time:  { type: string, description: "When the vacation ends, RFC 3339 UTC; empty when none" }
+  schedule.segments.*.start_time: { type: string, description: "When a scheduled broadcast starts, RFC 3339 UTC, keyed by segment id" }
+  schedule.segments.*.end_time: { type: string, description: "When it ends, RFC 3339 UTC" }
+  schedule.segments.*.title:   { type: string, description: "The broadcast's title" }
+  schedule.segments.*.category_id: { type: string, description: "The broadcast's category id" }
+  schedule.segments.*.category_name: { type: string, description: "The broadcast's category name" }
+  schedule.segments.*.recurring: { type: bool, description: "The broadcast repeats weekly (is_recurring)" }
+  schedule.segments.*.canceled_until: { type: string, description: "Set to the end time when this occurrence is canceled" }
 
 telemetry:
   # EventSub over WebSocket (Handling WebSocket Events): Twitch sends a
@@ -710,6 +1522,7 @@ telemetry:
       - { method: GET, path: /helix/chat/settings,
           query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" } }
       - { method: GET, path: /helix/channels/followers, query: { broadcaster_id: "{settings.broadcaster_id}", first: "1" } }
+      - { method: GET, path: /helix/schedule, query: { broadcaster_id: "{settings.broadcaster_id}", first: "25" } }
   updates:
     # The probe and get_user: the signed-in user.
     - path: '^/helix/users$'
@@ -800,6 +1613,38 @@ telemetry:
             body: '{"type":"channel.update","version":"2","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
         - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
             body: '{"type":"channel.follow","version":"2","condition":{"broadcaster_user_id":"{settings.broadcaster_id}","moderator_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        # Each of these needs its own scope; without it Twitch answers 403,
+        # which is logged and leaves that state to the commands' replies.
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.poll.begin","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.poll.progress","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.poll.end","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.prediction.begin","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.prediction.progress","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.prediction.lock","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.prediction.end","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.shield_mode.begin","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}","moderator_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.shield_mode.end","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}","moderator_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.channel_points_custom_reward_redemption.add","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.channel_points_custom_reward_redemption.update","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.moderator.add","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.moderator.remove","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.vip.add","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.vip.remove","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
     - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^stream\\.online$" }
       json: { id: "$.payload.event.id", started: "$.payload.event.started_at", type: "$.payload.event.type" }
       state:
@@ -833,3 +1678,323 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: /helix/channels/followers, query: { broadcaster_id: "{settings.broadcaster_id}", first: "1" } }
+
+    # ── Polls: Helix replies (create, end, get; the newest first) ──────────
+    - path: '^/helix/polls(\?.*)?$'
+      json_match: { "$.data[0].id": "^." }
+      json:
+        id: "$.data[0].id"
+        title: "$.data[0].title"
+        status: "$.data[0].status"
+        duration: "$.data[0].duration"
+        started: "$.data[0].started_at"
+        ended: "$.data[0].ended_at"
+        cp: "$.data[0].channel_points_voting_enabled"
+        cp_per: "$.data[0].channel_points_per_vote"
+      replace: poll
+      state:
+        poll.id: "{id}"
+        poll.title: "{title}"
+        poll.status: "{status}"
+        poll.duration: "{duration}"
+        poll.started_at: "{started}"
+        poll.ended_at: "{ended}"
+        poll.channel_points_voting: "{cp}"
+        poll.channel_points_per_vote: "{cp_per}"
+    - path: '^/helix/polls(\?.*)?$'
+      json_each: "$.data[0].choices"
+      json: { id: "$.id", title: "$.title", votes: "$.votes", cp: "$.channel_points_votes" }
+      state:
+        poll.choices.{index}.id: "{id}"
+        poll.choices.{index}.title: "{title}"
+        poll.choices.{index}.votes: "{votes}"
+        poll.choices.{index}.channel_points_votes: "{cp}"
+    # EventSub: a poll begins (a new poll replaces the last), progresses, ends.
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.poll\\.begin$" }
+      json:
+        id: "$.payload.event.id"
+        title: "$.payload.event.title"
+        started: "$.payload.event.started_at"
+        ends: "$.payload.event.ends_at"
+        cp: "$.payload.event.channel_points_voting.is_enabled"
+        cp_per: "$.payload.event.channel_points_voting.amount_per_vote"
+      replace: poll
+      state:
+        poll.id: "{id}"
+        poll.title: "{title}"
+        poll.status: "ACTIVE"
+        poll.started_at: "{started}"
+        poll.ends_at: "{ends}"
+        poll.channel_points_voting: "{cp}"
+        poll.channel_points_per_vote: "{cp_per}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.poll\\.(begin|progress|end)$" }
+      json_each: "$.payload.event.choices"
+      json: { id: "$.id", title: "$.title", votes: "$.votes", cp: "$.channel_points_votes" }
+      state:
+        poll.choices.{index}.id: "{id}"
+        poll.choices.{index}.title: "{title}"
+        poll.choices.{index}.votes: "{votes}"
+        poll.choices.{index}.channel_points_votes: "{cp}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.poll\\.end$" }
+      json: { status: "$.payload.event.status", ended: "$.payload.event.ended_at" }
+      state:
+        poll.status: { value: "{status}", map: { completed: COMPLETED, terminated: TERMINATED, archived: ARCHIVED } }
+        poll.ended_at: "{ended}"
+
+    # ── Predictions: Helix replies, then EventSub ───────────────────────────
+    - path: '^/helix/predictions(\?.*)?$'
+      json_match: { "$.data[0].id": "^." }
+      json:
+        id: "$.data[0].id"
+        title: "$.data[0].title"
+        status: "$.data[0].status"
+        winner: "$.data[0].winning_outcome_id"
+        window: "$.data[0].prediction_window"
+        created: "$.data[0].created_at"
+        locked: "$.data[0].locked_at"
+        ended: "$.data[0].ended_at"
+      replace: prediction
+      state:
+        prediction.id: "{id}"
+        prediction.title: "{title}"
+        prediction.status: "{status}"
+        prediction.winning_outcome_id: "{winner}"
+        prediction.prediction_window: "{window}"
+        prediction.created_at: "{created}"
+        prediction.locked_at: "{locked}"
+        prediction.ended_at: "{ended}"
+    - path: '^/helix/predictions(\?.*)?$'
+      json_each: "$.data[0].outcomes"
+      json: { id: "$.id", title: "$.title", color: "$.color", users: "$.users", points: "$.channel_points" }
+      state:
+        prediction.outcomes.{index}.id: "{id}"
+        prediction.outcomes.{index}.title: "{title}"
+        prediction.outcomes.{index}.color: "{color}"
+        prediction.outcomes.{index}.users: "{users}"
+        prediction.outcomes.{index}.channel_points: "{points}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.prediction\\.begin$" }
+      json: { id: "$.payload.event.id", title: "$.payload.event.title", started: "$.payload.event.started_at",
+              locks: "$.payload.event.locks_at" }
+      replace: prediction
+      state:
+        prediction.id: "{id}"
+        prediction.title: "{title}"
+        prediction.status: "ACTIVE"
+        prediction.created_at: "{started}"
+        prediction.locks_at: "{locks}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.prediction\\.(begin|progress|lock|end)$" }
+      json_each: "$.payload.event.outcomes"
+      json: { id: "$.id", title: "$.title", color: "$.color", users: "$.users", points: "$.channel_points" }
+      state:
+        prediction.outcomes.{index}.id: "{id}"
+        prediction.outcomes.{index}.title: "{title}"
+        prediction.outcomes.{index}.color: { value: "{color}", map: { blue: BLUE, pink: PINK } }
+        prediction.outcomes.{index}.users: "{users}"
+        prediction.outcomes.{index}.channel_points: "{points}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.prediction\\.lock$" }
+      json: { locked: "$.payload.event.locked_at" }
+      state:
+        prediction.status: "LOCKED"
+        prediction.locked_at: "{locked}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.prediction\\.end$" }
+      json: { status: "$.payload.event.status", winner: "$.payload.event.winning_outcome_id", ended: "$.payload.event.ended_at" }
+      state:
+        prediction.status: { value: "{status}", map: { resolved: RESOLVED, canceled: CANCELED } }
+        prediction.winning_outcome_id: "{winner}"
+        prediction.ended_at: "{ended}"
+
+    # ── Shield Mode ─────────────────────────────────────────────────────────
+    - path: '^/helix/moderation/shield_mode\?'
+      json_each: "$.data"
+      json: { active: "$.is_active", last: "$.last_activated_at" }
+      state:
+        moderation.shield_mode: "{active}"
+        moderation.shield_mode_last_activated_at: "{last}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.shield_mode\\.begin$" }
+      json: { started: "$.payload.event.started_at" }
+      state:
+        moderation.shield_mode: "true"
+        moderation.shield_mode_last_activated_at: "{started}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.shield_mode\\.end$" }
+      json: {}
+      state: { moderation.shield_mode: "false" }
+
+    # ── Moderators and VIPs: the whole first page, read again on changes ───
+    - path: '^/helix/moderation/moderators\?broadcaster_id=[0-9]+&first=100$'
+      json_each: "$.data"
+      json: { id: "$.user_id", login: "$.user_login", name: "$.user_name" }
+      replace: moderation.moderators
+      state:
+        moderation.moderators.{id}.login: "{login}"
+        moderation.moderators.{id}.name: "{name}"
+    - path: '^/helix/moderation/moderators\?broadcaster_id=[0-9]+&user_id='
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.moderator\\.(add|remove)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/moderation/moderators, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    - path: '^/helix/channels/vips\?broadcaster_id=[0-9]+&first=100$'
+      json_each: "$.data"
+      json: { id: "$.user_id", login: "$.user_login", name: "$.user_name" }
+      replace: moderation.vips
+      state:
+        moderation.vips.{id}.login: "{login}"
+        moderation.vips.{id}.name: "{name}"
+    - path: '^/helix/channels/vips\?broadcaster_id=[0-9]+&user_id='
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.vip\\.(add|remove)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/channels/vips, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+
+    # ── Bans and blocked terms ──────────────────────────────────────────────
+    - path: '^/helix/moderation/banned\?broadcaster_id=[0-9]+&first=100$'
+      json_each: "$.data"
+      json: { id: "$.user_id", login: "$.user_login", name: "$.user_name", expires: "$.expires_at",
+              reason: "$.reason", moderator: "$.moderator_name" }
+      replace: moderation.banned
+      state:
+        moderation.banned.{id}.login: "{login}"
+        moderation.banned.{id}.name: "{name}"
+        moderation.banned.{id}.expires_at: "{expires}"
+        moderation.banned.{id}.reason: "{reason}"
+        moderation.banned.{id}.moderator_name: "{moderator}"
+    - path: '^/helix/moderation/bans\?'
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/moderation/banned, query: { broadcaster_id: "{settings.broadcaster_id}", first: "100" } }
+    - path: '^/helix/moderation/blocked_terms\?'
+      json_each: "$.data"
+      json: { id: "$.id", text: "$.text", expires: "$.expires_at" }
+      state:
+        moderation.blocked_terms.{id}.text: "{text}"
+        moderation.blocked_terms.{id}.expires_at: "{expires}"
+    - path: '^/helix/moderation/blocked_terms\?broadcaster_id=[0-9]+&moderator_id=[0-9]+&first=100$'
+      json: {}
+      replace: moderation.blocked_terms
+    - path: '^/helix/moderation/blocked_terms\?broadcaster_id=[0-9]+&moderator_id=[0-9]+&id='
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/moderation/blocked_terms,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}", first: "100" } }
+
+    # ── Channel Points rewards and the redemption queue ─────────────────────
+    - path: '^/helix/channel_points/custom_rewards\?'
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        title: "$.title"
+        cost: "$.cost"
+        prompt: "$.prompt"
+        enabled: "$.is_enabled"
+        paused: "$.is_paused"
+        stock: "$.is_in_stock"
+        color: "$.background_color"
+        input: "$.is_user_input_required"
+        skip: "$.should_redemptions_skip_request_queue"
+        mps_on: "$.max_per_stream_setting.is_enabled"
+        mps: "$.max_per_stream_setting.max_per_stream"
+        mpu_on: "$.max_per_user_per_stream_setting.is_enabled"
+        mpu: "$.max_per_user_per_stream_setting.max_per_user_per_stream"
+        cd_on: "$.global_cooldown_setting.is_enabled"
+        cd: "$.global_cooldown_setting.global_cooldown_seconds"
+        count: "$.redemptions_redeemed_current_stream"
+        cd_until: "$.cooldown_expires_at"
+      state:
+        channel_points.rewards.{id}.title: "{title}"
+        channel_points.rewards.{id}.cost: "{cost}"
+        channel_points.rewards.{id}.prompt: "{prompt}"
+        channel_points.rewards.{id}.enabled: "{enabled}"
+        channel_points.rewards.{id}.paused: "{paused}"
+        channel_points.rewards.{id}.in_stock: "{stock}"
+        channel_points.rewards.{id}.background_color: "{color}"
+        channel_points.rewards.{id}.user_input_required: "{input}"
+        channel_points.rewards.{id}.skip_queue: "{skip}"
+        channel_points.rewards.{id}.max_per_stream_enabled: "{mps_on}"
+        channel_points.rewards.{id}.max_per_stream: "{mps}"
+        channel_points.rewards.{id}.max_per_user_per_stream_enabled: "{mpu_on}"
+        channel_points.rewards.{id}.max_per_user_per_stream: "{mpu}"
+        channel_points.rewards.{id}.global_cooldown_enabled: "{cd_on}"
+        channel_points.rewards.{id}.global_cooldown_seconds: "{cd}"
+        channel_points.rewards.{id}.redemptions_this_stream: "{count}"
+        channel_points.rewards.{id}.cooldown_expires_at: "{cd_until}"
+    # The whole list only when every reward was asked for.
+    - path: '^/helix/channel_points/custom_rewards\?broadcaster_id=[0-9]+&only_manageable_rewards=false$'
+      json: {}
+      replace: channel_points.rewards
+    - path: '^/helix/channel_points/custom_rewards\?broadcaster_id=[0-9]+&id='
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/channel_points/custom_rewards,
+            query: { broadcaster_id: "{settings.broadcaster_id}", only_manageable_rewards: "false" } }
+    - path: '^/helix/channel_points/custom_rewards/redemptions\?'
+      json_each: "$.data"
+      each_match: { "$.status": "^UNFULFILLED$" }
+      json: { id: "$.id", reward: "$.reward.id", reward_title: "$.reward.title", user: "$.user_id",
+              name: "$.user_name", input: "$.user_input", at: "$.redeemed_at" }
+      state:
+        channel_points.redemptions.{id}.reward_id: "{reward}"
+        channel_points.redemptions.{id}.reward_title: "{reward_title}"
+        channel_points.redemptions.{id}.user_id: "{user}"
+        channel_points.redemptions.{id}.user_name: "{name}"
+        channel_points.redemptions.{id}.user_input: "{input}"
+        channel_points.redemptions.{id}.redeemed_at: "{at}"
+    - path: '^/helix/channel_points/custom_rewards/redemptions\?'
+      json_each: "$.data"
+      each_match: { "$.status": "^(FULFILLED|CANCELED)$" }
+      json: { id: "$.id" }
+      state: { "channel_points.redemptions.{id}": { delete: true } }
+    - json_match: { "$.metadata.message_type": "^notification$",
+                    "$.metadata.subscription_type": "^channel\\.channel_points_custom_reward_redemption\\.add$",
+                    "$.payload.event.status": "^unfulfilled$" }
+      json: { id: "$.payload.event.id", reward: "$.payload.event.reward.id", reward_title: "$.payload.event.reward.title",
+              user: "$.payload.event.user_id", name: "$.payload.event.user_name", input: "$.payload.event.user_input",
+              at: "$.payload.event.redeemed_at" }
+      state:
+        channel_points.redemptions.{id}.reward_id: "{reward}"
+        channel_points.redemptions.{id}.reward_title: "{reward_title}"
+        channel_points.redemptions.{id}.user_id: "{user}"
+        channel_points.redemptions.{id}.user_name: "{name}"
+        channel_points.redemptions.{id}.user_input: "{input}"
+        channel_points.redemptions.{id}.redeemed_at: "{at}"
+    - json_match: { "$.metadata.message_type": "^notification$",
+                    "$.metadata.subscription_type": "^channel\\.channel_points_custom_reward_redemption\\.update$" }
+      json: { id: "$.payload.event.id" }
+      state: { "channel_points.redemptions.{id}": { delete: true } }
+
+    # ── Stream schedule: the poll's next 25 broadcasts, read again on changes
+    - path: '^/helix/schedule\?broadcaster_id=[0-9]+&first=25$'
+      json_each: "$.data.segments"
+      json: { id: "$.id", start: "$.start_time", end: "$.end_time", title: "$.title", category_id: "$.category.id",
+              category: "$.category.name", recurring: "$.is_recurring", canceled: "$.canceled_until" }
+      replace: schedule.segments
+      state:
+        schedule.segments.{id}.start_time: "{start}"
+        schedule.segments.{id}.end_time: "{end}"
+        schedule.segments.{id}.title: "{title}"
+        schedule.segments.{id}.category_id: "{category_id}"
+        schedule.segments.{id}.category_name: "{category}"
+        schedule.segments.{id}.recurring: "{recurring}"
+        schedule.segments.{id}.canceled_until: "{canceled}"
+    - path: '^/helix/schedule\?broadcaster_id=[0-9]+&first=25$'
+      json_match: { "$.data.vacation": "^null$" }
+      json: {}
+      state:
+        schedule.vacation: "false"
+        schedule.vacation_start_time: ""
+        schedule.vacation_end_time: ""
+    - path: '^/helix/schedule\?broadcaster_id=[0-9]+&first=25$'
+      json_match: { "$.data.vacation": "^\\{" }
+      json: { start: "$.data.vacation.start_time", end: "$.data.vacation.end_time" }
+      state:
+        schedule.vacation: "true"
+        schedule.vacation_start_time: "{start}"
+        schedule.vacation_end_time: "{end}"
+    - path: '^/helix/schedule/(segment|settings)\?'
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/schedule, query: { broadcaster_id: "{settings.broadcaster_id}", first: "25" } }

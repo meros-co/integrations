@@ -1,0 +1,62 @@
+spec: planningcenter-services
+telemetry: items-with-songs
+settings:
+  auth: oauth2
+  access_token: pco_tok_x
+  service_type_id: '1234'
+  plan_id: '5678'
+inbound_http:
+  path: /services/v2/service_types/1234/plans/5678/items?per_page=100&include=song%2Carrangement%2Ckey
+  body: '{"links": {"self": "https://api.planningcenteronline.com/services/v2/service_types/1234/plans/5678/items?per_page=100"},
+    "data": [{"type": "Item", "id": "12", "attributes": {"title": "Amazing Grace", "sequence": 2, "length":
+    240, "item_type": "song", "service_position": "during", "description": null, "key_name": "G", "custom_arrangement_sequence":
+    []}, "relationships": {"song": {"data": {"type": "Song", "id": "301"}}, "arrangement": {"data": {"type":
+    "Arrangement", "id": "401"}}, "key": {"data": {"type": "Key", "id": "501"}}}}], "included": [{"type":
+    "Song", "id": "301", "attributes": {"title": "Amazing Grace", "author": "John Newton", "ccli_number":
+    22025, "copyright": "Public Domain"}}, {"type": "Arrangement", "id": "401", "attributes": {"name":
+    "Default", "bpm": 72.0, "meter": "3/4", "length": 240, "sequence": ["Verse 1", "Verse 2", "Verse 3"],
+    "chord_chart_key": "G", "has_chords": true, "lyrics": "Amazing grace, how sweet the sound"}}, {"type":
+    "Key", "id": "501", "attributes": {"name": "Default", "starting_key": "G", "ending_key": "G"}}], "meta":
+    {"total_count": 1, "count": 1}}'
+state_before:
+  plans:
+    '5678':
+      songs:
+        '300':
+          title: No longer in the plan
+expect_state:
+  plans:
+    '5678':
+      items:
+        '12':
+          title: Amazing Grace
+          sequence: 2
+          length: 240
+          item_type: song
+          service_position: during
+          key_name: G
+          song_id: '301'
+          arrangement_id: '401'
+          key_id: '501'
+          custom_arrangement_sequence: '[]'
+      songs:
+        '301':
+          title: Amazing Grace
+          author: John Newton
+          ccli_number: 22025
+          copyright: Public Domain
+      arrangements:
+        '401':
+          name: Default
+          bpm: 72.0
+          meter: 3/4
+          length: 240
+          sequence: '["Verse 1","Verse 2","Verse 3"]'
+          chord_chart_key: G
+          has_chords: true
+          lyrics: Amazing grace, how sweet the sound
+      keys:
+        '501':
+          name: Default
+          starting_key: G
+          ending_key: G

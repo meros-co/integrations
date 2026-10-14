@@ -11,8 +11,12 @@ _PCP = "/services/v2/service_types/1234/plans/5678"
 _INC = "?include=current_item_time%2Cnext_item_time"
 
 
-def _pc(command, input, method, target, **extra):
-    http(PC, command, input, method, target, settings=_PCS, **extra)
+def _pc(command, input, method, target, body=None, **extra):
+    request = {"method": method, "target": target}
+    if body is not None:
+        request["body"] = body
+    V.append({"spec": PC, "command": command, "input": input, "expect_request": request,
+              "settings": _PCS, **extra})
 
 
 _LIVE = {
@@ -148,7 +152,10 @@ telemetry(PC, "items-paged", settings=_PCS, inbound_http={"path": _PCP + "/items
 telemetry(PC, "item", settings=_PCS, inbound_http={"path": _PCP + "/items/12", "body": json.dumps({
     "data": _ITEMS[1]})},
     state_before={"plans": {"5678": {"items": {"11": {"title": "Welcome"}}}}},
-    expect_state={"plans": {"5678": {"items": {"11": {"title": "Welcome"}, "12": _ITEMS_STATE["12"]}}}})
+    expect_state={"plans": {"5678": {"items": {"11": {"title": "Welcome"}, "12": _ITEMS_STATE["12"]}}}},
+    # A read of one item, like an update's reply on the same path, reads the
+    # plan's items again.
+    expect_then_send=[{"method": "GET", "target": _PCP + "/items?per_page=100&include=song%2Carrangement%2Ckey"}])
 telemetry(PC, "plan-times", settings=_PCS, inbound_http={"path": _PCP + "/plan_times?per_page=100", "body": json.dumps({
     "links": {"self": _SELF + "/plan_times?per_page=100"},
     "data": [
@@ -181,3 +188,154 @@ telemetry(PC, "service-types", settings=_PCS, inbound_http={
             '"data":[{"type":"ServiceType","id":"1234","attributes":{"name":"Sunday Morning"}}]}'},
     state_before={"service_types": {"999": {"name": "Retired"}}},
     expect_state={"service_types": {"1234": {"name": "Sunday Morning"}}})
+
+# Editing (JSON:API bodies, as the documentation graph's writable attributes).
+_ST = {"service_type_id": "1234"}
+_SP = {"service_type_id": "1234", "plan_id": "5678"}
+_SPI = {**_SP, "item_id": "11"}
+_ITEMS_RELOAD = {"method": "GET", "target": _PCP + "/items?per_page=100&include=song%2Carrangement%2Ckey"}
+_pc("create_plan", {**_ST, "attributes": {"title": "Christmas Eve"}}, "POST", "/services/v2/service_types/1234/plans",
+    body='{"data":{"type":"Plan","attributes":{"title":"Christmas Eve"}}}')
+_pc("update_plan", {**_SP, "attributes": {"public": True}}, "PATCH", _PCP,
+    body='{"data":{"type":"Plan","attributes":{"public":true}}}')
+_pc("set_plan_title", {**_SP, "title": "Sunday \"Service\""}, "PATCH", _PCP,
+    body='{"data":{"type":"Plan","attributes":{"title":"Sunday \\"Service\\""}}}')
+_pc("delete_plan", _SP, "DELETE", _PCP, http_reply={"status": 204, "body": ""}, expect_result={"ok": {"kind": "ack"}})
+_pc("create_item", {**_SP, "attributes": {"title": "Offering", "length": 180}}, "POST", _PCP + "/items",
+    body='{"data":{"type":"Item","attributes":{"title":"Offering","length":180}}}')
+_pc("create_header", {**_SP, "title": "Worship"}, "POST", _PCP + "/items",
+    body='{"data":{"type":"Item","attributes":{"title":"Worship","item_type":"header"}}}')
+_pc("update_item", {**_SPI, "attributes": {"song_id": "301", "arrangement_id": "401"}}, "PATCH", _PCP + "/items/11",
+    body='{"data":{"type":"Item","attributes":{"song_id":"301","arrangement_id":"401"}}}')
+_pc("set_item_title", {**_SPI, "title": "Welcome"}, "PATCH", _PCP + "/items/11",
+    body='{"data":{"type":"Item","attributes":{"title":"Welcome"}}}')
+_pc("set_item_length", {**_SPI, "length": 240}, "PATCH", _PCP + "/items/11",
+    body='{"data":{"type":"Item","attributes":{"length":240}}}')
+_pc("set_item_description", {**_SPI, "description": "Host on stage"}, "PATCH", _PCP + "/items/11",
+    body='{"data":{"type":"Item","attributes":{"description":"Host on stage"}}}')
+_pc("delete_item", _SPI, "DELETE", _PCP + "/items/11")
+_pc("reorder_items", {**_SP, "sequence": ["12", "11"]}, "POST", _PCP + "/item_reorder",
+    body='{"data":{"type":"PlanItemReorder","attributes":{"sequence":["12","11"]}}}',
+    http_reply={"status": 204, "body": ""}, expect_result={"ok": {"kind": "ack"}})
+_pc("list_item_note_categories", _ST, "GET", "/services/v2/service_types/1234/item_note_categories?per_page=100")
+_pc("create_item_note", {**_SPI, "category_id": "5", "content": "Spot on the pulpit"}, "POST",
+    _PCP + "/items/11/item_notes",
+    body='{"data":{"type":"ItemNote","attributes":{"content":"Spot on the pulpit"},'
+         '"relationships":{"item_note_category":{"data":{"type":"ItemNoteCategory","id":"5"}}}}}')
+_pc("update_item_note", {**_SPI, "note_id": "81", "content": "Spot and haze"}, "PATCH", _PCP + "/items/11/item_notes/81",
+    body='{"data":{"type":"ItemNote","attributes":{"content":"Spot and haze"}}}')
+_pc("delete_item_note", {**_SPI, "note_id": "81"}, "DELETE", _PCP + "/items/11/item_notes/81")
+_pc("list_plan_note_categories", _ST, "GET", "/services/v2/service_types/1234/plan_note_categories?per_page=100")
+_pc("list_plan_notes", _SP, "GET", _PCP + "/notes?per_page=100")
+_pc("create_plan_note", {**_SP, "category_id": "6", "content": "Doors at 8:30"}, "POST", _PCP + "/notes",
+    body='{"data":{"type":"PlanNote","attributes":{"content":"Doors at 8:30"},'
+         '"relationships":{"plan_note_category":{"data":{"type":"PlanNoteCategory","id":"6"}}}}}')
+_pc("update_plan_note", {**_SP, "note_id": "91", "content": "Doors at 8:45"}, "PATCH", _PCP + "/notes/91",
+    body='{"data":{"type":"PlanNote","attributes":{"content":"Doors at 8:45"}}}')
+_pc("delete_plan_note", {**_SP, "note_id": "91"}, "DELETE", _PCP + "/notes/91")
+_pc("create_plan_time", {**_SP, "name": "11:00", "starts_at": "2026-10-18T11:00:00-05:00",
+                         "ends_at": "2026-10-18T12:15:00-05:00"}, "POST", _PCP + "/plan_times",
+    body='{"data":{"type":"PlanTime","attributes":{"name":"11:00","time_type":"service",'
+         '"starts_at":"2026-10-18T11:00:00-05:00","ends_at":"2026-10-18T12:15:00-05:00"}}}')
+_pc("update_plan_time", {**_SP, "plan_time_id": "77", "attributes": {"name": "9:30"}}, "PATCH", _PCP + "/plan_times/77",
+    body='{"data":{"type":"PlanTime","attributes":{"name":"9:30"}}}')
+_pc("delete_plan_time", {**_SP, "plan_time_id": "77"}, "DELETE", _PCP + "/plan_times/77")
+
+# Songs, arrangements, media and attachments.
+_pc("list_songs", {}, "GET", "/services/v2/songs?order=title&per_page=25&offset=0")
+_pc("search_songs", {"title": "Amazing Grace"}, "GET", "/services/v2/songs?where%5Btitle%5D=Amazing%20Grace&per_page=100")
+_pc("get_song", {"song_id": "301"}, "GET", "/services/v2/songs/301")
+_pc("list_arrangements", {"song_id": "301"}, "GET", "/services/v2/songs/301/arrangements?per_page=100")
+_pc("get_arrangement", {"song_id": "301", "arrangement_id": "401"}, "GET", "/services/v2/songs/301/arrangements/401?include=keys")
+_pc("list_arrangement_keys", {"song_id": "301", "arrangement_id": "401"}, "GET",
+    "/services/v2/songs/301/arrangements/401/keys?per_page=100")
+_pc("list_arrangement_sections", {"song_id": "301", "arrangement_id": "401"}, "GET",
+    "/services/v2/songs/301/arrangements/401/sections")
+_pc("list_media", {"order": "-created_at"}, "GET", "/services/v2/media?order=-created_at&per_page=25&offset=0")
+_pc("get_media", {"media_id": "601"}, "GET", "/services/v2/media/601")
+_pc("list_media_attachments", {"media_id": "601"}, "GET", "/services/v2/media/601/attachments?per_page=100")
+_pc("get_item_media", _SPI, "GET", _PCP + "/items/11/media")
+_pc("list_item_attachments", _SPI, "GET", _PCP + "/items/11/attachments?per_page=100")
+_pc("list_plan_attachments", _SP, "GET", _PCP + "/all_attachments?per_page=100")
+_pc("list_song_attachments", {"song_id": "301"}, "GET", "/services/v2/songs/301/attachments?per_page=100")
+_OPENED = {"data": {"type": "AttachmentActivity", "id": "1",
+                    "attributes": {"attachment_url": "https://services.planningcenteronline.com/files/abc"}}}
+_pc("open_media_attachment", {"media_id": "601", "attachment_id": "701"}, "POST",
+    "/services/v2/media/601/attachments/701/open",
+    http_reply={"status": 200, "body": json.dumps(_OPENED)},
+    expect_result={"ok": {"kind": "value", "value": "https://services.planningcenteronline.com/files/abc"}})
+_pc("open_item_attachment", {**_SPI, "attachment_id": "701"}, "POST", _PCP + "/items/11/attachments/701/open")
+
+# Telemetry: the poll's items with their songs, arrangements and keys.
+_SONG_ITEMS = [{**_ITEMS[1], "attributes": {**_ITEMS[1]["attributes"], "custom_arrangement_sequence": []},
+                "relationships": {"song": {"data": {"type": "Song", "id": "301"}},
+                                  "arrangement": {"data": {"type": "Arrangement", "id": "401"}},
+                                  "key": {"data": {"type": "Key", "id": "501"}}}}]
+_INCLUDED = [
+    {"type": "Song", "id": "301", "attributes": {"title": "Amazing Grace", "author": "John Newton",
+                                                 "ccli_number": 22025, "copyright": "Public Domain"}},
+    {"type": "Arrangement", "id": "401", "attributes": {
+        "name": "Default", "bpm": 72.0, "meter": "3/4", "length": 240,
+        "sequence": ["Verse 1", "Verse 2", "Verse 3"], "chord_chart_key": "G", "has_chords": True,
+        "lyrics": "Amazing grace, how sweet the sound"}},
+    {"type": "Key", "id": "501", "attributes": {"name": "Default", "starting_key": "G", "ending_key": "G"}}]
+telemetry(PC, "items-with-songs", settings=_PCS, inbound_http={
+    "path": _PCP + "/items?per_page=100&include=song%2Carrangement%2Ckey", "body": json.dumps({
+        "links": {"self": _SELF + "/items?per_page=100"}, "data": _SONG_ITEMS, "included": _INCLUDED,
+        "meta": {"total_count": 1, "count": 1}})},
+    state_before={"plans": {"5678": {"songs": {"300": {"title": "No longer in the plan"}}}}},
+    expect_state={"plans": {"5678": {
+        "items": {"12": {**_ITEMS_STATE["12"], "song_id": "301", "arrangement_id": "401", "key_id": "501",
+                         "custom_arrangement_sequence": "[]"}},
+        "songs": {"301": {"title": "Amazing Grace", "author": "John Newton", "ccli_number": 22025,
+                          "copyright": "Public Domain"}},
+        "arrangements": {"401": {"name": "Default", "bpm": 72.0, "meter": "3/4", "length": 240,
+                                 "sequence": '["Verse 1","Verse 2","Verse 3"]', "chord_chart_key": "G",
+                                 "has_chords": True, "lyrics": "Amazing grace, how sweet the sound"}},
+        "keys": {"501": {"name": "Default", "starting_key": "G", "ending_key": "G"}}}}})
+telemetry(PC, "item-created", settings=_PCS, inbound_http={"path": _PCP + "/items", "body": json.dumps({
+    "data": {"type": "Item", "id": "13", "attributes": {"title": "Offering", "sequence": 3, "length": 180,
+                                                         "item_type": "item", "service_position": "during"}}})},
+    state_before={"plans": {"5678": {"items": {"11": {"title": "Welcome"}}}}},
+    expect_state={"plans": {"5678": {"items": {"11": {"title": "Welcome"}, "13": {
+        "title": "Offering", "sequence": 3, "length": 180, "item_type": "item", "service_position": "during"}}}}},
+    expect_then_send=[_ITEMS_RELOAD])
+telemetry(PC, "items-reordered", settings=_PCS, inbound_http={"path": _PCP + "/item_reorder", "body": ""},
+          expect_state={}, expect_then_send=[_ITEMS_RELOAD])
+telemetry(PC, "plan-time-created", settings=_PCS, inbound_http={"path": _PCP + "/plan_times", "body": json.dumps({
+    "data": {"type": "PlanTime", "id": "78", "attributes": {
+        "name": "11:00", "time_type": "service", "starts_at": "2026-10-18T16:00:00Z", "ends_at": "2026-10-18T17:15:00Z",
+        "live_starts_at": None, "live_ends_at": None}}})},
+    expect_state={"plans": {"5678": {"plan_times": {"78": {
+        "name": "11:00", "time_type": "service", "starts_at": "2026-10-18T16:00:00Z", "ends_at": "2026-10-18T17:15:00Z"}}}}})
+telemetry(PC, "plan-time-deleted", settings=_PCS, inbound_http={"path": _PCP + "/plan_times/77", "body": ""},
+          expect_state={}, expect_then_send=[{"method": "GET", "target": _PCP + "/plan_times?per_page=100"}])
+telemetry(PC, "plan-created", settings=_PCS, inbound_http={
+    "path": "/services/v2/service_types/1234/plans", "body": json.dumps({"data": {
+        "type": "Plan", "id": "5690", "attributes": {"title": "Christmas Eve", "series_title": None,
+                                                     "dates": "No dates",
+                                                     "planning_center_url": "https://services.planningcenteronline.com/plans/5690"}}})},
+    expect_state={"plans": {"5690": {"service_type_id": "1234", "title": "Christmas Eve", "dates": "No dates",
+                                     "planning_center_url": "https://services.planningcenteronline.com/plans/5690"}}})
+_NOTE = {"type": "ItemNote", "id": "81", "attributes": {"category_name": "Lighting", "content": "Spot on the pulpit"}}
+telemetry(PC, "item-notes", settings=_PCS, inbound_http={
+    "path": _PCP + "/items/11/item_notes?per_page=100",
+    "body": json.dumps({"links": {"self": _SELF + "/items/11/item_notes?per_page=100"}, "data": [_NOTE]})},
+    state_before={"plans": {"5678": {"item_notes": {"11": {"80": {"content": "Deleted"}}, "12": {"85": {"content": "kept"}}}}}},
+    expect_state={"plans": {"5678": {"item_notes": {"11": {"81": {"category": "Lighting", "content": "Spot on the pulpit"}},
+                                                    "12": {"85": {"content": "kept"}}}}}})
+telemetry(PC, "item-note-created", settings=_PCS, inbound_http={"path": _PCP + "/items/11/item_notes",
+                                                                  "body": json.dumps({"data": _NOTE})},
+          expect_state={"plans": {"5678": {"item_notes": {"11": {"81": {"category": "Lighting",
+                                                                         "content": "Spot on the pulpit"}}}}}})
+telemetry(PC, "item-note-deleted", settings=_PCS, inbound_http={"path": _PCP + "/items/11/item_notes/81", "body": ""},
+          expect_state={}, expect_then_send=[{"method": "GET", "target": _PCP + "/items/11/item_notes?per_page=100"}])
+_PNOTE = {"type": "PlanNote", "id": "91", "attributes": {"category_name": "Production", "content": "Doors at 8:30"}}
+telemetry(PC, "plan-notes", settings=_PCS, inbound_http={
+    "path": _PCP + "/notes?per_page=100", "body": json.dumps({"data": [_PNOTE]})},
+    state_before={"plans": {"5678": {"notes": {"90": {"content": "Deleted"}}}}},
+    expect_state={"plans": {"5678": {"notes": {"91": {"category": "Production", "content": "Doors at 8:30"}}}}})
+telemetry(PC, "plan-note-updated", settings=_PCS, inbound_http={"path": _PCP + "/notes/91", "body": json.dumps({
+    "data": {**_PNOTE, "attributes": {"category_name": "Production", "content": "Doors at 8:45"}}})},
+    expect_state={"plans": {"5678": {"notes": {"91": {"category": "Production", "content": "Doors at 8:45"}}}}},
+    expect_then_send=[{"method": "GET", "target": _PCP + "/notes?per_page=100"}])

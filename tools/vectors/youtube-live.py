@@ -153,13 +153,137 @@ telemetry(YT, "stream-by-id", settings=_YTS, inbound_http={
     state_before={"streams": {"UCother": {"title": "Backup encoder"}}},
     expect_state={"streams": {"UCother": {"title": "Backup encoder"},
                               "UCchannel1700000000000": {"title": "Main encoder", "stream_status": "ready"}}})
+_VSNIP = {"publishedAt": "2026-10-01T10:00:00Z", "channelId": "UCchannel", "title": "Sunday Service",
+          "description": "Live from the main hall.", "tags": ["church", "live"], "categoryId": "29",
+          "liveBroadcastContent": "live", "defaultLanguage": "en"}
+_VSTATUS = {"uploadStatus": "uploaded", "privacyStatus": "public", "license": "youtube", "embeddable": True,
+            "publicStatsViewable": True, "madeForKids": False, "selfDeclaredMadeForKids": False,
+            "containsSyntheticMedia": False}
+_VIDEO_STATE = {"description": "Live from the main hall.", "category_id": "29", "tags": '["church","live"]',
+                "default_language": "en", "made_for_kids": False, "self_declared_made_for_kids": False,
+                "embeddable": True, "public_stats_viewable": True, "license": "youtube",
+                "contains_synthetic_media": False}
+_VPART = "part=snippet%2Cstatus%2CliveStreamingDetails%2Cstatistics"
 telemetry(YT, "viewers", settings=_YTS, inbound_http={
-    "path": "/youtube/v3/videos?part=liveStreamingDetails%2Cstatistics&id=abcDEF12345",
+    "path": "/youtube/v3/videos?" + _VPART + "&id=abcDEF12345",
     "body": json.dumps({"kind": "youtube#videoListResponse", "items": [{
-        "kind": "youtube#video", "id": "abcDEF12345",
+        "kind": "youtube#video", "id": "abcDEF12345", "snippet": _VSNIP, "status": _VSTATUS,
         "liveStreamingDetails": {"actualStartTime": "2026-10-04T16:00:41Z", "concurrentViewers": "187",
                                  "activeLiveChatId": "Cg0KC2FiY0RFRjEyMzQ1"},
         "statistics": {"viewCount": "412", "likeCount": "36", "commentCount": "0"}}]})},
     expect_state={"broadcasts": {"abcDEF12345": {
         "concurrent_viewers": 187, "active_live_chat_id": "Cg0KC2FiY0RFRjEyMzQ1",
-        "view_count": 412, "like_count": 36, "comment_count": 0}}})
+        "view_count": 412, "like_count": 36, "comment_count": 0, **_VIDEO_STATE}}})
+
+# The broadcast's video.
+_yt("get_video", {"video_id": "abcDEF12345"}, "GET", "/youtube/v3/videos?" + _VPART + "&id=abcDEF12345")
+_VIDEO = {"id": "abcDEF12345", "snippet": {"title": "Sunday Service", "categoryId": "29",
+                                           "description": "Live from the main hall.", "tags": ["church", "live"]},
+          "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False, "embeddable": True,
+                     "publicStatsViewable": True, "license": "youtube"}}
+_yt("update_video", {"video": _VIDEO}, "PUT", "/youtube/v3/videos?part=snippet%2Cstatus",
+    body=json.dumps(_VIDEO, separators=(",", ":")),
+    http_reply={"status": 200, "body": json.dumps({"kind": "youtube#video", **_VIDEO})},
+    expect_result={"ok": {"kind": "value", "value": {"kind": "youtube#video", **_VIDEO}}})
+_VSN = {"id": "abcDEF12345", "snippet": _VIDEO["snippet"]}
+_yt("update_video_snippet", {"video": _VSN}, "PUT", "/youtube/v3/videos?part=snippet",
+    body=json.dumps(_VSN, separators=(",", ":")))
+_VST = {"id": "abcDEF12345", "status": _VIDEO["status"]}
+_yt("update_video_status", {"video": _VST}, "PUT", "/youtube/v3/videos?part=status",
+    body=json.dumps(_VST, separators=(",", ":")))
+_yt("list_video_categories", {"region_code": "GB"}, "GET", "/youtube/v3/videoCategories?part=snippet&regionCode=GB")
+telemetry(YT, "video-updated", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/videos?part=snippet%2Cstatus",
+    "body": json.dumps({"kind": "youtube#video", "etag": "e2", "id": "abcDEF12345",
+                        "snippet": {**_VSNIP, "categoryId": "22", "tags": ["church"]},
+                        "status": {**_VSTATUS, "selfDeclaredMadeForKids": True, "madeForKids": True}})},
+    state_before={"broadcasts": {"abcDEF12345": {"title": "Sunday Service"}}},
+    expect_state={"broadcasts": {"abcDEF12345": {"title": "Sunday Service", **_VIDEO_STATE, "category_id": "22",
+                                                 "tags": '["church"]', "made_for_kids": True,
+                                                 "self_declared_made_for_kids": True}}})
+
+# Chat moderators.
+_CHAT = "Cg0KC2FiY0RFRjEyMzQ1"
+_MOD = {"kind": "youtube#liveChatModerator", "etag": "m1", "id": "Mod-ab12_cd",
+        "snippet": {"moderatorDetails": {"channelId": "UCmoderator", "channelUrl": "http://www.youtube.com/channel/UCmoderator",
+                                         "displayName": "Usher Team", "profileImageUrl": "https://yt3.ggpht.com/a"},
+                    "liveChatId": _CHAT}}
+_MOD_STATE = {"live_chat_id": _CHAT, "channel_id": "UCmoderator", "display_name": "Usher Team"}
+_yt("list_chat_moderators", {"live_chat_id": _CHAT}, "GET",
+    "/youtube/v3/liveChat/moderators?liveChatId=" + _CHAT + "&part=id%2Csnippet&maxResults=50")
+_yt("add_chat_moderator", {"live_chat_id": _CHAT, "channel_id": "UCmoderator"}, "POST",
+    "/youtube/v3/liveChat/moderators?part=snippet",
+    body='{"snippet":{"liveChatId":"' + _CHAT + '","moderatorDetails":{"channelId":"UCmoderator"}}}',
+    http_reply={"status": 200, "body": json.dumps(_MOD)},
+    expect_result={"ok": {"kind": "value", "value": _MOD}})
+_yt("remove_chat_moderator", {"moderator_id": "Mod-ab12_cd"}, "DELETE", "/youtube/v3/liveChat/moderators?id=Mod-ab12_cd",
+    http_reply={"status": 204, "body": ""}, expect_result={"ok": {"kind": "ack"}})
+telemetry(YT, "chat-moderators", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/liveChat/moderators?liveChatId=" + _CHAT + "&part=id%2Csnippet&maxResults=50",
+    "body": json.dumps({"kind": "youtube#liveChatModeratorListResponse",
+                        "pageInfo": {"totalResults": 1, "resultsPerPage": 50}, "items": [_MOD]})},
+    state_before={"chat_moderators": {"Gone": {"channel_id": "UCgone"}}},
+    expect_state={"chat_moderators": {"Mod-ab12_cd": _MOD_STATE}})
+telemetry(YT, "chat-moderator-added", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/liveChat/moderators?part=snippet", "body": json.dumps(_MOD)},
+    state_before={"chat_moderators": {"Other": {"channel_id": "UCother"}}},
+    expect_state={"chat_moderators": {"Other": {"channel_id": "UCother"}, "Mod-ab12_cd": _MOD_STATE}})
+telemetry(YT, "chat-moderator-removed", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/liveChat/moderators?id=Mod-ab12_cd", "body": ""},
+    state_before={"chat_moderators": {"Other": {"channel_id": "UCother"}, "Mod-ab12_cd": _MOD_STATE}},
+    expect_state={"chat_moderators": {"Other": {"channel_id": "UCother"}}})
+
+# Live chat polls.
+_POLLMSG = {"kind": "youtube#liveChatMessage", "etag": "p1", "id": "LCC.poll123",
+            "snippet": {"type": "pollEvent", "liveChatId": _CHAT, "authorChannelId": "UCchannel",
+                        "publishedAt": "2026-10-04T16:20:00Z", "hasDisplayContent": True,
+                        "displayMessage": "Which song next?",
+                        "pollDetails": {"metadata": {"questionText": "Which song next?",
+                                                     "options": [{"optionText": "Amazing Grace", "tally": "12"},
+                                                                 {"optionText": "Be Thou My Vision", "tally": "7"}],
+                                                     "status": "closed"}}}}
+_POLL_STATE = {"message_id": "LCC.poll123", "live_chat_id": _CHAT, "question": "Which song next?",
+               "status": "closed", "options": {"0": {"text": "Amazing Grace", "tally": 12},
+                                               "1": {"text": "Be Thou My Vision", "tally": 7}}}
+_OPTS = [{"optionText": "Amazing Grace"}, {"optionText": "Be Thou My Vision"}]
+_yt("create_chat_poll", {"live_chat_id": _CHAT, "question": "Which song next?", "options": _OPTS}, "POST",
+    "/youtube/v3/liveChat/messages?part=snippet",
+    body='{"snippet":{"liveChatId":"' + _CHAT + '","type":"pollEvent","pollDetails":{"metadata":'
+         '{"questionText":"Which song next?","options":[{"optionText":"Amazing Grace"},'
+         '{"optionText":"Be Thou My Vision"}]}}}}')
+_yt("close_chat_poll", {"message_id": "LCC.poll123"}, "POST",
+    "/youtube/v3/liveChat/messages/transition?id=LCC.poll123&status=closed&part=id%2Csnippet",
+    http_reply={"status": 200, "body": json.dumps(_POLLMSG)},
+    expect_result={"ok": {"kind": "value", "value": _POLLMSG}})
+telemetry(YT, "chat-poll-closed", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/liveChat/messages/transition?id=LCC.poll123&status=closed&part=id%2Csnippet",
+    "body": json.dumps(_POLLMSG)},
+    state_before={"chat_poll": {"message_id": "LCC.old", "options": {"2": {"text": "Old option"}}}},
+    expect_state={"chat_poll": _POLL_STATE})
+telemetry(YT, "chat-poll-in-chat", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/liveChat/messages?liveChatId=" + _CHAT + "&part=id%2Csnippet%2CauthorDetails",
+    "body": json.dumps({"kind": "youtube#liveChatMessageListResponse", "pollingIntervalMillis": 5000, "items": [
+        {"kind": "youtube#liveChatMessage", "id": "LCC.text1",
+         "snippet": {"type": "textMessageEvent", "liveChatId": _CHAT,
+                     "textMessageDetails": {"messageText": "Hello"}}},
+        {**_POLLMSG, "snippet": {**_POLLMSG["snippet"], "pollDetails": {"metadata": {
+            **_POLLMSG["snippet"]["pollDetails"]["metadata"], "status": "active"}}}}]})},
+    expect_state={"chat_poll": {**_POLL_STATE, "status": "active"}})
+
+# Super Chats.
+_SC = {"kind": "youtube#superChatEvent", "etag": "s1", "id": "SC-1",
+       "snippet": {"channelId": "UCchannel",
+                   "supporterDetails": {"channelId": "UCfan", "channelUrl": "http://www.youtube.com/channel/UCfan",
+                                        "displayName": "A Fan", "profileImageUrl": "https://yt3.ggpht.com/b"},
+                   "commentText": "Great sermon!", "createdAt": "2026-10-04T16:30:00Z", "amountMicros": "5000000",
+                   "currency": "USD", "displayString": "$5.00", "messageType": 2, "isSuperStickerEvent": False}}
+_yt("list_super_chat_events", {}, "GET", "/youtube/v3/superChatEvents?part=snippet&maxResults=50")
+telemetry(YT, "super-chats", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/superChatEvents?part=snippet&maxResults=50",
+    "body": json.dumps({"kind": "youtube#superChatEventListResponse",
+                        "pageInfo": {"totalResults": 1, "resultsPerPage": 50}, "items": [_SC]})},
+    state_before={"super_chats": {"SC-old": {"comment": "older than the page"}}},
+    expect_state={"super_chats": {"SC-1": {
+        "supporter_name": "A Fan", "supporter_channel_id": "UCfan", "comment": "Great sermon!",
+        "amount_micros": 5000000, "currency": "USD", "display_string": "$5.00", "tier": 2, "sticker": False,
+        "created_at": "2026-10-04T16:30:00Z"}}})
