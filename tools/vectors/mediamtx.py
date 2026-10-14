@@ -264,6 +264,29 @@ telemetry(MX, "path-configs", inbound_http={"path": "/v3/config/paths/list?items
                        "source_on_demand": False, "max_readers": 0, "override_publisher": True,
                        "always_available": False}}})
 
+# A path name holding dots is one state key.
+telemetry(MX, "paths-dotted-name", inbound_http={
+    "path": "/v3/paths/list?itemsPerPage=1000",
+    "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [{
+        "name": "studio.cam1", "confName": "all_others", "source": None,
+        "ready": False, "readyTime": None, "tracks": [], "bytesReceived": 0, "bytesSent": 0, "readers": []}]})},
+    expect_state={"path_count": 1, "paths": {"studio.cam1": {
+        "conf_name": "all_others", "ready": False, "readers": "[]", "codecs": "[]",
+        "inbound_bytes": 0, "outbound_bytes": 0}}})
+telemetry(MX, "path-configs-dotted-name", inbound_http={
+    "path": "/v3/config/paths/list?itemsPerPage=1000", "body": _MXJ({
+        "itemCount": 1, "pageCount": 1, "items": [dict(_DEF, name="studio.cam1", overridePublisher=True,
+                                                         alwaysAvailable=False)]})},
+    expect_state={"path_config_count": 1, "path_configs": {"studio.cam1": {
+        "record": False, "record_format": "fmp4", "record_delete_after": "1d", "source_on_demand": False,
+        "max_readers": 0, "override_publisher": True, "always_available": False}}})
+telemetry(MX, "hls-muxers-dotted-name", inbound_http={"path": "/v3/hls/muxers/list?itemsPerPage=1000", "body": _MXJ({
+    "itemCount": 1, "pageCount": 1, "items": [{
+        "path": "studio.cam1", "created": "2026-10-06T08:06:00Z", "lastRequest": "2026-10-06T08:07:00Z",
+        "outboundBytes": 7}]})},
+    expect_state={"hls": {"muxer_count": 1, "muxers": {"studio.cam1": {
+        "created": "2026-10-06T08:06:00Z", "last_request": "2026-10-06T08:07:00Z", "outbound_bytes": 7}}}})
+
 _RTSP = {"id": _MXID, "created": "2026-10-06T08:01:00Z", "remoteAddr": "10.0.0.50:51234", "state": "publish",
          "path": "cam1", "query": "", "transport": "TCP", "profile": "AVP", "user": "operator",
          "bytesReceived": 1000, "bytesSent": 20, "inboundBytes": 1000, "outboundBytes": 20, "conns": []}

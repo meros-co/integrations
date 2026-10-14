@@ -935,9 +935,9 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      A path whose name holds a dot is left out of state (state keys are
-      dotted paths); the commands still take it. Path names may hold
-      slashes (live/stage), sent percent-encoded in the request path. Sessions
+      A path's name is one state key, dots and slashes included
+      (paths.live/stage.v1). Path names may hold slashes (live/stage), sent
+      percent-encoded in the request path. Sessions
       and connections are keyed by their UUID, HLS muxers by their path.
       Byte counters are totals since the path or session started.
 
@@ -1231,13 +1231,13 @@ telemetry:
         override: "$.overridePublisher"
         always: "$.alwaysAvailable"
       state:
-        path_configs.{name}.record: "{record}"
-        path_configs.{name}.record_format: "{record_format}"
-        path_configs.{name}.record_delete_after: "{delete_after}"
-        path_configs.{name}.source_on_demand: "{on_demand}"
-        path_configs.{name}.max_readers: "{max_readers}"
-        path_configs.{name}.override_publisher: "{override}"
-        path_configs.{name}.always_available: "{always}"
+        path_configs.{name:key}.record: "{record}"
+        path_configs.{name:key}.record_format: "{record_format}"
+        path_configs.{name:key}.record_delete_after: "{delete_after}"
+        path_configs.{name:key}.source_on_demand: "{on_demand}"
+        path_configs.{name:key}.max_readers: "{max_readers}"
+        path_configs.{name:key}.override_publisher: "{override}"
+        path_configs.{name:key}.always_available: "{always}"
     - path: '^/v3/config/paths/list\?(?:page=0&)?itemsPerPage=\d+$'
       json_match: { "$.pageCount": "^[01]$" }
       json: {}
@@ -1254,9 +1254,9 @@ telemetry:
       json_each: "$.items"
       json: { name: "$.name", received: "$.bytesReceived", sent: "$.bytesSent", codecs: "$.tracks" }
       state:
-        paths.{name}.inbound_bytes: "{received}"
-        paths.{name}.outbound_bytes: "{sent}"
-        paths.{name}.codecs: "{codecs}"
+        paths.{name:key}.inbound_bytes: "{received}"
+        paths.{name:key}.outbound_bytes: "{sent}"
+        paths.{name:key}.codecs: "{codecs}"
     - path: '^/v3/paths/list(?:\?|$)'
       json_each: "$.items"
       json:
@@ -1274,18 +1274,18 @@ telemetry:
         outbound: "$.outboundBytes"
         frames_in_error: "$.inboundFramesInError"
       state:
-        paths.{name}.conf_name: "{conf}"
-        paths.{name}.ready: "{ready}"
-        paths.{name}.online: "{online}"
-        paths.{name}.available: "{available}"
-        paths.{name}.ready_time: "{ready_time}"
-        paths.{name}.online_time: "{online_time}"
-        paths.{name}.source_type: "{source_type}"
-        paths.{name}.source_id: "{source_id}"
-        paths.{name}.readers: "{readers}"
-        paths.{name}.inbound_bytes: "{inbound}"
-        paths.{name}.outbound_bytes: "{outbound}"
-        paths.{name}.inbound_frames_in_error: "{frames_in_error}"
+        paths.{name:key}.conf_name: "{conf}"
+        paths.{name:key}.ready: "{ready}"
+        paths.{name:key}.online: "{online}"
+        paths.{name:key}.available: "{available}"
+        paths.{name:key}.ready_time: "{ready_time}"
+        paths.{name:key}.online_time: "{online_time}"
+        paths.{name:key}.source_type: "{source_type}"
+        paths.{name:key}.source_id: "{source_id}"
+        paths.{name:key}.readers: "{readers}"
+        paths.{name:key}.inbound_bytes: "{inbound}"
+        paths.{name:key}.outbound_bytes: "{outbound}"
+        paths.{name:key}.inbound_frames_in_error: "{frames_in_error}"
     - path: '^/v3/paths/list\?(?:page=0&)?itemsPerPage=\d+$'
       json_match: { "$.pageCount": "^[01]$" }
       json: {}
@@ -1302,13 +1302,13 @@ telemetry:
         sample_rate: "$.codecProps.sampleRate"
         channels: "$.codecProps.channelCount"
       state:
-        paths.{name}.tracks.{index}.codec: "{codec}"
-        paths.{name}.tracks.{index}.width: "{width}"
-        paths.{name}.tracks.{index}.height: "{height}"
-        paths.{name}.tracks.{index}.profile: "{profile}"
-        paths.{name}.tracks.{index}.level: "{level}"
-        paths.{name}.tracks.{index}.sample_rate: "{sample_rate}"
-        paths.{name}.tracks.{index}.channel_count: "{channels}"
+        paths.{name:key}.tracks.{index}.codec: "{codec}"
+        paths.{name:key}.tracks.{index}.width: "{width}"
+        paths.{name:key}.tracks.{index}.height: "{height}"
+        paths.{name:key}.tracks.{index}.profile: "{profile}"
+        paths.{name:key}.tracks.{index}.level: "{level}"
+        paths.{name:key}.tracks.{index}.sample_rate: "{sample_rate}"
+        paths.{name:key}.tracks.{index}.channel_count: "{channels}"
 
     # ── Sessions (RTSP, RTSPS, WebRTC, HLS, MoQ) ────────────────────────────
     # Both forms of the names: /v3/rtsp/sessions/list (1.21) and
@@ -1463,9 +1463,9 @@ telemetry:
       json_each: "$.items"
       json: { path: "$.path", created: "$.created", last: "$.lastRequest", outbound: "$.outboundBytes" }
       state:
-        hls.muxers.{path}.created: "{created}"
-        hls.muxers.{path}.last_request: "{last}"
-        hls.muxers.{path}.outbound_bytes: "{outbound}"
+        hls.muxers.{path:key}.created: "{created}"
+        hls.muxers.{path:key}.last_request: "{last}"
+        hls.muxers.{path:key}.outbound_bytes: "{outbound}"
     - path: '^/v3/hls/?muxers/list\?(?:page=0&)?itemsPerPage=\d+$'
       json_match: { "$.pageCount": "^[01]$" }
       json: {}
@@ -1474,9 +1474,9 @@ telemetry:
       json_each: "$.items"
       json: { path: "$.path", created: "$.created", last: "$.lastRequest", outbound: "$.bytesSent" }
       state:
-        hls.muxers.{path}.created: "{created}"
-        hls.muxers.{path}.last_request: "{last}"
-        hls.muxers.{path}.outbound_bytes: "{outbound}"
+        hls.muxers.{path:key}.created: "{created}"
+        hls.muxers.{path:key}.last_request: "{last}"
+        hls.muxers.{path:key}.outbound_bytes: "{outbound}"
 
     # ── Re-reads after this integration's own changes (1.15.5 and later) ────
     - path: '^/v3/config/(?:paths/(?:add|patch|replace|delete)/|path-?defaults/patch$|global/patch$)'
