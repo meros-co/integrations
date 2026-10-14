@@ -677,16 +677,14 @@ quirks:
     severity: warning
     text: >
       The protocol documents no change notifications for the crosspoint: front panel and other clients'
-      changes reach state only through the poll of the connections ({VC}) and of the input and output
-      status ({:ISD}, {:OSD}), network settings and RS-232 baud rate, which each connection view's answer
-      has read after it, every 5 seconds, and through replies. An MX-CPU2 frame (MX-FR) also sends "(PSC)"
-      when a port status changes, which has the status read again at once (MX-FR 7.14.2). The emulated
-      EDIDs reach state from get_emulated_edids only: an EDID change ("(E_S_C)") cannot have {VEDID} sent
-      again, because the format reads the bare word in a rule's message as a placeholder. On the UMX the
-      {VC} form without a layer is not documented and its error answer is ignored; its crosspoint,
-      network, RS-232 and GPIO state comes from the replies to its commands (get_connection_layer,
-      get_ip_status, get_rs232_mode, get_gpio and the others), since nothing it answers on its own can have
-      them read after it.
+      changes reach state only through the polls every 5 seconds and through replies. The MX matrices are
+      asked for the connections ({VC}), the mutes ({VM}), the input and output status ({:ISD}, {:OSD}), the
+      emulated EDIDs ({VEDID}), the network settings and the RS-232 baud rate; the UMX for its video and
+      audio layers ({VC V}, {VC A}); both for the product type ({i}). An MX-CPU2 frame (MX-FR) also sends
+      "(PSC)" when a port status changes, which has the status read again at once (MX-FR 7.14.2), and an
+      EDID change's "(E_S_C)" has the emulated EDIDs read again. A frame without RS232BAUD (MX8x8, MX-CPU1)
+      answers that poll with an error, which changes nothing. The UMX's network, RS-232 and GPIO state comes
+      from the replies to its commands (get_ip_status, get_rs232_mode, get_gpio and the others).
   - models: [all]
     severity: info
     text: >
@@ -696,9 +694,9 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Format gap: a template cannot hold a bare identifier in braces, because "{i}" is a placeholder. The
-      commands whose wire text is such a word ({i}, {f}, {s}, {ct}, {st}, {rst}, {ping}, {label}, {VC},
-      {VM}, {VEDID}) take it through a one-value enum parameter (command), which renders the exact text.
+      The commands whose wire text is a bare word in braces ({i}, {f}, {s}, {ct}, {st}, {rst}, {ping},
+      {label}, {VC}, {VM}, {VEDID}) keep the one-value enum parameter (command) they were offered with,
+      which renders the exact text; the polls write the same words with escaped braces.
   - models: [mx-pro]
     severity: info
     text: >
@@ -766,10 +764,20 @@ state:
   hdmi.outputs.*.status: { type: string, description: "MX8x8: an HDMI output's status line (STO), its settings after O" }
 
 telemetry:
-  # No change notifications are documented for the crosspoint, so it is polled; an MX's connection view
-  # has the port status and settings read after it (the rule below).
+  # No change notifications are documented for the crosspoint, so it, the mutes, the port status and
+  # the settings are polled. A bare word in braces is written with its braces escaped (SPEC.md §4).
   poll:
-    send: ["{VC}"]
+    send:
+      - { models: [mx-pro], message: '\{VC}' }
+      - { models: [mx-pro], message: '\{VM}' }
+      - { models: [mx-pro], message: "{:ISD}" }
+      - { models: [mx-pro], message: "{:OSD}" }
+      - { models: [mx-pro], message: '\{VEDID}' }
+      - { models: [mx-pro], message: "{IP_CONFIG=?}" }
+      - { models: [mx-pro], message: "{RS232BAUD=?}" }
+      - { models: [umx-hdmi-140], message: "{VC V}" }
+      - { models: [umx-hdmi-140], message: "{VC A}" }
+      - '\{i}'
     every_ms: 5000
   updates:
     - match: '^\((?:I:)?((?:MX|UMX|DXP|MMX|HDMI|DVI)[^)]*)\)$'
@@ -796,17 +804,18 @@ telemetry:
       state:
         "layers.{1}.muted": { value: "x{2}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
         "layers.{1}.locked": { value: "x{2}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    # The connection view: one field per output, in order, a state letter then the input.
+    # The connection view ({VC}): one field per output, in order, a state letter then the input.
     - match: '^\(ALL\s'
       match_each: '([LMU]?)0*(\d+)'
       state:
         "outputs.{index:+1}.input": "{2}"
         "outputs.{index:+1}.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
         "outputs.{index:+1}.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    # Each connection view an MX answers has the port status and the network and RS-232 settings read
-    # after it, so they follow the 5-second poll.
-    - match: '^\(ALL\s'
-      then_send: ["{:ISD}", "{:OSD}", "{IP_CONFIG=?}", "{RS232BAUD=?}"]
+    # The mutes ({VM}): one 1 or 0 per output, in order.
+    - match: '^\(MUT\s'
+      match_each: '([01])'
+      state:
+        "outputs.{index:+1}.muted": { value: "{1}", map: { "0": false, "1": true } }
     # Port status, one hex digit per port (MX 7.6.1-7.6.2, MX-FR 7.9.1-7.9.2).
     - match: '^\(ISD\s+'
       match_each: '([0-9A-Fa-f])'
@@ -816,11 +825,12 @@ telemetry:
       match_each: '([0-9A-Fa-f])'
       state:
         "outputs.{index:+1}.status": { value: "{1}", map: { "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "A": 10, "B": 11, "C": 12, "D": 13, "E": 14, "F": 15, "a": 10, "b": 11, "c": 12, "d": 13, "e": 14, "f": 15 } }
-    # An MX-CPU2 frame says a port status changed (MX-FR 7.14.2). "(E_S_C)", which announces an EDID
-    # change, cannot have {VEDID} sent again: a then_send message is a template over the rule's captures,
-    # and {VEDID} would be read as one.
+    # An MX-CPU2 frame says a port status changed (MX-FR 7.14.2), and "(E_S_C)" announces an EDID change:
+    # each has what changed read again at once.
     - match: '^\(PSC\)$'
       then_send: ["{:ISD}", "{:OSD}"]
+    - match: '^\(E_S_C\)$'
+      then_send: ['\{VEDID}']
     - match: '^\(VEDID\s'
       match_each: '([FUDfud]?\d+)'
       state: { "inputs.{index:+1}.edid": "{1}" }

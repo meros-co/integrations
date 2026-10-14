@@ -1967,51 +1967,59 @@ telemetry:
   # notify switch only; they are read by the field names the switches use
   # (corroborated for display timecode, timeline position and playrange by
   # Sofie's hyperdeck-connection, MIT). One notify line per kind, so a deck
-  # lacking one still enables the rest; a protocol 1.8 or 1.11 deck answers
-  # the later ones with an error, which changes nothing.
+  # lacking one still enables the rest. A protocol 1.8 or 1.11 deck is sent
+  # only the transport, slot, remote and configuration switches.
   subscribe:
     send:
       - "notify: transport: true"
       - "notify: slot: true"
       - "notify: remote: true"
       - "notify: configuration: true"
-      - "notify: display timecode: true"
-      - "notify: timeline position: true"
-      - "notify: dropped frames: true"
-      - "notify: playrange: true"
-      - "notify: cache: true"
-      - "notify: dynamic range: true"
-      - "notify: slate: true"
-      - "notify: clips: true"
-      - "notify: nas: true"
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: display timecode: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: timeline position: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: dropped frames: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: playrange: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: cache: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: dynamic range: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: slate: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: clips: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: disk: true" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify: nas: true" }
   # Asked once on connecting; after that the pushes and the re-reads below
   # keep state. Slots 1 to 4 are each asked for; a deck answers a slot it
-  # lacks with an error.
+  # lacks with an error. A protocol 1.8 or 1.11 deck is asked only what its
+  # commands cover (device and transport info, its disks' clip lists, the
+  # configuration and the timeline, and on 1.11 the playrange), and told to
+  # send only the notifications of its era.
   poll:
     send:
       - "device info"
       - "transport info"
-      - "slot info"
-      - "slot info: slot id: 1"
-      - "slot info: slot id: 2"
-      - "slot info: slot id: 3"
-      - "slot info: slot id: 4"
-      - "remote"
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 1" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 2" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 3" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 4" }
+      - "disk list: slot id: 1"
+      - "disk list: slot id: 2"
+      - "disk list: slot id: 3"
+      - "disk list: slot id: 4"
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "remote" }
       - "configuration"
-      - "notify"
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify" }
       - "clips get"
-      - "playrange"
-      - "play on startup"
-      - "play option"
-      - "cache info"
-      - "dynamic range"
-      - "slate clips"
-      - "slate project"
-      - "slate lens"
-      - "nas list"
-      - "nas selected"
-      - "external drive list"
-      - "external drive selected"
+      - { models: [hyperdeck-1-11, hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "playrange" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "play on startup" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "play option" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "cache info" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "dynamic range" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate clips" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate project" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate lens" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "nas list" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "nas selected" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "external drive list" }
+      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "external drive selected" }
   updates:
     - header: "^500 connection info:$"
       fields:
@@ -2154,6 +2162,34 @@ telemetry:
     # whole timeline read again.
     - match: "^519 "
       then_send: ["clips get"]
+
+    # ── Disk clip lists (206 disk list, p.18) ─────────────────────────────
+    # The reply names its slot on the line after the header, then lists the
+    # clips: in response version 1 "{index}: {name} {file format} {video
+    # format} {duration}", in version 2 "{index}: {codec} {format}
+    # {duration} {folder/filename}" (p.8). The slot's list is replaced whole.
+    - match: "(?ms)\\A206 disk list:$.*?^slot id: (\\d+)$"
+      replace: "slots.{1}.clips"
+    - match: "(?ms)\\A206 disk list:$.*?^slot id: (\\d+)$"
+      match_each: "(?m)^(\\d+): (.+) (\\S+) (\\S+) ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2})$"
+      state:
+        "slots.{1}.clips.{2}.name": "{3}"
+        "slots.{1}.clips.{2}.file_format": "{4}"
+        "slots.{1}.clips.{2}.video_format": "{5}"
+        "slots.{1}.clips.{2}.duration": "{6}"
+    - match: "(?ms)\\A206 disk list:$.*?^slot id: (\\d+)$"
+      match_each: "(?m)^(\\d+): (\\S+) (\\S+) ([0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}) (.+)$"
+      state:
+        "slots.{1}.clips.{2}.file_format": "{3}"
+        "slots.{1}.clips.{2}.video_format": "{4}"
+        "slots.{1}.clips.{2}.duration": "{5}"
+        "slots.{1}.clips.{2}.name": "{6}"
+    # A disk clips notification (520) has the active disk's list read again;
+    # a slot change (502) has that slot's.
+    - match: "^520 "
+      then_send: ["disk list"]
+    - match: "(?ms)\\A502 slot info:$.*?^slot id: (\\d+)$"
+      then_send: ["disk list: slot id: {1}"]
 
     # ── Playrange, play on startup, play option (219, 218, 220) ──────────
     # Reply codes as Sofie's hyperdeck-connection gives them; a playrange
@@ -2319,6 +2355,10 @@ state:
   transport.dynamic_range:   { type: string, description: "off, Rec709, Rec2020_SDR, HLG, ST2084_300 to ST2084_4000, ST2048 or none" }
   transport.reference_locked: { type: bool, description: "Locked to the reference signal" }
   slots.*.name:              { type: string, description: "Slot name, keyed by slot id" }
+  slots.*.clips.*.name:      { type: string, description: "A playable clip's name on the slot's disk, keyed by its index from 1 (206 disk list; with its folder in response version 2)" }
+  slots.*.clips.*.file_format: { type: string, description: "The clip's file format (version 1) or codec (version 2), such as QuickTimeProRes" }
+  slots.*.clips.*.video_format: { type: string, description: "The clip's video format, such as 1080p30" }
+  slots.*.clips.*.duration:  { type: string, description: "The clip's duration as timecode" }
   slots.*.device_name:       { type: string, description: "Identifying name of the disk device in the slot" }
   slots.*.status:            { type: string, description: "empty, mounting, error or mounted" }
   slots.*.volume_name:       { type: string, description: "Volume name" }
@@ -2457,9 +2497,12 @@ quirks:
       change this integration makes; a change made elsewhere shows only on
       the next connection unless the deck notifies it. The nas list, nas
       selected and external drive replies are undocumented and kept as the
-      reply's text. Disk clip lists (disk list) are returned by their commands
-      and not kept in state: a 206 reply names its slot on a line of its own,
-      which a state rule cannot key by.
+      reply's text. Each slot's disk clip list (slots.<id>.clips) is read on
+      connecting, when the deck notifies a disk change (520, the active
+      disk's list) or a slot change (502, that slot's), and from any disk
+      list reply; a list read again replaces the last, so a removed clip
+      leaves state. A clip list is keyed by the index the deck gives, which
+      changes as clips are added or removed.
 
   - models: [all]
     severity: info

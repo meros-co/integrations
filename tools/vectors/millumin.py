@@ -151,4 +151,20 @@ telemetry(MI, "layer-selected", inbound_hex=hexs(osc("/millumin/layer:MyLayer/se
 telemetry(MI, "light-deselected", inbound_hex=hexs(osc("/millumin/light:Wash/selected", ("i", 0))),
           expect_state={"lights": {"Wash": {"selected": False}}})
 telemetry(MI, "info", inbound_hex=hexs(osc("/millumin/info", ("s", "layer:MyLayer/opacity"), ("f", 0.75))),
-          expect_state={"info": {"address": "layer:MyLayer/opacity", "value": "0.75"}})
+          expect_state={"info": {"address": "layer:MyLayer/opacity", "value": "0.75"},
+                        "layers": {"MyLayer": {"opacity": 0.75}}})
+# The properties /millumin/info names in its first argument update state as
+# the regular messages do.
+telemetry(MI, "info-selected", inbound_hex=hexs(osc("/millumin/info", ("s", "layer:MyLayer/selected"), ("i", 1))),
+          expect_state={"info": {"address": "layer:MyLayer/selected", "value": "1"},
+                        "layers": {"MyLayer": {"selected": True}}})
+telemetry(MI, "info-position", inbound_hex=hexs(osc("/millumin/info", ("s", "layer:MyLayer/position/xy"),
+                                                     ("f", 0.25), ("f", 0.5))),
+          expect_state={"info": {"address": "layer:MyLayer/position/xy", "value": "0.25"},
+                        "layers": {"MyLayer": {"x": 0.25, "y": 0.5}}})
+telemetry(MI, "info-effect", inbound_hex=hexs(osc("/millumin/info", ("s", "layer:Background/effect1/red"), ("f", 0.25))),
+          expect_state={"info": {"address": "layer:Background/effect1/red", "value": "0.25"},
+                        "layers": {"Background": {"effects": {"1": {"red": 0.25}}}}})
+telemetry(MI, "info-light", inbound_hex=hexs(osc("/millumin/info", ("s", "light:Wash/intensity"), ("f", 0.5))),
+          expect_state={"info": {"address": "light:Wash/intensity", "value": "0.5"},
+                        "lights": {"Wash": {"intensity": 0.5}}})

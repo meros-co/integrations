@@ -36,6 +36,10 @@ conversions: { … }            # §4, named value conversions, optional
 
 `id` is the consumer-facing identifier. It does not change once published.
 
+A spec gives each mapping key once, at every depth, and defines each anchor
+once: YAML loaders disagree on which of two values they keep, and
+`tools/validate.py` refuses both.
+
 `state` declares every state path the device reports, with its type, unit and
 meaning, keyed by dotted path with `*` for a number such as a channel:
 
@@ -98,8 +102,15 @@ command is sent:
 | `block` | A blank line | Blackmagic Videohub |
 | `headed-block` | The end of the first line, unless that line ends in `:`, in which case a blank line | Blackmagic HyperDeck: `200 ok`, or `208 transport info:` followed by fields |
 | `terminated` | The first of `reply_terminators`, kept as part of the message; no line ending is needed | Roland V-60HD: `VFL:a;`, and a bare ACK byte (`reply_terminators: [";", "\u0006"]`) |
+| `fenced` | The end of the line, unless the line matches `reply_fence`: then the next such line after other text, the lines between being one message | Turtle AV controllers: a status block between lines of `=` (`reply_fence: "^=+\\s*$"`) |
 
 It defaults to `block` for `framing: block` and to `line` otherwise.
+
+With `fenced`, a fence line opens a block and the next fence line after any
+other text closes it, so two fences in a row open one block; the fences, and
+the blank lines at the block's start and end, are not part of the message.
+The block's first line is what `header` rules (§8) match, and its other
+lines what `each_line` reads, as for a `block` reply.
 
 `reply_match` is an RE2-safe regex separating replies from unsolicited
 messages. A device that pushes status at any time (HyperDeck's `5xx` messages,
@@ -137,6 +148,23 @@ The reply is the first message holding the rendered text; other messages
 are not the reply, and still go to the telemetry rules. As with `reply_json`
 (§2, `ws`), a command whose reply never comes times out without the stream
 being reset, since a late reply names what it answers.
+
+A device that answers one message with several replies (an Evertz Quartz
+router answers a name write with the name update, then an acknowledge) gives
+their number as `expect.replies`. The command then takes that many replies
+for each message, in order, each one a reply as above (the first holding
+`reply_contains`, when given, and the rest the next replies); `expect` checks
+them all, joined by line breaks, so `(?m)` lets a `matches` regex find one of
+them. Every reply is also offered to the telemetry rules. A reply matching
+the transport's `error_match` ends the wait at once:
+
+```yaml
+commands:
+  set_destination_name:
+    send: ".WD{destination},{name}"
+    expect: { replies: 2, matches: '(?m)^\.A' }
+    returns: ack
+```
 
 A device whose error answer names nothing (Shure's `< REP ERR >`) declares it
 as the transport's `error_match`, a regex: such a message is taken as the
@@ -256,6 +284,27 @@ transport:
   refusal_status: [401]
   refusal_json: { "$.error.code": "^190$" }
 ```
+
+A service that answers a refused token and other errors with the same
+status names what the refusal's body holds with `refusal_status_body`: a
+status of `refusal_status` is then a refusal only when its body matches too,
+and any other answer with that status fails only the request it answers (no
+token refresh, no `unauthorized`). `json` maps JSON paths to regexes, all of
+which must match; `match` is a regex over the body text; with both, both
+must. Twitch answers a revoked or expired token with 401 and "Invalid OAuth
+token", and a token lacking a command's scope with 401 too:
+
+```yaml
+transport:
+  type: http
+  auth: oauth2
+  refusal_status: [401]
+  refusal_status_body: { json: { "$.message": "(?i)^invalid oauth token$" } }
+```
+
+It applies to answers the core reads a body of: command, poll and probe
+requests. The opening of a push websocket or event stream has no body to
+read, and its refusal statuses stand alone, as without it.
 
 A service that wants a header of its own on every request, beside the
 credential, lists it in `headers`, each name mapped to a template over
@@ -418,6 +467,21 @@ sent while the login is answered.
 | To the login, 2xx with the session | The session is held; the queue goes on. |
 | To the login, anything else, or no answer | Logged; commands waiting for a session fail. The next request needing one logs in again. |
 | To any other request, matching `relogin` | The session is dropped, the core logs in again and sends that request once more. A second match for the same request is its answer. |
+
+A device whose login the operator can turn off (AJA KUMO's User
+Authentication, off by default) names the setting that says it is on with
+`when_set`: while that setting is empty or false, nothing logs in and
+requests go without a session; once it is set (or true), the next request
+needing a session logs in first. It is decided from the settings current at
+the time, so `update_settings` turns it on or off:
+
+```yaml
+    session:
+      when_set: user_authentication     # a bool setting
+      login: { method: POST, path: /authenticator/login, body: "password_provided={settings.password:url}",
+               content_type: application/x-www-form-urlencoded }
+      capture: { cookie: session }
+```
 
 The session is a secret: the login's answer is never offered to the
 telemetry rules, and the session is never logged or kept in state.
@@ -756,6 +820,7 @@ commands:
 | `enum` | `values`, `default` |
 | `string` | `max_length`, `pattern` (RE2-safe), `default` |
 | `json` | Any JSON value, sent as compact JSON. Only for a request body whose shape the device's own API documents and validates; the command's summary names that schema |
+| `binary` | Bytes given as base64, sent as they are in an HTTP body (§4, "Binary request bodies"); `max_length` in bytes |
 
 Values outside the declared range are rejected before transmission. The core
 does not clamp, because a clamped value masks a caller error and produces a
@@ -787,6 +852,10 @@ Every string in `send`, `on_connect` and `probe` is a template. Substitution is
 `{param}` for a command parameter or `{settings.name}` for a setting, optionally
 followed by directives after `:`. A name is made of letters, digits, `_` and
 `.`, so any other brace is literal: `{"status":"toggle"}` is sent as written.
+A word in braces that is a protocol's own text, not a placeholder
+(Lightware LW2's `{VC}`), escapes its braces with a backslash: `\{VC}` and
+`\{VC\}` are both sent as `{VC}`. `\{` and `\}` are always a literal
+brace, and a backslash before anything else is itself.
 
 **Every substituted value is always present.** A parameter used in a template
 must be `required` or have a `default`. A protocol clause that exists only when
@@ -945,11 +1014,24 @@ commands:
       - { models: [ip-to-hdmi], method: POST, path: /api/reboot }
 ```
 
+A line device's text messages are written the same way, the text under
+`message`. A HyperDeck on protocol 1.8 is not asked for what its protocol
+lacks:
+
+```yaml
+telemetry:
+  poll:
+    send:
+      - "transport info"
+      - { models: [hyperdeck-studio, hyperdeck-extreme], message: "cache info" }
+```
+
 A message naming `models` is sent only to those models; one without is sent
 to every model. This is decided from the model the device was opened as,
 before anything is sent, like `when_set` (§2), never from what the device
 says. It applies to the object messages of `send` (HTTP requests and OSC
-messages), telemetry `poll` and `subscribe` items, `on_connect` steps, the
+messages, and on line and websocket transports a text message written as
+`{models: [...], message: "..."}`), telemetry `poll` and `subscribe` items, `on_connect` steps, the
 `probe` (a list whose first message for the model is used), a session's
 `login` and telemetry `updates` rules (§8, "Rules per model").
 `tools/validate.py` checks that every model a command `supports` has a
@@ -1027,6 +1109,53 @@ commands:
 `&`-separated arguments. Use `query: {k: v}` for key/value APIs; the core
 URL-encode that form. A spec sets one or the other, not both.
 
+`content_type` is a template, so an enum parameter can choose it (an image
+as `image/jpeg` or `image/png`). `headers` gives headers of one message
+alone, each a template over its parameters and the settings, as
+`transport.headers` (§2) does for every request.
+
+### Binary request bodies
+
+A file a device takes as a request body (an image, a show file, a media
+clip) is a `binary` parameter: the caller gives its bytes as a base64 string
+(RFC 4648, padding optional), and the core sends them as they are.
+`max_length` limits the decoded bytes. A binary parameter is `required`, and
+is never rendered in a template; it is sent in one of two ways:
+
+```yaml
+commands:
+  set_thumbnail:
+    params:
+      video_id: { type: string, max_length: 64, required: true, … }
+      image: { type: binary, max_length: 2097152, required: true, … }
+      format: { type: enum, values: [image/jpeg, image/png], default: image/jpeg, … }
+    send:
+      method: POST
+      path: /upload/youtube/v3/thumbnails/set
+      query: { videoId: "{video_id}", uploadType: media }
+      body: { binary: image }          # the bytes are the whole body
+      content_type: "{format}"
+  upload_media:
+    params: { file: { type: binary, required: true, … }, name: { type: string, … } }
+    send:
+      method: POST
+      path: /media/upload
+      multipart:                       # multipart/form-data (RFC 7578)
+        - { name: addToMap, value: "true" }
+        - { name: MediaFile, binary: file, filename: "{name}", content_type: application/octet-stream }
+```
+
+With `multipart` in place of `body` and `content_type`, each part is a form
+field: `name`, then a template `value` or a binary parameter's bytes, with an
+optional `filename` and `content_type`, both templates (a line break or a
+quote in them, or in `name`, is refused before transmission). The core writes
+the body with a boundary derived from its content, so the same parts always
+give the same bytes, and sends `Content-Type: multipart/form-data;
+boundary=...`. A vector for such a command gives the body as `body_hex`, and
+may give `content_type`, in `expect_request`. `tools/validate.py` checks that
+a binary parameter is required, named only by `body.binary` or a part's
+`binary`, and used only over HTTP.
+
 ## 5. Responses
 
 ```yaml
@@ -1044,6 +1173,7 @@ expect:
   arg: 0                    # OSC only: argument returned as the value
   reply_json: { "$.id": "{id}" }    # ws only: what identifies the reply (§2)
   reply_contains: "REP {channel:02d} AUDIO_MUTE "  # line transports: text the reply holds (§2)
+  replies: 2                # line transports: replies each message takes (§2)
   convert: x32_fader        # the returned value, converted from the wire (§4)
 ```
 
@@ -1212,6 +1342,7 @@ of:
 | `header` + `each_line` | A block whose first line matches `header`; `each_line` is applied to each following line | per line: `{1}`, `{2}`, … |
 | `header` + `fields` | A block whose first line matches `header`; the following lines are `name: value` | `fields` maps each name to a state path |
 | `address` | An OSC message whose address matches | `{1}`, … from the address; `{arg0}`, `{arg1}`, … the arguments |
+| `address` + `arg_match` | As `address`, where the text of each argument named matches its regex | as `address`, then `arg_match`'s |
 | `address` + `json` | As `address`, where the string argument at `json_arg` (default 0) holds JSON; with `json_match`, `json_each` and `each_match` it is read as a JSON message is (below) | as `address`, then `json_match`'s, plus `json` names by JSON path |
 
 `state` maps a path template to a value template. Both use the template rules
@@ -1497,6 +1628,22 @@ whole and each item can have more read:
 The message must match `match` for the rule to apply at all, so an empty list
 (`0 0`) still replaces what was there.
 
+A list that does not run to the end of the message, or shares its opening
+words with another message, is taken from one capture group of `match` with
+`match_each_in`, the group's number. A Shure MXA sends each meter as `<
+SAMPLE 040 052 ... >`, one level per channel, and its talker positions as `<
+SAMPLE TALKER_POSITIONS ... >`; only the first is a meter list:
+
+```yaml
+    - match: "^< SAMPLE((?: \\d{3})+) >$"
+      match_each: "(\\d{3})"
+      match_each_in: 1
+      state: { "meters.levels.{index:+1}": "{2:-60}" }
+```
+
+`{index}` takes offsets as a number does, so a list numbered from 1 keys its
+state from 1. A group that took no part in the match gives no items.
+
 #### Poll replies on another address
 
 An OSC query is answered on its own address by most devices. ETC Eos answers
@@ -1529,6 +1676,21 @@ exactly those type tags:
     - address: '^/13\.13\.1\.6\.(\d+)$'
       arg_types: sif
       state: { "sequences.{1}.faders.{arg0}": "{arg2}" }
+```
+
+#### OSC string arguments
+
+A device that names what changed inside a string argument (Millumin's
+`/millumin/info`, whose first argument is the original feedback address,
+`layer:Screen/opacity`, and the next its value) is read with `arg_match`: an
+argument's index to an RE2-safe regex its text must match, a number as its
+decimal text. The rule applies only when each matches, and their captures
+are numbered on after the address's, in index order (before `json_match`'s):
+
+```yaml
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/(opacity|rotation|scale)$" }
+      state: { "layers.{1}.{2}": "{arg1}" }
 ```
 
 #### JSON messages
@@ -1710,8 +1872,35 @@ Each event goes to the `json_match` rules as `{"event": <name>, "data":
 <data>}`, with `data` parsed where it is JSON (the event name is `message`
 when the stream gives none), and its data to the text rules.
 
+A stream opened with a request of its own takes `method` (`GET`, the
+default, or `POST`), a `body`, a template over settings, and its
+`content_type`. A service whose stream is chunked JSON rather than
+event-stream, one document per part with a blank line between parts, says
+`format: json`: the stream is asked for as `application/json`, and each
+part goes to the `json_match` rules as the document it is (not as `{event,
+data}`) and to the text rules as its text. With `as_reply`, each part (or,
+for event-stream, each `{event, data}`) is also offered to the `path`
+rules as the reply to a GET of the path at `as_reply.path`, with the value
+at `as_reply.body` as its body, so the rules that read a poll's reply read
+the stream's updates too, and the polls can stay as the fallback.
+ProPresenter's update stream names each part's endpoint in `url`:
+
+```yaml
+telemetry:
+  sse:
+    method: POST
+    path: /v1/status/updates
+    body: '["status/slide","timer/video_countdown"]'
+    content_type: application/json
+    format: json
+    as_reply: { path: "$.url", body: "$.data" }
+```
+
+A path without a leading `/` is given one.
+
 A telemetry vector for an event stream gives `inbound_sse: { event, data }`,
-one event as the stream would deliver it (`event` defaults to `message`).
+one event as the stream would deliver it (`event` defaults to `message`);
+for `format: json`, `data` is the part's text.
 
 ## Native modules
 

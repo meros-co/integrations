@@ -53,7 +53,11 @@ transport:
   encoding: ascii
   timeout_ms: 3000
   reply: expected
-  reply_match: ^\[(SUCCESS|ERROR)\]
+  # The status commands answer with a block between lines of = signs (§2.2,
+  # §3.33, §4.24): each block is one message, its first line the title.
+  reply_framing: fenced
+  reply_fence: ^=+\s*$
+  reply_match: ^(\[(SUCCESS|ERROR)\]|\s*(IP Control Box )?\S+ CONTROL \S+ Info)
 
 ports:
   - {port: 23, protocol: tcp, role: control, note: 'Telnet, changeable on the controller; the same commands run on its RS-232 port'}
@@ -67,7 +71,7 @@ models:
        set_decoder_pause, set_decoder_mode, set_decoder_name, set_encoder_name,
        set_encoder_edid, set_encoder_audio_input, set_encoder_bitrate,
        set_encoder_main_stream, apply_wall_preset, set_wall_preset_source,
-       set_gpio_direction, set_gpio_level, reboot_decoder, reboot_encoder]
+       set_gpio_direction, set_gpio_level, reboot_decoder, reboot_encoder, get_status]
     verification: none
     notes: >
       Controller for DARWIN HD H.265 encoders and decoders, up to 762 of each.
@@ -80,7 +84,7 @@ models:
        set_encoder_name, set_encoder_edid_chazy, apply_wall_preset, set_wall_preset_source,
        set_gpio_direction, set_gpio_level, set_relay, set_io_output, send_cec, send_ir,
        reboot_decoder, reboot_encoder, reboot_controller, dante_subscribe,
-       set_dante_latency]
+       set_dante_latency, get_status]
     verification: none
     notes: >
       Controller for CHAZY 4K encoders and decoders, with an embedded Dante controller.
@@ -101,6 +105,11 @@ models:
       schedules; its replies are not published.
 
 commands:
+  get_status:
+    summary: "The controller's status block: firmware, power, IR and baud, every encoder and decoder with its IP, network and signal, each decoder's source, resolution and mode, and the LAN settings (GET STATUS, DARWIN §2.2, CHAZY §2.2)"
+    send: GET STATUS
+    expect: { matches: CONTROL Status Info }
+    returns: text
   route:
     summary: 'Route an encoder to a decoder: video, audio, IR, RS-232, USB (and CEC) together; encoder 0 disconnects'
     params:
@@ -538,7 +547,67 @@ commands:
     # CHAZY Control Pro API commands (FW 1.10.08 help listing), SET DEC SENDGUEST
 
 telemetry:
+  # GET STATUS lists every encoder and decoder of the project; it is read on
+  # connecting and every 10 seconds, so changes made elsewhere are seen.
+  poll:
+    send: [GET STATUS]
+    every_ms: 10000
   updates:
+    # GET STATUS (DARWIN §2.2 and CHAZY §2.2 examples): one block, the title,
+    # then tables of whitespace-separated columns.
+    - header: ^\s*(?:IP Control Box )?\S+ CONTROL Status Info\s*$
+      each_line: ^\s*FW Version:\s*(\S+)\s*$
+      state: { controller.firmware: '{1}' }
+    - header: ^\s*(?:IP Control Box )?\S+ CONTROL Status Info\s*$
+      each_line: ^\s*(On|Off)\s+(On|Off)\s+(\d+)\s*$
+      state:
+        controller.power: {value: '{1}', map: {'On': true, 'Off': false}}
+        controller.ir: {value: '{2}', map: {'On': true, 'Off': false}}
+        controller.baud: '{3}'
+    # DARWIN: In, EDID, IP, NET/Sig, AudioFormat.
+    - models: [darwin-control]
+      header: ^\s*IP Control Box \S+ CONTROL Status Info\s*$
+      each_line: ^\s*(\d{3})\s+([A-Za-z]\S*)\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(On|Off)\s*/\s*(On|Off)\s+(\S+)\s*$
+      state:
+        encoders.{1}.edid: '{2}'
+        encoders.{1}.ip: '{3}'
+        encoders.{1}.online: {value: '{4}', map: {'On': true, 'Off': false}}
+        encoders.{1}.signal: {value: '{5}', map: {'On': true, 'Off': false}}
+        encoders.{1}.audio_format: '{6}'
+    # DARWIN: Out, FromIn, IP, NET/HDMI, Res, Mode, Osp.
+    - models: [darwin-control]
+      header: ^\s*IP Control Box \S+ CONTROL Status Info\s*$
+      each_line: ^\s*(\d{3})\s+(\d{3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(On|Off)\s*/\s*(On|Off)\s+(\d+)\s+(\S+)\s+(\S+)\s*$
+      state:
+        decoders.{1}.source: '{2}'
+        decoders.{1}.ip: '{3}'
+        decoders.{1}.online: {value: '{4}', map: {'On': true, 'Off': false}}
+        decoders.{1}.hdmi: {value: '{5}', map: {'On': true, 'Off': false}}
+        decoders.{1}.resolution: '{6}'
+        decoders.{1}.mode: '{7}'
+        decoders.{1}.osp: '{8}'
+    # CHAZY: ENC, Type, EDID, IP, NET/Sig.
+    - models: [chazy-control]
+      header: ^\s*\S+ CONTROL Status Info\s*$
+      each_line: ^\s*(\d{3})\s+(Gen \d+)\s+(\S+)\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(On|Off)\s*/\s*(On|Off)\s*$
+      state:
+        encoders.{1}.type: '{2}'
+        encoders.{1}.edid: '{3}'
+        encoders.{1}.ip: '{4}'
+        encoders.{1}.online: {value: '{5}', map: {'On': true, 'Off': false}}
+        encoders.{1}.signal: {value: '{6}', map: {'On': true, 'Off': false}}
+    # CHAZY: DEC, Type, From, IP, NET/HDMI, Res, Mode.
+    - models: [chazy-control]
+      header: ^\s*\S+ CONTROL Status Info\s*$
+      each_line: ^\s*(\d{3})\s+(Gen \d+)\s+(\d{3})\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(On|Off)\s*/\s*(On|Off)\s+(\d+)\s+(\S+)\s*$
+      state:
+        decoders.{1}.type: '{2}'
+        decoders.{1}.source: '{3}'
+        decoders.{1}.ip: '{4}'
+        decoders.{1}.online: {value: '{5}', map: {'On': true, 'Off': false}}
+        decoders.{1}.hdmi: {value: '{6}', map: {'On': true, 'Off': false}}
+        decoders.{1}.resolution: '{7}'
+        decoders.{1}.mode: '{8}'
     - match: ^\[SUCCESS\]Set decoder (\d+) from encoder (\d+)\.$
       state:
         decoders.{1}.source: '{2}'
@@ -559,7 +628,24 @@ telemetry:
         walls.last_preset: '{1}'
 
 state:
-  decoders.*.source:    {type: int, description: 'Encoder routed to the decoder by this session''s last route, 0 for none, keyed by decoder ID'}
+  controller.firmware:  {type: string, description: 'The controller''s firmware version (GET STATUS)'}
+  controller.power:     {type: bool, description: 'The controller''s power state (GET STATUS)'}
+  controller.ir:        {type: bool, description: 'The controller''s IR receiver on (GET STATUS)'}
+  controller.baud:      {type: int, unit: baud, description: 'The controller''s RS-232 baud rate (GET STATUS)'}
+  encoders.*.type:      {type: string, description: 'CHAZY: the encoder''s generation, such as Gen 2, keyed by encoder ID'}
+  encoders.*.edid:      {type: string, description: 'The encoder''s EDID, as the status lists it (DF000 for the default), keyed by encoder ID'}
+  encoders.*.ip:        {type: string, description: 'The encoder''s IP address, zero-padded as the status lists it'}
+  encoders.*.online:    {type: bool, description: 'The encoder is on the network (NET)'}
+  encoders.*.signal:    {type: bool, description: 'The encoder has an input signal (Sig)'}
+  encoders.*.audio_format: {type: string, description: 'DARWIN: the encoder''s audio format, such as PCM'}
+  decoders.*.type:      {type: string, description: 'CHAZY: the decoder''s generation, such as Gen 2, keyed by decoder ID'}
+  decoders.*.ip:        {type: string, description: 'The decoder''s IP address, zero-padded as the status lists it'}
+  decoders.*.online:    {type: bool, description: 'The decoder is on the network (NET)'}
+  decoders.*.hdmi:      {type: bool, description: 'A display is connected to the decoder''s HDMI output (HDMI)'}
+  decoders.*.resolution: {type: int, description: 'The decoder''s output resolution code, as set_decoder_resolution takes it'}
+  decoders.*.mode:      {type: string, description: 'The decoder''s mode, such as MX (matrix), as the status lists it'}
+  decoders.*.osp:       {type: string, description: 'DARWIN: the decoder''s output scaling (Osp), such as SNK, as the status lists it'}
+  decoders.*.source:    {type: int, description: 'Encoder routed to the decoder, 0 for none, keyed by decoder ID: from GET STATUS and this session''s routes'}
   decoders.*.output:    {type: bool, description: 'Decoder HDMI output on, from this session''s last change'}
   decoders.*.mute:      {type: bool, description: 'Decoder output muted (black), from this session''s last change'}
   decoders.*.rotation:  {type: int, description: 'Decoder output rotation in degrees, from this session''s last change'}
@@ -576,11 +662,13 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      The status commands (GET STATUS, GET DEC STATUS ...) answer with blocks between
-      lines of = signs with no end the line framing can find, so state is not read from
-      them and they are not offered. State holds what this session's own commands changed,
-      from their [SUCCESS] replies; changes made from the web interface or another client
-      are not seen. Nothing is pushed.
+      The status commands answer with blocks between lines of = signs. GET STATUS is read
+      on connecting and every 10 seconds, and its encoder and decoder tables update state,
+      so changes made from the web interface or another client are seen within 10 seconds;
+      nothing is pushed. The columns are read as the documents' examples print them
+      (whitespace between columns); the LAN and Telnet tables are not read. The per-device
+      blocks (GET DEC STATUS, GET ENC STATUS) are not offered. CHAZY Control Pro gives no
+      status example, so its state still holds only this session's own changes.
 
   - models: [all]
     severity: warning

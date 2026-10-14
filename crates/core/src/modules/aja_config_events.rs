@@ -300,7 +300,9 @@ impl AjaConfigEvents {
             HttpRequest {
                 method: "GET",
                 url: format!("{}{target}", self.origin),
-                headers: Vec::new(),
+                // The spec's session (a KUMO with User Authentication on),
+                // once the engine holds one.
+                headers: self.engine.session_header().into_iter().collect(),
                 body: None,
                 timeout: Some(timeout),
                 accept_invalid_certs: false,

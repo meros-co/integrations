@@ -88,6 +88,30 @@ _gh("get_media", {}, "GET", "/media")
 _gh("get_media_info", {"media_id": MEDIA_ID}, "GET", "/media/" + MEDIA_ID, **_gh_err(404))
 _gh("get_media_info_index", {"index": 1}, "GET", "/media/1")
 _gh("get_media_map", {}, "GET", "/media/map")
+# UploadFile: multipart/form-data (RFC 7578) with the four form fields of the
+# API's schema; the boundary is the core's, derived from the parts (SPEC.md
+# §4, "Binary request bodies"). The file is a made-up four bytes.
+def _form(parts):
+    import hashlib
+    digest = hashlib.sha256(b"".join(n.encode() + b"\0" + d + b"\0" for n, d, _ in parts)).hexdigest()
+    boundary = "----form-" + digest[:16]
+    body = b""
+    for name, data, filename in parts:
+        body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"".encode()
+        if filename:
+            body += f"; filename=\"{filename}\"\r\nContent-Type: application/octet-stream".encode()
+        body += b"\r\n\r\n" + data + b"\r\n"
+    body += f"--{boundary}--\r\n".encode()
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+_UP_BODY, _UP_TYPE = _form([("addToMap", b"true", None), ("mapIndex", b"-1", None),
+                            ("customFolderPath", b"", None), ("MediaFile", b"\x00\x01\xfe\xff", "clip.mov")])
+V.append({"spec": GH, "command": "upload_media", "input": {"file": "AAH+/w==", "filename": "clip.mov"},
+          "expect_request": {"method": "POST", "target": "/media/upload", "body_hex": _UP_BODY.hex(),
+                             "content_type": _UP_TYPE},
+          "http_reply": {"status": 200, "body": json.dumps({"mediaID": MEDIA_ID})},
+          "expect_result": {"ok": {"kind": "value", "value": MEDIA_ID}}})
 _gh("delete_media", {"media_id": MEDIA_ID}, "DELETE", "/media/delete/" + MEDIA_ID, **_OK)
 _gh("delete_media_map_entry", {"index": 65535}, "DELETE", "/media/deletemapentry/65535")
 _gh("add_media_map_entry", {"index": 4, "media_id": MEDIA_ID}, "PUT", "/media/addmapentry/4/" + MEDIA_ID)

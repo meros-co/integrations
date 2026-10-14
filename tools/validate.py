@@ -22,8 +22,11 @@ except ImportError as exc:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# libyaml's parser where PyYAML has it, for the duplicate checks.
+FAST_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
 # {name} or {name:directive:directive...}; SPEC.md §4, "Templates".
-PLACEHOLDER = re.compile(r"""\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
+PLACEHOLDER = re.compile(r"""(?<!\\)\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
 
 # The closed directive set, keyed by the parameter types each one accepts.
 DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
@@ -58,6 +61,8 @@ def template_strings(send) -> list[tuple[str, str]]:
     for item in items:
         if isinstance(item, str):
             out.append(("text", item))
+        elif isinstance(item, dict) and "message" in item:
+            out.append(("text", item["message"]))
         elif isinstance(item, dict) and "address" in item:
             out.append(("osc-address", item["address"]))
             for arg in item.get("args", []):
@@ -68,9 +73,57 @@ def template_strings(send) -> list[tuple[str, str]]:
                 out.append(("http-query", value))
             if "raw_query" in item:
                 out.append(("http-raw-query", item["raw_query"]))
-            if "body" in item:
+            if isinstance(item.get("body"), str):
                 out.append(("http-body", item["body"]))
+            if "content_type" in item:
+                out.append(("http-header", item["content_type"]))
+            for value in (item.get("headers") or {}).values():
+                out.append(("http-header", value))
+            for part in item.get("multipart") or []:
+                for key in ("name", "value", "filename", "content_type"):
+                    if key in part:
+                        out.append(("http-body", part[key]))
     return out
+
+
+def binary_refs(send) -> list[str]:
+    """The parameters a send block sends as bytes: `body: {binary: name}`
+    and multipart parts' `binary`."""
+    out: list[str] = []
+    for item in send if isinstance(send, list) else [send]:
+        if not isinstance(item, dict):
+            continue
+        body = item.get("body")
+        if isinstance(body, dict) and "binary" in body:
+            out.append(body["binary"])
+        out += [p["binary"] for p in item.get("multipart") or [] if "binary" in p]
+    return out
+
+
+def binary_checks(send, params: dict, where: str, transport_type) -> list[str]:
+    """SPEC.md §4, "Binary request bodies": a binary parameter is sent only
+    as bytes, over HTTP, and is always present; multipart has no body."""
+    errors: list[str] = []
+    refs = binary_refs(send)
+    for item in send if isinstance(send, list) else [send]:
+        if isinstance(item, dict) and "multipart" in item and ("body" in item or "content_type" in item):
+            errors.append(f"{where}: multipart goes without body and content_type")
+        if isinstance(item, dict) and item.get("headers"):
+            for name in item["headers"]:
+                if name.lower() in ("authorization", "content-type", "host"):
+                    errors.append(f"{where}: header {name} is set by the core, not by the spec")
+    if refs and transport_type != "http":
+        errors.append(f"{where}: binary bodies are for the http transport")
+    for name in refs:
+        decl = params.get(name)
+        if decl is None or decl.get("type") != "binary":
+            errors.append(f"{where}: '{name}' sent as bytes is not a binary parameter")
+        elif not decl.get("required"):
+            errors.append(f"{where}: binary '{name}' must be required")
+    for name, decl in params.items():
+        if decl.get("type") == "binary" and name not in refs:
+            errors.append(f"{where}: binary '{name}' is sent only as a body or a multipart part")
+    return errors
 
 
 def check_template(
@@ -113,6 +166,9 @@ def check_template(
             )
 
         ptype = decl["type"]
+        if ptype == "binary":
+            errors.append(f"{where}: binary '{name}' is sent only as a body or a multipart part, never in a template")
+            continue
         # A multiline string may hold line breaks: only `:json` escapes them.
         if decl.get("multiline"):
             if ptype != "string":
@@ -176,6 +232,50 @@ def check_template(
                     f"needs a 'pattern' restricting it or the ':url' directive"
                 )
     return errors
+
+
+def duplicates(text: str) -> list[str]:
+    """A mapping key given twice, at any depth, silently keeps only the last
+    value, and an anchor defined twice makes each alias name whichever came
+    last before it; loaders in other languages refuse both. Reject them."""
+    found: list[str] = []
+    anchors: dict[str, int] = {}
+    for event in yaml.parse(text, Loader=FAST_LOADER):
+        anchor = getattr(event, "anchor", None)
+        if anchor is None or isinstance(event, yaml.AliasEvent):
+            continue
+        line = event.start_mark.line + 1
+        if anchor in anchors:
+            found.append(f"line {line}: anchor &{anchor} is already defined on line {anchors[anchor]}")
+        else:
+            anchors[anchor] = line
+    if found:
+        return found
+    seen: set[int] = set()
+
+    def walk(node, trail: str) -> None:
+        if id(node) in seen:
+            return
+        seen.add(id(node))
+        if isinstance(node, yaml.MappingNode):
+            keys: dict[str, int] = {}
+            for key, value in node.value:
+                if isinstance(key, yaml.ScalarNode) and key.tag != "tag:yaml.org,2002:merge":
+                    line = key.start_mark.line + 1
+                    here = f"{trail}.{key.value}" if trail else key.value
+                    if key.value in keys:
+                        found.append(f"line {line}: key {here} is already given on line {keys[key.value]}")
+                    else:
+                        keys[key.value] = line
+                    walk(value, here)
+                else:
+                    walk(value, trail)
+        elif isinstance(node, yaml.SequenceNode):
+            for i, item in enumerate(node.value):
+                walk(item, f"{trail}[{i}]")
+
+    walk(yaml.compose(text, Loader=FAST_LOADER), "")
+    return found
 
 
 def non_string_keys(node, trail: str = "") -> list[str]:
@@ -289,6 +389,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         for context, text in template_strings(command.get("send", [])):
             errors += check_template(context, text, params, settings, f"commands.{name}",
                                      conversions=conversions, maps=doc.get("maps") or {})
+        if doc.get("implementation") != "native":
+            errors += binary_checks(command.get("send", []), params, f"commands.{name}", transport_type)
         expect_ = command.get("expect") or {}
         if "reply_json" in expect_:
             if transport_type != "ws":
@@ -303,6 +405,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 errors.append(f"commands.{name}: expect.reply_contains needs a line transport")
             errors += check_template("text", expect_["reply_contains"], params, settings,
                                      f"commands.{name}.expect.reply_contains")
+        if expect_.get("replies", 1) != 1 and transport_type not in ("line-tcp", "line-udp"):
+            errors.append(f"commands.{name}: expect.replies needs a line transport")
         if "convert" in expect_:
             if expect_["convert"] not in conversions:
                 errors.append(f"commands.{name}: expect.convert names undeclared conversion '{expect_['convert']}'")
@@ -381,11 +485,55 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     for method in sorted(methods & {"bearer", "header"}):
         if "token" not in settings:
             errors.append(f"auth: {method} needs a 'token' setting")
+    for i, rule in enumerate(((doc.get("telemetry") or {}).get("updates")) or []):
+        if "match_each_in" in rule:
+            if "match_each" not in rule:
+                errors.append(f"telemetry.updates[{i}]: match_each_in goes with match_each")
+            else:
+                try:
+                    groups = re.compile(rule.get("match", "")).groups
+                except re.error:
+                    groups = 0
+                if rule["match_each_in"] > groups:
+                    errors.append(f"telemetry.updates[{i}]: match_each_in names group {rule['match_each_in']}, which match does not have")
+        if "arg_match" in rule and "address" not in rule:
+            errors.append(f"telemetry.updates[{i}]: arg_match goes with address")
+        for index, pattern in (rule.get("arg_match") or {}).items():
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errors.append(f"telemetry.updates[{i}].arg_match.{index} does not compile: {e}")
+    sse_ = (doc.get("telemetry") or {}).get("sse") or {}
+    if "body" in sse_:
+        errors += check_template("text", sse_["body"], {}, settings, "telemetry.sse.body")
+    if (transport.get("reply_framing") == "fenced") != ("reply_fence" in transport):
+        errors.append("transport: reply_framing fenced and reply_fence go together")
+    if "reply_fence" in transport:
+        try:
+            re.compile(transport["reply_fence"])
+        except re.error as e:
+            errors.append(f"transport.reply_fence does not compile: {e}")
     for path, pattern in (transport.get("refusal_json") or {}).items():
         try:
             re.compile(pattern)
         except re.error as e:
             errors.append(f"transport.refusal_json.{path} does not compile: {e}")
+    rsb = transport.get("refusal_status_body")
+    if rsb is not None:
+        if transport_type != "http":
+            errors.append("transport.refusal_status_body is for the http transport")
+        for path, pattern in (rsb.get("json") or {}).items():
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errors.append(f"transport.refusal_status_body.json.{path} does not compile: {e}")
+        if rsb.get("match") is not None:
+            try:
+                re.compile(rsb["match"])
+            except re.error as e:
+                errors.append(f"transport.refusal_status_body.match does not compile: {e}")
+        if transport.get("refusal_status") == []:
+            errors.append("transport.refusal_status_body needs a refusal_status")
     for name, text in (transport.get("headers") or {}).items():
         errors += check_template("text", text, {}, settings, f"transport.headers.{name}")
     if ("header" in methods) != bool(transport.get("auth_header")):
@@ -530,6 +678,9 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
                 bad = set(item["models"]) - model_ids
                 if bad:
                     errors.append(f"{where}[{i}]: models names unknown model(s) {sorted(bad)}")
+            if (isinstance(item, dict) and "message" in item and where != "telemetry.updates"
+                    and transport.get("type") not in ("line-tcp", "line-udp", "ws")):
+                errors.append(f"{where}[{i}]: {{models, message}} is for line and websocket transports")
             if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
                 errors.append(f"{where}[{i}]: session applies to http requests")
     for model in doc.get("models", []):
@@ -556,6 +707,8 @@ def session_checks(doc: dict) -> list[str]:
     if session is not None:
         if not is_http:
             errors.append("transport.session is for the http transport")
+        if "when_set" in session and session["when_set"] not in settings:
+            errors.append(f"transport.session.when_set names unknown setting '{session['when_set']}'")
         for i, item in enumerate(items_of(session.get("login"))):
             for context, text in template_strings(item):
                 errors += check_template(context, text, {}, settings, f"transport.session.login[{i}]")
@@ -803,7 +956,7 @@ def main() -> int:
             print(f"    YAML parse error (unquoted braces? see CONTRIBUTING.md): {exc}")
             continue
 
-        bad_keys = non_string_keys(doc)
+        bad_keys = duplicates(Path(path).read_text("utf-8")) + non_string_keys(doc)
         if bad_keys:
             failed = True
             print(f"INVALID  {rel}")

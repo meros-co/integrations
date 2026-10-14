@@ -124,6 +124,10 @@ enum Transport {
         /// whose body matches them all is a refusal too, whatever its status
         /// (the Graph API's `error.code` 190 under HTTP 400).
         refusal_json: Vec<(String, Regex)>,
+        /// `transport.refusal_status_body`: a status of `refusal` is a
+        /// refusal only when its body matches this too (Twitch answers a
+        /// missing scope with 401, as it answers a refused token).
+        refusal_body: Option<RefusalBody>,
         /// `transport.endpoints`: other HTTP servers of the same device, on
         /// other ports, by name (MediaMTX's playback server).
         endpoints: BTreeMap<String, Endpoint>,
@@ -256,6 +260,9 @@ struct SessionSpec {
     /// An answer to the login refusing the credential: terminal.
     refused_status: Vec<u16>,
     refused_json: Vec<(String, Regex)>,
+    /// `when_set`: the session is used only while this setting is set
+    /// (non-empty, and not false): a login the operator turns on.
+    when_set: Option<String>,
 }
 
 /// What of the login's answer is the session.
@@ -325,6 +332,7 @@ impl SessionSpec {
             relogin_json: json("relogin")?,
             refused_status: statuses("refused"),
             refused_json: json("refused")?,
+            when_set: str_field(v, "when_set").map(str::to_string),
         })
     }
 
@@ -373,6 +381,16 @@ fn body_matches(selectors: &[(String, Regex)], body: &[u8]) -> bool {
 
 /// Whether a `send` item, probe or login applies to the device's model: one
 /// naming `models` applies only to those (SPEC.md §4, "Messages per model").
+/// A text message's template: the item itself, or on a line or websocket
+/// transport `{models, message}` for a message sent to some models only
+/// (SPEC.md §4, "Messages per model").
+fn line_message(item: &Value) -> Option<&str> {
+    match item {
+        Value::String(text) => Some(text),
+        other => other.get("message").and_then(Value::as_str),
+    }
+}
+
 fn for_model(item: &Value, model: &str) -> bool {
     match item.get("models").and_then(Value::as_array) {
         Some(models) => models.iter().any(|m| m.as_str() == Some(model)),
@@ -580,6 +598,10 @@ struct InFlight {
     ws_reply: Option<Vec<(String, String)>>,
     /// On a line transport: text the reply holds (`expect.reply_contains`).
     text_reply: Option<String>,
+    /// On a line transport: how many replies each message takes
+    /// (`expect.replies`), and those taken so far for the message in flight.
+    replies: usize,
+    taken: Vec<String>,
     /// The text of the line message now awaiting its reply.
     request_text: Option<String>,
     expect: Map<String, Value>,
@@ -697,6 +719,12 @@ pub(crate) struct SpecEngine {
     push_backoff: Millis,
     /// `telemetry.sse`: an event stream beside an HTTP transport.
     events: Option<HttpRequest>,
+    /// `telemetry.sse.format: json`: each part of the stream is a JSON
+    /// document, offered as it is rather than as `{event, data}`.
+    events_json: bool,
+    /// `telemetry.sse.as_reply`: JSON paths to the path and the body each
+    /// part is offered under, as that GET's reply would be.
+    events_reply: Option<(String, String)>,
     events_backoff: Millis,
     /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
     /// opened: no subscription, poll or push websocket. Replies and anything
@@ -836,21 +864,85 @@ fn header_templates(t: &Value) -> Result<Vec<(String, String)>, String> {
 
 /// `transport.refusal_json`: JSON paths to regexes.
 fn refusal_json(t: &Value) -> Result<Vec<(String, Regex)>, String> {
-    let Some(map) = t.get("refusal_json") else {
+    refusal_json_at(t, "refusal_json", "transport.refusal_json")
+}
+
+/// JSON paths to regexes at `key` of `t`, named `name` in errors.
+fn refusal_json_at(t: &Value, key: &str, name: &str) -> Result<Vec<(String, Regex)>, String> {
+    let Some(map) = t.get(key) else {
         return Ok(Vec::new());
     };
     let map = map
         .as_object()
-        .ok_or("transport.refusal_json maps JSON paths to regexes")?;
+        .ok_or_else(|| format!("{name} maps JSON paths to regexes"))?;
     let mut out = Vec::new();
     for (path, re) in map {
         let re = re
             .as_str()
-            .ok_or_else(|| format!("transport.refusal_json.{path} is a regex"))?;
-        let re = Regex::new(re).map_err(|e| format!("transport.refusal_json.{path}: {e}"))?;
+            .ok_or_else(|| format!("{name}.{path} is a regex"))?;
+        let re = Regex::new(re).map_err(|e| format!("{name}.{path}: {e}"))?;
         out.push((path.clone(), re));
     }
     Ok(out)
+}
+
+/// `transport.refusal_status_body`: what the body of an answer with one of
+/// `refusal_status` must hold for it to be a refusal. Without it the status
+/// alone is.
+#[derive(Debug, Clone)]
+struct RefusalBody {
+    json: Vec<(String, Regex)>,
+    text: Option<Regex>,
+}
+
+impl RefusalBody {
+    fn parse(t: &Value) -> Result<Option<RefusalBody>, String> {
+        let Some(v) = t.get("refusal_status_body") else {
+            return Ok(None);
+        };
+        let json = match v.get("json") {
+            None => Vec::new(),
+            Some(_) => refusal_json_at(v, "json", "transport.refusal_status_body.json")?,
+        };
+        let text = match v.get("match") {
+            None => None,
+            Some(re) => {
+                let re = re
+                    .as_str()
+                    .ok_or("transport.refusal_status_body.match is a regex")?;
+                Some(
+                    Regex::new(re)
+                        .map_err(|e| format!("transport.refusal_status_body.match: {e}"))?,
+                )
+            }
+        };
+        if json.is_empty() && text.is_none() {
+            return Err("transport.refusal_status_body needs json or match".into());
+        }
+        Ok(Some(RefusalBody { json, text }))
+    }
+
+    /// The body holds every JSON value and the text named.
+    fn matches(&self, body: &[u8]) -> bool {
+        if let Some(re) = &self.text {
+            match std::str::from_utf8(body) {
+                Ok(text) if re.is_match(text) => {}
+                _ => return false,
+            }
+        }
+        self.json.is_empty() || json_selected(&self.json, body)
+    }
+}
+
+/// A refusal by status: one of `refusal`, with a body matching
+/// `refusal_status_body` when the spec gives one.
+fn refused_by_status(
+    refusal: &[u16],
+    refusal_body: &Option<RefusalBody>,
+    status: u16,
+    body: &[u8],
+) -> bool {
+    refusal.contains(&status) && refusal_body.as_ref().is_none_or(|b| b.matches(body))
 }
 
 /// An error answer (4xx or 5xx) whose JSON body matches every
@@ -859,6 +951,11 @@ fn refused_by_body(selectors: &[(String, Regex)], status: u16, body: &[u8]) -> b
     if selectors.is_empty() || status < 400 {
         return false;
     }
+    json_selected(selectors, body)
+}
+
+/// A JSON body holding a match for every selector.
+fn json_selected(selectors: &[(String, Regex)], body: &[u8]) -> bool {
     let Ok(doc) = serde_json::from_slice::<Value>(body) else {
         return false;
     };
@@ -892,6 +989,124 @@ fn render_headers(
         }
     }
     Ok(out)
+}
+
+/// An HTTP message's body and its content type (SPEC.md §4, "Binary request
+/// bodies"): a template (`body: "..."`), a binary parameter's bytes as they
+/// are (`body: { binary: name }`), or `multipart/form-data` parts.
+fn request_body(
+    item: &Value,
+    values: &Values,
+) -> Result<(Option<Vec<u8>>, Option<String>), String> {
+    let content_type = match str_field(item, "content_type") {
+        Some(ct) => {
+            let ct = render(ct, values, no_escape)?;
+            if ct.contains(['\r', '\n']) {
+                return Err("content_type contains a line break".into());
+            }
+            Some(ct)
+        }
+        None => None,
+    };
+    if let Some(parts) = item.get("multipart") {
+        if item.get("body").is_some() || content_type.is_some() {
+            return Err("multipart goes without body and content_type".into());
+        }
+        let parts = parts.as_array().ok_or("multipart is a list of parts")?;
+        let mut rendered = Vec::new();
+        for part in parts {
+            let field = |key: &str| -> Result<Option<String>, String> {
+                match str_field(part, key) {
+                    None => Ok(None),
+                    Some(t) => {
+                        let text = render(t, values, no_escape)?;
+                        if text.contains(['\r', '\n', '"']) {
+                            return Err(format!("multipart {key} holds a line break or a quote"));
+                        }
+                        Ok(Some(text))
+                    }
+                }
+            };
+            let name = field("name")?.ok_or("a multipart part needs a name")?;
+            let data = match (str_field(part, "binary"), str_field(part, "value")) {
+                (Some(param), None) => values.binary(param)?,
+                (None, Some(t)) => render(t, values, no_escape)?.into_bytes(),
+                _ => return Err(format!("multipart part {name} has one of binary or value")),
+            };
+            rendered.push(Part {
+                name,
+                filename: field("filename")?,
+                content_type: field("content_type")?,
+                data,
+            });
+        }
+        let (body, boundary) = multipart(&rendered);
+        return Ok((
+            Some(body),
+            Some(format!("multipart/form-data; boundary={boundary}")),
+        ));
+    }
+    let body = match item.get("body") {
+        None => None,
+        Some(Value::String(b)) => Some(render(b, values, no_escape)?.into_bytes()),
+        Some(other) => match other.get("binary").and_then(Value::as_str) {
+            Some(param) => Some(values.binary(param)?),
+            None => return Err("body is a template or {binary: parameter}".into()),
+        },
+    };
+    Ok((body, content_type))
+}
+
+/// One part of a `multipart/form-data` body (RFC 7578).
+struct Part {
+    name: String,
+    filename: Option<String>,
+    content_type: Option<String>,
+    data: Vec<u8>,
+}
+
+/// The `multipart/form-data` body of `parts` and its boundary. The boundary
+/// is derived from the content, so the same parts always give the same
+/// bytes, and is lengthened until no part holds it.
+fn multipart(parts: &[Part]) -> (Vec<u8>, String) {
+    use sha2::Digest;
+    let mut hash = sha2::Sha256::new();
+    for p in parts {
+        hash.update(p.name.as_bytes());
+        hash.update([0]);
+        hash.update(&p.data);
+        hash.update([0]);
+    }
+    let digest: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    let mut length = 16;
+    let boundary = loop {
+        let candidate = format!("----form-{}", &digest[..length]);
+        let held = parts
+            .iter()
+            .any(|p| find(&p.data, candidate.as_bytes()).is_some());
+        if !held || length == digest.len() {
+            break candidate;
+        }
+        length += 8;
+    };
+    let mut body = Vec::new();
+    for p in parts {
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        let mut disposition = format!("Content-Disposition: form-data; name=\"{}\"", p.name);
+        if let Some(f) = &p.filename {
+            disposition.push_str(&format!("; filename=\"{f}\""));
+        }
+        body.extend_from_slice(disposition.as_bytes());
+        body.extend_from_slice(b"\r\n");
+        if let Some(ct) = &p.content_type {
+            body.extend_from_slice(format!("Content-Type: {ct}\r\n").as_bytes());
+        }
+        body.extend_from_slice(b"\r\n");
+        body.extend_from_slice(&p.data);
+        body.extend_from_slice(b"\r\n");
+    }
+    body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+    (body, boundary)
 }
 
 fn host_text(host: IpAddr) -> String {
@@ -979,6 +1194,9 @@ impl SpecEngine {
         if kind != "http" && t.get("refusal_json").is_some() {
             return Err("transport.refusal_json is for the http transport".into());
         }
+        if kind != "http" && t.get("refusal_status_body").is_some() {
+            return Err("transport.refusal_status_body is for the http transport".into());
+        }
         if kind != "http" && t.get("endpoints").is_some() {
             return Err("transport.endpoints is for the http transport".into());
         }
@@ -1032,6 +1250,12 @@ impl SpecEngine {
                             .filter(|a| !a.is_empty())
                             .ok_or("reply_framing terminated needs reply_terminators")?,
                     ),
+                    (Some("fenced"), _) => {
+                        let fence = str_field(&t, "reply_fence")
+                            .ok_or("reply_framing fenced needs reply_fence")?;
+                        Regex::new(fence).map_err(|e| format!("reply_fence: {e}"))?;
+                        ReplyFraming::Fenced(fence.to_string())
+                    }
                     (None, "block") => ReplyFraming::Block,
                     (None, "delimited") => ReplyFraming::Delimited { open, close },
                     (None, _) => ReplyFraming::Line,
@@ -1126,6 +1350,7 @@ impl SpecEngine {
                     auth,
                     headers: header_templates(&t)?,
                     refusal_json: refusal_json(&t)?,
+                    refusal_body: RefusalBody::parse(&t)?,
                     accept_invalid_certs: t
                         .get("accept_invalid_certs")
                         .and_then(Value::as_bool)
@@ -1362,7 +1587,49 @@ impl SpecEngine {
                 let path = str_field(e, "path").ok_or("telemetry.sse needs a path")?;
                 let mut headers = auth_headers(*auth, &auth_header, &ctx.settings);
                 headers.extend(side_headers.iter().cloned());
-                headers.push(("Accept".into(), "text/event-stream".into()));
+                let json = match str_field(e, "format") {
+                    None | Some("sse") => false,
+                    Some("json") => true,
+                    Some(other) => {
+                        return Err(format!("telemetry.sse format '{other}' is sse or json"))
+                    }
+                };
+                headers.push((
+                    "Accept".into(),
+                    if json {
+                        "application/json"
+                    } else {
+                        "text/event-stream"
+                    }
+                    .into(),
+                ));
+                let method: &'static str = match str_field(e, "method") {
+                    None | Some("GET") => "GET",
+                    Some("POST") => "POST",
+                    Some(other) => {
+                        return Err(format!("telemetry.sse method '{other}' is GET or POST"))
+                    }
+                };
+                // A body is a template over settings, as on_connect's are.
+                let body = match str_field(e, "body") {
+                    None => None,
+                    Some(template) => {
+                        let empty = Params::new();
+                        let empty_specs = BTreeMap::new();
+                        let values = Values {
+                            params: &empty,
+                            param_specs: &empty_specs,
+                            settings: &ctx.settings,
+                            setting_specs: &spec.settings,
+                            conversions: &conversions,
+                            maps: &maps,
+                        };
+                        Some(render(template, &values, no_escape)?.into_bytes())
+                    }
+                };
+                if let Some(ct) = str_field(e, "content_type") {
+                    headers.push(("Content-Type".into(), ct.to_string()));
+                }
                 let setting = |name: &str| {
                     ctx.settings
                         .get(name)
@@ -1371,10 +1638,10 @@ impl SpecEngine {
                         .to_string()
                 };
                 Some(HttpRequest {
-                    method: "GET",
+                    method,
                     url: format!("{base}{path}"),
                     headers,
-                    body: None,
+                    body,
                     // A stream stays open; the session watches it for activity.
                     timeout: None,
                     accept_invalid_certs: *accept_invalid_certs,
@@ -1386,6 +1653,19 @@ impl SpecEngine {
                     ),
                 })
             }
+        };
+        let sse = spec.telemetry.as_ref().and_then(|t| t.get("sse"));
+        let events_json = sse.and_then(|e| str_field(e, "format")) == Some("json");
+        let events_reply = match sse.and_then(|e| e.get("as_reply")) {
+            None => None,
+            Some(r) => Some((
+                str_field(r, "path")
+                    .ok_or("telemetry.sse.as_reply needs path")?
+                    .to_string(),
+                str_field(r, "body")
+                    .ok_or("telemetry.sse.as_reply needs body")?
+                    .to_string(),
+            )),
         };
         let oauth = match &transport {
             Transport::Http {
@@ -1431,6 +1711,8 @@ impl SpecEngine {
             push,
             push_backoff: RECONNECT_MIN,
             events,
+            events_json,
+            events_reply,
             events_backoff: RECONNECT_MIN,
         })
     }
@@ -1476,7 +1758,7 @@ impl SpecEngine {
     fn build(&self, item: &Value, values: &Values) -> Result<Outgoing, String> {
         match &self.transport {
             Transport::LineTcp { send, ascii, .. } | Transport::LineUdp { send, ascii, .. } => {
-                let template = item.as_str().ok_or("a line message must be a string")?;
+                let template = line_message(item).ok_or("a line message must be a string")?;
                 let payload = render(template, values, no_escape)?;
                 let framed = framing::frame(send, &payload);
                 if *ascii && !framed.is_ascii() {
@@ -1485,9 +1767,7 @@ impl SpecEngine {
                 Ok(Outgoing::Bytes(framed.into_bytes()))
             }
             Transport::Ws { .. } => {
-                let template = item
-                    .as_str()
-                    .ok_or("a websocket message must be a string")?;
+                let template = line_message(item).ok_or("a websocket message must be a string")?;
                 Ok(Outgoing::Ws(render(template, values, no_escape)?))
             }
             Transport::OscUdp { .. } | Transport::OscTcp { .. } => {
@@ -1573,12 +1853,15 @@ impl SpecEngine {
                         .to_string()
                 };
                 let (user, pass) = (setting("username"), setting("password"));
-                let body = match str_field(item, "body") {
-                    Some(b) => Some(render(b, values, no_escape)?.into_bytes()),
-                    None => None,
-                };
-                if let Some(ct) = str_field(item, "content_type") {
-                    headers.push(("Content-Type".into(), ct.into()));
+                // Headers of this message alone (a file name in
+                // Content-Disposition), templates over its parameters.
+                if item.get("headers").is_some() {
+                    let templates = header_templates(item)?;
+                    headers.extend(render_headers(&templates, values)?);
+                }
+                let (body, content_type) = request_body(item, values)?;
+                if let Some(ct) = content_type {
+                    headers.push(("Content-Type".into(), ct));
                 }
                 Ok(Outgoing::Http(
                     HttpRequest {
@@ -1674,11 +1957,10 @@ impl SpecEngine {
                 _ => item.clone(),
             };
             let outgoing = self.build(&item, &values)?;
-            let text = match (&self.transport, &item) {
-                (
-                    Transport::LineTcp { .. } | Transport::LineUdp { .. },
-                    Value::String(template),
-                ) => Some(render(template, &values, no_escape)?),
+            let text = match (&self.transport, line_message(&item)) {
+                (Transport::LineTcp { .. } | Transport::LineUdp { .. }, Some(template)) => {
+                    Some(render(template, &values, no_escape)?)
+                }
                 _ => None,
             };
             messages.push_back((outgoing, awaited_address.clone(), text));
@@ -1688,6 +1970,11 @@ impl SpecEngine {
             messages,
             ws_reply,
             text_reply,
+            replies: expect
+                .get("replies")
+                .and_then(Value::as_u64)
+                .map_or(1, |n| n.max(1) as usize),
+            taken: Vec::new(),
             request_text: None,
             expect,
             returns,
@@ -1723,9 +2010,28 @@ impl SpecEngine {
 
     /// Whether a job's requests carry the session (`transport.session`):
     /// all but the login, the probe and items sent without it.
+    /// The session held, as the header it is sent in: for a native
+    /// extension's own requests to the device (AJA's event connection).
+    pub(crate) fn session_header(&self) -> Option<(String, String)> {
+        self.session_token.clone()
+    }
+
     fn needs_session(&self, job: &Job) -> bool {
-        if self.session.is_none() || job.login {
+        let Some(session) = &self.session else {
             return false;
+        };
+        if job.login {
+            return false;
+        }
+        // `when_set`: no login while the operator has not turned it on,
+        // decided from the settings current now, as update_settings changes.
+        if let Some(setting) = &session.when_set {
+            let set = self.settings.get(setting).is_some_and(|v| {
+                !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
+            });
+            if !set {
+                return false;
+            }
         }
         let items = match (&job.id, &job.item) {
             (None, None) => return false,
@@ -2703,6 +3009,23 @@ impl SpecEngine {
             None => self.apply_message(cx, &message),
         }
         if waiting {
+            // `expect.replies`: the message takes several replies, the
+            // rest in order; an error answer ends the wait at once.
+            let error = matches!(&self.transport, Transport::LineTcp { error_match: Some(re), .. } if re.is_match(&message));
+            if let Some(flight) = self.current.as_mut() {
+                if flight.replies > 1 {
+                    flight.taken.push(message);
+                    if flight.taken.len() < flight.replies && !error {
+                        flight.awaiting = Some(Await::Text(None));
+                        self.last_heard = cx.now();
+                        cx.alive();
+                        return;
+                    }
+                    let all = std::mem::take(&mut flight.taken).join("\n");
+                    self.reply(cx, Reply::Text(all));
+                    return;
+                }
+            }
             self.reply(cx, Reply::Text(message));
         } else {
             self.last_heard = cx.now();
@@ -2837,8 +3160,34 @@ impl SpecEngine {
             SseInput::Event(event) => {
                 let data = serde_json::from_str::<Value>(&event.data)
                     .unwrap_or_else(|_| Value::String(event.data.clone()));
-                let doc = serde_json::json!({"event": event.event, "data": data});
+                // `format: json`: the part is the document; otherwise the
+                // event's name and data.
+                let doc = if self.events_json {
+                    data
+                } else {
+                    serde_json::json!({"event": event.event, "data": data})
+                };
                 self.offer(cx, &telemetry::Inbound::Json(&doc));
+                // `as_reply`: also the reply to a GET of the path it names.
+                if let Some((path, body)) = &self.events_reply {
+                    let path = match expect::json_path(&doc, path) {
+                        Some(Value::String(p)) if p.starts_with('/') => Some(p.clone()),
+                        Some(Value::String(p)) => Some(format!("/{p}")),
+                        _ => None,
+                    };
+                    if let (Some(path), Some(body)) = (path, expect::json_path(&doc, body)) {
+                        let body = body.to_string().into_bytes();
+                        self.offer(
+                            cx,
+                            &telemetry::Inbound::Http {
+                                path: &path,
+                                headers: &[],
+                                body: &body,
+                                request: None,
+                            },
+                        );
+                    }
+                }
                 self.apply_text(cx, &event.data);
                 self.last_heard = cx.now();
                 cx.alive();
@@ -3364,6 +3713,7 @@ impl Module for SpecEngine {
                     auth,
                     refusal,
                     refusal_json,
+                    refusal_body,
                     ..
                 },
                 Ok(response),
@@ -3374,7 +3724,7 @@ impl Module for SpecEngine {
                     Route::Endpoint { credentialed } => credentialed && *auth != HttpAuth::None,
                 };
                 credentialed
-                    && (refusal.contains(&response.status)
+                    && (refused_by_status(refusal, refusal_body, response.status, &response.body)
                         || refused_by_body(refusal_json, response.status, &response.body))
             }
             _ => false,
@@ -4956,6 +5306,65 @@ mod tests {
     }
 
     #[test]
+    fn a_json_stream_is_posted_for_and_read_as_replies() {
+        let telemetry = json!({
+            "sse": {"method": "POST", "path": "/v1/status/updates", "body": r#"["status/slide"]"#,
+                    "content_type": "application/json", "format": "json",
+                    "as_reply": {"path": "$.url", "body": "$.data"}},
+            "updates": [
+                {"path": "^/v1/status/slide$", "json": {"text": "$.current.text"},
+                 "state": {"slide.text": "{text}"}},
+                {"json_match": {"$.url": "^status/countdown$"}, "json": {"t": "$.data"},
+                 "state": {"countdown": "{t}"}},
+            ],
+        });
+        let state = json!({
+            "slide.text": {"type": "string", "description": "x"},
+            "countdown": {"type": "string", "description": "x"},
+        });
+        let mut e = http_with(telemetry, state, true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let (stream, request) = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::SseOpen { stream, request } => Some((stream, request)),
+                _ => None,
+            })
+            .expect("the update stream");
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.body.as_deref(), Some(&br#"["status/slide"]"#[..]));
+        assert!(request
+            .headers
+            .contains(&("Accept".to_string(), "application/json".to_string())));
+        assert!(request
+            .headers
+            .contains(&("Content-Type".to_string(), "application/json".to_string())));
+        let part = |e: &mut SpecEngine, data: &str| {
+            let mut cx = Cx::new(10);
+            e.sse(
+                &mut cx,
+                stream,
+                SseInput::Event(crate::sse::SseEvent {
+                    event: "message".into(),
+                    data: data.into(),
+                }),
+            );
+            cx.take()
+        };
+        // Read as the GET of its url would be, by the path rules.
+        assert!(part(
+            &mut e,
+            r#"{"url":"/v1/status/slide","data":{"current":{"text":"Amazing"}}}"#
+        )
+        .contains(&Action::State(json!({"slide": {"text": "Amazing"}}))));
+        // And as the document it is, by the JSON rules.
+        assert!(part(&mut e, r#"{"url":"status/countdown","data":"00:01"}"#)
+            .contains(&Action::State(json!({"countdown": "00:01"}))));
+    }
+
+    #[test]
     fn an_event_stream_beside_http_keeps_state_current() {
         let telemetry = json!({
             "sse": {"path": "/events"},
@@ -5413,6 +5822,99 @@ mod tests {
     }
 
     #[test]
+    fn a_refusal_status_counts_only_with_the_body_named() {
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        let t = spec.transport.as_mut().unwrap();
+        t["auth"] = json!("bearer");
+        t["refusal_status"] = json!([401]);
+        t["refusal_status_body"] = json!({"json": {"$.message": "(?i)^invalid oauth token$"}});
+        spec.telemetry = None;
+        let answer = |spec: &DeviceSpec, status: u16, body: &str| {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "propresenter-7".into(),
+                    channels: None,
+                    settings: json!({"token": "t"}).as_object().unwrap().clone(),
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            let id = cx
+                .take()
+                .into_iter()
+                .find_map(|a| match a {
+                    Action::Http { id, .. } => Some(id),
+                    _ => None,
+                })
+                .unwrap();
+            let mut cx = Cx::new(1);
+            e.http_response(
+                &mut cx,
+                id,
+                Ok(HttpResponse {
+                    headers: Vec::new(),
+                    status,
+                    body: body.as_bytes().to_vec(),
+                }),
+            );
+            let actions = cx.take();
+            let refused = actions
+                .iter()
+                .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. })));
+            // The device stays usable after any other answer.
+            let usable = e.refused.is_none();
+            assert_eq!(refused, !usable);
+            refused
+        };
+        let invalid = r#"{"error":"Unauthorized","status":401,"message":"Invalid OAuth token"}"#;
+        let scope =
+            r#"{"error":"Unauthorized","status":401,"message":"Missing scope: clips:edit"}"#;
+        assert!(answer(&spec, 401, invalid));
+        // A 401 for a missing scope, or with no JSON body, fails only that
+        // request.
+        assert!(!answer(&spec, 401, scope));
+        assert!(!answer(&spec, 401, ""));
+        // The body alone is not a refusal under another status.
+        assert!(!answer(&spec, 403, invalid));
+        // A regex over the body text works the same way.
+        let t = spec.transport.as_mut().unwrap();
+        t["refusal_status_body"] = json!({"match": "Invalid OAuth token"});
+        assert!(answer(&spec, 401, invalid));
+        assert!(!answer(&spec, 401, scope));
+        // Both, when both are given.
+        let t = spec.transport.as_mut().unwrap();
+        t["refusal_status_body"] =
+            json!({"match": "Unauthorized", "json": {"$.message": "^Invalid"}});
+        assert!(answer(&spec, 401, invalid));
+        assert!(!answer(&spec, 401, scope));
+        // Neither is a spec error.
+        let t = spec.transport.as_mut().unwrap();
+        t["refusal_status_body"] = json!({});
+        assert!(SpecEngine::new(
+            Arc::new(spec.clone()),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings: json!({"token": "t"}).as_object().unwrap().clone(),
+                monitor: false,
+            },
+        )
+        .is_err());
+    }
+
+    #[test]
     fn transport_headers_are_rendered_from_settings_on_every_request() {
         let mut spec = Catalog::source_tree()
             .device("youtube-live")
@@ -5703,6 +6205,75 @@ mod tests {
             .iter()
             .find(|(k, _)| k == "Cookie")
             .map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn a_session_logs_in_only_when_its_setting_is_on() {
+        let kumo = |settings: Value| {
+            let spec = Catalog::source_tree().device("aja-kumo").unwrap().clone();
+            let settings =
+                crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+            let model = spec.models[0].id.clone();
+            let mut e = SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model,
+                    channels: None,
+                    settings,
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            let (probe, _) = requests(&cx.take()).remove(0);
+            let mut cx = Cx::new(1);
+            e.http_response(&mut cx, probe, answer("{}", None));
+            cx.take();
+            let mut cx = Cx::new(2);
+            let params = json!({"paramid": "eParamID_KumoProductID"});
+            e.command(&mut cx, 1, "get_parameter", params.as_object().unwrap());
+            (e, requests(&cx.take()))
+        };
+        // Off (the default): no login, no cookie.
+        let (_, sent) = kumo(json!({}));
+        assert_eq!(sent.len(), 1);
+        assert!(
+            sent[0].1.url.contains("/config?action=get"),
+            "{}",
+            sent[0].1.url
+        );
+        assert_eq!(cookie_of(&sent[0].1), None);
+        // On: the login goes first, and the command carries its cookie.
+        let (mut e, sent) = kumo(json!({"user_authentication": true, "password": "s3cret"}));
+        assert_eq!(sent.len(), 1);
+        let (login, request) = &sent[0];
+        assert!(
+            request.url.ends_with("/authenticator/login"),
+            "{}",
+            request.url
+        );
+        assert_eq!(
+            request.body.as_deref(),
+            Some(&b"password_provided=s3cret"[..])
+        );
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, *login, answer("{}", Some("session=abc; path=/")));
+        let sent = requests(&cx.take());
+        assert!(
+            sent[0].1.url.contains("/config?action=get"),
+            "{}",
+            sent[0].1.url
+        );
+        assert_eq!(cookie_of(&sent[0].1), Some("session=abc"));
+        // The extension's own requests carry it too.
+        assert_eq!(
+            e.session_header(),
+            Some(("Cookie".to_string(), "session=abc".to_string()))
+        );
     }
 
     #[test]
@@ -6354,5 +6925,290 @@ state:
             &completed(&cx.take())[..],
             [(1, Err(CommandError::InvalidParams { .. }))]
         ));
+    }
+
+    const BINARY: &str = r#"
+spec: 1
+id: binary-test
+name: Binary test
+vendor: Test
+category: other
+source: [{ title: test }]
+transport: { type: http, port: 80, probe: { method: GET, path: /info } }
+ports: [{ port: 80, protocol: http, role: control }]
+models: [{ id: m, name: M, supports: [raw, form, named], verification: none }]
+commands:
+  raw:
+    params:
+      data: { type: binary, max_length: 4, required: true }
+      kind: { type: enum, values: [image/png, image/jpeg], default: image/png }
+    send: { method: POST, path: /raw, body: { binary: data }, content_type: "{kind}" }
+    expect: { status: 200 }
+    returns: ack
+  form:
+    params:
+      data: { type: binary, required: true }
+      name: { type: string, max_length: 64, required: true }
+    send:
+      method: POST
+      path: /form
+      multipart:
+        - { name: addToMap, value: "true" }
+        - { name: MediaFile, binary: data, filename: "{name}", content_type: application/octet-stream }
+    expect: { status: 200 }
+    returns: ack
+  named:
+    params:
+      data: { type: binary, required: true }
+      name: { type: string, max_length: 64, required: true }
+    send:
+      method: POST
+      path: /named
+      body: { binary: data }
+      content_type: application/octet-stream
+      headers: { Content-Disposition: 'attachment; filename="{name}.cset"' }
+    expect: { status: 200 }
+    returns: ack
+"#;
+
+    #[test]
+    fn binary_parameters_go_out_as_bytes_whole_or_in_multipart_parts() {
+        let spec: DeviceSpec = serde_yaml::from_str(BINARY).unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        endpoints_connected(&mut e);
+        let send = |e: &mut SpecEngine, name: &str, params: Value| {
+            let mut cx = Cx::new(2);
+            e.command(&mut cx, 1, name, params.as_object().unwrap());
+            let actions = cx.take();
+            match requests(&actions).pop() {
+                Some((rid, request)) => {
+                    let mut cx = Cx::new(3);
+                    e.http_response(&mut cx, rid, answer("{}", None));
+                    assert_eq!(completed(&cx.take()), vec![(1, Ok(Outcome::Ack))]);
+                    Ok(request)
+                }
+                None => Err(completed(&actions)),
+            }
+        };
+        // The bytes as they are, padded base64 or not, with the type chosen.
+        for given in ["iVBORw==", "iVBORw"] {
+            let r = send(&mut e, "raw", json!({"data": given, "kind": "image/png"})).unwrap();
+            assert_eq!(r.body.as_deref(), Some(&[0x89, b'P', b'N', b'G'][..]));
+            assert_eq!(header(&r, "Content-Type"), Some("image/png"));
+        }
+        // Not base64, or longer than max_length: refused before sending.
+        for bad in ["not base64!", "AAAAAAA="] {
+            let err = send(&mut e, "raw", json!({"data": bad})).unwrap_err();
+            assert!(matches!(
+                &err[..],
+                [(1, Err(CommandError::InvalidParams { .. }))]
+            ));
+        }
+        // multipart/form-data: the same parts always give the same bytes.
+        let form = json!({"data": "AAEC", "name": "clip.mov"});
+        let a = send(&mut e, "form", form.clone()).unwrap();
+        let b = send(&mut e, "form", form).unwrap();
+        assert_eq!(a.body, b.body);
+        let ct = header(&a, "Content-Type").unwrap().to_string();
+        let boundary = ct
+            .strip_prefix("multipart/form-data; boundary=")
+            .unwrap()
+            .to_string();
+        let mut want = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"addToMap\"\r\n\r\ntrue\r\n\
+             --{boundary}\r\nContent-Disposition: form-data; name=\"MediaFile\"; filename=\"clip.mov\"\r\n\
+             Content-Type: application/octet-stream\r\n\r\n"
+        )
+        .into_bytes();
+        want.extend_from_slice(&[0, 1, 2]);
+        want.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        assert_eq!(a.body.unwrap(), want);
+        // A quote in a file name would end the field: refused.
+        let err = send(&mut e, "form", json!({"data": "AAEC", "name": "a\"b"})).unwrap_err();
+        assert!(matches!(
+            &err[..],
+            [(1, Err(CommandError::InvalidParams { .. }))]
+        ));
+        // A header of the message alone, beside the bytes.
+        let r = send(&mut e, "named", json!({"data": "AAEC", "name": "Look"})).unwrap();
+        assert_eq!(
+            header(&r, "Content-Disposition"),
+            Some("attachment; filename=\"Look.cset\"")
+        );
+        assert_eq!(r.body.as_deref(), Some(&[0, 1, 2][..]));
+    }
+
+    const TWO_REPLIES: &str = r#"
+spec: 1
+id: replies-test
+name: Replies test
+vendor: Test
+category: router
+source: [{ title: test }]
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  reply_match: "^\\.(A|RA|E)"
+  error_match: "^\\.E"
+ports: [{ port: 23, protocol: tcp, role: control }]
+models: [{ id: m, name: M, supports: [name, ping], verification: none }]
+commands:
+  name:
+    params:
+      destination: { type: int, min: 1, required: true }
+      name: { type: string, max_length: 8, required: true }
+    send: ".WD{destination},{name}"
+    expect: { replies: 2, matches: '(?m)^\.A' }
+    returns: text
+  ping:
+    send: ".#01"
+    expect: { matches: '^\.A' }
+    returns: ack
+telemetry:
+  updates:
+    - match: '^\.RAD(\d+),(.*?)\s*$'
+      state: { "destinations.{1}.name": "{2}" }
+state:
+  destinations.*.name: { type: string, description: "Name" }
+"#;
+
+    #[test]
+    fn a_command_can_take_several_replies() {
+        let spec: DeviceSpec = serde_yaml::from_str(TWO_REPLIES).unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        let params = json!({"destination": 2, "name": "MON 2"});
+        let mut cx = Cx::new(10);
+        e.command(&mut cx, 1, "name", params.as_object().unwrap());
+        assert_eq!(tcp_sent(&cx.take()), vec![".WD2,MON 2\r".to_string()]);
+        // The first reply is not the end: it updates state, and the command
+        // waits for the second.
+        let mut cx = Cx::new(11);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".RAD2,MON 2\r".to_vec()));
+        let a = cx.take();
+        assert!(completed(&a).is_empty());
+        assert!(a.iter().any(|a| matches!(a, Action::State(_))));
+        let mut cx = Cx::new(12);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".A\r".to_vec()));
+        assert_eq!(
+            completed(&cx.take()),
+            vec![(
+                1,
+                Ok(Outcome::Value {
+                    value: json!(".RAD2,MON 2\n.A")
+                })
+            )]
+        );
+        // The next command takes one reply, as before.
+        let mut cx = Cx::new(13);
+        e.command(&mut cx, 2, "ping", &Params::new());
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".A\r".to_vec()));
+        assert_eq!(completed(&cx.take()), vec![(2, Ok(Outcome::Ack))]);
+        // An error answer ends the wait at once.
+        let mut cx = Cx::new(14);
+        e.command(&mut cx, 3, "name", params.as_object().unwrap());
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".E\r".to_vec()));
+        assert!(matches!(
+            &completed(&cx.take())[..],
+            [(3, Err(CommandError::DeviceError { .. }))]
+        ));
+    }
+
+    const LINE_MODELS: &str = r#"
+spec: 1
+id: line-models-test
+name: Line models test
+vendor: Test
+category: recorder
+source: [{ title: test }]
+transport: { type: line-tcp, port: 9993, framing: terminated, terminator: crlf }
+ports: [{ port: 9993, protocol: tcp, role: control }]
+models:
+  - { id: old, name: Old, supports: [goto], verification: none }
+  - { id: new, name: New, supports: [goto], verification: none }
+commands:
+  goto:
+    params: { clip: { type: int, min: 1, required: true } }
+    send:
+      - { models: [old], message: "goto: clip: {clip}" }
+      - { models: [new], message: "goto: clip id: {clip}" }
+    expect: { matches: "^200" }
+    returns: ack
+telemetry:
+  poll:
+    send:
+      - { models: [new], message: "cache info" }
+      - "transport info"
+"#;
+
+    #[test]
+    fn line_messages_can_name_their_models() {
+        let spec: DeviceSpec = serde_yaml::from_str(LINE_MODELS).unwrap();
+        let open = |model: &str| {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: model.into(),
+                    channels: None,
+                    settings: Params::new(),
+                    monitor: true,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+            let first_poll = tcp_sent(&cx.take());
+            let mut cx = Cx::new(1);
+            e.tcp(&mut cx, SOCKET, TcpInput::Data(b"200 ok\r\n".to_vec()));
+            let second_poll = tcp_sent(&cx.take());
+            let mut cx = Cx::new(2);
+            e.tcp(&mut cx, SOCKET, TcpInput::Data(b"200 ok\r\n".to_vec()));
+            cx.take();
+            let mut cx = Cx::new(3);
+            e.command(&mut cx, 1, "goto", json!({"clip": 3}).as_object().unwrap());
+            (first_poll, second_poll, tcp_sent(&cx.take()))
+        };
+        // The old model is not asked what it lacks, and each model gets its
+        // own form of a command.
+        let (first, _, command) = open("old");
+        assert_eq!(first, vec!["transport info\r\n".to_string()]);
+        assert_eq!(command, vec!["goto: clip: 3\r\n".to_string()]);
+        let (first, second, command) = open("new");
+        assert_eq!(first, vec!["cache info\r\n".to_string()]);
+        assert_eq!(second, vec!["transport info\r\n".to_string()]);
+        assert_eq!(command, vec!["goto: clip id: 3\r\n".to_string()]);
     }
 }

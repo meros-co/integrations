@@ -156,8 +156,11 @@ transport:
   headers:
     Client-Id: "{settings.client_id}"
   # Twitch answers 403 for a missing role or an unfinished account and 400
-  # for most rule breaches; only 401 means the token was refused.
+  # for most rule breaches. A refused token is a 401 saying "Invalid OAuth
+  # token"; a 401 for a missing scope, or anything else, fails only its
+  # command. A revoked token is caught by the hourly validation too.
   refusal_status: [401]
+  refusal_status_body: { json: { "$.message": "(?i)^invalid oauth token$" } }
   timeout_ms: 10000
   # Get Users with no parameters: the token's own user (1 rate-limit point),
   # so an idle probe also checks the token.
@@ -1303,19 +1306,21 @@ quirks:
       with the new settings, which update state at once.
 
   - models: [all]
-    severity: critical
+    severity: warning
     text: >
       Twitch answers a token that lacks a command's scope with 401, as it
-      answers a revoked token, and the core takes every 401 as a refused
-      token: it refreshes once and, when the new token is refused too,
-      reports unauthorized and sends nothing more until new tokens arrive.
-      A consumer must therefore ask at sign-in for the scope of every
-      command it offers (each command's summary names it), and never offer a
-      command whose scope the user did not grant. The polls, predictions,
-      Shield Mode, rewards, moderators, VIPs, bans and blocked terms are
-      for that reason never polled: they need scopes a consumer may not ask
-      for. EventSub subscriptions are different: one whose scope is missing
-      is answered 403 and only logged.
+      answers a revoked token. The core takes a 401 as a refused token only
+      when its message is "Invalid OAuth token": it then refreshes once and,
+      when the new token is refused too, reports unauthorized and sends
+      nothing more until new tokens arrive. Any other 401 (a missing scope)
+      fails that command alone, with Twitch's message. A token revoked
+      without that message is still caught by the hourly validation. A
+      consumer should still ask at sign-in for the scope of every command it
+      offers (each command's summary names it). The polls, predictions,
+      Shield Mode, rewards, moderators, VIPs, bans and blocked terms are not
+      polled: they need scopes a consumer may not ask for, and each poll
+      without its scope would fail every round. EventSub subscriptions whose
+      scope is missing are answered 403 and only logged.
 
   - models: [all]
     severity: info

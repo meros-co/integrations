@@ -90,6 +90,16 @@ _ppt("timer-settings", "/v1/timers", [
         "t3": {"name": "Elapsed", "index": 2, "allows_overrun": False, "elapsed_start": 0,
                "elapsed_end": 3600}}},
     state_before={"timer_settings": {"t0": {"name": "Deleted", "index": 0}}})
+# The update stream (POST /v1/status/updates): each part {"url", "data"} is
+# read as the reply to that GET would be.
+telemetry(PPT, "stream-countdown",
+          inbound_sse={"data": json.dumps({"url": "/v1/timer/video_countdown", "data": "00:01:30"})},
+          expect_state={"video_countdown": "00:01:30"})
+telemetry(PPT, "stream-slide",
+          inbound_sse={"data": json.dumps({"url": "/v1/status/slide", "data": {
+              "current": {"text": "Amazing grace", "notes": ""}, "next": {"text": "How sweet the sound", "notes": ""}}})},
+          expect_state={"slide": {"current": {"text": "Amazing grace", "notes": ""},
+                                  "next": {"text": "How sweet the sound", "notes": ""}}})
 _ppt("video-countdown", "/v1/timer/video_countdown", '"00:01:30"',
      {"video_countdown": "00:01:30"})
 

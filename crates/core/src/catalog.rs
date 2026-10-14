@@ -193,6 +193,21 @@ pub enum ParamType {
     /// Any JSON value, for a request body whose shape the device's own API
     /// documents and validates. Sent as compact JSON.
     Json,
+    /// Bytes, given as a base64 string (RFC 4648, padding optional) and sent
+    /// as they are: an HTTP request body or a multipart part (an image, a
+    /// show file). `max_length` limits the decoded bytes.
+    Binary,
+}
+
+/// A `binary` parameter's bytes: standard base64, with or without padding.
+pub(crate) fn decode_binary(text: &str) -> Option<Vec<u8>> {
+    use base64::engine::{general_purpose, DecodePaddingMode, GeneralPurpose};
+    use base64::Engine;
+    const B64: GeneralPurpose = GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        general_purpose::PAD.with_decode_padding_mode(DecodePaddingMode::Indifferent),
+    );
+    B64.decode(text).ok()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -409,6 +424,18 @@ fn check_value(name: &str, spec: &ParamSpec, value: &Value) -> Result<(), String
             .map(|_| ())
             .ok_or_else(|| format!("'{name}' must be true or false")),
         ParamType::Json => Ok(()),
+        ParamType::Binary => {
+            let s = value
+                .as_str()
+                .ok_or_else(|| format!("'{name}' must be a base64 string"))?;
+            let bytes = decode_binary(s).ok_or_else(|| format!("'{name}' is not base64"))?;
+            if let Some(max) = spec.max_length {
+                if bytes.len() > max {
+                    return Err(format!("'{name}' is longer than {max} bytes"));
+                }
+            }
+            Ok(())
+        }
         ParamType::Enum => {
             let s = value
                 .as_str()

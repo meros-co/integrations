@@ -20,6 +20,13 @@ http(KUMO, "get_parameter", {"paramid": "eParamID_KumoProductID"}, "GET", _KGET 
      http_reply={"status": 200, "body": _kreply("eParamID_KumoProductID", "3", "KUMO 32x32 Matrix")},
      expect_result={"ok": {"kind": "value", "value": {
          "paramid": "1", "name": "eParamID_KumoProductID", "value": "3", "value_name": "KUMO 32x32 Matrix"}}})
+# With User Authentication on (the user_authentication setting), the request
+# goes after the login (KumoRtrWithAuth.py), with its session cookie.
+http(KUMO, "get_parameter", {"paramid": "eParamID_KumoProductID"}, "GET", _KGET + "eParamID_KumoProductID",
+     file="get_parameter.with-login", settings={"user_authentication": True, "password": "s3cret"},
+     http_reply={"status": 200, "body": _kreply("eParamID_KumoProductID", "3", "KUMO 32x32 Matrix")},
+     expect_result={"ok": {"kind": "value", "value": {
+         "paramid": "1", "name": "eParamID_KumoProductID", "value": "3", "value_name": "KUMO 32x32 Matrix"}}})
 http(KUMO, "set_parameter", {"paramid": "eParamID_SuppressPSAlarm", "value": "1"}, "GET",
      _KSET + "eParamID_SuppressPSAlarm&value=1",
      http_reply={"status": 404, "body": "<html><head><title>404 Not Found</title></head></html>"},

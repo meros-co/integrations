@@ -1763,6 +1763,14 @@ commands:
     returns: ack
 
 state:
+  meters.levels.*: { type: int, unit: dBFS, description: "Level, -60 to 0, by channel from 1 as Channel Number Assignments gives them (automatic coverage on: 1-8 coverage areas, 9 automixer, 10 AEC reference; off: 1-8 channels, 9 automixer), from the SAMPLE meter last started (RMS, post-gate, automixer gain or AEC reference)" }
+  meters.precomp.*: { type: int, unit: dBFS, description: "Pre-compressor level, -60 to 0, by channel from 1 (SAMPLE_PRECOMP)" }
+  meters.coverage_areas.*: { type: int, unit: dBFS, description: "Post-gate level of each coverage area, -60 to 0, from 1 (SAMPLE_CA)" }
+  talkers.*.lobe: { type: int, description: "Lobe the talker is heard on, 1-8, by talker from 1 in the last report" }
+  talkers.*.coverage_area: { type: int, description: "Coverage area the talker is in, 1-8, or 0 with automatic coverage off" }
+  talkers.*.x_cm: { type: int, unit: cm, description: "Talker X position from the array's centre (along the LED bar on square arrays)" }
+  talkers.*.y_cm: { type: int, unit: cm, description: "Talker Y position from the array's centre" }
+  talkers.*.z_cm: { type: int, unit: cm, description: "Talker distance down from the array" }
   device.model: { type: string, description: "the model" }
   device.serial_number: { type: string, description: "the serial number" }
   device.firmware: { type: string, description: "the firmware version" }
@@ -1836,6 +1844,33 @@ telemetry:
   poll:
     send: ["GET 00 ALL"]
   updates:
+    # Metering (Meter Rate Commands): one level per channel, 000-060 for -60
+    # to 0 dBFS, in the order of Channel Number Assignments. METER_RATE,
+    # METER_RATE_POSTGATE, METER_RATE_MXR_GAIN and METER_RATE_AECREF all send
+    # SAMPLE, so it holds whichever of them a consumer started last.
+    - match: "^< SAMPLE((?: \\d{3})+) >$"
+      match_each: "(\\d{3})"
+      match_each_in: 1
+      state: { "meters.levels.{index:+1}": "{2:-60}" }
+    - match: "^< SAMPLE_PRECOMP "
+      match_each: "(\\d{3})"
+      state: { "meters.precomp.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_CA "
+      match_each: "(\\d{3})"
+      state: { "meters.coverage_areas.{index:+1}": "{1:-60}" }
+    # Talker positions (MXA920 Talker Position): sets of lobe, coverage area,
+    # X, Y, Z in cm and a reserved 0, all in one message per period; a period
+    # with no talker sends nothing, so the last positions stay.
+    - match: "^< SAMPLE TALKER_POSITIONS "
+      replace: talkers
+    - match: "^< SAMPLE TALKER_POSITIONS "
+      match_each: "(\\d+) (\\d+) (-?\\d+) (-?\\d+) (-?\\d+) -?\\d+"
+      state:
+        "talkers.{index:+1}.lobe": "{1}"
+        "talkers.{index:+1}.coverage_area": "{2}"
+        "talkers.{index:+1}.x_cm": "{3}"
+        "talkers.{index:+1}.y_cm": "{4}"
+        "talkers.{index:+1}.z_cm": "{5}"
     - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
       state: { "device.model": "{1}" }
     - match: "^< REP SERIAL_NUM \\{?(.*?) *\\}? >$"
@@ -1991,9 +2026,14 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval until set
-      to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not kept in
-      state. Values 1-99 ms are refused by the device.
+      Metering (METER_RATE and its siblings) and talker positions (TALKER_POSITION_RATE) are sent at
+      the chosen interval until set to 0. They are never started here: a consumer that wants them
+      sets a rate (100 ms or more; 1-99 are refused), and each sample then updates meters.* or
+      talkers.* (a state event per sample). Levels are kept in dBFS (000-060 on the wire is -60 to
+      0). METER_RATE, METER_RATE_POSTGATE, METER_RATE_MXR_GAIN and METER_RATE_AECREF all report as
+      SAMPLE, which does not say which it is: run one of them at a time. Talker positions are
+      replaced by each report; a period with no talker sends no report, so the last positions
+      stay.
   - models: [all]
     severity: info
     text: >

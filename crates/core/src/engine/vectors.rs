@@ -45,7 +45,7 @@ fn unhex(s: &str) -> Vec<u8> {
 }
 
 /// What the engine put on the wire, in the form vectors state it.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 enum Wire {
     Bytes(Vec<u8>),
     Http {
@@ -54,8 +54,57 @@ enum Wire {
         /// endpoint's (`transport.endpoints`).
         port: u16,
         target: String,
+        /// The body as text, or `hex:` and its bytes when it is not UTF-8
+        /// (a binary body, `body_hex` in a vector).
         body: Option<String>,
+        /// The request's Content-Type; compared only when the vector gives
+        /// one.
+        content_type: Option<String>,
     },
+}
+
+/// `sent == expected`: an expected request without a content type matches
+/// any.
+impl PartialEq for Wire {
+    fn eq(&self, expected: &Wire) -> bool {
+        match (self, expected) {
+            (Wire::Bytes(a), Wire::Bytes(b)) => a == b,
+            (
+                Wire::Http {
+                    method,
+                    port,
+                    target,
+                    body,
+                    content_type,
+                },
+                Wire::Http {
+                    method: m,
+                    port: p,
+                    target: t,
+                    body: b,
+                    content_type: c,
+                },
+            ) => {
+                method == m
+                    && port == p
+                    && target == t
+                    && body == b
+                    && (c.is_none() || content_type == c)
+            }
+            _ => false,
+        }
+    }
+}
+
+/// A body as vectors state it: its text, or `hex:` and its bytes.
+fn body_text(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(text) => text.to_string(),
+        Err(_) => format!(
+            "hex:{}",
+            bytes.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        ),
+    }
 }
 
 /// The port a URL names.
@@ -98,10 +147,12 @@ fn wire(actions: &[Action]) -> Vec<Wire> {
                     method: request.method.to_string(),
                     port: url_port(&request.url),
                     target: format!("/{after_host}"),
-                    body: request
-                        .body
-                        .as_ref()
-                        .map(|b| String::from_utf8_lossy(b).into_owned()),
+                    body: request.body.as_deref().map(body_text),
+                    content_type: request
+                        .headers
+                        .iter()
+                        .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
+                        .map(|(_, v)| v.clone()),
                 })
             }
             _ => None,
@@ -155,7 +206,14 @@ fn expected_wire(v: &Value, main_port: u16) -> Option<Vec<Wire>> {
                         .and_then(Value::as_u64)
                         .map_or(main_port, |p| p as u16),
                     target: r["target"].as_str().unwrap().to_string(),
-                    body: r.get("body").and_then(Value::as_str).map(String::from),
+                    body: match r.get("body_hex").and_then(Value::as_str) {
+                        Some(hex) => Some(body_text(&unhex(hex))),
+                        None => r.get("body").and_then(Value::as_str).map(String::from),
+                    },
+                    content_type: r
+                        .get("content_type")
+                        .and_then(Value::as_str)
+                        .map(String::from),
                 })
                 .collect(),
         );
@@ -526,7 +584,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 12] = [
+    const SUCCESS: [&str; 14] = [
         "200 ok",
         "~01@ok",
         "ACK;",
@@ -540,6 +598,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         // LW3: the answer to OPEN is "o- <node>".
         "o- ok",
         "!Done ok",
+        // Turtle AV's acknowledgement.
+        "[SUCCESS]ok",
+        // Lightware LW2: every answer is in round brackets.
+        "(ok)",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {

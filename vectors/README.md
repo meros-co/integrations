@@ -34,6 +34,9 @@ expect_request: { method: GET, target: "/cgi-bin/ptzctrl.cgi?ptzcmd&home" }   # 
 # A request to an HTTP endpoint (SPEC.md §2, Endpoints) adds its port, the
 # default of any setting giving it: { method: GET, port: 9996, target: /list?path=cam1 }.
 # Without `port`, the request must go to the transport's own port.
+# A binary body (SPEC.md §4, Binary request bodies) is `body_hex` in place of
+# `body`; `content_type`, when given, must be the request's Content-Type:
+# { method: POST, target: /v0/showfile, body_hex: "504b0304", content_type: application/octet-stream }
 # A command sending several messages lists them: expect_wire: [ …, … ]
 
 # Optionally, a reply to feed back and the result it must produce:

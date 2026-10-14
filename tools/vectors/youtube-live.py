@@ -11,10 +11,14 @@ _YB = "/youtube/v3/liveBroadcasts"
 _PART = "part=id%2Csnippet%2CcontentDetails%2Cstatus"
 
 
-def _yt(command, input, method, target, body=None, **extra):
+def _yt(command, input, method, target, body=None, body_hex=None, content_type=None, **extra):
     request = {"method": method, "target": target}
     if body is not None:
         request["body"] = body
+    if body_hex is not None:
+        request["body_hex"] = body_hex
+    if content_type is not None:
+        request["content_type"] = content_type
     V.append({"spec": YT, "command": command, "input": input, "settings": _YTS,
               "expect_request": request, **extra})
 
@@ -191,6 +195,16 @@ _yt("update_video_snippet", {"video": _VSN}, "PUT", "/youtube/v3/videos?part=sni
 _VST = {"id": "abcDEF12345", "status": _VIDEO["status"]}
 _yt("update_video_status", {"video": _VST}, "PUT", "/youtube/v3/videos?part=status",
     body=json.dumps(_VST, separators=(",", ":")))
+# The image's bytes are the whole body, sent as they are: the first eight
+# bytes of a PNG file (its signature), given as base64.
+_yt("set_thumbnail", {"video_id": "abcDEF12345", "image": "iVBORw0KGgo=", "format": "image/png"}, "POST",
+    "/upload/youtube/v3/thumbnails/set?videoId=abcDEF12345&uploadType=media",
+    body_hex="89504e470d0a1a0a", content_type="image/png",
+    http_reply={"status": 200, "body": json.dumps({"kind": "youtube#thumbnailSetResponse", "etag": "e3",
+                                                   "items": [{"default": {"url": "https://i.ytimg.com/vi/x/default.jpg",
+                                                                          "width": 120, "height": 90}}]})},
+    expect_result={"ok": {"kind": "value", "value": [{"default": {"url": "https://i.ytimg.com/vi/x/default.jpg",
+                                                                   "width": 120, "height": 90}}]}})
 _yt("list_video_categories", {"region_code": "GB"}, "GET", "/youtube/v3/videoCategories?part=snippet&regionCode=GB")
 telemetry(YT, "video-updated", settings=_YTS, inbound_http={
     "path": "/youtube/v3/videos?part=snippet%2Cstatus",

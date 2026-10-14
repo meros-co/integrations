@@ -121,6 +121,16 @@ source:
       status.containsSyntheticMedia, recordingDetails.recordingDate and
       localizations; a property left out of the request that has a value is
       deleted. 50 units.
+  - title: YouTube Data API reference, thumbnails.set
+    author: Google
+    url: https://developers.google.com/youtube/v3/docs/thumbnails/set
+    note: >
+      Manufacturer document, retrieved 2026-10-14. POST
+      https://www.googleapis.com/upload/youtube/v3/thumbnails/set with
+      videoId; the body is the image; accepted media image/jpeg, image/png
+      and application/octet-stream, at most 50 MB; about 50 quota units;
+      answers a thumbnailSetResponse (kind, etag, items[] of thumbnail
+      resources).
   - title: YouTube Live Streaming API reference, liveChatModerators (list, insert, delete)
     author: Google
     url: https://developers.google.com/youtube/v3/live/docs/liveChatModerators
@@ -207,7 +217,8 @@ models:
                delete_broadcast, list_streams, get_stream, insert_stream, update_stream,
                delete_stream, get_live_details, list_chat_messages, send_chat_message,
                delete_chat_message, ban_chat_user, ban_chat_user_temporarily, unban_chat_user,
-               get_video, update_video, update_video_snippet, update_video_status, list_video_categories,
+               get_video, update_video, update_video_snippet, update_video_status, set_thumbnail,
+               list_video_categories,
                list_chat_moderators, add_chat_moderator, remove_chat_moderator, list_super_chat_events,
                create_chat_poll, close_chat_poll]
     verification: none
@@ -615,6 +626,24 @@ commands:
     expect: { status: 200, json_path: "$" }
     returns: value
 
+  set_thumbnail:
+    summary: Upload a video's custom thumbnail image (thumbnails.set; about 50 quota units); answers the thumbnails set
+    params:
+      video_id: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_-]+$", required: true,
+                  label: Video ID,
+                  description: "The id of the video (a broadcast's id is its video's) whose thumbnail is set." }
+      image: { type: binary, max_length: 52428800, required: true,
+               label: Image,
+               description: "The thumbnail image file, given as base64; at most 50 MB." }
+      format: { type: enum, values: [image/jpeg, image/png, application/octet-stream], default: image/jpeg,
+                label: Image format,
+                description: "The image's media type: JPEG, PNG, or application/octet-stream when unknown." }
+    send: { method: POST, path: /upload/youtube/v3/thumbnails/set,
+            query: { videoId: "{video_id}", uploadType: media },
+            body: { binary: image }, content_type: "{format}" }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
   list_video_categories:
     summary: The video categories that can be assigned in a region, for a video's snippet.categoryId (videoCategories.list; 1 quota unit)
     params:
@@ -756,10 +785,9 @@ quirks:
       is YouTube's own decision and may differ from the channel's
       declaration (self_declared_made_for_kids), the only one that can be
       set. YouTube leaves tags out of the video when there are none, so after
-      every tag is removed state keeps the last list. A video's thumbnail is
-      set with thumbnails.set, which takes the
-      image file as the request body: the format sends only text bodies, so
-      it is not offered here.
+      every tag is removed state keeps the last list. set_thumbnail uploads a
+      video's custom thumbnail (thumbnails.set), which the channel must be
+      allowed to use; the thumbnail is not kept in state.
 
   - models: [all]
     severity: info

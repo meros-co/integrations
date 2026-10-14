@@ -155,6 +155,9 @@
             "type": "string"
           },
           {
+            "$ref": "#/$defs/lineSend"
+          },
+          {
             "$ref": "#/$defs/oscSend"
           },
           {
@@ -172,6 +175,9 @@
                 "oneOf": [
                   {
                     "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/lineSend"
                   },
                   {
                     "$ref": "#/$defs/oscSend"
@@ -377,6 +383,9 @@
                       "type": "string"
                     },
                     {
+                      "$ref": "#/$defs/lineSend"
+                    },
+                    {
                       "$ref": "#/$defs/oscSend"
                     },
                     {
@@ -390,6 +399,9 @@
                     "oneOf": [
                       {
                         "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/lineSend"
                       },
                       {
                         "$ref": "#/$defs/oscSend"
@@ -446,6 +458,11 @@
               "match_each": {
                 "type": "string",
                 "description": "With match: an RE2-safe regex applied along the rest of the message, after what match matched; the rule matches once per match of it, its captures numbered on after match's and request_match's, and {index} its place from 0. For a list on one line (SPEC.md §8, Lists on one line)."
+              },
+              "match_each_in": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "With match_each: the capture group of match whose text match_each goes along, instead of the rest of the message (a list between markers, SPEC.md §8, Lists on one line)."
               },
               "header": {
                 "type": "string",
@@ -572,6 +589,16 @@
                 "pattern": "^[ifsbhdTFN]*$",
                 "description": "With address: the message's OSC type tags must be exactly these (without the comma), for a device that sends different shapes on one address."
               },
+              "arg_match": {
+                "type": "object",
+                "propertyNames": {
+                  "pattern": "^[0-9]+$"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "With address: an argument's index to an RE2-safe regex its text must match (a number as its decimal text); its captures are numbered on after the address's, in index order (SPEC.md §8, OSC string arguments)."
+              },
               "json_match": {
                 "type": "object",
                 "minProperties": 1,
@@ -602,6 +629,9 @@
                   "oneOf": [
                     {
                       "type": "string"
+                    },
+                    {
+                      "$ref": "#/$defs/lineSend"
                     },
                     {
                       "$ref": "#/$defs/oscPollSend"
@@ -883,6 +913,47 @@
           ],
           "description": "A server-sent event stream opened beside an http transport, with the transport's credential, for a device that pushes changes as text/event-stream. Each event goes to the json_match rules as {\"event\": name, \"data\": data} (data parsed where it is JSON) and its data to the text rules; it is reopened with backoff when it closes.",
           "properties": {
+            "method": {
+              "enum": [
+                "GET",
+                "POST"
+              ],
+              "default": "GET",
+              "description": "The stream's request method."
+            },
+            "body": {
+              "type": "string",
+              "description": "The request body, a template over settings."
+            },
+            "content_type": {
+              "type": "string",
+              "description": "The request body's Content-Type."
+            },
+            "format": {
+              "enum": [
+                "sse",
+                "json"
+              ],
+              "default": "sse",
+              "description": "sse: text/event-stream. json: a chunked JSON stream, one document per part, parts separated by a blank line; each part goes to the rules as the document it is."
+            },
+            "as_reply": {
+              "type": "object",
+              "required": [
+                "path",
+                "body"
+              ],
+              "additionalProperties": false,
+              "description": "Each part is also offered to the path rules as the reply to a GET of the path at this JSON path, with the value at body as its body (SPEC.md §8, An event stream beside an HTTP transport).",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                }
+              }
+            },
             "path": {
               "type": "string",
               "pattern": "^/"
@@ -1028,9 +1099,15 @@
                 "line",
                 "block",
                 "headed-block",
-                "terminated"
+                "terminated",
+                "fenced"
               ],
-              "description": "How a reply is delimited. Defaults to 'block' for framing: block, otherwise 'line'. 'terminated' ends a message at any of reply_terminators, with no line ending needed."
+              "description": "How a reply is delimited. Defaults to 'block' for framing: block, otherwise 'line'. 'terminated' ends a message at any of reply_terminators, with no line ending needed. 'fenced' takes each line as a message, except the lines between two lines matching reply_fence, which are one."
+            },
+            "reply_fence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With reply_framing: fenced. A regex over a line: such a line opens a block, the next one after its first other line closes it, and the lines between are one message (Turtle AV's status between lines of = signs)."
             },
             "reply_terminators": {
               "type": "array",
@@ -1270,6 +1347,25 @@
               "default": false,
               "description": "Over HTTPS, accept a certificate that does not chain to a trusted root, such as a device's self-signed one. The connection is encrypted; the device is not authenticated."
             },
+            "refusal_status_body": {
+              "type": "object",
+              "description": "What the body of an answer with one of refusal_status must hold for it to be a refusal of the credential; any other answer with that status fails only its request. For a service answering a refused token and other errors (a missing scope) with the same status, as Twitch does with 401.",
+              "properties": {
+                "json": {
+                  "type": "object",
+                  "description": "JSON paths to regexes, all of which the body must match.",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "match": {
+                  "type": "string",
+                  "description": "A regex over the body text."
+                }
+              },
+              "minProperties": 1,
+              "additionalProperties": false
+            },
             "refusal_json": {
               "type": "object",
               "description": "JSON paths to regexes: an error answer (4xx or 5xx) whose JSON body matches every one is a refusal of the credential too, whatever its status, for a service that names a refused token in its error body (the Graph API's error.code 190 under HTTP 400).",
@@ -1491,6 +1587,10 @@
               ],
               "description": "A login whose answer carries a session (a cookie or a header) sent back on every later request; renewed when the device says it ended (SPEC.md §2, Sessions).",
               "properties": {
+                "when_set": {
+                  "type": "string",
+                  "description": "A setting: the session is used only while it is set (non-empty and not false), for a login the operator can turn off; decided from the current settings."
+                },
                 "login": {
                   "description": "The login request (templates over settings), or a list of them each naming its models.",
                   "oneOf": [
@@ -1719,6 +1819,9 @@
                     "type": "string"
                   },
                   {
+                    "$ref": "#/$defs/lineSend"
+                  },
+                  {
                     "$ref": "#/$defs/oscSend"
                   },
                   {
@@ -1758,7 +1861,8 @@
             "bool",
             "enum",
             "string",
-            "json"
+            "json",
+            "binary"
           ]
         },
         "min": {
@@ -1896,6 +2000,29 @@
         }
       }
     },
+    "lineSend": {
+      "type": "object",
+      "required": [
+        "message",
+        "models"
+      ],
+      "additionalProperties": false,
+      "description": "Line and websocket transports: a text message sent to some models only (SPEC.md §4, Messages per model).",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "The message, a template as a plain string item is."
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids this message is for; it is skipped for any other model."
+        }
+      }
+    },
     "httpSend": {
       "type": "object",
       "required": [
@@ -1928,10 +2055,82 @@
           }
         },
         "body": {
-          "type": "string"
+          "description": "The request body: a template, or {binary: name} sending a binary parameter's bytes as they are.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "required": [
+                "binary"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "binary": {
+                  "type": "string",
+                  "description": "A binary parameter of the command."
+                }
+              }
+            }
+          ]
         },
         "content_type": {
-          "type": "string"
+          "type": "string",
+          "description": "The body's Content-Type, a template (an enum parameter may choose it)."
+        },
+        "multipart": {
+          "type": "array",
+          "minItems": 1,
+          "description": "A multipart/form-data body (RFC 7578), in place of body and content_type: each part a template value or a binary parameter's bytes.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The form field's name, a template."
+              },
+              "value": {
+                "type": "string",
+                "description": "The part's text, a template."
+              },
+              "binary": {
+                "type": "string",
+                "description": "A binary parameter whose bytes are the part."
+              },
+              "filename": {
+                "type": "string",
+                "description": "The file name in the part's Content-Disposition, a template."
+              },
+              "content_type": {
+                "type": "string",
+                "description": "The part's Content-Type, a template."
+              }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "value"
+                ]
+              },
+              {
+                "required": [
+                  "binary"
+                ]
+              }
+            ]
+          }
+        },
+        "headers": {
+          "type": "object",
+          "description": "Headers of this message alone, each name mapped to a template over its parameters and the settings (a file name in Content-Disposition). Not Authorization, Content-Type or Host.",
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "models": {
           "type": "array",
@@ -2030,6 +2229,12 @@
         "convert": {
           "type": "string",
           "description": "The name of a conversion: the returned value is converted from the wire."
+        },
+        "replies": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Line transports only. How many replies each message of the command takes (Quartz's name writes: the name, then an acknowledge); the reply expect checks is all of them, joined by line breaks. Default 1."
         }
       }
     },
@@ -2102,6 +2307,9 @@
                   "type": "string"
                 },
                 {
+                  "$ref": "#/$defs/lineSend"
+                },
+                {
                   "$ref": "#/$defs/oscPollSend"
                 },
                 {
@@ -2115,6 +2323,9 @@
                 "oneOf": [
                   {
                     "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/lineSend"
                   },
                   {
                     "$ref": "#/$defs/oscPollSend"
