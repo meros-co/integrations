@@ -183,16 +183,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## barco-eventmaster — Barco Event Master
 
-- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1289](specs/barco-eventmaster.yaml#L1289))
-- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1339](specs/barco-eventmaster.yaml#L1339))
-- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1346](specs/barco-eventmaster.yaml#L1346))
-- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1355](specs/barco-eventmaster.yaml#L1355))
-- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1358](specs/barco-eventmaster.yaml#L1358))
-- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1441](specs/barco-eventmaster.yaml#L1441))
-- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1412](specs/barco-eventmaster.yaml#L1412))
-- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1305](specs/barco-eventmaster.yaml#L1305))
-- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1391](specs/barco-eventmaster.yaml#L1391))
-- [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1208](specs/barco-eventmaster.yaml#L1208))
+- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1396](specs/barco-eventmaster.yaml#L1396))
+- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1446](specs/barco-eventmaster.yaml#L1446))
+- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1453](specs/barco-eventmaster.yaml#L1453))
+- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1462](specs/barco-eventmaster.yaml#L1462))
+- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1465](specs/barco-eventmaster.yaml#L1465))
+- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1550](specs/barco-eventmaster.yaml#L1550))
+- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1521](specs/barco-eventmaster.yaml#L1521))
+- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1412](specs/barco-eventmaster.yaml#L1412))
+- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1500](specs/barco-eventmaster.yaml#L1500))
+- [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1295](specs/barco-eventmaster.yaml#L1295))
+- [ ] Confirm reading listContent for every screen destination every 10 seconds (after listDestinations) is acceptable on a processor with many screens, and that listContent's Layers, BGLyr and Transition arrays match the Doc 8.2 example on E2, S3, EX and Encore3. ([specs/barco-eventmaster.yaml:1175](specs/barco-eventmaster.yaml#L1175))
+- [ ] Record a listCues reply: the documents give no cue object, and the cue's id and Name are read as the other lists hold them. ([specs/barco-eventmaster.yaml:1248](specs/barco-eventmaster.yaml#L1248))
 
 ## behringer-wing — Behringer WING
 

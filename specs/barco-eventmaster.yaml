@@ -1111,7 +1111,8 @@ commands:
 telemetry:
   # The processor pushes changes only as HTTP POSTs to a listener the client
   # runs (subscribe), which the core does not provide, so the system, the
-  # destination list and the source list are asked for every 10 seconds.
+  # destination list (and each screen destination's content), the source
+  # list, the presets and the cues are asked for every 10 seconds.
   # Every method shares the one URL, so a rule can only recognise a reply by
   # its shape: each rule below reads fields that only one method's reply holds.
   poll:
@@ -1119,6 +1120,8 @@ telemetry:
       - { method: POST, path: /, body: '{"params":{},"method":"getFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
       - { method: POST, path: /, body: '{"params":{},"method":"listDestinations","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
       - { method: POST, path: /, body: '{"params":{},"method":"listSources","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+      - { method: POST, path: /, body: '{"params":{"ScreenDest":-1,"AuxDest":-1},"method":"listPresets","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+      - { method: POST, path: /, body: '{"params":{},"method":"listCues","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     every_ms: 10000
   updates:
     # getFrameSettings: the frame (System.FrameCollection.Frame).
@@ -1160,7 +1163,8 @@ telemetry:
       json: {}
       replace: cards
 
-    # listDestinations: screen destinations.
+    # listDestinations: screen destinations. Each one's content is read in
+    # turn (listContent), so every poll round reads every screen's layers.
     - path: "^/$"
       json_each: "$.result.response.ScreenDestination"
       json: { id: "$.id", name: "$.Name", width: "$.HSize", height: "$.VSize" }
@@ -1168,6 +1172,89 @@ telemetry:
         "screens.{id}.name": "{name}"
         "screens.{id}.width": "{width}"
         "screens.{id}.height": "{height}"
+      then_send:
+        - { method: POST, path: /, body: '{"params":{"id":{id}},"method":"listContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+
+    # listContent (Doc 8.2 example): a screen destination's layers, its
+    # backgrounds (0 program, 1 preview) and transitions, by the id asked
+    # for. Each reply replaces that screen's lists.
+    - path: "^/$"
+      request_match: { "$.method": "^listContent$", "$.params.id": "^(\\d+)$" }
+      json_match: { "$.result.response.Layers": "^\\[" }
+      json: {}
+      replace: ["screens.{1}.layers", "screens.{1}.backgrounds", "screens.{1}.transitions"]
+    - path: "^/$"
+      request_match: { "$.method": "^listContent$", "$.params.id": "^(\\d+)$" }
+      json_each: "$.result.response.Layers"
+      json:
+        id: "$.id"
+        name: "$.Name"
+        source: "$.LastSrcIdx"
+        pvw: "$.PvwMode"
+        pgm: "$.PgmMode"
+        pvw_z: "$.PvwZOrder"
+        pgm_z: "$.PgmZOrder"
+        freeze: "$.Freeze"
+        scaling: "$.ScalingMode"
+        capacity: "$.Capacity"
+        link_layer: "$.LinkLayerId"
+        link_dest: "$.LinkDestId"
+      state:
+        "screens.{1}.layers.{id}.name": "{name}"
+        "screens.{1}.layers.{id}.source": "{source}"
+        "screens.{1}.layers.{id}.preview": { value: "{pvw}", map: { "0": false, "1": true } }
+        "screens.{1}.layers.{id}.program": { value: "{pgm}", map: { "0": false, "1": true } }
+        "screens.{1}.layers.{id}.preview_z": "{pvw_z}"
+        "screens.{1}.layers.{id}.program_z": "{pgm_z}"
+        "screens.{1}.layers.{id}.frozen": { value: "{freeze}", map: { "0": false, "1": true } }
+        "screens.{1}.layers.{id}.scaling_mode": "{scaling}"
+        "screens.{1}.layers.{id}.capacity": "{capacity}"
+        "screens.{1}.layers.{id}.link_layer": "{link_layer}"
+        "screens.{1}.layers.{id}.link_destination": "{link_dest}"
+    - path: "^/$"
+      request_match: { "$.method": "^listContent$", "$.params.id": "^(\\d+)$" }
+      json_each: "$.result.response.BGLyr"
+      json: { id: "$.id", source: "$.LastBGSourceIndex", matte: "$.BGShowMatte" }
+      state:
+        "screens.{1}.backgrounds.{id}.source": "{source}"
+        "screens.{1}.backgrounds.{id}.show_matte": { value: "{matte}", map: { "0": false, "1": true } }
+    - path: "^/$"
+      request_match: { "$.method": "^listContent$", "$.params.id": "^(\\d+)$" }
+      json_each: "$.result.response.Transition"
+      json: { id: "$.id", time: "$.TransTime", position: "$.TransPos", arm: "$.ArmMode" }
+      state:
+        "screens.{1}.transitions.{id}.time": "{time}"
+        "screens.{1}.transitions.{id}.position": "{position}"
+        "screens.{1}.transitions.{id}.arm_mode": "{arm}"
+
+    # listPresets with every destination: the presets, replaced whole.
+    - path: "^/$"
+      request_match: { "$.method": "^listPresets$" }
+      json_match: { "$.result.response": "^\\[" }
+      json: {}
+      replace: presets
+    - path: "^/$"
+      request_match: { "$.method": "^listPresets$" }
+      json_each: "$.result.response"
+      json: { id: "$.id", name: "$.Name", lock: "$.LockMode", serial: "$.presetSno" }
+      state:
+        "presets.{id}.name": "{name}"
+        "presets.{id}.lock_mode": "{lock}"
+        "presets.{id}.serial": "{serial}"
+
+    # listCues: the cues, replaced whole. The documents give no cue object;
+    # its id and Name are read as every other list's are.
+    - path: "^/$"
+      request_match: { "$.method": "^listCues$" }
+      json_match: { "$.result.response": "^\\[" }
+      json: {}
+      replace: cues
+    - path: "^/$"
+      request_match: { "$.method": "^listCues$" }
+      json_each: "$.result.response"
+      json: { id: "$.id", name: "$.Name" }
+      state:
+        "cues.{id}.name": "{name}"
 
     # listDestinations: aux destinations.
     - path: "^/$"
@@ -1267,6 +1354,26 @@ state:
   screens.*.width: { type: int, unit: px, description: "Screen destination width" }
   screens.*.height: { type: int, unit: px, description: "Screen destination height" }
   screens.*.active: { type: bool, description: "Screen destination is active (listContent IsActive)" }
+  screens.*.layers.*.name: { type: string, description: "Layer name, keyed by screen and the layer's 0-based id (listContent)" }
+  screens.*.layers.*.source: { type: int, description: "Index of the source last put on the layer, -1 for none" }
+  screens.*.layers.*.preview: { type: bool, description: "The layer is on preview (PvwMode)" }
+  screens.*.layers.*.program: { type: bool, description: "The layer is on program (PgmMode)" }
+  screens.*.layers.*.preview_z: { type: int, description: "The layer's z-order on preview" }
+  screens.*.layers.*.program_z: { type: int, description: "The layer's z-order on program" }
+  screens.*.layers.*.frozen: { type: bool, description: "The layer is frozen" }
+  screens.*.layers.*.scaling_mode: { type: int, description: "The layer's scaling mode, as the processor numbers it" }
+  screens.*.layers.*.capacity: { type: int, description: "The layer's capacity, as the processor reports it" }
+  screens.*.layers.*.link_layer: { type: int, description: "Link (global) layer index" }
+  screens.*.layers.*.link_destination: { type: int, description: "Link destination index" }
+  screens.*.backgrounds.*.source: { type: int, description: "Index of the last background source on the screen, -1 for none; background 0 is program, 1 preview" }
+  screens.*.backgrounds.*.show_matte: { type: bool, description: "The background shows its matte" }
+  screens.*.transitions.*.time: { type: int, unit: frames, description: "Transition time of the screen destination (TransTime)" }
+  screens.*.transitions.*.position: { type: int, description: "Transition position (TransPos)" }
+  screens.*.transitions.*.arm_mode: { type: int, description: "Transition arm mode (ArmMode)" }
+  presets.*.name: { type: string, description: "Preset name, keyed by its 0-based id (listPresets)" }
+  presets.*.lock_mode: { type: int, description: "Preset lock mode" }
+  presets.*.serial: { type: float, description: "Preset serial number, such as 3.00" }
+  cues.*.name: { type: string, description: "Cue name, keyed by its 0-based id (listCues)" }
   aux.*.name: { type: string, description: "Aux destination name, keyed by its 0-based id" }
   aux.*.stream_mode: { type: int, description: "Aux destination AuxStreamMode, as the processor reports it" }
   aux.*.preview_source: { type: int, description: "Source id in the aux destination's preview (listAuxContent)" }
@@ -1375,13 +1482,15 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      State is limited to replies the core can tell apart. Every method shares
-      one URL, and telemetry rules are matched by URL, so a reply is
-      recognised only by fields no other reply holds. Source, preset, cue,
-      still, operator and user key names and the layers in a screen are not
-      tracked as state, because those replies share their field names (id,
-      Name) with others; read them with the list commands, whose value is the
-      whole list.
+      Every method shares one URL, so a reply is told apart by the method of
+      the request it answers or by fields no other reply holds. Each screen
+      destination's layers, backgrounds and transitions (listContent, read
+      for every screen the destination list names), the presets and the cues
+      are polled every 10 seconds and kept in state, each list replaced
+      whole. Source, still, operator and user key names are not tracked;
+      read them with the list commands, whose value is the whole list. A
+      cue's fields are not documented: its id and Name are read as the other
+      lists hold them.
 
   - models: [e2, s3-4k, ex]
     severity: warning

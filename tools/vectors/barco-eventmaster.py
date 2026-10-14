@@ -298,6 +298,8 @@ telemetry(BM, "destinations", inbound_http={"path": "/", "body": json.dumps({"js
                                                                            "VPos": 0, "HSize": 1920, "VSize": 1080,
                                                                            "Freeze": 0}]}]}],
         "AuxDestination": [{"id": 0, "Name": "AuxDest1", "AuxStreamMode": 4}, {"id": 1, "AuxStreamMode": 4}]}}})},
+    # Each screen destination's content is read in turn.
+    expect_then_send=[{"method": "POST", "target": "/", "body": _rpc("listContent", {"id": 0})}],
     expect_state={"screens": {"0": {"name": "Dest1", "width": 3840, "height": 1080}},
                   "aux": {"0": {"name": "AuxDest1", "stream_mode": 4}, "1": {"stream_mode": 4}}})
 # listAuxContent: the aux's sources; its Name is not taken (listContent has one too).
@@ -310,6 +312,46 @@ telemetry(BM, "screen-content", inbound_http={"path": "/", "body": json.dumps({"
         {"id": 0, "LastBGSourceIndex": -1, "BGShowMatte": 1, "BGColor": {"id": 0, "Red": 0, "Green": 0, "Blue": 0}}],
         "Transition": [{"id": 0, "TransTime": 30, "TransPos": 0, "ArmMode": 1}]}}, "id": "1234"})},
     expect_state={"screens": {"0": {"active": True}}})
+# listContent asked for screen 0 (Doc 8.2 example, two layers): the layers,
+# backgrounds and transitions, each list replaced whole.
+_LAYER = {"PvwMode": 0, "PgmMode": 0, "LinkLayerId": 0, "LinkDestId": 0, "Capacity": 1, "PvwZOrder": 0,
+          "PgmZOrder": 0, "Freeze": 0, "ScalingMode": 2, "Window": [], "Source": [], "Mask": []}
+telemetry(BM, "screen-layers", inbound_http={
+    "path": "/", "request": {"params": {"id": 0}, "method": "listContent", "id": "1234", "jsonrpc": "2.0"},
+    "body": json.dumps({"jsonrpc": "2.0", "result": {"success": 0, "response": {
+        "id": 0, "Name": "ScreenDest1", "IsActive": 1,
+        "BGLyr": [{"id": 0, "LastBGSourceIndex": -1, "BGShowMatte": 1, "BGColor": {"id": 0, "Red": 0, "Green": 0, "Blue": 0}},
+                  {"id": 1, "LastBGSourceIndex": 3, "BGShowMatte": 0, "BGColor": {"id": 0, "Red": 0, "Green": 0, "Blue": 0}}],
+        "Layers": [{"id": 0, "Name": "Layer1-A", "LastSrcIdx": -1, **_LAYER},
+                   {"id": 1, "Name": "Layer1-B", "LastSrcIdx": 4, **_LAYER, "PgmMode": 1, "PgmZOrder": 1, "LinkLayerId": 1}],
+        "Transition": [{"id": 0, "TransTime": 30, "TransPos": 0, "ArmMode": 1},
+                       {"id": 1, "TransTime": 30, "TransPos": 0, "ArmMode": 0}]}}, "id": "1234"})},
+    state_before={"screens": {"0": {"name": "ScreenDest1", "layers": {"2": {"name": "Gone"}}}}},
+    expect_state={"screens": {"0": {
+        "name": "ScreenDest1", "active": True,
+        "layers": {
+            "0": {"name": "Layer1-A", "source": -1, "preview": False, "program": False, "preview_z": 0, "program_z": 0,
+                  "frozen": False, "scaling_mode": 2, "capacity": 1, "link_layer": 0, "link_destination": 0},
+            "1": {"name": "Layer1-B", "source": 4, "preview": False, "program": True, "preview_z": 0, "program_z": 1,
+                  "frozen": False, "scaling_mode": 2, "capacity": 1, "link_layer": 1, "link_destination": 0}},
+        "backgrounds": {"0": {"source": -1, "show_matte": True}, "1": {"source": 3, "show_matte": False}},
+        "transitions": {"0": {"time": 30, "position": 0, "arm_mode": 1}, "1": {"time": 30, "position": 0, "arm_mode": 0}}}}})
+# listPresets for every destination: the presets, replaced whole.
+telemetry(BM, "presets", inbound_http={
+    "path": "/", "request": {"params": {"ScreenDest": -1, "AuxDest": -1}, "method": "listPresets", "id": "1234", "jsonrpc": "2.0"},
+    "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {"success": 0, "response": [
+        {"id": 0, "Name": "Preset3.00", "LockMode": 0, "presetSno": 3.00},
+        {"id": 1, "Name": "Preset4.00", "LockMode": 0, "presetSno": 4.10}]}})},
+    state_before={"presets": {"5": {"name": "Old"}}},
+    expect_state={"presets": {"0": {"name": "Preset3.00", "lock_mode": 0, "serial": 3.0},
+                              "1": {"name": "Preset4.00", "lock_mode": 0, "serial": 4.1}}})
+# listCues: the cues, replaced whole (the documents give no cue object; id
+# and Name are read as other lists hold them).
+telemetry(BM, "cues", inbound_http={
+    "path": "/", "request": {"params": {}, "method": "listCues", "id": "1234", "jsonrpc": "2.0"},
+    "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {"success": 0, "response": [
+        {"id": 0, "Name": "Cue1"}, {"id": 1, "Name": "Walk-in"}]}})},
+    expect_state={"cues": {"0": {"name": "Cue1"}, "1": {"name": "Walk-in"}}})
 # listSources, the document's example plus a still.
 telemetry(BM, "sources", inbound_http={"path": "/", "request": {"params": {}, "method": "listSources", "id": "1234", "jsonrpc": "2.0"}, "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": SOURCES + [
