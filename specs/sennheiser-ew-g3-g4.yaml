@@ -31,7 +31,8 @@ models:
   - id: em-300-500-g4
     name: Sennheiser EM 300-500 G4 receiver
     channels: 1
-    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware]
+    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_squelch, step_af_out]
     verification: none
     notes: >
       Requires firmware 1.7.0 or later. The EM 100 G4 does not support the
@@ -39,7 +40,8 @@ models:
   - id: sr-iem-g4
     name: Sennheiser SR IEM G4 transmitter
     channels: 1
-    supports: [rf_mute, set_frequency, set_name, set_sensitivity, set_mode, get_rf_config, get_firmware]
+    supports: [rf_mute, set_frequency, set_name, set_sensitivity, set_mode, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_sensitivity, set_iem_equalizer]
     verification: none
     notes: >
       An in-ear monitor transmitter. Its Mute stops the RF carrier, so it is
@@ -47,7 +49,8 @@ models:
   - id: em-300-500-g3
     name: Sennheiser EM 300-500 G3 receiver
     channels: 1
-    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware]
+    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_squelch, step_af_out]
     verification: none
     notes: >
       A consumer runs against ew 500 G3 receivers over this protocol. TI 1254 covers
@@ -134,6 +137,79 @@ commands:
     summary: Firmware revision, e.g. "1.20.1"
     returns: value
 
+  get_bank_list:
+    summary: >
+      The frequencies of a preset or user bank in kHz, from channel 1, with 0
+      for an unused channel (trailing unused channels left out). Also kept in
+      the state.
+    params:
+      bank: { type: int, min: 1, max: 26, required: true,
+              label: Bank,
+              description: "1 to 20 are the preset banks, 21 to 26 the user banks U1 to U6." }
+    returns: value
+
+  set_bank_channel:
+    summary: >
+      Tune to a channel of a preset or user bank. The bank is listed first, since
+      the device takes a bank and channel only with that channel's own
+      frequency; the command fails if the channel is unused or the device files
+      the frequency under U1.0 instead.
+    params:
+      bank:         { type: int, min: 1, max: 26, required: true,
+                      label: Bank,
+                      description: "1 to 20 are the preset banks, 21 to 26 the user banks U1 to U6." }
+      bank_channel: { type: int, min: 1, max: 64, required: true,
+                      label: Bank channel,
+                      description: "Channel within the bank, from 1; how many a bank has depends on the device." }
+    returns: ack
+
+  step_frequency:
+    summary: Move the frequency up or down by whole tuning steps (into user bank U1.0)
+    params:
+      steps: { type: int, min: -100, max: 100, required: true,
+               label: Steps,
+               description: "Tuning steps to move, positive up and negative down, not 0." }
+    returns: ack
+
+  step_squelch:
+    summary: Raise or lower the squelch by 2 dB steps (it cannot be switched off this way)
+    params:
+      steps: { type: int, min: -10, max: 10, required: true,
+               label: Steps,
+               description: "2 dB steps to move, positive up and negative down, not 0." }
+    returns: ack
+
+  step_af_out:
+    summary: Raise or lower the AF out by 3 dB steps (relative changes stop at +18 dB)
+    params:
+      steps: { type: int, min: -16, max: 16, required: true,
+               label: Steps,
+               description: "3 dB steps to move, positive up and negative down, not 0." }
+    returns: ack
+
+  step_sensitivity:
+    summary: Raise or lower the transmitter's input sensitivity by 3 dB steps
+    params:
+      steps: { type: int, min: -14, max: 14, required: true,
+               label: Steps,
+               description: "3 dB steps to move, positive up and negative down, not 0." }
+    returns: ack
+
+  set_iem_equalizer:
+    summary: >
+      Switch the in-ear transmitter's equalizer on or off, and optionally set
+      all five bands at once
+    params:
+      enabled:  { type: bool, default: true,
+                  label: Equalizer,
+                  description: "On applies the equalizer, off bypasses it; the bands are kept either way." }
+      low:      { type: int, min: -5, max: 5, label: Low, description: "Low band, -5 to +5; give all five bands or none." }
+      low_mid:  { type: int, min: -5, max: 5, label: Low mid, description: "Low mid band, -5 to +5; give all five bands or none." }
+      mid:      { type: int, min: -5, max: 5, label: Mid, description: "Mid band, -5 to +5; give all five bands or none." }
+      mid_high: { type: int, min: -5, max: 5, label: Mid high, description: "Mid high band, -5 to +5; give all five bands or none." }
+      high:     { type: int, min: -5, max: 5, label: High, description: "High band, -5 to +5; give all five bands or none." }
+    returns: ack
+
 state:
   channels.*.name:            { type: string, description: "Device display name" }
   channels.*.frequency_khz:   { type: int, unit: kHz, description: "Carrier frequency" }
@@ -160,6 +236,17 @@ state:
   channels.*.battery_percent: { type: int, unit: "%", description: "Transmitter battery: 0 (low), 30, 70 or 100. Absent when the receiver has no battery telegram (EM)" }
   channels.*.warnings:        { type: array, description: "Active warnings from Msg; empty when Msg is OK" }
   channels.*.config_index:    { type: int, description: "Increments on every configuration change, 0-999, wrapping" }
+  channels.*.mute_now:        { type: object, description: "EM: the current mute state from AF, {any, tx, rf, rx}, as opposed to mute_flags since the last cycle" }
+  channels.*.rf_mute_flag:    { type: int, description: "SR: RF mute since the last cycle: 0 RF on throughout, 1 off throughout, 2 changed" }
+  channels.*.iem_equalizer.enabled: { type: bool, description: "SR equalizer on" }
+  channels.*.iem_equalizer.low:      { type: int, description: "SR equalizer low band, -5 to +5" }
+  channels.*.iem_equalizer.low_mid:  { type: int, description: "SR equalizer low mid band" }
+  channels.*.iem_equalizer.mid:      { type: int, description: "SR equalizer mid band" }
+  channels.*.iem_equalizer.mid_high: { type: int, description: "SR equalizer mid high band" }
+  channels.*.iem_equalizer.high:     { type: int, description: "SR equalizer high band" }
+  channels.*.banks.*:         { type: array, unit: kHz, description: "A bank's frequencies by bank number (1-20 presets, 21-26 user banks), from channel 1; 0 is unused. Kept once read with get_bank_list or set_bank_channel" }
+  device.firmware:            { type: string, description: "Firmware revision, read on connecting" }
+  device.rf_config:           { type: array, description: "Tunable blocks as {min_khz, max_khz, step_khz}, read on connecting" }
 
 quirks:
   - models: [all]
@@ -224,4 +311,24 @@ quirks:
       No manufacturer document covering G3 has been found. A consumer runs against
       ew 500 G3 receivers, but no conformance vector has been recorded from one,
       and commands a consumer does not use (squelch, AF out, equalizer, RfConfig,
-      FirmwareRevision) are assumed to behave as on G4.
+      FirmwareRevision, BankList, relative changes) are assumed to behave as on
+      G4.
+
+  - models: [all]
+    severity: info
+    text: >
+      Push is the subscription itself, which the core sends and renews (60 s,
+      cyclic attributes every 500 ms, mode 3); it is not offered as a command.
+      Mode 3 also makes the device send every configuration attribute when the
+      Push arrives and whenever one changes, so the configuration needs no
+      polling. TI 1254 shows "AfPOut" only as an example of an invalid
+      command; there is no such command.
+
+  - models: [all]
+    severity: info
+    text: >
+      Relative changes (the step commands) are answered with the new value, not
+      an echo. A relative frequency change files the result under user bank
+      U1.0, and relative AF out changes stop at +18 dB: +21 and +24 dB are
+      reached only by set_af_out. Bank lists are read on request only; the
+      protocol has no command to edit a bank's channels.

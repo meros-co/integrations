@@ -47,6 +47,8 @@ async fn simulated_g4() -> tokio::task::JoinHandle<()> {
                 ["Name"] => "Name Vocal 1\r".into(),
                 ["Frequency"] => "Frequency 606000 0 0\r".into(),
                 ["Mute", v] => format!("Mute {v}\r"),
+                ["BankList", "2"] => "BankList 820000 821000 822000\r".into(),
+                ["Frequency", f, b, c] => format!("Frequency {f} {b} {c}\r"),
                 ["AfOut", v] => match v.parse::<i32>() {
                     Ok(level) if (-24..=24).contains(&level) && level % 3 == 0 => {
                         format!("AfOut {level}\r")
@@ -114,6 +116,20 @@ async fn g4_receiver_end_to_end() {
         .execute(id, "mute", params(json!({"muted": true})))
         .await;
     assert_eq!(outcome, Ok(Outcome::Ack));
+
+    // A bank channel is tuned through the bank's list, in one command.
+    let outcome = core
+        .execute(
+            id,
+            "set_bank_channel",
+            params(json!({"bank": 2, "bank_channel": 3})),
+        )
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    let ch = core.snapshot(id).unwrap().state["channels"]["1"].clone();
+    assert_eq!(ch["frequency_khz"], 822000);
+    assert_eq!(ch["bank_channel"], 3);
+    assert_eq!(ch["banks"]["2"], json!([820000, 821000, 822000]));
 
     // A value the device refuses is reported with its code.
     let outcome = core
