@@ -40,11 +40,17 @@ pub(crate) enum ReplyFraming {
     /// Text up to and including any of these, with no line ending needed:
     /// Roland's `;`-ended replies and its bare ACK byte.
     Terminated(Vec<String>),
+    /// One message per non-empty line, except a block between two lines
+    /// matching this regex (the fences), which is one message without them:
+    /// Turtle AV's status between lines of `=`.
+    Fenced(String),
 }
 
 /// Turns received bytes into complete reply messages.
 pub(crate) struct Framer {
     framing: ReplyFraming,
+    /// `Fenced`: the fence, compiled.
+    fence: Option<regex::Regex>,
     lines: Lines,
     block: Vec<String>,
     in_block: bool,
@@ -53,8 +59,13 @@ pub(crate) struct Framer {
 
 impl Framer {
     pub(crate) fn new(framing: ReplyFraming) -> Framer {
+        let fence = match &framing {
+            ReplyFraming::Fenced(re) => regex::Regex::new(re).ok(),
+            _ => None,
+        };
         Framer {
             framing,
+            fence,
             lines: Lines::default(),
             block: Vec::new(),
             in_block: false,
@@ -133,6 +144,29 @@ impl Framer {
                         self.in_block = true;
                         self.block.push(line);
                     } else if !line.is_empty() {
+                        out.push(line);
+                    }
+                }
+                ReplyFraming::Fenced(_) => {
+                    let fence = self.fence.as_ref().is_some_and(|re| re.is_match(&line));
+                    if fence && self.in_block {
+                        // A fence right after a fence (DARWIN's status opens
+                        // with two) keeps the block open; one after content
+                        // closes it.
+                        if self.block.iter().any(|l| !l.trim().is_empty()) {
+                            self.in_block = false;
+                            let lines = std::mem::take(&mut self.block);
+                            let first = lines.iter().position(|l| !l.trim().is_empty());
+                            let last = lines.iter().rposition(|l| !l.trim().is_empty());
+                            if let (Some(a), Some(b)) = (first, last) {
+                                out.push(lines[a..=b].join("\n"));
+                            }
+                        }
+                    } else if fence {
+                        self.in_block = true;
+                    } else if self.in_block {
+                        self.block.push(line);
+                    } else if !line.trim().is_empty() {
                         out.push(line);
                     }
                 }
@@ -274,6 +308,19 @@ mod tests {
         assert_eq!(f.feed(b"\x06"), vec!["\u{6}"]);
         assert_eq!(f.feed(b"\x02VFL:"), Vec::<String>::new());
         assert_eq!(f.feed(b"a;\r\nACK;"), vec!["\u{2}VFL:a;", "ACK;"]);
+    }
+
+    #[test]
+    fn fenced_blocks_are_one_message() {
+        let mut f = Framer::new(ReplyFraming::Fenced(r"^=+\s*$".into()));
+        // Lines outside fences are messages of their own; consecutive fences
+        // open one block, whose blank edge lines are dropped.
+        let out = f.feed(
+            b"[SUCCESS]Set decoder 001 output on.\r\n====\r\n==== \r\n  Status Info\r\n\r\n001 On\r\n",
+        );
+        assert_eq!(out, ["[SUCCESS]Set decoder 001 output on."]);
+        let out = f.feed(b"002 Off\r\n\r\n====\r\n[ERROR]x\r\n");
+        assert_eq!(out, ["  Status Info\n\n001 On\n002 Off", "[ERROR]x"]);
     }
 
     #[test]

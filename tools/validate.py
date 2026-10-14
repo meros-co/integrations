@@ -483,6 +483,13 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     for method in sorted(methods & {"bearer", "header"}):
         if "token" not in settings:
             errors.append(f"auth: {method} needs a 'token' setting")
+    if (transport.get("reply_framing") == "fenced") != ("reply_fence" in transport):
+        errors.append("transport: reply_framing fenced and reply_fence go together")
+    if "reply_fence" in transport:
+        try:
+            re.compile(transport["reply_fence"])
+        except re.error as e:
+            errors.append(f"transport.reply_fence does not compile: {e}")
     for path, pattern in (transport.get("refusal_json") or {}).items():
         try:
             re.compile(pattern)

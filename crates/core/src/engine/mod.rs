@@ -1230,6 +1230,12 @@ impl SpecEngine {
                             .filter(|a| !a.is_empty())
                             .ok_or("reply_framing terminated needs reply_terminators")?,
                     ),
+                    (Some("fenced"), _) => {
+                        let fence = str_field(&t, "reply_fence")
+                            .ok_or("reply_framing fenced needs reply_fence")?;
+                        Regex::new(fence).map_err(|e| format!("reply_fence: {e}"))?;
+                        ReplyFraming::Fenced(fence.to_string())
+                    }
                     (None, "block") => ReplyFraming::Block,
                     (None, "delimited") => ReplyFraming::Delimited { open, close },
                     (None, _) => ReplyFraming::Line,
@@ -2922,10 +2928,7 @@ impl SpecEngine {
                         cx.alive();
                         return;
                     }
-                    let all = std::mem::take(&mut flight.taken).join(
-                        "
-",
-                    );
+                    let all = std::mem::take(&mut flight.taken).join("\n");
                     self.reply(cx, Reply::Text(all));
                     return;
                 }

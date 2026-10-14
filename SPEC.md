@@ -102,8 +102,15 @@ command is sent:
 | `block` | A blank line | Blackmagic Videohub |
 | `headed-block` | The end of the first line, unless that line ends in `:`, in which case a blank line | Blackmagic HyperDeck: `200 ok`, or `208 transport info:` followed by fields |
 | `terminated` | The first of `reply_terminators`, kept as part of the message; no line ending is needed | Roland V-60HD: `VFL:a;`, and a bare ACK byte (`reply_terminators: [";", "\u0006"]`) |
+| `fenced` | The end of the line, unless the line matches `reply_fence`: then the next such line after other text, the lines between being one message | Turtle AV controllers: a status block between lines of `=` (`reply_fence: "^=+\\s*$"`) |
 
 It defaults to `block` for `framing: block` and to `line` otherwise.
+
+With `fenced`, a fence line opens a block and the next fence line after any
+other text closes it, so two fences in a row open one block; the fences, and
+the blank lines at the block's start and end, are not part of the message.
+The block's first line is what `header` rules (§8) match, and its other
+lines what `each_line` reads, as for a `block` reply.
 
 `reply_match` is an RE2-safe regex separating replies from unsolicited
 messages. A device that pushes status at any time (HyperDeck's `5xx` messages,
