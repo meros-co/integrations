@@ -1930,11 +1930,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## yamaha-dm7 — Yamaha DM7
 
-- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm7.yaml:7575](specs/yamaha-dm7.yaml#L7575))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm7.yaml:7618](specs/yamaha-dm7.yaml#L7618))
-- [ ] Record the sscurrentt_ex reply form, which is matched leniently, and check whether ssrecallt_ex and sscurrentt_ex need scpmode sstype "text" first (the Companion module sends it). ([specs/yamaha-dm7.yaml:7650](specs/yamaha-dm7.yaml#L7650))
-- [ ] Check what send pre/post 0 and 1 mean (RIVAGE gives 0 Post, 1 Pre). ([specs/yamaha-dm7.yaml:7662](specs/yamaha-dm7.yaml#L7662))
-- [ ] Check the PEQ band gain scaling (10 or 100). ([specs/yamaha-dm7.yaml:7664](specs/yamaha-dm7.yaml#L7664))
+- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm7.yaml:9055](specs/yamaha-dm7.yaml#L9055))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm7.yaml:9098](specs/yamaha-dm7.yaml#L9098))
+- [ ] Record the sscurrentt_ex reply form, which is matched leniently, and check whether ssrecallt_ex and sscurrentt_ex need scpmode sstype "text" first (the Companion module sends it). ([specs/yamaha-dm7.yaml:9132](specs/yamaha-dm7.yaml#L9132))
+- [ ] Check what send pre/post 0 and 1 mean (RIVAGE gives 0 Post, 1 Pre). ([specs/yamaha-dm7.yaml:9143](specs/yamaha-dm7.yaml#L9143))
+- [ ] Check the PEQ band gain scaling (10 or 100). ([specs/yamaha-dm7.yaml:9143](specs/yamaha-dm7.yaml#L9143))
+- [ ] Confirm on current DM7 firmware (V2.0 or later) that no dynamics, insert, delay or effect parameter has an RCP address, and whether the RIVAGE PM addresses (MIXER:Current/InCh/Dyna1/...) are answered. ([specs/yamaha-dm7.yaml:9152](specs/yamaha-dm7.yaml#L9152))
+- [ ] Confirm MIXER:Current/Mix/PanMode, Mix/BusType, Cue/ActiveCue, InCh/PanMode and St/PanMode answer as the captured parameter list gives them, and name the bus types and pan modes. ([specs/yamaha-dm7.yaml:9159](specs/yamaha-dm7.yaml#L9159))
 
 ## yamaha-dme7 — Yamaha DME7
 

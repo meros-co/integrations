@@ -205,6 +205,12 @@ def _ydm7_vectors():
         ('cue_dca_point', 'MIXER:Current/Cue/DCA/Point', ('cue', 2), None, ('enum', ('PRE PAN', 'POST PAN')), 'cue.{x}.dca_point', False),
         ('cue_dca_unity', 'MIXER:Current/Cue/DCA/Unity', ('cue', 2), None, ('bool',), 'cue.{x}.dca_unity', False),
         ('cue_output_level', 'MIXER:Current/Cue/Out/Level', ('cue', 2), None, ('level', 0), 'cue.{x}.output_level', False),
+        # From the console's own parameter list (prminfo), not Yamaha's OSC document.
+        ('mix_pan_mode', 'MIXER:Current/Mix/PanMode', ('mix', 48), None, ('int', 'mode', 0, 1, '0 or 1, unnamed'), 'mixes.{x}.pan_mode', False),
+        ('mix_bus_type', 'MIXER:Current/Mix/BusType', ('mix', 48), None, ('text',), 'mixes.{x}.bus_type', False),
+        ('cue_active', 'MIXER:Current/Cue/ActiveCue', ('cue', 2), None, ('text',), 'cue.{x}.active', False),
+        ('input_pan_mode', 'MIXER:Current/InCh/PanMode', ('channel', 120), None, ('int', 'mode', 0, 1, '0 or 1, unnamed'), 'inputs.{x}.pan_mode', False),
+        ('stereo_pan_mode', 'MIXER:Current/St/PanMode', ('stereo', 4), None, ('int', 'mode', 0, 1, '0 or 1, unnamed'), 'stereo.{x}.pan_mode', False),
     ]
 
     # Expected wire stated independently of the spec's templates: X and Y go
@@ -241,7 +247,8 @@ def _ydm7_vectors():
         cur[parts[-1]] = value
         return out
 
-    done = set(_ydm7_EXPLICIT)
+    # Read-only parameters (the console's parameter list marks them r) have no set.
+    done = set(_ydm7_EXPLICIT) | {'set_' + b for b in ['cue_active', 'input_pan_mode', 'stereo_pan_mode']}
     for base, addr, x, y, kind, state, set_only in rows:
         inp, xw, yw, xn, yn = {}, 0, 0, None, None
         if x:
