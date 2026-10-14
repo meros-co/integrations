@@ -880,17 +880,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## greenhippo-hippotizer — Green Hippo Hippotizer
 
-- [ ] Check whether mix, layer and timeline indexes start at 0 or 1 (mix and layer from 1, timeline by iD are assumed). ([specs/greenhippo-hippotizer.yaml:663](specs/greenhippo-hippotizer.yaml#L663))
-- [ ] Check the single preset number of load_mix_preset and load_layer_preset (bank * 256 + slot per the Companion module). ([specs/greenhippo-hippotizer.yaml:661](specs/greenhippo-hippotizer.yaml#L661))
+- [ ] Check whether mix, layer and timeline indexes start at 0 or 1 (mix and layer from 1, timeline by iD are assumed). ([specs/greenhippo-hippotizer.yaml:682](specs/greenhippo-hippotizer.yaml#L682))
+- [ ] Check the single preset number of load_mix_preset and load_layer_preset (bank * 256 + slot per the Companion module). ([specs/greenhippo-hippotizer.yaml:680](specs/greenhippo-hippotizer.yaml#L680))
 - [ ] Check the body of a level reply (a bare integer is assumed) and of the action endpoints. ([specs/greenhippo-hippotizer.yaml:240](specs/greenhippo-hippotizer.yaml#L240))
-- [ ] Capture the JSON wrapper of GET /timelines, which the Swagger document leaves empty. ([specs/greenhippo-hippotizer.yaml:679](specs/greenhippo-hippotizer.yaml#L679))
-- [ ] Check that the Web Callbacks websocket on 40513 accepts the subscription array sent on opening, with the path /, and whether it acknowledges it. ([specs/greenhippo-hippotizer.yaml:492](specs/greenhippo-hippotizer.yaml#L492))
-- [ ] Check whether the presets-reset event is PRESETS_RESET or PRESES_RESET (the manual's example). ([specs/greenhippo-hippotizer.yaml:692](specs/greenhippo-hippotizer.yaml#L692))
-- [ ] Check that DELETE /media/delete/{id}, DELETE /media/deletemapentry/{index} and PUT /media/addmapentry/... behave as their GET forms. ([specs/greenhippo-hippotizer.yaml:633](specs/greenhippo-hippotizer.yaml#L633))
-- [ ] Check how a pin name containing an underscore is written in a REST pin path. ([specs/greenhippo-hippotizer.yaml:656](specs/greenhippo-hippotizer.yaml#L656))
-- [ ] Check whether the media id and preset id path forms are told apart from map indexes and preset numbers by the segment being a number. ([specs/greenhippo-hippotizer.yaml:670](specs/greenhippo-hippotizer.yaml#L670))
+- [ ] Capture the JSON wrapper of GET /timelines, which the Swagger document leaves empty. ([specs/greenhippo-hippotizer.yaml:698](specs/greenhippo-hippotizer.yaml#L698))
+- [ ] Check that the Web Callbacks websocket on 40513 accepts the subscription array sent on opening, with the path /, and whether it acknowledges it. ([specs/greenhippo-hippotizer.yaml:511](specs/greenhippo-hippotizer.yaml#L511))
+- [ ] Check whether the presets-reset event is PRESETS_RESET or PRESES_RESET (the manual's example). ([specs/greenhippo-hippotizer.yaml:711](specs/greenhippo-hippotizer.yaml#L711))
+- [ ] Check that DELETE /media/delete/{id}, DELETE /media/deletemapentry/{index} and PUT /media/addmapentry/... behave as their GET forms. ([specs/greenhippo-hippotizer.yaml:652](specs/greenhippo-hippotizer.yaml#L652))
+- [ ] Check how a pin name containing an underscore is written in a REST pin path. ([specs/greenhippo-hippotizer.yaml:675](specs/greenhippo-hippotizer.yaml#L675))
+- [ ] Check whether the media id and preset id path forms are told apart from map indexes and preset numbers by the segment being a number. ([specs/greenhippo-hippotizer.yaml:689](specs/greenhippo-hippotizer.yaml#L689))
 - [ ] Capture the 4.9.x REST additions (media encoding settings, strata folder, user name and colour) from the API help served at port 40512. ([specs/greenhippo-hippotizer.yaml:57](specs/greenhippo-hippotizer.yaml#L57))
-- [ ] Confirm /media/map lists every filled slot (and leaves out empty ones), and /presets/<type> every bank of the type: each read replaces media_map or that type's preset_banks. ([specs/greenhippo-hippotizer.yaml:544](specs/greenhippo-hippotizer.yaml#L544))
+- [ ] Confirm /media/map lists every filled slot (and leaves out empty ones), and /presets/<type> every bank of the type: each read replaces media_map or that type's preset_banks. ([specs/greenhippo-hippotizer.yaml:563](specs/greenhippo-hippotizer.yaml#L563))
+- [ ] Confirm POST /media/upload takes the multipart/form-data fields addToMap (true or false), mapIndex, customFolderPath and MediaFile as sent, with the file's type taken from its name, and answers 200 with mediaID. ([specs/greenhippo-hippotizer.yaml:418](specs/greenhippo-hippotizer.yaml#L418))
 
 ## h2r-graphics — H2R Graphics
 

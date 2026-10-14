@@ -89,7 +89,7 @@ models:
                set_layer_level, load_layer_media, load_layer_media_index, play_layer_media_oneshot,
                play_layer_media_oneshot_index, load_layer_preset, load_layer_preset_bank_slot,
                load_layer_preset_id, get_media, get_media_info, get_media_info_index, get_media_map,
-               delete_media, delete_media_map_entry, add_media_map_entry, sync_media, get_pin_value,
+               upload_media, delete_media, delete_media_map_entry, add_media_map_entry, sync_media, get_pin_value,
                set_pin_value, reset_pin, get_pin_info, fade_pin_value]
     verification: none
 
@@ -404,6 +404,25 @@ commands:
     summary: The media map, slot by slot (GetMap, MediaMapModel)
     send: { method: GET, path: /media/map }
     expect: { status: 200, json_path: "$" }
+    returns: value
+
+  upload_media:
+    summary: Upload a media file to the server, optionally into a media map slot (UploadFile, POST /media/upload, multipart/form-data); answers the new media id
+    params:
+      file: { type: binary, required: true, label: Media file, description: "The media file's contents, given as base64." }
+      filename: { type: string, max_length: 255, pattern: "^[^/\\\\\"]+$", required: true, label: File name, description: "The file's name with its extension, which the server uses to tell its type; a type it does not support is refused (415)." }
+      add_to_map: { type: bool, default: true, label: Add to media map, description: "On places the file in the media map after uploading, off only stores it." }
+      map_index: { type: int, min: -1, max: 65535, default: -1, label: Media map slot, description: "Slot in the media map to place the file in; -1 takes the next free slot." }
+      folder: { type: string, max_length: 1024, default: "", label: Folder, description: "A custom folder to place the file in; empty for the server's default media folder." }
+    send:
+      method: POST
+      path: /media/upload
+      multipart:
+        - { name: addToMap, value: "{add_to_map}" }
+        - { name: mapIndex, value: "{map_index}" }
+        - { name: customFolderPath, value: "{folder}" }
+        - { name: MediaFile, binary: file, filename: "{filename}", content_type: application/octet-stream }
+    expect: { status: 200, json_path: "$.mediaID" }
     returns: value
 
   delete_media:
