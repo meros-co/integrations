@@ -1859,17 +1859,28 @@ telemetry:
         focused_presentation.uuid: "{uuid}"
         focused_presentation.name: "{name}"
         focused_presentation.index: "{index}"
-    # The active presentation's and announcement's groups, in order, each
-    # with its slides as JSON text (enabled, notes, text, label, color, size),
-    # as the API gives them.
+    # The active presentation's and announcement's groups, in order, and
+    # each group's slides, keyed by the group's position and the slide's
+    # within it ({^index}, {index}), as the API numbers them.
     - path: "^/v1/(presentation|announcement)/active$"
       replace: "{1}.groups"
       json_each: "$.*.groups"
-      json: { name: "$.name", color: "$.color", slides: "$.slides" }
+      json: { name: "$.name", color: "$.color" }
       state:
         "{1}.groups.{index}.name": "{name}"
         "{1}.groups.{index}.color": "{color}"
-        "{1}.groups.{index}.slides": "{slides}"
+    - path: "^/v1/(presentation|announcement)/active$"
+      json_each: "$.*.groups[*].slides"
+      json: { enabled: "$.enabled", notes: "$.notes", text: "$.text", label: "$.label", color: "$.color",
+              width: "$.size.width", height: "$.size.height" }
+      state:
+        "{1}.groups.{^index}.slides.{index}.enabled": "{enabled}"
+        "{1}.groups.{^index}.slides.{index}.notes": "{notes}"
+        "{1}.groups.{^index}.slides.{index}.text": "{text}"
+        "{1}.groups.{^index}.slides.{index}.label": "{label}"
+        "{1}.groups.{^index}.slides.{index}.color": "{color}"
+        "{1}.groups.{^index}.slides.{index}.width": "{width}"
+        "{1}.groups.{^index}.slides.{index}.height": "{height}"
     - path: "^/v1/presentation/active$"
       json: { timeline: "$.presentation.has_timeline", items: "$.presentation.has_timeline_items", file: "$.presentation.presentation_path" }
       state:
@@ -2364,13 +2375,25 @@ state:
   announcement.slide_index: { type: int, description: "Index of the live cue in the active announcement" }
   presentation.groups.*.name:   { type: string, description: "Group (such as Verse 1) of the active presentation, keyed by its position from 0" }
   presentation.groups.*.color:  { type: string, description: "The group's color as JSON text: red, green, blue and alpha from 0 to 1" }
-  presentation.groups.*.slides: { type: string, description: "The group's slides in order as JSON text: an array of enabled, notes, text, label, color and size, as /v1/presentation/active gives them" }
+  presentation.groups.*.slides.*.enabled: { type: bool, description: "Slide enabled, keyed by the group's position and the slide's within the group, both from 0" }
+  presentation.groups.*.slides.*.notes:   { type: string, description: "The slide's notes" }
+  presentation.groups.*.slides.*.text:    { type: string, description: "The slide's text, lines separated by line breaks" }
+  presentation.groups.*.slides.*.label:   { type: string, description: "The slide's label" }
+  presentation.groups.*.slides.*.color:   { type: string, description: "The slide's color as JSON text: red, green, blue and alpha from 0 to 1" }
+  presentation.groups.*.slides.*.width:   { type: int, unit: px, description: "The slide's width" }
+  presentation.groups.*.slides.*.height:  { type: int, unit: px, description: "The slide's height" }
   presentation.has_timeline:    { type: bool, description: "The active presentation has a timeline" }
   presentation.has_timeline_items: { type: bool, description: "The active presentation's timeline has items" }
   presentation.path:            { type: string, description: "File of the active presentation on the ProPresenter computer" }
   announcement.groups.*.name:   { type: string, description: "Group of the active announcement, keyed by its position from 0" }
   announcement.groups.*.color:  { type: string, description: "The group's color as JSON text: red, green, blue and alpha from 0 to 1" }
-  announcement.groups.*.slides: { type: string, description: "The group's slides in order as JSON text: an array of enabled, notes, text, label, color and size" }
+  announcement.groups.*.slides.*.enabled: { type: bool, description: "Slide enabled, keyed by the group's position and the slide's within the group, both from 0" }
+  announcement.groups.*.slides.*.notes:   { type: string, description: "The slide's notes" }
+  announcement.groups.*.slides.*.text:    { type: string, description: "The slide's text, lines separated by line breaks" }
+  announcement.groups.*.slides.*.label:   { type: string, description: "The slide's label" }
+  announcement.groups.*.slides.*.color:   { type: string, description: "The slide's color as JSON text: red, green, blue and alpha from 0 to 1" }
+  announcement.groups.*.slides.*.width:   { type: int, unit: px, description: "The slide's width" }
+  announcement.groups.*.slides.*.height:  { type: int, unit: px, description: "The slide's height" }
   announcement.has_timeline:    { type: bool, description: "The active announcement has a timeline" }
   announcement.has_timeline_items: { type: bool, description: "The active announcement's timeline has items" }
   announcement.path:            { type: string, description: "File of the active announcement on the ProPresenter computer" }
@@ -2582,10 +2605,10 @@ quirks:
       commands): the contents of each library (its reply does not say which
       library it lists, and naming a library by UUID is deprecated), the
       slides of a presentation that is not active, themes, macro and prop
-      collections, a macro's actions, and the system time. Slides are kept by
-      group, each group's slides as one JSON text: the API numbers a slide
-      within its group only, and the core's lists cannot key a slide by its
-      group's position. A media or audio playlist request returns at most 100
+      collections, a macro's actions, and the system time. Slides are kept
+      under their group, keyed by the group's position and the slide's within
+      it, both from 0, as the API numbers a slide within its group only. A
+      slide's image is not kept. A media or audio playlist request returns at most 100
       items, and only the first 100 are kept; the rest need media_playlist_get
       or audio_playlist_get with start. A playlist deleted in ProPresenter
       keeps its last items in playlist_items until the device is opened

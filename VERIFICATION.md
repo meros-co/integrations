@@ -1341,19 +1341,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## propresenter — ProPresenter
 
-- [ ] Confirm the network API port in use (50001 assumed). ([specs/propresenter.yaml:2532](specs/propresenter.yaml#L2532))
-- [ ] Confirm /v1/timers/current lists every configured timer: each poll replaces timers, so a deleted timer leaves. ([specs/propresenter.yaml:1976](specs/propresenter.yaml#L1976))
-- [ ] Record what /v1/transport/{layer}/current and /time, /v1/presentation/slide_index, /v1/announcement/slide_index, /v1/presentation/focused and the active and focused playlist endpoints answer when nothing is on the layer or active (empty values, null or an error status): a value a reply leaves out keeps what it had. ([specs/propresenter.yaml:2419](specs/propresenter.yaml#L2419))
-- [ ] Confirm that the id of a look, macro, prop, message, clear group, timer, library, mask, group and stage layout is an object with uuid, name and index, as the document's examples show (its schema gives the field by reference only). ([specs/propresenter.yaml:2112](specs/propresenter.yaml#L2112))
-- [ ] Confirm the stage layout map's screen and layout are id objects with a uuid. ([specs/propresenter.yaml:2037](specs/propresenter.yaml#L2037))
-- [ ] Check that media and audio playlist folders list their contents under children, and playlist folders under playlists, and how deep folders nest (three levels are read). ([specs/propresenter.yaml:2161](specs/propresenter.yaml#L2161))
-- [ ] Check the units of a timer's countdown duration, time of day and elapsed start and end times (seconds assumed). ([specs/propresenter.yaml:2434](specs/propresenter.yaml#L2434))
-- [ ] Check that ProPresenter answers about 31 status requests a second without slowing playback, and whether a slower poll should be used on older computers. ([specs/propresenter.yaml:2554](specs/propresenter.yaml#L2554))
-- [ ] Confirm that /v1/status/updates streams one JSON object per change in a chunked reply, for a future streaming transport. ([specs/propresenter.yaml:2570](specs/propresenter.yaml#L2570))
+- [ ] Confirm the network API port in use (50001 assumed). ([specs/propresenter.yaml:2555](specs/propresenter.yaml#L2555))
+- [ ] Confirm /v1/timers/current lists every configured timer: each poll replaces timers, so a deleted timer leaves. ([specs/propresenter.yaml:1987](specs/propresenter.yaml#L1987))
+- [ ] Record what /v1/transport/{layer}/current and /time, /v1/presentation/slide_index, /v1/announcement/slide_index, /v1/presentation/focused and the active and focused playlist endpoints answer when nothing is on the layer or active (empty values, null or an error status): a value a reply leaves out keeps what it had. ([specs/propresenter.yaml:2442](specs/propresenter.yaml#L2442))
+- [ ] Confirm that the id of a look, macro, prop, message, clear group, timer, library, mask, group and stage layout is an object with uuid, name and index, as the document's examples show (its schema gives the field by reference only). ([specs/propresenter.yaml:2123](specs/propresenter.yaml#L2123))
+- [ ] Confirm the stage layout map's screen and layout are id objects with a uuid. ([specs/propresenter.yaml:2048](specs/propresenter.yaml#L2048))
+- [ ] Check that media and audio playlist folders list their contents under children, and playlist folders under playlists, and how deep folders nest (three levels are read). ([specs/propresenter.yaml:2172](specs/propresenter.yaml#L2172))
+- [ ] Check the units of a timer's countdown duration, time of day and elapsed start and end times (seconds assumed). ([specs/propresenter.yaml:2457](specs/propresenter.yaml#L2457))
+- [ ] Check that ProPresenter answers about 31 status requests a second without slowing playback, and whether a slower poll should be used on older computers. ([specs/propresenter.yaml:2577](specs/propresenter.yaml#L2577))
+- [ ] Confirm that /v1/status/updates streams one JSON object per change in a chunked reply, for a future streaming transport. ([specs/propresenter.yaml:2593](specs/propresenter.yaml#L2593))
 - [ ] Record what /v1/presentation/active and /v1/announcement/active answer when nothing is active (404, an empty object or null), and check that its groups list every group of the selected arrangement in order. ([specs/propresenter.yaml:1865](specs/propresenter.yaml#L1865))
 - [ ] Check that reading /v1/presentation/active and /v1/announcement/active every 5 s, with every slide's text and notes, does not slow a large presentation. ([specs/propresenter.yaml:1802](specs/propresenter.yaml#L1802))
-- [ ] Check that playlist_get by UUID answers id and items for a playlist inside folders, as the document gives it. ([specs/propresenter.yaml:2221](specs/propresenter.yaml#L2221))
-- [ ] Check the media and audio playlist replies: the document gives media's items as an object with array fields and audio's reply as an array of playlists; an object with id and an items array is assumed for both. ([specs/propresenter.yaml:2249](specs/propresenter.yaml#L2249))
+- [ ] Check that playlist_get by UUID answers id and items for a playlist inside folders, as the document gives it. ([specs/propresenter.yaml:2232](specs/propresenter.yaml#L2232))
+- [ ] Check the media and audio playlist replies: the document gives media's items as an object with array fields and audio's reply as an array of playlists; an object with id and an items array is assumed for both. ([specs/propresenter.yaml:2260](specs/propresenter.yaml#L2260))
 - [ ] Open POST /v1/status/updates with Accept application/json and confirm each update arrives as {"url", "data"} followed by a blank line (not as server-sent events), that url carries /v1 as the document's example does, and that data is what each endpoint's own GET returns; and record whether the stream ends when ProPresenter changes presentations. ([specs/propresenter.yaml:1756](specs/propresenter.yaml#L1756))
 
 ## ptzoptics — PTZOptics
