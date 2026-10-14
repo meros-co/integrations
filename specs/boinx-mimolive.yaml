@@ -245,7 +245,7 @@ commands:
     summary: "Set the comments in the show metadata (PUT /documents/(DocumentID), metadata.comments)"
     params:
       document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
-      comments: { type: string, max_length: 4096, required: true, label: Comments, description: "Free text comments about the show, as the show metadata panel holds them, on one line (set_document_metadata takes line breaks as JSON escapes)." }
+      comments: { type: string, multiline: true, max_length: 4096, required: true, label: Comments, description: "Free text comments about the show, as the show metadata panel holds them, line breaks included." }
     send: { method: PUT, path: "/api/v1/documents/{document}", body: "{\"metadata\":{\"comments\":{comments:json}}}", content_type: application/vnd.api+json }
     expect: { status: 200 }
     returns: ack
@@ -1245,11 +1245,10 @@ commands:
   # (Boinx's reference); a JSON:API object is assumed, {"data": {"type":
   # "layertypes", "id": TypeID, "attributes": {...}}}, with the type's inputs
   # as a layer reports them (input-descriptions, and input-values holding the
-  # defaults). It is returned whole to the caller and not kept in state: the
-  # reply names the type only by its dotted identifier, which cannot be a
-  # state key, and cannot be matched to the type's position in the list.
+  # defaults). It is returned whole and kept in state as JSON text under
+  # type_details.layers.<type id>.
   get_layer_type:
-    summary: "One layer type with its input parameters, such as the descriptions and default values of its inputs, returned whole and not kept in state (GET /layertypes/(TypeID))"
+    summary: "One layer type with its input parameters, such as the descriptions and default values of its inputs; kept in state under type_details (GET /layertypes/(TypeID))"
     params:
       type_id: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer type", description: "The layer type's identifier from the layer type list, such as com.boinx.mimoLive.layer.lowerthird." }
     send: { method: GET, path: "/api/v1/layertypes/{type_id}" }
@@ -1257,7 +1256,7 @@ commands:
     returns: value
 
   get_source_type:
-    summary: "One source type with its settings (GET /sourcetypes/(TypeID))"
+    summary: "One source type with its settings; kept in state under type_details (GET /sourcetypes/(TypeID))"
     params:
       type_id: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source type", description: "The source type's identifier from the source type list, such as com.boinx.mimoLive.sources.deviceVideoSource." }
     send: { method: GET, path: "/api/v1/sourcetypes/{type_id}" }
@@ -1265,7 +1264,7 @@ commands:
     returns: value
 
   get_output_destination_type:
-    summary: "One output destination type with its settings (GET /outputdestinationtypes/(TypeID))"
+    summary: "One output destination type with its settings; kept in state under type_details (GET /outputdestinationtypes/(TypeID))"
     params:
       type_id: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination type", description: "The output destination type's identifier from the type list, such as com.boinx.mimoLive.outputDestination.fileRecording." }
     send: { method: GET, path: "/api/v1/outputdestinationtypes/{type_id}" }
@@ -1451,10 +1450,11 @@ commands:
 # reply and every websocket event updates it the same way whatever endpoint it
 # came from: documents.<id>, layers.<id>, variants.<id>, sources.<id>,
 # filters.<id>, output-destinations.<id>, layer-sets.<id>, devices.<id> and
-# accounts.<id>; beside them the type catalogs types.layers.<index>,
-# types.sources.<index> and types.output-destinations.<index> (by position, since
-# type identifiers hold dots), zoom.participants.<user id> and mlController's
-# mlcontroller.*.
+# accounts.<id>; beside them the type catalogs types.layers.<type id>,
+# types.sources.<type id> and types.output-destinations.<type id> (each id one
+# key, dots included), what a GET of one type gives under type_details,
+# zoom.participants.<user id> and mlController's mlcontroller.*. Every id is
+# kept as one key, so a device ID holding dots is kept too.
 state:
   documents.*.name: { type: string, description: "Document name, the .tvshow file's name" }
   documents.*.live_state: { type: string, description: "Show state: off (not running) or live (running)" }
@@ -1552,15 +1552,15 @@ state:
   devices.*.device_type: { type: string, description: "Device kind: com.boinx.devicetype.avfoundation (local) or com.boinx.devicetype.ndi (NDI on the network)" }
   devices.*.tally_state: { type: string, description: "Highest use of the device: off, in-use, effect, preview or program" }
   devices.*.input_channels: { type: string, description: "An audio device's input channel names as JSON text, such as [\"Ch. 1\", \"Ch. 2\"], which a source's channel map takes" }
-  types.layers.*.id: { type: string, description: "A layer type's identifier, the composition-id add_layer takes, at this position in the layer type list (0 first)" }
-  types.layers.*.name: { type: string, description: "The layer type's name, as the layer type list reports it" }
-  types.layers.*.attributes: { type: string, description: "Everything the layer type list reports for the type, as JSON text (its inputs too, if the list carries them); get_layer_type gives its input parameters, which are not kept in state" }
-  types.sources.*.id: { type: string, description: "A source type's identifier, the source-type add_source takes, at this position in the source type list (0 first)" }
-  types.sources.*.name: { type: string, description: "The source type's name, as the source type list reports it" }
-  types.sources.*.attributes: { type: string, description: "Everything the source type list reports for the type, as JSON text; get_source_type gives its settings" }
-  types.output-destinations.*.id: { type: string, description: "An output destination type's identifier, the output-destination-type add_output_destination takes, at this position in the type list (0 first)" }
-  types.output-destinations.*.name: { type: string, description: "The output destination type's name, as the type list reports it" }
-  types.output-destinations.*.attributes: { type: string, description: "Everything the output destination type list reports for the type, as JSON text; get_output_destination_type gives its settings" }
+  types.layers.*.name: { type: string, description: "The layer type's name, as the layer type list reports it, keyed by the type's identifier (one key, dots included), the composition-id add_layer takes" }
+  types.layers.*.attributes: { type: string, description: "Everything the layer type list reports for the type, as JSON text (its inputs too, if the list carries them); get_layer_type gives its input parameters (type_details)" }
+  types.sources.*.name: { type: string, description: "The source type's name, as the source type list reports it, keyed by the type's identifier (one key, dots included), the source-type add_source takes" }
+  types.sources.*.attributes: { type: string, description: "Everything the source type list reports for the type, as JSON text; get_source_type gives its settings (type_details)" }
+  types.output-destinations.*.name: { type: string, description: "The output destination type's name, as the type list reports it, keyed by the type's identifier (one key, dots included), the output-destination-type add_output_destination takes" }
+  types.output-destinations.*.attributes: { type: string, description: "Everything the output destination type list reports for the type, as JSON text; get_output_destination_type gives its settings (type_details)" }
+  type_details.layers.*.attributes: { type: string, description: "Everything a GET of one layer type (get_layer_type) last gave for it, as JSON text, such as its inputs' descriptions and default values; keyed by the type's identifier" }
+  type_details.sources.*.attributes: { type: string, description: "Everything a GET of one source type (get_source_type) last gave for it, as JSON text, such as its settings; keyed by the type's identifier" }
+  type_details.output-destinations.*.attributes: { type: string, description: "Everything a GET of one output destination type (get_output_destination_type) last gave for it, as JSON text, such as its settings; keyed by the type's identifier" }
   accounts.*.name: { type: string, description: "A web service account's name in mimoLive's Accounts settings, which zoom_join takes (mimoLive 6.19 and later)" }
   accounts.*.account_type: { type: string, description: "The service: Zoom, YouTube, Facebook, Twitch or Boinx Connect" }
   accounts.*.identifier: { type: string, description: "The account's identifier on the service, when known" }
@@ -1683,74 +1683,74 @@ telemetry:
         email: "$.attributes.email"
         source: "$.relationships.source.data.id"
       state: &assign
-        "{type}.{id}.name": "{name}"
-        "{type}.{id}.live_state": "{live}"
-        "{type}.{id}.duration": "{duration}"
-        "{type}.{id}.show_start": "{show_start}"
-        "{type}.{id}.program_volume": "{program_volume}"
-        "{type}.{id}.show_title": "{title}"
-        "{type}.{id}.width": "{width}"
-        "{type}.{id}.height": "{height}"
-        "{type}.{id}.framerate": "{framerate}"
-        "{type}.{id}.index": "{stack_index}"
-        "{type}.{id}.volume": "{volume}"
-        "{type}.{id}.composition_id": "{composition}"
-        "{type}.{id}.tally_state": "{tally}"
-        "{type}.{id}.gain": "{gain}"
-        "{type}.{id}.video": "{video}"
-        "{type}.{id}.audio": "{audio}"
-        "{type}.{id}.video_connected": "{video_connected}"
-        "{type}.{id}.audio_connected": "{audio_connected}"
-        "{type}.{id}.summary": "{summary}"
-        "{type}.{id}.source_type": "{source_type}"
-        "{type}.{id}.title": "{output_title}"
-        "{type}.{id}.kind": "{kind}"
-        "{type}.{id}.ready": "{ready}"
-        "{type}.{id}.starts_with_show": "{starts}"
-        "{type}.{id}.stops_with_show": "{stops}"
-        "{type}.{id}.active": "{active}"
-        "{type}.{id}.recall_on_show_start": "{recall_start}"
-        "{type}.{id}.recall_on_show_end": "{recall_end}"
-        "{type}.{id}.document": "{document}"
-        "{type}.{id}.active_variant": "{active_variant}"
-        "{type}.{id}.live_variant": "{live_variant}"
-        "{type}.{id}.layer": "{layer}"
-        "{type}.{id}.samplerate": "{samplerate}"
-        "{type}.{id}.show_author": "{author}"
-        "{type}.{id}.show_comments": "{comments}"
-        "{type}.{id}.show_name": "{show}"
-        "{type}.{id}.planned_duration": "{planned}"
-        "{type}.{id}.input_values": "{inputs}"
-        "{type}.{id}.input_descriptions": "{input_descriptions}"
-        "{type}.{id}.output_values": "{outputs}"
-        "{type}.{id}.hidden": "{hidden}"
-        "{type}.{id}.static": "{static}"
-        "{type}.{id}.filepath": "{filepath}"
-        "{type}.{id}.zoom_user_id": "{zoom_user}"
-        "{type}.{id}.zoom_user_name": "{zoom_name}"
-        "{type}.{id}.zoom_selection_type": "{zoom_selection}"
-        "{type}.{id}.zoom_video_resolution": "{zoom_resolution}"
-        "{type}.{id}.video_codec": "{codec}"
-        "{type}.{id}.high_quality_audio": "{hq_audio}"
-        "{type}.{id}.partner_sees": "{sees}"
-        "{type}.{id}.partner_sees_source": "{sees_source}"
-        "{type}.{id}.partner_sees_layer_index": "{sees_layer}"
-        "{type}.{id}.partner_hears": "{hears}"
-        "{type}.{id}.partner_hears_mix": "{hears_mix}"
-        "{type}.{id}.partner_hears_source": "{hears_source}"
-        "{type}.{id}.available_actions": "{actions}"
-        "{type}.{id}.output_type": "{output_type}"
-        "{type}.{id}.location": "{location}"
-        "{type}.{id}.filename": "{filename}"
-        "{type}.{id}.rtmp_url": "{rtmp}"
-        "{type}.{id}.public_url": "{public_url}"
-        "{type}.{id}.connected": "{connected}"
-        "{type}.{id}.device_type": "{device_type}"
-        "{type}.{id}.input_channels": "{channels}"
-        "{type}.{id}.account_type": "{account_type}"
-        "{type}.{id}.identifier": "{identifier}"
-        "{type}.{id}.email": "{email}"
-        "{type}.{id}.source": "{source}"
+        "{type}.{id:key}.name": "{name}"
+        "{type}.{id:key}.live_state": "{live}"
+        "{type}.{id:key}.duration": "{duration}"
+        "{type}.{id:key}.show_start": "{show_start}"
+        "{type}.{id:key}.program_volume": "{program_volume}"
+        "{type}.{id:key}.show_title": "{title}"
+        "{type}.{id:key}.width": "{width}"
+        "{type}.{id:key}.height": "{height}"
+        "{type}.{id:key}.framerate": "{framerate}"
+        "{type}.{id:key}.index": "{stack_index}"
+        "{type}.{id:key}.volume": "{volume}"
+        "{type}.{id:key}.composition_id": "{composition}"
+        "{type}.{id:key}.tally_state": "{tally}"
+        "{type}.{id:key}.gain": "{gain}"
+        "{type}.{id:key}.video": "{video}"
+        "{type}.{id:key}.audio": "{audio}"
+        "{type}.{id:key}.video_connected": "{video_connected}"
+        "{type}.{id:key}.audio_connected": "{audio_connected}"
+        "{type}.{id:key}.summary": "{summary}"
+        "{type}.{id:key}.source_type": "{source_type}"
+        "{type}.{id:key}.title": "{output_title}"
+        "{type}.{id:key}.kind": "{kind}"
+        "{type}.{id:key}.ready": "{ready}"
+        "{type}.{id:key}.starts_with_show": "{starts}"
+        "{type}.{id:key}.stops_with_show": "{stops}"
+        "{type}.{id:key}.active": "{active}"
+        "{type}.{id:key}.recall_on_show_start": "{recall_start}"
+        "{type}.{id:key}.recall_on_show_end": "{recall_end}"
+        "{type}.{id:key}.document": "{document}"
+        "{type}.{id:key}.active_variant": "{active_variant}"
+        "{type}.{id:key}.live_variant": "{live_variant}"
+        "{type}.{id:key}.layer": "{layer}"
+        "{type}.{id:key}.samplerate": "{samplerate}"
+        "{type}.{id:key}.show_author": "{author}"
+        "{type}.{id:key}.show_comments": "{comments}"
+        "{type}.{id:key}.show_name": "{show}"
+        "{type}.{id:key}.planned_duration": "{planned}"
+        "{type}.{id:key}.input_values": "{inputs}"
+        "{type}.{id:key}.input_descriptions": "{input_descriptions}"
+        "{type}.{id:key}.output_values": "{outputs}"
+        "{type}.{id:key}.hidden": "{hidden}"
+        "{type}.{id:key}.static": "{static}"
+        "{type}.{id:key}.filepath": "{filepath}"
+        "{type}.{id:key}.zoom_user_id": "{zoom_user}"
+        "{type}.{id:key}.zoom_user_name": "{zoom_name}"
+        "{type}.{id:key}.zoom_selection_type": "{zoom_selection}"
+        "{type}.{id:key}.zoom_video_resolution": "{zoom_resolution}"
+        "{type}.{id:key}.video_codec": "{codec}"
+        "{type}.{id:key}.high_quality_audio": "{hq_audio}"
+        "{type}.{id:key}.partner_sees": "{sees}"
+        "{type}.{id:key}.partner_sees_source": "{sees_source}"
+        "{type}.{id:key}.partner_sees_layer_index": "{sees_layer}"
+        "{type}.{id:key}.partner_hears": "{hears}"
+        "{type}.{id:key}.partner_hears_mix": "{hears_mix}"
+        "{type}.{id:key}.partner_hears_source": "{hears_source}"
+        "{type}.{id:key}.available_actions": "{actions}"
+        "{type}.{id:key}.output_type": "{output_type}"
+        "{type}.{id:key}.location": "{location}"
+        "{type}.{id:key}.filename": "{filename}"
+        "{type}.{id:key}.rtmp_url": "{rtmp}"
+        "{type}.{id:key}.public_url": "{public_url}"
+        "{type}.{id:key}.connected": "{connected}"
+        "{type}.{id:key}.device_type": "{device_type}"
+        "{type}.{id:key}.input_channels": "{channels}"
+        "{type}.{id:key}.account_type": "{account_type}"
+        "{type}.{id:key}.identifier": "{identifier}"
+        "{type}.{id:key}.email": "{email}"
+        "{type}.{id:key}.source": "{source}"
 
     # The objects sideloaded in included (the poll's layers, sources, output
     # destinations and layer sets).
@@ -1892,53 +1892,59 @@ telemetry:
               tally: "$.attributes.tally-state", channels: "$.attributes.input-channels" }
       replace: devices
       state:
-        "devices.{id}.name": "{name}"
-        "devices.{id}.connected": "{connected}"
-        "devices.{id}.video": "{video}"
-        "devices.{id}.audio": "{audio}"
-        "devices.{id}.device_type": "{kind}"
-        "devices.{id}.tally_state": "{tally}"
-        "devices.{id}.input_channels": "{channels}"
+        "devices.{id:key}.name": "{name}"
+        "devices.{id:key}.connected": "{connected}"
+        "devices.{id:key}.video": "{video}"
+        "devices.{id:key}.audio": "{audio}"
+        "devices.{id:key}.device_type": "{kind}"
+        "devices.{id:key}.tally_state": "{tally}"
+        "devices.{id:key}.input_channels": "{channels}"
     - path: "^/api/v1/accounts(\\?.*)?$"
       json_each: "$.data"
       json: { id: "$.id", name: "$.attributes.name", kind: "$.attributes.account-type",
               identifier: "$.attributes.identifier", email: "$.attributes.email" }
       replace: accounts
       state:
-        "accounts.{id}.name": "{name}"
-        "accounts.{id}.account_type": "{kind}"
-        "accounts.{id}.identifier": "{identifier}"
-        "accounts.{id}.email": "{email}"
+        "accounts.{id:key}.name": "{name}"
+        "accounts.{id:key}.account_type": "{kind}"
+        "accounts.{id:key}.identifier": "{identifier}"
+        "accounts.{id:key}.email": "{email}"
 
     # The layer, source and output destination type catalogs, whole, each
-    # type kept by its position in the list (its identifier, such as
-    # com.boinx.mimoLive.sources.deviceVideoSource, holds dots, which a state
-    # key cannot): a type no longer listed leaves state. A GET of one type
-    # (/layertypes/(TypeID)) does not match and is returned to the caller.
+    # type keyed by its identifier, one key though it holds dots (such as
+    # com.boinx.mimoLive.sources.deviceVideoSource): a type no longer listed
+    # leaves state. A GET of one type goes to type_details, outside the list
+    # each list read replaces.
     - path: "^/api/v1/layertypes(\\?.*)?$"
       json_each: "$.data"
       json: &type_entry { id: "$.id", name: "$.attributes.name", attributes: "$.attributes" }
       replace: types.layers
       state:
-        "types.layers.{index}.id": "{id}"
-        "types.layers.{index}.name": "{name}"
-        "types.layers.{index}.attributes": "{attributes}"
+        "types.layers.{id:key}.name": "{name}"
+        "types.layers.{id:key}.attributes": "{attributes}"
     - path: "^/api/v1/sourcetypes(\\?.*)?$"
       json_each: "$.data"
       json: *type_entry
       replace: types.sources
       state:
-        "types.sources.{index}.id": "{id}"
-        "types.sources.{index}.name": "{name}"
-        "types.sources.{index}.attributes": "{attributes}"
+        "types.sources.{id:key}.name": "{name}"
+        "types.sources.{id:key}.attributes": "{attributes}"
     - path: "^/api/v1/outputdestinationtypes(\\?.*)?$"
       json_each: "$.data"
       json: *type_entry
       replace: types.output-destinations
       state:
-        "types.output-destinations.{index}.id": "{id}"
-        "types.output-destinations.{index}.name": "{name}"
-        "types.output-destinations.{index}.attributes": "{attributes}"
+        "types.output-destinations.{id:key}.name": "{name}"
+        "types.output-destinations.{id:key}.attributes": "{attributes}"
+    - path: "^/api/v1/layertypes/[^/?]+$"
+      json: &type_detail { id: "$.data.id", attributes: "$.data.attributes" }
+      state: { "type_details.layers.{id:key}.attributes": "{attributes}" }
+    - path: "^/api/v1/sourcetypes/[^/?]+$"
+      json: *type_detail
+      state: { "type_details.sources.{id:key}.attributes": "{attributes}" }
+    - path: "^/api/v1/outputdestinationtypes/[^/?]+$"
+      json: *type_detail
+      state: { "type_details.output-destinations.{id:key}.attributes": "{attributes}" }
 
     # The Zoom meeting's participants, whole, by numeric user ID: none while
     # no meeting is joined. Read again after joining, leaving and each
@@ -2006,9 +2012,9 @@ telemetry:
       then_send:
         - { method: GET, path: "/api/v1/documents/{3}/layer-sets/{2}" }
     # Pushed: an object removed. It leaves state, with everything under it.
-    - json_match: { "$.event": "^removed$", "$.type": "^(documents|layers|variants|sources|filters|output-destinations|layer-sets)$", "$.id": "^([^.]+)$" }
+    - json_match: { "$.event": "^removed$", "$.type": "^(documents|layers|variants|sources|filters|output-destinations|layer-sets)$", "$.id": "^(.+)$" }
       json: {}
-      state: { "{1}.{2}": { delete: true } }
+      state: { "{1}.{2:key}": { delete: true } }
 
 quirks:
   - models: [all]
@@ -2134,23 +2140,21 @@ quirks:
       not from the poll. The devices, the logged-in accounts, the Zoom meeting's participants and
       mlController's status are read every minute, each list replaced whole; the participants are
       read again after each Zoom command, and talking and hand_raised are only as current as that
-      read. A device whose ID holds a dot is not kept in state.
+      read. Every ID is one state key, dots included.
 
   - models: [all]
     severity: info
     text: >
       The layer, source and output destination types (GET /layertypes, /sourcetypes and
       /outputdestinationtypes) are read on connecting and every minute, each list replaced whole,
-      and kept by position (types.sources.<index>.id, name, and everything else the list reports
-      as JSON text in attributes), because type identifiers such as
-      com.boinx.mimoLive.sources.deviceVideoSource hold dots, which a state key cannot. The shape
-      of these lists is not documented beyond each type's id; the JSON:API form the rest of the
-      API answers with is assumed. A type's parameters and settings come from get_layer_type,
-      get_source_type and get_output_destination_type, which return them to the caller and are not
-      kept in state: a GET of one type cannot be matched to the type's position in the list, and
-      its identifier cannot be a state key, so a layer type's inputs and their defaults are not in
-      state until the core can key state by identifiers that hold dots. A layer already in the
-      document reports its own (layers.<id>.input_descriptions and input_values).
+      and kept by type identifier, one key with its dots (types.sources.<type id>.name, and
+      everything else the list reports as JSON text in attributes). The shape of these lists is
+      not documented beyond each type's id; the JSON:API form the rest of the API answers with is
+      assumed. A type's parameters and settings come from get_layer_type, get_source_type and
+      get_output_destination_type, which are not polled: what one of them last gave is kept as
+      JSON text under type_details.<layers|sources|output-destinations>.<type id>.attributes,
+      outside the lists, so a list read does not remove it. A layer already in the document
+      reports its own (layers.<id>.input_descriptions and input_values).
       add_output_destination takes the ten type identifiers the manual lists;
       add_output_destination_with_attributes takes any other the type list gives.
 

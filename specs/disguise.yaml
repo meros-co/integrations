@@ -939,10 +939,10 @@ commands:
       note: { type: string, max_length: 256, required: true,
               label: Note,
               description: "Name of the note resource as shown in Designer." }
-      text: { type: json, required: true,
+      text: { type: string, multiline: true, required: true,
               label: Text,
-              description: "The note's new text as a JSON string (line breaks as \\n), which replaces the old." }
-    send: { method: POST, path: /api/session/note, body: '{"note":{"name":{note:json}},"text":{text}}', content_type: application/json }
+              description: "The note's new text, line breaks included, which replaces the old." }
+    send: { method: POST, path: /api/session/note, body: '{"note":{"name":{note:json}},"text":{text:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
     returns: value
 
@@ -978,13 +978,13 @@ commands:
       Run a Python 2.7 script in Designer on the Director (python/execute);
       returns {d3Log, pythonLog, returnValue}. See the critical quirk first
     params:
-      script: { type: json, required: true,
+      script: { type: string, multiline: true, required: true,
                 label: Script,
-                description: "Python 2.7 code as a JSON string (lines joined with \\n), run as the body of a function with d3 imported; its return value comes back as returnValue." }
+                description: "Python 2.7 code, lines separated by line breaks, run as the body of a function with d3 imported; its return value comes back as returnValue." }
       module: { type: string, max_length: 256, default: "",
                 label: Module,
                 description: "Registered module to run the script in; empty for a one-off script." }
-    send: { method: POST, path: /api/session/python/execute, body: '{"moduleName":{module:json},"script":{script}}', content_type: application/json }
+    send: { method: POST, path: /api/session/python/execute, body: '{"moduleName":{module:json},"script":{script:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
     returns: value
 
@@ -994,10 +994,10 @@ commands:
       module:   { type: string, max_length: 256, required: true,
                   label: Module,
                   description: "Name to register the module under." }
-      contents: { type: json, required: true,
+      contents: { type: string, multiline: true, required: true,
                   label: Contents,
-                  description: "The module's Python 2.7 source as a JSON string (lines joined with \\n), which imports d3 itself." }
-    send: { method: POST, path: /api/session/python/registermodule, body: '{"moduleName":{module:json},"contents":{contents}}', content_type: application/json }
+                  description: "The module's Python 2.7 source, lines separated by line breaks, which imports d3 itself." }
+    send: { method: POST, path: /api/session/python/registermodule, body: '{"moduleName":{module:json},"contents":{contents:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
@@ -1297,51 +1297,50 @@ commands:
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
-    every_ms: 10000
-    send:
-      - { method: GET, path: /api/session/transport/transports }
-      - { method: GET, path: /api/session/transport/activetransport }
-      - { method: GET, path: /api/session/status/health }
-      - { method: GET, path: /api/session/status/notifications }
-      - { method: GET, path: /api/session/sequencing/indirections }
-      - { method: GET, path: /api/session/renderstream/layers }
-      - { method: GET, path: /api/session/sockpuppet/patches }
-      - { method: GET, path: /api/session/shotrecorder/recorders }
-  # What an operator changes in the project, and the machines' set-up, every
-  # minute (and on connecting).
-  subscribe:
-    every_ms: 60000
-    send:
-      - { method: GET, path: /api/session/status/project }
-      - { method: GET, path: /api/session/status/session }
-      - { method: GET, path: /api/session/failover/settings }
-      - { method: GET, path: /api/session/failover/understudytargets }
-      - { method: GET, path: /api/session/transport/tracks }
-      - { method: GET, path: /api/session/transport/setlists }
-      - { method: GET, path: /api/session/renderstream/pools }
-      - { method: GET, path: /api/session/renderstream/assigners }
-      - { method: GET, path: /api/session/sockpuppet/easingfunctions }
-      - { method: GET, path: /api/session/colour/cdls }
-      - { method: GET, path: /api/session/notes }
-      - { method: GET, path: /api/session/mixedreality/cameras }
-      - { method: GET, path: /api/session/mixedreality/mrsets }
-      - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
-      - { method: GET, path: /api/session/mixedreality/captureprogress }
-      - { method: GET, path: /api/session/quickcal/referencepoints }
-      - { method: GET, path: /api/session/omnical/cameradiscovery }
-      - { method: GET, path: /api/session/omnical/currentplan }
-      - { method: GET, path: /api/session/omnical/plans }
-      - { method: GET, path: /api/session/omnical/rigcheck/checkresult }
-      - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
-      - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
-      - { method: GET, path: /api/session/omnical/rigcheck/results }
-      - { method: GET, path: /api/service/system/detectsystems }
-      - { method: GET, path: /api/service/system/osinfo }
-      - { method: GET, path: /api/service/system/networkadapters }
-      - { method: GET, path: /api/service/system/gpuoutputs }
-      - { method: GET, path: /api/service/system/projects }
-      - { method: GET, path: /api/service/system/vfcs }
-      - { method: GET, path: /api/service/media/list, query: { directory: "{settings.media_directory}" } }
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /api/session/transport/transports }
+        - { method: GET, path: /api/session/transport/activetransport }
+        - { method: GET, path: /api/session/status/health }
+        - { method: GET, path: /api/session/status/notifications }
+        - { method: GET, path: /api/session/sequencing/indirections }
+        - { method: GET, path: /api/session/renderstream/layers }
+        - { method: GET, path: /api/session/sockpuppet/patches }
+        - { method: GET, path: /api/session/shotrecorder/recorders }
+    # What an operator changes in the project, and the machines' set-up, every
+    # minute (and on connecting).
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/session/status/project }
+        - { method: GET, path: /api/session/status/session }
+        - { method: GET, path: /api/session/failover/settings }
+        - { method: GET, path: /api/session/failover/understudytargets }
+        - { method: GET, path: /api/session/transport/tracks }
+        - { method: GET, path: /api/session/transport/setlists }
+        - { method: GET, path: /api/session/renderstream/pools }
+        - { method: GET, path: /api/session/renderstream/assigners }
+        - { method: GET, path: /api/session/sockpuppet/easingfunctions }
+        - { method: GET, path: /api/session/colour/cdls }
+        - { method: GET, path: /api/session/notes }
+        - { method: GET, path: /api/session/mixedreality/cameras }
+        - { method: GET, path: /api/session/mixedreality/mrsets }
+        - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
+        - { method: GET, path: /api/session/mixedreality/captureprogress }
+        - { method: GET, path: /api/session/quickcal/referencepoints }
+        - { method: GET, path: /api/session/omnical/cameradiscovery }
+        - { method: GET, path: /api/session/omnical/currentplan }
+        - { method: GET, path: /api/session/omnical/plans }
+        - { method: GET, path: /api/session/omnical/rigcheck/checkresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/currentresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/currentfallbackresult }
+        - { method: GET, path: /api/session/omnical/rigcheck/results }
+        - { method: GET, path: /api/service/system/detectsystems }
+        - { method: GET, path: /api/service/system/osinfo }
+        - { method: GET, path: /api/service/system/networkadapters }
+        - { method: GET, path: /api/service/system/gpuoutputs }
+        - { method: GET, path: /api/service/system/projects }
+        - { method: GET, path: /api/service/system/vfcs }
+        - { method: GET, path: /api/service/media/list, query: { directory: "{settings.media_directory}" } }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1999,22 +1998,22 @@ telemetry:
         manager: "$.isManagerRunning"
         notch: "$.isNotchHostRunning"
       state:
-        service.systems.{host}.type: "{type}"
-        service.systems.{host}.version: "{major}.{minor}.{hotfix}.{revision}"
-        service.systems.{host}.running_project: "{project}"
-        service.systems.{host}.ip_address: "{ip}"
-        service.systems.{host}.designer_running: "{designer}"
-        service.systems.{host}.service_running: "{service}"
-        service.systems.{host}.manager_running: "{manager}"
-        service.systems.{host}.notch_host_running: "{notch}"
+        service.systems.{host:key}.type: "{type}"
+        service.systems.{host:key}.version: "{major}.{minor}.{hotfix}.{revision}"
+        service.systems.{host:key}.running_project: "{project}"
+        service.systems.{host:key}.ip_address: "{ip}"
+        service.systems.{host:key}.designer_running: "{designer}"
+        service.systems.{host:key}.service_running: "{service}"
+        service.systems.{host:key}.manager_running: "{manager}"
+        service.systems.{host:key}.notch_host_running: "{notch}"
     - path: "^/api/service/system/osinfo$"
       json_match: { "$.result": "^\\[" }
       replace: service.os
       json_each: "$.result"
       json: { host: "$.hostname", windows: "$.windowsVersion", image: "$.imageVersion" }
       state:
-        service.os.{host}.windows_version: "{windows}"
-        service.os.{host}.image_version: "{image}"
+        service.os.{host:key}.windows_version: "{windows}"
+        service.os.{host:key}.image_version: "{image}"
     - path: "^/api/service/system/networkadapters$"
       json_match: { "$.result": "^\\[" }
       replace: service.adapters
@@ -2028,19 +2027,19 @@ telemetry:
         status: "$.status"
         addresses: "$.addresses"
       state:
-        service.adapters.{host}.{index}.name: "{name}"
-        service.adapters.{host}.{index}.mac: "{mac}"
-        service.adapters.{host}.{index}.enabled: "{enabled}"
-        service.adapters.{host}.{index}.dhcp: "{dhcp}"
-        service.adapters.{host}.{index}.status: "{status}"
-        service.adapters.{host}.{index}.addresses: "{addresses}"
+        service.adapters.{host:key}.{index}.name: "{name}"
+        service.adapters.{host:key}.{index}.mac: "{mac}"
+        service.adapters.{host:key}.{index}.enabled: "{enabled}"
+        service.adapters.{host:key}.{index}.dhcp: "{dhcp}"
+        service.adapters.{host:key}.{index}.status: "{status}"
+        service.adapters.{host:key}.{index}.addresses: "{addresses}"
     - path: "^/api/service/system/gpuoutputs$"
       json_match: { "$.result": "^\\[" }
       replace: service.gpu
       json_each: "$.result"
       json: { host: "$.hostname", frequency: "$.genlock.frequency" }
       state:
-        service.gpu.{host}.genlock_frequency: "{frequency}"
+        service.gpu.{host:key}.genlock_frequency: "{frequency}"
     - path: "^/api/service/system/gpuoutputs$"
       json_each: "$.result[*].gpuOutputs"
       json:
@@ -2054,21 +2053,21 @@ telemetry:
         depth: "$.bitDepth"
         colour: "$.colourFormat"
       state:
-        service.gpu.{host}.outputs.{index}.gpu_port: "{port}"
-        service.gpu.{host}.outputs.{index}.genlock_state: "{genlock}"
-        service.gpu.{host}.outputs.{index}.emulated: "{emulated}"
-        service.gpu.{host}.outputs.{index}.width: "{width}"
-        service.gpu.{host}.outputs.{index}.height: "{height}"
-        service.gpu.{host}.outputs.{index}.refresh_rate: "{rate}"
-        service.gpu.{host}.outputs.{index}.bit_depth: "{depth}"
-        service.gpu.{host}.outputs.{index}.colour_format: "{colour}"
+        service.gpu.{host:key}.outputs.{index}.gpu_port: "{port}"
+        service.gpu.{host:key}.outputs.{index}.genlock_state: "{genlock}"
+        service.gpu.{host:key}.outputs.{index}.emulated: "{emulated}"
+        service.gpu.{host:key}.outputs.{index}.width: "{width}"
+        service.gpu.{host:key}.outputs.{index}.height: "{height}"
+        service.gpu.{host:key}.outputs.{index}.refresh_rate: "{rate}"
+        service.gpu.{host:key}.outputs.{index}.bit_depth: "{depth}"
+        service.gpu.{host:key}.outputs.{index}.colour_format: "{colour}"
     - path: "^/api/service/system/projects$"
       json_match: { "$.result": "^\\[" }
       replace: service.projects
       json_each: "$.result"
       json: { host: "$.hostname", last: "$.lastProject" }
       state:
-        service.projects.{host}.last_project: "{last}"
+        service.projects.{host:key}.last_project: "{last}"
     - path: "^/api/service/system/projects$"
       json_each: "$.result[*].projects"
       json:
@@ -2080,16 +2079,16 @@ telemetry:
         hotfix: "$.version.hotfix"
         revision: "$.version.revision"
       state:
-        service.projects.{host}.projects.{index}.path: "{path}"
-        service.projects.{host}.projects.{index}.last_modified: "{modified}"
-        service.projects.{host}.projects.{index}.version: "{major}.{minor}.{hotfix}.{revision}"
+        service.projects.{host:key}.projects.{index}.path: "{path}"
+        service.projects.{host:key}.projects.{index}.last_modified: "{modified}"
+        service.projects.{host:key}.projects.{index}.version: "{major}.{minor}.{hotfix}.{revision}"
     - path: "^/api/service/system/vfcs$"
       json_match: { "$.result": "^\\[" }
       replace: service.vfcs
       json_each: "$.result"
       json: { host: "$.hostname", backplane: "$.backplaneVersion" }
       state:
-        service.vfcs.{host}.backplane: "{backplane}"
+        service.vfcs.{host:key}.backplane: "{backplane}"
     - path: "^/api/service/system/vfcs$"
       json_each: "$.result[*].cards"
       json:
@@ -2102,13 +2101,13 @@ telemetry:
         generation: "$.generation"
         ports: "$.ports"
       state:
-        service.vfcs.{host}.cards.{index}.slot: "{slot}"
-        service.vfcs.{host}.cards.{index}.type: "{type}"
-        service.vfcs.{host}.cards.{index}.firmware_version: "{firmware}"
-        service.vfcs.{host}.cards.{index}.fpga_version: "{fpga}"
-        service.vfcs.{host}.cards.{index}.split_mode: "{split}"
-        service.vfcs.{host}.cards.{index}.generation: "{generation}"
-        service.vfcs.{host}.cards.{index}.ports: "{ports}"
+        service.vfcs.{host:key}.cards.{index}.slot: "{slot}"
+        service.vfcs.{host:key}.cards.{index}.type: "{type}"
+        service.vfcs.{host:key}.cards.{index}.firmware_version: "{firmware}"
+        service.vfcs.{host:key}.cards.{index}.fpga_version: "{fpga}"
+        service.vfcs.{host:key}.cards.{index}.split_mode: "{split}"
+        service.vfcs.{host:key}.cards.{index}.generation: "{generation}"
+        service.vfcs.{host:key}.cards.{index}.ports: "{ports}"
     # The media listing: the setting's directory every minute, or the
     # directory list_media last asked for.
     - path: "^/api/service/media/list\\?"
@@ -2562,8 +2561,9 @@ quirks:
       notes on a track's timeline, which get_annotations reads and which the API
       cannot edit. set_note creates a note when none has the name; the API
       cannot delete one. Every note is read every minute, and a note read or
-      written is kept at once. set_note takes the text as a JSON string, since a
-      text parameter here cannot hold a line break.
+      written is kept at once. set_note takes the text as plain text, line
+      breaks included (a multiline parameter, sent JSON-escaped); a caller that
+      passed it as a JSON string value passes the same string.
   - models: [all]
     severity: info
     text: >
@@ -2584,7 +2584,9 @@ quirks:
       can run it: there is no authentication. register_python_module replaces a
       module of the same name. Nothing here reads state from Python: every
       state key comes from the documented endpoints. The script and module source
-      are JSON strings, since a text parameter here cannot hold a line break.
+      are plain text, line breaks and tabs included (multiline parameters, sent
+      JSON-escaped); a caller that passed them as JSON string values passes the
+      same strings.
   - models: [all]
     severity: critical
     text: >
@@ -2647,8 +2649,8 @@ quirks:
     severity: info
     text: >
       The Service API's machine lists (systems, OS, adapters, GPU outputs,
-      projects and VFCs) are read every minute, keyed by host name: a host name
-      holding a dot cannot be a state key and is left out. They are read-only:
+      projects and VFCs) are read every minute, keyed by host name, one state
+      key even when it holds dots (an FQDN). They are read-only:
       network, GPU and VFC settings are changed in d3Manager or the OS.
   - models: [all]
     severity: info

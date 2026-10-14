@@ -425,31 +425,31 @@ telemetry:
     send: ["sg"]
     every_ms: 30000
   updates:
-    # cv CONTROL_ID CONTROL_STRING CONTROL_VALUE CONTROL_POSITION. Names
-    # holding a dot, a quotation mark or a back slash are not tracked: a dot
-    # would split the state path.
-    - match: '^cv "([^".\\]+)" "((?:[^"\\]|\\.)*)" (\S+) (\S+)$'
+    # cv CONTROL_ID CONTROL_STRING CONTROL_VALUE CONTROL_POSITION. A name is
+    # one state key, dots included; names holding a quotation mark or a back
+    # slash (sent escaped) are not tracked.
+    - match: '^cv "([^"\\]+)" "((?:[^"\\]|\\.)*)" (\S+) (\S+)$'
       state:
-        "controls.{1}.string": "{2}"
-        "controls.{1}.value": "{3}"
-        "controls.{1}.position": "{4}"
+        "controls.{1:key}.string": "{2}"
+        "controls.{1:key}.value": "{3}"
+        "controls.{1:key}.position": "{4}"
     # cvv CONTROL_ID COUNT STRING... COUNT VALUE... COUNT POSITION...: the
     # first string and the first value.
-    - match: '^cvv "([^".\\]+)" [1-9][0-9]* "((?:[^"\\]|\\.)*)"(?: "(?:[^"\\]|\\.)*")* [1-9][0-9]* (\S+)'
+    - match: '^cvv "([^"\\]+)" [1-9][0-9]* "((?:[^"\\]|\\.)*)"(?: "(?:[^"\\]|\\.)*")* [1-9][0-9]* (\S+)'
       state:
-        "controls.{1}.string": "{2}"
-        "controls.{1}.value": "{3}"
+        "controls.{1:key}.string": "{2}"
+        "controls.{1:key}.value": "{3}"
     # cmv CONTROL_ID ASPECT STRING VALUE POSITION.
-    - match: '^cmv "([^".\\]+)" 6 "(true|false)" \S+ \S+$'
-      state: { "controls.{1}.disabled": "{2}" }
-    - match: '^cmv "([^".\\]+)" 5 "(true|false)" \S+ \S+$'
-      state: { "controls.{1}.invisible": "{2}" }
-    - match: '^cmv "([^".\\]+)" 4 "(true|false)" \S+ \S+$'
-      state: { "controls.{1}.indeterminate": "{2}" }
-    - match: '^cmv "([^".\\]+)" 7 "((?:[^"\\]|\\.)*)" \S+ \S+$'
-      state: { "controls.{1}.legend": "{2}" }
-    - match: '^cmv "([^".\\]+)" 3 "((?:[^"\\]|\\.)*)" \S+ \S+$'
-      state: { "controls.{1}.color": "{2}" }
+    - match: '^cmv "([^"\\]+)" 6 "(true|false)" \S+ \S+$'
+      state: { "controls.{1:key}.disabled": "{2}" }
+    - match: '^cmv "([^"\\]+)" 5 "(true|false)" \S+ \S+$'
+      state: { "controls.{1:key}.invisible": "{2}" }
+    - match: '^cmv "([^"\\]+)" 4 "(true|false)" \S+ \S+$'
+      state: { "controls.{1:key}.indeterminate": "{2}" }
+    - match: '^cmv "([^"\\]+)" 7 "((?:[^"\\]|\\.)*)" \S+ \S+$'
+      state: { "controls.{1:key}.legend": "{2}" }
+    - match: '^cmv "([^"\\]+)" 3 "((?:[^"\\]|\\.)*)" \S+ \S+$'
+      state: { "controls.{1:key}.color": "{2}" }
     # sr DESIGN_NAME DESIGN_ID IS_PRIMARY IS_ACTIVE.
     - match: '^sr "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" ([01]) ([01])$'
       state:
@@ -500,8 +500,8 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Controls are keyed in state by their Named Control name; a name containing a dot, a quotation mark or a
-      back slash is not tracked, since a dot would split the state path. Strings in state keep ECP's escapes.
+      Controls are keyed in state by their Named Control name, one key even when it holds dots; a name
+      containing a quotation mark or a back slash is not tracked. Strings in state keep ECP's escapes.
       Vector controls (cvv) report only their first string and first value; metadata choice lists (cmvv aspect 2)
       are not kept.
   - models: [all]

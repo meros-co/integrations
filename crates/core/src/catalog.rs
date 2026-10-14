@@ -175,6 +175,11 @@ pub struct ParamSpec {
     pub required: bool,
     #[serde(default)]
     pub secret: bool,
+    /// A string that may hold line breaks, tabs and other control
+    /// characters (a script, a note): accepted only because every template
+    /// sends it through `:json`, which escapes them (SPEC.md §4).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub multiline: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -419,7 +424,7 @@ fn check_value(name: &str, spec: &ParamSpec, value: &Value) -> Result<(), String
             let s = value
                 .as_str()
                 .ok_or_else(|| format!("'{name}' must be a string"))?;
-            if s.chars().any(|c| (c as u32) < 0x20) {
+            if !spec.multiline && s.chars().any(|c| (c as u32) < 0x20) {
                 return Err(format!("'{name}' contains a control character"));
             }
             if let Some(max) = spec.max_length {

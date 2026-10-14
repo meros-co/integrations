@@ -54,7 +54,16 @@ const REPLY: Key = "reply";
 const PROBE: Key = "probe";
 const RECONNECT: Key = "reconnect";
 const RENEW: Key = "telemetry-renew";
-const POLL: Key = "telemetry-poll";
+/// One timer per poll group (`telemetry.poll` as a list); the first is the
+/// one a single `poll` uses.
+const POLLS: [Key; telemetry::MAX_POLLS] = [
+    "telemetry-poll",
+    "telemetry-poll-2",
+    "telemetry-poll-3",
+    "telemetry-poll-4",
+];
+#[cfg(test)]
+const POLL: Key = POLLS[0];
 const PROMPT: Key = "login-prompt";
 /// A token refresh that failed, tried again.
 const OAUTH_RETRY: Key = "oauth-retry";
@@ -654,6 +663,10 @@ pub(crate) struct SpecEngine {
     packets: Option<PacketReader>,
     next_request: RequestId,
     telemetry: Arc<telemetry::Telemetry>,
+    /// The state this engine has reported, kept when a rule `replace`s a
+    /// list, so a list read again unchanged reports nothing (SPEC.md §8,
+    /// Lists).
+    mirror: Option<Value>,
     /// The path and query of each HTTP request in flight, so its reply can be
     /// offered to the telemetry rules for that path.
     request_paths: std::collections::HashMap<RequestId, (String, Option<Value>)>,
@@ -1405,6 +1418,7 @@ impl SpecEngine {
             framer: None,
             packets: None,
             next_request: 1,
+            mirror: telemetry.replaces().then(|| Value::Object(Map::new())),
             telemetry,
             request_paths: Default::default(),
             refused: None,
@@ -2368,7 +2382,9 @@ impl SpecEngine {
         }
         cx.cancel_timer(PROBE);
         cx.cancel_timer(RENEW);
-        cx.cancel_timer(POLL);
+        for key in POLLS {
+            cx.cancel_timer(key);
+        }
         self.set_link(cx, Connection::Disconnected { reason });
         cx.set_timer(RECONNECT, self.backoff);
         self.backoff = (self.backoff * 2).min(RECONNECT_MAX);
@@ -2583,14 +2599,25 @@ impl SpecEngine {
     fn offer(&mut self, cx: &mut Cx, message: &telemetry::Inbound) {
         let mut triggered = Vec::new();
         let mut cleared = Value::Object(Map::new());
-        let patch = self
+        let mut patch = self
             .telemetry
             .apply_into(message, &mut triggered, &mut cleared);
+        // A list read again as it was changes nothing: neither its removal
+        // nor its values are reported.
+        if let Some(mirror) = &self.mirror {
+            unchanged_lists(mirror, &mut cleared, &mut patch);
+        }
         // What the message replaces leaves state first.
         if cleared.as_object().is_some_and(|c| !c.is_empty()) {
+            if let Some(mirror) = &mut self.mirror {
+                crate::session::merge_patch(mirror, &cleared);
+            }
             cx.state(cleared);
         }
         if let Some(patch) = patch {
+            if let Some(mirror) = &mut self.mirror {
+                crate::session::merge_patch(mirror, &patch);
+            }
             cx.state(patch);
         }
         if !triggered.is_empty() && self.monitor && self.refused.is_none() {
@@ -2604,14 +2631,16 @@ impl SpecEngine {
             return;
         }
         let subscribe = self.telemetry.subscribe.clone();
-        let poll = self.telemetry.poll.clone();
         self.send_telemetry(cx, subscribe, false);
-        self.send_telemetry(cx, poll, true);
+        let polls = self.telemetry.polls.clone();
+        for (key, poll) in POLLS.iter().zip(polls) {
+            self.send_telemetry(cx, poll.send, true);
+            if let Some(every) = poll.every {
+                cx.set_timer(key, every);
+            }
+        }
         if let Some(every) = self.telemetry.renew_every {
             cx.set_timer(RENEW, every);
-        }
-        if let Some(every) = self.telemetry.poll_every {
-            cx.set_timer(POLL, every);
         }
     }
 
@@ -3031,6 +3060,86 @@ impl SpecEngine {
 }
 
 /// Whether the push channel's opening request carries a credential.
+/// The paths a `replace` removal names: the null leaves of `cleared`.
+fn null_leaves(node: &Value, at: &mut Vec<String>, out: &mut Vec<Vec<String>>) {
+    match node {
+        Value::Null => out.push(at.clone()),
+        Value::Object(map) => {
+            for (k, v) in map {
+                at.push(k.clone());
+                null_leaves(v, at, out);
+                at.pop();
+            }
+        }
+        _ => {}
+    }
+}
+
+fn get_path<'a>(node: &'a Value, path: &[String]) -> Option<&'a Value> {
+    path.iter().try_fold(node, |n, k| n.get(k))
+}
+
+/// Remove `path` from `node`, and every object it leaves empty on the way.
+fn remove_path(node: &mut Value, path: &[String]) {
+    let Some((first, rest)) = path.split_first() else {
+        return;
+    };
+    let Some(map) = node.as_object_mut() else {
+        return;
+    };
+    if rest.is_empty() {
+        map.remove(first);
+        return;
+    }
+    if let Some(child) = map.get_mut(first) {
+        remove_path(child, rest);
+        if child.as_object().is_some_and(|c| c.is_empty()) {
+            map.remove(first);
+        }
+    }
+}
+
+/// Each list a message replaces whose new content is what state already
+/// holds is taken out of both patches: its removal from `cleared` and its
+/// values from `patch`. What state holds there afterwards is the same
+/// either way; consumers just see no change where there was none.
+fn unchanged_lists(mirror: &Value, cleared: &mut Value, patch: &mut Option<Value>) {
+    let mut paths = Vec::new();
+    null_leaves(cleared, &mut Vec::new(), &mut paths);
+    let empty = |v: Option<&Value>| match v {
+        None => true,
+        Some(Value::Object(m)) => m.is_empty(),
+        _ => false,
+    };
+    for path in paths {
+        let old = get_path(mirror, &path);
+        // What the list will be: its values applied to nothing, so a
+        // removal inside them counts for what it is.
+        let new = patch.as_ref().and_then(|p| get_path(p, &path)).map(|v| {
+            let mut out = Value::Object(Map::new());
+            crate::session::merge_patch(&mut out, v);
+            out
+        });
+        let same = match (&new, old) {
+            (Some(new), Some(old)) => new == old || (empty(Some(new)) && empty(Some(old))),
+            (new, old) => empty(new.as_ref()) && empty(old),
+        };
+        if !same {
+            continue;
+        }
+        remove_path(cleared, &path);
+        if let Some(p) = patch.as_mut() {
+            remove_path(p, &path);
+        }
+    }
+    if patch
+        .as_ref()
+        .is_some_and(|p| p.as_object().is_some_and(|m| m.is_empty()))
+    {
+        *patch = None;
+    }
+}
+
 fn auth_headers_empty(push: &Option<Push>) -> bool {
     push.as_ref().is_none_or(|p| !p.credentialed)
 }
@@ -3422,7 +3531,7 @@ impl Module for SpecEngine {
                     self.lost(cx, "no login prompt within the timeout".into());
                 }
             }
-            RENEW | POLL if !self.monitor => {}
+            _ if (key == RENEW || POLLS.contains(&key)) && !self.monitor => {}
             RENEW => {
                 let items = self.telemetry.subscribe.clone();
                 self.send_telemetry(cx, items, false);
@@ -3430,11 +3539,14 @@ impl Module for SpecEngine {
                     cx.set_timer(RENEW, every);
                 }
             }
-            POLL => {
-                let items = self.telemetry.poll.clone();
-                self.send_telemetry(cx, items, true);
-                if let Some(every) = self.telemetry.poll_every {
-                    cx.set_timer(POLL, every);
+            _ if POLLS.contains(&key) => {
+                let i = POLLS.iter().position(|k| *k == key).unwrap_or(0);
+                let Some(poll) = self.telemetry.polls.get(i).cloned() else {
+                    return;
+                };
+                self.send_telemetry(cx, poll.send, true);
+                if let Some(every) = poll.every {
+                    cx.set_timer(key, every);
                 }
             }
             _ => {}
@@ -3716,6 +3828,58 @@ mod tests {
             items(json!({"self": "https://x/items", "next": "https://x/items?offset=100"})),
         );
         assert_eq!(patches, vec![welcome]);
+    }
+
+    #[test]
+    fn a_list_read_again_unchanged_reports_nothing() {
+        let telemetry = json!({
+            "updates": [{"path": "^/list$", "json_each": "$", "json": {"id": "$.id", "n": "$.n"},
+                         "replace": "items", "state": {"items.{id}.n": "{n}"}},
+                        {"path": "^/list$", "json": {"c": "$[0].n"}, "state": {"count": "{c}"}}],
+        });
+        let state = json!({"items.*.n": {"type": "int", "description": "x"},
+                           "count": {"type": "int", "description": "x"}});
+        let mut e = http_with(telemetry, state, true);
+        let mut offer = |body: &str| {
+            let mut cx = Cx::new(0);
+            e.offer(
+                &mut cx,
+                &telemetry::Inbound::Http {
+                    path: "/list",
+                    headers: &[],
+                    body: body.as_bytes(),
+                    request: None,
+                },
+            );
+            cx.take()
+                .into_iter()
+                .filter_map(|a| match a {
+                    Action::State(p) => Some(p),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let list = r#"[{"id": "a", "n": 1}, {"id": "b", "n": 2}]"#;
+        assert_eq!(
+            offer(list),
+            vec![
+                json!({"items": null}),
+                json!({"items": {"a": {"n": 1}, "b": {"n": 2}}, "count": 1})
+            ]
+        );
+        // The same list: only what lies outside it is reported.
+        assert_eq!(offer(list), vec![json!({"count": 1})]);
+        // A changed list is replaced as before.
+        assert_eq!(
+            offer(r#"[{"id": "a", "n": 1}]"#),
+            vec![
+                json!({"items": null}),
+                json!({"items": {"a": {"n": 1}}, "count": 1})
+            ]
+        );
+        // An empty list over an empty list: nothing about the list.
+        assert_eq!(offer("[]"), vec![json!({"items": null})]);
+        assert_eq!(offer("[]"), Vec::<Value>::new());
     }
 
     #[test]
@@ -5413,6 +5577,58 @@ mod tests {
         let a = cx.take();
         assert_eq!(completed(&a), vec![(2, Err(CommandError::Timeout))]);
         assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
+    }
+
+    #[test]
+    fn poll_groups_each_keep_their_own_interval() {
+        let telemetry = json!({
+            "poll": [{"every_ms": 1000, "send": [{"method": "GET", "path": "/fast"}]},
+                     {"every_ms": 30000, "send": [{"method": "GET", "path": "/slow"}]}],
+            "updates": [],
+        });
+        let mut e = http_with(telemetry, json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: POLLS[0],
+            after: 1000
+        }));
+        assert!(a.contains(&Action::SetTimer {
+            key: POLLS[1],
+            after: 30000
+        }));
+        let paths = |e: &SpecEngine| -> Vec<String> {
+            e.queue
+                .iter()
+                .filter_map(|j| j.item.as_ref()?.get("path")?.as_str().map(str::to_string))
+                .collect()
+        };
+        // Both groups on connecting, the first already in flight.
+        assert_eq!(paths(&e), ["/slow"]);
+        e.queue.clear();
+        // The fast group's timer asks for the fast group alone, and is set again.
+        let mut cx = Cx::new(1000);
+        e.timer(&mut cx, POLLS[0]);
+        assert_eq!(paths(&e), ["/fast"]);
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: POLLS[0],
+            after: 1000
+        }));
+        e.queue.clear();
+        let mut cx = Cx::new(30000);
+        e.timer(&mut cx, POLLS[1]);
+        assert_eq!(paths(&e), ["/slow"]);
+        // A device opened for commands only polls neither.
+        let mut e = http_with(
+            json!({"poll": [{"every_ms": 1000, "send": [{"method": "GET", "path": "/fast"}]}], "updates": []}),
+            json!({}),
+            false,
+        );
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.timer(&mut cx, POLLS[0]);
+        assert!(paths(&e).is_empty());
     }
 
     #[test]

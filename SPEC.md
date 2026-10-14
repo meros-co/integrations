@@ -813,6 +813,30 @@ before transmission. A CR or LF in a label would otherwise end the command and
 start another. Rejecting rather than stripping follows the no-clamping rule
 above.
 
+A string that is text by nature, such as a script or a note, takes
+`multiline: true`: its value may then hold line breaks, tabs and any other
+control character, because it is only ever sent through the `json` directive,
+which escapes them (`\n`, `\t`, `\u0001`):
+
+```yaml
+params:
+  script:
+    type: string
+    multiline: true
+    required: true
+    label: Script
+    description: Python code to run, lines separated by line breaks.
+send: { method: POST, path: /api/python/execute, body: '{"script":{script:json}}' }
+```
+
+Every placeholder naming a multiline parameter must be `{name:json}`, with no
+other directive, wherever it stands; `tools/validate.py` checks this and the
+core refuses to render it any other way. The catalogue serves `multiline`, so
+a consumer can offer a text area. Such a parameter used to be a `json`
+parameter holding a JSON string; a caller that passed a string to it passes the
+same string now and the same bytes go out, while a value that was not a string
+is now refused before transmission.
+
 Encoding depends on where the value lands:
 
 | Location | Encoding |
@@ -843,6 +867,7 @@ The directive set is closed.
 | `to.<name>` | A number converted to the wire by the named conversion (below): `{level_db:to.x32_fader}` |
 | `from.<name>` | A wire number converted back to the operator's value: `{arg0:from.x32_fader:.1f}` |
 | `map.<name>` | A value replaced by its wire text from the named value table (below): `{level:map.reference_level}`. The only directive on the placeholder |
+| `key` | In a telemetry state path or `replace` only: the value is one state key, dots included: `types.{id:key}.name` (§8, "Keys holding dots") |
 
 Offsets apply before formatting, and directives apply left to right.
 
@@ -1149,6 +1174,25 @@ telemetry:
       state: { "outputs.{1:+1}.input": "{2:+1}" }
 ```
 
+A device whose state changes at different rates (a timer every second, a
+configuration every minute) gives `poll` as a list of groups, each sent on
+connecting and then at its own `every_ms`, at most four:
+
+```yaml
+telemetry:
+  poll:
+    - every_ms: 1000                # what moves during a show
+      send: [{ method: GET, path: /v1/timers/current }]
+    - every_ms: 30000               # what an operator configures
+      send: [{ method: GET, path: /v1/timers }, { method: GET, path: /v1/props }]
+```
+
+A group is a poll like any other: its items are queries, queued one at a
+time, and an item still waiting from its last round is not queued again.
+Over HTTP this is the way to read something less often; a `subscribe` with
+`every_ms` is sent again at its interval too, and older specs use it so, but
+its items are not kept from piling up behind a slow device.
+
 `send` items are the same as a command's. They go through the command queue,
 one at a time, wherever a reply is expected: `subscribe` items on a line
 transport whose device answers, and `poll` items (queries) on any transport
@@ -1200,7 +1244,7 @@ The state patch carries `null` there, which RFC 7386 reads as a removal:
 the snapshot loses the subtree, and the `state` event tells consumers so.
 The path must be declared, or lead to declared paths; a captured segment
 that renders empty or holds a `.` removes nothing, so a device can never
-name something else. Within one message a removal wins over a value the same
+name something else (a `key` segment, below, is one key whatever it holds). Within one message a removal wins over a value the same
 message assigns under it. A telemetry vector for a removal gives
 `state_before`, the state the message arrives on.
 
@@ -1231,7 +1275,13 @@ lists of plain lines (Ultimatte's FILE LIST):
 `json_each` (the path's, the selectors'; with `json_each`, each element's
 too, below), each declared or leading to
 declared paths. Consumers see the removal and the new list as two `state`
-events in a row. A rule may carry `replace` with no `state` when only some
+events in a row, unless the list is what the state already holds there: a
+list read again unchanged (a poll every second of timers or playlists that
+did not move) reports neither its removal nor its values, so a consumer sees
+a `state` event only when something changed. The core compares what it has
+reported itself for that device; values the same message writes outside the
+list are reported as usual. A telemetry vector's `state_before` is that
+state. A rule may carry `replace` with no `state` when only some
 messages hold the whole list (Planning Center's first page with no `next`
 link): it sits beside the plain rule that writes the values for the same
 messages, and since every removal of a message is applied before any of its
@@ -1325,6 +1375,26 @@ array, for state keyed by position where the elements have no id:
       state: { "live_videos.{video}.ingest_streams.{stream}.video_bitrate": "{bitrate}" }
 ```
 
+A device that lists things as an object's members, keyed by name, rather
+than as an array (BirdDog's NDI sources, `{"CAM 1 (BirdDog)":
+"10.0.0.5:5961", ...}`) is gone through with `.*`: `json_each: "$.*"` is
+each member of the reply, `$.sources.*` each member of the object at
+`$.sources`. Each match captures the member's name as `{key}`, and `$` is the
+member's value; `{index}` is its place among the members, in the order the
+device sent them. `.*` may also stand within a path, as `[*]` does
+(`$.devices.*.inputs` is the inputs array of every member of `devices`, and
+`$^.` the member), and a value that is not an object there gives no match.
+Names are usually free text, so the state key takes them with `key` (below,
+"Keys holding dots"):
+
+```yaml
+    - path: "^/List$"
+      json_each: "$.*"
+      json: { address: "$" }
+      replace: ndi.sources
+      state: { "ndi.sources.{key:key}.address": "{address}" }
+```
+
 A JSON path anywhere may also index an array, `$.streams[0].name` (§5).
 State keyed this way keeps what a later reply no longer lists, so a list
 that shrinks (a tag list) is better kept whole, as JSON text.
@@ -1332,6 +1402,32 @@ that shrinks (a tag list) is better kept whole, as JSON text.
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`, plus `request` (the JSON request body) for a `request_match` rule
 and `headers` (name to value) for a `headers` rule.
+
+#### Keys holding dots
+
+A state path's segments are separated by dots, so a captured value holding
+one would split its segment: without more, a rule writing `sources.{id}.name`
+for the id `com.boinx.source.camera` reaches no declared path and assigns
+nothing, and a deletion or `replace` with it removes nothing. A device whose
+ids, names or types hold dots (mimoLive's type identifiers, a media server's
+path names, a host name) marks the segment with the `key` directive, and the
+value is kept as one segment, dots and all:
+
+```yaml
+    - path: "^/api/v1/sources$"
+      json_each: "$.data"
+      json: { id: "$.id", type: "$.attributes.source-type" }
+      state: { "sources.{id:key}.type": "{type}" }
+```
+
+`key` goes last among a placeholder's directives (`{1:url_decode:key}`), and
+only in a state path or a `replace` path; a key segment that renders empty
+is not written. Consumers see the key as the literal string it is: the state
+patch is `{"sources": {"com.boinx.source.camera": {"type": "..."}}}`, an RFC
+7386 merge patch whose object key holds the dots, and the snapshot has the
+same object. A consumer that addresses state by a dotted path must not split
+such a key; it walks the JSON objects instead. The declared path stays
+`sources.*.type`: `*` stands for any one key, dotted or not.
 
 #### Rules per model
 

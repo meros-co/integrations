@@ -106,42 +106,89 @@ enum Matcher {
     HttpText { path: Regex, re: Regex },
 }
 
-/// One element `json_each` reaches: the element, its index in its array,
-/// and the elements it lies in, outermost first (the document, then each
-/// `[*]` level's element).
+/// One element `json_each` reaches: the element, its index in its array
+/// (or its place among its object's members), the member's name when it is
+/// an object's member, and the elements it lies in, outermost first (the
+/// document, then each `[*]` or `.*` level's element).
 struct EachItem<'a> {
     item: &'a Value,
     index: usize,
+    key: Option<&'a str>,
     outer: Vec<&'a Value>,
 }
 
-/// The elements of the array at `each`, through every `[*]` in it:
-/// `$.data[*].ingest_streams` is each ingest stream of each live video.
+/// The steps of a `json_each` path: each a JSON path, from the element the
+/// step before reached, to an array whose elements it goes through, or with
+/// `members` to an object whose members it goes through. `[*]` and `.*` end
+/// a step; what follows the last of them is an array, unless the path ends
+/// with `.*`.
+fn each_steps(each: &str) -> Vec<(String, bool)> {
+    let mut steps = Vec::new();
+    let mut rest = each;
+    let mut start = true;
+    loop {
+        let array = rest.find("[*]");
+        // `.*` as a whole step: followed by the end, a `.` or a `[`.
+        let members = rest
+            .match_indices(".*")
+            .map(|(i, _)| i)
+            .find(|&i| matches!(rest.as_bytes().get(i + 2), None | Some(b'.') | Some(b'[')));
+        let (at, len, is_members) = match (array, members) {
+            (Some(a), Some(m)) if m < a => (m, 2, true),
+            (Some(a), _) => (a, 3, false),
+            (None, Some(m)) => (m, 2, true),
+            (None, None) => break,
+        };
+        let part = &rest[..at];
+        steps.push((path_of(part, start), is_members));
+        start = false;
+        rest = &rest[at + len..];
+        if rest.is_empty() && is_members {
+            return steps;
+        }
+    }
+    steps.push((path_of(rest, start), false));
+    steps
+}
+
+/// A step's JSON path: the first is the document's, every other is the
+/// element's, from `$`.
+fn path_of(part: &str, start: bool) -> String {
+    match start {
+        true => part.to_string(),
+        false => format!("${part}"),
+    }
+}
+
+/// The elements `each` reaches, through every `[*]` (an array's elements)
+/// and `.*` (an object's members) in it: `$.data[*].ingest_streams` is each
+/// ingest stream of each live video, `$.sources.*` each member of the
+/// object at `$.sources`.
 fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
-    let parts: Vec<&str> = each.split("[*]").collect();
+    let steps = each_steps(each);
     // Elements reached so far, each with the elements it lies in.
     let mut level: Vec<(&Value, Vec<&Value>)> = vec![(doc, Vec::new())];
-    let last = parts.len() - 1;
+    let last = steps.len() - 1;
     let mut out = Vec::new();
-    for (i, part) in parts.iter().enumerate() {
-        let path = if i == 0 {
-            part.to_string()
-        } else {
-            format!("${part}")
-        };
+    for (i, (path, members)) in steps.iter().enumerate() {
         let mut next = Vec::new();
         for (node, outer) in level {
-            let Some(array) = super::expect::json_path(node, &path).and_then(Value::as_array)
-            else {
+            let Some(at) = super::expect::json_path(node, path) else {
                 continue;
+            };
+            let found: Vec<(Option<&str>, &Value)> = match (members, at) {
+                (false, Value::Array(a)) => a.iter().map(|v| (None, v)).collect(),
+                (true, Value::Object(o)) => o.iter().map(|(k, v)| (Some(k.as_str()), v)).collect(),
+                _ => continue,
             };
             let mut within = outer.clone();
             within.push(node);
-            for (index, item) in array.iter().enumerate() {
+            for (index, (key, item)) in found.into_iter().enumerate() {
                 if i == last {
                     out.push(EachItem {
                         item,
                         index,
+                        key,
                         outer: within.clone(),
                     });
                 } else {
@@ -186,6 +233,7 @@ fn each_values(
         None => vec![EachItem {
             item: doc,
             index: 0,
+            key: None,
             outer: Vec::new(),
         }],
     };
@@ -211,6 +259,10 @@ fn each_values(
             }
             if each.is_some() {
                 values.push(("index".to_string(), Value::from(e.index)));
+            }
+            // `.*`: the member's name.
+            if let Some(key) = e.key {
+                values.push(("key".to_string(), Value::String(key.to_string())));
             }
             for (name, path) in json {
                 if let Some(v) = present(element_path(&e, path)) {
@@ -357,14 +409,25 @@ pub(crate) enum Inbound<'a> {
     },
 }
 
+/// One group of `poll` queries and its interval: sent on connecting, and
+/// again every `every` ms when set.
+#[derive(Debug, Clone)]
+pub(crate) struct Poll {
+    pub(crate) send: Vec<Value>,
+    pub(crate) every: Option<u64>,
+}
+
+/// The most poll groups a spec may have: each has a timer of its own.
+pub(crate) const MAX_POLLS: usize = 4;
+
 #[derive(Debug, Default)]
 pub(crate) struct Telemetry {
     /// Sent after connecting, and again every `renew_every` ms if set.
     pub(crate) subscribe: Vec<Value>,
     pub(crate) renew_every: Option<u64>,
-    /// Queries sent on a schedule; their replies go through the rules.
-    pub(crate) poll: Vec<Value>,
-    pub(crate) poll_every: Option<u64>,
+    /// Queries sent on a schedule, in groups each with its own interval
+    /// (`poll` as a list); their replies go through the rules.
+    pub(crate) polls: Vec<Poll>,
     rules: Vec<Rule>,
     types: Vec<(Vec<String>, String)>,
     conversions: Conversions,
@@ -478,12 +541,28 @@ impl Telemetry {
         let mut t = Telemetry {
             subscribe: items(spec.get("subscribe").and_then(|s| s.get("send"))),
             renew_every: every(spec.get("subscribe")),
-            poll: items(spec.get("poll").and_then(|s| s.get("send"))),
-            poll_every: every(spec.get("poll")),
+            polls: match spec.get("poll") {
+                // A list: groups, each at its own interval.
+                Some(Value::Array(groups)) => groups
+                    .iter()
+                    .map(|g| Poll {
+                        send: items(g.get("send")),
+                        every: every(Some(g)),
+                    })
+                    .collect(),
+                Some(one) => vec![Poll {
+                    send: items(one.get("send")),
+                    every: every(Some(one)),
+                }],
+                None => Vec::new(),
+            },
             rules: Vec::new(),
             types,
             conversions,
         };
+        if t.polls.len() > MAX_POLLS {
+            return Err(format!("telemetry: at most {MAX_POLLS} poll groups"));
+        }
         for rule in spec
             .get("updates")
             .and_then(Value::as_array)
@@ -666,34 +745,39 @@ impl Telemetry {
         Ok(t)
     }
 
+    /// Whether any rule replaces a list whole (`replace`).
+    pub(crate) fn replaces(&self) -> bool {
+        self.rules.iter().any(|r| !r.replace.is_empty())
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
-        self.rules.is_empty() && self.subscribe.is_empty() && self.poll.is_empty()
+        self.rules.is_empty()
+            && self.subscribe.is_empty()
+            && self.polls.iter().all(|p| p.send.is_empty())
     }
 
     /// Whether a concrete or starred path is declared, or is a prefix of
     /// declared paths: what a deletion may remove.
-    fn declares(&self, path: &str) -> bool {
-        let parts: Vec<&str> = path.split('.').collect();
+    fn declares<S: AsRef<str>>(&self, parts: &[S]) -> bool {
         self.types.iter().any(|(pattern, _)| {
             pattern.len() >= parts.len()
-                && pattern
-                    .iter()
-                    .zip(&parts)
-                    .all(|(p, s)| p == "*" || p == s || *s == "*")
+                && pattern.iter().zip(parts).all(|(p, s)| {
+                    let s = s.as_ref();
+                    p == "*" || p == s || s == "*"
+                })
         })
     }
 
     /// The declared type of a concrete or starred path.
-    fn kind_of(&self, path: &str) -> Option<&str> {
-        let parts: Vec<&str> = path.split('.').collect();
+    fn kind_of<S: AsRef<str>>(&self, parts: &[S]) -> Option<&str> {
         self.types
             .iter()
             .find(|(pattern, _)| {
                 pattern.len() == parts.len()
-                    && pattern
-                        .iter()
-                        .zip(&parts)
-                        .all(|(p, s)| p == "*" || p == s || *s == "*")
+                    && pattern.iter().zip(parts).all(|(p, s)| {
+                        let s = s.as_ref();
+                        p == "*" || p == s || s == "*"
+                    })
             })
             .map(|(_, k)| k.as_str())
     }
@@ -1020,11 +1104,11 @@ impl Telemetry {
             maps: &Default::default(),
         };
         for template in &rule.replace {
-            let Ok(path) = render(template, &ctx, |s| s.to_string()) else {
+            let Some(path) = render_path(template, &ctx) else {
                 continue;
             };
-            if path.split('.').any(str::is_empty)
-                || path.split('.').count() != template.split('.').count()
+            if path.iter().any(String::is_empty)
+                || path.len() != segments(template).len()
                 || !self.declares(&path)
             {
                 continue;
@@ -1096,14 +1180,15 @@ impl Telemetry {
         };
         let mut any = false;
         for a in assigns {
-            let Ok(path) = render(&a.path, &ctx, |s| s.to_string()) else {
+            let Some(path) = render_path(&a.path, &ctx) else {
                 continue;
             };
             if a.delete {
-                // A segment rendered empty, or holding a dot, would delete
-                // something other than what the rule names.
-                if path.split('.').any(str::is_empty)
-                    || path.split('.').count() != a.path.split('.').count()
+                // A segment rendered empty, or holding a dot (other than a
+                // `:key` one), would delete something other than what the
+                // rule names.
+                if path.iter().any(String::is_empty)
+                    || path.len() != segments(&a.path).len()
                     || !self.declares(&path)
                 {
                     continue;
@@ -1176,6 +1261,7 @@ fn spec_of(kind: ParamType) -> ParamSpec {
         default: None,
         required: false,
         secret: false,
+        multiline: false,
     }
 }
 
@@ -1187,12 +1273,83 @@ fn captures(caps: &regex::Captures) -> Vec<(String, Value)> {
         .collect()
 }
 
-/// `outputs.{1:+1}.input` → `outputs.*.input`.
-fn placeholder_to_star(path: &str) -> String {
-    path.split('.')
+/// `outputs.{1:+1}.input` → `outputs.*.input`, as segments.
+fn placeholder_to_star(path: &str) -> Vec<&str> {
+    segments(path)
+        .into_iter()
         .map(|seg| if seg.contains('{') { "*" } else { seg })
-        .collect::<Vec<_>>()
-        .join(".")
+        .collect()
+}
+
+/// A state path template's segments: split at each dot outside a
+/// placeholder, so `{2:.1f}` stays whole.
+fn segments(template: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0;
+    for (i, c) in template.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            '.' if depth == 0 => {
+                out.push(&template[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(&template[start..]);
+    out
+}
+
+/// A segment whose placeholder carries `:key`, without that directive:
+/// `{1:url_decode:key}` becomes `{1:url_decode}`. `None` for any other
+/// segment.
+fn without_key(segment: &str) -> Option<String> {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\{([^{}:]+)((?::[^{}:]+)*)\}").unwrap());
+    let mut keyed = false;
+    let out = re.replace_all(segment, |caps: &regex::Captures| {
+        let mut s = format!("{{{}", &caps[1]);
+        for d in caps[2].split(':').filter(|d| !d.is_empty()) {
+            if d == "key" {
+                keyed = true;
+            } else {
+                s.push(':');
+                s.push_str(d);
+            }
+        }
+        s.push('}');
+        s
+    });
+    keyed.then(|| out.into_owned())
+}
+
+/// A state path template rendered to its segments (SPEC.md §8, "Keys
+/// holding dots"). A segment whose placeholder carries `:key` stays one
+/// segment whatever its value holds, so mimoLive's
+/// `com.boinx.mimoLive.layers.text` is one key. Any other segment is split
+/// at the dots its value holds, as it always was, so such a value reaches no
+/// declared path and a deletion's length check refuses it. `None` when a
+/// value is missing or a `:key` segment renders empty.
+fn render_path(template: &str, ctx: &Values) -> Option<Vec<String>> {
+    let mut out = Vec::new();
+    for segment in segments(template) {
+        match without_key(segment) {
+            Some(stripped) => {
+                let text = render(&stripped, ctx, |s| s.to_string()).ok()?;
+                if text.is_empty() {
+                    return None;
+                }
+                out.push(text);
+            }
+            None => {
+                let text = render(segment, ctx, |s| s.to_string()).ok()?;
+                out.extend(text.split('.').map(str::to_string));
+            }
+        }
+    }
+    Some(out)
 }
 
 /// A wire value as the declared state type. `None` when it does not convert:
@@ -1218,20 +1375,19 @@ fn convert(raw: &Value, kind: &str) -> Option<Value> {
     }
 }
 
-fn set_path(patch: &mut Value, path: &str, value: Value) {
+fn set_path(patch: &mut Value, parts: &[String], value: Value) {
     let mut node = patch;
-    let parts: Vec<&str> = path.split('.').collect();
     for (i, part) in parts.iter().enumerate() {
         let map = match node {
             Value::Object(m) => m,
             _ => return,
         };
         if i == parts.len() - 1 {
-            map.insert((*part).to_string(), value);
+            map.insert(part.clone(), value);
             return;
         }
         node = map
-            .entry((*part).to_string())
+            .entry(part.clone())
             .or_insert_with(|| Value::Object(Map::new()));
     }
 }
@@ -1633,6 +1789,139 @@ mod tests {
         // An id that would reach elsewhere ("a.b") deletes nothing.
         let dotted = json!({"event": "removed", "type": "layers", "id": "A1.name"});
         assert_eq!(t.apply(&Inbound::Json(&dotted)), None);
+    }
+
+    #[test]
+    fn a_key_segment_keeps_its_dots() {
+        let state_decl = state(json!({
+            "types.*.name": {"type": "string", "description": "x"},
+            "types.*.live": {"type": "bool", "description": "x"},
+            "plain.*.name": {"type": "string", "description": "x"},
+        }));
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"json_match": {"$.event": "^added$"},
+                 "json": {"id": "$.id", "name": "$.name"},
+                 "state": {"types.{id:key}.name": "{name}", "plain.{id}.name": "{name}"}},
+                {"json_match": {"$.event": "^removed$", "$.id": "^(.*)$"},
+                 "state": {"types.{1:key}": {"delete": true}}},
+                {"json_match": {"$.event": "^list$"},
+                 "json_each": "$.ids",
+                 "json": {"id": "$"},
+                 "replace": "types.{id:url_decode:key}",
+                 "state": {"types.{id:url_decode:key}.live": "true"}},
+            ]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap();
+        // The id is one key, dots and all; without `:key` it reaches nothing.
+        let added = json!({"event": "added", "id": "com.boinx.text", "name": "Text"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&added)),
+            Some(json!({"types": {"com.boinx.text": {"name": "Text"}}}))
+        );
+        let plain = json!({"event": "added", "id": "A1", "name": "Bg"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&plain)),
+            Some(json!({"types": {"A1": {"name": "Bg"}}, "plain": {"A1": {"name": "Bg"}}}))
+        );
+        // A deletion and a replace remove that one key.
+        let removed = json!({"event": "removed", "id": "com.boinx.text"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&removed)),
+            Some(json!({"types": {"com.boinx.text": null}}))
+        );
+        let list = json!({"event": "list", "ids": ["a.b", "c%2Ed"]});
+        let mut s = json!({"types": {"a.b": {"name": "AB", "live": false}}});
+        let mut cleared = json!({});
+        let patch = t.apply_into(&Inbound::Json(&list), &mut Vec::new(), &mut cleared);
+        assert_eq!(cleared, json!({"types": {"a.b": null, "c.d": null}}));
+        crate::session::merge_patch(&mut s, &cleared);
+        crate::session::merge_patch(&mut s, &patch.unwrap());
+        assert_eq!(
+            s,
+            json!({"types": {"a.b": {"live": true}, "c.d": {"live": true}}})
+        );
+        // An empty key is no key.
+        let empty = json!({"event": "removed", "id": ""});
+        assert_eq!(t.apply(&Inbound::Json(&empty)), None);
+    }
+
+    #[test]
+    fn an_objects_members_are_gone_through_by_name() {
+        assert_eq!(
+            each_steps("$.data[*].ingest_streams"),
+            vec![
+                ("$.data".to_string(), false),
+                ("$.ingest_streams".to_string(), false)
+            ]
+        );
+        assert_eq!(
+            each_steps("$.sources.*"),
+            vec![("$.sources".to_string(), true)]
+        );
+        assert_eq!(
+            each_steps("$.devices.*.inputs"),
+            vec![
+                ("$.devices".to_string(), true),
+                ("$.inputs".to_string(), false)
+            ]
+        );
+        // `.*x` is a member's name, not a step.
+        assert_eq!(each_steps("$.a.*x"), vec![("$.a.*x".to_string(), false)]);
+        let state_decl = state(json!({
+            "sources.*.address": {"type": "string", "description": "x"},
+            "sources.*.index": {"type": "int", "description": "x"},
+            "devices.*.inputs.*.name": {"type": "string", "description": "x"},
+        }));
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/List$", "json_each": "$.*", "json": {"address": "$"},
+                 "replace": "sources",
+                 "state": {"sources.{key:key}.address": "{address}", "sources.{key:key}.index": "{index}"}},
+                {"path": "^/devices$", "json_each": "$.devices.*.inputs",
+                 "json": {"device": "$^.id", "name": "$.name"},
+                 "state": {"devices.{device}.inputs.{index}.name": "{name}"}},
+            ]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = br#"{"CAM 1 (BirdDog)": "10.0.0.5:5961", "studio.cam2": "10.0.0.6:5961"}"#;
+        let reply = Inbound::Http {
+            path: "/List",
+            headers: &[],
+            body,
+            request: None,
+        };
+        assert_eq!(
+            t.apply(&reply),
+            Some(json!({"sources": {
+                "CAM 1 (BirdDog)": {"address": "10.0.0.5:5961", "index": 0},
+                "studio.cam2": {"address": "10.0.0.6:5961", "index": 1}}}))
+        );
+        // Through members, then an array in each: `$^.` is the member.
+        let body = br#"{"devices": {"a": {"id": "A", "inputs": [{"name": "In 1"}]}, "b": {"id": "B", "inputs": []}}}"#;
+        let reply = Inbound::Http {
+            path: "/devices",
+            headers: &[],
+            body,
+            request: None,
+        };
+        assert_eq!(
+            t.apply(&reply),
+            Some(json!({"devices": {"A": {"inputs": {"0": {"name": "In 1"}}}}}))
+        );
+        // An array where members are expected is no match.
+        let body = br#"["10.0.0.5"]"#;
+        let reply = Inbound::Http {
+            path: "/List",
+            headers: &[],
+            body,
+            request: None,
+        };
+        assert_eq!(t.apply(&reply), Some(json!({"sources": null})));
     }
 
     #[test]
