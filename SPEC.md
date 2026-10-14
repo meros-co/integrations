@@ -843,6 +843,7 @@ The directive set is closed.
 | `to.<name>` | A number converted to the wire by the named conversion (below): `{level_db:to.x32_fader}` |
 | `from.<name>` | A wire number converted back to the operator's value: `{arg0:from.x32_fader:.1f}` |
 | `map.<name>` | A value replaced by its wire text from the named value table (below): `{level:map.reference_level}`. The only directive on the placeholder |
+| `key` | In a telemetry state path or `replace` only: the value is one state key, dots included: `types.{id:key}.name` (§8, "Keys holding dots") |
 
 Offsets apply before formatting, and directives apply left to right.
 
@@ -1200,7 +1201,7 @@ The state patch carries `null` there, which RFC 7386 reads as a removal:
 the snapshot loses the subtree, and the `state` event tells consumers so.
 The path must be declared, or lead to declared paths; a captured segment
 that renders empty or holds a `.` removes nothing, so a device can never
-name something else. Within one message a removal wins over a value the same
+name something else (a `key` segment, below, is one key whatever it holds). Within one message a removal wins over a value the same
 message assigns under it. A telemetry vector for a removal gives
 `state_before`, the state the message arrives on.
 
@@ -1332,6 +1333,32 @@ that shrinks (a tag list) is better kept whole, as JSON text.
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`, plus `request` (the JSON request body) for a `request_match` rule
 and `headers` (name to value) for a `headers` rule.
+
+#### Keys holding dots
+
+A state path's segments are separated by dots, so a captured value holding
+one would split its segment: without more, a rule writing `sources.{id}.name`
+for the id `com.boinx.source.camera` reaches no declared path and assigns
+nothing, and a deletion or `replace` with it removes nothing. A device whose
+ids, names or types hold dots (mimoLive's type identifiers, a media server's
+path names, a host name) marks the segment with the `key` directive, and the
+value is kept as one segment, dots and all:
+
+```yaml
+    - path: "^/api/v1/sources$"
+      json_each: "$.data"
+      json: { id: "$.id", type: "$.attributes.source-type" }
+      state: { "sources.{id:key}.type": "{type}" }
+```
+
+`key` goes last among a placeholder's directives (`{1:url_decode:key}`), and
+only in a state path or a `replace` path; a key segment that renders empty
+is not written. Consumers see the key as the literal string it is: the state
+patch is `{"sources": {"com.boinx.source.camera": {"type": "..."}}}`, an RFC
+7386 merge patch whose object key holds the dots, and the snapshot has the
+same object. A consumer that addresses state by a dotted path must not split
+such a key; it walks the JSON objects instead. The declared path stays
+`sources.*.type`: `*` stands for any one key, dotted or not.
 
 #### Rules per model
 

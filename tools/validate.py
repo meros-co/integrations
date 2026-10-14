@@ -666,6 +666,19 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     c = CONVERSION.match(d)
                     if c and c.group(2) not in (conversions or {}):
                         errors.append(f"{where}: ':{d}' names undeclared conversion '{c.group(2)}'")
+                    if d == "key":
+                        errors.append(f"{where}: ':key' marks a state path segment, not a value")
+        # `:key` keeps a path segment whole, dots included (SPEC.md §8, Keys
+        # holding dots): only in a state or replace path, and last.
+        replace_ = rule.get("replace") or []
+        for path in list(rule.get("state") or {}) + ([replace_] if isinstance(replace_, str) else replace_):
+            for m in PLACEHOLDER.finditer(path):
+                directives = [d for d in m.group(2).split(":") if d]
+                if "key" in directives[:-1]:
+                    errors.append(f"{where}: ':key' goes last in '{m.group(0)}'")
+        for _, text in template_strings(rule.get("then_send") or []):
+            if any("key" in m.group(2).split(":") for m in PLACEHOLDER.finditer(text)):
+                errors.append(f"{where}.then_send: ':key' marks a state path segment, not a message")
         deletions = {p for p, v in (rule.get("state") or {}).items()
                      if isinstance(v, dict) and v.get("delete") is True}
         paths = list((rule.get("state") or {}).keys())

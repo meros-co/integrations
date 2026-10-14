@@ -672,28 +672,26 @@ impl Telemetry {
 
     /// Whether a concrete or starred path is declared, or is a prefix of
     /// declared paths: what a deletion may remove.
-    fn declares(&self, path: &str) -> bool {
-        let parts: Vec<&str> = path.split('.').collect();
+    fn declares<S: AsRef<str>>(&self, parts: &[S]) -> bool {
         self.types.iter().any(|(pattern, _)| {
             pattern.len() >= parts.len()
-                && pattern
-                    .iter()
-                    .zip(&parts)
-                    .all(|(p, s)| p == "*" || p == s || *s == "*")
+                && pattern.iter().zip(parts).all(|(p, s)| {
+                    let s = s.as_ref();
+                    p == "*" || p == s || s == "*"
+                })
         })
     }
 
     /// The declared type of a concrete or starred path.
-    fn kind_of(&self, path: &str) -> Option<&str> {
-        let parts: Vec<&str> = path.split('.').collect();
+    fn kind_of<S: AsRef<str>>(&self, parts: &[S]) -> Option<&str> {
         self.types
             .iter()
             .find(|(pattern, _)| {
                 pattern.len() == parts.len()
-                    && pattern
-                        .iter()
-                        .zip(&parts)
-                        .all(|(p, s)| p == "*" || p == s || *s == "*")
+                    && pattern.iter().zip(parts).all(|(p, s)| {
+                        let s = s.as_ref();
+                        p == "*" || p == s || s == "*"
+                    })
             })
             .map(|(_, k)| k.as_str())
     }
@@ -1020,11 +1018,11 @@ impl Telemetry {
             maps: &Default::default(),
         };
         for template in &rule.replace {
-            let Ok(path) = render(template, &ctx, |s| s.to_string()) else {
+            let Some(path) = render_path(template, &ctx) else {
                 continue;
             };
-            if path.split('.').any(str::is_empty)
-                || path.split('.').count() != template.split('.').count()
+            if path.iter().any(String::is_empty)
+                || path.len() != segments(template).len()
                 || !self.declares(&path)
             {
                 continue;
@@ -1096,14 +1094,15 @@ impl Telemetry {
         };
         let mut any = false;
         for a in assigns {
-            let Ok(path) = render(&a.path, &ctx, |s| s.to_string()) else {
+            let Some(path) = render_path(&a.path, &ctx) else {
                 continue;
             };
             if a.delete {
-                // A segment rendered empty, or holding a dot, would delete
-                // something other than what the rule names.
-                if path.split('.').any(str::is_empty)
-                    || path.split('.').count() != a.path.split('.').count()
+                // A segment rendered empty, or holding a dot (other than a
+                // `:key` one), would delete something other than what the
+                // rule names.
+                if path.iter().any(String::is_empty)
+                    || path.len() != segments(&a.path).len()
                     || !self.declares(&path)
                 {
                     continue;
@@ -1187,12 +1186,83 @@ fn captures(caps: &regex::Captures) -> Vec<(String, Value)> {
         .collect()
 }
 
-/// `outputs.{1:+1}.input` → `outputs.*.input`.
-fn placeholder_to_star(path: &str) -> String {
-    path.split('.')
+/// `outputs.{1:+1}.input` → `outputs.*.input`, as segments.
+fn placeholder_to_star(path: &str) -> Vec<&str> {
+    segments(path)
+        .into_iter()
         .map(|seg| if seg.contains('{') { "*" } else { seg })
-        .collect::<Vec<_>>()
-        .join(".")
+        .collect()
+}
+
+/// A state path template's segments: split at each dot outside a
+/// placeholder, so `{2:.1f}` stays whole.
+fn segments(template: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0;
+    for (i, c) in template.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            '.' if depth == 0 => {
+                out.push(&template[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(&template[start..]);
+    out
+}
+
+/// A segment whose placeholder carries `:key`, without that directive:
+/// `{1:url_decode:key}` becomes `{1:url_decode}`. `None` for any other
+/// segment.
+fn without_key(segment: &str) -> Option<String> {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\{([^{}:]+)((?::[^{}:]+)*)\}").unwrap());
+    let mut keyed = false;
+    let out = re.replace_all(segment, |caps: &regex::Captures| {
+        let mut s = format!("{{{}", &caps[1]);
+        for d in caps[2].split(':').filter(|d| !d.is_empty()) {
+            if d == "key" {
+                keyed = true;
+            } else {
+                s.push(':');
+                s.push_str(d);
+            }
+        }
+        s.push('}');
+        s
+    });
+    keyed.then(|| out.into_owned())
+}
+
+/// A state path template rendered to its segments (SPEC.md §8, "Keys
+/// holding dots"). A segment whose placeholder carries `:key` stays one
+/// segment whatever its value holds, so mimoLive's
+/// `com.boinx.mimoLive.layers.text` is one key. Any other segment is split
+/// at the dots its value holds, as it always was, so such a value reaches no
+/// declared path and a deletion's length check refuses it. `None` when a
+/// value is missing or a `:key` segment renders empty.
+fn render_path(template: &str, ctx: &Values) -> Option<Vec<String>> {
+    let mut out = Vec::new();
+    for segment in segments(template) {
+        match without_key(segment) {
+            Some(stripped) => {
+                let text = render(&stripped, ctx, |s| s.to_string()).ok()?;
+                if text.is_empty() {
+                    return None;
+                }
+                out.push(text);
+            }
+            None => {
+                let text = render(segment, ctx, |s| s.to_string()).ok()?;
+                out.extend(text.split('.').map(str::to_string));
+            }
+        }
+    }
+    Some(out)
 }
 
 /// A wire value as the declared state type. `None` when it does not convert:
@@ -1218,20 +1288,19 @@ fn convert(raw: &Value, kind: &str) -> Option<Value> {
     }
 }
 
-fn set_path(patch: &mut Value, path: &str, value: Value) {
+fn set_path(patch: &mut Value, parts: &[String], value: Value) {
     let mut node = patch;
-    let parts: Vec<&str> = path.split('.').collect();
     for (i, part) in parts.iter().enumerate() {
         let map = match node {
             Value::Object(m) => m,
             _ => return,
         };
         if i == parts.len() - 1 {
-            map.insert((*part).to_string(), value);
+            map.insert(part.clone(), value);
             return;
         }
         node = map
-            .entry((*part).to_string())
+            .entry(part.clone())
             .or_insert_with(|| Value::Object(Map::new()));
     }
 }
@@ -1633,6 +1702,63 @@ mod tests {
         // An id that would reach elsewhere ("a.b") deletes nothing.
         let dotted = json!({"event": "removed", "type": "layers", "id": "A1.name"});
         assert_eq!(t.apply(&Inbound::Json(&dotted)), None);
+    }
+
+    #[test]
+    fn a_key_segment_keeps_its_dots() {
+        let state_decl = state(json!({
+            "types.*.name": {"type": "string", "description": "x"},
+            "types.*.live": {"type": "bool", "description": "x"},
+            "plain.*.name": {"type": "string", "description": "x"},
+        }));
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"json_match": {"$.event": "^added$"},
+                 "json": {"id": "$.id", "name": "$.name"},
+                 "state": {"types.{id:key}.name": "{name}", "plain.{id}.name": "{name}"}},
+                {"json_match": {"$.event": "^removed$", "$.id": "^(.*)$"},
+                 "state": {"types.{1:key}": {"delete": true}}},
+                {"json_match": {"$.event": "^list$"},
+                 "json_each": "$.ids",
+                 "json": {"id": "$"},
+                 "replace": "types.{id:url_decode:key}",
+                 "state": {"types.{id:url_decode:key}.live": "true"}},
+            ]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap();
+        // The id is one key, dots and all; without `:key` it reaches nothing.
+        let added = json!({"event": "added", "id": "com.boinx.text", "name": "Text"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&added)),
+            Some(json!({"types": {"com.boinx.text": {"name": "Text"}}}))
+        );
+        let plain = json!({"event": "added", "id": "A1", "name": "Bg"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&plain)),
+            Some(json!({"types": {"A1": {"name": "Bg"}}, "plain": {"A1": {"name": "Bg"}}}))
+        );
+        // A deletion and a replace remove that one key.
+        let removed = json!({"event": "removed", "id": "com.boinx.text"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&removed)),
+            Some(json!({"types": {"com.boinx.text": null}}))
+        );
+        let list = json!({"event": "list", "ids": ["a.b", "c%2Ed"]});
+        let mut s = json!({"types": {"a.b": {"name": "AB", "live": false}}});
+        let mut cleared = json!({});
+        let patch = t.apply_into(&Inbound::Json(&list), &mut Vec::new(), &mut cleared);
+        assert_eq!(cleared, json!({"types": {"a.b": null, "c.d": null}}));
+        crate::session::merge_patch(&mut s, &cleared);
+        crate::session::merge_patch(&mut s, &patch.unwrap());
+        assert_eq!(
+            s,
+            json!({"types": {"a.b": {"live": true}, "c.d": {"live": true}}})
+        );
+        // An empty key is no key.
+        let empty = json!({"event": "removed", "id": ""});
+        assert_eq!(t.apply(&Inbound::Json(&empty)), None);
     }
 
     #[test]
