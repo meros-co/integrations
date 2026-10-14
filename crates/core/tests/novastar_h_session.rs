@@ -5,8 +5,9 @@
 //! define it: a POST of {"body", "sign", "pId", "timeStamp"} whose sign is
 //! Base64 of the hexadecimal MD5 of timeStamp + pId, and a timeStamp within a
 //! minute of its own clock (it answers status 11, incorrect device time,
-//! otherwise). It serves the initialisation status, a screen list, the
-//! current preset, and loads presets.
+//! otherwise). It serves the initialisation status, a screen list, a
+//! screen's brightness and the current preset, sets the brightness and loads
+//! presets.
 
 #![cfg(feature = "novastar-h")]
 
@@ -24,6 +25,7 @@ const P_ID: &str = "YmRj";
 
 struct Splicer {
     preset: Mutex<i64>,
+    brightness: Mutex<i64>,
     paths: Mutex<Vec<String>>,
 }
 
@@ -57,6 +59,12 @@ impl Splicer {
                 "body": {"deviceId": 0, "screens": [{"createTime": "1757509392.7567859", "name": "Screen 1", "screenId": 0}]}}),
             "/open/api/preset/readPlay" => json!({"status": 0, "msg": "Success", "sign": "",
                 "body": {"deviceId": 0, "presetId": *self.preset.lock().unwrap(), "screenId": 0}}),
+            "/open/api/screen/readDetail" => json!({"status": 0, "msg": "", "sign": "",
+                "body": {"screenId": 0, "brightness": *self.brightness.lock().unwrap(), "Freeze": {"enable": 0}, "Ftb": {"enable": 0}}}),
+            "/open/api/screen/writeBrightness" => {
+                *self.brightness.lock().unwrap() = body["brightness"].as_i64().unwrap_or(0);
+                json!({"status": 0, "msg": "Success", "sign": "", "body": ""})
+            }
             "/open/api/preset/play" => {
                 if body["screenId"] != json!(0) {
                     return json!({"status": 404, "msg": "The screen does not exist.", "body": ""});
@@ -124,6 +132,7 @@ async fn simulate() -> (u16, Arc<Splicer>) {
     let port = listener.local_addr().unwrap().port();
     let splicer = Arc::new(Splicer {
         preset: Mutex::new(-1),
+        brightness: Mutex::new(100),
         paths: Mutex::default(),
     });
     let s = splicer.clone();
@@ -179,8 +188,19 @@ async fn signed_requests_poll_the_screens_and_load_presets() {
             && s["device"]["software_version"] == "1.9.7.0.S1.T1"
             && s["screens"]["0"]["name"] == "Screen 1"
             && s["screens"]["0"]["preset"] == -1
+            && s["screens"]["0"]["brightness"] == 100
+            && s["screens"]["0"]["freeze"] == false
     })
     .await;
+
+    core.execute(
+        id,
+        "set_screen_brightness",
+        params(json!({"screen_id": 0, "brightness": 30})),
+    )
+    .await
+    .unwrap();
+    wait_for_state(&core, id, |s| s["screens"]["0"]["brightness"] == 30).await;
 
     assert_eq!(
         core.execute(
