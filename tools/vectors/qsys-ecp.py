@@ -58,7 +58,22 @@ telemetry(Q, "control-value", inbound='cv "gain1" "-12.0dB" -12 0.75\r\n',
 telemetry(Q, "control-value-dotted-name", inbound='cv "ent.xfade.gain" "-6.0dB" -6 0.8\r\n',
           expect_state={"controls": {"ent.xfade.gain": {"string": "-6.0dB", "value": -6.0, "position": 0.8}}})
 telemetry(Q, "vector-control", inbound='cvv "meter1" 2 "-20.5dB" "-30.0dB" 2 -20.5 -30 2 0.4 0.3\r\n',
-          expect_state={"controls": {"meter1": {"string": "-20.5dB", "value": -20.5}}})
+          expect_state={"controls": {"meter1": {
+              "string": "-20.5dB", "value": -20.5,
+              "strings": {"1": "-20.5dB", "2": "-30.0dB"}, "values": {"1": -20.5, "2": -30.0},
+              "positions": {"1": 0.4, "2": 0.3}}}})
+# The documents' four-element meter, with a dotted name.
+telemetry(Q, "vector-control-four", inbound='cvv "m.1" 4 "-100dB" "-6dB" "0dB" "-100dB" 4 -100 -6 0 -100 4 0 0.5 1 0\r\n',
+          expect_state={"controls": {"m.1": {
+              "string": "-100dB", "value": -100.0,
+              "strings": {"1": "-100dB", "2": "-6dB", "3": "0dB", "4": "-100dB"},
+              "values": {"1": -100.0, "2": -6.0, "3": 0.0, "4": -100.0},
+              "positions": {"1": 0.0, "2": 0.5, "3": 1.0, "4": 0.0}}}})
+# A choice list (metadata aspect 2), replaced whole.
+telemetry(Q, "choices", inbound='cmvv "slope" 2 4 "12 dB/Oct" "24 dB/Oct" "36 dB/Oct" "48 dB/Oct" 0 0\r\n',
+          state_before={"controls": {"slope": {"choices": {"5": "Gone"}}}},
+          expect_state={"controls": {"slope": {"choices": {
+              "1": "12 dB/Oct", "2": "24 dB/Oct", "3": "36 dB/Oct", "4": "48 dB/Oct"}}}})
 telemetry(Q, "metadata", inbound='cmv "mute1" 6 "true" 1 1\r\n',
           expect_state={"controls": {"mute1": {"disabled": True}}})
 telemetry(Q, "status", inbound='sr "Room 1" "a1b2c3" 1 0\r\n',

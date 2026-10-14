@@ -1460,7 +1460,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that quoting every control name (cg "gain1") is accepted for names without spaces. ([specs/qsys-ecp.yaml:116](specs/qsys-ecp.yaml#L116))
 - [ ] Check csvvr's form: the command reference shows it without the value count that csvv takes. ([specs/qsys-ecp.yaml:199](specs/qsys-ecp.yaml#L199))
 - [ ] Check what ssl answers on success and on an unknown bank. ([specs/qsys-ecp.yaml:330](specs/qsys-ecp.yaml#L330))
-- [ ] Check the cvv layout for a meter (count, strings, count, values, count, positions). ([specs/qsys-ecp.yaml:399](specs/qsys-ecp.yaml#L399))
+- [ ] Check the cvv layout for a meter (count, strings, count, values, count, positions). ([specs/qsys-ecp.yaml:403](specs/qsys-ecp.yaml#L403))
+- [ ] Check that a choice control's cmvv aspect 2 lists its choices as the strings, with zero values and positions, as the document's slope example shows, and note any vector control longer than 16 elements (its values and positions are not kept). ([specs/qsys-ecp.yaml:582](specs/qsys-ecp.yaml#L582))
 - [ ] Check that an sg every 30 s keeps the connection open while a scheduled change group is pushing. ([specs/qsys-ecp.yaml:385](specs/qsys-ecp.yaml#L385))
 
 ## renewedvision-pvp — Renewed Vision PVP

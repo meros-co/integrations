@@ -391,6 +391,10 @@ commands:
     returns: none
 
 state:
+  controls.*.strings.*:     { type: string, description: "A vector control's (cvv) CONTROL_STRING of each element, from 1 in ECP's order, with ECP's escapes as sent" }
+  controls.*.values.*:      { type: float, description: "A vector control's CONTROL_VALUE of each element, from 1, for vectors of up to 16 elements" }
+  controls.*.positions.*:   { type: float, description: "A vector control's CONTROL_POSITION of each element, 0 to 1, from 1, for vectors of up to 16 elements" }
+  controls.*.choices.*:     { type: string, description: "A control's choice list (metadata aspect 2, cmvv), from 1 in ECP's order, with ECP's escapes as sent" }
   controls.*.string:        { type: string, description: "A Named Control's CONTROL_STRING, its text form such as \"-12.0dB\", keyed by control name, with ECP's escapes (\\\" \\\\ \\r \\n) as sent. For a vector control (cvv), the first element: a Meter's RMS or current reading" }
   controls.*.value:         { type: float, description: "The control's CONTROL_VALUE, a 32-bit float in the control's own units; for a vector control, the first element" }
   controls.*.position:      { type: float, description: "The control's CONTROL_POSITION, 0 to 1 within its range (not reported for vector controls)" }
@@ -439,6 +443,148 @@ telemetry:
       state:
         "controls.{1:key}.string": "{2}"
         "controls.{1:key}.value": "{3}"
+    # Every element of a vector control: its strings (any count), then its
+    # values and positions. ECP gives the three lists the same COUNT, which a
+    # regex cannot compare, so a rule per count reads them, up to 16.
+    - match: '^cvv "([^"\\]+)" [1-9][0-9]* ((?:"(?:[^"\\]|\\.)*" ?)+)'
+      match_each: '"((?:[^"\\]|\\.)*)"'
+      match_each_in: 2
+      replace: "controls.{1:key}.strings"
+      state: { "controls.{1:key}.strings.{index:+1}": "{3}" }
+    - match: '^cvv "([^"\\]+)" 1 (?:"(?:[^"\\]|\\.)*" ?){1} ?1 (\S+) 1 (\S+)$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 1 (?:"(?:[^"\\]|\\.)*" ?){1} ?1 (\S+) 1 (\S+)$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 2 (?:"(?:[^"\\]|\\.)*" ?){2} ?2 (\S+(?: \S+){1}) 2 (\S+(?: \S+){1})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 2 (?:"(?:[^"\\]|\\.)*" ?){2} ?2 (\S+(?: \S+){1}) 2 (\S+(?: \S+){1})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 3 (?:"(?:[^"\\]|\\.)*" ?){3} ?3 (\S+(?: \S+){2}) 3 (\S+(?: \S+){2})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 3 (?:"(?:[^"\\]|\\.)*" ?){3} ?3 (\S+(?: \S+){2}) 3 (\S+(?: \S+){2})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 4 (?:"(?:[^"\\]|\\.)*" ?){4} ?4 (\S+(?: \S+){3}) 4 (\S+(?: \S+){3})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 4 (?:"(?:[^"\\]|\\.)*" ?){4} ?4 (\S+(?: \S+){3}) 4 (\S+(?: \S+){3})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 5 (?:"(?:[^"\\]|\\.)*" ?){5} ?5 (\S+(?: \S+){4}) 5 (\S+(?: \S+){4})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 5 (?:"(?:[^"\\]|\\.)*" ?){5} ?5 (\S+(?: \S+){4}) 5 (\S+(?: \S+){4})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 6 (?:"(?:[^"\\]|\\.)*" ?){6} ?6 (\S+(?: \S+){5}) 6 (\S+(?: \S+){5})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 6 (?:"(?:[^"\\]|\\.)*" ?){6} ?6 (\S+(?: \S+){5}) 6 (\S+(?: \S+){5})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 7 (?:"(?:[^"\\]|\\.)*" ?){7} ?7 (\S+(?: \S+){6}) 7 (\S+(?: \S+){6})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 7 (?:"(?:[^"\\]|\\.)*" ?){7} ?7 (\S+(?: \S+){6}) 7 (\S+(?: \S+){6})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 8 (?:"(?:[^"\\]|\\.)*" ?){8} ?8 (\S+(?: \S+){7}) 8 (\S+(?: \S+){7})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 8 (?:"(?:[^"\\]|\\.)*" ?){8} ?8 (\S+(?: \S+){7}) 8 (\S+(?: \S+){7})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 9 (?:"(?:[^"\\]|\\.)*" ?){9} ?9 (\S+(?: \S+){8}) 9 (\S+(?: \S+){8})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 9 (?:"(?:[^"\\]|\\.)*" ?){9} ?9 (\S+(?: \S+){8}) 9 (\S+(?: \S+){8})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 10 (?:"(?:[^"\\]|\\.)*" ?){10} ?10 (\S+(?: \S+){9}) 10 (\S+(?: \S+){9})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 10 (?:"(?:[^"\\]|\\.)*" ?){10} ?10 (\S+(?: \S+){9}) 10 (\S+(?: \S+){9})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 11 (?:"(?:[^"\\]|\\.)*" ?){11} ?11 (\S+(?: \S+){10}) 11 (\S+(?: \S+){10})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 11 (?:"(?:[^"\\]|\\.)*" ?){11} ?11 (\S+(?: \S+){10}) 11 (\S+(?: \S+){10})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 12 (?:"(?:[^"\\]|\\.)*" ?){12} ?12 (\S+(?: \S+){11}) 12 (\S+(?: \S+){11})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 12 (?:"(?:[^"\\]|\\.)*" ?){12} ?12 (\S+(?: \S+){11}) 12 (\S+(?: \S+){11})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 13 (?:"(?:[^"\\]|\\.)*" ?){13} ?13 (\S+(?: \S+){12}) 13 (\S+(?: \S+){12})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 13 (?:"(?:[^"\\]|\\.)*" ?){13} ?13 (\S+(?: \S+){12}) 13 (\S+(?: \S+){12})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 14 (?:"(?:[^"\\]|\\.)*" ?){14} ?14 (\S+(?: \S+){13}) 14 (\S+(?: \S+){13})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 14 (?:"(?:[^"\\]|\\.)*" ?){14} ?14 (\S+(?: \S+){13}) 14 (\S+(?: \S+){13})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 15 (?:"(?:[^"\\]|\\.)*" ?){15} ?15 (\S+(?: \S+){14}) 15 (\S+(?: \S+){14})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 15 (?:"(?:[^"\\]|\\.)*" ?){15} ?15 (\S+(?: \S+){14}) 15 (\S+(?: \S+){14})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 16 (?:"(?:[^"\\]|\\.)*" ?){16} ?16 (\S+(?: \S+){15}) 16 (\S+(?: \S+){15})$'
+      match_each: '(\S+)'
+      match_each_in: 2
+      state: { "controls.{1:key}.values.{index:+1}": "{4}" }
+    - match: '^cvv "([^"\\]+)" 16 (?:"(?:[^"\\]|\\.)*" ?){16} ?16 (\S+(?: \S+){15}) 16 (\S+(?: \S+){15})$'
+      match_each: '(\S+)'
+      match_each_in: 3
+      state: { "controls.{1:key}.positions.{index:+1}": "{4}" }
+    # cmvv CONTROL_ID 2 COUNT STRING... 0 0: a control's choice list.
+    - match: '^cmvv "([^"\\]+)" 2 [0-9]+ ((?:"(?:[^"\\]|\\.)*" ?)*)'
+      match_each: '"((?:[^"\\]|\\.)*)"'
+      match_each_in: 2
+      replace: "controls.{1:key}.choices"
+      state: { "controls.{1:key}.choices.{index:+1}": "{3}" }
     # cmv CONTROL_ID ASPECT STRING VALUE POSITION.
     - match: '^cmv "([^"\\]+)" 6 "(true|false)" \S+ \S+$'
       state: { "controls.{1:key}.disabled": "{2}" }
@@ -502,8 +648,10 @@ quirks:
     text: >
       Controls are keyed in state by their Named Control name, one key even when it holds dots; a name
       containing a quotation mark or a back slash is not tracked. Strings in state keep ECP's escapes.
-      Vector controls (cvv) report only their first string and first value; metadata choice lists (cmvv aspect 2)
-      are not kept.
+      Vector controls (cvv) keep every string (controls.*.strings), and every value and position
+      (controls.*.values, controls.*.positions) for vectors of up to 16 elements; string and value also keep
+      the first element, as for a single control. Metadata choice lists (cmvv aspect 2) are kept as
+      controls.*.choices, replaced whole by each report.
   - models: [all]
     severity: info
     text: >
