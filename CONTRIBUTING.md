@@ -119,6 +119,21 @@ core named after its spec id. Adding a spec means adding its feature:
 - run `python tools/devices_table.py` to add it to [DEVICES.md](DEVICES.md)
   (a native integration also needs its transport described in that script).
 
+### Tests bind loopback only
+
+Every test, simulator and binding test binds and listens on 127.0.0.1 (or
+another loopback address, or ::1), never on 0.0.0.0 or `::`: each test build
+is a new executable, and a firewall asks for network access whenever one
+binds a wildcard address. A session test builds its core with
+`common::core()` or `common::core_with(options)` (`crates/core/tests/common`),
+which bind it to 127.0.0.1; a unit test gives `Core::with_catalog` a loopback
+`bind_address`; a binding test passes `bind_address` 127.0.0.1; a sidecar test
+starts `serve --listen 127.0.0.1:0 --bind-address 127.0.0.1`. A device a test
+simulates listens on 127.0.0.x; ports a test picks are free on 127.0.0.1.
+`crates/core/tests/loopback_only.rs` fails on a test that does otherwise. The
+production default is unchanged: a core without `bind_address` binds every
+interface.
+
 ## Review checklist
 
 - [ ] `python tools/validate.py` passes
