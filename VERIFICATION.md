@@ -1311,6 +1311,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On models other than Move 4K and Link 4K, check whether the query endpoints answer, and whether replies come as name="value" lines or JSON. ([specs/ptzoptics.yaml:1789](specs/ptzoptics.yaml#L1789))
 - [ ] Check whether the camera decodes percent-encoded names, stream keys and SRT settings. ([specs/ptzoptics.yaml:1801](specs/ptzoptics.yaml#L1801))
 - [ ] Record the values of the streaming, standby and privacy flags and the formats of the network and camera information replies, which are not documented. ([specs/ptzoptics.yaml:1397](specs/ptzoptics.yaml#L1397))
+- [ ] Check whether any HTTP query reports pan, tilt, zoom or focus position, power, time of flight, display info, the tracking overlay or the tracking start location (the document shows none; trackstart in get_image_conf may be the start location). ([specs/ptzoptics.yaml:1820](specs/ptzoptics.yaml#L1820))
 
 ## qlab — QLab
 
