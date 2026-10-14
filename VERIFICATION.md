@@ -83,12 +83,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## allenheath-ahm — Allen & Heath AHM
 
-- [ ] Confirm the login encoding on the TLS port 51327: profile sent as one byte followed by the password's UTF-8 bytes, with no ", " separator or terminator, answered by AuthOK. ([specs/allenheath-ahm.yaml:227](specs/allenheath-ahm.yaml#L227))
-- [ ] Check whether the processor transmits changes other than preset recall, source selection and room combination (mutes, levels) when they are made on it. ([specs/allenheath-ahm.yaml:240](specs/allenheath-ahm.yaml#L240))
-- [ ] Confirm that -48 dB sent as 01 sets -48 dB, and that received levels read back as the expected dB. ([specs/allenheath-ahm.yaml:245](specs/allenheath-ahm.yaml#L245))
-- [ ] Check trim (-24 to +24 dB) and preamp gain (+5 to +60 dB) at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-ahm.yaml:248](specs/allenheath-ahm.yaml#L248))
-- [ ] Confirm the source selector get is answered when sent with N = 1, and that its reply is told apart from the message sent on a selection. ([specs/allenheath-ahm.yaml:253](specs/allenheath-ahm.yaml#L253))
-- [ ] Confirm room numbers in the room combiner message are 00-0F for rooms 1-16. ([specs/allenheath-ahm.yaml:257](specs/allenheath-ahm.yaml#L257))
+- [ ] Confirm the login encoding on the TLS port 51327: profile sent as one byte followed by the password's UTF-8 bytes, with no ", " separator or terminator, answered by AuthOK. ([specs/allenheath-ahm.yaml:243](specs/allenheath-ahm.yaml#L243))
+- [ ] Check whether the processor transmits changes other than preset recall, source selection and room combination (mutes, levels) when they are made on it. ([specs/allenheath-ahm.yaml:256](specs/allenheath-ahm.yaml#L256))
+- [ ] Confirm that -48 dB sent as 01 sets -48 dB, and that received levels read back as the expected dB. ([specs/allenheath-ahm.yaml:261](specs/allenheath-ahm.yaml#L261))
+- [ ] Check trim (-24 to +24 dB) and preamp gain (+5 to +60 dB) at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-ahm.yaml:264](specs/allenheath-ahm.yaml#L264))
+- [ ] Confirm the source selector get is answered when sent with N = 1, and that its reply is told apart from the message sent on a selection. ([specs/allenheath-ahm.yaml:269](specs/allenheath-ahm.yaml#L269))
+- [ ] Confirm room numbers in the room combiner message are 00-0F for rooms 1-16. ([specs/allenheath-ahm.yaml:273](specs/allenheath-ahm.yaml#L273))
+- [ ] Confirm that playback channel 02 plays on the stereo playback channel (V1.5), on firmware V1.5x and V1.6x. ([specs/allenheath-ahm.yaml:232](specs/allenheath-ahm.yaml#L232))
+- [ ] On firmware V1.60 or later, check that a name longer than 8 characters comes back whole in the name reply. ([specs/allenheath-ahm.yaml:344](specs/allenheath-ahm.yaml#L344))
 
 ## allenheath-cq — Allen & Heath CQ
 
@@ -97,25 +99,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## allenheath-dlive — Allen & Heath dLive / Avantis
 
-- [ ] Confirm the login encoding on the TLS ports 51327 and 51329: profile sent as one byte followed by the password's UTF-8 bytes, with no separator or terminator, answered by AuthOK. ([specs/allenheath-dlive.yaml:375](specs/allenheath-dlive.yaml#L375))
-- [ ] Check how the login profile number 00-1F maps to the console's user profiles. ([specs/allenheath-dlive.yaml:379](specs/allenheath-dlive.yaml#L379))
-- [ ] On Avantis, find the TLS port (not documented) and confirm tls works with it set. ([specs/allenheath-dlive.yaml:366](specs/allenheath-dlive.yaml#L366))
-- [ ] Check that a plain TCP connection to a console in Secure mode gets no answer (so the warning fires) rather than being dropped. ([specs/allenheath-dlive.yaml:368](specs/allenheath-dlive.yaml#L368))
-- [ ] Check whether the console transmits changes other than scene recall (mutes, faders, names) when made on the surface. ([specs/allenheath-dlive.yaml:397](specs/allenheath-dlive.yaml#L397))
-- [ ] Confirm fader and send level rounding: 6B reads 0 dB, +5 dB is 75, and on Avantis the hex column (not the decimal column) matches the console. ([specs/allenheath-dlive.yaml:404](specs/allenheath-dlive.yaml#L404))
-- [ ] Confirm preamp gain follows the p.9 table (+30 dB is 3A) and that the preamp get works with the socket number MP in place of CH, including DX sockets. ([specs/allenheath-dlive.yaml:412](specs/allenheath-dlive.yaml#L412))
-- [ ] Confirm that group and aux assignment off, sent as 3F, unassigns. ([specs/allenheath-dlive.yaml:419](specs/allenheath-dlive.yaml#L419))
-- [ ] Check whether dLive accepts the UFX chromatic scale (02), which is offered on Avantis only. ([specs/allenheath-dlive.yaml:426](specs/allenheath-dlive.yaml#L426))
-- [ ] Check how dLive handles a name longer than it allows (presumably truncated). ([specs/allenheath-dlive.yaml:431](specs/allenheath-dlive.yaml#L431))
+- [ ] Confirm the login encoding on the TLS ports 51327 and 51329: profile sent as one byte followed by the password's UTF-8 bytes, with no separator or terminator, answered by AuthOK. ([specs/allenheath-dlive.yaml:394](specs/allenheath-dlive.yaml#L394))
+- [ ] Check how the login profile number 00-1F maps to the console's user profiles. ([specs/allenheath-dlive.yaml:398](specs/allenheath-dlive.yaml#L398))
+- [ ] On Avantis, find the TLS port (not documented) and confirm tls works with it set. ([specs/allenheath-dlive.yaml:385](specs/allenheath-dlive.yaml#L385))
+- [ ] Check that a plain TCP connection to a console in Secure mode gets no answer (so the warning fires) rather than being dropped. ([specs/allenheath-dlive.yaml:387](specs/allenheath-dlive.yaml#L387))
+- [ ] Check whether the console transmits changes other than scene recall (mutes, faders, names) when made on the surface. ([specs/allenheath-dlive.yaml:416](specs/allenheath-dlive.yaml#L416))
+- [ ] Confirm fader and send level rounding: 6B reads 0 dB, +5 dB is 75, and on Avantis the hex column (not the decimal column) matches the console. ([specs/allenheath-dlive.yaml:423](specs/allenheath-dlive.yaml#L423))
+- [ ] Confirm preamp gain follows the p.9 table (+30 dB is 3A) and that the preamp get works with the socket number MP in place of CH, including DX sockets. ([specs/allenheath-dlive.yaml:431](specs/allenheath-dlive.yaml#L431))
+- [ ] Confirm that group and aux assignment off, sent as 3F, unassigns. ([specs/allenheath-dlive.yaml:438](specs/allenheath-dlive.yaml#L438))
+- [ ] Check whether dLive accepts the UFX chromatic scale (02), which is offered on Avantis only. ([specs/allenheath-dlive.yaml:445](specs/allenheath-dlive.yaml#L445))
+- [ ] Check how dLive handles a name longer than it allows (presumably truncated). ([specs/allenheath-dlive.yaml:450](specs/allenheath-dlive.yaml#L450))
+- [ ] On a Surface, confirm Go, Next and Previous respond to their assigned Control Change sent on the base MIDI channel N, which CC numbers are reserved, and whether the Surface transmits the CC when Go is pressed. ([specs/allenheath-dlive.yaml:477](specs/allenheath-dlive.yaml#L477))
 - [ ] Opened for commands only, check that the console answers the liveness probe when nothing else has been sent, since that answer is what reports it connected. ([crates/core/src/modules/allenheath.rs:41](crates/core/src/modules/allenheath.rs#L41))
 
 ## allenheath-qu — Allen & Heath Qu
 
-- [ ] Confirm the mixer sends Active Sensing (FE) about every 300 ms and keeps the connection with the core's FE every second. ([specs/allenheath-qu.yaml:274](specs/allenheath-qu.yaml#L274))
-- [ ] Check pan and trim at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-qu.yaml:288](specs/allenheath-qu.yaml#L288))
-- [ ] Confirm the DCA assign values address DCAs 1-4 (the document repeats the mute group label). ([specs/allenheath-qu.yaml:295](specs/allenheath-qu.yaml#L295))
-- [ ] Confirm stereo mixes, groups and matrices answer on their odd number and the LR destination is index 07. ([specs/allenheath-qu.yaml:294](specs/allenheath-qu.yaml#L294))
-- [ ] Confirm remote shutdown works when sent on MIDI channel 1 (B0) whatever the mixer's channel. ([specs/allenheath-qu.yaml:301](specs/allenheath-qu.yaml#L301))
+- [ ] Confirm the mixer sends Active Sensing (FE) about every 300 ms and keeps the connection with the core's FE every second. ([specs/allenheath-qu.yaml:278](specs/allenheath-qu.yaml#L278))
+- [ ] Check pan and trim at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-qu.yaml:292](specs/allenheath-qu.yaml#L292))
+- [ ] Confirm the DCA assign values address DCAs 1-4 (the document repeats the mute group label). ([specs/allenheath-qu.yaml:299](specs/allenheath-qu.yaml#L299))
+- [ ] Confirm stereo mixes, groups and matrices answer on their odd number and the LR destination is index 07. ([specs/allenheath-qu.yaml:298](specs/allenheath-qu.yaml#L298))
+- [ ] Confirm remote shutdown works when sent on MIDI channel 1 (B0) whatever the mixer's channel. ([specs/allenheath-qu.yaml:305](specs/allenheath-qu.yaml#L305))
+- [ ] With meters on, record how often the mixer sends meter data, whether it stops when the connection closes, and that each value is big-endian. ([specs/allenheath-qu.yaml:323](specs/allenheath-qu.yaml#L323))
+- [ ] Check the meter block order on each model: that the first column of the p.12 table is the Qu-16's, and the Qu-24's 180 unused meters and two group blocks against the Qu-32's 20 unused meters, inputs 25-32 and four group blocks. ([specs/allenheath-qu.yaml:324](specs/allenheath-qu.yaml#L324))
 
 ## allenheath-sq — Allen & Heath SQ
 
@@ -306,21 +311,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## behringer-xair — Behringer X AIR
 
-- [ ] Confirm the mute sense of mix/on (0 muted, 1 passing audio), which is taken from the X32. ([specs/behringer-xair.yaml:4755](specs/behringer-xair.yaml#L4755))
-- [ ] Check whether the mixer echoes a set back to the client that sent it. ([specs/behringer-xair.yaml:4779](specs/behringer-xair.yaml#L4779))
-- [ ] Confirm the snapshot node is /-snap/ (not /snap/ as the manufacturer document writes it), and whether /-snap/load replies. ([specs/behringer-xair.yaml:4772](specs/behringer-xair.yaml#L4772))
-- [ ] Confirm the fader taper is the X32's four segments (0.75 = 0 dB), which the X AIR document does not state. ([specs/behringer-xair.yaml:4820](specs/behringer-xair.yaml#L4820))
-- [ ] Confirm headamp gain range is -12 to +60 dB (the community list says -12 to +20 dB). ([specs/behringer-xair.yaml:4837](specs/behringer-xair.yaml#L4837))
-- [ ] Find how line inputs and the stereo aux input are addressed for gain, which is not documented. ([specs/behringer-xair.yaml:4834](specs/behringer-xair.yaml#L4834))
-- [ ] Find which /ch/NN/config/insrc value is OFF, if any, within 0-15. ([specs/behringer-xair.yaml:4862](specs/behringer-xair.yaml#L4862))
-- [ ] Find the order of gate modes 0-4 (GATE, EXP2, EXP3, EXP4, DUCK or the X32's EXP2, EXP3, EXP4, GATE, DUCK). ([specs/behringer-xair.yaml:4870](specs/behringer-xair.yaml#L4870))
-- [ ] Confirm the copy-error resolutions: bus pan and insert ranges, bus compressor filter type 0-8, /bus/N/grp, USB routing 1-18. ([specs/behringer-xair.yaml:4878](specs/behringer-xair.yaml#L4878))
-- [ ] Check the main LR insert address, FX return EQ on/off, the GEQ indexing and whether FX parameters are int or float, which are not covered because sources disagree. ([specs/behringer-xair.yaml:4890](specs/behringer-xair.yaml#L4890))
-- [ ] Check the order of /xinfo's reply strings. ([specs/behringer-xair.yaml:4913](specs/behringer-xair.yaml#L4913))
-- [ ] Check whether /-action/setclock is ignored on XR18, X18 and MR18. ([specs/behringer-xair.yaml:4856](specs/behringer-xair.yaml#L4856))
-- [ ] Check the low-cut frequency mapping of 0-1 (the community list gives 20 to 200 Hz). ([specs/behringer-xair.yaml:2882](specs/behringer-xair.yaml#L2882))
-- [ ] Check the automix weight range (-24 to +24 or -12 to +12). ([specs/behringer-xair.yaml:2938](specs/behringer-xair.yaml#L2938))
-- [ ] Check whether the mixer answers /node and the / text set as the X32 does, which the manufacturer document does not describe and this spec does not offer. ([specs/behringer-xair.yaml:4920](specs/behringer-xair.yaml#L4920))
+- [ ] Confirm the mute sense of mix/on (0 muted, 1 passing audio), which is taken from the X32. ([specs/behringer-xair.yaml:4892](specs/behringer-xair.yaml#L4892))
+- [ ] Check whether the mixer echoes a set back to the client that sent it. ([specs/behringer-xair.yaml:4916](specs/behringer-xair.yaml#L4916))
+- [ ] Confirm the snapshot node is /-snap/ (not /snap/ as the manufacturer document writes it), and whether /-snap/load replies. ([specs/behringer-xair.yaml:4909](specs/behringer-xair.yaml#L4909))
+- [ ] Confirm the fader taper is the X32's four segments (0.75 = 0 dB), which the X AIR document does not state. ([specs/behringer-xair.yaml:4957](specs/behringer-xair.yaml#L4957))
+- [ ] Confirm headamp gain range is -12 to +60 dB (the community list says -12 to +20 dB). ([specs/behringer-xair.yaml:4974](specs/behringer-xair.yaml#L4974))
+- [ ] Find how line inputs and the stereo aux input are addressed for gain, which is not documented. ([specs/behringer-xair.yaml:4971](specs/behringer-xair.yaml#L4971))
+- [ ] Find which /ch/NN/config/insrc value is OFF, if any, within 0-15. ([specs/behringer-xair.yaml:4999](specs/behringer-xair.yaml#L4999))
+- [ ] Find the order of gate modes 0-4 (GATE, EXP2, EXP3, EXP4, DUCK or the X32's EXP2, EXP3, EXP4, GATE, DUCK). ([specs/behringer-xair.yaml:5007](specs/behringer-xair.yaml#L5007))
+- [ ] Confirm the copy-error resolutions: bus pan and insert ranges, bus compressor filter type 0-8, /bus/N/grp, USB routing 1-18. ([specs/behringer-xair.yaml:5015](specs/behringer-xair.yaml#L5015))
+- [ ] Confirm the main LR insert is /lr/insert/on and /lr/insert/fxslot (0-8), as on the buses, not /lr/dyn/insert/... as the community list prints it. ([specs/behringer-xair.yaml:5029](specs/behringer-xair.yaml#L5029))
+- [ ] Confirm FX return EQ on/off is /rtn/N/eq/on (the community list gives eq/on for the aux return only). ([specs/behringer-xair.yaml:5031](specs/behringer-xair.yaml#L5031))
+- [ ] Confirm the bus and main graphic EQ bands are /bus/N/geq/<frequency> and /lr/geq/<frequency> (20, 25, 31.5 ... 1k25 ... 20k), not indexed /geq/0-30, that they are 0-1 floats over -15 to +15 dB, and whether TEQ mode uses the same bands. ([specs/behringer-xair.yaml:5034](specs/behringer-xair.yaml#L5034))
+- [ ] Find which effect parameters take a float and which an int (the community list types every /fx/N/par/NN as int; this spec follows the X32's per-parameter types), and how many parameters a slot has. ([specs/behringer-xair.yaml:5041](specs/behringer-xair.yaml#L5041))
+- [ ] Check the order of /xinfo's reply strings. ([specs/behringer-xair.yaml:5065](specs/behringer-xair.yaml#L5065))
+- [ ] Check whether /-action/setclock is ignored on XR18, X18 and MR18. ([specs/behringer-xair.yaml:4993](specs/behringer-xair.yaml#L4993))
+- [ ] Check the low-cut frequency mapping of 0-1 (the community list gives 20 to 200 Hz). ([specs/behringer-xair.yaml:2970](specs/behringer-xair.yaml#L2970))
+- [ ] Check the automix weight range (-24 to +24 or -12 to +12). ([specs/behringer-xair.yaml:3026](specs/behringer-xair.yaml#L3026))
+- [ ] Check whether the mixer answers /node and the / text set as the X32 does, which the manufacturer document does not describe and this spec does not offer. ([specs/behringer-xair.yaml:5072](specs/behringer-xair.yaml#L5072))
 
 ## biamp-tesira — Biamp Tesira
 
@@ -706,17 +714,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## digico-sd — DiGiCo SD and Quantum consoles
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
-- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:4033](specs/digico-sd.yaml#L4033))
-- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4041](specs/digico-sd.yaml#L4041))
-- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:4050](specs/digico-sd.yaml#L4050))
-- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:4058](specs/digico-sd.yaml#L4058))
-- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:3760](specs/digico-sd.yaml#L3760))
-- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:833](specs/digico-sd.yaml#L833))
-- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:917](specs/digico-sd.yaml#L917))
-- [ ] Confirm /sd/Input_Channels/N/Channel_Input/main/alt_in is the address (the table's row is garbled) and that 1 selects the alternate input and 0 the main input. ([specs/digico-sd.yaml:3788](specs/digico-sd.yaml#L3788))
-- [ ] Check what CGs_level and CGs_mute do on input channels and aux, group and matrix outputs (taken as the level and mute a strip takes from its control groups), and what a CGs_level position means in dB. ([specs/digico-sd.yaml:3800](specs/digico-sd.yaml#L3800))
-- [ ] Confirm Matrix_Inputs/N/Matrix_Send/M sends matrix input N to matrix output M, both numbered from 1, and how many matrix inputs each console has. ([specs/digico-sd.yaml:3896](specs/digico-sd.yaml#L3896))
-- [ ] Find what a multi is on current SD and Quantum software, how many exist, and whether Multis/N solo, fader, mute and name act on them as the list's rows read. ([specs/digico-sd.yaml:3926](specs/digico-sd.yaml#L3926))
+- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:4037](specs/digico-sd.yaml#L4037))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4045](specs/digico-sd.yaml#L4045))
+- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:4054](specs/digico-sd.yaml#L4054))
+- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:4062](specs/digico-sd.yaml#L4062))
+- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:3764](specs/digico-sd.yaml#L3764))
+- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:837](specs/digico-sd.yaml#L837))
+- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:921](specs/digico-sd.yaml#L921))
+- [ ] Confirm /sd/Input_Channels/N/Channel_Input/main/alt_in is the address (the table's row is garbled) and that 1 selects the alternate input and 0 the main input. ([specs/digico-sd.yaml:3792](specs/digico-sd.yaml#L3792))
+- [ ] Check what CGs_level and CGs_mute do on input channels and aux, group and matrix outputs (taken as the level and mute a strip takes from its control groups), and what a CGs_level position means in dB. ([specs/digico-sd.yaml:3804](specs/digico-sd.yaml#L3804))
+- [ ] Confirm Matrix_Inputs/N/Matrix_Send/M sends matrix input N to matrix output M, both numbered from 1, and how many matrix inputs each console has. ([specs/digico-sd.yaml:3900](specs/digico-sd.yaml#L3900))
+- [ ] Find what a multi is on current SD and Quantum software, how many exist, and whether Multis/N solo, fader, mute and name act on them as the list's rows read. ([specs/digico-sd.yaml:3930](specs/digico-sd.yaml#L3930))
 
 ## disguise — disguise Designer
 
@@ -1913,20 +1921,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## yamaha-dm3 — Yamaha DM3
 
-- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm3.yaml:4432](specs/yamaha-dm3.yaml#L4432))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm3.yaml:4474](specs/yamaha-dm3.yaml#L4474))
-- [ ] Record the sscurrent_ex reply form, which is matched leniently, and whether the query for the inactive scene list is answered with an error. ([specs/yamaha-dm3.yaml:4505](specs/yamaha-dm3.yaml#L4505))
-- [ ] Check how stereo input and FX return sends to mix, FX and matrix choose their destination (no Y dimension documented). ([specs/yamaha-dm3.yaml:4517](specs/yamaha-dm3.yaml#L4517))
-- [ ] Check what send pre/post 0 and 1 mean. ([specs/yamaha-dm3.yaml:4520](specs/yamaha-dm3.yaml#L4520))
-- [ ] Confirm local head-amp gain is whole dB 0 to 64. ([specs/yamaha-dm3.yaml:4521](specs/yamaha-dm3.yaml#L4521))
+- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm3.yaml:7822](specs/yamaha-dm3.yaml#L7822))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm3.yaml:7864](specs/yamaha-dm3.yaml#L7864))
+- [ ] Record the sscurrent_ex reply form, which is matched leniently, and whether the query for the inactive scene list is answered with an error. ([specs/yamaha-dm3.yaml:7895](specs/yamaha-dm3.yaml#L7895))
+- [ ] Confirm that the stereo input and FX return sends take the destination bus as Y (6 mixes, 2 FX, 2 matrices), as the console's parameter list gives it but Yamaha's document does not. ([specs/yamaha-dm3.yaml:7909](specs/yamaha-dm3.yaml#L7909))
+- [ ] Check what send pre/post 0 and 1 mean. ([specs/yamaha-dm3.yaml:7910](specs/yamaha-dm3.yaml#L7910))
+- [ ] Confirm local head-amp gain is whole dB 0 to 64. ([specs/yamaha-dm3.yaml:7911](specs/yamaha-dm3.yaml#L7911))
+- [ ] Confirm on a console that the mix and matrix HPF/On, LPF/On, PEQ/On and PEQ/Band/Freq, Gain, Q and Type (4 bands) answer as the captured parameter list gives them, and on which firmware. ([specs/yamaha-dm3.yaml:7917](specs/yamaha-dm3.yaml#L7917))
+- [ ] List the text values the console takes for PEQ band type (7, Bell the default), mix bus type (9, VARI), cue mode (6, MIX) and the input and output cue points (PFL, AFL). ([specs/yamaha-dm3.yaml:7926](specs/yamaha-dm3.yaml#L7926))
+- [ ] Find what mix, input, stereo input, FX return and stereo pan mode 0 and 1 mean, and the meaning of the IO:Current/Dev SystemStatus (0-11) and SyncStatus (0-12) codes. ([specs/yamaha-dm3.yaml:7926](specs/yamaha-dm3.yaml#L7926))
+- [ ] Confirm the cue switches, monitor on, level, cue interruption, mono and source selections answer as the captured parameter list gives them. ([specs/yamaha-dm3.yaml:7920](specs/yamaha-dm3.yaml#L7920))
+- [ ] Check on current firmware whether input channel EQ, HPF, dynamics, DCA assignment or effect parameters have RCP addresses (none appear in Yamaha's document or the captured parameter list). ([specs/yamaha-dm3.yaml:7933](specs/yamaha-dm3.yaml#L7933))
 
 ## yamaha-dm7 — Yamaha DM7
 
-- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm7.yaml:7575](specs/yamaha-dm7.yaml#L7575))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm7.yaml:7618](specs/yamaha-dm7.yaml#L7618))
-- [ ] Record the sscurrentt_ex reply form, which is matched leniently, and check whether ssrecallt_ex and sscurrentt_ex need scpmode sstype "text" first (the Companion module sends it). ([specs/yamaha-dm7.yaml:7650](specs/yamaha-dm7.yaml#L7650))
-- [ ] Check what send pre/post 0 and 1 mean (RIVAGE gives 0 Post, 1 Pre). ([specs/yamaha-dm7.yaml:7662](specs/yamaha-dm7.yaml#L7662))
-- [ ] Check the PEQ band gain scaling (10 or 100). ([specs/yamaha-dm7.yaml:7664](specs/yamaha-dm7.yaml#L7664))
+- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm7.yaml:9055](specs/yamaha-dm7.yaml#L9055))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm7.yaml:9098](specs/yamaha-dm7.yaml#L9098))
+- [ ] Record the sscurrentt_ex reply form, which is matched leniently, and check whether ssrecallt_ex and sscurrentt_ex need scpmode sstype "text" first (the Companion module sends it). ([specs/yamaha-dm7.yaml:9132](specs/yamaha-dm7.yaml#L9132))
+- [ ] Check what send pre/post 0 and 1 mean (RIVAGE gives 0 Post, 1 Pre). ([specs/yamaha-dm7.yaml:9143](specs/yamaha-dm7.yaml#L9143))
+- [ ] Check the PEQ band gain scaling (10 or 100). ([specs/yamaha-dm7.yaml:9143](specs/yamaha-dm7.yaml#L9143))
+- [ ] Confirm on current DM7 firmware (V2.0 or later) that no dynamics, insert, delay or effect parameter has an RCP address, and whether the RIVAGE PM addresses (MIXER:Current/InCh/Dyna1/...) are answered. ([specs/yamaha-dm7.yaml:9152](specs/yamaha-dm7.yaml#L9152))
+- [ ] Confirm MIXER:Current/Mix/PanMode, Mix/BusType, Cue/ActiveCue, InCh/PanMode and St/PanMode answer as the captured parameter list gives them, and name the bus types and pan modes. ([specs/yamaha-dm7.yaml:9159](specs/yamaha-dm7.yaml#L9159))
 
 ## yamaha-dme7 — Yamaha DME7
 

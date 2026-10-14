@@ -53,6 +53,14 @@ source:
       0 (paramFuncs.js parseOptions subtracts 1), reply OK/OKm and push NOTIFY set, answer devinfo productname/devicename
       and devstatus runmode (variables.js), and push NOTIFY sscurrent_ex (index.js). Nothing in this spec
       rests on it alone except where a quirk says so.
+  - title: companion-module-yamaha-rcp, schemas/DM7 Parameters-2.txt (master branch; MIT licence)
+    author: Andrew Broughton (community, not Yamaha)
+    url: https://github.com/bitfocus/companion-module-yamaha-rcp/blob/master/schemas/DM7%20Parameters-2.txt
+    note: >-
+      A DM7's own answers to the RCP parameter-list query (prminfo and mtrinfo), recorded by the module's
+      author; data, not code, firmware not stated. Used only for what Yamaha's DM7 document leaves out:
+      MIXER:Current/Mix/PanMode and Mix/BusType, Cue/ActiveCue (read only, X = cue A/B) and InCh/PanMode
+      and St/PanMode (read only), and for the absence of any dynamics or insert address.
 
 transport:
   type: line-tcp
@@ -474,6 +482,13 @@ models:
       - get_device_name
       - get_run_mode
       - set_keepalive
+      - set_mix_pan_mode
+      - get_mix_pan_mode
+      - set_mix_bus_type
+      - get_mix_bus_type
+      - get_cue_active
+      - get_input_pan_mode
+      - get_stereo_pan_mode
     verification: none
     notes: 120 input channels, 48 mix, 12 matrix, 4 stereo channels, 24 DCA, 12 mute groups (p.19).
   - id: dm7-compact
@@ -881,6 +896,13 @@ models:
       - get_device_name
       - get_run_mode
       - set_keepalive
+      - set_mix_pan_mode
+      - get_mix_pan_mode
+      - set_mix_bus_type
+      - get_mix_bus_type
+      - get_cue_active
+      - get_input_pan_mode
+      - get_stereo_pan_mode
     verification: none
     notes: 72 input channels; other counts as the DM7 (p.19).
 
@@ -8906,6 +8928,125 @@ commands:
       matches: ^OK scpmode keepalive
     returns: ack
 
+  set_mix_pan_mode:
+    summary: Set the mix channel pan mode (MIXER:Current/Mix/PanMode; 0 or 1, unnamed)
+    params:
+      mix:
+        type: int
+        min: 1
+        max: 48
+        required: true
+        label: Mix
+        description: Mix channel, numbered from 1 as on the console.
+      mode:
+        type: int
+        min: 0
+        max: 1
+        required: true
+        label: Pan mode
+        description: The mix's pan mode as the console numbers it, 0 or 1; the parameter list does not name the two
+          modes.
+    send: set MIXER:Current/Mix/PanMode {mix:-1} 0 {mode}
+    expect:
+      matches: '^OKm? set MIXER:Current/Mix/PanMode \d+ \d+ '
+    returns: ack
+  get_mix_pan_mode:
+    summary: Read the mix channel pan mode (MIXER:Current/Mix/PanMode); returns the raw value (0 or 1, unnamed)
+    params:
+      mix:
+        type: int
+        min: 1
+        max: 48
+        required: true
+        label: Mix
+        description: Mix channel, numbered from 1 as on the console.
+    send: get MIXER:Current/Mix/PanMode {mix:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/Mix/PanMode \d+ \d+ (-?\d+)
+    returns: value
+  set_mix_bus_type:
+    summary: Set the mix bus type (MIXER:Current/Mix/BusType; the console's type name, such as VARI)
+    params:
+      mix:
+        type: int
+        min: 1
+        max: 48
+        required: true
+        label: Mix
+        description: Mix channel, numbered from 1 as on the console.
+      value:
+        type: string
+        max_length: 16
+        pattern: ^[A-Za-z0-9 ._+-]{1,16}$
+        required: true
+        label: Bus type
+        description: The mix bus type by the console's own name for it, such as VARI (the default); the parameter
+          list gives nine types without naming the others.
+    send: set MIXER:Current/Mix/BusType {mix:-1} 0 {value:json}
+    expect:
+      matches: '^OKm? set MIXER:Current/Mix/BusType \d+ \d+ '
+    returns: ack
+  get_mix_bus_type:
+    summary: Read the mix bus type (MIXER:Current/Mix/BusType); returns the raw value (the console's type name, such
+      as VARI)
+    params:
+      mix:
+        type: int
+        min: 1
+        max: 48
+        required: true
+        label: Mix
+        description: Mix channel, numbered from 1 as on the console.
+    send: get MIXER:Current/Mix/BusType {mix:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/Mix/BusType \d+ \d+ "((?:[^"\\]|\\.)*)"
+    returns: value
+  get_cue_active:
+    summary: Read the active cue of cue A/B (read only) (MIXER:Current/Cue/ActiveCue); returns the raw value (the
+      console's name for the active cue, NONE when none)
+    params:
+      cue:
+        type: int
+        min: 1
+        max: 2
+        required: true
+        label: Cue
+        description: Cue A (1) or cue B (2).
+    send: get MIXER:Current/Cue/ActiveCue {cue:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/Cue/ActiveCue \d+ \d+ "((?:[^"\\]|\\.)*)"
+    returns: value
+  get_input_pan_mode:
+    summary: Read the input channel pan mode (read only) (MIXER:Current/InCh/PanMode); returns the raw value (0 or
+      1, unnamed)
+    params:
+      channel:
+        type: int
+        min: 1
+        max: 120
+        required: true
+        label: Channel
+        description: Input channel, numbered from 1 as on the console.
+    send: get MIXER:Current/InCh/PanMode {channel:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/InCh/PanMode \d+ \d+ (-?\d+)
+    returns: value
+  get_stereo_pan_mode:
+    summary: Read the stereo channel pan mode (read only) (MIXER:Current/St/PanMode); returns the raw value (0 or
+      1, unnamed)
+    params:
+      stereo:
+        type: int
+        min: 1
+        max: 4
+        required: true
+        label: Stereo
+        description: Stereo channel, numbered from 1 as on the console.
+    send: get MIXER:Current/St/PanMode {stereo:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/St/PanMode \d+ \d+ (-?\d+)
+    returns: value
+
 quirks:
   - models:
       - all
@@ -9004,6 +9145,20 @@ quirks:
       scaling 100, +/-18 dB); input PEQ has 4 bands and output PEQ 8 (p.19). Monitor and cue output levels
       range -inf to 0 dB. The document's known issue on DM7 V1.60: surround monitor sources Define 1-8
       cannot be set externally and are reported as "Define" (p.14).
+  - models:
+      - all
+    severity: info
+    text: >-
+      API limit, as far as Yamaha's documents and the console show: the DM7 OSC Specifications V1.1.0
+      (the latest Yamaha publishes, as listed on its DM7 downloads page) list no dynamics (Dynamics 1 and
+      2), insert, delay or effect parameters, only the channel-link switches for them
+      (InputChLink/OutputChLink LinkParams Dyna1, Dyna2, Insert, Delay), and a DM7's own answer to the
+      RCP parameter-list query (prminfo, recorded in the MIT-licensed Companion module's schemas/DM7
+      Parameters-2.txt) has none either. Yamaha's RIVAGE PM OSC document does give dynamics and insert
+      addresses, but for the RIVAGE PM consoles; no Yamaha document says the DM7 shares them, so they are
+      not borrowed. The mix pan mode and bus type, the active cue and the input and stereo pan modes (read
+      only) come from that parameter list, not from Yamaha's document; the names behind the bus type text
+      (VARI the default) and the pan modes' meaning are not given.
 
 state:
   inputs.*.fader_level:
@@ -9736,6 +9891,23 @@ state:
   device.run_mode:
     type: string
     description: 'Run mode: normal, emergency, booting or update (devstatus runmode)'
+
+  mixes.*.pan_mode:
+    type: int
+    description: 'Mix channel pan mode (MIXER:Current/Mix/PanMode): 0 or 1, unnamed'
+  mixes.*.bus_type:
+    type: string
+    description: 'Mix bus type (MIXER:Current/Mix/BusType): the console''s type name, such as VARI'
+  cue.*.active:
+    type: string
+    description: 'Active cue of cue A/B (read only) (MIXER:Current/Cue/ActiveCue): the console''s name for the active
+      cue, NONE when none'
+  inputs.*.pan_mode:
+    type: int
+    description: 'Input channel pan mode (read only) (MIXER:Current/InCh/PanMode): 0 or 1, unnamed'
+  stereo.*.pan_mode:
+    type: int
+    description: 'Stereo channel pan mode (read only) (MIXER:Current/St/PanMode): 0 or 1, unnamed'
 
 telemetry:
   poll:
@@ -11567,3 +11739,19 @@ telemetry:
     - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/Cue/Out/Level (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
       state:
         cue.{1:+1}.output_level: '{3}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/Mix/PanMode (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        mixes.{1:+1}.pan_mode: '{3}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/Mix/BusType (\d+) (\d+) "((?:[^"\\]|\\.)*)"(?: .*)?$'
+      state:
+        mixes.{1:+1}.bus_type: '{3}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/Cue/ActiveCue (\d+) (\d+) "((?:[^"\\]|\\.)*)"(?: .*)?$'
+      state:
+        cue.{1:+1}.active: '{3}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/InCh/PanMode (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        inputs.{1:+1}.pan_mode: '{3}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/St/PanMode (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        stereo.{1:+1}.pan_mode: '{3}'
+

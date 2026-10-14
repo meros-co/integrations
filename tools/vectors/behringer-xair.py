@@ -210,6 +210,19 @@ binary(XA, "get_fx_type", {"slot": 4}, osc("/fx/4/type"),
        device_reply_hex=hexs(osc("/fx/4/type", ("i", 3))), expect_result=_val(3))
 binary(XA, "set_fx_insert", {"slot": 2, "enabled": True}, osc("/fx/2/insert", ("i", 1)))
 binary(XA, "get_fx_parameter", {"slot": 3, "parameter": 1}, osc("/fx/3/par/01"))
+# Effect parameters: a 0-1 float for a continuous one, an int for a switch or
+# enumeration (protocol document p.2's type rules; the X32's per-parameter types).
+binary(XA, "set_fx_parameter", {"slot": 4, "parameter": 64, "value": 0.25}, osc("/fx/4/par/64", ("f", 0.25)),
+       expect_result=UNVERIFIED)
+binary(XA, "set_fx_parameter_int", {"slot": 1, "parameter": 7, "value": 3}, osc("/fx/1/par/07", ("i", 3)))
+
+# FX return EQ on/off, the main LR insert, and the bus and main 31-band GEQ
+# (bands named by frequency, 0-1 over -15 to +15 dB).
+binary(XA, "set_fx_return_eq_on", {"fx_return": 3, "enabled": False}, osc("/rtn/3/eq/on", ("i", 0)))
+binary(XA, "set_main_insert_on", {"enabled": True}, osc("/lr/insert/on", ("i", 1)))
+binary(XA, "set_main_insert_select", {"insert": 4}, osc("/lr/insert/fxslot", ("i", 4)))
+binary(XA, "set_bus_geq_band", {"bus": 6, "band": "1k25", "gain": 0.5}, osc("/bus/6/geq/1k25", ("f", 0.5)))
+binary(XA, "set_main_geq_band", {"band": "31.5", "gain": 1.0}, osc("/lr/geq/31.5", ("f", 1.0)))
 
 # Routing.
 binary(XA, "set_aux_out_source", {"output": 6, "source": 55}, osc("/routing/aux/06/src", ("i", 55)))
@@ -405,6 +418,15 @@ _t("headamp-phantom", "/headamp/16/phantom", ("i", 1), {"headamps": {"16": {"pha
 _t("fx-type", "/fx/2/type", ("i", 11), {"fx": {"2": {"type": 11}}})
 _t("fx-insert", "/fx/2/insert", ("i", 0), {"fx": {"2": {"insert": False}}})
 _t("fx-parameter", "/fx/2/par/05", ("f", 0.5), {"fx": {"2": {"parameters": {"5": 0.5}}}})
+_t("fx-parameter-int", "/fx/1/par/07", ("i", 3), {"fx": {"1": {"parameters": {"7": 3.0}}}})
+_t("fx-return-eq-on", "/rtn/2/eq/on", ("i", 1), {"fx_returns": {"2": {"eq_on": True}}})
+_t("main-insert-on", "/lr/insert/on", ("i", 1), {"main": {"insert_on": True}})
+_t("main-insert-select", "/lr/insert/fxslot", ("i", 8), {"main": {"insert_select": 8}})
+_t("bus-geq-band", "/bus/2/geq/20k", ("f", 0.75), {"buses": {"2": {"geq": {"20k": 0.75}}}})
+_t("main-geq-band", "/lr/geq/3k15", ("f", 0.25), {"main": {"geq": {"3k15": 0.25}}})
+# A band name holding a dot is one state key, and is not an address the
+# generic params rules take.
+_t("main-geq-band-dotted", "/lr/geq/31.5", ("f", 0.5), {"main": {"geq": {"31.5": 0.5}}})
 _t("routing-aux-source", "/routing/aux/03/src", ("i", 26), {"routing": {"aux": {"3": {"source": 26}}}})
 _t("routing-aux-tap", "/routing/aux/03/pos", ("i", 8), {"routing": {"aux": {"3": {"tap": 8}}}})
 _t("routing-main", "/routing/main/01/src", ("i", 0), {"routing": {"main_source": 0}})

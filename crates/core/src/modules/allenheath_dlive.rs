@@ -187,6 +187,35 @@ pub(crate) struct Dlive {
     base: u8,
     types: &'static [ChType],
     sync_preamps: bool,
+    /// The Surface's user-defined Go / Next / Previous Control Changes
+    /// (controller, value), from the settings; `None` while unset.
+    cue_controls: [Option<(u8, u8)>; 3],
+}
+
+/// The Go / Next / Previous commands, which are also their settings' prefix
+/// (p.5).
+const CUE_CONTROLS: [&str; 3] = ["cue_go", "cue_next", "cue_previous"];
+
+/// A user-defined CC from `<prefix>_controller` and `<prefix>_value`: both
+/// set, each 0-127, or neither.
+fn cue_control(settings: &Params, prefix: &str) -> Result<Option<(u8, u8)>, String> {
+    let get = |k: &str| {
+        settings
+            .get(&format!("{prefix}_{k}"))
+            .and_then(Value::as_i64)
+    };
+    match (get("controller"), get("value")) {
+        (None, None) => Ok(None),
+        (Some(c), Some(v)) if (0..=127).contains(&c) && (0..=127).contains(&v) => {
+            Ok(Some((c as u8, v as u8)))
+        }
+        (Some(_), Some(_)) => Err(format!(
+            "{prefix}_controller and {prefix}_value are 0 to 127"
+        )),
+        _ => Err(format!(
+            "set both {prefix}_controller and {prefix}_value, or neither"
+        )),
+    }
 }
 
 fn peq_param(id: u8) -> Option<(u8, &'static str)> {
@@ -230,6 +259,11 @@ impl Dlive {
                 DLIVE_TYPES
             },
             sync_preamps: setting_flag(settings, "sync_preamps", true),
+            cue_controls: [
+                cue_control(settings, CUE_CONTROLS[0])?,
+                cue_control(settings, CUE_CONTROLS[1])?,
+                cue_control(settings, CUE_CONTROLS[2])?,
+            ],
         })
     }
 
@@ -659,6 +693,16 @@ impl Dialect for Dlive {
                     ));
                 }
                 Plan::write(midi::cc(n, 0x0D, scale))
+            }
+            "cue_go" | "cue_next" | "cue_previous" => {
+                let i = CUE_CONTROLS.iter().position(|c| *c == name).unwrap_or(0);
+                let (c, v) = self.cue_controls[i].ok_or_else(|| {
+                    invalid(format!(
+                        "set {name}_controller and {name}_value to the Control Change the \
+                         Surface's Utility / Control / MIDI page assigns"
+                    ))
+                })?;
+                Plan::write(midi::cc(n, c, v))
             }
             "control_change" => {
                 let ch = a.int("midi_channel")?;
@@ -1212,6 +1256,41 @@ mod tests {
                 value: json!({"level_db": 10.0, "level_raw": 127})
             })
         }));
+    }
+
+    #[test]
+    fn surface_sends_the_configured_go_next_and_previous_ccs() {
+        let d = Dlive::new(
+            "dlive-surface",
+            &params(json!({
+                "midi_channel": 12,
+                "cue_go_controller": 20, "cue_go_value": 127,
+                "cue_next_controller": 21, "cue_next_value": 127,
+                "cue_previous_controller": 22, "cue_previous_value": 0
+            })),
+        )
+        .unwrap();
+        let (mut m, _) = connected(Box::new(d), &[0xFE]);
+        // p.5: BN, Number, Value on the base channel N (12, so B).
+        assert_eq!(bytes(&mut m, "cue_go", json!({})).unwrap(), hex("BB 14 7F"));
+        assert_eq!(
+            bytes(&mut m, "cue_next", json!({})).unwrap(),
+            hex("BB 15 7F")
+        );
+        assert_eq!(
+            bytes(&mut m, "cue_previous", json!({})).unwrap(),
+            hex("BB 16 00")
+        );
+    }
+
+    #[test]
+    fn go_next_and_previous_need_their_cc_configured() {
+        let (mut m, _) = connected(dlive("dlive-surface", 1), &[0xFE]);
+        assert!(bytes(&mut m, "cue_go", json!({})).is_err());
+        let half = params(json!({"midi_channel": 1, "cue_next_controller": 5}));
+        assert!(Dlive::new("dlive-surface", &half).is_err());
+        let wide = params(json!({"midi_channel": 1, "cue_go_controller": 128, "cue_go_value": 1}));
+        assert!(Dlive::new("dlive-surface", &wide).is_err());
     }
 
     #[test]

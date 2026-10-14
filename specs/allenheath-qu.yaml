@@ -36,6 +36,10 @@ settings:
   # The mixer's MIDI channel (Setup / Control / MIDI). Required: a wrong
   # channel makes every message miss.
   midi_channel: { type: int, min: 1, max: 16, required: true, label: MIDI channel, description: "The mixer's MIDI channel from 1 to 16, as set in Setup > Control > MIDI; a wrong channel makes every message miss." }
+  # Turn the mixer's meter data on (SysEx 12 01, p.11) when its state is
+  # read, and keep every meter in state. Off by default: it is a continuous
+  # stream of several hundred values.
+  meters: { type: bool, default: false, label: Meters, description: "On asks the mixer for its meter data when connecting and keeps every meter in state in dB; off leaves the meters alone." }
 
 ports:
   - { port: 51325, protocol: tcp, role: control }
@@ -305,11 +309,26 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Remote shutdown is printed with MIDI channel 1 written out (B0, p.8) and is sent that way. Meter data
-      (SysEx 12/13, p.11-12) is not read: it is a continuous stream for the Qu-Pad app. MMC and the MIDI
-      fader strips are for DAW control on channel N+1 and are not modelled.
+      Remote shutdown is printed with MIDI channel 1 written out (B0, p.8) and is sent that way. MMC and
+      the MIDI fader strips are for DAW control on channel N+1 and are not modelled.
+  - models: [all]
+    severity: warning
+    text: >
+      Meter data (p.11-12) is read only with the meters setting on: the request (SysEx 12, MeterOnOff 1) is
+      sent with the state reads on connecting and on refresh, and each 13 reply is unpacked from its
+      seven-bit form and decoded as 7Q8 dB with an offset of 8000 (7C80 is -3.5 dB). Meters are kept as
+      meters.<kind>.<number>.<meter> in dB, keyed as the channels are (stereo mixes, groups and matrices by
+      their odd number, LR as main 1), plus monitor 1 (PAFL, talkback, main pre and post fader, USB record
+      and the 31-band RTA as rta_l_1 ... rta_r_31) and fx 1-4; unused meters are skipped. The document
+      does not say how often the mixer sends the data, that it stops when the connection closes, or the
+      byte order of each value (big-endian, as its example reads). Its block order table heads its first
+      column Qu-24 although it lists 16 inputs and no groups or matrices; that column is taken as the
+      Qu-16's. For the Qu-24 it lists 180 unused meters after the stereo inputs and two stereo group
+      blocks, where the Qu-32 has 20 unused meters, inputs 25-32 and four group blocks; both are followed
+      as written. A reply shorter than the layout fills what it covers.
 
 state:
+  meters.*.*.*: { type: float, unit: dB, description: "Meter in dB, keyed by block kind (input, stereo_input, mix, main, group, matrix, monitor, fx), its number and the meter's name, as p.12 lists them; with the meters setting on" }
   channels.*.*.mute: { type: bool, description: "Mute; keyed by channel type then number (odd number for stereo pairs)" }
   channels.*.*.level_raw: { type: int, description: "Fader, raw 0-127 (0 is -inf)" }
   channels.*.*.level_db: { type: float, unit: dB, description: "Fader; absent at -inf or below -45 dB" }

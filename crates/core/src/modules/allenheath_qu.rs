@@ -15,6 +15,10 @@
 //!   or so when idle; a client that sends FE must keep sending something at
 //!   least every 12 s (p.3, p.10).
 //! - Scenes 1-100 are Bank 1 (CC 00 00, CC 20 00) and Program Change (p.9).
+//! - Meters: `12 01` turns the meter data on, and the mixer answers with
+//!   `13` and every meter, each a 16-bit dB value (7Q8 offset 8000) packed
+//!   seven bits to a byte, in blocks whose order depends on the model
+//!   (p.11-12). Read only when the `meters` setting is on.
 
 use serde_json::{json, Value};
 
@@ -136,6 +140,194 @@ pub(crate) struct Qu {
     model: Model,
     /// The mixer's MIDI channel, 0-based.
     n: u8,
+    /// Turn the meter data on when reading the mixer's state.
+    meters: bool,
+}
+
+/// The meters in each kind of block, in the order the mixer sends them
+/// (p.12). `None` is an unused meter.
+const MONO_INPUT_METERS: &[&str] = &[
+    "post_preamp",
+    "post_peq",
+    "post_compressor",
+    "post_delay",
+    "gate_side_chain",
+    "compressor_side_chain",
+    "direct_out",
+    "gate_gain_reduction",
+    "compressor_gain_reduction",
+    "ducker_gain_reduction",
+];
+const MONO_MIX_METERS: &[&str] = &[
+    "talkback_signal_generator",
+    "pre_insert",
+    "post_peq",
+    "post_geq",
+    "post_compressor",
+    "post_fader",
+    "post_insert",
+    "compressor_side_chain",
+    "compressor_gain_reduction",
+    "ducker_gain_reduction",
+];
+const MONITOR_METERS: &[&str] = &[
+    "pafl_l",
+    "pafl_r",
+    "pafl_mono",
+    "talkback",
+    "signal_generator",
+    "main_pre_fader_l",
+    "main_pre_fader_r",
+    "main_post_fader_l",
+    "main_post_fader_r",
+    "main_mono_pre_fader",
+    "main_mono_post_fader",
+    "usb_a_record_l",
+    "usb_a_record_r",
+];
+const FX_METERS: &[&str] = &[
+    "send_l",
+    "send_r",
+    "send_mono",
+    "pre_peq_l",
+    "pre_peq_r",
+    "tap_tempo_l",
+    "tap_tempo_r",
+    "post_peq_l",
+    "post_peq_r",
+];
+
+/// One run of the meter data: `count` blocks of `kind`, numbered from
+/// `first` in steps of `step` (stereo mixes, groups and matrices go by their
+/// odd number), or unused meters.
+#[derive(Clone, Copy)]
+enum MeterRun {
+    Blocks {
+        kind: Block,
+        state: &'static str,
+        first: u32,
+        step: u32,
+        count: u32,
+    },
+    Unused(usize),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Block {
+    MonoInput,
+    StereoInput,
+    MonoMix,
+    StereoMix,
+    Monitor,
+    Fx,
+}
+
+impl Block {
+    /// Every meter of the block in order, an unused one as `None`.
+    fn meters(self) -> Vec<Option<String>> {
+        let stereo = |names: &[&str]| -> Vec<Option<String>> {
+            names
+                .iter()
+                .map(|n| Some(format!("{n}_l")))
+                .chain(names.iter().map(|n| Some(format!("{n}_r"))))
+                .collect()
+        };
+        match self {
+            Block::MonoInput => MONO_INPUT_METERS
+                .iter()
+                .map(|n| Some(n.to_string()))
+                .collect(),
+            Block::StereoInput => stereo(MONO_INPUT_METERS),
+            Block::MonoMix => MONO_MIX_METERS
+                .iter()
+                .map(|n| Some(n.to_string()))
+                .collect(),
+            Block::StereoMix => stereo(MONO_MIX_METERS),
+            Block::Monitor => {
+                let mut v: Vec<Option<String>> =
+                    MONITOR_METERS.iter().map(|n| Some(n.to_string())).collect();
+                v.extend([None, None, None]);
+                v.extend((1..=31).map(|b| Some(format!("rta_l_{b}"))));
+                v.extend((1..=31).map(|b| Some(format!("rta_r_{b}"))));
+                v
+            }
+            Block::Fx => {
+                let mut v: Vec<Option<String>> =
+                    FX_METERS.iter().map(|n| Some(n.to_string())).collect();
+                v.extend(std::iter::repeat_n(None, 9));
+                v
+            }
+        }
+    }
+}
+
+const fn blocks(kind: Block, state: &'static str, first: u32, step: u32, count: u32) -> MeterRun {
+    MeterRun::Blocks {
+        kind,
+        state,
+        first,
+        step,
+        count,
+    }
+}
+
+/// p.12, "Transmission of meter data". The first column is headed Qu-24 in
+/// the document but lists 16 inputs and no groups or matrices: it is the
+/// Qu-16's.
+const QU16_METERS: &[MeterRun] = &[
+    blocks(Block::MonoInput, "input", 1, 1, 16),
+    MeterRun::Unused(80),
+    blocks(Block::StereoInput, "stereo_input", 1, 1, 3),
+    MeterRun::Unused(20),
+    blocks(Block::MonoMix, "mix", 1, 1, 4),
+    blocks(Block::StereoMix, "mix", 5, 2, 3),
+    blocks(Block::StereoMix, "main", 1, 1, 1),
+    blocks(Block::Monitor, "monitor", 1, 1, 1),
+    blocks(Block::Fx, "fx", 1, 1, 4),
+];
+const QU24_METERS: &[MeterRun] = &[
+    blocks(Block::MonoInput, "input", 1, 1, 24),
+    blocks(Block::StereoInput, "stereo_input", 1, 1, 3),
+    MeterRun::Unused(180),
+    blocks(Block::MonoMix, "mix", 1, 1, 4),
+    blocks(Block::StereoMix, "mix", 5, 2, 3),
+    blocks(Block::StereoMix, "main", 1, 1, 1),
+    blocks(Block::StereoMix, "group", 1, 2, 2),
+    blocks(Block::StereoMix, "matrix", 1, 2, 2),
+    blocks(Block::Monitor, "monitor", 1, 1, 1),
+    blocks(Block::Fx, "fx", 1, 1, 4),
+];
+const QU32_METERS: &[MeterRun] = &[
+    blocks(Block::MonoInput, "input", 1, 1, 24),
+    blocks(Block::StereoInput, "stereo_input", 1, 1, 3),
+    MeterRun::Unused(20),
+    blocks(Block::MonoInput, "input", 25, 1, 8),
+    blocks(Block::MonoMix, "mix", 1, 1, 4),
+    blocks(Block::StereoMix, "mix", 5, 2, 3),
+    blocks(Block::StereoMix, "main", 1, 1, 1),
+    blocks(Block::StereoMix, "group", 1, 2, 4),
+    blocks(Block::StereoMix, "matrix", 1, 2, 2),
+    blocks(Block::Monitor, "monitor", 1, 1, 1),
+    blocks(Block::Fx, "fx", 1, 1, 4),
+];
+
+/// p.11: every 7 bytes of data travel as 8, the first carrying the top bit
+/// of each of the others, the first data byte's in bit 6; a last, shorter
+/// group keeps the same order.
+pub(crate) fn unpack_7bit(packed: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(packed.len() * 7 / 8);
+    for group in packed.chunks(8) {
+        let (high, data) = group.split_first().unwrap_or((&0, &[]));
+        for (i, b) in data.iter().enumerate() {
+            out.push((b & 0x7F) | (((high >> (6 - i)) & 1) << 7));
+        }
+    }
+    out
+}
+
+/// p.11: a signed dB value in 7Q8 with an offset of 8000: 7C80 is -3.5 dB.
+fn meter_db(raw: u16) -> f64 {
+    (raw as i32 - 0x8000) as f64 / 256.0
 }
 
 /// Channel numbers, p.3: the note for mutes and the NRPN MSB for the rest.
@@ -243,6 +435,7 @@ impl Qu {
         Ok(Qu {
             model,
             n: midi_channel(settings, 16)?,
+            meters: super::allenheath::setting_flag(settings, "meters", false),
         })
     }
 
@@ -554,6 +747,7 @@ impl Dialect for Qu {
                         ("device.firmware".into(), json!(format!("{major}.{minor}"))),
                     ],
                     [0x14] => vec![("device.synced".into(), json!(true))],
+                    [0x13, packed @ ..] => self.meter_updates(packed),
                     _ => Vec::new(),
                 }
             }
@@ -568,6 +762,10 @@ impl Dialect for Qu {
             &[0x10, 0x00],
         )];
         out.extend(self.all_channels().into_iter().map(|c| self.get_name(c)));
+        if self.meters {
+            // p.11: "Sysex Header, 12, <MeterOnOff>", 1 for on.
+            out.push(self.header(&[0x12, 0x01]));
+        }
         out
     }
 
@@ -586,6 +784,52 @@ impl Dialect for Qu {
 }
 
 impl Qu {
+    /// Meter data (`13`, p.11-12) to `meters.<kind>.<number>.<meter>` in dB.
+    fn meter_updates(&self, packed: &[u8]) -> Vec<Update> {
+        let data = unpack_7bit(packed);
+        let mut values = data
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|b| meter_db(u16::from_be_bytes(*b)));
+        let layout = match self.model {
+            Model::Qu16 => QU16_METERS,
+            Model::Qu24 => QU24_METERS,
+            Model::Qu32 => QU32_METERS,
+        };
+        let mut out = Vec::new();
+        for run in layout {
+            match *run {
+                MeterRun::Unused(n) => {
+                    if values.by_ref().take(n).count() < n {
+                        return out;
+                    }
+                }
+                MeterRun::Blocks {
+                    kind,
+                    state,
+                    first,
+                    step,
+                    count,
+                } => {
+                    let names = kind.meters();
+                    for i in 0..count {
+                        let number = first + i * step;
+                        for name in &names {
+                            let Some(db) = values.next() else {
+                                return out;
+                            };
+                            if let Some(name) = name {
+                                out.push((format!("meters.{state}.{number}.{name}"), json!(db)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
     fn nrpn_update(&self, ch: u8, id: u8, va: u8, vx: u8) -> Vec<Update> {
         let Some((kind, num)) = channel_name(ch) else {
             return Vec::new();
@@ -677,6 +921,76 @@ mod tests {
 
     fn qu(model: &str) -> Box<Qu> {
         Box::new(Qu::new(model, &params(json!({"midi_channel": 1}))).unwrap())
+    }
+
+    /// Pack bytes seven bits to a byte, as the mixer sends its meter data.
+    fn pack_7bit(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        for group in data.chunks(7) {
+            let mut high = 0u8;
+            for (i, b) in group.iter().enumerate() {
+                high |= (b >> 7) << (6 - i);
+            }
+            out.push(high);
+            out.extend(group.iter().map(|b| b & 0x7F));
+        }
+        out
+    }
+
+    #[test]
+    fn meter_values_unpack_as_the_document_shows() {
+        // p.11: 20 7C 00 unpacks to 7C 80, which is -3.5 dB.
+        assert_eq!(unpack_7bit(&[0x20, 0x7C, 0x00]), [0x7C, 0x80]);
+        assert_eq!(meter_db(0x7C80), -3.5);
+        assert_eq!(meter_db(0x8000), 0.0);
+        let data: Vec<u8> = (0..=255u8).collect();
+        assert_eq!(unpack_7bit(&pack_7bit(&data)), data);
+    }
+
+    #[test]
+    fn meters_are_off_unless_set_and_then_requested_with_the_state() {
+        let (_, a) = connected(qu("qu-16"), &[0xFE]);
+        assert!(!sent(&a)
+            .iter()
+            .any(|b| b.windows(2).any(|w| w == [0x12, 0x01])));
+        let on = Qu::new("qu-16", &params(json!({"midi_channel": 2, "meters": true}))).unwrap();
+        let sync = on.sync();
+        assert_eq!(
+            sync.last().unwrap(),
+            &hex("F0 00 00 1A 50 11 01 00 01 12 01 F7")
+        );
+    }
+
+    #[test]
+    fn meter_data_lands_in_state_by_the_model_layout() {
+        let (mut m, _) = connected(qu("qu-32"), &[0xFE]);
+        // Qu-32: 24 mono inputs (10 meters), 3 stereo inputs (20), 20 unused,
+        // inputs 25-32, 4 mono mixes, then the stereo mixes 5-6, 7-8, 9-10
+        // and LR (20 each).
+        let n = 240 + 60 + 20 + 80 + 40 + 60 + 20;
+        let mut raw = Vec::new();
+        for i in 0..n {
+            let v: u16 = match i {
+                0 => 0x7C80,   // input 1 post preamp, -3.5 dB
+                319 => 0x8100, // the last unused meter
+                329 => 0x8200, // input 25 ducker gain reduction, +2 dB
+                505 => 0x7E00, // main post fader L, -2 dB
+                _ => 0x8000,
+            };
+            raw.extend(v.to_be_bytes());
+        }
+        let mut msg = hex("F0 00 00 1A 50 11 01 00 00 13");
+        msg.extend(pack_7bit(&raw));
+        msg.push(0xF7);
+        let s = state(&feed(&mut m, 10, &msg));
+        let meters = &s["meters"];
+        assert_eq!(meters["input"]["1"]["post_preamp"], -3.5);
+        assert_eq!(meters["input"]["25"]["ducker_gain_reduction"], 2.0);
+        assert_eq!(meters["main"]["1"]["post_fader_l"], -2.0);
+        assert_eq!(meters["stereo_input"]["3"]["ducker_gain_reduction_r"], 0.0);
+        assert_eq!(meters["mix"]["9"]["talkback_signal_generator_l"], 0.0);
+        // The data ended before the groups: nothing is invented past it.
+        assert!(meters.get("group").is_none());
     }
 
     #[test]

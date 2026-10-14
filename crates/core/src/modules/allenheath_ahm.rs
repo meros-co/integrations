@@ -318,9 +318,12 @@ impl Dialect for Ahm {
                 if !(0..=127).contains(&track) {
                     return Err(invalid("track_id is 0-127"));
                 }
+                // V1.5 p.4: 00 Mono 1, 01 Mono 2, 02 stereo playback.
                 let channel = match a.str("playback_channel")? {
+                    "mono_1" => 0,
                     "mono_2" => 1,
-                    _ => 0,
+                    "stereo" => 2,
+                    other => return Err(invalid(format!("unknown playback_channel '{other}'"))),
                 };
                 Plan::write(Self::sx(&[0x00, 0x06, channel, track as u8]))
             }
@@ -590,6 +593,14 @@ mod tests {
                 json!({"track_id": 3, "playback_channel": "mono_2"})
             ),
             h("00 06 01 03")
+        );
+        assert_eq!(
+            b(
+                &mut m,
+                "play_track",
+                json!({"track_id": 127, "playback_channel": "stereo"})
+            ),
+            h("00 06 02 7F")
         );
         assert_eq!(
             b(&mut m, "select_source", json!({"zone": 1, "source": 20})),
