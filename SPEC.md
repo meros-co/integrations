@@ -36,6 +36,10 @@ conversions: { … }            # §4, named value conversions, optional
 
 `id` is the consumer-facing identifier. It does not change once published.
 
+A spec gives each mapping key once, at every depth, and defines each anchor
+once: YAML loaders disagree on which of two values they keep, and
+`tools/validate.py` refuses both.
+
 `state` declares every state path the device reports, with its type, unit and
 meaning, keyed by dotted path with `*` for a number such as a channel:
 

@@ -22,6 +22,9 @@ except ImportError as exc:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# libyaml's parser where PyYAML has it, for the duplicate checks.
+FAST_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
 # {name} or {name:directive:directive...}; SPEC.md §4, "Templates".
 PLACEHOLDER = re.compile(r"""\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
 
@@ -176,6 +179,50 @@ def check_template(
                     f"needs a 'pattern' restricting it or the ':url' directive"
                 )
     return errors
+
+
+def duplicates(text: str) -> list[str]:
+    """A mapping key given twice, at any depth, silently keeps only the last
+    value, and an anchor defined twice makes each alias name whichever came
+    last before it; loaders in other languages refuse both. Reject them."""
+    found: list[str] = []
+    anchors: dict[str, int] = {}
+    for event in yaml.parse(text, Loader=FAST_LOADER):
+        anchor = getattr(event, "anchor", None)
+        if anchor is None or isinstance(event, yaml.AliasEvent):
+            continue
+        line = event.start_mark.line + 1
+        if anchor in anchors:
+            found.append(f"line {line}: anchor &{anchor} is already defined on line {anchors[anchor]}")
+        else:
+            anchors[anchor] = line
+    if found:
+        return found
+    seen: set[int] = set()
+
+    def walk(node, trail: str) -> None:
+        if id(node) in seen:
+            return
+        seen.add(id(node))
+        if isinstance(node, yaml.MappingNode):
+            keys: dict[str, int] = {}
+            for key, value in node.value:
+                if isinstance(key, yaml.ScalarNode) and key.tag != "tag:yaml.org,2002:merge":
+                    line = key.start_mark.line + 1
+                    here = f"{trail}.{key.value}" if trail else key.value
+                    if key.value in keys:
+                        found.append(f"line {line}: key {here} is already given on line {keys[key.value]}")
+                    else:
+                        keys[key.value] = line
+                    walk(value, here)
+                else:
+                    walk(value, trail)
+        elif isinstance(node, yaml.SequenceNode):
+            for i, item in enumerate(node.value):
+                walk(item, f"{trail}[{i}]")
+
+    walk(yaml.compose(text, Loader=FAST_LOADER), "")
+    return found
 
 
 def non_string_keys(node, trail: str = "") -> list[str]:
@@ -819,7 +866,7 @@ def main() -> int:
             print(f"    YAML parse error (unquoted braces? see CONTRIBUTING.md): {exc}")
             continue
 
-        bad_keys = non_string_keys(doc)
+        bad_keys = duplicates(Path(path).read_text("utf-8")) + non_string_keys(doc)
         if bad_keys:
             failed = True
             print(f"INVALID  {rel}")
