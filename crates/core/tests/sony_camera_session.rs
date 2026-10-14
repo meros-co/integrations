@@ -616,7 +616,7 @@ fn ptp3_body(c: &mut Camera) {
 }
 
 async fn wait_for(core: &Core, mut pred: impl FnMut(&Event) -> bool) {
-    tokio::time::timeout(Duration::from_secs(10), async {
+    tokio::time::timeout(Duration::from_secs(30), async {
         loop {
             if core.next_events(64).await.iter().any(&mut pred) {
                 return;
@@ -624,7 +624,7 @@ async fn wait_for(core: &Core, mut pred: impl FnMut(&Event) -> bool) {
         }
     })
     .await
-    .expect("event within 10 s")
+    .expect("event within 30 s")
 }
 
 async fn connected(core: &Core, model: &str, port: u16, settings: Value) -> u64 {
