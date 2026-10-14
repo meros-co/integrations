@@ -62,17 +62,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aja-kumo — AJA KUMO
 
-- [ ] Check what a salvo crosspoint of source 0 does: turns the output off, or leaves the destination unchanged. ([specs/aja-kumo.yaml:1461](specs/aja-kumo.yaml#L1461))
-- [ ] Confirm that take_salvo sending the salvo number as the eParamID_TakeSalvo value takes salvos 2-8 (AJA's own TakeSalvo always sends 1). ([specs/aja-kumo.yaml:1468](specs/aja-kumo.yaml#L1468))
-- [ ] Confirm the lock parameter eParamID_XPT_Destination{n}_Locked (taken from the Companion module) exists and works, and whether lock changes arrive as events. ([specs/aja-kumo.yaml:1392](specs/aja-kumo.yaml#L1392))
+- [ ] Check what a salvo crosspoint of source 0 does: turns the output off, or leaves the destination unchanged. ([specs/aja-kumo.yaml:1649](specs/aja-kumo.yaml#L1649))
+- [ ] Confirm that take_salvo sending the salvo number as the eParamID_TakeSalvo value takes salvos 2-8 (AJA's own TakeSalvo always sends 1). ([specs/aja-kumo.yaml:1656](specs/aja-kumo.yaml#L1656))
+- [ ] Confirm the lock parameter eParamID_XPT_Destination{n}_Locked (taken from the Companion module) exists and works, and whether lock changes arrive as events. ([specs/aja-kumo.yaml:1571](specs/aja-kumo.yaml#L1571))
 - [ ] Check that string and integer values in KUMO event elements are told apart correctly, since KUMO sends no param_type and a non-empty str_value with no or zero int_value is taken as a string. ([crates/core/src/modules/aja_config_events.rs:172](crates/core/src/modules/aja_config_events.rs#L172))
-- [ ] Record what a salvo change looks like on the event connection, since AJA does not document its event form. ([specs/aja-kumo.yaml:1412](specs/aja-kumo.yaml#L1412))
-- [ ] Check how the router answers wait_for_config_events with an expired connection id, and that /config (not /json) gives the connection id. ([specs/aja-kumo.yaml:1414](specs/aja-kumo.yaml#L1414))
-- [ ] Check whether the firmware on hand answers eParamID_XPT_DestinationAll_Status through /options, or {} as older firmware does. ([specs/aja-kumo.yaml:1424](specs/aja-kumo.yaml#L1424))
-- [ ] Confirm that a number above the router's count, and a switch to a locked destination, fail with HTTP 403 (or note the actual status). ([specs/aja-kumo.yaml:1384](specs/aja-kumo.yaml#L1384))
-- [ ] Confirm the router handles back-to-back requests without the pauses AJA's examples add. ([specs/aja-kumo.yaml:1433](specs/aja-kumo.yaml#L1433))
-- [ ] Confirm button colour writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1476](specs/aja-kumo.yaml#L1476))
-- [ ] Confirm eParamID_LED_Identify turns Identify on and off (it comes from a generic AJA example, not the manual). ([specs/aja-kumo.yaml:1485](specs/aja-kumo.yaml#L1485))
+- [ ] Record what a salvo change looks like on the event connection, since AJA does not document its event form. ([specs/aja-kumo.yaml:1591](specs/aja-kumo.yaml#L1591))
+- [ ] Check how the router answers wait_for_config_events with an expired connection id, and that /config (not /json) gives the connection id. ([specs/aja-kumo.yaml:1593](specs/aja-kumo.yaml#L1593))
+- [ ] Check whether the firmware on hand answers eParamID_XPT_DestinationAll_Status through /options, or {} as older firmware does. ([specs/aja-kumo.yaml:1603](specs/aja-kumo.yaml#L1603))
+- [ ] Confirm that a number above the router's count, and a switch to a locked destination, fail with HTTP 403 (or note the actual status). ([specs/aja-kumo.yaml:1563](specs/aja-kumo.yaml#L1563))
+- [ ] Confirm the router handles back-to-back requests without the pauses AJA's examples add. ([specs/aja-kumo.yaml:1612](specs/aja-kumo.yaml#L1612))
+- [ ] Confirm button colour writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1664](specs/aja-kumo.yaml#L1664))
+- [ ] Read a button colour (eParamID_Button_Settings_{n}) and its event, and check the value holds color_N as written, for a source and a destination in each bank. ([specs/aja-kumo.yaml:1674](specs/aja-kumo.yaml#L1674))
+- [ ] Record the values and names eParamID_SuppressPSAlarm reads, and the ids of the switching mode, reference and temperature alarm suppression from desc.json. ([specs/aja-kumo.yaml:1699](specs/aja-kumo.yaml#L1699))
+- [ ] Check what /authenticator/login answers on a unit with User Authentication Disabled (whether it still sets a session cookie). ([specs/aja-kumo.yaml:1625](specs/aja-kumo.yaml#L1625))
+- [ ] Confirm eParamID_LED_Identify turns Identify on and off (it comes from a generic AJA example, not the manual). ([specs/aja-kumo.yaml:1673](specs/aja-kumo.yaml#L1673))
 
 ## allenheath-ahm — Allen & Heath AHM
 
