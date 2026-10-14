@@ -485,6 +485,14 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     for method in sorted(methods & {"bearer", "header"}):
         if "token" not in settings:
             errors.append(f"auth: {method} needs a 'token' setting")
+    for i, rule in enumerate(((doc.get("telemetry") or {}).get("updates")) or []):
+        if "arg_match" in rule and "address" not in rule:
+            errors.append(f"telemetry.updates[{i}]: arg_match goes with address")
+        for index, pattern in (rule.get("arg_match") or {}).items():
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errors.append(f"telemetry.updates[{i}].arg_match.{index} does not compile: {e}")
     if (transport.get("reply_framing") == "fenced") != ("reply_fence" in transport):
         errors.append("transport: reply_framing fenced and reply_fence go together")
     if "reply_fence" in transport:

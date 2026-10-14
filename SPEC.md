@@ -1323,6 +1323,7 @@ of:
 | `header` + `each_line` | A block whose first line matches `header`; `each_line` is applied to each following line | per line: `{1}`, `{2}`, … |
 | `header` + `fields` | A block whose first line matches `header`; the following lines are `name: value` | `fields` maps each name to a state path |
 | `address` | An OSC message whose address matches | `{1}`, … from the address; `{arg0}`, `{arg1}`, … the arguments |
+| `address` + `arg_match` | As `address`, where the text of each argument named matches its regex | as `address`, then `arg_match`'s |
 | `address` + `json` | As `address`, where the string argument at `json_arg` (default 0) holds JSON; with `json_match`, `json_each` and `each_match` it is read as a JSON message is (below) | as `address`, then `json_match`'s, plus `json` names by JSON path |
 
 `state` maps a path template to a value template. Both use the template rules
@@ -1640,6 +1641,21 @@ exactly those type tags:
     - address: '^/13\.13\.1\.6\.(\d+)$'
       arg_types: sif
       state: { "sequences.{1}.faders.{arg0}": "{arg2}" }
+```
+
+#### OSC string arguments
+
+A device that names what changed inside a string argument (Millumin's
+`/millumin/info`, whose first argument is the original feedback address,
+`layer:Screen/opacity`, and the next its value) is read with `arg_match`: an
+argument's index to an RE2-safe regex its text must match, a number as its
+decimal text. The rule applies only when each matches, and their captures
+are numbered on after the address's, in index order (before `json_match`'s):
+
+```yaml
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/(opacity|rotation|scale)$" }
+      state: { "layers.{1}.{2}": "{arg1}" }
 ```
 
 #### JSON messages

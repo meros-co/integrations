@@ -62,6 +62,10 @@ enum Matcher {
         /// The message's OSC type tags must be exactly these (`sis`), for a
         /// device that sends different shapes on one address (grandMA3).
         arg_types: Option<String>,
+        /// `arg_match`: arguments, by index, whose text must match these
+        /// (Millumin's `/millumin/info` names what changed in a string);
+        /// their captures follow the address's.
+        arg_match: Vec<(usize, Regex)>,
         select: Vec<(String, Regex)>,
         each: Option<String>,
         each_select: Vec<(String, Regex)>,
@@ -288,6 +292,51 @@ fn selectors(v: Option<&Value>, what: &str) -> Result<Vec<(String, Regex)>, Stri
         out.push((path.clone(), regex(re, what)?));
     }
     Ok(out)
+}
+
+/// `arg_match`: an OSC argument index to a regex over its text.
+fn arg_selectors(v: Option<&Value>) -> Result<Vec<(usize, Regex)>, String> {
+    let Some(v) = v else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    for (index, re) in v
+        .as_object()
+        .ok_or("telemetry: arg_match maps argument indexes to regexes")?
+    {
+        let index: usize = index
+            .parse()
+            .map_err(|_| format!("telemetry: arg_match key '{index}' is not an argument index"))?;
+        out.push((index, regex(re, "arg_match")?));
+    }
+    out.sort_by_key(|(i, _)| *i);
+    Ok(out)
+}
+
+/// Whether each `arg_match` regex matches its argument's text (a string as
+/// it is, a number as its decimal text); their captures are appended to
+/// `base`, numbered on from those already there.
+fn select_args(
+    args: &[Value],
+    selectors: &[(usize, Regex)],
+    base: &mut Vec<(String, Value)>,
+) -> bool {
+    for (index, re) in selectors {
+        let text = match args.get(*index) {
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Null) | None => return false,
+            Some(other) => other.to_string(),
+        };
+        let Some(caps) = re.captures(&text) else {
+            return false;
+        };
+        let offset = base.len();
+        for (i, v) in captures(&caps) {
+            let n: usize = i.parse().unwrap_or(0);
+            base.push(((n + offset).to_string(), v));
+        }
+    }
+    true
 }
 
 /// Whether every selector matches `doc`; their captures are appended to
@@ -604,6 +653,7 @@ impl Telemetry {
                         .get("arg_types")
                         .and_then(Value::as_str)
                         .map(str::to_string),
+                    arg_match: arg_selectors(rule.get("arg_match"))?,
                     select: selectors(rule.get("json_match"), "json_match")?,
                     each: rule
                         .get("json_each")
@@ -1022,6 +1072,7 @@ impl Telemetry {
                         json,
                         json_arg,
                         arg_types,
+                        arg_match,
                         select: selectors,
                         each,
                         each_select,
@@ -1039,6 +1090,9 @@ impl Telemetry {
                         continue;
                     };
                     let mut base = captures(&caps);
+                    if !select_args(args, arg_match, &mut base) {
+                        continue;
+                    }
                     let reads_json = !json.is_empty() || !selectors.is_empty() || each.is_some();
                     let doc = match reads_json {
                         false => Value::Null,
@@ -1640,6 +1694,47 @@ mod tests {
         assert!(t
             .apply(&Inbound::Json(&json!({"type": "sources_update"})))
             .is_none());
+    }
+
+    #[test]
+    fn osc_string_arguments_can_be_matched_with_captures() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"address": "^/(\\w+)/info$", "arg_match": {"0": "^layer:([^/]+)/(opacity|scale)$"},
+                 "state": {"layers.{2}.{3}": "{arg1}", "apps.{1}": "{arg0}"}},
+                {"address": "^/(\\w+)/info$", "arg_match": {"1": "^(\\d+)$", "0": "^light:([^/]+)/intensity$"},
+                 "state": {"lights.{2}.intensity": "{3}"}},
+            ]})),
+            &state(json!({
+                "layers.*.opacity": {"type": "float", "description": "x"},
+                "layers.*.scale": {"type": "float", "description": "x"},
+                "lights.*.intensity": {"type": "int", "description": "x"},
+                "apps.*": {"type": "string", "description": "x"},
+            })),
+            Default::default(),
+        )
+        .unwrap();
+        let osc = |args: &[Value]| {
+            t.apply(&Inbound::Osc {
+                address: "/millumin/info",
+                types: "sf",
+                args,
+            })
+        };
+        // The address's captures come first, then the argument's.
+        assert_eq!(
+            osc(&[json!("layer:Screen 1/opacity"), json!(0.5)]).unwrap(),
+            json!({"layers": {"Screen 1": {"opacity": 0.5}}, "apps": {"millumin": "layer:Screen 1/opacity"}})
+        );
+        // Every argument named must match, a number as its decimal text, in
+        // index order whatever the order written.
+        assert_eq!(
+            osc(&[json!("light:Spot/intensity"), json!(200)]).unwrap(),
+            json!({"lights": {"Spot": {"intensity": 200}}})
+        );
+        assert!(osc(&[json!("light:Spot/intensity"), json!(0.5)]).is_none());
+        assert!(osc(&[json!("layer:Screen 1/rotation"), json!(0.5)]).is_none());
+        assert!(osc(&[]).is_none());
     }
 
     #[test]
