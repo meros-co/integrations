@@ -54,7 +54,16 @@ const REPLY: Key = "reply";
 const PROBE: Key = "probe";
 const RECONNECT: Key = "reconnect";
 const RENEW: Key = "telemetry-renew";
-const POLL: Key = "telemetry-poll";
+/// One timer per poll group (`telemetry.poll` as a list); the first is the
+/// one a single `poll` uses.
+const POLLS: [Key; telemetry::MAX_POLLS] = [
+    "telemetry-poll",
+    "telemetry-poll-2",
+    "telemetry-poll-3",
+    "telemetry-poll-4",
+];
+#[cfg(test)]
+const POLL: Key = POLLS[0];
 const PROMPT: Key = "login-prompt";
 /// A token refresh that failed, tried again.
 const OAUTH_RETRY: Key = "oauth-retry";
@@ -2373,7 +2382,9 @@ impl SpecEngine {
         }
         cx.cancel_timer(PROBE);
         cx.cancel_timer(RENEW);
-        cx.cancel_timer(POLL);
+        for key in POLLS {
+            cx.cancel_timer(key);
+        }
         self.set_link(cx, Connection::Disconnected { reason });
         cx.set_timer(RECONNECT, self.backoff);
         self.backoff = (self.backoff * 2).min(RECONNECT_MAX);
@@ -2620,14 +2631,16 @@ impl SpecEngine {
             return;
         }
         let subscribe = self.telemetry.subscribe.clone();
-        let poll = self.telemetry.poll.clone();
         self.send_telemetry(cx, subscribe, false);
-        self.send_telemetry(cx, poll, true);
+        let polls = self.telemetry.polls.clone();
+        for (key, poll) in POLLS.iter().zip(polls) {
+            self.send_telemetry(cx, poll.send, true);
+            if let Some(every) = poll.every {
+                cx.set_timer(key, every);
+            }
+        }
         if let Some(every) = self.telemetry.renew_every {
             cx.set_timer(RENEW, every);
-        }
-        if let Some(every) = self.telemetry.poll_every {
-            cx.set_timer(POLL, every);
         }
     }
 
@@ -3518,7 +3531,7 @@ impl Module for SpecEngine {
                     self.lost(cx, "no login prompt within the timeout".into());
                 }
             }
-            RENEW | POLL if !self.monitor => {}
+            _ if (key == RENEW || POLLS.contains(&key)) && !self.monitor => {}
             RENEW => {
                 let items = self.telemetry.subscribe.clone();
                 self.send_telemetry(cx, items, false);
@@ -3526,11 +3539,14 @@ impl Module for SpecEngine {
                     cx.set_timer(RENEW, every);
                 }
             }
-            POLL => {
-                let items = self.telemetry.poll.clone();
-                self.send_telemetry(cx, items, true);
-                if let Some(every) = self.telemetry.poll_every {
-                    cx.set_timer(POLL, every);
+            _ if POLLS.contains(&key) => {
+                let i = POLLS.iter().position(|k| *k == key).unwrap_or(0);
+                let Some(poll) = self.telemetry.polls.get(i).cloned() else {
+                    return;
+                };
+                self.send_telemetry(cx, poll.send, true);
+                if let Some(every) = poll.every {
+                    cx.set_timer(key, every);
                 }
             }
             _ => {}
@@ -5561,6 +5577,58 @@ mod tests {
         let a = cx.take();
         assert_eq!(completed(&a), vec![(2, Err(CommandError::Timeout))]);
         assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
+    }
+
+    #[test]
+    fn poll_groups_each_keep_their_own_interval() {
+        let telemetry = json!({
+            "poll": [{"every_ms": 1000, "send": [{"method": "GET", "path": "/fast"}]},
+                     {"every_ms": 30000, "send": [{"method": "GET", "path": "/slow"}]}],
+            "updates": [],
+        });
+        let mut e = http_with(telemetry, json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: POLLS[0],
+            after: 1000
+        }));
+        assert!(a.contains(&Action::SetTimer {
+            key: POLLS[1],
+            after: 30000
+        }));
+        let paths = |e: &SpecEngine| -> Vec<String> {
+            e.queue
+                .iter()
+                .filter_map(|j| j.item.as_ref()?.get("path")?.as_str().map(str::to_string))
+                .collect()
+        };
+        // Both groups on connecting, the first already in flight.
+        assert_eq!(paths(&e), ["/slow"]);
+        e.queue.clear();
+        // The fast group's timer asks for the fast group alone, and is set again.
+        let mut cx = Cx::new(1000);
+        e.timer(&mut cx, POLLS[0]);
+        assert_eq!(paths(&e), ["/fast"]);
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: POLLS[0],
+            after: 1000
+        }));
+        e.queue.clear();
+        let mut cx = Cx::new(30000);
+        e.timer(&mut cx, POLLS[1]);
+        assert_eq!(paths(&e), ["/slow"]);
+        // A device opened for commands only polls neither.
+        let mut e = http_with(
+            json!({"poll": [{"every_ms": 1000, "send": [{"method": "GET", "path": "/fast"}]}], "updates": []}),
+            json!({}),
+            false,
+        );
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.timer(&mut cx, POLLS[0]);
+        assert!(paths(&e).is_empty());
     }
 
     #[test]

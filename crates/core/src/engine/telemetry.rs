@@ -409,14 +409,25 @@ pub(crate) enum Inbound<'a> {
     },
 }
 
+/// One group of `poll` queries and its interval: sent on connecting, and
+/// again every `every` ms when set.
+#[derive(Debug, Clone)]
+pub(crate) struct Poll {
+    pub(crate) send: Vec<Value>,
+    pub(crate) every: Option<u64>,
+}
+
+/// The most poll groups a spec may have: each has a timer of its own.
+pub(crate) const MAX_POLLS: usize = 4;
+
 #[derive(Debug, Default)]
 pub(crate) struct Telemetry {
     /// Sent after connecting, and again every `renew_every` ms if set.
     pub(crate) subscribe: Vec<Value>,
     pub(crate) renew_every: Option<u64>,
-    /// Queries sent on a schedule; their replies go through the rules.
-    pub(crate) poll: Vec<Value>,
-    pub(crate) poll_every: Option<u64>,
+    /// Queries sent on a schedule, in groups each with its own interval
+    /// (`poll` as a list); their replies go through the rules.
+    pub(crate) polls: Vec<Poll>,
     rules: Vec<Rule>,
     types: Vec<(Vec<String>, String)>,
     conversions: Conversions,
@@ -530,12 +541,28 @@ impl Telemetry {
         let mut t = Telemetry {
             subscribe: items(spec.get("subscribe").and_then(|s| s.get("send"))),
             renew_every: every(spec.get("subscribe")),
-            poll: items(spec.get("poll").and_then(|s| s.get("send"))),
-            poll_every: every(spec.get("poll")),
+            polls: match spec.get("poll") {
+                // A list: groups, each at its own interval.
+                Some(Value::Array(groups)) => groups
+                    .iter()
+                    .map(|g| Poll {
+                        send: items(g.get("send")),
+                        every: every(Some(g)),
+                    })
+                    .collect(),
+                Some(one) => vec![Poll {
+                    send: items(one.get("send")),
+                    every: every(Some(one)),
+                }],
+                None => Vec::new(),
+            },
             rules: Vec::new(),
             types,
             conversions,
         };
+        if t.polls.len() > MAX_POLLS {
+            return Err(format!("telemetry: at most {MAX_POLLS} poll groups"));
+        }
         for rule in spec
             .get("updates")
             .and_then(Value::as_array)
@@ -724,7 +751,9 @@ impl Telemetry {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.rules.is_empty() && self.subscribe.is_empty() && self.poll.is_empty()
+        self.rules.is_empty()
+            && self.subscribe.is_empty()
+            && self.polls.iter().all(|p| p.send.is_empty())
     }
 
     /// Whether a concrete or starred path is declared, or is a prefix of

@@ -1174,6 +1174,25 @@ telemetry:
       state: { "outputs.{1:+1}.input": "{2:+1}" }
 ```
 
+A device whose state changes at different rates (a timer every second, a
+configuration every minute) gives `poll` as a list of groups, each sent on
+connecting and then at its own `every_ms`, at most four:
+
+```yaml
+telemetry:
+  poll:
+    - every_ms: 1000                # what moves during a show
+      send: [{ method: GET, path: /v1/timers/current }]
+    - every_ms: 30000               # what an operator configures
+      send: [{ method: GET, path: /v1/timers }, { method: GET, path: /v1/props }]
+```
+
+A group is a poll like any other: its items are queries, queued one at a
+time, and an item still waiting from its last round is not queued again.
+Over HTTP this is the way to read something less often; a `subscribe` with
+`every_ms` is sent again at its interval too, and older specs use it so, but
+its items are not kept from piling up behind a slow device.
+
 `send` items are the same as a command's. They go through the command queue,
 one at a time, wherever a reply is expected: `subscribe` items on a line
 transport whose device answers, and `poll` items (queries) on any transport

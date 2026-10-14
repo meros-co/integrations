@@ -480,8 +480,8 @@ def endpoint_checks(doc: dict) -> list[str]:
                               + ("an int" if kind == "int" else f"an enum of {' and '.join(sorted(values))}"))
     telemetry = doc.get("telemetry") or {}
     places = [(f"commands.{n}.send", c.get("send")) for n, c in (doc.get("commands") or {}).items()]
-    places += [("telemetry.poll.send", (telemetry.get("poll") or {}).get("send")),
-               ("telemetry.subscribe.send", (telemetry.get("subscribe") or {}).get("send"))]
+    places += [(where, group.get("send")) for where, group in poll_groups(telemetry)]
+    places += [("telemetry.subscribe.send", (telemetry.get("subscribe") or {}).get("send"))]
     places += [(f"on_connect[{i}]", step.get("send") if isinstance(step, dict) and "send" in step else step)
                for i, step in enumerate(doc.get("on_connect") or [])]
     places += [(f"telemetry.updates[{i}].then_send", rule.get("then_send"))
@@ -501,6 +501,15 @@ def items_of(send) -> list:
     return send if isinstance(send, list) else [send] if send is not None else []
 
 
+def poll_groups(telemetry: dict) -> list[tuple[str, dict]]:
+    """`telemetry.poll`: one group (an object), or a list of groups each at
+    its own interval (SPEC.md §8, Telemetry)."""
+    poll = telemetry.get("poll")
+    if isinstance(poll, list):
+        return [(f"telemetry.poll[{i}].send", g or {}) for i, g in enumerate(poll)]
+    return [("telemetry.poll.send", poll)] if poll else []
+
+
 def per_model_checks(doc: dict, model_ids: set) -> list[str]:
     """Messages naming `models` (SPEC.md §4, Messages per model): the models
     exist, and every model a command supports has a message."""
@@ -510,7 +519,7 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
     places = [(f"commands.{n}.send", c.get("send")) for n, c in (doc.get("commands") or {}).items()]
     places += [("transport.probe", transport.get("probe")),
                ("transport.session.login", (transport.get("session") or {}).get("login")),
-               ("telemetry.poll.send", (telemetry.get("poll") or {}).get("send")),
+               *[(where, group.get("send")) for where, group in poll_groups(telemetry)],
                ("telemetry.subscribe.send", (telemetry.get("subscribe") or {}).get("send")),
                ("on_connect", doc.get("on_connect")),
                # Update rules naming `models` (SPEC.md §8, Rules per model).
@@ -584,15 +593,18 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     telemetry = doc.get("telemetry") or {}
     transport_type = (doc.get("transport") or {}).get("type")
 
-    poll = (telemetry.get("poll") or {}).get("send", [])
-    for i, item in enumerate(poll if isinstance(poll, list) else [poll]):
-        if isinstance(item, dict) and "reply_address" in item:
-            if transport_type not in ("osc-udp", "osc-tcp"):
-                errors.append(f"telemetry.poll.send[{i}]: reply_address needs an OSC transport")
-            try:
-                re.compile(item["reply_address"])
-            except re.error as e:
-                errors.append(f"telemetry.poll.send[{i}].reply_address: {e}")
+    groups = poll_groups(telemetry)
+    if len(groups) > 4:
+        errors.append("telemetry.poll: at most 4 poll groups")
+    for where, group in groups:
+        for i, item in enumerate(items_of(group.get("send"))):
+            if isinstance(item, dict) and "reply_address" in item:
+                if transport_type not in ("osc-udp", "osc-tcp"):
+                    errors.append(f"{where}[{i}]: reply_address needs an OSC transport")
+                try:
+                    re.compile(item["reply_address"])
+                except re.error as e:
+                    errors.append(f"{where}[{i}].reply_address: {e}")
 
     # JSON messages arrive on a websocket, an event stream, or as the lines of
     # a line transport; HTTP replies are matched with `path`.
