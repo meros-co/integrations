@@ -132,9 +132,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-livecore — Analog Way LiveCore
 
-- [ ] Confirm master preset screen enabling uses PSose (not PSsse), GPits takes a value, and layers 1-24 are accepted. ([specs/analogway-livecore.yaml:619](specs/analogway-livecore.yaml#L619))
-- [ ] Check that an out-of-range value is answered with the previous value followed by an E10-E13 error. ([specs/analogway-livecore.yaml:613](specs/analogway-livecore.yaml#L613))
-- [ ] Check how often unsolicited register pushes arrive while a command waits, which makes that command fail. ([specs/analogway-livecore.yaml:606](specs/analogway-livecore.yaml#L606))
+- [ ] Confirm master preset screen enabling uses PSose (not PSsse), GPits takes a value, and layers 1-24 are accepted. ([specs/analogway-livecore.yaml:967](specs/analogway-livecore.yaml#L967))
+- [ ] Check that an out-of-range value is answered with the previous value followed by an E10-E13 error. ([specs/analogway-livecore.yaml:961](specs/analogway-livecore.yaml#L961))
+- [ ] Check how often unsolicited register pushes arrive while a command waits, which makes that command fail. ([specs/analogway-livecore.yaml:954](specs/analogway-livecore.yaml#L954))
+- [ ] Confirm the index order of MMsav (device, then memory) and CMsav (screen, then memory), the reverse of the loads, and that writing 1 saves the current layout. ([specs/analogway-livecore.yaml:611](specs/analogway-livecore.yaml#L611))
+- [ ] Check that COupd applies confidence layout and source changes, as MLupd does for monitoring. ([specs/analogway-livecore.yaml:604](specs/analogway-livecore.yaml#L604))
+- [ ] Check that a plug the input card lacks is refused by INplg with an error. ([specs/analogway-livecore.yaml:530](specs/analogway-livecore.yaml#L530))
 
 ## analogway-livepremier — Analog Way LivePremier / Aquilon
 

@@ -138,3 +138,47 @@ telemetry(LC, "monitoring-window", inbound="MLces0,2,3\r\n",
 telemetry(LC, "preset-loading", inbound="PMloa0\r\n", expect_state={"presets": {"loading": False}})
 telemetry(LC, "master-loading", inbound="PSloa1\r\n", expect_state={"master_presets": {"loading": True}})
 telemetry(LC, "read-back", inbound="TPdie0\r\n", expect_state={"device": {"reading_back": False}})
+
+# Registers from the variables document (sheet 1): input plugs, confidence
+# monitoring, monitoring and confidence preset saves, GPO tally inputs.
+text(LC, "set_input_plug", {"input": 3, "plug": 4}, "2,4INplg\n", device_reply="INplg2,4\r\n", expect_result=ACK)
+text(LC, "autoset_input", {"input": 1}, "0,1INasi\n", device_reply="INasi0,1\r\n", expect_result=ACK)
+text(LC, "autocenter_input", {"input": 13, "mode": 2}, "12,2INain\n", device_reply="INain12,2\r\n", expect_result=ACK)
+text(LC, "set_confidence_mode", {"screen": 2, "enabled": True}, "1,1SCico\n", device_reply="SCico1,1\r\n",
+     expect_result=ACK)
+text(LC, "set_confidence_layout", {"screen": 2, "layout": 10}, "1,10COlay\n", device_reply="COlay1,10\r\n",
+     expect_result=ACK)
+text(LC, "set_confidence_source", {"screen": 2, "window": 3, "source": 41}, "1,41COscc\n",
+     device_reply="COscc1,41\r\n", expect_result=ACK)
+text(LC, "update_confidence", {}, "1COupd\n", device_reply="COupd1\r\n", expect_result=ACK)
+text(LC, "save_monitoring_preset", {"memory": 3}, "0,2,1MMsav\n", device_reply="MMsav0,2,1\r\n", expect_result=ACK)
+text(LC, "reset_monitoring_preset", {"memory": 8}, "7,1MMres\n", device_reply="MMres7,1\r\n", expect_result=ACK)
+text(LC, "save_confidence_preset", {"screen": 1, "memory": 16}, "0,15,1CMsav\n", device_reply="CMsav0,15,1\r\n",
+     expect_result=ACK)
+text(LC, "reset_confidence_preset", {"memory": 1}, "0,1CMres\n", device_reply="CMres0,1\r\n", expect_result=ACK)
+text(LC, "set_gpo_tally_input", {"gpo": 2, "screen": 1, "source": 5, "enabled": True}, "1,0,5,1GPoti\n",
+     device_reply="GPoti1,0,5,1\r\n", expect_result=ACK)
+telemetry(LC, "input-plug", inbound="INplg2,4\r\n", expect_state={"inputs": {"3": {"plug": 4}}})
+telemetry(LC, "plug-available", inbound="INpav0,3,1\r\n",
+          expect_state={"inputs": {"1": {"plugs": {"3": {"available": True}}}}})
+telemetry(LC, "plug-hdcp", inbound="IShdc0,4,0\r\n", expect_state={"inputs": {"1": {"plugs": {"4": {"hdcp": False}}}}})
+telemetry(LC, "plug-width", inbound="ISiwi0,4,1920\r\n",
+          expect_state={"inputs": {"1": {"plugs": {"4": {"width": 1920}}}}})
+telemetry(LC, "plug-height", inbound="ISihe0,4,1080\r\n",
+          expect_state={"inputs": {"1": {"plugs": {"4": {"height": 1080}}}}})
+telemetry(LC, "autocenter-progress", inbound="INaip0,55\r\n",
+          expect_state={"inputs": {"1": {"autocenter_progress": 55}}})
+telemetry(LC, "output-hdcp", inbound="OUihc4,1\r\n", expect_state={"outputs": {"5": {"hdcp": True}}})
+telemetry(LC, "screen-width", inbound="SCssh0,3840\r\n", expect_state={"screens": {"1": {"width": 3840}}})
+telemetry(LC, "screen-height", inbound="SCssv0,2160\r\n", expect_state={"screens": {"1": {"height": 2160}}})
+telemetry(LC, "confidence-mode", inbound="SCico1,1\r\n", expect_state={"screens": {"2": {"confidence": True}}})
+telemetry(LC, "confidence-layout", inbound="COlay1,10\r\n",
+          expect_state={"screens": {"2": {"confidence_layout": 10}}})
+telemetry(LC, "confidence-source", inbound="COscc1,41\r\n",
+          expect_state={"screens": {"2": {"confidence_sources": {"c": 41}}}})
+telemetry(LC, "confidence-valid", inbound="COsva1,0\r\n",
+          expect_state={"screens": {"2": {"confidence_valid": False}}})
+telemetry(LC, "master-valid", inbound="PSval9,1\r\n", expect_state={"master_presets": {"10": {"valid": True}}})
+telemetry(LC, "confidence-preset-valid", inbound="CMval0,1\r\n",
+          expect_state={"confidence_presets": {"1": {"valid": True}}})
+telemetry(LC, "gpo-tally", inbound="GPoti1,0,5,1\r\n", expect_state={"gpo": {"2": {"tally": {"1": {"5": True}}}}})
