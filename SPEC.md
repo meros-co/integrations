@@ -1609,6 +1609,22 @@ whole and each item can have more read:
 The message must match `match` for the rule to apply at all, so an empty list
 (`0 0`) still replaces what was there.
 
+A list that does not run to the end of the message, or shares its opening
+words with another message, is taken from one capture group of `match` with
+`match_each_in`, the group's number. A Shure MXA sends each meter as `<
+SAMPLE 040 052 ... >`, one level per channel, and its talker positions as `<
+SAMPLE TALKER_POSITIONS ... >`; only the first is a meter list:
+
+```yaml
+    - match: "^< SAMPLE((?: \\d{3})+) >$"
+      match_each: "(\\d{3})"
+      match_each_in: 1
+      state: { "meters.levels.{index:+1}": "{2:-60}" }
+```
+
+`{index}` takes offsets as a number does, so a list numbered from 1 keys its
+state from 1. A group that took no part in the match gives no items.
+
 #### Poll replies on another address
 
 An OSC query is answered on its own address by most devices. ETC Eos answers

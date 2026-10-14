@@ -42,6 +42,9 @@ enum Matcher {
         re: Regex,
         request: Option<Regex>,
         each: Option<Regex>,
+        /// `match_each_in`: `each` goes along this capture group of `re`
+        /// instead of the rest of the message (a list between markers).
+        each_in: Option<usize>,
     },
     /// The first line matches `header`; `line` is applied to every other line.
     Lines { header: Regex, line: Regex },
@@ -643,6 +646,14 @@ impl Telemetry {
                         Some(r) => Some(regex(r, "match_each")?),
                         None => None,
                     },
+                    each_in: match rule.get("match_each_in") {
+                        None => None,
+                        Some(n) => {
+                            Some(n.as_u64().filter(|n| *n >= 1).ok_or(
+                                "telemetry: match_each_in is a capture group of match, from 1",
+                            )? as usize)
+                        }
+                    },
                 }
             } else if let Some(a) = rule.get("address") {
                 Matcher::Osc {
@@ -874,6 +885,7 @@ impl Telemetry {
                         re,
                         request: asked,
                         each,
+                        each_in,
                     },
                     Inbound::Text(text),
                 ) => {
@@ -899,7 +911,12 @@ impl Telemetry {
                         // Each item along the rest of the message, after
                         // what `match` matched.
                         Some(each) => {
-                            let rest = &text[caps.get(0).map_or(0, |m| m.end())..];
+                            // `match_each_in`: within that capture group; a
+                            // group that took part in no match has no items.
+                            let rest = match each_in {
+                                Some(n) => caps.get(*n).map_or("", |m| m.as_str()),
+                                None => &text[caps.get(0).map_or(0, |m| m.end())..],
+                            };
                             for (index, item) in each.captures_iter(rest).enumerate() {
                                 let mut values = values.clone();
                                 for (i, v) in captures(&item) {
@@ -2058,6 +2075,36 @@ mod tests {
         // Without its request, a bare value is nothing.
         assert_eq!(t.apply(&Inbound::Text("1")), None);
         assert_eq!(answer("1", "Subnet.Status ?").0, None);
+    }
+
+    #[test]
+    fn a_list_can_be_read_within_one_capture_group() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"match": "^< SAMPLE((?: \\d{3})+) >$", "match_each": "(\\d{3})", "match_each_in": 1,
+                 "state": {"meters.{index:+1}": "{2:-60}"}},
+            ]})),
+            &state(json!({"meters.*": {"type": "int", "description": "x"}})),
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            t.apply(&Inbound::Text("< SAMPLE 060 045 000 >")).unwrap(),
+            json!({"meters": {"1": 0, "2": -15, "3": -60}})
+        );
+        // A message sharing the opening words, but no list of levels, does
+        // not match.
+        assert!(t
+            .apply(&Inbound::Text(
+                "< SAMPLE TALKER_POSITIONS 1 2 -1524 321 914 0 >"
+            ))
+            .is_none());
+        assert!(Telemetry::parse(
+            Some(&json!({"updates": [{"match": "^x$", "match_each": "y", "match_each_in": 0, "state": {}}]})),
+            &state(json!({})),
+            Default::default(),
+        )
+        .is_err());
     }
 
     #[test]

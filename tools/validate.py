@@ -486,6 +486,16 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         if "token" not in settings:
             errors.append(f"auth: {method} needs a 'token' setting")
     for i, rule in enumerate(((doc.get("telemetry") or {}).get("updates")) or []):
+        if "match_each_in" in rule:
+            if "match_each" not in rule:
+                errors.append(f"telemetry.updates[{i}]: match_each_in goes with match_each")
+            else:
+                try:
+                    groups = re.compile(rule.get("match", "")).groups
+                except re.error:
+                    groups = 0
+                if rule["match_each_in"] > groups:
+                    errors.append(f"telemetry.updates[{i}]: match_each_in names group {rule['match_each_in']}, which match does not have")
         if "arg_match" in rule and "address" not in rule:
             errors.append(f"telemetry.updates[{i}]: arg_match goes with address")
         for index, pattern in (rule.get("arg_match") or {}).items():
