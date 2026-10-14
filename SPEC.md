@@ -1449,7 +1449,7 @@ offered to `path` rules, which match the request's path and query:
 |---|---|---|
 | `path` + `json` | A JSON reply | `json` names values by JSON path (`$`, `$.a.b`) |
 | `path` + `json` + `json_each` | A JSON reply holding an array at `json_each` | once per element; `json` paths relative to it |
-| `path` + `xml_each` | An XML reply | once per element of that name; its attributes |
+| `path` + `xml_each` | An XML reply | once per element of that name; its attributes, its text and its children's (below) |
 | `path` + `json` + `json_match` | A JSON reply whose value at each JSON path matches its regex | the path's, then `json_match`'s, in order |
 | `path` + `json` + `request_match` | A JSON reply to a request whose JSON body matches | the path's, then `request_match`'s, then `json_match`'s |
 | `path` + `headers` | Any reply, JSON or not | `headers` names response header values, by header name in any case; with `json` too, both |
@@ -1566,6 +1566,31 @@ that shrinks (a tag list) is better kept whole, as JSON text.
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`, plus `request` (the JSON request body) for a `request_match` rule
 and `headers` (name to value) for a `headers` rule.
+
+#### XML elements
+
+An `xml_each` match captures its element's attributes by name, then
+`{text}`, the element's own text (text and CDATA, trimmed, entities
+decoded), each child element that holds only text under the child's name,
+and the attributes of the elements it lies in, `{^name}` for the element one
+level out and `{^^name}` two, as `$^.` names an enclosing JSON element. A
+name already captured keeps its first value, so an attribute wins over a
+child or the text. TriCaster's product information is child elements, and
+its buffer dictionary keys each M/E row's buffer by the `<me>` two levels
+out:
+
+```yaml
+    - path: "^/(?:v1/)?version$"
+      xml_each: product_information
+      state: { product.model: "{product_model}", product.name: "{product_name}" }
+    - path: "^/v1/dictionary\\?key=buffer$"
+      xml_each: buffer
+      state: { "buffers.me.{^^index}": "{selection}" }
+```
+
+A placeholder whose capture an element does not give leaves its path
+unassigned, so the main row's buffer, with no `<me>` around it, writes
+nothing there.
 
 #### Keys holding dots
 

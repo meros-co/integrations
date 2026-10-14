@@ -862,7 +862,9 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 if name.startswith("settings."):
                     errors += check_template(context, m.group(0), {}, settings, f"{where}.then_send")
                 elif not (name.isdigit() or name in captures or name.startswith("arg")
-                          or re.fullmatch(r"\^*(index|key)", name)):
+                          or re.fullmatch(r"\^*(index|key)", name)
+                          # An XML element's captures are named by the reply.
+                          or "xml_each" in rule):
                     errors.append(f"{where}.then_send: '{{{name}}}' is not one of the rule's captures")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")

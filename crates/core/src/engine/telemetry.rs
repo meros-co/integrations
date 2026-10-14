@@ -260,6 +260,17 @@ fn each_path(each: &str, settings: &Params) -> Option<String> {
     Some(out)
 }
 
+/// An XML element's own text (its text and CDATA, not its children's),
+/// trimmed.
+fn xml_text(node: roxmltree::Node) -> Value {
+    let text: String = node
+        .children()
+        .filter(|c| c.is_text())
+        .filter_map(|c| c.text())
+        .collect();
+    Value::String(text.trim().to_string())
+}
+
 /// The value at a JSON path from an element `json_each` reached: `$.` is the
 /// element's, `$^.` the element one level out's (`$^^.` two).
 fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
@@ -1154,6 +1165,35 @@ impl Telemetry {
                         let mut values = base.clone();
                         for a in node.attributes() {
                             values.push((a.name().to_string(), Value::String(a.value().into())));
+                        }
+                        // Its text, each child element's text by the child's
+                        // name, and the attributes of the elements it lies
+                        // in (`{^name}` one out, `{^^name}` two), none
+                        // replacing a capture already named.
+                        let mut more = vec![("text".to_string(), xml_text(node))];
+                        for child in node.children().filter(|c| c.is_element()) {
+                            if child.children().all(|c| !c.is_element()) {
+                                more.push((child.tag_name().name().to_string(), xml_text(child)));
+                            }
+                        }
+                        for (n, outer) in node
+                            .ancestors()
+                            .skip(1)
+                            .filter(|a| a.is_element())
+                            .enumerate()
+                        {
+                            let up = "^".repeat(n + 1);
+                            for a in outer.attributes() {
+                                more.push((
+                                    format!("{up}{}", a.name()),
+                                    Value::String(a.value().into()),
+                                ));
+                            }
+                        }
+                        for (name, v) in more {
+                            if !values.iter().any(|(k, _)| *k == name) {
+                                values.push((name, v));
+                            }
                         }
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
@@ -2510,6 +2550,59 @@ mod tests {
                     "ABCD": {"sc": {"1": {"1": 3, "2": 1}, "2": {"1": 7}}},
                     "EFGH": {"s2": {"1": {"1": 9}}}},
                 "cue_place": {"sc": 1, "s2": 0}}))
+        );
+    }
+
+    #[test]
+    fn xml_elements_give_their_text_children_and_ancestors() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/version$", "xml_each": "product_information",
+                 "state": {"product.model": "{product_model}", "product.width": "{session_x_resolution}"}},
+                {"path": "^/buffers$", "xml_each": "buffer",
+                 "state": {"me.{^^index}.buffer": "{selection}"}},
+                {"path": "^/names$", "xml_each": "name",
+                 "state": {"names.{id}": "{text}"}},
+            ]})),
+            &state(json!({
+                "product.model": {"type": "string", "description": "x"},
+                "product.width": {"type": "int", "description": "x"},
+                "me.*.buffer": {"type": "string", "description": "x"},
+                "names.*": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let reply = |path: &'static str, body: &'static str| {
+            t.apply(&Inbound::Http {
+                path,
+                headers: &[],
+                body: body.as_bytes(),
+                request: None,
+            })
+        };
+        assert_eq!(
+            reply(
+                "/version",
+                "<product_information><product_model> TC1 </product_model>\
+                   <session_x_resolution>1920</session_x_resolution></product_information>"
+            ),
+            Some(json!({"product": {"model": "TC1", "width": 1920}}))
+        );
+        assert_eq!(
+            reply(
+                "/buffers",
+                r#"<buffers><main><buffer selection="BFR4"/></main><me index="0"><row><buffer selection="BFR1"/></row></me><me index="1"><row><buffer selection="BFR2"/></row></me></buffers>"#
+            ),
+            Some(json!({"me": {"0": {"buffer": "BFR1"}, "1": {"buffer": "BFR2"}}}))
+        );
+        // An attribute keeps its name over the element's text.
+        assert_eq!(
+            reply(
+                "/names",
+                r#"<n><name id="a">Cam &amp; 1</name><name id="b" text="x">y</name></n>"#
+            ),
+            Some(json!({"names": {"a": "Cam & 1", "b": "x"}}))
         );
     }
 
