@@ -1091,21 +1091,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## millumin — Millumin
 
-- [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:812](specs/millumin.yaml#L812))
-- [ ] Check that changes made through the OSC API send no feedback, and which side effects (a column's media starting) still do. ([specs/millumin.yaml:767](specs/millumin.yaml#L767))
-- [ ] Check where /? and /ping answers go (the configured senders are assumed) and what /ping sends. ([specs/millumin.yaml:770](specs/millumin.yaml#L770))
-- [ ] Check the light intensity scale on input (0-255 in the documentation's example) and feedback (0 to 1), and the master levels' range. ([specs/millumin.yaml:799](specs/millumin.yaml#L799))
-- [ ] Check the rate of /millumin/layer:<name>/media/time feedback and whether it is sent for every layer. ([specs/millumin.yaml:673](specs/millumin.yaml#L673))
-- [ ] Check whether Millumin 5 still has a global API feedback switch beside each sender's send feedback. ([specs/millumin.yaml:759](specs/millumin.yaml#L759))
-- [ ] Check which of the dashboard and the edited timeline play, pause and go_to_time act on. ([specs/millumin.yaml:781](specs/millumin.yaml#L781))
-- [ ] Check that stop_column takes no column in Millumin 5. ([specs/millumin.yaml:783](specs/millumin.yaml#L783))
-- [ ] Check that floats are accepted where the documentation shows whole numbers (positions, rotation, media time). ([specs/millumin.yaml:405](specs/millumin.yaml#L405))
-- [ ] Check that /layer:<name>/mapping/<corner> (and its /x and /y forms) moves the corner for a named layer, as the documentation shows for selectedLayer. ([specs/millumin.yaml:456](specs/millumin.yaml#L456))
-- [ ] Record the feedback for a moved mapping corner: its address (mapping/topLeft by layer name assumed) and arguments ([x, y] assumed, or x and y apart). ([specs/millumin.yaml:703](specs/millumin.yaml#L703))
-- [ ] Record the feedback address and argument for an effect parameter change (layer:<name>/effect<N>/<param> [value] assumed). ([specs/millumin.yaml:712](specs/millumin.yaml#L712))
-- [ ] Record the argument of /millumin/layer:<name>/selected and /millumin/light:<name>/selected (1 assumed from the /millumin/info example), and whether deselection sends 0. ([specs/millumin.yaml:715](specs/millumin.yaml#L715))
-- [ ] Check whether media normalizedTime and speed feedback is also sent by layer name, or only for the selected layer as documented. ([specs/millumin.yaml:700](specs/millumin.yaml#L700))
-- [ ] Record the argument types of /millumin/info (the original address as a string, then the values). ([specs/millumin.yaml:721](specs/millumin.yaml#L721))
+- [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:864](specs/millumin.yaml#L864))
+- [ ] Check that changes made through the OSC API send no feedback, and which side effects (a column's media starting) still do. ([specs/millumin.yaml:802](specs/millumin.yaml#L802))
+- [ ] Check where /? and /ping answers go (the configured senders are assumed) and what /ping sends. ([specs/millumin.yaml:803](specs/millumin.yaml#L803))
+- [ ] Check the light intensity scale on input (0-255 in the documentation's example) and feedback (0 to 1), and the master levels' range. ([specs/millumin.yaml:851](specs/millumin.yaml#L851))
+- [ ] Check the rate of /millumin/layer:<name>/media/time feedback and whether it is sent for every layer. ([specs/millumin.yaml:706](specs/millumin.yaml#L706))
+- [ ] Check whether Millumin 5 still has a global API feedback switch beside each sender's send feedback. ([specs/millumin.yaml:794](specs/millumin.yaml#L794))
+- [ ] Check which of the dashboard and the edited timeline play, pause and go_to_time act on. ([specs/millumin.yaml:833](specs/millumin.yaml#L833))
+- [ ] Check that stop_column takes no column in Millumin 5. ([specs/millumin.yaml:835](specs/millumin.yaml#L835))
+- [ ] Check that floats are accepted where the documentation shows whole numbers (positions, rotation, media time). ([specs/millumin.yaml:408](specs/millumin.yaml#L408))
+- [ ] Check that /layer:<name>/mapping/<corner> (and its /x and /y forms) moves the corner for a named layer, as the documentation shows for selectedLayer. ([specs/millumin.yaml:471](specs/millumin.yaml#L471))
+- [ ] Record the feedback for a moved mapping corner: its address (mapping/topLeft by layer name assumed) and arguments ([x, y] assumed, or x and y apart). ([specs/millumin.yaml:736](specs/millumin.yaml#L736))
+- [ ] Record the feedback address and argument for an effect parameter change (layer:<name>/effect<N>/<param> [value] assumed). ([specs/millumin.yaml:745](specs/millumin.yaml#L745))
+- [ ] Record the argument of /millumin/layer:<name>/selected and /millumin/light:<name>/selected (1 assumed from the /millumin/info example), and whether deselection sends 0. ([specs/millumin.yaml:748](specs/millumin.yaml#L748))
+- [ ] Check whether media normalizedTime and speed feedback is also sent by layer name, or only for the selected layer as documented. ([specs/millumin.yaml:733](specs/millumin.yaml#L733))
+- [ ] Record the argument types of /millumin/info (the original address as a string, then the values). ([specs/millumin.yaml:754](specs/millumin.yaml#L754))
+- [ ] Check that a property's /? query sent right after an OSC change is answered with the new value, and which address the position, mapping corner and effect queries answer on. ([specs/millumin.yaml:805](specs/millumin.yaml#L805))
+- [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:676](specs/millumin.yaml#L676))
 
 ## newtek-tricaster — NewTek TriCaster
 
