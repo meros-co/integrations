@@ -172,17 +172,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## avstumpfl-pixera — AV Stumpfl PIXERA
 
-- [ ] Confirm that replies and pushed monEvent messages on a JSON/TCP (dl) access point end with 0xPX, and what setMonitoringHasDelimiter changes (26.1 lists it without a description). ([specs/avstumpfl-pixera.yaml:690](specs/avstumpfl-pixera.yaml#L690))
-- [ ] Check how a PIXERA before 26.1 answers setMonitoringHasDelimiter (an error reply is assumed) and that monitoring still works there. ([specs/avstumpfl-pixera.yaml:691](specs/avstumpfl-pixera.yaml#L691))
-- [ ] Confirm that setMonitoringEventMode all pushes timelineTransport, timelinePositions and timelineCountdowns with the same entry shapes as pollMonitoring, with id -1, and how often positions arrive. ([specs/avstumpfl-pixera.yaml:682](specs/avstumpfl-pixera.yaml#L682))
-- [ ] Check that a reply carries the request's id (1) as "id":1, so that pushed messages (id -1) are not taken as replies. ([specs/avstumpfl-pixera.yaml:94](specs/avstumpfl-pixera.yaml#L94))
-- [ ] Check the error object PIXERA sends for an unknown method, wrong parameter names, an unknown timeline or cue name, and an invalid handle. ([specs/avstumpfl-pixera.yaml:139](specs/avstumpfl-pixera.yaml#L139))
-- [ ] Check what a name or path containing the text 0xPX does to framing. ([specs/avstumpfl-pixera.yaml:668](specs/avstumpfl-pixera.yaml#L668))
-- [ ] Confirm the default API port (1400 assumed from AV Stumpfl's examples; none is documented) and whether a disabled API (25.2 default) refuses the connection or answers -32602. ([specs/avstumpfl-pixera.yaml:660](specs/avstumpfl-pixera.yaml#L660))
-- [ ] Check whether handles stay valid after reloading the project or restarting PIXERA. ([specs/avstumpfl-pixera.yaml:685](specs/avstumpfl-pixera.yaml#L685))
-- [ ] Confirm the Compound time methods take "name" in 26.1 and "timelineName" before it, and which revision changed it. ([specs/avstumpfl-pixera.yaml:69](specs/avstumpfl-pixera.yaml#L69))
-- [ ] Check whether load_project discards unsaved changes silently. ([specs/avstumpfl-pixera.yaml:696](specs/avstumpfl-pixera.yaml#L696))
-- [ ] Check the format of getCurrentHMSFOfTimeline (hh:mm:ss:ff assumed) and what getCurrentCountdownOfTimeline returns when no cue is ahead. ([specs/avstumpfl-pixera.yaml:305](specs/avstumpfl-pixera.yaml#L305))
+- [ ] Confirm that replies and pushed monEvent messages on a JSON/TCP (dl) access point end with 0xPX, and what setMonitoringHasDelimiter changes (26.1 lists it without a description). ([specs/avstumpfl-pixera.yaml:6725](specs/avstumpfl-pixera.yaml#L6725))
+- [ ] Check how a PIXERA before 26.1 answers setMonitoringHasDelimiter (an error reply is assumed) and that monitoring still works there. ([specs/avstumpfl-pixera.yaml:6726](specs/avstumpfl-pixera.yaml#L6726))
+- [ ] Confirm that setMonitoringEventMode all pushes timelineTransport, timelinePositions and timelineCountdowns with the same entry shapes as pollMonitoring, with id -1, and how often positions arrive. ([specs/avstumpfl-pixera.yaml:6718](specs/avstumpfl-pixera.yaml#L6718))
+- [ ] Check that a reply carries the request's id (1) as "id":1, so that pushed messages (id -1) are not taken as replies. ([specs/avstumpfl-pixera.yaml:104](specs/avstumpfl-pixera.yaml#L104))
+- [ ] Check the error object PIXERA sends for an unknown method, wrong parameter names, an unknown timeline or cue name, and an invalid handle. ([specs/avstumpfl-pixera.yaml:427](specs/avstumpfl-pixera.yaml#L427))
+- [ ] Check what a name or path containing the text 0xPX does to framing. ([specs/avstumpfl-pixera.yaml:6703](specs/avstumpfl-pixera.yaml#L6703))
+- [ ] Confirm the default API port (1400 assumed from AV Stumpfl's examples; none is documented) and whether a disabled API (25.2 default) refuses the connection or answers -32602. ([specs/avstumpfl-pixera.yaml:6695](specs/avstumpfl-pixera.yaml#L6695))
+- [ ] Check whether handles stay valid after reloading the project or restarting PIXERA. ([specs/avstumpfl-pixera.yaml:6720](specs/avstumpfl-pixera.yaml#L6720))
+- [ ] Confirm the Compound time methods take "name" in 26.1 and "timelineName" before it, and which revision changed it. ([specs/avstumpfl-pixera.yaml:79](specs/avstumpfl-pixera.yaml#L79))
+- [ ] Check whether load_project discards unsaved changes silently. ([specs/avstumpfl-pixera.yaml:6731](specs/avstumpfl-pixera.yaml#L6731))
+- [ ] Check the format of getCurrentHMSFOfTimeline (hh:mm:ss:ff assumed) and what getCurrentCountdownOfTimeline returns when no cue is ahead. ([specs/avstumpfl-pixera.yaml:651](specs/avstumpfl-pixera.yaml#L651))
+- [ ] Confirm the handle-based requests answer as the 26.1 reference shows, and how a setter whose arguments the reference marks optional treats each one left out. ([specs/avstumpfl-pixera.yaml:6778](specs/avstumpfl-pixera.yaml#L6778))
+- [ ] Record the units of the arguments the reference does not state (positions, rotations, layer opacity and volume, cue wait and blend durations, clip times) against PIXERA's user interface. ([specs/avstumpfl-pixera.yaml:6782](specs/avstumpfl-pixera.yaml#L6782))
+- [ ] Check which handle-based, Session, Resources and LiveSystems methods PIXERA before 26.1 has, to list them for pixera-legacy. ([specs/avstumpfl-pixera.yaml:6791](specs/avstumpfl-pixera.yaml#L6791))
+- [ ] Record the words getLiveSystemState, getRemoteSystemState and LiveSystem.getState answer, and the numbers getBackupRole answers. ([specs/avstumpfl-pixera.yaml:6808](specs/avstumpfl-pixera.yaml#L6808))
+- [ ] Check how audio master channels are numbered (0 or 1 for the master) for live_system_get_audio_master_volume and mute. ([specs/avstumpfl-pixera.yaml:6805](specs/avstumpfl-pixera.yaml#L6805))
+- [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
+- [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
 ## barco-eventmaster — Barco Event Master
 
