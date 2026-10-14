@@ -1115,13 +1115,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## obs-studio — OBS Studio (obs-websocket 5)
 
 - [ ] Record the fields of the scene item, filter, input, transition and output objects in GetSceneItemList, GetSourceFilterList, GetInputList, GetSceneTransitionList and GetOutputList replies (sceneItemId, sceneItemBlendMode, filterSettings, unversionedInputKind, transitionFixed, outputWidth and the rest): the protocol description names the arrays but not their members. ([specs/obs-studio.yaml:1106](specs/obs-studio.yaml#L1106))
-- [ ] Check that InputVolumeMeters arrives every 50 ms listing only active inputs, including when none is active, since an input it stops listing loses its levels. ([specs/obs-studio.yaml:1180](specs/obs-studio.yaml#L1180))
-- [ ] Check which input kinds answer GetMediaInputStatus (the media source, VLC source and image slide show are assumed) and what other inputs reply. ([specs/obs-studio.yaml:1183](specs/obs-studio.yaml#L1183))
-- [ ] Check that RecordStateChanged carries outputPath only on stop, and that RecordFileChanged fires on each split. ([specs/obs-studio.yaml:1142](specs/obs-studio.yaml#L1142))
-- [ ] Check GetReplayBufferStatus's refusal when the profile has no replay buffer, and that the replay buffer state is read again after a profile change. ([specs/obs-studio.yaml:1144](specs/obs-studio.yaml#L1144))
-- [ ] Check that the stream service settings name the server "server" for both rtmp_common and rtmp_custom. ([specs/obs-studio.yaml:1159](specs/obs-studio.yaml#L1159))
-- [ ] Check the units of GetStats' memoryUsage and availableDiskSpace (MB assumed). ([specs/obs-studio.yaml:1161](specs/obs-studio.yaml#L1161))
-- [ ] Check that no event follows set_scene_item_blend_mode, set_input_deinterlace_mode, set_scene_scene_transition_override or set_video_settings, which are read back after the command instead. ([specs/obs-studio.yaml:1216](specs/obs-studio.yaml#L1216))
+- [ ] Check that InputVolumeMeters arrives every 50 ms listing only active inputs, including when none is active, since an input it stops listing loses its levels. ([specs/obs-studio.yaml:1181](specs/obs-studio.yaml#L1181))
+- [ ] Check which input kinds answer GetMediaInputStatus (the media source, VLC source and image slide show are assumed) and what other inputs reply. ([specs/obs-studio.yaml:1184](specs/obs-studio.yaml#L1184))
+- [ ] Check that RecordStateChanged carries outputPath only on stop, and that RecordFileChanged fires on each split. ([specs/obs-studio.yaml:1143](specs/obs-studio.yaml#L1143))
+- [ ] Check GetReplayBufferStatus's refusal when the profile has no replay buffer, and that the replay buffer state is read again after a profile change. ([specs/obs-studio.yaml:1145](specs/obs-studio.yaml#L1145))
+- [ ] Check that the stream service settings name the server "server" for both rtmp_common and rtmp_custom. ([specs/obs-studio.yaml:1160](specs/obs-studio.yaml#L1160))
+- [ ] Check the units of GetStats' memoryUsage and availableDiskSpace (MB assumed). ([specs/obs-studio.yaml:1162](specs/obs-studio.yaml#L1162))
+- [ ] Check that no event follows set_scene_item_blend_mode, set_input_deinterlace_mode, set_scene_scene_transition_override or set_video_settings, which are read back after the command instead. ([specs/obs-studio.yaml:1217](specs/obs-studio.yaml#L1217))
+- [ ] Check that GetCurrentSceneTransitionCursor follows the studio-mode T-bar while it is dragged in OBS or held part-way by set_t_bar_position with release off, that dragging the T-bar sends SceneTransitionStarted, and that the cursor reads 1.0 once an interrupted transition stops. ([specs/obs-studio.yaml:1128](specs/obs-studio.yaml#L1128))
 
 ## obsidian-onyx — Obsidian ONYX (Telnet)
 
