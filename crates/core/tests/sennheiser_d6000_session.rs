@@ -7,6 +7,8 @@
 
 #![cfg(feature = "sennheiser-digital-6000")]
 
+mod common;
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
@@ -106,7 +108,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn em6000_end_to_end() {
     let (port, _device) = simulated_em6000().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
 
     let id = core
         .open(OpenRequest {

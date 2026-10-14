@@ -4,6 +4,8 @@
 
 #![cfg(feature = "mediamtx")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -127,7 +129,7 @@ async fn requests_reach_a_second_server_of_the_device_on_its_own_port() {
     serve(api_listener, seen.clone(), api);
     serve(playback_listener, seen.clone(), playback);
 
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "mediamtx".into(),

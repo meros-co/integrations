@@ -6,6 +6,8 @@
 
 #![cfg(feature = "biamp-tesira")]
 
+mod common;
+
 use std::time::Duration;
 
 use meros_integrations::{Core, Event, OpenRequest, Outcome};
@@ -83,7 +85,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn tesira_end_to_end() {
     let port = simulated_tesira().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "biamp-tesira".into(),

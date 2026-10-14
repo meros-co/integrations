@@ -12,6 +12,8 @@
     feature = "generic-tcp-udp"
 ))]
 
+mod common;
+
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -138,7 +140,7 @@ async fn osc_udp_device(feedback: Option<u16>) -> (u16, Arc<Mutex<Vec<Vec<u8>>>>
 #[tokio::test(flavor = "multi_thread")]
 async fn osc_over_udp() {
     let (port, received) = osc_udp_device(None).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "generic-osc", port, json!({}));
     wait_for_connection(&core, id, |c| *c == Connection::Unmonitored).await;
 
@@ -199,7 +201,7 @@ async fn osc_over_udp() {
 async fn osc_feedback_to_a_fixed_listen_port() {
     let listen = free_udp_port();
     let (port, _) = osc_udp_device(Some(listen)).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "generic-osc", port, json!({"listen_port": listen}));
     wait_for_connection(&core, id, |c| *c == Connection::Unmonitored).await;
     core.execute(id, "send", params(json!({"address": "/subscribe"})))
@@ -251,7 +253,7 @@ async fn osc_over_tcp_with_slip() {
         }
     });
 
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "generic-osc", port, json!({"transport": "tcp"}));
     wait_for_connection(&core, id, |c| *c == Connection::Connected).await;
     let reply = core
@@ -289,7 +291,7 @@ async fn tcp_lines_requests_and_reconnection() {
         }
     });
 
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(
         &core,
         "generic-tcp-udp",
@@ -396,7 +398,7 @@ async fn udp_requests() {
             }
         }
     });
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(
         &core,
         "generic-tcp-udp",
@@ -529,7 +531,7 @@ async fn http_server() -> (u16, Arc<AtomicUsize>) {
 #[tokio::test(flavor = "multi_thread")]
 async fn http_requests_and_polling() {
     let (port, polls) = http_server().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(
         &core,
         "generic-http",
@@ -627,7 +629,7 @@ async fn http_without_a_server_reports_disconnected() {
         .local_addr()
         .unwrap()
         .port();
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "generic-http", port, json!({}));
     wait_for_connection(&core, id, |c| *c == Connection::Unmonitored).await;
     let result = core

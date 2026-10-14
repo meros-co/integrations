@@ -3,9 +3,11 @@
 
 #![cfg(all(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
 
+mod common;
+
 use std::time::Duration;
 
-use meros_integrations::{Core, Event, OpenRequest, Outcome};
+use meros_integrations::{Event, OpenRequest, Outcome};
 use serde_json::{json, Value};
 
 fn params(v: Value) -> meros_integrations::Params {
@@ -21,7 +23,7 @@ async fn tsl_sent_by_one_core_is_received_by_another() {
         .unwrap()
         .port();
 
-    let receiver = Core::new().unwrap();
+    let receiver = common::core().unwrap();
     let listener = receiver
         .open(OpenRequest {
             device: "tsl-umd-listener".into(),
@@ -33,7 +35,7 @@ async fn tsl_sent_by_one_core_is_received_by_another() {
         })
         .unwrap();
 
-    let sender = Core::new().unwrap();
+    let sender = common::core().unwrap();
     let display = sender
         .open(OpenRequest {
             device: "tsl-umd-display".into(),
@@ -109,7 +111,7 @@ async fn tsl_over_tcp_the_switcher_connects_to_the_listener() {
         .unwrap()
         .port();
 
-    let receiver = Core::new().unwrap();
+    let receiver = common::core().unwrap();
     let listener = receiver
         .open(OpenRequest {
             device: "tsl-umd-listener".into(),
@@ -121,7 +123,7 @@ async fn tsl_over_tcp_the_switcher_connects_to_the_listener() {
         })
         .unwrap();
 
-    let sender = Core::new().unwrap();
+    let sender = common::core().unwrap();
     let display = sender
         .open(OpenRequest {
             device: "tsl-umd-display".into(),

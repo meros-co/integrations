@@ -11,6 +11,8 @@
 
 #![cfg(feature = "novastar-h")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -171,7 +173,7 @@ async fn wait_for_state(
 #[tokio::test(flavor = "multi_thread")]
 async fn signed_requests_poll_the_screens_and_load_presets() {
     let (port, splicer) = simulate().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "novastar-h".into(),

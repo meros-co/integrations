@@ -10,6 +10,8 @@
 
 #![cfg(feature = "probel-swp08")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -189,7 +191,7 @@ async fn wait_for_state(
 #[tokio::test(flavor = "multi_thread")]
 async fn routing_and_names_are_read_and_kept_current() {
     let (port, router) = simulate().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, true);
 
     wait_for_state(&core, id, |s| {
@@ -228,7 +230,7 @@ async fn routing_and_names_are_read_and_kept_current() {
 #[tokio::test(flavor = "multi_thread")]
 async fn opened_for_commands_only_nothing_is_read() {
     let (port, router) = simulate().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, false);
     assert_eq!(
         core.execute(id, "interrogate", params(json!({"destination": 3})))

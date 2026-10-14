@@ -4,6 +4,8 @@
 
 #![cfg(feature = "softouch-easyworship")]
 
+mod common;
+
 use std::time::Duration;
 
 use meros_integrations::{Core, Event, OpenRequest, Outcome};
@@ -73,7 +75,7 @@ async fn wait_for(core: &Core, mut pred: impl FnMut(&Event) -> bool) {
 #[tokio::test(flavor = "multi_thread")]
 async fn easyworship_end_to_end() {
     let (port, mut seen) = simulated_easyworship().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "softouch-easyworship".into(),

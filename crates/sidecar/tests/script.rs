@@ -179,7 +179,14 @@ async fn the_shared_binding_script() {
     let _ = std::fs::remove_file(&token_file);
     let mut sidecar = KillOnDrop(
         Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
-            .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+            .args([
+                "serve",
+                "--listen",
+                "127.0.0.1:0",
+                "--bind-address",
+                "127.0.0.1",
+            ])
+            .arg("--token-file")
             .arg(&token_file)
             .stdout(Stdio::piped())
             .spawn()
@@ -336,7 +343,14 @@ async fn a_sidecar_started_for_some_devices() {
     let _ = std::fs::remove_file(&token_file);
     let mut sidecar = KillOnDrop(
         Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
-            .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+            .args([
+                "serve",
+                "--listen",
+                "127.0.0.1:0",
+                "--bind-address",
+                "127.0.0.1",
+            ])
+            .arg("--token-file")
             .arg(&token_file)
             .args(["--devices", "sennheiser-ew-g3-g4,shure-wireless"])
             .stdout(Stdio::piped())
@@ -374,7 +388,14 @@ async fn a_sidecar_started_for_some_devices() {
 
     // An id the build does not have stops it at startup.
     let status = Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
-        .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+        .args([
+            "serve",
+            "--listen",
+            "127.0.0.1:0",
+            "--bind-address",
+            "127.0.0.1",
+        ])
+        .arg("--token-file")
         .arg(&token_file)
         .args(["--devices", "no-such-device"])
         .stdout(Stdio::null())
@@ -421,7 +442,14 @@ async fn sigterm_closes_every_device_before_exiting() {
     let _ = std::fs::remove_file(&token_file);
     let mut sidecar = KillOnDrop(
         Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
-            .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+            .args([
+                "serve",
+                "--listen",
+                "127.0.0.1:0",
+                "--bind-address",
+                "127.0.0.1",
+            ])
+            .arg("--token-file")
             .arg(&token_file)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

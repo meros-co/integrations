@@ -9,6 +9,8 @@
 // tungstenite's handshake callback signature returns a large error type.
 #![allow(clippy::result_large_err)]
 
+mod common;
+
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -187,7 +189,7 @@ fn open(core: &Core, port: u16, password: &str) -> u64 {
 #[tokio::test(flavor = "multi_thread")]
 async fn obs_end_to_end() {
     let (port, _) = simulated_obs().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, PASSWORD);
 
     wait_for(&core, |e| {
@@ -225,7 +227,7 @@ async fn obs_end_to_end() {
 #[tokio::test(flavor = "multi_thread")]
 async fn obs_wrong_password_is_unauthorized_and_never_retried() {
     let (port, connections) = simulated_obs().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "wrong");
 
     wait_for(&core, |e| {

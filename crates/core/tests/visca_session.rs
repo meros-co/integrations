@@ -9,6 +9,8 @@
 
 #![cfg(feature = "visca")]
 
+mod common;
+
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -119,7 +121,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn visca_over_ip_end_to_end() {
     let (port, log) = simulated_camera().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "visca".into(),

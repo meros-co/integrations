@@ -15,6 +15,8 @@
 
 #![cfg(feature = "sony-camera")]
 
+mod common;
+
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -664,7 +666,7 @@ fn codes(camera: &Shared) -> Vec<u16> {
 #[tokio::test(flavor = "multi_thread")]
 async fn sony_camera_over_ptp_ip_end_to_end() {
     let (port, camera, events) = simulated_camera(ptp3_body).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = connected(
         &core,
         "ilce-7sm3",
@@ -882,7 +884,7 @@ async fn camera_control_ptp2_body() {
         c.controls = vec![0x5007, 0xD2C1, 0xD2C2, 0xD2C7];
     })
     .await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = connected(
         &core,
         "ilce-7m3",
@@ -936,7 +938,7 @@ async fn ftp_jobs_on_a_video_body() {
         c.jobs = vec![(1, "C0001.MXF".into())];
     })
     .await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = connected(
         &core,
         "ilme-fx6",
@@ -984,7 +986,7 @@ async fn uploads_and_setting_files() {
         c.props.insert(0xD08B, prop(UINT8, false, 0, &[]));
     })
     .await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = connected(
         &core,
         "ilce-7sm3",
@@ -1079,7 +1081,7 @@ fn live_requests(camera: &Shared) -> usize {
 #[tokio::test(flavor = "multi_thread")]
 async fn live_view_stream_while_watched() {
     let (port, camera, _events) = simulated_camera(ptp3_body).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = connected(
         &core,
         "ilce-7sm3",
@@ -1155,7 +1157,7 @@ async fn live_view_during_downloads_is_the_operators_choice() {
         c.part_delay_ms = 120;
     })
     .await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = connected(
         &core,
         "ilce-7sm3",

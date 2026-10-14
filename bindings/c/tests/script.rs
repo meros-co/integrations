@@ -90,7 +90,9 @@ fn the_shared_binding_script() {
         &std::fs::read_to_string(root().join("tests/bindings/script.json")).unwrap(),
     )
     .unwrap();
-    let core = mi_core_new();
+    // Loopback only, so a test run asks no firewall for network access.
+    let options = cs(r#"{"bind_address":"127.0.0.1"}"#);
+    let core = unsafe { mi_core_new_with_options(options.as_ptr()) };
     assert!(!core.is_null());
 
     for (index, raw) in script["steps"].as_array().unwrap().iter().enumerate() {
@@ -216,7 +218,9 @@ fn the_shared_binding_script() {
 #[test]
 fn a_core_started_for_some_devices() {
     unsafe {
-        let options = cs(r#"{"devices":["sennheiser-ew-g3-g4","shure-wireless"]}"#);
+        let options = cs(
+            r#"{"bind_address":"127.0.0.1","devices":["sennheiser-ew-g3-g4","shure-wireless"]}"#,
+        );
         let core = mi_core_create(options.as_ptr(), std::ptr::null_mut());
         assert!(!core.is_null());
         let catalog = take(mi_catalog(core));
@@ -232,7 +236,7 @@ fn a_core_started_for_some_devices() {
         assert_eq!(refused["error"]["error"], "invalid_request");
         mi_core_free(core);
 
-        let options = cs(r#"{"devices":["no-such-device"]}"#);
+        let options = cs(r#"{"bind_address":"127.0.0.1","devices":["no-such-device"]}"#);
         assert!(mi_core_new_with_options(options.as_ptr()).is_null());
         let mut error: *mut c_char = std::ptr::null_mut();
         assert!(mi_core_create(options.as_ptr(), &mut error).is_null());

@@ -8,6 +8,8 @@
 
 #![cfg(feature = "pjlink")]
 
+mod common;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -215,7 +217,7 @@ async fn wait_for_state(
 #[tokio::test(flavor = "multi_thread")]
 async fn class_2_with_sha256_authentication() {
     let (port, projector) = simulate(true, 2).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "class-2", PASSWORD);
 
     // The first poll reads identity and status.
@@ -271,7 +273,7 @@ async fn class_2_with_sha256_authentication() {
 #[tokio::test(flavor = "multi_thread")]
 async fn class_1_falls_back_to_md5() {
     let (port, projector) = simulate(false, 1).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "class-1", PASSWORD);
 
     wait_for_state(&core, id, |s| {
@@ -305,7 +307,7 @@ async fn class_1_falls_back_to_md5() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_refused_password_is_never_retried() {
     let (port, projector) = simulate(true, 2).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "class-2", "wrongpassword");
 
     tokio::time::timeout(Duration::from_secs(10), async {

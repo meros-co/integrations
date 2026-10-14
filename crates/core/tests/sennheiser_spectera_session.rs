@@ -10,6 +10,8 @@
 
 #![cfg(feature = "sennheiser-spectera")]
 
+mod common;
+
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
@@ -264,7 +266,7 @@ fn open(core: &Core, port: u16, password: &str) -> u64 {
 #[tokio::test(flavor = "multi_thread")]
 async fn spectera_end_to_end() {
     let (port, device) = simulated_spectera().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "secret");
 
     wait_for(&core, |e| {
@@ -342,7 +344,7 @@ async fn spectera_end_to_end() {
 #[tokio::test(flavor = "multi_thread")]
 async fn spectera_wrong_password_is_unauthorized_and_never_retried() {
     let (port, device) = simulated_spectera().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "wrong");
 
     wait_for(&core, |e| {

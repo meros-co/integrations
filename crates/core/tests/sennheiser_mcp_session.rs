@@ -10,6 +10,8 @@
 
 #![cfg(feature = "sennheiser-ew-g3-g4")]
 
+mod common;
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
@@ -83,7 +85,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn g4_receiver_end_to_end() {
     let _device = simulated_g4().await;
-    let core = Core::with_options(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
+    let core = common::core_with(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
         .unwrap();
 
     let id = core

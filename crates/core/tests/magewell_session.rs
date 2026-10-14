@@ -7,6 +7,8 @@
 
 #![cfg(feature = "magewell-proconvert")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -175,7 +177,7 @@ fn open(core: &Core, model: &str, port: u16, monitor: bool) -> u64 {
 async fn a_decoder_logs_in_polls_and_logs_in_again_when_the_session_ends() {
     let shared = Shared::default();
     let port = simulated(shared.clone(), false).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "ndi-to-hdmi", port, true);
 
     wait_for(&core, |e| {
@@ -197,7 +199,7 @@ async fn a_decoder_logs_in_polls_and_logs_in_again_when_the_session_ends() {
 async fn a_command_logs_in_again_when_the_session_has_ended() {
     let shared = Shared::default();
     let port = simulated(shared.clone(), false).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     // Commands only, so no poll renews the session meanwhile.
     let id = open(&core, "ndi-to-hdmi", port, false);
     assert!(core
@@ -236,7 +238,7 @@ async fn a_command_logs_in_again_when_the_session_has_ended() {
 async fn an_ip_decoder_logs_in_with_sha256_json() {
     let shared = Shared::default();
     let port = simulated(shared.clone(), true).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "ip-to-hdmi", port, true);
     wait_for(&core, |e| {
         matches!(e, Event::State { device, patch } if *device == id
@@ -274,7 +276,7 @@ async fn a_refused_login_is_final_and_commands_only_pings_without_one() {
     let shared = Shared::default();
     shared.lock().unwrap().refuse = true;
     let port = simulated(shared.clone(), false).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
 
     // Opened for commands only: ping needs no login.
     let quiet = open(&core, "sdi-plus", port, false);

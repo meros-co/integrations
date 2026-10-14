@@ -8,6 +8,8 @@
     feature = "shure-wireless"
 ))]
 
+mod common;
+
 use meros_integrations::{
     json as api, Core, CoreOptions, DiscoverAction, DiscoverRequest, OpenError, OpenRequest,
 };
@@ -21,7 +23,7 @@ const WIRELESS: [&str; 4] = [
 ];
 
 fn wireless() -> Core {
-    Core::with_options(CoreOptions::new().devices(WIRELESS)).unwrap()
+    common::core_with(CoreOptions::new().devices(WIRELESS)).unwrap()
 }
 
 fn open(core: &Core, device: &str, model: &str) -> Result<u64, OpenError> {
@@ -66,7 +68,7 @@ async fn a_selected_device_opens_and_any_other_is_refused() {
     let device = open(&core, "shure-wireless", "ulxd4").unwrap();
     core.close(device).await;
 
-    let every = Core::new().unwrap();
+    let every = common::core().unwrap();
     for (id, spec) in &every.catalog().devices {
         if WIRELESS.contains(&id.as_str()) {
             continue;
@@ -112,7 +114,7 @@ fn discovery_runs_only_the_protocols_of_the_selected_devices() {
     // Empty means every protocol of the selection: here MCP alone.
     core.discover(discover(&[], DiscoverAction::Stop)).unwrap();
 
-    let shure_only = Core::with_options(CoreOptions::new().devices(["shure-wireless"])).unwrap();
+    let shure_only = common::core_with(CoreOptions::new().devices(["shure-wireless"])).unwrap();
     assert!(shure_only.discovery_protocols().is_empty());
     assert!(shure_only
         .discover(discover(&["mcp"], DiscoverAction::Listen))
@@ -125,7 +127,7 @@ fn discovery_runs_only_the_protocols_of_the_selected_devices() {
 #[test]
 fn a_selection_the_build_cannot_meet_fails_construction() {
     for devices in [vec!["no-such-device".to_string()], vec![]] {
-        let err = Core::with_options(CoreOptions::new().devices(devices))
+        let err = common::core_with(CoreOptions::new().devices(devices))
             .err()
             .expect("refused");
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
@@ -133,7 +135,7 @@ fn a_selection_the_build_cannot_meet_fails_construction() {
     // The JSON options every binding passes.
     let options = api::core_options(&json!({"devices": ["shure-wireless"]})).unwrap();
     assert_eq!(options.devices, Some(vec!["shure-wireless".to_string()]));
-    assert!(Core::with_options(options).is_ok());
+    assert!(common::core_with(options).is_ok());
 }
 
 /// A build without the `sony-camera` integration has no Sony camera at all,
@@ -141,7 +143,7 @@ fn a_selection_the_build_cannot_meet_fails_construction() {
 #[cfg(not(feature = "sony-camera"))]
 #[test]
 fn an_integration_left_out_of_the_build_is_named() {
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     assert!(core.catalog().device("sony-camera").is_none());
     assert!(!core.discovery_protocols().contains(&"ssdp"));
     assert_eq!(
@@ -151,7 +153,7 @@ fn an_integration_left_out_of_the_build_is_named() {
             feature: "sony-camera".into()
         })
     );
-    let err = Core::with_options(CoreOptions::new().devices(["sony-camera"]))
+    let err = common::core_with(CoreOptions::new().devices(["sony-camera"]))
         .err()
         .expect("refused")
         .to_string();
@@ -162,7 +164,7 @@ fn an_integration_left_out_of_the_build_is_named() {
 #[test]
 fn a_vendor_group_selects_its_integrations() {
     let core =
-        Core::with_options(CoreOptions::new().devices(["vendor-sennheiser", "shure-wireless"]))
+        common::core_with(CoreOptions::new().devices(["vendor-sennheiser", "shure-wireless"]))
             .unwrap();
     let mut ids: Vec<&str> = core.catalog().devices.keys().map(String::as_str).collect();
     ids.sort();
@@ -177,7 +179,7 @@ fn a_vendor_group_selects_its_integrations() {
     expected.sort();
     assert_eq!(ids, expected);
     let options = api::core_options(&json!({"devices": ["vendor-shure"]})).unwrap();
-    let shure = Core::with_options(options).unwrap();
+    let shure = common::core_with(options).unwrap();
     assert_eq!(
         shure.catalog().devices.keys().collect::<Vec<_>>(),
         [
@@ -189,9 +191,9 @@ fn a_vendor_group_selects_its_integrations() {
             "shure-wireless"
         ]
     );
-    let every = Core::with_options(CoreOptions::new().devices(["all"])).unwrap();
+    let every = common::core_with(CoreOptions::new().devices(["all"])).unwrap();
     assert_eq!(
         every.catalog().devices.len(),
-        Core::new().unwrap().catalog().devices.len()
+        common::core().unwrap().catalog().devices.len()
     );
 }

@@ -17,6 +17,9 @@ sys.path.insert(0, str(HERE.parent))
 from meros_integrations import Core, IntegrationsError  # noqa: E402
 from meros_integrations._native import NativeCore  # noqa: E402
 
+# Tests bind loopback only, so a run asks no firewall for network access.
+LOOPBACK = "127.0.0.1"
+
 
 def strip_messages(v):
     if isinstance(v, dict):
@@ -56,7 +59,7 @@ class SharedScript(unittest.TestCase):
 
     def test_the_shared_binding_script(self):
         script = json.loads((ROOT / "tests" / "bindings" / "script.json").read_text())
-        native = NativeCore()
+        native = NativeCore(json.dumps({"bind_address": LOOPBACK}))
         variables = dict(self.ports)
         for index, raw in enumerate(script["steps"]):
             step = substitute(raw, variables)
@@ -115,7 +118,7 @@ class SharedScript(unittest.TestCase):
                 self.fail(f"unknown op {op}")
 
     def test_the_idiomatic_wrapper(self):
-        core = Core()
+        core = Core(bind_address=LOOPBACK)
         with self.assertRaises(IntegrationsError) as caught:
             core.open({"device": "no-such-device", "model": "x", "host": "127.0.0.1"})
         self.assertEqual(caught.exception.code, "unknown_device")
@@ -132,7 +135,7 @@ class SharedScript(unittest.TestCase):
         core.close(device)
 
     def test_streams(self):
-        core = Core()
+        core = Core(bind_address=LOOPBACK)
         device = core.open({"device": "http-snapshot", "model": "generic", "host": "127.0.0.1",
                             "port": self.ports["snapshot"],
                             "settings": {"path": "/snapshot.jpg", "interval_ms": 50}})
@@ -152,7 +155,7 @@ class SharedScript(unittest.TestCase):
         core.close(device)
 
     def test_a_core_started_for_some_devices(self):
-        core = Core(devices=["sennheiser-ew-g3-g4", "shure-wireless"])
+        core = Core(bind_address=LOOPBACK, devices=["sennheiser-ew-g3-g4", "shure-wireless"])
         self.assertEqual(list(core.catalog()["devices"]), ["sennheiser-ew-g3-g4", "shure-wireless"])
         with self.assertRaises(IntegrationsError) as refused:
             core.open({"device": "kramer-p3000", "model": "p3000-generic", "host": "127.0.0.1"})
@@ -160,7 +163,7 @@ class SharedScript(unittest.TestCase):
         with self.assertRaises(IntegrationsError):
             core.discover({"action": "scan", "protocols": ["ssdp"]})
         with self.assertRaises(RuntimeError):
-            Core(devices=["no-such-device"])
+            Core(bind_address=LOOPBACK, devices=["no-such-device"])
 
 
 if __name__ == "__main__":

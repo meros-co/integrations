@@ -158,7 +158,11 @@ fn core(port: u16, every_s: u64) -> Core {
     let catalog = Catalog {
         devices: [(spec.id.clone(), spec)].into(),
     };
-    Core::with_catalog(catalog, CoreOptions::new()).unwrap()
+    Core::with_catalog(
+        catalog,
+        CoreOptions::new().bind_address([127, 0, 0, 1].into()),
+    )
+    .unwrap()
 }
 
 fn unix() -> u64 {

@@ -9,6 +9,8 @@
 
 #![cfg(feature = "novastar-central-control")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -115,7 +117,7 @@ async fn wait_for_state(
 async fn commands_are_framed_answered_and_kept_in_state() {
     // Refuse preset switching (register 0x0a000002).
     let (port, controller) = simulate(vec![[0x02, 0x00, 0x00, 0x0a]]).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "novastar-central-control".into(),

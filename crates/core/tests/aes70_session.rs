@@ -14,6 +14,8 @@
 
 #![cfg(feature = "aes70")]
 
+mod common;
+
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -299,7 +301,7 @@ async fn wait_for_state(core: &Core, id: DeviceId, pred: impl Fn(&Value) -> bool
 async fn ocp1_end_to_end() {
     let silent = Arc::new(AtomicBool::new(false));
     let (port, log) = simulate(silent.clone()).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "aes70".into(),
@@ -398,7 +400,7 @@ async fn ocp1_end_to_end() {
 #[tokio::test(flavor = "multi_thread")]
 async fn commands_only_walks_nothing_and_looks_up_what_a_command_names() {
     let (port, log) = simulate(Arc::new(AtomicBool::new(false))).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "aes70".into(),
@@ -434,7 +436,7 @@ async fn commands_only_walks_nothing_and_looks_up_what_a_command_names() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_port_is_required() {
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let opened = core.open(OpenRequest {
         device: "aes70".into(),
         model: "aes70-device".into(),

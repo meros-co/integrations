@@ -8,6 +8,8 @@
 
 #![cfg(feature = "sennheiser-ew-dx")]
 
+mod common;
+
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
@@ -258,7 +260,7 @@ fn open(core: &Core, port: u16, password: &str) -> u64 {
 #[tokio::test(flavor = "multi_thread")]
 async fn ewdx_end_to_end() {
     let (port, device) = simulated_ewdx().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "secret");
 
     wait_for(&core, |e| {
@@ -330,7 +332,7 @@ async fn ewdx_end_to_end() {
 #[tokio::test(flavor = "multi_thread")]
 async fn ewdx_wrong_password_is_unauthorized_and_never_retried() {
     let (port, device) = simulated_ewdx().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, port, "wrong");
 
     wait_for(&core, |e| {
@@ -383,7 +385,7 @@ async fn simulated_legacy() -> (u16, Arc<Mutex<Vec<Value>>>) {
 async fn ewdx_legacy_mode_carries_what_sscv2_cannot() {
     let (port, _device) = simulated_ewdx().await;
     let (legacy_port, received) = simulated_legacy().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "sennheiser-ew-dx".into(),

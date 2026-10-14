@@ -12,6 +12,8 @@
 
 #![cfg(feature = "emberplus")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -501,7 +503,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn ember_plus_end_to_end() {
     let (port, log) = simulate().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "emberplus".into(),
@@ -612,7 +614,7 @@ async fn ember_plus_end_to_end() {
 #[tokio::test(flavor = "multi_thread")]
 async fn ember_plus_lazy_walk() {
     let (port, log) = simulate().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "emberplus".into(),

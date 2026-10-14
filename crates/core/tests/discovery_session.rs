@@ -4,15 +4,17 @@
 
 #![cfg(feature = "sennheiser-ew-g3-g4")]
 
+mod common;
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
-use meros_integrations::{Core, CoreOptions, DiscoverAction, DiscoverRequest, Event};
+use meros_integrations::{CoreOptions, DiscoverAction, DiscoverRequest, Event};
 use tokio::net::UdpSocket;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_g3_g4_is_discovered_and_identified_as_a_receiver() {
-    let core = Core::with_options(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
+    let core = common::core_with(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
         .unwrap();
     core.discover(DiscoverRequest {
         action: DiscoverAction::Listen,
