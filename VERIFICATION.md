@@ -468,11 +468,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-streaming — Blackmagic Web Presenter / Streaming
 
-- [ ] Check whether the device accepts a Streaming XML file sent on a single line. ([specs/blackmagic-streaming.yaml:681](specs/blackmagic-streaming.yaml#L681))
-- [ ] Confirm the character encoding is UTF-8 (the document names none). ([specs/blackmagic-streaming.yaml:695](specs/blackmagic-streaming.yaml#L695))
+- [ ] Check whether the device accepts a Streaming XML file sent on a single line. ([specs/blackmagic-streaming.yaml:685](specs/blackmagic-streaming.yaml#L685))
+- [ ] Confirm the character encoding is UTF-8 (the document names none). ([specs/blackmagic-streaming.yaml:699](specs/blackmagic-streaming.yaml#L699))
 - [ ] Check whether a unit can report more than two network interfaces. ([specs/blackmagic-streaming.yaml:657](specs/blackmagic-streaming.yaml#L657))
-- [ ] Check the length limits for label, stream key, password and URL. ([specs/blackmagic-streaming.yaml:715](specs/blackmagic-streaming.yaml#L715))
-- [ ] Check which firmware release introduced protocol 1.2 (and what earlier units report). ([specs/blackmagic-streaming.yaml:706](specs/blackmagic-streaming.yaml#L706))
+- [ ] Check the length limits for label, stream key, password and URL. ([specs/blackmagic-streaming.yaml:719](specs/blackmagic-streaming.yaml#L719))
+- [ ] Check which firmware release introduced protocol 1.2 (and what earlier units report). ([specs/blackmagic-streaming.yaml:710](specs/blackmagic-streaming.yaml#L710))
 - [ ] Record what Web Presenter and Streaming Encoder units advertise over mDNS (service types, and TXT `class` under `_blackmagic._tcp`). No public source names it, so mDNS discovery does not identify them; an unknown class is reported as a discovery message naming it. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
 
 ## blackmagic-teranex — Blackmagic Teranex
