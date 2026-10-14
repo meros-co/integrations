@@ -133,3 +133,18 @@ text(S, "get_peq_filter", {'block': 1, 'filter': 2}, "< GET 01 PEQ 02 >", device
 text(S, "set_peq_filter", {'block': 1, 'filter': 2, 'state': 'OFF'}, "< SET 01 PEQ 02 OFF >", device_reply="< REP 01 PEQ 02 OFF >", expect_result={'ok': {'kind': 'ack'}})
 text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}})
 telemetry(S, "mute-gain-name", inbound="< REP 01 AUDIO_MUTE ON >< REP 01 AUDIO_GAIN_HI_RES 1040 >< REP 01 CHAN_NAME {Podium     } >< REP PRESET 03 >", expect_state={'channels': {'1': {'mute': True, 'gain': -6.0, 'name': 'Podium'}}, 'device': {'preset': 3}})
+
+# Metering (Meter Rate Commands): one level per channel, 000-060 for -60 to 0
+# dBFS, kept in dBFS.
+telemetry(S, "meters", inbound="< SAMPLE 060 045 000 030 >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -15, "3": -60, "4": -30}}})
+telemetry(S, "meters-precomp", inbound="< SAMPLE_PRECOMP 050 >",
+          expect_state={"meters": {"precomp": {"1": -10}}})
+telemetry(S, "meters-coverage", inbound="< SAMPLE_CA 060 030 >",
+          expect_state={"meters": {"coverage_areas": {"1": 0, "2": -30}}})
+# Talker positions (MXA920 Talker Position): the document's example of two
+# talkers, which replace the last report.
+telemetry(S, "talkers", inbound="< SAMPLE TALKER_POSITIONS 1 2 -1524 321 914 0 2 3 123 -321 914 0 >",
+          state_before={"talkers": {"3": {"lobe": 4}}},
+          expect_state={"talkers": {"1": {"lobe": 1, "coverage_area": 2, "x_cm": -1524, "y_cm": 321, "z_cm": 914},
+                                    "2": {"lobe": 2, "coverage_area": 3, "x_cm": 123, "y_cm": -321, "z_cm": 914}}})

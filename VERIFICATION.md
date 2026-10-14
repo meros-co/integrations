@@ -1529,12 +1529,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## shure-mxa — Shure Microflex Advance arrays
 
 - [ ] Check whether the MXA910 and MXA310 accept lower-case inc and dec (their documents write INC and DEC). ([specs/shure-mxa.yaml:1077](specs/shure-mxa.yaml#L1077))
-- [ ] Check that GET 00 ALL is accepted on every model and firmware (some documents write GET 0 ALL or GET ALL). ([specs/shure-mxa.yaml:1834](specs/shure-mxa.yaml#L1834))
+- [ ] Check that GET 00 ALL is accepted on every model and firmware (some documents write GET 0 ALL or GET ALL). ([specs/shure-mxa.yaml:1842](specs/shure-mxa.yaml#L1842))
 - [ ] Check PRESET_NAME's answer form (< REP PRESET_NAME nn name >) on the MXA910 and MXA310, whose documents use PRESET1-PRESET10 instead. ([specs/shure-mxa.yaml:972](specs/shure-mxa.yaml#L972))
 - [ ] Check the speech gating and noise filter values each model accepts (Off/Low/Medium/High on the MXA920, ON/OFF on the MXA902 and MXA901) and their case in REP. ([specs/shure-mxa.yaml:1232](specs/shure-mxa.yaml#L1232))
 - [ ] Check LED_BRIGHTNESS's range per model and firmware (0-2 or 0-5). ([specs/shure-mxa.yaml:1337](specs/shure-mxa.yaml#L1337))
 - [ ] Check that lobe X and Y are accepted as four digits (0000-3048) on SET. ([specs/shure-mxa.yaml:1472](specs/shure-mxa.yaml#L1472))
 - [ ] Check the MXA310 polar pattern names (SUPER, HYPER, BIDIRECTION as documented). ([specs/shure-mxa.yaml:1731](specs/shure-mxa.yaml#L1731))
+- [ ] Capture SAMPLE with metering on, and confirm the values follow Channel Number Assignments for automatic coverage on and off, and that METER_RATE, METER_RATE_POSTGATE, METER_RATE_MXR_GAIN and METER_RATE_AECREF all report as plain SAMPLE (so only one should run at a time); record the MXA910, MXA710, MXA310 and MXA902/901 forms, taken here from the MXA920 document. ([specs/shure-mxa.yaml:1851](specs/shure-mxa.yaml#L1851))
+- [ ] Capture SAMPLE TALKER_POSITIONS on an MXA920 (and an MXA910 if it reports them) and confirm the six values per talker (lobe, coverage area, X, Y, Z, reserved) as the document's example gives them. ([specs/shure-mxa.yaml:1864](specs/shure-mxa.yaml#L1864))
 
 ## shure-mxn5 — Shure MXN5-C
 
