@@ -1507,6 +1507,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which buttons of each Jupiter app use negative logic. ([specs/symetrix-jupiter.yaml:113](specs/symetrix-jupiter.yaml#L113))
 - [ ] Check that answers never start with "#", which is how pushes are told apart. ([specs/symetrix-jupiter.yaml:38](specs/symetrix-jupiter.yaml#L38))
 
+## tsl-umd-display — TSL UMD tally sent to displays and multiviewers
+
+- [ ] Check that a V4.0 display or multiviewer with a right display lights the right display's tallies from the second XDATA byte (right_lh, right_text_tally, right_rh), and that one without ignores it. ([specs/tsl-umd-display.yaml:76](specs/tsl-umd-display.yaml#L76))
+
 ## tsl-umd-listener — TSL UMD tally received from a switcher
 
 - [ ] On a Ross Carbonite sending TSLUMD_1.0 over TCP, confirm the core receives each 18-byte V3.1 packet back to back with nothing between them, and record the tally and text for program, preview and a key. ([specs/tsl-umd-listener.yaml:46](specs/tsl-umd-listener.yaml#L46))
@@ -1753,4 +1757,4 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## Integrations with no open items
 
-Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio, tsl-umd-display.
+Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio.

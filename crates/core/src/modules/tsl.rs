@@ -17,6 +17,10 @@
 //! which is its whole purpose, and asks nothing of the switcher; the sender
 //! sends only what commands ask. TSL is one-way, so no request is answered and
 //! no latency is measured.
+//!
+//! The sender keeps what it last sent each display in state under
+//! `last_sent`, in the listener's shape: what this core sent, never what a
+//! display shows, since nothing comes back.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
@@ -192,6 +196,25 @@ struct Display {
     text_tally: u8,
     rh: u8,
     lamps: u8,
+    /// V4.0's right display: LH, text and RH tallies.
+    right: [u8; 3],
+}
+
+/// The text a version shows: V3.1 and V4.0 16 printable ASCII characters
+/// (others as `?`), V5.0 ASCII (others as `?`) unless sent as UTF-16LE.
+fn shown_text(text: &str, version: Version, unicode: bool) -> String {
+    match version {
+        Version::V31 | Version::V40 => text
+            .chars()
+            .map(|c| if (' '..='~').contains(&c) { c } else { '?' })
+            .take(16)
+            .collect(),
+        _ if unicode => text.to_string(),
+        _ => text
+            .chars()
+            .map(|c| if c.is_ascii() { c } else { '?' })
+            .collect(),
+    }
 }
 
 fn encode_v3(d: &Display, v4: bool) -> Vec<u8> {
@@ -217,7 +240,7 @@ fn encode_v3(d: &Display, v4: bool) -> Vec<u8> {
         p.push(((0x100 - (sum & 0xff)) & 0x7f) as u8);
         p.push(0x02); // minor version 0, two XDATA bytes
         p.push((d.lh << 4) | (d.text_tally << 2) | d.rh);
-        p.push(0); // the right display's tallies: off
+        p.push((d.right[0] << 4) | (d.right[1] << 2) | d.right[2]);
     }
     p
 }
@@ -494,6 +517,8 @@ pub(crate) struct Sender {
     unicode: bool,
     connected: bool,
     retry_after: Millis,
+    /// Displays this core has addressed, by screen, for V5.0 broadcasts.
+    sent: BTreeMap<u16, BTreeSet<u16>>,
 }
 
 impl Sender {
@@ -514,6 +539,7 @@ impl Sender {
                 .unwrap_or(false),
             connected: false,
             retry_after: RETRY_MIN,
+            sent: BTreeMap::new(),
         }
     }
 
@@ -524,6 +550,63 @@ impl Sender {
             Version::V50Udp => encode_v5(d, self.unicode),
             Version::V50Tcp => wrap_stream(&encode_v5(d, self.unicode)),
         }
+    }
+
+    /// What this core last sent each display, as a state patch under
+    /// `last_sent`, in the listener's shape. TSL is one-way, so this is what
+    /// was sent, never what a display shows. A V5.0 broadcast (screen or
+    /// index 65535) is recorded for every display this core has addressed
+    /// that it reaches.
+    fn last_sent(&mut self, d: &Display) -> Value {
+        let v3 = matches!(self.version, Version::V31 | Version::V40);
+        let screen = if v3 { 0 } else { d.screen };
+        let targets: Vec<(u16, u16)> = match (screen, d.index) {
+            (0xFFFF, 0xFFFF) if !v3 => self
+                .sent
+                .iter()
+                .flat_map(|(s, set)| set.iter().map(move |i| (*s, *i)))
+                .collect(),
+            (0xFFFF, i) if !v3 => self.sent.keys().map(|s| (*s, i)).collect(),
+            (s, 0xFFFF) if !v3 => self
+                .sent
+                .get(&s)
+                .map(|set| set.iter().map(|i| (s, *i)).collect())
+                .unwrap_or_default(),
+            (s, i) => {
+                self.sent.entry(s).or_default().insert(i);
+                vec![(s, i)]
+            }
+        };
+        let mut display = json!({
+            "text": shown_text(&d.text, self.version, self.unicode),
+            "brightness": d.brightness,
+        });
+        if self.version != Version::V31 {
+            display["tally"] = json!({
+                "lh": COLOURS[d.lh as usize & 3],
+                "text": COLOURS[d.text_tally as usize & 3],
+                "rh": COLOURS[d.rh as usize & 3],
+            });
+        }
+        if self.version == Version::V40 {
+            display["right_display"] = json!({
+                "lh": COLOURS[d.right[0] as usize & 3],
+                "text": COLOURS[d.right[1] as usize & 3],
+                "rh": COLOURS[d.right[2] as usize & 3],
+            });
+        }
+        if v3 {
+            let bit = |n: u8| d.lamps & (1 << n) != 0;
+            display["lamps"] = json!({"1": bit(0), "2": bit(1), "3": bit(2), "4": bit(3)});
+        }
+        let mut screens = Map::new();
+        for (s, i) in targets {
+            let screen = screens
+                .entry(s.to_string())
+                .or_insert_with(|| json!({"displays": {}}));
+            screen["displays"][i.to_string()] = display.clone();
+        }
+        json!({"last_sent": {"screens": screens}})
     }
 }
 
@@ -569,6 +652,11 @@ impl Module for Sender {
             text_tally: colour_bits(text("text_tally")),
             rh: colour_bits(text("rh")),
             lamps: int("lamps") as u8,
+            right: [
+                colour_bits(text("right_lh")),
+                colour_bits(text("right_text_tally")),
+                colour_bits(text("right_rh")),
+            ],
         };
         let packet = self.packet(&display);
         match self.version {
@@ -583,6 +671,7 @@ impl Module for Sender {
         }
         // TSL is one-way: nothing confirms a display applied it.
         cx.complete(id, Ok(Outcome::Unverified));
+        cx.state(self.last_sent(&display));
     }
 
     fn tcp(&mut self, cx: &mut Cx, _socket: Key, input: TcpInput) {
@@ -627,7 +716,90 @@ mod tests {
             text_tally: 2,
             rh: 3,
             lamps: 0b0101,
+            right: [0, 0, 0],
         }
+    }
+
+    #[test]
+    fn v4_0_sends_the_right_display_tallies() {
+        let mut d = display("CAM 1");
+        d.right = [3, 0, 1];
+        let p = encode_v3(&d, true);
+        // XDATA: left display red/green/amber, right display amber/off/red.
+        assert_eq!(&p[19..], &[0x02, 0b0001_1011, 0b0011_0001]);
+        let (_, u) = decode(&p).unwrap();
+        assert_eq!(u[0].right, Some(["amber", "off", "red"]));
+    }
+
+    #[test]
+    fn the_sender_keeps_what_it_last_sent() {
+        let ctx = |model: &str| OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            host_name: None,
+            port: Some(8900),
+            model: model.into(),
+            channels: None,
+            settings: Params::new(),
+            monitor: true,
+        };
+        let state = |a: Vec<Action>| {
+            a.into_iter()
+                .find_map(|x| match x {
+                    Action::State(v) => Some(v),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let mut s = Sender::new(&ctx("tsl-4-0"), 8900);
+        let mut cx = Cx::new(0);
+        s.start(&mut cx);
+        cx = Cx::new(1);
+        let params = json!({"index": 3, "text": "Kamera Ü 1 with a long name", "brightness": 2,
+                            "lh": "red", "text_tally": "off", "rh": "green",
+                            "right_lh": "amber", "right_text_tally": "off", "right_rh": "red", "lamps": 9});
+        s.command(&mut cx, 1, "set_display", params.as_object().unwrap());
+        assert_eq!(
+            state(cx.take()),
+            json!({"last_sent": {"screens": {"0": {"displays": {"3": {
+                "text": "Kamera ? 1 with ", "brightness": 2,
+                "tally": {"lh": "red", "text": "off", "rh": "green"},
+                "right_display": {"lh": "amber", "text": "off", "rh": "red"},
+                "lamps": {"1": true, "2": false, "3": false, "4": true}}}}}}})
+        );
+
+        // V5.0: a broadcast reaches every display this core has addressed.
+        let mut s = Sender::new(&ctx("tsl-5-0-udp"), 8900);
+        let mut cx = Cx::new(0);
+        s.start(&mut cx);
+        cx = Cx::new(1);
+        for i in [1, 2] {
+            s.command(
+                &mut cx,
+                i,
+                "set_display",
+                json!({"index": i, "screen": 4, "text": "CAM", "brightness": 3, "lh": "off", "text_tally": "red", "rh": "off"})
+                    .as_object()
+                    .unwrap(),
+            );
+            cx = Cx::new(1);
+        }
+        s.command(
+            &mut cx,
+            3,
+            "set_display",
+            json!({"index": 65535, "screen": 4, "text": "ALL", "brightness": 1, "lh": "off", "text_tally": "off", "rh": "off"})
+                .as_object()
+                .unwrap(),
+        );
+        let patch = state(cx.take());
+        let displays = patch["last_sent"]["screens"]["4"]["displays"]
+            .as_object()
+            .unwrap();
+        assert_eq!(displays.len(), 2);
+        assert_eq!(
+            displays["2"],
+            json!({"text": "ALL", "brightness": 1, "tally": {"lh": "off", "text": "off", "rh": "off"}})
+        );
     }
 
     #[test]

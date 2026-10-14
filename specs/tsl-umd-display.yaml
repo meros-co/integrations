@@ -73,10 +73,30 @@ commands:
       rh:         { type: enum, values: ["off", red, green, amber], default: "off",
                     label: Right tally,
                     description: "Colour of the right-hand tally: off, red, green or amber; sent by V4.0 and V5.0, not by V3.1." }
+      right_lh:   { type: enum, values: ["off", red, green, amber], default: "off",
+                    label: Right display left tally,
+                    description: "V4.0 only: colour of the right display's left-hand tally (the second XDATA byte): off, red, green or amber." }
+      right_text_tally: { type: enum, values: ["off", red, green, amber], default: "off",
+                    label: Right display text tally,
+                    description: "V4.0 only: colour of the right display's text tally: off, red, green or amber." }
+      right_rh:   { type: enum, values: ["off", red, green, amber], default: "off",
+                    label: Right display right tally,
+                    description: "V4.0 only: colour of the right display's right-hand tally: off, red, green or amber." }
       lamps:      { type: int, min: 0, max: 15, default: 0,
                     label: Tally lamps,
                     description: "V3.1 and V4.0 only: the four on/off tallies as a bit mask, tally 1 to 4 being 1, 2, 4 and 8, so 0 is all off and 15 all on." }
     returns: none
+
+state:
+  last_sent.screens.*.displays.*.text:             { type: string, description: "Text last sent by this core to the display, as the version shows it; keyed by screen (0 for V3.1 and V4.0) and display address. Not read from the display" }
+  last_sent.screens.*.displays.*.brightness:       { type: int, description: "Brightness last sent by this core, 0-3" }
+  last_sent.screens.*.displays.*.tally.lh:         { type: string, description: "Left-hand tally last sent by this core (V4.0 and V5.0): off, red, green or amber" }
+  last_sent.screens.*.displays.*.tally.text:       { type: string, description: "Text tally last sent by this core (V4.0 and V5.0)" }
+  last_sent.screens.*.displays.*.tally.rh:         { type: string, description: "Right-hand tally last sent by this core (V4.0 and V5.0)" }
+  last_sent.screens.*.displays.*.right_display.lh: { type: string, description: "V4.0 right display's left-hand tally last sent by this core" }
+  last_sent.screens.*.displays.*.right_display.text: { type: string, description: "V4.0 right display's text tally last sent by this core" }
+  last_sent.screens.*.displays.*.right_display.rh: { type: string, description: "V4.0 right display's right-hand tally last sent by this core" }
+  last_sent.screens.*.displays.*.lamps.*:          { type: bool, description: "V3.1 and V4.0 tally bits 1-4 last sent by this core" }
 
 quirks:
   - models: [all]
@@ -94,9 +114,21 @@ quirks:
   - models: [tsl-4-0]
     severity: info
     text: >
-      V4.0 sends lamps in the control byte and lh, text_tally and rh as the
-      left display's colour tallies. The right display's colour tallies are
-      sent as off.
+      V4.0 sends lamps in the control byte, lh, text_tally and rh as the left
+      display's colour tallies (the first XDATA byte), and right_lh,
+      right_text_tally and right_rh as the right display's (the second). Other
+      versions do not send the right display's tallies.
+
+  - models: [all]
+    severity: info
+    text: >
+      State under last_sent is what this core last sent each display (text as
+      the version shows it, brightness, tallies, lamps), keyed as the
+      tsl-umd-listener keys what it receives: screen (0 for V3.1 and V4.0)
+      and display address. It is not device state: TSL is one-way, so it
+      cannot say what a display shows, and another sender to the same display
+      is not seen. A V5.0 broadcast (screen or index 65535) is recorded for
+      every display this core has addressed that it reaches.
 
   - models: [tsl-5-0-udp, tsl-5-0-tcp]
     severity: info
