@@ -100,6 +100,8 @@ models:
                set_solo_mono, get_solo_mono, get_solo_active, get_console_info, set_console_name,
                get_console_name, get_firmware, get_serial, get_console_model, get_osc_read_only,
                set_parameter_float, set_parameter_int, set_parameter_string, get_parameter, get_parameter_value, get_parameter_raw, get_node, set_node,
+               describe_node, describe_node_values, dump_node, get_scene_list,
+               get_usb_playlist_songs, get_wlive_session_list,
                set_channel_eq_model, set_channel_eq_mix, set_channel_eq_low_frequency,
                set_channel_eq_low_q, set_channel_eq_low_type, set_channel_eq_high_frequency,
                set_channel_eq_high_q, set_channel_eq_high_type, set_channel_eq_band_frequency,
@@ -299,6 +301,8 @@ models:
                set_console_name, get_console_name, get_firmware, get_serial, get_console_model,
                get_osc_read_only, set_parameter_float, set_parameter_int, set_parameter_string,
                get_parameter, get_parameter_value, get_parameter_raw, get_node, set_node,
+               describe_node, describe_node_values, dump_node, get_scene_list,
+               get_usb_playlist_songs, get_wlive_session_list,
                set_channel_eq_model, set_channel_eq_mix, set_channel_eq_low_frequency,
                set_channel_eq_low_q, set_channel_eq_low_type, set_channel_eq_high_frequency,
                set_channel_eq_high_q, set_channel_eq_high_type, set_channel_eq_band_frequency,
@@ -498,6 +502,8 @@ models:
                set_console_name, get_console_name, get_firmware, get_serial, get_console_model,
                get_osc_read_only, set_parameter_float, set_parameter_int, set_parameter_string,
                get_parameter, get_parameter_value, get_parameter_raw, get_node, set_node,
+               describe_node, describe_node_values, dump_node, get_scene_list,
+               get_usb_playlist_songs, get_wlive_session_list,
                set_channel_eq_model, set_channel_eq_mix, set_channel_eq_low_frequency,
                set_channel_eq_low_q, set_channel_eq_low_type, set_channel_eq_high_frequency,
                set_channel_eq_high_q, set_channel_eq_high_type, set_channel_eq_band_frequency,
@@ -1085,7 +1091,7 @@ commands:
         description: "Input channel, numbered from 1 as on the console (1 to 40)." }
       tags: { type: string, max_length: 80, required: true,
         label: Tags,
-        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there." }
+        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there; the document does not give the separator between tags, so edit the string the matching get command returns rather than building one." }
     send:
       address: "/ch/{channel}/tags"
       args: [ { value: "{tags}", type: string } ]
@@ -1703,7 +1709,7 @@ commands:
         description: "Aux input, numbered from 1 as on the console (1 to 8)." }
       tags: { type: string, max_length: 80, required: true,
         label: Tags,
-        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there." }
+        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there; the document does not give the separator between tags, so edit the string the matching get command returns rather than building one." }
     send:
       address: "/aux/{aux}/tags"
       args: [ { value: "{tags}", type: string } ]
@@ -2188,7 +2194,7 @@ commands:
         description: "Mix bus, numbered from 1 as on the console (1 to 16)." }
       tags: { type: string, max_length: 80, required: true,
         label: Tags,
-        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there." }
+        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there; the document does not give the separator between tags, so edit the string the matching get command returns rather than building one." }
     send:
       address: "/bus/{bus}/tags"
       args: [ { value: "{tags}", type: string } ]
@@ -2673,7 +2679,7 @@ commands:
         description: "Main, numbered from 1 as on the console (1 to 4)." }
       tags: { type: string, max_length: 80, required: true,
         label: Tags,
-        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there." }
+        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there; the document does not give the separator between tags, so edit the string the matching get command returns rather than building one." }
     send:
       address: "/main/{main}/tags"
       args: [ { value: "{tags}", type: string } ]
@@ -3038,7 +3044,7 @@ commands:
         description: "Matrix, numbered from 1 as on the console (1 to 8)." }
       tags: { type: string, max_length: 80, required: true,
         label: Tags,
-        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there." }
+        description: "The whole tag string, which replaces the old one; #D1 to #D16 assign DCAs 1-16, so keep the tags already there; the document does not give the separator between tags, so edit the string the matching get command returns rather than building one." }
     send:
       address: "/mtx/{matrix}/tags"
       args: [ { value: "{tags}", type: string } ]
@@ -3679,6 +3685,68 @@ commands:
     send: { address: "/{node}" }
     expect: { address: "/{node}" }
     returns: text
+
+  describe_node:
+    summary: "Describe a node's parameters with their types and ranges, as one text (the node query ,s ?, p.24-25)"
+    params:
+      node: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$_/-]*$', default: "",
+        label: Node,
+        description: "The node's OSC address without its leading /, such as fx/1 or $ctl/lib; empty for the root." }
+    send:
+      address: "/{node}"
+      args: [ { value: "?", type: string } ]
+    expect: { address: "/{node}", arg: 0 }
+    returns: value
+
+  describe_node_values:
+    summary: "Describe a node's parameters with their current values, types and ranges, as one text (the node query ,s #, p.25)"
+    params:
+      node: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$_/-]*$', default: "",
+        label: Node,
+        description: "The node's OSC address without its leading /, such as fx/1 or $ctl/lib; empty for the root." }
+    send:
+      address: "/{node}"
+      args: [ { value: "#", type: string } ]
+    expect: { address: "/{node}", arg: 0 }
+    returns: value
+
+  dump_node:
+    summary: "A node's data as a snap file holds it, name=value pairs separated by commas, without read-only values (the node query ,s *, p.24-25)"
+    params:
+      node: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$_/-]*$', default: "",
+        label: Node,
+        description: "The node's OSC address without its leading /, such as ch/1; empty for the root." }
+    send:
+      address: "/{node}"
+      args: [ { value: "*", type: string } ]
+    expect: { address: "/{node}", arg: 0 }
+    returns: value
+
+  get_scene_list:
+    summary: "Every scene name of the open show, read with the node query the document gives for it (/$ctl/lib ,s ?, p.88 footnote 72); the reply text holds them all, where $scenes alone gives only the first"
+    send:
+      address: "/$ctl/lib"
+      args: [ { value: "?", type: string } ]
+    expect: { address: "/$ctl/lib", arg: 0 }
+    returns: value
+
+  get_usb_playlist_songs:
+    summary: "Every song of the USB player's open playlist, read with the node query the document gives for it (/play ,s ?, p.70 footnote 47); $songs alone gives only the first"
+    send:
+      address: "/play"
+      args: [ { value: "?", type: string } ]
+    expect: { address: "/play", arg: 0 }
+    returns: value
+
+  get_wlive_session_list:
+    summary: "Every session date and name of a W-Live SD card, read with the node query (p.69 footnote 44: the node definition command gives the full contents); sessionlist and snamelist alone give only the first"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+    send:
+      address: "/cards/wlive/{card}/$stat"
+      args: [ { value: "?", type: string } ]
+    expect: { address: "/cards/wlive/{card}/$stat", arg: 0 }
+    returns: value
 
   set_node:
     summary: "Set several parameters under a node in one message, as name=value pairs separated by commas (ch/1 with \"fdr=4,mute=1\"); answered OK or an error such as NODE NOT FOUND (p.23-24)"
@@ -8440,10 +8508,17 @@ quirks:
       DCA assignment is carried in a strip's tag string: tags #D1 to #D16 are
       reserved for DCAs 1-16 (p.51 footnote 27 and the matching footnotes for
       aux, bus, main and matrix). Setting tags replaces the whole string, so
-      read it first and keep the other tags. The document does not give the
-      separator between tags. Mute group assignment is also held as tags (p.237,
-      "DCA, Mute, Talk Tags") but its tag names are not documented, so no mute
-      group assignment command is offered.
+      read it first and keep the other tags. The document gives no more than
+      that: not the separator between tags (its node dumps show only empty
+      tags, p.25), and so no format the core could build an assignment in;
+      a DCA is assigned by editing the string the get command returns, and
+      no assign or unassign command is offered, as one would also need the
+      read and the edit, which the format cannot express. Mute group and
+      talkback assignment are held as tags too (p.237, Library Scopes, TAGS:
+      "DCA, Mute, Talk Tags"), but their tag names are not documented at all
+      (/mgrp, p.65, has only a name and a mute), so no mute group assignment
+      command is offered. A capture of a tag string from a console with
+      DCAs and mute groups assigned settles both.
 
   - models: [all]
     severity: info
@@ -8476,8 +8551,15 @@ quirks:
       select_next_scene and select_previous_scene send first (p.88 footnote
       74). GONEXT and GOPREV are listed without further description. With no
       show open nothing happens, and the console gives no reply either way.
-      $scenes returns only the first scene name over plain OSC (footnote 72),
-      so the scene list is not offered.
+      $scenes, the USB player's $songs and a W-Live card's sessionlist and
+      snamelist return only their first entry to a plain query (footnotes 72,
+      47 and 44): that is the protocol, not paging, and the document's way to
+      the full list is the node query (/$ctl/lib ,s ?, /play ,s ?), which
+      get_scene_list, get_usb_playlist_songs and get_wlive_session_list send,
+      returning the reply's text. State keeps the first entry only: the core
+      cannot split a string argument into a list (an OSC rule reads whole
+      arguments), and the layout of a list inside the node query's reply is
+      not documented.
 
   - models: [all]
     severity: info
@@ -8610,7 +8692,11 @@ quirks:
     severity: info
     text: >
       Outputs (/io/out, p.44-46) are patched by a source group and
-      a number, as a strip's input is: set_output_source sends the
+      a number, as a strip's input is. Output group sizes, from the
+      node ranges on p.44-46: LCL 8, AUX 8 (1 to 6 on some models,
+      footnote 20), A to C 48, SC 32, USB 48, CRD and MOD 64, REC 4,
+      AES 2; set_output_source accepts up to 64 and the console
+      refuses a number past the group's size. set_output_source sends the
       group then the number, two messages, so for a moment the
       output carries the new group with the old number. User
       inputs 1 to 24 are user signals taken from a strip (type,

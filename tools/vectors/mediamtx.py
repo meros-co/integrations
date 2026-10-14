@@ -259,10 +259,55 @@ telemetry(MX, "path-configs", inbound_http={"path": "/v3/config/paths/list?items
     state_before={"path_configs": {"removed": {"record": True}}},
     expect_state={"path_config_count": 2, "path_configs": {
         "cam1": {"record": True, "record_format": "fmp4", "record_delete_after": "1d", "source_on_demand": True,
-                 "max_readers": 0, "override_publisher": True, "always_available": False},
-        "all_others": {"record": False, "record_format": "fmp4", "record_delete_after": "1d",
+                 "max_readers": 0, "override_publisher": True, "always_available": False,
+                 "source": "rtsp://10.0.0.20/main"},
+        "all_others": {"source": "publisher", "record": False, "record_format": "fmp4", "record_delete_after": "1d",
                        "source_on_demand": False, "max_readers": 0, "override_publisher": True,
                        "always_available": False}}})
+
+# Every PathConf field kept: source, fallback, forward (JSON text), the
+# recording's path and durations, playback.
+telemetry(MX, "path-config-fields", inbound_http={"path": "/v3/config/paths/list?itemsPerPage=1000", "body": _MXJ({
+    "itemCount": 1, "pageCount": 1, "items": [
+        dict(_DEF, name="stage", source="srt://10.0.0.30:9000?streamid=read:stage", fallback="/standby",
+             forward=[{"dest": "rtmp://203.0.113.5/live/stage"}],
+             recordPath="./recordings/%path/%Y-%m-%d_%H-%M-%S-%f", recordSegmentDuration="1h",
+             recordPartDuration="1s", playback=True, overridePublisher=True, alwaysAvailable=False)]})},
+    expect_state={"path_config_count": 1, "path_configs": {"stage": {
+        "source": "srt://10.0.0.30:9000?streamid=read:stage", "fallback": "/standby",
+        "forward": '[{"dest":"rtmp://203.0.113.5/live/stage"}]',
+        "record_path": "./recordings/%path/%Y-%m-%d_%H-%M-%S-%f", "record_segment_duration": "1h",
+        "record_part_duration": "1s", "playback": True, "record": False, "record_format": "fmp4",
+        "record_delete_after": "1d", "source_on_demand": False, "max_readers": 0,
+        "override_publisher": True, "always_available": False}}})
+
+# Recordings (RecordingList): the list replaced, each recording's segments by
+# position, and each one's spans asked of the playback server.
+_SEG1 = "2026-10-06T08:00:00.000123+01:00"
+_SEG2 = "2026-10-06T09:00:00.000456+01:00"
+telemetry(MX, "recordings", inbound_http={"path": "/v3/recordings/list?itemsPerPage=1000", "body": _MXJ({
+    "itemCount": 2, "pageCount": 1, "items": [
+        {"name": "cam1", "segments": [{"start": _SEG1}, {"start": _SEG2}]},
+        {"name": "live/stage", "segments": [{"start": _SEG1}]}]})},
+    state_before={"recordings": {"gone": {"segments": {"0": _SEG1}}, "cam1": {"segments": {"2": _SEG1}}}},
+    expect_state={"recording_count": 2, "recordings": {
+        "cam1": {"segments": {"0": _SEG1, "1": _SEG2}},
+        "live/stage": {"segments": {"0": _SEG1}}}},
+    expect_then_send=[{"method": "GET", "port": 9996, "target": "/list?path=cam1"},
+                      {"method": "GET", "port": 9996, "target": "/list?path=live%2Fstage"}])
+telemetry(MX, "recordings-get", inbound_http={"path": "/v3/recordings/get/cam1", "body": _MXJ({
+    "name": "cam1", "segments": [{"start": _SEG2}]})},
+    state_before={"recordings": {"cam1": {"segments": {"0": _SEG1, "1": _SEG2}}}},
+    expect_state={"recordings": {"cam1": {"segments": {"0": _SEG2}}}})
+# The playback server's spans of a path (ListEntry), keyed by the decoded name.
+telemetry(MX, "playback-spans", inbound_http={"path": "/list?path=live%2Fstage", "body": _MXJ(_SPANS)},
+    state_before={"playback_spans": {"live/stage": {"1": {"start": _SEG2}}}},
+    expect_state={"playback_spans": {"live/stage": {"0": {
+        "start": _SPANS[0]["start"], "duration": 60.0, "url": _SPANS[0]["url"]}}}})
+telemetry(MX, "playback-spans-between-not-kept",
+    inbound_http={"path": "/list?path=cam1&start=2026-10-06T08%3A00%3A00Z&end=2026-10-06T18%3A00%3A00Z",
+                  "body": _MXJ(_SPANS)},
+    expect_state={})
 
 # A path name holding dots is one state key.
 telemetry(MX, "paths-dotted-name", inbound_http={
@@ -278,7 +323,7 @@ telemetry(MX, "path-configs-dotted-name", inbound_http={
         "itemCount": 1, "pageCount": 1, "items": [dict(_DEF, name="studio.cam1", overridePublisher=True,
                                                          alwaysAvailable=False)]})},
     expect_state={"path_config_count": 1, "path_configs": {"studio.cam1": {
-        "record": False, "record_format": "fmp4", "record_delete_after": "1d", "source_on_demand": False,
+        "source": "publisher", "record": False, "record_format": "fmp4", "record_delete_after": "1d", "source_on_demand": False,
         "max_readers": 0, "override_publisher": True, "always_available": False}}})
 telemetry(MX, "hls-muxers-dotted-name", inbound_http={"path": "/v3/hls/muxers/list?itemsPerPage=1000", "body": _MXJ({
     "itemCount": 1, "pageCount": 1, "items": [{

@@ -11,8 +11,9 @@ category: playback
 # answers the sender: its feedback goes to the OSC senders (servers) with
 # "send feedback" set in its device panel, so it is received on a fixed local
 # port, the feedback_port setting. Millumin sends no feedback for a change made
-# through the OSC API itself, so feedback reports what the operator or the
-# show changed, and every command reports unverified.
+# through the OSC API itself, so every command reports unverified, and each
+# property command asks for the property afterwards with its /? query, which
+# Millumin does answer with feedback.
 
 source:
   - title: Millumin dev-kit wiki, "OSC documentation" (Millumin V5)
@@ -399,7 +400,9 @@ commands:
     params:
       layer:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       opacity: { type: float, min: 0.0, max: 1.0, required: true, label: Opacity, description: "Layer opacity from 0.0 (transparent) to 1.0 (opaque)." }
-    send: { address: "/layer:{layer}/opacity", args: [ { value: "{opacity}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/opacity", args: [ { value: "{opacity}", type: float } ] }
+      - { address: "/layer:{layer}/opacity/?" }
     returns: none
 
   set_layer_position:
@@ -408,7 +411,9 @@ commands:
       layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       x:     { type: float, required: true, label: X, description: "Horizontal position in pixels." }
       y:     { type: float, required: true, label: "Y", description: "Vertical position in pixels." }
-    send: { address: "/layer:{layer}/position/xy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/position/xy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
+      - { address: "/layer:{layer}/position/?" }
     returns: none
 
   set_layer_x:
@@ -416,7 +421,9 @@ commands:
     params:
       layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       x:     { type: float, required: true, label: X, description: "Horizontal position in pixels." }
-    send: { address: "/layer:{layer}/position/x", args: [ { value: "{x}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/position/x", args: [ { value: "{x}", type: float } ] }
+      - { address: "/layer:{layer}/position/?" }
     returns: none
 
   set_layer_y:
@@ -424,7 +431,9 @@ commands:
     params:
       layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       y:     { type: float, required: true, label: "Y", description: "Vertical position in pixels." }
-    send: { address: "/layer:{layer}/position/y", args: [ { value: "{y}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/position/y", args: [ { value: "{y}", type: float } ] }
+      - { address: "/layer:{layer}/position/?" }
     returns: none
 
   set_layer_rotation:
@@ -432,7 +441,9 @@ commands:
     params:
       layer:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       degrees: { type: float, required: true, label: Rotation, description: "Rotation in degrees." }
-    send: { address: "/layer:{layer}/rotation", args: [ { value: "{degrees}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/rotation", args: [ { value: "{degrees}", type: float } ] }
+      - { address: "/layer:{layer}/rotation/?" }
     returns: none
 
   set_layer_scale:
@@ -440,7 +451,9 @@ commands:
     params:
       layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       scale: { type: float, min: 0.0, required: true, label: Scale, description: "Layer scale, 1.0 for 100%." }
-    send: { address: "/layer:{layer}/scale", args: [ { value: "{scale}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/scale", args: [ { value: "{scale}", type: float } ] }
+      - { address: "/layer:{layer}/scale/?" }
     returns: none
 
   set_layer_effect:
@@ -450,7 +463,9 @@ commands:
       effect: { type: int, min: 1, required: true, label: Effect, description: "Effect on the layer, numbered from 1." }
       param:  { type: string, pattern: "^[^/]+$", max_length: 128, required: true, label: Effect parameter, description: "Parameter name as shown in Millumin's effect panel." }
       value:  { type: float, required: true, label: Value, description: "New value for the effect parameter, in that parameter's own scale." }
-    send: { address: "/layer:{layer}/effect{effect}/{param}", args: [ { value: "{value}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/effect{effect}/{param}", args: [ { value: "{value}", type: float } ] }
+      - { address: "/layer:{layer}/effect{effect}/{param}/?" }
     returns: none
 
   set_layer_mapping_corner:
@@ -460,7 +475,9 @@ commands:
       corner: { type: enum, values: [topLeft, topRight, bottomRight, bottomLeft], required: true, label: Corner, description: "The mapping corner to move, named as in Millumin's OSC addresses." }
       x:      { type: float, required: true, label: X, description: "Horizontal position of the corner in pixels." }
       y:      { type: float, required: true, label: "Y", description: "Vertical position of the corner in pixels." }
-    send: { address: "/layer:{layer}/mapping/{corner}", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/mapping/{corner}", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
+      - { address: "/layer:{layer}/mapping/{corner}/?" }
     returns: none
 
   set_layer_mapping_corner_x:
@@ -469,7 +486,9 @@ commands:
       layer:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       corner: { type: enum, values: [topLeft, topRight, bottomRight, bottomLeft], required: true, label: Corner, description: "The mapping corner to move, named as in Millumin's OSC addresses." }
       x:      { type: float, required: true, label: X, description: "Horizontal position of the corner in pixels." }
-    send: { address: "/layer:{layer}/mapping/{corner}/x", args: [ { value: "{x}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/mapping/{corner}/x", args: [ { value: "{x}", type: float } ] }
+      - { address: "/layer:{layer}/mapping/{corner}/?" }
     returns: none
 
   set_layer_mapping_corner_y:
@@ -478,7 +497,9 @@ commands:
       layer:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
       corner: { type: enum, values: [topLeft, topRight, bottomRight, bottomLeft], required: true, label: Corner, description: "The mapping corner to move, named as in Millumin's OSC addresses." }
       y:      { type: float, required: true, label: "Y", description: "Vertical position of the corner in pixels." }
-    send: { address: "/layer:{layer}/mapping/{corner}/y", args: [ { value: "{y}", type: float } ] }
+    send:
+      - { address: "/layer:{layer}/mapping/{corner}/y", args: [ { value: "{y}", type: float } ] }
+      - { address: "/layer:{layer}/mapping/{corner}/?" }
     returns: none
 
   select_layer_by_name:
@@ -494,7 +515,9 @@ commands:
     params:
       light:     { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Light, description: "Light name as shown in Millumin; it cannot contain a slash." }
       intensity: { type: float, min: 0.0, required: true, label: Intensity, description: "Light intensity; feedback reports 0.5 for 50%, while the documentation's example uses 0-255, so the scale is not certain." }
-    send: { address: "/light:{light}/intensity", args: [ { value: "{intensity}", type: float } ] }
+    send:
+      - { address: "/light:{light}/intensity", args: [ { value: "{intensity}", type: float } ] }
+      - { address: "/light:{light}/intensity/?" }
     returns: none
 
   set_property:
@@ -506,7 +529,9 @@ commands:
       target:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Target, description: "Element to address: layer:<name>, light:<name>, index:<n>, selectedLayer, selectedLight or a media name." }
       property: { type: string, pattern: "^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$", max_length: 128, required: true, label: Property, description: "Property path as named in Millumin, such as mapping/topLeft/x or media/speed." }
       value:    { type: float, required: true, label: Value, description: "New value for the property, in that property's own scale." }
-    send: { address: "/{target}/{property}", args: [ { value: "{value}", type: float } ] }
+    send:
+      - { address: "/{target}/{property}", args: [ { value: "{value}", type: float } ] }
+      - { address: "/{target}/{property}/?" }
     returns: none
 
   adjust_property:
@@ -516,7 +541,9 @@ commands:
       property:  { type: string, pattern: "^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$", max_length: 128, required: true, label: Property, description: "Property path as named in Millumin, such as mapping/topLeft/x or media/speed." }
       direction: { type: enum, values: ["+", "-"], default: "+", label: Direction, description: "+ adds the amount, - subtracts it." }
       amount:    { type: float, min: 0.0, required: true, label: Amount, description: "Amount to add or subtract, in the property's own scale." }
-    send: { address: "/{target}/{property}/{direction}", args: [ { value: "{amount}", type: float } ] }
+    send:
+      - { address: "/{target}/{property}/{direction}", args: [ { value: "{amount}", type: float } ] }
+      - { address: "/{target}/{property}/?" }
     returns: none
 
   query_property:
@@ -644,16 +671,22 @@ telemetry:
   # Millumin. Each layer event is sent twice, by layer name and by index; the
   # rules read the named form. The /millumin/info duplicates are not read.
   updates:
-    - address: "^/millumin/board/launchedColumn$"
+    # The detail section names these launchedColumn and stoppedColumn, the
+    # summary columnLaunched and columnStopped; both are read.
+    - address: "^/millumin/board/(?:launchedColumn|columnLaunched)$"
       state:
         board.column: "{arg0}"
         board.column_name: "{arg1}"
         board.column_playing: "true"
-    - address: "^/millumin/board/stoppedColumn$"
+        "columns.{arg0}.playing": "true"
+        "columns.{arg0}.name": "{arg1}"
+    - address: "^/millumin/board/(?:stoppedColumn|columnStopped)$"
       state:
         board.column: "{arg0}"
         board.column_name: "{arg1}"
         board.column_playing: "false"
+        "columns.{arg0}.playing": "false"
+        "columns.{arg0}.name": "{arg1}"
     - address: "^/millumin/layer:([^/]+)/mediaStarted$"
       state:
         layers.{1}.media_index: "{arg0}"
@@ -727,6 +760,8 @@ state:
   board.column:            { type: int, description: "Index of the column last launched or stopped, from 1" }
   board.column_name:       { type: string, description: "Name of that column, when it has one" }
   board.column_playing:    { type: bool, description: "The column was launched (true) or stopped (false)" }
+  columns.*.playing:       { type: bool, description: "A column of the current board is playing, keyed by its index from 1: true since Millumin reported it launched, false since it reported it stopped; a column never reported is absent" }
+  columns.*.name:          { type: string, description: "The column's name, when it has one, as the launch or stop feedback gives it" }
   layers.*.media_index:    { type: int, description: "Index of the layer's current media, keyed by layer name" }
   layers.*.media:          { type: string, description: "Name of the layer's current media" }
   layers.*.media_state:    { type: string, description: "started, paused or stopped, from the last media event" }
@@ -765,10 +800,27 @@ quirks:
     severity: info
     text: >
       A change made through the OSC API sends no feedback (Millumin staff,
-      September 2023), so the state reports changes made in Millumin or by its
-      show, and every command here reports unverified. A column launched over OSC
-      still reports the media it starts. query_property and ping ask for feedback;
-      their answers also go to the configured senders.
+      September 2023): this is Millumin's behaviour, not a setting, and every
+      command here reports unverified. So that state still follows what this
+      integration changes, each property command (layer opacity, position,
+      rotation, scale, effect parameters, mapping corners, light intensity,
+      set_property and adjust_property) sends the property's /? query after
+      the change, which Millumin answers with feedback to the configured
+      senders. Column, board, transport and media actions have no /? query; a
+      column launched over OSC still reports the media it starts, and its own
+      launch is reported only when Millumin sends it. query_property and ping
+      ask for feedback too.
+  - models: [all]
+    severity: info
+    text: >
+      Millumin's OSC API reports columns only as they are launched and stopped
+      (index and name), so columns.* holds the columns reported since the
+      device was opened, not the board's column list; it documents no way to
+      list a board's columns or the project's boards, and no feedback for
+      select_board, so the current board and the board list are not in state.
+      Column indexes are those of the current board: after a board change,
+      columns.* may still hold the last board's columns until they are
+      reported again.
   - models: [all]
     severity: info
     text: >

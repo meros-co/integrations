@@ -283,6 +283,19 @@ _q("get_parameter_raw", {"path": "ch/2/fdr"}, "/ch/2/fdr", [("s", "-2.0"), ("f",
 binary(W, "get_node", {"node": "$ctl/user/1/1/enc"}, osc("/$ctl/user/1/1/enc"),
        device_reply_hex=hexs(osc("/$ctl/user/1/1/enc", ("s", "mode"), ("s", "name"), ("s", "$fname"))),
        expect_result={"ok": {"kind": "value", "value": '["mode","name","$fname"]'}})
+# Node queries ,s ? / # / * (p.24-25): the reply is one string on the node's
+# address; the description here is the document's /fx/1 example, shortened.
+_FXDESC = "  mdl            list [NONE, EXT, HALL]\n  fxmix          lin [0 .. 100 %], 101 steps\n"
+binary(W, "describe_node", {"node": "fx/1"}, osc("/fx/1", ("s", "?")),
+       device_reply_hex=hexs(osc("/fx/1", ("s", _FXDESC))),
+       expect_result={"ok": {"kind": "value", "value": _FXDESC}})
+binary(W, "describe_node_values", {"node": "fx/1"}, osc("/fx/1", ("s", "#")))
+binary(W, "dump_node", {"node": "fx/1"}, osc("/fx/1", ("s", "*")),
+       device_reply_hex=hexs(osc("/fx/1", ("s", "mdl=NONE,fxmix=100,"))),
+       expect_result={"ok": {"kind": "value", "value": "mdl=NONE,fxmix=100,"}})
+binary(W, "get_scene_list", {}, osc("/$ctl/lib", ("s", "?")))
+binary(W, "get_usb_playlist_songs", {}, osc("/play", ("s", "?")))
+binary(W, "get_wlive_session_list", {"card": 2}, osc("/cards/wlive/2/$stat", ("s", "?")))
 binary(W, "set_node", {"node": "ch/1", "assignments": "fdr=4,mute=1"}, osc("/ch/1", ("s", "fdr=4,mute=1")),
        device_reply_hex=hexs(osc("/ch/1*", ("s", "OK"))), expect_result={"ok": {"kind": "ack"}})
 binary(W, "set_node", {"assignments": "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1"},
