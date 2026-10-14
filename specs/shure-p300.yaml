@@ -1036,6 +1036,11 @@ commands:
     returns: ack
 
 state:
+  meters.inputs.*: { type: int, unit: dBFS, description: "Input level, -60 to 0, by channel in SAMPLE_IN order from 1: 1-8 Dante inputs with mic processing, 9-10 Dante inputs, 11-12 analog, 13 USB, 14 mobile" }
+  meters.outputs.*: { type: int, unit: dBFS, description: "Output level, -60 to 0, by channel in SAMPLE_OUT order from 1: 1-2 Dante, 3-4 analog, 5 USB, 6 mobile, 7-12 Dante outputs 3-8" }
+  meters.processing.*: { type: int, unit: dBFS, description: "Processing level, -60 to 0, by channel in SAMPLE_PROC order from 1: 1-8 pre-AGC on the Dante inputs, 9 automixer output, 10 pre-compressor, 11 AEC reference" }
+  meters.erle.*: { type: int, unit: dB, description: "Echo return loss enhancement, 0 to 40, by channel from 1 (SAMPLE_ERLE)" }
+  meters.agc.*: { type: int, unit: dB, description: "AGC gain, by channel from 1 (SAMPLE_AGC)" }
   device.model: { type: string, description: "the model" }
   device.serial_number: { type: string, description: "the serial number" }
   device.firmware: { type: string, description: "the firmware version" }
@@ -1099,6 +1104,24 @@ telemetry:
   poll:
     send: ["GET 00 ALL"]
   updates:
+    # Metering (p.12-16, p.24-25): each SAMPLE_* message lists one level per
+    # channel in the document's order, 000-060 for -60 to 0 dBFS (ERLE and
+    # AGC in dB). Sent only while a consumer has set its meter rate.
+    - match: "^< SAMPLE_IN "
+      match_each: "(\\d{3})"
+      state: { "meters.inputs.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_OUT "
+      match_each: "(\\d{3})"
+      state: { "meters.outputs.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_PROC "
+      match_each: "(\\d{3})"
+      state: { "meters.processing.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_ERLE "
+      match_each: "(\\d{2,3})"
+      state: { "meters.erle.{index:+1}": "{1}" }
+    - match: "^< SAMPLE_AGC "
+      match_each: "(\\d{2,3})"
+      state: { "meters.agc.{index:+1}": "{1}" }
     - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
       state: { "device.model": "{1}" }
     - match: "^< REP SERIAL_NUM \\{?(.*?) *\\}? >$"
@@ -1234,9 +1257,11 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval until set
-      to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not kept in
-      state. Values 1-99 ms are refused by the device.
+      Metering (METER_RATE_IN and its siblings) sends SAMPLE_* messages at the chosen interval until
+      set to 0. It is never started here: a consumer that wants meters sets a rate (100 ms or more;
+      1-99 are refused), and each sample then updates meters.* (a state event per sample). Levels
+      are kept in dBFS (000-060 on the wire is -60 to 0); the meters keep their last value once
+      metering stops.
   - models: [all]
     severity: info
     text: >

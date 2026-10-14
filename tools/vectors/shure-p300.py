@@ -124,3 +124,18 @@ text(S, "get_peq_filter", {'block': 1, 'filter': 2}, "< GET 01 PEQ 02 >", device
 text(S, "set_peq_filter", {'block': 1, 'filter': 2, 'state': 'OFF'}, "< SET 01 PEQ 02 OFF >", device_reply="< REP 01 PEQ 02 OFF >", expect_result={'ok': {'kind': 'ack'}})
 text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}})
 telemetry(S, "mute-gain-name", inbound="< REP 01 AUDIO_MUTE ON >< REP 01 AUDIO_GAIN_HI_RES 1040 >< REP 01 CHAN_NAME {Podium     } >< REP PRESET 03 >", expect_state={'channels': {'1': {'mute': True, 'gain': -6.0, 'name': 'Podium'}}, 'device': {'preset': 3}})
+
+# Metering (p.12-16, p.24-25): one level per channel, 000-060 for -60 to 0
+# dBFS, kept in dBFS; ERLE and AGC in dB as sent.
+telemetry(S, "meters-in", inbound="< SAMPLE_IN 060 045 000 030 001 002 003 004 005 006 007 008 009 010 >",
+          expect_state={"meters": {"inputs": {"1": 0, "2": -15, "3": -60, "4": -30, "5": -59, "6": -58, "7": -57,
+                                              "8": -56, "9": -55, "10": -54, "11": -53, "12": -52, "13": -51,
+                                              "14": -50}}})
+telemetry(S, "meters-out", inbound="< SAMPLE_OUT 060 050 040 030 020 010 >",
+          expect_state={"meters": {"outputs": {"1": 0, "2": -10, "3": -20, "4": -30, "5": -40, "6": -50}}})
+telemetry(S, "meters-proc", inbound="< SAMPLE_PROC 060 000 >",
+          expect_state={"meters": {"processing": {"1": 0, "2": -60}}})
+telemetry(S, "meters-erle", inbound="< SAMPLE_ERLE 20 40 00 >",
+          expect_state={"meters": {"erle": {"1": 20, "2": 40, "3": 0}}})
+telemetry(S, "meters-agc", inbound="< SAMPLE_AGC 003 012 >",
+          expect_state={"meters": {"agc": {"1": 3, "2": 12}}})

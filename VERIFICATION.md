@@ -1551,6 +1551,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the AEC reference values on firmware 4.1 and later (Dante outputs 3-8 added). ([specs/shure-p300.yaml:554](specs/shure-p300.yaml#L554))
 - [ ] Check what GATE_INHIBIT answers on firmware 4.1 and later, where it is documented not to work. ([specs/shure-p300.yaml:681](specs/shure-p300.yaml#L681))
 - [ ] Check the matrix gain REP's spacing (the document shows < REP xx MATRIX_MXR_GAIN yyzzzz > once). ([specs/shure-p300.yaml:991](specs/shure-p300.yaml#L991))
+- [ ] Capture SAMPLE_IN, SAMPLE_OUT, SAMPLE_PROC, SAMPLE_ERLE and SAMPLE_AGC with metering on, and confirm each lists one value per channel in the document's order (14, 12 as the order lists, 12, 8 and 8 values), three digits each (ERLE and AGC shown as aaa too), and record the AGC value's unit and range, which the document gives only as ERLE's. ([specs/shure-p300.yaml:1110](specs/shure-p300.yaml#L1110))
 
 ## shure-wireless — Shure wireless receivers
 
