@@ -1304,15 +1304,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## qlab — QLab
 
-- [ ] Check whether a cue that completes on its own produces a stop event, and how pause, panic, stop-all and reset-all events are addressed. ([specs/qlab.yaml:14742](specs/qlab.yaml#L14742))
-- [ ] Confirm that /update/.../playbackPosition arrives with no argument when a cue list's playhead is unset. ([specs/qlab.yaml:13843](specs/qlab.yaml#L13843))
-- [ ] Confirm that /workspaces lists every open workspace, and that /workspace/{id}/... reads reach a workspace listening on another port. ([specs/qlab.yaml:13779](specs/qlab.yaml#L13779))
-- [ ] Check that a workspace-addressed reply (/reply/workspace/{id}/cueLists and the like) arrives on that address, and that the rootless /runningOrPausedCues/shallow reply carries workspace_id, once per workspace. ([specs/qlab.yaml:14440](specs/qlab.yaml#L14440))
-- [ ] Check that valuesForKeys answers a cue with the keys that apply to its type when the list holds others too, whether the others are left out or null, and that keys holding a slash (colorName/live) are accepted. ([specs/qlab.yaml:14034](specs/qlab.yaml#L14034))
-- [ ] Check that QLab sends /update/.../cue_id/{id} when a cue starts, pauses, loads or stops, and for a newly created cue, so its values are read again. ([specs/qlab.yaml:13834](specs/qlab.yaml#L13834))
-- [ ] Confirm the address of an update to the cue lists themselves: /update/workspace/{id}/cue_id/__root__ (QLab 5.5) or [root group of cue lists] before. ([specs/qlab.yaml:13826](specs/qlab.yaml#L13826))
-- [ ] Check whether /cueLists reports flagged and armed as numbers or booleans (the dictionary shows both). ([specs/qlab.yaml:13848](specs/qlab.yaml#L13848))
-- [ ] Check that a cue list's playheadID answers none when no cue stands by. ([specs/qlab.yaml:14031](specs/qlab.yaml#L14031))
+- [ ] Check whether a cue that completes on its own produces a stop event, and how pause, panic, stop-all and reset-all events are addressed. ([specs/qlab.yaml:14766](specs/qlab.yaml#L14766))
+- [ ] Confirm that /update/.../playbackPosition arrives with no argument when a cue list's playhead is unset. ([specs/qlab.yaml:13847](specs/qlab.yaml#L13847))
+- [ ] Confirm that /workspaces lists every open workspace, and that /workspace/{id}/... reads reach a workspace listening on another port. ([specs/qlab.yaml:13783](specs/qlab.yaml#L13783))
+- [ ] Check that a workspace-addressed reply (/reply/workspace/{id}/cueLists and the like) arrives on that address, and that the rootless /runningOrPausedCues/shallow reply carries workspace_id, once per workspace. ([specs/qlab.yaml:14444](specs/qlab.yaml#L14444))
+- [ ] Check that valuesForKeys answers a cue with the keys that apply to its type when the list holds others too, whether the others are left out or null, and that keys holding a slash (colorName/live) are accepted. ([specs/qlab.yaml:14038](specs/qlab.yaml#L14038))
+- [ ] Check that QLab sends /update/.../cue_id/{id} when a cue starts, pauses, loads or stops, and for a newly created cue, so its values are read again. ([specs/qlab.yaml:13838](specs/qlab.yaml#L13838))
+- [ ] Confirm the address of an update to the cue lists themselves: /update/workspace/{id}/cue_id/__root__ (QLab 5.5) or [root group of cue lists] before. ([specs/qlab.yaml:13830](specs/qlab.yaml#L13830))
+- [ ] Check whether /cueLists reports flagged and armed as numbers or booleans (the dictionary shows both). ([specs/qlab.yaml:13852](specs/qlab.yaml#L13852))
+- [ ] Check that a cue list's playheadID answers none when no cue stands by. ([specs/qlab.yaml:14035](specs/qlab.yaml#L14035))
 - [ ] Check that startTime and endTime read as numbers of seconds on Audio and Video cues. ([specs/qlab.yaml:5213](specs/qlab.yaml#L5213))
 - [ ] Check that a slice or last-slice play count of 0, which the range does not refuse, is rejected by QLab. ([specs/qlab.yaml:5309](specs/qlab.yaml#L5309))
 - [ ] Check that /solo/{output} (QLab 5) addresses a cue output as /mute/channel/{output} does. ([specs/qlab.yaml:5743](specs/qlab.yaml#L5743))
@@ -1325,7 +1325,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the MSC timecode ranges (hours to 23, frames to 29, subframes to 99), which the dictionary leaves to the format. ([specs/qlab.yaml:11579](specs/qlab.yaml#L11579))
 - [ ] Check that valuesForKeys accepts timecodeTrigger/text and the playlist/... keys. ([specs/qlab.yaml:12327](specs/qlab.yaml#L12327))
 - [ ] Check that /workspace/{id}/fullScreen, lightDashboard and dashboard/mode answer a read without an argument. ([specs/qlab.yaml:13036](specs/qlab.yaml#L13036))
-- [ ] Check whether QLab pushes anything when an override or a window changes; they are re-read only with the workspace. ([specs/qlab.yaml:13802](specs/qlab.yaml#L13802))
+- [ ] Check that the rootless /selectedCues/shallow is answered once per open workspace with its workspace_id and an empty array when nothing is selected, whether a QLab 5 workspace answers with the current cue list's selection only, and whether a selection change sends any /update message. ([specs/qlab.yaml:14455](specs/qlab.yaml#L14455))
+- [ ] Check whether QLab pushes anything when an override or a window changes; they are re-read only with the workspace. ([specs/qlab.yaml:13806](specs/qlab.yaml#L13806))
 
 ## qsys — Q-SYS
 

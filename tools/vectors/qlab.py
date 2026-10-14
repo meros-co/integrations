@@ -952,6 +952,17 @@ telemetry(Q, "active-cues",
           expect_state={"workspaces": {WS: {"active": {"0": C1, "1": C2}}}},
           expect_then_send_hex=[framed(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", ("s", TIMING_KEYS)),
                                 framed(f"/workspace/{WS}/cue_id/{C2}/valuesForKeys", ("s", TIMING_KEYS))])
+# The selected cues, polled: the list is replaced (QLab 5 dictionary,
+# /selectedCues/shallow: cue dictionaries without Group children).
+telemetry(Q, "selected-cues",
+          inbound_hex=reply("/selectedCues/shallow", [{"uniqueID": C2, "number": "2", "type": "Group"},
+                                                      {"uniqueID": C1, "number": "1"}]),
+          state_before={"workspaces": {WS: {"selected": {"0": "OLD-1", "1": "OLD-2", "2": "OLD-3"}}}},
+          expect_state={"workspaces": {WS: {"selected": {"0": C2, "1": C1}}}})
+telemetry(Q, "selected-cues-none",
+          inbound_hex=reply("/selectedCues/shallow", []),
+          state_before={"workspaces": {WS: {"selected": {"0": C1}}}},
+          expect_state={"workspaces": {WS: {}}})
 telemetry(Q, "show-mode", inbound_hex=reply(f"/workspace/{WS}/showMode", True),
           expect_state={"workspaces": {WS: {"show_mode": True}}})
 
