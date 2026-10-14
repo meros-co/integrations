@@ -164,6 +164,16 @@ fn apply_conversion(x: f64, d: &str, values: &Values) -> Result<f64, String> {
 }
 
 impl Values<'_> {
+    /// A `binary` parameter's bytes, decoded from the base64 it is given in.
+    pub(crate) fn binary(&self, name: &str) -> Result<Vec<u8>, String> {
+        let (value, kind) = self.lookup(name)?;
+        if kind != ParamType::Binary {
+            return Err(format!("'{name}' is not a binary parameter"));
+        }
+        crate::catalog::decode_binary(value.as_str().unwrap_or(""))
+            .ok_or_else(|| format!("'{name}' is not base64"))
+    }
+
     fn lookup(&self, name: &str) -> Result<(&Value, ParamType), String> {
         let (values, specs, key) = match name.strip_prefix("settings.") {
             Some(key) => (self.settings, self.setting_specs, key),
@@ -399,6 +409,9 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
             }
             Ok(value.to_string())
         }
+        ParamType::Binary => Err(format!(
+            "binary '{name}' is sent only as a request body or a multipart part"
+        )),
         ParamType::Enum | ParamType::String => {
             let mut s = value
                 .as_str()

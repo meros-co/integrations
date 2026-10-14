@@ -1777,7 +1777,8 @@
             "bool",
             "enum",
             "string",
-            "json"
+            "json",
+            "binary"
           ]
         },
         "min": {
@@ -1947,10 +1948,82 @@
           }
         },
         "body": {
-          "type": "string"
+          "description": "The request body: a template, or {binary: name} sending a binary parameter's bytes as they are.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "required": [
+                "binary"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "binary": {
+                  "type": "string",
+                  "description": "A binary parameter of the command."
+                }
+              }
+            }
+          ]
         },
         "content_type": {
-          "type": "string"
+          "type": "string",
+          "description": "The body's Content-Type, a template (an enum parameter may choose it)."
+        },
+        "multipart": {
+          "type": "array",
+          "minItems": 1,
+          "description": "A multipart/form-data body (RFC 7578), in place of body and content_type: each part a template value or a binary parameter's bytes.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The form field's name, a template."
+              },
+              "value": {
+                "type": "string",
+                "description": "The part's text, a template."
+              },
+              "binary": {
+                "type": "string",
+                "description": "A binary parameter whose bytes are the part."
+              },
+              "filename": {
+                "type": "string",
+                "description": "The file name in the part's Content-Disposition, a template."
+              },
+              "content_type": {
+                "type": "string",
+                "description": "The part's Content-Type, a template."
+              }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "value"
+                ]
+              },
+              {
+                "required": [
+                  "binary"
+                ]
+              }
+            ]
+          }
+        },
+        "headers": {
+          "type": "object",
+          "description": "Headers of this message alone, each name mapped to a template over its parameters and the settings (a file name in Content-Disposition). Not Authorization, Content-Type or Host.",
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "models": {
           "type": "array",

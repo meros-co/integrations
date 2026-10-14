@@ -71,9 +71,57 @@ def template_strings(send) -> list[tuple[str, str]]:
                 out.append(("http-query", value))
             if "raw_query" in item:
                 out.append(("http-raw-query", item["raw_query"]))
-            if "body" in item:
+            if isinstance(item.get("body"), str):
                 out.append(("http-body", item["body"]))
+            if "content_type" in item:
+                out.append(("http-header", item["content_type"]))
+            for value in (item.get("headers") or {}).values():
+                out.append(("http-header", value))
+            for part in item.get("multipart") or []:
+                for key in ("name", "value", "filename", "content_type"):
+                    if key in part:
+                        out.append(("http-body", part[key]))
     return out
+
+
+def binary_refs(send) -> list[str]:
+    """The parameters a send block sends as bytes: `body: {binary: name}`
+    and multipart parts' `binary`."""
+    out: list[str] = []
+    for item in send if isinstance(send, list) else [send]:
+        if not isinstance(item, dict):
+            continue
+        body = item.get("body")
+        if isinstance(body, dict) and "binary" in body:
+            out.append(body["binary"])
+        out += [p["binary"] for p in item.get("multipart") or [] if "binary" in p]
+    return out
+
+
+def binary_checks(send, params: dict, where: str, transport_type) -> list[str]:
+    """SPEC.md §4, "Binary request bodies": a binary parameter is sent only
+    as bytes, over HTTP, and is always present; multipart has no body."""
+    errors: list[str] = []
+    refs = binary_refs(send)
+    for item in send if isinstance(send, list) else [send]:
+        if isinstance(item, dict) and "multipart" in item and ("body" in item or "content_type" in item):
+            errors.append(f"{where}: multipart goes without body and content_type")
+        if isinstance(item, dict) and item.get("headers"):
+            for name in item["headers"]:
+                if name.lower() in ("authorization", "content-type", "host"):
+                    errors.append(f"{where}: header {name} is set by the core, not by the spec")
+    if refs and transport_type != "http":
+        errors.append(f"{where}: binary bodies are for the http transport")
+    for name in refs:
+        decl = params.get(name)
+        if decl is None or decl.get("type") != "binary":
+            errors.append(f"{where}: '{name}' sent as bytes is not a binary parameter")
+        elif not decl.get("required"):
+            errors.append(f"{where}: binary '{name}' must be required")
+    for name, decl in params.items():
+        if decl.get("type") == "binary" and name not in refs:
+            errors.append(f"{where}: binary '{name}' is sent only as a body or a multipart part")
+    return errors
 
 
 def check_template(
@@ -116,6 +164,9 @@ def check_template(
             )
 
         ptype = decl["type"]
+        if ptype == "binary":
+            errors.append(f"{where}: binary '{name}' is sent only as a body or a multipart part, never in a template")
+            continue
         # A multiline string may hold line breaks: only `:json` escapes them.
         if decl.get("multiline"):
             if ptype != "string":
@@ -336,6 +387,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         for context, text in template_strings(command.get("send", [])):
             errors += check_template(context, text, params, settings, f"commands.{name}",
                                      conversions=conversions, maps=doc.get("maps") or {})
+        if doc.get("implementation") != "native":
+            errors += binary_checks(command.get("send", []), params, f"commands.{name}", transport_type)
         expect_ = command.get("expect") or {}
         if "reply_json" in expect_:
             if transport_type != "ws":

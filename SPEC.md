@@ -781,6 +781,7 @@ commands:
 | `enum` | `values`, `default` |
 | `string` | `max_length`, `pattern` (RE2-safe), `default` |
 | `json` | Any JSON value, sent as compact JSON. Only for a request body whose shape the device's own API documents and validates; the command's summary names that schema |
+| `binary` | Bytes given as base64, sent as they are in an HTTP body (§4, "Binary request bodies"); `max_length` in bytes |
 
 Values outside the declared range are rejected before transmission. The core
 does not clamp, because a clamped value masks a caller error and produces a
@@ -1051,6 +1052,53 @@ commands:
 `raw_query` is transmitted without re-encoding, for devices taking positional
 `&`-separated arguments. Use `query: {k: v}` for key/value APIs; the core
 URL-encode that form. A spec sets one or the other, not both.
+
+`content_type` is a template, so an enum parameter can choose it (an image
+as `image/jpeg` or `image/png`). `headers` gives headers of one message
+alone, each a template over its parameters and the settings, as
+`transport.headers` (§2) does for every request.
+
+### Binary request bodies
+
+A file a device takes as a request body (an image, a show file, a media
+clip) is a `binary` parameter: the caller gives its bytes as a base64 string
+(RFC 4648, padding optional), and the core sends them as they are.
+`max_length` limits the decoded bytes. A binary parameter is `required`, and
+is never rendered in a template; it is sent in one of two ways:
+
+```yaml
+commands:
+  set_thumbnail:
+    params:
+      video_id: { type: string, max_length: 64, required: true, … }
+      image: { type: binary, max_length: 2097152, required: true, … }
+      format: { type: enum, values: [image/jpeg, image/png], default: image/jpeg, … }
+    send:
+      method: POST
+      path: /upload/youtube/v3/thumbnails/set
+      query: { videoId: "{video_id}", uploadType: media }
+      body: { binary: image }          # the bytes are the whole body
+      content_type: "{format}"
+  upload_media:
+    params: { file: { type: binary, required: true, … }, name: { type: string, … } }
+    send:
+      method: POST
+      path: /media/upload
+      multipart:                       # multipart/form-data (RFC 7578)
+        - { name: addToMap, value: "true" }
+        - { name: MediaFile, binary: file, filename: "{name}", content_type: application/octet-stream }
+```
+
+With `multipart` in place of `body` and `content_type`, each part is a form
+field: `name`, then a template `value` or a binary parameter's bytes, with an
+optional `filename` and `content_type`, both templates (a line break or a
+quote in them, or in `name`, is refused before transmission). The core writes
+the body with a boundary derived from its content, so the same parts always
+give the same bytes, and sends `Content-Type: multipart/form-data;
+boundary=...`. A vector for such a command gives the body as `body_hex`, and
+may give `content_type`, in `expect_request`. `tools/validate.py` checks that
+a binary parameter is required, named only by `body.binary` or a part's
+`binary`, and used only over HTTP.
 
 ## 5. Responses
 

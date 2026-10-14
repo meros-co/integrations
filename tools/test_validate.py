@@ -26,5 +26,37 @@ class Duplicates(unittest.TestCase):
         self.assertEqual(validate.duplicates(text), [])
 
 
+class Binary(unittest.TestCase):
+    PARAMS = {"file": {"type": "binary", "required": True}, "name": {"type": "string", "required": True}}
+
+    def test_a_binary_parameter_is_sent_as_bytes_over_http(self):
+        send = {"method": "POST", "path": "/u", "body": {"binary": "file"}}
+        self.assertEqual(validate.binary_checks(send, self.PARAMS, "c", "http"), [])
+        form = {"method": "POST", "path": "/u",
+                "multipart": [{"name": "f", "binary": "file", "filename": "{name}"}]}
+        self.assertEqual(validate.binary_checks(form, self.PARAMS, "c", "http"), [])
+        self.assertEqual(validate.binary_checks(send, self.PARAMS, "c", "line-tcp"),
+                         ["c: binary bodies are for the http transport"])
+
+    def test_a_binary_parameter_is_never_templated_and_always_given(self):
+        errors = validate.check_template("http-body", "{file}", self.PARAMS, {}, "c")
+        self.assertTrue(any("never in a template" in e for e in errors), errors)
+        unsent = validate.binary_checks({"method": "POST", "path": "/u"}, self.PARAMS, "c", "http")
+        self.assertEqual(unsent, ["c: binary 'file' is sent only as a body or a multipart part"])
+        optional = {"file": {"type": "binary"}}
+        send = {"method": "POST", "path": "/u", "body": {"binary": "file"}}
+        self.assertEqual(validate.binary_checks(send, optional, "c", "http"), ["c: binary 'file' must be required"])
+        self.assertEqual(validate.binary_checks({"method": "POST", "path": "/u", "body": {"binary": "name"}},
+                                                self.PARAMS, "c", "http")[0],
+                         "c: 'name' sent as bytes is not a binary parameter")
+
+    def test_multipart_has_no_body_and_message_headers_are_the_specs(self):
+        send = {"method": "POST", "path": "/u", "body": "x", "headers": {"Content-Type": "a"},
+                "multipart": [{"name": "f", "binary": "file"}]}
+        errors = validate.binary_checks(send, self.PARAMS, "c", "http")
+        self.assertIn("c: multipart goes without body and content_type", errors)
+        self.assertIn("c: header Content-Type is set by the core, not by the spec", errors)
+
+
 if __name__ == "__main__":
     unittest.main()

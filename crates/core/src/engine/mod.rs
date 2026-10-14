@@ -967,6 +967,124 @@ fn render_headers(
     Ok(out)
 }
 
+/// An HTTP message's body and its content type (SPEC.md §4, "Binary request
+/// bodies"): a template (`body: "..."`), a binary parameter's bytes as they
+/// are (`body: { binary: name }`), or `multipart/form-data` parts.
+fn request_body(
+    item: &Value,
+    values: &Values,
+) -> Result<(Option<Vec<u8>>, Option<String>), String> {
+    let content_type = match str_field(item, "content_type") {
+        Some(ct) => {
+            let ct = render(ct, values, no_escape)?;
+            if ct.contains(['\r', '\n']) {
+                return Err("content_type contains a line break".into());
+            }
+            Some(ct)
+        }
+        None => None,
+    };
+    if let Some(parts) = item.get("multipart") {
+        if item.get("body").is_some() || content_type.is_some() {
+            return Err("multipart goes without body and content_type".into());
+        }
+        let parts = parts.as_array().ok_or("multipart is a list of parts")?;
+        let mut rendered = Vec::new();
+        for part in parts {
+            let field = |key: &str| -> Result<Option<String>, String> {
+                match str_field(part, key) {
+                    None => Ok(None),
+                    Some(t) => {
+                        let text = render(t, values, no_escape)?;
+                        if text.contains(['\r', '\n', '"']) {
+                            return Err(format!("multipart {key} holds a line break or a quote"));
+                        }
+                        Ok(Some(text))
+                    }
+                }
+            };
+            let name = field("name")?.ok_or("a multipart part needs a name")?;
+            let data = match (str_field(part, "binary"), str_field(part, "value")) {
+                (Some(param), None) => values.binary(param)?,
+                (None, Some(t)) => render(t, values, no_escape)?.into_bytes(),
+                _ => return Err(format!("multipart part {name} has one of binary or value")),
+            };
+            rendered.push(Part {
+                name,
+                filename: field("filename")?,
+                content_type: field("content_type")?,
+                data,
+            });
+        }
+        let (body, boundary) = multipart(&rendered);
+        return Ok((
+            Some(body),
+            Some(format!("multipart/form-data; boundary={boundary}")),
+        ));
+    }
+    let body = match item.get("body") {
+        None => None,
+        Some(Value::String(b)) => Some(render(b, values, no_escape)?.into_bytes()),
+        Some(other) => match other.get("binary").and_then(Value::as_str) {
+            Some(param) => Some(values.binary(param)?),
+            None => return Err("body is a template or {binary: parameter}".into()),
+        },
+    };
+    Ok((body, content_type))
+}
+
+/// One part of a `multipart/form-data` body (RFC 7578).
+struct Part {
+    name: String,
+    filename: Option<String>,
+    content_type: Option<String>,
+    data: Vec<u8>,
+}
+
+/// The `multipart/form-data` body of `parts` and its boundary. The boundary
+/// is derived from the content, so the same parts always give the same
+/// bytes, and is lengthened until no part holds it.
+fn multipart(parts: &[Part]) -> (Vec<u8>, String) {
+    use sha2::Digest;
+    let mut hash = sha2::Sha256::new();
+    for p in parts {
+        hash.update(p.name.as_bytes());
+        hash.update([0]);
+        hash.update(&p.data);
+        hash.update([0]);
+    }
+    let digest: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    let mut length = 16;
+    let boundary = loop {
+        let candidate = format!("----form-{}", &digest[..length]);
+        let held = parts
+            .iter()
+            .any(|p| find(&p.data, candidate.as_bytes()).is_some());
+        if !held || length == digest.len() {
+            break candidate;
+        }
+        length += 8;
+    };
+    let mut body = Vec::new();
+    for p in parts {
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        let mut disposition = format!("Content-Disposition: form-data; name=\"{}\"", p.name);
+        if let Some(f) = &p.filename {
+            disposition.push_str(&format!("; filename=\"{f}\""));
+        }
+        body.extend_from_slice(disposition.as_bytes());
+        body.extend_from_slice(b"\r\n");
+        if let Some(ct) = &p.content_type {
+            body.extend_from_slice(format!("Content-Type: {ct}\r\n").as_bytes());
+        }
+        body.extend_from_slice(b"\r\n");
+        body.extend_from_slice(&p.data);
+        body.extend_from_slice(b"\r\n");
+    }
+    body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+    (body, boundary)
+}
+
 fn host_text(host: IpAddr) -> String {
     match host {
         IpAddr::V6(v6) => format!("[{v6}]"),
@@ -1650,12 +1768,15 @@ impl SpecEngine {
                         .to_string()
                 };
                 let (user, pass) = (setting("username"), setting("password"));
-                let body = match str_field(item, "body") {
-                    Some(b) => Some(render(b, values, no_escape)?.into_bytes()),
-                    None => None,
-                };
-                if let Some(ct) = str_field(item, "content_type") {
-                    headers.push(("Content-Type".into(), ct.into()));
+                // Headers of this message alone (a file name in
+                // Content-Disposition), templates over its parameters.
+                if item.get("headers").is_some() {
+                    let templates = header_templates(item)?;
+                    headers.extend(render_headers(&templates, values)?);
+                }
+                let (body, content_type) = request_body(item, values)?;
+                if let Some(ct) = content_type {
+                    headers.push(("Content-Type".into(), ct));
                 }
                 Ok(Outgoing::Http(
                     HttpRequest {
@@ -6525,5 +6646,128 @@ state:
             &completed(&cx.take())[..],
             [(1, Err(CommandError::InvalidParams { .. }))]
         ));
+    }
+
+    const BINARY: &str = r#"
+spec: 1
+id: binary-test
+name: Binary test
+vendor: Test
+category: other
+source: [{ title: test }]
+transport: { type: http, port: 80, probe: { method: GET, path: /info } }
+ports: [{ port: 80, protocol: http, role: control }]
+models: [{ id: m, name: M, supports: [raw, form, named], verification: none }]
+commands:
+  raw:
+    params:
+      data: { type: binary, max_length: 4, required: true }
+      kind: { type: enum, values: [image/png, image/jpeg], default: image/png }
+    send: { method: POST, path: /raw, body: { binary: data }, content_type: "{kind}" }
+    expect: { status: 200 }
+    returns: ack
+  form:
+    params:
+      data: { type: binary, required: true }
+      name: { type: string, max_length: 64, required: true }
+    send:
+      method: POST
+      path: /form
+      multipart:
+        - { name: addToMap, value: "true" }
+        - { name: MediaFile, binary: data, filename: "{name}", content_type: application/octet-stream }
+    expect: { status: 200 }
+    returns: ack
+  named:
+    params:
+      data: { type: binary, required: true }
+      name: { type: string, max_length: 64, required: true }
+    send:
+      method: POST
+      path: /named
+      body: { binary: data }
+      content_type: application/octet-stream
+      headers: { Content-Disposition: 'attachment; filename="{name}.cset"' }
+    expect: { status: 200 }
+    returns: ack
+"#;
+
+    #[test]
+    fn binary_parameters_go_out_as_bytes_whole_or_in_multipart_parts() {
+        let spec: DeviceSpec = serde_yaml::from_str(BINARY).unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        endpoints_connected(&mut e);
+        let send = |e: &mut SpecEngine, name: &str, params: Value| {
+            let mut cx = Cx::new(2);
+            e.command(&mut cx, 1, name, params.as_object().unwrap());
+            let actions = cx.take();
+            match requests(&actions).pop() {
+                Some((rid, request)) => {
+                    let mut cx = Cx::new(3);
+                    e.http_response(&mut cx, rid, answer("{}", None));
+                    assert_eq!(completed(&cx.take()), vec![(1, Ok(Outcome::Ack))]);
+                    Ok(request)
+                }
+                None => Err(completed(&actions)),
+            }
+        };
+        // The bytes as they are, padded base64 or not, with the type chosen.
+        for given in ["iVBORw==", "iVBORw"] {
+            let r = send(&mut e, "raw", json!({"data": given, "kind": "image/png"})).unwrap();
+            assert_eq!(r.body.as_deref(), Some(&[0x89, b'P', b'N', b'G'][..]));
+            assert_eq!(header(&r, "Content-Type"), Some("image/png"));
+        }
+        // Not base64, or longer than max_length: refused before sending.
+        for bad in ["not base64!", "AAAAAAA="] {
+            let err = send(&mut e, "raw", json!({"data": bad})).unwrap_err();
+            assert!(matches!(
+                &err[..],
+                [(1, Err(CommandError::InvalidParams { .. }))]
+            ));
+        }
+        // multipart/form-data: the same parts always give the same bytes.
+        let form = json!({"data": "AAEC", "name": "clip.mov"});
+        let a = send(&mut e, "form", form.clone()).unwrap();
+        let b = send(&mut e, "form", form).unwrap();
+        assert_eq!(a.body, b.body);
+        let ct = header(&a, "Content-Type").unwrap().to_string();
+        let boundary = ct
+            .strip_prefix("multipart/form-data; boundary=")
+            .unwrap()
+            .to_string();
+        let mut want = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"addToMap\"\r\n\r\ntrue\r\n\
+             --{boundary}\r\nContent-Disposition: form-data; name=\"MediaFile\"; filename=\"clip.mov\"\r\n\
+             Content-Type: application/octet-stream\r\n\r\n"
+        )
+        .into_bytes();
+        want.extend_from_slice(&[0, 1, 2]);
+        want.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        assert_eq!(a.body.unwrap(), want);
+        // A quote in a file name would end the field: refused.
+        let err = send(&mut e, "form", json!({"data": "AAEC", "name": "a\"b"})).unwrap_err();
+        assert!(matches!(
+            &err[..],
+            [(1, Err(CommandError::InvalidParams { .. }))]
+        ));
+        // A header of the message alone, beside the bytes.
+        let r = send(&mut e, "named", json!({"data": "AAEC", "name": "Look"})).unwrap();
+        assert_eq!(
+            header(&r, "Content-Disposition"),
+            Some("attachment; filename=\"Look.cset\"")
+        );
+        assert_eq!(r.body.as_deref(), Some(&[0, 1, 2][..]));
     }
 }
