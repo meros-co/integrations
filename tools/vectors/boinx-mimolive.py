@@ -559,15 +559,17 @@ telemetry(ML, "source-and-filter-input-descriptions", inbound_http={
                   "filters": {_ML_FLT: {"name": "Color Correction", "input_descriptions":
                                         '{"tvIn_Amount":{"hidden":false,"type":"number","value-min":0,'
                                         '"value-max":1,"label":"Amount","index":0}}'}}})
-# A GET of one layer type, with its inputs in the assumed shape, is returned
-# to the caller only: its dotted identifier cannot be a state key and the
-# reply cannot be matched to the type's position in the list.
-telemetry(ML, "one-layer-type-not-state", inbound_http={
+# A GET of one layer type, with its inputs in the assumed shape, is kept
+# under type_details by its dotted identifier, one key; the list is left as
+# it was.
+telemetry(ML, "one-layer-type", inbound_http={
     "path": "/api/v1/layertypes/com.boinx.layer.lowerthird",
     "body": json.dumps({"data": {"type": "layertypes", "id": "com.boinx.layer.lowerthird", "attributes": {
-        "name": "Lower Third", "input-values": {"tvIn_Title": ""}, "input-descriptions": _ML_DESC}}})},
-    state_before={"types": {"layers": {"0": {"id": "com.boinx.layer.lowerthird", "name": "Lower Third"}}}},
-    expect_state={"types": {"layers": {"0": {"id": "com.boinx.layer.lowerthird", "name": "Lower Third"}}}})
+        "name": "Lower Third", "input-values": {"tvIn_Title": ""}}}})},
+    state_before={"types": {"layers": {"com.boinx.layer.lowerthird": {"name": "Lower Third"}}}},
+    expect_state={"types": {"layers": {"com.boinx.layer.lowerthird": {"name": "Lower Third"}}},
+                  "type_details": {"layers": {"com.boinx.layer.lowerthird": {
+                      "attributes": '{"name":"Lower Third","input-values":{"tvIn_Title":""}}'}}}})
 # Zoom participant and mimoCall source attributes (the manual's mimoCall
 # source properties; Boinx's reference for the Zoom ones).
 telemetry(ML, "sources-zoom-and-mimocall", inbound_http={
@@ -635,9 +637,23 @@ telemetry(ML, "devices-list", inbound_http={
         "name": "MacBook Pro Microphone", "connected": True, "video": False, "audio": True,
         "device_type": "com.boinx.devicetype.avfoundation", "tally_state": "off",
         "input_channels": '["Ch. 1"]'}}})
+# A device whose ID holds dots is one key.
+telemetry(ML, "devices-list-dotted-id", inbound_http={
+    "path": "/api/v1/devices",
+    "body": json.dumps({"data": [{"type": "devices", "id": "ndi.STUDIO (CAM 1)", "attributes": {
+        "name": "STUDIO (CAM 1)", "connected": True, "video": True, "audio": False,
+        "device-type": "com.boinx.devicetype.ndi", "tally-state": "program"}}]})},
+    expect_state={"devices": {"ndi.STUDIO (CAM 1)": {
+        "name": "STUDIO (CAM 1)", "connected": True, "video": True, "audio": False,
+        "device_type": "com.boinx.devicetype.ndi", "tally_state": "program"}}})
+telemetry(ML, "pushed-dotted-device-change", inbound_ws=json.dumps({
+    "event": "changed", "type": "devices",
+    "data": {"type": "devices", "id": "ndi.STUDIO (CAM 1)", "attributes": {"tally-state": "preview"}}}),
+    state_before={"devices": {"ndi.STUDIO (CAM 1)": {"name": "STUDIO (CAM 1)", "tally_state": "program"}}},
+    expect_state={"devices": {"ndi.STUDIO (CAM 1)": {"name": "STUDIO (CAM 1)", "tally_state": "preview"}}})
 # The type catalogs (Boinx's reference: each id is what the create call
-# takes), kept by position since the identifiers hold dots; a list replaces
-# the one before, and a GET of one type leaves state alone.
+# takes), keyed by identifier, each one key with its dots; a list replaces
+# the one before, and a GET of one type goes to type_details.
 telemetry(ML, "source-types-list", inbound_http={
     "path": "/api/v1/sourcetypes",
     "body": json.dumps({"data": [
@@ -645,33 +661,42 @@ telemetry(ML, "source-types-list", inbound_http={
          "attributes": {"name": "Camera"}},
         {"type": "sourcetypes", "id": "com.boinx.mimoLive.sources.imageSource",
          "attributes": {"name": "Image"}}]})},
-    state_before={"types": {"sources": {"2": {"id": "com.boinx.old", "name": "Old"}}}},
+    state_before={"types": {"sources": {"com.boinx.old": {"name": "Old"}}}},
     expect_state={"types": {"sources": {
-        "0": {"id": "com.boinx.mimoLive.sources.deviceVideoSource", "name": "Camera",
-              "attributes": '{"name":"Camera"}'},
-        "1": {"id": "com.boinx.mimoLive.sources.imageSource", "name": "Image",
-              "attributes": '{"name":"Image"}'}}}})
+        "com.boinx.mimoLive.sources.deviceVideoSource": {"name": "Camera", "attributes": '{"name":"Camera"}'},
+        "com.boinx.mimoLive.sources.imageSource": {"name": "Image", "attributes": '{"name":"Image"}'}}}})
 telemetry(ML, "layer-types-list", inbound_http={
     "path": "/api/v1/layertypes",
     "body": json.dumps({"data": [
         {"type": "layertypes", "id": "com.boinx.layer.lowerthird", "attributes": {"name": "Lower Third"}}]})},
-    expect_state={"types": {"layers": {"0": {
-        "id": "com.boinx.layer.lowerthird", "name": "Lower Third", "attributes": '{"name":"Lower Third"}'}}}})
+    expect_state={"types": {"layers": {"com.boinx.layer.lowerthird": {
+        "name": "Lower Third", "attributes": '{"name":"Lower Third"}'}}}})
 telemetry(ML, "output-destination-types-list", inbound_http={
     "path": "/api/v1/outputdestinationtypes",
     "body": json.dumps({"data": [
         {"type": "outputdestinationtypes", "id": "com.boinx.mimoLive.outputDestination.ndi",
          "attributes": {"name": "NDI"}}]})},
-    expect_state={"types": {"output-destinations": {"0": {
-        "id": "com.boinx.mimoLive.outputDestination.ndi", "name": "NDI", "attributes": '{"name":"NDI"}'}}}})
+    expect_state={"types": {"output-destinations": {"com.boinx.mimoLive.outputDestination.ndi": {
+        "name": "NDI", "attributes": '{"name":"NDI"}'}}}})
 telemetry(ML, "source-types-empty", inbound_http={"path": "/api/v1/sourcetypes", "body": '{"data":[]}'},
-          state_before={"types": {"sources": {"0": {"id": "com.boinx.old", "name": "Old"}}}},
+          state_before={"types": {"sources": {"com.boinx.old": {"name": "Old"}}}},
           expect_state={"types": {}})
-telemetry(ML, "one-source-type-not-state", inbound_http={
+telemetry(ML, "one-source-type", inbound_http={
     "path": "/api/v1/sourcetypes/com.boinx.mimoLive.sources.imageSource",
     "body": json.dumps({"data": {"type": "sourcetypes", "id": "com.boinx.mimoLive.sources.imageSource",
                                  "attributes": {"name": "Image"}}})},
-    expect_state={})
+    expect_state={"type_details": {"sources": {"com.boinx.mimoLive.sources.imageSource": {
+        "attributes": '{"name":"Image"}'}}}})
+telemetry(ML, "one-output-destination-type", inbound_http={
+    "path": "/api/v1/outputdestinationtypes/com.boinx.mimoLive.outputDestination.ndi",
+    "body": json.dumps({"data": {"type": "outputdestinationtypes", "id": "com.boinx.mimoLive.outputDestination.ndi",
+                                 "attributes": {"name": "NDI"}}})},
+    expect_state={"type_details": {"output-destinations": {"com.boinx.mimoLive.outputDestination.ndi": {
+        "attributes": '{"name":"NDI"}'}}}})
+# A source pushed removed whose ID holds dots leaves state, that key alone.
+telemetry(ML, "pushed-dotted-removal", inbound_ws=json.dumps({"event": "removed", "type": "sources", "id": "a.b"}),
+          state_before={"sources": {"a.b": {"name": "Dotted"}, "a": {"name": "Plain"}}},
+          expect_state={"sources": {"a": {"name": "Plain"}}})
 telemetry(ML, "accounts-list", inbound_http={
     "path": "/api/v1/accounts",
     "body": json.dumps({"data": [{"type": "accounts", "id": "6995291F-E0C3-4307-84E0-BEA3A3EA7A8E", "attributes": {
