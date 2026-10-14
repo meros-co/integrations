@@ -41,6 +41,14 @@ text(Q, "get_source_name", {"source": 14}, ".RS14\r", device_reply=".RAS014,CAM 
      expect_result={"ok": {"kind": "value", "value": "CAM 1"}})
 text(Q, "get_level_name", {"level": "B"}, ".RLB\r", device_reply=".RALB,AES 1\r",
      expect_result={"ok": {"kind": "value", "value": "AES 1"}})
+# Name writes (p.11): the router answers with the name update, then an
+# acknowledge; the command takes both.
+text(Q, "set_destination_name", {"destination": 2, "name": "MON 2"}, ".WD2,MON 2\r",
+     device_reply=".RAD002,MON 2\r.A\r", expect_result=ACK)
+text(Q, "set_source_name", {"source": 14, "name": "CAM 1"}, ".WS14,CAM 1\r",
+     device_reply=".RAS014,CAM 1\r.A\r", expect_result=ACK)
+text(Q, "set_level_name", {"level": "B", "name": "AES 1"}, ".WLB,AES 1\r",
+     device_reply=".RALB,AES 1\r.A\r", expect_result=ACK)
 
 # Queue (dynamic salvo) commands (p.13-14); ".QC0" is the failure answer to
 # a salvo selection.

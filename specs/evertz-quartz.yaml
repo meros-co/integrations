@@ -12,9 +12,9 @@ category: router
 # The note itself is read through a public third-party mirror of the Evertz
 # document. Covered: crosspoint set (single and block), interrogate and list,
 # system destination locks, system salvos, the queue (dynamic salvo) commands,
-# reading destination, source and level names, and the connection test and
-# protocol version. Left out: writing names (two replies per command, see the
-# quirks), the 10-character extended names (their reply form is not given),
+# reading and writing destination, source and level names, and the
+# connection test and protocol version. Left out: the 10-character extended
+# names (.RE: AN65 gives no reply form for them),
 # configuration EPROM read/write (.? and .!, embedded control systems only),
 # engineering commands that reset the controller, halt vertical-interval
 # switching, change Q-Link panel status or the controller's IP settings (.#12,
@@ -130,6 +130,9 @@ models:
       - get_destination_name
       - get_source_name
       - get_level_name
+      - set_destination_name
+      - set_source_name
+      - set_level_name
       - salvo_select
       - salvo_deselect
       - salvo_clear
@@ -156,6 +159,9 @@ models:
       - get_destination_name
       - get_source_name
       - get_level_name
+      - set_destination_name
+      - set_source_name
+      - set_level_name
     verification: none
     notes: >
       MAGNUM presents its routers to Quartz clients with up to 26 levels (V and
@@ -178,6 +184,9 @@ models:
       - get_destination_name
       - get_source_name
       - get_level_name
+      - set_destination_name
+      - set_source_name
+      - set_level_name
       - salvo_select
       - salvo_deselect
       - salvo_clear
@@ -204,6 +213,9 @@ models:
       - get_destination_name
       - get_source_name
       - get_level_name
+      - set_destination_name
+      - set_source_name
+      - set_level_name
     verification: none
     notes: >
       Routers whose manuals name the Quartz (-1) protocol and refer to AN65.
@@ -376,6 +388,45 @@ commands:
     expect: { matches: '^\.RAL(?:[A-Z],)?(.*?)\s*$' }
     returns: value
 
+  set_destination_name:
+    summary: Rename a destination (mnemonic, 8 characters) (.WD); the router answers with the name and then an acknowledge
+    params:
+      destination: { type: int, min: 1, required: true,
+                     label: Destination,
+                     description: "Destination number, from 1 as on the router." }
+      name: { type: string, max_length: 8, pattern: "^[ -~]{1,8}$", required: true,
+              label: Name,
+              description: "The new name, up to 8 printable ASCII characters." }
+    send: ".WD{destination},{name}"
+    expect: { replies: 2, matches: '(?m)^\.A' }
+    returns: ack
+
+  set_source_name:
+    summary: Rename a source (mnemonic, 8 characters) (.WS); the router answers with the name and then an acknowledge
+    params:
+      source: { type: int, min: 1, required: true,
+                label: Source,
+                description: "Source number, from 1 as on the router." }
+      name: { type: string, max_length: 8, pattern: "^[ -~]{1,8}$", required: true,
+              label: Name,
+              description: "The new name, up to 8 printable ASCII characters." }
+    send: ".WS{source},{name}"
+    expect: { replies: 2, matches: '(?m)^\.A' }
+    returns: ack
+
+  set_level_name:
+    summary: Rename a level (mnemonic, 8 characters) (.WL); the router answers with the name and then an acknowledge
+    params:
+      level: { type: enum, values: [V, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, W, X, Y, Z], required: true,
+               label: Level,
+               description: "One level by its letter: V is the first level, then A, B, C and so on, as configured on the router." }
+      name: { type: string, max_length: 8, pattern: "^[ -~]{1,8}$", required: true,
+              label: Name,
+              description: "The new name, up to 8 printable ASCII characters." }
+    send: ".WL{level},{name}"
+    expect: { replies: 2, matches: '(?m)^\.A' }
+    returns: ack
+
   # ── Queue (dynamic salvo) commands (p.13-14) ────────────────────────────
   salvo_select:
     summary: >
@@ -531,11 +582,13 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Writing names (.WD, .WS, .WL) is not offered: the router answers each
-      with a .RA name update and then a separate acknowledge (p.11), and the
-      line transport takes one reply per message, so the second would be taken
-      as the next command's reply. The 10-character extended names (.RE) are
-      not offered either, because AN65 does not give their reply form. Name
+      The name writes (.WD, .WS, .WL) are answered with a .RA name update
+      and then a separate acknowledge (p.11): each command takes both
+      replies, and the name update keeps the state's name. AN65 gives the
+      write a name of eight characters "delimited by whitespace" without
+      saying whether a space may stand within it; names are sent as given.
+      The 10-character extended names (.RE) are not offered, because AN65
+      does not give their reply form. Name
       replies come with or without the number depending on firmware (p.10);
       only replies carrying the number update the state.
 

@@ -747,13 +747,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## evertz-quartz — Evertz Quartz protocol routers
 
 - [ ] Confirm the control port of each product (23 assumed per AN65; EQT, EMR and 7700R use 3737-3740, the 7700R also 2000). ([specs/evertz-quartz.yaml:97](specs/evertz-quartz.yaml#L97))
-- [ ] Check that a route (.S) is answered only by a .U update, and that .E comes only for commands the router cannot parse. ([specs/evertz-quartz.yaml:414](specs/evertz-quartz.yaml#L414))
-- [ ] Check what an interrogate of a missing destination returns on EQX and MAGNUM (AN65 says nothing). ([specs/evertz-quartz.yaml:436](specs/evertz-quartz.yaml#L436))
-- [ ] Check that numbers without leading zeros are accepted, and that replies use three digits. ([specs/evertz-quartz.yaml:457](specs/evertz-quartz.yaml#L457))
-- [ ] Check whether lock and name changes made elsewhere are pushed as .BA or .RA. ([specs/evertz-quartz.yaml:484](specs/evertz-quartz.yaml#L484))
-- [ ] Check which commands MAGNUM implements beyond routing, interrogate, locks, salvos and names. ([specs/evertz-quartz.yaml:484](specs/evertz-quartz.yaml#L484))
-- [ ] Check whether name replies carry the number on current firmware. ([specs/evertz-quartz.yaml:473](specs/evertz-quartz.yaml#L473))
-- [ ] Record the tieline source encoding (source in the lower 12 bits, level above) on a system with tielines. ([specs/evertz-quartz.yaml:448](specs/evertz-quartz.yaml#L448))
+- [ ] Check that a route (.S) is answered only by a .U update, and that .E comes only for commands the router cannot parse. ([specs/evertz-quartz.yaml:465](specs/evertz-quartz.yaml#L465))
+- [ ] Check what an interrogate of a missing destination returns on EQX and MAGNUM (AN65 says nothing). ([specs/evertz-quartz.yaml:487](specs/evertz-quartz.yaml#L487))
+- [ ] Check that numbers without leading zeros are accepted, and that replies use three digits. ([specs/evertz-quartz.yaml:508](specs/evertz-quartz.yaml#L508))
+- [ ] Check whether lock and name changes made elsewhere are pushed as .BA or .RA. ([specs/evertz-quartz.yaml:535](specs/evertz-quartz.yaml#L535))
+- [ ] Check which commands MAGNUM implements beyond routing, interrogate, locks, salvos and names. ([specs/evertz-quartz.yaml:535](specs/evertz-quartz.yaml#L535))
+- [ ] Check whether name replies carry the number on current firmware. ([specs/evertz-quartz.yaml:524](specs/evertz-quartz.yaml#L524))
+- [ ] Record the tieline source encoding (source in the lower 12 bits, level above) on a system with tielines. ([specs/evertz-quartz.yaml:499](specs/evertz-quartz.yaml#L499))
+- [ ] Confirm a name write (.WD, .WS, .WL) is answered with the .RA name update and then .A, in that order, that a space within a name is accepted, and record what an invalid number or a name over eight characters answers. ([specs/evertz-quartz.yaml:401](specs/evertz-quartz.yaml#L401))
 
 ## extron-matrix — Extron SIS matrix switchers
 
