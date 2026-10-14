@@ -125,3 +125,88 @@ telemetry(L2, "preset", inbound="(LPR01)\r\n", expect_state={"last_preset_loaded
 telemetry(L2, "umx-layer", inbound="(ALLV M03)\r\n",
           expect_state={"layers": {"V": {"input": 3, "muted": True, "locked": False}}})
 telemetry(L2, "product", inbound="(I:UMX-HDMI-140)\r\n", expect_state={"device": {"product_type": "UMX-HDMI-140"}})
+
+# Network (MX 7.4, MX-FR 7.5; UMX 6.5), MX-CPU2 extras (MX-FR 7.5-7.8), HDMI
+# ports (MX 7.6.3-7.6.7), UMX RS-232 and GPIO (UMX 6.6-6.7).
+text(L2, "set_ip_dhcp", {}, "{IP_CONFIG=D}\r\n", device_reply="(Changing IP configuration...)\r\n", expect_result=OK2, **MXP)
+text(L2, "reset_ip_config", {}, "{IP_CONFIG=!}\r\n", device_reply="(Changing IP configuration...)\r\n",
+     expect_result=OK2, **MXP)
+text(L2, "edid_route", {"input": 5, "source": "F10"}, "{E05:F10}\r\n", device_reply="(E_SW_OK)\r\n", expect_result=OK2, **MXP)
+text(L2, "edid_route_all", {"source": "U4"}, "{EA:U4}\r\n", device_reply="(E_SW_OK)\r\n", expect_result=OK2, **MXP)
+text(L2, "get_hdmi_input_status", {"input": 1}, "{:HDMIIGET1}\r\n",
+     device_reply="(STI1=S1131;V1920x1080p60,675,00;A1C010000;I111190;PAA;)\r\n",
+     expect_result=v2("S1131;V1920x1080p60,675,00;A1C010000;I111190;PAA;"), **MXP)
+text(L2, "get_hdmi_output_status", {"output": 1}, "{:HDMIOGET1}\r\n",
+     device_reply="(STO1=G10101;V800x600p60,379,00;I111100;M110111077;OAAAAAU;)\r\n",
+     expect_result=v2("G10101;V800x600p60,379,00;I111100;M110111077;OAAAAAU;"), **MXP)
+text(L2, "set_hdmi_output", {"output": 1, "signal": "H", "color_space": "2"}, "{:HDMISET#1@SO=H;2;x;x;x;}\r\n",
+     device_reply="(STO1=G1100;OH2AAA;)\r\n", expect_result=OK2, **MXP)
+text(L2, "get_rs232_baud", {}, "{RS232BAUD=?}\r\n", device_reply="(RS232BAUD=57600)\r\n", expect_result=v2("57600"), **MXP)
+text(L2, "set_rs232_baud", {"baud": "115200"}, "{RS232BAUD=115200}\r\n", device_reply="(RS232BAUD=115200)\r\n",
+     expect_result=OK2, **MXP)
+text(L2, "get_time", {}, "{GETTIME}\r\n", device_reply="(04.10.2016. 16:52:34 UTC+0100)\r\n",
+     expect_result=v2("04.10.2016. 16:52:34 UTC+0100"), **MXP)
+text(L2, "set_time", {"time": "04.10.2016. 16:52:34 UTC+0100"}, "{SETTIME=04.10.2016. 16:52:34 UTC+0100}\r\n",
+     device_reply="(04.10.2016. 16:52:34 UTC+0100)\r\n", expect_result=OK2, **MXP)
+text(L2, "get_ip_status", {}, "{IP_STAT=?}\r\n", device_reply="(IP_STAT=0;192.168.0.75;255.255.255.0;192.168.0.1)\r\n",
+     expect_result=v2("0;192.168.0.75;255.255.255.0;192.168.0.1"), **UMX2)
+text(L2, "get_ip_address", {}, "{IP_ADDRESS=?}\r\n", device_reply="(IP_ADDRESS=0;192.168.0.75)\r\n",
+     expect_result=v2("0;192.168.0.75"), **UMX2)
+text(L2, "set_ip_address", {"dhcp": True, "address": "192.168.2.118"}, "{IP_ADDRESS=1;192.168.2.118}\r\n",
+     device_reply="(IP_ADDRESS=1;192.168.2.118)\r\n", expect_result=OK2, **UMX2)
+text(L2, "set_ip_netmask", {"netmask": "255.255.255.0"}, "{IP_NETMASK=255.255.255.0}\r\n",
+     device_reply="(IP_NETMASK=255.255.255.0)\r\n", expect_result=OK2, **UMX2)
+text(L2, "set_ip_gateway", {"gateway": "192.168.0.1"}, "{IP_GATEWAY=192.168.0.1}\r\n",
+     device_reply="(IP_GATEWAY=192.168.0.1)\r\n", expect_result=OK2, **UMX2)
+text(L2, "set_ethernet_enabled", {"enabled": True}, "{ETH_ENABLE=1}\r\n", device_reply="(ETH_ENABLE=1)\r\n",
+     expect_result=OK2, **UMX2)
+text(L2, "apply_ip_settings", {}, "{IP_APPLY}\r\n", device_reply="(IP_APPLY)\r\n", expect_result=OK2, **UMX2)
+text(L2, "get_rs232_mode", {}, "{RS232=?}\r\n", device_reply="(RS232=CONTROL)\r\n", expect_result=v2("CONTROL"), **UMX2)
+text(L2, "set_rs232_mode", {"mode": "PASS"}, "{RS232=PASS}\r\n", device_reply="(RS232=PASS)\r\n", expect_result=OK2, **UMX2)
+text(L2, "get_rs232_format", {}, "{RS232_LOCAL_FORMAT=?}\r\n", device_reply="(RS232_LOCAL_FORMAT=57600;8;N;1)\r\n",
+     expect_result=v2("57600;8;N;1"), **UMX2)
+text(L2, "set_rs232_format", {"baud": "9600"}, "{RS232_LOCAL_FORMAT=9600;X;X;X}\r\n",
+     device_reply="(RS232_LOCAL_FORMAT=9600;8;N;1)\r\n", expect_result=OK2, **UMX2)
+text(L2, "get_rs232_protocol", {}, "{RS232_LOCAL_PROT=?}\r\n", device_reply="(RS232_LOCAL_PROT=LW2)\r\n",
+     expect_result=v2("LW2"), **UMX2)
+text(L2, "set_rs232_protocol", {"protocol": "LW3"}, "{RS232_LOCAL_PROT=LW3}\r\n", device_reply="(RS232_LOCAL_PROT=LW3)\r\n",
+     expect_result=OK2, **UMX2)
+text(L2, "get_gpio", {"pin": 2}, "{GPIO2=?}\r\n", device_reply="(GPIO2=O;H)\r\n", expect_result=v2("O;H"), **UMX2)
+text(L2, "set_gpio", {"pin": 2, "direction": "O", "level": "T"}, "{GPIO2=O;T}\r\n", device_reply="(GPIO2=O;L)\r\n",
+     expect_result=OK2, **UMX2)
+
+telemetry(L2, "connections-41", inbound="(ALL " + " ".join(f"{i:02d}" for i in range(1, 41)) + " L03)\r\n",
+          expect_state={"outputs": {**{str(i): {"input": i, "muted": False, "locked": False} for i in range(1, 41)},
+                                    "41": {"input": 3, "muted": False, "locked": True}}},
+          # The port status and settings are polled directly, not read after it.
+          expect_then_send=[])
+telemetry(L2, "input-status", inbound="(ISD 1133377A)\r\n",
+          expect_state={"inputs": {"1": {"status": 1}, "2": {"status": 1}, "3": {"status": 3}, "4": {"status": 3},
+                                   "5": {"status": 3}, "6": {"status": 7}, "7": {"status": 7}, "8": {"status": 10}}})
+telemetry(L2, "output-status", inbound="(OSD 0101)\r\n",
+          expect_state={"outputs": {"1": {"status": 0}, "2": {"status": 1}, "3": {"status": 0}, "4": {"status": 1}}})
+telemetry(L2, "port-status-changed", inbound="(PSC)\r\n", expect_state={},
+          expect_then_send=["{:ISD}\r\n", "{:OSD}\r\n"])
+# An EDID change has the emulated EDIDs read again, the bare word sent with
+# escaped braces.
+telemetry(L2, "edid-changed", inbound="(E_S_C)\r\n", expect_state={}, expect_then_send=["{VEDID}\r\n"])
+telemetry(L2, "emulated-edids", inbound="(VEDID F049 U002 D004)\r\n",
+          expect_state={"inputs": {"1": {"edid": "F049"}, "2": {"edid": "U002"}, "3": {"edid": "D004"}}})
+telemetry(L2, "ip-config", inbound="(IP_CONFIG=2 192.168.2.106 10001 255.255.000.000 192.168.002.001)\r\n",
+          expect_state={"network": {"dhcp": True, "address": "192.168.2.106", "port": 10001,
+                                    "netmask": "255.255.000.000", "gateway": "192.168.002.001"}})
+telemetry(L2, "ip-status", inbound="(IP_STAT=0;192.168.0.75;255.255.255.0;192.168.0.1)\r\n",
+          expect_state={"network": {"dhcp": False, "address": "192.168.0.75", "netmask": "255.255.255.0",
+                                    "gateway": "192.168.0.1"}})
+telemetry(L2, "ip-address", inbound="(IP_ADDRESS=1;192.168.2.118)\r\n",
+          expect_state={"network": {"dhcp": True, "static_address": "192.168.2.118"}})
+telemetry(L2, "ethernet", inbound="(ETH_ENABLE=1)\r\n", expect_state={"network": {"ethernet_enabled": True}})
+telemetry(L2, "rs232-format", inbound="(RS232_LOCAL_FORMAT=57600;8;N;1)\r\n",
+          expect_state={"rs232": {"format": "57600;8;N;1", "baud": 57600}})
+telemetry(L2, "rs232-mode", inbound="(RS232=CI)\r\n", expect_state={"rs232": {"mode": "CI"}})
+telemetry(L2, "rs232-protocol", inbound="(RS232_LOCAL_PROT=LW3)\r\n", expect_state={"rs232": {"protocol": "LW3"}})
+telemetry(L2, "rs232-baud", inbound="(RS232BAUD=115200)\r\n", expect_state={"rs232": {"baud": 115200}})
+telemetry(L2, "gpio", inbound="(GPIO3=I;L)\r\n", expect_state={"gpio": {"3": {"direction": "I", "level": "L"}}})
+telemetry(L2, "hdmi-output", inbound="(STO1=G1100;OH2AAA;)\r\n",
+          expect_state={"hdmi": {"outputs": {"1": {"status": "G1100;OH2AAA;"}}}})
+telemetry(L2, "locked-switch", inbound="(1LO02)\r\n", expect_state={"outputs": {"2": {"locked": True}}})

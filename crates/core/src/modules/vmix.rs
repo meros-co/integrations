@@ -1568,12 +1568,47 @@ mod tests {
             line("ptz_move_up", json!({"input": "Cam 1", "value": "0.5"})),
             "FUNCTION PTZMoveUp Input=Cam%201&Value=0.5"
         );
+        // Title field functions pick the field by name or index.
+        assert_eq!(
+            line(
+                "set_text_colour",
+                json!({"input": "2", "selected_index": 1, "value": "#FF0000"})
+            ),
+            "FUNCTION SetTextColour Input=2&SelectedIndex=1&Value=%23FF0000"
+        );
+        assert_eq!(
+            line(
+                "start_countdown",
+                json!({"input": "Clock", "selected_name": "Timer.Text"})
+            ),
+            "FUNCTION StartCountdown Input=Clock&SelectedName=Timer.Text"
+        );
         assert_eq!(
             line("run_transition", json!({"name": "Merge", "duration": 500})),
             "FUNCTION Merge Duration=500"
         );
         assert!(FUNCTIONS.windows(2).all(|w| w[0].0 < w[1].0), "sorted");
         assert_eq!(function_for("no_such_function", &params(json!({}))), None);
+    }
+
+    #[test]
+    fn title_field_commands_take_a_field_selector() {
+        let spec: Value =
+            serde_yaml::from_str(include_str!("../../../../specs/vmix.yaml")).unwrap();
+        for name in [
+            "set_text",
+            "set_text_colour",
+            "set_text_visible",
+            "set_image",
+            "set_color",
+            "set_ticker_speed",
+            "set_countdown",
+            "start_countdown",
+        ] {
+            let p = &spec["commands"][name]["params"];
+            assert_eq!(p["selected_name"]["type"], "string", "{name}");
+            assert_eq!(p["selected_index"]["type"], "int", "{name}");
+        }
     }
 
     #[test]

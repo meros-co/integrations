@@ -12,7 +12,8 @@
 //! filters, transitions, outputs, profile, scene collection, video settings),
 //! then keeps it current from events. What OBS sends no event for is re-read
 //! after the command that changes it, or polled: output status and stats every
-//! 5 s, and the cursor of playing media every second. The high-volume events
+//! 5 s, the cursor of playing media every second, and the cursor of a running
+//! scene transition every 100 ms. The high-volume events
 //! (volume meters, item transforms) are coalesced to one state patch every
 //! 200 ms.
 //!
@@ -71,6 +72,9 @@ const POLL_STRIKES: u32 = 2;
 /// OBS sends no event as a media input plays; its cursor is read this often
 /// while it plays.
 const MEDIA_EVERY: Millis = 1_000;
+/// OBS sends no event as a scene transition (or the T-bar) moves; its cursor is
+/// read this often while one runs or stands part-way.
+const CURSOR_EVERY: Millis = 100;
 /// Volume meters arrive every 50 ms and transforms as fast as an item is
 /// dragged; both are published at most this often.
 const FLUSH_EVERY: Millis = 200;
@@ -89,6 +93,7 @@ const RETRY: Key = "retry";
 const POLL: Key = "poll";
 const REQUEST: Key = "request";
 const MEDIA: Key = "media";
+const CURSOR: Key = "cursor";
 const FLUSH: Key = "flush";
 
 /// Collections keyed by name, cleared when the scene collection changes or the
@@ -165,6 +170,7 @@ enum Read {
     StudioMode,
     Transition,
     TransitionList,
+    TransitionCursor,
     StreamStatus,
     RecordStatus,
     VirtualCam,
@@ -202,6 +208,7 @@ impl Read {
             Read::StudioMode => ("GetStudioModeEnabled", None),
             Read::Transition => ("GetCurrentSceneTransition", None),
             Read::TransitionList => ("GetSceneTransitionList", None),
+            Read::TransitionCursor => ("GetCurrentSceneTransitionCursor", None),
             Read::StreamStatus => ("GetStreamStatus", None),
             Read::RecordStatus => ("GetRecordStatus", None),
             Read::VirtualCam => ("GetVirtualCamStatus", None),
@@ -322,6 +329,7 @@ pub(crate) struct Obs {
     transforms: BTreeMap<(String, String), Value>,
     flush_armed: bool,
     media_armed: bool,
+    cursor_armed: bool,
 }
 
 /// The authentication string: base64(sha256(base64(sha256(password + salt)) +
@@ -440,6 +448,7 @@ impl Obs {
             transforms: BTreeMap::new(),
             flush_armed: false,
             media_armed: false,
+            cursor_armed: false,
         }
     }
 
@@ -503,7 +512,7 @@ impl Obs {
 
     fn stop_everything(&mut self, cx: &mut Cx) {
         cx.ws_close(SOCKET);
-        for key in [HELLO, POLL, RETRY, MEDIA, FLUSH] {
+        for key in [HELLO, POLL, RETRY, MEDIA, CURSOR, FLUSH] {
             cx.cancel_timer(key);
         }
         self.phase = Phase::Idle;
@@ -513,6 +522,7 @@ impl Obs {
         self.transforms.clear();
         self.flush_armed = false;
         self.media_armed = false;
+        self.cursor_armed = false;
     }
 
     /// The connection failed or ended: try again, backing off to 30 s.
@@ -590,6 +600,7 @@ impl Obs {
             Read::StudioMode,
             Read::Transition,
             Read::TransitionList,
+            Read::TransitionCursor,
             Read::VirtualCam,
             Read::ReplayBuffer,
             Read::InputList,
@@ -781,6 +792,20 @@ impl Obs {
         }
     }
 
+    /// Read the transition cursor again soon while a transition runs or stands
+    /// part-way. OBS answers 1.0 when none is active, which ends the reads
+    /// even when SceneTransitionEnded never comes (OBS does not send it for
+    /// an interrupted transition).
+    fn arm_cursor(&mut self, cx: &mut Cx) {
+        let running = self.mirror["transition"]["cursor"]
+            .as_f64()
+            .is_some_and(|c| c < 1.0);
+        if !self.cursor_armed && running {
+            self.cursor_armed = true;
+            cx.set_timer(CURSOR, CURSOR_EVERY);
+        }
+    }
+
     fn arm_flush(&mut self, cx: &mut Cx) {
         if !self.flush_armed {
             self.flush_armed = true;
@@ -863,6 +888,7 @@ impl Obs {
             "set_input_deinterlace_mode" => of_input(InputRead::DeinterlaceMode),
             "set_input_deinterlace_field_order" => of_input(InputRead::DeinterlaceFieldOrder),
             "set_current_scene_transition_settings" => vec![Read::Transition],
+            "set_t_bar_position" => vec![Read::TransitionCursor],
             "set_video_settings" => vec![Read::VideoSettings],
             "set_record_directory" => vec![Read::RecordDirectory],
             "set_stream_service_settings" => vec![Read::StreamService],
@@ -988,6 +1014,13 @@ impl Obs {
                     &["transition", "settings"],
                     data["transitionSettings"].clone(),
                 );
+            }
+            Read::TransitionCursor => {
+                self.emit(
+                    cx,
+                    json!({"transition": {"cursor": data["transitionCursor"]}}),
+                );
+                self.arm_cursor(cx);
             }
             Read::TransitionList => {
                 let transitions: Vec<Value> = data["transitions"]
@@ -1424,8 +1457,14 @@ impl Obs {
                 cx,
                 json!({"transition": {"duration_ms": data["transitionDuration"]}}),
             ),
-            "SceneTransitionStarted" => self.emit(cx, json!({"transition": {"active": true}})),
-            "SceneTransitionEnded" => self.emit(cx, json!({"transition": {"active": false}})),
+            "SceneTransitionStarted" => {
+                self.emit(cx, json!({"transition": {"active": true}}));
+                self.read(cx, Read::TransitionCursor);
+            }
+            "SceneTransitionEnded" => {
+                self.emit(cx, json!({"transition": {"active": false}}));
+                self.read(cx, Read::TransitionCursor);
+            }
 
             // Outputs.
             "StreamStateChanged" => {
@@ -1733,6 +1772,10 @@ impl Module for Obs {
                     self.read_input(cx, &input, InputRead::Media);
                 }
             }
+            CURSOR if self.phase == Phase::Identified => {
+                self.cursor_armed = false;
+                self.read(cx, Read::TransitionCursor);
+            }
             FLUSH if self.phase == Phase::Identified => {
                 self.flush_armed = false;
                 self.flush(cx);
@@ -1969,6 +2012,7 @@ mod tests {
                     "transitionFixed": true, "transitionConfigurable": false},
                     {"transitionName": "Fade", "transitionKind": "fade_transition",
                     "transitionFixed": false, "transitionConfigurable": true}]}),
+            "GetCurrentSceneTransitionCursor" => json!({"transitionCursor": 1.0}),
             "GetProfileList" => {
                 json!({"currentProfileName": "Show", "profiles": ["Show", "Rehearsal"]})
             }
@@ -2648,6 +2692,63 @@ mod tests {
             s,
             json!({"scene_items": {"Wide": {"1": {"transform": {"positionX": 3.0}}}}})
         );
+    }
+
+    #[test]
+    fn a_running_transition_has_its_cursor_read_until_it_ends() {
+        let mut m = obs("");
+        let s = loaded(&mut m);
+        assert_eq!(s["transition"]["cursor"], 1.0);
+        let a = event(
+            &mut m,
+            100,
+            "SceneTransitionStarted",
+            json!({"transitionName": "Fade"}),
+        );
+        assert_eq!(
+            requests(&a),
+            [("GetCurrentSceneTransitionCursor".to_string(), Value::Null)]
+        );
+        let at = |c: f64| move |_: &str, _: &Value| Some(json!({"transitionCursor": c}));
+        let a = settle(&mut m, 110, a, &at(0.25));
+        assert_eq!(
+            state(&a)["transition"],
+            json!({"active": true, "cursor": 0.25})
+        );
+        assert!(a.contains(&Action::SetTimer {
+            key: CURSOR,
+            after: CURSOR_EVERY
+        }));
+        let a = timer(&mut m, 210, CURSOR);
+        let a = settle(&mut m, 220, a, &at(0.75));
+        assert_eq!(state(&a)["transition"]["cursor"], 0.75);
+        // Done, even with no SceneTransitionEnded: OBS answers 1.0.
+        let a = timer(&mut m, 320, CURSOR);
+        let a = settle(&mut m, 330, a, &at(1.0));
+        assert_eq!(state(&a)["transition"]["cursor"], 1.0);
+        assert!(!a
+            .iter()
+            .any(|x| matches!(x, Action::SetTimer { key: CURSOR, .. })));
+    }
+
+    #[test]
+    fn a_t_bar_move_reads_the_cursor_back() {
+        let mut m = obs("");
+        loaded(&mut m);
+        let mut cx = Cx::new(100);
+        let p: Params = serde_json::from_value(json!({"position": 0.4, "release": false})).unwrap();
+        m.command(&mut cx, 7, "set_t_bar_position", &p);
+        let a = cx.take();
+        assert_eq!(requests(&a)[0].0, "SetTBarPosition");
+        let a = settle(&mut m, 110, a, &|kind, _| match kind {
+            "GetCurrentSceneTransitionCursor" => Some(json!({"transitionCursor": 0.4})),
+            _ => Some(json!({})),
+        });
+        assert_eq!(state(&a)["transition"]["cursor"], 0.4);
+        assert!(a.contains(&Action::SetTimer {
+            key: CURSOR,
+            after: CURSOR_EVERY
+        }));
     }
 
     #[test]

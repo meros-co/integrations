@@ -704,6 +704,12 @@ state:
   tracks.*.armed: { type: bool, description: "Record-armed" }
   tracks.*.monitor: { type: int, description: "Record monitoring: 0 off, 1 on, 2 tape-auto" }
   tracks.*.selected: { type: bool, description: "Selected in REAPER" }
+  tracks.*.automation.trim: { type: bool, description: "Automation mode trim/read in force (TRACK_AUTO_TRIM); one of the five automation flags is on" }
+  tracks.*.automation.read: { type: bool, description: "Automation mode read in force (TRACK_AUTO_READ)" }
+  tracks.*.automation.latch: { type: bool, description: "Automation mode latch in force (TRACK_AUTO_LATCH)" }
+  tracks.*.automation.touch: { type: bool, description: "Automation mode touch in force (TRACK_AUTO_TOUCH)" }
+  tracks.*.automation.write: { type: bool, description: "Automation mode write in force (TRACK_AUTO_WRITE)" }
+  selected_track.automation: { type: string, description: "Automation mode of the device's selected track as REAPER names it (TRACK_AUTO)" }
   tracks.*.volume: { type: float, description: "Fader position, 0.0 to 1.0" }
   tracks.*.volume_db: { type: float, unit: dB, description: "Volume in dB" }
   tracks.*.volume_text: { type: string, description: "Volume as REAPER shows it" }
@@ -858,6 +864,13 @@ telemetry:
       state: { "tracks.{1}.armed": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
     - address: '^/track/(\d+)/monitor$'
       state: { "tracks.{1}.monitor": "{arg0}" }
+    # Automation mode (TRACK_AUTO_TRIM ... _WRITE, t messages fed back as b):
+    # one flag per mode, the one in force 1. TRACK_AUTO is the device's
+    # selected track's mode as text.
+    - address: '^/track/(\d+)/auto(trim|read|latch|touch|write)$'
+      state: { "tracks.{1}.automation.{2}": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/auto$'
+      state: { "selected_track.automation": "{arg0}" }
     - address: '^/track/(\d+)/select$'
       state: { "tracks.{1}.selected": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
     - address: '^/track/(\d+)/volume$'
@@ -1077,15 +1090,22 @@ quirks:
       track n is REAPER's track n. select_track_bank moves the bank, after which the same numbers
       address other tracks and the state's tracks.* follow the new bank. REAPER reports only the
       bank's tracks, and markers and regions only up to the marker_count and region_count
-      settings, numbered by their place among those reported.
+      settings, numbered by their place among those reported. These are limits of REAPER's OSC:
+      the bank selects (DEVICE_TRACK_BANK_SELECT, _PREV_ and _NEXT_) are i and t messages,
+      which Default.ReaperOSC defines as sent from the device to REAPER only, so REAPER never
+      reports the current track bank (the bank is the last one selected, as DEVICE_TRACK_BANK_FOLLOWS
+      DEVICE, the default, keeps it), and no pattern reports the project's number of tracks,
+      markers or regions; only the counts the device asks for are reported.
 
   - models: [all]
     severity: warning
     text: >
       REAPER sends feedback when something changes, so the state fills as things change; there is
       no documented request for the whole state. Running REAPER's "Control surface: Refresh all
-      surfaces" action with run_action makes REAPER send everything again; its command ID is in
-      REAPER's Actions list.
+      surfaces" action with run_action makes REAPER send everything again, but Cockos documents no
+      action command IDs outside REAPER's own Actions list (Default.ReaperOSC: "See the REAPER
+      actions window for a complete list of action command ID numbers"), so the ID is not built
+      in: read it from the Actions list of the REAPER in use and send it with run_action.
 
   - models: [all]
     severity: warning

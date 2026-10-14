@@ -1231,6 +1231,19 @@ telemetry:
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_TransportState } }
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_CurrentClip } }
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_MediaState } }
+      # The inputs, monitor selections and media format each model documents.
+      - { models: [kipro], method: GET, path: /config, query: { action: get, paramid: eParamID_VideoInSelect } }
+      - { models: [kipro], method: GET, path: /config, query: { action: get, paramid: eParamID_AudioInSelect } }
+      - { models: [kipro-go, kipro-go2], method: GET, path: /config, query: { action: get, paramid: eParamID_VideoInput_1 } }
+      - { models: [kipro-go, kipro-go2], method: GET, path: /config, query: { action: get, paramid: eParamID_AudioInput_1 } }
+      - { models: [kipro-go, kipro-go2], method: GET, path: /config, query: { action: get, paramid: eParamID_HeadphoneMonitorChannel } }
+      - { models: [kipro-go, kipro-go2], method: GET, path: /config, query: { action: get, paramid: eParamID_HDMIMonitorChannel } }
+      - { models: [kipro-go, kipro-go2, kipro-ultra-plus, kipro-ultra-12g], method: GET, path: /config, query: { action: get, paramid: eParamID_SDIMonitorChannel } }
+      - { models: [kipro-ultra-plus, kipro-ultra-12g], method: GET, path: /config, query: { action: get, paramid: eParamID_HDMIOutChannel } }
+      - { models: [kipro-ultra-plus, kipro-ultra-12g], method: GET, path: /config, query: { action: get, paramid: eParamID_AudioChannelsFocus } }
+      - { models: [kipro-ultra-plus, kipro-ultra-12g], method: GET, path: /config, query: { action: get, paramid: eParamID_AudioEncodeChannelFocus } }
+      - { models: [kipro-ultra-plus, kipro-ultra-12g], method: GET, path: /config, query: { action: get, paramid: eParamID_EncodeChannels } }
+      - { models: [kipro-ultra, kipro-ultra-plus, kipro-ultra-12g], method: GET, path: /config, query: { action: get, paramid: eParamID_FileSystemFormat } }
   updates:
     # Every get or set reply carries {paramid, name, value, value_name}.
     - path: "^/config\\?action=(get|set)&paramid="
@@ -1279,6 +1292,68 @@ telemetry:
       state: { media.state: "{1}" }
     - match: "^event eParamID_StoragePath value=(.*)$"
       state: { media.storage_path: "{1}" }
+    # Inputs, monitor selections and media format, from a get or set reply
+    # and from events, numbered from 1 as the commands number them.
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_VideoInSelect(?:&|$)"
+      json: { v: "$.value" }
+      state: { inputs.1.video: { value: "{v}", map: { "0": "sdi", "1": "hdmi", "2": "component" } } }
+    - match: "^event eParamID_VideoInSelect value=(-?\\d+)$"
+      state: { inputs.1.video: { value: "{1}", map: { "0": "sdi", "1": "hdmi", "2": "component" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_AudioInSelect(?:&|$)"
+      json: { v: "$.value" }
+      state: { inputs.1.audio: { value: "{v}", map: { "0": "sdi", "1": "rca", "2": "xlr", "3": "hdmi" } } }
+    - match: "^event eParamID_AudioInSelect value=(-?\\d+)$"
+      state: { inputs.1.audio: { value: "{1}", map: { "0": "sdi", "1": "rca", "2": "xlr", "3": "hdmi" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_VideoInput_1(?:&|$)"
+      json: { v: "$.value" }
+      state: { inputs.1.video: { value: "{v}", map: { "0": "sdi_1", "1": "sdi_2", "2": "sdi_3", "3": "sdi_4", "4": "hdmi_1", "5": "hdmi_2", "6": "hdmi_3", "7": "hdmi_4" } } }
+    - match: "^event eParamID_VideoInput_1 value=(-?\\d+)$"
+      state: { inputs.1.video: { value: "{1}", map: { "0": "sdi_1", "1": "sdi_2", "2": "sdi_3", "3": "sdi_4", "4": "hdmi_1", "5": "hdmi_2", "6": "hdmi_3", "7": "hdmi_4" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_AudioInput_1(?:&|$)"
+      json: { v: "$.value" }
+      state: { inputs.1.audio: { value: "{v}", map: { "0": "follow_video", "1": "analog" } } }
+    - match: "^event eParamID_AudioInput_1 value=(-?\\d+)$"
+      state: { inputs.1.audio: { value: "{1}", map: { "0": "follow_video", "1": "analog" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_HeadphoneMonitorChannel(?:&|$)"
+      json: { v: "$.value" }
+      state: { monitor.headphone_channel: { value: "{v}", map: { "0": 1, "1": 2, "2": 3, "3": 4 } } }
+    - match: "^event eParamID_HeadphoneMonitorChannel value=(-?\\d+)$"
+      state: { monitor.headphone_channel: { value: "{1}", map: { "0": 1, "1": 2, "2": 3, "3": 4 } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_HDMIMonitorChannel(?:&|$)"
+      json: { v: "$.value" }
+      state: { monitor.hdmi: { value: "{v}", map: { "0": "1", "1": "2", "2": "3", "3": "4", "4": "all" } } }
+    - match: "^event eParamID_HDMIMonitorChannel value=(-?\\d+)$"
+      state: { monitor.hdmi: { value: "{1}", map: { "0": "1", "1": "2", "2": "3", "3": "4", "4": "all" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_SDIMonitorChannel(?:&|$)"
+      json: { v: "$.value" }
+      state: { monitor.sdi: { value: "{v}", map: { "0": "1", "1": "2", "2": "3", "3": "4", "4": "all" } } }
+    - match: "^event eParamID_SDIMonitorChannel value=(-?\\d+)$"
+      state: { monitor.sdi: { value: "{1}", map: { "0": "1", "1": "2", "2": "3", "3": "4", "4": "all" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_HDMIOutChannel(?:&|$)"
+      json: { v: "$.value" }
+      state: { monitor.hdmi: { value: "{v}", map: { "0": "1", "1": "2", "2": "3", "3": "4", "4": "all" } } }
+    - match: "^event eParamID_HDMIOutChannel value=(-?\\d+)$"
+      state: { monitor.hdmi: { value: "{1}", map: { "0": "1", "1": "2", "2": "3", "3": "4", "4": "all" } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_AudioChannelsFocus(?:&|$)"
+      json: { v: "$.value" }
+      state: { monitor.audio_pair: { value: "{v}", map: { "0": 1, "1": 2, "2": 3, "3": 4, "4": 5, "5": 6, "6": 7, "7": 8 } } }
+    - match: "^event eParamID_AudioChannelsFocus value=(-?\\d+)$"
+      state: { monitor.audio_pair: { value: "{1}", map: { "0": 1, "1": 2, "2": 3, "3": 4, "4": 5, "5": 6, "6": 7, "7": 8 } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_AudioEncodeChannelFocus(?:&|$)"
+      json: { v: "$.value" }
+      state: { monitor.headphone_encode_channel: { value: "{v}", map: { "0": 1, "1": 2, "2": 3, "3": 4 } } }
+    - match: "^event eParamID_AudioEncodeChannelFocus value=(-?\\d+)$"
+      state: { monitor.headphone_encode_channel: { value: "{1}", map: { "0": 1, "1": 2, "2": 3, "3": 4 } } }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_EncodeChannels(?:&|$)"
+      json: { v: "$.value" }
+      state: { encode_channels: "{v}" }
+    - match: "^event eParamID_EncodeChannels value=(-?\\d+)$"
+      state: { encode_channels: "{1}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_FileSystemFormat(?:&|$)"
+      json: { v: "$.value" }
+      state: { media.file_system_format: { value: "{v}", map: { "0": "hfs", "1": "exfat" } } }
+    - match: "^event eParamID_FileSystemFormat value=(-?\\d+)$"
+      state: { media.file_system_format: { value: "{1}", map: { "0": "hfs", "1": "exfat" } } }
 
 state:
   params.*.value: { type: string, description: "A parameter's last value read or set, keyed by its eParamID name: the enum's number, an integer, or a string" }
@@ -1290,6 +1365,15 @@ state:
   media.state: { type: string, description: "Media state as the recorder names it: Record-Play or Data - LAN" }
   media.data_lan: { type: bool, description: "True in Data - LAN (transfer) mode, false in Record-Play mode" }
   media.storage_path: { type: string, description: "Path clips are recorded to and played from, such as /mnt/S1/AJA" }
+  media.file_system_format: { type: string, description: "File system format_media uses: hfs or exfat (eParamID_FileSystemFormat; Ultra models)" }
+  inputs.*.video: { type: string, description: "Video input a channel records from, keyed by channel from 1: sdi, hdmi or component on the original Ki Pro (eParamID_VideoInSelect), sdi_1 to sdi_4 or hdmi_1 to hdmi_4 on the GO and GO2 (eParamID_VideoInput_1, channel 1 only)" }
+  inputs.*.audio: { type: string, description: "Audio input of a channel: sdi, rca, xlr or hdmi on the original Ki Pro (eParamID_AudioInSelect), follow_video or analog on the GO and GO2 (eParamID_AudioInput_1, channel 1 only)" }
+  monitor.headphone_channel: { type: int, description: "Channel heard on the headphones, 1 to 4 (eParamID_HeadphoneMonitorChannel; GO and GO2)" }
+  monitor.hdmi: { type: string, description: "What the HDMI monitor output shows: a channel 1 to 4, or all (eParamID_HDMIMonitorChannel on the GO and GO2, eParamID_HDMIOutChannel on the Ultra Plus and 12G)" }
+  monitor.sdi: { type: string, description: "What the SDI monitor output shows: a channel 1 to 4, or all in quadrants (eParamID_SDIMonitorChannel)" }
+  monitor.audio_pair: { type: int, description: "Audio pair on the headphones, monitor jacks and VU meters: 1 is channels 1-2, 8 is channels 15-16 (eParamID_AudioChannelsFocus; Ultra Plus and 12G)" }
+  monitor.headphone_encode_channel: { type: int, description: "Encode channel feeding the headphones and VU meters in Multi Channel mode, 1 to 4 (eParamID_AudioEncodeChannelFocus; Ultra Plus and 12G)" }
+  encode_channels: { type: int, description: "eParamID_EncodeChannels as the unit reports it; 1 is single-channel mode, in which the channel monitor selections are disabled (Ultra Plus and 12G)" }
 
 quirks:
   - models: [all]
@@ -1337,13 +1421,26 @@ quirks:
       changes. Events carry changes only: the displayed timecode is read once
       on connecting, and the transport, clip and media state every 30
       seconds, which fills them in at the start and corrects them if the unit
-      has no event connection or changes were missed while it was reopened;
+      has no event connection or changes were missed while it was reopened,
+      as are the inputs, monitor selections and media format each model's chapter documents;
       the storage path is read only by get_storage_path. AJA's 2021 guide
       lists connect and wait_for_config_events among the /config actions,
       while every AJA example uses /json; /json is the documented URL, and
       the extension tries /config when /json does not give a connection id.
       AJA does not document how an expired id is answered; the extension
       reconnects on any reply that is not a 2xx JSON array.
+
+  - models: [kipro-go, kipro-go2, kipro-ultra, kipro-ultra-plus, kipro-ultra-12g]
+    severity: info
+    text: >
+      Presets are actions only: eParamID_RegisterSave and
+      eParamID_RegisterRecall store and recall all included parameters in
+      register 1 to 20, and AJA documents no way to read which preset was
+      last recalled, whether a register holds anything, or a preset's name
+      or contents (the web UI's export and import are files). A recall
+      changes the inputs, monitor selections and other included parameters,
+      which then reach state through the event connection and the 30-second
+      poll; the preset itself is not kept in state.
 
   - models: [all]
     severity: info

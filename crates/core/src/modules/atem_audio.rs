@@ -236,6 +236,37 @@ impl Atem {
     pub(super) fn decode_audio(&mut self, name: &[u8; 4], b: &[u8]) -> Option<Value> {
         let need = |n: usize| (b.len() >= n).then_some(());
         match name {
+            // Classic mixer levels, sent only while subscribed (SALN): u16
+            // source count, rsv, the master's left, right, left peak and
+            // right peak at 4, the monitor's at 20, then the sources' ids
+            // (u16 each, padded to 4 bytes), then each source's four levels
+            // (OpenSwitcher AMLv "AudioMeterLevelsField"; SKAARHOJ AMLv
+            // "Source Order"). Levels are u32, linear as the switcher sends
+            // them: neither source gives their full scale.
+            b"AMLv" => {
+                need(36)?;
+                let count = u16_at(b, 0) as usize;
+                let at = 36 + (count * 2).div_ceil(4) * 4;
+                need(at + count * 16)?;
+                let four = |at: usize| {
+                    json!({
+                        "left": u32_at(b, at),
+                        "right": u32_at(b, at + 4),
+                        "left_peak": u32_at(b, at + 8),
+                        "right_peak": u32_at(b, at + 12),
+                    })
+                };
+                let mut inputs = Map::new();
+                for i in 0..count {
+                    let id = u16_at(b, 36 + 2 * i);
+                    inputs.insert(id.to_string(), json!({"level": four(at + 16 * i)}));
+                }
+                Some(json!({"audio": {
+                    "master": {"level": four(4)},
+                    "monitor": {"level": four(20)},
+                    "inputs": inputs,
+                }}))
+            }
             // u16 input, rsv, i64 source at 8, band at 16, then the band
             // (Sofie `Fairlight/FairlightMixerSourceEqualizerBandCommand.ts:66-80`).
             b"AEBP" => {

@@ -10,10 +10,11 @@ category: router
 # products (UMX-HDMI-140) keep on TCP 10001 for compatibility. Commands are
 # sent in curly brackets, answers come in round brackets and only on success.
 #
-# Not here: network settings (IP_CONFIG, IP_ADDRESS..., which drop the
-# connection), RS-232 and GPIO settings, EDID upload/download and the EDID
-# validity table, HDCP key counting, firmware and the LCMD list (several
-# lines per answer).
+# Not here: EDID upload and download (a 32-packet exchange) and the EDID
+# validity table, HDCP key counting, firmware, the frame's per-board settings
+# beyond the HDMI ports, and the LCMD, IS and FC lists (several lines per
+# answer). Static IP addresses cannot be written over LW2 on the MX matrices
+# (front panel, LDC or web page only).
 source:
   - title: "MX8x8HDMI-Pro / MX8x8DVI-HDCP-Pro User's Manual v3.0, chapter 7 Programmers' Reference"
     author: Lightware Visual Engineering
@@ -35,7 +36,19 @@ source:
       "(I:...)", protocol, firmware, ping "(PONG!)", serial, compile time, label, boards, restart, health,
       factory defaults (6.3); port numbering and layers A, V, AV (6.4); switch with a layer, mute, unmute,
       lock, unlock with a layer, connection view per layer, crosspoint size, autoselect mode and priority
-      (6.4.1-6.4.11). The Cleartext login does not cover port 10001 (7.12.2).
+      (6.4.1-6.4.11); IP_STAT, IP_ADDRESS, IP_NETMASK, IP_GATEWAY, ETH_ENABLE and IP_APPLY (6.5); RS232,
+      RS232_LOCAL_FORMAT and RS232_LOCAL_PROT (6.6.1-6.6.3); GPIO (6.7). The Cleartext login does not cover
+      port 10001 (7.12.2). Retrieved again 2026-10-14 (rev. v5, 2026-09-14).
+  - title: "MX-FR series User Manual, rev. v8 (2026-09-09), chapter 7 Programmer's Reference (MX-CPU2)"
+    author: Lightware Visual Engineering PLC.
+    url: https://assets.prod.pim.lightware.com/assets/File-Downloads/Guides-and-Manuals/User-Manual/HTML/MX-FR_series/UM.html
+    note: >
+      Manufacturer document for the MX-FR9 to MX-FR80R frames (MX16x16 and MX32x32 with MX-CPU2). Error
+      answers (ERR01) to (ERR04) (7.14.3); "(PSC)" sent when the port status changes and "(E_S_C)" when the
+      EDID list changes (7.14.1-7.14.2); a switch to a locked output answered "(1LO<out>)" (7.4.3, 7.4.11);
+      IP_CONFIG with type 0 fixed or 2 DHCP, IP_CONFIG=D and IP_CONFIG=! (7.5.1-7.5.3); RS232BAUD
+      (7.5.4-7.5.5); GETTIME and SETTIME (7.7.2-7.7.3); EDID routing with letter-prefixed locations
+      (7.8.1-7.8.9); ISD, OSD and PS port status per board type (7.9.1-7.9.3).
   - title: companion-module-lightware-lw2 (Bitfocus Companion module, MIT)
     author: Bitfocus AS and contributors
     url: https://github.com/bitfocus/companion-module-lightware-lw2
@@ -52,9 +65,10 @@ transport:
   encoding: ascii
   timeout_ms: 2000
   reply: expected
-  # Every answer is in round brackets. "(E_S_C)", which an EDID change sends after its answer, is not a
-  # reply (the pattern accepts any "(" not followed by E_S_C; the format's regexes have no look-ahead).
-  reply_match: '^\((?:[^E]|E[^_]|E_[^S]|E_S[^_]|E_S_[^C])'
+  # Every answer is in round brackets. "(E_S_C)", which an EDID change sends after its answer, and
+  # "(PSC)", which an MX-CPU2 frame sends when a port status changes, are not replies (the pattern accepts
+  # any "(" not followed by E_S_C or PSC); the format's regexes have no look-ahead).
+  reply_match: '^\((?:[^EP]|E[^_]|E_[^S]|E_S[^_]|E_S_[^C]|P[^S]|PS[^C]|PSC[^)])'
   # A template cannot hold a bare identifier in braces ("{i}" is a placeholder), so the probe is the
   # protocol query, which has a ? in it.
   probe: "{P_?}"
@@ -71,7 +85,9 @@ models:
        get_connections, get_mutes, save_preset, load_preset, view_preset, set_preset_name, get_preset_name,
        reset_preset_names, set_input_name, get_input_name, reset_input_names, set_output_name,
        get_output_name, reset_output_names, edid_switch, edid_switch_all, edid_learn, get_emulated_edids,
-       get_edid_header, get_input_status, get_output_status, clear_hdcp_key_cache, get_ip_config]
+       get_edid_header, get_input_status, get_output_status, clear_hdcp_key_cache, get_ip_config,
+       set_ip_dhcp, reset_ip_config, edid_route, edid_route_all, get_hdmi_input_status, get_hdmi_output_status,
+       set_hdmi_output, get_rs232_baud, set_rs232_baud, get_time, set_time]
     verification: none
     notes: >
       Up to 80 inputs and outputs depending on the frame; presets 1-32 (7.3.18). The connection view lists
@@ -83,7 +99,10 @@ models:
       [get_product_type, get_firmware, get_serial, get_compile_time, get_health, get_protocol, ping, restart,
        get_label, switch_layer, mute_output_layer, unmute_output_layer, lock_output_layer,
        unlock_output_layer, get_connection_layer, get_crosspoint_size, get_autoselect, set_autoselect,
-       get_autoselect_priority, set_autoselect_priority, factory_defaults]
+       get_autoselect_priority, set_autoselect_priority, factory_defaults, get_ip_status, get_ip_address,
+       set_ip_address, set_ip_netmask, set_ip_gateway, set_ethernet_enabled, apply_ip_settings, get_rs232_mode,
+       set_rs232_mode, get_rs232_format, set_rs232_format, get_rs232_protocol, set_rs232_protocol, get_gpio,
+       set_gpio]
     verification: none
     notes: >
       One output (1) with video inputs 1-5 and audio inputs 1-5 (VGA 1, HDMI 2, DP 3, DVI-D 4, DVI-A 5;
@@ -448,10 +467,192 @@ commands:
     expect: { matches: '^\(DONE\)$' }
     returns: ack
   get_ip_config:
-    summary: Get the IP configuration as "<type> <address> <port> <netmask> <gateway>", type 0 static or 7 DHCP ({IP_CONFIG=?})
+    summary: Get the IP configuration as "<type> <address> <port> <netmask> <gateway>"; type 0 static, 7 (MX8x8) or 2 (MX-FR) DHCP ({IP_CONFIG=?})
     send: "{IP_CONFIG=?}"
     expect: { matches: '^\(IP_CONFIG=(.*)\)$' }
     returns: value
+  set_ip_dhcp:
+    summary: Switch the network to DHCP, keeping the port ({IP_CONFIG=D}); the connection drops at once
+    send: "{IP_CONFIG=D}"
+    expect: { matches: '^\(Changing IP configuration' }
+    returns: ack
+  reset_ip_config:
+    summary: Reload the factory network settings, 192.168.254.254 port 10001 mask 255.255.0.0 ({IP_CONFIG=!}); the connection drops at once
+    send: "{IP_CONFIG=!}"
+    expect: { matches: '^\(Changing IP configuration' }
+    returns: ack
+
+  # ── MX-CPU2 frames (MX-FR 7.5-7.10) ─────────────────────────────────────
+  edid_route:
+    summary: Emulate an EDID on an input by location letter, F factory, U user or D dynamic (the sink's on that output) ({E<in>:<loc>}, MX-CPU2)
+    params:
+      input: { type: int, min: 1, max: 80, required: true, label: Input, description: "Input port to emulate the EDID on, numbered from 1 (E01 to E80)." }
+      source: { type: string, pattern: '^([Ff](0?[1-9][0-9]?|1[01][0-9])|[Uu](0?[1-9]|[1-4][0-9]|50)|[Dd](0?[1-9]|[1-7][0-9]|80))$', required: true, label: EDID, description: "EDID location: F1 to F119 factory, U1 to U50 user, or D1 to D80 the sink's EDID on that output, such as F10." }
+    send: "{E{input:02d}:{source}}"
+    expect: { matches: '^\(E_SW_OK\)$' }
+    returns: ack
+  edid_route_all:
+    summary: Emulate an EDID on every input by location letter ({EA:<loc>}, MX-CPU2)
+    params:
+      source: { type: string, pattern: '^([Ff](0?[1-9][0-9]?|1[01][0-9])|[Uu](0?[1-9]|[1-4][0-9]|50)|[Dd](0?[1-9]|[1-7][0-9]|80))$', required: true, label: EDID, description: "EDID location: F1 to F119 factory, U1 to U50 user, or D1 to D80 the sink's EDID on that output, such as F10." }
+    send: "{EA:{source}}"
+    expect: { matches: '^\(E_SW_OK\)$' }
+    returns: ack
+  get_hdmi_input_status:
+    summary: "Get an HDMI input's status line, such as \"S1131;V1920x1080p60,675,00;A1C010000;I111190;PAA;\" (S: 5 V, signal, DVI/HDMI bit depth, HDCP) ({:HDMIIGET<in>}, MX8x8)"
+    params:
+      input: { type: int, min: 1, max: 80, required: true, label: Input, description: "HDMI input port, numbered from 1." }
+    send: "{:HDMIIGET{input}}"
+    expect: { matches: '^\(STI\d+=(.*)\)$' }
+    returns: value
+  get_hdmi_output_status:
+    summary: "Get an HDMI output's status line, such as \"G10101;V800x600p60,379,00;I111100;M110111077;OAAAAAU;\" (G: sink, mode, signal, HDCP, hotplug; O: the settings) ({:HDMIOGET<out>}, MX8x8)"
+    params:
+      output: { type: int, min: 1, max: 80, required: true, label: Output, description: "HDMI output port, numbered from 1." }
+    send: "{:HDMIOGET{output}}"
+    expect: { matches: '^\(STO\d+=(.*)\)$' }
+    returns: value
+  set_hdmi_output:
+    summary: Set an HDMI output's signal type, colour space, colour range, audio and HDCP; x keeps a setting ({:HDMISET#<out>@SO=...}, MX8x8); answered with its status line
+    params:
+      output: { type: int, min: 1, max: 80, required: true, label: Output, description: "HDMI output port, numbered from 1." }
+      signal: { type: enum, values: [A, D, H, "1", "2", x], default: x, label: Signal type, description: "A auto, D DVI, H HDMI 24-bit, 1 HDMI 30-bit, 2 HDMI 36-bit, x keep." }
+      color_space: { type: enum, values: [A, "1", "2", "3", x], default: x, label: Colour space, description: "A auto, 1 RGB, 2 YCbCr 4:4:4, 3 YCbCr 4:2:2, x keep." }
+      color_range: { type: enum, values: [A, C, E, x], default: x, label: Colour range, description: "A auto, C compress to limited range, E expand to full range, x keep." }
+      audio: { type: enum, values: [A, D, "2", "4", x], default: x, label: Audio, description: "A auto, D disable the audio, 2 or 4 PCM subsampling, x keep." }
+      hdcp: { type: enum, values: [A, "1", x], default: x, label: HDCP, description: "A HDCP when the source has it, 1 always HDCP, x keep." }
+    send: "{:HDMISET#{output}@SO={signal};{color_space};{color_range};{audio};{hdcp};}"
+    expect: { matches: '^\(STO\d+=' }
+    returns: ack
+  get_rs232_baud:
+    summary: Get the RS-232 control port's baud rate ({RS232BAUD=?}, MX-CPU2)
+    send: "{RS232BAUD=?}"
+    expect: { matches: '^\(RS232BAUD=(\d+)\)$' }
+    returns: value
+  set_rs232_baud:
+    summary: Set the RS-232 control port's baud rate ({RS232BAUD=<rate>}, MX-CPU2)
+    params:
+      baud: { type: enum, values: ["9600", "19200", "38400", "57600", "115200"], required: true, label: Baud rate, description: "Baud rate of the matrix's RS-232 control port." }
+    send: "{RS232BAUD={baud}}"
+    expect: { matches: '^\(RS232BAUD=\d+\)$' }
+    returns: ack
+  get_time:
+    summary: Get the matrix clock, as "DD.MM.YYYY. HH:MM:SS UTC+HHMM" ({GETTIME}, MX-CPU2)
+    params:
+      command: { type: enum, values: ["{GETTIME}"], default: "{GETTIME}", label: Command, description: "The fixed protocol text this command sends; it has only one value, so leave it at its default." }
+    send: "{command}"
+    expect: { matches: '^\((\d\d\.\d\d\.\d{4}\. \d\d:\d\d:\d\d UTC[+-]\d{4})\)$' }
+    returns: value
+  set_time:
+    summary: Set the matrix clock ({SETTIME=DD.MM.YYYY. HH:MM:SS UTC+HHMM}, MX-CPU2)
+    params:
+      time: { type: string, pattern: '^\d\d\.\d\d\.\d{4}\. \d\d:\d\d:\d\d UTC[+-]\d{4}$', required: true, label: Time, description: "Date, time and UTC offset as DD.MM.YYYY. HH:MM:SS UTC+HHMM, such as 04.10.2016. 16:52:34 UTC+0100." }
+    send: "{SETTIME={time}}"
+    expect: { matches: '^\(\d\d\.\d\d\.\d{4}\. ' }
+    returns: ack
+
+  # ── UMX network, RS-232 and GPIO (UMX 6.5-6.7) ──────────────────────────
+  get_ip_status:
+    summary: Get the network settings as "<mode>;<address>;<netmask>;<gateway>", mode 0 static or 1 DHCP ({IP_STAT=?})
+    send: "{IP_STAT=?}"
+    expect: { matches: '^\(IP_STAT=(.*)\)$' }
+    returns: value
+  get_ip_address:
+    summary: Get the address mode and static address as "<mode>;<address>" ({IP_ADDRESS=?})
+    send: "{IP_ADDRESS=?}"
+    expect: { matches: '^\(IP_ADDRESS=(.*)\)$' }
+    returns: value
+  set_ip_address:
+    summary: Set DHCP or a static address, applied by apply_ip_settings ({IP_ADDRESS=<mode>;<address>})
+    params:
+      dhcp: { type: bool, required: true, label: DHCP, description: "On takes the address from DHCP, off uses the static address." }
+      address: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Static address, description: "Static IPv4 address, used when DHCP is off, such as 192.168.0.75." }
+    send: "{IP_ADDRESS={dhcp:bool01};{address}}"
+    expect: { matches: '^\(IP_ADDRESS=[01];' }
+    returns: ack
+  set_ip_netmask:
+    summary: Set the static network mask, applied by apply_ip_settings ({IP_NETMASK=<mask>})
+    params:
+      netmask: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Network mask, description: "Static IPv4 network mask, such as 255.255.255.0." }
+    send: "{IP_NETMASK={netmask}}"
+    expect: { matches: '^\(IP_NETMASK=' }
+    returns: ack
+  set_ip_gateway:
+    summary: Set the static gateway, applied by apply_ip_settings ({IP_GATEWAY=<gateway>})
+    params:
+      gateway: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Gateway, description: "Static IPv4 gateway address, such as 192.168.0.1." }
+    send: "{IP_GATEWAY={gateway}}"
+    expect: { matches: '^\(IP_GATEWAY=' }
+    returns: ack
+  set_ethernet_enabled:
+    summary: Enable or disable the Ethernet port ({ETH_ENABLE=0|1}); disabling it ends network control
+    params:
+      enabled: { type: bool, required: true, label: Ethernet, description: "On enables the Ethernet port, off disables it, which cuts this connection." }
+    send: "{ETH_ENABLE={enabled:bool01}}"
+    expect: { matches: '^\(ETH_ENABLE=[01]\)$' }
+    returns: ack
+  apply_ip_settings:
+    summary: Apply the network settings set before; the network interface restarts and the connection drops ({IP_APPLY})
+    params:
+      command: { type: enum, values: ["{IP_APPLY}"], default: "{IP_APPLY}", label: Command, description: "The fixed protocol text this command sends; it has only one value, so leave it at its default." }
+    send: "{command}"
+    expect: { matches: '^\(IP_APPLY\)$' }
+    returns: ack
+  get_rs232_mode:
+    summary: Get the RS-232 port's mode, CONTROL, CI (command injection) or PASS (pass-through) ({RS232=?})
+    send: "{RS232=?}"
+    expect: { matches: '^\(RS232=(\w+)\)$' }
+    returns: value
+  set_rs232_mode:
+    summary: Set the RS-232 port's mode ({RS232=<mode>})
+    params:
+      mode: { type: enum, values: [CONTROL, CI, PASS], required: true, label: RS-232 mode, description: "CONTROL to control the switcher, CI for command injection from the network, PASS for pass-through." }
+    send: "{RS232={mode}}"
+    expect: { matches: '^\(RS232=\w+\)$' }
+    returns: ack
+  get_rs232_format:
+    summary: Get the local RS-232 port's format as "<baud>;<data bits>;<parity>;<stop bits>" ({RS232_LOCAL_FORMAT=?})
+    send: "{RS232_LOCAL_FORMAT=?}"
+    expect: { matches: '^\(RS232_LOCAL_FORMAT=(.*)\)$' }
+    returns: value
+  set_rs232_format:
+    summary: Set the local RS-232 port's baud rate, data bits, parity and stop bits; X keeps a setting ({RS232_LOCAL_FORMAT=...})
+    params:
+      baud: { type: enum, values: ["4800", "7200", "9600", "14400", "19200", "38400", "57600", "115200", X], default: X, label: Baud rate, description: "Baud rate, or X to keep it." }
+      data_bits: { type: enum, values: ["8", "9", X], default: X, label: Data bits, description: "8 or 9 data bits, or X to keep them." }
+      parity: { type: enum, values: [N, E, O, X], default: X, label: Parity, description: "N none, E even, O odd, or X to keep it." }
+      stop_bits: { type: enum, values: ["1", "1,5", "2", X], default: X, label: Stop bits, description: "1, 1,5 or 2 stop bits, or X to keep them." }
+    send: "{RS232_LOCAL_FORMAT={baud};{data_bits};{parity};{stop_bits}}"
+    expect: { matches: '^\(RS232_LOCAL_FORMAT=' }
+    returns: ack
+  get_rs232_protocol:
+    summary: Get the protocol the local RS-232 port speaks in control mode, LW2 or LW3 ({RS232_LOCAL_PROT=?})
+    send: "{RS232_LOCAL_PROT=?}"
+    expect: { matches: '^\(RS232_LOCAL_PROT=(LW[23])\)$' }
+    returns: value
+  set_rs232_protocol:
+    summary: Set the protocol the local RS-232 port speaks in control mode ({RS232_LOCAL_PROT=LW2|LW3})
+    params:
+      protocol: { type: enum, values: [LW2, LW3], required: true, label: Protocol, description: "LW2 or LW3 on the local RS-232 port." }
+    send: "{RS232_LOCAL_PROT={protocol}}"
+    expect: { matches: '^\(RS232_LOCAL_PROT=LW[23]\)$' }
+    returns: ack
+  get_gpio:
+    summary: Get a GPIO pin's direction and level as "<I|O>;<L|H>" ({GPIO<pin>=?})
+    params:
+      pin: { type: int, min: 1, max: 7, required: true, label: GPIO pin, description: "GPIO pin, numbered from 1." }
+    send: "{GPIO{pin}=?}"
+    expect: { matches: '^\(GPIO\d=([IO];[LH])\)$' }
+    returns: value
+  set_gpio:
+    summary: Set a GPIO pin's direction and output level; T toggles the level ({GPIO<pin>=<dir>;<level>})
+    params:
+      pin: { type: int, min: 1, max: 7, required: true, label: GPIO pin, description: "GPIO pin, numbered from 1." }
+      direction: { type: enum, values: [I, O], required: true, label: Direction, description: "I input, O output." }
+      level: { type: enum, values: [L, H, T], default: L, label: Level, description: "Output level: L low, H high, T toggle; ignored for an input." }
+    send: "{GPIO{pin}={direction};{level}}"
+    expect: { matches: '^\(GPIO\d=[IO];[LH]\)$' }
+    returns: ack
 
 quirks:
   - models: [all]
@@ -459,21 +660,31 @@ quirks:
     text: >
       load_preset and switch_all change many outputs at once and cannot be undone except by loading or
       re-making the previous ties. A preset holds ties and mutes, not locks (MX 7.3.9-7.3.10). restart and
-      factory_defaults drop the connection; factory_defaults resets every setting.
+      factory_defaults drop the connection; factory_defaults resets every setting. set_ip_dhcp and
+      reset_ip_config change the matrix's address at once and drop the connection after their first answer
+      line (MX-FR 7.5.2-7.5.3); apply_ip_settings restarts the UMX's network interface, and
+      set_ethernet_enabled off ends network control until it is turned on locally (UMX 6.5).
   - models: [all]
     severity: warning
     text: >
       Answers come only on success (MX 7.1, UMX 6.1). A command the device cannot carry out is answered with
-      an error in brackets, such as "(ERR04)" (Companion's module), or not at all; either fails the command,
-      the second by a timeout after which the connection is reopened. Commands are sent in brackets followed
+      an error in brackets, (ERR01) invalid input, (ERR02) invalid output, (ERR03) invalid value, (ERR04)
+      invalid preset (MX-FR 7.14.3), or not at all; either fails the command, the second by a timeout after
+      which the connection is reopened. A switch to a locked output is answered "(1LO<out>)" (MX-FR 7.4.3),
+      which fails the switch and keeps the lock in state. Commands are sent in brackets followed
       by CR LF, as Companion's module does; the manuals give no terminator.
   - models: [all]
     severity: warning
     text: >
-      The protocol documents no change notifications: front panel and other clients' changes reach state
-      only through the polls every 5 seconds and through replies. The MX matrices are asked for the
-      connections ({VC}) and the mutes ({VM}), the UMX for the video and audio layers ({VC V}, {VC A}),
-      and both for the product type ({i}).
+      The protocol documents no change notifications for the crosspoint: front panel and other clients'
+      changes reach state only through the polls every 5 seconds and through replies. The MX matrices are
+      asked for the connections ({VC}), the mutes ({VM}), the input and output status ({:ISD}, {:OSD}), the
+      emulated EDIDs ({VEDID}), the network settings and the RS-232 baud rate; the UMX for its video and
+      audio layers ({VC V}, {VC A}); both for the product type ({i}). An MX-CPU2 frame (MX-FR) also sends
+      "(PSC)" when a port status changes, which has the status read again at once (MX-FR 7.14.2), and an
+      EDID change's "(E_S_C)" has the emulated EDIDs read again. A frame without RS232BAUD (MX8x8, MX-CPU1)
+      answers that poll with an error, which changes nothing. The UMX's network, RS-232 and GPIO state comes
+      from the replies to its commands (get_ip_status, get_rs232_mode, get_gpio and the others).
   - models: [all]
     severity: info
     text: >
@@ -492,7 +703,20 @@ quirks:
       Port numbers are sent as given (1-2 digits; mute and lock with two, as the manual's examples); answers
       pad them to two digits. The manual's MX8x8HDMI-Pro chapter calls the set "LW1"; it is the same bracket
       protocol that later manuals call LW2. Input and output status digit layouts depend on the installed
-      boards (7.6.1-7.6.2).
+      boards (7.6.1-7.6.2): one hex digit per port, kept in state as its number. On HDMI input boards bit
+      0 is the source's 5 V, bit 1 signal and bit 2 HDMI mode; on HDMI output boards bit 0 is receiver
+      sense; other boards (DVI, optical, TPS, 3G-SDI) use the bits otherwise (MX-FR 7.9.1-7.9.2). The
+      MX8x8 manual's ISD example does not match its own bit table.
+  - models: [mx-pro]
+    severity: info
+    text: >
+      Two generations share these models: MX8x8 and MX-CPU1 frames take EDID locations as numbers
+      (edid_switch, edid_switch_all) and HDMI port settings through HDMIIGET, HDMIOGET and HDMISET; MX-CPU2
+      frames (MX-FR) take letter-prefixed locations (edid_route, edid_route_all), RS232BAUD, GETTIME and
+      SETTIME, and set their HDMI ports with the :HDMI# form instead (MX-FR 7.10), which is not offered
+      here. A command the frame lacks fails with an error. API limit: a static address, mask and gateway
+      cannot be written over LW2 on the MX matrices (front panel, LDC or web page, MX-FR 4.10.3); LW2 can
+      only switch to DHCP or reload the factory settings.
   - models: [mx-pro]
     severity: warning
     text: >
@@ -520,15 +744,37 @@ state:
   layers.*.muted:      { type: bool, description: "UMX: the layer is muted" }
   layers.*.locked:     { type: bool, description: "UMX: the layer is locked" }
   device.product_type: { type: string, description: "Product type ({i})" }
+  inputs.*.status:     { type: int, description: "MX: the input's status digit as a number (bits per board; HDMI boards bit 0 source 5 V, bit 1 signal, bit 2 HDMI) ({:ISD})" }
+  outputs.*.status:    { type: int, description: "MX: the output's status digit as a number (bits per board; HDMI boards bit 0 receiver sense) ({:OSD})" }
+  inputs.*.edid:       { type: string, description: "EDID location emulated on the input, as the matrix lists it ({VEDID})" }
+  network.dhcp:        { type: bool, description: "The address comes from DHCP (IP_CONFIG, UMX IP_STAT)" }
+  network.address:     { type: string, description: "IP address (IP_CONFIG, UMX IP_STAT)" }
+  network.port:        { type: int, description: "MX: LW2 TCP port (IP_CONFIG)" }
+  network.netmask:     { type: string, description: "Network mask (IP_CONFIG, UMX IP_STAT and IP_NETMASK)" }
+  network.gateway:     { type: string, description: "Gateway (IP_CONFIG, UMX IP_STAT and IP_GATEWAY)" }
+  network.static_address: { type: string, description: "UMX: the static address set, used when DHCP is off (IP_ADDRESS)" }
+  network.ethernet_enabled: { type: bool, description: "UMX: the Ethernet port is enabled (ETH_ENABLE, from its replies)" }
+  rs232.baud:          { type: int, description: "Baud rate of the RS-232 port (MX-CPU2 RS232BAUD, UMX RS232_LOCAL_FORMAT)" }
+  rs232.mode:          { type: string, description: "UMX: RS-232 mode, CONTROL, CI or PASS" }
+  rs232.format:        { type: string, description: "UMX: local RS-232 format as <baud>;<data bits>;<parity>;<stop bits>" }
+  rs232.protocol:      { type: string, description: "UMX: protocol of the local RS-232 port, LW2 or LW3" }
+  gpio.*.direction:    { type: string, description: "UMX: GPIO pin direction, I input or O output" }
+  gpio.*.level:        { type: string, description: "UMX: GPIO pin level, L low or H high" }
+  hdmi.inputs.*.status: { type: string, description: "MX8x8: an HDMI input's status line (STI)" }
+  hdmi.outputs.*.status: { type: string, description: "MX8x8: an HDMI output's status line (STO), its settings after O" }
 
 telemetry:
-  # No change notifications are documented, so the crosspoint and the mutes
-  # are polled; the product type is read with them. A bare word in braces is
-  # written with its braces escaped (SPEC.md §4).
+  # No change notifications are documented for the crosspoint, so it, the mutes, the port status and
+  # the settings are polled. A bare word in braces is written with its braces escaped (SPEC.md §4).
   poll:
     send:
       - { models: [mx-pro], message: '\{VC}' }
       - { models: [mx-pro], message: '\{VM}' }
+      - { models: [mx-pro], message: "{:ISD}" }
+      - { models: [mx-pro], message: "{:OSD}" }
+      - { models: [mx-pro], message: '\{VEDID}' }
+      - { models: [mx-pro], message: "{IP_CONFIG=?}" }
+      - { models: [mx-pro], message: "{RS232BAUD=?}" }
       - { models: [umx-hdmi-140], message: "{VC V}" }
       - { models: [umx-hdmi-140], message: "{VC A}" }
       - '\{i}'
@@ -570,4 +816,61 @@ telemetry:
       match_each: '([01])'
       state:
         "outputs.{index:+1}.muted": { value: "{1}", map: { "0": false, "1": true } }
-
+    # Port status, one hex digit per port (MX 7.6.1-7.6.2, MX-FR 7.9.1-7.9.2).
+    - match: '^\(ISD\s+'
+      match_each: '([0-9A-Fa-f])'
+      state:
+        "inputs.{index:+1}.status": { value: "{1}", map: { "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "A": 10, "B": 11, "C": 12, "D": 13, "E": 14, "F": 15, "a": 10, "b": 11, "c": 12, "d": 13, "e": 14, "f": 15 } }
+    - match: '^\(OSD\s+'
+      match_each: '([0-9A-Fa-f])'
+      state:
+        "outputs.{index:+1}.status": { value: "{1}", map: { "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "A": 10, "B": 11, "C": 12, "D": 13, "E": 14, "F": 15, "a": 10, "b": 11, "c": 12, "d": 13, "e": 14, "f": 15 } }
+    # An MX-CPU2 frame says a port status changed (MX-FR 7.14.2), and "(E_S_C)" announces an EDID change:
+    # each has what changed read again at once.
+    - match: '^\(PSC\)$'
+      then_send: ["{:ISD}", "{:OSD}"]
+    - match: '^\(E_S_C\)$'
+      then_send: ['\{VEDID}']
+    - match: '^\(VEDID\s'
+      match_each: '([FUDfud]?\d+)'
+      state: { "inputs.{index:+1}.edid": "{1}" }
+    # Network (MX 7.4.1, MX-FR 7.5.1; UMX 6.5).
+    - match: '^\(IP_CONFIG=(\d) (\S+) (\d+) (\S+) (\S+)\)$'
+      state:
+        network.dhcp: { value: "{1}", map: { "0": false, "2": true, "7": true } }
+        network.address: "{2}"
+        network.port: "{3}"
+        network.netmask: "{4}"
+        network.gateway: "{5}"
+    - match: '^\(IP_STAT=([01]);([^;]*);([^;]*);([^;)]*)\)$'
+      state:
+        network.dhcp: { value: "{1}", map: { "0": false, "1": true } }
+        network.address: "{2}"
+        network.netmask: "{3}"
+        network.gateway: "{4}"
+    - match: '^\(IP_ADDRESS=([01]);([^)]*)\)$'
+      state:
+        network.dhcp: { value: "{1}", map: { "0": false, "1": true } }
+        network.static_address: "{2}"
+    - match: '^\(IP_NETMASK=([^)]*)\)$'
+      state: { network.netmask: "{1}" }
+    - match: '^\(IP_GATEWAY=([^)]*)\)$'
+      state: { network.gateway: "{1}" }
+    - match: '^\(ETH_ENABLE=([01])\)$'
+      state: { network.ethernet_enabled: { value: "{1}", map: { "0": false, "1": true } } }
+    # RS-232 and GPIO (MX-FR 7.5.4-7.5.5; UMX 6.6-6.7).
+    - match: '^\(RS232BAUD=(\d+)\)$'
+      state: { rs232.baud: "{1}" }
+    - match: '^\(RS232=(CONTROL|CI|PASS)\)$'
+      state: { rs232.mode: "{1}" }
+    - match: '^\(RS232_LOCAL_FORMAT=((\d+);[^)]*)\)$'
+      state: { rs232.format: "{1}", rs232.baud: "{2}" }
+    - match: '^\(RS232_LOCAL_PROT=(LW[23])\)$'
+      state: { rs232.protocol: "{1}" }
+    - match: '^\(GPIO(\d)=([IO]);([LH])\)$'
+      state: { "gpio.{1}.direction": "{2}", "gpio.{1}.level": "{3}" }
+    # HDMI port status lines (MX 7.6.3-7.6.7); set_hdmi_output answers with the output's line.
+    - match: '^\(STI(\d+)=(.*)\)$'
+      state: { "hdmi.inputs.{1}.status": "{2}" }
+    - match: '^\(STO(\d+)=(.*)\)$'
+      state: { "hdmi.outputs.{1}.status": "{2}" }

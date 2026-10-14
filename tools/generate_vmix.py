@@ -180,9 +180,27 @@ OTHER = {
     "mix": ("Mix", "Mix as vMix's API numbers it, 0 or left out for the main mix."),
     "channel": ("Replay channel", "Replay channel, such as A or B; left out, vMix uses its own default."),
     "duration": ("Duration", "Duration in milliseconds."),
-    "selected_name": ("Selected name", "Name of the title field or object to change."),
-    "selected_index": ("Selected index", "Index of the title field or object to change."),
+    "selected_name": ("Field name", "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field."),
+    "selected_index": ("Field index", "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field."),
 }
+
+# Title functions that act on one field. The reference's parameter column
+# lists only Input and Value for them, but their descriptions say
+# SelectedIndex or SelectedName picks the field (and the Developer API page
+# gives SetText with SelectedName as its example). SetTextColour and the
+# countdown functions say nothing, but act on a field in the same way; the
+# Bitfocus Companion vMix module (MIT) sends SelectedName or SelectedIndex
+# with each of them.
+FIELD_FUNCTIONS = {
+    "AdjustCountdown", "ChangeCountdown", "PauseCountdown", "SetCountdown",
+    "SetTextColour", "StartCountdown", "StopCountdown", "SuspendCountdown",
+}
+
+
+def field_params(fn: str, desc: str, params: list[str]) -> list[str]:
+    if fn in FIELD_FUNCTIONS or "SelectedIndex or SelectedName" in desc:
+        params = params + [p for p in ("SelectedName", "SelectedIndex") if p not in params]
+    return params
 DURATION = {
     "Cut": "Transition duration in milliseconds.",
     "Fade": "Transition duration in milliseconds.",
@@ -248,7 +266,9 @@ for row in re.findall(r"<tr[^>]*>(.*?)</tr>", page, re.S)[1:]:
     unknown = [p for p in params if p not in PARAMS]
     if unknown:
         raise SystemExit(f"{name}: unknown parameters {unknown}")
-    functions.append((snake(name), name, section, " ".join(description.split()), params))
+    description = " ".join(description.split())
+    functions.append((snake(name), name, section, description,
+                      field_params(name, description, params)))
 
 # Transitions are functions named as in vMix's interface; the page names Cut
 # and Fade, and says the rest follow the interface.

@@ -14,6 +14,12 @@ def mi(command, input, address, *args, **extra):
     binary(MI, command, input, osc(address, *args), **extra)
 
 
+def miq(command, query, input, address, *args, **extra):
+    """A property set followed by its /? query (the Feedback section's suffix),
+    so Millumin feeds the new value back."""
+    binary(MI, command, input, [osc(address, *args), osc(query)], **extra)
+
+
 mi("launch_column", {"column": 11}, "/action/launchColumn", ("i", 11), **_U)
 mi("launch_column_named", {"column": "test"}, "/action/launchColumn", ("s", "test"))
 mi("launch_or_stop_column", {"column": 3}, "/action/launchOrStopColumn", ("i", 3))
@@ -55,26 +61,26 @@ mi("save_project_as", {"path": "/Users/show/Backup.millumin"}, "/action/saveProj
    ("s", "/Users/show/Backup.millumin"))
 mi("quit", {}, "/action/quit")
 mi("ping", {}, "/ping")
-mi("set_layer_opacity", {"layer": "test", "opacity": 0.75}, "/layer:test/opacity", ("f", 0.75), **_U)
-mi("set_layer_position", {"layer": "test", "x": 12.0, "y": 21.0}, "/layer:test/position/xy", ("f", 12.0), ("f", 21.0))
-mi("set_layer_x", {"layer": "test", "x": 12.0}, "/layer:test/position/x", ("f", 12.0))
-mi("set_layer_y", {"layer": "test", "y": 21.0}, "/layer:test/position/y", ("f", 21.0))
-mi("set_layer_rotation", {"layer": "test", "degrees": 90.0}, "/layer:test/rotation", ("f", 90.0))
-mi("set_layer_scale", {"layer": "test", "scale": 0.5}, "/layer:test/scale", ("f", 0.5))
-mi("set_layer_effect", {"layer": "test", "effect": 1, "param": "red", "value": 0.5}, "/layer:test/effect1/red",
+miq("set_layer_opacity", "/layer:test/opacity/?", {"layer": "test", "opacity": 0.75}, "/layer:test/opacity", ("f", 0.75), **_U)
+miq("set_layer_position", "/layer:test/position/?", {"layer": "test", "x": 12.0, "y": 21.0}, "/layer:test/position/xy", ("f", 12.0), ("f", 21.0))
+miq("set_layer_x", "/layer:test/position/?", {"layer": "test", "x": 12.0}, "/layer:test/position/x", ("f", 12.0))
+miq("set_layer_y", "/layer:test/position/?", {"layer": "test", "y": 21.0}, "/layer:test/position/y", ("f", 21.0))
+miq("set_layer_rotation", "/layer:test/rotation/?", {"layer": "test", "degrees": 90.0}, "/layer:test/rotation", ("f", 90.0))
+miq("set_layer_scale", "/layer:test/scale/?", {"layer": "test", "scale": 0.5}, "/layer:test/scale", ("f", 0.5))
+miq("set_layer_effect", "/layer:test/effect1/red/?", {"layer": "test", "effect": 1, "param": "red", "value": 0.5}, "/layer:test/effect1/red",
    ("f", 0.5))
 mi("select_layer_by_name", {"layer": "test"}, "/layer:test/selected", ("i", 1))
 # The input section's example: /selectedLayer/mapping/topLeft [12,21], and /x and /y alone.
-mi("set_layer_mapping_corner", {"layer": "test", "corner": "topLeft", "x": 12.0, "y": 21.0},
+miq("set_layer_mapping_corner", "/layer:test/mapping/topLeft/?", {"layer": "test", "corner": "topLeft", "x": 12.0, "y": 21.0},
    "/layer:test/mapping/topLeft", ("f", 12.0), ("f", 21.0))
-mi("set_layer_mapping_corner_x", {"layer": "test", "corner": "bottomRight", "x": 12.0},
+miq("set_layer_mapping_corner_x", "/layer:test/mapping/bottomRight/?", {"layer": "test", "corner": "bottomRight", "x": 12.0},
    "/layer:test/mapping/bottomRight/x", ("f", 12.0))
-mi("set_layer_mapping_corner_y", {"layer": "test", "corner": "bottomLeft", "y": 21.0},
+miq("set_layer_mapping_corner_y", "/layer:test/mapping/bottomLeft/?", {"layer": "test", "corner": "bottomLeft", "y": 21.0},
    "/layer:test/mapping/bottomLeft/y", ("f", 21.0))
-mi("set_light_intensity", {"light": "Wash", "intensity": 0.5}, "/light:Wash/intensity", ("f", 0.5))
-mi("set_property", {"target": "index:99", "property": "mapping/topLeft/x", "value": 10.0},
+miq("set_light_intensity", "/light:Wash/intensity/?", {"light": "Wash", "intensity": 0.5}, "/light:Wash/intensity", ("f", 0.5))
+miq("set_property", "/index:99/mapping/topLeft/x/?", {"target": "index:99", "property": "mapping/topLeft/x", "value": 10.0},
    "/index:99/mapping/topLeft/x", ("f", 10.0))
-mi("adjust_property", {"target": "selectedLayer", "property": "position/x", "amount": 10.0},
+miq("adjust_property", "/selectedLayer/position/x/?", {"target": "selectedLayer", "property": "position/x", "amount": 10.0},
    "/selectedLayer/position/x/+", ("f", 10.0))
 mi("query_property", {"target": "layer:x", "property": "position"}, "/layer:x/position/?")
 mi("start_media", {"layer": "boop1"}, "/layer:boop1/startMedia")
@@ -97,9 +103,16 @@ mi("import_and_start", {"path": "/Users/show/media/clip.mov", "column": 1}, "/se
 
 # ── Telemetry: feedback as the Feedback section gives it ──
 telemetry(MI, "launched-column", inbound_hex=hexs(osc("/millumin/board/launchedColumn", ("i", 3), ("s", "Intro"))),
-          expect_state={"board": {"column": 3, "column_name": "Intro", "column_playing": True}})
+          expect_state={"board": {"column": 3, "column_name": "Intro", "column_playing": True},
+                        "columns": {"3": {"playing": True, "name": "Intro"}}})
 telemetry(MI, "stopped-column", inbound_hex=hexs(osc("/millumin/board/stoppedColumn", ("i", 3), ("s", "Intro"))),
-          expect_state={"board": {"column": 3, "column_name": "Intro", "column_playing": False}})
+          expect_state={"board": {"column": 3, "column_name": "Intro", "column_playing": False},
+                        "columns": {"3": {"playing": False, "name": "Intro"}}})
+# The summary's names for the same feedback; a column without a name.
+telemetry(MI, "column-launched-summary-name", inbound_hex=hexs(osc("/millumin/board/columnLaunched", ("i", 7))),
+          expect_state={"board": {"column": 7, "column_playing": True}, "columns": {"7": {"playing": True}}})
+telemetry(MI, "column-stopped-summary-name", inbound_hex=hexs(osc("/millumin/board/columnStopped", ("i", 7))),
+          expect_state={"board": {"column": 7, "column_playing": False}, "columns": {"7": {"playing": False}}})
 telemetry(MI, "media-started", inbound_hex=hexs(osc("/millumin/layer:Background/mediaStarted",
                                                     ("i", 2), ("s", "Movie.mov"), ("f", 12.5))),
           expect_state={"layers": {"Background": {"media_index": 2, "media": "Movie.mov", "duration_s": 12.5,

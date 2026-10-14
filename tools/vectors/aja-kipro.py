@@ -183,7 +183,33 @@ telemetry(A, "storage-path", inbound_http={
 telemetry(A, "set-reply", inbound_http={
     "path": "/config?action=set&paramid=eParamID_VideoInSelect&value=1",
     "body": '{"paramid":"33619978","name":"eParamID_VideoInSelect","value":"1","value_name":"HDMI"}'},
-    expect_state={"params": {"eParamID_VideoInSelect": {"value": "1", "value_name": "HDMI"}}})
+    expect_state={"params": {"eParamID_VideoInSelect": {"value": "1", "value_name": "HDMI"}},
+                  "inputs": {"1": {"video": "hdmi"}}})
+
+
+# Inputs, monitor selections and the media format, from get replies (the
+# values each chapter's descriptor lists), numbered from 1 in state.
+def _aja_get(name, param, value, model, expect):
+    telemetry(A, name, model=model, inbound_http={
+        "path": "/config?action=get&paramid=" + param,
+        "body": json.dumps({"paramid": "1", "name": param, "value": value, "value_name": ""},
+                           separators=(",", ":"))},
+        expect_state={"params": {param: {"value": value, "value_name": ""}}, **expect})
+
+
+_aja_get("audio-input", "eParamID_AudioInSelect", "2", "kipro", {"inputs": {"1": {"audio": "xlr"}}})
+_aja_get("go-video-input", "eParamID_VideoInput_1", "5", "kipro-go", {"inputs": {"1": {"video": "hdmi_2"}}})
+_aja_get("go-audio-input", "eParamID_AudioInput_1", "1", "kipro-go", {"inputs": {"1": {"audio": "analog"}}})
+_aja_get("go-headphone", "eParamID_HeadphoneMonitorChannel", "3", "kipro-go",
+         {"monitor": {"headphone_channel": 4}})
+_aja_get("go-hdmi-monitor", "eParamID_HDMIMonitorChannel", "4", "kipro-go", {"monitor": {"hdmi": "all"}})
+_aja_get("sdi-monitor", "eParamID_SDIMonitorChannel", "1", "kipro-ultra-plus", {"monitor": {"sdi": "2"}})
+_aja_get("hdmi-out", "eParamID_HDMIOutChannel", "0", "kipro-ultra-12g", {"monitor": {"hdmi": "1"}})
+_aja_get("audio-pair", "eParamID_AudioChannelsFocus", "7", "kipro-ultra-plus", {"monitor": {"audio_pair": 8}})
+_aja_get("encode-focus", "eParamID_AudioEncodeChannelFocus", "2", "kipro-ultra-plus",
+         {"monitor": {"headphone_encode_channel": 3}})
+_aja_get("encode-channels", "eParamID_EncodeChannels", "1", "kipro-ultra-plus", {"encode_channels": 1})
+_aja_get("file-system", "eParamID_FileSystemFormat", "1", "kipro-ultra", {"media": {"file_system_format": "exfat"}})
 telemetry(A, "not-json", inbound_http={
     "path": "/config?action=get&paramid=eParamID_TransportState",
     "body": "<html><head><title>404 Not Found</title></head></html>"},

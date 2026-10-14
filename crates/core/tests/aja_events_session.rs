@@ -70,7 +70,8 @@ async fn answer(router: &Router, target: &str) -> (&'static str, String) {
             "2" => match router.waits_on_2.fetch_add(1, Ordering::SeqCst) {
                 0 => (
                     "200 OK",
-                    r#"[{"param_id":"eParamID_XPT_Destination4_Status","int_value":9,"str_value":""}]"#
+                    r#"[{"param_id":"eParamID_XPT_Destination4_Status","int_value":9,"str_value":""},
+                        {"param_id":"eParamID_Button_Settings_49","int_value":0,"str_value":"{'classes': 'color_5'}"}]"#
                         .into(),
                 ),
                 _ => {
@@ -191,6 +192,8 @@ async fn kumo_events_connect_wait_and_expire() {
 
     // The next wait finds the id expired: a new connection, and its change.
     wait_for_state(&core, id, |s| s["outputs"]["4"]["input"] == 9).await;
+    // A button colour change, destination 17 in AJA's button numbering.
+    wait_for_state(&core, id, |s| s["outputs"]["17"]["color"] == "color_5").await;
     assert_eq!(router.connects.load(Ordering::SeqCst), 2);
     assert_eq!(router.waits_on_1.load(Ordering::SeqCst), 2);
     core.close(id).await;
