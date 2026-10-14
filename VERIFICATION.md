@@ -1414,10 +1414,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sennheiser-digital-6000 — Sennheiser Digital 6000
 
-- [ ] Confirm the SSC port is 45 (the Companion module defaults to 6970). ([specs/sennheiser-digital-6000.yaml:110](specs/sennheiser-digital-6000.yaml#L110))
-- [ ] Confirm that subscriptions lapse after 20 s and that renewal every 6.7 s keeps telemetry flowing. ([specs/sennheiser-digital-6000.yaml:102](specs/sennheiser-digital-6000.yaml#L102))
-- [ ] Confirm out-of-range set_frequency and set_af_out values are adapted and replied with the value applied. ([specs/sennheiser-digital-6000.yaml:116](specs/sennheiser-digital-6000.yaml#L116))
-- [ ] Opened for commands only, confirm the receiver answers an unsubscribed `device.name` read and echoes its `osc.xid`, the liveness check. ([crates/core/src/modules/sennheiser_d6000.rs:129](crates/core/src/modules/sennheiser_d6000.rs#L129))
+- [ ] Confirm the SSC port is 45 (the Companion module defaults to 6970). ([specs/sennheiser-digital-6000.yaml:266](specs/sennheiser-digital-6000.yaml#L266))
+- [ ] Confirm that subscriptions lapse after 20 s and that renewal every 6.7 s keeps telemetry flowing. ([specs/sennheiser-digital-6000.yaml:258](specs/sennheiser-digital-6000.yaml#L258))
+- [ ] Confirm out-of-range set_frequency and set_af_out values are adapted and replied with the value applied. ([specs/sennheiser-digital-6000.yaml:272](specs/sennheiser-digital-6000.yaml#L272))
+- [ ] Opened for commands only, confirm the receiver answers an unsubscribed `device.name` read and echoes its `osc.xid`, the liveness check. ([crates/core/src/modules/sennheiser_d6000.rs:163](crates/core/src/modules/sennheiser_d6000.rs#L163))
+- [ ] Confirm name, carrier, active_status, the other skx methods and both wsm_master_cnt counters can be subscribed in the one tree (the guide marks only some as subscribable). ([crates/core/src/modules/sennheiser_d6000.rs:457](crates/core/src/modules/sennheiser_d6000.rs#L457))
+- [ ] Confirm wsm_master_cnt increments for changes made on the receiver only, so re-reading on it misses nothing the core did itself, and which settings each counter covers. ([crates/core/src/modules/sennheiser_d6000.rs:232](crates/core/src/modules/sennheiser_d6000.rs#L232))
+- [ ] Check that active_bank_channel accepts user banks u4-u6 (the guide's limits list u1-u3; Companion and the frequency tables have u1-u6), and whether banks come back upper or lower case. ([specs/sennheiser-digital-6000.yaml:104](specs/sennheiser-digital-6000.yaml#L104))
+- [ ] Check the channel name limit (8 characters and the forbidden characters are Companion's; the guide gives none) and what the receiver does with a longer name. ([specs/sennheiser-digital-6000.yaml:89](specs/sennheiser-digital-6000.yaml#L89))
+- [ ] Check that /device/name is replied with the MAC address appended, as the guide's example shows, and its length limit. ([specs/sennheiser-digital-6000.yaml:96](specs/sennheiser-digital-6000.yaml#L96))
+- [ ] Confirm a sync settings write with several leaves in one message is applied and replied, and that a gain off the 3 dB grid is refused. ([specs/sennheiser-digital-6000.yaml:121](specs/sennheiser-digital-6000.yaml#L121))
+- [ ] Confirm a read of all 100 channels of a bank in one datagram is answered in one reply that fits a datagram. ([specs/sennheiser-digital-6000.yaml:148](specs/sennheiser-digital-6000.yaml#L148))
+- [ ] Check set_user_frequency's adaptation of frequencies off the 25 kHz grid, and whether a stored user bank channel can be cleared. ([specs/sennheiser-digital-6000.yaml:139](specs/sennheiser-digital-6000.yaml#L139))
+- [ ] Check that /sys/clock accepts 4 (internal manual) as a write and what it means. ([specs/sennheiser-digital-6000.yaml:169](specs/sennheiser-digital-6000.yaml#L169))
+- [ ] Check whether set_network is replied before the receiver changes address, whether mdns may be written with auto off, and the ipv4_dante auto write (the guide shows only the settings array). ([specs/sennheiser-digital-6000.yaml:175](specs/sennheiser-digital-6000.yaml#L175))
+- [ ] Confirm encryption and sync setting changes reach the transmitter only at its next sync. ([specs/sennheiser-digital-6000.yaml:302](specs/sennheiser-digital-6000.yaml#L302))
 
 ## sennheiser-ew-dx — Sennheiser EW-DX
 

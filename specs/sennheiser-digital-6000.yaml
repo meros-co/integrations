@@ -15,14 +15,23 @@ source:
     url: https://www.sennheiser.com/globalassets/digizuite/41931-en-ti_1109_v2.2_sennheiser_sound_control_protocol_digital_6000_en.pdf
     note: >
       Manufacturer document. Transport (UDP, default port 45), subscriptions,
-      the method list, the metering array and its conversion formulae.
+      the method list (§8: bank and user bank frequencies §8.4-8.15,
+      active_bank_channel §8.16, sync settings §8.29-8.38, the wsm_master_cnt
+      on-change counters §8.42 and §8.95, name §8.44, encryption §8.45, active
+      status §8.47, clock §8.97, brightness §8.98, booster §8.99, network
+      §8.106-8.119, device name §8.120), the metering array and its conversion
+      formulae.
   - title: Meros internal Digital 6000 client and protocol notes (not public)
     note: >
       Meros. Subscription lifecycle, renewal at a third of the lifetime, and the
       silence timeout. Tested against a simulated device only.
   - title: Bitfocus Companion, companion-module-sennheiser-digital6000
     url: https://github.com/bitfocus/companion-module-sennheiser-digital6000
-    note: MIT-licensed; cross-check only. Its default port of 6970 is not supported by the document.
+    note: >
+      MIT-licensed; cross-check only, no code copied. Its default port of 6970
+      is not supported by the document. Corroborates user banks u1-u6 for
+      active_bank_channel (the document's limits list u1-u3) and the 8-character
+      channel name with its forbidden characters, which the document leaves out.
 
 ports:
   - { port: 45, protocol: udp, role: control }
@@ -31,12 +40,14 @@ models:
   - id: em-6000
     name: Sennheiser EM 6000 two-channel receiver
     channels: 2
-    supports: [mute, set_frequency, set_af_out, identify, get_frequency_limits]
+    supports: [mute, set_frequency, set_af_out, identify, get_frequency_limits, set_channel_name, set_device_name, set_bank_channel,
+               set_encryption, set_sync_settings, set_user_frequency, get_bank, set_booster, set_brightness, set_clock, set_network]
     verification: none
   - id: em-6000-dante
     name: Sennheiser EM 6000 Dante two-channel receiver
     channels: 2
-    supports: [mute, set_frequency, set_af_out, identify, get_frequency_limits]
+    supports: [mute, set_frequency, set_af_out, identify, get_frequency_limits, set_channel_name, set_device_name, set_bank_channel,
+               set_encryption, set_sync_settings, set_user_frequency, get_bank, set_booster, set_brightness, set_clock, set_network, set_dante_network]
     verification: none
 
 commands:
@@ -75,6 +86,113 @@ commands:
     summary: The carrier range the receiver accepts, as {min_khz, max_khz, step_khz}
     returns: value
 
+  set_channel_name:
+    summary: Name a receiver channel. Returns the name the receiver applied.
+    params:
+      channel: { type: int, min: 1, max: 2, required: true, label: Channel, description: "Receiver channel, 1 or 2 as numbered on the front panel." }
+      name:    { type: string, max_length: 8, pattern: '^[^{}\[\]()~`!@$%^&_\\:''".?]*$', required: true, label: Name, description: "Channel name shown on the receiver, up to 8 characters, without brackets, braces or the punctuation the receiver refuses." }
+    returns: value
+
+  set_device_name:
+    summary: >
+      Name the receiver (its device id in the menu and in discovery). Returns
+      the name applied, to which the receiver appends its MAC address.
+    params:
+      name: { type: string, max_length: 32, pattern: '^[^{}\[\]\\"]*$', required: true, label: Device name, description: "Name for the receiver; it adds its MAC address after it to keep names unique in discovery." }
+    returns: value
+
+  set_bank_channel:
+    summary: >
+      Tune a channel to a channel of a system or user bank. Returns the bank and
+      channel applied, as [bank, channel].
+    params:
+      channel:      { type: int, min: 1, max: 2, required: true, label: Channel, description: "Receiver channel, 1 or 2 as numbered on the front panel." }
+      bank:         { type: enum, values: [b1, b2, b3, b4, b5, b6, u1, u2, u3, u4, u5, u6], required: true, label: Bank, description: "b1 to b6 are the system banks, u1 to u6 the user banks." }
+      bank_channel: { type: int, min: 0, max: 99, required: true, label: Bank channel, description: "Channel within the bank, 0 to 99." }
+    returns: value
+
+  set_encryption:
+    summary: Turn a channel's AES 256 encryption on or off; the transmitter must be synced again
+    params:
+      channel: { type: int, min: 1, max: 2, required: true, label: Channel, description: "Receiver channel, 1 or 2 as numbered on the front panel." }
+      enabled: { type: bool, default: true, label: Encryption, description: "On encrypts the link to the transmitter, off sends it in the clear." }
+    returns: ack
+
+  set_sync_settings:
+    summary: >
+      Set what a transmitter is given when synced to the channel. Only the
+      settings given are written.
+    params:
+      channel:                { type: int, min: 1, max: 2, required: true, label: Channel, description: "Receiver channel, 1 or 2 as numbered on the front panel." }
+      low_cut_hz:             { type: enum, values: ["30", "60", "80", "100", "120"], label: Low cut, description: "Transmitter low cut frequency in Hz." }
+      ignore_low_cut:         { type: bool, label: Keep low cut, description: "On leaves the transmitter's own low cut alone at sync." }
+      gain_db:                { type: int, min: -6, max: 60, label: Gain, description: "Transmitter gain in dB, -6 to 60 in 3 dB steps." }
+      ignore_gain:            { type: bool, label: Keep gain, description: "On leaves the transmitter's own gain alone at sync." }
+      display:                { type: enum, values: [frequency, name], label: Display, description: "What the transmitter's display shows: its frequency or its name." }
+      ignore_display:         { type: bool, label: Keep display, description: "On leaves the transmitter's own display setting alone at sync." }
+      cable_emulation:        { type: enum, values: [line, type1, type2, type3], label: Cable emulation, description: "The instrument cable the transmitter emulates, or line for none." }
+      ignore_cable_emulation: { type: bool, label: Keep cable emulation, description: "On leaves the transmitter's own cable emulation alone at sync." }
+      auto_lock:              { type: bool, label: Auto lock, description: "On locks the transmitter's controls automatically." }
+      ignore_auto_lock:       { type: bool, label: Keep auto lock, description: "On leaves the transmitter's own auto lock alone at sync." }
+    returns: ack
+
+  set_user_frequency:
+    summary: Store a frequency in a user bank channel. Returns the frequency the receiver stored.
+    params:
+      channel:       { type: int, min: 1, max: 2, required: true, label: Channel, description: "Receiver channel whose user banks to change, 1 or 2." }
+      bank:          { type: enum, values: [u1, u2, u3, u4, u5, u6], required: true, label: User bank, description: "User bank u1 to u6." }
+      index:         { type: int, min: 0, max: 99, required: true, label: Bank channel, description: "Channel within the bank, 0 to 99." }
+      frequency_khz: { type: int, min: 470100, max: 713900, required: true, label: Frequency, description: "Frequency in kHz to store; the receiver adapts it to its range and 25 kHz grid." }
+    returns: value
+
+  get_bank:
+    summary: >
+      Read the hundred frequencies of a system or user bank, as {"00": kHz, ...};
+      they also land in the channel's presets.
+    params:
+      channel: { type: int, min: 1, max: 2, required: true, label: Channel, description: "Receiver channel whose bank to read, 1 or 2." }
+      bank:    { type: enum, values: [b1, b2, b3, b4, b5, b6, u1, u2, u3, u4, u5, u6], required: true, label: Bank, description: "b1 to b6 are the system banks, u1 to u6 the user banks." }
+    returns: value
+
+  set_booster:
+    summary: Turn the antenna booster feed (DC to the antenna inputs) on or off
+    params:
+      enabled: { type: bool, default: true, label: Booster feed, description: "On powers active antennas and boosters through the antenna cables, off turns that supply off." }
+    returns: ack
+
+  set_brightness:
+    summary: Set the brightness of both displays. Returns the level applied.
+    params:
+      percent: { type: int, min: 0, max: 100, required: true, label: Brightness, description: "Display brightness in percent." }
+    returns: value
+
+  set_clock:
+    summary: Set the word clock mode
+    params:
+      mode: { type: enum, values: [internal_48k, internal_96k, external, internal_manual], required: true, label: Clock, description: "internal_48k or internal_96k runs from the receiver's own clock; external follows the word clock input; internal_manual is the receiver's manual internal mode." }
+    returns: ack
+
+  set_network:
+    summary: >
+      Set the control network's addressing. The receiver may move to the new
+      address, and the core then has to be pointed at it.
+    params:
+      mode:        { type: enum, values: [auto, manual], required: true, label: Addressing, description: "auto uses DHCP and link-local addressing; manual uses the address, mask and gateway given." }
+      address:     { type: string, max_length: 15, pattern: "^[0-9.]*$", label: IP address, description: "Dotted IPv4 address for manual addressing." }
+      subnet_mask: { type: string, max_length: 15, pattern: "^[0-9.]*$", label: Subnet mask, description: "Dotted IPv4 subnet mask for manual addressing." }
+      gateway:     { type: string, max_length: 15, pattern: "^[0-9.]*$", label: Gateway, description: "Dotted IPv4 gateway for manual addressing; leave out for none." }
+      mdns:        { type: bool, label: mDNS only, description: "With manual addressing, on keeps mDNS discovery without DHCP or link-local addressing." }
+    returns: ack
+
+  set_dante_network:
+    summary: Set the Dante network's addressing (EM 6000 Dante)
+    params:
+      mode:        { type: enum, values: [auto, manual], required: true, label: Addressing, description: "auto uses DHCP or link-local addressing; manual uses the address, mask and gateway given." }
+      address:     { type: string, max_length: 15, pattern: "^[0-9.]*$", label: IP address, description: "Dotted IPv4 address for manual addressing." }
+      subnet_mask: { type: string, max_length: 15, pattern: "^[0-9.]*$", label: Subnet mask, description: "Dotted IPv4 subnet mask for manual addressing." }
+      gateway:     { type: string, max_length: 15, pattern: "^[0-9.]*$", label: Gateway, description: "Dotted IPv4 gateway for manual addressing; leave out for none." }
+    returns: ack
+
 state:
   device.version:               { type: string, description: "Software version, e.g. 1.1.4.74" }
   device.vendor:                { type: string, description: "Vendor string" }
@@ -97,6 +215,44 @@ state:
   channels.*.rf.lqi:            { type: int, description: "Audio link quality indicator, 0 (worst) to 255 (best)" }
   channels.*.af.level_dbfs:     { type: float, unit: dBFS, description: "Audio level: (value + 1) / 2 - 128" }
   channels.*.af.peak:           { type: bool, description: "Digital clip in the audio section, held for at least 1 s" }
+  channels.*.af_out_db:         { type: int, unit: dB, description: "Analogue audio output level, -10 to 18 (/audio/outN/level_db)" }
+  channels.*.bank:              { type: string, description: "Active bank: b1-b6, u1-u6, or manual when tuned by frequency" }
+  channels.*.bank_channel:      { type: int, description: "Channel within the active bank, 0-99; absent when manual" }
+  channels.*.encryption:        { type: bool, description: "AES 256 encryption of the link" }
+  channels.*.test_tone_dbfs:    { type: int, unit: dBFS, description: "Test tone level, -60 to 0; absent when the tone is off" }
+  channels.*.status:            { type: string, description: "Active status: SyncOK, SyncFail, Identified, SwUpdatePass or SwUpdateFail; absent when none" }
+  channels.*.status_detail:     { type: string, description: "Its substatus, e.g. SyncResultTimeout; absent when none" }
+  channels.*.sync.low_cut_hz:   { type: int, unit: Hz, description: "Low cut given to a transmitter at sync: 30, 60, 80, 100 or 120" }
+  channels.*.sync.ignore_low_cut: { type: bool, description: "Sync leaves the transmitter's low cut alone" }
+  channels.*.sync.gain_db:      { type: int, unit: dB, description: "Gain given at sync, -6 to 60 in 3 dB steps" }
+  channels.*.sync.ignore_gain:  { type: bool, description: "Sync leaves the transmitter's gain alone" }
+  channels.*.sync.display:      { type: string, description: "Display given at sync: frequency or name" }
+  channels.*.sync.ignore_display: { type: bool, description: "Sync leaves the transmitter's display alone" }
+  channels.*.sync.cable_emulation: { type: string, description: "Cable emulation given at sync: line, type1, type2 or type3" }
+  channels.*.sync.ignore_cable_emulation: { type: bool, description: "Sync leaves the transmitter's cable emulation alone" }
+  channels.*.sync.auto_lock:    { type: bool, description: "Auto lock given at sync" }
+  channels.*.sync.ignore_auto_lock: { type: bool, description: "Sync leaves the transmitter's auto lock alone" }
+  channels.*.presets.*.*:       { type: int, unit: kHz, description: "Bank frequencies by bank (u1-u6 read on connecting; b1-b6 once read with get_bank) and channel 00-99" }
+  channels.*.transmitter.low_cut: { type: string, description: "Transmitter low cut as it reports it, e.g. 60 Hz; absent when unknown" }
+  channels.*.transmitter.gain:  { type: string, description: "Transmitter gain as it reports it, e.g. 42 dB" }
+  channels.*.transmitter.display: { type: string, description: "Transmitter display: Frequency, Name or Preset" }
+  channels.*.transmitter.capsule: { type: string, description: "Microphone capsule, e.g. MMD 935" }
+  channels.*.transmitter.cable_emulation: { type: string, description: "Transmitter cable emulation: Line, Type 1, Type 2 or Type 3" }
+  channels.*.transmitter.auto_lock: { type: string, description: "Transmitter auto lock: On or Off" }
+  device.booster:               { type: bool, description: "Antenna booster feed on" }
+  device.brightness_percent:    { type: int, unit: "%", description: "Display brightness" }
+  device.clock:                 { type: string, description: "Word clock mode: internal_48k, internal_96k, external or internal_manual" }
+  device.clock_measured:        { type: string, description: "Frequency measured on the word clock input, as reported, e.g. 48000 Hz" }
+  device.dante.name:            { type: string, description: "Dante device name (EM 6000 Dante)" }
+  device.dante.version:         { type: string, description: "Dante module version (EM 6000 Dante)" }
+  device.network.*.auto:        { type: bool, description: "Automatic addressing, per interface: control, dante" }
+  device.network.*.mdns:        { type: bool, description: "mDNS-only manual mode (control)" }
+  device.network.*.address:     { type: string, description: "Current IPv4 address" }
+  device.network.*.subnet_mask: { type: string, description: "Current IPv4 subnet mask" }
+  device.network.*.gateway:     { type: string, description: "Current IPv4 gateway" }
+  device.network.*.static_address: { type: string, description: "Address used in manual mode (control)" }
+  device.network.*.static_subnet_mask: { type: string, description: "Subnet mask used in manual mode (control)" }
+  device.network.*.static_gateway: { type: string, description: "Gateway used in manual mode (control)" }
 
 quirks:
   - models: [all]
@@ -132,3 +288,36 @@ quirks:
     text: >
       identify is a read of a read-only method, per TI 1109 §8.41, and always
       returns true.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Bank and channel, encryption, sync settings, user banks, AF out, booster,
+      brightness, clock and network cannot be subscribed. The core reads them on
+      connecting, and again when the receiver's on-change counters (which are
+      subscribed) show they were changed on the receiver; changes made by
+      another SSC client are not counted, so they are only seen on the next
+      connection.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_encryption and set_sync_settings take effect on the transmitter only
+      at its next sync; with encryption changed, audio stops until the
+      transmitter is synced again.
+
+  - models: [all]
+    severity: critical
+    text: >
+      set_network and set_dante_network change the receiver's addressing at
+      once; on the control interface the receiver may move away from the
+      address the core uses.
+
+  - models: [all]
+    severity: info
+    text: >
+      Over SSC the transmitter's settings (low cut, gain, display, capsule,
+      cable emulation, auto lock) are read only; they are set on the
+      transmitter through the sync settings and a sync. The test tone, the
+      system banks and the Dante name are read only too. The frequency scan
+      (§8.18-8.19) and walk test (§8.39-8.40) are not offered.
