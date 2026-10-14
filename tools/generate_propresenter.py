@@ -319,6 +319,7 @@ transport:
 
 ports:
   - {{ port: 50001, protocol: http, role: control }}
+  - {{ port: 50001, protocol: http, role: push, note: "the update stream, POST /v1/status/updates on the API's port" }}
 
 models:
   - id: propresenter-7
@@ -333,6 +334,18 @@ commands:
 
 # Telemetry, state and quirks: written by hand, not generated.
 TAIL = r'''telemetry:
+  # The chunked update stream (POST /v1/status/updates): one request whose
+  # reply carries a JSON object per change, {"url", "data"}, each in the
+  # format its own GET returns. Each is read as that GET's reply would be,
+  # so the rules below serve both; the polls stay as the fallback while the
+  # stream is down, and read what it does not carry.
+  sse:
+    method: POST
+    path: /v1/status/updates
+    body: '["status/slide","presentation/slide_index","status/layers","look/current","playlist/active","media/playlist/active","media/playlist/focused","transport/presentation/current","transport/presentation/time","transport/announcement/current","transport/announcement/time","transport/audio/current","transport/audio/time","presentation/active/timeline","announcement/active/timeline","timers/current","timer/video_countdown","messages","stage/message","stage/layout_map","capture/status","status/audience_screens","status/stage_screens"]'
+    content_type: application/json
+    format: json
+    as_reply: { path: "$.url", body: "$.data" }
   # What changes during a service, asked once a second. Their replies, and the
   # replies to the matching get commands, update the state.
   poll:
@@ -1163,11 +1176,13 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      ProPresenter also streams changes over HTTP (/v1/status/updates, and
-      the updates endpoints of playlists and the chord chart): one request
-      whose chunked reply carries a JSON object per change. Reading it would
-      need the HTTP transport to deliver a reply in parts, which the core does
-      not yet do, so state is polled instead.
+      State is kept current by ProPresenter's update stream (POST
+      /v1/status/updates for the slide, layers, look, playlists, transports,
+      timelines, timers, messages, stage message and layout map, capture
+      and screens), each update read as the reply to its own GET, and by
+      the polls, which go on as the fallback while the stream is down
+      (reopened after 1 s doubling to 30 s) and read the rest. The updates
+      endpoints of single playlists and the chord chart are not streamed.
 
   - models: [all]
     severity: info
