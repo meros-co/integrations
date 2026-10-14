@@ -765,6 +765,18 @@ impl Atem {
         self.connect(cx);
     }
 
+    /// The level subscription for this switcher's mixer: SFLN (Fairlight) or
+    /// SALN (classic).
+    fn levels_command(&self) -> Option<[u8; 4]> {
+        if self.topology.fairlight {
+            Some(*b"SFLN")
+        } else if self.topology.classic_audio {
+            Some(*b"SALN")
+        } else {
+            None
+        }
+    }
+
     /// Commands in one reliable packet, resent until acknowledged.
     fn send_commands(
         &mut self,
@@ -1606,8 +1618,10 @@ impl Atem {
                     self.hello_attempts = 0;
                     cx.connection(Connection::Connected);
                     // A new session does not remember the level subscription.
-                    if self.monitor && self.levels_wanted && self.topology.fairlight {
-                        self.send_commands(cx, None, &[(*b"SFLN", vec![1, 0, 0, 0])]);
+                    if self.monitor && self.levels_wanted {
+                        if let Some(cmd) = self.levels_command() {
+                            self.send_commands(cx, None, &[(cmd, vec![1, 0, 0, 0])]);
+                        }
                     }
                 }
                 None
@@ -2504,14 +2518,14 @@ impl Atem {
                 }
                 one(b"CFMP", b)
             }
-            // Send levels on or off, 3 rsv (Sofie
-            // `Fairlight/FairlightMixerSendLevelsCommand.ts:10-14`).
-            "set_audio_levels" => {
-                if !self.topology.fairlight {
-                    return Err(unsupported(name, "this switcher (no Fairlight mixer)"));
-                }
-                one(b"SFLN", vec![flag(params, "enabled") as u8, 0, 0, 0])
-            }
+            // Send levels on or off, 3 rsv: SFLN for the Fairlight mixer
+            // (Sofie `Fairlight/FairlightMixerSendLevelsCommand.ts:10-14`),
+            // SALN for the classic mixer (OpenSwitcher SendAudioLevelsCommand,
+            // SKAARHOJ SALN).
+            "set_audio_levels" => match self.levels_command() {
+                Some(cmd) => one(&cmd, vec![flag(params, "enabled") as u8, 0, 0, 0]),
+                None => Err(unsupported(name, "this switcher (no audio mixer)")),
+            },
             // Multiviewer, window, u16 source (Sofie
             // `Settings/MultiViewerSourceCommand.ts:19-25`).
             "set_multiviewer_window" => {
@@ -4091,6 +4105,34 @@ mod tests {
             reliable(0x8001, 2, &[cmd(b"AMMO", &[0x40, 0x26, 0, 0, 0, 0, 0, 0])]),
         );
         assert_eq!(state(&a)["audio"]["master"]["gain"], -6.0);
+
+        // Levels: SALN subscribes; AMLv gives the master, the monitor, the
+        // source ids (padded to 4 bytes) and then each source's levels.
+        let p = payload(&mut m, "set_audio_levels", json!({"enabled": true}));
+        assert_eq!(p, command(b"SALN", &[1, 0, 0, 0]));
+        let mut b = vec![0, 3, 0, 0];
+        for v in 1u32..=8 {
+            b.extend_from_slice(&v.to_be_bytes());
+        }
+        for id in [1u16, 2, 1001] {
+            b.extend_from_slice(&id.to_be_bytes());
+        }
+        b.extend_from_slice(&[0, 0]);
+        for v in 100u32..112 {
+            b.extend_from_slice(&v.to_be_bytes());
+        }
+        let a = feed(&mut m, 40, reliable(0x8001, 3, &[cmd(b"AMLv", &b)]));
+        let s = state(&a);
+        assert_eq!(
+            s["audio"]["master"]["level"],
+            json!({"left": 1, "right": 2, "left_peak": 3, "right_peak": 4})
+        );
+        assert_eq!(s["audio"]["monitor"]["level"]["right_peak"], 8);
+        assert_eq!(
+            s["audio"]["inputs"]["1001"]["level"],
+            json!({"left": 108, "right": 109, "left_peak": 110, "right_peak": 111})
+        );
+        assert_eq!(s["audio"]["inputs"]["2"]["level"]["left"], 104);
     }
 
     #[test]

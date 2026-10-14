@@ -1125,6 +1125,7 @@ state:
   transition.duration_ms:      { type: int, unit: ms, description: "Current transition duration, when the transition has one" }
   transition.settings:         { type: object, description: "Settings of the current transition, as set_current_scene_transition_settings takes them" }
   transition.active:           { type: bool, description: "A scene transition is running" }
+  transition.cursor:           { type: float, description: "Position of the current scene transition from 0 to 1, 1 when none runs; read every 100 ms while it is below 1, and after set_t_bar_position. Studio mode's T-bar moves it, but OBS reports no T-bar position of its own" }
   transitions:                 { type: array, description: "Transitions available, each {name, kind, fixed, configurable}" }
   streaming.active:            { type: bool, description: "Streaming output running" }
   streaming.reconnecting:      { type: bool, description: "Streaming output reconnecting" }
@@ -1217,19 +1218,22 @@ quirks:
       to the high-volume volume meters, input active and show states, and
       scene item transforms. Volume meters (every 50 ms from OBS) and
       transforms are published at most every 200 ms. OBS sends no event for a
-      media input's position, output statistics, other outputs, scene item
-      blend modes, deinterlacing, scene transition overrides, video settings,
-      the record directory or the stream service: media position is read every
-      second while it plays, status and statistics every 5 s, and the rest
-      after the command that sets them.
+      media input's position, a scene transition's progress, output
+      statistics, other outputs, scene item blend modes, deinterlacing, scene
+      transition overrides, video settings, the record directory or the stream
+      service: media position is read every second while it plays, the
+      transition cursor every 100 ms while a transition runs or the T-bar
+      stands part-way, status and statistics every 5 s, and the rest after the
+      command that sets them.
 
   - models: [all]
     severity: info
     text: >
       Not kept in state, as the API only reads them on request: persistent
       data, profile parameters, hotkeys, the monitor list, output settings,
-      input kinds, filter kinds, the transition cursor and the T-bar position
-      (set_t_bar_position has no read-back). The stream service's settings
+      input kinds and filter kinds. OBS has no request or event for the
+      T-bar's own position; transition.cursor, the progress of the transition
+      the T-bar drives, stands in for it. The stream service's settings
       hold the stream key, so only its type and server are published.
       Canvases (obs-websocket 5.7) other than the main one are not mirrored;
       their commands work.

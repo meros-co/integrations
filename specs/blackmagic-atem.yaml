@@ -29,7 +29,10 @@ source:
     note: >
       Documentation pages only (the transport description and field and command
       tables, which corroborate the transition, keyer, colour, media player and
-      SuperSource layouts and give their value ranges). No OpenSwitcher or
+      SuperSource layouts and give their value ranges). fields/audiomixer.html
+      and commands/audiomixer.html give the classic mixer's AMLv levels (source
+      count, master and monitor levels, then four u32 per source) and the SALN
+      subscription. No OpenSwitcher or
       pyatem source code was read.
   - title: Bitfocus Companion, companion-module-bmd-atem (v4.3.0, commit 4cd3d9a)
     url: https://github.com/bitfocus/companion-module-bmd-atem
@@ -47,8 +50,9 @@ source:
       data type each one takes.
   - title: SKAARHOJ, BlackMagic ATEM Switcher Protocol (documentation page)
     note: >
-      Protocol prose (CC BY-SA), used to corroborate command names. SKAARHOJ's
-      GPL libraries were not read.
+      Protocol prose (CC BY-SA), used to corroborate command names, and the
+      AMLv source order list (one u16 source id per source, before the
+      levels). SKAARHOJ's GPL libraries were not read.
 
 ports:
   - { port: 9910, protocol: udp, role: control }
@@ -2110,8 +2114,9 @@ commands:
 
   set_audio_levels:
     summary: >
-      Ask the Fairlight mixer to send its meter levels, or stop. They arrive
-      many times a second as fairlight.*.level state while on.
+      Ask the audio mixer to send its meter levels, or stop. They arrive many
+      times a second while on: as fairlight.*.level state from the Fairlight
+      mixer, as audio.*.level state from the classic mixer.
     params:
       enabled: { type: bool, default: true,
                  label: Send levels,
@@ -3388,6 +3393,18 @@ state:
   audio.inputs.*.balance:      { type: float, description: "Input balance, -50 to 50" }
   audio.master.gain:           { type: float, unit: dB, description: "Master gain; null when silent" }
   audio.master.balance:        { type: float, description: "Master balance, -50 to 50" }
+  audio.inputs.*.level.left:   { type: int, description: "Classic input's left level, linear as the switcher sends it (full scale undocumented), only while set_audio_levels is on" }
+  audio.inputs.*.level.right:  { type: int, description: "Classic input's right level, as level.left" }
+  audio.inputs.*.level.left_peak: { type: int, description: "Classic input's left peak, as level.left" }
+  audio.inputs.*.level.right_peak: { type: int, description: "Classic input's right peak, as level.left" }
+  audio.master.level.left:     { type: int, description: "Classic master's left level, as audio.inputs.*.level.left" }
+  audio.master.level.right:    { type: int, description: "Classic master's right level" }
+  audio.master.level.left_peak: { type: int, description: "Classic master's left peak" }
+  audio.master.level.right_peak: { type: int, description: "Classic master's right peak" }
+  audio.monitor.level.left:    { type: int, description: "Classic monitor's left level, as audio.inputs.*.level.left" }
+  audio.monitor.level.right:   { type: int, description: "Classic monitor's right level" }
+  audio.monitor.level.left_peak: { type: int, description: "Classic monitor's left peak" }
+  audio.monitor.level.right_peak: { type: int, description: "Classic monitor's right peak" }
   fairlight.inputs.*.sources.*.gain: { type: float, unit: dB, description: "Fairlight source input gain, keyed by input and source id" }
   fairlight.inputs.*.sources.*.fader_gain: { type: float, unit: dB, description: "Fairlight source fader gain" }
   fairlight.inputs.*.sources.*.balance: { type: float, description: "Fairlight source balance, -100 to 100" }
@@ -3550,10 +3567,22 @@ state:
   cameras.*.display_tools.focus_assist: { type: bool, description: "Focus assist shown" }
   cameras.*.display_tools.false_color: { type: bool, description: "False colour shown" }
   cameras.*.color_bars:        { type: bool, description: "Camera colour bars shown" }
-  cameras.*.color.lift.red:    { type: float, description: "Lift red (also green, blue, luma), -2 to 2" }
-  cameras.*.color.gamma.red:   { type: float, description: "Gamma red (also green, blue, luma), -4 to 4" }
-  cameras.*.color.gain.red:    { type: float, description: "Gain red (also green, blue, luma), 0 to 16" }
-  cameras.*.color.offset.red:  { type: float, description: "Offset red (also green, blue, luma), -8 to 8" }
+  cameras.*.color.lift.red:              { type: float, description: "Lift red, -2 to 2" }
+  cameras.*.color.lift.green:            { type: float, description: "Lift green, -2 to 2" }
+  cameras.*.color.lift.blue:             { type: float, description: "Lift blue, -2 to 2" }
+  cameras.*.color.lift.luma:             { type: float, description: "Lift luma, -2 to 2" }
+  cameras.*.color.gamma.red:             { type: float, description: "Gamma red, -4 to 4" }
+  cameras.*.color.gamma.green:           { type: float, description: "Gamma green, -4 to 4" }
+  cameras.*.color.gamma.blue:            { type: float, description: "Gamma blue, -4 to 4" }
+  cameras.*.color.gamma.luma:            { type: float, description: "Gamma luma, -4 to 4" }
+  cameras.*.color.gain.red:              { type: float, description: "Gain red, 0 to 15.99" }
+  cameras.*.color.gain.green:            { type: float, description: "Gain green, 0 to 15.99" }
+  cameras.*.color.gain.blue:             { type: float, description: "Gain blue, 0 to 15.99" }
+  cameras.*.color.gain.luma:             { type: float, description: "Gain luma, 0 to 15.99" }
+  cameras.*.color.offset.red:            { type: float, description: "Offset red, -8 to 8" }
+  cameras.*.color.offset.green:          { type: float, description: "Offset green, -8 to 8" }
+  cameras.*.color.offset.blue:           { type: float, description: "Offset blue, -8 to 8" }
+  cameras.*.color.offset.luma:           { type: float, description: "Offset luma, -8 to 8" }
   cameras.*.color.contrast.pivot: { type: float, description: "Contrast pivot, 0 to 1" }
   cameras.*.color.contrast.adjust: { type: float, description: "Contrast, 0 to 2" }
   cameras.*.color.luma_mix:    { type: float, description: "Luma mix, 0 to 1" }
@@ -3618,9 +3647,11 @@ quirks:
       A switcher has either the classic audio mixer (set_audio_input,
       set_audio_master) or the Fairlight mixer (set_fairlight_source,
       set_fairlight_master, set_audio_levels); topology.audio says which, and
-      the other mixer's commands are refused as unsupported. Only the Fairlight
-      mixer sends meter levels, and only while asked; the sources document no
-      level subscription for the classic mixer.
+      the other mixer's commands are refused as unsupported. Either mixer
+      sends meter levels only while asked (set_audio_levels). The Fairlight
+      mixer's are in dB; the classic mixer's are published as the linear
+      numbers it sends, since no public source gives their full scale, so a
+      meter can show them relative to each other but not in dBFS.
 
   - models: [all]
     severity: info
