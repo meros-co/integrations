@@ -73,6 +73,8 @@ models:
       - get_device_name
       - get_run_mode
       - get_error_status
+      - start_input_meters
+      - stop_input_meters
       - set_keepalive
     verification: none
     notes: Eight remote-controlled mic preamps, channels 1-8 (0-7 on the wire).
@@ -249,6 +251,23 @@ commands:
     expect:
       matches: ^OK devstatus error "?([a-z]+)"?
     returns: value
+  start_input_meters:
+    summary: >
+      Start the input meters (mtrstart IO:Current/InCh/InputLevel): the unit then sends every channel's input
+      level as a NOTIFY mtr line at most every interval_ms, which updates meters.inputs
+    params:
+      interval_ms: { type: int, min: 40, max: 1000, required: true, label: Interval,
+                     description: "Shortest time between meter reports, in milliseconds (40 to 1000, as the Companion module offers)." }
+    send: mtrstart IO:Current/InCh/InputLevel {interval_ms}
+    expect:
+      matches: ^OK mtrstart
+    returns: ack
+  stop_input_meters:
+    summary: Stop the input meters (mtrstop IO:Current/InCh/InputLevel)
+    send: mtrstop IO:Current/InCh/InputLevel
+    expect:
+      matches: ^OK mtrstop
+    returns: ack
   set_keepalive:
     summary: >
       Ask the unit to close the connection if nothing arrives for interval_ms milliseconds (scpmode keepalive;
@@ -270,6 +289,7 @@ state:
   device.system_status:           { type: int, description: "IO:Current/Dev/SystemStatus: 0 virtual state, 1 not operating, 2 operating normally, 3 Brooklyn 2 error, 4 corrupt MAC address, 5 cooling fan stopping, 6 corrupt SRAM data, 7 device ID conflict, 8 DIP switch setting error, 9 version mismatch, 10 Dante resource overflow, 11 Dante setting mismatch" }
   device.sync_status:             { type: int, description: "IO:Current/Dev/SyncStatus: 0 not operating, 1 operating normally, 2 synchronized, 3 incorrect word clock setting, 4 Dante not connected, 5 Dante connection failure, 6 not gigabit Ethernet, 7 redundant (secondary) running, 8 redundant (secondary) error, 9 leader running, 10 leader running and not gigabit, 11 leader running and redundant running, 12 leader running and redundant error" }
   device.exec_mode:               { type: int, description: "IO:Current/Dev/ExecMode, 0-2; the values' meanings are not documented" }
+  meters.inputs.*:                { type: int, description: "Input level of each channel from 1, 0 to 127 as the unit's mtrinfo gives the meter's range (unit dB, scale not documented), while start_input_meters runs" }
   device.product_name:            { type: string, description: "Product name (devinfo productname)" }
   device.name:                    { type: string, description: "Device name (devinfo devicename)" }
   device.run_mode:                { type: string, description: "Run mode: normal, emergency, booting, update or diagnostics (devstatus runmode)" }
@@ -326,6 +346,16 @@ telemetry:
       - get IO:Current/InCh/CompGain 6 0
       - get IO:Current/InCh/CompGain 7 0
   updates:
+    # NOTIFY mtr ADDRESS [TYPE] hh hh ...: one two-digit hexadecimal value
+    # per channel (Yamaha RCP 3.2.3 and "How to interpret meter values"); a
+    # meter value is 00-7F, so the first digit is 0-7, and the type is a word.
+    - match: '^NOTIFY mtr IO:Current/(?:Meter/)?InCh/InputLevel(?: "?[A-Za-z][^\s"]*"?)?((?: [0-7][0-9A-Fa-f])+)\s*$'
+      match_each: '([0-7][0-9A-Fa-f])'
+      match_each_in: 1
+      state:
+        meters.inputs.{index:+1}:
+          value: '{2}'
+          map: { '00': 0, '01': 1, '02': 2, '03': 3, '04': 4, '05': 5, '06': 6, '07': 7, '08': 8, '09': 9, '0a': 10, '0A': 10, '0b': 11, '0B': 11, '0c': 12, '0C': 12, '0d': 13, '0D': 13, '0e': 14, '0E': 14, '0f': 15, '0F': 15, '10': 16, '11': 17, '12': 18, '13': 19, '14': 20, '15': 21, '16': 22, '17': 23, '18': 24, '19': 25, '1a': 26, '1A': 26, '1b': 27, '1B': 27, '1c': 28, '1C': 28, '1d': 29, '1D': 29, '1e': 30, '1E': 30, '1f': 31, '1F': 31, '20': 32, '21': 33, '22': 34, '23': 35, '24': 36, '25': 37, '26': 38, '27': 39, '28': 40, '29': 41, '2a': 42, '2A': 42, '2b': 43, '2B': 43, '2c': 44, '2C': 44, '2d': 45, '2D': 45, '2e': 46, '2E': 46, '2f': 47, '2F': 47, '30': 48, '31': 49, '32': 50, '33': 51, '34': 52, '35': 53, '36': 54, '37': 55, '38': 56, '39': 57, '3a': 58, '3A': 58, '3b': 59, '3B': 59, '3c': 60, '3C': 60, '3d': 61, '3D': 61, '3e': 62, '3E': 62, '3f': 63, '3F': 63, '40': 64, '41': 65, '42': 66, '43': 67, '44': 68, '45': 69, '46': 70, '47': 71, '48': 72, '49': 73, '4a': 74, '4A': 74, '4b': 75, '4B': 75, '4c': 76, '4C': 76, '4d': 77, '4D': 77, '4e': 78, '4E': 78, '4f': 79, '4F': 79, '50': 80, '51': 81, '52': 82, '53': 83, '54': 84, '55': 85, '56': 86, '57': 87, '58': 88, '59': 89, '5a': 90, '5A': 90, '5b': 91, '5B': 91, '5c': 92, '5C': 92, '5d': 93, '5D': 93, '5e': 94, '5E': 94, '5f': 95, '5F': 95, '60': 96, '61': 97, '62': 98, '63': 99, '64': 100, '65': 101, '66': 102, '67': 103, '68': 104, '69': 105, '6a': 106, '6A': 106, '6b': 107, '6B': 107, '6c': 108, '6C': 108, '6d': 109, '6D': 109, '6e': 110, '6E': 110, '6f': 111, '6F': 111, '70': 112, '71': 113, '72': 114, '73': 115, '74': 116, '75': 117, '76': 118, '77': 119, '78': 120, '79': 121, '7a': 122, '7A': 122, '7b': 123, '7B': 123, '7c': 124, '7C': 124, '7d': 125, '7D': 125, '7e': 126, '7E': 126, '7f': 127, '7F': 127 }
     - match: ^OK devinfo productname "?([^"]*?)"?\s*$
       state:
         device.product_name: '{1}'
@@ -400,8 +430,9 @@ quirks:
     text: >
       Changes made elsewhere are pushed as NOTIFY set lines, which the telemetry rules apply; on connecting every
       channel's switches and gains and the status values are read once. The input meters
-      (IO:Current/Meter/InCh/InputLevel, through mtrstart) are not covered: the format cannot map RCP meter
-      notifications to state. The IP settings (IO:Current/Dev/IPSelectMode, IPAddress, DefaultGateway,
+      (IO:Current/Meter/InCh/InputLevel) run only after start_input_meters, sent as mtrstart with the address
+      without /Meter as the Companion module sends it, until stop_input_meters or the connection ends; each
+      NOTIFY mtr line updates meters.inputs with the raw value 0-127, whose scale in dB is not documented. The IP settings (IO:Current/Dev/IPSelectMode, IPAddress, DefaultGateway,
       SubnetMask, and their NextBoot forms) are reachable with get_parameter and set_parameter only; changing them
       can take the unit off the network.
   - models: [all]

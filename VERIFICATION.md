@@ -131,11 +131,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-alta4k — Analog Way Alta 4K
 
-- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-alta4k.yaml:1271](specs/analogway-alta4k.yaml#L1271))
-- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-alta4k.yaml:1259](specs/analogway-alta4k.yaml#L1259))
-- [ ] Confirm the auxiliary screen T-bar read path DeviceObject/transition/$auxiliaryScreen/@items/<n>/status/@props/transition, which is inferred. ([specs/analogway-alta4k.yaml:657](specs/analogway-alta4k.yaml#L657))
-- [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen' as printed, audio modes with underscores, followScreen/@props/source for follow-screen writes, audio/$lineOut, and $preset in the background status read. ([specs/analogway-alta4k.yaml:663](specs/analogway-alta4k.yaml#L663))
-- [ ] Confirm that errors arrive in message order, so matching each to the oldest unanswered message is right. ([specs/analogway-alta4k.yaml:651](specs/analogway-alta4k.yaml#L651))
+- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-alta4k.yaml:1028](specs/analogway-alta4k.yaml#L1028))
+- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-alta4k.yaml:1057](specs/analogway-alta4k.yaml#L1057))
+- [ ] Confirm the auxiliary screen T-bar read path DeviceObject/transition/$auxiliaryScreen/@items/<n>/status/@props/transition, which is inferred. ([specs/analogway-alta4k.yaml:1020](specs/analogway-alta4k.yaml#L1020))
+- [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen' as printed, audio modes with underscores, followScreen/@props/source for follow-screen writes, audio/$lineOut, and $preset in the background status read. ([specs/analogway-alta4k.yaml:1026](specs/analogway-alta4k.yaml#L1026))
+- [ ] Confirm that errors arrive in message order, so matching each to the oldest unanswered message is right. ([specs/analogway-alta4k.yaml:1013](specs/analogway-alta4k.yaml#L1013))
 
 ## analogway-livecore — Analog Way LiveCore
 
@@ -148,13 +148,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-livepremier — Analog Way LivePremier / Aquilon
 
-- [ ] Check that subscribing to DeviceObject/audio, DeviceObject/$still, DeviceObject/preconfig/backgrounds and DeviceObject/backup pushes their changes, and how often isLevelDetected changes are pushed. ([specs/analogway-livepremier.yaml:1196](specs/analogway-livepremier.yaml#L1196))
+- [ ] Check that subscribing to DeviceObject/audio, DeviceObject/$still, DeviceObject/preconfig/backgrounds and DeviceObject/backup pushes their changes, and how often isLevelDetected changes are pushed. ([specs/analogway-livepremier.yaml:1061](specs/analogway-livepremier.yaml#L1061))
 - [ ] Check that a TCP client cannot set layer position, size or opacity, transitions or output settings over AWJ, or find the paths: the guide documents none. ([specs/analogway-livepremier.yaml:1075](specs/analogway-livepremier.yaml#L1075))
-- [ ] Confirm the auxiliary screen T-bar read path DeviceObject/$screenAuxGroup/@items/A<n>/status/@props/transition, which is inferred. ([specs/analogway-livepremier.yaml:904](specs/analogway-livepremier.yaml#L904))
-- [ ] Confirm freeze_input can write the input's freeze property (the guide documents only reading it). ([specs/analogway-livepremier.yaml:910](specs/analogway-livepremier.yaml#L910))
-- [ ] Check whether reboot and shutdown work on DeviceObject/system/shutdown/cmd or need the long v4.0 path. ([specs/analogway-livepremier.yaml:916](specs/analogway-livepremier.yaml#L916))
-- [ ] Confirm that reading an object returns the paths beneath it, as read_on_connect assumes. ([specs/analogway-livepremier.yaml:942](specs/analogway-livepremier.yaml#L942))
-- [ ] Confirm errors arrive in message order, so matching each to the oldest unanswered message is right. ([specs/analogway-livepremier.yaml:896](specs/analogway-livepremier.yaml#L896))
+- [ ] Confirm the auxiliary screen T-bar read path DeviceObject/$screenAuxGroup/@items/A<n>/status/@props/transition, which is inferred. ([specs/analogway-livepremier.yaml:1025](specs/analogway-livepremier.yaml#L1025))
+- [ ] Confirm freeze_input can write the input's freeze property (the guide documents only reading it). ([specs/analogway-livepremier.yaml:1031](specs/analogway-livepremier.yaml#L1031))
+- [ ] Check whether reboot and shutdown work on DeviceObject/system/shutdown/cmd or need the long v4.0 path. ([specs/analogway-livepremier.yaml:1037](specs/analogway-livepremier.yaml#L1037))
+- [ ] Confirm that reading an object returns the paths beneath it, as read_on_connect assumes. ([specs/analogway-livepremier.yaml:1063](specs/analogway-livepremier.yaml#L1063))
+- [ ] Confirm errors arrive in message order, so matching each to the oldest unanswered message is right. ([specs/analogway-livepremier.yaml:1017](specs/analogway-livepremier.yaml#L1017))
 
 ## analogway-midra — Analog Way Midra
 
@@ -166,11 +166,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-midra4k — Analog Way Midra 4K
 
-- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-midra4k.yaml:1136](specs/analogway-midra4k.yaml#L1136))
-- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-midra4k.yaml:1124](specs/analogway-midra4k.yaml#L1124))
-- [ ] Confirm the auxiliary screen T-bar read path, which is inferred from the auxiliary xTake. ([specs/analogway-midra4k.yaml:772](specs/analogway-midra4k.yaml#L772))
-- [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen', underscored audio modes, followScreen/@props/source, audio/$lineOut, and $preset in the background status read. ([specs/analogway-midra4k.yaml:778](specs/analogway-midra4k.yaml#L778))
-- [ ] Check whether screen 3 exists (the REST guide gives 1-2, the multiviewer source list shows SCREEN_PRGM_3). ([specs/analogway-midra4k.yaml:806](specs/analogway-midra4k.yaml#L806))
+- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-midra4k.yaml:887](specs/analogway-midra4k.yaml#L887))
+- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-midra4k.yaml:922](specs/analogway-midra4k.yaml#L922))
+- [ ] Confirm the auxiliary screen T-bar read path, which is inferred from the auxiliary xTake. ([specs/analogway-midra4k.yaml:879](specs/analogway-midra4k.yaml#L879))
+- [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen', underscored audio modes, followScreen/@props/source, audio/$lineOut, and $preset in the background status read. ([specs/analogway-midra4k.yaml:885](specs/analogway-midra4k.yaml#L885))
+- [ ] Check whether screen 3 exists (the REST guide gives 1-2, the multiviewer source list shows SCREEN_PRGM_3). ([specs/analogway-midra4k.yaml:913](specs/analogway-midra4k.yaml#L913))
 
 ## analogway-picturall — Analog Way Picturall
 
@@ -247,46 +247,49 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the reply of /$ctl/lib ,s ?, /play ,s ? and /cards/wlive/1/$stat ,s ? with several scenes, songs and sessions, to see how a list is laid out in a node description (for a rule that keeps the whole list). ([specs/behringer-wing.yaml:3725](specs/behringer-wing.yaml#L3725))
 - [ ] Check that the node queries ,s ?, ,s # and ,s * are answered on the node's own address, as the /fx/1 examples show. ([specs/behringer-wing.yaml:3725](specs/behringer-wing.yaml#L3725))
 - [ ] Check what GONEXT and GOPREV do, since they are listed without description. ([specs/behringer-wing.yaml:8552](specs/behringer-wing.yaml#L8552))
-- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:8567](specs/behringer-wing.yaml#L8567))
+- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:8570](specs/behringer-wing.yaml#L8570))
 - [ ] Check which models allow set_monitor_level (settable on Compact and Rack, read-only on the full-size WING). ([specs/behringer-wing.yaml:8539](specs/behringer-wing.yaml#L8539))
 - [ ] On WING Rack, check whether main sends 5-8 (the headphone outputs) are reachable. ([specs/behringer-wing.yaml:8532](specs/behringer-wing.yaml#L8532))
 - [ ] Confirm the 9-second /*s renewal keeps the subscription alive and the connection open, and that another subscribing client takes changes away as described. ([specs/behringer-wing.yaml:8434](specs/behringer-wing.yaml#L8434))
-- [ ] Confirm set_node is answered on the node's address followed by * (/* for the root) with OK or one of the documented error strings, and that get_node's reply lists the node's children. ([specs/behringer-wing.yaml:8605](specs/behringer-wing.yaml#L8605))
-- [ ] Check on which address the console answers a query sent with a native hash (/#f50f69f8), which decides the key the params state uses for it, and whether a set of a [RO] parameter returns an error. ([specs/behringer-wing.yaml:8590](specs/behringer-wing.yaml#L8590))
-- [ ] Check what the console does with STD-model EQ addresses (lf, 1q, heq ...) while another EQ model is loaded: ignored, an error, or applied to the hidden STD settings. ([specs/behringer-wing.yaml:8617](specs/behringer-wing.yaml#L8617))
-- [ ] Confirm the EQ mix range per strip (the document gives 0..125 for channels, auxes and matrices and 0..100 with 126 steps for buses and mains). ([specs/behringer-wing.yaml:8615](specs/behringer-wing.yaml#L8615))
-- [ ] Confirm the compressor ratio's type per strip: a list of texts on channels, a float 1.1-100 on buses, mains and matrices, as the document gives them. ([specs/behringer-wing.yaml:8632](specs/behringer-wing.yaml#L8632))
-- [ ] Confirm the gate side-chain source's first value is SELF (the document's table says SHELF). ([specs/behringer-wing.yaml:8643](specs/behringer-wing.yaml#L8643))
-- [ ] Confirm the aux input dynamics parameters (thr -36..12, depth, fast, peak, ingain, cpeak, cmode) and that an aux has no dynamics model choice. ([specs/behringer-wing.yaml:8637](specs/behringer-wing.yaml#L8637))
-- [ ] Check that a numbered effect parameter takes a float in its own unit and an enumeration by its text, and how the console answers a number out of range. ([specs/behringer-wing.yaml:8651](specs/behringer-wing.yaml#L8651))
-- [ ] Check what slots 9-16 do with a model only slots 1-8 take. ([specs/behringer-wing.yaml:8657](specs/behringer-wing.yaml#L8657))
-- [ ] Check how the console keeps a delay value outside the range of the selected delay unit (for example 400 with mode M, whose range is 0-150 m). ([specs/behringer-wing.yaml:8666](specs/behringer-wing.yaml#L8666))
-- [ ] Confirm the preamp remote parameters' types, read from misaligned table columns: rmt OFF/AES A/AES B/AES C, rcvc 0/1, $ha an int, $ract 0/1, $rdest text. ([specs/behringer-wing.yaml:8676](specs/behringer-wing.yaml#L8676))
-- [ ] Check how the console answers a query or set for an input or output number past its group's size, and whether CRD and MOD inputs and outputs answer with no card or module fitted (each unanswered query costs the timeout on connecting). ([specs/behringer-wing.yaml:8676](specs/behringer-wing.yaml#L8676))
-- [ ] Check whether patching an output with set_output_source (group, then number) is heard as a glitch between the two messages. ([specs/behringer-wing.yaml:8694](specs/behringer-wing.yaml#L8694))
-- [ ] Confirm that user inputs 25-56 are the user patches the console numbers 1-32, and that a user signal's tap and side apply only to inputs 1-24. ([specs/behringer-wing.yaml:8694](specs/behringer-wing.yaml#L8694))
-- [ ] Confirm the monitor bus dim and PFL dim ranges are -40 to 0 dB (the document writes 40..0) and that the monitor delay is in metres only. ([specs/behringer-wing.yaml:8712](specs/behringer-wing.yaml#L8712))
-- [ ] Confirm the source solo enable values (/cfg/solo/srcsolo: OFF, CH39, AUX7 as documented) and the source solo group numbering 1-13 in input-group order. ([specs/behringer-wing.yaml:8712](specs/behringer-wing.yaml#L8712))
-- [ ] Confirm $sololed is a 0/1 int on every strip type and /$stat/sip a 0/1 int (the document's columns are misaligned for aux, bus, main and matrix). ([specs/behringer-wing.yaml:8712](specs/behringer-wing.yaml#L8712))
-- [ ] Check what the RTA and EQ-RTA range does with a value other than 30 or 60 dB. ([specs/behringer-wing.yaml:8712](specs/behringer-wing.yaml#L8712))
-- [ ] Confirm that apply_network_settings ($ipapply ,i 1) applies the network mode, address, mask and gateway, and what the console does with a set of ipN, mskN or gwN before it. ([specs/behringer-wing.yaml:8729](specs/behringer-wing.yaml#L8729))
-- [ ] Confirm the clock rate is set as the strings 48000.0 / 44100.0 (the ae_globals snapshot shows a number). ([specs/behringer-wing.yaml:8740](specs/behringer-wing.yaml#L8740))
-- [ ] Confirm save_console_data ($savenow ,i 1) saves at once, and that $noautosave 0 means autosave on. ([specs/behringer-wing.yaml:8749](specs/behringer-wing.yaml#L8749))
-- [ ] Confirm muteovr and autosel_* live under /$ctl/cfg (the table writes /$globals/muteovr and /$ctl/cgf/autosel_*), and that the EQ RTA size value is spelled Off rather than OFF. ([specs/behringer-wing.yaml:8760](specs/behringer-wing.yaml#L8760))
-- [ ] Confirm /$ctl/$stat/selidx is reported 0-75 while set 1-76, and what /$ctl/$stat/sof reports. ([specs/behringer-wing.yaml:8760](specs/behringer-wing.yaml#L8760))
-- [ ] Check whether /$syscfg/tcplock also blocks OSC sets over UDP. ([specs/behringer-wing.yaml:8777](specs/behringer-wing.yaml#L8777))
-- [ ] Check how often the subscription pushes /$stat/time and /$stat/date. ([specs/behringer-wing.yaml:8777](specs/behringer-wing.yaml#L8777))
-- [ ] Confirm the USB player's position and length are seconds and that usb_player_seek ($pos) moves the play position. ([specs/behringer-wing.yaml:8794](specs/behringer-wing.yaml#L8794))
-- [ ] Confirm that /play/$actionidx selects a playlist entry, and whether playing it needs a following PLAY. ([specs/behringer-wing.yaml:8794](specs/behringer-wing.yaml#L8794))
-- [ ] Check whether a W-Live card's sessionpos, markerpos, start and stop are settable (the document does not mark them read-only) and what setting them does. ([specs/behringer-wing.yaml:8794](specs/behringer-wing.yaml#L8794))
-- [ ] Confirm the W-Live time values (etime, sdfree, sessionlen, start, stop) are milliseconds. ([specs/behringer-wing.yaml:8794](specs/behringer-wing.yaml#L8794))
-- [ ] Confirm that once /$ctl/OSC/ronly is on, an OSC set cannot switch it off again. ([specs/behringer-wing.yaml:8813](specs/behringer-wing.yaml#L8813))
-- [ ] Check whether the console answers a query for an address the model or a control's function lacks (custom-control parameters, the other models' layer sections and pages); an unanswered query costs the timeout on connecting. ([specs/behringer-wing.yaml:8821](specs/behringer-wing.yaml#L8821))
-- [ ] Confirm the custom-control page select is set 1-16 and reported 0-15, and that the Compact's pages U1-U4, MM and D1-D4 have no lower row or encoder. ([specs/behringer-wing.yaml:8821](specs/behringer-wing.yaml#L8821))
-- [ ] Confirm the layer counts (left 7, centre and right 9, Compact 9, Rack 5), which layers are User 1 and User 2 on each, and whether the Rack has user layers. ([specs/behringer-wing.yaml:8839](specs/behringer-wing.yaml#L8839))
-- [ ] Check that a user layer's fader position takes type, index and destination as set_layer_strip sends them, and what select_layer does with 8 and 9. ([specs/behringer-wing.yaml:8839](specs/behringer-wing.yaml#L8839))
-- [ ] Check what set_daw_preset does: record the name only, or load the DAW preset. ([specs/behringer-wing.yaml:8856](specs/behringer-wing.yaml#L8856))
-- [ ] Confirm GPIO gpstate is the switchable state and $state the read state, and that set_gpio_state drives an output GPIO. ([specs/behringer-wing.yaml:8856](specs/behringer-wing.yaml#L8856))
+- [ ] Confirm set_node is answered on the node's address followed by * (/* for the root) with OK or one of the documented error strings, and that get_node's reply lists the node's children. ([specs/behringer-wing.yaml:8608](specs/behringer-wing.yaml#L8608))
+- [ ] Check on which address the console answers a query sent with a native hash (/#f50f69f8), which decides the key the params state uses for it, and whether a set of a [RO] parameter returns an error. ([specs/behringer-wing.yaml:8593](specs/behringer-wing.yaml#L8593))
+- [ ] Check what the console does with STD-model EQ addresses (lf, 1q, heq ...) while another EQ model is loaded: ignored, an error, or applied to the hidden STD settings. ([specs/behringer-wing.yaml:8620](specs/behringer-wing.yaml#L8620))
+- [ ] Confirm the EQ mix range per strip (the document gives 0..125 for channels, auxes and matrices and 0..100 with 126 steps for buses and mains). ([specs/behringer-wing.yaml:8618](specs/behringer-wing.yaml#L8618))
+- [ ] Confirm the compressor ratio's type per strip: a list of texts on channels, a float 1.1-100 on buses, mains and matrices, as the document gives them. ([specs/behringer-wing.yaml:8635](specs/behringer-wing.yaml#L8635))
+- [ ] Confirm the gate side-chain source's first value is SELF (the document's table says SHELF). ([specs/behringer-wing.yaml:8646](specs/behringer-wing.yaml#L8646))
+- [ ] Confirm the aux input dynamics parameters (thr -36..12, depth, fast, peak, ingain, cpeak, cmode) and that an aux has no dynamics model choice. ([specs/behringer-wing.yaml:8640](specs/behringer-wing.yaml#L8640))
+- [ ] Check that a numbered effect parameter takes a float in its own unit and an enumeration by its text, and how the console answers a number out of range. ([specs/behringer-wing.yaml:8654](specs/behringer-wing.yaml#L8654))
+- [ ] Check what slots 9-16 do with a model only slots 1-8 take. ([specs/behringer-wing.yaml:8660](specs/behringer-wing.yaml#L8660))
+- [ ] Check how the console keeps a delay value outside the range of the selected delay unit (for example 400 with mode M, whose range is 0-150 m). ([specs/behringer-wing.yaml:8669](specs/behringer-wing.yaml#L8669))
+- [ ] Confirm the preamp remote parameters' types, read from misaligned table columns: rmt OFF/AES A/AES B/AES C, rcvc 0/1, $ha an int, $ract 0/1, $rdest text. ([specs/behringer-wing.yaml:8679](specs/behringer-wing.yaml#L8679))
+- [ ] Check how the console answers a query or set for an input or output number past its group's size, and whether CRD and MOD inputs and outputs answer with no card or module fitted (each unanswered query costs the timeout on connecting). ([specs/behringer-wing.yaml:8679](specs/behringer-wing.yaml#L8679))
+- [ ] Check whether patching an output with set_output_source (group, then number) is heard as a glitch between the two messages. ([specs/behringer-wing.yaml:8697](specs/behringer-wing.yaml#L8697))
+- [ ] Confirm that user inputs 25-56 are the user patches the console numbers 1-32, and that a user signal's tap and side apply only to inputs 1-24. ([specs/behringer-wing.yaml:8697](specs/behringer-wing.yaml#L8697))
+- [ ] Confirm the monitor bus dim and PFL dim ranges are -40 to 0 dB (the document writes 40..0) and that the monitor delay is in metres only. ([specs/behringer-wing.yaml:8715](specs/behringer-wing.yaml#L8715))
+- [ ] Confirm the source solo enable values (/cfg/solo/srcsolo: OFF, CH39, AUX7 as documented) and the source solo group numbering 1-13 in input-group order. ([specs/behringer-wing.yaml:8715](specs/behringer-wing.yaml#L8715))
+- [ ] Confirm $sololed is a 0/1 int on every strip type and /$stat/sip a 0/1 int (the document's columns are misaligned for aux, bus, main and matrix). ([specs/behringer-wing.yaml:8715](specs/behringer-wing.yaml#L8715))
+- [ ] Check what the RTA and EQ-RTA range does with a value other than 30 or 60 dB. ([specs/behringer-wing.yaml:8715](specs/behringer-wing.yaml#L8715))
+- [ ] Confirm that apply_network_settings ($ipapply ,i 1) applies the network mode, address, mask and gateway, and what the console does with a set of ipN, mskN or gwN before it. ([specs/behringer-wing.yaml:8732](specs/behringer-wing.yaml#L8732))
+- [ ] Confirm the clock rate is set as the strings 48000.0 / 44100.0 (the ae_globals snapshot shows a number). ([specs/behringer-wing.yaml:8743](specs/behringer-wing.yaml#L8743))
+- [ ] Confirm save_console_data ($savenow ,i 1) saves at once, and that $noautosave 0 means autosave on. ([specs/behringer-wing.yaml:8752](specs/behringer-wing.yaml#L8752))
+- [ ] Confirm muteovr and autosel_* live under /$ctl/cfg (the table writes /$globals/muteovr and /$ctl/cgf/autosel_*), and that the EQ RTA size value is spelled Off rather than OFF. ([specs/behringer-wing.yaml:8763](specs/behringer-wing.yaml#L8763))
+- [ ] Confirm /$ctl/$stat/selidx is reported 0-75 while set 1-76, and what /$ctl/$stat/sof reports. ([specs/behringer-wing.yaml:8763](specs/behringer-wing.yaml#L8763))
+- [ ] Check whether /$syscfg/tcplock also blocks OSC sets over UDP. ([specs/behringer-wing.yaml:8780](specs/behringer-wing.yaml#L8780))
+- [ ] Check how often the subscription pushes /$stat/time and /$stat/date. ([specs/behringer-wing.yaml:8780](specs/behringer-wing.yaml#L8780))
+- [ ] Confirm the USB player's position and length are seconds and that usb_player_seek ($pos) moves the play position. ([specs/behringer-wing.yaml:8797](specs/behringer-wing.yaml#L8797))
+- [ ] Confirm that /play/$actionidx selects a playlist entry, and whether playing it needs a following PLAY. ([specs/behringer-wing.yaml:8797](specs/behringer-wing.yaml#L8797))
+- [ ] Check whether a W-Live card's sessionpos, markerpos, start and stop are settable (the document does not mark them read-only) and what setting them does. ([specs/behringer-wing.yaml:8797](specs/behringer-wing.yaml#L8797))
+- [ ] Confirm the W-Live time values (etime, sdfree, sessionlen, start, stop) are milliseconds. ([specs/behringer-wing.yaml:8797](specs/behringer-wing.yaml#L8797))
+- [ ] Confirm that once /$ctl/OSC/ronly is on, an OSC set cannot switch it off again. ([specs/behringer-wing.yaml:8816](specs/behringer-wing.yaml#L8816))
+- [ ] Check whether the console answers a query for an address the model or a control's function lacks (custom-control parameters, the other models' layer sections and pages); an unanswered query costs the timeout on connecting. ([specs/behringer-wing.yaml:8824](specs/behringer-wing.yaml#L8824))
+- [ ] Confirm the custom-control page select is set 1-16 and reported 0-15, and that the Compact's pages U1-U4, MM and D1-D4 have no lower row or encoder. ([specs/behringer-wing.yaml:8824](specs/behringer-wing.yaml#L8824))
+- [ ] Confirm the layer counts (left 7, centre and right 9, Compact 9, Rack 5), which layers are User 1 and User 2 on each, and whether the Rack has user layers. ([specs/behringer-wing.yaml:8842](specs/behringer-wing.yaml#L8842))
+- [ ] Check that a user layer's fader position takes type, index and destination as set_layer_strip sends them, and what select_layer does with 8 and 9. ([specs/behringer-wing.yaml:8842](specs/behringer-wing.yaml#L8842))
+- [ ] Check what set_daw_preset does: record the name only, or load the DAW preset. ([specs/behringer-wing.yaml:8859](specs/behringer-wing.yaml#L8859))
+- [ ] Confirm GPIO gpstate is the switchable state and $state the read state, and that set_gpio_state drives an output GPIO. ([specs/behringer-wing.yaml:8859](specs/behringer-wing.yaml#L8859))
+- [ ] Capture the /$ctl/lib ,s ? reply with a show open and check that $scenes is given as `$scenes list [name, name, ...]`, what separates the node's entries (the document prints it as ~), and how a scene name holding a comma or a bracket is written. ([specs/behringer-wing.yaml:34156](specs/behringer-wing.yaml#L34156))
+- [ ] Capture the /play ,s ? reply with a playlist open and check that $songs is listed as `$songs list [...]`. ([specs/behringer-wing.yaml:35173](specs/behringer-wing.yaml#L35173))
+- [ ] Capture a W-Live card's /cards/wlive/N/$stat ,s ? reply and check that sessionlist and snamelist are listed as `list [...]`, in the same order. ([specs/behringer-wing.yaml:35263](specs/behringer-wing.yaml#L35263))
 
 ## behringer-x32 — Behringer X32 / Midas M32
 
@@ -419,22 +422,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-camera — Blackmagic cameras
 
-- [ ] Confirm the notification websocket's path, /control/api/v1/event/websocket, against the camera's /control/documentation.html: the PDF does not give it. ([specs/blackmagic-camera.yaml:2388](specs/blackmagic-camera.yaml#L2388))
-- [ ] Confirm the camera accepts the subscribe request with type "request" (the PDF's Publish table repeats the Response table, type "response") and that every property subscribed is subscribable. ([specs/blackmagic-camera.yaml:2391](specs/blackmagic-camera.yaml#L2391))
-- [ ] Check that over HTTPS the websocket is served as wss on the same port, and whether it needs the same login. ([specs/blackmagic-camera.yaml:2389](specs/blackmagic-camera.yaml#L2389))
-- [ ] Check that a pushed property names its path without the /control/api/v1 base, as the document's tables show, so the re-read goes to the right path. ([specs/blackmagic-camera.yaml:2461](specs/blackmagic-camera.yaml#L2461))
-- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2847](specs/blackmagic-camera.yaml#L2847))
-- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2853](specs/blackmagic-camera.yaml#L2853))
-- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2871](specs/blackmagic-camera.yaml#L2871))
-- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2868](specs/blackmagic-camera.yaml#L2868))
-- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2913](specs/blackmagic-camera.yaml#L2913))
-- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2922](specs/blackmagic-camera.yaml#L2922))
-- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2935](specs/blackmagic-camera.yaml#L2935))
-- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2936](specs/blackmagic-camera.yaml#L2936))
-- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2948](specs/blackmagic-camera.yaml#L2948))
+- [ ] Confirm the notification websocket's path, /control/api/v1/event/websocket, against the camera's /control/documentation.html: the PDF does not give it. ([specs/blackmagic-camera.yaml:2387](specs/blackmagic-camera.yaml#L2387))
+- [ ] Confirm the camera accepts the subscribe request with type "request" (the PDF's Publish table repeats the Response table, type "response") and that every property subscribed is subscribable. ([specs/blackmagic-camera.yaml:2393](specs/blackmagic-camera.yaml#L2393))
+- [ ] Check that over HTTPS the websocket is served as wss on the same port, and whether it needs the same login. ([specs/blackmagic-camera.yaml:2388](specs/blackmagic-camera.yaml#L2388))
+- [ ] Check that a pushed property names its path without the /control/api/v1 base, as the document's tables show, so the value and the re-read go to the right path. ([specs/blackmagic-camera.yaml:2391](specs/blackmagic-camera.yaml#L2391))
+- [ ] Confirm a propertyValueChanged event carries the property's value in the format its REST GET returns (applied as that reply), and whether any event names only the property (then read again). ([specs/blackmagic-camera.yaml:2465](specs/blackmagic-camera.yaml#L2465))
+- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2851](specs/blackmagic-camera.yaml#L2851))
+- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2857](specs/blackmagic-camera.yaml#L2857))
+- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2875](specs/blackmagic-camera.yaml#L2875))
+- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2872](specs/blackmagic-camera.yaml#L2872))
+- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2918](specs/blackmagic-camera.yaml#L2918))
+- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2927](specs/blackmagic-camera.yaml#L2927))
+- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2940](specs/blackmagic-camera.yaml#L2940))
+- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2941](specs/blackmagic-camera.yaml#L2941))
+- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2953](specs/blackmagic-camera.yaml#L2953))
 - [ ] Record what the camera advertises over mDNS besides its `<name>.local` host name (service types, TXT `class`). No public source names it, so mDNS discovery does not identify cameras. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
-- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2618](specs/blackmagic-camera.yaml#L2618))
-- [ ] Confirm POST /presets takes the .cset file as the request body with a Content-Disposition header naming it (the document only implies this through its 400 answer), not a multipart/form-data part, and answers 200 with presetAdded. ([specs/blackmagic-camera.yaml:1698](specs/blackmagic-camera.yaml#L1698))
+- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2622](specs/blackmagic-camera.yaml#L2622))
+- [ ] Confirm POST /presets takes the .cset file as the request body with a Content-Disposition header naming it (the document only implies this through its 400 answer), not a multipart/form-data part, and answers 200 with presetAdded. ([specs/blackmagic-camera.yaml:1697](specs/blackmagic-camera.yaml#L1697))
 
 ## blackmagic-hyperdeck — Blackmagic HyperDeck
 
@@ -903,10 +907,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## focusrite-rednet-rcp — Focusrite RedNet MP8R (Yamaha RCP)
 
-- [ ] Confirm the MP8R answers RCP on TCP 49280 directly, and whether it needs a Yamaha ID set in RedNet Control for it. ([specs/focusrite-rednet-rcp.yaml:386](specs/focusrite-rednet-rcp.yaml#L386))
-- [ ] Check the get and set replies follow Yamaha's grammar (OK get ... value, OK set, OKm when clamped, ERROR) and that changes made in RedNet Control are pushed as NOTIFY set. ([specs/focusrite-rednet-rcp.yaml:379](specs/focusrite-rednet-rcp.yaml#L379))
-- [ ] Check how HAGain 0-66 maps onto the MP8R's 10-65 dB preamp range, and what CompGain and ExecMode mean. ([specs/focusrite-rednet-rcp.yaml:393](specs/focusrite-rednet-rcp.yaml#L393))
-- [ ] Try the same addresses on a RedNet 4. ([specs/focusrite-rednet-rcp.yaml:407](specs/focusrite-rednet-rcp.yaml#L407))
+- [ ] Confirm the MP8R answers RCP on TCP 49280 directly, and whether it needs a Yamaha ID set in RedNet Control for it. ([specs/focusrite-rednet-rcp.yaml:416](specs/focusrite-rednet-rcp.yaml#L416))
+- [ ] Check the get and set replies follow Yamaha's grammar (OK get ... value, OK set, OKm when clamped, ERROR) and that changes made in RedNet Control are pushed as NOTIFY set. ([specs/focusrite-rednet-rcp.yaml:409](specs/focusrite-rednet-rcp.yaml#L409))
+- [ ] Check how HAGain 0-66 maps onto the MP8R's 10-65 dB preamp range, and what CompGain and ExecMode mean. ([specs/focusrite-rednet-rcp.yaml:423](specs/focusrite-rednet-rcp.yaml#L423))
+- [ ] Try the same addresses on a RedNet 4. ([specs/focusrite-rednet-rcp.yaml:438](specs/focusrite-rednet-rcp.yaml#L438))
+- [ ] Send mtrstart IO:Current/InCh/InputLevel 100 and confirm the unit answers OK mtrstart, the address it accepts (with or without /Meter), and the NOTIFY mtr line's form (address, a type word or none, eight two-digit hex values); record what 0-127 means in dB, and the shortest interval accepted. ([specs/focusrite-rednet-rcp.yaml:254](specs/focusrite-rednet-rcp.yaml#L254))
+- [ ] Check whether the meters stop by themselves (as Yamaha meters time out) and need mtrstart again, and what mtrstop answers. ([specs/focusrite-rednet-rcp.yaml:349](specs/focusrite-rednet-rcp.yaml#L349))
 
 ## freeshow — FreeShow
 
@@ -966,15 +972,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## h2r-graphics — H2R Graphics
 
-- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:519](specs/h2r-graphics.yaml#L519))
-- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:569](specs/h2r-graphics.yaml#L569))
-- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:575](specs/h2r-graphics.yaml#L575))
-- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:578](specs/h2r-graphics.yaml#L578))
-- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:557](specs/h2r-graphics.yaml#L557))
-- [ ] Confirm H2R serves Socket.IO 4 (Engine.IO 4) on the HTTP API's port in versions 2 and 3, and that updateFrontend comes on connecting and after every change without a request. ([specs/h2r-graphics.yaml:530](specs/h2r-graphics.yaml#L530))
-- [ ] Record the timer fields H2R sends (state values, duration, startedAt and endAt in milliseconds, endTime's format) and whether duration is a number or text. ([specs/h2r-graphics.yaml:538](specs/h2r-graphics.yaml#L538))
-- [ ] Check that a list's selected row (dynamicLists, row 0 cell 0) counts as select_list_row does, and how several projects' lists are numbered. ([specs/h2r-graphics.yaml:534](specs/h2r-graphics.yaml#L534))
-- [ ] Confirm that a graphic with no status field is off air. ([specs/h2r-graphics.yaml:537](specs/h2r-graphics.yaml#L537))
+- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:541](specs/h2r-graphics.yaml#L541))
+- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:594](specs/h2r-graphics.yaml#L594))
+- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:600](specs/h2r-graphics.yaml#L600))
+- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:603](specs/h2r-graphics.yaml#L603))
+- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:582](specs/h2r-graphics.yaml#L582))
+- [ ] Confirm H2R serves Socket.IO 4 (Engine.IO 4) on the HTTP API's port in versions 2 and 3, and that updateFrontend comes on connecting and after every change without a request. ([specs/h2r-graphics.yaml:552](specs/h2r-graphics.yaml#L552))
+- [ ] Record the timer fields H2R sends (state values, duration, startedAt and endAt in milliseconds, endTime's format) and whether duration is a number or text. ([specs/h2r-graphics.yaml:563](specs/h2r-graphics.yaml#L563))
+- [ ] Check that a list's selected row (dynamicLists, row 0 cell 0) counts as select_list_row does. ([specs/h2r-graphics.yaml:554](specs/h2r-graphics.yaml#L554))
+- [ ] Confirm that a graphic with no status field is off air. ([specs/h2r-graphics.yaml:562](specs/h2r-graphics.yaml#L562))
+- [ ] Confirm that each project in updateFrontend carries its name in a name field (assumed; the Companion module does not read it). ([specs/h2r-graphics.yaml:488](specs/h2r-graphics.yaml#L488))
+- [ ] Confirm a score graphic's scores are an array per team of {score} per level, with levels and delimiter on the graphic, as the Companion module reads them, and whether a score can be other than a whole number. ([specs/h2r-graphics.yaml:483](specs/h2r-graphics.yaml#L483))
 
 ## highend-hog4 — High End Systems Hog 4 / Hog OS
 
@@ -1182,13 +1190,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## newtek-tricaster — NewTek TriCaster
 
-- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:576](specs/newtek-tricaster.yaml#L576))
-- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:569](specs/newtek-tricaster.yaml#L569))
+- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:572](specs/newtek-tricaster.yaml#L572))
+- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:565](specs/newtek-tricaster.yaml#L565))
 - [ ] Confirm the change notification websocket is on the web port (the guide's text says 5951, its example the web port), whether it needs the Live Panel login, and whether it stays open without the client sending anything. ([specs/newtek-tricaster.yaml:430](specs/newtek-tricaster.yaml#L430))
 - [ ] Confirm each notification is the bare dictionary name, one per message, as the guide says. ([specs/newtek-tricaster.yaml:447](specs/newtek-tricaster.yaml#L447))
-- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:491](specs/newtek-tricaster.yaml#L491))
-- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:499](specs/newtek-tricaster.yaml#L499))
+- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:497](specs/newtek-tricaster.yaml#L497))
+- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:505](specs/newtek-tricaster.yaml#L505))
 - [ ] Check which of /version (the guide) and /v1/version answers on each software version. ([specs/newtek-tricaster.yaml:444](specs/newtek-tricaster.yaml#L444))
+- [ ] Record the buffer dictionary with several M/Es: check each M/E's index (from 0 as the guide's example shows, or from 1) and whether an M/E has more than one row of buffers. ([specs/newtek-tricaster.yaml:492](specs/newtek-tricaster.yaml#L492))
 - [ ] Check whether media_select_clip counts clips from 0 or 1. ([specs/newtek-tricaster.yaml:313](specs/newtek-tricaster.yaml#L313))
 - [ ] Check that the mode toggles take true or false as a value to set the mode rather than toggle it. ([specs/newtek-tricaster.yaml:380](specs/newtek-tricaster.yaml#L380))
 - [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:399](specs/newtek-tricaster.yaml#L399))
@@ -1383,19 +1392,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## propresenter — ProPresenter
 
-- [ ] Confirm the network API port in use (50001 assumed). ([specs/propresenter.yaml:2532](specs/propresenter.yaml#L2532))
-- [ ] Confirm /v1/timers/current lists every configured timer: each poll replaces timers, so a deleted timer leaves. ([specs/propresenter.yaml:1976](specs/propresenter.yaml#L1976))
-- [ ] Record what /v1/transport/{layer}/current and /time, /v1/presentation/slide_index, /v1/announcement/slide_index, /v1/presentation/focused and the active and focused playlist endpoints answer when nothing is on the layer or active (empty values, null or an error status): a value a reply leaves out keeps what it had. ([specs/propresenter.yaml:2419](specs/propresenter.yaml#L2419))
-- [ ] Confirm that the id of a look, macro, prop, message, clear group, timer, library, mask, group and stage layout is an object with uuid, name and index, as the document's examples show (its schema gives the field by reference only). ([specs/propresenter.yaml:2112](specs/propresenter.yaml#L2112))
-- [ ] Confirm the stage layout map's screen and layout are id objects with a uuid. ([specs/propresenter.yaml:2037](specs/propresenter.yaml#L2037))
-- [ ] Check that media and audio playlist folders list their contents under children, and playlist folders under playlists, and how deep folders nest (three levels are read). ([specs/propresenter.yaml:2161](specs/propresenter.yaml#L2161))
-- [ ] Check the units of a timer's countdown duration, time of day and elapsed start and end times (seconds assumed). ([specs/propresenter.yaml:2434](specs/propresenter.yaml#L2434))
-- [ ] Check that ProPresenter answers about 31 status requests a second without slowing playback, and whether a slower poll should be used on older computers. ([specs/propresenter.yaml:2554](specs/propresenter.yaml#L2554))
-- [ ] Confirm that /v1/status/updates streams one JSON object per change in a chunked reply, for a future streaming transport. ([specs/propresenter.yaml:2570](specs/propresenter.yaml#L2570))
+- [ ] Confirm the network API port in use (50001 assumed). ([specs/propresenter.yaml:2555](specs/propresenter.yaml#L2555))
+- [ ] Confirm /v1/timers/current lists every configured timer: each poll replaces timers, so a deleted timer leaves. ([specs/propresenter.yaml:1987](specs/propresenter.yaml#L1987))
+- [ ] Record what /v1/transport/{layer}/current and /time, /v1/presentation/slide_index, /v1/announcement/slide_index, /v1/presentation/focused and the active and focused playlist endpoints answer when nothing is on the layer or active (empty values, null or an error status): a value a reply leaves out keeps what it had. ([specs/propresenter.yaml:2442](specs/propresenter.yaml#L2442))
+- [ ] Confirm that the id of a look, macro, prop, message, clear group, timer, library, mask, group and stage layout is an object with uuid, name and index, as the document's examples show (its schema gives the field by reference only). ([specs/propresenter.yaml:2123](specs/propresenter.yaml#L2123))
+- [ ] Confirm the stage layout map's screen and layout are id objects with a uuid. ([specs/propresenter.yaml:2048](specs/propresenter.yaml#L2048))
+- [ ] Check that media and audio playlist folders list their contents under children, and playlist folders under playlists, and how deep folders nest (three levels are read). ([specs/propresenter.yaml:2172](specs/propresenter.yaml#L2172))
+- [ ] Check the units of a timer's countdown duration, time of day and elapsed start and end times (seconds assumed). ([specs/propresenter.yaml:2457](specs/propresenter.yaml#L2457))
+- [ ] Check that ProPresenter answers about 31 status requests a second without slowing playback, and whether a slower poll should be used on older computers. ([specs/propresenter.yaml:2577](specs/propresenter.yaml#L2577))
+- [ ] Confirm that /v1/status/updates streams one JSON object per change in a chunked reply, for a future streaming transport. ([specs/propresenter.yaml:2593](specs/propresenter.yaml#L2593))
 - [ ] Record what /v1/presentation/active and /v1/announcement/active answer when nothing is active (404, an empty object or null), and check that its groups list every group of the selected arrangement in order. ([specs/propresenter.yaml:1865](specs/propresenter.yaml#L1865))
 - [ ] Check that reading /v1/presentation/active and /v1/announcement/active every 5 s, with every slide's text and notes, does not slow a large presentation. ([specs/propresenter.yaml:1802](specs/propresenter.yaml#L1802))
-- [ ] Check that playlist_get by UUID answers id and items for a playlist inside folders, as the document gives it. ([specs/propresenter.yaml:2221](specs/propresenter.yaml#L2221))
-- [ ] Check the media and audio playlist replies: the document gives media's items as an object with array fields and audio's reply as an array of playlists; an object with id and an items array is assumed for both. ([specs/propresenter.yaml:2249](specs/propresenter.yaml#L2249))
+- [ ] Check that playlist_get by UUID answers id and items for a playlist inside folders, as the document gives it. ([specs/propresenter.yaml:2232](specs/propresenter.yaml#L2232))
+- [ ] Check the media and audio playlist replies: the document gives media's items as an object with array fields and audio's reply as an array of playlists; an object with id and an items array is assumed for both. ([specs/propresenter.yaml:2260](specs/propresenter.yaml#L2260))
 - [ ] Open POST /v1/status/updates with Accept application/json and confirm each update arrives as {"url", "data"} followed by a blank line (not as server-sent events), that url carries /v1 as the document's example does, and that data is what each endpoint's own GET returns; and record whether the stream ends when ProPresenter changes presentations. ([specs/propresenter.yaml:1756](specs/propresenter.yaml#L1756))
 
 ## ptzoptics — PTZOptics
@@ -1455,7 +1464,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that quoting every control name (cg "gain1") is accepted for names without spaces. ([specs/qsys-ecp.yaml:116](specs/qsys-ecp.yaml#L116))
 - [ ] Check csvvr's form: the command reference shows it without the value count that csvv takes. ([specs/qsys-ecp.yaml:199](specs/qsys-ecp.yaml#L199))
 - [ ] Check what ssl answers on success and on an unknown bank. ([specs/qsys-ecp.yaml:330](specs/qsys-ecp.yaml#L330))
-- [ ] Check the cvv layout for a meter (count, strings, count, values, count, positions). ([specs/qsys-ecp.yaml:399](specs/qsys-ecp.yaml#L399))
+- [ ] Check the cvv layout for a meter (count, strings, count, values, count, positions). ([specs/qsys-ecp.yaml:403](specs/qsys-ecp.yaml#L403))
+- [ ] Check that a choice control's cmvv aspect 2 lists its choices as the strings, with zero values and positions, as the document's slope example shows, and note any vector control longer than 16 elements (its values and positions are not kept). ([specs/qsys-ecp.yaml:582](specs/qsys-ecp.yaml#L582))
 - [ ] Check that an sg every 30 s keeps the connection open while a scheduled change group is pushing. ([specs/qsys-ecp.yaml:385](specs/qsys-ecp.yaml#L385))
 
 ## renewedvision-pvp — Renewed Vision PVP
@@ -1661,10 +1671,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check that the ANI4IN and ANI4OUT accept two-digit channel numbers (01), which the session sends, though their documents write one digit. ([specs/shure-ani.yaml:443](specs/shure-ani.yaml#L443))
 - [ ] Check that < REP ERR > is the answer to an invalid command and nothing else. ([specs/shure-ani.yaml:60](specs/shure-ani.yaml#L60))
-- [ ] Check that GET 00 ALL is accepted by every ANI (the ANIUSB-MATRIX document limits GET ALL to V1 units) and that the answers end. ([specs/shure-ani.yaml:766](specs/shure-ani.yaml#L766))
+- [ ] Check that GET 00 ALL is accepted by every ANI (the ANIUSB-MATRIX document limits GET ALL to V1 units) and that the answers end. ([specs/shure-ani.yaml:767](specs/shure-ani.yaml#L767))
 - [ ] Check that the analog gain is sent and reported as two digits (00-51) and in 3 dB steps. ([specs/shure-ani.yaml:466](specs/shure-ani.yaml#L466))
 - [ ] Confirm that CHAN_LED_IN_STATE is not answered on the ANI4IN and whether it is on the ANI22. ([specs/shure-ani.yaml:544](specs/shure-ani.yaml#L544))
 - [ ] Check LED_BRIGHTNESS's range on current firmware (0-2 documented). ([specs/shure-ani.yaml:577](specs/shure-ani.yaml#L577))
+- [ ] Capture SAMPLE with metering on, on each model, and confirm the values' order (ANI4IN's document labels its four values output 1-4; ANI22's inputs 1-2 then outputs 1-2; ANIUSB-MATRIX's ten channels) and whether the four-value form ends with two spaces before >. ([specs/shure-ani.yaml:775](specs/shure-ani.yaml#L775))
 
 ## shure-imx-room — Shure IntelliMix Room
 
@@ -1687,9 +1698,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## shure-mxn5 — Shure MXN5-C
 
-- [ ] Check what an MXN5-C that is not V1 answers to GET 00 ALL. ([specs/shure-mxn5.yaml:459](specs/shure-mxn5.yaml#L459))
+- [ ] Check what an MXN5-C that is not V1 answers to GET 00 ALL. ([specs/shure-mxn5.yaml:460](specs/shure-mxn5.yaml#L460))
 - [ ] Check that the gain step keywords are accepted in lower case. ([specs/shure-mxn5.yaml:267](specs/shure-mxn5.yaml#L267))
 - [ ] Check that SIG_GEN on channel 03 starts and stops the generator and what the 00 index does. ([specs/shure-mxn5.yaml:403](specs/shure-mxn5.yaml#L403))
+- [ ] Capture SAMPLE with metering on, and confirm its four values follow Channel Number Assignments (1-2 Dante inputs, 3 summed input, 4 Dante output). ([specs/shure-mxn5.yaml:468](specs/shure-mxn5.yaml#L468))
 - [ ] Check the PRESET_NAME answer for an empty preset ({empty}). ([specs/shure-mxn5.yaml:162](specs/shure-mxn5.yaml#L162))
 
 ## shure-p300 — Shure P300

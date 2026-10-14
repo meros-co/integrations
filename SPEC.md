@@ -1449,7 +1449,7 @@ offered to `path` rules, which match the request's path and query:
 |---|---|---|
 | `path` + `json` | A JSON reply | `json` names values by JSON path (`$`, `$.a.b`) |
 | `path` + `json` + `json_each` | A JSON reply holding an array at `json_each` | once per element; `json` paths relative to it |
-| `path` + `xml_each` | An XML reply | once per element of that name; its attributes |
+| `path` + `xml_each` | An XML reply | once per element of that name; its attributes, its text and its children's (below) |
 | `path` + `json` + `json_match` | A JSON reply whose value at each JSON path matches its regex | the path's, then `json_match`'s, in order |
 | `path` + `json` + `request_match` | A JSON reply to a request whose JSON body matches | the path's, then `request_match`'s, then `json_match`'s |
 | `path` + `headers` | Any reply, JSON or not | `headers` names response header values, by header name in any case; with `json` too, both |
@@ -1506,6 +1506,39 @@ array, for state keyed by position where the elements have no id:
       state: { "live_videos.{video}.ingest_streams.{stream}.video_bitrate": "{bitrate}" }
 ```
 
+The elements a match lies in have places too: `{^index}` is the index of
+the element one level out (the one `$^.` names), `{^^index}` two, and so
+on, so elements numbered only within their own array are keyed by both
+positions. ProPresenter numbers each slide within its group:
+
+```yaml
+    - path: "^/v1/(presentation|announcement)/active$"
+      json_each: "$.*.groups[*].slides"
+      json: { text: "$.text" }
+      state: { "{1}.groups.{^index}.slides.{index}.text": "{text}" }
+```
+
+An element reached through `.*` gives its member name as `{^key}` (one
+level out), `{^^key}` (two) and so on, beside `{key}` for the match itself.
+A level with no place (the document, or an array reached without `[*]`)
+gives neither.
+
+A member the operator chooses is named by a setting in the `json_each`
+path, `{settings.name}` with no directive: H2R Graphics pushes every
+project of an installation in each event, and the spec reads the one its
+commands reach:
+
+```yaml
+    - json_match: { "$.event": "^updateFrontend$" }
+      json_each: "$.data.projects.{settings.project}.cues"
+```
+
+The path is filled in from the settings current when each message arrives,
+so `update_settings` changes what is read. A setting that is empty, or
+whose value holds `.`, `[`, `]` or `*` (which would make it another path),
+gives no element, as a member the message does not hold does; `replace`
+still applies, so the list then empties.
+
 A device that lists things as an object's members, keyed by name, rather
 than as an array (BirdDog's NDI sources, `{"CAM 1 (BirdDog)":
 "10.0.0.5:5961", ...}`) is gone through with `.*`: `json_each: "$.*"` is
@@ -1533,6 +1566,31 @@ that shrinks (a tag list) is better kept whole, as JSON text.
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`, plus `request` (the JSON request body) for a `request_match` rule
 and `headers` (name to value) for a `headers` rule.
+
+#### XML elements
+
+An `xml_each` match captures its element's attributes by name, then
+`{text}`, the element's own text (text and CDATA, trimmed, entities
+decoded), each child element that holds only text under the child's name,
+and the attributes of the elements it lies in, `{^name}` for the element one
+level out and `{^^name}` two, as `$^.` names an enclosing JSON element. A
+name already captured keeps its first value, so an attribute wins over a
+child or the text. TriCaster's product information is child elements, and
+its buffer dictionary keys each M/E row's buffer by the `<me>` two levels
+out:
+
+```yaml
+    - path: "^/(?:v1/)?version$"
+      xml_each: product_information
+      state: { product.model: "{product_model}", product.name: "{product_name}" }
+    - path: "^/v1/dictionary\\?key=buffer$"
+      xml_each: buffer
+      state: { "buffers.me.{^^index}": "{selection}" }
+```
+
+A placeholder whose capture an element does not give leaves its path
+unassigned, so the main row's buffer, with no `<me>` around it, writes
+nothing there.
 
 #### Keys holding dots
 
@@ -1693,6 +1751,25 @@ are numbered on after the address's, in index order (before `json_match`'s):
       state: { "layers.{1}.{2}": "{arg1}" }
 ```
 
+A list inside a string argument is read item by item with `match_each`, as
+for a list on one line (above), and `match_each_in`, which an address rule
+requires: the capture, numbered across the address's and `arg_match`'s,
+whose text `match_each` goes along. The rule matches once per item, its
+captures numbered on after the rule's and `{index}` its place from 0;
+`replace` and `then_send` work as for any rule, so a list read whole
+replaces the last. A Behringer WING answers its node query (`/$ctl/lib ,s
+?`) with one string describing every parameter of the node, the show's
+scenes among them:
+
+```yaml
+    - address: "^/\\$ctl/lib$"
+      arg_match: { "0": "\\$scenes\\s+list \\[([^\\]]*)\\]" }
+      match_each: "\\s*([^,]+?)\\s*(?:,|$)"
+      match_each_in: 1
+      replace: scene.list
+      state: { "scene.list.{index:+1}": "{2}" }
+```
+
 #### JSON messages
 
 A message on a websocket (the transport's, §2, or `telemetry.websocket`'s), an
@@ -1744,6 +1821,11 @@ telemetry:
     every_ms: 5000            # optional: send them again at this interval
 ```
 
+`scheme` may name the HTTP transport's own scheme setting, an enum of
+`http` and `https`: `http` then opens `ws` and `https` opens `wss`, so a
+device serving its push websocket beside its REST API (a Blackmagic
+camera) needs no second setting to keep the two in step.
+
 `port` may name an integer setting, `port: { setting: websocket_port }`, for
 a device whose push port the operator can move (OpenLP, FreeShow); an empty
 setting means the transport's port.
@@ -1777,6 +1859,23 @@ is open: a keepalive a device requires of a client (mimoLive closes a socket
 that sends nothing for 15 seconds), or a request a device answers with its
 state (FreeShow's variables). Text that arrives in binary frames (OpenLP's
 state) goes to the rules as text when it is UTF-8.
+
+A device that pushes a changed value in the format its REST GET returns
+names where with `as_reply`, as for `telemetry.sse` (below): each JSON
+message is also offered to the `path` rules as the reply to a GET of the
+path at `as_reply.path`, with the value at `as_reply.body` as its body, so
+the rules that read a poll's reply apply the push directly. `prefix` is a
+fixed path the named one lies under. A Blackmagic camera names
+`/lens/iris` for its REST API's `/control/api/v1/lens/iris`:
+
+```yaml
+telemetry:
+  websocket:
+    path: /control/api/v1/event/websocket
+    as_reply: { path: "$.data.property", body: "$.data.value", prefix: /control/api/v1 }
+```
+
+A message without both paths is offered to the rules as usual only.
 
 A device that pushes over Socket.IO (H2R Graphics, FreeShow) sets `socketio`:
 

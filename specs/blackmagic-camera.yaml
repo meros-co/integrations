@@ -56,13 +56,12 @@ settings:
   scheme: { type: enum, values: [http, https], default: http, label: Scheme, description: "http for the web media manager enabled without security, https when it is enabled with security." }
   username: { type: string, default: "", label: Username, description: "The username set in Blackmagic Camera Setup when the web media manager is enabled with security; empty otherwise." }
   password: { type: string, secret: true, default: "", label: Password, description: "The password set in Blackmagic Camera Setup when the web media manager is enabled with security; empty otherwise." }
-  websocket_scheme: { type: enum, values: [ws, wss], default: ws, label: Notification scheme, description: "ws when the scheme is http and wss when it is https: the notification websocket is served beside the REST API." }
 
 ports:
   - { port: 80, protocol: http, role: control }
   - { port: 80, protocol: https, role: control, when: "scheme https" }
   - { port: 80, protocol: ws, role: push }
-  - { port: 80, protocol: wss, role: push, when: "websocket_scheme wss" }
+  - { port: 80, protocol: wss, role: push, when: "scheme https" }
 
 models:
   - id: ursa-cine-12k-lf
@@ -2386,7 +2385,10 @@ telemetry:
   # own /control/documentation.html gives (see quirks).
   websocket:
     path: /control/api/v1/event/websocket
-    scheme: { setting: websocket_scheme }
+    scheme: { setting: scheme }        # ws over http, wss over https
+    # Each propertyValueChanged event's value, in the format the property's
+    # REST GET returns (p.73), is read as that GET's reply.
+    as_reply: { path: "$.data.property", body: "$.data.value", prefix: /control/api/v1 }
     send:
       - '{"type":"request","data":{"action":"subscribe","properties":["/transports/0","/transports/0/record","/transports/0/play","/transports/0/stop","/transports/0/playback","/transports/0/timecode","/transports/0/timecode/source","/transports/0/clipIndex","/camera/tallyStatus","/camera/power","/camera/power/displayMode","/camera/colorBars","/camera/programFeedDisplay","/camera/timingReferenceLock","/lens/iris","/lens/zoom","/lens/focus","/video/iso","/video/gain","/video/whiteBalance","/video/whiteBalanceTint","/video/ndFilter","/video/ndFilter/displayMode","/video/shutter","/video/shutter/measurement","/video/autoExposure","/video/detailSharpening","/video/detailSharpeningLevel","/colorCorrection/lift","/colorCorrection/gamma","/colorCorrection/gain","/colorCorrection/offset","/colorCorrection/contrast","/colorCorrection/color","/colorCorrection/lumaContribution","/presets/active","/media/active","/media/workingset","/system/codecFormat","/system/videoFormat","/system/format","/slates/nextClip","/monitoring/focusAssist","/monitoring/frameGuideRatio","/monitoring/safeAreaPercent","/audio/channel/0/level","/audio/channel/0/input","/audio/channel/0/phantomPower","/audio/channel/0/padding","/audio/channel/0/lowCutFilter","/audio/channel/0/available","/audio/channel/1/level","/audio/channel/1/input","/audio/channel/1/phantomPower","/audio/channel/1/padding","/audio/channel/1/lowCutFilter","/audio/channel/1/available"]}}'
   # Everything subscribed is read on connecting and again every minute, as a
@@ -2456,18 +2458,20 @@ telemetry:
         - { method: GET, path: /control/api/v1/audio/channel/1/lowCutFilter }
         - { method: GET, path: /control/api/v1/audio/channel/1/available }
   updates:
-    # A pushed change (p.73): read the property's path again. One rule per
-    # depth, so that each segment is sent as its own path segment.
-    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)$" }
+    # A pushed change (p.73) carrying its value is read by the path rules
+    # below (as_reply); one naming only the property has the property's path
+    # read again. One rule per depth, so that each segment is sent as its own
+    # path segment.
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)$", "$.data": "^\\{[^{}]*\\}$" }
       json: {}
       then_send: [{ method: GET, path: "/control/api/v1/{1}" }]
-    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)$" }
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)$", "$.data": "^\\{[^{}]*\\}$" }
       json: {}
       then_send: [{ method: GET, path: "/control/api/v1/{1}/{2}" }]
-    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)/([^/]+)$" }
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)/([^/]+)$", "$.data": "^\\{[^{}]*\\}$" }
       json: {}
       then_send: [{ method: GET, path: "/control/api/v1/{1}/{2}/{3}" }]
-    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)/([^/]+)/([^/]+)$" }
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)/([^/]+)/([^/]+)$", "$.data": "^\\{[^{}]*\\}$" }
       json: {}
       then_send: [{ method: GET, path: "/control/api/v1/{1}/{2}/{3}/{4}" }]
     # Transport (p.27-30)
@@ -2885,8 +2889,9 @@ quirks:
       table repeats the Response table, type "response"). The spec opens
       /control/api/v1/event/websocket, the path the camera's own
       /control/documentation.html gives, and subscribes with type "request";
-      both are to be confirmed on a camera. Each pushed change has its path
-      read again over REST rather than the pushed value applied. Subscribed are
+      both are to be confirmed on a camera. Each pushed change is applied from
+      its value, read as the reply to the property's REST GET; a change that
+      names only the property has its path read again over REST. Subscribed are
       the transport, camera, lens, video, colour correction, preset, media,
       format, slate and monitoring properties and the first two audio
       channels; everything subscribed is also read every minute, and the
@@ -2894,8 +2899,8 @@ quirks:
       monitoring flags, further audio channels and the immersive eye view are
       not subscribed (they need the display names or channel count first) and
       update only when the matching get command is sent, or when the camera
-      pushes a change of them anyway. Set the notification scheme to wss with
-      the https scheme. Each battery's level (camera/power batteries array) is
+      pushes a change of them anyway. The websocket opens as wss when the
+      scheme is https, ws otherwise. Each battery's level (camera/power batteries array) is
       not in the state.
 
   - models: [all]

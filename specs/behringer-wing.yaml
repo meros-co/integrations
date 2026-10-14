@@ -8556,10 +8556,13 @@ quirks:
       47 and 44): that is the protocol, not paging, and the document's way to
       the full list is the node query (/$ctl/lib ,s ?, /play ,s ?), which
       get_scene_list, get_usb_playlist_songs and get_wlive_session_list send,
-      returning the reply's text. State keeps the first entry only: the core
-      cannot split a string argument into a list (an OSC rule reads whole
-      arguments), and the layout of a list inside the node query's reply is
-      not documented.
+      returning the reply's text. The same replies keep the lists in state
+      (scene.list, usb_player.songs, cards.wlive.sd.N.session_list), read
+      again whenever a show or playlist opens or a card's session count
+      changes. The document does not show these lists in a node query's
+      reply: they are read as its node descriptions give a list parameter
+      (name, then list [a, b, ...], p.24), so a name holding a comma or a
+      closing bracket is split or cut there.
 
   - models: [all]
     severity: info
@@ -8979,6 +8982,7 @@ state:
   "scene.name": { type: string, description: "Active scene, e.g. I:SHOW2/scene_1.snap" }
   "scene.show": { type: string, description: "Open show, e.g. I:SHOW2" }
   "scene.tag": { type: int, description: "Tag of the active scene, 0-128" }
+  "scene.list.*": { type: string, description: "Scene of the open show, numbered from 1 in the show's order (the position recall_scene takes), from the /$ctl/lib node query" }
   "talkback.a.on": { type: bool, description: "Talkback A on" }
   "talkback.a.mode": { type: string, description: "Talkback A mode: AUTO, PUSH or LATCH" }
   "talkback.a.buses.*": { type: bool, description: "Talkback A assigned to the mix bus" }
@@ -9486,6 +9490,7 @@ state:
   "usb_player.rate": { type: string, description: "USB player: File sample rate in kHz (44.1, 48)" }
   "usb_player.format": { type: string, description: "USB player: File format (WAV, MP3, FLAC)" }
   "usb_player.repeat": { type: bool, description: "USB player: Repeat on" }
+  "usb_player.songs.*": { type: string, description: "USB player: Song of the open playlist, numbered from 1 in playlist order, from the /play node query" }
   "usb_recorder.state": { type: string, description: "USB recorder: Recorder state (STOP, REC, PAUSE, ERROR)" }
   "usb_recorder.file": { type: string, description: "USB recorder: File being recorded" }
   "usb_recorder.path": { type: string, description: "USB recorder: Recording folder" }
@@ -9512,6 +9517,8 @@ state:
   "cards.wlive.sd.*.first_session_date": { type: string, description: "W-Live SD card first entry of the session date list" }
   "cards.wlive.sd.*.marker_time": { type: string, description: "W-Live SD card current marker time" }
   "cards.wlive.sd.*.first_session_name": { type: string, description: "W-Live SD card first entry of the session name list" }
+  "cards.wlive.sd.*.session_list.*.date": { type: string, description: "W-Live SD card session's date, sessions numbered from 1 in the card's order, from the node query" }
+  "cards.wlive.sd.*.session_list.*.name": { type: string, description: "W-Live SD card session's name, sessions numbered from 1 in the card's order, from the node query" }
   "cards.wlive.sd.*.sessions": { type: int, description: "W-Live SD card number of sessions" }
   "cards.wlive.sd.*.markers": { type: int, description: "W-Live SD card number of markers" }
   "cards.wlive.sd.*.session_length": { type: float, unit: "ms", description: "W-Live SD card session length" }
@@ -34139,6 +34146,19 @@ telemetry:
       state: { "scene.name": "{arg0}" }
     - address: "^/\\$ctl/lib/\\$actshow$"
       state: { "scene.show": "{arg0}" }
+      # A show opened (or read on connecting): its scene list is read whole
+      # with the node query, which alone returns every name (p.88 footnote 72).
+      then_send:
+        - { address: "/$ctl/lib", args: [ { value: "?", type: string } ] }
+    # The node query's reply describes every parameter of /$ctl/lib in one
+    # string; $scenes is given as a list, [name, name, ...], as the document's
+    # node descriptions give a list parameter (p.24). Replaced whole.
+    - address: "^/\\$ctl/lib$"
+      arg_match: { "0": "(?:^|\\s)\\$scenes\\s+(?:r/o\\s+)?list\\s*\\[([^\\]]*)\\]" }
+      match_each: "\\s*([^,]+?)\\s*(?:,|$)"
+      match_each_in: 1
+      replace: scene.list
+      state: { "scene.list.{index:+1}": "{2}" }
     - address: "^/\\$ctl/lib/\\$activeid$"
       state: { "scene.tag": "{arg2}" }
     - address: "^/cfg/talk/A/\\$on$"
@@ -35146,6 +35166,16 @@ telemetry:
       state: { "status.stageconnect.upstream_routing": "{arg0}" }
     - address: "^/play/\\$actlist$"
       state: { "usb_player.playlist": "{arg0}" }
+      # A playlist opened (or read on connecting): its songs are read whole
+      # with the node query (p.70 footnote 47).
+      then_send:
+        - { address: "/play", args: [ { value: "?", type: string } ] }
+    - address: "^/play$"
+      arg_match: { "0": "(?:^|\\s)\\$songs\\s+(?:r/o\\s+)?list\\s*\\[([^\\]]*)\\]" }
+      match_each: "\\s*([^,]+?)\\s*(?:,|$)"
+      match_each_in: 1
+      replace: usb_player.songs
+      state: { "usb_player.songs.{index:+1}": "{2}" }
     - address: "^/play/\\$actidx$"
       state: { "usb_player.entry": "{arg2}" }
     - address: "^/play/\\$actstate$"
@@ -35226,6 +35256,22 @@ telemetry:
       state: { "cards.wlive.sd.{1}.first_session_name": "{arg0}" }
     - address: "^/cards/wlive/([12])/\\$stat/sessions$"
       state: { "cards.wlive.sd.{1}.sessions": "{arg2}" }
+      # The session count changed (or was read on connecting): the session
+      # dates and names are read whole with the node query (p.69 footnote 44).
+      then_send:
+        - { address: "/cards/wlive/{1}/$stat", args: [ { value: "?", type: string } ] }
+    - address: "^/cards/wlive/([12])/\\$stat$"
+      arg_match: { "0": "(?:^|\\s)sessionlist\\s+(?:r/o\\s+)?list\\s*\\[([^\\]]*)\\]" }
+      match_each: "\\s*([^,]+?)\\s*(?:,|$)"
+      match_each_in: 2
+      replace: "cards.wlive.sd.{1}.session_list"
+      state: { "cards.wlive.sd.{1}.session_list.{index:+1}.date": "{3}" }
+    - address: "^/cards/wlive/([12])/\\$stat$"
+      arg_match: { "0": "(?:^|\\s)snamelist\\s+(?:r/o\\s+)?list\\s*\\[([^\\]]*)\\]" }
+      match_each: "\\s*([^,]+?)\\s*(?:,|$)"
+      match_each_in: 2
+      replace: "cards.wlive.sd.{1}.session_list"
+      state: { "cards.wlive.sd.{1}.session_list.{index:+1}.name": "{3}" }
     - address: "^/cards/wlive/([12])/\\$stat/markers$"
       state: { "cards.wlive.sd.{1}.markers": "{arg2}" }
     - address: "^/cards/wlive/([12])/\\$stat/sessionlen$"

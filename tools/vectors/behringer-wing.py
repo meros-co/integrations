@@ -1056,3 +1056,38 @@ _ts("safes-section", "/$ctl/safes/dca", "+ + ", {"safes": {"dca": "+ + "}})
 _ts("safes-source", "/$ctl/safes/source/USR", "+", {"safes": {"sources": {"USR": "+"}}})
 _ts("safes-output", "/$ctl/safes/output/REC", " +", {"safes": {"outputs": {"REC": " +"}}})
 _ts("safes-area", "/$ctl/safes/area/COMPACT", "+", {"safes": {"areas": {"COMPACT": "+"}}})
+
+# The node query's lists (p.24 node descriptions, footnotes 72, 47 and 44):
+# a show or playlist opening, or a card's session count, asks for the node
+# description, whose list parameter is read whole into state.
+_NODE_Q = ("s", "?")
+telemetry(W, "scene-show-reads-scenes", inbound_hex=hexs(osc("/$ctl/lib/$actshow", ("s", "I:SHOW2"))),
+          expect_state={"scene": {"show": "I:SHOW2"}, "params": {"$ctl/lib/$actshow": {"text": "I:SHOW2"}}},
+          expect_then_send_hex=[hexs(osc("/$ctl/lib", _NODE_Q))])
+_SCENES = " $actshow  string [64]\n $scenes   list [Walk-in, Act 1 , Act 2,Finale]\n $actidx  int [0 .. 16384]\n"
+telemetry(W, "scene-list", inbound_hex=hexs(osc("/$ctl/lib", ("s", _SCENES))),
+          state_before={"scene": {"list": {"1": "Old", "5": "Gone"}}},
+          expect_state={"scene": {"list": {"1": "Walk-in", "2": "Act 1", "3": "Act 2", "4": "Finale"}},
+                        "params": {"$ctl/lib": {"text": _SCENES}}})
+telemetry(W, "scene-list-empty", inbound_hex=hexs(osc("/$ctl/lib", ("s", " $scenes list []"))),
+          state_before={"scene": {"list": {"1": "Old"}}},
+          expect_state={"scene": {}, "params": {"$ctl/lib": {"text": " $scenes list []"}}})
+telemetry(W, "player-playlist-reads-songs", inbound_hex=hexs(osc("/play/$actlist", ("s", "U:/music"))),
+          expect_state={"usb_player": {"playlist": "U:/music"}, "params": {"play/$actlist": {"text": "U:/music"}}},
+          expect_then_send_hex=[hexs(osc("/play", _NODE_Q))])
+_SONGS = " $actlist  string [256]\n $songs  list [Intro.wav, Song 2.mp3]\n"
+telemetry(W, "player-songs", inbound_hex=hexs(osc("/play", ("s", _SONGS))),
+          expect_state={"usb_player": {"songs": {"1": "Intro.wav", "2": "Song 2.mp3"}},
+                        "params": {"play": {"text": _SONGS}}})
+telemetry(W, "wlive-sessions-reads-list",
+          inbound_hex=hexs(osc("/cards/wlive/2/$stat/sessions", ("s", "2"), ("f", 2.0), ("i", 2))),
+          expect_state={"cards": {"wlive": {"sd": {"2": {"sessions": 2}}}},
+                        "params": {"cards/wlive/2/$stat/sessions": {"text": "2", "raw": 2.0, "int": 2}}},
+          expect_then_send_hex=[hexs(osc("/cards/wlive/2/$stat", _NODE_Q))])
+_SESSIONS = (" sessionlist  list [2020-04-04 10:16:36, 2020-04-05 09:00:00]\n"
+             " snamelist  list [CC Mr Jones, Rehearsal]\n")
+telemetry(W, "wlive-session-list-node", inbound_hex=hexs(osc("/cards/wlive/2/$stat", ("s", _SESSIONS))),
+          expect_state={"cards": {"wlive": {"sd": {"2": {"session_list": {
+              "1": {"date": "2020-04-04 10:16:36", "name": "CC Mr Jones"},
+              "2": {"date": "2020-04-05 09:00:00", "name": "Rehearsal"}}}}}},
+              "params": {"cards/wlive/2/$stat": {"text": _SESSIONS}}})

@@ -189,20 +189,29 @@ _ppt("media-playlists", "/v1/media/playlists", [
                                 "parent": "mf"}}})
 
 # The active presentation's groups and slides (presentationGetActive), the
-# list replaced; slides kept as JSON text per group.
+# list replaced; each slide keyed by its group's position and its own within
+# the group.
 _WHITE = {"red": 1, "green": 1, "blue": 1, "alpha": 1}
+_WHITE_TEXT = json.dumps(_WHITE, separators=(",", ":"))
 _SLIDE = {"enabled": True, "notes": "Slow", "text": "Amazing grace", "label": "", "color": _WHITE,
           "size": {"width": 1920, "height": 1080}}
+_SLIDE_2 = {"enabled": False, "notes": "", "text": "How sweet\nthe sound", "label": "Acoustic", "color": _WHITE,
+            "size": {"width": 1920, "height": 1080}}
+_SLIDE_STATE = {"enabled": True, "notes": "Slow", "text": "Amazing grace", "label": "", "color": _WHITE_TEXT,
+                "width": 1920, "height": 1080}
+_SLIDE_2_STATE = {"enabled": False, "notes": "", "text": "How sweet\nthe sound", "label": "Acoustic",
+                  "color": _WHITE_TEXT, "width": 1920, "height": 1080}
 _ppt("presentation-active", "/v1/presentation/active", {"presentation": {
     "id": _id("pr1", "Amazing Grace", 0),
-    "groups": [{"name": "Verse 1", "color": _WHITE, "slides": [_SLIDE]},
-               {"name": "Chorus", "color": _WHITE, "slides": []}],
+    "groups": [{"name": "Verse 1", "color": _WHITE, "slides": [_SLIDE, _SLIDE_2]},
+               {"name": "Chorus", "color": _WHITE, "slides": []},
+               {"name": "Verse 2", "color": _WHITE, "slides": [_SLIDE_2]}],
     "has_timeline": False, "has_timeline_items": False, "presentation_path": "/Library/Amazing Grace.pro",
     "destination": "presentation"}},
     {"presentation": {"groups": {
-        "0": {"name": "Verse 1", "color": json.dumps(_WHITE, separators=(",", ":")),
-              "slides": json.dumps([_SLIDE], separators=(",", ":"))},
-        "1": {"name": "Chorus", "color": json.dumps(_WHITE, separators=(",", ":")), "slides": "[]"}},
+        "0": {"name": "Verse 1", "color": _WHITE_TEXT, "slides": {"0": _SLIDE_STATE, "1": _SLIDE_2_STATE}},
+        "1": {"name": "Chorus", "color": _WHITE_TEXT},
+        "2": {"name": "Verse 2", "color": _WHITE_TEXT, "slides": {"0": _SLIDE_2_STATE}}},
         "has_timeline": False, "has_timeline_items": False, "path": "/Library/Amazing Grace.pro"}},
     state_before={"presentation": {"groups": {"0": {"name": "Old"}, "1": {"name": "Old"},
                                               "2": {"name": "Old"}}}})
@@ -211,8 +220,7 @@ _ppt("announcement-active", "/v1/announcement/active", {"announcement": {
     "groups": [{"name": "Loop", "color": _WHITE, "slides": []}],
     "has_timeline": True, "has_timeline_items": True, "presentation_path": "/Library/Welcome.pro",
     "destination": "announcements"}},
-    {"announcement": {"groups": {"0": {"name": "Loop", "color": json.dumps(_WHITE, separators=(",", ":")),
-                                       "slides": "[]"}},
+    {"announcement": {"groups": {"0": {"name": "Loop", "color": _WHITE_TEXT}},
                       "has_timeline": True, "has_timeline_items": True, "path": "/Library/Welcome.pro"}})
 # Each playlist (not a folder) has its items read whenever the playlists are.
 _ppt("playlists-read-items", "/v1/playlists", [

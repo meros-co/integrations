@@ -15,8 +15,11 @@ use std::collections::BTreeMap;
 fn placeholder() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     // A name is an identifier, so a literal brace in a JSON body, such as
-    // {"status":"toggle"}, is never taken for a placeholder.
-    RE.get_or_init(|| Regex::new(r#"\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}"#).unwrap())
+    // {"status":"toggle"}, is never taken for a placeholder. Leading carets
+    // name a telemetry capture of an element further out (`{^index}`).
+    RE.get_or_init(|| {
+        Regex::new(r#"\{(\^*[A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}"#).unwrap()
+    })
 }
 
 /// Where values come from: a command's parameters and the device's settings,

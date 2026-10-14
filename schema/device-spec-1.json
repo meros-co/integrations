@@ -457,12 +457,12 @@
               },
               "match_each": {
                 "type": "string",
-                "description": "With match: an RE2-safe regex applied along the rest of the message, after what match matched; the rule matches once per match of it, its captures numbered on after match's and request_match's, and {index} its place from 0. For a list on one line (SPEC.md §8, Lists on one line)."
+                "description": "With match: an RE2-safe regex applied along the rest of the message, after what match matched; the rule matches once per match of it, its captures numbered on after match's and request_match's, and {index} its place from 0. For a list on one line (SPEC.md §8, Lists on one line). With address and match_each_in: applied along that capture's text, for a list inside an OSC string argument (SPEC.md §8, OSC string arguments)."
               },
               "match_each_in": {
                 "type": "integer",
                 "minimum": 1,
-                "description": "With match_each: the capture group of match whose text match_each goes along, instead of the rest of the message (a list between markers, SPEC.md §8, Lists on one line)."
+                "description": "With match_each: the capture group of match whose text match_each goes along, instead of the rest of the message (a list between markers, SPEC.md §8, Lists on one line). On an address rule, required: the capture, numbered across the address's and arg_match's, whose text it goes along."
               },
               "header": {
                 "type": "string",
@@ -570,11 +570,11 @@
               },
               "xml_each": {
                 "type": "string",
-                "description": "With path: an XML element name; each such element in the reply is a match, its attributes the captures."
+                "description": "With path: an XML element name; each such element in the reply is a match, its attributes the captures, then {text} its own text, each child element holding only text by the child's name, and the attributes of the elements it lies in as {^name} (one out), {^^name} (two); a name already captured is kept (SPEC.md §8)."
               },
               "json_each": {
                 "type": "string",
-                "description": "With path, json_match or address, and json: a JSON path to an array; the rule matches once per element, json paths relative to it. [*] in the path goes through every element of an array on the way ($.data[*].ingest_streams); $^. names the element one level out, $^^. two, and {index} is the element's index in its array (SPEC.md §8)."
+                "description": "With path, json_match or address, and json: a JSON path to an array; the rule matches once per element, json paths relative to it. [*] in the path goes through every element of an array on the way ($.data[*].ingest_streams); $^. names the element one level out, $^^. two, and {index} is the element's index in its array; {^index} and {^key} are the index and member name of the element one level out, {^^index} two. A member name may be {settings.name}, filled in from the settings current when the message arrives (SPEC.md §8)."
               },
               "each_match": {
                 "type": "object",
@@ -786,7 +786,7 @@
               ]
             },
             "scheme": {
-              "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss.",
+              "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss, or http and https (the REST API's own scheme setting: http opens ws, https wss).",
               "oneOf": [
                 {
                   "enum": [
@@ -871,6 +871,28 @@
               "type": "integer",
               "minimum": 1000,
               "description": "Reopen the websocket when nothing has arrived for this long: for a service that sends keepalives, so silence means a dead connection."
+            },
+            "as_reply": {
+              "type": "object",
+              "required": [
+                "path",
+                "body"
+              ],
+              "additionalProperties": false,
+              "description": "Each JSON message is also offered to the path rules as the reply to a GET of the path at this JSON path (under prefix), with the value at body as its body, as for telemetry.sse (SPEC.md §8, A push websocket beside the transport).",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "prefix": {
+                  "type": "string",
+                  "pattern": "^/",
+                  "description": "A fixed path the named path is under (/control/api/v1 for a camera naming /lens/iris)."
+                }
+              }
             }
           },
           "oneOf": [
@@ -951,6 +973,11 @@
                 },
                 "body": {
                   "type": "string"
+                },
+                "prefix": {
+                  "type": "string",
+                  "pattern": "^/",
+                  "description": "A fixed path the named path is under."
                 }
               }
             },
@@ -1668,7 +1695,7 @@
               "pattern": "^/"
             },
             "scheme": {
-              "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss.",
+              "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss, or http and https (the REST API's own scheme setting: http opens ws, https wss).",
               "oneOf": [
                 {
                   "enum": [

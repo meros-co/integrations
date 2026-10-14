@@ -87,10 +87,14 @@ _H2R_PROJECT = {
     "dynamicText": {"text.1": "Studio A", "text.2": ""},
     "dynamicLists": [[[{"selected": 3}]], [[{}]]],
 }
+_H2R_OTHER = {"name": "Second show", "cues": [{"id": "x1", "type": "image", "label": "Other"}],
+              "dynamicText": {"text.1": "Elsewhere"}}
 telemetry("h2r-graphics", "update-frontend",
-          inbound_ws="42" + json.dumps(["updateFrontend", {"projects": {"ABCD": _H2R_PROJECT}}],
+          inbound_ws="42" + json.dumps(["updateFrontend", {"projects": {
+              "ABCD": {"name": "Main show", **_H2R_PROJECT}, "EFGH": _H2R_OTHER}}],
                                        separators=(",", ":")),
           expect_state={
+              "projects": {"ABCD": {"name": "Main show"}, "EFGH": {"name": "Second show"}},
               "graphics": {
                   "lt1": {"type": "lower_third", "label": "Host", "status": "onair", "on_air": True,
                           "line_one": "Jane Doe", "line_two": "[text.1]", "line_three": "",
@@ -110,3 +114,21 @@ telemetry("h2r-graphics", "graphic-removed",
               separators=(",", ":")),
           expect_state={"graphics": {"lt1": {"type": "lower_third", "label": "Host"}}})
 telemetry("h2r-graphics", "other-event", inbound_ws='42["connected",{}]', expect_state={})
+# The project setting chooses which project's graphics and variables are kept.
+telemetry("h2r-graphics", "configured-project",
+          settings={"project": "EFGH"},
+          inbound_ws="42" + json.dumps(["updateFrontend", {"projects": {
+              "ABCD": {"name": "Main show", **_H2R_PROJECT}, "EFGH": _H2R_OTHER}}],
+                                       separators=(",", ":")),
+          expect_state={"projects": {"ABCD": {"name": "Main show"}, "EFGH": {"name": "Second show"}},
+                        "graphics": {"x1": {"type": "image", "label": "Other"}},
+                        "variables": {"text.1": "Elsewhere"}})
+# A score graphic: each team's levels, by team and level from 1.
+telemetry("h2r-graphics", "scores",
+          inbound_ws="42" + json.dumps(["updateFrontend", {"projects": {"ABCD": {"cues": [
+              {"id": "sc1", "type": "score", "label": "Match", "levels": 2, "delimiter": "-",
+               "scores": [[{"score": 3}, {"score": 1}], [{"score": 0}, {"score": 2}]]}]}}}],
+                                       separators=(",", ":")),
+          expect_state={"graphics": {"sc1": {"type": "score", "label": "Match", "score_levels": 2,
+                                             "score_delimiter": "-",
+                                             "scores": {"1": {"1": 3, "2": 1}, "2": {"1": 0, "2": 2}}}}})

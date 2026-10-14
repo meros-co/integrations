@@ -520,19 +520,32 @@ _BC_SUB = json.dumps({"type": "request", "data": {"action": "subscribe", "proper
                      separators=(",", ":"))
 
 
-def _bc_event(prop, value):
-    return json.dumps({"type": "event", "data": {"action": "propertyValueChanged", "property": prop,
-                                                 "value": value}}, separators=(",", ":"))
+def _bc_event(prop, value=None):
+    data = {"action": "propertyValueChanged", "property": prop}
+    if value is not None:
+        data["value"] = value
+    return json.dumps({"type": "event", "data": data}, separators=(",", ":"))
 
 
-telemetry(BC, "event-depth-1", expect_connect_ws=[_BC_SUB], inbound_ws=_bc_event("/system", {}),
+_BC_IRIS_STATE = {"lens": {"iris": {"stop": 2.8}}}
+_BC_ZEBRA_STATE = {"monitoring": {"displays": {"LCD": {"zebra": True}}}}
+_BC_TC_STATE = {"timecode": {"source": "Clip"}}
+# An event naming only its property has the property read again over REST.
+telemetry(BC, "event-depth-1", expect_connect_ws=[_BC_SUB], inbound_ws=_bc_event("/system"),
           expect_then_send=[{"method": "GET", "target": _BA + "/system"}], expect_state={})
-telemetry(BC, "event-iris", inbound_ws=_bc_event("/lens/iris", {"apertureStop": 2.8}),
+telemetry(BC, "event-iris-name-only", inbound_ws=_bc_event("/lens/iris"),
           expect_then_send=[{"method": "GET", "target": _BA + "/lens/iris"}], expect_state={})
-telemetry(BC, "event-display-zebra", inbound_ws=_bc_event("/monitoring/LCD/zebra", {"enabled": True}),
+telemetry(BC, "event-display-zebra-name-only", inbound_ws=_bc_event("/monitoring/LCD/zebra"),
           expect_then_send=[{"method": "GET", "target": _BA + "/monitoring/LCD/zebra"}], expect_state={})
-telemetry(BC, "event-timecode-source", inbound_ws=_bc_event("/transports/0/timecode/source", {"timecode": "Clip"}),
+telemetry(BC, "event-timecode-source-name-only", inbound_ws=_bc_event("/transports/0/timecode/source"),
           expect_then_send=[{"method": "GET", "target": _BA + "/transports/0/timecode/source"}], expect_state={})
+# An event carrying its value is read as the property's GET reply, with no re-read.
+telemetry(BC, "event-iris", inbound_ws=_bc_event("/lens/iris", {"apertureStop": 2.8}),
+          expect_then_send=[], expect_state=_BC_IRIS_STATE)
+telemetry(BC, "event-display-zebra", inbound_ws=_bc_event("/monitoring/LCD/zebra", {"enabled": True}),
+          expect_then_send=[], expect_state=_BC_ZEBRA_STATE)
+telemetry(BC, "event-timecode-source", inbound_ws=_bc_event("/transports/0/timecode/source", {"timecode": "Clip"}),
+          expect_then_send=[], expect_state=_BC_TC_STATE)
 # The websocketOpened event re-reads nothing.
 telemetry(BC, "event-opened", inbound_ws='{"type":"event","data":{"action":"websocketOpened"}}',
           expect_then_send=[], expect_state={})

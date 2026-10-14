@@ -486,6 +486,12 @@ telemetry:
     - path: "^/v1/dictionary\\?key=buffer$"
       match: '(?s)^\s*(<.*>)\s*$'
       state: { buffers.xml: "{1}" }
+    # Each M/E row's buffer, keyed by its <me> element's index, two levels
+    # out (<me index="0"><row><buffer .../></row></me>).
+    - path: "^/v1/dictionary\\?key=buffer$"
+      xml_each: buffer
+      replace: buffers.me
+      state: { "buffers.me.{^^index}": "{selection}" }
     # DDR playlists and time remaining (guide p.70-71 lists the keys but not
     # their content): kept whole, as the XML the system sends.
     - path: "^/v1/dictionary\\?key=ddr_playlist$"
@@ -502,38 +508,24 @@ telemetry:
       state:
         "macros.{name:key}.name": "{name}"
         "macros.{name:key}.id": "{id}"
-    # Product information (guide p.68-69): child elements of
-    # <product_information>.
+    # Product information (guide p.68-69): the child elements of
+    # <product_information>, each by its name.
     - path: "^/(?:v1/)?version$"
-      match: '<product_model>([^<]*)</product_model>'
-      state: { product.model: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<product_name>([^<]*)</product_name>'
-      state: { product.name: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<product_version>([^<]*)</product_version>'
-      state: { product.version: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<product_build_no>([^<]*)</product_build_no>'
-      state: { product.build: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<machine_name>([^<]*)</machine_name>'
-      state: { product.machine_name: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<session_name>([^<]*)</session_name>'
-      state: { session.name: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<session_x_resolution>([^<]*)</session_x_resolution>'
-      state: { session.width: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<session_y_resolution>([^<]*)</session_y_resolution>'
-      state: { session.height: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<session_frame_rate>([^<]*)</session_frame_rate>'
-      state: { session.frame_rate: "{1}" }
-    - path: "^/(?:v1/)?version$"
-      match: '<session_fielded>([^<]*)</session_fielded>'
-      state: { session.fielded: { value: "{1}", map: { "true": true, "false": false } } }
+      xml_each: product_information
+      state:
+        product.model: "{product_model}"
+        product.name: "{product_name}"
+        product.version: "{product_version}"
+        product.id: "{product_id}"
+        product.serial_number: "{product_serial_no}"
+        product.build: "{product_build_no}"
+        product.machine_name: "{machine_name}"
+        session.name: "{session_name}"
+        session.width: "{session_x_resolution}"
+        session.height: "{session_y_resolution}"
+        session.frame_rate: "{session_frame_rate}"
+        session.aspect_ratio: "{session_aspect_ratio}"
+        session.fielded: { value: "{session_fielded}", map: { "true": true, "false": false } }
 
 state:
   tally.*.program: { type: bool, description: "Source visible on program (through any layer), keyed by internal source name such as input1 or ddr1" }
@@ -547,6 +539,7 @@ state:
   shortcuts.*:      { type: string, description: "Each shortcut state the system reports, keyed by its name: record_toggle, streaming_toggle, ddr1_play, input1_long_name and others" }
   buffers.main: { type: string, description: "The buffer selected on the main switcher row, such as BFR4" }
   buffers.xml: { type: string, description: "The whole buffer dictionary as the system sends it: the main row's and each M/E row's buffer selections" }
+  buffers.me.*: { type: string, description: "The buffer selected on each M/E's row, keyed by the M/E's index as the buffer dictionary gives it (from 0 in the guide's example)" }
   ddr.playlist_xml: { type: string, description: "The whole ddr_playlist dictionary as the system sends it: each media player's playlist (its shape is not documented)" }
   ddr.timecode_xml: { type: string, description: "The whole ddr_timecode dictionary as the system sends it: each media player's elapsed and remaining time (its shape is not documented)" }
   macros.*.name: { type: string, description: "Each macro the system lists, keyed by its name" }
@@ -556,11 +549,14 @@ state:
   product.version: { type: string, description: "Software version, such as 7-0" }
   product.build: { type: string, description: "Software build, such as 7-0-180920" }
   product.machine_name: { type: string, description: "The system's machine name" }
+  product.id: { type: string, description: "Product id, such as NCWL" }
+  product.serial_number: { type: string, description: "Serial number; empty when the system reports none" }
   session.name: { type: string, description: "The open session's name" }
   session.width: { type: int, unit: px, description: "Session video width" }
   session.height: { type: int, unit: px, description: "Session video height" }
   session.frame_rate: { type: float, unit: Hz, description: "Session frame rate, such as 29.970030" }
   session.fielded: { type: bool, description: "The session is interlaced" }
+  session.aspect_ratio: { type: float, description: "Session picture aspect ratio, such as 1.777778" }
 
 quirks:
   - models: [all]
@@ -605,8 +601,9 @@ quirks:
       The guide names the ddr_playlist and ddr_timecode dictionaries but
       documents neither's content, so each is kept whole as the XML the system
       sends (ddr.playlist_xml, ddr.timecode_xml) rather than read into clips
-      and times. The same holds for the M/E rows of the buffer dictionary
-      (buffers.xml), whose rows carry no index. The macros_list dictionary's
+      and times. Each M/E row's buffer is kept by its <me> element's index
+      (buffers.me), the whole dictionary too (buffers.xml); an M/E with more
+      than one row keeps its last row's buffer there. The macros_list dictionary's
       shape is not documented either; macros are read from its macro
       elements' name attribute (and an id attribute, if present). Product
       information is documented at /version, and recent software serves it at

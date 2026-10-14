@@ -439,6 +439,44 @@ struct Push {
     /// `idle_ms`: reopened when nothing arrives for this long (a service
     /// that sends keepalives, so silence means a dead connection).
     idle: Option<Millis>,
+    /// `as_reply`: JSON paths to the path and the body each message is also
+    /// offered under, as that GET's reply would be (a Blackmagic camera's
+    /// property pushes, in the format its REST GET returns).
+    as_reply: Option<AsReply>,
+}
+
+/// `as_reply` (`telemetry.sse`, `telemetry.websocket`): each message is also
+/// offered to the `path` rules as the reply to a GET.
+#[derive(Debug, Clone)]
+struct AsReply {
+    /// JSON path to the path the message names.
+    path: String,
+    /// JSON path to the value that is the reply's body.
+    body: String,
+    /// `prefix`: a fixed path the named one is under (a camera that names
+    /// `/lens/iris` for its REST API's `/control/api/v1/lens/iris`).
+    prefix: String,
+}
+
+/// An `as_reply` block: its `path` and `body` JSON paths, and `prefix`.
+fn as_reply_of(v: Option<&Value>, what: &str) -> Result<Option<AsReply>, String> {
+    let Some(r) = v else {
+        return Ok(None);
+    };
+    let field = |name: &str| {
+        str_field(r, name)
+            .map(str::to_string)
+            .ok_or(format!("{what}.as_reply needs {name}"))
+    };
+    let prefix = str_field(r, "prefix").unwrap_or("").trim_end_matches('/');
+    if !(prefix.is_empty() || prefix.starts_with('/')) {
+        return Err(format!("{what}.as_reply.prefix starts with /"));
+    }
+    Ok(Some(AsReply {
+        path: field("path")?,
+        body: field("body")?,
+        prefix: prefix.to_string(),
+    }))
 }
 
 /// Engine.IO's query, after a URL with or without one.
@@ -724,7 +762,7 @@ pub(crate) struct SpecEngine {
     events_json: bool,
     /// `telemetry.sse.as_reply`: JSON paths to the path and the body each
     /// part is offered under, as that GET's reply would be.
-    events_reply: Option<(String, String)>,
+    events_reply: Option<AsReply>,
     events_backoff: Millis,
     /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
     /// opened: no subscription, poll or push websocket. Replies and anything
@@ -749,11 +787,14 @@ fn scheme_of(
         Some(Value::String(s)) => s.clone(),
         Some(Value::Object(o)) => {
             let name = o.get("setting").and_then(Value::as_str).ok_or_else(bad)?;
-            settings
-                .get(name)
-                .and_then(Value::as_str)
-                .unwrap_or(plain)
-                .to_string()
+            match (plain, settings.get(name).and_then(Value::as_str)) {
+                // A websocket following an HTTP scheme setting (the REST
+                // API's own): http opens ws, https wss.
+                ("ws", Some("http")) => "ws".to_string(),
+                ("ws", Some("https")) => "wss".to_string(),
+                (_, Some(s)) => s.to_string(),
+                (_, None) => plain.to_string(),
+            }
         }
         Some(_) => return Err(bad()),
     };
@@ -1569,6 +1610,7 @@ impl SpecEngine {
                     socketio,
                     url,
                     idle,
+                    as_reply: as_reply_of(w.get("as_reply"), "telemetry.websocket")?,
                 })
             }
         };
@@ -1656,17 +1698,7 @@ impl SpecEngine {
         };
         let sse = spec.telemetry.as_ref().and_then(|t| t.get("sse"));
         let events_json = sse.and_then(|e| str_field(e, "format")) == Some("json");
-        let events_reply = match sse.and_then(|e| e.get("as_reply")) {
-            None => None,
-            Some(r) => Some((
-                str_field(r, "path")
-                    .ok_or("telemetry.sse.as_reply needs path")?
-                    .to_string(),
-                str_field(r, "body")
-                    .ok_or("telemetry.sse.as_reply needs body")?
-                    .to_string(),
-            )),
-        };
+        let events_reply = as_reply_of(sse.and_then(|e| e.get("as_reply")), "telemetry.sse")?;
         let oauth = match &transport {
             Transport::Http {
                 auth: HttpAuth::OAuth2,
@@ -2905,9 +2937,9 @@ impl SpecEngine {
     fn offer(&mut self, cx: &mut Cx, message: &telemetry::Inbound) {
         let mut triggered = Vec::new();
         let mut cleared = Value::Object(Map::new());
-        let mut patch = self
-            .telemetry
-            .apply_into(message, &mut triggered, &mut cleared);
+        let mut patch =
+            self.telemetry
+                .apply_with(message, &self.settings, &mut triggered, &mut cleared);
         // A list read again as it was changes nothing: neither its removal
         // nor its values are reported.
         if let Some(mirror) = &self.mirror {
@@ -3054,6 +3086,43 @@ impl SpecEngine {
         self.apply_text(cx, text);
     }
 
+    /// A message on the push websocket: to the rules as any message is,
+    /// and with `as_reply`, also as the reply to a GET of the path it names.
+    fn push_message(&mut self, cx: &mut Cx, text: &str) {
+        self.apply_message(cx, text);
+        let Some(paths) = self.push.as_ref().and_then(|p| p.as_reply.clone()) else {
+            return;
+        };
+        if let Ok(doc) = serde_json::from_str::<Value>(text) {
+            self.offer_as_reply(cx, &doc, &paths);
+        }
+    }
+
+    /// `as_reply` (`telemetry.sse` and `telemetry.websocket`): the value at
+    /// the body path offered to the `path` rules as the reply to a GET of
+    /// the path the message names, a `/` added before one without, under
+    /// the `prefix`.
+    fn offer_as_reply(&mut self, cx: &mut Cx, doc: &Value, reply: &AsReply) {
+        let path = match expect::json_path(doc, &reply.path) {
+            Some(Value::String(p)) if p.starts_with('/') => format!("{}{p}", reply.prefix),
+            Some(Value::String(p)) => format!("{}/{p}", reply.prefix),
+            _ => return,
+        };
+        let Some(body) = expect::json_path(doc, &reply.body) else {
+            return;
+        };
+        let body = body.to_string().into_bytes();
+        self.offer(
+            cx,
+            &telemetry::Inbound::Http {
+                path: &path,
+                headers: &[],
+                body: &body,
+                request: None,
+            },
+        );
+    }
+
     fn inbound_ws(&mut self, cx: &mut Cx, text: String) {
         self.apply_message(cx, &text);
         let ours =
@@ -3169,24 +3238,8 @@ impl SpecEngine {
                 };
                 self.offer(cx, &telemetry::Inbound::Json(&doc));
                 // `as_reply`: also the reply to a GET of the path it names.
-                if let Some((path, body)) = &self.events_reply {
-                    let path = match expect::json_path(&doc, path) {
-                        Some(Value::String(p)) if p.starts_with('/') => Some(p.clone()),
-                        Some(Value::String(p)) => Some(format!("/{p}")),
-                        _ => None,
-                    };
-                    if let (Some(path), Some(body)) = (path, expect::json_path(&doc, body)) {
-                        let body = body.to_string().into_bytes();
-                        self.offer(
-                            cx,
-                            &telemetry::Inbound::Http {
-                                path: &path,
-                                headers: &[],
-                                body: &body,
-                                request: None,
-                            },
-                        );
-                    }
+                if let Some(paths) = self.events_reply.clone() {
+                    self.offer_as_reply(cx, &doc, &paths);
                 }
                 self.apply_text(cx, &event.data);
                 self.last_heard = cx.now();
@@ -3247,7 +3300,7 @@ impl SpecEngine {
                 let text = String::from_utf8(bytes).unwrap_or_default();
                 match self.push.as_ref().and_then(|p| p.socketio.clone()) {
                     Some(sio) => self.socketio_input(cx, &sio, &text),
-                    None => self.apply_message(cx, &text),
+                    None => self.push_message(cx, &text),
                 }
                 self.last_heard = cx.now();
                 self.push_heard(cx);
@@ -3256,7 +3309,7 @@ impl SpecEngine {
             WsInput::Text(text) => {
                 match self.push.as_ref().and_then(|p| p.socketio.clone()) {
                     Some(sio) => self.socketio_input(cx, &sio, &text),
-                    None => self.apply_message(cx, &text),
+                    None => self.push_message(cx, &text),
                 }
                 self.last_heard = cx.now();
                 self.push_heard(cx);
@@ -4230,6 +4283,32 @@ mod tests {
         // An empty list over an empty list: nothing about the list.
         assert_eq!(offer("[]"), vec![json!({"items": null})]);
         assert_eq!(offer("[]"), Vec::<Value>::new());
+    }
+
+    #[test]
+    fn a_websocket_follows_an_http_scheme_setting() {
+        let t = json!({"scheme": {"setting": "scheme"}});
+        let with = |v: Value| {
+            let mut s = Params::new();
+            s.insert("scheme".into(), v);
+            s
+        };
+        assert_eq!(
+            scheme_of(&t, &with(json!("http")), "ws", "wss").unwrap(),
+            "ws"
+        );
+        assert_eq!(
+            scheme_of(&t, &with(json!("https")), "ws", "wss").unwrap(),
+            "wss"
+        );
+        assert_eq!(
+            scheme_of(&t, &with(json!("wss")), "ws", "wss").unwrap(),
+            "wss"
+        );
+        assert_eq!(scheme_of(&t, &Params::new(), "ws", "wss").unwrap(), "ws");
+        // An HTTP scheme is not a websocket's anywhere else.
+        assert!(scheme_of(&t, &with(json!("ws")), "http", "https").is_err());
+        assert!(scheme_of(&json!({"scheme": "https"}), &Params::new(), "ws", "wss").is_err());
     }
 
     #[test]
@@ -5362,6 +5441,51 @@ mod tests {
         // And as the document it is, by the JSON rules.
         assert!(part(&mut e, r#"{"url":"status/countdown","data":"00:01"}"#)
             .contains(&Action::State(json!({"countdown": "00:01"}))));
+    }
+
+    #[test]
+    fn a_push_websocket_message_is_read_as_a_reply() {
+        let telemetry = json!({
+            "websocket": {"path": "/events",
+                          "as_reply": {"path": "$.data.property", "body": "$.data.value",
+                                       "prefix": "/control/api/v1"}},
+            "updates": [
+                {"path": "^/control/api/v1/lens/iris$", "json": {"stop": "$.apertureStop"},
+                 "state": {"iris": "{stop}"}},
+            ],
+        });
+        let state = json!({"iris": {"type": "float", "description": "x"}});
+        let mut e = http_with(telemetry, state, true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let push = |e: &mut SpecEngine, text: &str| {
+            let mut cx = Cx::new(10);
+            e.ws(&mut cx, PUSH, WsInput::Text(text.into()));
+            cx.take()
+        };
+        assert!(push(
+            &mut e,
+            r#"{"type":"event","data":{"action":"propertyValueChanged","property":"/lens/iris","value":{"apertureStop":2.8}}}"#
+        )
+        .contains(&Action::State(json!({"iris": 2.8}))));
+        // A message naming no path, or carrying no body, is no reply.
+        assert!(!push(
+            &mut e,
+            r#"{"type":"event","data":{"action":"websocketOpened"}}"#
+        )
+        .iter()
+        .any(|a| matches!(a, Action::State(_))));
+        assert!(!push(
+            &mut e,
+            r#"{"type":"event","data":{"property":"/lens/iris"}}"#
+        )
+        .iter()
+        .any(|a| matches!(a, Action::State(_))));
+        assert!(as_reply_of(
+            Some(&json!({"path": "$.a", "body": "$.b", "prefix": "x"})),
+            "w"
+        )
+        .is_err());
     }
 
     #[test]

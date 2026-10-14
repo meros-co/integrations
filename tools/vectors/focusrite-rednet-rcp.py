@@ -54,6 +54,19 @@ text(FR, "get_error_status", {}, "devstatus error\n", device_reply='OK devstatus
      expect_result={"ok": {"kind": "value", "value": "nothing"}})
 text(FR, "set_keepalive", {"interval_ms": 20000}, "scpmode keepalive 20000\n",
      device_reply="OK scpmode keepalive 20000\n", expect_result={"ok": {"kind": "ack"}})
+# Input meters: mtrstart with the meter address without /Meter (as the
+# Companion module sends it) and the interval, answered OK mtrstart (Yamaha
+# RCP 2-16, 2-17).
+text(FR, "start_input_meters", {"interval_ms": 100}, "mtrstart IO:Current/InCh/InputLevel 100\n",
+     device_reply="OK mtrstart IO:Current/InCh/InputLevel\n", expect_result={"ok": {"kind": "ack"}})
+text(FR, "stop_input_meters", {}, "mtrstop IO:Current/InCh/InputLevel\n",
+     device_reply="OK mtrstop IO:Current/InCh/InputLevel\n", expect_result={"ok": {"kind": "ack"}})
+# NOTIFY mtr: one two-digit hexadecimal value per channel, after the type.
+telemetry(FR, "input-meters", inbound="NOTIFY mtr IO:Current/InCh/InputLevel level 00 7f 40 1A 0a 71 69 68\n",
+          expect_state={"meters": {"inputs": {"1": 0, "2": 127, "3": 64, "4": 26, "5": 10, "6": 113,
+                                              "7": 105, "8": 104}}})
+telemetry(FR, "input-meters-no-type", inbound="NOTIFY mtr IO:Current/Meter/InCh/InputLevel 01 02\n",
+          expect_state={"meters": {"inputs": {"1": 1, "2": 2}}})
 telemetry(FR, "product-name", expect_connect_wire=["devinfo productname\n"],
           inbound='OK devinfo productname "MP8R"\n', expect_state={"device": {"product_name": "MP8R"}})
 telemetry(FR, "run-mode", inbound='NOTIFY devstatus runmode "normal"\n', expect_state={"device": {"run_mode": "normal"}})

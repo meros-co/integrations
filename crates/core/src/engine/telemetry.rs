@@ -69,6 +69,11 @@ enum Matcher {
         /// (Millumin's `/millumin/info` names what changed in a string);
         /// their captures follow the address's.
         arg_match: Vec<(usize, Regex)>,
+        /// `match_each` with `match_each_in`: the rule matches once for each
+        /// match of this regex along the text of that capture (an address's
+        /// or `arg_match`'s): a list inside a string argument (WING's node
+        /// query), each item's captures numbered on and `{index}` its place.
+        text_each: Option<(Regex, usize)>,
         select: Vec<(String, Regex)>,
         each: Option<String>,
         each_select: Vec<(String, Regex)>,
@@ -116,13 +121,29 @@ enum Matcher {
 /// One element `json_each` reaches: the element, its index in its array
 /// (or its place among its object's members), the member's name when it is
 /// an object's member, and the elements it lies in, outermost first (the
-/// document, then each `[*]` or `.*` level's element).
+/// document, then each `[*]` or `.*` level's element), each with its own
+/// place (none for the document).
 struct EachItem<'a> {
     item: &'a Value,
     index: usize,
     key: Option<&'a str>,
-    outer: Vec<&'a Value>,
+    outer: Vec<(&'a Value, Option<Place<'a>>)>,
 }
+
+/// Where an element `json_each` went through lies: its index in its array,
+/// or its place among its object's members and the member's name.
+#[derive(Clone, Copy)]
+struct Place<'a> {
+    index: usize,
+    key: Option<&'a str>,
+}
+
+/// An element reached so far, with its place and the elements it lies in.
+type Reached<'a> = (
+    &'a Value,
+    Option<Place<'a>>,
+    Vec<(&'a Value, Option<Place<'a>>)>,
+);
 
 /// The steps of a `json_each` path: each a JSON path, from the element the
 /// step before reached, to an array whose elements it goes through, or with
@@ -174,12 +195,12 @@ fn path_of(part: &str, start: bool) -> String {
 fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
     let steps = each_steps(each);
     // Elements reached so far, each with the elements it lies in.
-    let mut level: Vec<(&Value, Vec<&Value>)> = vec![(doc, Vec::new())];
+    let mut level: Vec<Reached> = vec![(doc, None, Vec::new())];
     let last = steps.len() - 1;
     let mut out = Vec::new();
     for (i, (path, members)) in steps.iter().enumerate() {
         let mut next = Vec::new();
-        for (node, outer) in level {
+        for (node, place, outer) in level {
             let Some(at) = super::expect::json_path(node, path) else {
                 continue;
             };
@@ -189,7 +210,7 @@ fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
                 _ => continue,
             };
             let mut within = outer.clone();
-            within.push(node);
+            within.push((node, place));
             for (index, (key, item)) in found.into_iter().enumerate() {
                 if i == last {
                     out.push(EachItem {
@@ -199,13 +220,55 @@ fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
                         outer: within.clone(),
                     });
                 } else {
-                    next.push((item, within.clone()));
+                    next.push((item, Some(Place { index, key }), within.clone()));
                 }
             }
         }
         level = next;
     }
     out
+}
+
+/// A `json_each` path with its `{settings.name}` placeholders filled in from
+/// the settings current now: a member name (H2R's project id), so a rule
+/// reads only the configured one. `None`, and no element, when a setting is
+/// empty or unset, or its value holds `.`, `[`, `]` or `*`, which would make
+/// it another path.
+fn each_path(each: &str, settings: &Params) -> Option<String> {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\{settings\.([A-Za-z0-9_]+)\}").unwrap());
+    if !re.is_match(each) {
+        return Some(each.to_string());
+    }
+    let mut out = String::new();
+    let mut last = 0;
+    for caps in re.captures_iter(each) {
+        let whole = caps.get(0).unwrap();
+        let text = match settings.get(&caps[1])? {
+            Value::String(s) => s.clone(),
+            Value::Number(n) => n.to_string(),
+            _ => return None,
+        };
+        if text.is_empty() || text.contains(['.', '[', ']', '*']) {
+            return None;
+        }
+        out.push_str(&each[last..whole.start()]);
+        out.push_str(&text);
+        last = whole.end();
+    }
+    out.push_str(&each[last..]);
+    Some(out)
+}
+
+/// An XML element's own text (its text and CDATA, not its children's),
+/// trimmed.
+fn xml_text(node: roxmltree::Node) -> Value {
+    let text: String = node
+        .children()
+        .filter(|c| c.is_text())
+        .filter_map(|c| c.text())
+        .collect();
+    Value::String(text.trim().to_string())
 }
 
 /// The value at a JSON path from an element `json_each` reached: `$.` is the
@@ -217,7 +280,7 @@ fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
     match up {
         0 => super::expect::json_path(e.item, path),
         n => {
-            let node = e.outer.len().checked_sub(n).map(|i| e.outer[i])?;
+            let node = e.outer.len().checked_sub(n).map(|i| e.outer[i].0)?;
             super::expect::json_path(node, &format!("${}", &path[1 + n..]))
         }
     }
@@ -227,16 +290,22 @@ fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
 /// selectors'), then its `json` names. With `json_each`, once per element
 /// that `each_match` selects (its captures numbered on after `base`'s):
 /// `json` paths are the element's, `$^.` names the element one level out
-/// (`$^^.` two), and `{index}` is the element's index in its array.
+/// (`$^^.` two), and `{index}` is the element's index in its array. Of the
+/// elements it lies in, `{^index}` and `{^key}` are the place and member name
+/// of the one a level out, `{^^index}` and `{^^key}` two, and so on.
 fn each_values(
     doc: &Value,
     each: Option<&str>,
+    settings: &Params,
     each_select: &[(String, Regex)],
     json: &BTreeMap<String, String>,
     base: &[(String, Value)],
 ) -> Vec<Vec<(String, Value)>> {
     let items = match each {
-        Some(each) => each_items(doc, each),
+        Some(each) => match each_path(each, settings) {
+            Some(path) => each_items(doc, &path),
+            None => Vec::new(),
+        },
         None => vec![EachItem {
             item: doc,
             index: 0,
@@ -270,6 +339,17 @@ fn each_values(
             // `.*`: the member's name.
             if let Some(key) = e.key {
                 values.push(("key".to_string(), Value::String(key.to_string())));
+            }
+            // The elements it lies in, a level out at a time.
+            for (n, (_, place)) in e.outer.iter().rev().enumerate() {
+                let Some(place) = place else {
+                    continue;
+                };
+                let up = "^".repeat(n + 1);
+                values.push((format!("{up}index"), Value::from(place.index)));
+                if let Some(key) = place.key {
+                    values.push((format!("{up}key"), Value::String(key.to_string())));
+                }
             }
             for (name, path) in json {
                 if let Some(v) = present(element_path(&e, path)) {
@@ -665,6 +745,18 @@ impl Telemetry {
                         .and_then(Value::as_str)
                         .map(str::to_string),
                     arg_match: arg_selectors(rule.get("arg_match"))?,
+                    text_each: match rule.get("match_each") {
+                        None => None,
+                        Some(r) => Some((
+                            regex(r, "match_each")?,
+                            rule.get("match_each_in")
+                                .and_then(Value::as_u64)
+                                .filter(|n| *n >= 1)
+                                .ok_or(
+                                    "telemetry: match_each on an address rule needs match_each_in, a capture from 1",
+                                )? as usize,
+                        )),
+                    },
                     select: selectors(rule.get("json_match"), "json_match")?,
                     each: rule
                         .get("json_each")
@@ -864,10 +956,23 @@ impl Telemetry {
     /// As `apply`, adding to `triggers` the `then_send` items of every rule
     /// that matched, once per match, with its captures, and to `cleared` the
     /// `replace` subtrees of the rules whose message this is: a patch of
-    /// removals to apply before the one returned.
+    /// removals to apply before the one returned. Without settings.
+    #[cfg(test)]
     pub(crate) fn apply_into(
         &self,
         message: &Inbound,
+        triggers: &mut Vec<Triggered>,
+        cleared: &mut Value,
+    ) -> Option<Value> {
+        self.apply_with(message, &Params::new(), triggers, cleared)
+    }
+
+    /// As `apply_into`, with the device's settings, which a `json_each`
+    /// path may name (`{settings.project}`).
+    pub(crate) fn apply_with(
+        &self,
+        message: &Inbound,
+        settings: &Params,
         triggers: &mut Vec<Triggered>,
         cleared: &mut Value,
     ) -> Option<Value> {
@@ -1006,7 +1111,9 @@ impl Telemetry {
                         continue;
                     }
                     self.clear(rule, &base, cleared);
-                    for values in each_values(&doc, each.as_deref(), each_select, json, &base) {
+                    for values in
+                        each_values(&doc, each.as_deref(), settings, each_select, json, &base)
+                    {
                         if each.is_some() {
                             self.clear(rule, &values, cleared);
                         }
@@ -1059,6 +1166,35 @@ impl Telemetry {
                         for a in node.attributes() {
                             values.push((a.name().to_string(), Value::String(a.value().into())));
                         }
+                        // Its text, each child element's text by the child's
+                        // name, and the attributes of the elements it lies
+                        // in (`{^name}` one out, `{^^name}` two), none
+                        // replacing a capture already named.
+                        let mut more = vec![("text".to_string(), xml_text(node))];
+                        for child in node.children().filter(|c| c.is_element()) {
+                            if child.children().all(|c| !c.is_element()) {
+                                more.push((child.tag_name().name().to_string(), xml_text(child)));
+                            }
+                        }
+                        for (n, outer) in node
+                            .ancestors()
+                            .skip(1)
+                            .filter(|a| a.is_element())
+                            .enumerate()
+                        {
+                            let up = "^".repeat(n + 1);
+                            for a in outer.attributes() {
+                                more.push((
+                                    format!("{up}{}", a.name()),
+                                    Value::String(a.value().into()),
+                                ));
+                            }
+                        }
+                        for (name, v) in more {
+                            if !values.iter().any(|(k, _)| *k == name) {
+                                values.push((name, v));
+                            }
+                        }
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
@@ -1076,7 +1212,9 @@ impl Telemetry {
                         continue;
                     }
                     self.clear(rule, &base, cleared);
-                    for values in each_values(doc, each.as_deref(), each_select, json, &base) {
+                    for values in
+                        each_values(doc, each.as_deref(), settings, each_select, json, &base)
+                    {
                         if each.is_some() {
                             self.clear(rule, &values, cleared);
                         }
@@ -1090,6 +1228,7 @@ impl Telemetry {
                         json_arg,
                         arg_types,
                         arg_match,
+                        text_each,
                         select: selectors,
                         each,
                         each_select,
@@ -1126,15 +1265,37 @@ impl Telemetry {
                     if !select(&doc, selectors, &mut base) {
                         continue;
                     }
+                    let numbered = base.len();
                     for (i, a) in args.iter().enumerate() {
                         base.push((format!("arg{i}"), a.clone()));
                     }
                     self.clear(rule, &base, cleared);
+                    // Each item of a list inside a capture's text; a capture
+                    // that took part in no match has no items.
+                    if let Some((each, group)) = text_each {
+                        let name = group.to_string();
+                        let text = match base.iter().find(|(k, _)| *k == name) {
+                            Some((_, Value::String(s))) => s.clone(),
+                            _ => String::new(),
+                        };
+                        for (index, item) in each.captures_iter(&text).enumerate() {
+                            let mut values = base.clone();
+                            for (i, v) in captures(&item) {
+                                let n: usize = i.parse().unwrap_or(0);
+                                values.push(((n + numbered).to_string(), v));
+                            }
+                            values.push(("index".to_string(), Value::from(index)));
+                            any |= self.matched(rule, &values, &mut patch, triggers);
+                        }
+                        continue;
+                    }
                     if !reads_json {
                         any |= self.matched(rule, &base, &mut patch, triggers);
                         continue;
                     }
-                    for values in each_values(&doc, each.as_deref(), each_select, json, &base) {
+                    for values in
+                        each_values(&doc, each.as_deref(), settings, each_select, json, &base)
+                    {
                         if each.is_some() {
                             self.clear(rule, &values, cleared);
                         }
@@ -1587,6 +1748,56 @@ mod tests {
             }),
             None
         );
+    }
+
+    #[test]
+    fn a_list_inside_an_osc_string_is_read_item_by_item() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"address": "^/cards/([12])/stat$",
+                 "arg_match": {"0": "(?:^|\\s)names\\s+list \\[([^\\]]*)\\]"},
+                 "match_each": "\\s*([^,]+?)\\s*(?:,|$)", "match_each_in": 2,
+                 "replace": "cards.{1}.names",
+                 "state": {"cards.{1}.names.{index:+1}": "{3}"}},
+            ]})),
+            &state(json!({"cards.*.names.*": {"type": "string", "description": "x"}})),
+            Conversions::new(),
+        )
+        .unwrap();
+        let reply = |text: &str| {
+            let args = [json!(text)];
+            let mut cleared = json!({});
+            let patch = t.apply_into(
+                &Inbound::Osc {
+                    address: "/cards/2/stat",
+                    types: "s",
+                    args: &args,
+                },
+                &mut Vec::new(),
+                &mut cleared,
+            );
+            (cleared, patch)
+        };
+        let (cleared, patch) =
+            reply(" count int [0 .. 9]\n names   list [Take 1, Second take,Last]\n");
+        assert_eq!(cleared, json!({"cards": {"2": {"names": null}}}));
+        assert_eq!(
+            patch,
+            Some(json!({"cards": {"2": {"names": {
+                "1": "Take 1", "2": "Second take", "3": "Last"}}}}))
+        );
+        // An empty list clears and writes nothing; another text is no match.
+        let (cleared, patch) = reply(" names list []");
+        assert_eq!(cleared, json!({"cards": {"2": {"names": null}}}));
+        assert_eq!(patch, None);
+        assert_eq!(reply(" other list [a]"), (json!({}), None));
+        // An address rule's match_each needs the capture it goes along.
+        assert!(Telemetry::parse(
+            Some(&json!({"updates": [{"address": "^/x$", "match_each": "y", "state": {}}]})),
+            &state(json!({})),
+            Conversions::new(),
+        )
+        .is_err());
     }
 
     #[test]
@@ -2289,6 +2500,152 @@ mod tests {
             t.apply(&Inbound::Json(&tags)),
             Some(json!({"tags": {"0": "English", "1": "Music"}}))
         );
+    }
+
+    #[test]
+    fn an_outer_elements_place_keys_the_inner_ones() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                // Each slide of each group, keyed by both positions.
+                {"path": "^/active$", "json_each": "$.*.groups[*].slides",
+                 "json": {"text": "$.text"},
+                 "state": {"p.groups.{^index}.slides.{index:+1}.text": "{text}"}},
+                // Members, then arrays in arrays: each level's place and name.
+                {"json_match": {"$.event": "^update$"}, "json_each": "$.data.projects.*.cues[*].scores[*]",
+                 "json": {"id": "$^^.id", "score": "$.score"},
+                 "state": {"scores.{^^^key}.{id}.{^index:+1}.{index:+1}": "{score}",
+                           "cue_place.{id}": "{^^index}"}},
+            ]})),
+            &state(json!({
+                "p.groups.*.slides.*.text": {"type": "string", "description": "x"},
+                "scores.*.*.*.*": {"type": "int", "description": "x"},
+                "cue_place.*": {"type": "int", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = br#"{"presentation": {"groups": [
+            {"slides": [{"text": "a"}, {"text": "b"}]},
+            {"slides": []},
+            {"slides": [{"text": "c"}]}]}}"#;
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/active",
+                headers: &[],
+                body,
+                request: None
+            }),
+            Some(json!({"p": {"groups": {
+                "0": {"slides": {"1": {"text": "a"}, "2": {"text": "b"}}},
+                "2": {"slides": {"1": {"text": "c"}}}}}}))
+        );
+        let event = json!({"event": "update", "data": {"projects": {
+            "ABCD": {"cues": [{"id": "lt"}, {"id": "sc", "scores": [
+                [{"score": 3}, {"score": 1}], [{"score": 7}]]}]},
+            "EFGH": {"cues": [{"id": "s2", "scores": [[{"score": 9}]]}]}}}});
+        assert_eq!(
+            t.apply(&Inbound::Json(&event)),
+            Some(json!({
+                "scores": {
+                    "ABCD": {"sc": {"1": {"1": 3, "2": 1}, "2": {"1": 7}}},
+                    "EFGH": {"s2": {"1": {"1": 9}}}},
+                "cue_place": {"sc": 1, "s2": 0}}))
+        );
+    }
+
+    #[test]
+    fn xml_elements_give_their_text_children_and_ancestors() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/version$", "xml_each": "product_information",
+                 "state": {"product.model": "{product_model}", "product.width": "{session_x_resolution}"}},
+                {"path": "^/buffers$", "xml_each": "buffer",
+                 "state": {"me.{^^index}.buffer": "{selection}"}},
+                {"path": "^/names$", "xml_each": "name",
+                 "state": {"names.{id}": "{text}"}},
+            ]})),
+            &state(json!({
+                "product.model": {"type": "string", "description": "x"},
+                "product.width": {"type": "int", "description": "x"},
+                "me.*.buffer": {"type": "string", "description": "x"},
+                "names.*": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let reply = |path: &'static str, body: &'static str| {
+            t.apply(&Inbound::Http {
+                path,
+                headers: &[],
+                body: body.as_bytes(),
+                request: None,
+            })
+        };
+        assert_eq!(
+            reply(
+                "/version",
+                "<product_information><product_model> TC1 </product_model>\
+                   <session_x_resolution>1920</session_x_resolution></product_information>"
+            ),
+            Some(json!({"product": {"model": "TC1", "width": 1920}}))
+        );
+        assert_eq!(
+            reply(
+                "/buffers",
+                r#"<buffers><main><buffer selection="BFR4"/></main><me index="0"><row><buffer selection="BFR1"/></row></me><me index="1"><row><buffer selection="BFR2"/></row></me></buffers>"#
+            ),
+            Some(json!({"me": {"0": {"buffer": "BFR1"}, "1": {"buffer": "BFR2"}}}))
+        );
+        // An attribute keeps its name over the element's text.
+        assert_eq!(
+            reply(
+                "/names",
+                r#"<n><name id="a">Cam &amp; 1</name><name id="b" text="x">y</name></n>"#
+            ),
+            Some(json!({"names": {"a": "Cam & 1", "b": "x"}}))
+        );
+    }
+
+    #[test]
+    fn a_json_each_path_can_name_a_setting() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"json_match": {"$.event": "^update$"}, "json_each": "$.projects.{settings.project}.cues",
+                 "json": {"id": "$.id"}, "replace": "cues", "state": {"cues.{id}.index": "{index}"}},
+            ]})),
+            &state(json!({"cues.*.index": {"type": "int", "description": "x"}})),
+            Conversions::new(),
+        )
+        .unwrap();
+        let event = json!({"event": "update", "projects": {
+            "ABCD": {"cues": [{"id": "a"}]}, "EFGH": {"cues": [{"id": "e"}, {"id": "f"}]}}});
+        let apply = |project: Value| {
+            let mut settings = Params::new();
+            settings.insert("project".into(), project);
+            let mut cleared = json!({});
+            let patch = t.apply_with(
+                &Inbound::Json(&event),
+                &settings,
+                &mut Vec::new(),
+                &mut cleared,
+            );
+            (cleared, patch)
+        };
+        assert_eq!(
+            apply(json!("EFGH")).1,
+            Some(json!({"cues": {"e": {"index": 0}, "f": {"index": 1}}}))
+        );
+        assert_eq!(
+            apply(json!("ABCD")).1,
+            Some(json!({"cues": {"a": {"index": 0}}}))
+        );
+        // A project the message does not hold, or a value that would be
+        // another path, gives no element; the list is still replaced.
+        for project in [json!("WXYZ"), json!(""), json!("AB.CD"), json!("*")] {
+            assert_eq!(apply(project), (json!({"cues": null}), None));
+        }
+        assert_eq!(each_path("$.a.*", &Params::new()).as_deref(), Some("$.a.*"));
+        assert_eq!(each_path("$.a.{settings.x}", &Params::new()), None);
     }
 
     #[test]

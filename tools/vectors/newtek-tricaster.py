@@ -56,9 +56,11 @@ telemetry(TC, "switcher-overlays", inbound_http={
                                "tbar": {"position": 0.25, "speed": 0.5},
                                "overlays": {"0": {"source": "V2"}, "1": {"source": "DDR1"}}}})
 _BUF = ('<buffers><main><buffer selection="BFR4"/></main>'
-        '<me index="0"><row><buffer selection="BFR1"/></row></me></buffers>')
+        '<me index="0"><row><buffer selection="BFR1"/></row></me>'
+        '<me index="1"><row><buffer selection="BFR2"/></row></me></buffers>')
 telemetry(TC, "buffer", inbound_http={"path": "/v1/dictionary?key=buffer", "body": _BUF},
-          expect_state={"buffers": {"main": "BFR4", "xml": _BUF}})
+          state_before={"buffers": {"me": {"5": "BFR9"}}},
+          expect_state={"buffers": {"main": "BFR4", "xml": _BUF, "me": {"0": "BFR1", "1": "BFR2"}}})
 _PL = '<ddr_playlist><ddr name="ddr1"><clip name="Intro.mov"/></ddr></ddr_playlist>'
 telemetry(TC, "ddr-playlist", inbound_http={"path": "/v1/dictionary?key=ddr_playlist", "body": _PL + "\n"},
           expect_state={"ddr": {"playlist_xml": _PL}})
@@ -82,6 +84,6 @@ telemetry(TC, "product", inbound_http={
             '<session_aspect_ratio>1.777778</session_aspect_ratio><session_name>TC1 Session</session_name>'
             '</product_information>'},
     expect_state={"product": {"model": "TC1", "name": "TriCaster TC1", "version": "7-0", "build": "7-0-180920",
-                              "machine_name": "TC1"},
+                              "machine_name": "TC1", "id": "NCWL", "serial_number": ""},
                   "session": {"name": "TC1 Session", "width": 1920, "height": 1080, "frame_rate": 29.97003,
-                              "fielded": True}})
+                              "fielded": True, "aspect_ratio": 1.777778}})

@@ -418,15 +418,19 @@ commands:
 telemetry:
   # Socket.IO 4 on the HTTP API's port, default namespace; H2R emits
   # updateFrontend with every project whenever something changes, and the
-  # client sends nothing (H2R's Companion module, src/tcp.js).
+  # client sends nothing (H2R's Companion module, src/tcp.js). Graphics,
+  # variables and lists are read from the configured project only, the one
+  # the commands reach; every project's name is kept.
   websocket:
     path: /socket.io/
     socketio: true
   updates:
     - json_match: { "$.event": "^updateFrontend$" }
-      json_each: "$.data.projects.*.cues"
+      json_each: "$.data.projects.{settings.project}.cues"
       json:
         id: "$.id"
+        levels: "$.levels"
+        delimiter: "$.delimiter"
         type: "$.type"
         label: "$.label"
         status: "$.status"
@@ -471,13 +475,27 @@ telemetry:
         "graphics.{id:key}.outputs.3": "{output_3}"
         "graphics.{id:key}.outputs.4": "{output_4}"
         "graphics.{id:key}.outputs.utility": "{output_utility}"
+        "graphics.{id:key}.score_levels": "{levels}"
+        "graphics.{id:key}.score_delimiter": "{delimiter}"
+    # A score graphic's scores: an array per team, each an array of levels
+    # holding {score} (the Companion module's src/tcp.js reads them so).
     - json_match: { "$.event": "^updateFrontend$" }
-      json_each: "$.data.projects.*.dynamicText.*"
+      json_each: "$.data.projects.{settings.project}.cues[*].scores[*]"
+      json: { id: "$^^.id", score: "$.score" }
+      state:
+        "graphics.{id:key}.scores.{^index:+1}.{index:+1}": "{score}"
+    - json_match: { "$.event": "^updateFrontend$" }
+      json_each: "$.data.projects.*"
+      json: { name: "$.name" }
+      replace: projects
+      state: { "projects.{key:key}.name": "{name}" }
+    - json_match: { "$.event": "^updateFrontend$" }
+      json_each: "$.data.projects.{settings.project}.dynamicText.*"
       json: { value: "$" }
       replace: variables
       state: { "variables.{key:key}": "{value}" }
     - json_match: { "$.event": "^updateFrontend$" }
-      json_each: "$.data.projects.*.dynamicLists"
+      json_each: "$.data.projects.{settings.project}.dynamicLists"
       json: { selected: "$[0][0].selected" }
       replace: lists
       state: { "lists.{index:+1}.selected_row": "{selected}" }
@@ -502,6 +520,10 @@ state:
   graphics.*.outputs.*: { type: bool, description: "Whether the graphic shows on output 1 to 4 or the utility output, where the graphic sets it; output 1 is on and the others off when not set" }
   variables.*: { type: string, description: "Text variable's value, keyed by its id such as text.1" }
   lists.*.selected_row: { type: int, description: "Selected row of list N, numbered as select_list_row takes it" }
+  graphics.*.scores.*.*: { type: int, description: "Score graphic's score, by team then level, both from 1 as update_score numbers them" }
+  graphics.*.score_levels: { type: int, description: "Score graphic's number of levels shown per team" }
+  graphics.*.score_delimiter: { type: string, description: "Score graphic's text between a team's levels" }
+  projects.*.name: { type: string, description: "Name of each project of the installation, keyed by project id (the project setting's value)" }
 
 quirks:
   - models: [all]
@@ -529,18 +551,21 @@ quirks:
       The HTTP API has no authentication and no read endpoints. State comes
       from the Socket.IO connection H2R's Companion module uses on the same
       port, which H2R does not document: each updateFrontend event carries
-      every project, and graphics, text variables and lists are read from
-      all of them, keyed by graphic id, variable id and list number (a
-      project's name is not kept, so with several projects their graphics
-      share one list, and list numbers can collide). Each event replaces the
+      every project. Graphics, text variables and lists are read from the
+      configured project only (the project setting, which the commands use
+      too), keyed by graphic id, variable id and list number, and every
+      project's name is kept by project id. A project the event does not
+      hold empties them, as H2R's Companion module reports a project not
+      found; update_settings to another project reads that one from the
+      next event. Each event replaces the
       lists, so a graphic or variable removed in H2R leaves state. A graphic
       with no status is off air, as the Companion module reads it; its
       on_air is then absent. Timers are reported as H2R holds them (state,
       duration in milliseconds, start and end times in milliseconds since
       1970), not counted down: the remaining time is end_at minus the
       present for a running countdown, as the Companion module computes it.
-      Scores are not kept (each team's levels are an array in an array), nor
-      a graphic's other fields, which depend on its type.
+      A score graphic's scores are kept by team and level, as numbers; a
+      graphic's other fields, which depend on its type, are not kept.
 
   - models: [all]
     severity: info

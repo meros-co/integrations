@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FAST_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 # {name} or {name:directive:directive...}; SPEC.md §4, "Templates".
-PLACEHOLDER = re.compile(r"""(?<!\\)\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
+PLACEHOLDER = re.compile(r"""(?<!\\)\{(\^*[A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
 
 # The closed directive set, keyed by the parameter types each one accepts.
 DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
@@ -430,14 +430,30 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 {"ws", "wss"} if transport_type == "ws" else {"http", "https"})]
     if websocket:
         schemes.append(("telemetry.websocket", websocket.get("scheme"), {"ws", "wss"}))
+    for where_, block in (("telemetry.websocket", websocket or {}),
+                          ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})):
+        reply = block.get("as_reply")
+        if reply is None:
+            continue
+        if transport_type != "http":
+            errors.append(f"{where_}.as_reply offers messages to path rules, which need the http transport")
+        if not isinstance(reply, dict) or not {"path", "body"} <= set(reply):
+            errors.append(f"{where_}.as_reply needs path and body")
+        elif not str(reply.get("prefix", "/")).startswith("/"):
+            errors.append(f"{where_}.as_reply.prefix starts with /")
     for where_, scheme, allowed in schemes:
         if not isinstance(scheme, dict):
             continue
         decl = settings.get(scheme.get("setting"))
         if decl is None:
             errors.append(f"{where_}.scheme names unknown setting '{scheme.get('setting')}'")
-        elif decl.get("type") != "enum" or set(decl.get("values", [])) - allowed:
-            errors.append(f"{where_}.scheme's setting must be an enum of {' and '.join(sorted(allowed))}")
+        elif decl.get("type") != "enum" or (
+                set(decl.get("values", [])) - allowed
+                # A websocket may follow the http transport's own scheme
+                # setting: http opens ws, https wss (SPEC.md §8).
+                and not (allowed == {"ws", "wss"} and not set(decl.get("values", [])) - {"http", "https"})):
+            errors.append(f"{where_}.scheme's setting must be an enum of {' and '.join(sorted(allowed))}"
+                          + (" (or of http and https)" if allowed == {"ws", "wss"} else ""))
     # accept_invalid_certs only means something over TLS.
     for where_, obj, default in [
             ("transport", transport, "ws" if transport_type == "ws" else "http"),
@@ -490,12 +506,22 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             if "match_each" not in rule:
                 errors.append(f"telemetry.updates[{i}]: match_each_in goes with match_each")
             else:
+                # On an address rule, the captures are the address's, then
+                # arg_match's in argument order.
+                sources = ([rule.get("match", "")] if "address" not in rule else
+                           [rule["address"]] + [p for _, p in sorted((rule.get("arg_match") or {}).items(),
+                                                                     key=lambda kv: int(kv[0]))])
                 try:
-                    groups = re.compile(rule.get("match", "")).groups
-                except re.error:
+                    groups = sum(re.compile(s).groups for s in sources)
+                except (re.error, ValueError):
                     groups = 0
                 if rule["match_each_in"] > groups:
                     errors.append(f"telemetry.updates[{i}]: match_each_in names group {rule['match_each_in']}, which match does not have")
+        if "address" in rule and "match_each" in rule:
+            if "match_each_in" not in rule:
+                errors.append(f"telemetry.updates[{i}]: match_each on an address rule needs match_each_in")
+            if any(k in rule for k in ("json", "json_each", "json_match")):
+                errors.append(f"telemetry.updates[{i}]: match_each goes along a capture's text, not JSON")
         if "arg_match" in rule and "address" not in rule:
             errors.append(f"telemetry.updates[{i}]: arg_match goes with address")
         for index, pattern in (rule.get("arg_match") or {}).items():
@@ -797,10 +823,19 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 errors.append(f"{where}.request_match: {e}")
             if "match" not in rule or transport_type not in ("line-tcp", "line-udp"):
                 errors.append(f"{where}: a request_match regex goes with match, on a line transport")
-        if "match_each" in rule and ("match" not in rule or "path" in rule):
-            errors.append(f"{where}: match_each reads the rest of a message a match rule matched")
+        if "match_each" in rule and ("match" not in rule or "path" in rule) and "address" not in rule:
+            errors.append(f"{where}: match_each reads the rest of a message a match rule matched, "
+                          "or a capture of an address rule")
         if "each_match" in rule and "json_each" not in rule:
             errors.append(f"{where}: each_match selects elements of json_each")
+        # A json_each path may name settings only (SPEC.md §8, a member
+        # chosen by a setting), with no directives.
+        for m in PLACEHOLDER.finditer(rule.get("json_each") or ""):
+            name = m.group(1)
+            if not name.startswith("settings.") or m.group(2):
+                errors.append(f"{where}.json_each: '{m.group(0)}' is not a plain {{settings.name}}")
+            elif name[len("settings."):] not in (doc.get("settings") or {}):
+                errors.append(f"{where}.json_each: unknown setting '{name[len('settings.'):]}'")
         for key in ("json_match", "request_match", "each_match"):
             if not isinstance(rule.get(key) or {}, dict):
                 continue
@@ -826,7 +861,10 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 name = m.group(1)
                 if name.startswith("settings."):
                     errors += check_template(context, m.group(0), {}, settings, f"{where}.then_send")
-                elif not (name.isdigit() or name in captures or name.startswith("arg")):
+                elif not (name.isdigit() or name in captures or name.startswith("arg")
+                          or re.fullmatch(r"\^*(index|key)", name)
+                          # An XML element's captures are named by the reply.
+                          or "xml_each" in rule):
                     errors.append(f"{where}.then_send: '{{{name}}}' is not one of the rule's captures")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
