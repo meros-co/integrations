@@ -112,11 +112,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## allenheath-qu — Allen & Heath Qu
 
-- [ ] Confirm the mixer sends Active Sensing (FE) about every 300 ms and keeps the connection with the core's FE every second. ([specs/allenheath-qu.yaml:274](specs/allenheath-qu.yaml#L274))
-- [ ] Check pan and trim at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-qu.yaml:288](specs/allenheath-qu.yaml#L288))
-- [ ] Confirm the DCA assign values address DCAs 1-4 (the document repeats the mute group label). ([specs/allenheath-qu.yaml:295](specs/allenheath-qu.yaml#L295))
-- [ ] Confirm stereo mixes, groups and matrices answer on their odd number and the LR destination is index 07. ([specs/allenheath-qu.yaml:294](specs/allenheath-qu.yaml#L294))
-- [ ] Confirm remote shutdown works when sent on MIDI channel 1 (B0) whatever the mixer's channel. ([specs/allenheath-qu.yaml:301](specs/allenheath-qu.yaml#L301))
+- [ ] Confirm the mixer sends Active Sensing (FE) about every 300 ms and keeps the connection with the core's FE every second. ([specs/allenheath-qu.yaml:278](specs/allenheath-qu.yaml#L278))
+- [ ] Check pan and trim at several points, since only their ends are documented and the spec spaces them evenly. ([specs/allenheath-qu.yaml:292](specs/allenheath-qu.yaml#L292))
+- [ ] Confirm the DCA assign values address DCAs 1-4 (the document repeats the mute group label). ([specs/allenheath-qu.yaml:299](specs/allenheath-qu.yaml#L299))
+- [ ] Confirm stereo mixes, groups and matrices answer on their odd number and the LR destination is index 07. ([specs/allenheath-qu.yaml:298](specs/allenheath-qu.yaml#L298))
+- [ ] Confirm remote shutdown works when sent on MIDI channel 1 (B0) whatever the mixer's channel. ([specs/allenheath-qu.yaml:305](specs/allenheath-qu.yaml#L305))
+- [ ] With meters on, record how often the mixer sends meter data, whether it stops when the connection closes, and that each value is big-endian. ([specs/allenheath-qu.yaml:323](specs/allenheath-qu.yaml#L323))
+- [ ] Check the meter block order on each model: that the first column of the p.12 table is the Qu-16's, and the Qu-24's 180 unused meters and two group blocks against the Qu-32's 20 unused meters, inputs 25-32 and four group blocks. ([specs/allenheath-qu.yaml:324](specs/allenheath-qu.yaml#L324))
 
 ## allenheath-sq — Allen & Heath SQ
 
