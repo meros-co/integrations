@@ -132,6 +132,26 @@ binary(X, "set_headamp_phantom", {"headamp": 128, "enabled": True}, osc("/headam
 binary(X, "get_headamp_gain", {"headamp": 33}, osc("/headamp/032/gain"))
 binary(X, "get_headamp_phantom", {"headamp": 10}, osc("/headamp/009/phantom"),
        device_reply_hex=hexs(osc("/headamp/009/phantom", ("i", 1))), expect_result={"ok": {"kind": "value", "value": 1}})
+# Which headamp feeds an input (/-ha/NN/index, read-only, p.42).
+binary(X, "get_input_headamp", {"input": 34}, osc("/-ha/33/index"),
+       device_reply_hex=hexs(osc("/-ha/33/index", ("i", 40))), expect_result={"ok": {"kind": "value", "value": 40}})
+telemetry(X, "channel-headamp", inbound_hex=hexs(osc("/-ha/04/index", ("i", 36))),
+          expect_state={"channels": {"5": {"headamp": 37}}})
+telemetry(X, "channel-headamp-none", inbound_hex=hexs(osc("/-ha/31/index", ("i", -1))),
+          expect_state={"channels": {"32": {"headamp": 0}}})
+telemetry(X, "aux-headamp", inbound_hex=hexs(osc("/-ha/39/index", ("i", 7))),
+          expect_state={"aux": {"8": {"headamp": 8}}})
+# A routing change reads every input's headamp again; a source change, that
+# input's.
+telemetry(X, "routing-rereads-headamps", inbound_hex=hexs(osc("/config/routing/IN/1-8", ("i", 5))),
+          expect_state={"routing": {"input": {"1-8": 5}}},
+          expect_then_send_hex=[hexs(osc(f"/-ha/{i:02d}/index")) for i in range(40)])
+telemetry(X, "channel-source-rereads-headamp", inbound_hex=hexs(osc("/ch/17/config/source", ("i", 3))),
+          expect_state={"channels": {"17": {"source": 3}}},
+          expect_then_send_hex=[hexs(osc("/-ha/16/index"))])
+telemetry(X, "aux-source-rereads-headamp", inbound_hex=hexs(osc("/auxin/02/config/source", ("i", 3))),
+          expect_state={"aux": {"2": {"source": 3}}},
+          expect_then_send_hex=[hexs(osc("/-ha/33/index"))])
 
 # Talkback (p.21, p.64).
 binary(X, "set_talkback", {"talkback": "A", "enabled": True}, osc("/-stat/talk/A", ("i", 1)))

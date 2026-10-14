@@ -767,7 +767,7 @@ state:
   screens.*.gamma: { type: float, description: "Screen gamma, as set_screen_gamma writes it" }
   screens.*.ftb: { type: bool, description: "The screen is faded to black (screen detail's Ftb.enable 1)" }
   screens.*.freeze: { type: bool, description: "The screen is frozen (Freeze.enable 1)" }
-  screens.*.bkg.enable: { type: int, description: "Background switch as the splicer reports it (Bkg.enable); set_screen_bkg documents 0 as shown and 1 as hidden" }
+  screens.*.bkg.enable: { type: int, description: "Background switch as the splicer reports it (Bkg.enable); writeBKG documents 0 as Enable (shown) and 1 as Disable (hidden), and the read is taken in the same sense, which its page does not state" }
   screens.*.bkg.id: { type: int, description: "Background image on the screen, a bkgs key" }
   screens.*.size.x: { type: int, unit: px, description: "Screen's horizontal start, from its layout (outputMode.size)" }
   screens.*.size.y: { type: int, unit: px, description: "Screen's vertical start, from its layout" }
@@ -813,6 +813,19 @@ state:
   inputs.*.edid.width: { type: int, unit: px, description: "Horizontal resolution of the input's EDID timing (timing.horizontal.addrTime)" }
   inputs.*.edid.height: { type: int, unit: px, description: "Vertical resolution of the input's EDID timing" }
   inputs.*.edid.refresh_rate: { type: int, description: "EDID refresh rate as the splicer reports it (timing.refreshRate: 60 in the example, documented as hundredths)" }
+  inputs.*.slot: { type: int, description: "Slot of the input's card (slotId), the slotId set_layer_source's body takes" }
+  inputs.*.interface_id: { type: int, description: "The interface's number on its card, from 0 (interfaceId)" }
+  inputs.*.interface_type: { type: int, description: "Interface type code (interfaceType, such as 27 in the documentation's example), the interfaceType set_layer_source's body takes" }
+  inputs.*.source_type: { type: int, description: "Source type (sourceType): 1 for an input (0 no source, 3 IPC), the sourceType set_layer_source's body takes" }
+  inputs.*.default_name: { type: string, description: "The input's factory name, such as input 3-3-1 (defaultName)" }
+  inputs.*.audio.supported: { type: bool, description: "The input carries audio (isSupportAudio)" }
+  inputs.*.audio.source: { type: int, description: "Where the input's audio comes from: 0 its video interface, 1 an audio interface such as 3.5 mm (audioInterface.audioSrc)" }
+  inputs.*.audio.linked: { type: bool, description: "The audio interface is online (audioInterface.linkStatus)" }
+  inputs.*.format.color_depth: { type: int, description: "Colour depth: 0 8 bits, 1 10 bits, 2 12 bits, 3 16 bits (general.colorDepth)" }
+  inputs.*.format.color_space: { type: int, description: "Colour space: 0 RGB, 1 YCbCr (general.colorSpace)" }
+  inputs.*.format.sample_rate: { type: int, description: "Chroma sampling: 0 4:4:4, 1 4:2:2, 2 4:2:0 (general.sampleRate)" }
+  inputs.*.format.capacity: { type: int, description: "Connection capacity: 0 single link, 1 dual link, 2 4K (general.connectCapacity)" }
+  inputs.*.format.hdcp_encrypted: { type: bool, description: "The received signal is HDCP-encrypted (general.HDCPEncryted)" }
   inputs.*.crops.*.name: { type: string, description: "Cropped source name, keyed by cropId" }
   inputs.*.crops.*.x: { type: int, unit: px, description: "Cropped area's left edge in the input picture" }
   inputs.*.crops.*.y: { type: int, unit: px, description: "Cropped area's top edge in the input picture" }
@@ -900,8 +913,13 @@ quirks:
       display), set_output_locating or input groups, so those are not kept in
       state. Kept out of state though readable: the OSD's text, colours and
       position and the 3D timing (get_screen returns them), and preset group
-      contents and play times (get_preset_group). set_screen_bkg's enable is
-      kept as the splicer reports it, whose sense the pages do not state.
+      contents and play times (get_preset_group). The background switch's
+      sense is documented for the write only: Set BKG (screen/writeBKG) gives
+      enable as "0: Enable, 1: Disable", the reverse of the other switches.
+      Read Screen Detailed Information's Bkg refers to the BKG detail page,
+      which has no enable, so the read's sense is not documented; it is kept
+      as the splicer reports it (screens.*.bkg.enable), taken to be the
+      write's.
 
   - models: [all]
     severity: critical

@@ -116,6 +116,13 @@ telemetry(RP, "track-arm-int", inbound_hex=hexs(osc("/track/1/recarm", ("i", 0))
           expect_state={"tracks": {"1": {"armed": False}}})
 telemetry(RP, "track-monitor", inbound_hex=hexs(osc("/track/5/monitor", ("i", 2))),
           expect_state={"tracks": {"5": {"monitor": 2}}})
+# Automation mode: each TRACK_AUTO_* toggle fed back as b (Default.ReaperOSC).
+telemetry(RP, "track-automation-on", inbound_hex=hexs(osc("/track/2/autolatch", ("f", 1.0))),
+          expect_state={"tracks": {"2": {"automation": {"latch": True}}}})
+telemetry(RP, "track-automation-off", inbound_hex=hexs(osc("/track/2/autoread", ("i", 0))),
+          expect_state={"tracks": {"2": {"automation": {"read": False}}}})
+telemetry(RP, "selected-track-automation", inbound_hex=hexs(osc("/track/auto", ("s", "Touch"))),
+          expect_state={"selected_track": {"automation": "Touch"}})
 telemetry(RP, "fx-bypassed", inbound_hex=hexs(osc("/track/3/fx/1/bypass", ("f", 0.0))),
           expect_state={"tracks": {"3": {"fx": {"1": {"active": False}}}}})
 telemetry(RP, "fx-name", inbound_hex=hexs(osc("/track/3/fx/1/name", ("s", "ReaEQ"))),

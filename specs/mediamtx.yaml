@@ -930,7 +930,15 @@ quirks:
       it fits a page. A configuration change or kick this integration makes
       reads the affected list again at once, on 1.15.5 and later, whose
       answers say {"status": "ok"}. RTSP and RTSPS connections are not
-      polled (their sessions are), and recordings are not kept in state.
+      polled (their sessions are). Recordings are listed every 30 seconds,
+      each recording's time spans read from the playback server after it;
+      with the playback server off those reads fail quietly and the spans
+      stay empty. A path's span list (playback_spans) is replaced only by an
+      answer that lists spans: a path whose recordings are all deleted
+      answers 404 (1.11.1 and later) and keeps its last spans until the
+      device is opened again.
+      A path's source is kept as MediaMTX reports it, credentials in a pull
+      URL included.
 
   - models: [all]
     severity: info
@@ -1006,6 +1014,18 @@ state:
   path_defaults.max_readers:     { type: int, description: "Default reader limit per path, 0 for none (maxReaders)" }
 
   path_config_count:             { type: int, description: "How many paths are configured (config/paths/list itemCount)" }
+  recording_count:               { type: int, description: "How many paths have recordings on disk (recordings/list itemCount, 1.5.1 and later)" }
+  recordings.*.segments.*:       { type: string, description: "Start of a recording segment on disk, RFC 3339, keyed by path name and the segment's position from 0; delete_recording_segment takes it as it is" }
+  playback_spans.*.*.start:      { type: string, description: "Start of a recorded time span, RFC 3339, keyed by path name and the span's position from 0 (the playback server's /list)" }
+  playback_spans.*.*.duration: { type: float, unit: s, description: "Length of the time span; it grows while the path records" }
+  playback_spans.*.*.url:        { type: string, description: "Address a player downloads the span from as MP4 (1.9.0 and later)" }
+  path_configs.*.source:         { type: string, description: "Where the configured path's stream comes from, keyed by path name: publisher, redirect, rpiCamera or a URL to pull from, as MediaMTX reports it (source)" }
+  path_configs.*.fallback:       { type: string, description: "Path or URL readers are redirected to while the path has no source (fallback)" }
+  path_configs.*.forward:        { type: string, description: "Destinations the path's stream is forwarded to, JSON text: a list of {dest, ...} (forward, 1.20 and later)" }
+  path_configs.*.record_path:    { type: string, description: "Where the path's recordings are written, with %path and time placeholders (recordPath)" }
+  path_configs.*.record_segment_duration: { type: string, description: "Length of each recording segment, such as 1h (recordSegmentDuration)" }
+  path_configs.*.record_part_duration: { type: string, description: "How often a recording is written to disk, such as 1s (recordPartDuration)" }
+  path_configs.*.playback:       { type: bool, description: "The path's recordings can be played back from the playback server (playback)" }
   path_configs.*.record:         { type: bool, description: "The configured path records to disk, keyed by path name (record)" }
   path_configs.*.record_format:  { type: string, description: "The path's recording container, fmp4 or mpegts (recordFormat)" }
   path_configs.*.record_delete_after: { type: string, description: "How long the path's recordings are kept, such as 1d (recordDeleteAfter)" }
@@ -1152,6 +1172,11 @@ telemetry:
         - { method: GET, path: /v3/config/global/get }
         - { method: GET, path: /v3/config/paths/list, query: { itemsPerPage: "1000" } }
         - { method: GET, path: /v3/info }
+    # Recordings on disk every 30 seconds (1.5.1 and later); each one's
+    # recorded time spans are then asked of the playback server.
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /v3/recordings/list, query: { itemsPerPage: "1000" } }
   updates:
     # ── Server and configuration ────────────────────────────────────────────
     - path: '^/v3/info$'
@@ -1229,7 +1254,21 @@ telemetry:
         max_readers: "$.maxReaders"
         override: "$.overridePublisher"
         always: "$.alwaysAvailable"
+        source: "$.source"
+        fallback: "$.fallback"
+        forward: "$.forward"
+        record_path: "$.recordPath"
+        segment: "$.recordSegmentDuration"
+        part: "$.recordPartDuration"
+        playback: "$.playback"
       state:
+        path_configs.{name:key}.source: "{source}"
+        path_configs.{name:key}.fallback: "{fallback}"
+        path_configs.{name:key}.forward: "{forward}"
+        path_configs.{name:key}.record_path: "{record_path}"
+        path_configs.{name:key}.record_segment_duration: "{segment}"
+        path_configs.{name:key}.record_part_duration: "{part}"
+        path_configs.{name:key}.playback: "{playback}"
         path_configs.{name:key}.record: "{record}"
         path_configs.{name:key}.record_format: "{record_format}"
         path_configs.{name:key}.record_delete_after: "{delete_after}"
@@ -1241,6 +1280,47 @@ telemetry:
       json_match: { "$.pageCount": "^[01]$" }
       json: {}
       replace: path_configs
+
+    # ── Recordings (1.5.1 and later) ────────────────────────────────────────
+    # The count from every answer; the whole list replaces state when it fits
+    # one page. Each recording's segments, by position, replace its last ones,
+    # and its time spans are read from the playback server.
+    - path: '^/v3/recordings/list(?:\?|$)'
+      json: { count: "$.itemCount" }
+      state: { recording_count: "{count}" }
+    - path: '^/v3/recordings/list(?:\?|$)'
+      json_each: "$.items"
+      each_match: { "$.segments": "^\\[" }
+      json: { name: "$.name" }
+      replace: "recordings.{name:key}.segments"
+      then_send:
+        - { endpoint: playback, method: GET, path: /list, query: { path: "{name}" } }
+    - path: '^/v3/recordings/list\?(?:page=0&)?itemsPerPage=\d+$'
+      json_match: { "$.pageCount": "^[01]$" }
+      json: {}
+      replace: recordings
+    - path: '^/v3/recordings/list(?:\?|$)'
+      json_each: "$.items[*].segments"
+      json: { name: "$^.name", start: "$.start" }
+      state: { "recordings.{name:key}.segments.{index}": "{start}" }
+    # get_recordings answers one Recording, not a list.
+    - path: '^/v3/recordings/get/'
+      json_match: { "$.name": "^(.+)$", "$.segments": "^\\[" }
+      replace: "recordings.{1:key}.segments"
+      json_each: "$.segments"
+      json: { start: "$.start" }
+      state: { "recordings.{1:key}.segments.{index}": "{start}" }
+    # The playback server's time spans of a path (list_playback_spans and the
+    # read above); a list asked with start and end is a part only, and is
+    # not kept.
+    - path: '^/list\?path=([^&]+)$'
+      replace: "playback_spans.{1:url_decode:key}"
+      json_each: "$"
+      json: { start: "$.start", duration: "$.duration", url: "$.url" }
+      state:
+        "playback_spans.{1:url_decode:key}.{index}.start": "{start}"
+        "playback_spans.{1:url_decode:key}.{index}.duration": "{duration}"
+        "playback_spans.{1:url_decode:key}.{index}.url": "{url}"
 
     # ── Live paths ──────────────────────────────────────────────────────────
     - path: '^/v3/paths/list(?:\?|$)'

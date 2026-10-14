@@ -13521,6 +13521,7 @@ state:
   workspaces.*.has_passcode: { type: bool, description: "Whether the workspace has an OSC passcode (QLab 4)" }
   workspaces.*.cue_lists.*.index: { type: int, description: "Position of a cue list or cart in the sidebar, from 0" }
   workspaces.*.active.*: { type: string, description: "Unique IDs of the running or paused cues, in Active Cues order from 0" }
+  workspaces.*.selected.*: { type: string, description: "Unique IDs of the cues selected in the workspace, in QLab's order from 0, without the children of a selected Group cue (/selectedCues/shallow, polled once a second)" }
   workspaces.*.cues.*.index: { type: int, description: "Position of the cue in its list, cart or Group, from 0" }
   workspaces.*.cues.*.children.*: { type: string, description: "Unique IDs of a list's, cart's or Group's children, in order from 0" }
   workspaces.*.cues.*.number: { type: string, description: "Cue number; empty when the cue has none" }
@@ -13769,10 +13770,13 @@ telemetry:
       - /listen/cue/start
       - /listen/cue/stop
       - /workspaces
-  # The active cues of every workspace, and each one's times, once a second.
+  # The active cues of every workspace, and each one's times, once a second;
+  # the selected cues too, since QLab sends no update when the selection
+  # changes (Getting status updates lists none).
   poll:
     send:
       - { address: /runningOrPausedCues/shallow, reply_address: "^/reply/runningOrPausedCues/shallow$" }
+      - { address: /selectedCues/shallow, reply_address: "^/reply/selectedCues/shallow$" }
     every_ms: 1000
   updates:
     # The open workspaces; each one's cue lists and settings are read.
@@ -14446,6 +14450,15 @@ telemetry:
       state: { "workspaces.{1}.active.{index}": "{2}" }
       then_send:
         - { address: "/workspace/{1}/cue_id/{2}/valuesForKeys", args: [{ value: "[\"isRunning\",\"isPaused\",\"isLoaded\",\"isBroken\",\"isAuditioning\",\"isPanicking\",\"isTailingOut\",\"isActionRunning\",\"isOverridden\",\"isWarning\",\"actionElapsed\",\"percentActionElapsed\",\"preWaitElapsed\",\"percentPreWaitElapsed\",\"postWaitElapsed\",\"percentPostWaitElapsed\",\"currentFileTime\",\"currentDuration\"]", type: string }], reply_address: "^/reply/workspace/[^/]+/cue_id/[^/]+/valuesForKeys$" }
+    # The selected cues of each workspace, top level only (a selected Group
+    # cue is one entry), in the order QLab lists them.
+    - address: "^/reply/selectedCues/shallow$"
+      json_match: { "$.workspace_id": "^([A-Za-z0-9-]+)$", "$.status": "^ok$" }
+      replace: "workspaces.{1}.selected"
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: {}
+      state: { "workspaces.{1}.selected.{index}": "{2}" }
     - address: "^/reply/workspace/([^/]+)/showMode$"
       json_match: { "$.status": "^ok$" }
       json: { value: "$.data" }
@@ -14636,6 +14649,17 @@ telemetry:
         "cues.{arg2}.running": "false"
 
 quirks:
+  - models: [all]
+    severity: info
+    text: >
+      QLab sends no update when the selection changes: the OSC dictionary's
+      status updates cover cue lists, cues, playback positions and
+      disconnection only. The selected cues of each workspace
+      (workspaces.*.selected) are therefore polled with /selectedCues/shallow
+      once a second, and a change shows up to a second late. The reply lists
+      the top-level selected cues by unique ID; the children of a selected
+      Group cue are not listed separately.
+
   - models: [all]
     severity: warning
     text: >

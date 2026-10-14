@@ -19,7 +19,8 @@ def _id(uuid, name, index):
 
 _LIVE = [{"method": "GET", "target": t} for t in (
     "/v1/status/slide", "/v1/presentation/slide_index", "/v1/status/layers",
-    "/v1/look/current", "/v1/playlist/active", "/v1/presentation/focused")]
+    "/v1/look/current", "/v1/playlist/active", "/v1/presentation/focused",
+    "/v1/presentation/active", "/v1/announcement/active")]
 
 _ppt("version", "/version", {"name": "ProPresenter", "platform": "mac", "os_version": "14.4.1",
                              "host_description": "Main", "api_version": "v1"},
@@ -176,6 +177,80 @@ _ppt("media-playlists", "/v1/media/playlists", [
     {"media_playlists": {"mf": {"name": "Media", "index": 0, "type": "group"},
                          "mp": {"name": "Backgrounds", "index": 0, "type": "playlist",
                                 "parent": "mf"}}})
+
+# The active presentation's groups and slides (presentationGetActive), the
+# list replaced; slides kept as JSON text per group.
+_WHITE = {"red": 1, "green": 1, "blue": 1, "alpha": 1}
+_SLIDE = {"enabled": True, "notes": "Slow", "text": "Amazing grace", "label": "", "color": _WHITE,
+          "size": {"width": 1920, "height": 1080}}
+_ppt("presentation-active", "/v1/presentation/active", {"presentation": {
+    "id": _id("pr1", "Amazing Grace", 0),
+    "groups": [{"name": "Verse 1", "color": _WHITE, "slides": [_SLIDE]},
+               {"name": "Chorus", "color": _WHITE, "slides": []}],
+    "has_timeline": False, "has_timeline_items": False, "presentation_path": "/Library/Amazing Grace.pro",
+    "destination": "presentation"}},
+    {"presentation": {"groups": {
+        "0": {"name": "Verse 1", "color": json.dumps(_WHITE, separators=(",", ":")),
+              "slides": json.dumps([_SLIDE], separators=(",", ":"))},
+        "1": {"name": "Chorus", "color": json.dumps(_WHITE, separators=(",", ":")), "slides": "[]"}},
+        "has_timeline": False, "has_timeline_items": False, "path": "/Library/Amazing Grace.pro"}},
+    state_before={"presentation": {"groups": {"0": {"name": "Old"}, "1": {"name": "Old"},
+                                              "2": {"name": "Old"}}}})
+_ppt("announcement-active", "/v1/announcement/active", {"announcement": {
+    "id": _id("an1", "Welcome Loop", 0),
+    "groups": [{"name": "Loop", "color": _WHITE, "slides": []}],
+    "has_timeline": True, "has_timeline_items": True, "presentation_path": "/Library/Welcome.pro",
+    "destination": "announcements"}},
+    {"announcement": {"groups": {"0": {"name": "Loop", "color": json.dumps(_WHITE, separators=(",", ":")),
+                                       "slides": "[]"}},
+                      "has_timeline": True, "has_timeline_items": True, "path": "/Library/Welcome.pro"}})
+# Each playlist (not a folder) has its items read whenever the playlists are.
+_ppt("playlists-read-items", "/v1/playlists", [
+    {"id": _id("f1", "2026", 0), "type": "group", "playlists": [
+        {"id": _id("f2", "October", 0), "type": "group", "playlists": [
+            {"id": _id("p1", "Sunday", 0), "type": "playlist"}]}]},
+    {"id": _id("p2", "Loose", 1), "type": "playlist"}],
+    {"playlists": {
+        "f1": {"name": "2026", "index": 0, "type": "group"},
+        "p2": {"name": "Loose", "index": 1, "type": "playlist"},
+        "f2": {"name": "October", "index": 0, "type": "group", "parent": "f1"},
+        "p1": {"name": "Sunday", "index": 0, "type": "playlist", "parent": "f2"}}},
+    expect_then_send=[{"method": "GET", "target": "/v1/playlist/p2"},
+                      {"method": "GET", "target": "/v1/playlist/p1"}])
+_ppt("media-playlists-read-items", "/v1/media/playlists", [
+    {"id": _id("mf", "Media", 0), "type": "group", "children": [
+        {"id": _id("mp", "Backgrounds", 0), "type": "playlist"}]}],
+    {"media_playlists": {"mf": {"name": "Media", "index": 0, "type": "group"},
+                         "mp": {"name": "Backgrounds", "index": 0, "type": "playlist",
+                                "parent": "mf"}}},
+    expect_then_send=[{"method": "GET", "target": "/v1/media/playlist/mp"}])
+# A playlist's items (playlistGet), by position, the list replaced.
+_ppt("playlist-items", "/v1/playlist/p1", {"id": _id("p1", "Sunday", 0), "items": [
+    {"id": _id("i1", "Welcome", 0), "type": "header", "is_hidden": False, "is_pco": False,
+     "header_color": _WHITE},
+    {"id": _id("i2", "Amazing Grace", 1), "type": "presentation", "is_hidden": False, "is_pco": True,
+     "presentation_info": {"presentation_uuid": "pr1", "arrangement_name": "Default"},
+     "target_uuid": "pr1"},
+    {"id": _id("i3", "Walk-in", 2), "type": "media", "is_hidden": True, "is_pco": False, "duration": 95,
+     "target_uuid": "m1"}]},
+    {"playlist_items": {"p1": {
+        "0": {"uuid": "i1", "name": "Welcome", "type": "header", "hidden": False, "pco": False,
+              "header_color": json.dumps(_WHITE, separators=(",", ":"))},
+        "1": {"uuid": "i2", "name": "Amazing Grace", "type": "presentation", "hidden": False, "pco": True,
+              "presentation_uuid": "pr1", "arrangement": "Default", "target_uuid": "pr1"},
+        "2": {"uuid": "i3", "name": "Walk-in", "type": "media", "hidden": True, "pco": False,
+              "duration": 95, "target_uuid": "m1"}}}},
+    state_before={"playlist_items": {"p1": {"3": {"uuid": "gone"}}}})
+_ppt("playlist-items-empty", "/v1/playlist/p1", {"id": _id("p1", "Sunday", 0), "items": []},
+     {"playlist_items": {}}, state_before={"playlist_items": {"p1": {"0": {"uuid": "gone"}}}})
+_ppt("media-playlist-items", "/v1/media/playlist/mp", {"id": _id("mp", "Backgrounds", 0), "items": [
+    {"id": _id("m1", "Clouds", 0), "type": "video", "artist": "", "duration": 30}]},
+    {"media_playlist_items": {"mp": {"0": {"uuid": "m1", "name": "Clouds", "type": "video", "artist": "",
+                                           "duration": 30}}}})
+_ppt("audio-playlist-items", "/v1/audio/playlist/ap", {"id": _id("ap", "Pre-service", 0), "items": [
+    {"id": _id("a1", "Song", 0), "type": "audio", "artist": "Band", "duration": 240}]},
+    {"audio_playlist_items": {"ap": {"0": {"uuid": "a1", "name": "Song", "type": "audio", "artist": "Band",
+                                           "duration": 240}}}})
 
 # Re-reads. A trigger reads what is live again at once.
 _ppt("reread-trigger", "/v1/presentation/active/next/trigger", "", {},
