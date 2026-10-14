@@ -747,13 +747,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## extron-matrix — Extron SIS matrix switchers
 
-- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([specs/extron-matrix.yaml:931](specs/extron-matrix.yaml#L931))
-- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([specs/extron-matrix.yaml:941](specs/extron-matrix.yaml#L941))
-- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([specs/extron-matrix.yaml:916](specs/extron-matrix.yaml#L916))
-- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([specs/extron-matrix.yaml:955](specs/extron-matrix.yaml#L955))
-- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([specs/extron-matrix.yaml:971](specs/extron-matrix.yaml#L971))
-- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([specs/extron-matrix.yaml:985](specs/extron-matrix.yaml#L985))
-- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([specs/extron-matrix.yaml:978](specs/extron-matrix.yaml#L978))
+- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([specs/extron-matrix.yaml:956](specs/extron-matrix.yaml#L956))
+- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([specs/extron-matrix.yaml:966](specs/extron-matrix.yaml#L966))
+- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([specs/extron-matrix.yaml:941](specs/extron-matrix.yaml#L941))
+- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([specs/extron-matrix.yaml:980](specs/extron-matrix.yaml#L980))
+- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([specs/extron-matrix.yaml:996](specs/extron-matrix.yaml#L996))
+- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([specs/extron-matrix.yaml:1010](specs/extron-matrix.yaml#L1010))
+- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([specs/extron-matrix.yaml:1910](specs/extron-matrix.yaml#L1910))
+- [ ] On DXP HD 4K PLUS, record the EDID view replies (EdidR hex, EdidN native resolution) and the EDID import and export tags, which the guide prints as EIX5@ and EEX5@. ([specs/extron-matrix.yaml:1175](specs/extron-matrix.yaml#L1175))
+- [ ] On XTP II, record the remote power (POEC) replies and pushes, and the all-ports forms. ([specs/extron-matrix.yaml:1271](specs/extron-matrix.yaml#L1271))
+- [ ] On XTP II, check ETIE: which type value (1 or 2) selects video only, and the receiver form (Rev. Q). ([specs/extron-matrix.yaml:1340](specs/extron-matrix.yaml#L1340))
+- [ ] Check which IP, DHCP and password changes end the Telnet session on each family (only DXP DVI documents it). ([specs/extron-matrix.yaml:1924](specs/extron-matrix.yaml#L1924))
+- [ ] Check the unit name length limit on each family (63 on DXP HD 4K PLUS, 24 elsewhere) and the CT read format (SMX MM/DD/YY, others Ddd, DD Mmm YYYY). ([specs/extron-matrix.yaml:1589](specs/extron-matrix.yaml#L1589))
+- [ ] On SMX, check the serial port (CP) syntax, which the guide prints as Esc *port,...CP, and which port numbers are the rear ports on each family. ([specs/extron-matrix.yaml:1639](specs/extron-matrix.yaml#L1639))
+- [ ] On SMX, record a virtual plane definition and its read-back (Mpv), and whether Esc ZXXX clears virtual planes. ([specs/extron-matrix.yaml:1699](specs/extron-matrix.yaml#L1699))
+- [ ] Check what a DXP HD 4K PLUS answers for global presets 17-32, and how DXP DVI and SMX treat names longer than 12 characters. ([specs/extron-matrix.yaml:1953](specs/extron-matrix.yaml#L1953))
+- [ ] Check that the 2-minute poll's extra queries (network, EDID, HDCP authorization, formats, transmitter inputs, slot and virtual planes) are answered with E-codes, not silence, on the models that lack them. ([specs/extron-matrix.yaml:1953](specs/extron-matrix.yaml#L1953))
 
 ## extron-switcher — Extron IN-series scaling presentation switchers
 
