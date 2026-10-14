@@ -55,6 +55,13 @@ _wo7("send_msc", {"commands": [{"command": {"go": {}}}]}, "POST", "/v0/msc", '[{
      http_reply={"status": 400, "body": "MSC Cue not found"},
      expect_result={"error": {"error": "device_error", "code": "400"}})
 _wo7("load_show", {"show": {"showName": "Demo"}}, "POST", "/v0/show", '{"showName":"Demo"}')
+# The file's bytes are the whole body (a made-up four-byte file, 50 4b 03 04).
+V.append({"spec": WO7, "command": "load_show_file", "input": {"file": "UEsDBA=="},
+          "expect_request": {"method": "POST", "target": "/v0/showfile", "body_hex": "504b0304",
+                             "content_type": "application/octet-stream"}})
+V.append({"spec": WO7, "command": "load_show_file_named", "input": {"file": "UEsDBA==", "name": "Main Show"},
+          "expect_request": {"method": "POST", "target": "/v0/showfile?showName=Main%20Show",
+                             "body_hex": "504b0304", "content_type": "application/octet-stream"}})
 # The node's Process Manager on port 3017 (the same page's node management
 # section): POST, no body.
 for _cmd, _path in [("restart_node_services", "/v0/services/restart"), ("reboot_node", "/v0/reboot"),
