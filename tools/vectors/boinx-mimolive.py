@@ -381,6 +381,8 @@ _ml("set_show_title", {**D_, "title": 'The "Sunday" Show'}, "PUT", _ML_D, {"meta
 _ml("set_show_author", {**D_, "author": "Jane Doe"}, "PUT", _ML_D, {"metadata": {"author": "Jane Doe"}})
 _ml("set_show_comments", {**D_, "comments": "Second camera on the left"}, "PUT", _ML_D,
     {"metadata": {"comments": "Second camera on the left"}})
+_ml("set_show_comments", {**D_, "comments": "Cameras:\n1 left\n2 right"}, "PUT", _ML_D,
+    {"metadata": {"comments": "Cameras:\n1 left\n2 right"}}, file="set_show_comments.multiline")
 _ml("set_show_name", {**D_, "show": "Sunday"}, "PUT", _ML_D, {"metadata": {"show": "Sunday"}})
 _ml("set_show_planned_duration", {**D_, "seconds": 3600}, "PUT", _ML_D, {"metadata": {"duration": 3600}})
 _ml("set_document_resolution", {**D_, "width": 1920, "height": 1080}, "PUT", _ML_D,
