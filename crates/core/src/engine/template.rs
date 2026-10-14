@@ -177,6 +177,12 @@ impl Values<'_> {
             .ok_or_else(|| format!("'{name}' has no value"))?;
         Ok((value, spec.kind))
     }
+
+    /// Whether a parameter may hold control characters (`multiline`): it is
+    /// then only ever sent through `:json`, which escapes them.
+    fn multiline(&self, name: &str) -> bool {
+        !name.starts_with("settings.") && self.param_specs.get(name).is_some_and(|s| s.multiline)
+    }
 }
 
 /// Render `template`, passing each substituted value through `escape`. Literal
@@ -205,7 +211,7 @@ pub(crate) fn render(
 /// used for OSC arguments, where a number is sent as a number.
 pub(crate) fn sole_value<'a>(template: &str, values: &'a Values) -> Option<(&'a Value, ParamType)> {
     let caps = placeholder().captures(template)?;
-    if caps.get(0)?.as_str() != template || !caps[2].is_empty() {
+    if caps.get(0)?.as_str() != template || !caps[2].is_empty() || values.multiline(&caps[1]) {
         return None;
     }
     values.lookup(&caps[1]).ok()
@@ -245,6 +251,10 @@ pub(crate) fn sole_converted(template: &str, values: &Values) -> Option<Result<f
 
 fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String, String> {
     let (value, kind) = values.lookup(name)?;
+    // A value that may hold line breaks goes out JSON-escaped, or not at all.
+    if values.multiline(name) && directives != ["json"] {
+        return Err(format!("multiline '{name}' is sent only as ':json'"));
+    }
 
     // A value table: the value's plain text looked up, and the wire text
     // taken as it is. A value the table does not list is rejected.
@@ -518,6 +528,25 @@ mod tests {
             go("{n:url_decode}", json!({"n": 7}), "n: {type: int}"),
             Ok("7".into())
         );
+    }
+
+    #[test]
+    fn a_multiline_string_goes_out_only_json_escaped() {
+        let spec = "script: {type: string, multiline: true}";
+        let script = json!({"script": "a = 1\n\treturn a"});
+        assert_eq!(
+            go("{\"script\":{script:json}}", script.clone(), spec),
+            Ok("{\"script\":\"a = 1\\n\\treturn a\"}".into())
+        );
+        assert!(go("run {script}", script.clone(), spec).is_err());
+        assert!(go("{script:upper:json}", script, spec).is_err());
+        // The catalogue accepts its control characters; any other string's
+        // are refused.
+        let (_, specs) = values(json!({}), spec);
+        let given = json!({"script": "a\nb"}).as_object().unwrap().clone();
+        assert!(crate::catalog::validate(&specs, &given).is_ok());
+        let (_, plain) = values(json!({}), "script: {type: string}");
+        assert!(crate::catalog::validate(&plain, &given).is_err());
     }
 
     fn values(params: Value, specs: &str) -> (Params, BTreeMap<String, ParamSpec>) {

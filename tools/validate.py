@@ -113,6 +113,12 @@ def check_template(
             )
 
         ptype = decl["type"]
+        # A multiline string may hold line breaks: only `:json` escapes them.
+        if decl.get("multiline"):
+            if ptype != "string":
+                errors.append(f"{where}: multiline applies to a string, not {ptype} '{name}'")
+            if directives != ["json"]:
+                errors.append(f"{where}: multiline '{name}' is sent only as '{{{name}:json}}'")
         for directive in directives:
             allowed = next((types for pat, types in DIRECTIVES if pat.match(directive)), None)
             if allowed is None:

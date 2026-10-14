@@ -1227,6 +1227,7 @@ fn spec_of(kind: ParamType) -> ParamSpec {
         default: None,
         required: false,
         secret: false,
+        multiline: false,
     }
 }
 

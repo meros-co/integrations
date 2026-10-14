@@ -813,6 +813,30 @@ before transmission. A CR or LF in a label would otherwise end the command and
 start another. Rejecting rather than stripping follows the no-clamping rule
 above.
 
+A string that is text by nature, such as a script or a note, takes
+`multiline: true`: its value may then hold line breaks, tabs and any other
+control character, because it is only ever sent through the `json` directive,
+which escapes them (`\n`, `\t`, `\u0001`):
+
+```yaml
+params:
+  script:
+    type: string
+    multiline: true
+    required: true
+    label: Script
+    description: Python code to run, lines separated by line breaks.
+send: { method: POST, path: /api/python/execute, body: '{"script":{script:json}}' }
+```
+
+Every placeholder naming a multiline parameter must be `{name:json}`, with no
+other directive, wherever it stands; `tools/validate.py` checks this and the
+core refuses to render it any other way. The catalogue serves `multiline`, so
+a consumer can offer a text area. Such a parameter used to be a `json`
+parameter holding a JSON string; a caller that passed a string to it passes the
+same string now and the same bytes go out, while a value that was not a string
+is now refused before transmission.
+
 Encoding depends on where the value lands:
 
 | Location | Encoding |
