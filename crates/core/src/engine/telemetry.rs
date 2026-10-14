@@ -106,42 +106,89 @@ enum Matcher {
     HttpText { path: Regex, re: Regex },
 }
 
-/// One element `json_each` reaches: the element, its index in its array,
-/// and the elements it lies in, outermost first (the document, then each
-/// `[*]` level's element).
+/// One element `json_each` reaches: the element, its index in its array
+/// (or its place among its object's members), the member's name when it is
+/// an object's member, and the elements it lies in, outermost first (the
+/// document, then each `[*]` or `.*` level's element).
 struct EachItem<'a> {
     item: &'a Value,
     index: usize,
+    key: Option<&'a str>,
     outer: Vec<&'a Value>,
 }
 
-/// The elements of the array at `each`, through every `[*]` in it:
-/// `$.data[*].ingest_streams` is each ingest stream of each live video.
+/// The steps of a `json_each` path: each a JSON path, from the element the
+/// step before reached, to an array whose elements it goes through, or with
+/// `members` to an object whose members it goes through. `[*]` and `.*` end
+/// a step; what follows the last of them is an array, unless the path ends
+/// with `.*`.
+fn each_steps(each: &str) -> Vec<(String, bool)> {
+    let mut steps = Vec::new();
+    let mut rest = each;
+    let mut start = true;
+    loop {
+        let array = rest.find("[*]");
+        // `.*` as a whole step: followed by the end, a `.` or a `[`.
+        let members = rest
+            .match_indices(".*")
+            .map(|(i, _)| i)
+            .find(|&i| matches!(rest.as_bytes().get(i + 2), None | Some(b'.') | Some(b'[')));
+        let (at, len, is_members) = match (array, members) {
+            (Some(a), Some(m)) if m < a => (m, 2, true),
+            (Some(a), _) => (a, 3, false),
+            (None, Some(m)) => (m, 2, true),
+            (None, None) => break,
+        };
+        let part = &rest[..at];
+        steps.push((path_of(part, start), is_members));
+        start = false;
+        rest = &rest[at + len..];
+        if rest.is_empty() && is_members {
+            return steps;
+        }
+    }
+    steps.push((path_of(rest, start), false));
+    steps
+}
+
+/// A step's JSON path: the first is the document's, every other is the
+/// element's, from `$`.
+fn path_of(part: &str, start: bool) -> String {
+    match start {
+        true => part.to_string(),
+        false => format!("${part}"),
+    }
+}
+
+/// The elements `each` reaches, through every `[*]` (an array's elements)
+/// and `.*` (an object's members) in it: `$.data[*].ingest_streams` is each
+/// ingest stream of each live video, `$.sources.*` each member of the
+/// object at `$.sources`.
 fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
-    let parts: Vec<&str> = each.split("[*]").collect();
+    let steps = each_steps(each);
     // Elements reached so far, each with the elements it lies in.
     let mut level: Vec<(&Value, Vec<&Value>)> = vec![(doc, Vec::new())];
-    let last = parts.len() - 1;
+    let last = steps.len() - 1;
     let mut out = Vec::new();
-    for (i, part) in parts.iter().enumerate() {
-        let path = if i == 0 {
-            part.to_string()
-        } else {
-            format!("${part}")
-        };
+    for (i, (path, members)) in steps.iter().enumerate() {
         let mut next = Vec::new();
         for (node, outer) in level {
-            let Some(array) = super::expect::json_path(node, &path).and_then(Value::as_array)
-            else {
+            let Some(at) = super::expect::json_path(node, path) else {
                 continue;
+            };
+            let found: Vec<(Option<&str>, &Value)> = match (members, at) {
+                (false, Value::Array(a)) => a.iter().map(|v| (None, v)).collect(),
+                (true, Value::Object(o)) => o.iter().map(|(k, v)| (Some(k.as_str()), v)).collect(),
+                _ => continue,
             };
             let mut within = outer.clone();
             within.push(node);
-            for (index, item) in array.iter().enumerate() {
+            for (index, (key, item)) in found.into_iter().enumerate() {
                 if i == last {
                     out.push(EachItem {
                         item,
                         index,
+                        key,
                         outer: within.clone(),
                     });
                 } else {
@@ -186,6 +233,7 @@ fn each_values(
         None => vec![EachItem {
             item: doc,
             index: 0,
+            key: None,
             outer: Vec::new(),
         }],
     };
@@ -211,6 +259,10 @@ fn each_values(
             }
             if each.is_some() {
                 values.push(("index".to_string(), Value::from(e.index)));
+            }
+            // `.*`: the member's name.
+            if let Some(key) = e.key {
+                values.push(("key".to_string(), Value::String(key.to_string())));
             }
             for (name, path) in json {
                 if let Some(v) = present(element_path(&e, path)) {
@@ -1759,6 +1811,82 @@ mod tests {
         // An empty key is no key.
         let empty = json!({"event": "removed", "id": ""});
         assert_eq!(t.apply(&Inbound::Json(&empty)), None);
+    }
+
+    #[test]
+    fn an_objects_members_are_gone_through_by_name() {
+        assert_eq!(
+            each_steps("$.data[*].ingest_streams"),
+            vec![
+                ("$.data".to_string(), false),
+                ("$.ingest_streams".to_string(), false)
+            ]
+        );
+        assert_eq!(
+            each_steps("$.sources.*"),
+            vec![("$.sources".to_string(), true)]
+        );
+        assert_eq!(
+            each_steps("$.devices.*.inputs"),
+            vec![
+                ("$.devices".to_string(), true),
+                ("$.inputs".to_string(), false)
+            ]
+        );
+        // `.*x` is a member's name, not a step.
+        assert_eq!(each_steps("$.a.*x"), vec![("$.a.*x".to_string(), false)]);
+        let state_decl = state(json!({
+            "sources.*.address": {"type": "string", "description": "x"},
+            "sources.*.index": {"type": "int", "description": "x"},
+            "devices.*.inputs.*.name": {"type": "string", "description": "x"},
+        }));
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/List$", "json_each": "$.*", "json": {"address": "$"},
+                 "replace": "sources",
+                 "state": {"sources.{key:key}.address": "{address}", "sources.{key:key}.index": "{index}"}},
+                {"path": "^/devices$", "json_each": "$.devices.*.inputs",
+                 "json": {"device": "$^.id", "name": "$.name"},
+                 "state": {"devices.{device}.inputs.{index}.name": "{name}"}},
+            ]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = br#"{"CAM 1 (BirdDog)": "10.0.0.5:5961", "studio.cam2": "10.0.0.6:5961"}"#;
+        let reply = Inbound::Http {
+            path: "/List",
+            headers: &[],
+            body,
+            request: None,
+        };
+        assert_eq!(
+            t.apply(&reply),
+            Some(json!({"sources": {
+                "CAM 1 (BirdDog)": {"address": "10.0.0.5:5961", "index": 0},
+                "studio.cam2": {"address": "10.0.0.6:5961", "index": 1}}}))
+        );
+        // Through members, then an array in each: `$^.` is the member.
+        let body = br#"{"devices": {"a": {"id": "A", "inputs": [{"name": "In 1"}]}, "b": {"id": "B", "inputs": []}}}"#;
+        let reply = Inbound::Http {
+            path: "/devices",
+            headers: &[],
+            body,
+            request: None,
+        };
+        assert_eq!(
+            t.apply(&reply),
+            Some(json!({"devices": {"A": {"inputs": {"0": {"name": "In 1"}}}}}))
+        );
+        // An array where members are expected is no match.
+        let body = br#"["10.0.0.5"]"#;
+        let reply = Inbound::Http {
+            path: "/List",
+            headers: &[],
+            body,
+            request: None,
+        };
+        assert_eq!(t.apply(&reply), Some(json!({"sources": null})));
     }
 
     #[test]

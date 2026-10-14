@@ -1326,6 +1326,26 @@ array, for state keyed by position where the elements have no id:
       state: { "live_videos.{video}.ingest_streams.{stream}.video_bitrate": "{bitrate}" }
 ```
 
+A device that lists things as an object's members, keyed by name, rather
+than as an array (BirdDog's NDI sources, `{"CAM 1 (BirdDog)":
+"10.0.0.5:5961", ...}`) is gone through with `.*`: `json_each: "$.*"` is
+each member of the reply, `$.sources.*` each member of the object at
+`$.sources`. Each match captures the member's name as `{key}`, and `$` is the
+member's value; `{index}` is its place among the members, in the order the
+device sent them. `.*` may also stand within a path, as `[*]` does
+(`$.devices.*.inputs` is the inputs array of every member of `devices`, and
+`$^.` the member), and a value that is not an object there gives no match.
+Names are usually free text, so the state key takes them with `key` (below,
+"Keys holding dots"):
+
+```yaml
+    - path: "^/List$"
+      json_each: "$.*"
+      json: { address: "$" }
+      replace: ndi.sources
+      state: { "ndi.sources.{key:key}.address": "{address}" }
+```
+
 A JSON path anywhere may also index an array, `$.streams[0].name` (§5).
 State keyed this way keeps what a later reply no longer lists, so a list
 that shrinks (a tag list) is better kept whole, as JSON text.
