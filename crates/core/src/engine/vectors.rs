@@ -696,10 +696,32 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     Ok(())
 }
 
+/// `MEROS_VECTORS`: spec ids, separated by commas, whose vectors alone
+/// `every_vector_passes` runs (`MEROS_VECTORS=boinx-mimolive`). Unset or
+/// empty, every vector runs.
+fn vector_filter() -> Option<Vec<String>> {
+    let ids = std::env::var("MEROS_VECTORS").ok()?;
+    let ids: Vec<String> = ids
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    (!ids.is_empty()).then_some(ids)
+}
+
 #[test]
 fn every_vector_passes() {
     let catalog = Catalog::source_tree();
-    let files = vector_files();
+    let mut files = vector_files();
+    if let Some(ids) = vector_filter() {
+        files.retain(|f| {
+            f.parent()
+                .and_then(|d| d.file_name())
+                .is_some_and(|d| ids.iter().any(|id| d == id.as_str()))
+        });
+        assert!(!files.is_empty(), "no vectors for MEROS_VECTORS={ids:?}");
+    }
     assert!(!files.is_empty(), "no vectors found");
     let failures: Vec<String> = files
         .iter()

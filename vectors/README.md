@@ -70,6 +70,21 @@ with the change they cover. Hand-written vector files, such as recorded ones,
 live alongside the generated ones; use a distinct file name, for example
 `get_channel_name.recorded-slxd.yaml`, so regeneration never overwrites them.
 
+## Running
+
+`cargo test -p meros-integrations --features all every_vector_passes` runs
+every vector. To run one spec's, or a few, name them in `MEROS_VECTORS`,
+separated by commas:
+
+```
+MEROS_VECTORS=boinx-mimolive cargo test -p meros-integrations --features all every_vector_passes
+MEROS_VECTORS=birddog,disguise cargo test -p meros-integrations --features all every_vector_passes
+```
+
+The other vector tests (every command has a vector, every spec with
+telemetry has a telemetry vector) always look at every spec. The full run is
+the check before a commit; the filter is for working on a spec.
+
 ## Rules
 
 - A spec change altering wire format updates its vectors in the same commit.
