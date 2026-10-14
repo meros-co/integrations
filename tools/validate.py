@@ -61,6 +61,8 @@ def template_strings(send) -> list[tuple[str, str]]:
     for item in items:
         if isinstance(item, str):
             out.append(("text", item))
+        elif isinstance(item, dict) and "message" in item:
+            out.append(("text", item["message"]))
         elif isinstance(item, dict) and "address" in item:
             out.append(("osc-address", item["address"]))
             for arg in item.get("args", []):
@@ -655,6 +657,9 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
                 bad = set(item["models"]) - model_ids
                 if bad:
                     errors.append(f"{where}[{i}]: models names unknown model(s) {sorted(bad)}")
+            if (isinstance(item, dict) and "message" in item and where != "telemetry.updates"
+                    and transport.get("type") not in ("line-tcp", "line-udp", "ws")):
+                errors.append(f"{where}[{i}]: {{models, message}} is for line and websocket transports")
             if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
                 errors.append(f"{where}[{i}]: session applies to http requests")
     for model in doc.get("models", []):

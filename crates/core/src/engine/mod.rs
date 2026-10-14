@@ -377,6 +377,16 @@ fn body_matches(selectors: &[(String, Regex)], body: &[u8]) -> bool {
 
 /// Whether a `send` item, probe or login applies to the device's model: one
 /// naming `models` applies only to those (SPEC.md §4, "Messages per model").
+/// A text message's template: the item itself, or on a line or websocket
+/// transport `{models, message}` for a message sent to some models only
+/// (SPEC.md §4, "Messages per model").
+fn line_message(item: &Value) -> Option<&str> {
+    match item {
+        Value::String(text) => Some(text),
+        other => other.get("message").and_then(Value::as_str),
+    }
+}
+
 fn for_model(item: &Value, model: &str) -> bool {
     match item.get("models").and_then(Value::as_array) {
         Some(models) => models.iter().any(|m| m.as_str() == Some(model)),
@@ -1681,7 +1691,7 @@ impl SpecEngine {
     fn build(&self, item: &Value, values: &Values) -> Result<Outgoing, String> {
         match &self.transport {
             Transport::LineTcp { send, ascii, .. } | Transport::LineUdp { send, ascii, .. } => {
-                let template = item.as_str().ok_or("a line message must be a string")?;
+                let template = line_message(item).ok_or("a line message must be a string")?;
                 let payload = render(template, values, no_escape)?;
                 let framed = framing::frame(send, &payload);
                 if *ascii && !framed.is_ascii() {
@@ -1690,9 +1700,7 @@ impl SpecEngine {
                 Ok(Outgoing::Bytes(framed.into_bytes()))
             }
             Transport::Ws { .. } => {
-                let template = item
-                    .as_str()
-                    .ok_or("a websocket message must be a string")?;
+                let template = line_message(item).ok_or("a websocket message must be a string")?;
                 Ok(Outgoing::Ws(render(template, values, no_escape)?))
             }
             Transport::OscUdp { .. } | Transport::OscTcp { .. } => {
@@ -1882,11 +1890,10 @@ impl SpecEngine {
                 _ => item.clone(),
             };
             let outgoing = self.build(&item, &values)?;
-            let text = match (&self.transport, &item) {
-                (
-                    Transport::LineTcp { .. } | Transport::LineUdp { .. },
-                    Value::String(template),
-                ) => Some(render(template, &values, no_escape)?),
+            let text = match (&self.transport, line_message(&item)) {
+                (Transport::LineTcp { .. } | Transport::LineUdp { .. }, Some(template)) => {
+                    Some(render(template, &values, no_escape)?)
+                }
                 _ => None,
             };
             messages.push_back((outgoing, awaited_address.clone(), text));
@@ -6894,5 +6901,74 @@ state:
             &completed(&cx.take())[..],
             [(3, Err(CommandError::DeviceError { .. }))]
         ));
+    }
+
+    const LINE_MODELS: &str = r#"
+spec: 1
+id: line-models-test
+name: Line models test
+vendor: Test
+category: recorder
+source: [{ title: test }]
+transport: { type: line-tcp, port: 9993, framing: terminated, terminator: crlf }
+ports: [{ port: 9993, protocol: tcp, role: control }]
+models:
+  - { id: old, name: Old, supports: [goto], verification: none }
+  - { id: new, name: New, supports: [goto], verification: none }
+commands:
+  goto:
+    params: { clip: { type: int, min: 1, required: true } }
+    send:
+      - { models: [old], message: "goto: clip: {clip}" }
+      - { models: [new], message: "goto: clip id: {clip}" }
+    expect: { matches: "^200" }
+    returns: ack
+telemetry:
+  poll:
+    send:
+      - { models: [new], message: "cache info" }
+      - "transport info"
+"#;
+
+    #[test]
+    fn line_messages_can_name_their_models() {
+        let spec: DeviceSpec = serde_yaml::from_str(LINE_MODELS).unwrap();
+        let open = |model: &str| {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: model.into(),
+                    channels: None,
+                    settings: Params::new(),
+                    monitor: true,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+            let first_poll = tcp_sent(&cx.take());
+            let mut cx = Cx::new(1);
+            e.tcp(&mut cx, SOCKET, TcpInput::Data(b"200 ok\r\n".to_vec()));
+            let second_poll = tcp_sent(&cx.take());
+            let mut cx = Cx::new(2);
+            e.tcp(&mut cx, SOCKET, TcpInput::Data(b"200 ok\r\n".to_vec()));
+            cx.take();
+            let mut cx = Cx::new(3);
+            e.command(&mut cx, 1, "goto", json!({"clip": 3}).as_object().unwrap());
+            (first_poll, second_poll, tcp_sent(&cx.take()))
+        };
+        // The old model is not asked what it lacks, and each model gets its
+        // own form of a command.
+        let (first, _, command) = open("old");
+        assert_eq!(first, vec!["transport info\r\n".to_string()]);
+        assert_eq!(command, vec!["goto: clip: 3\r\n".to_string()]);
+        let (first, second, command) = open("new");
+        assert_eq!(first, vec!["cache info\r\n".to_string()]);
+        assert_eq!(second, vec!["transport info\r\n".to_string()]);
+        assert_eq!(command, vec!["goto: clip id: 3\r\n".to_string()]);
     }
 }

@@ -995,11 +995,24 @@ commands:
       - { models: [ip-to-hdmi], method: POST, path: /api/reboot }
 ```
 
+A line device's text messages are written the same way, the text under
+`message`. A HyperDeck on protocol 1.8 is not asked for what its protocol
+lacks:
+
+```yaml
+telemetry:
+  poll:
+    send:
+      - "transport info"
+      - { models: [hyperdeck-studio, hyperdeck-extreme], message: "cache info" }
+```
+
 A message naming `models` is sent only to those models; one without is sent
 to every model. This is decided from the model the device was opened as,
 before anything is sent, like `when_set` (§2), never from what the device
 says. It applies to the object messages of `send` (HTTP requests and OSC
-messages), telemetry `poll` and `subscribe` items, `on_connect` steps, the
+messages, and on line and websocket transports a text message written as
+`{models: [...], message: "..."}`), telemetry `poll` and `subscribe` items, `on_connect` steps, the
 `probe` (a list whose first message for the model is used), a session's
 `login` and telemetry `updates` rules (§8, "Rules per model").
 `tools/validate.py` checks that every model a command `supports` has a
