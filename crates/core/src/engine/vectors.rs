@@ -268,6 +268,11 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     // What the connection queued (polls) is dropped, so what the message
     // queues (`then_send`) is all that is left.
     engine.queue.clear();
+    // The engine knows the state the message arrives on, so a list read
+    // again unchanged is reported as no change.
+    if let (Some(mirror), Some(before)) = (engine.mirror.as_mut(), v.get("state_before")) {
+        *mirror = before.clone();
+    }
     if let (Some(text), Some(request)) = (
         v.get("inbound").and_then(Value::as_str),
         v.get("request").and_then(Value::as_str),

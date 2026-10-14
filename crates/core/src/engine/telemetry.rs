@@ -718,6 +718,11 @@ impl Telemetry {
         Ok(t)
     }
 
+    /// Whether any rule replaces a list whole (`replace`).
+    pub(crate) fn replaces(&self) -> bool {
+        self.rules.iter().any(|r| !r.replace.is_empty())
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.rules.is_empty() && self.subscribe.is_empty() && self.poll.is_empty()
     }

@@ -1256,7 +1256,13 @@ lists of plain lines (Ultimatte's FILE LIST):
 `json_each` (the path's, the selectors'; with `json_each`, each element's
 too, below), each declared or leading to
 declared paths. Consumers see the removal and the new list as two `state`
-events in a row. A rule may carry `replace` with no `state` when only some
+events in a row, unless the list is what the state already holds there: a
+list read again unchanged (a poll every second of timers or playlists that
+did not move) reports neither its removal nor its values, so a consumer sees
+a `state` event only when something changed. The core compares what it has
+reported itself for that device; values the same message writes outside the
+list are reported as usual. A telemetry vector's `state_before` is that
+state. A rule may carry `replace` with no `state` when only some
 messages hold the whole list (Planning Center's first page with no `next`
 link): it sits beside the plain rule that writes the values for the same
 messages, and since every removal of a message is applied before any of its
