@@ -1666,10 +1666,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check that the ANI4IN and ANI4OUT accept two-digit channel numbers (01), which the session sends, though their documents write one digit. ([specs/shure-ani.yaml:443](specs/shure-ani.yaml#L443))
 - [ ] Check that < REP ERR > is the answer to an invalid command and nothing else. ([specs/shure-ani.yaml:60](specs/shure-ani.yaml#L60))
-- [ ] Check that GET 00 ALL is accepted by every ANI (the ANIUSB-MATRIX document limits GET ALL to V1 units) and that the answers end. ([specs/shure-ani.yaml:766](specs/shure-ani.yaml#L766))
+- [ ] Check that GET 00 ALL is accepted by every ANI (the ANIUSB-MATRIX document limits GET ALL to V1 units) and that the answers end. ([specs/shure-ani.yaml:767](specs/shure-ani.yaml#L767))
 - [ ] Check that the analog gain is sent and reported as two digits (00-51) and in 3 dB steps. ([specs/shure-ani.yaml:466](specs/shure-ani.yaml#L466))
 - [ ] Confirm that CHAN_LED_IN_STATE is not answered on the ANI4IN and whether it is on the ANI22. ([specs/shure-ani.yaml:544](specs/shure-ani.yaml#L544))
 - [ ] Check LED_BRIGHTNESS's range on current firmware (0-2 documented). ([specs/shure-ani.yaml:577](specs/shure-ani.yaml#L577))
+- [ ] Capture SAMPLE with metering on, on each model, and confirm the values' order (ANI4IN's document labels its four values output 1-4; ANI22's inputs 1-2 then outputs 1-2; ANIUSB-MATRIX's ten channels) and whether the four-value form ends with two spaces before >. ([specs/shure-ani.yaml:775](specs/shure-ani.yaml#L775))
 
 ## shure-imx-room — Shure IntelliMix Room
 
@@ -1692,9 +1693,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## shure-mxn5 — Shure MXN5-C
 
-- [ ] Check what an MXN5-C that is not V1 answers to GET 00 ALL. ([specs/shure-mxn5.yaml:459](specs/shure-mxn5.yaml#L459))
+- [ ] Check what an MXN5-C that is not V1 answers to GET 00 ALL. ([specs/shure-mxn5.yaml:460](specs/shure-mxn5.yaml#L460))
 - [ ] Check that the gain step keywords are accepted in lower case. ([specs/shure-mxn5.yaml:267](specs/shure-mxn5.yaml#L267))
 - [ ] Check that SIG_GEN on channel 03 starts and stops the generator and what the 00 index does. ([specs/shure-mxn5.yaml:403](specs/shure-mxn5.yaml#L403))
+- [ ] Capture SAMPLE with metering on, and confirm its four values follow Channel Number Assignments (1-2 Dante inputs, 3 summed input, 4 Dante output). ([specs/shure-mxn5.yaml:468](specs/shure-mxn5.yaml#L468))
 - [ ] Check the PRESET_NAME answer for an empty preset ({empty}). ([specs/shure-mxn5.yaml:162](specs/shure-mxn5.yaml#L162))
 
 ## shure-p300 — Shure P300

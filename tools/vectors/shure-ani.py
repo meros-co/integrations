@@ -69,3 +69,12 @@ text(S, "get_peq_filter", {'block': 1, 'filter': 2}, "< GET 01 PEQ 02 >", device
 text(S, "set_peq_filter", {'block': 1, 'filter': 2, 'state': 'OFF'}, "< SET 01 PEQ 02 OFF >", device_reply="< REP 01 PEQ 02 OFF >", expect_result={'ok': {'kind': 'ack'}})
 text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}})
 telemetry(S, "mute-gain-name", inbound="< REP 01 AUDIO_MUTE ON >< REP 01 AUDIO_GAIN_HI_RES 1040 >< REP 01 CHAN_NAME {Podium     } >< REP PRESET 03 >", expect_state={'channels': {'1': {'mute': True, 'gain': -6.0, 'name': 'Podium'}}, 'device': {'preset': 3}})
+
+# Metering (Turn Metering On): one level per channel, 000-060 for -60 to 0
+# dBFS, kept in dBFS; four values, ten on the ANIUSB-MATRIX. The document
+# writes the four-channel sample with two spaces before the closing >.
+telemetry(S, "meters", inbound="< SAMPLE 060 045 000 030  >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -15, "3": -60, "4": -30}}})
+telemetry(S, "meters-usb-matrix", inbound="< SAMPLE 060 050 040 030 020 010 000 001 002 003 >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -10, "3": -20, "4": -30, "5": -40, "6": -50,
+                                              "7": -60, "8": -59, "9": -58, "10": -57}}})

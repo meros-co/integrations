@@ -53,3 +53,8 @@ text(S, "get_peq_filter", {'block': 1, 'filter': 2}, "< GET 01 PEQ 02 >", device
 text(S, "set_peq_filter", {'block': 1, 'filter': 2, 'state': 'OFF'}, "< SET 01 PEQ 02 OFF >", device_reply="< REP 01 PEQ 02 OFF >", expect_result={'ok': {'kind': 'ack'}})
 text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}})
 telemetry(S, "mute-gain-name", inbound="< REP 01 AUDIO_MUTE ON >< REP 01 AUDIO_GAIN_HI_RES 1040 >< REP 01 CHAN_NAME {Podium     } >< REP PRESET 03 >", expect_state={'channels': {'1': {'mute': True, 'gain': -6.0, 'name': 'Podium'}}, 'device': {'preset': 3}})
+
+# Metering (Metering Rate): one level per channel in Channel Number
+# Assignments order, 000-060 for -60 to 0 dBFS, kept in dBFS.
+telemetry(S, "meters", inbound="< SAMPLE 060 045 000 030 >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -15, "3": -60, "4": -30}}})
