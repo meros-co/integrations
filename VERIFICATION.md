@@ -906,10 +906,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## focusrite-rednet-rcp — Focusrite RedNet MP8R (Yamaha RCP)
 
-- [ ] Confirm the MP8R answers RCP on TCP 49280 directly, and whether it needs a Yamaha ID set in RedNet Control for it. ([specs/focusrite-rednet-rcp.yaml:386](specs/focusrite-rednet-rcp.yaml#L386))
-- [ ] Check the get and set replies follow Yamaha's grammar (OK get ... value, OK set, OKm when clamped, ERROR) and that changes made in RedNet Control are pushed as NOTIFY set. ([specs/focusrite-rednet-rcp.yaml:379](specs/focusrite-rednet-rcp.yaml#L379))
-- [ ] Check how HAGain 0-66 maps onto the MP8R's 10-65 dB preamp range, and what CompGain and ExecMode mean. ([specs/focusrite-rednet-rcp.yaml:393](specs/focusrite-rednet-rcp.yaml#L393))
-- [ ] Try the same addresses on a RedNet 4. ([specs/focusrite-rednet-rcp.yaml:407](specs/focusrite-rednet-rcp.yaml#L407))
+- [ ] Confirm the MP8R answers RCP on TCP 49280 directly, and whether it needs a Yamaha ID set in RedNet Control for it. ([specs/focusrite-rednet-rcp.yaml:416](specs/focusrite-rednet-rcp.yaml#L416))
+- [ ] Check the get and set replies follow Yamaha's grammar (OK get ... value, OK set, OKm when clamped, ERROR) and that changes made in RedNet Control are pushed as NOTIFY set. ([specs/focusrite-rednet-rcp.yaml:409](specs/focusrite-rednet-rcp.yaml#L409))
+- [ ] Check how HAGain 0-66 maps onto the MP8R's 10-65 dB preamp range, and what CompGain and ExecMode mean. ([specs/focusrite-rednet-rcp.yaml:423](specs/focusrite-rednet-rcp.yaml#L423))
+- [ ] Try the same addresses on a RedNet 4. ([specs/focusrite-rednet-rcp.yaml:438](specs/focusrite-rednet-rcp.yaml#L438))
+- [ ] Send mtrstart IO:Current/InCh/InputLevel 100 and confirm the unit answers OK mtrstart, the address it accepts (with or without /Meter), and the NOTIFY mtr line's form (address, a type word or none, eight two-digit hex values); record what 0-127 means in dB, and the shortest interval accepted. ([specs/focusrite-rednet-rcp.yaml:254](specs/focusrite-rednet-rcp.yaml#L254))
+- [ ] Check whether the meters stop by themselves (as Yamaha meters time out) and need mtrstart again, and what mtrstop answers. ([specs/focusrite-rednet-rcp.yaml:349](specs/focusrite-rednet-rcp.yaml#L349))
 
 ## freeshow — FreeShow
 
