@@ -969,15 +969,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## h2r-graphics — H2R Graphics
 
-- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:519](specs/h2r-graphics.yaml#L519))
-- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:569](specs/h2r-graphics.yaml#L569))
-- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:575](specs/h2r-graphics.yaml#L575))
-- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:578](specs/h2r-graphics.yaml#L578))
-- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:557](specs/h2r-graphics.yaml#L557))
-- [ ] Confirm H2R serves Socket.IO 4 (Engine.IO 4) on the HTTP API's port in versions 2 and 3, and that updateFrontend comes on connecting and after every change without a request. ([specs/h2r-graphics.yaml:530](specs/h2r-graphics.yaml#L530))
-- [ ] Record the timer fields H2R sends (state values, duration, startedAt and endAt in milliseconds, endTime's format) and whether duration is a number or text. ([specs/h2r-graphics.yaml:538](specs/h2r-graphics.yaml#L538))
-- [ ] Check that a list's selected row (dynamicLists, row 0 cell 0) counts as select_list_row does, and how several projects' lists are numbered. ([specs/h2r-graphics.yaml:534](specs/h2r-graphics.yaml#L534))
-- [ ] Confirm that a graphic with no status field is off air. ([specs/h2r-graphics.yaml:537](specs/h2r-graphics.yaml#L537))
+- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:541](specs/h2r-graphics.yaml#L541))
+- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:594](specs/h2r-graphics.yaml#L594))
+- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:600](specs/h2r-graphics.yaml#L600))
+- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:603](specs/h2r-graphics.yaml#L603))
+- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:582](specs/h2r-graphics.yaml#L582))
+- [ ] Confirm H2R serves Socket.IO 4 (Engine.IO 4) on the HTTP API's port in versions 2 and 3, and that updateFrontend comes on connecting and after every change without a request. ([specs/h2r-graphics.yaml:552](specs/h2r-graphics.yaml#L552))
+- [ ] Record the timer fields H2R sends (state values, duration, startedAt and endAt in milliseconds, endTime's format) and whether duration is a number or text. ([specs/h2r-graphics.yaml:563](specs/h2r-graphics.yaml#L563))
+- [ ] Check that a list's selected row (dynamicLists, row 0 cell 0) counts as select_list_row does. ([specs/h2r-graphics.yaml:554](specs/h2r-graphics.yaml#L554))
+- [ ] Confirm that a graphic with no status field is off air. ([specs/h2r-graphics.yaml:562](specs/h2r-graphics.yaml#L562))
+- [ ] Confirm that each project in updateFrontend carries its name in a name field (assumed; the Companion module does not read it). ([specs/h2r-graphics.yaml:488](specs/h2r-graphics.yaml#L488))
+- [ ] Confirm a score graphic's scores are an array per team of {score} per level, with levels and delimiter on the graphic, as the Companion module reads them, and whether a score can be other than a whole number. ([specs/h2r-graphics.yaml:483](specs/h2r-graphics.yaml#L483))
 
 ## highend-hog4 — High End Systems Hog 4 / Hog OS
 
