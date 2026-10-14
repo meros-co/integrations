@@ -468,6 +468,21 @@ sent while the login is answered.
 | To the login, anything else, or no answer | Logged; commands waiting for a session fail. The next request needing one logs in again. |
 | To any other request, matching `relogin` | The session is dropped, the core logs in again and sends that request once more. A second match for the same request is its answer. |
 
+A device whose login the operator can turn off (AJA KUMO's User
+Authentication, off by default) names the setting that says it is on with
+`when_set`: while that setting is empty or false, nothing logs in and
+requests go without a session; once it is set (or true), the next request
+needing a session logs in first. It is decided from the settings current at
+the time, so `update_settings` turns it on or off:
+
+```yaml
+    session:
+      when_set: user_authentication     # a bool setting
+      login: { method: POST, path: /authenticator/login, body: "password_provided={settings.password:url}",
+               content_type: application/x-www-form-urlencoded }
+      capture: { cookie: session }
+```
+
 The session is a secret: the login's answer is never offered to the
 telemetry rules, and the session is never logged or kept in state.
 `update_settings` drops it, so the next request logs in with the new

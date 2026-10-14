@@ -707,6 +707,8 @@ def session_checks(doc: dict) -> list[str]:
     if session is not None:
         if not is_http:
             errors.append("transport.session is for the http transport")
+        if "when_set" in session and session["when_set"] not in settings:
+            errors.append(f"transport.session.when_set names unknown setting '{session['when_set']}'")
         for i, item in enumerate(items_of(session.get("login"))):
             for context, text in template_strings(item):
                 errors += check_template(context, text, {}, settings, f"transport.session.login[{i}]")

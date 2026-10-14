@@ -260,6 +260,9 @@ struct SessionSpec {
     /// An answer to the login refusing the credential: terminal.
     refused_status: Vec<u16>,
     refused_json: Vec<(String, Regex)>,
+    /// `when_set`: the session is used only while this setting is set
+    /// (non-empty, and not false): a login the operator turns on.
+    when_set: Option<String>,
 }
 
 /// What of the login's answer is the session.
@@ -329,6 +332,7 @@ impl SessionSpec {
             relogin_json: json("relogin")?,
             refused_status: statuses("refused"),
             refused_json: json("refused")?,
+            when_set: str_field(v, "when_set").map(str::to_string),
         })
     }
 
@@ -2006,9 +2010,28 @@ impl SpecEngine {
 
     /// Whether a job's requests carry the session (`transport.session`):
     /// all but the login, the probe and items sent without it.
+    /// The session held, as the header it is sent in: for a native
+    /// extension's own requests to the device (AJA's event connection).
+    pub(crate) fn session_header(&self) -> Option<(String, String)> {
+        self.session_token.clone()
+    }
+
     fn needs_session(&self, job: &Job) -> bool {
-        if self.session.is_none() || job.login {
+        let Some(session) = &self.session else {
             return false;
+        };
+        if job.login {
+            return false;
+        }
+        // `when_set`: no login while the operator has not turned it on,
+        // decided from the settings current now, as update_settings changes.
+        if let Some(setting) = &session.when_set {
+            let set = self.settings.get(setting).is_some_and(|v| {
+                !v.is_null() && v.as_str() != Some("") && v.as_bool() != Some(false)
+            });
+            if !set {
+                return false;
+            }
         }
         let items = match (&job.id, &job.item) {
             (None, None) => return false,
@@ -6182,6 +6205,75 @@ mod tests {
             .iter()
             .find(|(k, _)| k == "Cookie")
             .map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn a_session_logs_in_only_when_its_setting_is_on() {
+        let kumo = |settings: Value| {
+            let spec = Catalog::source_tree().device("aja-kumo").unwrap().clone();
+            let settings =
+                crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+            let model = spec.models[0].id.clone();
+            let mut e = SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model,
+                    channels: None,
+                    settings,
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            let (probe, _) = requests(&cx.take()).remove(0);
+            let mut cx = Cx::new(1);
+            e.http_response(&mut cx, probe, answer("{}", None));
+            cx.take();
+            let mut cx = Cx::new(2);
+            let params = json!({"paramid": "eParamID_KumoProductID"});
+            e.command(&mut cx, 1, "get_parameter", params.as_object().unwrap());
+            (e, requests(&cx.take()))
+        };
+        // Off (the default): no login, no cookie.
+        let (_, sent) = kumo(json!({}));
+        assert_eq!(sent.len(), 1);
+        assert!(
+            sent[0].1.url.contains("/config?action=get"),
+            "{}",
+            sent[0].1.url
+        );
+        assert_eq!(cookie_of(&sent[0].1), None);
+        // On: the login goes first, and the command carries its cookie.
+        let (mut e, sent) = kumo(json!({"user_authentication": true, "password": "s3cret"}));
+        assert_eq!(sent.len(), 1);
+        let (login, request) = &sent[0];
+        assert!(
+            request.url.ends_with("/authenticator/login"),
+            "{}",
+            request.url
+        );
+        assert_eq!(
+            request.body.as_deref(),
+            Some(&b"password_provided=s3cret"[..])
+        );
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, *login, answer("{}", Some("session=abc; path=/")));
+        let sent = requests(&cx.take());
+        assert!(
+            sent[0].1.url.contains("/config?action=get"),
+            "{}",
+            sent[0].1.url
+        );
+        assert_eq!(cookie_of(&sent[0].1), Some("session=abc"));
+        // The extension's own requests carry it too.
+        assert_eq!(
+            e.session_header(),
+            Some(("Cookie".to_string(), "session=abc".to_string()))
+        );
     }
 
     #[test]
