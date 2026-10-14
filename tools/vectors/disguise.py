@@ -629,6 +629,11 @@ telemetry(DG, "systems", inbound_http={"path": _SV + "system/detectsystems", "bo
 telemetry(DG, "os-info", inbound_http={"path": _SV + "system/osinfo", "body": _envelope(result=[
     {"hostname": "VX4-01", "windowsVersion": "10.0.19044", "imageVersion": "R22.1"}])},
     expect_state={"service": {"os": {"VX4-01": {"windows_version": "10.0.19044", "image_version": "R22.1"}}}})
+# A host name holding dots (an FQDN) is one state key.
+telemetry(DG, "os-info-fqdn", inbound_http={"path": _SV + "system/osinfo", "body": _envelope(result=[
+    {"hostname": "vx4-01.stage.local", "windowsVersion": "10.0.19044", "imageVersion": "R22.1"}])},
+    expect_state={"service": {"os": {"vx4-01.stage.local": {"windows_version": "10.0.19044",
+                                                            "image_version": "R22.1"}}}})
 ADDRESSES = [{"address": "10.0.0.11", "subnet": "255.255.255.0", "family": "IPv4", "gateway": ""}]
 telemetry(DG, "network-adapters", inbound_http={"path": _SV + "system/networkadapters", "body": _envelope(result=[
     {"hostname": "VX4-01", "netAdapters": [{"name": "d3net", "mac": "00:11:22:33:44:55", "enabled": True,

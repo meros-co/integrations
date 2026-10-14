@@ -695,7 +695,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find the values of the OmniCal RequestPlansFilter, the cameradiscovery discovery states, and which Designer release added the OmniCal endpoints (not in the Swagger document). ([specs/disguise.yaml:2623](specs/disguise.yaml#L2623))
 - [ ] Confirm the form of media/remove's path: an array in the Swagger document, a single string on the Media page and guide; an array is sent. ([specs/disguise.yaml:1293](specs/disguise.yaml#L1293))
 - [ ] Check the size, creationDate and lastWriteDate units of media/list (uint64 strings; the epoch of the dates is not documented), and whether provision overwrites a file already at the destination. ([specs/disguise.yaml:2414](specs/disguise.yaml#L2414))
-- [ ] Check whether host names in the Service API's machine lists can hold a dot (an FQDN), which would leave that machine out of state. ([specs/disguise.yaml:2650](specs/disguise.yaml#L2650))
 - [ ] Confirm the proof of play subscription to one dictionary of subsystem:ProofOfPlaySubsystem (getRecords, called if it is a method, and getRecentRecords(n)), that it is available without enabling anything, and which release added it. ([specs/disguise.yaml:1351](specs/disguise.yaml#L1351))
 
 ## emberplus — Ember+
