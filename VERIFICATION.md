@@ -1916,12 +1916,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## yamaha-dm3 — Yamaha DM3
 
-- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm3.yaml:4432](specs/yamaha-dm3.yaml#L4432))
-- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm3.yaml:4474](specs/yamaha-dm3.yaml#L4474))
-- [ ] Record the sscurrent_ex reply form, which is matched leniently, and whether the query for the inactive scene list is answered with an error. ([specs/yamaha-dm3.yaml:4505](specs/yamaha-dm3.yaml#L4505))
-- [ ] Check how stereo input and FX return sends to mix, FX and matrix choose their destination (no Y dimension documented). ([specs/yamaha-dm3.yaml:4517](specs/yamaha-dm3.yaml#L4517))
-- [ ] Check what send pre/post 0 and 1 mean. ([specs/yamaha-dm3.yaml:4520](specs/yamaha-dm3.yaml#L4520))
-- [ ] Confirm local head-amp gain is whole dB 0 to 64. ([specs/yamaha-dm3.yaml:4521](specs/yamaha-dm3.yaml#L4521))
+- [ ] Confirm the RCP command set (get, OK/OKm, ERROR, NOTIFY set, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-dm3.yaml:7822](specs/yamaha-dm3.yaml#L7822))
+- [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-dm3.yaml:7864](specs/yamaha-dm3.yaml#L7864))
+- [ ] Record the sscurrent_ex reply form, which is matched leniently, and whether the query for the inactive scene list is answered with an error. ([specs/yamaha-dm3.yaml:7895](specs/yamaha-dm3.yaml#L7895))
+- [ ] Confirm that the stereo input and FX return sends take the destination bus as Y (6 mixes, 2 FX, 2 matrices), as the console's parameter list gives it but Yamaha's document does not. ([specs/yamaha-dm3.yaml:7909](specs/yamaha-dm3.yaml#L7909))
+- [ ] Check what send pre/post 0 and 1 mean. ([specs/yamaha-dm3.yaml:7910](specs/yamaha-dm3.yaml#L7910))
+- [ ] Confirm local head-amp gain is whole dB 0 to 64. ([specs/yamaha-dm3.yaml:7911](specs/yamaha-dm3.yaml#L7911))
+- [ ] Confirm on a console that the mix and matrix HPF/On, LPF/On, PEQ/On and PEQ/Band/Freq, Gain, Q and Type (4 bands) answer as the captured parameter list gives them, and on which firmware. ([specs/yamaha-dm3.yaml:7917](specs/yamaha-dm3.yaml#L7917))
+- [ ] List the text values the console takes for PEQ band type (7, Bell the default), mix bus type (9, VARI), cue mode (6, MIX) and the input and output cue points (PFL, AFL). ([specs/yamaha-dm3.yaml:7926](specs/yamaha-dm3.yaml#L7926))
+- [ ] Find what mix, input, stereo input, FX return and stereo pan mode 0 and 1 mean, and the meaning of the IO:Current/Dev SystemStatus (0-11) and SyncStatus (0-12) codes. ([specs/yamaha-dm3.yaml:7926](specs/yamaha-dm3.yaml#L7926))
+- [ ] Confirm the cue switches, monitor on, level, cue interruption, mono and source selections answer as the captured parameter list gives them. ([specs/yamaha-dm3.yaml:7920](specs/yamaha-dm3.yaml#L7920))
+- [ ] Check on current firmware whether input channel EQ, HPF, dynamics, DCA assignment or effect parameters have RCP addresses (none appear in Yamaha's document or the captured parameter list). ([specs/yamaha-dm3.yaml:7933](specs/yamaha-dm3.yaml#L7933))
 
 ## yamaha-dm7 — Yamaha DM7
 
