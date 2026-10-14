@@ -66,6 +66,12 @@ _tw("create_clip", {}, "POST", "/helix/clips?" + _B,
                                                             "edit_url": "https://clips.twitch.tv/FiveWordsForClipSlug/edit"}]})},
     expect_result={"ok": {"kind": "value", "value": [{"id": "FiveWordsForClipSlug",
                                                       "edit_url": "https://clips.twitch.tv/FiveWordsForClipSlug/edit"}]}})
+# A token lacking clips:edit: a 401 that is no refusal of the token, so only
+# this command fails.
+_tw("create_clip", {}, "POST", "/helix/clips?" + _B, file="create_clip.missing-scope",
+    http_reply={"status": 401, "body": json.dumps({"error": "Unauthorized", "status": 401,
+                                                   "message": "Missing scope: clips:edit"})},
+    expect_result={"error": {"error": "device_error", "code": "401"}})
 
 # Ads.
 _tw("start_commercial", {"length": 60}, "POST", "/helix/channels/commercial",

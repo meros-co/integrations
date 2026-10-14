@@ -257,6 +257,27 @@ transport:
   refusal_json: { "$.error.code": "^190$" }
 ```
 
+A service that answers a refused token and other errors with the same
+status names what the refusal's body holds with `refusal_status_body`: a
+status of `refusal_status` is then a refusal only when its body matches too,
+and any other answer with that status fails only the request it answers (no
+token refresh, no `unauthorized`). `json` maps JSON paths to regexes, all of
+which must match; `match` is a regex over the body text; with both, both
+must. Twitch answers a revoked or expired token with 401 and "Invalid OAuth
+token", and a token lacking a command's scope with 401 too:
+
+```yaml
+transport:
+  type: http
+  auth: oauth2
+  refusal_status: [401]
+  refusal_status_body: { json: { "$.message": "(?i)^invalid oauth token$" } }
+```
+
+It applies to answers the core reads a body of: command, poll and probe
+requests. The opening of a push websocket or event stream has no body to
+read, and its refusal statuses stand alone, as without it.
+
 A service that wants a header of its own on every request, beside the
 credential, lists it in `headers`, each name mapped to a template over
 settings. Twitch's Helix API takes the application's client id in

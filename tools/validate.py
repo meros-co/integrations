@@ -386,6 +386,22 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             re.compile(pattern)
         except re.error as e:
             errors.append(f"transport.refusal_json.{path} does not compile: {e}")
+    rsb = transport.get("refusal_status_body")
+    if rsb is not None:
+        if transport_type != "http":
+            errors.append("transport.refusal_status_body is for the http transport")
+        for path, pattern in (rsb.get("json") or {}).items():
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errors.append(f"transport.refusal_status_body.json.{path} does not compile: {e}")
+        if rsb.get("match") is not None:
+            try:
+                re.compile(rsb["match"])
+            except re.error as e:
+                errors.append(f"transport.refusal_status_body.match does not compile: {e}")
+        if transport.get("refusal_status") == []:
+            errors.append("transport.refusal_status_body needs a refusal_status")
     for name, text in (transport.get("headers") or {}).items():
         errors += check_template("text", text, {}, settings, f"transport.headers.{name}")
     if ("header" in methods) != bool(transport.get("auth_header")):

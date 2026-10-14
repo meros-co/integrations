@@ -124,6 +124,10 @@ enum Transport {
         /// whose body matches them all is a refusal too, whatever its status
         /// (the Graph API's `error.code` 190 under HTTP 400).
         refusal_json: Vec<(String, Regex)>,
+        /// `transport.refusal_status_body`: a status of `refusal` is a
+        /// refusal only when its body matches this too (Twitch answers a
+        /// missing scope with 401, as it answers a refused token).
+        refusal_body: Option<RefusalBody>,
         /// `transport.endpoints`: other HTTP servers of the same device, on
         /// other ports, by name (MediaMTX's playback server).
         endpoints: BTreeMap<String, Endpoint>,
@@ -836,21 +840,85 @@ fn header_templates(t: &Value) -> Result<Vec<(String, String)>, String> {
 
 /// `transport.refusal_json`: JSON paths to regexes.
 fn refusal_json(t: &Value) -> Result<Vec<(String, Regex)>, String> {
-    let Some(map) = t.get("refusal_json") else {
+    refusal_json_at(t, "refusal_json", "transport.refusal_json")
+}
+
+/// JSON paths to regexes at `key` of `t`, named `name` in errors.
+fn refusal_json_at(t: &Value, key: &str, name: &str) -> Result<Vec<(String, Regex)>, String> {
+    let Some(map) = t.get(key) else {
         return Ok(Vec::new());
     };
     let map = map
         .as_object()
-        .ok_or("transport.refusal_json maps JSON paths to regexes")?;
+        .ok_or_else(|| format!("{name} maps JSON paths to regexes"))?;
     let mut out = Vec::new();
     for (path, re) in map {
         let re = re
             .as_str()
-            .ok_or_else(|| format!("transport.refusal_json.{path} is a regex"))?;
-        let re = Regex::new(re).map_err(|e| format!("transport.refusal_json.{path}: {e}"))?;
+            .ok_or_else(|| format!("{name}.{path} is a regex"))?;
+        let re = Regex::new(re).map_err(|e| format!("{name}.{path}: {e}"))?;
         out.push((path.clone(), re));
     }
     Ok(out)
+}
+
+/// `transport.refusal_status_body`: what the body of an answer with one of
+/// `refusal_status` must hold for it to be a refusal. Without it the status
+/// alone is.
+#[derive(Debug, Clone)]
+struct RefusalBody {
+    json: Vec<(String, Regex)>,
+    text: Option<Regex>,
+}
+
+impl RefusalBody {
+    fn parse(t: &Value) -> Result<Option<RefusalBody>, String> {
+        let Some(v) = t.get("refusal_status_body") else {
+            return Ok(None);
+        };
+        let json = match v.get("json") {
+            None => Vec::new(),
+            Some(_) => refusal_json_at(v, "json", "transport.refusal_status_body.json")?,
+        };
+        let text = match v.get("match") {
+            None => None,
+            Some(re) => {
+                let re = re
+                    .as_str()
+                    .ok_or("transport.refusal_status_body.match is a regex")?;
+                Some(
+                    Regex::new(re)
+                        .map_err(|e| format!("transport.refusal_status_body.match: {e}"))?,
+                )
+            }
+        };
+        if json.is_empty() && text.is_none() {
+            return Err("transport.refusal_status_body needs json or match".into());
+        }
+        Ok(Some(RefusalBody { json, text }))
+    }
+
+    /// The body holds every JSON value and the text named.
+    fn matches(&self, body: &[u8]) -> bool {
+        if let Some(re) = &self.text {
+            match std::str::from_utf8(body) {
+                Ok(text) if re.is_match(text) => {}
+                _ => return false,
+            }
+        }
+        self.json.is_empty() || json_selected(&self.json, body)
+    }
+}
+
+/// A refusal by status: one of `refusal`, with a body matching
+/// `refusal_status_body` when the spec gives one.
+fn refused_by_status(
+    refusal: &[u16],
+    refusal_body: &Option<RefusalBody>,
+    status: u16,
+    body: &[u8],
+) -> bool {
+    refusal.contains(&status) && refusal_body.as_ref().is_none_or(|b| b.matches(body))
 }
 
 /// An error answer (4xx or 5xx) whose JSON body matches every
@@ -859,6 +927,11 @@ fn refused_by_body(selectors: &[(String, Regex)], status: u16, body: &[u8]) -> b
     if selectors.is_empty() || status < 400 {
         return false;
     }
+    json_selected(selectors, body)
+}
+
+/// A JSON body holding a match for every selector.
+fn json_selected(selectors: &[(String, Regex)], body: &[u8]) -> bool {
     let Ok(doc) = serde_json::from_slice::<Value>(body) else {
         return false;
     };
@@ -978,6 +1051,9 @@ impl SpecEngine {
         }
         if kind != "http" && t.get("refusal_json").is_some() {
             return Err("transport.refusal_json is for the http transport".into());
+        }
+        if kind != "http" && t.get("refusal_status_body").is_some() {
+            return Err("transport.refusal_status_body is for the http transport".into());
         }
         if kind != "http" && t.get("endpoints").is_some() {
             return Err("transport.endpoints is for the http transport".into());
@@ -1126,6 +1202,7 @@ impl SpecEngine {
                     auth,
                     headers: header_templates(&t)?,
                     refusal_json: refusal_json(&t)?,
+                    refusal_body: RefusalBody::parse(&t)?,
                     accept_invalid_certs: t
                         .get("accept_invalid_certs")
                         .and_then(Value::as_bool)
@@ -3364,6 +3441,7 @@ impl Module for SpecEngine {
                     auth,
                     refusal,
                     refusal_json,
+                    refusal_body,
                     ..
                 },
                 Ok(response),
@@ -3374,7 +3452,7 @@ impl Module for SpecEngine {
                     Route::Endpoint { credentialed } => credentialed && *auth != HttpAuth::None,
                 };
                 credentialed
-                    && (refusal.contains(&response.status)
+                    && (refused_by_status(refusal, refusal_body, response.status, &response.body)
                         || refused_by_body(refusal_json, response.status, &response.body))
             }
             _ => false,
@@ -5410,6 +5488,99 @@ mod tests {
         assert!(!answer(400, "Bad Request"));
         // The status list still applies.
         assert!(answer(401, ""));
+    }
+
+    #[test]
+    fn a_refusal_status_counts_only_with_the_body_named() {
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        let t = spec.transport.as_mut().unwrap();
+        t["auth"] = json!("bearer");
+        t["refusal_status"] = json!([401]);
+        t["refusal_status_body"] = json!({"json": {"$.message": "(?i)^invalid oauth token$"}});
+        spec.telemetry = None;
+        let answer = |spec: &DeviceSpec, status: u16, body: &str| {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "propresenter-7".into(),
+                    channels: None,
+                    settings: json!({"token": "t"}).as_object().unwrap().clone(),
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            let id = cx
+                .take()
+                .into_iter()
+                .find_map(|a| match a {
+                    Action::Http { id, .. } => Some(id),
+                    _ => None,
+                })
+                .unwrap();
+            let mut cx = Cx::new(1);
+            e.http_response(
+                &mut cx,
+                id,
+                Ok(HttpResponse {
+                    headers: Vec::new(),
+                    status,
+                    body: body.as_bytes().to_vec(),
+                }),
+            );
+            let actions = cx.take();
+            let refused = actions
+                .iter()
+                .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. })));
+            // The device stays usable after any other answer.
+            let usable = e.refused.is_none();
+            assert_eq!(refused, !usable);
+            refused
+        };
+        let invalid = r#"{"error":"Unauthorized","status":401,"message":"Invalid OAuth token"}"#;
+        let scope =
+            r#"{"error":"Unauthorized","status":401,"message":"Missing scope: clips:edit"}"#;
+        assert!(answer(&spec, 401, invalid));
+        // A 401 for a missing scope, or with no JSON body, fails only that
+        // request.
+        assert!(!answer(&spec, 401, scope));
+        assert!(!answer(&spec, 401, ""));
+        // The body alone is not a refusal under another status.
+        assert!(!answer(&spec, 403, invalid));
+        // A regex over the body text works the same way.
+        let t = spec.transport.as_mut().unwrap();
+        t["refusal_status_body"] = json!({"match": "Invalid OAuth token"});
+        assert!(answer(&spec, 401, invalid));
+        assert!(!answer(&spec, 401, scope));
+        // Both, when both are given.
+        let t = spec.transport.as_mut().unwrap();
+        t["refusal_status_body"] =
+            json!({"match": "Unauthorized", "json": {"$.message": "^Invalid"}});
+        assert!(answer(&spec, 401, invalid));
+        assert!(!answer(&spec, 401, scope));
+        // Neither is a spec error.
+        let t = spec.transport.as_mut().unwrap();
+        t["refusal_status_body"] = json!({});
+        assert!(SpecEngine::new(
+            Arc::new(spec.clone()),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings: json!({"token": "t"}).as_object().unwrap().clone(),
+                monitor: false,
+            },
+        )
+        .is_err());
     }
 
     #[test]
