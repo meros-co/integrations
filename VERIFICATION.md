@@ -608,14 +608,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## cockos-reaper — Cockos REAPER (OSC)
 
 - [ ] Confirm REAPER's default Local listen port (8000) and Device port (9000) when a new OSC control surface is added. ([specs/cockos-reaper.yaml:59](specs/cockos-reaper.yaml#L59))
-- [ ] Confirm that /device/track/count, /device/marker/count and /device/region/count sent on connecting take effect, and whether REAPER then sends the new bank's state at once. ([specs/cockos-reaper.yaml:79](specs/cockos-reaper.yaml#L79))
-- [ ] Record the OSC types REAPER sends feedback in for b and t patterns (float 1.0 and 0.0 or integers); the state accepts both. ([specs/cockos-reaper.yaml:597](specs/cockos-reaper.yaml#L597))
-- [ ] Confirm that REAPER takes binary values as OSC integers, as reaper-osc.js sends them, and floats where the pattern is n or f. ([specs/cockos-reaper.yaml:153](specs/cockos-reaper.yaml#L153))
-- [ ] Confirm the inverted FX bypass (0 bypasses, 1 makes active) in both directions. ([specs/cockos-reaper.yaml:382](specs/cockos-reaper.yaml#L382))
-- [ ] Record the track monitor values REAPER takes and sends (0 off, 1 on, 2 tape-auto, from reaper-osc.js) and the OSC type of the feedback, which the state reads as an integer. ([specs/cockos-reaper.yaml:652](specs/cockos-reaper.yaml#L652))
-- [ ] Check whether /time, /tempo/raw and /playrate/raw sent to REAPER move the cursor and set the tempo and rate, and the tempo range REAPER accepts. ([specs/cockos-reaper.yaml:181](specs/cockos-reaper.yaml#L181))
-- [ ] Check the lowest and highest dB /track/@/volume/db accepts (REAPER's fader-range preference assumed for the top). ([specs/cockos-reaper.yaml:226](specs/cockos-reaper.yaml#L226))
-- [ ] Confirm that /action/str runs a named command ID (_SWS_..., a script's ID). ([specs/cockos-reaper.yaml:452](specs/cockos-reaper.yaml#L452))
+- [ ] Confirm that /device/track/count, /device/marker/count and /device/region/count sent on connecting take effect, and whether REAPER then sends the new bank's state at once. ([specs/cockos-reaper.yaml:94](specs/cockos-reaper.yaml#L94))
+- [ ] Record the OSC types REAPER sends feedback in for b and t patterns (float 1.0 and 0.0 or integers); the state accepts both. ([specs/cockos-reaper.yaml:804](specs/cockos-reaper.yaml#L804))
+- [ ] Confirm that REAPER takes binary values as OSC integers, as reaper-osc.js sends them, and floats where the pattern is n or f. ([specs/cockos-reaper.yaml:179](specs/cockos-reaper.yaml#L179))
+- [ ] Confirm the inverted FX bypass (0 bypasses, 1 makes active) in both directions. ([specs/cockos-reaper.yaml:433](specs/cockos-reaper.yaml#L433))
+- [ ] Record the track monitor values REAPER takes and sends (0 off, 1 on, 2 tape-auto, from reaper-osc.js) and the OSC type of the feedback, which the state reads as an integer. ([specs/cockos-reaper.yaml:859](specs/cockos-reaper.yaml#L859))
+- [ ] Check whether /time, /tempo/raw and /playrate/raw sent to REAPER move the cursor and set the tempo and rate, and the tempo range REAPER accepts. ([specs/cockos-reaper.yaml:207](specs/cockos-reaper.yaml#L207))
+- [ ] Check the lowest and highest dB /track/@/volume/db accepts (REAPER's fader-range preference assumed for the top). ([specs/cockos-reaper.yaml:252](specs/cockos-reaper.yaml#L252))
+- [ ] Confirm that /action/str runs a named command ID (_SWS_..., a script's ID). ([specs/cockos-reaper.yaml:551](specs/cockos-reaper.yaml#L551))
+- [ ] Confirm that /device/send/count, /device/receive/count, /device/fx/count, /device/fxparam/count and /device/fxinstparam/count sent on connecting take effect. ([specs/cockos-reaper.yaml:94](specs/cockos-reaper.yaml#L94))
+- [ ] Confirm that REAPER sends /track/@/fx/@/fxparam/@/value for every track in the bank, numbering parameters from 1, and not only for the device's selected track. ([specs/cockos-reaper.yaml:917](specs/cockos-reaper.yaml#L917))
+- [ ] Record what /track/@/recv/@/name carries (the source track's name assumed). ([specs/cockos-reaper.yaml:899](specs/cockos-reaper.yaml#L899))
+- [ ] Confirm that an instrument's bypass (/track/@/fxinst/bypass) is inverted like an effect's, in both directions. ([specs/cockos-reaper.yaml:921](specs/cockos-reaper.yaml#L921))
+- [ ] Check that /fx/@/fxparam/@/... address the device's selected track's effects and /fxparam/@/... its selected effect, numbered within the selected parameter bank. ([specs/cockos-reaper.yaml:998](specs/cockos-reaper.yaml#L998))
+- [ ] Check that /device/fxparam/bank/select numbers banks from 1, as track banks are. ([specs/cockos-reaper.yaml:643](specs/cockos-reaper.yaml#L643))
 
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
@@ -1016,15 +1022,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## millumin — Millumin
 
-- [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:722](specs/millumin.yaml#L722))
-- [ ] Check that changes made through the OSC API send no feedback, and which side effects (a column's media starting) still do. ([specs/millumin.yaml:689](specs/millumin.yaml#L689))
-- [ ] Check where /? and /ping answers go (the configured senders are assumed) and what /ping sends. ([specs/millumin.yaml:692](specs/millumin.yaml#L692))
-- [ ] Check the light intensity scale on input (0-255 in the documentation's example) and feedback (0 to 1), and the master levels' range. ([specs/millumin.yaml:709](specs/millumin.yaml#L709))
-- [ ] Check the rate of /millumin/layer:<name>/media/time feedback and whether it is sent for every layer. ([specs/millumin.yaml:638](specs/millumin.yaml#L638))
-- [ ] Check whether Millumin 5 still has a global API feedback switch beside each sender's send feedback. ([specs/millumin.yaml:682](specs/millumin.yaml#L682))
-- [ ] Check which of the dashboard and the edited timeline play, pause and go_to_time act on. ([specs/millumin.yaml:703](specs/millumin.yaml#L703))
-- [ ] Check that stop_column takes no column in Millumin 5. ([specs/millumin.yaml:705](specs/millumin.yaml#L705))
-- [ ] Check that floats are accepted where the documentation shows whole numbers (positions, rotation, media time). ([specs/millumin.yaml:398](specs/millumin.yaml#L398))
+- [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:812](specs/millumin.yaml#L812))
+- [ ] Check that changes made through the OSC API send no feedback, and which side effects (a column's media starting) still do. ([specs/millumin.yaml:767](specs/millumin.yaml#L767))
+- [ ] Check where /? and /ping answers go (the configured senders are assumed) and what /ping sends. ([specs/millumin.yaml:770](specs/millumin.yaml#L770))
+- [ ] Check the light intensity scale on input (0-255 in the documentation's example) and feedback (0 to 1), and the master levels' range. ([specs/millumin.yaml:799](specs/millumin.yaml#L799))
+- [ ] Check the rate of /millumin/layer:<name>/media/time feedback and whether it is sent for every layer. ([specs/millumin.yaml:673](specs/millumin.yaml#L673))
+- [ ] Check whether Millumin 5 still has a global API feedback switch beside each sender's send feedback. ([specs/millumin.yaml:759](specs/millumin.yaml#L759))
+- [ ] Check which of the dashboard and the edited timeline play, pause and go_to_time act on. ([specs/millumin.yaml:781](specs/millumin.yaml#L781))
+- [ ] Check that stop_column takes no column in Millumin 5. ([specs/millumin.yaml:783](specs/millumin.yaml#L783))
+- [ ] Check that floats are accepted where the documentation shows whole numbers (positions, rotation, media time). ([specs/millumin.yaml:405](specs/millumin.yaml#L405))
+- [ ] Check that /layer:<name>/mapping/<corner> (and its /x and /y forms) moves the corner for a named layer, as the documentation shows for selectedLayer. ([specs/millumin.yaml:456](specs/millumin.yaml#L456))
+- [ ] Record the feedback for a moved mapping corner: its address (mapping/topLeft by layer name assumed) and arguments ([x, y] assumed, or x and y apart). ([specs/millumin.yaml:703](specs/millumin.yaml#L703))
+- [ ] Record the feedback address and argument for an effect parameter change (layer:<name>/effect<N>/<param> [value] assumed). ([specs/millumin.yaml:712](specs/millumin.yaml#L712))
+- [ ] Record the argument of /millumin/layer:<name>/selected and /millumin/light:<name>/selected (1 assumed from the /millumin/info example), and whether deselection sends 0. ([specs/millumin.yaml:715](specs/millumin.yaml#L715))
+- [ ] Check whether media normalizedTime and speed feedback is also sent by layer name, or only for the selected layer as documented. ([specs/millumin.yaml:700](specs/millumin.yaml#L700))
+- [ ] Record the argument types of /millumin/info (the original address as a string, then the values). ([specs/millumin.yaml:721](specs/millumin.yaml#L721))
 
 ## newtek-tricaster — NewTek TriCaster
 
@@ -1065,12 +1077,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## novastar-h — NovaStar H series
 
-- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:768](specs/novastar-h.yaml#L768))
+- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:849](specs/novastar-h.yaml#L849))
 - [ ] Confirm the OpenAPI listens on port 8000 (the documentation's example address) on every model. ([specs/novastar-h.yaml:47](specs/novastar-h.yaml#L47))
-- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:793](specs/novastar-h.yaml#L793))
-- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:801](specs/novastar-h.yaml#L801))
-- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off). ([specs/novastar-h.yaml:152](specs/novastar-h.yaml#L152))
-- [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:280](specs/novastar-h.yaml#L280))
+- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:874](specs/novastar-h.yaml#L874))
+- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:892](specs/novastar-h.yaml#L892))
+- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off), and what screen/readDetail's Bkg.enable reports after each. ([specs/novastar-h.yaml:770](specs/novastar-h.yaml#L770))
+- [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:283](specs/novastar-h.yaml#L283))
+- [ ] Capture a screen/readDetail reply (the page gives only its schema) and confirm brightness, gamma, Ftb, Freeze, Bkg, outputMode.size and mosaic, screen3D, Osd and OsdImage are where the module reads them. ([specs/novastar-h.yaml:884](specs/novastar-h.yaml#L884))
+- [ ] Confirm Ftb.enable is 1 while a screen is faded to black and 0 once screen_ftb brings it back. ([specs/novastar-h.yaml:768](specs/novastar-h.yaml#L768))
+- [ ] Check screen/readDetail's gamma after set_screen_gamma with a decimal (the schema types it as an integer). ([specs/novastar-h.yaml:767](specs/novastar-h.yaml#L767))
+- [ ] Check the scale of an input's timing.refreshRate (60 in the example, documented as frame rate x100). ([specs/novastar-h.yaml:815](specs/novastar-h.yaml#L815))
+- [ ] Check the sourceType a layer reports for an input (1 in the examples and on the write page, 2 on the list page). ([specs/novastar-h.yaml:790](specs/novastar-h.yaml#L790))
+- [ ] Capture an input's crops array with a cropped source (the example's is empty) and confirm each element has cropId, name, x, y, width and height. ([specs/novastar-h.yaml:816](specs/novastar-h.yaml#L816))
+- [ ] Confirm bkg/readAllList and input/readSourceList answer in data (not body), as their examples show. ([specs/novastar-h.yaml:884](specs/novastar-h.yaml#L884))
+- [ ] Check that polling six requests per screen at 5 s does not load the splicer, and whether a slower default is wiser. ([specs/novastar-h.yaml:886](specs/novastar-h.yaml#L886))
 
 ## obs-studio — OBS Studio (obs-websocket 5)
 
@@ -1525,6 +1545,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which buttons of each Jupiter app use negative logic. ([specs/symetrix-jupiter.yaml:113](specs/symetrix-jupiter.yaml#L113))
 - [ ] Check that answers never start with "#", which is how pushes are told apart. ([specs/symetrix-jupiter.yaml:38](specs/symetrix-jupiter.yaml#L38))
 
+## tsl-umd-display — TSL UMD tally sent to displays and multiviewers
+
+- [ ] Check that a V4.0 display or multiviewer with a right display lights the right display's tallies from the second XDATA byte (right_lh, right_text_tally, right_rh), and that one without ignores it. ([specs/tsl-umd-display.yaml:76](specs/tsl-umd-display.yaml#L76))
+
 ## tsl-umd-listener — TSL UMD tally received from a switcher
 
 - [ ] On a Ross Carbonite sending TSLUMD_1.0 over TCP, confirm the core receives each 18-byte V3.1 packet back to back with nothing between them, and record the tally and text for program, preview and a key. ([specs/tsl-umd-listener.yaml:46](specs/tsl-umd-listener.yaml#L46))
@@ -1771,4 +1795,4 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## Integrations with no open items
 
-Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio, tsl-umd-display.
+Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio.

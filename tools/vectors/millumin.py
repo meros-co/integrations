@@ -64,6 +64,13 @@ mi("set_layer_scale", {"layer": "test", "scale": 0.5}, "/layer:test/scale", ("f"
 mi("set_layer_effect", {"layer": "test", "effect": 1, "param": "red", "value": 0.5}, "/layer:test/effect1/red",
    ("f", 0.5))
 mi("select_layer_by_name", {"layer": "test"}, "/layer:test/selected", ("i", 1))
+# The input section's example: /selectedLayer/mapping/topLeft [12,21], and /x and /y alone.
+mi("set_layer_mapping_corner", {"layer": "test", "corner": "topLeft", "x": 12.0, "y": 21.0},
+   "/layer:test/mapping/topLeft", ("f", 12.0), ("f", 21.0))
+mi("set_layer_mapping_corner_x", {"layer": "test", "corner": "bottomRight", "x": 12.0},
+   "/layer:test/mapping/bottomRight/x", ("f", 12.0))
+mi("set_layer_mapping_corner_y", {"layer": "test", "corner": "bottomLeft", "y": 21.0},
+   "/layer:test/mapping/bottomLeft/y", ("f", 21.0))
 mi("set_light_intensity", {"light": "Wash", "intensity": 0.5}, "/light:Wash/intensity", ("f", 0.5))
 mi("set_property", {"target": "index:99", "property": "mapping/topLeft/x", "value": 10.0},
    "/index:99/mapping/topLeft/x", ("f", 10.0))
@@ -106,3 +113,29 @@ telemetry(MI, "opacity", inbound_hex=hexs(osc("/millumin/layer:Background/opacit
           expect_state={"layers": {"Background": {"opacity": 0.75}}})
 telemetry(MI, "light", inbound_hex=hexs(osc("/millumin/light:Wash/intensity", ("f", 0.5))),
           expect_state={"lights": {"Wash": {"intensity": 0.5}}})
+telemetry(MI, "selected-normalized-time",
+          inbound_hex=hexs(osc("/millumin/selectedLayer/media/normalizedTime", ("f", 0.5))),
+          expect_state={"selected_layer": {"normalized_time": 0.5}})
+telemetry(MI, "selected-speed", inbound_hex=hexs(osc("/millumin/selectedLayer/media/speed", ("f", 0.5))),
+          expect_state={"selected_layer": {"speed": 0.5}})
+telemetry(MI, "layer-speed", inbound_hex=hexs(osc("/millumin/layer:Background/media/speed", ("f", 2.0))),
+          expect_state={"layers": {"Background": {"speed": 2.0}}})
+telemetry(MI, "layer-normalized-time",
+          inbound_hex=hexs(osc("/millumin/layer:Background/media/normalizedTime", ("f", 0.25))),
+          expect_state={"layers": {"Background": {"normalized_time": 0.25}}})
+# The input section's example: a corner at [12, 21].
+telemetry(MI, "mapping-corner", inbound_hex=hexs(osc("/millumin/layer:Background/mapping/topLeft",
+                                                     ("f", 12.0), ("f", 21.0))),
+          expect_state={"layers": {"Background": {"mapping": {"topLeft": {"x": 12.0, "y": 21.0}}}}})
+telemetry(MI, "mapping-corner-x", inbound_hex=hexs(osc("/millumin/layer:Background/mapping/bottomRight/x",
+                                                       ("f", 1920.0))),
+          expect_state={"layers": {"Background": {"mapping": {"bottomRight": {"x": 1920.0}}}}})
+telemetry(MI, "effect-param", inbound_hex=hexs(osc("/millumin/layer:Background/effect1/red", ("f", 0.25))),
+          expect_state={"layers": {"Background": {"effects": {"1": {"red": 0.25}}}}})
+# The legacy example: /millumin/info ["layer:MyLayer/selected", 1].
+telemetry(MI, "layer-selected", inbound_hex=hexs(osc("/millumin/layer:MyLayer/selected", ("i", 1))),
+          expect_state={"layers": {"MyLayer": {"selected": True}}})
+telemetry(MI, "light-deselected", inbound_hex=hexs(osc("/millumin/light:Wash/selected", ("i", 0))),
+          expect_state={"lights": {"Wash": {"selected": False}}})
+telemetry(MI, "info", inbound_hex=hexs(osc("/millumin/info", ("s", "layer:MyLayer/opacity"), ("f", 0.75))),
+          expect_state={"info": {"address": "layer:MyLayer/opacity", "value": "0.75"}})

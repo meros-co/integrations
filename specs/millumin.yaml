@@ -96,7 +96,8 @@ models:
                    enter_fullscreen, exit_fullscreen, show_test_card, hide_test_card,
                    enable_workspace, disable_workspace, open_project, save_project, save_project_as,
                    quit, ping, set_layer_opacity, set_layer_position, set_layer_x, set_layer_y,
-                   set_layer_rotation, set_layer_scale, set_layer_effect, select_layer_by_name,
+                   set_layer_rotation, set_layer_scale, set_layer_effect, set_layer_mapping_corner,
+                   set_layer_mapping_corner_x, set_layer_mapping_corner_y, select_layer_by_name,
                    set_light_intensity, set_property, adjust_property, query_property,
                    start_media, start_media_column, start_media_named, pause_media,
                    start_or_pause_media, stop_media, set_media_time, set_media_normalized_time,
@@ -113,7 +114,8 @@ models:
                enter_fullscreen, exit_fullscreen, show_test_card, hide_test_card,
                enable_workspace, disable_workspace, open_project, save_project, save_project_as,
                quit, ping, set_layer_opacity, set_layer_position, set_layer_x, set_layer_y,
-               set_layer_rotation, set_layer_scale, set_layer_effect, select_layer_by_name,
+               set_layer_rotation, set_layer_scale, set_layer_effect, set_layer_mapping_corner,
+                   set_layer_mapping_corner_x, set_layer_mapping_corner_y, select_layer_by_name,
                set_light_intensity, set_property, adjust_property, query_property,
                start_media, start_media_column, start_media_named, pause_media,
                start_or_pause_media, stop_media, set_media_time, set_media_normalized_time,
@@ -133,7 +135,8 @@ models:
                brush, enter_fullscreen, exit_fullscreen, show_test_card, hide_test_card,
                enable_workspace, disable_workspace, open_project, save_project, save_project_as,
                quit, ping, set_layer_opacity, set_layer_position, set_layer_x, set_layer_y,
-               set_layer_rotation, set_layer_scale, set_layer_effect, select_layer_by_name,
+               set_layer_rotation, set_layer_scale, set_layer_effect, set_layer_mapping_corner,
+                   set_layer_mapping_corner_x, set_layer_mapping_corner_y, select_layer_by_name,
                set_light_intensity, set_property, adjust_property, query_property,
                start_media, start_media_column, start_media_named, pause_media,
                start_or_pause_media, stop_media, set_media_time, set_media_normalized_time,
@@ -450,6 +453,34 @@ commands:
     send: { address: "/layer:{layer}/effect{effect}/{param}", args: [ { value: "{value}", type: float } ] }
     returns: none
 
+  set_layer_mapping_corner:
+    summary: Move one corner of a layer's mapping to a position in pixels (/layer:<name>/mapping/<corner>)
+    params:
+      layer:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
+      corner: { type: enum, values: [topLeft, topRight, bottomRight, bottomLeft], required: true, label: Corner, description: "The mapping corner to move, named as in Millumin's OSC addresses." }
+      x:      { type: float, required: true, label: X, description: "Horizontal position of the corner in pixels." }
+      y:      { type: float, required: true, label: "Y", description: "Vertical position of the corner in pixels." }
+    send: { address: "/layer:{layer}/mapping/{corner}", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
+    returns: none
+
+  set_layer_mapping_corner_x:
+    summary: Move one corner of a layer's mapping horizontally, in pixels (/layer:<name>/mapping/<corner>/x)
+    params:
+      layer:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
+      corner: { type: enum, values: [topLeft, topRight, bottomRight, bottomLeft], required: true, label: Corner, description: "The mapping corner to move, named as in Millumin's OSC addresses." }
+      x:      { type: float, required: true, label: X, description: "Horizontal position of the corner in pixels." }
+    send: { address: "/layer:{layer}/mapping/{corner}/x", args: [ { value: "{x}", type: float } ] }
+    returns: none
+
+  set_layer_mapping_corner_y:
+    summary: Move one corner of a layer's mapping vertically, in pixels (/layer:<name>/mapping/<corner>/y)
+    params:
+      layer:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Layer, description: "Layer name as shown in Millumin; it cannot contain a slash." }
+      corner: { type: enum, values: [topLeft, topRight, bottomRight, bottomLeft], required: true, label: Corner, description: "The mapping corner to move, named as in Millumin's OSC addresses." }
+      y:      { type: float, required: true, label: "Y", description: "Vertical position of the corner in pixels." }
+    send: { address: "/layer:{layer}/mapping/{corner}/y", args: [ { value: "{y}", type: float } ] }
+    returns: none
+
   select_layer_by_name:
     summary: Select (true) or deselect (false) a layer, by name (/layer:<name>/selected)
     params:
@@ -659,6 +690,38 @@ telemetry:
       state:
         selected_layer.time_s: "{arg0}"
         selected_layer.duration_s: "{arg1}"
+    - address: "^/millumin/selectedLayer/media/normalizedTime$"
+      state: { "selected_layer.normalized_time": "{arg0}" }
+    - address: "^/millumin/selectedLayer/media/speed$"
+      state: { "selected_layer.speed": "{arg0}" }
+    # The same media properties by layer name, as media/time is sent.
+    - address: "^/millumin/layer:([^/]+)/media/normalizedTime$"
+      state: { "layers.{1}.normalized_time": "{arg0}" }
+    - address: "^/millumin/layer:([^/]+)/media/speed$"
+      state: { "layers.{1}.speed": "{arg0}" }
+    # Mapping corners, tracked like the other properties: [x, y].
+    - address: "^/millumin/layer:([^/]+)/mapping/(topLeft|topRight|bottomRight|bottomLeft)$"
+      state:
+        layers.{1}.mapping.{2}.x: "{arg0}"
+        layers.{1}.mapping.{2}.y: "{arg1}"
+    - address: "^/millumin/layer:([^/]+)/mapping/(topLeft|topRight|bottomRight|bottomLeft)/x$"
+      state: { "layers.{1}.mapping.{2}.x": "{arg0}" }
+    - address: "^/millumin/layer:([^/]+)/mapping/(topLeft|topRight|bottomRight|bottomLeft)/y$"
+      state: { "layers.{1}.mapping.{2}.y": "{arg0}" }
+    # Effect parameters, by effect number and parameter name.
+    - address: "^/millumin/layer:([^/]+)/effect(\\d+)/([^/.]+)$"
+      state: { "layers.{1}.effects.{2}.{3}": "{arg0}" }
+    # Selection: 1 when selected, 0 when deselected.
+    - address: "^/millumin/layer:([^/]+)/selected$"
+      state: { "layers.{1}.selected": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: "^/millumin/light:([^/]+)/selected$"
+      state: { "lights.{1}.selected": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    # The legacy duplicate of every feedback message: the original address
+    # (without /millumin) and its first value.
+    - address: "^/millumin/info$"
+      state:
+        info.address: "{arg0}"
+        info.value: "{arg1}"
 
 state:
   board.column:            { type: int, description: "Index of the column last launched or stopped, from 1" }
@@ -677,6 +740,17 @@ state:
   lights.*.intensity:      { type: float, description: "Light intensity as Millumin reports it (0.5 for 50%), keyed by light name" }
   selected_layer.time_s:   { type: float, unit: s, description: "Playhead of the selected layer's media" }
   selected_layer.duration_s: { type: float, unit: s, description: "Duration of the selected layer's media" }
+  selected_layer.normalized_time: { type: float, description: "Playhead of the selected layer's media as a fraction of its duration, 0.0 to 1.0" }
+  selected_layer.speed:    { type: float, description: "Speed of the selected layer's media, 1.0 for normal speed" }
+  layers.*.normalized_time: { type: float, description: "Playhead of the layer's media as a fraction of its duration, if Millumin sends it by layer" }
+  layers.*.speed:          { type: float, description: "Speed of the layer's media, 1.0 for normal, if Millumin sends it by layer" }
+  layers.*.mapping.*.x:    { type: float, unit: px, description: "Horizontal position of a mapping corner, keyed topLeft, topRight, bottomRight or bottomLeft" }
+  layers.*.mapping.*.y:    { type: float, unit: px, description: "Vertical position of a mapping corner" }
+  layers.*.effects.*.*:    { type: float, description: "Effect parameter value, keyed by effect number from 1 and parameter name as in Millumin" }
+  layers.*.selected:       { type: bool, description: "The layer is selected, from Millumin's selection feedback" }
+  lights.*.selected:       { type: bool, description: "The light is selected, from Millumin's selection feedback" }
+  info.address:            { type: string, description: "Address of the last /millumin/info message, the original feedback address without /millumin (layer:MyLayer/opacity)" }
+  info.value:              { type: string, description: "First value of the last /millumin/info message, as text" }
 
 quirks:
   - models: [all]
@@ -707,6 +781,18 @@ quirks:
       play, pause, play_or_pause and go_to_time act on the dashboard's media, or
       on the timeline being edited; which one is not documented further.
       stop_column takes no column: it stops the playing one.
+  - models: [all]
+    severity: info
+    text: >
+      Media normalized time and speed are documented as feedback for the
+      selected layer only (selected_layer); the same addresses by layer name
+      are read too, as media/time is, in case Millumin sends them. Selection
+      feedback carries 1 or 0 in the legacy /millumin/info example; a layer
+      Millumin never reports as deselected keeps selected true. /millumin/info
+      repeats every feedback message with the original address as its first
+      argument; the format cannot read a property out of an argument, so only
+      the last one's address and value are kept (info), and the regular
+      messages fill the rest of the state.
   - models: [all]
     severity: info
     text: >

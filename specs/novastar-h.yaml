@@ -40,8 +40,8 @@ source:
 settings:
   # Settings > OpenAPI Management on the splicer.
   p_id: { type: string, max_length: 64, default: "", label: Requestor ID, description: "The pId of the requestor made under Settings > OpenAPI Management on the splicer, with encryption turned off." }
-  # Read the state (screens and the preset each plays) every this many ms; 0 reads it once.
-  poll_ms: { type: int, min: 0, max: 600000, default: 5000, label: Poll interval, description: "How often, in milliseconds, the screens and the preset each plays are read; 0 reads them once." }
+  # Read the state every this many ms; 0 reads it once.
+  poll_ms: { type: int, min: 0, max: 600000, default: 5000, label: Poll interval, description: "How often, in milliseconds, the screens, their layers and presets, inputs, outputs and backgrounds are read; 0 reads them once." }
 
 ports:
   - { port: 8000, protocol: http, role: control }
@@ -763,6 +763,84 @@ state:
   device.main_model_id: { type: int, description: "Main control card model ID" }
   screens.*.name: { type: string, description: "Screen name, keyed by screenId" }
   screens.*.preset: { type: int, description: "Preset playing on the screen, -1 for none" }
+  screens.*.brightness: { type: int, unit: "%", description: "Screen brightness, 0 to 100 (screen detail's brightness)" }
+  screens.*.gamma: { type: float, description: "Screen gamma, as set_screen_gamma writes it" }
+  screens.*.ftb: { type: bool, description: "The screen is faded to black (screen detail's Ftb.enable 1)" }
+  screens.*.freeze: { type: bool, description: "The screen is frozen (Freeze.enable 1)" }
+  screens.*.bkg.enable: { type: int, description: "Background switch as the splicer reports it (Bkg.enable); set_screen_bkg documents 0 as shown and 1 as hidden" }
+  screens.*.bkg.id: { type: int, description: "Background image on the screen, a bkgs key" }
+  screens.*.size.x: { type: int, unit: px, description: "Screen's horizontal start, from its layout (outputMode.size)" }
+  screens.*.size.y: { type: int, unit: px, description: "Screen's vertical start, from its layout" }
+  screens.*.size.width: { type: int, unit: px, description: "Screen width, from its layout" }
+  screens.*.size.height: { type: int, unit: px, description: "Screen height, from its layout" }
+  screens.*.mosaic.rows: { type: int, description: "Rows of outputs in the screen's mosaic" }
+  screens.*.mosaic.columns: { type: int, description: "Columns of outputs in the screen's mosaic" }
+  screens.*.stereo_3d.enabled: { type: bool, description: "3D is on for the screen (screen3D.enable)" }
+  screens.*.stereo_3d.type: { type: int, description: "3D type, as set_screen_3d's type" }
+  screens.*.osd.text: { type: bool, description: "Text OSD is shown (Osd.enable)" }
+  screens.*.osd.image: { type: bool, description: "Image OSD is shown (OsdImage.enable)" }
+  screens.*.layers.*.name: { type: string, description: "Layer name, keyed by layerId; a layer the splicer no longer lists leaves state" }
+  screens.*.layers.*.zorder: { type: int, description: "Layer z-order; the higher, the further in front" }
+  screens.*.layers.*.lock: { type: bool, description: "The layer is locked" }
+  screens.*.layers.*.freeze: { type: bool, description: "The layer is frozen" }
+  screens.*.layers.*.background: { type: bool, description: "The layer is the screen's background layer" }
+  screens.*.layers.*.flip: { type: int, description: "Flip: 0 none, 1 horizontal, 2 vertical, 3 both" }
+  screens.*.layers.*.size_type: { type: int, description: "Layer size type: 0 SL, 1 DL, 2 4K" }
+  screens.*.layers.*.type: { type: int, description: "Layer type: 0 mix, 1 SL, 2 remapping" }
+  screens.*.layers.*.source.type: { type: int, description: "Source type as the splicer reports it (sourceType: 0 none; the pages give 1 or 2 for an input and 3 for IPC)" }
+  screens.*.layers.*.source.input: { type: int, description: "Input on the layer, an inputs key (255 for an IPC source)" }
+  screens.*.layers.*.source.crop: { type: int, description: "Cropped source on the layer, 255 for the whole input" }
+  screens.*.layers.*.source.slot: { type: int, description: "Slot of the layer's source" }
+  screens.*.layers.*.source.interface_type: { type: int, description: "Interface type of the layer's source" }
+  screens.*.layers.*.source.name: { type: string, description: "Name of the layer's source" }
+  screens.*.layers.*.source.channel: { type: int, description: "IPC channel of the layer's source (65535 for none)" }
+  screens.*.layers.*.source.stream_index: { type: int, description: "IPC stream the layer pulls, as set_layer_stream_rule sets it" }
+  screens.*.layers.*.window.x: { type: int, unit: px, description: "Layer's left edge on the screen" }
+  screens.*.layers.*.window.y: { type: int, unit: px, description: "Layer's top edge on the screen" }
+  screens.*.layers.*.window.width: { type: int, unit: px, description: "Layer width" }
+  screens.*.layers.*.window.height: { type: int, unit: px, description: "Layer height" }
+  screens.*.layers.*.window.lock_ratio: { type: bool, description: "The layer's aspect ratio is locked" }
+  screens.*.presets.*.name: { type: string, description: "Preset name, keyed by presetId; a preset no longer listed leaves state" }
+  screens.*.preset_groups.*.name: { type: string, description: "Preset group (playlist) name, keyed by presetGroupId" }
+  screens.*.preset_group.playing: { type: bool, description: "A preset group is playing on the screen (readPresetPoll enable)" }
+  screens.*.preset_group.id: { type: int, description: "Preset group last played on the screen" }
+  inputs.*.name: { type: string, description: "Input name, keyed by inputId" }
+  inputs.*.online: { type: int, description: "Signal: 0 offline, 1 online, 2 online and then offline" }
+  inputs.*.signal.width: { type: int, unit: px, description: "Width of the signal the input receives" }
+  inputs.*.signal.height: { type: int, unit: px, description: "Height of the signal the input receives" }
+  inputs.*.signal.refresh: { type: int, description: "Refresh rate of the received signal, in hundredths of a hertz as documented" }
+  inputs.*.signal.interlaced: { type: bool, description: "The received signal is interlaced" }
+  inputs.*.edid.width: { type: int, unit: px, description: "Horizontal resolution of the input's EDID timing (timing.horizontal.addrTime)" }
+  inputs.*.edid.height: { type: int, unit: px, description: "Vertical resolution of the input's EDID timing" }
+  inputs.*.edid.refresh_rate: { type: int, description: "EDID refresh rate as the splicer reports it (timing.refreshRate: 60 in the example, documented as hundredths)" }
+  inputs.*.crops.*.name: { type: string, description: "Cropped source name, keyed by cropId" }
+  inputs.*.crops.*.x: { type: int, unit: px, description: "Cropped area's left edge in the input picture" }
+  inputs.*.crops.*.y: { type: int, unit: px, description: "Cropped area's top edge in the input picture" }
+  inputs.*.crops.*.width: { type: int, unit: px, description: "Cropped area width" }
+  inputs.*.crops.*.height: { type: int, unit: px, description: "Cropped area height" }
+  outputs.*.name: { type: string, description: "Output name, keyed by outputId" }
+  outputs.*.gamma: { type: int, description: "Output gamma, as set_output_gamma writes it" }
+  outputs.*.width: { type: int, unit: px, description: "Output horizontal resolution (timing.horizontal.addrTime)" }
+  outputs.*.height: { type: int, unit: px, description: "Output vertical resolution (timing.vertical.addrTime)" }
+  outputs.*.refresh_rate: { type: int, unit: Hz, description: "Output refresh rate (timing.refreshRate)" }
+  outputs.*.interlaced: { type: bool, description: "The output is interlaced" }
+  outputs.*.image_quality.brightness.all: { type: int, description: "Output brightness, overall" }
+  outputs.*.image_quality.brightness.r: { type: int, description: "Output brightness, red" }
+  outputs.*.image_quality.brightness.g: { type: int, description: "Output brightness, green" }
+  outputs.*.image_quality.brightness.b: { type: int, description: "Output brightness, blue" }
+  outputs.*.image_quality.contrast.all: { type: int, description: "Output contrast, overall" }
+  outputs.*.image_quality.contrast.r: { type: int, description: "Output contrast, red" }
+  outputs.*.image_quality.contrast.g: { type: int, description: "Output contrast, green" }
+  outputs.*.image_quality.contrast.b: { type: int, description: "Output contrast, blue" }
+  outputs.*.image_quality.hue: { type: int, description: "Output hue" }
+  outputs.*.image_quality.saturation: { type: int, description: "Output saturation" }
+  outputs.*.image_quality.colour_temperature: { type: int, unit: K, description: "Output colour temperature, 2000 to 10000" }
+  bkgs.*.name: { type: string, description: "Background image name, keyed by bkgId" }
+  bkgs.*.width: { type: int, unit: px, description: "Background image width" }
+  bkgs.*.height: { type: int, unit: px, description: "Background image height" }
+  source_playlists.*.name: { type: string, description: "Signal source playlist name, keyed by sourceId" }
+  source_playlists.*.enabled: { type: bool, description: "The playlist is enabled (ctrl.pullEnable)" }
+  source_playlists.*.in_use: { type: int, description: "Use as documented: 1 in use, 2 not in use" }
 
 quirks:
   - models: [all]
@@ -802,10 +880,28 @@ quirks:
     severity: info
     text: >
       State is polled (poll_ms, 5 s by default): the initialisation status,
-      the screen list, and the preset each screen plays. Opened for commands
-      only, the module asks only the initialisation status, as its liveness
-      check. The change history mentions websocket push notifications (layer
-      z-order) whose form the pages do not give, so they are not used.
+      the screen list, inputs, outputs, background images and signal source
+      playlists, and for each screen its details (screen/readDetail), layers,
+      presets, current preset, preset groups and the preset group playing,
+      six requests per screen and six more each round; raise poll_ms for a
+      splicer with many screens. A command that succeeds has what it changed
+      read back at once (a screen's details, its layers, presets or groups,
+      inputs, outputs, backgrounds or playlists; the screen list after
+      create, rename, delete or a layout). Opened for commands only, the
+      module asks only the initialisation status, as its liveness check, and
+      reads nothing back. The change history mentions websocket push
+      notifications (layer z-order) whose form the pages do not give, so they
+      are not used.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the OpenAPI has no read for show_screen_ids (screen ID
+      display), set_output_locating or input groups, so those are not kept in
+      state. Kept out of state though readable: the OSD's text, colours and
+      position and the 3D timing (get_screen returns them), and preset group
+      contents and play times (get_preset_group). set_screen_bkg's enable is
+      kept as the splicer reports it, whose sense the pages do not state.
 
   - models: [all]
     severity: critical

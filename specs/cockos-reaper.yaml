@@ -73,6 +73,21 @@ settings:
   region_count: { type: int, min: 0, max: 1024, default: 16,
     label: Regions followed,
     description: "How many regions REAPER reports names, times and lengths for, sent on connecting; 0 for none." }
+  send_count: { type: int, min: 0, max: 1024, default: 4,
+    label: Sends followed,
+    description: "How many sends of each track (and of the master) REAPER reports and the send numbers reach, sent on connecting; REAPER's default is 4." }
+  receive_count: { type: int, min: 0, max: 1024, default: 4,
+    label: Receives followed,
+    description: "How many receives of each track REAPER reports and the receive numbers reach, sent on connecting; REAPER's default is 4." }
+  fx_count: { type: int, min: 0, max: 1024, default: 8,
+    label: Effects followed,
+    description: "How many effects of each track's FX chain REAPER reports and the FX numbers reach, sent on connecting; REAPER's default is 8." }
+  fx_param_count: { type: int, min: 0, max: 1024, default: 16,
+    label: Effect parameters followed,
+    description: "How many parameters of each effect REAPER reports values for (its FX parameter bank size), sent on connecting; REAPER's default is 16." }
+  fx_inst_param_count: { type: int, min: 0, max: 1024, default: 16,
+    label: Instrument parameters followed,
+    description: "How many parameters of each track's instrument REAPER reports values for, sent on connecting; REAPER's default is 16." }
 
 # The device's display capabilities, which the pattern config's defaults
 # (8 tracks, no markers or regions) would otherwise limit.
@@ -80,6 +95,11 @@ on_connect:
   - { address: /device/track/count, args: [ { value: "{settings.track_count}", type: int } ] }
   - { address: /device/marker/count, args: [ { value: "{settings.marker_count}", type: int } ] }
   - { address: /device/region/count, args: [ { value: "{settings.region_count}", type: int } ] }
+  - { address: /device/send/count, args: [ { value: "{settings.send_count}", type: int } ] }
+  - { address: /device/receive/count, args: [ { value: "{settings.receive_count}", type: int } ] }
+  - { address: /device/fx/count, args: [ { value: "{settings.fx_count}", type: int } ] }
+  - { address: /device/fxparam/count, args: [ { value: "{settings.fx_param_count}", type: int } ] }
+  - { address: /device/fxinstparam/count, args: [ { value: "{settings.fx_inst_param_count}", type: int } ] }
 
 ports:
   - { port: 8000, protocol: udp, role: control, note: "REAPER's Local listen port for the OSC device" }
@@ -96,10 +116,16 @@ models:
                set_track_selected, set_track_name, set_track_automation_trim,
                set_track_automation_read, set_track_automation_latch, set_track_automation_touch,
                set_track_automation_write, set_track_send_volume, set_track_send_pan,
-               set_track_receive_volume, set_fx_bypass, set_fx_ui_open, next_fx_preset,
-               previous_fx_preset, set_fx_preset, set_fx_wet_dry, set_fx_param, run_action,
+               set_track_receive_volume, set_track_receive_pan, set_master_send_volume,
+               set_master_send_pan, set_fx_bypass, set_fx_ui_open, next_fx_preset,
+               previous_fx_preset, set_fx_preset, set_fx_wet_dry, set_fx_param, set_instrument_bypass,
+               set_instrument_ui_open, next_instrument_preset, previous_instrument_preset,
+               set_instrument_preset, set_instrument_param, run_action,
                run_named_action, run_midi_editor_action, select_track_bank, select_device_track,
-               set_device_track_count, set_device_marker_count, set_device_region_count, vkb_note,
+               set_device_track_count, set_device_marker_count, set_device_region_count,
+               set_device_send_count, set_device_receive_count, set_device_fx_count,
+               set_device_fx_param_count, set_device_fx_inst_param_count, select_device_fx,
+               select_fx_param_bank, vkb_note,
                vkb_cc, vkb_program]
     verification: none
 
@@ -378,6 +404,31 @@ commands:
     send: { address: "/track/{track}/recv/{receive}/volume", args: [{ value: "{position}", type: float }] }
     returns: none
 
+  set_track_receive_pan:
+    summary: "Set the pan of one of a track's receives (TRACK_RECV_PAN)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      receive: { type: int, min: 1, max: 999, required: true, label: Receive, description: "The track's receive, numbered from 1 in REAPER's routing order." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized pan from 0.0 (left) to 1.0 (right), 0.5 being centre." }
+    send: { address: "/track/{track}/recv/{receive}/pan", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_master_send_volume:
+    summary: "Set the level of one of the master track's sends (MASTER_SEND_VOLUME)"
+    params:
+      send: { type: int, min: 1, max: 999, required: true, label: Send, description: "The master track's send, numbered from 1 in REAPER's routing order." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/master/send/{send}/volume", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_master_send_pan:
+    summary: "Set the pan of one of the master track's sends (MASTER_SEND_PAN)"
+    params:
+      send: { type: int, min: 1, max: 999, required: true, label: Send, description: "The master track's send, numbered from 1 in REAPER's routing order." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized pan from 0.0 (left) to 1.0 (right), 0.5 being centre." }
+    send: { address: "/master/send/{send}/pan", args: [{ value: "{position}", type: float }] }
+    returns: none
+
   # ── Track effects ─────────────────────────────────────────────────────────
   set_fx_bypass:
     summary: "Bypass or un-bypass an effect on a track (FX_BYPASS)"
@@ -441,6 +492,54 @@ commands:
     send: { address: "/track/{track}/fx/{fx}/fxparam/{param}/value", args: [{ value: "{position}", type: float }] }
     returns: none
 
+  # ── Track instruments ─────────────────────────────────────────────────────
+  set_instrument_bypass:
+    summary: "Bypass a track's instrument, or make it active again (FX_INST_BYPASS)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      bypassed: { type: bool, required: true, label: Bypassed, description: "True bypasses the instrument, false makes it active; sent inverted, as for effects." }
+    send: { address: "/track/{track}/fxinst/bypass", args: [{ value: "{bypassed:bool10}", type: int }] }
+    returns: none
+
+  set_instrument_ui_open:
+    summary: "Open or close a track's instrument window (FX_INST_OPEN_UI)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      open: { type: bool, required: true, label: Window open, description: "True opens the instrument's window in REAPER, false closes it." }
+    send: { address: "/track/{track}/fxinst/openui", args: [{ value: "{open:bool01}", type: int }] }
+    returns: none
+
+  next_instrument_preset:
+    summary: "Load a track's instrument's next preset (FX_INST_NEXT_PRESET)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/fxinst/preset+" }
+    returns: none
+
+  previous_instrument_preset:
+    summary: "Load a track's instrument's previous preset (FX_INST_PREV_PRESET)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/fxinst/preset-" }
+    returns: none
+
+  set_instrument_preset:
+    summary: "Load a track's instrument's preset by name (FX_INST_PRESET)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      preset: { type: string, max_length: 255, required: true, label: Preset, description: "Name of the instrument preset to load, as REAPER lists it." }
+    send: { address: "/track/{track}/fxinst/preset", args: [{ value: "{preset}", type: string }] }
+    returns: none
+
+  set_instrument_param:
+    summary: "Set a parameter of a track's instrument (FX_INST_PARAM_VALUE)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      param: { type: int, min: 1, max: 9999, required: true, label: Parameter, description: "The instrument parameter's number, from 1, as REAPER orders the instrument's parameters." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/track/{track}/fxinstparam/{param}/value", args: [{ value: "{position}", type: float }] }
+    returns: none
+
   # ── Actions ───────────────────────────────────────────────────────────────
   run_action:
     summary: "Run a REAPER action by its command ID number (ACTION)"
@@ -497,6 +596,55 @@ commands:
     params:
       count: { type: int, min: 0, max: 1024, required: true, label: "Region count", description: "How many regions REAPER reports names, times and lengths for; 0 for none." }
     send: { address: "/device/region/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  set_device_send_count:
+    summary: "Set how many sends of each track REAPER reports (DEVICE_SEND_COUNT)"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true, label: "Send count", description: "How many sends of each track, and of the master, REAPER reports and the send numbers reach." }
+    send: { address: "/device/send/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  set_device_receive_count:
+    summary: "Set how many receives of each track REAPER reports (DEVICE_RECEIVE_COUNT)"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true, label: "Receive count", description: "How many receives of each track REAPER reports and the receive numbers reach." }
+    send: { address: "/device/receive/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  set_device_fx_count:
+    summary: "Set how many effects of each track REAPER reports (DEVICE_FX_COUNT)"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true, label: "FX count", description: "How many effects of each track's FX chain REAPER reports and the FX numbers reach." }
+    send: { address: "/device/fx/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  set_device_fx_param_count:
+    summary: "Set how many parameters of each effect REAPER reports (DEVICE_FX_PARAM_COUNT)"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true, label: "Parameter count", description: "How many parameters of each effect REAPER reports, the size of the FX parameter bank." }
+    send: { address: "/device/fxparam/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  set_device_fx_inst_param_count:
+    summary: "Set how many parameters of each instrument REAPER reports (DEVICE_FX_INST_PARAM_COUNT)"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true, label: "Instrument parameter count", description: "How many parameters of each track's instrument REAPER reports, the size of the instrument parameter bank." }
+    send: { address: "/device/fxinstparam/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  select_device_fx:
+    summary: "Choose the device's selected effect on its selected track, which /fx and /fxparam messages without a track address (DEVICE_FX_SELECT)"
+    params:
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the selected track's FX chain, from 1." }
+    send: { address: "/device/fx/select", args: [{ value: "{fx}", type: int }] }
+    returns: none
+
+  select_fx_param_bank:
+    summary: "Choose which bank of the selected effect's parameters REAPER reports (DEVICE_FX_PARAM_BANK_SELECT)"
+    params:
+      bank: { type: int, min: 1, max: 9999, required: true, label: Parameter bank, description: "Bank of parameters, from 1; each holds as many parameters as the FX parameter count." }
+    send: { address: "/device/fxparam/bank/select", args: [{ value: "{bank}", type: int }] }
     returns: none
 
   # ── Virtual MIDI keyboard ─────────────────────────────────────────────────
@@ -573,6 +721,65 @@ state:
   tracks.*.sends.*.volume: { type: float, description: "Send level, 0.0 to 1.0" }
   tracks.*.sends.*.volume_text: { type: string, description: "Send level as REAPER shows it" }
   tracks.*.sends.*.pan: { type: float, description: "Send pan, 0.0 to 1.0" }
+  tracks.*.sends.*.pan_text: { type: string, description: "Send pan as REAPER shows it" }
+  tracks.*.receives.*.name: { type: string, description: "Name of the track the receive comes from, by its number among the track's receives" }
+  tracks.*.receives.*.volume: { type: float, description: "Receive level, 0.0 to 1.0" }
+  tracks.*.receives.*.volume_text: { type: string, description: "Receive level as REAPER shows it" }
+  tracks.*.receives.*.pan: { type: float, description: "Receive pan, 0.0 to 1.0" }
+  tracks.*.receives.*.pan_text: { type: string, description: "Receive pan as REAPER shows it" }
+  tracks.*.pan2_text: { type: string, description: "Second pan control as REAPER shows it" }
+  tracks.*.vu_left: { type: float, description: "Left level meter, 0.0 to 1.0" }
+  tracks.*.vu_right: { type: float, description: "Right level meter, 0.0 to 1.0" }
+  tracks.*.fx.*.number: { type: string, description: "Effect number as REAPER shows it" }
+  tracks.*.fx.*.params.*.value: { type: float, description: "Effect parameter value, normalized 0.0 to 1.0, by parameter number from 1" }
+  tracks.*.instrument.name: { type: string, description: "Name of the track's instrument" }
+  tracks.*.instrument.active: { type: bool, description: "Instrument active (the bypass flag reads 1 for active)" }
+  tracks.*.instrument.ui_open: { type: bool, description: "Instrument window open" }
+  tracks.*.instrument.preset: { type: string, description: "Instrument preset name" }
+  tracks.*.instrument.params.*.value: { type: float, description: "Instrument parameter value, normalized 0.0 to 1.0" }
+  master.vu: { type: float, description: "Master level meter, 0.0 to 1.0" }
+  master.vu_left: { type: float, description: "Master left level meter, 0.0 to 1.0" }
+  master.vu_right: { type: float, description: "Master right level meter, 0.0 to 1.0" }
+  master.sends.*.name: { type: string, description: "Master send destination name" }
+  master.sends.*.volume: { type: float, description: "Master send level, 0.0 to 1.0" }
+  master.sends.*.volume_text: { type: string, description: "Master send level as REAPER shows it" }
+  master.sends.*.pan: { type: float, description: "Master send pan, 0.0 to 1.0" }
+  master.sends.*.pan_text: { type: string, description: "Master send pan as REAPER shows it" }
+  selected_track.fx.*.name: { type: string, description: "Name of an effect on the device's selected track" }
+  selected_track.fx.*.number: { type: string, description: "Number of an effect on the device's selected track, as REAPER shows it" }
+  selected_track.fx.*.active: { type: bool, description: "Effect on the selected track active" }
+  selected_track.fx.*.ui_open: { type: bool, description: "Effect on the selected track has its window open" }
+  selected_track.fx.*.preset: { type: string, description: "Preset of an effect on the selected track" }
+  selected_track.fx.*.wet: { type: float, description: "Wet/dry mix of an effect on the selected track, 0.0 to 1.0" }
+  selected_track.fx.*.wet_text: { type: string, description: "Wet/dry mix as REAPER shows it" }
+  selected_track.fx.*.params.*.name: { type: string, description: "Parameter name of an effect on the selected track (REAPER sends names only for the selected track)" }
+  selected_track.fx.*.params.*.value: { type: float, description: "Parameter value of an effect on the selected track, 0.0 to 1.0" }
+  selected_track.fx.*.params.*.value_text: { type: string, description: "Parameter value as REAPER shows it" }
+  selected_track.instrument.name: { type: string, description: "Name of the selected track's instrument" }
+  selected_track.instrument.active: { type: bool, description: "Selected track's instrument active" }
+  selected_track.instrument.ui_open: { type: bool, description: "Selected track's instrument window open" }
+  selected_track.instrument.preset: { type: string, description: "Selected track's instrument preset" }
+  selected_track.instrument.params.*.name: { type: string, description: "Selected track's instrument parameter name" }
+  selected_track.instrument.params.*.value: { type: float, description: "Selected track's instrument parameter value, 0.0 to 1.0" }
+  selected_track.instrument.params.*.value_text: { type: string, description: "Selected track's instrument parameter value as REAPER shows it" }
+  selected_fx.name: { type: string, description: "Name of the device's selected effect" }
+  selected_fx.number: { type: string, description: "Number of the device's selected effect, as REAPER shows it" }
+  selected_fx.active: { type: bool, description: "Selected effect active" }
+  selected_fx.ui_open: { type: bool, description: "Selected effect's window open" }
+  selected_fx.preset: { type: string, description: "Selected effect's preset" }
+  selected_fx.wet: { type: float, description: "Selected effect's wet/dry mix, 0.0 to 1.0" }
+  selected_fx.wet_text: { type: string, description: "Selected effect's wet/dry mix as REAPER shows it" }
+  selected_fx.param_bank: { type: string, description: "The selected effect's parameter bank, as REAPER shows it" }
+  selected_fx.params.*.name: { type: string, description: "Name of a parameter of the selected effect, by its number in the parameter bank" }
+  selected_fx.params.*.value: { type: float, description: "Value of a parameter of the selected effect, 0.0 to 1.0" }
+  selected_fx.params.*.value_text: { type: string, description: "Value of a parameter of the selected effect, as REAPER shows it" }
+  last_touched_fx.track_name: { type: string, description: "Track of the effect last touched in REAPER" }
+  last_touched_fx.track_number: { type: string, description: "Number of that track, as REAPER shows it" }
+  last_touched_fx.name: { type: string, description: "Name of the effect last touched" }
+  last_touched_fx.number: { type: string, description: "Number of the effect last touched, as REAPER shows it" }
+  last_touched_fx.param_name: { type: string, description: "Name of the effect parameter last touched" }
+  last_touched_fx.param_value: { type: float, description: "Value of the effect parameter last touched, 0.0 to 1.0" }
+  last_touched_fx.param_value_text: { type: string, description: "Value of the effect parameter last touched, as REAPER shows it" }
   markers.*.name: { type: string, description: "Marker name, by its place among the reported markers" }
   markers.*.number: { type: string, description: "Marker number as REAPER shows it" }
   markers.*.time: { type: float, unit: s, description: "Marker position" }
@@ -687,6 +894,128 @@ telemetry:
       state: { "tracks.{1}.sends.{2}.volume_text": "{arg0}" }
     - address: '^/track/(\d+)/send/(\d+)/pan$'
       state: { "tracks.{1}.sends.{2}.pan": "{arg0}" }
+    - address: '^/track/(\d+)/send/(\d+)/pan/str$'
+      state: { "tracks.{1}.sends.{2}.pan_text": "{arg0}" }
+    - address: '^/track/(\d+)/recv/(\d+)/name$'
+      state: { "tracks.{1}.receives.{2}.name": "{arg0}" }
+    - address: '^/track/(\d+)/recv/(\d+)/volume$'
+      state: { "tracks.{1}.receives.{2}.volume": "{arg0}" }
+    - address: '^/track/(\d+)/recv/(\d+)/volume/str$'
+      state: { "tracks.{1}.receives.{2}.volume_text": "{arg0}" }
+    - address: '^/track/(\d+)/recv/(\d+)/pan$'
+      state: { "tracks.{1}.receives.{2}.pan": "{arg0}" }
+    - address: '^/track/(\d+)/recv/(\d+)/pan/str$'
+      state: { "tracks.{1}.receives.{2}.pan_text": "{arg0}" }
+    - address: '^/track/(\d+)/pan2/str$'
+      state: { "tracks.{1}.pan2_text": "{arg0}" }
+    - address: '^/track/(\d+)/vu/L$'
+      state: { "tracks.{1}.vu_left": "{arg0}" }
+    - address: '^/track/(\d+)/vu/R$'
+      state: { "tracks.{1}.vu_right": "{arg0}" }
+    - address: '^/track/(\d+)/fx/(\d+)/number/str$'
+      state: { "tracks.{1}.fx.{2}.number": "{arg0}" }
+    - address: '^/track/(\d+)/fx/(\d+)/fxparam/(\d+)/value$'
+      state: { "tracks.{1}.fx.{2}.params.{3}.value": "{arg0}" }
+    - address: '^/track/(\d+)/fxinst/name$'
+      state: { "tracks.{1}.instrument.name": "{arg0}" }
+    - address: '^/track/(\d+)/fxinst/bypass$'
+      state: { "tracks.{1}.instrument.active": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/fxinst/openui$'
+      state: { "tracks.{1}.instrument.ui_open": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/fxinst/preset$'
+      state: { "tracks.{1}.instrument.preset": "{arg0}" }
+    - address: '^/track/(\d+)/fxinstparam/(\d+)/value$'
+      state: { "tracks.{1}.instrument.params.{2}.value": "{arg0}" }
+    # The master track.
+    - address: '^/master/vu$'
+      state: { "master.vu": "{arg0}" }
+    - address: '^/master/vu/L$'
+      state: { "master.vu_left": "{arg0}" }
+    - address: '^/master/vu/R$'
+      state: { "master.vu_right": "{arg0}" }
+    - address: '^/master/send/(\d+)/name$'
+      state: { "master.sends.{1}.name": "{arg0}" }
+    - address: '^/master/send/(\d+)/volume$'
+      state: { "master.sends.{1}.volume": "{arg0}" }
+    - address: '^/master/send/(\d+)/volume/str$'
+      state: { "master.sends.{1}.volume_text": "{arg0}" }
+    - address: '^/master/send/(\d+)/pan$'
+      state: { "master.sends.{1}.pan": "{arg0}" }
+    - address: '^/master/send/(\d+)/pan/str$'
+      state: { "master.sends.{1}.pan_text": "{arg0}" }
+    # Effects of the device's selected track (/fx/@/...).
+    - address: '^/fx/(\d+)/name$'
+      state: { "selected_track.fx.{1}.name": "{arg0}" }
+    - address: '^/fx/(\d+)/number/str$'
+      state: { "selected_track.fx.{1}.number": "{arg0}" }
+    - address: '^/fx/(\d+)/bypass$'
+      state: { "selected_track.fx.{1}.active": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/fx/(\d+)/openui$'
+      state: { "selected_track.fx.{1}.ui_open": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/fx/(\d+)/preset$'
+      state: { "selected_track.fx.{1}.preset": "{arg0}" }
+    - address: '^/fx/(\d+)/wetdry$'
+      state: { "selected_track.fx.{1}.wet": "{arg0}" }
+    - address: '^/fx/(\d+)/wetdry/str$'
+      state: { "selected_track.fx.{1}.wet_text": "{arg0}" }
+    - address: '^/fx/(\d+)/fxparam/(\d+)/name$'
+      state: { "selected_track.fx.{1}.params.{2}.name": "{arg0}" }
+    - address: '^/fx/(\d+)/fxparam/(\d+)/value$'
+      state: { "selected_track.fx.{1}.params.{2}.value": "{arg0}" }
+    - address: '^/fx/(\d+)/fxparam/(\d+)/value/str$'
+      state: { "selected_track.fx.{1}.params.{2}.value_text": "{arg0}" }
+    - address: '^/fxinst/name$'
+      state: { "selected_track.instrument.name": "{arg0}" }
+    - address: '^/fxinst/bypass$'
+      state: { "selected_track.instrument.active": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/fxinst/openui$'
+      state: { "selected_track.instrument.ui_open": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/fxinst/preset$'
+      state: { "selected_track.instrument.preset": "{arg0}" }
+    - address: '^/fxinstparam/(\d+)/name$'
+      state: { "selected_track.instrument.params.{1}.name": "{arg0}" }
+    - address: '^/fxinstparam/(\d+)/value$'
+      state: { "selected_track.instrument.params.{1}.value": "{arg0}" }
+    - address: '^/fxinstparam/(\d+)/value/str$'
+      state: { "selected_track.instrument.params.{1}.value_text": "{arg0}" }
+    # The device's selected effect (/fx/... and /fxparam/@/...).
+    - address: '^/fx/name$'
+      state: { "selected_fx.name": "{arg0}" }
+    - address: '^/fx/number/str$'
+      state: { "selected_fx.number": "{arg0}" }
+    - address: '^/fx/bypass$'
+      state: { "selected_fx.active": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/fx/openui$'
+      state: { "selected_fx.ui_open": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/fx/preset$'
+      state: { "selected_fx.preset": "{arg0}" }
+    - address: '^/fx/wetdry$'
+      state: { "selected_fx.wet": "{arg0}" }
+    - address: '^/fx/wetdry/str$'
+      state: { "selected_fx.wet_text": "{arg0}" }
+    - address: '^/device/fxparam/bank/str$'
+      state: { "selected_fx.param_bank": "{arg0}" }
+    - address: '^/fxparam/(\d+)/name$'
+      state: { "selected_fx.params.{1}.name": "{arg0}" }
+    - address: '^/fxparam/(\d+)/value$'
+      state: { "selected_fx.params.{1}.value": "{arg0}" }
+    - address: '^/fxparam/(\d+)/value/str$'
+      state: { "selected_fx.params.{1}.value_text": "{arg0}" }
+    # The effect parameter last touched in REAPER.
+    - address: '^/fx/last_touched/track/name$'
+      state: { "last_touched_fx.track_name": "{arg0}" }
+    - address: '^/fx/last_touched/track/number/str$'
+      state: { "last_touched_fx.track_number": "{arg0}" }
+    - address: '^/fx/last_touched/name$'
+      state: { "last_touched_fx.name": "{arg0}" }
+    - address: '^/fx/last_touched/number/str$'
+      state: { "last_touched_fx.number": "{arg0}" }
+    - address: '^/fxparam/last_touched/name$'
+      state: { "last_touched_fx.param_name": "{arg0}" }
+    - address: '^/fxparam/last_touched/value$'
+      state: { "last_touched_fx.param_value": "{arg0}" }
+    - address: '^/fxparam/last_touched/value/str$'
+      state: { "last_touched_fx.param_value_text": "{arg0}" }
     - address: '^/marker/(\d+)/name$'
       state: { "markers.{1}.name": "{arg0}" }
     - address: '^/marker/(\d+)/number/str$'
@@ -772,6 +1101,20 @@ quirks:
       depend on REAPER's fader preferences; set_track_volume_db and tracks.*.volume_db carry dB.
       FX bypass is inverted on the wire (1 is active, 0 bypassed): set_fx_bypass sends it that way
       and the state holds tracks.*.fx.*.active.
+
+  - models: [all]
+    severity: info
+    text: >
+      Effect parameter values arrive for every track in the bank (/track/n/fx/m/fxparam/p/value),
+      up to the fx_count effects and fx_param_count parameters set on connecting, and receives up
+      to receive_count; the config's notes warn this can be a lot of data. Parameter names and
+      their displayed values (value/str) are sent only for the device's selected track
+      (selected_track.fx.*) and selected effect (selected_fx, chosen with select_device_fx and
+      select_fx_param_bank), so tracks.*.fx.*.params hold values only. The instrument patterns
+      (FX_INST) address each track's instrument, and its bypass is taken to be inverted like an
+      effect's. The pattern config's ReaEQ patterns (FX_EQ), view scrolling and zooming, scrub and
+      marker and region ID patterns are not covered; an EQ's bands are reachable as an effect's
+      parameters with set_fx_param.
 
   - models: [all]
     severity: info
