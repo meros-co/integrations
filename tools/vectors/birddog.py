@@ -728,6 +728,20 @@ _tel("connect-to", "/connectTo?location=decoder",
 _tel("operation-mode", "/operationmode", "dual", {"device": {"operation_mode": "dual"}})
 _tel("video-output-p400", "/videooutputinterface", "NormalMode", {"video_output": {"mode": "NormalMode"}})
 
+# The NDI finder's sources (2.0 NDIFINDER List): an object keyed by source
+# name, each name one key, the list replaced whole; {"None":"None"} is none.
+telemetry(BD, "ndi-sources", inbound_http={
+    "path": "/List", "body": '{"BIRDDOG-4C526 (Stream1)":"192.168.100.100:5961","studio.cam2 (CAM)":"192.168.100.101:5962"}'},
+    state_before={"ndi": {"sources": {"OLD (CAM)": {"address": "192.168.100.9:5961"}}}},
+    expect_state={"ndi": {"sources": {"BIRDDOG-4C526 (Stream1)": {"address": "192.168.100.100:5961"},
+                                      "studio.cam2 (CAM)": {"address": "192.168.100.101:5962"}}}})
+telemetry(BD, "ndi-sources-none", inbound_http={"path": "/List", "body": '{"None":"None"}'},
+          state_before={"ndi": {"sources": {"OLD (CAM)": {"address": "192.168.100.9:5961"}}}},
+          expect_state={"ndi": {}})
+# A finder reset or refresh reads the list again.
+telemetry(BD, "ndi-finder-refresh-rereads", inbound_http={"path": "/refresh", "body": '{"Status":"success"}'},
+          expect_then_send=[{"method": "GET", "target": "/List"}], expect_state={})
+
 # Re-reads: a POST with a JSON body has its endpoint read again; its GET
 # reply does not.
 telemetry(BD, "reread-exposure", inbound_http={

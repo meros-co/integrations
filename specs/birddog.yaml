@@ -3475,6 +3475,7 @@ telemetry:
     send:
       - { method: GET, path: /encodeTransport }
       - { method: GET, path: /NDIDisServer }
+      - { method: GET, path: /List }
       - { models: *v21, method: GET, path: /operationmode }
       - { models: *v21, method: GET, path: /EthSetup }
       - { models: *v21, method: GET, path: /secondary_protocol }
@@ -3629,6 +3630,20 @@ telemetry:
       state:
         ndi.discovery_server: { value: "{enabled}", map: { "NDIDisServEn": true, "NDIDisServDis": false } }
         ndi.discovery_server_ip: "{ip}"
+    # The NDI finder's sources, an object keyed by source name, each name one
+    # state key (names hold spaces, brackets and dots), the list replaced
+    # whole. {"None":"None"} is the empty list: only members whose value
+    # holds a digit (an address) are sources.
+    - path: "^/List$"
+      json_each: "$.*"
+      each_match: { "$": "[0-9]" }
+      json: { address: "$" }
+      replace: ndi.sources
+      state: { "ndi.sources.{key:key}.address": "{address}" }
+    # A finder reset or refresh changes the list: read it again.
+    - path: "^/(reset|refresh)$"
+      json: {}
+      then_send: [{ method: GET, path: /List }]
     - path: "^/analogaudiosetup$"
       json: { in_gain: "$.AnalogAudioInGain", out_gain: "$.AnalogAudioOutGain", select: "$.AnalogAudiooutputselect" }
       state:
@@ -4077,6 +4092,7 @@ state:
   ndi.receive_method:           { type: string, description: "Decoder NDI receive method (rxpm)" }
   ndi.discovery_server:         { type: bool, description: "NDI discovery server in use" }
   ndi.discovery_server_ip:      { type: string, description: "NDI discovery server address" }
+  ndi.sources.*.address:        { type: string, description: "An NDI source the finder sees, keyed by its NDI name (one key, such as BIRDDOG-4C526 (Stream1)): its address and port, as the camera reports it (GET /List)" }
   audio.in_gain:                { type: string, description: "Analog input gain: 0-100, 1-80 on X4 Ultra, or dB such as -6 dB on X5 Ultra" }
   audio.out_gain:               { type: int, description: "Analog output gain 0-100 (2.0)" }
   audio.select:                 { type: string, description: "AnalogAudiooutputselect: output source on 2.0, Mic or Line on X5 Ultra and MAKI Ultra" }
@@ -4362,17 +4378,19 @@ quirks:
       that serve them; every other endpoint a camera serves (transport,
       discovery server, audio, video output, operation mode, Sil2, secondary
       protocol, colour matrix, advanced, external, detail, gamma, network,
-      Wi-Fi, genlock and failover, decoder setup, the decoder's connection) is
-      read on connecting and every 30 seconds, each request naming the cameras
-      that serve it. A POST with a JSON body has its endpoint read again at
-      once; a preset recall and an image reset read exposure, picture, white
-      balance, colour matrix, advanced and PTZ position again. The operation
+      Wi-Fi, genlock and failover, decoder setup, the decoder's connection,
+      the NDI finder's source list) is read on connecting and every 30
+      seconds, each request naming the cameras that serve it. A POST with a
+      JSON body has its endpoint read again at once; a preset recall and an
+      image reset read exposure, picture, white balance, colour matrix,
+      advanced and PTZ position again, and a finder reset or refresh reads
+      the source list again. The NDI sources are kept by name
+      (ndi.sources.<name>.address), the list replaced whole. The operation
       mode and the P400/P4K output mode are plain text, read by their words.
       The other plain-text replies (version, hostname, NDI group names,
-      off-subnet list) and the NDI source list (an object keyed by source
-      name) are not in the state: the format cannot read a plain-text HTTP
-      reply by its path, nor the members of a JSON object, so they stay
-      available through their get_ commands. Keys some cameras report but
+      off-subnet list) are not in the state: the format cannot read a
+      plain-text HTTP reply by its path, so they stay available through their
+      get_ commands. Keys some cameras report but
       neither document defines (FreeD, SmartExposure, DRC, NearLimit,
       Portrait, GTuning and others) are not settable here except through the
       set_<endpoint> JSON commands.
