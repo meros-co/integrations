@@ -490,12 +490,22 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             if "match_each" not in rule:
                 errors.append(f"telemetry.updates[{i}]: match_each_in goes with match_each")
             else:
+                # On an address rule, the captures are the address's, then
+                # arg_match's in argument order.
+                sources = ([rule.get("match", "")] if "address" not in rule else
+                           [rule["address"]] + [p for _, p in sorted((rule.get("arg_match") or {}).items(),
+                                                                     key=lambda kv: int(kv[0]))])
                 try:
-                    groups = re.compile(rule.get("match", "")).groups
-                except re.error:
+                    groups = sum(re.compile(s).groups for s in sources)
+                except (re.error, ValueError):
                     groups = 0
                 if rule["match_each_in"] > groups:
                     errors.append(f"telemetry.updates[{i}]: match_each_in names group {rule['match_each_in']}, which match does not have")
+        if "address" in rule and "match_each" in rule:
+            if "match_each_in" not in rule:
+                errors.append(f"telemetry.updates[{i}]: match_each on an address rule needs match_each_in")
+            if any(k in rule for k in ("json", "json_each", "json_match")):
+                errors.append(f"telemetry.updates[{i}]: match_each goes along a capture's text, not JSON")
         if "arg_match" in rule and "address" not in rule:
             errors.append(f"telemetry.updates[{i}]: arg_match goes with address")
         for index, pattern in (rule.get("arg_match") or {}).items():
@@ -797,8 +807,9 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 errors.append(f"{where}.request_match: {e}")
             if "match" not in rule or transport_type not in ("line-tcp", "line-udp"):
                 errors.append(f"{where}: a request_match regex goes with match, on a line transport")
-        if "match_each" in rule and ("match" not in rule or "path" in rule):
-            errors.append(f"{where}: match_each reads the rest of a message a match rule matched")
+        if "match_each" in rule and ("match" not in rule or "path" in rule) and "address" not in rule:
+            errors.append(f"{where}: match_each reads the rest of a message a match rule matched, "
+                          "or a capture of an address rule")
         if "each_match" in rule and "json_each" not in rule:
             errors.append(f"{where}: each_match selects elements of json_each")
         for key in ("json_match", "request_match", "each_match"):

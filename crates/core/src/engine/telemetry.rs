@@ -69,6 +69,11 @@ enum Matcher {
         /// (Millumin's `/millumin/info` names what changed in a string);
         /// their captures follow the address's.
         arg_match: Vec<(usize, Regex)>,
+        /// `match_each` with `match_each_in`: the rule matches once for each
+        /// match of this regex along the text of that capture (an address's
+        /// or `arg_match`'s): a list inside a string argument (WING's node
+        /// query), each item's captures numbered on and `{index}` its place.
+        text_each: Option<(Regex, usize)>,
         select: Vec<(String, Regex)>,
         each: Option<String>,
         each_select: Vec<(String, Regex)>,
@@ -694,6 +699,18 @@ impl Telemetry {
                         .and_then(Value::as_str)
                         .map(str::to_string),
                     arg_match: arg_selectors(rule.get("arg_match"))?,
+                    text_each: match rule.get("match_each") {
+                        None => None,
+                        Some(r) => Some((
+                            regex(r, "match_each")?,
+                            rule.get("match_each_in")
+                                .and_then(Value::as_u64)
+                                .filter(|n| *n >= 1)
+                                .ok_or(
+                                    "telemetry: match_each on an address rule needs match_each_in, a capture from 1",
+                                )? as usize,
+                        )),
+                    },
                     select: selectors(rule.get("json_match"), "json_match")?,
                     each: rule
                         .get("json_each")
@@ -1119,6 +1136,7 @@ impl Telemetry {
                         json_arg,
                         arg_types,
                         arg_match,
+                        text_each,
                         select: selectors,
                         each,
                         each_select,
@@ -1155,10 +1173,30 @@ impl Telemetry {
                     if !select(&doc, selectors, &mut base) {
                         continue;
                     }
+                    let numbered = base.len();
                     for (i, a) in args.iter().enumerate() {
                         base.push((format!("arg{i}"), a.clone()));
                     }
                     self.clear(rule, &base, cleared);
+                    // Each item of a list inside a capture's text; a capture
+                    // that took part in no match has no items.
+                    if let Some((each, group)) = text_each {
+                        let name = group.to_string();
+                        let text = match base.iter().find(|(k, _)| *k == name) {
+                            Some((_, Value::String(s))) => s.clone(),
+                            _ => String::new(),
+                        };
+                        for (index, item) in each.captures_iter(&text).enumerate() {
+                            let mut values = base.clone();
+                            for (i, v) in captures(&item) {
+                                let n: usize = i.parse().unwrap_or(0);
+                                values.push(((n + numbered).to_string(), v));
+                            }
+                            values.push(("index".to_string(), Value::from(index)));
+                            any |= self.matched(rule, &values, &mut patch, triggers);
+                        }
+                        continue;
+                    }
                     if !reads_json {
                         any |= self.matched(rule, &base, &mut patch, triggers);
                         continue;
@@ -1616,6 +1654,56 @@ mod tests {
             }),
             None
         );
+    }
+
+    #[test]
+    fn a_list_inside_an_osc_string_is_read_item_by_item() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"address": "^/cards/([12])/stat$",
+                 "arg_match": {"0": "(?:^|\\s)names\\s+list \\[([^\\]]*)\\]"},
+                 "match_each": "\\s*([^,]+?)\\s*(?:,|$)", "match_each_in": 2,
+                 "replace": "cards.{1}.names",
+                 "state": {"cards.{1}.names.{index:+1}": "{3}"}},
+            ]})),
+            &state(json!({"cards.*.names.*": {"type": "string", "description": "x"}})),
+            Conversions::new(),
+        )
+        .unwrap();
+        let reply = |text: &str| {
+            let args = [json!(text)];
+            let mut cleared = json!({});
+            let patch = t.apply_into(
+                &Inbound::Osc {
+                    address: "/cards/2/stat",
+                    types: "s",
+                    args: &args,
+                },
+                &mut Vec::new(),
+                &mut cleared,
+            );
+            (cleared, patch)
+        };
+        let (cleared, patch) =
+            reply(" count int [0 .. 9]\n names   list [Take 1, Second take,Last]\n");
+        assert_eq!(cleared, json!({"cards": {"2": {"names": null}}}));
+        assert_eq!(
+            patch,
+            Some(json!({"cards": {"2": {"names": {
+                "1": "Take 1", "2": "Second take", "3": "Last"}}}}))
+        );
+        // An empty list clears and writes nothing; another text is no match.
+        let (cleared, patch) = reply(" names list []");
+        assert_eq!(cleared, json!({"cards": {"2": {"names": null}}}));
+        assert_eq!(patch, None);
+        assert_eq!(reply(" other list [a]"), (json!({}), None));
+        // An address rule's match_each needs the capture it goes along.
+        assert!(Telemetry::parse(
+            Some(&json!({"updates": [{"address": "^/x$", "match_each": "y", "state": {}}]})),
+            &state(json!({})),
+            Conversions::new(),
+        )
+        .is_err());
     }
 
     #[test]

@@ -1710,6 +1710,25 @@ are numbered on after the address's, in index order (before `json_match`'s):
       state: { "layers.{1}.{2}": "{arg1}" }
 ```
 
+A list inside a string argument is read item by item with `match_each`, as
+for a list on one line (above), and `match_each_in`, which an address rule
+requires: the capture, numbered across the address's and `arg_match`'s,
+whose text `match_each` goes along. The rule matches once per item, its
+captures numbered on after the rule's and `{index}` its place from 0;
+`replace` and `then_send` work as for any rule, so a list read whole
+replaces the last. A Behringer WING answers its node query (`/$ctl/lib ,s
+?`) with one string describing every parameter of the node, the show's
+scenes among them:
+
+```yaml
+    - address: "^/\\$ctl/lib$"
+      arg_match: { "0": "\\$scenes\\s+list \\[([^\\]]*)\\]" }
+      match_each: "\\s*([^,]+?)\\s*(?:,|$)"
+      match_each_in: 1
+      replace: scene.list
+      state: { "scene.list.{index:+1}": "{2}" }
+```
+
 #### JSON messages
 
 A message on a websocket (the transport's, §2, or `telemetry.websocket`'s), an
