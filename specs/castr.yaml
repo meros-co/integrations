@@ -62,7 +62,33 @@ source:
       .../recordings (page, limit, start_time, end_time), .../epg; POST
       .../temporary_recordings/{recording_id} (from, duration). Webhook
       endpoints, sub-second streams, VOD folders and activity logs and
-      events (which name an auth-token header) are also listed.
+      events (which name an auth-token header) are also listed. Retrieved
+      again 2026-10-14 (updated 2026-09-08) for: GET, POST, PATCH and
+      DELETE /v2/sub_second_streams[/{id}] (name, enabled, settings
+      country_block, country_whitelist, domain_whitelist; answers with
+      ingest, playback.embed_url, broadcasting_status, creation_time,
+      pull_urls); /v2/videos folders (list with page and limit answering
+      total, page, pages and docs; create and update with name and
+      settings including embed_password; delete), contents (list with
+      include_subfolders, delete, PATCH subfolder_id or null), uploads
+      (POST, customFileName), subfolders (list, create, get, rename,
+      delete answering removed and removedVideos, contents, uploads);
+      GET /v2/activity/logs/stream/{id} and /v2/activity/events/stream/{id}
+      for streams and videos alike (answers undocumented); and
+      /v2/webhook_endpoints (name, enabled, url). varying_rewind takes -1,
+      3600, 7200, 10800 or 14400.
+  - title: Castr API documentation, Guides (Uploading Video, Create Sub Second Streams)
+    author: Castr
+    url: https://developers.castr.com/docs/post-a-video
+    note: >
+      Manufacturer document, retrieved 2026-10-14. Upload: create a folder,
+      ask for a signed link (POST /v2/videos/{id}/uploads, optional
+      customFileName), which expires after 6 hours, then POST the file to it
+      as multipart form data with the given fields; not resumable; files
+      over 5 GB await multipart upload. Sub-second streams
+      (https://developers.castr.com/docs/create-sub-second-streams): POST
+      /v2/sub_second_streams with name and enabled answers the stream with
+      its ingest server and key.
 
 transport:
   type: http
@@ -98,7 +124,18 @@ models:
                set_cloud_recording, set_abr, set_low_latency_playback, set_chat_enabled,
                delete_stream, add_platform, add_platform_custom, set_platform_enabled,
                set_platform_meta, update_platform, delete_platform, get_stream_stats,
-               list_temporary_recordings, convert_recording_to_vod, list_vod_recordings, get_epg]
+               list_temporary_recordings, convert_recording_to_vod, list_vod_recordings, get_epg,
+               set_varying_rewind, set_embed_password, set_country_block, set_country_whitelist,
+               set_domain_whitelist,
+               list_sub_second_streams, get_sub_second_stream, create_sub_second_stream,
+               create_sub_second_stream_custom, update_sub_second_stream, rename_sub_second_stream,
+               set_sub_second_stream_enabled, delete_sub_second_stream,
+               list_folders, create_folder, create_folder_custom, update_folder, rename_folder, delete_folder,
+               list_folder_contents, delete_folder_content, move_content_to_subfolder, move_content_to_root,
+               create_upload_url, create_upload_url_named, list_subfolders, get_subfolder, create_subfolder,
+               rename_subfolder, delete_subfolder, list_subfolder_contents, delete_subfolder_content,
+               create_subfolder_upload_url, create_subfolder_upload_url_named,
+               get_stream_logs, get_stream_events, get_video_logs, get_video_events]
     verification: none
     notes: >
       Follows the live stream named by stream_id; the commands take any
@@ -265,6 +302,66 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  set_varying_rewind:
+    summary: Set how far back viewers can rewind the live stream (Update a live stream, settings.varying_rewind)
+    params:
+      stream_id: *stream_id
+      seconds: { type: enum, values: ["-1", "3600", "7200", "10800", "14400"], required: true,
+                 label: Rewind,
+                 description: "Seconds of the live stream viewers can go back: 3600 to 14400 (1 to 4 hours), or -1 for Castr's default." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"varying_rewind":{seconds}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_embed_password:
+    summary: Protect the embedded player with a password, or remove it with an empty one (Update a live stream, settings.embed_password)
+    params:
+      stream_id: *stream_id
+      password: { type: string, max_length: 200, required: true,
+                  label: Player password,
+                  description: "The password viewers type to watch the embedded player; empty removes it." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"embed_password":{password:json}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_country_block:
+    summary: Block viewers in the listed countries (Update a live stream, settings.country_block)
+    params:
+      stream_id: *stream_id
+      countries: { type: json, required: true,
+                   label: Blocked countries,
+                   description: "A JSON array of the countries Castr documents for country_block, such as [\"US\", \"CA\"]; [] blocks none." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"country_block":{countries}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_country_whitelist:
+    summary: Allow viewers only in the listed countries (Update a live stream, settings.country_whitelist)
+    params:
+      stream_id: *stream_id
+      countries: { type: json, required: true,
+                   label: Allowed countries,
+                   description: "A JSON array of the countries Castr documents for country_whitelist; [] allows every country." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"country_whitelist":{countries}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_domain_whitelist:
+    summary: Allow the embedded player only on the listed web sites (Update a live stream, settings.domain_whitelist)
+    params:
+      stream_id: *stream_id
+      domains: { type: json, required: true,
+                 label: Allowed domains,
+                 description: "A JSON array of domain names, such as [\"example.org\"]; [] allows any site." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"domain_whitelist":{domains}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
   delete_stream:
     summary: Delete a live stream (Delete a live stream)
     params: { stream_id: *stream_id }
@@ -412,6 +509,358 @@ commands:
     expect: { status: 200, json_path: "$" }
     returns: value
 
+  # ── Sub-second streams ────────────────────────────────────────────────────
+  list_sub_second_streams:
+    summary: The account's sub-second (WebRTC) streams with status; they include ingest keys, so the value is never kept or logged (List sub-second streams)
+    params:
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+      limit: { type: int, min: 1, max: 100, default: 20,
+               label: Streams per page,
+               description: "How many streams each page holds." }
+    send: { method: GET, path: /v2/sub_second_streams, query: { page: "{page}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_sub_second_stream:
+    summary: One sub-second stream with status, ingest, playback and pull URLs; the ingest key is a secret, never kept or logged (Get a sub-second stream)
+    params:
+      stream_id: &sub_second_id { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+                                  label: Sub-second stream ID,
+                                  description: "The sub-second stream's id, 24 hexadecimal characters." }
+    send: { method: GET, path: "/v2/sub_second_streams/{stream_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_sub_second_stream:
+    summary: Create a sub-second stream, played with under a second of delay; answers it with its ingest server and key (Create a new sub-second stream)
+    params:
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The stream's name in Castr." }
+      enabled: { type: bool, default: true,
+                 label: Enabled,
+                 description: "On to accept the encoder's stream as soon as it arrives." }
+    send: { method: POST, path: /v2/sub_second_streams,
+            body: '{"name":{name:json},"enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_sub_second_stream_custom:
+    summary: Create a sub-second stream with a full Create body (name, enabled, settings country_block, country_whitelist, domain_whitelist)
+    params:
+      stream: { type: json, required: true,
+                label: Stream,
+                description: "A JSON object as Castr documents for Create a new sub-second stream." }
+    send: { method: POST, path: /v2/sub_second_streams, body: '{stream}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  update_sub_second_stream:
+    summary: Change a sub-second stream with an Update body (name, enabled, settings country_block, country_whitelist, domain_whitelist)
+    params:
+      stream_id: *sub_second_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields Castr documents for Update a sub-second stream." }
+    send: { method: PATCH, path: "/v2/sub_second_streams/{stream_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  rename_sub_second_stream:
+    summary: Change a sub-second stream's name (Update a sub-second stream, name)
+    params:
+      stream_id: *sub_second_id
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The stream's new name in Castr." }
+    send: { method: PATCH, path: "/v2/sub_second_streams/{stream_id}",
+            body: '{"name":{name:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_sub_second_stream_enabled:
+    summary: Turn a sub-second stream on or off; off cuts the encoder off (Update a sub-second stream, enabled)
+    params:
+      stream_id: *sub_second_id
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "On to accept the encoder's stream, off to cut it off." }
+    send: { method: PATCH, path: "/v2/sub_second_streams/{stream_id}",
+            body: '{"enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_sub_second_stream:
+    summary: Delete a sub-second stream (Delete a sub-second stream)
+    params: { stream_id: *sub_second_id }
+    send: { method: DELETE, path: "/v2/sub_second_streams/{stream_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  # ── Video hosting (VOD folders) ───────────────────────────────────────────
+  list_folders:
+    summary: The account's video hosting folders, a page at a time, kept in state (List folders)
+    params:
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+      limit: { type: int, min: 1, max: 100, default: 20,
+               label: Folders per page,
+               description: "How many folders each page holds." }
+    send: { method: GET, path: /v2/videos, query: { page: "{page}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_folder:
+    summary: Create a video hosting folder; answers it with its id (Create a folder)
+    params:
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The folder's name in Castr." }
+    send: { method: POST, path: /v2/videos, body: '{"name":{name:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_folder_custom:
+    summary: Create a video hosting folder with a full Create body (name, settings country_block, country_whitelist, domain_whitelist, embed_password)
+    params:
+      folder: { type: json, required: true,
+                label: Folder,
+                description: "A JSON object as Castr documents for Create a folder." }
+    send: { method: POST, path: /v2/videos, body: '{folder}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  update_folder:
+    summary: Change a folder with an Update folder body (name, settings country_block, country_whitelist, domain_whitelist, embed_password)
+    params:
+      folder_id: &folder_id { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+                              label: Folder ID,
+                              description: "The folder's id, 24 hexadecimal characters, from list_folders." }
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields Castr documents for Update folder." }
+    send: { method: PATCH, path: "/v2/videos/{folder_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  rename_folder:
+    summary: Change a folder's name (Update folder, name)
+    params:
+      folder_id: *folder_id
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The folder's new name." }
+    send: { method: PATCH, path: "/v2/videos/{folder_id}", body: '{"name":{name:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_folder:
+    summary: Delete a folder and the videos in it (Delete folder)
+    params: { folder_id: *folder_id }
+    send: { method: DELETE, path: "/v2/videos/{folder_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  list_folder_contents:
+    summary: The videos in a folder's root, or in all its subfolders too, a page at a time (List contents in folder)
+    params:
+      folder_id: *folder_id
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+      limit: { type: int, min: 1, max: 100, default: 20,
+               label: Videos per page,
+               description: "How many videos each page holds." }
+      include_subfolders: { type: bool, default: false,
+                            label: Include subfolders,
+                            description: "On to list the videos of every subfolder as well as the root's." }
+    send: { method: GET, path: "/v2/videos/{folder_id}/contents",
+            query: { page: "{page}", limit: "{limit}", include_subfolders: "{include_subfolders}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_folder_content:
+    summary: Delete a video from a folder (Delete content in folder)
+    params:
+      folder_id: *folder_id
+      content_id: &content_id { type: string, pattern: "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9]+)?$", max_length: 200, required: true,
+                                label: Video ID,
+                                description: "The video file's id, such as LfC3rMO4J1RYOiPe.mp4, from list_folder_contents." }
+    send: { method: DELETE, path: "/v2/videos/{folder_id}/contents/{content_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  move_content_to_subfolder:
+    summary: Move a folder's video into one of its subfolders (Move content to subfolder)
+    params:
+      folder_id: *folder_id
+      content_id: *content_id
+      subfolder_id: &subfolder_id { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+                                    label: Subfolder ID,
+                                    description: "The subfolder's id, 24 hexadecimal characters, from list_subfolders." }
+    send: { method: PATCH, path: "/v2/videos/{folder_id}/contents/{content_id}",
+            body: '{"subfolder_id":{subfolder_id:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  move_content_to_root:
+    summary: Move a video out of its subfolder to the folder's root (Move content to subfolder, subfolder_id null)
+    params:
+      folder_id: *folder_id
+      content_id: *content_id
+    send: { method: PATCH, path: "/v2/videos/{folder_id}/contents/{content_id}",
+            body: '{"subfolder_id":null}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  create_upload_url:
+    summary: A signed link, valid 6 hours, to upload one video file into a folder with a form POST (Create direct upload URL)
+    params: { folder_id: *folder_id }
+    send: { method: POST, path: "/v2/videos/{folder_id}/uploads" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_upload_url_named:
+    summary: A signed upload link that names the uploaded file (Create direct upload URL with customFileName)
+    params:
+      folder_id: *folder_id
+      file_name: &file_name { type: string, pattern: "^[^/\\\\]+$", max_length: 200, required: true,
+                              label: File name,
+                              description: "The name the uploaded video file is given, such as service-2026-10-11.mp4." }
+    send: { method: POST, path: "/v2/videos/{folder_id}/uploads", query: { customFileName: "{file_name}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_subfolders:
+    summary: A folder's subfolders with their video counts, kept in state (List subfolders)
+    params: { folder_id: *folder_id }
+    send: { method: GET, path: "/v2/videos/{folder_id}/subfolders" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_subfolder:
+    summary: One subfolder with its video count, kept in state (Get subfolder detail)
+    params:
+      folder_id: *folder_id
+      subfolder_id: *subfolder_id
+    send: { method: GET, path: "/v2/videos/{folder_id}/subfolders/{subfolder_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_subfolder:
+    summary: Create a subfolder in a folder; names are unique within the folder (Create a subfolder)
+    params:
+      folder_id: *folder_id
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The subfolder's name, unique within its folder." }
+    send: { method: POST, path: "/v2/videos/{folder_id}/subfolders", body: '{"name":{name:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  rename_subfolder:
+    summary: Change a subfolder's name, unique within its folder (Rename a subfolder)
+    params:
+      folder_id: *folder_id
+      subfolder_id: *subfolder_id
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The subfolder's new name." }
+    send: { method: PATCH, path: "/v2/videos/{folder_id}/subfolders/{subfolder_id}",
+            body: '{"name":{name:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  delete_subfolder:
+    summary: Delete a subfolder and every video in it; answers how many were removed (Delete a subfolder)
+    params:
+      folder_id: *folder_id
+      subfolder_id: *subfolder_id
+    send: { method: DELETE, path: "/v2/videos/{folder_id}/subfolders/{subfolder_id}" }
+    expect: { status: 200, json_path: "$.removedVideos" }
+    returns: value
+
+  list_subfolder_contents:
+    summary: The videos in a subfolder, a page at a time (List contents in subfolder)
+    params:
+      folder_id: *folder_id
+      subfolder_id: *subfolder_id
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+      limit: { type: int, min: 1, max: 100, default: 20,
+               label: Videos per page,
+               description: "How many videos each page holds." }
+    send: { method: GET, path: "/v2/videos/{folder_id}/subfolders/{subfolder_id}/contents",
+            query: { page: "{page}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_subfolder_content:
+    summary: Delete a video from a subfolder (Delete content in subfolder)
+    params:
+      folder_id: *folder_id
+      subfolder_id: *subfolder_id
+      content_id: *content_id
+    send: { method: DELETE, path: "/v2/videos/{folder_id}/subfolders/{subfolder_id}/contents/{content_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  create_subfolder_upload_url:
+    summary: A signed link, valid 6 hours, to upload one video file straight into a subfolder (Create subfolder upload URL)
+    params:
+      folder_id: *folder_id
+      subfolder_id: *subfolder_id
+    send: { method: POST, path: "/v2/videos/{folder_id}/subfolders/{subfolder_id}/uploads" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_subfolder_upload_url_named:
+    summary: A signed upload link into a subfolder that names the uploaded file (Create subfolder upload URL with customFileName)
+    params:
+      folder_id: *folder_id
+      subfolder_id: *subfolder_id
+      file_name: *file_name
+    send: { method: POST, path: "/v2/videos/{folder_id}/subfolders/{subfolder_id}/uploads",
+            query: { customFileName: "{file_name}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Activity ──────────────────────────────────────────────────────────────
+  get_stream_logs:
+    summary: A live stream's activity log (Get Stream Logs)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/activity/logs/stream/{stream_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream_events:
+    summary: A live stream's activity events (Get Stream Events)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/activity/events/stream/{stream_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_video_logs:
+    summary: A hosted video's activity log; Castr documents it on the same path as a stream's (Get Video Logs)
+    params:
+      video_id: &video_id { type: string, pattern: "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9]+)?$", max_length: 200, required: true,
+                            label: Video ID,
+                            description: "The hosted video's id." }
+    send: { method: GET, path: "/v2/activity/logs/stream/{video_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_video_events:
+    summary: A hosted video's activity events; Castr documents it on the same path as a stream's (Get Video Events)
+    params: { video_id: *video_id }
+    send: { method: GET, path: "/v2/activity/events/stream/{video_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
 quirks:
   - models: [all]
     severity: info
@@ -470,6 +919,56 @@ quirks:
       streams.*.broadcasting_status says whether they are current. The
       documents state no rate limits.
 
+  - models: [all]
+    severity: info
+    text: >
+      Sub-second streams (WebRTC playback under a second behind) are a
+      resource apart from live streams, with their own ids and a smaller
+      set of settings (name, enabled, country and domain lists). The
+      account's first 100 are polled every 15 seconds with the followed
+      stream (sub_second_streams.<id>: name, enabled, broadcasting status,
+      embed URL); one deleted elsewhere stays in state until the
+      integration is opened again, while delete_sub_second_stream removes
+      it at once. Their answers hold the ingest key, which is never kept.
+
+  - models: [all]
+    severity: info
+    text: >
+      Video hosting is organised as folders (folders.<id>) holding videos
+      and subfolders (folders.<id>.subfolders.<id>, with their video
+      counts). Folders are kept from list_folders and every folder command's
+      answer; subfolders from list_subfolders, which replaces a folder's
+      subfolders, and are read again after each subfolder or video change.
+      They are not polled. A video's content id is its file name in Castr
+      (LfC3rMO4J1RYOiPe.mp4). Uploading is two steps: create_upload_url (or
+      a subfolder's) answers a signed link, valid 6 hours, with the form
+      fields to send; the consumer then POSTs the file to that link as
+      multipart form data itself, which the core does not do. Files over 5
+      GB should wait for Castr's multipart upload. move_content_to_root
+      sends subfolder_id null.
+
+  - models: [all]
+    severity: critical
+    text: >
+      delete_folder deletes a folder with its videos, delete_subfolder a
+      subfolder with every video in it (answering how many), and
+      delete_folder_content and delete_subfolder_content one video; none can
+      be undone. delete_sub_second_stream deletes the stream and its ingest
+      key.
+
+  - models: [all]
+    severity: info
+    text: >
+      Activity logs and events are read on demand. Castr documents the
+      video logs and events on the same paths as a stream's
+      (/v2/activity/logs/stream/<id>), names an optional auth-token header
+      for them (the integration sends its usual Basic credential), and does
+      not document the answers, so they are returned as they come.
+      Castr's webhook endpoints (/v2/webhook_endpoints) deliver events to a
+      URL the consumer runs; the core receives nothing that way, so
+      registering them is left to a consumer that runs such a server.
+      set_embed_password's password is not kept in state.
+
 state:
   streams.*.name:                 { type: string, description: "The stream's name, keyed by stream id" }
   streams.*.enabled:              { type: bool, description: "The stream accepts the encoder's input (enabled)" }
@@ -480,6 +979,27 @@ state:
   streams.*.chat_enabled:         { type: bool, description: "The embedded player shows chat (settings.chat_enabled)" }
   streams.*.embed_url:            { type: string, description: "The player's embed URL (playback.embed_url)" }
   streams.*.hls_url:              { type: string, description: "The HLS playback URL (playback.hls_url)" }
+  streams.*.ll_embed_url:         { type: string, description: "The low-latency player's embed URL (playback.ll_embed_url)" }
+  streams.*.varying_rewind:       { type: int, unit: s, description: "How far back viewers can rewind, or -1 for the default (settings.varying_rewind)" }
+  streams.*.country_block:        { type: string, description: "Blocked countries as a JSON array (settings.country_block)" }
+  streams.*.country_whitelist:    { type: string, description: "The only countries allowed, as a JSON array; [] for all (settings.country_whitelist)" }
+  streams.*.domain_whitelist:     { type: string, description: "The only sites the player may be embedded on, as a JSON array (settings.domain_whitelist)" }
+  sub_second_streams.*.name:      { type: string, description: "A sub-second stream's name, keyed by its id" }
+  sub_second_streams.*.enabled:   { type: bool, description: "It accepts the encoder's input" }
+  sub_second_streams.*.broadcasting_status: { type: string, description: "online or offline" }
+  sub_second_streams.*.embed_url: { type: string, description: "The player's embed URL (playback.embed_url)" }
+  sub_second_streams.*.creation_time: { type: string, description: "When it was created, ISO 8601" }
+  sub_second_streams.*.country_block: { type: string, description: "Blocked countries as a JSON array" }
+  sub_second_streams.*.country_whitelist: { type: string, description: "The only countries allowed, as a JSON array" }
+  sub_second_streams.*.domain_whitelist: { type: string, description: "The only embedding sites allowed, as a JSON array" }
+  folders.*.name:                 { type: string, description: "A video hosting folder's name, keyed by folder id" }
+  folders.*.enabled:              { type: bool, description: "The folder is enabled" }
+  folders.*.country_block:        { type: string, description: "Blocked countries as a JSON array" }
+  folders.*.country_whitelist:    { type: string, description: "The only countries allowed, as a JSON array" }
+  folders.*.domain_whitelist:     { type: string, description: "The only embedding sites allowed, as a JSON array" }
+  folders.*.subfolders.*.name:    { type: string, description: "A subfolder's name, keyed by subfolder id" }
+  folders.*.subfolders.*.content_count: { type: int, description: "Videos in the subfolder" }
+  folders.*.subfolders.*.creation_time: { type: string, description: "When the subfolder was made, ISO 8601" }
   streams.*.platforms.*.name:     { type: string, description: "The multistream target's name, keyed by its id" }
   streams.*.platforms.*.template: { type: string, description: "The target's kind, such as custom (template)" }
   streams.*.platforms.*.enabled:  { type: bool, description: "The stream is sent to the target (enabled)" }
@@ -506,6 +1026,7 @@ telemetry:
     send:
       - { method: GET, path: "/v2/live_streams/{settings.stream_id}" }
       - { method: GET, path: "/v2/live_streams/{settings.stream_id}/stats" }
+      - { method: GET, path: /v2/sub_second_streams, query: { page: "1", limit: "100" } }
   updates:
     # Polls, get_stream, every stream update and every platform change
     # answer the stream.
@@ -521,7 +1042,17 @@ telemetry:
         chat: "$.settings.chat_enabled"
         embed: "$.playback.embed_url"
         hls: "$.playback.hls_url"
+        ll_embed: "$.playback.ll_embed_url"
+        rewind: "$.settings.varying_rewind"
+        block: "$.settings.country_block"
+        allow: "$.settings.country_whitelist"
+        domains: "$.settings.domain_whitelist"
       state:
+        streams.{1}.ll_embed_url: "{ll_embed}"
+        streams.{1}.varying_rewind: "{rewind}"
+        streams.{1}.country_block: "{block}"
+        streams.{1}.country_whitelist: "{allow}"
+        streams.{1}.domain_whitelist: "{domains}"
         streams.{1}.name: "{name}"
         streams.{1}.enabled: "{enabled}"
         streams.{1}.broadcasting_status: "{status}"
@@ -575,3 +1106,92 @@ telemetry:
         streams.{1}.tracks.{track}.fps: "{fps}"
         streams.{1}.tracks.{track}.sample_rate: "{sample_rate}"
         streams.{1}.tracks.{track}.channels: "{channels}"
+
+    # Sub-second streams: the poll's list, and each answer about one.
+    - path: '^/v2/sub_second_streams\?'
+      json_each: "$"
+      json: &sub_second
+        id: "$._id"
+        name: "$.name"
+        enabled: "$.enabled"
+        status: "$.broadcasting_status"
+        embed: "$.playback.embed_url"
+        created: "$.creation_time"
+        block: "$.settings.country_block"
+        allow: "$.settings.country_whitelist"
+        domains: "$.settings.domain_whitelist"
+      state: &sub_second_state
+        sub_second_streams.{id}.name: "{name}"
+        sub_second_streams.{id}.enabled: "{enabled}"
+        sub_second_streams.{id}.broadcasting_status: "{status}"
+        sub_second_streams.{id}.embed_url: "{embed}"
+        sub_second_streams.{id}.creation_time: "{created}"
+        sub_second_streams.{id}.country_block: "{block}"
+        sub_second_streams.{id}.country_whitelist: "{allow}"
+        sub_second_streams.{id}.domain_whitelist: "{domains}"
+    - path: '^/v2/sub_second_streams(/[0-9a-f]{24})?$'
+      json_match: { "$._id": '^[0-9a-f]{24}$' }
+      json: *sub_second
+      state: *sub_second_state
+    - path: '^/v2/sub_second_streams/([0-9a-f]{24})$'
+      json_match: { "$.success": "^true$" }
+      json: {}
+      state: { "sub_second_streams.{1}": { delete: true } }
+
+    # Video hosting folders.
+    - path: '^/v2/videos\?'
+      json_each: "$.docs"
+      json: &folder
+        id: "$._id"
+        name: "$.name"
+        enabled: "$.enabled"
+        block: "$.settings.country_block"
+        allow: "$.settings.country_whitelist"
+        domains: "$.settings.domain_whitelist"
+      state: &folder_state
+        folders.{id}.name: "{name}"
+        folders.{id}.enabled: "{enabled}"
+        folders.{id}.country_block: "{block}"
+        folders.{id}.country_whitelist: "{allow}"
+        folders.{id}.domain_whitelist: "{domains}"
+    # The reference shows the page inside an array.
+    - path: '^/v2/videos\?'
+      json_each: "$[*].docs"
+      json: *folder
+      state: *folder_state
+    - path: '^/v2/videos(/[0-9a-f]{24})?$'
+      json_match: { "$._id": '^[0-9a-f]{24}$' }
+      json: *folder
+      state: *folder_state
+    - path: '^/v2/videos/([0-9a-f]{24})$'
+      json_match: { "$.success": "^true$" }
+      json: {}
+      state: { "folders.{1}": { delete: true } }
+    # Subfolders: the list is all of them; one is read, made, renamed or
+    # deleted; a video change reads the counts again.
+    - path: '^/v2/videos/([0-9a-f]{24})/subfolders$'
+      json_match: { "$": '^\[' }
+      json_each: "$"
+      json: &subfolder { id: "$._id", name: "$.name", count: "$.content_count", created: "$.creation_time" }
+      replace: "folders.{1}.subfolders"
+      state: &subfolder_state
+        folders.{1}.subfolders.{id}.name: "{name}"
+        folders.{1}.subfolders.{id}.content_count: "{count}"
+        folders.{1}.subfolders.{id}.creation_time: "{created}"
+    - path: '^/v2/videos/([0-9a-f]{24})/subfolders(/[0-9a-f]{24})?$'
+      json_match: { "$._id": '^[0-9a-f]{24}$' }
+      json: *subfolder
+      state: *subfolder_state
+    - path: '^/v2/videos/([0-9a-f]{24})/subfolders/([0-9a-f]{24})$'
+      json_match: { "$.success": "^true$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/v2/videos/{1}/subfolders/{2}" }
+    - path: '^/v2/videos/([0-9a-f]{24})/subfolders/([0-9a-f]{24})$'
+      json_match: { "$.removed": "^true$" }
+      json: {}
+      state: { "folders.{1}.subfolders.{2}": { delete: true } }
+    - path: '^/v2/videos/([0-9a-f]{24})/(subfolders/[0-9a-f]{24}/)?contents/[^/?]+$'
+      json: {}
+      then_send:
+        - { method: GET, path: "/v2/videos/{1}/subfolders" }
