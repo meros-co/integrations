@@ -28,7 +28,14 @@ source:
       with object name="source1" and info media_file, play_state, timecode, media_length; D.f ctrl_status,
       ctrl_info, enum_objects, loglevel all|none, receiving all|none, set object control
       [time=<t>] param=value[,...] with the examples, wait_startup, fullscreen layer display...; D.g
-      system and system_bg. Appendix E (pp.148-152): lua, runcue and the Lua API.
+      system and system_bg. Appendix E (pp.148-152): lua, lua_file, runcue and the Lua API. Read again
+      2026-10-14 for the full-control commands: the D.c ctrl_info example's source parameters with their
+      ranges and defaults (media_end_action 0-10, play_state_req 0-6, seek 0-1, sync source 0-255, fps
+      1-140 default 30, relative_fps 0.1-2, fps_mode 0-1, effective_fps, frame_blending mode 0-1), table
+      13's draw modes, D.e.c's control status as set-compatible controls separated by "\n", D.e.e's
+      object list (id:name), the full set format with time=, fullscreen over several displays; E.b's
+      connect and set_pda_value_by_index; Appendix F (pp.153-156): send_ui_event's mouse and keyboard
+      events and set_global.
   - title: "Picturall Mark II media servers, TCP/IP quick start guide v1.0 (June 2021)"
     author: Analog Way
     url: "https://dwn01.analogway.com/Site+Internet/Series/Picturall++Mark+II/Common/Programmer's+Guide/picturall_markii_series_tcpip_quick_start_guide.pdf"
@@ -60,8 +67,12 @@ models:
   - id: picturall-pro-mkii
     name: Analog Way Picturall Pro Mark II (MSP16-MkII)
     supports: &all [run_cue, playback_select, playback_go, layer_media, layer_play_mode, layer_seek,
-                    layer_intensity, layer_intensity_fade, layer_position, layer_fullscreen, layer_status,
-                    status_all, list_objects, poweroff, send_raw]
+               layer_intensity, layer_intensity_fade, layer_position, layer_fullscreen, layer_status,
+               status_all, list_objects, poweroff, send_raw, set_parameter, set_parameters, set_parameter_fade,
+               set_parameters_fade, object_status, object_info, set_array_value, layer_play, layer_pause,
+               layer_stop, layer_media_end_action, layer_sync_source, layer_fps, layer_relative_fps,
+               layer_fps_mode, layer_frame_blending, layer_position_fade, layer_fullscreen_displays,
+               connect_io, set_global, web_ui_event, run_lua, run_lua_file]
     verification: none
   - id: picturall-quad-mkii
     name: Analog Way Picturall Quad Mark II (MSQ04-MkII)
@@ -245,12 +256,219 @@ commands:
     send: "{command}"
     returns: none
 
+  # ── Any object's parameters (D.f.f set, D.f.a ctrl_status, D.f.b ctrl_info) ─
+  set_parameter:
+    summary: "Set one parameter of any object's control, such as a layer's composition or a source's selection (manual D.f.f, set)"
+    params:
+      object: &object { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Object, description: "Object name, as enum_objects lists it: sourceN, layerN, audioN, stackN, gpuN and so on." }
+      control: &control { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Control, description: "Control of the object holding the parameter, as ctrl_info lists it (composition, selection, control, time...)." }
+      param: &param { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Parameter, description: "Parameter name in the control, as ctrl_info lists it." }
+      value: &pvalue { type: string, max_length: 1024, pattern: '^("[^"\\]*"|[^\s",=]+)$', required: true, label: Value, description: "Value in the parameter's type: a number such as 0.8 or 3, or text in double quotes such as \"clip.mov\"." }
+    send: "set {object} {control} {param}={value}"
+    returns: none
+  set_parameters:
+    summary: "Set several parameters of one object's control at once, as parameter=value pairs separated by commas (manual D.f.f, set)"
+    params:
+      object: *object
+      control: *control
+      values: &pvalues { type: string, max_length: 4096, pattern: '^[A-Za-z][A-Za-z0-9_]*=("[^"\\]*"|[^\s",=]+)(,[A-Za-z][A-Za-z0-9_]*=("[^"\\]*"|[^\s",=]+))*$', required: true, label: Values, description: "parameter=value pairs separated by commas, such as x=0.3,y=0.2,intensity=0.8; text values in double quotes." }
+    send: "set {object} {control} {values}"
+    returns: none
+  set_parameter_fade:
+    summary: "Crossfade one parameter of an object's control to a value over a time in seconds (manual D.f.f, set with time=)"
+    params:
+      object: *object
+      control: *control
+      param: *param
+      value: *pvalue
+      time: &fade { type: float, min: 0, max: 3600, required: true, label: Fade time, description: "Crossfade duration in seconds; 0 changes at once." }
+    send: "set {object} {control} time={time:.2f} {param}={value}"
+    returns: none
+  set_parameters_fade:
+    summary: "Crossfade several parameters of one object's control over a time in seconds (manual D.f.f, set with time=)"
+    params:
+      object: *object
+      control: *control
+      values: *pvalues
+      time: *fade
+    send: "set {object} {control} time={time:.2f} {values}"
+    returns: none
+  object_status:
+    summary: "Ask for an object's current parameter values; they arrive as a control status message (manual D.f.a, ctrl_status)"
+    params:
+      object: *object
+    send: "ctrl_status {object}"
+    returns: none
+  object_info:
+    summary: "Ask for an object's controls and parameters with their types, defaults and ranges; they arrive as a control info message (manual D.f.b, ctrl_info)"
+    params:
+      object: *object
+    send: "ctrl_info {object}"
+    returns: none
+  set_array_value:
+    summary: "Set one element of an array (DoubleArray) parameter, through the Lua API's set_pda_value_by_index (manual E.b)"
+    params:
+      object: *object
+      control: *control
+      param: *param
+      index: { type: int, min: 0, max: 65535, required: true, label: Index, description: "Element of the array to set, from 0; an index out of range is ignored." }
+      value: { type: float, required: true, label: Value, description: "New value of the element." }
+    send: 'lua "set_pda_value_by_index(\"{object}\", \"{control}\", \"{param}\", {index}, {value:.6f})"'
+    returns: none
+
+  # ── Layer playback and timing (manual D.c, D.d.a) ────────────────────────
+  layer_play:
+    summary: "Play a layer's media, looping (play_state_req 0, the default play mode)"
+    params:
+      layer: &layer { type: int, min: 1, required: true, label: Layer, description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+    send: "set source{layer} control play_state_req=0"
+    returns: none
+  layer_pause:
+    summary: "Pause a layer's media (play_state_req 5)"
+    params:
+      layer: *layer
+    send: "set source{layer} control play_state_req=5"
+    returns: none
+  layer_stop:
+    summary: "Stop a layer's media (play_state_req 6)"
+    params:
+      layer: *layer
+    send: "set source{layer} control play_state_req=6"
+    returns: none
+  layer_media_end_action:
+    summary: "What a layer's source does at the end of its media, 0 to 10 (source control media_end_action)"
+    params:
+      layer: *layer
+      action: { type: int, min: 0, max: 10, required: true, label: End action, description: "Media end action number, 0 to 10; the manual gives the range but not the meanings." }
+    send: "set source{layer} control media_end_action={action}"
+    returns: none
+  layer_sync_source:
+    summary: "Synchronise a layer's source to another, 0 for none (source sync source)"
+    params:
+      layer: *layer
+      source: { type: int, min: 0, max: 255, required: true, label: Sync source, description: "Source number to follow, 0 to 255; 0 is the default." }
+    send: "set source{layer} sync source={source}"
+    returns: none
+  layer_fps:
+    summary: "Frame rate a layer's source plays at, 1 to 140 fps (source time fps)"
+    params:
+      layer: *layer
+      fps: { type: float, min: 1, max: 140, required: true, label: Frame rate, description: "Playback frame rate in frames per second, 1 to 140 (default 30)." }
+    send: "set source{layer} time fps={fps:.3f}"
+    returns: none
+  layer_relative_fps:
+    summary: "Relative playback speed of a layer's source, 0.1 to 2 (source time relative_fps)"
+    params:
+      layer: *layer
+      speed: { type: float, min: 0.1, max: 2, required: true, label: Relative speed, description: "Speed relative to the media's own rate, 0.1 to 2 (default 1)." }
+    send: "set source{layer} time relative_fps={speed:.3f}"
+    returns: none
+  layer_fps_mode:
+    summary: "Frame rate mode of a layer's source, 0 or 1 (source time fps_mode)"
+    params:
+      layer: *layer
+      mode: { type: int, min: 0, max: 1, required: true, label: FPS mode, description: "Frame rate mode, 0 (default) or 1; the manual gives the range but not the meanings." }
+    send: "set source{layer} time fps_mode={mode}"
+    returns: none
+  layer_frame_blending:
+    summary: "Frame blending of a layer's source, off (0) or on (1) (source frame_blending mode)"
+    params:
+      layer: *layer
+      mode: { type: int, min: 0, max: 1, required: true, label: Frame blending, description: "Frame blending mode, 0 (default) or 1." }
+    send: "set source{layer} frame_blending mode={mode}"
+    returns: none
+  layer_position_fade:
+    summary: "Move a layer to x and y over a time in seconds (manual D.f.f, composition time=)"
+    params:
+      layer: *layer
+      x: { type: float, required: true, label: X, description: "Horizontal position of the layer in the composition's units." }
+      y: { type: float, required: true, label: "Y", description: "Vertical position of the layer in the composition's units." }
+      time: *fade
+    send: "set layer{layer} composition time={time:.2f} x={x:.4f},y={y:.4f}"
+    returns: none
+  layer_fullscreen_displays:
+    summary: "Fit a layer to the bounding box of several displays (manual D.f.h, fullscreen layer2 2 5 3)"
+    params:
+      layer: *layer
+      displays: { type: string, pattern: '^[0-9]{1,3}( [0-9]{1,3}){0,63}$', required: true, label: Displays, description: "Display numbers separated by spaces, such as 2 5 3." }
+    send: "fullscreen layer{layer} {displays}"
+    returns: none
+
+  # ── Routing, globals, web pages and Lua (manual E, F) ────────────────────
+  connect_io:
+    summary: "Connect an output of one IO object to an input of another, through the Lua API's connect (manual E.b)"
+    params:
+      output: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Output object, description: "Name of the object whose output is connected." }
+      output_id: { type: int, min: 0, max: 65535, required: true, label: Output index, description: "Output index on that object." }
+      input: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Input object, description: "Name of the object whose input it feeds." }
+      input_id: { type: int, min: 0, max: 65535, required: true, label: Input index, description: "Input index on that object." }
+    send: 'lua "connect(\"{output}\", {output_id}, \"{input}\", {input_id})"'
+    returns: none
+  set_global:
+    summary: "Set a server global variable, such as enable_cef_logging (manual F.a, set_global)"
+    params:
+      name: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]{0,63}$', required: true, label: Global, description: "Name of the global variable." }
+      value: { type: string, pattern: '^[^\s"]{1,256}$', required: true, label: Value, description: "Value of the variable; a global is false when it is 0 or absent." }
+    send: "set_global {name} {value}"
+    returns: none
+  web_ui_event:
+    summary: "Send a mouse or keyboard event to a web page source (manual F.c, send_ui_event)"
+    params:
+      source: { type: int, min: 1, max: 32, required: true, label: Source, description: "Source showing the web page, 1 to 32." }
+      event: { type: string, pattern: '^(Mouse (ButtonLeftDown|ButtonLeftUp|ButtonMiddleDown|ButtonMiddleUp|ButtonRightDown|ButtonRightUp|Move) [0-9]{1,5} [0-9]{1,5}|Keyboard (KeyDown|KeyChar|KeyUp) (Name [A-Za-z0-9]{1,32}|[0-9]{1,5} [0-9]{1,5})( (CapsLock|NumLock|Shift|Ctrl|Alt|AltGr|Meta|MouseButtonLeft|MouseButtonMiddle|MouseButtonRight)){0,10})$', required: true, label: Event, description: "Event as the manual writes it, such as Mouse ButtonLeftDown 1010 890 or Keyboard KeyDown Name KeyA Shift." }
+    send: 'lua "send_ui_event(\"source{source}\", \"{event}\")"'
+    returns: none
+  run_lua:
+    summary: "Run Lua code on the server (manual E.a, lua); quotation marks inside the code are escaped with a backslash, as the manual requires"
+    params:
+      code: { type: string, max_length: 4096, required: true, label: Lua code, description: "Lua code on one line, with every double quote inside it written as \\\" as the manual shows (dmesg(\\\"hello\\\"))." }
+    send: 'lua "{code}"'
+    returns: none
+  run_lua_file:
+    summary: "Run a Lua script file on the server, by path or by name in /picturall/media/scripts (manual E.a, lua_file)"
+    params:
+      path: { type: string, pattern: '^[^\s"]{1,512}$', required: true, label: Script, description: "Absolute path, or a file name looked up in /picturall/media/scripts, without spaces." }
+    send: "lua_file {path}"
+    returns: none
+
 telemetry:
   # Every parameter is reported once; afterwards the server sends a control
   # status message to every client whenever a parameter changes (D.e.c).
   poll:
-    send: ["ctrl_status"]
+    send: ["enum_objects", "ctrl_status"]
   updates:
+    # Every object's every control, as the set-compatible text the server
+    # sends (D.e.c): one state value per control, "param=value,...".
+    - match: '^MSG\(\d+, *\d+, *13, *object name="([A-Za-z0-9_]+)"'
+      match_each: '\\n([a-z][a-z0-9_]*) ((?:[^\\]|\\[^n])*)'
+      state: { "objects.{1}.controls.{2}": "{3}" }
+    # The object list (D.e.e): each object's id, the source field of its messages.
+    - match: '^MSG\(\d+, *\d+, *15, *'
+      match_each: '(\d+):([A-Za-z][A-Za-z0-9_]*):'
+      replace: objects_by_id
+      state: { "objects_by_id.{1}": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bmedia_end_action=(\d+)'
+      state: { "layers.{1}.media_end_action": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bplay_state_req=(\d+)'
+      state: { "layers.{1}.play_mode": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bseek=(-?[0-9.]+)'
+      state: { "layers.{1}.seek": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\\nsync source=(\d+)'
+      state: { "layers.{1}.sync_source": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bfps=(-?[0-9.]+)'
+      state: { "layers.{1}.fps": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\brelative_fps=(-?[0-9.]+)'
+      state: { "layers.{1}.relative_fps": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bfps_mode=(\d+)'
+      state: { "layers.{1}.fps_mode": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\beffective_fps=(-?[0-9.]+)'
+      state: { "layers.{1}.effective_fps": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\\nframe_blending mode=(\d+)'
+      state: { "layers.{1}.frame_blending": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="layer(\d+)".*\\ncomposition (?:[^\\]*,)?x="?(-?[0-9.]+)'
+      state: { "layers.{1}.x": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="layer(\d+)".*\\ncomposition (?:[^\\]*,)?y="?(-?[0-9.]+)'
+      state: { "layers.{1}.y": "{2}" }
     - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bmedia_file="([^"]*)"'
       state: { "layers.{1}.media_file": "{2}" }
     - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bplay_state=(-?\d+)'
@@ -267,6 +485,9 @@ telemetry:
       state: { "layers.{1}.intensity": "{2}" }
     - match: '^MSG\(\d+, *\d+, *24, *([^)]+)\)'
       state: { "server.last_object_added": "{1}" }
+    # A new object: the list read again, and the object's values.
+    - match: '^MSG\(\d+, *\d+, *24, *([A-Za-z][A-Za-z0-9_]*)\)'
+      then_send: ["enum_objects", "ctrl_status {1}"]
     - match: '^MSG\(\d+, *\d+, *20\b'
       state: { "server.overflow": { value: "20", map: { "20": true } } }
 
@@ -279,6 +500,19 @@ state:
   layers.*.collection: { type: int, description: "Media library playing" }
   layers.*.intensity: { type: float, description: "Layer intensity, 0 to 1" }
   server.last_object_added: { type: string, description: "Name of the last object added to the show (message 24)" }
+  objects.*.controls.*: { type: string, description: "An object's control as the server last reported it, by object and control name: its parameters as set-compatible parameter=value text, such as slot=2,collection=0" }
+  objects_by_id.*: { type: string, description: "Object name by the object id the server's messages carry as their source (enum_objects)" }
+  layers.*.media_end_action: { type: int, description: "Source's media end action, 0 to 10" }
+  layers.*.play_mode: { type: int, description: "Source's requested play mode (play_state_req), as layer_play_mode sets it" }
+  layers.*.seek: { type: float, description: "Source's seek position, 0 to 1" }
+  layers.*.sync_source: { type: int, description: "Source the layer's source synchronises to, 0 for none" }
+  layers.*.fps: { type: float, unit: fps, description: "Source's frame rate control" }
+  layers.*.relative_fps: { type: float, description: "Source's relative playback speed" }
+  layers.*.fps_mode: { type: int, description: "Source's frame rate mode" }
+  layers.*.effective_fps: { type: float, unit: fps, description: "Source's current effective frame rate" }
+  layers.*.frame_blending: { type: int, description: "Source's frame blending mode" }
+  layers.*.x: { type: float, description: "Layer's horizontal position in the composition" }
+  layers.*.y: { type: float, description: "Layer's vertical position in the composition" }
   server.overflow: { type: bool, description: "The server reported a message queue overflow and disconnects the client (message 20)" }
 
 quirks:
@@ -312,5 +546,33 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      The commands system, system_bg (Linux shell) and lua run code on the server and are not offered as
-      commands; send_raw can still send them.
+      The commands system and system_bg (Linux shell) are not offered as commands; send_raw can still send
+      them.
+  - models: [all]
+    severity: critical
+    text: >
+      run_lua and run_lua_file run any Lua on the server, which can change any parameter, run any console
+      command and wait or loop; nothing limits what the code does and none of it can be undone from here.
+      The manual requires double quotes inside the code to be escaped with a backslash; the code is sent
+      as given. set_array_value, connect_io and web_ui_event are sent as one lua command each, built from
+      the Lua API functions set_pda_value_by_index, connect and send_ui_event.
+  - models: [all]
+    severity: info
+    text: >
+      set_parameter, set_parameters and their _fade forms set any parameter of any object, the way
+      Picturall Commander does: a layer's transform, colour, crop and draw mode are parameters of its
+      layerN object, its media and playback of sourceN, its audio of audioN. The manual describes only the
+      parameters of a source (and x, y and intensity of a layer's composition); every object's controls,
+      parameters, types, defaults and ranges are listed by object_info (ctrl_info) and their values by
+      object_status, and the state keeps every object's every control as the server reports it
+      (objects.*.controls.*), so a parameter changed from any client shows there.
+  - models: [all]
+    severity: info
+    text: >
+      Not in the protocol document, so not offered beyond the generic set and Lua: creating or deleting
+      objects (the server only reports an object added, message 24, after which the object list and the
+      object are read again), stopping or pausing a playback (stack), whose only documented command is go
+      (command=1), and outputs and mappings other than fitting a layer to displays (fullscreen) and
+      connecting IO objects (connect_io). The meanings of media_end_action 0 to 10, fps_mode 0 and 1 and
+      the layer draw-mode parameter's name are not documented either; draw modes are 0 additive, 1 replace,
+      2 subtract, 3 darken, 4 lighten, 5 multiply, 6 linear burn, 7 screen (table 13).

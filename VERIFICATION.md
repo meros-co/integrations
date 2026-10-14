@@ -154,9 +154,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-picturall — Analog Way Picturall
 
-- [ ] Check whether control status messages separate controls with the literal string "\n" or with real line breaks. ([specs/analogway-picturall.yaml:240](specs/analogway-picturall.yaml#L240))
-- [ ] Confirm unquoted set values are accepted. ([specs/analogway-picturall.yaml:246](specs/analogway-picturall.yaml#L246))
-- [ ] Check what media_end_action values mean and which playback commands besides go exist. ([specs/analogway-picturall.yaml:251](specs/analogway-picturall.yaml#L251))
+- [ ] Check whether control status messages separate controls with the literal string "\n" or with real line breaks, and that they end with "\n)" as the manual's example does (the per-control state reads them so). ([specs/analogway-picturall.yaml:527](specs/analogway-picturall.yaml#L527))
+- [ ] Confirm unquoted set values are accepted. ([specs/analogway-picturall.yaml:533](specs/analogway-picturall.yaml#L533))
+- [ ] Check what media_end_action values mean and which playback commands besides go exist. ([specs/analogway-picturall.yaml:538](specs/analogway-picturall.yaml#L538))
+- [ ] Check that the server sends a control status message for every object on ctrl_status, so objects.*.controls.* fills for all of them, and how large it is on a big show. ([specs/analogway-picturall.yaml:443](specs/analogway-picturall.yaml#L443))
+- [ ] Confirm the object list message ends each entry with a colon (id:name:) as the D.e.e example shows. ([specs/analogway-picturall.yaml:449](specs/analogway-picturall.yaml#L449))
+- [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
+- [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
 
 ## avolites-titan — Avolites Titan
 
