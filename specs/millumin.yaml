@@ -642,7 +642,9 @@ commands:
 telemetry:
   # Feedback arrives on feedback_port from the OSC senders set up in
   # Millumin. Each layer event is sent twice, by layer name and by index; the
-  # rules read the named form. The /millumin/info duplicates are not read.
+  # rules read the named form. /millumin/info repeats each message with its
+  # address as a string argument; the rules after the plain ones read the
+  # same properties out of it.
   updates:
     - address: "^/millumin/board/launchedColumn$"
       state:
@@ -722,6 +724,40 @@ telemetry:
       state:
         info.address: "{arg0}"
         info.value: "{arg1}"
+    # The same properties read out of /millumin/info, whose first argument
+    # is the original address (layer:MyLayer/opacity) and the next its
+    # value, for a setup that sends only the legacy form.
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/(opacity|rotation|scale)$" }
+      state: { "layers.{1}.{2}": "{arg1}" }
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/(?:position/)?xy$" }
+      state:
+        layers.{1}.x: "{arg1}"
+        layers.{1}.y: "{arg2}"
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/media/time$" }
+      state:
+        layers.{1}.time_s: "{arg1}"
+        layers.{1}.duration_s: "{arg2}"
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/media/normalizedTime$" }
+      state: { "layers.{1}.normalized_time": "{arg1}" }
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/media/speed$" }
+      state: { "layers.{1}.speed": "{arg1}" }
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/selected$" }
+      state: { "layers.{1}.selected": { value: "{arg1}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^layer:([^/]+)/effect(\\d+)/([^/.]+)$" }
+      state: { "layers.{1}.effects.{2}.{3}": "{arg1}" }
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^light:([^/]+)/intensity$" }
+      state: { "lights.{1}.intensity": "{arg1}" }
+    - address: "^/millumin/info$"
+      arg_match: { "0": "^light:([^/]+)/selected$" }
+      state: { "lights.{1}.selected": { value: "{arg1}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
 
 state:
   board.column:            { type: int, description: "Index of the column last launched or stopped, from 1" }
@@ -790,9 +826,12 @@ quirks:
       feedback carries 1 or 0 in the legacy /millumin/info example; a layer
       Millumin never reports as deselected keeps selected true. /millumin/info
       repeats every feedback message with the original address as its first
-      argument; the format cannot read a property out of an argument, so only
-      the last one's address and value are kept (info), and the regular
-      messages fill the rest of the state.
+      argument: the last one's address and value are kept (info), and the
+      layer and light properties it names (opacity, rotation, scale,
+      position, media time, normalized time and speed, selection, effect
+      parameters, light intensity and selection) update state as the
+      regular messages do, so a setup that sends only the legacy form keeps
+      them too.
   - models: [all]
     severity: info
     text: >
