@@ -1414,10 +1414,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sennheiser-digital-6000 — Sennheiser Digital 6000
 
-- [ ] Confirm the SSC port is 45 (the Companion module defaults to 6970). ([specs/sennheiser-digital-6000.yaml:110](specs/sennheiser-digital-6000.yaml#L110))
-- [ ] Confirm that subscriptions lapse after 20 s and that renewal every 6.7 s keeps telemetry flowing. ([specs/sennheiser-digital-6000.yaml:102](specs/sennheiser-digital-6000.yaml#L102))
-- [ ] Confirm out-of-range set_frequency and set_af_out values are adapted and replied with the value applied. ([specs/sennheiser-digital-6000.yaml:116](specs/sennheiser-digital-6000.yaml#L116))
-- [ ] Opened for commands only, confirm the receiver answers an unsubscribed `device.name` read and echoes its `osc.xid`, the liveness check. ([crates/core/src/modules/sennheiser_d6000.rs:129](crates/core/src/modules/sennheiser_d6000.rs#L129))
+- [ ] Confirm the SSC port is 45 (the Companion module defaults to 6970). ([specs/sennheiser-digital-6000.yaml:266](specs/sennheiser-digital-6000.yaml#L266))
+- [ ] Confirm that subscriptions lapse after 20 s and that renewal every 6.7 s keeps telemetry flowing. ([specs/sennheiser-digital-6000.yaml:258](specs/sennheiser-digital-6000.yaml#L258))
+- [ ] Confirm out-of-range set_frequency and set_af_out values are adapted and replied with the value applied. ([specs/sennheiser-digital-6000.yaml:272](specs/sennheiser-digital-6000.yaml#L272))
+- [ ] Opened for commands only, confirm the receiver answers an unsubscribed `device.name` read and echoes its `osc.xid`, the liveness check. ([crates/core/src/modules/sennheiser_d6000.rs:163](crates/core/src/modules/sennheiser_d6000.rs#L163))
+- [ ] Confirm name, carrier, active_status, the other skx methods and both wsm_master_cnt counters can be subscribed in the one tree (the guide marks only some as subscribable). ([crates/core/src/modules/sennheiser_d6000.rs:457](crates/core/src/modules/sennheiser_d6000.rs#L457))
+- [ ] Confirm wsm_master_cnt increments for changes made on the receiver only, so re-reading on it misses nothing the core did itself, and which settings each counter covers. ([crates/core/src/modules/sennheiser_d6000.rs:232](crates/core/src/modules/sennheiser_d6000.rs#L232))
+- [ ] Check that active_bank_channel accepts user banks u4-u6 (the guide's limits list u1-u3; Companion and the frequency tables have u1-u6), and whether banks come back upper or lower case. ([specs/sennheiser-digital-6000.yaml:104](specs/sennheiser-digital-6000.yaml#L104))
+- [ ] Check the channel name limit (8 characters and the forbidden characters are Companion's; the guide gives none) and what the receiver does with a longer name. ([specs/sennheiser-digital-6000.yaml:89](specs/sennheiser-digital-6000.yaml#L89))
+- [ ] Check that /device/name is replied with the MAC address appended, as the guide's example shows, and its length limit. ([specs/sennheiser-digital-6000.yaml:96](specs/sennheiser-digital-6000.yaml#L96))
+- [ ] Confirm a sync settings write with several leaves in one message is applied and replied, and that a gain off the 3 dB grid is refused. ([specs/sennheiser-digital-6000.yaml:121](specs/sennheiser-digital-6000.yaml#L121))
+- [ ] Confirm a read of all 100 channels of a bank in one datagram is answered in one reply that fits a datagram. ([specs/sennheiser-digital-6000.yaml:148](specs/sennheiser-digital-6000.yaml#L148))
+- [ ] Check set_user_frequency's adaptation of frequencies off the 25 kHz grid, and whether a stored user bank channel can be cleared. ([specs/sennheiser-digital-6000.yaml:139](specs/sennheiser-digital-6000.yaml#L139))
+- [ ] Check that /sys/clock accepts 4 (internal manual) as a write and what it means. ([specs/sennheiser-digital-6000.yaml:169](specs/sennheiser-digital-6000.yaml#L169))
+- [ ] Check whether set_network is replied before the receiver changes address, whether mdns may be written with auto off, and the ipv4_dante auto write (the guide shows only the settings array). ([specs/sennheiser-digital-6000.yaml:175](specs/sennheiser-digital-6000.yaml#L175))
+- [ ] Confirm encryption and sync setting changes reach the transmitter only at its next sync. ([specs/sennheiser-digital-6000.yaml:302](specs/sennheiser-digital-6000.yaml#L302))
 
 ## sennheiser-ew-dx — Sennheiser EW-DX
 
@@ -1439,9 +1450,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sennheiser-ew-g3-g4 — Sennheiser ew G3 / G4
 
-- [ ] Check which bit of States is TX mute against a real receiver, using mute_flags, since the document's examples disagree with its table. ([specs/sennheiser-ew-g3-g4.yaml:187](specs/sennheiser-ew-g3-g4.yaml#L187))
-- [ ] On a G3 receiver, confirm squelch, AF out, equalizer, RfConfig and FirmwareRevision behave as on G4 (no G3 document has been found). ([specs/sennheiser-ew-g3-g4.yaml:205](specs/sennheiser-ew-g3-g4.yaml#L205))
-- [ ] Opened for commands only, confirm a receiver with no Push subscription answers a bare `Name`, the liveness check. ([crates/core/src/modules/sennheiser_mcp.rs:31](crates/core/src/modules/sennheiser_mcp.rs#L31))
+- [ ] Check which bit of States is TX mute against a real receiver, using mute_flags, since the document's examples disagree with its table. ([specs/sennheiser-ew-g3-g4.yaml:293](specs/sennheiser-ew-g3-g4.yaml#L293))
+- [ ] On a G3 receiver, confirm squelch, AF out, equalizer, RfConfig, FirmwareRevision, BankList and the relative changes behave as on G4 (no G3 document has been found). ([specs/sennheiser-ew-g3-g4.yaml:308](specs/sennheiser-ew-g3-g4.yaml#L308))
+- [ ] Opened for commands only, confirm a receiver with no Push subscription answers a bare `Name`, the liveness check. ([crates/core/src/modules/sennheiser_mcp.rs:37](crates/core/src/modules/sennheiser_mcp.rs#L37))
+- [ ] Confirm a BankList reply carries no bank number (as the document's example shows), so it can only be tied to its request, and how many channels a preset bank lists. ([specs/sennheiser-ew-g3-g4.yaml:140](specs/sennheiser-ew-g3-g4.yaml#L140))
+- [ ] Confirm `Frequency f bank channel` with the channel's own frequency is answered with that bank and channel, and with 0 0 when they do not match. ([specs/sennheiser-ew-g3-g4.yaml:151](specs/sennheiser-ew-g3-g4.yaml#L151))
+- [ ] Check the reply to a relative change: the document's frequency example shows `821025 0 0` without the Frequency keyword, which the core would not match. ([specs/sennheiser-ew-g3-g4.yaml:166](specs/sennheiser-ew-g3-g4.yaml#L166))
+- [ ] Confirm the SR answers `Equalizer 1` with all six values, and the EM's AF third value carries the current mute bits as the AF table gives them. ([specs/sennheiser-ew-g3-g4.yaml:198](specs/sennheiser-ew-g3-g4.yaml#L198))
+- [ ] Confirm a Push with mode 3 sends every configuration attribute at once, so renewing it every 8 s keeps the configuration current without other reads. ([specs/sennheiser-ew-g3-g4.yaml:317](specs/sennheiser-ew-g3-g4.yaml#L317))
 
 ## sennheiser-spectera — Sennheiser Spectera
 
@@ -1500,9 +1516,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## shure-wireless — Shure wireless receivers
 
-- [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:199](specs/shure-wireless.yaml#L199))
-- [ ] Confirm the PSM1000 answers REPORT with string values without braces. ([specs/shure-wireless.yaml:223](specs/shure-wireless.yaml#L223))
-- [ ] Opened for commands only, confirm a receiver that is not metering answers `GET DEVICE_ID` (`GET DEVICE_NAME` on the PSM1000) promptly enough for the 5 s liveness check. ([crates/core/src/modules/shure.rs:48](crates/core/src/modules/shure.rs#L48))
+- [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:658](specs/shure-wireless.yaml#L658))
+- [ ] Confirm the PSM1000 answers REPORT with string values without braces. ([specs/shure-wireless.yaml:689](specs/shure-wireless.yaml#L689))
+- [ ] Opened for commands only, confirm a receiver that is not metering answers `GET DEVICE_ID` (`GET DEVICE_NAME` on the PSM1000) promptly enough for the 5 s liveness check. ([crates/core/src/modules/shure.rs:50](crates/core/src/modules/shure.rs#L50))
+- [ ] Confirm `< REP ERR >` carries no channel or parameter and that SETs are answered in order, so failing the oldest waiting command with it is right. ([specs/shure-wireless.yaml:608](specs/shure-wireless.yaml#L608))
+- [ ] Check that ULX-D, QLX-D and the PSM1000 accept a group and channel padded to two characters (`GROUP_CHAN 03,07`), and how a three-character channel is written. ([specs/shure-wireless.yaml:213](specs/shure-wireless.yaml#L213))
+- [ ] On Axient Digital and SLX-D, confirm a channel name SET is limited to 8 characters (the current documents) rather than 31 (the 2018 Axient Digital document). ([specs/shure-wireless.yaml:230](specs/shure-wireless.yaml#L230))
+- [ ] On the PSM1000, check whether a device or channel name with a space can be set unbraced, and whether `GET x CHAN_NAME` is answered with the channel number (the table omits it). ([specs/shure-wireless.yaml:241](specs/shure-wireless.yaml#L241))
+- [ ] Confirm `GET x SLOT_... 0` answers every one of the channel's eight slots, and whether `GET x ALL` already includes the slots. ([crates/core/src/modules/shure.rs:62](crates/core/src/modules/shure.rs#L62))
+- [ ] Check whether `SET NET_SETTINGS` is answered before the receiver moves to its new address or restarts. ([specs/shure-wireless.yaml:274](specs/shure-wireless.yaml#L274))
+- [ ] On ULX-D, confirm the sampled audio level is dBFS + 50 (the current document; the 2018 one gives 0-50 without units). ([specs/shure-wireless.yaml:528](specs/shure-wireless.yaml#L528))
+- [ ] On ULX-D, confirm TX_OFFSET is reported offset by 12 (the current document; the 2018 one lists 000-021 as the offset itself). ([specs/shure-wireless.yaml:545](specs/shure-wireless.yaml#L545))
+- [ ] On ULX-D firmware before 1.4.8, check that the per-channel `ENCRYPTION ON/OFF` reports are the same on every channel, since they are kept as one device value. ([specs/shure-wireless.yaml:490](specs/shure-wireless.yaml#L490))
+- [ ] Check that ULX-D answers `SET HIGH_DENSITY` with a REP of the new value, and whether changing it retunes the channels. ([specs/shure-wireless.yaml:310](specs/shure-wireless.yaml#L310))
+- [ ] Check that a dual ULX-D answers an inapplicable summing or diversity mode with the mode it kept, not REP ERR. ([specs/shure-wireless.yaml:334](specs/shure-wireless.yaml#L334))
+- [ ] On the PSM1000, confirm AUDIO_IN_LVL is written and reported as signed dB from -67 to 0 and RF_TX_LVL as 10, 50 or 100 (Companion's values; Shure's page gives none), and whether the reply is RF_TX_LVL or RF_TX_LEVEL. ([specs/shure-wireless.yaml:439](specs/shure-wireless.yaml#L439))
+- [ ] On Axient Digital, confirm slot SETs for a linked, active ADX transmitter are answered with the slot's REP, and that SLOT_INPUT_PAD takes 0 and 12. ([specs/shure-wireless.yaml:355](specs/shure-wireless.yaml#L355))
+- [ ] On QLX-D, check whether FLASH, DEVICE_ID, GROUP_CHAN and METER_RATE behave as on ULX-D (Companion offers QLX-D no FLASH; Shure publishes no QLX-D document). ([specs/shure-wireless.yaml:141](specs/shure-wireless.yaml#L141))
+- [ ] On ULX-D, check that a metering interval above 65535 ms (to 99999, as documented) is accepted. ([specs/shure-wireless.yaml:260](specs/shure-wireless.yaml#L260))
+- [ ] On ULX-D, confirm set_encryption, regenerate_encryption_key and set_frequency_diversity_mode need an IR sync before audio returns, and how long a key regeneration takes. ([specs/shure-wireless.yaml:582](specs/shure-wireless.yaml#L582))
 
 ## softouch-easyworship — Softouch EasyWorship
 

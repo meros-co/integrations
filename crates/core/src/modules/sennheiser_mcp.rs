@@ -6,6 +6,10 @@
 //! address that never answers. Readings that differ from a consumer's client were reviewed
 //! with it in that consumer's integration review.
 //!
+//! Push with mode 3 also makes the device send every configuration attribute
+//! at once and again whenever one changes, so the configuration needs no
+//! polling; firmware and RF configuration are read once on connecting.
+//!
 //! Opened for commands only, it sends no Push and reads nothing on connecting.
 //! Without Push a receiver sends nothing unasked, so it is asked its name at
 //! the renewal cadence instead, as the liveness check.
@@ -52,6 +56,8 @@ const SLOW_PROBE: Key = "slow-probe";
 const REPLY: Key = "reply";
 
 const EM_EQUALIZER: [&str; 4] = ["flat", "low_cut", "low_cut_high_boost", "high_boost"];
+/// The SR equalizer's five bands, in wire order after the on/off flag.
+const IEM_BANDS: [&str; 5] = ["low", "low_mid", "mid", "mid_high", "high"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
@@ -65,9 +71,28 @@ enum Kind {
 enum Expect {
     /// A set request: the device echoes the instruction on success.
     Echo(String),
+    /// A request answered with the new value rather than an echo (relative
+    /// changes, the SR equalizer): any reply with this keyword settles it.
+    Keyword(&'static str),
     /// A get request: the reply starts with this keyword.
     FirmwareRevision,
     RfConfig,
+    /// BankList for this bank: the reply names no bank, so it is tied to the
+    /// request.
+    BankList(i64),
+    /// set_bank_channel, first step: the bank's list, to find the channel's
+    /// frequency.
+    BankForTune {
+        bank: i64,
+        channel: i64,
+    },
+    /// set_bank_channel, second step: Frequency with bank and channel, which
+    /// the device answers with the bank and channel it took (0 0 when the
+    /// frequency does not belong to them).
+    Tuned {
+        bank: i64,
+        channel: i64,
+    },
 }
 
 #[derive(Debug)]
@@ -257,13 +282,65 @@ impl Mcp {
         let p = self.pending.remove(index);
         cx.round_trip(cx.now().saturating_sub(p.sent_at));
         let result = match p.expect {
-            Expect::Echo(_) => Ok(Outcome::Ack),
+            Expect::Echo(_) | Expect::Keyword(_) => Ok(Outcome::Ack),
             Expect::FirmwareRevision => Ok(Outcome::Value {
                 value: json!(line.strip_prefix("FirmwareRevision").unwrap_or("").trim()),
             }),
             Expect::RfConfig => Ok(Outcome::Value {
                 value: parse_rf_config(line),
             }),
+            Expect::BankList(bank) => {
+                let list = parse_bank_list(line);
+                cx.state(json!({"channels": {"1": {"banks": {bank.to_string(): list.clone()}}}}));
+                Ok(Outcome::Value { value: json!(list) })
+            }
+            Expect::BankForTune { bank, channel } => {
+                let list = parse_bank_list(line);
+                cx.state(json!({"channels": {"1": {"banks": {bank.to_string(): list.clone()}}}}));
+                let khz = usize::try_from(channel - 1)
+                    .ok()
+                    .and_then(|i| list.get(i))
+                    .and_then(Value::as_i64)
+                    .filter(|&f| f > 0);
+                match khz {
+                    Some(khz) => {
+                        // The same command goes on to its second step.
+                        let instruction = format!("Frequency {khz} {bank} {channel}");
+                        self.send(cx, &instruction);
+                        self.pending.push(Pending {
+                            id: p.id,
+                            sent: instruction,
+                            expect: Expect::Tuned { bank, channel },
+                            sent_at: cx.now(),
+                            deadline: cx.now() + REPLY_WAIT,
+                        });
+                        self.arm_reply_timer(cx);
+                        return;
+                    }
+                    None => Err(CommandError::DeviceError {
+                        code: None,
+                        message: format!("bank {bank} has no frequency on channel {channel}"),
+                    }),
+                }
+            }
+            Expect::Tuned { bank, channel } => {
+                let mut fields = line
+                    .split_whitespace()
+                    .skip(2)
+                    .map(|v| v.parse::<i64>().ok());
+                let took = (fields.next().flatten(), fields.next().flatten());
+                if took == (Some(bank), Some(channel)) {
+                    Ok(Outcome::Ack)
+                } else {
+                    Err(CommandError::DeviceError {
+                        code: None,
+                        message: format!(
+                            "the device tuned the frequency but did not take bank {bank} \
+                             channel {channel}"
+                        ),
+                    })
+                }
+            }
         };
         cx.complete(p.id, result);
         self.arm_reply_timer(cx);
@@ -361,15 +438,7 @@ impl Mcp {
             }
             (Kind::Receiver, "States") => {
                 if let Some(flags) = int(0) {
-                    channel.insert(
-                        "mute_flags".into(),
-                        json!({
-                            "any": flags & 1 != 0,
-                            "tx": flags & 2 != 0,
-                            "rf": flags & 4 != 0,
-                            "rx": flags & 8 != 0,
-                        }),
-                    );
+                    channel.insert("mute_flags".into(), mute_bits(flags));
                     tx.states = Some(flags & 2 != 0);
                 }
                 insert_int(channel, "pilot_flag", int(1));
@@ -382,6 +451,14 @@ impl Mcp {
                 if let Some(hold) = int(1) {
                     af.insert("peak_hold".into(), json!(hold));
                 }
+                // The current mute state, as opposed to States' flags since
+                // the last cycle.
+                if let Some(flags) = int(2) {
+                    channel.insert("mute_now".into(), mute_bits(flags));
+                }
+            }
+            (_, "RfConfig") => {
+                device.insert("rf_config".into(), parse_rf_config(line));
             }
             (Kind::Receiver, "Bat") => match args.first() {
                 // "?": no battery telegram. Absent, never zero: no pack is not
@@ -404,6 +481,18 @@ impl Mcp {
             (Kind::Transmitter, "States") => {
                 if let Some(v) = int(0) {
                     channel.insert("rf_off".into(), json!(v == 1));
+                }
+                // 0 on all cycle, 1 off all cycle, 2 changed during it.
+                insert_int(channel, "rf_mute_flag", int(1));
+            }
+            (Kind::Transmitter, "Equalizer") => {
+                if let Some(on) = int(0) {
+                    let mut eq = Map::new();
+                    eq.insert("enabled".into(), json!(on == 1));
+                    for (i, band) in IEM_BANDS.iter().enumerate() {
+                        insert_int(&mut eq, band, int(i + 1));
+                    }
+                    channel.insert("iem_equalizer".into(), Value::Object(eq));
                 }
             }
             (Kind::Transmitter, "Sensitivity") => insert_int(channel, "sensitivity_db", int(0)),
@@ -430,9 +519,35 @@ fn matches_reply(p: &Pending, line: &str) -> bool {
         // A Frequency echo carries bank and channel after the value:
         // "Frequency 822000" is answered by "Frequency 822000 0 0".
         Expect::Echo(sent) => line == sent || line.starts_with(&format!("{sent} ")),
+        Expect::Keyword(keyword) => line.split_whitespace().next() == Some(*keyword),
         Expect::FirmwareRevision => line.starts_with("FirmwareRevision "),
         Expect::RfConfig => line.starts_with("RfConfig "),
+        Expect::BankList(_) | Expect::BankForTune { .. } => {
+            line.split_whitespace().next() == Some("BankList")
+        }
+        Expect::Tuned { .. } => line.starts_with("Frequency "),
     }
+}
+
+/// "BankList 0 822000 0 819375" -> each channel's frequency in kHz, from
+/// channel 1; 0 is an unused channel. Trailing unused channels are left out by
+/// the device.
+fn parse_bank_list(line: &str) -> Vec<Value> {
+    line.split_whitespace()
+        .skip(1)
+        .filter_map(|v| v.parse::<i64>().ok())
+        .map(|f| json!(f))
+        .collect()
+}
+
+/// The four mute bits of the EM's States and AF attributes.
+fn mute_bits(flags: i64) -> Value {
+    json!({
+        "any": flags & 1 != 0,
+        "tx": flags & 2 != 0,
+        "rf": flags & 4 != 0,
+        "rx": flags & 8 != 0,
+    })
 }
 
 /// "RfConfig 779125 787875 125 797125 805875 125" -> blocks of min, max, step.
@@ -486,8 +601,9 @@ impl Module for Mcp {
         cx.udp_open(SOCKET, Bind::Shared(PORT));
         self.keep_alive(cx);
         if self.monitor {
-            self.send(cx, "Name");
-            self.send(cx, "Frequency");
+            for read in ["Name", "Frequency", "FirmwareRevision", "RfConfig"] {
+                self.send(cx, read);
+            }
         }
         cx.set_timer(RESUB, RESUBSCRIBE_EVERY);
         cx.set_timer(SILENCE, SILENCE_TIMEOUT);
@@ -512,6 +628,70 @@ impl Module for Mcp {
             }
             "get_rf_config" => {
                 return self.request(cx, id, "RfConfig".into(), Expect::RfConfig);
+            }
+            "get_bank_list" => {
+                let bank = int_param(params, "bank");
+                return self.request(cx, id, format!("BankList {bank}"), Expect::BankList(bank));
+            }
+            "set_bank_channel" => {
+                // Frequency must name the channel's own frequency for the bank
+                // and channel to be taken, so the bank is listed first.
+                let bank = int_param(params, "bank");
+                let channel = int_param(params, "bank_channel");
+                return self.request(
+                    cx,
+                    id,
+                    format!("BankList {bank}"),
+                    Expect::BankForTune { bank, channel },
+                );
+            }
+            "step_frequency" | "step_squelch" | "step_af_out" | "step_sensitivity" => {
+                let keyword = match name {
+                    "step_frequency" => "Frequency",
+                    "step_squelch" => "Squelch",
+                    "step_af_out" => "AfOut",
+                    _ => "Sensitivity",
+                };
+                let steps = int_param(params, "steps");
+                if steps == 0 {
+                    cx.complete(
+                        id,
+                        Err(CommandError::InvalidParams {
+                            message: "steps must not be 0".into(),
+                        }),
+                    );
+                    return;
+                }
+                return self.request(
+                    cx,
+                    id,
+                    format!("{keyword} #{steps}"),
+                    Expect::Keyword(keyword),
+                );
+            }
+            "set_iem_equalizer" => {
+                let on = u8::from(bool_param(params, "enabled"));
+                let bands: Vec<Option<i64>> = IEM_BANDS
+                    .iter()
+                    .map(|b| params.get(*b).and_then(Value::as_i64))
+                    .collect();
+                let instruction = if bands.iter().all(Option::is_none) {
+                    format!("Equalizer {on}")
+                } else if let Some(values) = bands.iter().copied().collect::<Option<Vec<i64>>>() {
+                    let values: Vec<String> = values.iter().map(i64::to_string).collect();
+                    format!("Equalizer {on} {}", values.join(" "))
+                } else {
+                    cx.complete(
+                        id,
+                        Err(CommandError::InvalidParams {
+                            message: "give all five bands, or none to switch the equalizer only"
+                                .into(),
+                        }),
+                    );
+                    return;
+                };
+                // Answered with the whole equalizer, not an echo.
+                return self.request(cx, id, instruction, Expect::Keyword("Equalizer"));
             }
             other => {
                 cx.complete(
@@ -681,7 +861,16 @@ mod tests {
             socket: SOCKET,
             bind: Bind::Shared(53212)
         }));
-        assert_eq!(sent(&actions), ["Push 60 500 3\r", "Name\r", "Frequency\r"]);
+        assert_eq!(
+            sent(&actions),
+            [
+                "Push 60 500 3\r",
+                "Name\r",
+                "Frequency\r",
+                "FirmwareRevision\r",
+                "RfConfig\r"
+            ]
+        );
     }
 
     #[test]
@@ -1035,5 +1224,169 @@ mod tests {
         ))["channels"]["1"];
         assert_eq!(ch["af"]["levels"], json!([15, 25, 40, 38, 5]));
         assert_eq!(ch["rf_off"], false);
+    }
+
+    fn run(m: &mut Mcp, now: Millis, id: CommandId, name: &str, p: Value) -> Vec<String> {
+        let mut cx = Cx::new(now);
+        m.command(&mut cx, id, name, &params(p));
+        sent(&cx.take())
+    }
+
+    #[test]
+    fn bank_lists_are_returned_and_kept() {
+        let mut m = receiver();
+        assert_eq!(
+            run(&mut m, 0, 1, "get_bank_list", json!({"bank": 21})),
+            ["BankList 21\r"]
+        );
+        // TI 1254 p.14: unused channels are 0, trailing ones left out.
+        let a = feed(&mut m, 10, "BankList 0 822000 0 819375\r");
+        assert_eq!(
+            completed(&a),
+            [(
+                1,
+                Ok(Outcome::Value {
+                    value: json!([0, 822000, 0, 819375])
+                })
+            )]
+        );
+        assert_eq!(
+            state(&a)["channels"]["1"]["banks"]["21"],
+            json!([0, 822000, 0, 819375])
+        );
+    }
+
+    #[test]
+    fn bank_and_channel_are_tuned_through_the_bank_list() {
+        let mut m = receiver();
+        assert_eq!(
+            run(
+                &mut m,
+                0,
+                1,
+                "set_bank_channel",
+                json!({"bank": 2, "bank_channel": 3})
+            ),
+            ["BankList 2\r"]
+        );
+        let mut cx = Cx::new(10);
+        m.datagram(&mut cx, SOCKET, from(), b"BankList 820000 821000 822000\r");
+        let a = cx.take();
+        // The channel's own frequency, with its bank and channel.
+        assert_eq!(sent(&a), ["Frequency 822000 2 3\r"]);
+        assert!(completed(&a).is_empty());
+        let a = feed(&mut m, 20, "Frequency 822000 2 3\r");
+        assert_eq!(completed(&a), [(1, Ok(Outcome::Ack))]);
+        assert_eq!(state(&a)["channels"]["1"]["bank"], 2);
+
+        // An unused channel is refused without tuning.
+        run(
+            &mut m,
+            30,
+            2,
+            "set_bank_channel",
+            json!({"bank": 21, "bank_channel": 1}),
+        );
+        let a = feed(&mut m, 40, "BankList 0 822000\r");
+        assert!(sent(&a).is_empty());
+        assert!(matches!(
+            &completed(&a)[..],
+            [(2, Err(CommandError::DeviceError { .. }))]
+        ));
+
+        // Taken into U1.0 instead of the bank: the command fails.
+        run(
+            &mut m,
+            50,
+            3,
+            "set_bank_channel",
+            json!({"bank": 2, "bank_channel": 1}),
+        );
+        feed(&mut m, 60, "BankList 820000\r");
+        let a = feed(&mut m, 70, "Frequency 820000 0 0\r");
+        assert!(matches!(
+            &completed(&a)[..],
+            [(3, Err(CommandError::DeviceError { .. }))]
+        ));
+    }
+
+    #[test]
+    fn relative_steps_are_settled_by_the_new_value() {
+        let mut m = receiver();
+        assert_eq!(
+            run(&mut m, 0, 1, "step_squelch", json!({"steps": -2})),
+            ["Squelch #-2\r"]
+        );
+        let a = feed(&mut m, 10, "Squelch 5\r");
+        assert_eq!(completed(&a), [(1, Ok(Outcome::Ack))]);
+        assert_eq!(state(&a)["channels"]["1"]["squelch_db"], 5);
+        assert_eq!(
+            run(&mut m, 20, 2, "step_frequency", json!({"steps": 1})),
+            ["Frequency #1\r"]
+        );
+        let a = feed(&mut m, 30, "Frequency 821025 0 0\r");
+        assert_eq!(completed(&a), [(2, Ok(Outcome::Ack))]);
+        assert!(run(&mut m, 40, 3, "step_af_out", json!({"steps": 0})).is_empty());
+    }
+
+    #[test]
+    fn the_iem_equalizer_is_set_and_read() {
+        let mut m = Mcp::for_host(HOST, Kind::Transmitter);
+        assert_eq!(
+            run(
+                &mut m,
+                0,
+                1,
+                "set_iem_equalizer",
+                json!({"enabled": false, "low": -5, "low_mid": 3, "mid": 0, "mid_high": -3, "high": 5})
+            ),
+            ["Equalizer 0 -5 3 0 -3 5\r"]
+        );
+        assert_eq!(
+            run(&mut m, 10, 2, "set_iem_equalizer", json!({"enabled": true})),
+            ["Equalizer 1\r"]
+        );
+        // Answered with the whole equalizer (TI 1254 p.33).
+        let a = feed(
+            &mut m,
+            20,
+            "Equalizer 0 -5 3 0 -3 5\rEqualizer 1 -5 3 0 -3 5\r",
+        );
+        assert_eq!(
+            completed(&a),
+            [(1, Ok(Outcome::Ack)), (2, Ok(Outcome::Ack))]
+        );
+        assert_eq!(
+            state(&a)["channels"]["1"]["iem_equalizer"],
+            json!({"enabled": true, "low": -5, "low_mid": 3, "mid": 0, "mid_high": -3, "high": 5})
+        );
+        // Some bands but not all is refused.
+        assert!(run(
+            &mut m,
+            30,
+            3,
+            "set_iem_equalizer",
+            json!({"enabled": true, "low": 1})
+        )
+        .is_empty());
+        // SR States: the RF-mute flag since the last cycle.
+        let a = feed(&mut m, 40, "States 1 2\r");
+        assert_eq!(state(&a)["channels"]["1"]["rf_mute_flag"], 2);
+    }
+
+    #[test]
+    fn the_em_current_mute_state_and_rf_config() {
+        let mut m = receiver();
+        // TI 1254 p.30: 13 is RX-Mute and RF-Mute.
+        let a = feed(&mut m, 0, "AF 37 42 13\rRfConfig 566000 608000 25\r");
+        let s = state(&a);
+        assert_eq!(
+            s["channels"]["1"]["mute_now"],
+            json!({"any": true, "tx": false, "rf": true, "rx": true})
+        );
+        assert_eq!(
+            s["device"]["rf_config"],
+            json!([{"min_khz": 566000, "max_khz": 608000, "step_khz": 25}])
+        );
     }
 }

@@ -55,6 +55,8 @@ async fn simulated_em6000() -> (u16, tokio::task::JoinHandle<()>) {
                     }
                 }
                 replies.push(json!({"osc": {"state": {"subscribe": subs}}}));
+            } else if let Some(booster) = msg.pointer("/sys/booster").and_then(Value::as_bool) {
+                replies.push(json!({"sys": {"booster": booster}}));
             } else if msg.get("device").is_some() {
                 replies.push(json!({"device": {
                     "identity": {"version": "1.1.4.74", "vendor": "Sennheiser", "product": "EM 6000"},
@@ -68,6 +70,9 @@ async fn simulated_em6000() -> (u16, tokio::task::JoinHandle<()>) {
                     if let Some(m) = block.get("audio_mute").and_then(Value::as_bool) {
                         mute[ch - 1] = m;
                         replies.push(json!({ format!("rx{ch}"): {"audio_mute": m} }));
+                    }
+                    if let Some(bc) = block.get("active_bank_channel").filter(|v| v.is_array()) {
+                        replies.push(json!({ format!("rx{ch}"): {"active_bank_channel": bc} }));
                     }
                     if block.get("identify").is_some() {
                         replies.push(json!({ format!("rx{ch}"): {"identify": true} }));
@@ -144,6 +149,29 @@ async fn em6000_end_to_end() {
         .execute(id, "identify", params(json!({"channel": 1})))
         .await;
     assert_eq!(outcome, Ok(Outcome::Ack));
+
+    let outcome = core
+        .execute(
+            id,
+            "set_bank_channel",
+            params(json!({"channel": 1, "bank": "u2", "bank_channel": 63})),
+        )
+        .await;
+    assert_eq!(
+        outcome,
+        Ok(Outcome::Value {
+            value: json!(["u2", 63])
+        })
+    );
+    let ch1 = core.snapshot(id).unwrap().state["channels"]["1"].clone();
+    assert_eq!(ch1["bank"], "u2");
+    assert_eq!(ch1["bank_channel"], 63);
+
+    let outcome = core
+        .execute(id, "set_booster", params(json!({"enabled": true})))
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    assert_eq!(core.snapshot(id).unwrap().state["device"]["booster"], true);
 
     core.close(id).await;
 }
