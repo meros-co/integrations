@@ -37,6 +37,12 @@ source:
       DIM_SCREEN S1-S2, DIM_PRESET CURRENT/NEXT/PREVIOUS, DIM_PRESET_MEM 1-8, DIM_INPUT 1-10, DIM_OUTPUT 1-2,
       DIM_AUDIO_INPUT 1_ANALOG (1) to 4_HDBASET (24). Enumerations: ENUM_DEV 257-262 and 282-285,
       ENUM_LAYER, ENUM_INPUTLAYER, ENUM_LOAD_FILTER, ENUM_SWITCHER_MODE, ENUM_IN_PLUG, ENUM_AUDIO_INPUT.
+      Also from the same sheets: PRbst and PRbal (layer border style and border alpha, to be applied with
+      PUscu), SGsam (switcher audio mode), INain, INaip and INapi (autocenter, its progress, autoset
+      progress), INhdc, INlre and OUlre (HDCP and HDBaseT long reach), IEain, IEaou and IEpcr (input aspect
+      ratio, aspect mode and predefined crop), RTreq, RTyea, RTmon, RTday, RThou, RTmin, RTsec and RTval
+      (the clock), SBprg, INpav, IScfo, ISiwi, ISihe, ISaud, IShdc, OUihc and DFtra (transitions
+      available, read only).
 
 transport:
   type: line-tcp
@@ -59,7 +65,10 @@ models:
                     quick_frame_all, auto_quick_frame, standby, set_switcher_mode, set_input_plug,
                     autoset_input, set_audio_input_level, set_audio_output_volume, mute_audio_input,
                     mute_audio_output, set_audio_output_input, ping, get_ready, get_device_type, get_firmware,
-                    get_command_set_version, get_take_available, get_layer_source, get_tbar, read_back, send_raw]
+                    get_command_set_version, get_take_available, get_layer_source, get_tbar, read_back, send_raw,
+                    set_layer_border, set_layer_border_alpha, set_audio_mode, autocenter_input, set_input_hdcp,
+                    set_input_long_reach, set_output_long_reach, set_input_aspect, set_input_aspect_mode,
+                    set_input_crop, set_clock, refresh_clock]
     verification: none
     notes: Reports DEV257.
   - id: saphyr
@@ -285,6 +294,196 @@ commands:
         description: "On shows the Quick Frame automatically when a displayed source is lost." }
     send: "{enabled:bool01}CTaqf"
     expect: { matches: "^CTaqf" }
+    returns: ack
+
+  # ── Layer borders (variables: PE_BORDER_STYLE, PE_BORDER_ALPHA) ──────────
+  set_layer_border:
+    summary: "Border style of a layer on a screen's preview (or program), then the screen update (variables, PRbst and PUscu): 0 none, 1 edge, 2 smooth, 3 smooth edge, 4 shadow"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      layer: { type: int, min: 0, max: 7, required: true,
+        label: Layer,
+        description: "0 frame, 1-4 PIPs, 5-6 logos, 7 audio." }
+      preview: { type: bool, default: true,
+        label: To preview,
+        description: "On acts on the screen's preview, off on its program." }
+      style: { type: int, min: 0, max: 4, required: true,
+        label: Border style,
+        description: "0 none, 1 edge, 2 smooth, 3 smooth edge, 4 shadow." }
+    send:
+      - "{screen:-1},{preview:bool01},{layer},{style}PRbst"
+      - "{screen:-1},1PUscu"
+    expect: { matches: "^(PRbst|PUscu)" }
+    returns: ack
+  set_layer_border_alpha:
+    summary: "Border transparency of a layer on a screen's preview (or program), 0 transparent to 255 opaque, then the screen update (variables, PRbal and PUscu)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      layer: { type: int, min: 0, max: 7, required: true,
+        label: Layer,
+        description: "0 frame, 1-4 PIPs, 5-6 logos, 7 audio." }
+      preview: { type: bool, default: true,
+        label: To preview,
+        description: "On acts on the screen's preview, off on its program." }
+      alpha: { type: int, min: 0, max: 255, required: true,
+        label: Border opacity,
+        description: "0 makes the border fully transparent and 255 fully opaque." }
+    send:
+      - "{screen:-1},{preview:bool01},{layer},{alpha}PRbal"
+      - "{screen:-1},1PUscu"
+    expect: { matches: "^(PRbal|PUscu)" }
+    returns: ack
+  set_audio_mode:
+    summary: "Switcher audio mode: 0 no audio, 1 audio follows presets and TAKE, 2 audio de-embedded apart from the video (variables, SGsam)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true,
+        label: Audio mode,
+        description: "0 no audio, 1 audio follows preset editing and TAKE, 2 audio decorrelated from the video." }
+    send: "{mode}SGsam"
+    expect: { matches: "^SGsam" }
+    returns: ack
+
+  # ── Input settings (variables: INain, INhdc, INlre, OUlre, IEain, IEaou, IEpcr) ─
+  autocenter_input:
+    summary: "Autocenter an analog input: 1 quick (phase and blankings), 2 advanced (pixel frequency too) (variables, INain)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      mode: { type: int, min: 1, max: 2, required: true,
+        label: Autocenter,
+        description: "1 quick, adjusting phase and blankings; 2 advanced, adjusting pixel frequency, phase and blankings." }
+    send: "{input:-1},{mode}INain"
+    expect: { matches: "^INain" }
+    returns: ack
+  set_input_hdcp:
+    summary: "Whether an input's plug accepts HDCP (variables, IN_HDCP_ENABLE INhdc)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      plug: { type: int, min: 0, max: 4, required: true,
+        label: Plug,
+        description: "The input's plug: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT." }
+      enabled: { type: bool, required: true,
+        label: HDCP,
+        description: "On lets the plug accept HDCP-protected sources, off refuses them." }
+    send: "{input:-1},{plug},{enabled:bool01}INhdc"
+    expect: { matches: "^INhdc" }
+    returns: ack
+  set_input_long_reach:
+    summary: "HDBaseT long reach on an input's plug (variables, INlre)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      plug: { type: int, min: 0, max: 4, required: true,
+        label: Plug,
+        description: "The input's plug: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT." }
+      enabled: { type: bool, required: true,
+        label: Long reach,
+        description: "On turns HDBaseT long reach on, for longer cables at lower resolutions." }
+    send: "{input:-1},{plug},{enabled:bool01}INlre"
+    expect: { matches: "^INlre" }
+    returns: ack
+  set_output_long_reach:
+    summary: "HDBaseT long reach on an output (variables, OUlre)"
+    params:
+      output: { type: int, min: 1, max: 2, required: true,
+        label: Output,
+        description: "Output number, 1 or 2." }
+      enabled: { type: bool, required: true,
+        label: Long reach,
+        description: "On turns HDBaseT long reach on, for longer cables at lower resolutions." }
+    send: "{output:-1},{enabled:bool01}OUlre"
+    expect: { matches: "^OUlre" }
+    returns: ack
+  set_input_aspect:
+    summary: "An input plug's aspect ratio: 0 native, 1 5:4, 2 4:3, 3 16:10, 4 15:9, 5 16:9, 6 21:9 (variables, SET_ASPECT_IN IEain)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      plug: { type: int, min: 0, max: 4, required: true,
+        label: Plug,
+        description: "The input's plug: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT." }
+      aspect: { type: int, min: 0, max: 6, required: true,
+        label: Aspect ratio,
+        description: "0 native, 1 5:4, 2 4:3, 3 16:10, 4 15:9, 5 16:9, 6 21:9." }
+    send: "{input:-1},{plug},{aspect}IEain"
+    expect: { matches: "^IEain" }
+    returns: ack
+  set_input_aspect_mode:
+    summary: "How an input plug fills its layer: 0 1:1, 1 centred with black bands, 2 full screen (distorted), 3 cropped (variables, SET_ASPECT_OUT IEaou)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      plug: { type: int, min: 0, max: 4, required: true,
+        label: Plug,
+        description: "The input's plug: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT." }
+      mode: { type: int, min: 0, max: 3, required: true,
+        label: Aspect mode,
+        description: "0 one to one, 1 centred with black bands, 2 full screen (distorted), 3 cropped." }
+    send: "{input:-1},{plug},{mode}IEaou"
+    expect: { matches: "^IEaou" }
+    returns: ack
+  set_input_crop:
+    summary: "An input plug's predefined crop: 0 none, 1 letterbox 1.78, 2 letterbox 1.85, 3 letterbox 2.35, 4 pillarbox 1.33 (variables, SET_CROP_PREDEF IEpcr)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      plug: { type: int, min: 0, max: 4, required: true,
+        label: Plug,
+        description: "The input's plug: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT." }
+      crop: { type: int, min: 0, max: 4, required: true,
+        label: Crop,
+        description: "0 none, 1 letterbox 1.78, 2 letterbox 1.85, 3 letterbox 2.35, 4 pillarbox 1.33." }
+    send: "{input:-1},{plug},{crop}IEpcr"
+    expect: { matches: "^IEpcr" }
+    returns: ack
+
+  # ── Clock (variables: RTreq, RTyea, RTmon, RTday, RThou, RTmin, RTsec) ─────
+  set_clock:
+    summary: "Set the device's clock: year, month, day, hours, minutes and seconds, then the program request (variables, RTyea to RTsec and 2RTreq)"
+    params:
+      year: { type: int, min: 2000, max: 2199, required: true,
+        label: Year,
+        description: "The year, 2000 to 2199." }
+      month: { type: int, min: 1, max: 12, required: true,
+        label: Month,
+        description: "The month, 1 for January to 12 for December (sent from 0)." }
+      day: { type: int, min: 1, max: 31, required: true,
+        label: Day,
+        description: "The day of the month, 1 to 31." }
+      hour: { type: int, min: 0, max: 23, required: true,
+        label: Hours,
+        description: "The hour, 0 to 23." }
+      minute: { type: int, min: 0, max: 59, required: true,
+        label: Minutes,
+        description: "The minutes, 0 to 59." }
+      second: { type: int, min: 0, max: 59, required: true,
+        label: Seconds,
+        description: "The seconds, 0 to 59." }
+    send:
+      - "{year}RTyea"
+      - "{month:-1}RTmon"
+      - "{day}RTday"
+      - "{hour}RThou"
+      - "{minute}RTmin"
+      - "{second}RTsec"
+      - "2RTreq"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  refresh_clock:
+    summary: "Have the device read its clock again, so the RT registers report it (variables, 1RTreq)"
+    send: "1RTreq"
+    expect: { matches: "^RTreq" }
     returns: ack
 
   # ── Device ────────────────────────────────────────────────────────────────
@@ -540,6 +739,64 @@ telemetry:
       state: { "audio.outputs.{1:+1}.muted": { value: "{2}", map: { "0": false, "1": true } } }
     - match: "^AUodi(\\d+),(\\d+)$"
       state: { "audio.outputs.{1:+1}.input": "{2}" }
+    - match: "^PRbst(\\d+),0,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.program.layers.{2}.border": "{3}" }
+    - match: "^PRbst(\\d+),1,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.preview.layers.{2}.border": "{3}" }
+    - match: "^PRbal(\\d+),0,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.program.layers.{2}.border_alpha": "{3}" }
+    - match: "^PRbal(\\d+),1,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.preview.layers.{2}.border_alpha": "{3}" }
+    - match: "^SGsam(\\d+)$"
+      state: { "device.audio_mode": "{1}" }
+    - match: "^SBprg(\\d+)$"
+      state: { "device.standby_progress": "{1}" }
+    - match: "^INaip(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.autocenter_progress": "{2}" }
+    - match: "^INapi(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.autoset_progress": "{2}" }
+    - match: "^INhdc(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.hdcp_enabled": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^INlre(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.long_reach": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^OUlre(\\d+),(\\d+)$"
+      state: { "outputs.{1:+1}.long_reach": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^IEain(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.aspect": "{3}" }
+    - match: "^IEaou(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.aspect_mode": "{3}" }
+    - match: "^IEpcr(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.crop": "{3}" }
+    - match: "^INpav(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.available": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^IShdc(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.hdcp": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^ISaud(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.embedded_audio": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^ISiwi(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.width": "{3}" }
+    - match: "^ISihe(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.height": "{3}" }
+    - match: "^IScfo(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.format": "{3}" }
+    - match: "^OUihc(\\d+),(\\d+),(\\d+)$"
+      state: { "outputs.{1:+1}.plugs.{2}.hdcp": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^RTyea(\\d+)$"
+      state: { "clock.year": "{1}" }
+    - match: "^RTmon(\\d+)$"
+      state: { "clock.month": "{1:+1}" }
+    - match: "^RTday(\\d+)$"
+      state: { "clock.day": "{1}" }
+    - match: "^RThou(\\d+)$"
+      state: { "clock.hour": "{1}" }
+    - match: "^RTmin(\\d+)$"
+      state: { "clock.minute": "{1}" }
+    - match: "^RTsec(\\d+)$"
+      state: { "clock.second": "{1}" }
+    - match: "^RTval(\\d+)$"
+      state: { "clock.valid": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^DFtra(\\d+),(\\d+),(\\d+)$"
+      state: { "transitions.{1}.layers.{2}": { value: "{3}", map: { "0": false, "1": true } } }
 
 state:
   device.ready: { type: bool, description: "Ready after power up (READY)" }
@@ -559,6 +816,35 @@ state:
   screens.*.quick_frame: { type: bool, description: "Quick Frame shown" }
   screens.*.program.layers.*.source: { type: int, description: "Source of a layer on program: 0 none, 1-10 input or frame, 11 color" }
   screens.*.preview.layers.*.source: { type: int, description: "Source of a layer on preview" }
+  device.audio_mode: { type: int, description: "Switcher audio mode: 0 no audio, 1 follows presets, 2 decorrelated" }
+  device.standby_progress: { type: int, unit: "%", description: "Standby progress, 0-100" }
+  screens.*.program.layers.*.border: { type: int, description: "Layer border style on program: 0 none, 1 edge, 2 smooth, 3 smooth edge, 4 shadow" }
+  screens.*.preview.layers.*.border: { type: int, description: "Layer border style on preview" }
+  screens.*.program.layers.*.border_alpha: { type: int, description: "Layer border opacity on program, 0 transparent to 255 opaque" }
+  screens.*.preview.layers.*.border_alpha: { type: int, description: "Layer border opacity on preview" }
+  inputs.*.autocenter_progress: { type: int, unit: "%", description: "Autocenter progress, 0-100" }
+  inputs.*.autoset_progress: { type: int, unit: "%", description: "Autoset progress, 0-100" }
+  inputs.*.plugs.*.hdcp_enabled: { type: bool, description: "The plug accepts HDCP" }
+  inputs.*.plugs.*.long_reach: { type: bool, description: "HDBaseT long reach on" }
+  inputs.*.plugs.*.aspect: { type: int, description: "Aspect ratio: 0 native, 1 5:4, 2 4:3, 3 16:10, 4 15:9, 5 16:9, 6 21:9" }
+  inputs.*.plugs.*.aspect_mode: { type: int, description: "Aspect mode: 0 1:1, 1 centred, 2 full screen, 3 cropped" }
+  inputs.*.plugs.*.crop: { type: int, description: "Predefined crop: 0 none, 1-3 letterbox 1.78, 1.85, 2.35, 4 pillarbox 1.33" }
+  inputs.*.plugs.*.available: { type: bool, description: "The input has this plug" }
+  inputs.*.plugs.*.hdcp: { type: bool, description: "HDCP detected on the plug" }
+  inputs.*.plugs.*.embedded_audio: { type: bool, description: "Embedded audio detected on the plug" }
+  inputs.*.plugs.*.width: { type: int, unit: px, description: "Image width on the plug" }
+  inputs.*.plugs.*.height: { type: int, unit: lines, description: "Image height on the plug" }
+  inputs.*.plugs.*.format: { type: int, description: "Detected format, the IScfo enumeration (0 none, 1 invalid, 2 unknown, then the formats)" }
+  outputs.*.long_reach: { type: bool, description: "HDBaseT long reach on" }
+  outputs.*.plugs.*.hdcp: { type: bool, description: "Output plug encrypted with HDCP (0 HD15, 1 DVI-A, 2 DVI-D, 3 SDI, 4 BNC YPbPr, 5 BNC CVBS, 6 HDMI, 7 HDBaseT)" }
+  clock.year: { type: int, description: "The device clock's year" }
+  clock.month: { type: int, description: "The device clock's month, 1-12" }
+  clock.day: { type: int, description: "The device clock's day of the month" }
+  clock.hour: { type: int, description: "The device clock's hour" }
+  clock.minute: { type: int, description: "The device clock's minutes" }
+  clock.second: { type: int, description: "The device clock's seconds" }
+  clock.valid: { type: bool, description: "The device clock is valid" }
+  transitions.*.layers.*: { type: bool, description: "A transition (0 cut, 1 clean cut, 2 fade, 3 slide, 4 wipe, 5 circle, 6 stretch) is available for a layer" }
   freeze_all: { type: bool, description: "All screens frozen" }
   quick_frame_all: { type: bool, description: "Quick Frames shown on all screens" }
   auto_quick_frame: { type: bool, description: "Quick Frame shown automatically on signal loss" }
@@ -610,3 +896,12 @@ quirks:
     text: >
       Master memories 1-8 are the only presets a controller can recall; the 56 RCS² memories live on the
       computer running RCS² (guide 3.6.2).
+  - models: [all]
+    severity: info
+    text: >
+      Layer position, size and opacity, transition type and duration, test patterns, output formats and
+      saving presets are not in Midra's TPP documents. The only transition register, DFtra, says read-only
+      which transitions a layer has; border style and border opacity (PRbst, PRbal) are the only layer
+      appearance registers, and memories are recorded with RCS² (guide 3.6.1). set_clock writes the date
+      and time registers, then asks the device to program them (2RTreq); the order is inferred, the
+      document giving the registers but no sequence.

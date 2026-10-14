@@ -1602,3 +1602,132 @@ telemetry(PA, 'ue160-bar-type3', inbound_http={"path": '/cgi-bin/aw_cam', "body"
 telemetry(PA, 'ue20-drs-on', inbound_http={"path": '/cgi-bin/aw_cam', "body": 'OSE:33:1'}, expect_state={"drs": "on"}, model='aw-ue20')
 telemetry(PA, 'ue20-agc-42', inbound_http={"path": '/cgi-bin/aw_cam', "body": 'OSD:69:07'}, expect_state={"gain_agc_max": "42dB"}, model='aw-ue20')
 telemetry(PA, 'ue20-format-2160-30p', inbound_http={"path": '/cgi-bin/aw_cam', "body": 'OSA:87:24'}, expect_state={"system": {"format": "2160/30p"}}, model='aw-ue20')
+
+# ── HE-family camera commands (HD/4K Integrated Camera Interface
+# Specifications v1.12): the command text as the document's tables write it,
+# then ':' sent as %3A. Each is opened as a model that has it. ──
+def _he(command, input, text, model, **extra):
+    http(PA, command, input, "GET", "/cgi-bin/aw_cam?cmd=" + text.replace(":", "%3A") + "&res=1", model=model, **extra)
+
+
+for _cmd, _in, _text, _model in [
+    ("shutter_speed", {"shutter": "5"}, "OSH:5", "aw-ue70"),
+    ("get_shutter_speed", {}, "QSH", "aw-he130"),
+    ("synchro_scan_step", {"step": "080"}, "OMS:080", "aw-he50"),
+    ("get_synchro_scan_step", {}, "QMS", "aw-he50"),
+    ("red_gain_offset", {"gain": "096"}, "ORI:096", "aw-he120"),
+    ("get_red_gain_offset", {}, "QRI", "aw-he120"),
+    ("blue_gain_offset", {"gain": "12C"}, "OBI:12C", "aw-he60"),
+    ("get_blue_gain_offset", {}, "QBI", "aw-he60"),
+    ("master_pedestal_offset", {"pedestal": "0A0"}, "OTP:0A0", "aw-he40"),
+    ("get_master_pedestal_offset", {}, "QTP", "aw-he40"),
+    ("color_temperature_step", {"step": "04B"}, "OSD:B1:04B", "aw-ue70"),
+    ("get_color_temperature_step", {}, "QSD:B1", "aw-he130"),
+    ("flesh_tone_mode", {"mode": "3"}, "OSE:32:3", "aw-he60"),
+    ("get_flesh_tone_mode", {}, "QSE:32", "aw-he60"),
+    ("extended_drs", {"mode": "1"}, "OSD:C8:1", "aw-he70"),
+    ("get_extended_drs", {}, "QSD:C8", "aw-he70"),
+    ("hdr_mode", {"mode": "3"}, "OSD:B4:3", "aw-ue70"),
+    ("get_hdr_mode", {}, "QSD:B4", "aw-ue70"),
+    ("night_mode_select", {"mode": "1"}, "OSD:B2:1", "aw-he65"),
+    ("get_night_mode_select", {}, "QSD:B2", "aw-he65"),
+    ("night_day_level", {"level": "2"}, "OSD:B7:2", "aw-he65"),
+    ("get_night_day_level", {}, "QSD:B7", "aw-he65"),
+    ("down_conversion_mode", {"mode": "2"}, "OSE:20:2", "aw-he130"),
+    ("get_down_conversion_mode", {}, "QSE:20", "aw-he130"),
+    ("digital_extender_switch", {"enabled": "1"}, "ODE:1", "aw-he130"),
+    ("get_digital_extender_switch", {}, "QDE", "aw-he130"),
+    ("digital_extender_magnification", {"magnification": "1"}, "OSD:B8:1", "aw-ue70"),
+    ("get_digital_extender_magnification", {}, "QSD:B8", "aw-ue70"),
+    ("audio_auto_level", {"enabled": "1"}, "OSD:BB:1", "aw-ue70"),
+    ("get_audio_auto_level", {}, "QSD:BB", "aw-ue70"),
+    ("audio_equalizer", {"mode": "2"}, "OSD:BC:2", "aw-ue70"),
+    ("get_audio_equalizer", {}, "QSD:BC", "aw-ue70"),
+    ("total_detail_level", {"level": "8A"}, "OSA:B1:8A", "aw-he60"),
+    ("get_total_detail_level", {}, "QSA:B1", "aw-he60"),
+    ("flesh_tone_noise_suppress", {"level": "01"}, "OSD:4B:01", "aw-he120"),
+    ("get_flesh_tone_noise_suppress", {}, "QSD:4B", "aw-he120"),
+    ("h_detail_level_high", {"level": "20"}, "OSD:0A:20", "aw-he120"),
+    ("get_h_detail_level_high", {}, "QSD:0A", "aw-he120"),
+    ("h_detail_level_low", {"level": "01"}, "OSD:12:01", "aw-he120"),
+    ("get_h_detail_level_low", {}, "QSD:12", "aw-he120"),
+    ("v_detail_level_high", {"level": "1F"}, "OSD:0E:1F", "aw-he120"),
+    ("get_v_detail_level_high", {}, "QSD:0E", "aw-he120"),
+    ("v_detail_level_low", {"level": "1E"}, "OSD:16:1E", "aw-he120"),
+    ("get_v_detail_level_low", {}, "QSD:16", "aw-he120"),
+    ("detail_band", {"level": "03"}, "OSD:1E:03", "aw-he120"),
+    ("get_detail_band", {}, "QSD:1E", "aw-he120"),
+    ("analog_component_output", {"mode": "01"}, "OSD:65:01", "aw-he120"),
+    ("get_analog_component_output", {}, "QSD:65", "aw-he120"),
+    ("sdi_output_format", {"format": "10"}, "OSD:B9:10", "aw-ue70"),
+    ("get_sdi_output_format", {}, "QSD:B9", "aw-ue70"),
+    ("gamma_level", {"level": "02"}, "OSD:50:02", "aw-he50"),
+    ("get_gamma_level", {}, "QSD:50", "aw-he50"),
+    ("chroma_level_offset", {"level": "03"}, "OCG:03", "aw-he40"),
+    ("get_chroma_level_offset", {}, "QCG", "aw-he40"),
+    ("gamma_select", {"mode": "2"}, "OSE:72:2", "aw-he120"),
+    ("get_gamma_select", {}, "QSE:72", "aw-he120"),
+    ("elc_limit_step", {"limit": "4"}, "OSD:BF:4", "aw-ue70"),
+    ("get_elc_limit_step", {}, "QSD:BF", "aw-ue70"),
+]:
+    _he(_cmd, _in, _text, _model)
+for _axis, _sat, _ph in (("cy_cy_b", "AA", "AB"), ("cy_b_b", "AC", "AD"), ("b_b_mg", "C0", "C1"),
+                         ("b_mg_mg", "C2", "C3"), ("yl_yl_g_hd", "C4", "C5"), ("yl_g_g", "C6", "C7")):
+    _he(f"color_correction_{_axis}_saturation", {"value": "9F"}, f"OSD:{_sat}:9F", "aw-he40")
+    _he(f"get_color_correction_{_axis}_saturation", {}, f"QSD:{_sat}", "aw-he40")
+    _he(f"color_correction_{_axis}_phase", {"value": "41"}, f"OSD:{_ph}:41", "aw-ue70")
+    _he(f"get_color_correction_{_axis}_phase", {}, f"QSD:{_ph}", "aw-ue70")
+# Values the HE models add to shared commands.
+_he("gain", {"gain": "38"}, "OGU:38", "aw-he40", file="gain_he40")
+_he("agc_max_gain", {"max_gain": 8}, "OSD:69:08", "aw-ue70", file="agc_max_gain_ue70")
+_he("nd_filter", {"filter": "4"}, "OFT:4", "aw-he130", file="nd_filter_he130")
+_he("format", {"format": "13"}, "OSA:87:13", "aw-he60", file="format_he60")
+_he("audio_input_type", {"input": "4"}, "OSA:D1:4", "aw-he130", file="audio_input_type_he130")
+_he("max_digital_zoom", {"factor": 16}, "OSE:7A:16", "aw-he40", file="max_digital_zoom_he40")
+_he("r_pedestal", {"pedestal": "12C"}, "ORP:12C", "aw-he120", file="r_pedestal_he120")
+_he("gamma_type", {"mode": "1"}, "OSE:72:1", "aw-he130", file="gamma_type_he130")
+_he("white_balance_mode", {"mode": "3"}, "OAW:3", "aw-he50", file="white_balance_mode_he50")
+
+
+def _het(name, body, state, model):
+    telemetry(PA, name, inbound_http={"path": "/cgi-bin/aw_cam", "body": body}, expect_state=state, model=model)
+
+
+# Replies whose meaning differs by model (v1.12).
+_het("he50-awb-a", "OAW:2", {"white_balance": {"mode": "awb_a"}}, "aw-he50")
+_het("he40-awb-a", "OAW:1", {"white_balance": {"mode": "awb_a"}}, "aw-he40")
+_het("ue70-atw-3", "OAW:3", {"white_balance": {"mode": "atw"}}, "aw-ue70")
+_het("he130-ois-mode2", "OIS:2", {"ois": "on_mode2"}, "aw-he130")
+_het("he130-gamma-sd", "OSE:72:1", {"gamma_type": "sd"}, "aw-he130")
+_het("he120-gamma-cinema", "OSE:72:2", {"gamma_type": "cinema"}, "aw-he120")
+_het("ue70-elc-limit", "OSD:BF:3", {"shutter": {"elc_limit": "1/120"}}, "aw-ue70")
+_het("he40-audio-line-middle", "OSA:D1:4", {"audio": {"input_type": "line_middle"}}, "aw-he40")
+_het("he60-chroma-level", "OCG:05", {"chroma_level_step": "05"}, "aw-he60")
+_het("he50-gamma-level", "OSD:50:01", {"gamma_level": "mid"}, "aw-he50")
+_het("he120-matrix-ntsc", "OSE:31:2", {"matrix": {"type": "ntsc"}}, "aw-he120")
+_het("ue70-agc-48", "OSD:69:08", {"gain_agc_max": "48dB"}, "aw-ue70")
+_het("he130-nd-eighth", "OFT:4", {"nd_filter": "1/8"}, "aw-he130")
+_het("he60-format-576p", "OSA:87:13", {"system": {"format": "576/50p"}}, "aw-he60")
+_het("he70-detail-high", "ODT:2", {"detail": True, "detail_level": 2}, "aw-he70")
+_het("he130-shutter-code", "OSH:C", {"shutter": {"speed_code": "C"}}, "aw-he130")
+_het("he50-synchro-step", "OMS:0FF", {"shutter": {"synchro_step": "0FF"}}, "aw-he50")
+_het("he120-red-gain", "ORI:0C8", {"white_balance": {"red_gain_offset": "0C8"}}, "aw-he120")
+_het("he120-blue-gain", "OBI:064", {"white_balance": {"blue_gain_offset": "064"}}, "aw-he120")
+_het("he40-master-pedestal", "OTP:096", {"master_pedestal_offset": "096"}, "aw-he40")
+_het("ue70-color-temperature", "OSD:B1:01E", {"white_balance": {"color_temperature_step": "01E"}}, "aw-ue70")
+_het("he60-flesh-tone", "OSE:32:3", {"flesh_tone": "high"}, "aw-he60")
+_het("he70-extended-drs", "OSD:C8:1", {"drs_extended": "low"}, "aw-he70")
+_het("ue70-hdr", "OSD:B4:3", {"hdr_mode": "high"}, "aw-ue70")
+_het("he65-night-select", "OSD:B2:1", {"night_mode_select": "auto"}, "aw-he65")
+_het("he65-night-level", "OSD:B7:0", {"night_day_level": "low"}, "aw-he65")
+_het("he130-down-conversion", "OSE:20:1", {"down_conversion_mode": "squeeze"}, "aw-he130")
+_het("he130-digital-extender", "ODE:1", {"zoom": {"digital_extender_on": True}}, "aw-he130")
+_het("ue70-extender-magnification", "OSD:B8:3", {"zoom": {"digital_extender_magnification": "x6.0"}}, "aw-ue70")
+_het("ue70-audio-auto-level", "OSD:BB:1", {"audio": {"auto_level": True}}, "aw-ue70")
+_het("ue70-audio-equalizer", "OSD:BC:1", {"audio": {"equalizer": "low_cut"}}, "aw-ue70")
+_het("he60-total-detail", "OSA:B1:8A", {"detail_total_level": "8A"}, "aw-he60")
+_het("he120-ftns", "OSD:4B:02", {"flesh_tone_noise_suppress": "high"}, "aw-he120")
+_het("he120-detail-band", "OSD:1E:03", {"detail_he120": {"1E": "03"}}, "aw-he120")
+_het("he120-component", "OSD:65:01", {"output": {"analog_component": "rgb"}}, "aw-he120")
+_het("ue70-sdi-format", "OSD:B9:14", {"output": {"sdi_format_code": "14"}}, "aw-ue70")
+_het("he40-cc-yl-g-g", "OSD:C6:9F", {"color_correction_hd": {"C6": "9F"}}, "aw-he40")

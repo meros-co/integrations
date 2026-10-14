@@ -46,7 +46,13 @@ source:
       SPPEi, ISsva, INava, INfrz, INbla, MLfen, MLfes, MLces, MLupd, MMloa, CMloa, GPiav, GPist, GPimo,
       GPits, GPoav, GPofa, GPomo, TAopr, TAopw. Sheet 2 (dimensions): DIM_SCREEN S1-S8, DIM_LAYER L1-L24,
       DIM_INPUT IN_1-IN_24, DIM_GPI 1-2, DIM_GPO 1-10, DIM_MONITORING_ELEMENT 0-11, DIM_MON_MEM_SET 0-7,
-      DIM_CONFIDENCE_MEM_SET 0-15. Sheet 3 (enumerations): ENUM_DEV 97-119, ENUM_INPUTLAYER (0 none, 1-24
+      DIM_CONFIDENCE_MEM_SET 0-15. Also, from the same sheets: INplg (IN_PLUG, default SDI), INpav, INasi,
+      INain and INaip (autoset, autocenter and its progress), IShdc, ISiwi, ISihe, OUihc, SCico (confidence
+      mode), COlay, COsca-COscd, COupd and COsva (confidence layout, sources, update and validity), MMsav
+      and MMres (indexes device then memory, and memory), CMsav and CMres (screen then memory, and memory),
+      CMval, PSval, SCssh and SCssv (screen size), GPoti (GPO tally input), PMsav, PMres, PSsav and PSres
+      (no indexes or parameters given), ENUM_IN_PLUG (0 ANALOG_HD15, 1 ANALOG_DVI, 2 DVI, 3 SDI, 4 HDMI, 5
+      DISPLAY_PORT), ENUM_CONFIDENTIAL_LAYOUT (0-14) and ENUM_CONFIDENTIAL_SOURCE (0-56). Sheet 3 (enumerations): ENUM_DEV 97-119, ENUM_INPUTLAYER (0 none, 1-24
       live inputs, 25-32 frames, 33-40 logos, 41 color), ENUM_MONITORING_ELEMENT_SOURCES (0-55),
       ENUM_DEVICE_OPERATION_STATE, ENUM_TEMP_ALARM_LVL, ENUM_GPO_MODE.
 
@@ -63,6 +69,9 @@ transport:
 ports:
   - { port: 10600, protocol: tcp, role: control }
 
+maps:
+  confidence_slot: { "1": a, "2": b, "3": c, "4": d }
+
 models:
   - id: ascender-16
     name: Analog Way Ascender 16 (ASC016)
@@ -74,7 +83,10 @@ models:
                     reboot, shutdown, shutdown_wake_on_lan, get_device_type, get_device_state, get_firmware,
                     get_command_set_version, get_take_available, get_layer_source, get_background,
                     get_tbar, get_input_frozen, get_tally_program, get_tally_preview, get_gpi, read_back,
-                    send_raw]
+                    send_raw, set_input_plug, autoset_input, autocenter_input, set_confidence_mode,
+                    set_confidence_layout, set_confidence_source, update_confidence, save_monitoring_preset,
+                    reset_monitoring_preset, save_confidence_preset, reset_confidence_preset,
+                    set_gpo_tally_input]
     verification: none
     notes: Reports DEV112.
   - id: ascender-16-4k
@@ -514,6 +526,149 @@ commands:
     expect: { matches: "^PCsht" }
     returns: ack
 
+  # ── Input plugs (variables: IN_PLUG, IN_AUTOSET_INPUT, IN_AUTOCENTER_INPUT) ─
+  set_input_plug:
+    summary: "Choose a live input's active plug (variables, IN_PLUG INplg): 0 analog HD15, 1 analog DVI, 2 DVI, 3 SDI, 4 HDMI, 5 DisplayPort"
+    params:
+      input: { type: int, min: 1, max: 24, required: true,
+        label: Input,
+        description: "Live input number from 1; 13-24 are the slave's in an additive configuration." }
+      plug: { type: int, min: 0, max: 5, required: true,
+        label: Plug,
+        description: "0 analog HD15, 1 analog DVI (DVI-A), 2 DVI, 3 SDI, 4 HDMI, 5 DisplayPort; the input card decides which it has." }
+    send: "{input:-1},{plug}INplg"
+    expect: { matches: "^INplg" }
+    returns: ack
+  autoset_input:
+    summary: "Run an autoset of every plug of a live input (variables, IN_AUTOSET_INPUT INasi)"
+    params:
+      input: { type: int, min: 1, max: 24, required: true,
+        label: Input,
+        description: "Live input number from 1; 13-24 are the slave's in an additive configuration." }
+    send: "{input:-1},1INasi"
+    expect: { matches: "^INasi" }
+    returns: ack
+  autocenter_input:
+    summary: "Autocenter the active plug of an analog input: 1 quick (phase and blankings), 2 advanced (pixel frequency too) (variables, INain)"
+    params:
+      input: { type: int, min: 1, max: 24, required: true,
+        label: Input,
+        description: "Live input number from 1; 13-24 are the slave's in an additive configuration." }
+      mode: { type: int, min: 1, max: 2, required: true,
+        label: Autocenter,
+        description: "1 quick, adjusting phase and blankings; 2 advanced, adjusting pixel frequency, phase and blankings." }
+    send: "{input:-1},{mode}INain"
+    expect: { matches: "^INain" }
+    returns: ack
+
+  # ── Confidence monitoring (variables: SCico, COlay, COsca-d, COupd) ────────
+  set_confidence_mode:
+    summary: "Turn a screen's confidence (confidential) mode on or off (variables, OSCREEN_IS_CONFIDENCIAL SCico)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true,
+        label: Screen,
+        description: "Screen number from 1, as on the device." }
+      enabled: { type: bool, required: true,
+        label: Confidence mode,
+        description: "On makes the screen a confidence monitor, off a normal screen." }
+    send: "{screen:-1},{enabled:bool01}SCico"
+    expect: { matches: "^SCico" }
+    returns: ack
+  set_confidence_layout:
+    summary: "A confidence screen's layout (variables, COlay): 0 disabled, 1 full screen, 2-3 two windows, 4-9 three, 10-14 four"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true,
+        label: Screen,
+        description: "Screen number from 1, as on the device." }
+      layout: { type: int, min: 0, max: 14, required: true,
+        label: Layout,
+        description: "0 disabled, 1 one window full screen, 2 two split horizontally, 3 two split vertically, 4-9 three windows (split horizontally, vertically, then merged top, bottom, left, right), 10 quad, 11-14 four windows merged top, bottom, left, right." }
+    send: "{screen:-1},{layout}COlay"
+    expect: { matches: "^COlay" }
+    returns: ack
+  set_confidence_source:
+    summary: "The source of one window of a confidence screen (variables, COsca to COscd): 0 none, 1-24 inputs, 25-32 stills, 33-40 logos, 41-48 screens' program, 49-56 preview"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true,
+        label: Screen,
+        description: "Screen number from 1, as on the device." }
+      window: { type: int, min: 1, max: 4, required: true,
+        label: Window,
+        description: "The confidence window, 1 to 4 (registers COsca to COscd)." }
+      source: { type: int, min: 0, max: 56, required: true,
+        label: Source,
+        description: "0 none, 1-12 master inputs and 13-24 slave inputs, 25-28 master and 29-32 slave stills, 33-36 master and 37-40 slave logos, 41-48 screens 1-8 program, 49-56 screens 1-8 preview." }
+    send: "{screen:-1},{source}COsc{window:map.confidence_slot}"
+    expect: { matches: "^COsc[a-d]" }
+    returns: ack
+  update_confidence:
+    summary: "Apply the confidence layout and source changes (variables, CONFIDENTIAL_UPDATE COupd)"
+    send: "1COupd"
+    expect: { matches: "^COupd" }
+    returns: ack
+
+  # ── Saving monitoring and confidence presets (variables: MMsav, CMsav) ────
+  save_monitoring_preset:
+    summary: "Save the monitoring output's layout as a monitoring preset, 1-8 (variables, MON_MEM_SAVE MMsav)"
+    params:
+      device: { type: int, min: 1, max: 2, default: 1,
+        label: Device,
+        description: "1 is the master and 2 the slave in an additive configuration; a single device is 1." }
+      memory: { type: int, min: 1, max: 8, required: true,
+        label: Monitoring preset,
+        description: "Monitoring preset number to overwrite, 1 to 8." }
+    send: "{device:-1},{memory:-1},1MMsav"
+    expect: { matches: "^MMsav" }
+    returns: ack
+  reset_monitoring_preset:
+    summary: "Clear a monitoring preset, 1-8 (variables, MON_MEM_RESET MMres)"
+    params:
+      memory: { type: int, min: 1, max: 8, required: true,
+        label: Monitoring preset,
+        description: "Monitoring preset number to clear, 1 to 8." }
+    send: "{memory:-1},1MMres"
+    expect: { matches: "^MMres" }
+    returns: ack
+  save_confidence_preset:
+    summary: "Save a screen's confidence layout and sources as a confidence preset, 1-16 (variables, CONFIDENCE_MEM_SAVE CMsav)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true,
+        label: Screen,
+        description: "Screen number from 1, as on the device." }
+      memory: { type: int, min: 1, max: 16, required: true,
+        label: Confidence preset,
+        description: "Confidence preset number to overwrite, 1 to 16." }
+    send: "{screen:-1},{memory:-1},1CMsav"
+    expect: { matches: "^CMsav" }
+    returns: ack
+  reset_confidence_preset:
+    summary: "Clear a confidence preset, 1-16 (variables, CONFIDENCE_MEM_RESET CMres)"
+    params:
+      memory: { type: int, min: 1, max: 16, required: true,
+        label: Confidence preset,
+        description: "Confidence preset number to clear, 1 to 16." }
+    send: "{memory:-1},1CMres"
+    expect: { matches: "^CMres" }
+    returns: ack
+  set_gpo_tally_input:
+    summary: "In tally mode, whether a source on a screen drives a GPO (variables, GPIO_OUT_TALLY_INPUT GPoti); source in layer numbering, 0-41"
+    params:
+      gpo: { type: int, min: 1, max: 10, required: true,
+        label: GPO,
+        description: "General-purpose output number, 1 to 10." }
+      screen: { type: int, min: 1, max: 8, required: true,
+        label: Screen,
+        description: "Screen number from 1, as on the device." }
+      source: { type: int, min: 0, max: 41, required: true,
+        label: Source,
+        description: "Source in layer source numbering: 0 none, 1-24 inputs, 25-32 frames, 33-40 logos, 41 colour." }
+      enabled: { type: bool, required: true,
+        label: Drives the GPO,
+        description: "On makes this source on this screen light the GPO's tally, off leaves it out." }
+    send: "{gpo:-1},{screen:-1},{source},{enabled:bool01}GPoti"
+    expect: { matches: "^GPoti" }
+    returns: ack
+
   # ── Reads ─────────────────────────────────────────────────────────────────
   get_device_type:
     summary: "Device type number, 97-119 (guide 3.1, ?)"
@@ -704,6 +859,38 @@ telemetry:
       state: { "master_presets.loading": { value: "{1}", map: { "0": false, "1": true } } }
     - match: "^TPdie(\\d+)$"
       state: { "device.reading_back": { value: "{1}", map: { "0": false, "1": true, "2": true, "3": true } } }
+    - match: "^INplg(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plug": "{2}" }
+    - match: "^INpav(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.available": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^IShdc(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.hdcp": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^ISiwi(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.width": "{3}" }
+    - match: "^ISihe(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.height": "{3}" }
+    - match: "^INaip(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.autocenter_progress": "{2}" }
+    - match: "^OUihc(\\d+),(\\d+)$"
+      state: { "outputs.{1:+1}.hdcp": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^SCssh(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.width": "{2}" }
+    - match: "^SCssv(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.height": "{2}" }
+    - match: "^SCico(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.confidence": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^COlay(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.confidence_layout": "{2}" }
+    - match: "^COsc([a-d])(\\d+),(\\d+)$"
+      state: { "screens.{2:+1}.confidence_sources.{1}": "{3}" }
+    - match: "^COsva(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.confidence_valid": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^PSval(\\d+),(\\d+)$"
+      state: { "master_presets.{1:+1}.valid": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^CMval(\\d+),(\\d+)$"
+      state: { "confidence_presets.{1:+1}.valid": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^GPoti(\\d+),(\\d+),(\\d+),(\\d+)$"
+      state: { "gpo.{1:+1}.tally.{2:+1}.{3}": { value: "{4}", map: { "0": false, "1": true } } }
 
 state:
   device.type: { type: int, description: "Device type: 97 NeXtage 16, 98 SmartMatriX Ultra, 99 Ascender 32, 100 Ascender 48, 105-108 their 4K versions, 112/113 Ascender 16 (4K), 114 Ascender 48 4K PL, 116/117 NeXtage 08 (4K), 118 Ascender 32 4K PL; 102-104, 109-111, 115, 119 output expanders" }
@@ -734,6 +921,22 @@ state:
   monitoring.*.fullscreen: { type: bool, description: "Monitoring in full screen rather than mosaic" }
   monitoring.*.fullscreen_source: { type: int, description: "Full screen monitoring source (0-55)" }
   monitoring.*.windows.*.source: { type: int, description: "Source of a mosaic monitoring window" }
+  inputs.*.plug: { type: int, description: "Active plug: 0 analog HD15, 1 analog DVI, 2 DVI, 3 SDI, 4 HDMI, 5 DisplayPort" }
+  inputs.*.plugs.*.available: { type: bool, description: "The input card has this plug" }
+  inputs.*.plugs.*.hdcp: { type: bool, description: "HDCP detected on the plug" }
+  inputs.*.plugs.*.width: { type: int, unit: px, description: "Image width on the plug, after the user aspect ratio" }
+  inputs.*.plugs.*.height: { type: int, unit: lines, description: "Image height on the plug, after the user aspect ratio" }
+  inputs.*.autocenter_progress: { type: int, unit: "%", description: "Autocenter progress, 0-100" }
+  outputs.*.hdcp: { type: bool, description: "Output encrypted with HDCP; 5-8 are the slave's" }
+  screens.*.width: { type: int, unit: px, description: "Screen width" }
+  screens.*.height: { type: int, unit: px, description: "Screen height" }
+  screens.*.confidence: { type: bool, description: "Screen in confidence (confidential) mode" }
+  screens.*.confidence_layout: { type: int, description: "Confidence layout, 0-14 as set_confidence_layout" }
+  screens.*.confidence_sources.*: { type: int, description: "Source of each confidence window, keyed a to d for windows 1 to 4" }
+  screens.*.confidence_valid: { type: bool, description: "The confidence screen's layout is valid" }
+  master_presets.*.valid: { type: bool, description: "The master preset memory holds a preset" }
+  confidence_presets.*.valid: { type: bool, description: "The confidence preset holds a preset" }
+  gpo.*.tally.*.*: { type: bool, description: "In tally mode, the source drives the GPO, keyed by GPO, screen and source" }
   presets.loading: { type: bool, description: "A preset memory load is in progress" }
   master_presets.loading: { type: bool, description: "A master preset load is in progress" }
 
@@ -782,3 +985,21 @@ quirks:
     text: >
       The guide documents snapshots over HTTP (3.12) and Wake-on-LAN (3.15), which are not TPP commands and
       are not covered here.
+  - models: [all]
+    severity: critical
+    text: >
+      save_monitoring_preset and save_confidence_preset overwrite a preset with no undo; the reset commands
+      clear one. The variables document gives their indexes (device then memory for MMsav, the reverse of
+      MMloa; screen then memory for CMsav, the reverse of CMloa) but no sequence, so each is one register
+      write with value 1. Saving a screen preset memory or a master preset (PMsav, PSsav) is left out: the
+      document lists both registers with no index, no parameter registers and no sequence, so which memory,
+      screen and destination they save cannot be told.
+  - models: [all]
+    severity: info
+    text: >
+      Layer position, size and opacity, transition type and duration, test patterns and output formats are
+      not in LiveCore's TPP documents: the only layer register is its source (SPPEi), and positions,
+      transparencies and transitions appear only as categories of the preset recall filter (PMcat). They
+      are set from the Web RCS and recalled with presets. The confidence layout and sources are applied by
+      update_confidence (COupd); that it applies them is inferred from its name, as MLupd does for
+      monitoring. Overriding the over-temperature switch-off (TEdao) is left out.

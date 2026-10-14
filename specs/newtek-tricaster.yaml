@@ -14,6 +14,17 @@ source:
       main_background_auto, main_dskN_take, main_a_row_named_input, and
       play_macro_byname (p.59-60); password protection with admin/admin by
       default (p.63).
+  - title: Vizrt Live Production Automation, Integration & Control User Guide, Version 8-4 (May 2022 edition)
+    author: Vizrt
+    url: https://cms.vizrt.com/wp-content/uploads/2025/12/Automation-and-Integration-Guide.pdf
+    note: >
+      Manufacturer document, the same text as the NewTek guide under Vizrt's name (section 8.3 HTTP
+      from p.162). Used with the NewTek guide for: the dictionary keys (NewTek p.70-71, Vizrt p.170),
+      the buffer dictionary (p.70 / p.169), product information at /version (p.68-69 / p.168), the
+      switcher dictionary's T-bar and overlays (p.69 / p.169), the macro shortcuts and the
+      macros_list dictionary (p.59-60 / p.158-159), and the change notification websocket
+      /v1/change_notifications, which sends only the name of the dictionary that changed (p.71-72 /
+      p.170-172).
   - title: TriCaster User Guides 8-4 and 8-5 (Vizion, Mini, TriCaster), section 4.1
     author: Vizrt
     note: The Live Panel password covers web pages and network control, on by default as admin/admin.
@@ -22,10 +33,19 @@ source:
     note: >
       Third-party copy of the product's own shortcut dictionary, which the guide
       names as authoritative (p.17). record_start, record_stop,
-      streaming_toggle values, ddrN_play and ddrN_stop.
+      streaming_toggle values, ddrN_play and ddrN_stop, and the media player
+      shortcuts (prefixes ddr1-ddr4, gfx1, gfx2 and sound with _play_toggle,
+      _back, _forward, _select_clip, _select_preset, _next_preset,
+      _previous_preset, _playspeed, _mark_in, _mark_out, the mode toggles,
+      _show_on_switcher, _volume and _mute), continue_pausedmacro and
+      request_filebrowser_update. Corroborated by the newer list at
+      https://jonjones.co/blog/vizrt-tricaster-mini-s-macros/ (2025-05-25).
   - title: Bitfocus Companion, companion-module-newtek-tricaster
     url: https://github.com/bitfocus/companion-module-newtek-tricaster
-    note: MIT-licensed; cross-check only. Uses the same shortcut names over HTTP on port 80.
+    note: >
+      MIT-licensed; cross-check only. Uses the same shortcut names over HTTP on port 80, the
+      change notification websocket on port 80, /v1/version for product information, and reads
+      the macros_list dictionary as macro elements with a name attribute.
 
 transport:
   type: http
@@ -42,6 +62,7 @@ settings:
 
 ports:
   - { port: 80, protocol: http, role: control }
+  - { port: 80, protocol: ws, role: push }
 
 models:
   - id: tricaster-advanced-edition
@@ -49,14 +70,16 @@ models:
     supports: [take, auto, background_take, background_auto, set_program, set_preview,
                dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
                stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
-               shortcut, shortcut_with_value, trigger, set_datalink]
+               shortcut, shortcut_with_value, trigger, set_datalink,
+               play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser]
     verification: none
   - id: tricaster-8
     name: TriCaster TC1, TC2 Elite, Mini 4K / X and Vizion (software 7 and 8)
     supports: [take, auto, background_take, background_auto, set_program, set_preview,
                dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
                stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
-               shortcut, shortcut_with_value, trigger, set_datalink]
+               shortcut, shortcut_with_value, trigger, set_datalink,
+               play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser]
     verification: none
 
 commands:
@@ -219,41 +242,325 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  play_macro_by_id:
+    summary: Run a macro by its id (play_macro_byid, guide p.59-60)
+    params:
+      id: { type: string, max_length: 128, required: true, label: Macro id, description: "The macro's id (a GUID), as the macros_list dictionary gives it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "play_macro_byid", value: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_macro:
+    summary: Stop a running macro by name (stop_macro_byname, guide p.59-60)
+    params:
+      name: { type: string, max_length: 128, required: true, label: Macro, description: "Macro name as shown in the TriCaster's macro list." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "stop_macro_byname", value: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_macro_by_id:
+    summary: Stop a running macro by its id (stop_macro_byid, guide p.59-60)
+    params:
+      id: { type: string, max_length: 128, required: true, label: Macro id, description: "The macro's id (a GUID), as the macros_list dictionary gives it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "stop_macro_byid", value: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  record_macro:
+    summary: Start recording a new macro under this name (record_macro_byname, guide p.59-60)
+    params:
+      name: { type: string, max_length: 128, required: true, label: Macro, description: "Name of the macro to record; the operator's actions are recorded into it until stop_recording_macro." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "record_macro_byname", value: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_recording_macro:
+    summary: Stop recording the macro being recorded (stop_record_macro, guide p.59-60)
+    send: { method: GET, path: /v1/shortcut, query: { name: "stop_record_macro" } }
+    expect: { status: 200 }
+    returns: ack
+
+  continue_paused_macro:
+    summary: Continue a macro paused at a pause step (continue_pausedmacro, shortcuts_cfg.xml)
+    send: { method: GET, path: /v1/shortcut, query: { name: "continue_pausedmacro" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_play_toggle:
+    summary: Play or pause a media player (<player>_play_toggle, shortcuts_cfg.xml)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_play_toggle" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_previous_clip:
+    summary: Go to the previous clip in a media player's playlist (<player>_back)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_back" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_next_clip:
+    summary: Go to the next clip in a media player's playlist (<player>_forward)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_forward" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_select_clip:
+    summary: Select a clip of the media player's current preset (<player>_select_clip)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+      clip: { type: int, min: 0, max: 9999, required: true, label: Clip, description: "The clip's place in the playlist, sent as given: shortcuts_cfg.xml does not say whether it counts from 0 or 1." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_select_clip", value: "{clip}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_select_preset:
+    summary: Select a media player preset (playlist) (<player>_select_preset)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+      preset: { type: int, min: 1, max: 99, required: true, label: Preset, description: "The media player preset (playlist) to select, numbered as on the TriCaster." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_select_preset", value: "{preset}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_next_preset:
+    summary: Select a media player's next preset (<player>_next_preset)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_next_preset" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_previous_preset:
+    summary: Select a media player's previous preset (<player>_previous_preset)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_previous_preset" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_set_speed:
+    summary: Set a media player's play speed in percent of normal (<player>_playspeed)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+      speed: { type: int, min: 25, max: 400, required: true, label: Speed, description: "Play speed in percent of normal, 100 for normal speed." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_playspeed", value: "{speed}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_mark_in:
+    summary: Set the current clip's in point to the playhead (<player>_mark_in with no value)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_mark_in" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_mark_out:
+    summary: Set the current clip's out point to the playhead (<player>_mark_out with no value)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_mark_out" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_clear_marks:
+    summary: Clear the current clip's in and out points (<player>_mark_in_out_clear)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_mark_in_out_clear" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_set_mode:
+    summary: Turn a media player's single, playlist, loop or autoplay mode on or off (<player>_<mode>_mode_toggle with a value)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+      mode: { type: enum, values: [single, playlist, loop, autoplay], required: true, label: Mode, description: "Single plays one clip and stops, playlist plays on through the list, loop repeats, autoplay plays when taken to program." }
+      enabled: { type: bool, required: true, label: Enabled, description: "True turns the mode on and false turns it off." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_{mode}_mode_toggle", value: "{enabled}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  media_show_on_switcher:
+    summary: Show or hide a media player's controls on the switcher (<player>_show_on_switcher)
+    params:
+      player: { type: enum, values: [ddr1, ddr2, ddr3, ddr4, gfx1, gfx2, sound], required: true, label: Media player, description: "The media player: DDR 1 to 4, GFX 1 or 2, or the Sound player, as the shortcut prefix names it." }
+      shown: { type: bool, required: true, label: Shown, description: "True shows the media player on the switcher and false hides it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{player}_show_on_switcher", value: "{shown}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_volume:
+    summary: Set a source's audio level in dB (<source>_volume, shortcuts_cfg.xml)
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Audio source by internal name, such as input1, ddr1 or master." }
+      level: { type: float, min: -96.0, max: 12.0, required: true, label: Level, description: "Level in dB, 0 for unity; values below 0 attenuate." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{source}_volume", value: "{level:.1f}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  mute_source:
+    summary: Mute or unmute a source's audio (<source>_mute, shortcuts_cfg.xml)
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Audio source by internal name, such as input1, ddr1 or master." }
+      muted: { type: bool, required: true, label: Mute, description: "True mutes the source and false unmutes it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{source}_mute", value: "{muted}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  refresh_file_browser:
+    summary: Have the filebrowser dictionary updated (request_filebrowser_update, shortcuts_cfg.xml)
+    send: { method: GET, path: /v1/shortcut, query: { name: "request_filebrowser_update" } }
+    expect: { status: 200 }
+    returns: ack
+
 telemetry:
-  # The tally dictionary (Automation and Integration Guide p.67-68): one
-  # <column> per source, with on_pgm and on_prev as "true" or "false". Asked
-  # twice a second.
+  # The change notification websocket (guide p.71-72) sends only the name of
+  # the dictionary whose content changed; each name has that dictionary read
+  # again. ddr_timecode is not notified, so it is polled every second; the
+  # rest is read on connecting and every ten seconds as a safety net, and
+  # product information once.
+  websocket:
+    path: /v1/change_notifications
   poll:
-    every_ms: 500
-    send:
-      - { method: GET, path: /v1/dictionary, query: { key: tally } }
-      - { method: GET, path: /v1/dictionary, query: { key: switcher } }
-      - { method: GET, path: /v1/dictionary, query: { key: shortcut_states } }
+    - every_ms: 1000
+      send:
+        - { method: GET, path: /v1/dictionary, query: { key: ddr_timecode } }
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /v1/dictionary, query: { key: tally } }
+        - { method: GET, path: /v1/dictionary, query: { key: switcher } }
+        - { method: GET, path: /v1/dictionary, query: { key: shortcut_states } }
+        - { method: GET, path: /v1/dictionary, query: { key: buffer } }
+        - { method: GET, path: /v1/dictionary, query: { key: ddr_playlist } }
+        - { method: GET, path: /v1/dictionary, query: { key: macros_list } }
+    - send:
+        - { method: GET, path: /version }
+        - { method: GET, path: /v1/version }
   updates:
+    - match: "^(shortcut_states|tally|ddr_playlist|buffer|switcher|macros_list)$"
+      then_send:
+        - { method: GET, path: /v1/dictionary, query: { key: "{1}" } }
+    # The tally dictionary (Automation and Integration Guide p.67-68): one
+    # <column> per source, with on_pgm and on_prev as "true" or "false".
     - path: "^/v1/dictionary\\?key=tally$"
       xml_each: column
       state:
         "tally.{name}.program": { value: "{on_pgm}", map: { "true": true, "false": false } }
         "tally.{name}.preview": { value: "{on_prev}", map: { "true": true, "false": false } }
-    # The switcher dictionary (guide p.69): the main program and preview sources.
+    # The switcher dictionary (guide p.69): the main program and preview
+    # sources, the loaded effect, the main T-bar, and the overlays.
     - path: "^/v1/dictionary\\?key=switcher$"
       xml_each: switcher_update
       state:
         switcher.program: "{main_source}"
         switcher.preview: "{preview_source}"
+        switcher.effect: "{effect}"
+    - path: "^/v1/dictionary\\?key=switcher$"
+      match: '<switcher_update\b[^>]*>\s*<tbar\s+position="([^"]*)"\s+speed="([^"]*)"'
+      state:
+        switcher.tbar.position: "{1}"
+        switcher.tbar.speed: "{2}"
+    - path: "^/v1/dictionary\\?key=switcher$"
+      xml_each: overlay
+      replace: switcher.overlays
+      state:
+        "switcher.overlays.{z_order_position}.source": "{source}"
     # Every shortcut state the system reports: record and stream state, DDR
     # play state, source names (<input>_long_name), DSK values and more.
     - path: "^/v1/dictionary\\?key=shortcut_states$"
       xml_each: shortcut_state
       state:
         "shortcuts.{name}": "{value}"
+    # The buffer dictionary (guide p.70): the buffer on the main row first,
+    # then each M/E's; the whole reply is kept too.
+    - path: "^/v1/dictionary\\?key=buffer$"
+      match: '<main>\s*<buffer\s+selection="([^"]*)"'
+      state: { buffers.main: "{1}" }
+    - path: "^/v1/dictionary\\?key=buffer$"
+      match: '(?s)^\s*(<.*>)\s*$'
+      state: { buffers.xml: "{1}" }
+    # DDR playlists and time remaining (guide p.70-71 lists the keys but not
+    # their content): kept whole, as the XML the system sends.
+    - path: "^/v1/dictionary\\?key=ddr_playlist$"
+      match: '(?s)^\s*(<.*>)\s*$'
+      state: { ddr.playlist_xml: "{1}" }
+    - path: "^/v1/dictionary\\?key=ddr_timecode$"
+      match: '(?s)^\s*(<.*>)\s*$'
+      state: { ddr.timecode_xml: "{1}" }
+    # Macros (guide p.59-60): each macro element's name, the list replaced
+    # whole.
+    - path: "^/v1/dictionary\\?key=macros_list$"
+      xml_each: macro
+      replace: macros
+      state:
+        "macros.{name:key}.name": "{name}"
+        "macros.{name:key}.id": "{id}"
+    # Product information (guide p.68-69): child elements of
+    # <product_information>.
+    - path: "^/(?:v1/)?version$"
+      match: '<product_model>([^<]*)</product_model>'
+      state: { product.model: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<product_name>([^<]*)</product_name>'
+      state: { product.name: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<product_version>([^<]*)</product_version>'
+      state: { product.version: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<product_build_no>([^<]*)</product_build_no>'
+      state: { product.build: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<machine_name>([^<]*)</machine_name>'
+      state: { product.machine_name: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<session_name>([^<]*)</session_name>'
+      state: { session.name: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<session_x_resolution>([^<]*)</session_x_resolution>'
+      state: { session.width: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<session_y_resolution>([^<]*)</session_y_resolution>'
+      state: { session.height: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<session_frame_rate>([^<]*)</session_frame_rate>'
+      state: { session.frame_rate: "{1}" }
+    - path: "^/(?:v1/)?version$"
+      match: '<session_fielded>([^<]*)</session_fielded>'
+      state: { session.fielded: { value: "{1}", map: { "true": true, "false": false } } }
 
 state:
   tally.*.program: { type: bool, description: "Source visible on program (through any layer), keyed by internal source name such as input1 or ddr1" }
   tally.*.preview: { type: bool, description: "Source on preview" }
   switcher.program: { type: string, description: "Main program source, such as BFR4 or INPUT1" }
   switcher.preview: { type: string, description: "Main preview source" }
+  switcher.effect: { type: string, description: "The transition effect loaded on the main switcher, as its file path" }
+  switcher.tbar.position: { type: float, description: "Main T-bar position, 0 to 1" }
+  switcher.tbar.speed: { type: float, description: "Main transition speed the system reports with the T-bar" }
+  switcher.overlays.*.source: { type: string, description: "Source on each overlay (DSK), keyed by its z-order position from 0" }
   shortcuts.*:      { type: string, description: "Each shortcut state the system reports, keyed by its name: record_toggle, streaming_toggle, ddr1_play, input1_long_name and others" }
+  buffers.main: { type: string, description: "The buffer selected on the main switcher row, such as BFR4" }
+  buffers.xml: { type: string, description: "The whole buffer dictionary as the system sends it: the main row's and each M/E row's buffer selections" }
+  ddr.playlist_xml: { type: string, description: "The whole ddr_playlist dictionary as the system sends it: each media player's playlist (its shape is not documented)" }
+  ddr.timecode_xml: { type: string, description: "The whole ddr_timecode dictionary as the system sends it: each media player's elapsed and remaining time (its shape is not documented)" }
+  macros.*.name: { type: string, description: "Each macro the system lists, keyed by its name" }
+  macros.*.id: { type: string, description: "The macro's id, when the macros_list dictionary gives one" }
+  product.model: { type: string, description: "Product model, such as TC1" }
+  product.name: { type: string, description: "Product name, such as TriCaster TC1" }
+  product.version: { type: string, description: "Software version, such as 7-0" }
+  product.build: { type: string, description: "Software build, such as 7-0-180920" }
+  product.machine_name: { type: string, description: "The system's machine name" }
+  session.name: { type: string, description: "The open session's name" }
+  session.width: { type: int, unit: px, description: "Session video width" }
+  session.height: { type: int, unit: px, description: "Session video height" }
+  session.frame_rate: { type: float, unit: Hz, description: "Session frame rate, such as 29.970030" }
+  session.fielded: { type: bool, description: "The session is interlaced" }
 
 quirks:
   - models: [all]
@@ -282,7 +589,38 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Tally, the switcher's sources and every shortcut state are polled twice a
-      second from the tally, switcher and shortcut_states dictionaries. The
-      change notification WebSocket, which would push them instead, is not
-      used yet.
+      Changes come from the change notification websocket
+      (ws://<system>/v1/change_notifications), which sends only the name of
+      the dictionary that changed; that dictionary is then read again. The
+      guide's text names port 5951 for it, while its own example and field use
+      have it on the web port, which is used here. Its other websockets
+      (audio, video, VU, shortcut state and timecode notifications) carry
+      media or undocumented messages and are not used. ddr_timecode is not
+      notified and is read every second; the other dictionaries every ten
+      seconds as well, should the websocket not be available.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The guide names the ddr_playlist and ddr_timecode dictionaries but
+      documents neither's content, so each is kept whole as the XML the system
+      sends (ddr.playlist_xml, ddr.timecode_xml) rather than read into clips
+      and times. The same holds for the M/E rows of the buffer dictionary
+      (buffers.xml), whose rows carry no index. The macros_list dictionary's
+      shape is not documented either; macros are read from its macro
+      elements' name attribute (and an id attribute, if present). Product
+      information is documented at /version, and recent software serves it at
+      /v1/version; both are read once on connecting.
+
+  - models: [all]
+    severity: info
+    text: >
+      The media player, volume, mute and macro pause shortcuts come from the
+      system's shortcuts_cfg.xml as republished, not from the guide. Whether
+      media_select_clip counts clips from 0 or 1 is not stated. Shortcut
+      replies carry no result; whether a shortcut applied shows only in the
+      dictionaries (shortcut_states holds most media player states). Not
+      included: the media player time controls (scrub, shuttle, relative
+      moves, set duration), adding or removing clips by file path, and
+      set_global_var, which take values whose units or syntax the file states
+      only loosely.
