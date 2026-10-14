@@ -1835,6 +1835,23 @@ that sends nothing for 15 seconds), or a request a device answers with its
 state (FreeShow's variables). Text that arrives in binary frames (OpenLP's
 state) goes to the rules as text when it is UTF-8.
 
+A device that pushes a changed value in the format its REST GET returns
+names where with `as_reply`, as for `telemetry.sse` (below): each JSON
+message is also offered to the `path` rules as the reply to a GET of the
+path at `as_reply.path`, with the value at `as_reply.body` as its body, so
+the rules that read a poll's reply apply the push directly. `prefix` is a
+fixed path the named one lies under. A Blackmagic camera names
+`/lens/iris` for its REST API's `/control/api/v1/lens/iris`:
+
+```yaml
+telemetry:
+  websocket:
+    path: /control/api/v1/event/websocket
+    as_reply: { path: "$.data.property", body: "$.data.value", prefix: /control/api/v1 }
+```
+
+A message without both paths is offered to the rules as usual only.
+
 A device that pushes over Socket.IO (H2R Graphics, FreeShow) sets `socketio`:
 
 ```yaml

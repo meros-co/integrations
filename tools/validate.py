@@ -430,6 +430,17 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 {"ws", "wss"} if transport_type == "ws" else {"http", "https"})]
     if websocket:
         schemes.append(("telemetry.websocket", websocket.get("scheme"), {"ws", "wss"}))
+    for where_, block in (("telemetry.websocket", websocket or {}),
+                          ("telemetry.sse", (doc.get("telemetry") or {}).get("sse") or {})):
+        reply = block.get("as_reply")
+        if reply is None:
+            continue
+        if transport_type != "http":
+            errors.append(f"{where_}.as_reply offers messages to path rules, which need the http transport")
+        if not isinstance(reply, dict) or not {"path", "body"} <= set(reply):
+            errors.append(f"{where_}.as_reply needs path and body")
+        elif not str(reply.get("prefix", "/")).startswith("/"):
+            errors.append(f"{where_}.as_reply.prefix starts with /")
     for where_, scheme, allowed in schemes:
         if not isinstance(scheme, dict):
             continue
