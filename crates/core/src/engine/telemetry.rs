@@ -229,6 +229,37 @@ fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
     out
 }
 
+/// A `json_each` path with its `{settings.name}` placeholders filled in from
+/// the settings current now: a member name (H2R's project id), so a rule
+/// reads only the configured one. `None`, and no element, when a setting is
+/// empty or unset, or its value holds `.`, `[`, `]` or `*`, which would make
+/// it another path.
+fn each_path(each: &str, settings: &Params) -> Option<String> {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\{settings\.([A-Za-z0-9_]+)\}").unwrap());
+    if !re.is_match(each) {
+        return Some(each.to_string());
+    }
+    let mut out = String::new();
+    let mut last = 0;
+    for caps in re.captures_iter(each) {
+        let whole = caps.get(0).unwrap();
+        let text = match settings.get(&caps[1])? {
+            Value::String(s) => s.clone(),
+            Value::Number(n) => n.to_string(),
+            _ => return None,
+        };
+        if text.is_empty() || text.contains(['.', '[', ']', '*']) {
+            return None;
+        }
+        out.push_str(&each[last..whole.start()]);
+        out.push_str(&text);
+        last = whole.end();
+    }
+    out.push_str(&each[last..]);
+    Some(out)
+}
+
 /// The value at a JSON path from an element `json_each` reached: `$.` is the
 /// element's, `$^.` the element one level out's (`$^^.` two).
 fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
@@ -254,12 +285,16 @@ fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
 fn each_values(
     doc: &Value,
     each: Option<&str>,
+    settings: &Params,
     each_select: &[(String, Regex)],
     json: &BTreeMap<String, String>,
     base: &[(String, Value)],
 ) -> Vec<Vec<(String, Value)>> {
     let items = match each {
-        Some(each) => each_items(doc, each),
+        Some(each) => match each_path(each, settings) {
+            Some(path) => each_items(doc, &path),
+            None => Vec::new(),
+        },
         None => vec![EachItem {
             item: doc,
             index: 0,
@@ -910,10 +945,23 @@ impl Telemetry {
     /// As `apply`, adding to `triggers` the `then_send` items of every rule
     /// that matched, once per match, with its captures, and to `cleared` the
     /// `replace` subtrees of the rules whose message this is: a patch of
-    /// removals to apply before the one returned.
+    /// removals to apply before the one returned. Without settings.
+    #[cfg(test)]
     pub(crate) fn apply_into(
         &self,
         message: &Inbound,
+        triggers: &mut Vec<Triggered>,
+        cleared: &mut Value,
+    ) -> Option<Value> {
+        self.apply_with(message, &Params::new(), triggers, cleared)
+    }
+
+    /// As `apply_into`, with the device's settings, which a `json_each`
+    /// path may name (`{settings.project}`).
+    pub(crate) fn apply_with(
+        &self,
+        message: &Inbound,
+        settings: &Params,
         triggers: &mut Vec<Triggered>,
         cleared: &mut Value,
     ) -> Option<Value> {
@@ -1052,7 +1100,9 @@ impl Telemetry {
                         continue;
                     }
                     self.clear(rule, &base, cleared);
-                    for values in each_values(&doc, each.as_deref(), each_select, json, &base) {
+                    for values in
+                        each_values(&doc, each.as_deref(), settings, each_select, json, &base)
+                    {
                         if each.is_some() {
                             self.clear(rule, &values, cleared);
                         }
@@ -1122,7 +1172,9 @@ impl Telemetry {
                         continue;
                     }
                     self.clear(rule, &base, cleared);
-                    for values in each_values(doc, each.as_deref(), each_select, json, &base) {
+                    for values in
+                        each_values(doc, each.as_deref(), settings, each_select, json, &base)
+                    {
                         if each.is_some() {
                             self.clear(rule, &values, cleared);
                         }
@@ -1201,7 +1253,9 @@ impl Telemetry {
                         any |= self.matched(rule, &base, &mut patch, triggers);
                         continue;
                     }
-                    for values in each_values(&doc, each.as_deref(), each_select, json, &base) {
+                    for values in
+                        each_values(&doc, each.as_deref(), settings, each_select, json, &base)
+                    {
                         if each.is_some() {
                             self.clear(rule, &values, cleared);
                         }
@@ -2457,6 +2511,48 @@ mod tests {
                     "EFGH": {"s2": {"1": {"1": 9}}}},
                 "cue_place": {"sc": 1, "s2": 0}}))
         );
+    }
+
+    #[test]
+    fn a_json_each_path_can_name_a_setting() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"json_match": {"$.event": "^update$"}, "json_each": "$.projects.{settings.project}.cues",
+                 "json": {"id": "$.id"}, "replace": "cues", "state": {"cues.{id}.index": "{index}"}},
+            ]})),
+            &state(json!({"cues.*.index": {"type": "int", "description": "x"}})),
+            Conversions::new(),
+        )
+        .unwrap();
+        let event = json!({"event": "update", "projects": {
+            "ABCD": {"cues": [{"id": "a"}]}, "EFGH": {"cues": [{"id": "e"}, {"id": "f"}]}}});
+        let apply = |project: Value| {
+            let mut settings = Params::new();
+            settings.insert("project".into(), project);
+            let mut cleared = json!({});
+            let patch = t.apply_with(
+                &Inbound::Json(&event),
+                &settings,
+                &mut Vec::new(),
+                &mut cleared,
+            );
+            (cleared, patch)
+        };
+        assert_eq!(
+            apply(json!("EFGH")).1,
+            Some(json!({"cues": {"e": {"index": 0}, "f": {"index": 1}}}))
+        );
+        assert_eq!(
+            apply(json!("ABCD")).1,
+            Some(json!({"cues": {"a": {"index": 0}}}))
+        );
+        // A project the message does not hold, or a value that would be
+        // another path, gives no element; the list is still replaced.
+        for project in [json!("WXYZ"), json!(""), json!("AB.CD"), json!("*")] {
+            assert_eq!(apply(project), (json!({"cues": null}), None));
+        }
+        assert_eq!(each_path("$.a.*", &Params::new()).as_deref(), Some("$.a.*"));
+        assert_eq!(each_path("$.a.{settings.x}", &Params::new()), None);
     }
 
     #[test]

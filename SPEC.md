@@ -1523,6 +1523,22 @@ level out), `{^^key}` (two) and so on, beside `{key}` for the match itself.
 A level with no place (the document, or an array reached without `[*]`)
 gives neither.
 
+A member the operator chooses is named by a setting in the `json_each`
+path, `{settings.name}` with no directive: H2R Graphics pushes every
+project of an installation in each event, and the spec reads the one its
+commands reach:
+
+```yaml
+    - json_match: { "$.event": "^updateFrontend$" }
+      json_each: "$.data.projects.{settings.project}.cues"
+```
+
+The path is filled in from the settings current when each message arrives,
+so `update_settings` changes what is read. A setting that is empty, or
+whose value holds `.`, `[`, `]` or `*` (which would make it another path),
+gives no element, as a member the message does not hold does; `replace`
+still applies, so the list then empties.
+
 A device that lists things as an object's members, keyed by name, rather
 than as an array (BirdDog's NDI sources, `{"CAM 1 (BirdDog)":
 "10.0.0.5:5961", ...}`) is gone through with `.*`: `json_each: "$.*"` is

@@ -2905,9 +2905,9 @@ impl SpecEngine {
     fn offer(&mut self, cx: &mut Cx, message: &telemetry::Inbound) {
         let mut triggered = Vec::new();
         let mut cleared = Value::Object(Map::new());
-        let mut patch = self
-            .telemetry
-            .apply_into(message, &mut triggered, &mut cleared);
+        let mut patch =
+            self.telemetry
+                .apply_with(message, &self.settings, &mut triggered, &mut cleared);
         // A list read again as it was changes nothing: neither its removal
         // nor its values are reported.
         if let Some(mirror) = &self.mirror {

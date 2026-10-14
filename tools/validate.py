@@ -812,6 +812,14 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                           "or a capture of an address rule")
         if "each_match" in rule and "json_each" not in rule:
             errors.append(f"{where}: each_match selects elements of json_each")
+        # A json_each path may name settings only (SPEC.md §8, a member
+        # chosen by a setting), with no directives.
+        for m in PLACEHOLDER.finditer(rule.get("json_each") or ""):
+            name = m.group(1)
+            if not name.startswith("settings.") or m.group(2):
+                errors.append(f"{where}.json_each: '{m.group(0)}' is not a plain {{settings.name}}")
+            elif name[len("settings."):] not in (doc.get("settings") or {}):
+                errors.append(f"{where}.json_each: unknown setting '{name[len('settings.'):]}'")
         for key in ("json_match", "request_match", "each_match"):
             if not isinstance(rule.get(key) or {}, dict):
                 continue
