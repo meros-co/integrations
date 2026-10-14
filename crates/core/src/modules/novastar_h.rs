@@ -303,6 +303,20 @@ const INPUT_FIELDS: &[(&str, &str, Kind)] = &[
     ("edid.width", "/timing/horizontal/addrTime", Kind::Int),
     ("edid.height", "/timing/vertical/addrTime", Kind::Int),
     ("edid.refresh_rate", "/timing/refreshRate", Kind::Int),
+    // What layer/writeSource takes besides the input ID.
+    ("slot", "/slotId", Kind::Int),
+    ("interface_id", "/interfaceId", Kind::Int),
+    ("interface_type", "/interfaceType", Kind::Int),
+    ("source_type", "/sourceType", Kind::Int),
+    ("default_name", "/defaultName", Kind::Text),
+    ("audio.supported", "/isSupportAudio", Kind::Bool),
+    ("audio.source", "/audioInterface/audioSrc", Kind::Int),
+    ("audio.linked", "/audioInterface/linkStatus", Kind::Bool),
+    ("format.color_depth", "/general/colorDepth", Kind::Int),
+    ("format.color_space", "/general/colorSpace", Kind::Int),
+    ("format.sample_rate", "/general/sampleRate", Kind::Int),
+    ("format.capacity", "/general/connectCapacity", Kind::Int),
+    ("format.hdcp_encrypted", "/general/HDCPEncryted", Kind::Bool),
 ];
 
 const CROP_FIELDS: &[(&str, &str, Kind)] = &[
@@ -1255,7 +1269,12 @@ mod tests {
             Read::Inputs,
             json!({"status": 0, "msg": "", "sign": "", "body": {"inputs": [{
                 "crops": [{"cropId": 0, "name": "Left", "x": 0, "y": 0, "width": 1920, "height": 2160}],
-                "general": {"name": "input 3-3-1"}, "inputId": 8, "name": "input 3-3-1", "online": 1,
+                "general": {"name": "input 3-3-1", "colorDepth": 0, "colorSpace": 0, "sampleRate": 0,
+                    "connectCapacity": 0, "HDCPEncryted": 0, "defaultName": "input 3-3-1"},
+                "audioInterface": {"audioSrc": 1, "linkStatus": 0, "withAudioInterface": 0},
+                "defaultName": "input 3-3-1", "isSupportAudio": 0,
+                "inputId": 8, "interfaceId": 0, "interfaceType": 27, "slotId": 2, "sourceType": 1,
+                "name": "input 3-3-1", "online": 1,
                 "resolution": {"height": 0, "isInterlace": 0, "refresh": 0, "width": 0},
                 "timing": {"horizontal": {"addrTime": 3840}, "refreshRate": 60, "vertical": {"addrTime": 2160}}}]}}),
         );
@@ -1264,6 +1283,11 @@ mod tests {
             [json!({"inputs": {"8": {"name": "input 3-3-1", "online": 1,
                 "signal": {"width": 0, "height": 0, "refresh": 0, "interlaced": false},
                 "edid": {"width": 3840, "height": 2160, "refresh_rate": 60},
+                "slot": 2, "interface_id": 0, "interface_type": 27, "source_type": 1,
+                "default_name": "input 3-3-1",
+                "audio": {"supported": false, "source": 1, "linked": false},
+                "format": {"color_depth": 0, "color_space": 0, "sample_rate": 0, "capacity": 0,
+                    "hdcp_encrypted": false},
                 "crops": {"0": {"name": "Left", "x": 0, "y": 0, "width": 1920, "height": 2160}}}}})]
         );
         // The crop is deleted.
