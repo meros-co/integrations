@@ -41,7 +41,53 @@ source:
       Manufacturer document, retrieved 2026-10-04. A scheduled live video is
       created with status SCHEDULED_UNPUBLISHED and event_params start_time
       (Unix time); planned_start_time is no longer accepted. GET
-      /{page-id}/live_videos with broadcast_status lists them.
+      /{page-id}/live_videos with broadcast_status lists them. Retrieved
+      again 2026-10-14 (updated 2026-07-02): a broadcast may be scheduled
+      up to seven days ahead; POST /{live-video-id} with event_params and a
+      new start time reschedules it and answers the id; status LIVE_NOW
+      starts it at once.
+  - title: Graph API reference, Video Poll, Live Video Polls and Video Poll Option
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/video-poll/
+    note: >
+      Manufacturer document, retrieved 2026-10-14 (v26.0), with
+      https://developers.facebook.com/docs/graph-api/reference/live-video/polls/
+      and https://developers.facebook.com/docs/graph-api/reference/video-poll-option/.
+      POST /{live_video_id}/polls with question and options (required),
+      correct_option (from 1) and show_results answers id and option_ids;
+      GET lists the polls. A poll has question, show_results, status
+      (closed, voting_open, results_open) and the poll_options edge (id,
+      text, order, total_votes, is_correct). POST /{video_poll_id} with
+      action (ATTACH_TO_VIDEO, CLOSE, SHOW_VOTING, SHOW_RESULTS, DELETE_POLL)
+      and show_results answers success. Needs the Live Video API feature.
+  - title: Graph API reference, Comment, and Object Comments edge
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/comment/
+    note: >
+      Manufacturer document, retrieved 2026-10-14 (v26.0), with
+      https://developers.facebook.com/docs/graph-api/reference/object/comments/.
+      POST /{object-id}/comments with message (pages_manage_engagement with
+      a Page token) comments as the Page, also on a comment (a reply), and
+      answers the new id. POST /{comment_id} with is_hidden (Page comments
+      only) or message, and DELETE /{comment_id}, answer success. Fields
+      include message, from, created_time, is_hidden, can_hide and
+      comment_count.
+  - title: Live Video API, Guides, Crossposting
+    author: Meta
+    url: https://developers.facebook.com/documentation/live-video-api/guides/crossposting
+    note: >
+      Manufacturer document, retrieved 2026-10-14. Pages only; needs the
+      CREATE_CONTENT task and pages_manage_posts, pages_read_user_content,
+      pages_manage_engagement, pages_show_list and publish_video. POST
+      /{page-id} with begin_crossposting_handshake or
+      accept_crossposting_handshake ([{partner_page_id, allow_live}])
+      answers success; GET /{page-id}/crosspost_whitelisted_pages with
+      fields id, name, allows_live_crossposts lists the partners. POST
+      /{video-id} with crossposting_actions ([{page_id, action}], action
+      enable_crossposting, enable_crossposting_and_create_post or
+      disable_crossposting) answers the live video, with the
+      crosspost_shared_pages and crossposted_broadcasts fields asked for. A
+      crosspost that fails throws no error: only those fields tell.
   - title: Live Video API, Overview and Support
     author: Meta
     url: https://developers.facebook.com/documentation/live-video-api/overview
@@ -187,7 +233,12 @@ models:
                get_ingest_streams, get_errors, create_live_video, schedule_live_video,
                create_live_video_custom, set_title, set_description, set_privacy, set_embeddable,
                set_master_ingest_stream, update_live_video, go_live, end_live_video,
-               delete_live_video, list_comments, get_comment_count, get_reaction_count]
+               delete_live_video, list_comments, get_comment_count, get_reaction_count,
+               reschedule_live_video, cancel_scheduled_live_video, comment_on_live_video, reply_to_comment,
+               hide_comment, delete_comment, list_polls, get_poll, create_poll, create_quiz_poll,
+               show_poll_voting, show_poll_results, close_poll, attach_poll_to_video, delete_poll,
+               list_crosspost_pages, get_crossposting, set_crossposting, set_crossposting_actions,
+               request_crossposting, accept_crossposting]
     verification: none
     notes: >
       Acts for the Page named by page_id with a Page access token. The Meta
@@ -442,7 +493,8 @@ commands:
                label: Comments,
                description: "How many comments to return, newest first." }
     send: { method: GET, path: "/{settings.api_version}/{live_video_id}/comments",
-            query: { order: reverse_chronological, filter: stream, live_filter: no_filter,
+            query: { fields: "id,message,from,created_time,is_hidden,comment_count",
+                     order: reverse_chronological, filter: stream, live_filter: no_filter,
                      summary: total_count, limit: "{limit}" } }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -468,6 +520,294 @@ commands:
             query: { summary: total_count, limit: "0" } }
     expect: { status: 200, json_path: "$.summary.total_count" }
     returns: value
+
+  comment_on_live_video:
+    summary: Comment on the live video as the Page (POST /{live-video-id}/comments message; pages_manage_engagement)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      message: { type: string, pattern: "\\S", max_length: 8000, required: true,
+                 label: Comment,
+                 description: "The comment's text, posted as the Page." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}/comments",
+            body: '{"message":{message:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.id" }
+    returns: value
+
+  reply_to_comment:
+    summary: Reply to a viewer's comment as the Page (POST /{comment-id}/comments message; pages_manage_engagement)
+    params:
+      comment_id: { type: string, pattern: "^[0-9_]+$", max_length: 64, required: true,
+                    label: Comment ID,
+                    description: "The comment's id, from list_comments." }
+      message: { type: string, pattern: "\\S", max_length: 8000, required: true,
+                 label: Reply,
+                 description: "The reply's text, posted as the Page." }
+    send: { method: POST, path: "/{settings.api_version}/{comment_id}/comments",
+            body: '{"message":{message:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.id" }
+    returns: value
+
+  hide_comment:
+    summary: Hide a comment from everyone but its author and their friends, or show it again (POST /{comment-id} is_hidden; pages_manage_engagement)
+    params:
+      comment_id: { type: string, pattern: "^[0-9_]+$", max_length: 64, required: true,
+                    label: Comment ID,
+                    description: "The comment's id, from list_comments." }
+      hidden: { type: bool, default: true,
+                label: Hidden,
+                description: "On hides the comment; off shows it again." }
+    send: { method: POST, path: "/{settings.api_version}/{comment_id}",
+            body: '{"is_hidden":{hidden}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  delete_comment:
+    summary: Delete a comment on the Page's live video (DELETE /{comment-id}; pages_manage_engagement)
+    params:
+      comment_id: { type: string, pattern: "^[0-9_]+$", max_length: 64, required: true,
+                    label: Comment ID,
+                    description: "The comment's id, from list_comments." }
+    send: { method: DELETE, path: "/{settings.api_version}/{comment_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  # ── Scheduling ───────────────────────────────────────────────────────────
+  reschedule_live_video:
+    summary: Move a scheduled live video's planned start, at most seven days after it was created (POST /{live-video-id} event_params start_time)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The scheduled live video's id." }
+      start_time: { type: int, min: 0, required: true,
+                    label: Start time,
+                    description: "The new planned start, in Unix seconds." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"event_params":{"start_time":{start_time}}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  cancel_scheduled_live_video:
+    summary: Cancel a scheduled live video, removing its announcement (POST /{live-video-id} status SCHEDULED_CANCELED)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The scheduled live video's id." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"status":"SCHEDULED_CANCELED"}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Live polls ───────────────────────────────────────────────────────────
+  list_polls:
+    summary: The live video's polls with their options and votes, kept in state (GET /{live-video-id}/polls)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}/polls",
+            query: { fields: "id,question,status,show_results,poll_options{id,text,order,total_votes,is_correct}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_poll:
+    summary: One live poll with its options and votes, kept in state (GET /{video-poll-id})
+    params:
+      poll_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Poll ID,
+                 description: "The poll's id, from create_poll or polls in state." }
+    send: { method: GET, path: "/{settings.api_version}/{poll_id}",
+            query: { fields: "id,question,status,show_results,poll_options{id,text,order,total_votes,is_correct}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_poll:
+    summary: Add a poll to a live video; it is shown to viewers with show_poll_voting (POST /{live-video-id}/polls)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video the poll belongs to." }
+      question: { type: string, pattern: "\\S", max_length: 1000, required: true,
+                  label: Question,
+                  description: "The poll's question." }
+      options: { type: json, required: true,
+                 label: Options,
+                 description: "A JSON array of the options' texts, as Meta documents it, shown in that order." }
+      show_results: { type: bool, default: true,
+                      label: Show results,
+                      description: "On shows viewers the results after they vote." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}/polls",
+            body: '{"question":{question:json},"options":{options},"show_results":{show_results}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_quiz_poll:
+    summary: Add a poll with a correct answer to a live video (POST /{live-video-id}/polls with correct_option)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video the poll belongs to." }
+      question: { type: string, pattern: "\\S", max_length: 1000, required: true,
+                  label: Question,
+                  description: "The poll's question." }
+      options: { type: json, required: true,
+                 label: Options,
+                 description: "A JSON array of the options' texts, as Meta documents it, shown in that order." }
+      correct_option: { type: int, min: 1, required: true,
+                        label: Correct option,
+                        description: "The correct option's place in the list, counted from 1." }
+      show_results: { type: bool, default: true,
+                      label: Show results,
+                      description: "On shows viewers the results after they vote." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}/polls",
+            body: '{"question":{question:json},"options":{options},"correct_option":{correct_option},"show_results":{show_results}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  show_poll_voting:
+    summary: Show the poll to viewers and open voting (POST /{video-poll-id} action SHOW_VOTING)
+    params:
+      poll_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Poll ID,
+                 description: "The poll's id." }
+      show_results: { type: bool, default: true,
+                      label: Show results,
+                      description: "On shows viewers the results after they vote." }
+    send: { method: POST, path: "/{settings.api_version}/{poll_id}",
+            body: '{"action":"SHOW_VOTING","show_results":{show_results}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  show_poll_results:
+    summary: Show viewers the poll's results (POST /{video-poll-id} action SHOW_RESULTS)
+    params:
+      poll_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Poll ID,
+                 description: "The poll's id." }
+    send: { method: POST, path: "/{settings.api_version}/{poll_id}",
+            body: '{"action":"SHOW_RESULTS"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  close_poll:
+    summary: Close the poll to further votes (POST /{video-poll-id} action CLOSE)
+    params:
+      poll_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Poll ID,
+                 description: "The poll's id." }
+    send: { method: POST, path: "/{settings.api_version}/{poll_id}",
+            body: '{"action":"CLOSE"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  attach_poll_to_video:
+    summary: Attach the poll to its video, so it stays with the recording (POST /{video-poll-id} action ATTACH_TO_VIDEO)
+    params:
+      poll_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Poll ID,
+                 description: "The poll's id." }
+    send: { method: POST, path: "/{settings.api_version}/{poll_id}",
+            body: '{"action":"ATTACH_TO_VIDEO"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  delete_poll:
+    summary: Delete the poll (POST /{video-poll-id} action DELETE_POLL)
+    params:
+      poll_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Poll ID,
+                 description: "The poll's id." }
+    send: { method: POST, path: "/{settings.api_version}/{poll_id}",
+            body: '{"action":"DELETE_POLL"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  # ── Crossposting ─────────────────────────────────────────────────────────
+  list_crosspost_pages:
+    summary: The Pages this Page has a crossposting relationship with, and whether each takes live crossposts without approval, kept in state (GET /{page-id}/crosspost_whitelisted_pages)
+    send: { method: GET, path: "/{settings.api_version}/{settings.page_id}/crosspost_whitelisted_pages",
+            query: { fields: "id,name,allows_live_crossposts", limit: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_crossposting:
+    summary: Which Pages may crosspost the live video, and where it has been crossposted, kept in state (GET /{live-video-id} crosspost_shared_pages, crossposted_broadcasts)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}",
+            query: { fields: "crosspost_shared_pages,crossposted_broadcasts{id,status,from{id,name}}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_crossposting:
+    summary: Let one Page crosspost the live video, post it there at once, or stop it (POST /{live-video-id} crossposting_actions)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      page_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Target Page ID,
+                 description: "A Page from list_crosspost_pages." }
+      action: { type: enum, values: [enable_crossposting, enable_crossposting_and_create_post, disable_crossposting],
+                default: enable_crossposting_and_create_post,
+                label: Action,
+                description: "enable_crossposting lets the Page crosspost it; enable_crossposting_and_create_post also posts it there now; disable_crossposting stops it." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            query: { fields: "crosspost_shared_pages,crossposted_broadcasts{id,status,from{id,name}}" },
+            body: '{"crossposting_actions":[{"page_id":{page_id:json},"action":{action:json}}]}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_crossposting_actions:
+    summary: Apply several crossposting actions to the live video at once (POST /{live-video-id} crossposting_actions)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      actions: { type: json, required: true,
+                 label: Actions,
+                 description: "A JSON array of objects as Meta documents them, each {\"page_id\": \"...\", \"action\": \"enable_crossposting\" | \"enable_crossposting_and_create_post\" | \"disable_crossposting\"}." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            query: { fields: "crosspost_shared_pages,crossposted_broadcasts{id,status,from{id,name}}" },
+            body: '{"crossposting_actions":{actions}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  request_crossposting:
+    summary: Ask another Page for a crossposting relationship, which its admins must accept (POST /{page-id} begin_crossposting_handshake)
+    params:
+      partner_page_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                         label: Partner Page ID,
+                         description: "The Page to ask." }
+      allow_live: { type: bool, default: true,
+                    label: Live without approval,
+                    description: "On asks to post live crossposts there directly; off has the partner's admins approve each video." }
+    send: { method: POST, path: "/{settings.api_version}/{settings.page_id}",
+            body: '{"begin_crossposting_handshake":[{"partner_page_id":{partner_page_id:json},"allow_live":{allow_live}}]}',
+            content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  accept_crossposting:
+    summary: Accept or deny another Page's crossposting request (POST /{page-id} accept_crossposting_handshake)
+    params:
+      partner_page_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                         label: Partner Page ID,
+                         description: "The Page that sent the request." }
+      allow_live: { type: bool, default: true,
+                    label: Accept,
+                    description: "On accepts the request, letting the partner post live videos here; off denies it." }
+    send: { method: POST, path: "/{settings.api_version}/{settings.page_id}",
+            body: '{"accept_crossposting_handshake":[{"partner_page_id":{partner_page_id:json},"allow_live":{allow_live}}]}',
+            content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
 
 quirks:
   - models: [all]
@@ -594,6 +934,50 @@ quirks:
       Graph API also takes them form-encoded. Strings Facebook leaves null
       are not written to state.
 
+  - models: [all]
+    severity: info
+    text: >
+      A scheduled live video can be moved (reschedule_live_video) up to
+      seven days after it was created, or canceled; the planned start time
+      itself is not among the fields Meta documents for reading a live
+      video, so it is not kept in state, only the status
+      (SCHEDULED_UNPUBLISHED, SCHEDULED_CANCELED, ...).
+
+  - models: [all]
+    severity: info
+    text: >
+      Live polls are kept in state (polls.<id>, with their live video,
+      question, status and each option's text, order, votes and
+      correctness) from list_polls and get_poll, and read again after each
+      create, show, close or attach the integration makes; delete_poll
+      removes one. They are not polled: a vote count shows after the next
+      list_polls or get_poll, each one call against the Page's rate limit.
+      A poll is created hidden and shown with show_poll_voting; Meta does
+      not document limits on the question or the number of options.
+
+  - models: [all]
+    severity: info
+    text: >
+      Comments are moderated as the Page with the pages_manage_engagement
+      permission: comment_on_live_video and reply_to_comment post as the
+      Page, hide_comment hides a comment from everyone but its author and
+      their friends (Page content only), and delete_comment removes it for
+      good. list_comments returns each comment's is_hidden. Comments are
+      read on demand, not kept in state.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Crossposting puts the live video on partner Pages. A partnership is
+      asked for with request_crossposting and accepted on the other Page
+      (accept_crossposting there); list_crosspost_pages keeps the partners
+      in state, with whether each takes live crossposts without approval.
+      set_crossposting with enable_crossposting_and_create_post posts the
+      video on the partner Page at once, which can't be undone there by
+      disabling it. Facebook reports no error when a crosspost fails: the
+      live video's crosspost_shared_pages and crossposted_broadcasts, kept
+      in state from the reply and get_crossposting, are the only record.
+
 state:
   live_videos.*.title:                { type: string, description: "The live video's title, keyed by live video id" }
   live_videos.*.description:          { type: string, description: "The text posted with the live video" }
@@ -609,6 +993,20 @@ state:
   live_videos.*.ingest_streams.*.video_gop_size:  { type: int, unit: ms, description: "The GOP length Facebook measures (stream_health.video_gop_size)" }
   live_videos.*.ingest_streams.*.video_width:     { type: int, unit: px, description: "The video width received (stream_health.video_width)" }
   live_videos.*.ingest_streams.*.video_height:    { type: int, unit: px, description: "The video height received (stream_health.video_height)" }
+  live_videos.*.crosspost_shared_pages.*.name:    { type: string, description: "A Page allowed to crosspost the live video, keyed by Page id (crosspost_shared_pages)" }
+  live_videos.*.crossposted_broadcasts.*.page_id: { type: string, description: "The Page a crossposted broadcast is on, keyed by the broadcast's id (crossposted_broadcasts from.id)" }
+  live_videos.*.crossposted_broadcasts.*.page_name: { type: string, description: "That Page's name (from.name)" }
+  live_videos.*.crossposted_broadcasts.*.status:  { type: string, description: "The crossposted broadcast's status, as a live video's" }
+  polls.*.live_video_id:     { type: string, description: "The live video a poll belongs to, keyed by poll id (known once listed with list_polls)" }
+  polls.*.question:          { type: string, description: "The poll's question" }
+  polls.*.status:            { type: string, description: "closed, voting_open or results_open" }
+  polls.*.show_results:      { type: bool, description: "Viewers see the results after voting" }
+  polls.*.options.*.text:    { type: string, description: "An option's text, keyed by option id" }
+  polls.*.options.*.order:   { type: int, description: "The option's place in the poll" }
+  polls.*.options.*.total_votes: { type: int, description: "Votes for the option" }
+  polls.*.options.*.is_correct: { type: bool, description: "The option is the correct answer" }
+  crosspost_pages.*.name:    { type: string, description: "A Page this Page has a crossposting relationship with, keyed by Page id" }
+  crosspost_pages.*.allows_live_crossposts: { type: bool, description: "Live videos post there without that Page's approval" }
 
 telemetry:
   # Facebook pushes nothing to a Page token holder (webhooks need a public
@@ -679,3 +1077,77 @@ telemetry:
       json_each: "$.ingest_streams.data"
       json: *ingest
       state: *ingest_state
+
+    # Live polls: a live video's list, one poll, and re-reads after changes.
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)/polls\?fields=id%2Cquestion'
+      json_each: "$.data"
+      json: { id: "$.id", question: "$.question", status: "$.status", show: "$.show_results" }
+      replace: "polls.{id}.options"
+      state:
+        polls.{id}.live_video_id: "{1}"
+        polls.{id}.question: "{question}"
+        polls.{id}.status: "{status}"
+        polls.{id}.show_results: "{show}"
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)/polls\?fields=id%2Cquestion'
+      json_each: "$.data[*].poll_options.data"
+      json: { poll: "$^.id", id: "$.id", text: "$.text", order: "$.order", votes: "$.total_votes", correct: "$.is_correct" }
+      state:
+        polls.{poll}.options.{id}.text: "{text}"
+        polls.{poll}.options.{id}.order: "{order}"
+        polls.{poll}.options.{id}.total_votes: "{votes}"
+        polls.{poll}.options.{id}.is_correct: "{correct}"
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)\?fields=id%2Cquestion'
+      json: { question: "$.question", status: "$.status", show: "$.show_results" }
+      replace: "polls.{1}.options"
+      state:
+        polls.{1}.question: "{question}"
+        polls.{1}.status: "{status}"
+        polls.{1}.show_results: "{show}"
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)\?fields=id%2Cquestion'
+      json_each: "$.poll_options.data"
+      json: { id: "$.id", text: "$.text", order: "$.order", votes: "$.total_votes", correct: "$.is_correct" }
+      state:
+        polls.{1}.options.{id}.text: "{text}"
+        polls.{1}.options.{id}.order: "{order}"
+        polls.{1}.options.{id}.total_votes: "{votes}"
+        polls.{1}.options.{id}.is_correct: "{correct}"
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)/polls$'
+      json_match: { "$.id": "^[0-9]+$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/{settings.api_version}/{1}/polls",
+            query: { fields: "id,question,status,show_results,poll_options{id,text,order,total_votes,is_correct}" } }
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)$'
+      request_match: { "$.action": "^(CLOSE|SHOW_VOTING|SHOW_RESULTS|ATTACH_TO_VIDEO)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/{settings.api_version}/{1}",
+            query: { fields: "id,question,status,show_results,poll_options{id,text,order,total_votes,is_correct}" } }
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)$'
+      request_match: { "$.action": "^DELETE_POLL$" }
+      json_match: { "$.success": "^true$" }
+      json: {}
+      state: { "polls.{1}": { delete: true } }
+
+    # Crossposting: the partner Pages, and a live video's crossposts.
+    - path: '^/v[0-9]+\.[0-9]+/[0-9]+/crosspost_whitelisted_pages\?'
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.name", live: "$.allows_live_crossposts" }
+      replace: crosspost_pages
+      state:
+        crosspost_pages.{id}.name: "{name}"
+        crosspost_pages.{id}.allows_live_crossposts: "{live}"
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)\?fields=crosspost_shared_pages'
+      json_each: "$.crosspost_shared_pages.data"
+      json: { id: "$.id", name: "$.name" }
+      replace: "live_videos.{1}.crosspost_shared_pages"
+      state:
+        live_videos.{1}.crosspost_shared_pages.{id}.name: "{name}"
+    - path: '^/v[0-9]+\.[0-9]+/([0-9]+)\?fields=crosspost_shared_pages'
+      json_each: "$.crossposted_broadcasts.data"
+      json: { id: "$.id", page: "$.from.id", name: "$.from.name", status: "$.status" }
+      replace: "live_videos.{1}.crossposted_broadcasts"
+      state:
+        live_videos.{1}.crossposted_broadcasts.{id}.page_id: "{page}"
+        live_videos.{1}.crossposted_broadcasts.{id}.page_name: "{name}"
+        live_videos.{1}.crossposted_broadcasts.{id}.status: "{status}"
