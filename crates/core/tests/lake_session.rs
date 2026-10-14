@@ -9,6 +9,8 @@
 
 #![cfg(feature = "labgruppen-lake")]
 
+mod common;
+
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -131,7 +133,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn lake_end_to_end() {
     let (port, frame) = simulated_frame().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "labgruppen-lake".into(),

@@ -9,12 +9,14 @@
 
 #![cfg(all(feature = "blackmagic-atem", feature = "blackmagic-hyperdeck"))]
 
+mod common;
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use meros_integrations::{Core, CoreOptions, DiscoverAction, DiscoverRequest, Event};
+use meros_integrations::{CoreOptions, DiscoverAction, DiscoverRequest, Event};
 use serde_json::Value;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
@@ -139,7 +141,7 @@ async fn blackmagic_devices_answer_a_query_and_are_identified() {
         }
     });
 
-    let core = Core::with_options(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
+    let core = common::core_with(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
         .unwrap();
     assert!(core.discovery_protocols().contains(&"mdns"));
     core.discover(DiscoverRequest {

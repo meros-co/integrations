@@ -9,6 +9,8 @@
 
 #![cfg(feature = "resolume")]
 
+mod common;
+
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -361,7 +363,7 @@ fn by_id(id: u64) -> String {
 #[tokio::test(flavor = "multi_thread")]
 async fn resolume_state_is_pushed() {
     let sim = simulated_resolume().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "resolume".into(),

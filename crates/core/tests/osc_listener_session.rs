@@ -4,6 +4,8 @@
 
 #![cfg(feature = "osc-listener")]
 
+mod common;
+
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -58,13 +60,13 @@ fn slip(packet: &[u8]) -> Vec<u8> {
     out
 }
 
-/// A port free for both UDP and TCP on every address, since tests run in
-/// parallel and the listener binds 0.0.0.0.
+/// A port free on 127.0.0.1 for both UDP and TCP, since tests run in
+/// parallel and some listen over TCP. Loopback only: see `common`.
 fn free_port() -> u16 {
     loop {
-        let udp = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
+        let udp = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
         let port = udp.local_addr().unwrap().port();
-        if std::net::TcpListener::bind(("0.0.0.0", port)).is_ok() {
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
             return port;
         }
     }
@@ -118,7 +120,7 @@ async fn messages(core: &Core, n: usize) -> Vec<(String, Value, String)> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn udp_from_any_sender_every_message_and_bundles_in_order() {
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let port = free_port();
     let device = open(&core, port, json!({"bind_address": "127.0.0.1"}));
     wait_connected(&core, device).await;
@@ -191,7 +193,7 @@ async fn udp_from_any_sender_every_message_and_bundles_in_order() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn tcp_slip_two_clients_at_once_and_garbage_closes_only_its_sender() {
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let port = free_port();
     let device = open(
         &core,
@@ -276,7 +278,7 @@ async fn tcp_slip_two_clients_at_once_and_garbage_closes_only_its_sender() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn tcp_length_prefixed_framing() {
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let port = free_port();
     let device = open(
         &core,
@@ -299,7 +301,7 @@ async fn tcp_length_prefixed_framing() {
 #[tokio::test(flavor = "multi_thread")]
 async fn overflow_keeps_every_message() {
     const N: i32 = 10_500;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let port = free_port();
     let device = open(
         &core,
@@ -348,7 +350,7 @@ async fn overflow_keeps_every_message() {
 
 #[test]
 fn opened_without_a_host_through_the_json_surface() {
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let port = free_port();
     let opened = meros_integrations::json::open(
         &core,

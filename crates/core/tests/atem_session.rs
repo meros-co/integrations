@@ -8,6 +8,8 @@
 
 #![cfg(feature = "blackmagic-atem")]
 
+mod common;
+
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -166,7 +168,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn atem_end_to_end() {
     let port = simulated_atem().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "blackmagic-atem".into(),

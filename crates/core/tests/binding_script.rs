@@ -7,12 +7,14 @@
     feature = "http-snapshot"
 ))]
 
+mod common;
+
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use meros_integrations::{json as api, Core};
+use meros_integrations::json as api;
 use serde_json::{Map, Value};
 
 fn root() -> PathBuf {
@@ -79,7 +81,7 @@ async fn the_shared_binding_script() {
         &std::fs::read_to_string(root().join("tests/bindings/script.json")).unwrap(),
     )
     .unwrap();
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
 
     for (index, raw) in script["steps"].as_array().unwrap().iter().enumerate() {
         let step = substitute(raw, &vars);

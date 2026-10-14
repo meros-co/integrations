@@ -7,6 +7,8 @@
 
 #![cfg(feature = "shure-wireless")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -81,7 +83,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn shure_end_to_end() {
     let (port, received) = simulated_ulxd().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "shure-wireless".into(),
@@ -170,7 +172,7 @@ async fn shure_end_to_end() {
 #[tokio::test(flavor = "multi_thread")]
 async fn close_all_ends_what_each_device_started() {
     let (port, received) = simulated_ulxd().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let request = OpenRequest {
         device: "shure-wireless".into(),
         model: "ulxd4".into(),

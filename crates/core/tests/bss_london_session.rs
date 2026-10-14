@@ -5,6 +5,8 @@
 
 #![cfg(feature = "bss-london")]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -98,7 +100,7 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn london_end_to_end() {
     let (port, received) = simulated_london().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "bss-london".into(),

@@ -20,6 +20,8 @@
     feature = "analogway-midra4k"
 ))]
 
+mod common;
+
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -218,7 +220,7 @@ async fn livepremier_end_to_end() {
         object: "DeviceObject/$screenAuxGroup".into(),
     };
     let (port, log) = simulate(device).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "analogway-livepremier".into(),
@@ -344,7 +346,7 @@ async fn midra_reads_the_tbar_before_a_banked_write() {
         object: "none".into(),
     };
     let (port, log) = simulate(device).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "analogway-midra4k".into(),
@@ -442,7 +444,7 @@ async fn simulate_tpp(device_type: &'static str) -> (u16, Lines) {
 #[tokio::test(flavor = "multi_thread")]
 async fn livecore_recall_sends_every_register_in_order() {
     let (port, log) = simulate_tpp("113").await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "analogway-livecore".into(),
@@ -507,7 +509,7 @@ async fn livecore_recall_sends_every_register_in_order() {
 #[tokio::test(flavor = "multi_thread")]
 async fn midra_layer_change_is_followed_by_the_screen_update() {
     let (port, log) = simulate_tpp("259").await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "analogway-midra".into(),

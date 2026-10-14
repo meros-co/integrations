@@ -11,6 +11,8 @@
 
 #![cfg(all(feature = "aja-kipro", feature = "aja-kumo"))]
 
+mod common;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -144,7 +146,7 @@ async fn wait_for_state(
 #[tokio::test(flavor = "multi_thread")]
 async fn kumo_events_connect_wait_and_expire() {
     let (port, router) = simulate().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "aja-kumo".into(),

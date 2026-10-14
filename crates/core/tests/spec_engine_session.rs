@@ -6,6 +6,8 @@
     feature = "qlab"
 ))]
 
+mod common;
+
 use std::time::Duration;
 
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
@@ -74,7 +76,7 @@ async fn hyperdeck_over_tcp() {
         }
     });
 
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "blackmagic-hyperdeck", "hyperdeck-1-11", port);
     wait_connected(&core, id).await;
 
@@ -145,7 +147,7 @@ async fn x32_over_udp() {
         }
     });
 
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "behringer-x32", "x32", port);
     wait_connected(&core, id).await;
     assert_eq!(
@@ -220,7 +222,7 @@ async fn qlab_over_tcp_slip() {
         }
     });
 
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = open(&core, "qlab", "qlab-5", port);
     wait_connected(&core, id).await;
     assert_eq!(

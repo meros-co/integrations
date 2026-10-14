@@ -7,6 +7,8 @@
 
 #![cfg(all(feature = "generic-http", feature = "http-snapshot"))]
 
+mod common;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -75,7 +77,7 @@ async fn connected(core: &Core, id: u64) {
 #[tokio::test(flavor = "multi_thread")]
 async fn frames_flow_only_while_watched() {
     let (port, requests) = camera().await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "http-snapshot".into(),
@@ -167,7 +169,7 @@ async fn frames_flow_only_while_watched() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn devices_without_streams_refuse_them() {
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "generic-http".into(),

@@ -8,6 +8,8 @@
 
 #![cfg(all(feature = "allenheath-dlive", feature = "allenheath-sq"))]
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -165,7 +167,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 #[tokio::test(flavor = "multi_thread")]
 async fn dlive_end_to_end() {
     let (port, log) = simulate(dlive).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "allenheath-dlive".into(),
@@ -239,7 +241,7 @@ async fn dlive_end_to_end() {
 #[tokio::test(flavor = "multi_thread")]
 async fn sq_end_to_end() {
     let (port, log) = simulate(sq).await;
-    let core = Core::new().unwrap();
+    let core = common::core().unwrap();
     let id = core
         .open(OpenRequest {
             device: "allenheath-sq".into(),
