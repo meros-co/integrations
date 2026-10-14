@@ -16,7 +16,7 @@ mod osc;
 mod telemetry;
 pub(crate) mod template;
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
@@ -2520,6 +2520,9 @@ impl SpecEngine {
             // subscription goes to the rules like anything else.
             Transport::Ws { .. } => false,
         };
+        // The items already waiting, by their text, so a long poll list is
+        // checked against the queue in linear time.
+        let mut waiting: Option<HashSet<String>> = None;
         for telemetry::Triggered {
             item,
             params,
@@ -2530,12 +2533,23 @@ impl SpecEngine {
                 // A slow device must not fall behind: a poll item still
                 // waiting from the last round is not queued again, and a
                 // re-read already waiting serves a second push too.
-                if poll
-                    && self.queue.iter().any(|j| {
-                        j.id.is_none() && j.item.as_ref() == Some(&item) && j.params == params
-                    })
-                {
-                    continue;
+                if poll {
+                    let waiting = waiting.get_or_insert_with(|| {
+                        self.queue
+                            .iter()
+                            .filter(|j| j.id.is_none())
+                            .filter_map(|j| j.item.as_ref().map(Value::to_string))
+                            .collect()
+                    });
+                    let key = item.to_string();
+                    if waiting.contains(&key)
+                        && self.queue.iter().any(|j| {
+                            j.id.is_none() && j.item.as_ref() == Some(&item) && j.params == params
+                        })
+                    {
+                        continue;
+                    }
+                    waiting.insert(key);
                 }
                 self.queue.push_back(Job {
                     params,
