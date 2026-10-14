@@ -471,9 +471,9 @@ quirks:
     severity: warning
     text: >
       The protocol documents no change notifications: front panel and other clients' changes reach state
-      only through the poll of the connections ({VC}) every 5 seconds and through replies. On the UMX the
-      {VC} form without a layer is not documented and its error answer is ignored; its state comes from the
-      layer commands' replies.
+      only through the polls every 5 seconds and through replies. The MX matrices are asked for the
+      connections ({VC}) and the mutes ({VM}), the UMX for the video and audio layers ({VC V}, {VC A}),
+      and both for the product type ({i}).
   - models: [all]
     severity: info
     text: >
@@ -483,9 +483,9 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Format gap: a template cannot hold a bare identifier in braces, because "{i}" is a placeholder. The
-      commands whose wire text is such a word ({i}, {f}, {s}, {ct}, {st}, {rst}, {ping}, {label}, {VC},
-      {VM}, {VEDID}) take it through a one-value enum parameter (command), which renders the exact text.
+      The commands whose wire text is a bare word in braces ({i}, {f}, {s}, {ct}, {st}, {rst}, {ping},
+      {label}, {VC}, {VM}, {VEDID}) keep the one-value enum parameter (command) they were offered with,
+      which renders the exact text; the polls write the same words with escaped braces.
   - models: [mx-pro]
     severity: info
     text: >
@@ -522,9 +522,16 @@ state:
   device.product_type: { type: string, description: "Product type ({i})" }
 
 telemetry:
-  # No change notifications are documented, so the crosspoint is polled.
+  # No change notifications are documented, so the crosspoint and the mutes
+  # are polled; the product type is read with them. A bare word in braces is
+  # written with its braces escaped (SPEC.md §4).
   poll:
-    send: ["{VC}"]
+    send:
+      - { models: [mx-pro], message: '\{VC}' }
+      - { models: [mx-pro], message: '\{VM}' }
+      - { models: [umx-hdmi-140], message: "{VC V}" }
+      - { models: [umx-hdmi-140], message: "{VC A}" }
+      - '\{i}'
     every_ms: 5000
   updates:
     - match: '^\((?:I:)?((?:MX|UMX|DXP|MMX|HDMI|DVI)[^)]*)\)$'
@@ -551,164 +558,16 @@ telemetry:
       state:
         "layers.{1}.muted": { value: "x{2}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
         "layers.{1}.locked": { value: "x{2}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    # The connection view: one field per output, in order, a state letter then the input.
-    - match: '^\(ALL\s+([LMU]?)0*(\d+)(?:\s|\))'
+    # The connection view ({VC}): one field per output, in order, a state letter then the input.
+    - match: '^\(ALL\s'
+      match_each: '([LMU]?)0*(\d+)'
       state:
-        "outputs.1.input": "{2}"
-        "outputs.1.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.1.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){1}([LMU]?)0*(\d+)(?:\s|\))'
+        "outputs.{index:+1}.input": "{2}"
+        "outputs.{index:+1}.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.{index:+1}.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    # The mutes ({VM}): one 1 or 0 per output, in order.
+    - match: '^\(MUT\s'
+      match_each: '([01])'
       state:
-        "outputs.2.input": "{2}"
-        "outputs.2.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.2.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){2}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.3.input": "{2}"
-        "outputs.3.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.3.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){3}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.4.input": "{2}"
-        "outputs.4.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.4.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){4}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.5.input": "{2}"
-        "outputs.5.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.5.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){5}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.6.input": "{2}"
-        "outputs.6.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.6.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){6}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.7.input": "{2}"
-        "outputs.7.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.7.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){7}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.8.input": "{2}"
-        "outputs.8.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.8.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){8}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.9.input": "{2}"
-        "outputs.9.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.9.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){9}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.10.input": "{2}"
-        "outputs.10.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.10.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){10}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.11.input": "{2}"
-        "outputs.11.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.11.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){11}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.12.input": "{2}"
-        "outputs.12.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.12.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){12}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.13.input": "{2}"
-        "outputs.13.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.13.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){13}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.14.input": "{2}"
-        "outputs.14.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.14.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){14}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.15.input": "{2}"
-        "outputs.15.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.15.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){15}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.16.input": "{2}"
-        "outputs.16.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.16.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){16}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.17.input": "{2}"
-        "outputs.17.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.17.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){17}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.18.input": "{2}"
-        "outputs.18.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.18.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){18}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.19.input": "{2}"
-        "outputs.19.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.19.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){19}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.20.input": "{2}"
-        "outputs.20.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.20.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){20}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.21.input": "{2}"
-        "outputs.21.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.21.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){21}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.22.input": "{2}"
-        "outputs.22.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.22.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){22}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.23.input": "{2}"
-        "outputs.23.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.23.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){23}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.24.input": "{2}"
-        "outputs.24.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.24.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){24}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.25.input": "{2}"
-        "outputs.25.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.25.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){25}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.26.input": "{2}"
-        "outputs.26.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.26.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){26}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.27.input": "{2}"
-        "outputs.27.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.27.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){27}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.28.input": "{2}"
-        "outputs.28.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.28.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){28}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.29.input": "{2}"
-        "outputs.29.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.29.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){29}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.30.input": "{2}"
-        "outputs.30.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.30.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){30}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.31.input": "{2}"
-        "outputs.31.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.31.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
-    - match: '^\(ALL\s+(?:\S+\s+){31}([LMU]?)0*(\d+)(?:\s|\))'
-      state:
-        "outputs.32.input": "{2}"
-        "outputs.32.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
-        "outputs.32.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+        "outputs.{index:+1}.muted": { value: "{1}", map: { "0": false, "1": true } }
+

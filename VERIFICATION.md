@@ -961,6 +961,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:470](specs/lightware-lw2.yaml#L470))
 - [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:496](specs/lightware-lw2.yaml#L496))
 - [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:470](specs/lightware-lw2.yaml#L470))
+- [ ] Capture the {VM} answer on an MX matrix and confirm it lists one 1 or 0 per output in order after MUT, so the mutes poll keys them by position; and confirm {VC V} and {VC A} answer on the UMX as get_connection_layer's replies do. ([specs/lightware-lw2.yaml:569](specs/lightware-lw2.yaml#L569))
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 

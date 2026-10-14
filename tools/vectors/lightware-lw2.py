@@ -107,6 +107,16 @@ telemetry(L2, "connections", inbound="(ALL M01 L02 U03 04 05 06 07 00)\r\n",
               "6": {"input": 6, "muted": False, "locked": False},
               "7": {"input": 7, "muted": False, "locked": False},
               "8": {"input": 0, "muted": False, "locked": False}}})
+# The poll asks for the connections, the mutes and the product type, the
+# bare words in braces written with escaped braces; the first goes out on
+# connecting (7.3.7, 7.3.8, 7.3.1).
+telemetry(L2, "mutes", expect_connect_wire=["{VC}\r\n"], inbound="(MUT 1 0 0 1)\r\n",
+          expect_state={"outputs": {"1": {"muted": True}, "2": {"muted": False}, "3": {"muted": False},
+                                    "4": {"muted": True}}})
+# The connection view of a 40-output frame, beyond the 32 positions the
+# spec once listed one by one.
+telemetry(L2, "connections-wide", inbound="(ALL " + " ".join(f"{i:02d}" for i in range(1, 41)) + ")\r\n",
+          expect_state={"outputs": {str(i): {"input": i, "muted": False, "locked": False} for i in range(1, 41)}})
 telemetry(L2, "switch", inbound="(O02 I01)\r\n", expect_state={"outputs": {"2": {"input": 1}}})
 telemetry(L2, "mute", inbound="(1MT01)\r\n", expect_state={"outputs": {"1": {"muted": True}}})
 telemetry(L2, "unlock", inbound="(0LO03)\r\n", expect_state={"outputs": {"3": {"locked": False}}})
