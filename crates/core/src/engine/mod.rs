@@ -749,11 +749,14 @@ fn scheme_of(
         Some(Value::String(s)) => s.clone(),
         Some(Value::Object(o)) => {
             let name = o.get("setting").and_then(Value::as_str).ok_or_else(bad)?;
-            settings
-                .get(name)
-                .and_then(Value::as_str)
-                .unwrap_or(plain)
-                .to_string()
+            match (plain, settings.get(name).and_then(Value::as_str)) {
+                // A websocket following an HTTP scheme setting (the REST
+                // API's own): http opens ws, https wss.
+                ("ws", Some("http")) => "ws".to_string(),
+                ("ws", Some("https")) => "wss".to_string(),
+                (_, Some(s)) => s.to_string(),
+                (_, None) => plain.to_string(),
+            }
         }
         Some(_) => return Err(bad()),
     };
@@ -4230,6 +4233,32 @@ mod tests {
         // An empty list over an empty list: nothing about the list.
         assert_eq!(offer("[]"), vec![json!({"items": null})]);
         assert_eq!(offer("[]"), Vec::<Value>::new());
+    }
+
+    #[test]
+    fn a_websocket_follows_an_http_scheme_setting() {
+        let t = json!({"scheme": {"setting": "scheme"}});
+        let with = |v: Value| {
+            let mut s = Params::new();
+            s.insert("scheme".into(), v);
+            s
+        };
+        assert_eq!(
+            scheme_of(&t, &with(json!("http")), "ws", "wss").unwrap(),
+            "ws"
+        );
+        assert_eq!(
+            scheme_of(&t, &with(json!("https")), "ws", "wss").unwrap(),
+            "wss"
+        );
+        assert_eq!(
+            scheme_of(&t, &with(json!("wss")), "ws", "wss").unwrap(),
+            "wss"
+        );
+        assert_eq!(scheme_of(&t, &Params::new(), "ws", "wss").unwrap(), "ws");
+        // An HTTP scheme is not a websocket's anywhere else.
+        assert!(scheme_of(&t, &with(json!("ws")), "http", "https").is_err());
+        assert!(scheme_of(&json!({"scheme": "https"}), &Params::new(), "ws", "wss").is_err());
     }
 
     #[test]

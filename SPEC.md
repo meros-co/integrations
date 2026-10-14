@@ -1796,6 +1796,11 @@ telemetry:
     every_ms: 5000            # optional: send them again at this interval
 ```
 
+`scheme` may name the HTTP transport's own scheme setting, an enum of
+`http` and `https`: `http` then opens `ws` and `https` opens `wss`, so a
+device serving its push websocket beside its REST API (a Blackmagic
+camera) needs no second setting to keep the two in step.
+
 `port` may name an integer setting, `port: { setting: websocket_port }`, for
 a device whose push port the operator can move (OpenLP, FreeShow); an empty
 setting means the transport's port.

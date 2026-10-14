@@ -436,8 +436,13 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         decl = settings.get(scheme.get("setting"))
         if decl is None:
             errors.append(f"{where_}.scheme names unknown setting '{scheme.get('setting')}'")
-        elif decl.get("type") != "enum" or set(decl.get("values", [])) - allowed:
-            errors.append(f"{where_}.scheme's setting must be an enum of {' and '.join(sorted(allowed))}")
+        elif decl.get("type") != "enum" or (
+                set(decl.get("values", [])) - allowed
+                # A websocket may follow the http transport's own scheme
+                # setting: http opens ws, https wss (SPEC.md §8).
+                and not (allowed == {"ws", "wss"} and not set(decl.get("values", [])) - {"http", "https"})):
+            errors.append(f"{where_}.scheme's setting must be an enum of {' and '.join(sorted(allowed))}"
+                          + (" (or of http and https)" if allowed == {"ws", "wss"} else ""))
     # accept_invalid_certs only means something over TLS.
     for where_, obj, default in [
             ("transport", transport, "ws" if transport_type == "ws" else "http"),
