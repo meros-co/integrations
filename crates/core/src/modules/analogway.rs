@@ -117,6 +117,10 @@ impl Dialect {
                 "DeviceObject/masterPresetBank/$bank",
                 "DeviceObject/$input",
                 "DeviceObject/$monitoring",
+                "DeviceObject/audio",
+                "DeviceObject/$still",
+                "DeviceObject/preconfig/backgrounds",
+                "DeviceObject/backup",
             ],
             Dialect::Midra4k => &[
                 "DeviceObject/transition",
@@ -125,6 +129,9 @@ impl Dialect {
                 "DeviceObject/preset",
                 "DeviceObject/$input",
                 "DeviceObject/multiviewer",
+                "DeviceObject/$output",
+                "DeviceObject/audio",
+                "DeviceObject/preconfig",
             ],
         }
     }
@@ -952,6 +959,98 @@ fn rules(d: Dialect) -> Vec<Rule> {
                 r"^DeviceObject/\$monitoring/@items/(\d+)/layout/\$widget/@items/(\d+)/control/@props/source$",
                 Target::Plain("multiviewers.{1}.widgets.{2+1}.source"),
             ),
+            // Audio (5.1-5.2): input and Dante input channels, then the
+            // channels of outputs, Dante output groups and multiviewers.
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$rx/@items/INPUT_(\d+)_CHANNEL_(\d+)/control/@props/mute$",
+                Target::Plain("audio.inputs.{1}.channels.{2}.mute"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$rx/@items/INPUT_(\d+)_CHANNEL_(\d+)/status/@props/isLevelDetected$",
+                Target::Plain("audio.inputs.{1}.channels.{2}.level_detected"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$rx/@items/DANTE_(\d+)_CHANNEL_(\d+)/control/@props/mute$",
+                Target::Plain("audio.dante_inputs.{1}.channels.{2}.mute"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$rx/@items/DANTE_(\d+)_CHANNEL_(\d+)/status/@props/isLevelDetected$",
+                Target::Plain("audio.dante_inputs.{1}.channels.{2}.level_detected"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$tx/@items/OUTPUT_(\d+)/\$channel/@items/(\d+)/control/@props/(mute|source)$",
+                Target::Plain("audio.outputs.{1}.channels.{2}.{3}"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$tx/@items/OUTPUT_(\d+)/\$channel/@items/(\d+)/status/@props/isLevelDetected$",
+                Target::Plain("audio.outputs.{1}.channels.{2}.level_detected"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$tx/@items/DANTE_(\d+)/\$channel/@items/(\d+)/control/@props/(mute|source)$",
+                Target::Plain("audio.dante_outputs.{1}.channels.{2}.{3}"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$tx/@items/DANTE_(\d+)/\$channel/@items/(\d+)/status/@props/isLevelDetected$",
+                Target::Plain("audio.dante_outputs.{1}.channels.{2}.level_detected"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$tx/@items/MVW_(\d+)/\$channel/@items/(\d+)/control/@props/(mute|source)$",
+                Target::Plain("audio.multiviewers.{1}.channels.{2}.{3}"),
+            ),
+            (
+                r"^DeviceObject/audio/control/\$device/@items/1/\$tx/@items/MVW_(\d+)/\$channel/@items/(\d+)/status/@props/isLevelDetected$",
+                Target::Plain("audio.multiviewers.{1}.channels.{2}.level_detected"),
+            ),
+            // Stills (6.2).
+            (
+                r"^DeviceObject/\$still/@items/(\d+)/status/@props/isUsed$",
+                Target::Plain("stills.{1}.used"),
+            ),
+            (
+                r"^DeviceObject/\$still/@items/(\d+)/status/@props/isAvailable$",
+                Target::Plain("stills.{1}.available"),
+            ),
+            (
+                r"^DeviceObject/\$still/@items/(\d+)/control/@props/(label|source)$",
+                Target::Plain("stills.{1}.{2}"),
+            ),
+            // Background set contents (6.3) and backups (6.4-6.11).
+            (
+                r"^DeviceObject/preconfig/backgrounds/\$screen/@items/S(\d+)/\$backgroundSet/@items/(\d+)/\$output/@items/(\d+)/control/@props/content$",
+                Target::Plain("screens.{1}.background_sets.{2}.outputs.{3}.content"),
+            ),
+            (
+                r"^DeviceObject/preconfig/backgrounds/\$screen/@items/S(\d+)/\$backgroundSet/@items/(\d+)/backup/control/@props/xSelectSlot$",
+                Target::Plain("screens.{1}.background_sets.{2}.backup.selected"),
+            ),
+            (
+                r"^DeviceObject/preconfig/backgrounds/\$screen/@items/S(\d+)/\$backgroundSet/@items/(\d+)/backup/control/@props/enableAutoSelect$",
+                Target::Plain("screens.{1}.background_sets.{2}.backup.auto"),
+            ),
+            (
+                r"^DeviceObject/preconfig/backgrounds/\$screen/@items/S(\d+)/\$backgroundSet/@items/(\d+)/backup/\$slot/@items/(\d+)/control/@props/source$",
+                Target::Plain("screens.{1}.background_sets.{2}.backup.slots.{3}"),
+            ),
+            (
+                r"^DeviceObject/\$input/@items/IN_(\d+)/backup/control/@props/xSelectSlot$",
+                Target::Plain("inputs.{1}.backup.selected"),
+            ),
+            (
+                r"^DeviceObject/\$input/@items/IN_(\d+)/backup/control/@props/enableAutoSelect$",
+                Target::Plain("inputs.{1}.backup.auto"),
+            ),
+            (
+                r"^DeviceObject/\$input/@items/IN_(\d+)/backup/\$slot/@items/(\d+)/control/@props/source$",
+                Target::Plain("inputs.{1}.backup.slots.{2}"),
+            ),
+            (
+                r"^DeviceObject/backup/\$group/@items/GROUP_(\d+)/control/@props/xSelectSlot$",
+                Target::Plain("backup_groups.{1}.selected"),
+            ),
+            (
+                r"^DeviceObject/backup/\$group/@items/GROUP_(\d+)/control/@props/enableAutoSelect$",
+                Target::Plain("backup_groups.{1}.auto"),
+            ),
         ],
         Dialect::Midra4k => &[
             (
@@ -1069,6 +1168,138 @@ fn rules(d: Dialect) -> Vec<Rule> {
             (
                 r"^DeviceObject/\$output/@items/MTVW/control/@props/label$",
                 Target::Plain("multiviewer.label"),
+            ),
+            (
+                r"^DeviceObject/multiviewer/\$bank/@items/(\d+)/control/@props/label$",
+                Target::Plain("multiviewer.presets.{1}.label"),
+            ),
+            // Screens and auxiliaries enabled (3.1, 3.13).
+            (
+                r"^DeviceObject/preconfig/control/\$(screen|auxiliaryScreen)/@items/(\d+)/@props/enable$",
+                Target::Plain("{1}.{2}.enabled"),
+            ),
+            // Foreground and background images, background set content (6.2-6.6).
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/\$topFrame/@items/(\d+)/control/@props/label$",
+                Target::Plain("screens.{1}.foreground_images.{2}.label"),
+            ),
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/\$topFrame/@items/(\d+)/control/@props/librarySlot$",
+                Target::Plain("screens.{1}.foreground_images.{2}.library_slot"),
+            ),
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/\$topFrame/@items/(\d+)/status/@props/isValid$",
+                Target::Plain("screens.{1}.foreground_images.{2}.valid"),
+            ),
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/\$backFrame/@items/(\d+)/control/@props/label$",
+                Target::Plain("screens.{1}.background_images.{2}.label"),
+            ),
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/\$backFrame/@items/(\d+)/control/@props/librarySlot$",
+                Target::Plain("screens.{1}.background_images.{2}.library_slot"),
+            ),
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/\$backFrame/@items/(\d+)/status/@props/isValid$",
+                Target::Plain("screens.{1}.background_images.{2}.valid"),
+            ),
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/\$backgroundSet/@items/(\d+)/control/@props/singleContent$",
+                Target::Plain("screens.{1}.background_sets.{2}.content"),
+            ),
+            // Audio (5): modes and direct-routing sources of outputs, screens
+            // and auxiliaries, then Dante, line out and the multiviewer.
+            (
+                r"^DeviceObject/\$output/@items/MTVW/audio/control/@props/mode$",
+                Target::Plain("multiviewer.output_audio.mode"),
+            ),
+            (
+                r"^DeviceObject/\$output/@items/MTVW/audio/control/directRouting/@props/source$",
+                Target::Plain("multiviewer.output_audio.source"),
+            ),
+            (
+                r"^DeviceObject/\$output/@items/(\d+)/audio/control/@props/mode$",
+                Target::Plain("outputs.{1}.audio.mode"),
+            ),
+            (
+                r"^DeviceObject/\$output/@items/(\d+)/audio/control/directRouting/@props/source$",
+                Target::Plain("outputs.{1}.audio.source"),
+            ),
+            (
+                r"^DeviceObject/\$(screen|auxiliaryScreen)/@items/(\d+)/audio/control/@props/mode$",
+                Target::Plain("{1}.{2}.audio.mode"),
+            ),
+            (
+                r"^DeviceObject/\$(screen|auxiliaryScreen)/@items/(\d+)/audio/control/directRouting/@props/source$",
+                Target::Plain("{1}.{2}.audio.source"),
+            ),
+            (
+                r"^DeviceObject/\$screen/@items/(\d+)/audio/control/followLiveLayer/@props/layer$",
+                Target::Plain("screens.{1}.audio.follow_layer"),
+            ),
+            (
+                r"^DeviceObject/audio/\$output/@items/VIDEO_OUT_(\d+)/control/@props/mute$",
+                Target::Plain("outputs.{1}.audio.mute"),
+            ),
+            (
+                r"^DeviceObject/audio/\$(screen|auxiliaryScreen)/@items/(\d+)/control/@props/mute$",
+                Target::Plain("{1}.{2}.audio.mute"),
+            ),
+            (
+                r"^DeviceObject/audio/\$input/@items/([A-Z0-9_]+)/\$channel/@items/(\d+)/control/@props/mute$",
+                Target::Plain("audio.inputs.{1}.channels.{2}.mute"),
+            ),
+            (
+                r"^DeviceObject/audio/\$output/@items/([A-Z0-9_]+)/status/@props/source$",
+                Target::Plain("audio.outputs.{1}.source"),
+            ),
+            (
+                r"^DeviceObject/audio/dante/\$outputGroup/@items/(\d+)/control/@props/mode$",
+                Target::Plain("dante.groups.{1}.mode"),
+            ),
+            (
+                r"^DeviceObject/audio/dante/\$outputGroup/@items/(\d+)/control/directRouting/@props/source$",
+                Target::Plain("dante.groups.{1}.source"),
+            ),
+            (
+                r"^DeviceObject/audio/dante/\$outputGroup/@items/(\d+)/control/followScreen/@props/screen$",
+                Target::Plain("dante.groups.{1}.follow_screen"),
+            ),
+            (
+                r"^DeviceObject/audio/\$lineOut/@items/(\d+)/control/@props/mode$",
+                Target::Plain("line_outs.{1}.mode"),
+            ),
+            (
+                r"^DeviceObject/audio/\$lineOut/@items/(\d+)/control/directRouting/@props/source$",
+                Target::Plain("line_outs.{1}.source"),
+            ),
+            (
+                r"^DeviceObject/audio/\$lineOut/@items/(\d+)/control/followScreen/@props/screen$",
+                Target::Plain("line_outs.{1}.follow_screen"),
+            ),
+            (
+                r"^DeviceObject/audio/\$lineOut/@items/(\d+)/control/@props/selectedAudioPair$",
+                Target::Plain("line_outs.{1}.pair"),
+            ),
+            (
+                r"^DeviceObject/multiviewer/audio/control/@props/mode$",
+                Target::Plain("multiviewer.audio.mode"),
+            ),
+            (
+                r"^DeviceObject/multiviewer/audio/control/directRouting/@props/source$",
+                Target::Plain("multiviewer.audio.source"),
+            ),
+            (
+                r"^DeviceObject/multiviewer/audio/control/followWidget/@props/widget$",
+                Target::Plain("multiviewer.audio.follow_widget"),
+            ),
+            (
+                r"^DeviceObject/multiviewer/audio/control/vuMeters/@props/widget$",
+                Target::Plain("multiviewer.audio.vu_meter_widget"),
+            ),
+            (
+                r"^DeviceObject/multiviewer/audio/status/@props/source$",
+                Target::Plain("multiviewer.audio.current_source"),
             ),
         ],
     };
@@ -2469,6 +2700,145 @@ mod tests {
         assert!(s["auxiliaries"]["1"].get("program").is_none());
         assert_eq!(s["inputs"]["2"]["plugs"]["1"]["valid"], true);
         assert_eq!(s["device"]["type"], "PULSE");
+    }
+
+    // The replies of Aquilon guide 5.1-5.2, 6.2-6.10.
+    #[test]
+    fn livepremier_audio_stills_and_backups_become_state() {
+        let a = "DeviceObject/audio/control/$device/@items/1";
+        let bg = "DeviceObject/preconfig/backgrounds/$screen/@items/S2/$backgroundSet/@items/3";
+        let s = state_after(
+            Dialect::LivePremier,
+            &[
+                (
+                    &format!("{a}/$rx/@items/INPUT_5_CHANNEL_7/control/@props/mute"),
+                    json!(true),
+                ),
+                (
+                    &format!("{a}/$rx/@items/INPUT_5_CHANNEL_7/status/@props/isLevelDetected"),
+                    json!(false),
+                ),
+                (
+                    &format!("{a}/$rx/@items/DANTE_2_CHANNEL_1/control/@props/mute"),
+                    json!(false),
+                ),
+                (
+                    &format!("{a}/$tx/@items/OUTPUT_4/$channel/@items/3/control/@props/source"),
+                    json!("DANTE_1_CHANNEL_8"),
+                ),
+                (
+                    &format!("{a}/$tx/@items/OUTPUT_4/$channel/@items/3/control/@props/mute"),
+                    json!(true),
+                ),
+                (
+                    &format!(
+                        "{a}/$tx/@items/MVW_1/$channel/@items/2/status/@props/isLevelDetected"
+                    ),
+                    json!(true),
+                ),
+                (
+                    "DeviceObject/$still/@items/12/status/@props/isUsed",
+                    json!(true),
+                ),
+                (
+                    "DeviceObject/$still/@items/12/control/@props/label",
+                    json!("Pic12"),
+                ),
+                (
+                    &format!("{bg}/backup/$slot/@items/1/control/@props/source"),
+                    json!("NATIVE_4"),
+                ),
+                (
+                    &format!("{bg}/backup/control/@props/enableAutoSelect"),
+                    json!(true),
+                ),
+                (
+                    &format!("{bg}/$output/@items/3/control/@props/content"),
+                    json!("STILL_12"),
+                ),
+                (
+                    "DeviceObject/$input/@items/IN_9/backup/control/@props/xSelectSlot",
+                    json!("1"),
+                ),
+                (
+                    "DeviceObject/$input/@items/IN_9/backup/$slot/@items/1/control/@props/source",
+                    json!("LIVE_3"),
+                ),
+                (
+                    "DeviceObject/backup/$group/@items/GROUP_4/control/@props/xSelectSlot",
+                    json!("2"),
+                ),
+            ],
+        );
+        let ch = &s["audio"]["inputs"]["5"]["channels"]["7"];
+        assert_eq!(ch["mute"], true);
+        assert_eq!(ch["level_detected"], false);
+        assert_eq!(
+            s["audio"]["dante_inputs"]["2"]["channels"]["1"]["mute"],
+            false
+        );
+        let out = &s["audio"]["outputs"]["4"]["channels"]["3"];
+        assert_eq!(out["source"], "DANTE_1_CHANNEL_8");
+        assert_eq!(out["mute"], true);
+        assert_eq!(
+            s["audio"]["multiviewers"]["1"]["channels"]["2"]["level_detected"],
+            true
+        );
+        assert_eq!(s["stills"]["12"]["used"], true);
+        assert_eq!(s["stills"]["12"]["label"], "Pic12");
+        let set = &s["screens"]["2"]["background_sets"]["3"];
+        assert_eq!(set["backup"]["slots"]["1"], "NATIVE_4");
+        assert_eq!(set["backup"]["auto"], true);
+        assert_eq!(set["outputs"]["3"]["content"], "STILL_12");
+        assert_eq!(s["inputs"]["9"]["backup"]["selected"], "1");
+        assert_eq!(s["inputs"]["9"]["backup"]["slots"]["1"], "LIVE_3");
+        assert_eq!(s["backup_groups"]["4"]["selected"], "2");
+    }
+
+    // The replies of Midra 4K guide 3.1, 3.13, 4.1, 5 and 6.2-6.6.
+    #[test]
+    fn midra_audio_images_and_enables_become_state() {
+        let s = state_after(
+            Dialect::Midra4k,
+            &[
+                ("DeviceObject/preconfig/control/$screen/@items/1/@props/enable", json!(true)),
+                ("DeviceObject/preconfig/control/$auxiliaryScreen/@items/1/@props/enable", json!(false)),
+                ("DeviceObject/multiviewer/$bank/@items/5/control/@props/label", json!("MV5")),
+                ("DeviceObject/$screen/@items/1/$topFrame/@items/2/control/@props/librarySlot", json!("15")),
+                ("DeviceObject/$screen/@items/2/$backFrame/@items/3/status/@props/isValid", json!(true)),
+                ("DeviceObject/$screen/@items/1/$backgroundSet/@items/6/control/@props/singleContent", json!("PRESET_FRAME_2")),
+                ("DeviceObject/$output/@items/1/audio/control/@props/mode", json!("DIRECT_ROUTING")),
+                ("DeviceObject/$output/@items/MTVW/audio/control/@props/mode", json!("AUTO")),
+                ("DeviceObject/$screen/@items/1/audio/control/followLiveLayer/@props/layer", json!("2")),
+                ("DeviceObject/$auxiliaryScreen/@items/1/audio/control/directRouting/@props/source", json!("IN1")),
+                ("DeviceObject/audio/$output/@items/VIDEO_OUT_1/status/@props/source", json!("IN3")),
+                ("DeviceObject/audio/dante/$outputGroup/@items/2/control/followScreen/@props/screen", json!("3")),
+                ("DeviceObject/audio/$lineOut/@items/2/control/@props/selectedAudioPair", json!("CHANNEL_3_4")),
+                ("DeviceObject/multiviewer/audio/control/followWidget/@props/widget", json!("12")),
+                ("DeviceObject/audio/$screen/@items/2/control/@props/mute", json!(true)),
+            ],
+        );
+        assert_eq!(s["screens"]["1"]["enabled"], true);
+        assert_eq!(s["auxiliaries"]["1"]["enabled"], false);
+        assert_eq!(s["multiviewer"]["presets"]["5"]["label"], "MV5");
+        assert_eq!(
+            s["screens"]["1"]["foreground_images"]["2"]["library_slot"],
+            "15"
+        );
+        assert_eq!(s["screens"]["2"]["background_images"]["3"]["valid"], true);
+        assert_eq!(
+            s["screens"]["1"]["background_sets"]["6"]["content"],
+            "PRESET_FRAME_2"
+        );
+        assert_eq!(s["outputs"]["1"]["audio"]["mode"], "DIRECT_ROUTING");
+        assert_eq!(s["multiviewer"]["output_audio"]["mode"], "AUTO");
+        assert_eq!(s["screens"]["1"]["audio"]["follow_layer"], "2");
+        assert_eq!(s["auxiliaries"]["1"]["audio"]["source"], "IN1");
+        assert_eq!(s["audio"]["outputs"]["VIDEO_OUT_1"]["source"], "IN3");
+        assert_eq!(s["dante"]["groups"]["2"]["follow_screen"], "3");
+        assert_eq!(s["line_outs"]["2"]["pair"], "CHANNEL_3_4");
+        assert_eq!(s["multiviewer"]["audio"]["follow_widget"], "12");
+        assert_eq!(s["screens"]["2"]["audio"]["mute"], true);
     }
 
     /// Every command the three specs declare is one the module plans.

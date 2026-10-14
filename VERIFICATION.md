@@ -126,6 +126,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-alta4k — Analog Way Alta 4K
 
+- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-alta4k.yaml:1271](specs/analogway-alta4k.yaml#L1271))
+- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-alta4k.yaml:1259](specs/analogway-alta4k.yaml#L1259))
 - [ ] Confirm the auxiliary screen T-bar read path DeviceObject/transition/$auxiliaryScreen/@items/<n>/status/@props/transition, which is inferred. ([specs/analogway-alta4k.yaml:657](specs/analogway-alta4k.yaml#L657))
 - [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen' as printed, audio modes with underscores, followScreen/@props/source for follow-screen writes, audio/$lineOut, and $preset in the background status read. ([specs/analogway-alta4k.yaml:663](specs/analogway-alta4k.yaml#L663))
 - [ ] Confirm that errors arrive in message order, so matching each to the oldest unanswered message is right. ([specs/analogway-alta4k.yaml:651](specs/analogway-alta4k.yaml#L651))
@@ -141,6 +143,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-livepremier — Analog Way LivePremier / Aquilon
 
+- [ ] Check that subscribing to DeviceObject/audio, DeviceObject/$still, DeviceObject/preconfig/backgrounds and DeviceObject/backup pushes their changes, and how often isLevelDetected changes are pushed. ([specs/analogway-livepremier.yaml:1196](specs/analogway-livepremier.yaml#L1196))
+- [ ] Check that a TCP client cannot set layer position, size or opacity, transitions or output settings over AWJ, or find the paths: the guide documents none. ([specs/analogway-livepremier.yaml:1075](specs/analogway-livepremier.yaml#L1075))
 - [ ] Confirm the auxiliary screen T-bar read path DeviceObject/$screenAuxGroup/@items/A<n>/status/@props/transition, which is inferred. ([specs/analogway-livepremier.yaml:904](specs/analogway-livepremier.yaml#L904))
 - [ ] Confirm freeze_input can write the input's freeze property (the guide documents only reading it). ([specs/analogway-livepremier.yaml:910](specs/analogway-livepremier.yaml#L910))
 - [ ] Check whether reboot and shutdown work on DeviceObject/system/shutdown/cmd or need the long v4.0 path. ([specs/analogway-livepremier.yaml:916](specs/analogway-livepremier.yaml#L916))
@@ -157,6 +161,8 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-midra4k — Analog Way Midra 4K
 
+- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-midra4k.yaml:1136](specs/analogway-midra4k.yaml#L1136))
+- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-midra4k.yaml:1124](specs/analogway-midra4k.yaml#L1124))
 - [ ] Confirm the auxiliary screen T-bar read path, which is inferred from the auxiliary xTake. ([specs/analogway-midra4k.yaml:772](specs/analogway-midra4k.yaml#L772))
 - [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen', underscored audio modes, followScreen/@props/source, audio/$lineOut, and $preset in the background status read. ([specs/analogway-midra4k.yaml:778](specs/analogway-midra4k.yaml#L778))
 - [ ] Check whether screen 3 exists (the REST guide gives 1-2, the multiviewer source list shows SCREEN_PRGM_3). ([specs/analogway-midra4k.yaml:806](specs/analogway-midra4k.yaml#L806))
