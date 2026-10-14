@@ -220,7 +220,16 @@ models:
                set_usb_audio_config, set_stageconnect_config, set_ha_remote, set_custom_sync,
                set_log_flags, set_network_mode, set_network_address, set_network_mask,
                set_network_gateway, apply_network_settings, set_tcp_lock, set_usb_host_speed,
-               set_ethernet_mode, reset_aes50_errors]
+               set_ethernet_mode, reset_aes50_errors,
+               usb_player_play, usb_player_stop, usb_player_pause, usb_player_next,
+               usb_player_previous, usb_player_play_file, usb_player_select, usb_player_seek,
+               set_usb_player_repeat, usb_recorder_record, usb_recorder_stop, usb_recorder_pause,
+               usb_recorder_new_file, set_usb_recorder_path, set_usb_recorder_resolution,
+               set_usb_recorder_channels, set_wlive_sd_link, set_wlive_auto_input, set_wlive_meters,
+               set_wlive_auto_routing, wlive_transport, wlive_open_session, wlive_edit_marker,
+               wlive_goto_marker, wlive_delete_marker, wlive_delete_session, wlive_goto_time,
+               wlive_name_session, wlive_add_marker, wlive_format_sd, set_wlive_record_tracks,
+               set_wlive_play_mode, wlive_select_session, wlive_select_marker, set_wlive_play_range]
     verification: none
   - id: wing-compact
     name: Behringer WING Compact
@@ -402,7 +411,16 @@ models:
                set_usb_audio_config, set_stageconnect_config, set_ha_remote, set_custom_sync,
                set_log_flags, set_network_mode, set_network_address, set_network_mask,
                set_network_gateway, apply_network_settings, set_tcp_lock, set_usb_host_speed,
-               set_ethernet_mode, reset_aes50_errors]
+               set_ethernet_mode, reset_aes50_errors,
+               usb_player_play, usb_player_stop, usb_player_pause, usb_player_next,
+               usb_player_previous, usb_player_play_file, usb_player_select, usb_player_seek,
+               set_usb_player_repeat, usb_recorder_record, usb_recorder_stop, usb_recorder_pause,
+               usb_recorder_new_file, set_usb_recorder_path, set_usb_recorder_resolution,
+               set_usb_recorder_channels, set_wlive_sd_link, set_wlive_auto_input, set_wlive_meters,
+               set_wlive_auto_routing, wlive_transport, wlive_open_session, wlive_edit_marker,
+               wlive_goto_marker, wlive_delete_marker, wlive_delete_session, wlive_goto_time,
+               wlive_name_session, wlive_add_marker, wlive_format_sd, set_wlive_record_tracks,
+               set_wlive_play_mode, wlive_select_session, wlive_select_marker, set_wlive_play_range]
     verification: none
   - id: wing-rack
     name: Behringer WING Rack
@@ -584,7 +602,16 @@ models:
                set_usb_audio_config, set_stageconnect_config, set_ha_remote, set_custom_sync,
                set_log_flags, set_network_mode, set_network_address, set_network_mask,
                set_network_gateway, apply_network_settings, set_tcp_lock, set_usb_host_speed,
-               set_ethernet_mode, reset_aes50_errors]
+               set_ethernet_mode, reset_aes50_errors,
+               usb_player_play, usb_player_stop, usb_player_pause, usb_player_next,
+               usb_player_previous, usb_player_play_file, usb_player_select, usb_player_seek,
+               set_usb_player_repeat, usb_recorder_record, usb_recorder_stop, usb_recorder_pause,
+               usb_recorder_new_file, set_usb_recorder_path, set_usb_recorder_resolution,
+               set_usb_recorder_channels, set_wlive_sd_link, set_wlive_auto_input, set_wlive_meters,
+               set_wlive_auto_routing, wlive_transport, wlive_open_session, wlive_edit_marker,
+               wlive_goto_marker, wlive_delete_marker, wlive_delete_session, wlive_goto_time,
+               wlive_name_session, wlive_add_marker, wlive_format_sd, set_wlive_record_tracks,
+               set_wlive_play_mode, wlive_select_session, wlive_select_marker, set_wlive_play_range]
     verification: none
 
 commands:
@@ -7671,6 +7698,318 @@ commands:
       args: [ { value: "1", type: int } ]
     returns: none
 
+  usb_player_play:
+    summary: "Play the USB player's current song"
+    send:
+      address: "/play/$action"
+      args: [ { value: "PLAY", type: string } ]
+    returns: none
+
+  usb_player_stop:
+    summary: "Stop the USB player"
+    send:
+      address: "/play/$action"
+      args: [ { value: "STOP", type: string } ]
+    returns: none
+
+  usb_player_pause:
+    summary: "Pause the USB player"
+    send:
+      address: "/play/$action"
+      args: [ { value: "PAUSE", type: string } ]
+    returns: none
+
+  usb_player_next:
+    summary: "Skip the USB player to the next song in the playlist"
+    send:
+      address: "/play/$action"
+      args: [ { value: "NEXT", type: string } ]
+    returns: none
+
+  usb_player_previous:
+    summary: "Go back to the previous song in the USB player's playlist"
+    send:
+      address: "/play/$action"
+      args: [ { value: "PREV", type: string } ]
+    returns: none
+
+  usb_player_play_file:
+    summary: "Play a file from the USB stick by its full path"
+    params:
+      path: { type: string, max_length: 256, required: true, label: "File", description: "Full path of the song on the USB stick, 256 characters at most." }
+    send:
+      - { address: "/play/$playfile", args: [ { value: "{path}", type: string } ] }
+      - { address: "/play/$action", args: [ { value: "PLAYFILE", type: string } ] }
+    returns: none
+
+  usb_player_select:
+    summary: "Select an entry of the USB player's playlist"
+    params:
+      entry: { type: int, min: 1, max: 1000, required: true, label: "Entry", description: "Playlist entry, from 1." }
+    send:
+      address: "/play/$actionidx"
+      args: [ { value: "{entry}", type: int } ]
+    returns: none
+
+  usb_player_seek:
+    summary: "Move the USB player to a position in the current song, in seconds"
+    params:
+      position_s: { type: float, min: 0.0, max: 35999.0, required: true, label: "Position", description: "Position in seconds from the start, 0 to 35999." }
+    send:
+      address: "/play/$pos"
+      args: [ { value: "{position_s}", type: float } ]
+    returns: none
+
+  set_usb_player_repeat:
+    summary: "Switch the USB player's repeat"
+    params:
+      enabled: { type: bool, default: true, label: "Repeat", description: "On repeats the playlist." }
+    send:
+      address: "/play/repeat"
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  usb_recorder_record:
+    summary: "Start recording to the USB stick"
+    send:
+      address: "/rec/$action"
+      args: [ { value: "REC", type: string } ]
+    returns: none
+
+  usb_recorder_stop:
+    summary: "Stop the USB recorder"
+    send:
+      address: "/rec/$action"
+      args: [ { value: "STOP", type: string } ]
+    returns: none
+
+  usb_recorder_pause:
+    summary: "Pause the USB recorder"
+    send:
+      address: "/rec/$action"
+      args: [ { value: "PAUSE", type: string } ]
+    returns: none
+
+  usb_recorder_new_file:
+    summary: "Continue recording into a new file"
+    send:
+      address: "/rec/$action"
+      args: [ { value: "NEWFILE", type: string } ]
+    returns: none
+
+  set_usb_recorder_path:
+    summary: "Set the folder the USB recorder writes to"
+    params:
+      path: { type: string, max_length: 256, required: true, label: "Path", description: "Path on the USB stick." }
+    send:
+      address: "/rec/path"
+      args: [ { value: "{path}", type: string } ]
+    returns: none
+
+  set_usb_recorder_resolution:
+    summary: "Set the USB recorder's resolution: 16 or 24 bits"
+    params:
+      bits: { type: enum, values: ["16", "24"], required: true, label: "Resolution", description: "16 or 24 bits." }
+    send:
+      address: "/rec/resolution"
+      args: [ { value: "{bits}", type: string } ]
+    returns: none
+
+  set_usb_recorder_channels:
+    summary: "Set the USB recorder's channel count: 2 or 4"
+    params:
+      channels: { type: enum, values: ["2", "4"], required: true, label: "Channels", description: "2 or 4 tracks." }
+    send:
+      address: "/rec/channels"
+      args: [ { value: "{channels}", type: string } ]
+    returns: none
+
+  set_wlive_sd_link:
+    summary: "Set whether the two W-Live SD cards work independently or in parallel"
+    params:
+      mode: { type: enum, values: ["IND", "PAR"], required: true, label: "SD link", description: "IND independent, PAR parallel." }
+    send:
+      address: "/cards/wlive/sdlink"
+      args: [ { value: "{mode}", type: string } ]
+    returns: none
+
+  set_wlive_auto_input:
+    summary: "Set the W-Live automatic input: OFF, card 1 or 2"
+    params:
+      input: { type: enum, values: ["OFF", "1", "2"], required: true, label: "Auto input", description: "OFF, 1 or 2." }
+    send:
+      address: "/cards/wlive/autoin"
+      args: [ { value: "{input}", type: string } ]
+    returns: none
+
+  set_wlive_meters:
+    summary: "Switch showing the W-Live card meters"
+    params:
+      enabled: { type: bool, default: true, label: "Meters", description: "On shows the card meters." }
+    send:
+      address: "/cards/wlive/meters"
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_wlive_auto_routing:
+    summary: "Set which inputs strips use when the W-Live card stops, plays or records"
+    params:
+      when: { type: enum, values: ["stop", "play", "rec"], required: true, label: "When", description: "stop, play or rec." }
+      setting: { type: enum, values: ["KEEP", "MAIN", "ALT"], required: true, label: "Inputs", description: "KEEP as they are, MAIN inputs or ALT alternative inputs." }
+    send:
+      address: "/cards/wlive/auto_{when}"
+      args: [ { value: "{setting}", type: string } ]
+    returns: none
+
+  wlive_transport:
+    summary: "Stop, pause, play or record on a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      action: { type: enum, values: ["STOP", "PPAUSE", "PLAY", "REC"], required: true, label: "Action", description: "STOP, PPAUSE (pause), PLAY or REC." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/control"
+      args: [ { value: "{action}", type: string } ]
+    returns: none
+
+  wlive_open_session:
+    summary: "Open a session on a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      session: { type: int, min: 0, max: 100, required: true, label: "Session", description: "Session number, 0 to 100." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/opensession"
+      args: [ { value: "{session}", type: int } ]
+    returns: none
+
+  wlive_edit_marker:
+    summary: "Move a W-Live marker to the current pause time or last play start"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      marker: { type: int, min: 0, max: 100, required: true, label: "Marker", description: "Marker number, 0 to 100." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/editmarker"
+      args: [ { value: "{marker}", type: int } ]
+    returns: none
+
+  wlive_goto_marker:
+    summary: "Go to a marker on a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      marker: { type: int, min: 0, max: 100, required: true, label: "Marker", description: "Marker number, 0 to 100." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/gotomarker"
+      args: [ { value: "{marker}", type: int } ]
+    returns: none
+
+  wlive_delete_marker:
+    summary: "Delete a marker on a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      marker: { type: int, min: 0, max: 100, required: true, label: "Marker", description: "Marker number, 0 to 100." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/deletemarker"
+      args: [ { value: "{marker}", type: int } ]
+    returns: none
+
+  wlive_delete_session:
+    summary: "Delete a session from a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      session: { type: int, min: 0, max: 100, required: true, label: "Session", description: "Session number, 0 to 100." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/deletesession"
+      args: [ { value: "{session}", type: int } ]
+    returns: none
+
+  wlive_goto_time:
+    summary: "Move a W-Live SD card's play position to a time, in ms"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      time_ms: { type: float, min: 0.0, max: 36000000.0, required: true, label: "Time", description: "Position in milliseconds, 0 to 36000000 (10 hours)." }
+    send:
+      - { address: "/cards/wlive/{card}/$ctl/stime", args: [ { value: "{time_ms}", type: float } ] }
+      - { address: "/cards/wlive/{card}/$ctl/gotomarker", args: [ { value: "101", type: int } ] }
+    returns: none
+
+  wlive_name_session:
+    summary: "Name the current session of a W-Live SD card (only when stopped)"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      name: { type: string, max_length: 19, required: true, label: "Name", description: "Session name, 19 characters at most." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/namesession"
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  wlive_add_marker:
+    summary: "Set a marker at the current position of a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/setmarker"
+      args: [ { value: "1", type: int } ]
+    returns: none
+
+  wlive_format_sd:
+    summary: "Format a W-Live SD card, erasing every session on it"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+    send:
+      address: "/cards/wlive/{card}/$ctl/formatsdcard"
+      args: [ { value: "1", type: int } ]
+    returns: none
+
+  set_wlive_record_tracks:
+    summary: "Set how many tracks a W-Live SD card records: 32, 16 or 8"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      tracks: { type: enum, values: ["32", "16", "8"], required: true, label: "Tracks", description: "32, 16 or 8." }
+    send:
+      address: "/cards/wlive/{card}/cfg/rectracks"
+      args: [ { value: "{tracks}", type: string } ]
+    returns: none
+
+  set_wlive_play_mode:
+    summary: "Set a W-Live SD card's play mode: PLAY, A->B or LOOP"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      mode: { type: enum, values: ["PLAY", "A->B", "LOOP"], required: true, label: "Play mode", description: "PLAY, A->B or LOOP." }
+    send:
+      address: "/cards/wlive/{card}/cfg/playmode"
+      args: [ { value: "{mode}", type: string } ]
+    returns: none
+
+  wlive_select_session:
+    summary: "Set the session position of a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      session: { type: int, min: 0, max: 100, required: true, label: "Session", description: "Session position, 0 to 100." }
+    send:
+      address: "/cards/wlive/{card}/$stat/sessionpos"
+      args: [ { value: "{session}", type: int } ]
+    returns: none
+
+  wlive_select_marker:
+    summary: "Set the marker position of a W-Live SD card"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      marker: { type: int, min: 0, max: 100, required: true, label: "Marker", description: "Marker position, 0 to 100." }
+    send:
+      address: "/cards/wlive/{card}/$stat/markerpos"
+      args: [ { value: "{marker}", type: int } ]
+    returns: none
+
+  set_wlive_play_range:
+    summary: "Set the start and stop times of a W-Live SD card's play range, in ms"
+    params:
+      card: { type: int, min: 1, max: 2, required: true, label: "Card", description: "W-Live SD card 1 or 2 (SD A or SD B)." }
+      start_ms: { type: float, min: 0.0, max: 36000000.0, required: true, label: "Start", description: "Start in milliseconds." }
+      stop_ms: { type: float, min: 0.0, max: 36000000.0, required: true, label: "Stop", description: "Stop in milliseconds." }
+    send:
+      - { address: "/cards/wlive/{card}/$stat/start", args: [ { value: "{start_ms}", type: float } ] }
+      - { address: "/cards/wlive/{card}/$stat/stop", args: [ { value: "{stop_ms}", type: float } ] }
+    returns: none
+
 quirks:
   - models: [all]
     severity: warning
@@ -7703,8 +8042,8 @@ quirks:
     text: >
       On connecting the core asks for the current value of every parameter it
       tracks, one query at a time, mutes, faders and names of every strip first:
-      22,453 queries on the full-size WING, 22,453 on the
-      Compact and 22,453 on the Rack, paced by the console's replies. Commands go
+      22,527 queries on the full-size WING, 22,527 on the
+      Compact and 22,527 on the Rack, paced by the console's replies. Commands go
       ahead of these queries.
 
   - models: [all]
@@ -8013,6 +8352,32 @@ quirks:
       follow the subscription. /$syscfg/tcplock "prevents
       modifications from TCP input"; whether it affects OSC over
       UDP is not documented.
+
+  - models: [all]
+    severity: critical
+    text: >
+      wlive_delete_session, wlive_delete_marker and
+      wlive_format_sd erase recordings on a W-Live SD card and
+      cannot be undone (p.68).
+
+  - models: [all]
+    severity: info
+    text: >
+      The USB player commands act only while a playlist is open on
+      the console (p.70 footnote 46). Its song list, and a W-Live
+      card's session date and name lists, return only their first
+      entry to a plain query (p.69 footnote 44, p.70 footnote 47),
+      so state keeps that entry; the full lists need a node
+      definition request. wlive_goto_time sets the time then sends
+      marker 101, which the document requires (p.68);
+      wlive_name_session works only while the card is stopped. The
+      document does not mark a W-Live card's session and marker
+      positions, start and stop as read-only;
+      wlive_select_session, wlive_select_marker and
+      set_wlive_play_range set them. With the USB host at full
+      speed (FS) the recorder is limited to 2 tracks at 16 bits
+      (p.39 footnote 16). The USB player's position and length are
+      taken as seconds (0 to 35999).
 
 state:
   "channels.*.fader": { type: float, description: "Fader level in dB, -144 (-oo) to +10" }
@@ -8612,6 +8977,58 @@ state:
   "status.stageconnect.upstreams": { type: int, description: "StageConnect upstream channel count (read-only)" }
   "status.stageconnect.downstreams": { type: int, description: "StageConnect downstream channel count (read-only)" }
   "status.stageconnect.upstream_routing": { type: string, description: "StageConnect upstream routing (read-only)" }
+  "usb_player.playlist": { type: string, description: "USB player: Path of the playlist's files" }
+  "usb_player.entry": { type: int, description: "USB player: Active playlist entry" }
+  "usb_player.state": { type: string, description: "USB player: Player state (STOP, PLAY, PAUSE, ERROR)" }
+  "usb_player.file": { type: string, description: "USB player: Active file" }
+  "usb_player.song": { type: string, description: "USB player: Song title" }
+  "usb_player.album": { type: string, description: "USB player: Album" }
+  "usb_player.artist": { type: string, description: "USB player: Artist" }
+  "usb_player.position": { type: float, unit: "s", description: "USB player: Position in the song" }
+  "usb_player.total": { type: float, unit: "s", description: "USB player: Song length" }
+  "usb_player.resolution": { type: string, description: "USB player: File resolution in bits (16, 24)" }
+  "usb_player.channels": { type: string, description: "USB player: File channel count (1-4)" }
+  "usb_player.rate": { type: string, description: "USB player: File sample rate in kHz (44.1, 48)" }
+  "usb_player.format": { type: string, description: "USB player: File format (WAV, MP3, FLAC)" }
+  "usb_player.repeat": { type: bool, description: "USB player: Repeat on" }
+  "usb_recorder.state": { type: string, description: "USB recorder: Recorder state (STOP, REC, PAUSE, ERROR)" }
+  "usb_recorder.file": { type: string, description: "USB recorder: File being recorded" }
+  "usb_recorder.path": { type: string, description: "USB recorder: Recording folder" }
+  "usb_recorder.resolution": { type: string, description: "USB recorder: Resolution in bits (16, 24)" }
+  "usb_recorder.channels": { type: string, description: "USB recorder: Channel count (2, 4)" }
+  "usb_recorder.time": { type: float, unit: "s", description: "USB recorder: Recorded time" }
+  "cards.type": { type: string, description: "Installed card (NONE, WLIVE, WDANTE; read-only)" }
+  "cards.version": { type: string, description: "Card version (read-only)" }
+  "cards.wlive.sd_link": { type: string, description: "W-Live: SD cards independent or parallel (IND, PAR)" }
+  "cards.wlive.active_link": { type: string, description: "W-Live: SD link in use (read-only)" }
+  "cards.wlive.battery": { type: string, description: "W-Live: Battery state (NONE, GOOD, LOW; read-only)" }
+  "cards.wlive.auto_input": { type: string, description: "W-Live: Automatic input (OFF, 1, 2)" }
+  "cards.wlive.meters": { type: bool, description: "W-Live: Card meters shown" }
+  "cards.wlive.when_stopped": { type: string, description: "W-Live: Strip inputs when stopped (KEEP, MAIN, ALT)" }
+  "cards.wlive.when_playing": { type: string, description: "W-Live: Strip inputs when playing (KEEP, MAIN, ALT)" }
+  "cards.wlive.when_recording": { type: string, description: "W-Live: Strip inputs when recording (KEEP, MAIN, ALT)" }
+  "cards.wlive.sd.*.record_tracks": { type: string, description: "W-Live SD card tracks recorded (32, 16, 8)" }
+  "cards.wlive.sd.*.play_mode": { type: string, description: "W-Live SD card play mode (PLAY, A->B, LOOP)" }
+  "cards.wlive.sd.*.state": { type: string, description: "W-Live SD card state (STOP, PPAUSE, PLAY, REC)" }
+  "cards.wlive.sd.*.time": { type: float, unit: "ms", description: "W-Live SD card current time" }
+  "cards.wlive.sd.*.sd_free": { type: float, unit: "ms", description: "W-Live SD card free recording time" }
+  "cards.wlive.sd.*.sd_size": { type: int, unit: "GB", description: "W-Live SD card SD card size" }
+  "cards.wlive.sd.*.sd_state": { type: string, description: "W-Live SD card SD card state (NONE, READY, PROTECT, ERASE, ERROR)" }
+  "cards.wlive.sd.*.first_session_date": { type: string, description: "W-Live SD card first entry of the session date list" }
+  "cards.wlive.sd.*.marker_time": { type: string, description: "W-Live SD card current marker time" }
+  "cards.wlive.sd.*.first_session_name": { type: string, description: "W-Live SD card first entry of the session name list" }
+  "cards.wlive.sd.*.sessions": { type: int, description: "W-Live SD card number of sessions" }
+  "cards.wlive.sd.*.markers": { type: int, description: "W-Live SD card number of markers" }
+  "cards.wlive.sd.*.session_length": { type: float, unit: "ms", description: "W-Live SD card session length" }
+  "cards.wlive.sd.*.session": { type: int, description: "W-Live SD card session position" }
+  "cards.wlive.sd.*.marker": { type: int, description: "W-Live SD card marker position" }
+  "cards.wlive.sd.*.tracks": { type: string, description: "W-Live SD card tracks in the current session" }
+  "cards.wlive.sd.*.rate": { type: string, description: "W-Live SD card sample rate in kHz" }
+  "cards.wlive.sd.*.linked_session": { type: int, description: "W-Live SD card linked session position on the other card" }
+  "cards.wlive.sd.*.start": { type: float, unit: "ms", description: "W-Live SD card play range start" }
+  "cards.wlive.sd.*.stop": { type: float, unit: "ms", description: "W-Live SD card play range stop" }
+  "cards.wlive.sd.*.error": { type: string, description: "W-Live SD card error message" }
+  "cards.wlive.sd.*.error_code": { type: int, description: "W-Live SD card error code" }
   "params.*.text": { type: string, description: "Any parameter's display text, keyed by its OSC address without the leading / (ch/1/fdr): a string or enumeration's value, or a number as the console shows it" }
   "params.*.raw": { type: float, description: "A float or int parameter's raw position, 0 to 1, keyed by its OSC address" }
   "params.*.float": { type: float, description: "A float parameter's value in its own unit (dB for a fader), keyed by its OSC address" }
@@ -8626,7 +9043,7 @@ telemetry:
     send: ["/*s"]
     every_ms: 9000
   # Current values, asked once on connecting, one at a time
-  # (22453 on the full-size WING, 22453 on the Compact, 22453 on the Rack):
+  # (22527 on the full-size WING, 22527 on the Compact, 22527 on the Rack):
   # mutes, faders and names of every strip first, then everything else.
   # /*s reports changes only. Explicit, because the format has no loops.
   poll:
@@ -31084,6 +31501,80 @@ telemetry:
       - "/$stat/rmt_a"
       - "/$stat/rmt_b"
       - "/$stat/rmt_c"
+      - "/play/$actlist"
+      - "/play/$actidx"
+      - "/play/$actstate"
+      - "/play/$actfile"
+      - "/play/$song"
+      - "/play/$album"
+      - "/play/$artist"
+      - "/play/$pos"
+      - "/play/$total"
+      - "/play/$resolution"
+      - "/play/$channels"
+      - "/play/$rate"
+      - "/play/$format"
+      - "/play/repeat"
+      - "/rec/$actstate"
+      - "/rec/$actfile"
+      - "/rec/path"
+      - "/rec/resolution"
+      - "/rec/channels"
+      - "/rec/$time"
+      - "/cards/$type"
+      - "/cards/$ver"
+      - "/cards/wlive/sdlink"
+      - "/cards/wlive/$actlink"
+      - "/cards/wlive/$battstate"
+      - "/cards/wlive/autoin"
+      - "/cards/wlive/meters"
+      - "/cards/wlive/auto_stop"
+      - "/cards/wlive/auto_play"
+      - "/cards/wlive/auto_rec"
+      - "/cards/wlive/1/cfg/rectracks"
+      - "/cards/wlive/1/cfg/playmode"
+      - "/cards/wlive/1/$stat/state"
+      - "/cards/wlive/1/$stat/etime"
+      - "/cards/wlive/1/$stat/sdfree"
+      - "/cards/wlive/1/$stat/sdsize"
+      - "/cards/wlive/1/$stat/sdstate"
+      - "/cards/wlive/1/$stat/sessionlist"
+      - "/cards/wlive/1/$stat/markerlist"
+      - "/cards/wlive/1/$stat/snamelist"
+      - "/cards/wlive/1/$stat/sessions"
+      - "/cards/wlive/1/$stat/markers"
+      - "/cards/wlive/1/$stat/sessionlen"
+      - "/cards/wlive/1/$stat/sessionpos"
+      - "/cards/wlive/1/$stat/markerpos"
+      - "/cards/wlive/1/$stat/tracks"
+      - "/cards/wlive/1/$stat/rate"
+      - "/cards/wlive/1/$stat/linkedpos"
+      - "/cards/wlive/1/$stat/start"
+      - "/cards/wlive/1/$stat/stop"
+      - "/cards/wlive/1/$stat/errormessage"
+      - "/cards/wlive/1/$stat/errorcode"
+      - "/cards/wlive/2/cfg/rectracks"
+      - "/cards/wlive/2/cfg/playmode"
+      - "/cards/wlive/2/$stat/state"
+      - "/cards/wlive/2/$stat/etime"
+      - "/cards/wlive/2/$stat/sdfree"
+      - "/cards/wlive/2/$stat/sdsize"
+      - "/cards/wlive/2/$stat/sdstate"
+      - "/cards/wlive/2/$stat/sessionlist"
+      - "/cards/wlive/2/$stat/markerlist"
+      - "/cards/wlive/2/$stat/snamelist"
+      - "/cards/wlive/2/$stat/sessions"
+      - "/cards/wlive/2/$stat/markers"
+      - "/cards/wlive/2/$stat/sessionlen"
+      - "/cards/wlive/2/$stat/sessionpos"
+      - "/cards/wlive/2/$stat/markerpos"
+      - "/cards/wlive/2/$stat/tracks"
+      - "/cards/wlive/2/$stat/rate"
+      - "/cards/wlive/2/$stat/linkedpos"
+      - "/cards/wlive/2/$stat/start"
+      - "/cards/wlive/2/$stat/stop"
+      - "/cards/wlive/2/$stat/errormessage"
+      - "/cards/wlive/2/$stat/errorcode"
   updates:
     - address: "^/ch/(\\d+)/fdr$"
       state: { "channels.{1}.fader": "{arg2}" }
@@ -32296,6 +32787,110 @@ telemetry:
       state: { "status.stageconnect.downstreams": "{arg2}" }
     - address: "^/\\$stat/sc_uprout$"
       state: { "status.stageconnect.upstream_routing": "{arg0}" }
+    - address: "^/play/\\$actlist$"
+      state: { "usb_player.playlist": "{arg0}" }
+    - address: "^/play/\\$actidx$"
+      state: { "usb_player.entry": "{arg2}" }
+    - address: "^/play/\\$actstate$"
+      state: { "usb_player.state": "{arg0}" }
+    - address: "^/play/\\$actfile$"
+      state: { "usb_player.file": "{arg0}" }
+    - address: "^/play/\\$song$"
+      state: { "usb_player.song": "{arg0}" }
+    - address: "^/play/\\$album$"
+      state: { "usb_player.album": "{arg0}" }
+    - address: "^/play/\\$artist$"
+      state: { "usb_player.artist": "{arg0}" }
+    - address: "^/play/\\$pos$"
+      state: { "usb_player.position": "{arg2}" }
+    - address: "^/play/\\$total$"
+      state: { "usb_player.total": "{arg2}" }
+    - address: "^/play/\\$resolution$"
+      state: { "usb_player.resolution": "{arg0}" }
+    - address: "^/play/\\$channels$"
+      state: { "usb_player.channels": "{arg0}" }
+    - address: "^/play/\\$rate$"
+      state: { "usb_player.rate": "{arg0}" }
+    - address: "^/play/\\$format$"
+      state: { "usb_player.format": "{arg0}" }
+    - address: "^/play/repeat$"
+      state: { "usb_player.repeat": { value: "{arg2}", map: { "0": false, "1": true } } }
+    - address: "^/rec/\\$actstate$"
+      state: { "usb_recorder.state": "{arg0}" }
+    - address: "^/rec/\\$actfile$"
+      state: { "usb_recorder.file": "{arg0}" }
+    - address: "^/rec/path$"
+      state: { "usb_recorder.path": "{arg0}" }
+    - address: "^/rec/resolution$"
+      state: { "usb_recorder.resolution": "{arg0}" }
+    - address: "^/rec/channels$"
+      state: { "usb_recorder.channels": "{arg0}" }
+    - address: "^/rec/\\$time$"
+      state: { "usb_recorder.time": "{arg2}" }
+    - address: "^/cards/\\$type$"
+      state: { "cards.type": "{arg0}" }
+    - address: "^/cards/\\$ver$"
+      state: { "cards.version": "{arg0}" }
+    - address: "^/cards/wlive/sdlink$"
+      state: { "cards.wlive.sd_link": "{arg0}" }
+    - address: "^/cards/wlive/\\$actlink$"
+      state: { "cards.wlive.active_link": "{arg0}" }
+    - address: "^/cards/wlive/\\$battstate$"
+      state: { "cards.wlive.battery": "{arg0}" }
+    - address: "^/cards/wlive/autoin$"
+      state: { "cards.wlive.auto_input": "{arg0}" }
+    - address: "^/cards/wlive/meters$"
+      state: { "cards.wlive.meters": { value: "{arg2}", map: { "0": false, "1": true } } }
+    - address: "^/cards/wlive/auto_stop$"
+      state: { "cards.wlive.when_stopped": "{arg0}" }
+    - address: "^/cards/wlive/auto_play$"
+      state: { "cards.wlive.when_playing": "{arg0}" }
+    - address: "^/cards/wlive/auto_rec$"
+      state: { "cards.wlive.when_recording": "{arg0}" }
+    - address: "^/cards/wlive/([12])/cfg/rectracks$"
+      state: { "cards.wlive.sd.{1}.record_tracks": "{arg0}" }
+    - address: "^/cards/wlive/([12])/cfg/playmode$"
+      state: { "cards.wlive.sd.{1}.play_mode": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/state$"
+      state: { "cards.wlive.sd.{1}.state": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/etime$"
+      state: { "cards.wlive.sd.{1}.time": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/sdfree$"
+      state: { "cards.wlive.sd.{1}.sd_free": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/sdsize$"
+      state: { "cards.wlive.sd.{1}.sd_size": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/sdstate$"
+      state: { "cards.wlive.sd.{1}.sd_state": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/sessionlist$"
+      state: { "cards.wlive.sd.{1}.first_session_date": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/markerlist$"
+      state: { "cards.wlive.sd.{1}.marker_time": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/snamelist$"
+      state: { "cards.wlive.sd.{1}.first_session_name": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/sessions$"
+      state: { "cards.wlive.sd.{1}.sessions": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/markers$"
+      state: { "cards.wlive.sd.{1}.markers": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/sessionlen$"
+      state: { "cards.wlive.sd.{1}.session_length": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/sessionpos$"
+      state: { "cards.wlive.sd.{1}.session": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/markerpos$"
+      state: { "cards.wlive.sd.{1}.marker": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/tracks$"
+      state: { "cards.wlive.sd.{1}.tracks": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/rate$"
+      state: { "cards.wlive.sd.{1}.rate": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/linkedpos$"
+      state: { "cards.wlive.sd.{1}.linked_session": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/start$"
+      state: { "cards.wlive.sd.{1}.start": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/stop$"
+      state: { "cards.wlive.sd.{1}.stop": "{arg2}" }
+    - address: "^/cards/wlive/([12])/\\$stat/errormessage$"
+      state: { "cards.wlive.sd.{1}.error": "{arg0}" }
+    - address: "^/cards/wlive/([12])/\\$stat/errorcode$"
+      state: { "cards.wlive.sd.{1}.error_code": "{arg2}" }
     - address: "^/([A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*)$"
       arg_types: s
       state: { "params.{1}.text": "{arg0}" }
