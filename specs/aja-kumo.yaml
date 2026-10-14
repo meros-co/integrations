@@ -77,6 +77,21 @@ transport:
     method: GET
     path: /config
     query: { action: get, paramid: eParamID_KumoProductID }
+  # User Authentication set to Login (manual p.50): every request carries the
+  # session cookie from a form POST of the password (KumoRtrWithAuth.py).
+  # Only when the operator says the router asks for a login.
+  session:
+    when_set: user_authentication
+    login:
+      method: POST
+      path: /authenticator/login
+      body: "password_provided={settings.password:url}"
+      content_type: application/x-www-form-urlencoded
+    capture: { cookie: session }
+
+settings:
+  user_authentication: { type: bool, default: false, label: User authentication, description: "On when the router's User Authentication is set to Login, so every request first logs in with the password; off when it is Disabled (the default)." }
+  password: { type: string, secret: true, default: "password", label: Password, description: "The router's login password, used only with user authentication on; the router's default is password." }
 
 # The event connection (AJA REST API chapter 1; python_examples): connect,
 # then hold a wait_for_config_events request open, again and again, with the
@@ -1446,8 +1461,13 @@ quirks:
       With User Authentication set to Login (default Disabled; default
       password "password", manual p.50) every request needs the session
       cookie from a form POST of password_provided to /authenticator/login
-      (KumoRtrWithAuth.py). The format has no cookie login, so the unit must
-      have User Authentication set to Disabled.
+      (KumoRtrWithAuth.py): turn the user_authentication setting on and give
+      the password, and the integration logs in before its first request and
+      sends the cookie with each one, the event connection's included. The
+      documents say neither how a wrong password is answered nor how an
+      expired session is, so neither is detected: a wrong password shows as
+      failing requests, and a session the router ends needs the integration
+      reopened (or update_settings).
 
   - models: [all]
     severity: warning
