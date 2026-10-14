@@ -1485,6 +1485,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Acuity, Ultrix Acuity and Vision, check what the RTalk-IN "Cmd Response" option does. ([specs/rosstalk.yaml:1182](specs/rosstalk.yaml#L1182))
 - [ ] On Vision, check whether command words such as MECUT and MEAUTO must use MLE instead of ME. ([specs/rosstalk.yaml:1202](specs/rosstalk.yaml#L1202))
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
+- [ ] Capture, on a Carbonite-family and an Acuity-family switcher with Cmd Response on and off, the bytes each documented query answers (XPT, MS, MNEM, TRANSRATE, TRANSTYPE, TRANSINCL, MVBOX, USERVAR and KEYSHAPED with ?, KEYSTATE, ACTIVEID, VERSION, HELP, MEM ?), the answer to an unknown source or ME, the answer to a set, the order of answers to queries sent together, and any unasked messages, so state can be kept. ([specs/rosstalk.yaml:1469](specs/rosstalk.yaml#L1469))
 
 ## sennheiser-chg-70n — Sennheiser CHG 70N
 
