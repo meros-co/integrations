@@ -911,8 +911,9 @@ impl Shared {
     }
 }
 
-/// UDP 5353, shared with the host's own mDNS responder.
-fn bind_listener() -> std::io::Result<UdpSocket> {
+/// UDP 5353, shared with the host's own mDNS responder. A core bound to a
+/// loopback address listens there alone: nothing beyond the host reaches it.
+fn bind_listener(bind: IpAddr) -> std::io::Result<UdpSocket> {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
     // mDNSResponder binds 5353 with SO_REUSEPORT, so sharing it needs it too.
@@ -926,6 +927,7 @@ fn bind_listener() -> std::io::Result<UdpSocket> {
     let address = IpAddr::V4(GROUP);
     #[cfg(not(unix))]
     let address = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+    let address = if bind.is_loopback() { bind } else { address };
     socket.bind(&SocketAddr::new(address, PORT).into())?;
     UdpSocket::from_std(socket.into())
 }
@@ -1040,7 +1042,7 @@ impl Mdns {
         let mut state = self.state.lock().unwrap();
         let shared = self.shared(&mut state, services);
         if state.listener.is_none() {
-            let socket = match bind_listener() {
+            let socket = match bind_listener(services.bind_address) {
                 Ok(s) => Arc::new(s),
                 Err(e) => {
                     shared.log(format!(
