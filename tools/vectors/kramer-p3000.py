@@ -417,3 +417,147 @@ telemetry(K, "talkover", inbound="~01@MIC-TLK 0,0,80\r\n", expect_state={"audio"
 telemetry(K, "mix", inbound="~01@AUD-MIX 1,2,-20\r\n", expect_state={"audio": {"channels": {"1": {"mix": {"2": -20.0}}}}})
 telemetry(K, "bass", inbound="~01@BASS 1,15\r\n", expect_state={"audio": {"channels": {"1": {"bass": 15}}}})
 telemetry(K, "edid-error-not-state", inbound="~01@LOCK-EDID 9,1 ERR 003\r\n", expect_state={})
+
+# ── Product-specific commands, from each product's user manual: MV-4X
+# (2900-301566 Rev 5, p.60-70), KDS-EN7/DEC7 (2900-301543 Rev 9, p.86-103),
+# DSP-62-AEC/UC (2900-301432 Rev 3, p.59-83). The manuals write no space
+# after the command name; Protocol 3000 puts one there (guide p.2). ──
+_ACKR = {"ok": {"kind": "ack"}}
+_MV = {"model": "mv-4x"}
+_EN = {"model": "kds-en7"}
+_DE = {"model": "kds-dec7"}
+_DS = {"model": "dsp-62-aec"}
+_A2 = "IN.ANALOG_AUDIO.2.AUDIO.1"
+_A3 = "IN.ANALOG_AUDIO.3.AUDIO.1"
+_OS = "OUT.ANALOG_STEREO.1.AUDIO.1"
+_PRODUCT = [
+    # MV-4X
+    ("set_rotation", {"output": 1, "input": 1, "angle": 3}, "#ROTATE 1,1,3", _MV),
+    ("get_rotation", {"output": 1, "input": 3}, "#ROTATE? 1,3", _MV),
+    ("reset_window", {"window": 2}, "#RSTWIN 2", _MV),
+    ("reset_window_parameters", {"window": 4}, "#W-P-DEFAULT 4", _MV),
+    ("set_window_sharpness_h", {"window": 1, "value": 60}, "#W-SHARP-H 1,60", _MV),
+    ("get_window_sharpness_h", {"window": 1}, "#W-SHARP-H? 1", _MV),
+    ("set_window_sharpness_v", {"window": 3, "value": 40}, "#W-SHARP-V 3,40", _MV),
+    ("get_window_sharpness_v", {"window": 3}, "#W-SHARP-V? 3", _MV),
+    ("set_io_hdcp_mode", {"io": 1, "port": 2, "mode": 3}, "#HDCP-MOD 1,2,3", _MV),
+    ("get_io_hdcp_mode", {"io": 0, "port": 4}, "#HDCP-MOD? 0,4", _MV),
+    # KDS-EN7 / KDS-DEC7
+    ("set_kds_channel", {"channel": 1}, "#KDS-CHANNEL-SELECT [video,audio,rs232,ir,usb,cec],1", _DE),
+    ("set_kds_signal_channel", {"signal": "ir", "channel": 12}, "#KDS-CHANNEL-SELECT [ir],12", _DE),
+    ("get_kds_channel", {"signal": "video"}, "#KDS-CHANNEL-SELECT? video", _DE),
+    ("set_kds_define_channel", {"channel": 7}, "#KDS-DEFINE-CHANNEL 7", _EN),
+    ("get_kds_define_channel", {}, "#KDS-DEFINE-CHANNEL?", _EN),
+    ("set_kds_method", {"method": 2}, "#KDS-METHOD 2", _EN),
+    ("set_kds_multicast", {"group": "0.0.0.0", "ttl": 64}, "#KDS-MULTICAST 0.0.0.0,64", _EN),
+    ("get_kds_multicast", {}, "#KDS-MULTICAST?", _DE),
+    ("set_kds_multicast_prefix", {"prefix": 224}, "#KDS-MULTICAST-PREFIX 224", _EN),
+    ("get_kds_multicast_prefix", {}, "#KDS-MULTICAST-PREFIX?", _DE),
+    ("get_kds_ratio", {}, "#KDS-RATIO?", _EN),
+    ("get_kds_resolution", {"io": 0, "port": 1, "native": False}, "#KDS-RESOL? 0,1,0", _EN),
+    ("set_kds_vlan_tag", {"gateway": 1, "tag": 33}, "#KDS-VLAN-TAG 1,33", _EN),
+    ("get_kds_vlan_tag", {"gateway": 1}, "#KDS-VLAN-TAG? 1", _EN),
+    ("set_service_vlan", {"service": 1, "enabled": True, "vlan": 100, "cos": 5}, "#NET-SRV-802-1Q 1,1,100,5", _DE),
+    ("get_service_vlan", {"service": 0}, "#NET-SRV-802-1Q? 0", _DE),
+    ("set_service_dscp", {"service": 0, "dscp": 46}, "#NET-SRV-DSCP 0,46", _EN),
+    ("get_service_dscp", {"service": 1}, "#NET-SRV-DSCP? 1", _EN),
+    ("set_video_wall_grid", {"columns": 2, "rows": 2}, "#VIEW-MOD 15,2,2", _DE),
+    ("set_video_wall_mosaic", {"x1": 0, "y1": 0, "x2": 5000, "y2": 5000}, "#VIEW-MOD 16,0,0,5000,5000", _DE),
+    ("set_video_wall_position", {"position": 3, "rotation": 2}, "#VIDEO-WALL-SETUP 3,2", _DE),
+    ("get_video_wall_position", {}, "#VIDEO-WALL-SETUP?", _DE),
+    ("set_video_wall_bezel", {"vw": 1180, "ow": 1210, "vh": 664, "oh": 694}, "#KDS-VW-BEZEL 1180,1210,664,694", _DE),
+    ("get_video_wall_bezel", {}, "#KDS-VW-BEZEL?", _DE),
+    ("set_video_wall_pattern", {"enabled": True}, "#KDS-VW-PATTERN 1", _DE),
+    ("get_video_wall_pattern", {}, "#KDS-VW-PATTERN?", _DE),
+    ("set_video_wall_stretch", {"output": 1, "mode": 1}, "#WND-STRETCH 1,1", _DE),
+    ("get_video_wall_stretch", {"output": 1}, "#WND-STRETCH? 1", _DE),
+    ("set_kds_osd_display", {"mode": 2}, "#KDS-OSD-DISPLAY 2", _DE),
+    ("get_kds_osd_display", {}, "#KDS-OSD-DISPLAY?", _DE),
+    ("set_kds_daisy_chain", {"enabled": False}, "#KDS-DAISY-CHAIN 0", _DE),
+    ("get_kds_daisy_chain", {}, "#KDS-DAISY-CHAIN?", _DE),
+    ("set_kds_sleep_image", {"enabled": True}, "#KDS-SLEEP-IMAGE 1", _DE),
+    ("get_kds_sleep_image", {}, "#KDS-SLEEP-IMAGE?", _DE),
+    ("set_hdcp_output_mode", {"output": 1, "mode": 0}, "#HDCP-OUT 1,0", _EN),
+    ("get_hdcp_output_mode", {"output": 1}, "#HDCP-OUT? 1", _DE),
+    ("set_color_space_convert", {"output": 1, "mode": 1}, "#CS-CONVERT 1,1", _DE),
+    ("get_color_space_convert", {"output": 1}, "#CS-CONVERT? 1", _DE),
+    ("set_interface_name", {"interface": 0, "name": "LOBBY-DEC"}, "#NAME 0,LOBBY-DEC", _DE),
+    ("get_interface_name", {"interface": 0}, "#NAME? 0", _EN),
+    # DSP-62
+    ("set_dsp_aec", {"field": "bypass", "signal": _A3, "value": "0"}, f"#DSP-AEC bypass,{_A3},0", _DS),
+    ("get_dsp_aec", {"field": "low-freq", "signal": _A3}, f"#DSP-AEC? low-freq,{_A3}", _DS),
+    ("set_dsp_compressor", {"field": "attack", "signal": _A3, "value": "15"}, f"#DSP-COMP attack,{_A3},15", _DS),
+    ("get_dsp_compressor", {"field": "attack", "signal": _A3}, f"#DSP-COMP? attack,{_A3}", _DS),
+    ("set_dsp_delay", {"field": "delay", "signal": "OUT.USB_B.1.AUDIO.1", "value": "75"},
+     "#DSP-DELAY delay,OUT.USB_B.1.AUDIO.1,75", _DS),
+    ("get_dsp_delay", {"field": "bypass", "signal": "IN.HDMI_AUDIO.1.AUDIO.1"},
+     "#DSP-DELAY? bypass,IN.HDMI_AUDIO.1.AUDIO.1", _DS),
+    ("set_dsp_expander", {"field": "attack", "signal": _A2, "value": "50"}, f"#DSP-EXP attack,{_A2},50", _DS),
+    ("get_dsp_expander", {"field": "attack", "signal": _A2}, f"#DSP-EXP? attack,{_A2}", _DS),
+    ("set_dsp_high_pass", {"field": "bypass", "signal": _A2, "value": "0"}, f"#DSP-HPF bypass,{_A2},0", _DS),
+    ("get_dsp_high_pass", {"field": "bypass", "signal": _A2}, f"#DSP-HPF? bypass,{_A2}", _DS),
+    ("set_dsp_limiter", {"field": "bypass", "signal": _OS, "value": "1"}, f"#DSP-LIMITER bypass,{_OS},1", _DS),
+    ("get_dsp_limiter", {"field": "bypass", "signal": "OUT.ANALOG_STEREO.2.AUDIO.1"},
+     "#DSP-LIMITER? bypass,OUT.ANALOG_STEREO.2.AUDIO.1", _DS),
+    ("set_dsp_post", {"field": "mute", "signal": _A2, "value": "1"}, f"#DSP-POST mute,{_A2},1", _DS),
+    ("get_dsp_post", {"field": "mute", "signal": _A2}, f"#DSP-POST? mute,{_A2}", _DS),
+    ("set_dsp_eq", {"field": "level", "signal": _A2, "band": 2, "value": "12"}, f"#DSP-EQ level,{_A2},2,12", _DS),
+    ("get_dsp_eq", {"field": "band-bypass", "signal": _A2, "band": 0}, f"#DSP-EQ? band-bypass,{_A2},0", _DS),
+    ("set_dsp_invert", {"signal": _A2, "inverted": False}, f"#DSP-INVERT {_A2},0", _DS),
+    ("get_dsp_invert", {"signal": _A2}, f"#DSP-INVERT? {_A2}", _DS),
+    ("set_signal_generator", {"field": "mode", "value": "2"}, "#DSP-SIGGEN mode,IN.GENERATOR.1.AUDIO.1,2", _DS),
+    ("get_signal_generator", {"field": "tone-freq"}, "#DSP-SIGGEN? tone-freq,IN.GENERATOR.1.AUDIO.1", _DS),
+    ("get_dsp_meter", {"signal": _OS, "type": 5}, f"#DSP-METER? {_OS},5", _DS),
+    ("set_mix_level", {"output_signal": _OS, "input_signal": "IN.USB_B.1.AUDIO.2", "level": -25.0},
+     f"#X-MIX-LVL {_OS},IN.USB_B.1.AUDIO.2,-25.0", _DS),
+    ("get_mix_level", {"output_signal": _OS, "input_signal": "IN.HDMI_AUDIO.1.AUDIO.1"},
+     f"#X-MIX-LVL? {_OS},IN.HDMI_AUDIO.1.AUDIO.1", _DS),
+    ("set_mix_mute", {"output_signal": _OS, "input_signal": "IN.HDMI_AUDIO.1.AUDIO.1", "muted": False},
+     f"#X-MIX-MUTE {_OS},IN.HDMI_AUDIO.1.AUDIO.1,0", _DS),
+    ("get_mix_mute", {"output_signal": _OS, "input_signal": "IN.HDMI_AUDIO.1.AUDIO.1"},
+     f"#X-MIX-MUTE? {_OS},IN.HDMI_AUDIO.1.AUDIO.1", _DS),
+    ("set_audio_input_mode", {"signal": "IN.ANALOG_AUDIO.5.AUDIO.1", "mode": 2},
+     "#X-AUD-MODE IN.ANALOG_AUDIO.5.AUDIO.1,2", _DS),
+    ("get_audio_input_mode", {"signal": "IN.ANALOG_AUDIO.5.AUDIO.1"}, "#X-AUD-MODE? IN.ANALOG_AUDIO.5.AUDIO.1", _DS),
+    ("set_mic_type", {"signal": _A3, "type": "condenser"}, f"#X-MIC-TYPE {_A3},condenser", _DS),
+    ("get_mic_type", {"signal": _A3}, f"#X-MIC-TYPE? {_A3}", _DS),
+    ("set_link_group", {"group": 1, "linked": False}, "#X-LINK-GROUP 1,OFF", _DS),
+    ("get_link_group", {"group": 1}, "#X-LINK-GROUP? 1", _DS),
+    ("set_signal_pattern", {"pattern": 2}, "#X-PATTERN OUT.HDMI.1.VIDEO.1,2", _DS),
+    ("get_signal_pattern", {}, "#X-PATTERN? OUT.HDMI.1.VIDEO.1", _DS),
+    ("recall_config_preset", {"type": "IOCONFIG.SYSTEM.MIXER", "preset": 3}, "#X-PRST-RCL IOCONFIG.SYSTEM.MIXER,3", _DS),
+    ("store_config_preset", {"type": "IOCONFIG.SYSTEM", "preset": 2}, "#X-PRST-STO IOCONFIG.SYSTEM,2", _DS),
+]
+for _cmd, _in, _wire, _m in _PRODUCT:
+    text(K, _cmd, _in, _wire + "\r", **_m)
+# Replies: an ack and a value.
+text(K, "set_rotation", {"output": 1, "input": 2, "angle": 4}, "#ROTATE 1,2,4\r", device_reply="~01@ROTATE 1,2,4\r\n",
+     expect_result=_ACKR, file="set_rotation_reply", **_MV)
+text(K, "get_kds_channel", {"signal": "audio"}, "#KDS-CHANNEL-SELECT? audio\r",
+     device_reply="~01@KDS-CHANNEL-SELECT audio,12\r\n",
+     expect_result={"ok": {"kind": "value", "value": "audio,12"}}, file="get_kds_channel_reply", **_DE)
+# The products report their state the same way (bidirectional commands, guide p.3).
+telemetry(K, "mv-rotation", model="mv-4x", inbound="~01@#ROTATE 1,3,2\r\n", expect_state={"mv": {"rotation": {"1": {"3": 2}}}})
+telemetry(K, "kds-channel", model="kds-dec7", inbound="~01@KDS-CHANNEL-SELECT video,5\r\n",
+          expect_state={"kds": {"channels": {"video": 5}}})
+telemetry(K, "kds-channel-list", model="kds-dec7", inbound="~01@KDS-CHANNEL-SELECT [video,audio,IR],8\r\n",
+          expect_state={"kds": {"channels": {"video": 8, "audio": 8, "ir": 8}}})
+telemetry(K, "kds-define-channel", model="kds-en7", inbound="~01@KDS-DEFINE-CHANNEL 7\r\n",
+          expect_state={"kds": {"encoder_channel": 7}})
+telemetry(K, "kds-vlan", model="kds-en7", inbound="~01@KDS-VLAN-TAG 0,33\r\n", expect_state={"kds": {"vlan_tags": {"0": 33}}})
+telemetry(K, "video-wall", model="kds-dec7", inbound="~01@VIDEO-WALL-SETUP 3,1\r\n",
+          expect_state={"video_wall": {"position": 3, "rotation": 1}})
+telemetry(K, "mix-level", model="dsp-62-aec", inbound=f"~01@X-MIX-LVL {_OS},IN.USB_B.1.AUDIO.2,-25.5\r\n",
+          expect_state={"mixer": {_OS: {"IN.USB_B.1.AUDIO.2": {"level": -25.5}}}})
+telemetry(K, "mix-mute", model="dsp-62-aec", inbound=f"~01@X-MIX-MUTE {_OS},IN.HDMI_AUDIO.1.AUDIO.1,1\r\n",
+          expect_state={"mixer": {_OS: {"IN.HDMI_AUDIO.1.AUDIO.1": {"mute": True}}}})
+telemetry(K, "dsp-stage", model="dsp-62-aec", inbound=f"~01@DSP-COMP attack,{_A3},15\r\n",
+          expect_state={"dsp": {"comp": {_A3: {"attack": "15"}}}})
+telemetry(K, "dsp-eq", model="dsp-62-aec", inbound=f"~01@DSP-EQ level,{_A2},2,-3.5\r\n",
+          expect_state={"dsp": {"eq": {_A2: {"2": {"level": "-3.5"}}}}})
+telemetry(K, "dsp-invert", model="dsp-62-aec", inbound=f"~01@DSP-INVERT {_A2},1\r\n",
+          expect_state={"dsp": {"invert": {_A2: {"inverted": "1"}}}})
+telemetry(K, "dsp-meter", model="dsp-62-aec", inbound=f"~01@DSP-METER {_OS},5,-12.5\r\n",
+          expect_state={"meters": {_OS: {"5": -12.5}}})
+telemetry(K, "dsp-error-not-state", model="dsp-62-aec", inbound=f"~01@DSP-COMP attack,{_A3},150 ERR 003\r\n",
+          expect_state={})

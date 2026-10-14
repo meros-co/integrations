@@ -129,6 +129,26 @@ _mh("show_still", {"id": 26}, "POST", "/api/v1/media/26/show", http_reply={"stat
 _mh("show_still_by_name", {"name": "VGA-no-signal-image.jpeg"}, "POST", "/api/v1/media/show",
     {"name": "VGA-no-signal-image.jpeg"})
 _mh("hide_still", {}, "POST", "/api/v1/media/hide")
+
+
+# 3.4.5: one form field named file (curl -F file=@103.png); the boundary is
+# the core's, derived from the parts (SPEC.md §4, "Binary request bodies").
+def _mh_form(name, data, filename):
+    import hashlib
+    boundary = "----form-" + hashlib.sha256(name.encode() + b"\0" + data + b"\0").hexdigest()[:16]
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"; filename=\"{filename}\"\r\n"
+            "Content-Type: application/octet-stream\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+_MH_UP, _MH_UP_TYPE = _mh_form("file", b"\x89PNG", "103.png")
+V.append({"spec": "megapixel-helios", "command": "upload_still", "input": {"file": "iVBORw==", "filename": "103.png"},
+          "expect_request": {"method": "POST", "target": "/api/v1/media", "body_hex": _MH_UP.hex(),
+                             "content_type": _MH_UP_TYPE},
+          "http_reply": {"status": 200, "body": '{"type":"media","id":75,"attributes":{"id":75,"name":"103.png",'
+                                                '"media":"5f2b.png","updatedAt":"2024-05-03T10:00:00.000Z",'
+                                                '"createdAt":"2024-05-03T10:00:00.000Z"}}'},
+          "expect_result": {"ok": {"kind": "value", "value": 75}}})
 # 3.2.1.
 _mh("list_preview_sources", {}, "GET", "/api/v1/preview",
     http_reply={"status": 200, "body": '["preview","hdmi","sdi1"]'},

@@ -114,7 +114,7 @@ models:
                set_group_mask, set_group_test_pattern_enabled, set_group_test_pattern_color,
                set_receiver_group, set_receiver_position, set_processor_name,
                list_presets, list_presets_full, recall_preset, recall_preset_by_name,
-               list_stills, show_still, show_still_by_name, hide_still, list_preview_sources]
+               list_stills, upload_still, show_still, show_still_by_name, hide_still, list_preview_sources]
     verification: none
     notes: >
       One processor model; what it can do depends on its input cards (HDMI
@@ -627,6 +627,23 @@ commands:
     summary: "Stills in the still store: id, name, internal file name and times"
     send: { method: GET, path: /api/v1/media }
     expect: { status: 200, json_path: "$.media" }
+    returns: value
+
+  upload_still:
+    summary: "Add an image to the still store (POST /api/v1/media, multipart/form-data with the field file, 3.4.5); answers the new still's id"
+    params:
+      file: { type: binary, max_length: 33554432, required: true,
+              label: Image,
+              description: "The image file's contents, given as base64, such as a PNG or JPEG." }
+      filename: { type: string, max_length: 255, pattern: "^[^/\\\\\"]+$", required: true,
+                  label: File name,
+                  description: "The file's name with its extension, which becomes the still's name in the still store." }
+    send:
+      method: POST
+      path: /api/v1/media
+      multipart:
+        - { name: file, binary: file, filename: "{filename}", content_type: application/octet-stream }
+    expect: { status: 200, json_path: "$.id" }
     returns: value
 
   show_still:
@@ -3061,8 +3078,11 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Not included: uploading a still (multipart/form-data, which the format
-      does not send), the MJPEG and JPEG previews (binary, at
+      The Public API has no request to save the current settings as a
+      configuration (preset), rename one or delete one, and none to delete a
+      still: saved configurations are made and removed in the web application
+      only (3.3 lists four requests: list, list in full, apply by id, apply by
+      name). Not included: the MJPEG and JPEG previews (binary, at
       /api/v1/preview/<source>), sACN control of group gains (UDP 5568), and
       the processor reboot and pixel error detection that release notes after
       24.07 add to the API, whose request forms are only in the on-request

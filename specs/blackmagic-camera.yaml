@@ -6,10 +6,9 @@ category: camera
 
 # Every command is an endpoint of Blackmagic's REST API for Blackmagic
 # Cameras, under the base path /control/api/v1. Summaries end with the method,
-# the path below the base path and the document's page. The document's
-# websocket notification service is not used: the document does not give its
-# URL, so it cannot be opened (telemetry.websocket needs a path); state is
-# polled instead. See quirks.
+# the path below the base path and the document's page. Changes are pushed
+# by the camera's notification websocket (p.71-94) and re-read over REST; see
+# telemetry and quirks.
 
 source:
   - title: REST API for Blackmagic Cameras (Developer Information, August 2025)
@@ -57,10 +56,13 @@ settings:
   scheme: { type: enum, values: [http, https], default: http, label: Scheme, description: "http for the web media manager enabled without security, https when it is enabled with security." }
   username: { type: string, default: "", label: Username, description: "The username set in Blackmagic Camera Setup when the web media manager is enabled with security; empty otherwise." }
   password: { type: string, secret: true, default: "", label: Password, description: "The password set in Blackmagic Camera Setup when the web media manager is enabled with security; empty otherwise." }
+  websocket_scheme: { type: enum, values: [ws, wss], default: ws, label: Notification scheme, description: "ws when the scheme is http and wss when it is https: the notification websocket is served beside the REST API." }
 
 ports:
   - { port: 80, protocol: http, role: control }
   - { port: 80, protocol: https, role: control, when: "scheme https" }
+  - { port: 80, protocol: ws, role: push }
+  - { port: 80, protocol: wss, role: push, when: "websocket_scheme wss" }
 
 models:
   - id: ursa-cine-12k-lf
@@ -2374,52 +2376,100 @@ commands:
     returns: value
 
 telemetry:
-  # The camera pushes property changes only over its websocket (p.71-94),
-  # whose URL the document does not give, so the properties an operator watches are
-  # polled every ten seconds. Replies to the matching get commands, and to
-  # set_next_clip_slate (which answers with the slate), update the same state.
-  poll:
-    every_ms: 10000
+  # The camera pushes each change of a subscribed property over its
+  # notification websocket (Notification websocket 1.0.0, p.71-75) as an
+  # event whose data names the property ("/lens/iris") and carries its value,
+  # which is the GET body of the same path (p.76-94). Each event has that
+  # path read again, and the path rules below apply it. The subscription is
+  # sent each time the websocket opens. The document does not give the
+  # websocket's path; /control/api/v1/event/websocket is the one each camera's
+  # own /control/documentation.html gives (see quirks).
+  websocket:
+    path: /control/api/v1/event/websocket
+    scheme: { setting: websocket_scheme }
     send:
-      - { method: GET, path: /control/api/v1/transports/0 }
-      - { method: GET, path: /control/api/v1/transports/0/record }
-      - { method: GET, path: /control/api/v1/transports/0/playback }
-      - { method: GET, path: /control/api/v1/transports/0/timecode }
-      - { method: GET, path: /control/api/v1/transports/0/clipIndex }
-      - { method: GET, path: /control/api/v1/camera/tallyStatus }
-      - { method: GET, path: /control/api/v1/camera/power }
-      - { method: GET, path: /control/api/v1/camera/colorBars }
-      - { method: GET, path: /control/api/v1/camera/programFeedDisplay }
-      - { method: GET, path: /control/api/v1/camera/timingReferenceLock }
-      - { method: GET, path: /control/api/v1/lens/iris }
-      - { method: GET, path: /control/api/v1/lens/zoom }
-      - { method: GET, path: /control/api/v1/lens/focus }
-      - { method: GET, path: /control/api/v1/video/iso }
-      - { method: GET, path: /control/api/v1/video/gain }
-      - { method: GET, path: /control/api/v1/video/whiteBalance }
-      - { method: GET, path: /control/api/v1/video/whiteBalanceTint }
-      - { method: GET, path: /control/api/v1/video/ndFilter }
-      - { method: GET, path: /control/api/v1/video/shutter }
-      - { method: GET, path: /control/api/v1/video/autoExposure }
-      - { method: GET, path: /control/api/v1/colorCorrection/lift }
-      - { method: GET, path: /control/api/v1/colorCorrection/gamma }
-      - { method: GET, path: /control/api/v1/colorCorrection/gain }
-      - { method: GET, path: /control/api/v1/colorCorrection/offset }
-      - { method: GET, path: /control/api/v1/colorCorrection/contrast }
-      - { method: GET, path: /control/api/v1/colorCorrection/color }
-      - { method: GET, path: /control/api/v1/colorCorrection/lumaContribution }
-      - { method: GET, path: /control/api/v1/presets/active }
-      - { method: GET, path: /control/api/v1/media/active }
-      - { method: GET, path: /control/api/v1/media/workingset }
-      - { method: GET, path: /control/api/v1/system/codecFormat }
-      - { method: GET, path: /control/api/v1/system/videoFormat }
-      - { method: GET, path: /control/api/v1/livestreams/0 }
-      - { method: GET, path: /control/api/v1/slates/nextClip }
-      - { method: GET, path: /control/api/v1/audio/channel/0/level }
-      - { method: GET, path: /control/api/v1/audio/channel/0/input }
-      - { method: GET, path: /control/api/v1/audio/channel/1/level }
-      - { method: GET, path: /control/api/v1/audio/channel/1/input }
+      - '{"type":"request","data":{"action":"subscribe","properties":["/transports/0","/transports/0/record","/transports/0/play","/transports/0/stop","/transports/0/playback","/transports/0/timecode","/transports/0/timecode/source","/transports/0/clipIndex","/camera/tallyStatus","/camera/power","/camera/power/displayMode","/camera/colorBars","/camera/programFeedDisplay","/camera/timingReferenceLock","/lens/iris","/lens/zoom","/lens/focus","/video/iso","/video/gain","/video/whiteBalance","/video/whiteBalanceTint","/video/ndFilter","/video/ndFilter/displayMode","/video/shutter","/video/shutter/measurement","/video/autoExposure","/video/detailSharpening","/video/detailSharpeningLevel","/colorCorrection/lift","/colorCorrection/gamma","/colorCorrection/gain","/colorCorrection/offset","/colorCorrection/contrast","/colorCorrection/color","/colorCorrection/lumaContribution","/presets/active","/media/active","/media/workingset","/system/codecFormat","/system/videoFormat","/system/format","/slates/nextClip","/monitoring/focusAssist","/monitoring/frameGuideRatio","/monitoring/safeAreaPercent","/audio/channel/0/level","/audio/channel/0/input","/audio/channel/0/phantomPower","/audio/channel/0/padding","/audio/channel/0/lowCutFilter","/audio/channel/0/available","/audio/channel/1/level","/audio/channel/1/input","/audio/channel/1/phantomPower","/audio/channel/1/padding","/audio/channel/1/lowCutFilter","/audio/channel/1/available"]}}'
+  # Everything subscribed is read on connecting and again every minute, as a
+  # safety net should the websocket not open; the livestream, which is not a
+  # websocket property, every ten seconds.
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /control/api/v1/livestreams/0 }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /control/api/v1/transports/0 }
+        - { method: GET, path: /control/api/v1/transports/0/record }
+        - { method: GET, path: /control/api/v1/transports/0/play }
+        - { method: GET, path: /control/api/v1/transports/0/stop }
+        - { method: GET, path: /control/api/v1/transports/0/playback }
+        - { method: GET, path: /control/api/v1/transports/0/timecode }
+        - { method: GET, path: /control/api/v1/transports/0/timecode/source }
+        - { method: GET, path: /control/api/v1/transports/0/clipIndex }
+        - { method: GET, path: /control/api/v1/camera/tallyStatus }
+        - { method: GET, path: /control/api/v1/camera/power }
+        - { method: GET, path: /control/api/v1/camera/power/displayMode }
+        - { method: GET, path: /control/api/v1/camera/colorBars }
+        - { method: GET, path: /control/api/v1/camera/programFeedDisplay }
+        - { method: GET, path: /control/api/v1/camera/timingReferenceLock }
+        - { method: GET, path: /control/api/v1/lens/iris }
+        - { method: GET, path: /control/api/v1/lens/zoom }
+        - { method: GET, path: /control/api/v1/lens/focus }
+        - { method: GET, path: /control/api/v1/video/iso }
+        - { method: GET, path: /control/api/v1/video/gain }
+        - { method: GET, path: /control/api/v1/video/whiteBalance }
+        - { method: GET, path: /control/api/v1/video/whiteBalanceTint }
+        - { method: GET, path: /control/api/v1/video/ndFilter }
+        - { method: GET, path: /control/api/v1/video/ndFilter/displayMode }
+        - { method: GET, path: /control/api/v1/video/shutter }
+        - { method: GET, path: /control/api/v1/video/shutter/measurement }
+        - { method: GET, path: /control/api/v1/video/autoExposure }
+        - { method: GET, path: /control/api/v1/video/detailSharpening }
+        - { method: GET, path: /control/api/v1/video/detailSharpeningLevel }
+        - { method: GET, path: /control/api/v1/colorCorrection/lift }
+        - { method: GET, path: /control/api/v1/colorCorrection/gamma }
+        - { method: GET, path: /control/api/v1/colorCorrection/gain }
+        - { method: GET, path: /control/api/v1/colorCorrection/offset }
+        - { method: GET, path: /control/api/v1/colorCorrection/contrast }
+        - { method: GET, path: /control/api/v1/colorCorrection/color }
+        - { method: GET, path: /control/api/v1/colorCorrection/lumaContribution }
+        - { method: GET, path: /control/api/v1/presets/active }
+        - { method: GET, path: /control/api/v1/media/active }
+        - { method: GET, path: /control/api/v1/media/workingset }
+        - { method: GET, path: /control/api/v1/system/codecFormat }
+        - { method: GET, path: /control/api/v1/system/videoFormat }
+        - { method: GET, path: /control/api/v1/system/format }
+        - { method: GET, path: /control/api/v1/slates/nextClip }
+        - { method: GET, path: /control/api/v1/monitoring/focusAssist }
+        - { method: GET, path: /control/api/v1/monitoring/frameGuideRatio }
+        - { method: GET, path: /control/api/v1/monitoring/safeAreaPercent }
+        - { method: GET, path: /control/api/v1/audio/channel/0/level }
+        - { method: GET, path: /control/api/v1/audio/channel/0/input }
+        - { method: GET, path: /control/api/v1/audio/channel/0/phantomPower }
+        - { method: GET, path: /control/api/v1/audio/channel/0/padding }
+        - { method: GET, path: /control/api/v1/audio/channel/0/lowCutFilter }
+        - { method: GET, path: /control/api/v1/audio/channel/0/available }
+        - { method: GET, path: /control/api/v1/audio/channel/1/level }
+        - { method: GET, path: /control/api/v1/audio/channel/1/input }
+        - { method: GET, path: /control/api/v1/audio/channel/1/phantomPower }
+        - { method: GET, path: /control/api/v1/audio/channel/1/padding }
+        - { method: GET, path: /control/api/v1/audio/channel/1/lowCutFilter }
+        - { method: GET, path: /control/api/v1/audio/channel/1/available }
   updates:
+    # A pushed change (p.73): read the property's path again. One rule per
+    # depth, so that each segment is sent as its own path segment.
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)$" }
+      json: {}
+      then_send: [{ method: GET, path: "/control/api/v1/{1}" }]
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)$" }
+      json: {}
+      then_send: [{ method: GET, path: "/control/api/v1/{1}/{2}" }]
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)/([^/]+)$" }
+      json: {}
+      then_send: [{ method: GET, path: "/control/api/v1/{1}/{2}/{3}" }]
+    - json_match: { "$.type": "^event$", "$.data.action": "^propertyValueChanged$", "$.data.property": "^/([^/]+)/([^/]+)/([^/]+)/([^/]+)$" }
+      json: {}
+      then_send: [{ method: GET, path: "/control/api/v1/{1}/{2}/{3}/{4}" }]
     # Transport (p.27-30)
     - path: "^/control/api/v1/transports/0$"
       json: { mode: "$.mode" }
@@ -2830,16 +2880,23 @@ quirks:
     severity: warning
     text: >
       The camera pushes changes only through its websocket notification service
-      (Notification websocket 1.0.0, p.71-94: subscribe, unsubscribe,
-      listSubscriptions and listProperties requests, propertyValueChanged
-      events). The document does not give the websocket's URL, so it is not
-      opened (the format's telemetry.websocket could carry the subscribe
-      requests, but not a guessed path). Without it,
-      state is polled every ten seconds, including the first two audio
-      channels; per-display monitoring flags, further audio channels, the
-      immersive eye view and the off-speed format update only when the
-      matching get command is sent. Each battery's level (camera/power
-      batteries array) is not in the state.
+      (Notification websocket 1.0.0, p.71-94). The document gives its messages
+      but neither its URL nor the type value of a client's request (its Publish
+      table repeats the Response table, type "response"). The spec opens
+      /control/api/v1/event/websocket, the path the camera's own
+      /control/documentation.html gives, and subscribes with type "request";
+      both are to be confirmed on a camera. Each pushed change has its path
+      read again over REST rather than the pushed value applied. Subscribed are
+      the transport, camera, lens, video, colour correction, preset, media,
+      format, slate and monitoring properties and the first two audio
+      channels; everything subscribed is also read every minute, and the
+      livestream, not a websocket property, every ten seconds. Per-display
+      monitoring flags, further audio channels and the immersive eye view are
+      not subscribed (they need the display names or channel count first) and
+      update only when the matching get command is sent, or when the camera
+      pushes a change of them anyway. Set the notification scheme to wss with
+      the https scheme. Each battery's level (camera/power batteries array) is
+      not in the state.
 
   - models: [all]
     severity: info

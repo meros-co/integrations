@@ -50,7 +50,7 @@ settings:
     max_length: 4096
     default: ''
     label: Extra subscriptions
-    description: "More AWJ path prefixes to subscribe to on every connection, comma separated, such as DeviceObject/audio, on top of the screens, auxiliaries, presets, inputs and multiviewers subscribed by default."
+    description: "More AWJ path prefixes to subscribe to on every connection, comma separated, such as DeviceObject/preconfig, on top of the screens, auxiliaries, presets, inputs, multiviewers, audio, stills, background sets and backups subscribed by default."
   read_on_connect:
     type: bool
     default: true
@@ -1068,6 +1068,16 @@ quirks:
   text: >-
     Not documented over AWJ, so not offered: cut, auto transition with a rate, global take of several screens, transition
     type and duration, test patterns. awj_replace reaches any other property of the object model.
+- models:
+  - all
+  severity: info
+  text: >-
+    The AWJ guide documents only "the most frequently used commands" (1.1): it gives no paths for layer position,
+    size or opacity, transition type or duration, saving presets, output formats and settings, input plug selection
+    or test patterns, and neither does the REST API guide. Those are set from the Web RCS; awj_replace can write any path known
+    from elsewhere, at the operator's risk. Audio, stills, background set contents and every backup are subscribed and kept in state from the
+    paths the guide reads.
+
 state:
   device.type:
     type: string
@@ -1183,6 +1193,84 @@ state:
   multiviewers.*.widgets.*.source:
     type: string
     description: Source of a multiviewer widget, numbered from 1 (4.3)
+  audio.inputs.*.channels.*.mute:
+    type: bool
+    description: 'An input audio channel muted, by input and channel (5.1.1)'
+  audio.inputs.*.channels.*.level_detected:
+    type: bool
+    description: 'Audio level detected on an input channel (5.1.1)'
+  audio.dante_inputs.*.channels.*.mute:
+    type: bool
+    description: 'A Dante input group channel muted'
+  audio.dante_inputs.*.channels.*.level_detected:
+    type: bool
+    description: 'Audio level detected on a Dante input channel'
+  audio.outputs.*.channels.*.mute:
+    type: bool
+    description: 'An output audio channel muted (5.2.1)'
+  audio.outputs.*.channels.*.source:
+    type: string
+    description: 'Source of an output audio channel: INPUT_n_CHANNEL_m, DANTE_n_CHANNEL_m or NONE (5.2.3)'
+  audio.outputs.*.channels.*.level_detected:
+    type: bool
+    description: 'Audio level detected on an output channel (5.2.1)'
+  audio.dante_outputs.*.channels.*.mute:
+    type: bool
+    description: 'A Dante output group channel muted'
+  audio.dante_outputs.*.channels.*.source:
+    type: string
+    description: 'Source of a Dante output group channel'
+  audio.dante_outputs.*.channels.*.level_detected:
+    type: bool
+    description: 'Audio level detected on a Dante output channel'
+  audio.multiviewers.*.channels.*.mute:
+    type: bool
+    description: 'A multiviewer output audio channel muted'
+  audio.multiviewers.*.channels.*.source:
+    type: string
+    description: 'Source of a multiviewer output audio channel'
+  audio.multiviewers.*.channels.*.level_detected:
+    type: bool
+    description: 'Audio level detected on a multiviewer channel'
+  stills.*.used:
+    type: bool
+    description: 'Still in use (6.2)'
+  stills.*.available:
+    type: bool
+    description: 'Still available'
+  stills.*.label:
+    type: string
+    description: 'Still label'
+  stills.*.source:
+    type: int
+    description: 'Still library image shown by the still'
+  screens.*.background_sets.*.outputs.*.content:
+    type: string
+    description: 'Content of a background set on an output: STILL_n or NONE (6.3)'
+  screens.*.background_sets.*.backup.selected:
+    type: string
+    description: 'Background set backup selected: NONE, 1 or 2 (6.8)'
+  screens.*.background_sets.*.backup.auto:
+    type: bool
+    description: 'Background set automatic backup on (6.9)'
+  screens.*.background_sets.*.backup.slots.*:
+    type: string
+    description: 'Source of a background set backup slot: NATIVE_n or NONE (6.7)'
+  inputs.*.backup.selected:
+    type: string
+    description: 'Input backup selected: NONE, 1 or 2 (6.5)'
+  inputs.*.backup.auto:
+    type: bool
+    description: 'Input automatic backup on (6.6)'
+  inputs.*.backup.slots.*:
+    type: string
+    description: 'Source of an input backup slot: LIVE_n, STILL_n or NONE (6.4)'
+  backup_groups.*.selected:
+    type: string
+    description: 'Group backup selected: NONE, 1 or 2 (6.10)'
+  backup_groups.*.auto:
+    type: bool
+    description: 'Group automatic backup on (6.11)'
   last_error:
     type: object
     description: 'The last error object the device sent: code and message (1.3)'

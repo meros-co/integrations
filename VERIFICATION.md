@@ -131,18 +131,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-alta4k — Analog Way Alta 4K
 
+- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-alta4k.yaml:1271](specs/analogway-alta4k.yaml#L1271))
+- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-alta4k.yaml:1259](specs/analogway-alta4k.yaml#L1259))
 - [ ] Confirm the auxiliary screen T-bar read path DeviceObject/transition/$auxiliaryScreen/@items/<n>/status/@props/transition, which is inferred. ([specs/analogway-alta4k.yaml:657](specs/analogway-alta4k.yaml#L657))
 - [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen' as printed, audio modes with underscores, followScreen/@props/source for follow-screen writes, audio/$lineOut, and $preset in the background status read. ([specs/analogway-alta4k.yaml:663](specs/analogway-alta4k.yaml#L663))
 - [ ] Confirm that errors arrive in message order, so matching each to the oldest unanswered message is right. ([specs/analogway-alta4k.yaml:651](specs/analogway-alta4k.yaml#L651))
 
 ## analogway-livecore — Analog Way LiveCore
 
-- [ ] Confirm master preset screen enabling uses PSose (not PSsse), GPits takes a value, and layers 1-24 are accepted. ([specs/analogway-livecore.yaml:619](specs/analogway-livecore.yaml#L619))
-- [ ] Check that an out-of-range value is answered with the previous value followed by an E10-E13 error. ([specs/analogway-livecore.yaml:613](specs/analogway-livecore.yaml#L613))
-- [ ] Check how often unsolicited register pushes arrive while a command waits, which makes that command fail. ([specs/analogway-livecore.yaml:606](specs/analogway-livecore.yaml#L606))
+- [ ] Confirm master preset screen enabling uses PSose (not PSsse), GPits takes a value, and layers 1-24 are accepted. ([specs/analogway-livecore.yaml:967](specs/analogway-livecore.yaml#L967))
+- [ ] Check that an out-of-range value is answered with the previous value followed by an E10-E13 error. ([specs/analogway-livecore.yaml:961](specs/analogway-livecore.yaml#L961))
+- [ ] Check how often unsolicited register pushes arrive while a command waits, which makes that command fail. ([specs/analogway-livecore.yaml:954](specs/analogway-livecore.yaml#L954))
+- [ ] Confirm the index order of MMsav (device, then memory) and CMsav (screen, then memory), the reverse of the loads, and that writing 1 saves the current layout. ([specs/analogway-livecore.yaml:611](specs/analogway-livecore.yaml#L611))
+- [ ] Check that COupd applies confidence layout and source changes, as MLupd does for monitoring. ([specs/analogway-livecore.yaml:604](specs/analogway-livecore.yaml#L604))
+- [ ] Check that a plug the input card lacks is refused by INplg with an error. ([specs/analogway-livecore.yaml:530](specs/analogway-livecore.yaml#L530))
 
 ## analogway-livepremier — Analog Way LivePremier / Aquilon
 
+- [ ] Check that subscribing to DeviceObject/audio, DeviceObject/$still, DeviceObject/preconfig/backgrounds and DeviceObject/backup pushes their changes, and how often isLevelDetected changes are pushed. ([specs/analogway-livepremier.yaml:1196](specs/analogway-livepremier.yaml#L1196))
+- [ ] Check that a TCP client cannot set layer position, size or opacity, transitions or output settings over AWJ, or find the paths: the guide documents none. ([specs/analogway-livepremier.yaml:1075](specs/analogway-livepremier.yaml#L1075))
 - [ ] Confirm the auxiliary screen T-bar read path DeviceObject/$screenAuxGroup/@items/A<n>/status/@props/transition, which is inferred. ([specs/analogway-livepremier.yaml:904](specs/analogway-livepremier.yaml#L904))
 - [ ] Confirm freeze_input can write the input's freeze property (the guide documents only reading it). ([specs/analogway-livepremier.yaml:910](specs/analogway-livepremier.yaml#L910))
 - [ ] Check whether reboot and shutdown work on DeviceObject/system/shutdown/cmd or need the long v4.0 path. ([specs/analogway-livepremier.yaml:916](specs/analogway-livepremier.yaml#L916))
@@ -151,12 +158,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-midra — Analog Way Midra
 
-- [ ] Confirm TAKE ALL is accepted as "1GCtal" (the guide also shows "1,GCtal"). ([specs/analogway-midra.yaml:495](specs/analogway-midra.yaml#L495))
-- [ ] Confirm LF alone is accepted as the command terminator. ([specs/analogway-midra.yaml:497](specs/analogway-midra.yaml#L497))
-- [ ] Check what the device answers to a TAKE sent while TAKEAVA is 0. ([specs/analogway-midra.yaml:483](specs/analogway-midra.yaml#L483))
+- [ ] Confirm TAKE ALL is accepted as "1GCtal" (the guide also shows "1,GCtal"). ([specs/analogway-midra.yaml:884](specs/analogway-midra.yaml#L884))
+- [ ] Confirm LF alone is accepted as the command terminator. ([specs/analogway-midra.yaml:886](specs/analogway-midra.yaml#L886))
+- [ ] Check what the device answers to a TAKE sent while TAKEAVA is 0. ([specs/analogway-midra.yaml:872](specs/analogway-midra.yaml#L872))
+- [ ] Check that PRbst and PRbal take the same indexes as PRinp (screen, 0 program or 1 preview, layer) and are applied by PUscu. ([specs/analogway-midra.yaml:300](specs/analogway-midra.yaml#L300))
+- [ ] Check the clock is set by writing RTyea to RTsec and then 2RTreq, and that RTmon counts months from 0. ([specs/analogway-midra.yaml:452](specs/analogway-midra.yaml#L452))
 
 ## analogway-midra4k — Analog Way Midra 4K
 
+- [ ] Check which of followScreen/@props/source (the guide's write) and followScreen/@props/screen (its read) the device uses; state reads the second. ([specs/analogway-midra4k.yaml:1136](specs/analogway-midra4k.yaml#L1136))
+- [ ] Check that subscribing to DeviceObject/$output, DeviceObject/audio and DeviceObject/preconfig pushes audio, output and screen-enable changes. ([specs/analogway-midra4k.yaml:1124](specs/analogway-midra4k.yaml#L1124))
 - [ ] Confirm the auxiliary screen T-bar read path, which is inferred from the auxiliary xTake. ([specs/analogway-midra4k.yaml:772](specs/analogway-midra4k.yaml#L772))
 - [ ] Confirm the resolved guide ambiguities: '$auxillaryScreen', underscored audio modes, followScreen/@props/source, audio/$lineOut, and $preset in the background status read. ([specs/analogway-midra4k.yaml:778](specs/analogway-midra4k.yaml#L778))
 - [ ] Check whether screen 3 exists (the REST guide gives 1-2, the multiviewer source list shows SCREEN_PRGM_3). ([specs/analogway-midra4k.yaml:806](specs/analogway-midra4k.yaml#L806))
@@ -411,19 +422,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-camera — Blackmagic cameras
 
-- [ ] Find the event websocket URL, which the document does not give, so telemetry can use pushes instead of polling. ([specs/blackmagic-camera.yaml:2831](specs/blackmagic-camera.yaml#L2831))
-- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2797](specs/blackmagic-camera.yaml#L2797))
-- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2803](specs/blackmagic-camera.yaml#L2803))
-- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2821](specs/blackmagic-camera.yaml#L2821))
-- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2818](specs/blackmagic-camera.yaml#L2818))
-- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2856](specs/blackmagic-camera.yaml#L2856))
-- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2865](specs/blackmagic-camera.yaml#L2865))
-- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2878](specs/blackmagic-camera.yaml#L2878))
-- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2879](specs/blackmagic-camera.yaml#L2879))
-- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2891](specs/blackmagic-camera.yaml#L2891))
+- [ ] Confirm the notification websocket's path, /control/api/v1/event/websocket, against the camera's /control/documentation.html: the PDF does not give it. ([specs/blackmagic-camera.yaml:2388](specs/blackmagic-camera.yaml#L2388))
+- [ ] Confirm the camera accepts the subscribe request with type "request" (the PDF's Publish table repeats the Response table, type "response") and that every property subscribed is subscribable. ([specs/blackmagic-camera.yaml:2391](specs/blackmagic-camera.yaml#L2391))
+- [ ] Check that over HTTPS the websocket is served as wss on the same port, and whether it needs the same login. ([specs/blackmagic-camera.yaml:2389](specs/blackmagic-camera.yaml#L2389))
+- [ ] Check that a pushed property names its path without the /control/api/v1 base, as the document's tables show, so the re-read goes to the right path. ([specs/blackmagic-camera.yaml:2461](specs/blackmagic-camera.yaml#L2461))
+- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2847](specs/blackmagic-camera.yaml#L2847))
+- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2853](specs/blackmagic-camera.yaml#L2853))
+- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2871](specs/blackmagic-camera.yaml#L2871))
+- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2868](specs/blackmagic-camera.yaml#L2868))
+- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2913](specs/blackmagic-camera.yaml#L2913))
+- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2922](specs/blackmagic-camera.yaml#L2922))
+- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2935](specs/blackmagic-camera.yaml#L2935))
+- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2936](specs/blackmagic-camera.yaml#L2936))
+- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2948](specs/blackmagic-camera.yaml#L2948))
 - [ ] Record what the camera advertises over mDNS besides its `<name>.local` host name (service types, TXT `class`). No public source names it, so mDNS discovery does not identify cameras. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
-- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2568](specs/blackmagic-camera.yaml#L2568))
-- [ ] Confirm POST /presets takes the .cset file as the request body with a Content-Disposition header naming it (the document only implies this through its 400 answer), not a multipart/form-data part, and answers 200 with presetAdded. ([specs/blackmagic-camera.yaml:1696](specs/blackmagic-camera.yaml#L1696))
+- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2618](specs/blackmagic-camera.yaml#L2618))
+- [ ] Confirm POST /presets takes the .cset file as the request body with a Content-Disposition header naming it (the document only implies this through its 400 answer), not a multipart/form-data part, and answers 200 with presetAdded. ([specs/blackmagic-camera.yaml:1698](specs/blackmagic-camera.yaml#L1698))
 
 ## blackmagic-hyperdeck — Blackmagic HyperDeck
 
@@ -476,11 +490,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-streaming — Blackmagic Web Presenter / Streaming
 
-- [ ] Check whether the device accepts a Streaming XML file sent on a single line. ([specs/blackmagic-streaming.yaml:681](specs/blackmagic-streaming.yaml#L681))
-- [ ] Confirm the character encoding is UTF-8 (the document names none). ([specs/blackmagic-streaming.yaml:695](specs/blackmagic-streaming.yaml#L695))
+- [ ] Check whether the device accepts a Streaming XML file sent on a single line. ([specs/blackmagic-streaming.yaml:685](specs/blackmagic-streaming.yaml#L685))
+- [ ] Confirm the character encoding is UTF-8 (the document names none). ([specs/blackmagic-streaming.yaml:699](specs/blackmagic-streaming.yaml#L699))
 - [ ] Check whether a unit can report more than two network interfaces. ([specs/blackmagic-streaming.yaml:657](specs/blackmagic-streaming.yaml#L657))
-- [ ] Check the length limits for label, stream key, password and URL. ([specs/blackmagic-streaming.yaml:715](specs/blackmagic-streaming.yaml#L715))
-- [ ] Check which firmware release introduced protocol 1.2 (and what earlier units report). ([specs/blackmagic-streaming.yaml:706](specs/blackmagic-streaming.yaml#L706))
+- [ ] Check the length limits for label, stream key, password and URL. ([specs/blackmagic-streaming.yaml:719](specs/blackmagic-streaming.yaml#L719))
+- [ ] Check which firmware release introduced protocol 1.2 (and what earlier units report). ([specs/blackmagic-streaming.yaml:710](specs/blackmagic-streaming.yaml#L710))
 - [ ] Record what Web Presenter and Streaming Encoder units advertise over mDNS (service types, and TXT `class` under `_blackmagic._tcp`). No public source names it, so mDNS discovery does not identify them; an unknown class is reported as a discovery message naming it. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
 
 ## blackmagic-teranex — Blackmagic Teranex
@@ -978,21 +992,32 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## kramer-p3000 — Kramer Protocol 3000
 
-- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:2628](specs/kramer-p3000.yaml#L2628))
-- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:2734](specs/kramer-p3000.yaml#L2734))
-- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:2644](specs/kramer-p3000.yaml#L2644))
-- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:2769](specs/kramer-p3000.yaml#L2769))
-- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:2780](specs/kramer-p3000.yaml#L2780))
-- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:2732](specs/kramer-p3000.yaml#L2732))
-- [ ] On a presentation switcher (VP-440X, VP-551X or VP-427X2), a multiviewer (MV-4X) and a streamer (KDS-EN7), record the values VID-RES, IMAGE-PROP, SCLR-AS, VIEW-MOD and W-COLOR take and answer, and which channels count from 0. ([specs/kramer-p3000.yaml:3139](specs/kramer-p3000.yaml#L3139))
-- [ ] Check whether EDID-AUDIO takes the guide's single mode or the per-input form (input,format) on each product. ([specs/kramer-p3000.yaml:1448](specs/kramer-p3000.yaml#L1448))
-- [ ] Confirm GPIO-CFG answers type,direction without the pull-up, and that GPIO-STATE is pushed on a change. ([specs/kramer-p3000.yaml:1878](specs/kramer-p3000.yaml#L1878))
-- [ ] Confirm the KDS-ACTION values (0 stop, 1 play, 2 save), since the guide's table is a copy of another. ([specs/kramer-p3000.yaml:2045](specs/kramer-p3000.yaml#L2045))
-- [ ] Record how ETH-PORT names the protocol in its reply (TCP/UDP or 0/1) and whether a TCP port change ends the connection before the answer. ([specs/kramer-p3000.yaml:2268](specs/kramer-p3000.yaml#L2268))
-- [ ] Record the TIME? reply's date form (the guide's DD-MM-YYYY or SWT3's YYYY/MM/DD). ([specs/kramer-p3000.yaml:2295](specs/kramer-p3000.yaml#L2295))
-- [ ] Check which network changes end the connection at once, and that NET-IP answers before the address changes. ([specs/kramer-p3000.yaml:3128](specs/kramer-p3000.yaml#L3128))
-- [ ] On the VP-551X, check MIC-GAIN's three-parameter form (0,mic,level) against the two-parameter command offered. ([specs/kramer-p3000.yaml:2450](specs/kramer-p3000.yaml#L2450))
-- [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:3156](specs/kramer-p3000.yaml#L3156))
+- [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4077](specs/kramer-p3000.yaml#L4077))
+- [ ] Record the MV-4X ROTATE? reply (written "~nn@#ROTATE" in the manual) and confirm the rotation needs aspect ratio Full and the border off. ([specs/kramer-p3000.yaml:2742](specs/kramer-p3000.yaml#L2742))
+- [ ] Record the KDS-DEC7's KDS-CHANNEL-SELECT replies to a set (the signal list in brackets) and to a get (signal,channel), and whether signal names come back in lower case. ([specs/kramer-p3000.yaml:3891](specs/kramer-p3000.yaml#L3891))
+- [ ] Find the largest grid VIEW-MOD 15 takes (16 by 16 is assumed; the manual gives none) and the TTL range of KDS-MULTICAST (1-255 assumed). ([specs/kramer-p3000.yaml:2975](specs/kramer-p3000.yaml#L2975))
+- [ ] Check NET-SRV-DSCP's service numbering (0 stream, 1 control), which the manual gives the other way round from NET-SRV-802-1Q. ([specs/kramer-p3000.yaml:2958](specs/kramer-p3000.yaml#L2958))
+- [ ] Confirm the DSP-62's DSP field ids are the lower-case words of its examples (attack, low-freq, band-bypass, tone-freq) and which values take decimals. ([specs/kramer-p3000.yaml:3170](specs/kramer-p3000.yaml#L3170))
+- [ ] Confirm the DSP-62's signal generator command is DSP-SIGGEN (its syntax and example) rather than DSP-SIG-GEN (its table). ([specs/kramer-p3000.yaml:3322](specs/kramer-p3000.yaml#L3322))
+- [ ] Confirm DSP-METER is sent with "?" (the manual's syntax leaves it out) and record its reply. ([specs/kramer-p3000.yaml:3339](specs/kramer-p3000.yaml#L3339))
+- [ ] Check that X-MIX-LVL accepts one decimal place (-25.0) and replies with the level the same way. ([specs/kramer-p3000.yaml:3348](specs/kramer-p3000.yaml#L3348))
+- [ ] Confirm KDS-MULTICAST takes any group address, which the KDS-7 ignores and reports as 0.0.0.0. ([specs/kramer-p3000.yaml:2877](specs/kramer-p3000.yaml#L2877))
+
+- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:3492](specs/kramer-p3000.yaml#L3492))
+- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:3609](specs/kramer-p3000.yaml#L3609))
+- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:3508](specs/kramer-p3000.yaml#L3508))
+- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:3644](specs/kramer-p3000.yaml#L3644))
+- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:3655](specs/kramer-p3000.yaml#L3655))
+- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:3607](specs/kramer-p3000.yaml#L3607))
+- [ ] On a presentation switcher (VP-440X, VP-551X or VP-427X2), a multiviewer (MV-4X) and a streamer (KDS-EN7), record the values VID-RES, IMAGE-PROP, SCLR-AS, VIEW-MOD and W-COLOR take and answer, and which channels count from 0. ([specs/kramer-p3000.yaml:4041](specs/kramer-p3000.yaml#L4041))
+- [ ] Check whether EDID-AUDIO takes the guide's single mode or the per-input form (input,format) on each product. ([specs/kramer-p3000.yaml:1584](specs/kramer-p3000.yaml#L1584))
+- [ ] Confirm GPIO-CFG answers type,direction without the pull-up, and that GPIO-STATE is pushed on a change. ([specs/kramer-p3000.yaml:2014](specs/kramer-p3000.yaml#L2014))
+- [ ] Confirm the KDS-ACTION values (0 stop, 1 play, 2 save), since the guide's table is a copy of another. ([specs/kramer-p3000.yaml:2181](specs/kramer-p3000.yaml#L2181))
+- [ ] Record how ETH-PORT names the protocol in its reply (TCP/UDP or 0/1) and whether a TCP port change ends the connection before the answer. ([specs/kramer-p3000.yaml:2404](specs/kramer-p3000.yaml#L2404))
+- [ ] Record the TIME? reply's date form (the guide's DD-MM-YYYY or SWT3's YYYY/MM/DD). ([specs/kramer-p3000.yaml:2431](specs/kramer-p3000.yaml#L2431))
+- [ ] Check which network changes end the connection at once, and that NET-IP answers before the address changes. ([specs/kramer-p3000.yaml:4030](specs/kramer-p3000.yaml#L4030))
+- [ ] On the VP-551X, check MIC-GAIN's three-parameter form (0,mic,level) against the two-parameter command offered. ([specs/kramer-p3000.yaml:2586](specs/kramer-p3000.yaml#L2586))
+- [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:4058](specs/kramer-p3000.yaml#L4058))
 
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 
@@ -1127,12 +1152,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm that the JSON-RPC websocket answers {"jsonrpc":"2.0","id":1,"method":"state"} with the whole tree under result, then pushes updates without a subscription, and that it takes the web application's credentials when authentication is on. ([specs/megapixel-helios.yaml:520](specs/megapixel-helios.yaml#L520))
 - [ ] Check that basic access is accepted when authentication is on, or that the processor's digest challenge is answered. ([specs/megapixel-helios.yaml:83](specs/megapixel-helios.yaml#L83))
-- [ ] Confirm that a PATCH out of range answers 200 with the unchanged value, as the document says, on current firmware. ([specs/megapixel-helios.yaml:2827](specs/megapixel-helios.yaml#L2827))
+- [ ] Confirm that upload_still is answered 200 with the new still at the top level ($.id), as 3.4.5 shows, and which image types and sizes the still store accepts. ([specs/megapixel-helios.yaml:632](specs/megapixel-helios.yaml#L632))
+- [ ] Confirm that a PATCH out of range answers 200 with the unchanged value, as the document says, on current firmware. ([specs/megapixel-helios.yaml:2844](specs/megapixel-helios.yaml#L2844))
 - [ ] Record the ranges of display gains, output adjustment gain, gamma, lift, offset and saturation, which the document does not give. ([specs/megapixel-helios.yaml:199](specs/megapixel-helios.yaml#L199))
 - [ ] Confirm that a group's gains are keyed r, g, b and i, its mask l, t, b and r, and its test pattern colour r, g, b and a, and record their ranges (0-1 or 0-255). ([specs/megapixel-helios.yaml:362](specs/megapixel-helios.yaml#L362))
 - [ ] Confirm that blackClipping can be written (it is in the processor's data and fixtures, not the API tables). ([specs/megapixel-helios.yaml:191](specs/megapixel-helios.yaml#L191))
 - [ ] Check whether redundancy mode accepts manual and single, which sys.fixtures lists beside none, failover and seamless. ([specs/megapixel-helios.yaml:286](specs/megapixel-helios.yaml#L286))
-- [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:2900](specs/megapixel-helios.yaml#L2900))
+- [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:2917](specs/megapixel-helios.yaml#L2917))
 - [ ] Check that a receiver's x, y and groupId can be written by MAC address. ([specs/megapixel-helios.yaml:426](specs/megapixel-helios.yaml#L426))
 - [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:458](specs/megapixel-helios.yaml#L458))
 
@@ -1159,8 +1185,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## newtek-tricaster — NewTek TriCaster
 
-- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:269](specs/newtek-tricaster.yaml#L269))
-- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:262](specs/newtek-tricaster.yaml#L262))
+- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:576](specs/newtek-tricaster.yaml#L576))
+- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:569](specs/newtek-tricaster.yaml#L569))
+- [ ] Confirm the change notification websocket is on the web port (the guide's text says 5951, its example the web port), whether it needs the Live Panel login, and whether it stays open without the client sending anything. ([specs/newtek-tricaster.yaml:430](specs/newtek-tricaster.yaml#L430))
+- [ ] Confirm each notification is the bare dictionary name, one per message, as the guide says. ([specs/newtek-tricaster.yaml:447](specs/newtek-tricaster.yaml#L447))
+- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:491](specs/newtek-tricaster.yaml#L491))
+- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:499](specs/newtek-tricaster.yaml#L499))
+- [ ] Check which of /version (the guide) and /v1/version answers on each software version. ([specs/newtek-tricaster.yaml:444](specs/newtek-tricaster.yaml#L444))
+- [ ] Check whether media_select_clip counts clips from 0 or 1. ([specs/newtek-tricaster.yaml:313](specs/newtek-tricaster.yaml#L313))
+- [ ] Check that the mode toggles take true or false as a value to set the mode rather than toggle it. ([specs/newtek-tricaster.yaml:380](specs/newtek-tricaster.yaml#L380))
+- [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:399](specs/newtek-tricaster.yaml#L399))
 
 ## novastar-central-control — NovaStar COEX central control protocol
 
@@ -1276,25 +1310,33 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## panasonic-ptz — Panasonic PTZ
 
-- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:12471](specs/panasonic-ptz.yaml#L12471))
-- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:12477](specs/panasonic-ptz.yaml#L12477))
-- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:12456](specs/panasonic-ptz.yaml#L12456))
-- [ ] Confirm the AW-UE155 answers the AW-UE150 command set (assumed from the shared firmware; there is no AW-UE155 interface specification). ([specs/panasonic-ptz.yaml:777](specs/panasonic-ptz.yaml#L777))
-- [ ] Confirm the AW-UE150 pan/tilt speed modes: the document lists 0 Normal (60 deg/s), 1 Fast (180), 2 Quick (60), where the other documents give 0 normal 60, 1 fast1 90, 2 fast2 180. ([specs/panasonic-ptz.yaml:9117](specs/panasonic-ptz.yaml#L9117))
-- [ ] Confirm what awb_color_temperature (OSJ:4A) takes on AW-UE150/HE145/UE100: the usage example sends OSJ:4A:0, the command column OSJ:4A:[Data1]:[Data2]. ([specs/panasonic-ptz.yaml:1780](specs/panasonic-ptz.yaml#L1780))
-- [ ] Confirm flip_detect_angle sends #FDA (the AW-UE150 usage example shows #SPF5A). ([specs/panasonic-ptz.yaml:5285](specs/panasonic-ptz.yaml#L5285))
-- [ ] Confirm the AW-UE160 scene and user file name commands take OSL:91:[file]:[30 hex digits] (the usage examples send 32 hex digits without a file number). ([specs/panasonic-ptz.yaml:7937](specs/panasonic-ptz.yaml#L7937))
-- [ ] Confirm the AW-UE160 takes the format code as two digits (OSA:87:01) and answers it the same way; the state rule accepts both. ([specs/panasonic-ptz.yaml:12551](specs/panasonic-ptz.yaml#L12551))
-- [ ] Confirm awb_color_temperature and color_temperature_bch on the AW-UE160 take a trailing :0 (OSJ:4A:007D0:0, OSL:2F:007D0:0 in the usage examples). ([specs/panasonic-ptz.yaml:6108](specs/panasonic-ptz.yaml#L6108))
-- [ ] Confirm OSD:3A answers 01 and 02 on the AW-UE160 both meaning on, as the document lists, and what ODT 2 means there. ([specs/panasonic-ptz.yaml:10303](specs/panasonic-ptz.yaml#L10303))
-- [ ] Confirm the AW-UE160 custom iris window corners are single digits (OSL:CD:0:0:8:4 in the usage example, 00h-08h in the table). ([specs/panasonic-ptz.yaml:6007](specs/panasonic-ptz.yaml#L6007))
-- [ ] Confirm SDR convert gain (OSI:43) takes every value from 74 to 80; the document lists 74 (-12 dB), 7B (-5 dB) and 80 (0 dB). ([specs/panasonic-ptz.yaml:7684](specs/panasonic-ptz.yaml#L7684))
-- [ ] Confirm the AW-UE20/HE20/UE4 #TAA reply: Data1 is the tally LED and Data3 the command tally; the state reads Data1 as tally.red. ([specs/panasonic-ptz.yaml:12559](specs/panasonic-ptz.yaml#L12559))
-- [ ] Confirm the streaming mode CGIs are set_stream_mode and get_stream_mode (the usage examples call set_priority_mode, and the AW-UE160 get reply is worded strean_mode). ([specs/panasonic-ptz.yaml:8371](specs/panasonic-ptz.yaml#L8371))
-- [ ] Confirm each set_* CGI accepts a single parameter (the documents list all of a CGI's parameters together; the usage examples send some alone). ([specs/panasonic-ptz.yaml:12584](specs/panasonic-ptz.yaml#L12584))
-- [ ] Confirm the Web CGIs of the AW-HE145 and AW-UE155 match the AW-UE150 supplement (only the AW-UE150 is documented). ([specs/panasonic-ptz.yaml:71](specs/panasonic-ptz.yaml#L71))
-- [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8476](specs/panasonic-ptz.yaml#L8476))
-- [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:107](specs/panasonic-ptz.yaml#L107))
+- [ ] On an HE camera, check whether menu up and down take DUP:1 and DDW:1, as sent, or the bare DUP and DDW the v1.12 HE rows show. ([specs/panasonic-ptz.yaml:13650](specs/panasonic-ptz.yaml#L13650))
+- [ ] Check the white balance replies of AW-HE50/HE60/HE120/HE130 (AWB A and B as 2 and 3) against AW-HE40/HE65/HE70/UE70 (1 and 2, 3 ATW), as v1.12 states. ([specs/panasonic-ptz.yaml:13331](specs/panasonic-ptz.yaml#L13331))
+- [ ] Check that a value one HE model lacks but a shared command allows (gain, AGC maximum, format, ND, audio input) is answered ER3. ([specs/panasonic-ptz.yaml:1860](specs/panasonic-ptz.yaml#L1860))
+- [ ] Check the AW-HE120 R/B pedestal range 000-12C (-150 to +150) and that ORI/OBI replies are three digits while QGR/QGB answer two-digit OGR/OGB, which are not read. ([specs/panasonic-ptz.yaml:9274](specs/panasonic-ptz.yaml#L9274))
+- [ ] Check which HE models answer OSD:50 (gamma level): v1.12 marks the reply row AK-UB300 only but lists HE models in its notes. ([specs/panasonic-ptz.yaml:9596](specs/panasonic-ptz.yaml#L9596))
+- [ ] Check the AW-UE70's OSD:BF ELC limit codes (0 off, 1-4) against the UE family's 2-7. ([specs/panasonic-ptz.yaml:9638](specs/panasonic-ptz.yaml#L9638))
+- [ ] Check that QSJ:03 is no longer sent to HE cameras (v1.12 marks OSJ:03-09 UE150 only) and that OSJ:01/02 replies never come from them. ([specs/panasonic-ptz.yaml:1793](specs/panasonic-ptz.yaml#L1793))
+- [ ] Confirm the AW-HE130 colour temperature table (OSD:B1 000-078, 2000-15000 K) and the AW-HE40/UE70's 000-04B in 100 K steps. ([specs/panasonic-ptz.yaml:9316](specs/panasonic-ptz.yaml#L9316))
+- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:13524](specs/panasonic-ptz.yaml#L13524))
+- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:13530](specs/panasonic-ptz.yaml#L13530))
+- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:13509](specs/panasonic-ptz.yaml#L13509))
+- [ ] Confirm the AW-UE155 answers the AW-UE150 command set (assumed from the shared firmware; there is no AW-UE155 interface specification). ([specs/panasonic-ptz.yaml:1066](specs/panasonic-ptz.yaml#L1066))
+- [ ] Confirm the AW-UE150 pan/tilt speed modes: the document lists 0 Normal (60 deg/s), 1 Fast (180), 2 Quick (60), where the other documents give 0 normal 60, 1 fast1 90, 2 fast2 180. ([specs/panasonic-ptz.yaml:9981](specs/panasonic-ptz.yaml#L9981))
+- [ ] Confirm what awb_color_temperature (OSJ:4A) takes on AW-UE150/HE145/UE100: the usage example sends OSJ:4A:0, the command column OSJ:4A:[Data1]:[Data2]. ([specs/panasonic-ptz.yaml:2069](specs/panasonic-ptz.yaml#L2069))
+- [ ] Confirm flip_detect_angle sends #FDA (the AW-UE150 usage example shows #SPF5A). ([specs/panasonic-ptz.yaml:5574](specs/panasonic-ptz.yaml#L5574))
+- [ ] Confirm the AW-UE160 scene and user file name commands take OSL:91:[file]:[30 hex digits] (the usage examples send 32 hex digits without a file number). ([specs/panasonic-ptz.yaml:8226](specs/panasonic-ptz.yaml#L8226))
+- [ ] Confirm the AW-UE160 takes the format code as two digits (OSA:87:01) and answers it the same way; the state rule accepts both. ([specs/panasonic-ptz.yaml:13604](specs/panasonic-ptz.yaml#L13604))
+- [ ] Confirm awb_color_temperature and color_temperature_bch on the AW-UE160 take a trailing :0 (OSJ:4A:007D0:0, OSL:2F:007D0:0 in the usage examples). ([specs/panasonic-ptz.yaml:6397](specs/panasonic-ptz.yaml#L6397))
+- [ ] Confirm OSD:3A answers 01 and 02 on the AW-UE160 both meaning on, as the document lists, and what ODT 2 means there. ([specs/panasonic-ptz.yaml:11229](specs/panasonic-ptz.yaml#L11229))
+- [ ] Confirm the AW-UE160 custom iris window corners are single digits (OSL:CD:0:0:8:4 in the usage example, 00h-08h in the table). ([specs/panasonic-ptz.yaml:6296](specs/panasonic-ptz.yaml#L6296))
+- [ ] Confirm SDR convert gain (OSI:43) takes every value from 74 to 80; the document lists 74 (-12 dB), 7B (-5 dB) and 80 (0 dB). ([specs/panasonic-ptz.yaml:7973](specs/panasonic-ptz.yaml#L7973))
+- [ ] Confirm the AW-UE20/HE20/UE4 #TAA reply: Data1 is the tally LED and Data3 the command tally; the state reads Data1 as tally.red. ([specs/panasonic-ptz.yaml:13612](specs/panasonic-ptz.yaml#L13612))
+- [ ] Confirm the streaming mode CGIs are set_stream_mode and get_stream_mode (the usage examples call set_priority_mode, and the AW-UE160 get reply is worded strean_mode). ([specs/panasonic-ptz.yaml:8660](specs/panasonic-ptz.yaml#L8660))
+- [ ] Confirm each set_* CGI accepts a single parameter (the documents list all of a CGI's parameters together; the usage examples send some alone). ([specs/panasonic-ptz.yaml:13637](specs/panasonic-ptz.yaml#L13637))
+- [ ] Confirm the Web CGIs of the AW-HE145 and AW-UE155 match the AW-UE150 supplement (only the AW-UE150 is documented). ([specs/panasonic-ptz.yaml:88](specs/panasonic-ptz.yaml#L88))
+- [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8765](specs/panasonic-ptz.yaml#L8765))
+- [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:124](specs/panasonic-ptz.yaml#L124))
 
 ## pjlink — PJLink
 
