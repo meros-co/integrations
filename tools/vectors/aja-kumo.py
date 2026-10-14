@@ -205,3 +205,29 @@ telemetry(KUMO, "not-json", inbound_http={
     "path": _KGET + "eParamID_XPT_Destination1_Status",
     "body": "<html><head><title>403 Forbidden</title></head></html>"},
     expect_state={})
+
+# Button colours read back (the value as AJA's scripts write it; assumed to
+# read back the same); AJA's bank numbering decides source or destination.
+# The event forms go through the aja-config-events extension, tested in its
+# session test.
+_KCOL = "{'classes': 'color_%s'}"
+telemetry(KUMO, "colour-source", inbound_http={
+    "path": _KGET + "eParamID_Button_Settings_4", "body": _kreply("eParamID_Button_Settings_4", _KCOL % 7)},
+    expect_state={"params": {"eParamID_Button_Settings_4": {"value": _KCOL % 7, "value_name": _KCOL % 7}},
+                  "inputs": {"4": {"color": "color_7"}}})
+telemetry(KUMO, "colour-destination-17", inbound_http={
+    "path": _KGET + "eParamID_Button_Settings_49", "body": _kreply("eParamID_Button_Settings_49", _KCOL % 5)},
+    expect_state={"params": {"eParamID_Button_Settings_49": {"value": _KCOL % 5, "value_name": _KCOL % 5}},
+                  "outputs": {"17": {"color": "color_5"}}})
+telemetry(KUMO, "colour-source-33", inbound_http={
+    "path": _KGET + "eParamID_Button_Settings_65", "body": _kreply("eParamID_Button_Settings_65", _KCOL % 1)},
+    expect_state={"params": {"eParamID_Button_Settings_65": {"value": _KCOL % 1, "value_name": _KCOL % 1}},
+                  "inputs": {"33": {"color": "color_1"}}})
+telemetry(KUMO, "colour-destination-64", inbound_http={
+    "path": _KGET + "eParamID_Button_Settings_128", "body": _kreply("eParamID_Button_Settings_128", _KCOL % 9)},
+    expect_state={"params": {"eParamID_Button_Settings_128": {"value": _KCOL % 9, "value_name": _KCOL % 9}},
+                  "outputs": {"64": {"color": "color_9"}}})
+telemetry(KUMO, "ps-alarm", inbound_http={
+    "path": _KGET + "eParamID_SuppressPSAlarm", "body": _kreply("eParamID_SuppressPSAlarm", "1", "Suppress")},
+    expect_state={"params": {"eParamID_SuppressPSAlarm": {"value": "1", "value_name": "Suppress"}},
+                  "alarms": {"ps_suppression": "1", "ps_suppression_name": "Suppress"}})

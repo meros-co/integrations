@@ -201,3 +201,175 @@ telemetry(K, "smx-video-mute", inbound="01 Vmt4*1\r\n",
           expect_state={"planes": {"1": {"outputs": {"4": {"video_mute": True}}}}})
 telemetry(K, "smx-plane-mute-ignored", inbound="01 Vmt00*1\r\n", expect_state={})
 telemetry(K, "smx-plane-preset", inbound="01 Rpr2\r\n", expect_state={"planes": {"1": {"last_recalled": 2}}})
+
+# Full control (DXP HD 4K PLUS p.44-56, DXP DVI p.56-71, XTP II Rev. Q
+# p.51-66, SMX p.41-58). Replies are the verbose mode 3 tagged forms.
+text(K, "edid_assign", {"input": 3, "edid": 15}, E + "A3*15EDID\r", device_reply="EdidA03*15\r\n", expect_result=ACK, **DV)
+text(K, "edid_assign_all", {"edid": 32}, E + "A32*EDID\r", device_reply="EdidA00*32\r\n", expect_result=ACK, **DV)
+text(K, "get_edid_assignment", {"input": 3}, E + "A3EDID\r", device_reply="EdidA03*15\r\n", expect_result=val("15"), **DV)
+text(K, "edid_save_output", {"edid": 37}, E + "S37EDID\r", device_reply="EdidS37\r\n", expect_result=ACK, **DV)
+text(K, "smx_edid_assign", {"slot": 2, "input": 4, "edid": 38}, E + "A2*4*38EDID\r", device_reply="02EdidA04*38\r\n",
+     expect_result=ACK, **SM)
+text(K, "smx_edid_assign_all", {"slot": 2, "edid": 0}, E + "A2*0*EDID\r", device_reply="02EdidA00*00\r\n",
+     expect_result=ACK, **SM)
+text(K, "smx_get_edid_assignment", {"slot": 2, "input": 4}, E + "A2*4EDID\r", device_reply="02EdidA04*38\r\n",
+     expect_result=val("38"), **SM)
+text(K, "smx_edid_save_output", {"slot": 2, "edid": 40}, E + "S2*40EDID\r", device_reply="02EdidS40\r\n",
+     expect_result=ACK, **SM)
+text(K, "get_edid_hex", {"slot": 1}, E + "R1EDID\r", device_reply="EdidR" + "00FFFFFFFFFFFF00" * 16 + "\r\n",
+     expect_result=val("00FFFFFFFFFFFF00" * 16), **D4)
+text(K, "get_edid_native_resolution", {"slot": 1}, E + "N1EDID\r", device_reply="EdidN1920x1080 @ 60Hz\r\n",
+     expect_result=val("1920x1080 @ 60Hz"), **D4)
+text(K, "edid_import_file", {"slot": 2, "file": "EXN_HDMI_1080p60_2Ch.bin"}, E + "I2,EXN_HDMI_1080p60_2Ch.bin" + "EDID\r",
+     device_reply="EdidI02\r\n", expect_result=ACK, **D4)
+text(K, "edid_export_file", {"slot": 9, "file": "out1.bin"}, E + "E9,out1.binEDID\r", device_reply="EdidE09\r\n",
+     expect_result=ACK, **D4)
+text(K, "set_input_hdcp_authorization", {"input": 2, "enabled": False}, E + "E2*0HDCP\r", device_reply="HdcpE2*0\r\n",
+     expect_result=ACK, **D4)
+text(K, "get_input_hdcp_authorization", {"input": 2}, E + "E2HDCP\r", device_reply="HdcpE2*1\r\n", expect_result=val("1"), **XT)
+text(K, "set_output_hdcp_mode", {"output": 1, "mode": 1}, E + "S1*1HDCP\r", device_reply="HdcpS1*1\r\n", expect_result=ACK, **D4)
+text(K, "set_output_format", {"output": 2, "format": 1}, E + "2*1VTPO\r", device_reply="Vtpo2*1\r\n", expect_result=ACK, **D4)
+text(K, "get_output_format", {"output": 2}, E + "2VTPO\r", device_reply="Vtpo2*1\r\n", expect_result=val("1"), **D4)
+text(K, "set_room_outputs", {"room": 1, "outputs": "1,2,5"}, E + "1,1,2,5MR\r", device_reply="Mpr1,1,2,5\r\n",
+     expect_result=ACK, **DV)
+text(K, "get_room_outputs", {"room": 1}, E + "1MR\r", device_reply="Mpr1,1,2,5\r\n", expect_result=val("1,2,5"), **DV)
+text(K, "set_room_preset_name", {"room": 1, "preset": 2, "name": "Lecture"}, E + "1*2,LectureNP\r",
+     device_reply="Nmp1*2,Lecture\r\n", expect_result=ACK, **D4)
+text(K, "set_input_endpoint_power", {"input": 3, "enabled": True}, E + "I3*1POEC\r", device_reply="PoecI03*1*1*1\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_output_endpoint_power", {"output": 2, "enabled": False}, E + "O2*0POEC\r", device_reply="PoecO02*0*1*2\r\n",
+     expect_result=ACK, **XT)
+text(K, "get_input_endpoint_power", {"input": 3}, E + "I3POEC\r", device_reply="1*1*1\r\n", expect_result=val("1*1*1"), **XT)
+text(K, "get_output_endpoint_power", {"output": 2}, E + "O2POEC\r", device_reply="0*1*2\r\n", expect_result=val("0*1*2"), **XT)
+text(K, "get_endpoint_power_budget", {}, E + "TPOEC\r", device_reply="PoecT1*0\r\n", expect_result=val("1*0"), **XT)
+text(K, "set_receiver_relay", {"output": 4, "relay": 1, "state": "closed"}, E + "4*1*1RELY\r", device_reply="Rely4*1*1\r\n",
+     expect_result=ACK, **XT)
+text(K, "pulse_receiver_relay", {"output": 4, "relay": 2, "ticks": 31}, E + "4*2*3*31RELY\r", device_reply="Rely4*2*3\r\n",
+     expect_result=ACK, **XT)
+text(K, "get_receiver_relay", {"output": 4, "relay": 1}, E + "4*1RELY\r", device_reply="Rely4*1*1\r\n", expect_result=val("1"), **XT)
+text(K, "set_transmitter_input", {"input": 5, "sub_input": 2, "what": "all"}, E + "5*2*3ETIE\r", device_reply="Etie5*2*2\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_receiver_input", {"output": 3, "sub_input": 1, "what": "video"}, E + "R3*1*1ETIE\r",
+     device_reply="EtieR3*1*2\r\n", expect_result=ACK, **XT)
+text(K, "get_transmitter_inputs", {}, E + "ETIE\r", device_reply="Etie00*1*1 2*2 3*1\r\n", expect_result=val("1*1 2*2 3*1"), **XT)
+text(K, "set_receiver_video_mute", {"output": 3, "muted": True}, E + "R3*1*1B\r", device_reply="VmtR3*1*1\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_receiver_audio_mute", {"output": 3, "mode": 2}, E + "R3*1*2Z\r", device_reply="AmtR3*1*2\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_transmitter_audio_source", {"input": 5, "sub_input": 2, "source": 1}, E + "T5*2*1AFMT\r",
+     device_reply="AfmtT5*2*1\r\n", expect_result=ACK, **XT)
+text(K, "set_transmitter_gain", {"input": 5, "sub_input": 1, "gain": 6}, E + "T5*1*6G\r", device_reply="AudT5*1*+6\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_transmitter_attenuation", {"input": 5, "sub_input": 1, "attenuation": 3}, E + "T5*1*3g\r",
+     device_reply="AudT5*1*-3\r\n", expect_result=ACK, **XT)
+text(K, "set_receiver_volume", {"output": 3, "volume": 50}, E + "R3*1*50V\r", device_reply="VolR3*1*50\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_receiver_hdcp_authorization", {"output": 3, "sub_input": 1, "enabled": True}, E + "RE3*1*1HDCP\r",
+     device_reply="HdcpRE3*1*1\r\n", expect_result=ACK, **XT)
+text(K, "set_transmitter_hdcp_authorization", {"input": 5, "sub_input": 2, "enabled": False}, E + "TE5*2*0HDCP\r",
+     device_reply="HdcpTE5*2*0\r\n", expect_result=ACK, **XT)
+text(K, "set_receiver_freeze", {"output": 3, "frozen": True}, E + "R3*1*1F\r", device_reply="FrzR3*1*1\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_output_freeze", {"output": 3, "frozen": False}, E + "O3*0F\r", device_reply="FrzO3*0\r\n", expect_result=ACK, **XT)
+text(K, "transmitter_image_reset", {"input": 5, "sub_input": 1}, E + "T5*1*2AADJ\r", device_reply="AadjT5*1*2\r\n",
+     expect_result=ACK, **XT)
+text(K, "receiver_image_reset", {"output": 3}, E + "R3*1*2AADJ\r", device_reply="AadjR3*1*2\r\n", expect_result=ACK, **XT)
+text(K, "set_transmitter_front_panel_lock", {"input": 5, "mode": 1}, E + "T5*1X\r", device_reply="ExeT5*1\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_receiver_front_panel_lock", {"output": 3, "mode": 0}, E + "R3*0X\r", device_reply="ExeR3*0\r\n",
+     expect_result=ACK, **XT)
+text(K, "reset_transmitter", {"input": 5}, E + "T5ZXXX\r", device_reply="ZpxT5\r\n", expect_result=ACK, **XT)
+text(K, "reset_receiver", {"output": 3}, E + "R3ZXXX\r", device_reply="ZpxR3\r\n", expect_result=ACK, **XT)
+text(K, "set_input_audio_source", {"input": 2, "source": 2}, E + "I2*2AFMT\r", device_reply="AfmtI2*2\r\n",
+     expect_result=ACK, **XT)
+text(K, "set_dhcp", {"enabled": False}, E + "0DH\r", device_reply="Idh0\r\n", expect_result=ACK, **D4)
+text(K, "get_dhcp", {}, E + "DH\r", device_reply="Idh1\r\n", expect_result=val("1"), **DV)
+text(K, "set_ip_address", {"address": "192.168.254.254"}, E + "192.168.254.254CI\r", device_reply="Ipi 192.168.254.254\r\n",
+     expect_result=ACK, **D4)
+text(K, "get_ip_address", {}, E + "CI\r", device_reply="Ipi192.168.254.254\r\n", expect_result=val("192.168.254.254"), **XT)
+text(K, "set_subnet_mask", {"netmask": "255.255.0.0"}, E + "255.255.0.0CS\r", device_reply="Ips 255.255.0.0\r\n",
+     expect_result=ACK, **SM)
+text(K, "get_subnet_mask", {}, E + "CS\r", device_reply="Ips255.255.0.0\r\n", expect_result=val("255.255.0.0"), **DV)
+text(K, "set_gateway", {"gateway": "192.168.254.1"}, E + "192.168.254.1CG\r", device_reply="Ipg192.168.254.1\r\n",
+     expect_result=ACK, **XT)
+text(K, "get_gateway", {}, E + "CG\r", device_reply="Ipg 0.0.0.0\r\n", expect_result=val("0.0.0.0"), **D4)
+text(K, "get_mac_address", {}, E + "CH\r", device_reply="Iph 00-05-A6-12-34-56\r\n", expect_result=val("00-05-A6-12-34-56"), **D4)
+text(K, "get_connection_count", {}, E + "CC\r", device_reply="Icc3\r\n", expect_result=val("3"), **DV)
+text(K, "set_unit_name", {"name": "Rack-A-Matrix"}, E + "Rack-A-MatrixCN\r", device_reply="Ipn Rack-A-Matrix\r\n",
+     expect_result=ACK, **XT)
+text(K, "get_unit_name", {}, E + "CN\r", device_reply="Ipn DXP-HD-4K-12-34-56\r\n", expect_result=val("DXP-HD-4K-12-34-56"), **D4)
+text(K, "set_date_time", {"date_time": "10/14/26 09:30:00"}, E + "10/14/26 09:30:00CT\r",
+     device_reply="Ipt10/14/26 09:30:00\r\n", expect_result=ACK, **DV)
+text(K, "get_date_time", {}, E + "CT\r", device_reply="Ipt Wed, 14 Oct 2026 09:30:00\r\n",
+     expect_result=val("Wed, 14 Oct 2026 09:30:00"), **D4)
+text(K, "set_gmt_offset", {"offset": "8.30"}, E + "8.30CZ\r", device_reply="Ipz+08:30\r\n", expect_result=ACK, **XT)
+text(K, "get_gmt_offset", {}, E + "CZ\r", device_reply="Ipz-05:00\r\n", expect_result=val("-05:00"), **D4)
+text(K, "set_daylight_saving", {"mode": 2}, E + "2CX\r", device_reply="Ipx2\r\n", expect_result=ACK, **SM)
+text(K, "set_serial_port", {"port": 1, "baud": "38400", "parity": "N", "data_bits": "8", "stop_bits": "1"},
+     E + "1*38400,N,8,1CP\r", device_reply="Cpn01 Ccp38400,N,8,1\r\n", expect_result=ACK, **XT)
+text(K, "get_serial_port", {"port": 1}, E + "1CP\r", device_reply="Cpn01 Ccp9600,N,8,1\r\n", expect_result=val("9600,N,8,1"), **D4)
+text(K, "set_serial_port_type", {"port": 1, "type": 1}, E + "1*1CY\r", device_reply="Cpn01 Cty1\r\n", expect_result=ACK, **DV)
+text(K, "set_port_timeout", {"scope": "global", "steps": 60}, E + "1*60TC\r", device_reply="Pti1*60\r\n",
+     expect_result=ACK, **D4)
+text(K, "restart_network", {}, E + "2BOOT\r", device_reply="Boot2\r\n", expect_result=ACK, **D4)
+text(K, "set_admin_password", {"password": "extron"}, E + "extronCA\r", device_reply="Ipa ****\r\n", expect_result=ACK, **XT)
+text(K, "set_user_password", {"password": " "}, E + " CU\r", device_reply="Ipu \r\n", expect_result=ACK, **DV)
+text(K, "smx_define_virtual_plane", {"plane": 90, "planes": "01*02*05"}, E + "90,01*02*05MP\r",
+     device_reply="Mpv90,01,02,05\r\n", expect_result=ACK, **SM)
+text(K, "smx_get_virtual_plane", {"plane": 90}, E + "90MP\r", device_reply="01,02,05\r\n", expect_result=val("01,02,05"), **SM)
+text(K, "smx_get_slot_planes", {}, E + "STAT\r", device_reply="Stat00 01 -- 02 -- -- 03 -- 03 03\r\n",
+     expect_result=val("00 01 -- 02 -- -- 03 -- 03 03"), **SM)
+text(K, "smx_set_input_name", {"plane": 1, "input": 3, "name": "Camera 3"}, E + "1*3,Camera 3NI\r",
+     device_reply="01Nmi03,Camera 3\r\n", expect_result=ACK, **SM)
+text(K, "smx_set_output_name", {"plane": 1, "output": 2, "name": "Proj"}, E + "1*2,ProjNO\r",
+     device_reply="01Nmo02,Proj\r\n", expect_result=ACK, **SM)
+text(K, "smx_set_plane_preset_name", {"plane": 1, "preset": 4, "name": "Panel"}, E + "1*4,PanelNG\r",
+     device_reply="01Nmg04,Panel\r\n", expect_result=ACK, **SM)
+text(K, "smx_set_input_gain", {"plane": 1, "input": 3, "gain": 6}, "01*3*6G\r", device_reply="01In03 Aud+06\r\n",
+     expect_result=ACK, **SM)
+text(K, "smx_set_input_attenuation", {"plane": 1, "input": 3, "attenuation": 4}, "01*3*4g\r",
+     device_reply="01In03 Aud-04\r\n", expect_result=ACK, **SM)
+text(K, "smx_set_output_volume", {"plane": 1, "output": 2, "volume": 60}, "01*2*60V\r", device_reply="01Out02 Vol60\r\n",
+     expect_result=ACK, **SM)
+text(K, "smx_set_rgb_delay", {"plane": 2, "output": 1, "steps": 3}, E + "02*1*3D\r", device_reply="02Out01 Dly03\r\n",
+     expect_result=ACK, **SM)
+text(K, "smx_set_input_hdcp_authorization", {"slot": 3, "input": 2, "enabled": True}, E + "E3*2*1HDCP\r",
+     device_reply="03HdcpE02*1\r\n", expect_result=ACK, **SM)
+text(K, "smx_get_slot_signal", {"slot": 3}, "3*0LS\r", device_reply="03FRQ00*3 0 1 0\r\n", expect_result=val("3 0 1 0"), **SM)
+
+telemetry(K, "edid-assignment", inbound="EdidA03*15\r\n", expect_state={"inputs": {"3": {"edid": 15}}})
+telemetry(K, "smx-edid-assignment", inbound="02EdidA04*38\r\n",
+          expect_state={"slots": {"2": {"inputs": {"4": {"edid": 38}}}}})
+telemetry(K, "hdcp-authorization", inbound="HdcpE2*0\r\n", expect_state={"inputs": {"2": {"hdcp_authorized": False}}})
+telemetry(K, "output-format", inbound="Vtpo2*3\r\n", expect_state={"outputs": {"2": {"format": 3}}})
+telemetry(K, "room-outputs", inbound="Mpr1,1,2,5\r\n", expect_state={"rooms": {"1": {"outputs": "1,2,5"}}})
+telemetry(K, "endpoint-power", inbound="PoecI03*1*2*1\r\n",
+          expect_state={"inputs": {"3": {"endpoint_power_enabled": True, "endpoint_power_request": 2,
+                                         "endpoint_power_status": 1}}})
+telemetry(K, "relay", inbound="Rely4*2*1\r\n", expect_state={"outputs": {"4": {"relays": {"2": {"closed": True}}}}})
+telemetry(K, "transmitter-inputs", inbound="Etie00*1*1 2*3\r\n",
+          expect_state={"inputs": {"1": {"endpoint_video_input": 1, "endpoint_audio_input": 1},
+                                   "2": {"endpoint_video_input": 2, "endpoint_audio_input": 3}}})
+telemetry(K, "receiver-input", inbound="EtieR3*1*2\r\n",
+          expect_state={"outputs": {"3": {"receiver_video_input": 1, "receiver_audio_input": 2}}})
+telemetry(K, "receiver-mute", inbound="VmtR3*1*1\r\n", expect_state={"outputs": {"3": {"receiver_video_mute": True}}})
+telemetry(K, "transmitter-level", inbound="AudT5*1*-3\r\n",
+          expect_state={"inputs": {"5": {"endpoints": {"1": {"audio_level": -3}}}}})
+telemetry(K, "transmitter-signal", inbound="LsT5*2*1\r\n", expect_state={"inputs": {"5": {"endpoints": {"2": {"signal": True}}}}})
+telemetry(K, "receiver-volume", inbound="VolR3*1*50\r\n", expect_state={"outputs": {"3": {"receiver_volume": 50}}})
+telemetry(K, "network", inbound="Ipi 192.168.254.254\r\n", expect_state={"network": {"address": "192.168.254.254"}})
+telemetry(K, "mac", inbound="Iph 00-05-A6-12-34-56\r\n", expect_state={"network": {"mac": "00-05-A6-12-34-56"}})
+telemetry(K, "dhcp", inbound="Idh1\r\n", expect_state={"network": {"dhcp": True}})
+telemetry(K, "gmt", inbound="Ipz+08:30\r\n", expect_state={"clock": {"gmt_offset": "+08:30"}})
+telemetry(K, "serial-port", inbound="Cpn01 Ccp9600,N,8,1\r\n", expect_state={"serial": {"1": {"settings": "9600,N,8,1"}}})
+telemetry(K, "port-timeout", inbound="Pti1*60\r\n", expect_state={"port_timeout": {"global": 60}})
+telemetry(K, "virtual-plane", inbound="Mpv90,01,02,05\r\n", expect_state={"planes": {"90": {"virtual_members": "01,02,05"}}})
+telemetry(K, "slot-planes", inbound="Stat00 01 -- 02\r\n",
+          expect_state={"slots": {"1": {"plane": "00"}, "2": {"plane": "01"}, "3": {"plane": "--"}, "4": {"plane": "02"}}})
+telemetry(K, "smx-name", inbound="01Nmi03,Camera 3\r\n", expect_state={"planes": {"1": {"inputs": {"3": {"name": "Camera 3"}}}}})
+telemetry(K, "smx-level", inbound="01In03 Aud+06\r\n", expect_state={"planes": {"1": {"inputs": {"3": {"audio_level": 6}}}}})
+telemetry(K, "smx-volume", inbound="01Out02 Vol60\r\n", expect_state={"planes": {"1": {"outputs": {"2": {"volume": 60}}}}})
+telemetry(K, "signal-dvi", inbound="Frq00 3 0 3 3\r\n",
+          expect_state={"inputs": {"1": {"signal": True}, "2": {"signal": False}, "3": {"signal": True},
+                                   "4": {"signal": True}}})
+telemetry(K, "part-number-dvi", inbound="Pno43-265-01\r\n", expect_state={"device": {"part_number": "43-265-01"}})

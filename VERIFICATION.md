@@ -62,17 +62,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aja-kumo — AJA KUMO
 
-- [ ] Check what a salvo crosspoint of source 0 does: turns the output off, or leaves the destination unchanged. ([specs/aja-kumo.yaml:1461](specs/aja-kumo.yaml#L1461))
-- [ ] Confirm that take_salvo sending the salvo number as the eParamID_TakeSalvo value takes salvos 2-8 (AJA's own TakeSalvo always sends 1). ([specs/aja-kumo.yaml:1468](specs/aja-kumo.yaml#L1468))
-- [ ] Confirm the lock parameter eParamID_XPT_Destination{n}_Locked (taken from the Companion module) exists and works, and whether lock changes arrive as events. ([specs/aja-kumo.yaml:1392](specs/aja-kumo.yaml#L1392))
+- [ ] Check what a salvo crosspoint of source 0 does: turns the output off, or leaves the destination unchanged. ([specs/aja-kumo.yaml:1649](specs/aja-kumo.yaml#L1649))
+- [ ] Confirm that take_salvo sending the salvo number as the eParamID_TakeSalvo value takes salvos 2-8 (AJA's own TakeSalvo always sends 1). ([specs/aja-kumo.yaml:1656](specs/aja-kumo.yaml#L1656))
+- [ ] Confirm the lock parameter eParamID_XPT_Destination{n}_Locked (taken from the Companion module) exists and works, and whether lock changes arrive as events. ([specs/aja-kumo.yaml:1571](specs/aja-kumo.yaml#L1571))
 - [ ] Check that string and integer values in KUMO event elements are told apart correctly, since KUMO sends no param_type and a non-empty str_value with no or zero int_value is taken as a string. ([crates/core/src/modules/aja_config_events.rs:172](crates/core/src/modules/aja_config_events.rs#L172))
-- [ ] Record what a salvo change looks like on the event connection, since AJA does not document its event form. ([specs/aja-kumo.yaml:1412](specs/aja-kumo.yaml#L1412))
-- [ ] Check how the router answers wait_for_config_events with an expired connection id, and that /config (not /json) gives the connection id. ([specs/aja-kumo.yaml:1414](specs/aja-kumo.yaml#L1414))
-- [ ] Check whether the firmware on hand answers eParamID_XPT_DestinationAll_Status through /options, or {} as older firmware does. ([specs/aja-kumo.yaml:1424](specs/aja-kumo.yaml#L1424))
-- [ ] Confirm that a number above the router's count, and a switch to a locked destination, fail with HTTP 403 (or note the actual status). ([specs/aja-kumo.yaml:1384](specs/aja-kumo.yaml#L1384))
-- [ ] Confirm the router handles back-to-back requests without the pauses AJA's examples add. ([specs/aja-kumo.yaml:1433](specs/aja-kumo.yaml#L1433))
-- [ ] Confirm button colour writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1476](specs/aja-kumo.yaml#L1476))
-- [ ] Confirm eParamID_LED_Identify turns Identify on and off (it comes from a generic AJA example, not the manual). ([specs/aja-kumo.yaml:1485](specs/aja-kumo.yaml#L1485))
+- [ ] Record what a salvo change looks like on the event connection, since AJA does not document its event form. ([specs/aja-kumo.yaml:1591](specs/aja-kumo.yaml#L1591))
+- [ ] Check how the router answers wait_for_config_events with an expired connection id, and that /config (not /json) gives the connection id. ([specs/aja-kumo.yaml:1593](specs/aja-kumo.yaml#L1593))
+- [ ] Check whether the firmware on hand answers eParamID_XPT_DestinationAll_Status through /options, or {} as older firmware does. ([specs/aja-kumo.yaml:1603](specs/aja-kumo.yaml#L1603))
+- [ ] Confirm that a number above the router's count, and a switch to a locked destination, fail with HTTP 403 (or note the actual status). ([specs/aja-kumo.yaml:1563](specs/aja-kumo.yaml#L1563))
+- [ ] Confirm the router handles back-to-back requests without the pauses AJA's examples add. ([specs/aja-kumo.yaml:1612](specs/aja-kumo.yaml#L1612))
+- [ ] Confirm button colour writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1664](specs/aja-kumo.yaml#L1664))
+- [ ] Read a button colour (eParamID_Button_Settings_{n}) and its event, and check the value holds color_N as written, for a source and a destination in each bank. ([specs/aja-kumo.yaml:1674](specs/aja-kumo.yaml#L1674))
+- [ ] Record the values and names eParamID_SuppressPSAlarm reads, and the ids of the switching mode, reference and temperature alarm suppression from desc.json. ([specs/aja-kumo.yaml:1699](specs/aja-kumo.yaml#L1699))
+- [ ] Check what /authenticator/login answers on a unit with User Authentication Disabled (whether it still sets a session cookie). ([specs/aja-kumo.yaml:1625](specs/aja-kumo.yaml#L1625))
+- [ ] Confirm eParamID_LED_Identify turns Identify on and off (it comes from a generic AJA example, not the manual). ([specs/aja-kumo.yaml:1673](specs/aja-kumo.yaml#L1673))
 
 ## allenheath-ahm — Allen & Heath AHM
 
@@ -755,13 +758,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## extron-matrix — Extron SIS matrix switchers
 
-- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([specs/extron-matrix.yaml:931](specs/extron-matrix.yaml#L931))
-- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([specs/extron-matrix.yaml:941](specs/extron-matrix.yaml#L941))
-- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([specs/extron-matrix.yaml:916](specs/extron-matrix.yaml#L916))
-- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([specs/extron-matrix.yaml:955](specs/extron-matrix.yaml#L955))
-- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([specs/extron-matrix.yaml:971](specs/extron-matrix.yaml#L971))
-- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([specs/extron-matrix.yaml:985](specs/extron-matrix.yaml#L985))
-- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([specs/extron-matrix.yaml:978](specs/extron-matrix.yaml#L978))
+- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([specs/extron-matrix.yaml:956](specs/extron-matrix.yaml#L956))
+- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([specs/extron-matrix.yaml:966](specs/extron-matrix.yaml#L966))
+- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([specs/extron-matrix.yaml:941](specs/extron-matrix.yaml#L941))
+- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([specs/extron-matrix.yaml:980](specs/extron-matrix.yaml#L980))
+- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([specs/extron-matrix.yaml:996](specs/extron-matrix.yaml#L996))
+- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([specs/extron-matrix.yaml:1010](specs/extron-matrix.yaml#L1010))
+- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([specs/extron-matrix.yaml:1910](specs/extron-matrix.yaml#L1910))
+- [ ] On DXP HD 4K PLUS, record the EDID view replies (EdidR hex, EdidN native resolution) and the EDID import and export tags, which the guide prints as EIX5@ and EEX5@. ([specs/extron-matrix.yaml:1175](specs/extron-matrix.yaml#L1175))
+- [ ] On XTP II, record the remote power (POEC) replies and pushes, and the all-ports forms. ([specs/extron-matrix.yaml:1271](specs/extron-matrix.yaml#L1271))
+- [ ] On XTP II, check ETIE: which type value (1 or 2) selects video only, and the receiver form (Rev. Q). ([specs/extron-matrix.yaml:1340](specs/extron-matrix.yaml#L1340))
+- [ ] Check which IP, DHCP and password changes end the Telnet session on each family (only DXP DVI documents it). ([specs/extron-matrix.yaml:1924](specs/extron-matrix.yaml#L1924))
+- [ ] Check the unit name length limit on each family (63 on DXP HD 4K PLUS, 24 elsewhere) and the CT read format (SMX MM/DD/YY, others Ddd, DD Mmm YYYY). ([specs/extron-matrix.yaml:1589](specs/extron-matrix.yaml#L1589))
+- [ ] On SMX, check the serial port (CP) syntax, which the guide prints as Esc *port,...CP, and which port numbers are the rear ports on each family. ([specs/extron-matrix.yaml:1639](specs/extron-matrix.yaml#L1639))
+- [ ] On SMX, record a virtual plane definition and its read-back (Mpv), and whether Esc ZXXX clears virtual planes. ([specs/extron-matrix.yaml:1699](specs/extron-matrix.yaml#L1699))
+- [ ] Check what a DXP HD 4K PLUS answers for global presets 17-32, and how DXP DVI and SMX treat names longer than 12 characters. ([specs/extron-matrix.yaml:1953](specs/extron-matrix.yaml#L1953))
+- [ ] Check that the 2-minute poll's extra queries (network, EDID, HDCP authorization, formats, transmitter inputs, slot and virtual planes) are answered with E-codes, not silence, on the models that lack them. ([specs/extron-matrix.yaml:1953](specs/extron-matrix.yaml#L1953))
 
 ## extron-switcher — Extron IN-series scaling presentation switchers
 
@@ -911,12 +923,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## kramer-p3000 — Kramer Protocol 3000
 
-- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:1135](specs/kramer-p3000.yaml#L1135))
-- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:1164](specs/kramer-p3000.yaml#L1164))
-- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:1151](specs/kramer-p3000.yaml#L1151))
-- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:1176](specs/kramer-p3000.yaml#L1176))
-- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:1187](specs/kramer-p3000.yaml#L1187))
-- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:1162](specs/kramer-p3000.yaml#L1162))
+- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:2628](specs/kramer-p3000.yaml#L2628))
+- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:2734](specs/kramer-p3000.yaml#L2734))
+- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:2644](specs/kramer-p3000.yaml#L2644))
+- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:2769](specs/kramer-p3000.yaml#L2769))
+- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:2780](specs/kramer-p3000.yaml#L2780))
+- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:2732](specs/kramer-p3000.yaml#L2732))
+- [ ] On a presentation switcher (VP-440X, VP-551X or VP-427X2), a multiviewer (MV-4X) and a streamer (KDS-EN7), record the values VID-RES, IMAGE-PROP, SCLR-AS, VIEW-MOD and W-COLOR take and answer, and which channels count from 0. ([specs/kramer-p3000.yaml:3139](specs/kramer-p3000.yaml#L3139))
+- [ ] Check whether EDID-AUDIO takes the guide's single mode or the per-input form (input,format) on each product. ([specs/kramer-p3000.yaml:1448](specs/kramer-p3000.yaml#L1448))
+- [ ] Confirm GPIO-CFG answers type,direction without the pull-up, and that GPIO-STATE is pushed on a change. ([specs/kramer-p3000.yaml:1878](specs/kramer-p3000.yaml#L1878))
+- [ ] Confirm the KDS-ACTION values (0 stop, 1 play, 2 save), since the guide's table is a copy of another. ([specs/kramer-p3000.yaml:2045](specs/kramer-p3000.yaml#L2045))
+- [ ] Record how ETH-PORT names the protocol in its reply (TCP/UDP or 0/1) and whether a TCP port change ends the connection before the answer. ([specs/kramer-p3000.yaml:2268](specs/kramer-p3000.yaml#L2268))
+- [ ] Record the TIME? reply's date form (the guide's DD-MM-YYYY or SWT3's YYYY/MM/DD). ([specs/kramer-p3000.yaml:2295](specs/kramer-p3000.yaml#L2295))
+- [ ] Check which network changes end the connection at once, and that NET-IP answers before the address changes. ([specs/kramer-p3000.yaml:3128](specs/kramer-p3000.yaml#L3128))
+- [ ] On the VP-551X, check MIC-GAIN's three-parameter form (0,mic,level) against the two-parameter command offered. ([specs/kramer-p3000.yaml:2450](specs/kramer-p3000.yaml#L2450))
+- [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:3156](specs/kramer-p3000.yaml#L3156))
 
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 
@@ -949,21 +970,37 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
-- [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:463](specs/lightware-lw2.yaml#L463))
-- [ ] Record the error answers ("(ERR04)" and others) and whether a failed command is answered at all. ([specs/lightware-lw2.yaml:463](specs/lightware-lw2.yaml#L463))
-- [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:470](specs/lightware-lw2.yaml#L470))
-- [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:496](specs/lightware-lw2.yaml#L496))
-- [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:470](specs/lightware-lw2.yaml#L470))
+- [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
+- [ ] Record the error answers ("(ERR04)" and others) and whether a failed command is answered at all. ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
+- [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:678](specs/lightware-lw2.yaml#L678))
+- [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:724](specs/lightware-lw2.yaml#L724))
+- [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:678](specs/lightware-lw2.yaml#L678))
+- [ ] On an MX-CPU1 frame and an MX8x8, check which of edid_route, RS232BAUD, GETTIME/SETTIME and PS/(PSC) exist (documented for MX-CPU2 only), and on an MX-CPU2 frame whether HDMIIGET/HDMIOGET/HDMISET still work. ([specs/lightware-lw2.yaml:715](specs/lightware-lw2.yaml#L715))
+- [ ] Record the ISD and OSD digits for each board type on a live frame, and check the MX8x8's digits against its bit table. ([specs/lightware-lw2.yaml:708](specs/lightware-lw2.yaml#L708))
+- [ ] Check that each (ALL ...) answer having ISD, OSD, IP_CONFIG and RS232BAUD read after it every 5 seconds does not slow the matrix, and how the UMX answers those queries. ([specs/lightware-lw2.yaml:806](specs/lightware-lw2.yaml#L806))
+- [ ] Confirm set_ip_dhcp and reset_ip_config answer "(Changing IP configuration...)" before the connection drops. ([specs/lightware-lw2.yaml:664](specs/lightware-lw2.yaml#L664))
+- [ ] Confirm a switch to a locked output answers (1LO<out>) on the MX8x8 too. ([specs/lightware-lw2.yaml:674](specs/lightware-lw2.yaml#L674))
+- [ ] Check the UMX GPIO pin range (the manual prints 0 ...8 and pin 1 to 8; the hardware has 7) and the RS232_LOCAL_FORMAT reply. ([specs/lightware-lw2.yaml:643](specs/lightware-lw2.yaml#L643))
+- [ ] Confirm set_hdmi_output's answer is the output's STO line. ([specs/lightware-lw2.yaml:515](specs/lightware-lw2.yaml#L515))
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 
-- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:2640](specs/lightware-lw3.yaml#L2640))
-- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:2622](specs/lightware-lw3.yaml#L2622))
-- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:2674](specs/lightware-lw3.yaml#L2674))
-- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:2692](specs/lightware-lw3.yaml#L2692))
-- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2712](specs/lightware-lw3.yaml#L2712))
-- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2656](specs/lightware-lw3.yaml#L2656))
-- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:2718](specs/lightware-lw3.yaml#L2718))
+- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:4375](specs/lightware-lw3.yaml#L4375))
+- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:4357](specs/lightware-lw3.yaml#L4357))
+- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:4409](specs/lightware-lw3.yaml#L4409))
+- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:4427](specs/lightware-lw3.yaml#L4427))
+- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:4447](specs/lightware-lw3.yaml#L4447))
+- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:4391](specs/lightware-lw3.yaml#L4391))
+- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:4453](specs/lightware-lw3.yaml#L4453))
+- [ ] On MX2, record the answer to applySettings (the manual prints m0 where other methods answer mO). ([specs/lightware-lw3.yaml:1970](specs/lightware-lw3.yaml#L1970))
+- [ ] Check the /V1 GPIO pin range (P1-P6 assumed from the 8-pole connector; the manuals give no range) and that Direction and Output answer pw with = as in the examples. ([specs/lightware-lw3.yaml:1612](specs/lightware-lw3.yaml#L1612))
+- [ ] On UMX, check the GPIO pins P1-P7, and that the UART's numbered ControlProtocol, Rs232Mode, Baudrate, StopBits and Parity codes are as translated. ([specs/lightware-lw3.yaml:4510](specs/lightware-lw3.yaml#L4510))
+- [ ] On UMX-HDMI-140-Plus, record an Event Manager condition and action as GET answers them, and the RS-232 recognizer's Rx after a received message. ([specs/lightware-lw3.yaml:4510](specs/lightware-lw3.yaml#L4510))
+- [ ] Check whether the /V1 LW3 service can be disabled over LW3 (SERVICES/LW3.Enabled is not documented) and whether set_web_service_enabled answers before the service stops. ([specs/lightware-lw3.yaml:1738](specs/lightware-lw3.yaml#L1738))
+- [ ] On UCX and MMX2, check which remote syslog format property exists (UCX LogFormat, MMX2 SyslogFormat); it is left out. ([specs/lightware-lw3.yaml:1781](specs/lightware-lw3.yaml#L1781))
+- [ ] Check that the reads on connecting (about 390 single GETs across the three trees, most answered with errors on the other trees) complete without the device dropping the connection. ([specs/lightware-lw3.yaml:2760](specs/lightware-lw3.yaml#L2760))
+- [ ] On MX2, record the answers to PRESET:create and PRESET:rename, and whether GET /MEDIA/PRESET lists the presets as child nodes. ([specs/lightware-lw3.yaml:3392](specs/lightware-lw3.yaml#L3392))
+- [ ] On MX2, confirm that port names cannot be set over LW3 (no property in the manual's LW3 chapter). ([specs/lightware-lw3.yaml:4496](specs/lightware-lw3.yaml#L4496))
 
 ## magewell-proconvert — Magewell Pro Convert
 

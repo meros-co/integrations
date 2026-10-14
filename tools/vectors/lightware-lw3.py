@@ -24,6 +24,19 @@ _LW_STRINGS = {
     "^/[A-Za-z0-9_/@-]*:[A-Za-z0-9_]+$": "/V1/MEDIA/VIDEO/XP:switch",
     "^/[A-Za-z0-9_/@-]*[.:][A-Za-z0-9_]+$": "/MEDIA/PORTS/VIDEO/I1/SETTINGS.EnablePower",
     "^/[A-Za-z0-9_/@-]*(/\\*)?$": "/V1/MEDIA/VIDEO/*",
+    "^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$": "192.168.0.20",
+    "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$": "AA:BB:CC:22:14:FF",
+    "^/[^\\\\{}#%() ]*$": "/putxml",
+    "^[0-9A-Fa-f]+$": "0000006D0022",
+    "^[A-Za-z0-9 ._-]*$": "Welcome to Room 1",
+    "^[A-Za-z0-9 _-]*$": "Projector on",
+    "^[A-Za-z0-9.-]{1,253}$": "syslog.example.com",
+    "^[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?$": "room-1-ucx",
+    "^[A-Za-z0-9][A-Za-z0-9.-]{0,63}$": "umx.room-1",
+    "^[FUDE][1-9][0-9]{0,2}$": "D1",
+    "^[^\\\\{}#%()\\s]+$": "Secret2",
+    "^[^{}#%()]*$": "PWR ON\\x0D",
+    "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(\\.\\d{1,3})?Z$": "2020-11-01T04:39:54.000Z",
 }
 
 
@@ -46,6 +59,9 @@ def _lw_render(template, values):
     def sub(m):
         name, _, directive = m.group(1).partition(":")
         v = values[name]
+        if directive.startswith("map."):
+            key = ("true" if v else "false") if isinstance(v, bool) else str(v)
+            return _LW_DOC["maps"][directive[4:]][key]
         if directive.startswith(".") and directive.endswith("f"):
             return f"{v:.{int(directive[1:-1])}f}"
         if isinstance(v, bool):
@@ -168,6 +184,110 @@ text(LW, "close_node", {"node": "/MEDIA/VIDEO"}, "CLOSE /MEDIA/VIDEO\r\n",
 telemetry(LW, "any-property", inbound="CHG /MEDIA/AUDIO/O3.VolumePercent=50.00\r\n", expect_state={})
 telemetry(LW, "any-property-root", inbound="pr /.SerialNumber=87654321\r\n",
           expect_state={"device": {"serial": "87654321"}})
+
+
+# Full control: GPIO, serial, network, Event Manager, variables, message
+# sending (answers from the manuals' examples: UCX 8.5-8.20, MMX2 7.9-7.15,
+# MX2 9.16-9.19, UMX 7.4-7.23).
+text(LW, "set_gpio_direction", {"port": 1, "direction": "Input"}, "SET /V1/MEDIA/GPIO/P1.Direction=Input\r\n",
+     device_reply="pw /V1/MEDIA/GPIO/P1.Direction=Input\r\n", expect_result=ACK, **UCX)
+text(LW, "gpio_interval", {"port": 1, "level": "Low", "seconds": 1}, "CALL /V1/MEDIA/GPIO/P1:interval(Low;1)\r\n",
+     device_reply="mO /V1/MEDIA/GPIO/P1:interval=\r\n", expect_result=ACK, **UCX)
+text(LW, "gpio_toggle", {"port": 1}, "CALL /V1/MEDIA/GPIO/P1:toggle()\r\n",
+     device_reply="mO /V1/MEDIA/GPIO/P1:toggle\r\n", expect_result=ACK, **V1)
+text(LW, "set_serial_baudrate", {"port": 1, "baud": "57600"}, "SET /V1/MEDIA/SERIAL/P1.Baudrate=57600\r\n",
+     device_reply="pw /V1/MEDIA/SERIAL/P1.Baudrate=57600\r\n", expect_result=ACK, **UCX)
+text(LW, "apply_network_settings", {}, "CALL /V1/MANAGEMENT/NETWORK:applySettings()\r\n",
+     device_reply="mO /V1/MANAGEMENT/NETWORK:applySettings\r\n", expect_result=ACK, **UCX)
+text(LW, "set_time", {"time": "2020-11-01T04:39:54.000Z"}, "CALL /V1/MANAGEMENT/DATETIME:setTime(2020-11-01T04:39:54.000Z)\r\n",
+     device_reply="mO /V1/MANAGEMENT/DATETIME:setTime=\r\n", expect_result=ACK, **UCX)
+text(LW, "get_edid_preferred_resolution", {"bank": "U", "slot": 2}, "GET /V1/EDID/U/U2.PreferredResolution\r\n",
+     device_reply="pr /V1/EDID/U/U2.PreferredResolution=1920x1080p60.00Hz\r\n", expect_result=_v("1920x1080p60.00Hz"), **UCX)
+text(LW, "mx2_apply_network_settings", {}, "CALL /MANAGEMENT/NETWORK:applySettings()\r\n",
+     device_reply="mO /MANAGEMENT/NETWORK:applySettings=\r\n", expect_result=ACK, **MX)
+text(LW, "mx2_set_serial_protocol", {"protocol": "LW3"}, "SET /MANAGEMENT/SERIAL.Protocol=LW3\r\n",
+     device_reply="pw /MANAGEMENT/SERIAL.Protocol=LW3\r\n", expect_result=ACK, **MX)
+text(LW, "umx_set_gpio_direction", {"port": 1, "direction": "I"}, "SET /MEDIA/GPIO/P1.Direction=I\r\n",
+     device_reply="pw /MEDIA/GPIO/P1.Direction=I\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_set_serial_baudrate", {"baud": "57600"}, "SET /MEDIA/UART/P1.Baudrate=6\r\n",
+     device_reply="pw /MEDIA/UART/P1.Baudrate=6\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_set_serial_stop_bits", {"stop_bits": "1.5"}, "SET /MEDIA/UART/P1.StopBits=1\r\n",
+     device_reply="pw /MEDIA/UART/P1.StopBits=1\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_serial_send", {"message": "C00\\x0D"}, "CALL /MEDIA/UART/P1:sendMessage(C00\\x0D)\r\n",
+     device_reply="mO /MEDIA/UART/P1:sendMessage\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_serial_send_hex", {"hex": "433030"}, "CALL /MEDIA/UART/P1:sendBinaryMessage(433030)\r\n",
+     device_reply="mO /MEDIA/UART/P1:sendBinaryMessage\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_set_event_condition", {"event": 1, "condition": "/MEDIA/VIDEO/I1.SignalPresent=1"},
+     "SET /EVENTS/E1.Condition=/MEDIA/VIDEO/I1.SignalPresent=1\r\n",
+     device_reply="pw /EVENTS/E1.Condition=/MEDIA/VIDEO/I1.SignalPresent=1\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_set_event_action", {"event": 1, "action": "/MEDIA/VIDEO/XP.switch=I4:O1"},
+     "SET /EVENTS/E1.Action=/MEDIA/VIDEO/XP.switch=I4:O1\r\n",
+     device_reply="pw /EVENTS/E1.Action=/MEDIA/VIDEO/XP.switch=I4:O1\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_trigger_event_condition", {"event": 1}, "CALL /EVENTS/E1:triggerCondition(1)\r\n",
+     device_reply="mO /EVENTS/E1:triggerCondition\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_add_to_variable", {"variable": 1, "operand": 5, "min": 0, "max": 100},
+     "CALL /CTRL/VARS/V1:add(5;0;100)\r\n", device_reply="mO /CTRL/VARS/V1:add\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_tcp_message", {"address": "192.168.0.20", "port": 5555, "message": "C00\\x0a\\x0d"},
+     "CALL /MEDIA/ETHERNET:tcpMessage(192.168.0.20:5555=C00\\x0a\\x0d)\r\n",
+     device_reply="mO /MEDIA/ETHERNET:tcpMessage\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_wake_on_lan", {"mac": "AA:BB:CC:22:14:FF"}, "CALL /MEDIA/ETHERNET:wakeOnLan(AA:BB:CC:22:14:FF)\r\n",
+     device_reply="mO /MEDIA/ETHERNET:wakeOnLan\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_apply_network_settings", {}, "CALL /MANAGEMENT/NETWORK:applySettings(1)\r\n",
+     device_reply="mO /MANAGEMENT/NETWORK:applySettings\r\n", expect_result=ACK, **UMX)
+text(LW, "umx_edid_switch", {"source": "F49", "input": 1}, "CALL /EDID:switch(F49:E1)\r\n",
+     device_reply="mO /EDID:switch\r\n", expect_result=ACK, **UMX)
+
+telemetry(LW, "v1-gpio", inbound="CHG /V1/MEDIA/GPIO/P1.Output=High\r\n",
+          expect_state={"gpio": {"1": {"output": "High"}}})
+telemetry(LW, "umx-gpio", inbound="pw /MEDIA/GPIO/P2.Direction=O\r\n",
+          expect_state={"gpio": {"2": {"direction": "Output"}}})
+telemetry(LW, "v1-ocs", inbound="pr /V1/MEDIA/OCS/P1.State=Occupied\r\n", expect_state={"ocs": {"1": {"state": "Occupied"}}})
+telemetry(LW, "v1-serial", inbound="pw /V1/MEDIA/SERIAL/P2.Parity=Even\r\n", expect_state={"serial": {"2": {"parity": "Even"}}})
+telemetry(LW, "umx-uart-baud", inbound="pw /MEDIA/UART/P1.Baudrate=7\r\n", expect_state={"serial": {"1": {"baudrate": 115200}}})
+telemetry(LW, "umx-uart-mode", inbound="CHG /MEDIA/UART/P1.Rs232Mode=2\r\n",
+          expect_state={"serial": {"1": {"mode": "command_injection"}}})
+telemetry(LW, "umx-recognizer", inbound="pr /MEDIA/UART/RECOGNIZER.Rx=Login:\r\n",
+          expect_state={"serial": {"1": {"received": "Login:"}}})
+telemetry(LW, "mx2-serial", inbound="pw /MANAGEMENT/SERIAL.Protocol=LW2\r\n", expect_state={"serial": {"1": {"protocol": "LW2"}}})
+telemetry(LW, "network-dhcp", inbound="pw /V1/MANAGEMENT/NETWORK.DhcpEnabled=false\r\n",
+          expect_state={"network": {"dhcp": False}})
+telemetry(LW, "network-static", inbound="pw /MANAGEMENT/NETWORK.StaticIpAddress=192.168.0.20\r\n",
+          expect_state={"network": {"static_address": "192.168.0.20"}})
+telemetry(LW, "mx2-address", inbound="pr /MANAGEMENT/NETWORK.IpAddress=192.168.0.101\r\n",
+          expect_state={"network": {"address": "192.168.0.101"}})
+telemetry(LW, "v1-service", inbound="pr /V1/MANAGEMENT/NETWORK/SERVICES/LW3.Port=6107\r\n",
+          expect_state={"network": {"services": {"LW3": {"port": 6107}}}})
+telemetry(LW, "v1-ethernet", inbound="CHG /V1/MEDIA/ETHERNET/P3.Enabled=false\r\n",
+          expect_state={"network": {"ethernet": {"3": {"enabled": False}}}})
+telemetry(LW, "v1-5v", inbound="pw /V1/MEDIA/VIDEO/O1.Output5VMode=Follow signal present\r\n",
+          expect_state={"video": {"outputs": {"1": {"output_5v_mode": "Follow signal present"}}}})
+telemetry(LW, "v1-control-lock", inbound="pw /V1/MANAGEMENT/UI.ControlLock=Force locked\r\n",
+          expect_state={"ui": {"control_lock": "Force locked"}})
+telemetry(LW, "v1-autoselect", inbound="CHG /V1/MEDIA/VIDEO/AUTOSELECT/O1/I2.Priority=50\r\n",
+          expect_state={"video": {"outputs": {"1": {"autoselect": {"2": {"priority": 50}}}}}})
+telemetry(LW, "v1-edid-slot", inbound="pr /V1/EDID/U/U2.PreferredResolution=1920x1080p60.00Hz\r\n",
+          expect_state={"edid": {"slots": {"U2": {"preferred_resolution": "1920x1080p60.00Hz"}}}})
+telemetry(LW, "mx2-port-setting", inbound="pw /MEDIA/PORTS/VIDEO/O2/SETTINGS.HdcpMode=ALWAYS\r\n",
+          expect_state={"video": {"outputs": {"2": {"hdcp_mode": "ALWAYS"}}}})
+telemetry(LW, "umx-test-pattern", inbound="pw /MEDIA/VIDEO/I3.FreeRunMode=2\r\n",
+          expect_state={"video": {"inputs": {"3": {"test_pattern_mode": 2}}}})
+telemetry(LW, "umx-event", inbound="pw /EVENTS/E1.Action=/MEDIA/VIDEO/XP.switch=I4:O1\r\n",
+          expect_state={"events": {"1": {"action": "/MEDIA/VIDEO/XP.switch=I4:O1"}}})
+telemetry(LW, "umx-event-enabled", inbound="CHG /EVENTS/E12.Enabled=true\r\n",
+          expect_state={"events": {"12": {"enabled": True}}})
+telemetry(LW, "umx-variable", inbound="pw /CTRL/VARS/V3.Value=42\r\n", expect_state={"variables": {"3": {"value": "42"}}})
+telemetry(LW, "umx-cec", inbound="CHG /MEDIA/CEC/O1.LastReceivedMessage=0F87000000\r\n",
+          expect_state={"cec": {"O1": {"last_received": "0F87000000"}}})
+telemetry(LW, "umx-login-enable", inbound="pw /LOGIN.LoginEnable=true\r\n", expect_state={"device": {"login_enabled": True}})
+telemetry(LW, "mx2-preset-load", inbound="mO /MEDIA/PRESET/My_pres:load=Ok\r\n",
+          expect_state={"presets": {"last_loaded": "My_pres", "My_pres": {"exists": True}}})
+telemetry(LW, "mx2-preset-create", inbound="mO /MEDIA/PRESET:create=\r\n",
+          request="CALL /MEDIA/PRESET:create(Stage_A,VIDEO)",
+          expect_state={"presets": {"Stage_A": {"exists": True}}})
+telemetry(LW, "mx2-preset-rename", inbound="mO /MEDIA/PRESET:rename=\r\n",
+          request="CALL /MEDIA/PRESET:rename(Stage_A,Stage_B)",
+          state_before={"presets": {"Stage_A": {"exists": True}}},
+          expect_state={"presets": {"Stage_B": {"exists": True}}})
 
 
 def _lw_nodes():
