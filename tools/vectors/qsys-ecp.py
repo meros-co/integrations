@@ -54,6 +54,9 @@ text(Q, "command", {"line": "cg gain1"}, "cg gain1\n", expect_result=QNONE)
 
 telemetry(Q, "control-value", inbound='cv "gain1" "-12.0dB" -12 0.75\r\n',
           expect_state={"controls": {"gain1": {"string": "-12.0dB", "value": -12.0, "position": 0.75}}})
+# A Named Control whose name holds dots is one state key.
+telemetry(Q, "control-value-dotted-name", inbound='cv "ent.xfade.gain" "-6.0dB" -6 0.8\r\n',
+          expect_state={"controls": {"ent.xfade.gain": {"string": "-6.0dB", "value": -6.0, "position": 0.8}}})
 telemetry(Q, "vector-control", inbound='cvv "meter1" 2 "-20.5dB" "-30.0dB" 2 -20.5 -30 2 0.4 0.3\r\n',
           expect_state={"controls": {"meter1": {"string": "-20.5dB", "value": -20.5}}})
 telemetry(Q, "metadata", inbound='cmv "mute1" 6 "true" 1 1\r\n',
