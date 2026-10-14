@@ -1696,7 +1696,20 @@ impl SonyCamera {
         let mut changed = false;
         let mut jobs_changed = false;
         for info in list {
-            let raw = info.to_json();
+            let mut raw = info.to_json();
+            if let Some(prop) = props::by_code(info.code) {
+                // Where its operator value goes, and the options as that
+                // value reads them (names from the module's tables).
+                raw["path"] = json!(prop.path);
+                if let Form::Enum { settable, .. } = &info.form {
+                    if !matches!(prop.decode, Decode::Raw) {
+                        raw["labels"] = settable
+                            .iter()
+                            .map(|v| props::decode(prop.decode, v))
+                            .collect();
+                    }
+                }
+            }
             if self.reported_raw.get(&info.code) != Some(&raw) {
                 put(
                     &mut patch,
@@ -4120,7 +4133,8 @@ mod tests {
         assert_eq!(s["properties"]["D20D"]["enabled"], "disabled");
         assert_eq!(
             s["properties"]["5005"],
-            json!({"value": 2, "type": "uint16", "writable": true, "enabled": "enabled", "options": [2, 4, 0x8012]})
+            json!({"value": 2, "type": "uint16", "writable": true, "enabled": "enabled", "options": [2, 4, 0x8012],
+                   "path": "white_balance.mode", "labels": ["auto", "daylight", "color_temperature"]})
         );
     }
 
@@ -4493,7 +4507,8 @@ mod tests {
         let a = feed(&mut m, CMD, &packets);
         assert_eq!(
             state(&a),
-            json!({"properties": {"D21D": {"value": 1, "type": "uint8", "writable": false, "enabled": "enabled", "options": []}},
+            json!({"properties": {"D21D": {"value": 1, "type": "uint8", "writable": false, "enabled": "enabled", "options": [],
+                       "path": "recording.state", "labels": []}},
                    "recording": {"state": "recording"}})
         );
         // The queued read goes next, and an unchanged property is not reported.
