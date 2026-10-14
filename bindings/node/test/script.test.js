@@ -46,7 +46,7 @@ function at(value, path) {
 test('the shared binding script', async () => {
   const script = require(join(root, 'tests', 'bindings', 'script.json'));
   const { child, ports } = await startSimulator();
-  const core = new NativeCore();
+  const core = new NativeCore({ bind_address: '127.0.0.1' });
   const vars = { ...ports };
   try {
     for (const [index, raw] of script.steps.entries()) {

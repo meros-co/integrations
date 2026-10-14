@@ -44,7 +44,7 @@ function recorder(core) {
 
 test('drives a device through the binding', async () => {
   const device = await simulatedEm6000();
-  const core = new Core();
+  const core = new Core({ bindAddress: '127.0.0.1' });
   const until = recorder(core);
   try {
     const id = core.open({
@@ -75,7 +75,7 @@ test('drives a device through the binding', async () => {
 });
 
 test('the catalogue lists every spec', () => {
-  const core = new Core();
+  const core = new Core({ bindAddress: '127.0.0.1' });
   try {
     const { devices } = core.catalog();
     assert.ok(devices['sennheiser-ew-dx']);
@@ -86,7 +86,7 @@ test('the catalogue lists every spec', () => {
 });
 
 test('a core started for some devices knows only them', () => {
-  const core = new Core({ devices: ['sennheiser-ew-g3-g4', 'shure-wireless'] });
+  const core = new Core({ bindAddress: '127.0.0.1', devices: ['sennheiser-ew-g3-g4', 'shure-wireless'] });
   try {
     assert.deepStrictEqual(Object.keys(core.catalog().devices), ['sennheiser-ew-g3-g4', 'shure-wireless']);
     assert.throws(
@@ -97,7 +97,7 @@ test('a core started for some devices knows only them', () => {
   } finally {
     core.dispose();
   }
-  assert.throws(() => new Core({ devices: ['no-such-device'] }), /no-such-device/);
+  assert.throws(() => new Core({ bindAddress: '127.0.0.1', devices: ['no-such-device'] }), /no-such-device/);
 });
 
 test('streams frames as Buffers while watched', async () => {
@@ -109,7 +109,7 @@ test('streams frames as Buffers while watched', async () => {
     res.end(Buffer.from([0xff, 0xd8, served & 0xff, 0xff, 0xd9]));
   });
   await new Promise((resolve) => camera.listen(0, '127.0.0.1', resolve));
-  const core = new Core();
+  const core = new Core({ bindAddress: '127.0.0.1' });
   try {
     const id = core.open({
       device: 'http-snapshot',
