@@ -71,3 +71,42 @@ _h2r("post_social_messages", {"source": "UXKIOKQJAA", "body": _msg}, "/data/UXKI
      '"snippet":{"displayMessage":"Here is my message to you-ou-ou."},'
      '"authorDetails":{"displayName":"John Barker","profileImageUrl":"URL to image"},'
      '"platform":{"name":"YouTube","logoUrl":"https://img.url.com"}}]}', **_OK)
+
+# Telemetry: Socket.IO 4 event frames ("42" + JSON array) as H2R's Companion
+# module receives them (updateFrontend with data.projects.<id>); the field
+# names are those the module reads, the values made up.
+_H2R_PROJECT = {
+    "cues": [
+        {"id": "lt1", "type": "lower_third", "label": "Host", "status": "onair",
+         "line_one": "Jane Doe", "line_two": "[text.1]", "line_three": "", "outputTwo": True},
+        {"id": "cd1", "type": "time_countdown", "label": "Break", "status": "cued", "state": "running",
+         "duration": 300000, "endAt": 1791234567000, "onEnd": "hold"},
+        {"id": "vid1", "type": "video", "label": "Intro", "playing": True, "length": "12.5",
+         "playedAt": 1791234560000},
+    ],
+    "dynamicText": {"text.1": "Studio A", "text.2": ""},
+    "dynamicLists": [[[{"selected": 3}]], [[{}]]],
+}
+telemetry("h2r-graphics", "update-frontend",
+          inbound_ws="42" + json.dumps(["updateFrontend", {"projects": {"ABCD": _H2R_PROJECT}}],
+                                       separators=(",", ":")),
+          expect_state={
+              "graphics": {
+                  "lt1": {"type": "lower_third", "label": "Host", "status": "onair", "on_air": True,
+                          "line_one": "Jane Doe", "line_two": "[text.1]", "line_three": "",
+                          "outputs": {"2": True}},
+                  "cd1": {"type": "time_countdown", "label": "Break", "status": "cued", "on_air": False,
+                          "timer_state": "running", "duration_ms": 300000, "end_at": 1791234567000,
+                          "on_end": "hold"},
+                  "vid1": {"type": "video", "label": "Intro", "playing": True, "length_s": 12.5,
+                           "played_at": 1791234560000}},
+              "variables": {"text.1": "Studio A", "text.2": ""},
+              "lists": {"1": {"selected_row": 3}}})
+# A graphic removed in H2R leaves state with the next event.
+telemetry("h2r-graphics", "graphic-removed",
+          state_before={"graphics": {"old": {"type": "image", "label": "Logo"}}},
+          inbound_ws="42" + json.dumps(["updateFrontend", {"projects": {"ABCD": {
+              "cues": [{"id": "lt1", "type": "lower_third", "label": "Host"}], "dynamicText": {}}}}],
+              separators=(",", ":")),
+          expect_state={"graphics": {"lt1": {"type": "lower_third", "label": "Host"}}})
+telemetry("h2r-graphics", "other-event", inbound_ws='42["connected",{}]', expect_state={})

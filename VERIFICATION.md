@@ -913,11 +913,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## h2r-graphics — H2R Graphics
 
-- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:352](specs/h2r-graphics.yaml#L352))
-- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:391](specs/h2r-graphics.yaml#L391))
-- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:398](specs/h2r-graphics.yaml#L398))
-- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:401](specs/h2r-graphics.yaml#L401))
-- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:383](specs/h2r-graphics.yaml#L383))
+- [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:519](specs/h2r-graphics.yaml#L519))
+- [ ] Confirm the text variable id form text.N in updateVariableText. ([specs/h2r-graphics.yaml:569](specs/h2r-graphics.yaml#L569))
+- [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:575](specs/h2r-graphics.yaml#L575))
+- [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:578](specs/h2r-graphics.yaml#L578))
+- [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:557](specs/h2r-graphics.yaml#L557))
+- [ ] Confirm H2R serves Socket.IO 4 (Engine.IO 4) on the HTTP API's port in versions 2 and 3, and that updateFrontend comes on connecting and after every change without a request. ([specs/h2r-graphics.yaml:530](specs/h2r-graphics.yaml#L530))
+- [ ] Record the timer fields H2R sends (state values, duration, startedAt and endAt in milliseconds, endTime's format) and whether duration is a number or text. ([specs/h2r-graphics.yaml:538](specs/h2r-graphics.yaml#L538))
+- [ ] Check that a list's selected row (dynamicLists, row 0 cell 0) counts as select_list_row does, and how several projects' lists are numbered. ([specs/h2r-graphics.yaml:534](specs/h2r-graphics.yaml#L534))
+- [ ] Confirm that a graphic with no status field is off air. ([specs/h2r-graphics.yaml:537](specs/h2r-graphics.yaml#L537))
 
 ## highend-hog4 — High End Systems Hog 4 / Hog OS
 
