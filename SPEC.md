@@ -142,6 +142,23 @@ are not the reply, and still go to the telemetry rules. As with `reply_json`
 (§2, `ws`), a command whose reply never comes times out without the stream
 being reset, since a late reply names what it answers.
 
+A device that answers one message with several replies (an Evertz Quartz
+router answers a name write with the name update, then an acknowledge) gives
+their number as `expect.replies`. The command then takes that many replies
+for each message, in order, each one a reply as above (the first holding
+`reply_contains`, when given, and the rest the next replies); `expect` checks
+them all, joined by line breaks, so `(?m)` lets a `matches` regex find one of
+them. Every reply is also offered to the telemetry rules. A reply matching
+the transport's `error_match` ends the wait at once:
+
+```yaml
+commands:
+  set_destination_name:
+    send: ".WD{destination},{name}"
+    expect: { replies: 2, matches: '(?m)^\.A' }
+    returns: ack
+```
+
 A device whose error answer names nothing (Shure's `< REP ERR >`) declares it
 as the transport's `error_match`, a regex: such a message is taken as the
 reply of a command waiting with `reply_contains`, which then fails on its
@@ -1117,6 +1134,7 @@ expect:
   arg: 0                    # OSC only: argument returned as the value
   reply_json: { "$.id": "{id}" }    # ws only: what identifies the reply (§2)
   reply_contains: "REP {channel:02d} AUDIO_MUTE "  # line transports: text the reply holds (§2)
+  replies: 2                # line transports: replies each message takes (§2)
   convert: x32_fader        # the returned value, converted from the wire (§4)
 ```
 

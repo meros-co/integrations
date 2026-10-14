@@ -584,6 +584,10 @@ struct InFlight {
     ws_reply: Option<Vec<(String, String)>>,
     /// On a line transport: text the reply holds (`expect.reply_contains`).
     text_reply: Option<String>,
+    /// On a line transport: how many replies each message takes
+    /// (`expect.replies`), and those taken so far for the message in flight.
+    replies: usize,
+    taken: Vec<String>,
     /// The text of the line message now awaiting its reply.
     request_text: Option<String>,
     expect: Map<String, Value>,
@@ -1886,6 +1890,11 @@ impl SpecEngine {
             messages,
             ws_reply,
             text_reply,
+            replies: expect
+                .get("replies")
+                .and_then(Value::as_u64)
+                .map_or(1, |n| n.max(1) as usize),
+            taken: Vec::new(),
             request_text: None,
             expect,
             returns,
@@ -2901,6 +2910,26 @@ impl SpecEngine {
             None => self.apply_message(cx, &message),
         }
         if waiting {
+            // `expect.replies`: the message takes several replies, the
+            // rest in order; an error answer ends the wait at once.
+            let error = matches!(&self.transport, Transport::LineTcp { error_match: Some(re), .. } if re.is_match(&message));
+            if let Some(flight) = self.current.as_mut() {
+                if flight.replies > 1 {
+                    flight.taken.push(message);
+                    if flight.taken.len() < flight.replies && !error {
+                        flight.awaiting = Some(Await::Text(None));
+                        self.last_heard = cx.now();
+                        cx.alive();
+                        return;
+                    }
+                    let all = std::mem::take(&mut flight.taken).join(
+                        "
+",
+                    );
+                    self.reply(cx, Reply::Text(all));
+                    return;
+                }
+            }
             self.reply(cx, Reply::Text(message));
         } else {
             self.last_heard = cx.now();
@@ -6769,5 +6798,98 @@ commands:
             Some("attachment; filename=\"Look.cset\"")
         );
         assert_eq!(r.body.as_deref(), Some(&[0, 1, 2][..]));
+    }
+
+    const TWO_REPLIES: &str = r#"
+spec: 1
+id: replies-test
+name: Replies test
+vendor: Test
+category: router
+source: [{ title: test }]
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  reply_match: "^\\.(A|RA|E)"
+  error_match: "^\\.E"
+ports: [{ port: 23, protocol: tcp, role: control }]
+models: [{ id: m, name: M, supports: [name, ping], verification: none }]
+commands:
+  name:
+    params:
+      destination: { type: int, min: 1, required: true }
+      name: { type: string, max_length: 8, required: true }
+    send: ".WD{destination},{name}"
+    expect: { replies: 2, matches: '(?m)^\.A' }
+    returns: text
+  ping:
+    send: ".#01"
+    expect: { matches: '^\.A' }
+    returns: ack
+telemetry:
+  updates:
+    - match: '^\.RAD(\d+),(.*?)\s*$'
+      state: { "destinations.{1}.name": "{2}" }
+state:
+  destinations.*.name: { type: string, description: "Name" }
+"#;
+
+    #[test]
+    fn a_command_can_take_several_replies() {
+        let spec: DeviceSpec = serde_yaml::from_str(TWO_REPLIES).unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        let params = json!({"destination": 2, "name": "MON 2"});
+        let mut cx = Cx::new(10);
+        e.command(&mut cx, 1, "name", params.as_object().unwrap());
+        assert_eq!(tcp_sent(&cx.take()), vec![".WD2,MON 2\r".to_string()]);
+        // The first reply is not the end: it updates state, and the command
+        // waits for the second.
+        let mut cx = Cx::new(11);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".RAD2,MON 2\r".to_vec()));
+        let a = cx.take();
+        assert!(completed(&a).is_empty());
+        assert!(a.iter().any(|a| matches!(a, Action::State(_))));
+        let mut cx = Cx::new(12);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".A\r".to_vec()));
+        assert_eq!(
+            completed(&cx.take()),
+            vec![(
+                1,
+                Ok(Outcome::Value {
+                    value: json!(".RAD2,MON 2\n.A")
+                })
+            )]
+        );
+        // The next command takes one reply, as before.
+        let mut cx = Cx::new(13);
+        e.command(&mut cx, 2, "ping", &Params::new());
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".A\r".to_vec()));
+        assert_eq!(completed(&cx.take()), vec![(2, Ok(Outcome::Ack))]);
+        // An error answer ends the wait at once.
+        let mut cx = Cx::new(14);
+        e.command(&mut cx, 3, "name", params.as_object().unwrap());
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b".E\r".to_vec()));
+        assert!(matches!(
+            &completed(&cx.take())[..],
+            [(3, Err(CommandError::DeviceError { .. }))]
+        ));
     }
 }

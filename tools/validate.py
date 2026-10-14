@@ -403,6 +403,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 errors.append(f"commands.{name}: expect.reply_contains needs a line transport")
             errors += check_template("text", expect_["reply_contains"], params, settings,
                                      f"commands.{name}.expect.reply_contains")
+        if expect_.get("replies", 1) != 1 and transport_type not in ("line-tcp", "line-udp"):
+            errors.append(f"commands.{name}: expect.replies needs a line transport")
         if "convert" in expect_:
             if expect_["convert"] not in conversions:
                 errors.append(f"commands.{name}: expect.convert names undeclared conversion '{expect_['convert']}'")
