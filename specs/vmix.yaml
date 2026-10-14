@@ -39,6 +39,14 @@ source:
       loop, selectedIndex, text fields and layers; overlays; preview; active;
       fadeToBlack; transitions; recording; external; streaming; playList;
       multiCorder), Input by number, title or key, and Mix numbering.
+  - title: vMix Help, Overlays and Stinger Transitions
+    author: StudioCoast
+    url: https://www.vmix.com/help29/Overlay2.html
+    note: >
+      Manufacturer document. Eight overlay channels in the HD, 4K, Pro and
+      Max editions and one in Basic HD; stingers are configured apart from
+      them (StingerTransitions.html). The Developer API page's XML example
+      predates this and shows six overlays.
   - title: vMix Help, Activators (Add/Edit Activator)
     author: StudioCoast
     url: https://www.vmix.com/help29/ActivatorsEdit.html
@@ -63,6 +71,10 @@ source:
       streaming channels, fullscreen) and the activators beyond the
       documented list (InputMixN, InputPreviewMixN, InputAudioAuto,
       InputVolumeChannelMixerN, BusXSolo, Replay*, VideoCall*).
+      src/feedbacks/tallyFeedbacks.ts numbers the XML's overlays 1 to 8 for
+      the overlay channels and 9 to 16 for Stinger 1 to 8; src/actions/
+      titleActions.ts sends SelectedName or SelectedIndex with SetTextColour
+      and the countdown functions.
   - title: TallyArbiter vMix source
     url: https://github.com/josephdadams/TallyArbiter
     note: MIT-licensed; the tally string's first digit is input 1.
@@ -1424,6 +1436,8 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: Seconds, description: "Seconds to add to the countdown; negative subtracts." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   change_countdown:
@@ -1431,6 +1445,8 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: Time, description: "New countdown time as hh:mm:ss, such as 00:05:00." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   next_title_preset:
@@ -1443,6 +1459,8 @@ commands:
     summary: "PauseCountdown (Title): Pause or Resume Countdown or if complete, Start from beginning."
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   pause_render:
@@ -1475,6 +1493,8 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: Colour, description: "Colour in HTML #xxxxxxxx format." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_countdown:
@@ -1482,6 +1502,8 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: Duration, description: "Countdown duration as hh:mm:ss, such as 00:05:00." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_image:
@@ -1489,24 +1511,32 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: File name, description: "Full path of the image on the vMix computer; empty clears it." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_image_visible:
     summary: "SetImageVisible (Title): Toggle Image Visibility in Title SelectedIndex or SelectedName can be used to select image."
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_image_visible_off:
     summary: "SetImageVisibleOff (Title): Hide Image in Title SelectedIndex or SelectedName can be used to select image."
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_image_visible_on:
     summary: "SetImageVisibleOn (Title): Show Image in Title SelectedIndex or SelectedName can be used to select image."
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_text:
@@ -1514,6 +1544,8 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: Text, description: "Text to show in the title's text field." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_text_colour:
@@ -1521,24 +1553,32 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: Colour, description: "Text colour in HTML #xxxxxx format." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_text_visible:
     summary: "SetTextVisible (Title): Toggle Text Visibility in Title SelectedIndex or SelectedName can be used to select text field."
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_text_visible_off:
     summary: "SetTextVisibleOff (Title): Hide Text in Title SelectedIndex or SelectedName can be used to select text field."
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_text_visible_on:
     summary: "SetTextVisibleOn (Title): Show Text in Title SelectedIndex or SelectedName can be used to select text field."
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   set_ticker_speed:
@@ -1546,24 +1586,32 @@ commands:
     params:
       value: { type: string, max_length: 4096, label: Speed, description: "Ticker speed from 0 to 1000." }
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   start_countdown:
     summary: "StartCountdown (Title)"
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   stop_countdown:
     summary: "StopCountdown (Title): Stop and Reset Countdown"
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   suspend_countdown:
     summary: "SuspendCountdown (Title): Pause Countdown Only"
     params:
       input: { type: string, max_length: 256, label: Input, description: "Input by number, exact title (case-sensitive) or key; left out, vMix uses its own default." }
+      selected_name: { type: string, max_length: 256, label: Field name, description: "Title field to change by name, as the state names it under inputs.*.texts, images or colors (GT titles end text fields in .Text and images in .Source); left out, the first field." }
+      selected_index: { type: int, min: 0, label: Field index, description: "Title field to change by index from 0, as the state keys it under inputs.*.texts, images or colors; left out, the first field." }
     returns: ack
 
   title_begin_animation:
@@ -5123,7 +5171,7 @@ state:
   buses.*.meter_left:      { type: float, description: "Bus level of the first channel (meterF1), linear from 0, as of the last XML read" }
   buses.*.meter_right:     { type: float, description: "Bus level of the second channel (meterF2), linear from 0, as of the last XML read" }
   buses.*.attributes.*:    { type: string, description: "Any other attribute of the bus's XML element, by name, as vMix reports it" }
-  overlays.*.input:        { type: int, description: "Input in the overlay channel, keyed by overlay number (1 to 4 the overlay channels, higher numbers the stingers); absent when empty" }
+  overlays.*.input:        { type: int, description: "Input in the overlay channel, keyed by the XML's overlay number: 1 to 8 the overlay channels (1 only in Basic HD), 9 to 16 Stinger 1 to 8; absent when empty" }
   overlays.*.preview:      { type: bool, description: "The overlay is shown on preview only, not on program" }
   transitions.*.effect:    { type: string, description: "Effect of the transition button, keyed by button number (1 to 4), such as Fade, Merge or Wipe" }
   transitions.*.duration:  { type: int, unit: ms, description: "Duration of the transition button's effect" }
