@@ -285,6 +285,13 @@ impl Core {
     /// A core over `embedded` rather than the build's specs, for tests that
     /// change a spec (a cloud API's host and scheme) to reach a local server.
     pub(crate) fn with_catalog(embedded: Catalog, options: CoreOptions) -> std::io::Result<Core> {
+        // Unit tests bind loopback only, so a run asks no firewall for network
+        // access (CONTRIBUTING.md); the session tests' `common` checks theirs.
+        #[cfg(test)]
+        assert!(
+            options.bind_address.is_some_and(|a| a.is_loopback()),
+            "tests bind loopback only: give the core a loopback bind_address"
+        );
         let catalog = match &options.devices {
             None => embedded.clone(),
             Some(ids) => embedded
