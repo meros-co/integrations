@@ -631,19 +631,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Confirm REAPER's default Local listen port (8000) and Device port (9000) when a new OSC control surface is added. ([specs/cockos-reaper.yaml:59](specs/cockos-reaper.yaml#L59))
 - [ ] Confirm that /device/track/count, /device/marker/count and /device/region/count sent on connecting take effect, and whether REAPER then sends the new bank's state at once. ([specs/cockos-reaper.yaml:94](specs/cockos-reaper.yaml#L94))
-- [ ] Record the OSC types REAPER sends feedback in for b and t patterns (float 1.0 and 0.0 or integers); the state accepts both. ([specs/cockos-reaper.yaml:804](specs/cockos-reaper.yaml#L804))
+- [ ] Record the OSC types REAPER sends feedback in for b and t patterns (float 1.0 and 0.0 or integers); the state accepts both. ([specs/cockos-reaper.yaml:810](specs/cockos-reaper.yaml#L810))
 - [ ] Confirm that REAPER takes binary values as OSC integers, as reaper-osc.js sends them, and floats where the pattern is n or f. ([specs/cockos-reaper.yaml:179](specs/cockos-reaper.yaml#L179))
 - [ ] Confirm the inverted FX bypass (0 bypasses, 1 makes active) in both directions. ([specs/cockos-reaper.yaml:433](specs/cockos-reaper.yaml#L433))
-- [ ] Record the track monitor values REAPER takes and sends (0 off, 1 on, 2 tape-auto, from reaper-osc.js) and the OSC type of the feedback, which the state reads as an integer. ([specs/cockos-reaper.yaml:859](specs/cockos-reaper.yaml#L859))
+- [ ] Record the track monitor values REAPER takes and sends (0 off, 1 on, 2 tape-auto, from reaper-osc.js) and the OSC type of the feedback, which the state reads as an integer. ([specs/cockos-reaper.yaml:865](specs/cockos-reaper.yaml#L865))
 - [ ] Check whether /time, /tempo/raw and /playrate/raw sent to REAPER move the cursor and set the tempo and rate, and the tempo range REAPER accepts. ([specs/cockos-reaper.yaml:207](specs/cockos-reaper.yaml#L207))
 - [ ] Check the lowest and highest dB /track/@/volume/db accepts (REAPER's fader-range preference assumed for the top). ([specs/cockos-reaper.yaml:252](specs/cockos-reaper.yaml#L252))
 - [ ] Confirm that /action/str runs a named command ID (_SWS_..., a script's ID). ([specs/cockos-reaper.yaml:551](specs/cockos-reaper.yaml#L551))
 - [ ] Confirm that /device/send/count, /device/receive/count, /device/fx/count, /device/fxparam/count and /device/fxinstparam/count sent on connecting take effect. ([specs/cockos-reaper.yaml:94](specs/cockos-reaper.yaml#L94))
-- [ ] Confirm that REAPER sends /track/@/fx/@/fxparam/@/value for every track in the bank, numbering parameters from 1, and not only for the device's selected track. ([specs/cockos-reaper.yaml:917](specs/cockos-reaper.yaml#L917))
-- [ ] Record what /track/@/recv/@/name carries (the source track's name assumed). ([specs/cockos-reaper.yaml:899](specs/cockos-reaper.yaml#L899))
-- [ ] Confirm that an instrument's bypass (/track/@/fxinst/bypass) is inverted like an effect's, in both directions. ([specs/cockos-reaper.yaml:921](specs/cockos-reaper.yaml#L921))
-- [ ] Check that /fx/@/fxparam/@/... address the device's selected track's effects and /fxparam/@/... its selected effect, numbered within the selected parameter bank. ([specs/cockos-reaper.yaml:998](specs/cockos-reaper.yaml#L998))
+- [ ] Confirm that REAPER sends /track/@/fx/@/fxparam/@/value for every track in the bank, numbering parameters from 1, and not only for the device's selected track. ([specs/cockos-reaper.yaml:930](specs/cockos-reaper.yaml#L930))
+- [ ] Record what /track/@/recv/@/name carries (the source track's name assumed). ([specs/cockos-reaper.yaml:912](specs/cockos-reaper.yaml#L912))
+- [ ] Confirm that an instrument's bypass (/track/@/fxinst/bypass) is inverted like an effect's, in both directions. ([specs/cockos-reaper.yaml:934](specs/cockos-reaper.yaml#L934))
+- [ ] Check that /fx/@/fxparam/@/... address the device's selected track's effects and /fxparam/@/... its selected effect, numbered within the selected parameter bank. ([specs/cockos-reaper.yaml:1011](specs/cockos-reaper.yaml#L1011))
 - [ ] Check that /device/fxparam/bank/select numbers banks from 1, as track banks are. ([specs/cockos-reaper.yaml:643](specs/cockos-reaper.yaml#L643))
+- [ ] Check that REAPER feeds back /track/@/autotrim ... /autowrite as 1 for the mode in force and 0 for the others, and record what /track/auto sends for each mode. ([specs/cockos-reaper.yaml:870](specs/cockos-reaper.yaml#L870))
+- [ ] Record the command ID of "Control surface: Refresh all surfaces" in REAPER's Actions list, and whether it is the same across REAPER versions. ([specs/cockos-reaper.yaml:1105](specs/cockos-reaper.yaml#L1105))
 
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
