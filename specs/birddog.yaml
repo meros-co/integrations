@@ -3475,6 +3475,9 @@ telemetry:
         - { method: GET, path: /encodeTransport }
         - { method: GET, path: /NDIDisServer }
         - { method: GET, path: /List }
+        - { method: GET, path: /hostname }
+        - { method: GET, path: /NDIGrpName }
+        - { method: GET, path: /NDIOffSnSrc }
         - { models: *v21, method: GET, path: /operationmode }
         - { models: *v21, method: GET, path: /EthSetup }
         - { models: *v21, method: GET, path: /secondary_protocol }
@@ -3971,6 +3974,23 @@ telemetry:
       state: { device.operation_mode: "{1}" }
     - match: "^(LowLatency|NormalMode)$"
       state: { video_output.mode: "{1}" }
+    # Plain-text replies told apart by their path: the hardware identifier
+    # (also the probe's answer), the host name, the NDI finder's groups and
+    # its off-subnet sources. Each rule matches only the shape a GET answers
+    # with, so an error such as "Invalid API command" from a POST to the same
+    # path is not taken for a value.
+    - path: "^/version$"
+      match: "^([^{}\\r\\n]+)$"
+      state: { device.model: "{1}" }
+    - path: "^/hostname$"
+      match: "^([A-Za-z0-9][A-Za-z0-9._-]*)$"
+      state: { device.hostname: "{1}" }
+    - path: "^/NDIGrpName$"
+      match: '^((?:"[^"]*"(?:, ?"[^"]*")*)?)$'
+      state: { ndi.group_names: "{1}" }
+    - path: "^/NDIOffSnSrc$"
+      match: "^([0-9.,]*)$"
+      state: { ndi.off_subnet_sources: "{1}" }
 
     # Re-reads: a POST with a JSON body has its endpoint read again, since
     # the reply can still show the old value (see quirks). A GET carries no
@@ -4003,6 +4023,7 @@ telemetry:
 state:
   device.firmware:              { type: string, description: "Installed firmware version" }
   device.hardware:              { type: string, description: "Hardware version (2.1)" }
+  device.model:                 { type: string, description: "Hardware identifier the camera gives as plain text, such as BirdDog X1 (GET /version, also the probe)" }
   device.hostname:              { type: string, description: "Device (mDNS) name" }
   device.ip_address:            { type: string, description: "Current IP address" }
   device.netmask:               { type: string, description: "Current subnet mask" }
@@ -4091,6 +4112,8 @@ state:
   ndi.receive_method:           { type: string, description: "Decoder NDI receive method (rxpm)" }
   ndi.discovery_server:         { type: bool, description: "NDI discovery server in use" }
   ndi.discovery_server_ip:      { type: string, description: "NDI discovery server address" }
+  ndi.group_names:              { type: string, description: "NDI groups the finder subscribes to, as the camera gives them: quoted names separated by commas, such as \"BirdDog-Co1\",\"BirdDog-Co2\" (GET /NDIGrpName)" }
+  ndi.off_subnet_sources:       { type: string, description: "IP addresses of NDI sources on other subnets the finder asks, separated by commas (GET /NDIOffSnSrc)" }
   ndi.sources.*.address:        { type: string, description: "An NDI source the finder sees, keyed by its NDI name (one key, such as BIRDDOG-4C526 (Stream1)): its address and port, as the camera reports it (GET /List)" }
   audio.in_gain:                { type: string, description: "Analog input gain: 0-100, 1-80 on X4 Ultra, or dB such as -6 dB on X5 Ultra" }
   audio.out_gain:               { type: int, description: "Analog output gain 0-100 (2.0)" }
@@ -4378,18 +4401,20 @@ quirks:
       discovery server, audio, video output, operation mode, Sil2, secondary
       protocol, colour matrix, advanced, external, detail, gamma, network,
       Wi-Fi, genlock and failover, decoder setup, the decoder's connection,
-      the NDI finder's source list) is read on connecting and every 30
-      seconds, each request naming the cameras that serve it. A POST with a
+      the NDI finder's source list, groups and off-subnet sources, the host
+      name) is read on connecting and every 30 seconds, each request naming
+      the cameras that serve it; the hardware identifier is read by the
+      probe. A POST with a
       JSON body has its endpoint read again at once; a preset recall and an
       image reset read exposure, picture, white balance, colour matrix,
       advanced and PTZ position again, and a finder reset or refresh reads
       the source list again. The NDI sources are kept by name
       (ndi.sources.<name>.address), the list replaced whole. The operation
-      mode and the P400/P4K output mode are plain text, read by their words.
-      The other plain-text replies (version, hostname, NDI group names,
-      off-subnet list) are not in the state: the format cannot read a
-      plain-text HTTP reply by its path, so they stay available through their
-      get_ commands. Keys some cameras report but
+      mode and the P400/P4K output mode are plain text, read by their words;
+      the other plain-text replies (version, hostname, NDI group names,
+      off-subnet list) by the path they answer. A set of the NDI groups or
+      off-subnet sources is read back at the next 30-second poll; its reply is
+      plain text the camera does not document. Keys some cameras report but
       neither document defines (FreeD, SmartExposure, DRC, NearLimit,
       Portrait, GTuning and others) are not settable here except through the
       set_<endpoint> JSON commands.

@@ -728,6 +728,18 @@ _tel("connect-to", "/connectTo?location=decoder",
 _tel("operation-mode", "/operationmode", "dual", {"device": {"operation_mode": "dual"}})
 _tel("video-output-p400", "/videooutputinterface", "NormalMode", {"video_output": {"mode": "NormalMode"}})
 
+# Plain-text replies, read by the path they answer (2.0 BasicDeviceInfo and
+# NDIFINDER; 2.1 Device Information and NDI Finder Settings).
+_tel("version", "/version", "BirdDog X1", {"device": {"model": "BirdDog X1"}})
+_tel("hostname", "/hostname", "x1-046CE", {"device": {"hostname": "x1-046CE"}})
+_tel("ndi-group-names", "/NDIGrpName", '"BirdDog-Co1","BirdDog-Co2"',
+     {"ndi": {"group_names": '"BirdDog-Co1","BirdDog-Co2"'}})
+_tel("ndi-group-names-empty", "/NDIGrpName", "", {"ndi": {"group_names": ""}})
+_tel("ndi-off-subnet", "/NDIOffSnSrc", "192.168.100.100,192.168.100.101",
+     {"ndi": {"off_subnet_sources": "192.168.100.100,192.168.100.101"}})
+# An error from a POST to the same path is not a value.
+_tel("ndi-group-names-error", "/NDIGrpName", "Invalid API command", {})
+
 # The NDI finder's sources (2.0 NDIFINDER List): an object keyed by source
 # name, each name one key, the list replaced whole; {"None":"None"} is none.
 telemetry(BD, "ndi-sources", inbound_http={
