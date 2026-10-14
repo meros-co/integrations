@@ -465,6 +465,12 @@ _dg("execute_python", {"script": "return resourceManager.allResources(Track)[0].
     "/api/session/python/execute",
     '{"moduleName":"","script":"return resourceManager.allResources(Track)[0].description"}',
     http_reply={"status": 200, "body": json.dumps(PY_REPLY)}, expect_result={"ok": {"kind": "value", "value": PY_REPLY}})
+# A script over several lines, indented with a tab: sent JSON-escaped.
+_dg("execute_python", {"script": "t = resourceManager.allResources(Track)\nif t:\n\treturn t[0].description"}, "POST",
+    "/api/session/python/execute",
+    '{"moduleName":"","script":"t = resourceManager.allResources(Track)\\nif t:\\n\\treturn t[0].description"}',
+    file="execute_python.multiline", http_reply={"status": 200, "body": json.dumps(PY_REPLY)},
+    expect_result={"ok": {"kind": "value", "value": PY_REPLY}})
 _dg("register_python_module", {"module": "helpers", "contents": "from d3 import *\ndef tracks():\n    return 1\n"},
     "POST", "/api/session/python/registermodule",
     '{"moduleName":"helpers","contents":"from d3 import *\\ndef tracks():\\n    return 1\\n"}', **_OK)

@@ -939,10 +939,10 @@ commands:
       note: { type: string, max_length: 256, required: true,
               label: Note,
               description: "Name of the note resource as shown in Designer." }
-      text: { type: json, required: true,
+      text: { type: string, multiline: true, required: true,
               label: Text,
-              description: "The note's new text as a JSON string (line breaks as \\n), which replaces the old." }
-    send: { method: POST, path: /api/session/note, body: '{"note":{"name":{note:json}},"text":{text}}', content_type: application/json }
+              description: "The note's new text, line breaks included, which replaces the old." }
+    send: { method: POST, path: /api/session/note, body: '{"note":{"name":{note:json}},"text":{text:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
     returns: value
 
@@ -978,13 +978,13 @@ commands:
       Run a Python 2.7 script in Designer on the Director (python/execute);
       returns {d3Log, pythonLog, returnValue}. See the critical quirk first
     params:
-      script: { type: json, required: true,
+      script: { type: string, multiline: true, required: true,
                 label: Script,
-                description: "Python 2.7 code as a JSON string (lines joined with \\n), run as the body of a function with d3 imported; its return value comes back as returnValue." }
+                description: "Python 2.7 code, lines separated by line breaks, run as the body of a function with d3 imported; its return value comes back as returnValue." }
       module: { type: string, max_length: 256, default: "",
                 label: Module,
                 description: "Registered module to run the script in; empty for a one-off script." }
-    send: { method: POST, path: /api/session/python/execute, body: '{"moduleName":{module:json},"script":{script}}', content_type: application/json }
+    send: { method: POST, path: /api/session/python/execute, body: '{"moduleName":{module:json},"script":{script:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$" }
     returns: value
 
@@ -994,10 +994,10 @@ commands:
       module:   { type: string, max_length: 256, required: true,
                   label: Module,
                   description: "Name to register the module under." }
-      contents: { type: json, required: true,
+      contents: { type: string, multiline: true, required: true,
                   label: Contents,
-                  description: "The module's Python 2.7 source as a JSON string (lines joined with \\n), which imports d3 itself." }
-    send: { method: POST, path: /api/session/python/registermodule, body: '{"moduleName":{module:json},"contents":{contents}}', content_type: application/json }
+                  description: "The module's Python 2.7 source, lines separated by line breaks, which imports d3 itself." }
+    send: { method: POST, path: /api/session/python/registermodule, body: '{"moduleName":{module:json},"contents":{contents:json}}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
@@ -2562,8 +2562,9 @@ quirks:
       notes on a track's timeline, which get_annotations reads and which the API
       cannot edit. set_note creates a note when none has the name; the API
       cannot delete one. Every note is read every minute, and a note read or
-      written is kept at once. set_note takes the text as a JSON string, since a
-      text parameter here cannot hold a line break.
+      written is kept at once. set_note takes the text as plain text, line
+      breaks included (a multiline parameter, sent JSON-escaped); a caller that
+      passed it as a JSON string value passes the same string.
   - models: [all]
     severity: info
     text: >
@@ -2584,7 +2585,9 @@ quirks:
       can run it: there is no authentication. register_python_module replaces a
       module of the same name. Nothing here reads state from Python: every
       state key comes from the documented endpoints. The script and module source
-      are JSON strings, since a text parameter here cannot hold a line break.
+      are plain text, line breaks and tabs included (multiline parameters, sent
+      JSON-escaped); a caller that passed them as JSON string values passes the
+      same strings.
   - models: [all]
     severity: critical
     text: >
