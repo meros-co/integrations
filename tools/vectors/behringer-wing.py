@@ -557,3 +557,65 @@ _ti("matrix-direct-input", "/mtx/1/dir/on", 0, {"matrices": {"1": {"direct_input
 _tf("matrix-direct-input-level", "/mtx/1/dir/lvl", "0.0", 0.75, 0.0, {"matrices": {"1": {"direct_input": {"level": 0.0}}}})
 _ti("matrix-direct-input-invert", "/mtx/1/dir/inv", 1, {"matrices": {"1": {"direct_input": {"invert": True}}}})
 _ts("matrix-direct-input-source", "/mtx/1/dir/in", "AES", {"matrices": {"1": {"direct_input": {"source": "AES"}}}})
+
+# ── Input sources, output patching, user signals, oscillators (p.40-46) ──
+# /io/in/<group>/<n>/<leaf>; the preamp leaves g, vph, rmt and rcvc on the
+# LCL and AES50 (A-C) groups; /io/out/<group>/<n>/grp then in.
+binary(W, "set_input_mode", {"group": "LCL", "input": 3, "mode": "ST"}, osc("/io/in/LCL/3/mode", ("s", "ST")))
+binary(W, "set_input_mute", {"group": "USB", "input": 48, "muted": True}, osc("/io/in/USB/48/mute", ("i", 1)))
+binary(W, "set_input_invert", {"group": "A", "input": 1, "inverted": False}, osc("/io/in/A/1/pol", ("i", 0)))
+binary(W, "set_input_color", {"group": "AES", "input": 2, "color": 12}, osc("/io/in/AES/2/col", ("i", 12)))
+binary(W, "set_input_name", {"group": "CRD", "input": 64, "name": "Kick In"}, osc("/io/in/CRD/64/name", ("s", "Kick In")))
+binary(W, "set_input_icon", {"group": "OSC", "input": 1, "icon": 999}, osc("/io/in/OSC/1/icon", ("i", 999)))
+binary(W, "set_input_tags", {"group": "SC", "input": 32, "tags": "#D1"}, osc("/io/in/SC/32/tags", ("s", "#D1")))
+binary(W, "set_input_gain", {"group": "B", "input": 48, "gain_db": 45.5}, osc("/io/in/B/48/g", ("f", 45.5)))
+binary(W, "set_input_phantom", {"group": "LCL", "input": 1, "enabled": True}, osc("/io/in/LCL/1/vph", ("i", 1)))
+binary(W, "set_input_remote", {"group": "C", "input": 2, "remote": "AES A"}, osc("/io/in/C/2/rmt", ("s", "AES A")))
+binary(W, "set_input_remote_sync", {"group": "A", "input": 5, "enabled": False}, osc("/io/in/A/5/rcvc", ("i", 0)))
+binary(W, "set_output_source", {"group": "AUX", "output": 8, "source_group": "MAIN", "source_input": 1},
+       [osc("/io/out/AUX/8/grp", ("s", "MAIN")), osc("/io/out/AUX/8/in", ("i", 1))])
+binary(W, "set_user_signal_source", {"signal": 24, "source_group": "CH", "source_input": 40},
+       [osc("/io/in/USR/24/user/grp", ("s", "CH")), osc("/io/in/USR/24/user/in", ("i", 40))])
+binary(W, "set_user_signal_tap", {"signal": 1, "tap": "PRE"}, osc("/io/in/USR/1/user/tap", ("s", "PRE")))
+binary(W, "set_user_signal_side", {"signal": 1, "side": "L+R"}, osc("/io/in/USR/1/user/lr", ("s", "L+R")))
+binary(W, "set_user_patch_source", {"patch": 1, "source_group": "A", "source_input": 17},
+       [osc("/io/in/USR/25/user/grp", ("s", "A")), osc("/io/in/USR/25/user/in", ("i", 17))])
+binary(W, "set_oscillator_level", {"oscillator": 2, "level_db": -40.0}, osc("/io/in/OSC/2/osc/lvl", ("f", -40.0)))
+binary(W, "set_oscillator_type", {"oscillator": 1, "type": "PINK"}, osc("/io/in/OSC/1/osc/mode", ("s", "PINK")))
+binary(W, "set_oscillator_frequency", {"oscillator": 1, "frequency_hz": 1000.0}, osc("/io/in/OSC/1/osc/f", ("f", 1000.0)))
+binary(W, "set_alt_inputs", {"enabled": True}, osc("/io/altsw", ("i", 1)))
+binary(W, "set_input_select_override", {"enabled": False}, osc("/io/autoaltovr", ("i", 0)))
+
+
+def _io(group, n, **kv):
+    return {"io": {"inputs": {group: {str(n): kv}}}}
+
+
+_ts("input-mode", "/io/in/A/7/mode", "M/S", _io("A", 7, mode="M/S"))
+_ti("input-mute", "/io/in/PLAY/4/mute", 1, _io("PLAY", 4, mute=True))
+_ti("input-invert", "/io/in/USR/56/pol", 0, _io("USR", 56, invert=False))
+_ti("input-color", "/io/in/AUX/8/col", 3, _io("AUX", 8, color=3))
+_ts("input-name", "/io/in/LCL/24/name", "Talk", _io("LCL", 24, name="Talk"))
+_ti("input-icon", "/io/in/MOD/1/icon", 42, _io("MOD", 1, icon=42))
+_ts("input-tags", "/io/in/CRD/2/tags", "#D3", _io("CRD", 2, tags="#D3"))
+_ti("input-mute-state", "/io/in/SC/1/$mute", 2, _io("SC", 1, mute_state=2))
+_tf("input-gain", "/io/in/C/48/g", "30.0", 0.68, 30.0, _io("C", 48, gain=30.0))
+_ti("input-phantom", "/io/in/LCL/1/vph", 1, _io("LCL", 1, phantom=True))
+_ti("input-preamp-type", "/io/in/B/3/$ha", 4, _io("B", 3, preamp_type=4))
+_ts("input-remote", "/io/in/A/1/rmt", "AES B", _io("A", 1, remote="AES B"))
+_ti("input-remote-active", "/io/in/A/1/$ract", 1, _io("A", 1, remote_active=True))
+_ts("input-remote-destination", "/io/in/A/1/$rdest", "AES A", _io("A", 1, remote_destination="AES A"))
+_ti("input-remote-sync", "/io/in/LCL/2/rcvc", 0, _io("LCL", 2, remote_sync=False))
+_ts("output-source-group", "/io/out/REC/4/grp", "MAIN", {"io": {"outputs": {"REC": {"4": {"source_group": "MAIN"}}}}})
+_ti("output-source-input", "/io/out/CRD/64/in", 2, {"io": {"outputs": {"CRD": {"64": {"source_input": 2}}}}})
+_ts("user-signal-group", "/io/in/USR/24/user/grp", "BUS", {"user_signals": {"24": {"source_group": "BUS"}}})
+_ti("user-signal-input", "/io/in/USR/1/user/in", 16, {"user_signals": {"1": {"source_input": 16}}})
+_ts("user-signal-tap", "/io/in/USR/10/user/tap", "POST", {"user_signals": {"10": {"tap": "POST"}}})
+_ts("user-signal-side", "/io/in/USR/19/user/lr", "R", {"user_signals": {"19": {"side": "R"}}})
+_ts("user-patch-group", "/io/in/USR/25/user/grp", "LCL", {"user_patches": {"1": {"source_group": "LCL"}}})
+_ti("user-patch-input", "/io/in/USR/56/user/in", 64, {"user_patches": {"32": {"source_input": 64}}})
+_tf("oscillator-level", "/io/in/OSC/2/osc/lvl", "-18.0", 0.32, -18.0, {"oscillators": {"2": {"level": -18.0}}})
+_ts("oscillator-type", "/io/in/OSC/1/osc/mode", "WHITE", {"oscillators": {"1": {"type": "WHITE"}}})
+_tf("oscillator-frequency", "/io/in/OSC/1/osc/f", "1k00", 0.5, 1000.0, {"oscillators": {"1": {"frequency": 1000.0}}})
+_ti("alt-inputs", "/io/altsw", 1, {"io": {"alt_inputs": True}})
+_ti("input-select-override", "/io/autoaltovr", 0, {"io": {"input_select_override": False}})
