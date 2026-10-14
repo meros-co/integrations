@@ -1190,13 +1190,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## newtek-tricaster — NewTek TriCaster
 
-- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:576](specs/newtek-tricaster.yaml#L576))
-- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:569](specs/newtek-tricaster.yaml#L569))
+- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:572](specs/newtek-tricaster.yaml#L572))
+- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:565](specs/newtek-tricaster.yaml#L565))
 - [ ] Confirm the change notification websocket is on the web port (the guide's text says 5951, its example the web port), whether it needs the Live Panel login, and whether it stays open without the client sending anything. ([specs/newtek-tricaster.yaml:430](specs/newtek-tricaster.yaml#L430))
 - [ ] Confirm each notification is the bare dictionary name, one per message, as the guide says. ([specs/newtek-tricaster.yaml:447](specs/newtek-tricaster.yaml#L447))
-- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:491](specs/newtek-tricaster.yaml#L491))
-- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:499](specs/newtek-tricaster.yaml#L499))
+- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:497](specs/newtek-tricaster.yaml#L497))
+- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:505](specs/newtek-tricaster.yaml#L505))
 - [ ] Check which of /version (the guide) and /v1/version answers on each software version. ([specs/newtek-tricaster.yaml:444](specs/newtek-tricaster.yaml#L444))
+- [ ] Record the buffer dictionary with several M/Es: check each M/E's index (from 0 as the guide's example shows, or from 1) and whether an M/E has more than one row of buffers. ([specs/newtek-tricaster.yaml:492](specs/newtek-tricaster.yaml#L492))
 - [ ] Check whether media_select_clip counts clips from 0 or 1. ([specs/newtek-tricaster.yaml:313](specs/newtek-tricaster.yaml#L313))
 - [ ] Check that the mode toggles take true or false as a value to set the mode rather than toggle it. ([specs/newtek-tricaster.yaml:380](specs/newtek-tricaster.yaml#L380))
 - [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:399](specs/newtek-tricaster.yaml#L399))
