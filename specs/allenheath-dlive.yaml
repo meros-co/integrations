@@ -71,6 +71,15 @@ settings:
   # UserProfile, 00 to 1F (p.1), sent as that byte.
   user_profile: { type: int, min: 0, max: 31, default: 0, label: User profile, description: "User profile number sent in the TLS login, 0 to 31; the document does not say how it maps to the console's profiles." }
   password: { type: string, secret: true, default: "", label: Password, description: "The user profile's password, sent in the TLS login; unused without TLS." }
+  # The Surface's Go / Next / Previous Scene controls are Control Changes the
+  # operator assigns under Utility / Control / MIDI (p.5); the typed commands
+  # send the ones set here, on the base channel N. Each pair is set together.
+  cue_go_controller: { type: int, min: 0, max: 127, label: Go controller, description: "Control Change number assigned to Go on the Surface's Utility, Control, MIDI page; cue_go sends it." }
+  cue_go_value: { type: int, min: 0, max: 127, label: Go value, description: "Control Change value assigned to Go on the Surface, sent with the Go controller number." }
+  cue_next_controller: { type: int, min: 0, max: 127, label: Next controller, description: "Control Change number assigned to Next on the Surface's Utility, Control, MIDI page; cue_next sends it." }
+  cue_next_value: { type: int, min: 0, max: 127, label: Next value, description: "Control Change value assigned to Next on the Surface, sent with the Next controller number." }
+  cue_previous_controller: { type: int, min: 0, max: 127, label: Previous controller, description: "Control Change number assigned to Previous on the Surface's Utility, Control, MIDI page; cue_previous sends it." }
+  cue_previous_value: { type: int, min: 0, max: 127, label: Previous value, description: "Control Change value assigned to Previous on the Surface, sent with the Previous controller number." }
 
 ports:
   - { port: 51325, protocol: tcp, role: control, when: "model dlive-mixrack or avantis" }
@@ -95,7 +104,8 @@ models:
       [set_mute, get_mute, set_level, get_level, set_main_assign, get_main_assign, set_send_level,
       get_send_level, set_send_assign, get_send_assign, set_dca_assign, set_mute_group_assign,
       set_preamp_gain, get_preamp_gain, set_preamp_pad, get_preamp_pad, set_phantom_power, get_phantom_power,
-      set_channel_name, get_channel_name, set_channel_colour, get_channel_colour, recall_cue, set_peq_type,
+      set_channel_name, get_channel_name, set_channel_colour, get_channel_colour, recall_cue, cue_go,
+      cue_next, cue_previous, set_peq_type,
       set_peq_frequency, set_peq_width, set_peq_gain, get_peq, set_hpf_frequency, get_hpf_frequency, set_hpf,
       get_hpf, set_ufx_global_key, set_ufx_global_scale, control_change, raw_midi, refresh]
     verification: none
@@ -279,6 +289,15 @@ commands:
     params:
       recall_id: { type: int, min: 0, max: 1999, required: true, label: Recall ID, description: "The cue's Recall Id as set on the Surface, 0 to 1999." }
     returns: none
+  cue_go:
+    summary: "Press Go on the Surface's cue list: the Control Change set in cue_go_controller and cue_go_value, on channel N (p.5). dLive Surface only"
+    returns: none
+  cue_next:
+    summary: "Press Next on the Surface's cue list: the Control Change set in cue_next_controller and cue_next_value, on channel N (p.5). dLive Surface only"
+    returns: none
+  cue_previous:
+    summary: "Press Previous on the Surface's cue list: the Control Change set in cue_previous_controller and cue_previous_value, on channel N (p.5). dLive Surface only"
+    returns: none
   set_peq_type:
     summary: "Set a PEQ band's type (NRPN 1A/1E/22/26, p.6). Band 1-4 is the document's band 0-3; bell on bands 1 and 4, lf_shelf and high_pass band 1, hf_shelf and low_pass band 4"
     params:
@@ -449,9 +468,20 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      MIDI strips, SoftKeys and the Surface's Go / Next / Previous and cue Recall Ids send messages the
-      operator configures on the console, so they are not modelled; use control_change or raw_midi. MMC is
-      transmitted by the console for a DAW and is not a console control.
+      MIDI strips and SoftKeys send messages the operator configures on the console, so they are not
+      modelled; use control_change or raw_midi. MMC is transmitted by the console for a DAW and is not a
+      console control.
+  - models: [dlive-surface]
+    severity: critical
+    text: >
+      cue_go, cue_next and cue_previous send the Control Change the operator assigned to Go, Next and
+      Previous on the Surface's Utility / Control / MIDI page (p.5), which the document leaves to the user:
+      its number and value must be entered in the matching settings, and a command whose pair is unset
+      fails without sending anything. Go recalls the next cue on the live mix at once, as a recall_cue
+      does. The document says some CC numbers are reserved for other MIDI controls and does not list
+      them, and does not say on which MIDI channel the CCs are received; the commands send on the base
+      channel N, as the document's "BN, Number, Value" shows. The console does not report the cue list's
+      position, so these commands change no state.
 
 state:
   channels.*.*.mute: { type: bool, description: "Mute, keyed by channel type then number" }

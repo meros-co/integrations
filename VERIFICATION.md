@@ -97,16 +97,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## allenheath-dlive — Allen & Heath dLive / Avantis
 
-- [ ] Confirm the login encoding on the TLS ports 51327 and 51329: profile sent as one byte followed by the password's UTF-8 bytes, with no separator or terminator, answered by AuthOK. ([specs/allenheath-dlive.yaml:375](specs/allenheath-dlive.yaml#L375))
-- [ ] Check how the login profile number 00-1F maps to the console's user profiles. ([specs/allenheath-dlive.yaml:379](specs/allenheath-dlive.yaml#L379))
-- [ ] On Avantis, find the TLS port (not documented) and confirm tls works with it set. ([specs/allenheath-dlive.yaml:366](specs/allenheath-dlive.yaml#L366))
-- [ ] Check that a plain TCP connection to a console in Secure mode gets no answer (so the warning fires) rather than being dropped. ([specs/allenheath-dlive.yaml:368](specs/allenheath-dlive.yaml#L368))
-- [ ] Check whether the console transmits changes other than scene recall (mutes, faders, names) when made on the surface. ([specs/allenheath-dlive.yaml:397](specs/allenheath-dlive.yaml#L397))
-- [ ] Confirm fader and send level rounding: 6B reads 0 dB, +5 dB is 75, and on Avantis the hex column (not the decimal column) matches the console. ([specs/allenheath-dlive.yaml:404](specs/allenheath-dlive.yaml#L404))
-- [ ] Confirm preamp gain follows the p.9 table (+30 dB is 3A) and that the preamp get works with the socket number MP in place of CH, including DX sockets. ([specs/allenheath-dlive.yaml:412](specs/allenheath-dlive.yaml#L412))
-- [ ] Confirm that group and aux assignment off, sent as 3F, unassigns. ([specs/allenheath-dlive.yaml:419](specs/allenheath-dlive.yaml#L419))
-- [ ] Check whether dLive accepts the UFX chromatic scale (02), which is offered on Avantis only. ([specs/allenheath-dlive.yaml:426](specs/allenheath-dlive.yaml#L426))
-- [ ] Check how dLive handles a name longer than it allows (presumably truncated). ([specs/allenheath-dlive.yaml:431](specs/allenheath-dlive.yaml#L431))
+- [ ] Confirm the login encoding on the TLS ports 51327 and 51329: profile sent as one byte followed by the password's UTF-8 bytes, with no separator or terminator, answered by AuthOK. ([specs/allenheath-dlive.yaml:394](specs/allenheath-dlive.yaml#L394))
+- [ ] Check how the login profile number 00-1F maps to the console's user profiles. ([specs/allenheath-dlive.yaml:398](specs/allenheath-dlive.yaml#L398))
+- [ ] On Avantis, find the TLS port (not documented) and confirm tls works with it set. ([specs/allenheath-dlive.yaml:385](specs/allenheath-dlive.yaml#L385))
+- [ ] Check that a plain TCP connection to a console in Secure mode gets no answer (so the warning fires) rather than being dropped. ([specs/allenheath-dlive.yaml:387](specs/allenheath-dlive.yaml#L387))
+- [ ] Check whether the console transmits changes other than scene recall (mutes, faders, names) when made on the surface. ([specs/allenheath-dlive.yaml:416](specs/allenheath-dlive.yaml#L416))
+- [ ] Confirm fader and send level rounding: 6B reads 0 dB, +5 dB is 75, and on Avantis the hex column (not the decimal column) matches the console. ([specs/allenheath-dlive.yaml:423](specs/allenheath-dlive.yaml#L423))
+- [ ] Confirm preamp gain follows the p.9 table (+30 dB is 3A) and that the preamp get works with the socket number MP in place of CH, including DX sockets. ([specs/allenheath-dlive.yaml:431](specs/allenheath-dlive.yaml#L431))
+- [ ] Confirm that group and aux assignment off, sent as 3F, unassigns. ([specs/allenheath-dlive.yaml:438](specs/allenheath-dlive.yaml#L438))
+- [ ] Check whether dLive accepts the UFX chromatic scale (02), which is offered on Avantis only. ([specs/allenheath-dlive.yaml:445](specs/allenheath-dlive.yaml#L445))
+- [ ] Check how dLive handles a name longer than it allows (presumably truncated). ([specs/allenheath-dlive.yaml:450](specs/allenheath-dlive.yaml#L450))
+- [ ] On a Surface, confirm Go, Next and Previous respond to their assigned Control Change sent on the base MIDI channel N, which CC numbers are reserved, and whether the Surface transmits the CC when Go is pressed. ([specs/allenheath-dlive.yaml:477](specs/allenheath-dlive.yaml#L477))
 - [ ] Opened for commands only, check that the console answers the liveness probe when nothing else has been sent, since that answer is what reports it connected. ([crates/core/src/modules/allenheath.rs:41](crates/core/src/modules/allenheath.rs#L41))
 
 ## allenheath-qu — Allen & Heath Qu
