@@ -289,7 +289,7 @@ binary(W, "set_node", {"assignments": "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1"},
        osc("/", ("s", "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1")),
        device_reply_hex=hexs(osc("/*", ("s", "OK"))), expect_result={"ok": {"kind": "ack"}}, file="set_node-root")
 _ts("param-enum", "/$ctl/user/1/1/enc/mode", "FX", {})
-_tf("param-float", "/cfg/mon/1/dim", "-20.0", 0.5, -20.0, {})
+_tf("param-float", "/cfg/mon/1/dim", "-20.0", 0.5, -20.0, {"monitors": {"1": {"dim": -20.0}}})
 _ti("param-int", "/ch/40/$muteovr", 1, {})
 
 # ── EQ model, mix, frequencies, Qs, types and tilt; pre-send EQ (p.48-63) ─
@@ -619,3 +619,125 @@ _ts("oscillator-type", "/io/in/OSC/1/osc/mode", "WHITE", {"oscillators": {"1": {
 _tf("oscillator-frequency", "/io/in/OSC/1/osc/f", "1k00", 0.5, 1000.0, {"oscillators": {"1": {"frequency": 1000.0}}})
 _ti("alt-inputs", "/io/altsw", 1, {"io": {"alt_inputs": True}})
 _ti("input-select-override", "/io/autoaltovr", 0, {"io": {"input_select_override": False}})
+
+# ── Monitor buses, solo, talkback, main link, automix, RTA, meters (p.34-38) ──
+for cmd_, inp, leaf, wire in [
+        ("set_monitor_invert", {"enabled": True}, "inv", ("i", 1)),
+        ("set_monitor_pan", {"pan": -100.0}, "pan", ("f", -100.0)),
+        ("set_monitor_width", {"width": 150.0}, "wid", ("f", 150.0)),
+        ("set_monitor_eq", {"enabled": False}, "eq/on", ("i", 0)),
+        ("set_monitor_eq_low_gain", {"gain_db": -15.0}, "eq/lsg", ("f", -15.0)),
+        ("set_monitor_eq_low_frequency", {"frequency_hz": 2000.0}, "eq/lsf", ("f", 2000.0)),
+        ("set_monitor_eq_band_gain", {"band": 6, "gain_db": 15.0}, "eq/6g", ("f", 15.0)),
+        ("set_monitor_eq_band_frequency", {"band": 1, "frequency_hz": 20.0}, "eq/1f", ("f", 20.0)),
+        ("set_monitor_eq_band_q", {"band": 3, "q": 0.44}, "eq/3q", ("f", 0.44)),
+        ("set_monitor_eq_high_gain", {"gain_db": 2.5}, "eq/hsg", ("f", 2.5)),
+        ("set_monitor_eq_high_frequency", {"frequency_hz": 50.0}, "eq/hsf", ("f", 50.0)),
+        ("set_monitor_limiter", {"level_db": -40.0}, "lim", ("f", -40.0)),
+        ("set_monitor_delay", {"enabled": True}, "dly/on", ("i", 1)),
+        ("set_monitor_delay_distance", {"meters": 100.0}, "dly/m", ("f", 100.0)),
+        ("set_monitor_dim", {"level_db": -20.0}, "dim", ("f", -20.0)),
+        ("set_monitor_pfl_dim", {"level_db": 0.0}, "pfldim", ("f", 0.0)),
+        ("set_monitor_band_solo_trim", {"trim_db": 24.0}, "eqbdtrim", ("f", 24.0)),
+        ("set_monitor_source_level", {"level_db": -144.0}, "srclvl", ("f", -144.0)),
+        ("set_monitor_source_mix", {"level_db": 10.0}, "srcmix", ("f", 10.0)),
+        ("set_monitor_tags", {"tags": "#M"}, "tags", ("s", "#M"))]:
+    binary(W, cmd_, {"monitor": 2, **inp}, osc(f"/cfg/mon/2/{leaf}", wire))
+binary(W, "set_solo_mode", {"mode": "SIP"}, osc("/cfg/solo/mode", ("s", "SIP")))
+binary(W, "set_solo_monitor", {"monitor": "PH+SPK"}, osc("/cfg/solo/mon", ("s", "PH+SPK")))
+binary(W, "set_solo_mute", {"enabled": True}, osc("/cfg/solo/mute", ("i", 1)))
+binary(W, "set_solo_flip", {"enabled": False}, osc("/cfg/solo/$flip", ("i", 0)))
+binary(W, "set_solo_tap", {"section": "mtx", "tap": "AFL"}, osc("/cfg/solo/mtxtap", ("s", "AFL")))
+binary(W, "set_source_solo_enable", {"value": "CH39"}, osc("/cfg/solo/srcsolo", ("s", "CH39")))
+binary(W, "set_source_solo", {"enabled": True}, osc("/cfg/solo/$srcsolo", ("i", 1)))
+binary(W, "set_source_solo_input", {"group": 13, "input": 2},
+       [osc("/cfg/solo/$srcsgrp", ("i", 13)), osc("/cfg/solo/$srcsin", ("i", 2))])
+binary(W, "set_talkback_assign", {"assign": "AUX8"}, osc("/cfg/talk/assign", ("s", "AUX8")))
+binary(W, "set_talkback_monitor_dim", {"talkback": "A", "dim_db": -40.0}, osc("/cfg/talk/A/mondim", ("f", -40.0)))
+binary(W, "set_talkback_bus_dim", {"talkback": "B", "dim_db": 0.0}, osc("/cfg/talk/B/busdim", ("f", 0.0)))
+binary(W, "set_talkback_individual_levels", {"talkback": "B", "enabled": True}, osc("/cfg/talk/B/indiv", ("i", 1)))
+binary(W, "set_main_link", {"link": "2-4"}, osc("/cfg/mainlink", ("s", "2-4")))
+binary(W, "set_dca_mute_groups", {"enabled": True}, osc("/cfg/dcamgrp", ("i", 1)))
+binary(W, "set_automix_group", {"group": "Y", "enabled": False}, osc("/cfg/amix/y", ("i", 0)))
+binary(W, "set_rta_source", {"source": 76}, osc("/cfg/rta/rtasrc", ("i", 76)))
+binary(W, "set_rta_tap", {"tap": "FXOUT"}, osc("/cfg/rta/rtatap", ("s", "FXOUT")))
+for pre, leaf in [("rta", "rta"), ("eq_rta", "eq")]:
+    binary(W, f"set_{pre}_decay", {"decay": "FAST"}, osc(f"/cfg/rta/{leaf}decay", ("s", "FAST")))
+    binary(W, f"set_{pre}_detector", {"detector": "AVG"}, osc(f"/cfg/rta/{leaf}det", ("s", "AVG")))
+    binary(W, f"set_{pre}_range", {"range_db": 60.0}, osc(f"/cfg/rta/{leaf}range", ("f", 60.0)))
+    binary(W, f"set_{pre}_gain", {"gain_db": -5.0}, osc(f"/cfg/rta/{leaf}gain", ("f", -5.0)))
+    binary(W, f"set_{pre}_autogain", {"enabled": True}, osc(f"/cfg/rta/{leaf}auto", ("i", 1)))
+binary(W, "set_meter_scope_source", {"source": 0}, osc("/cfg/mtr/scopesrc", ("i", 0)))
+binary(W, "set_meter_scope_tap", {"tap": "MON.SPK"}, osc("/cfg/mtr/scopetap", ("s", "MON.SPK")))
+binary(W, "set_fader_meter_tap", {"section": "dca", "tap": "PRE"}, osc("/cfg/mtr/mtrsfc/dca", ("s", "PRE")))
+binary(W, "set_meter_page_tap", {"section": "in", "tap": "POST"}, osc("/cfg/mtr/mtrpage/in", ("s", "POST")))
+binary(W, "set_main_meter", {"source": "SEL_CH"}, osc("/cfg/mtr/mainmtr", ("s", "SEL_CH")))
+binary(W, "set_main_meter_position", {"position": "AUTO"}, osc("/cfg/mtr/mainpos", ("s", "AUTO")))
+
+_ti("monitor-invert", "/cfg/mon/1/inv", 1, {"monitors": {"1": {"invert": True}}})
+_tf("monitor-pan", "/cfg/mon/1/pan", "-20", 0.4, -20.0, {"monitors": {"1": {"pan": -20.0}}})
+_tf("monitor-width", "/cfg/mon/2/wid", "100", 0.8333, 100.0, {"monitors": {"2": {"width": 100.0}}})
+_ti("monitor-eq", "/cfg/mon/2/eq/on", 0, {"monitors": {"2": {"eq": {"on": False}}}})
+_tf("monitor-eq-low-gain", "/cfg/mon/1/eq/lsg", "3.0", 0.6, 3.0, {"monitors": {"1": {"eq": {"low_gain": 3.0}}}})
+_tf("monitor-eq-low-frequency", "/cfg/mon/1/eq/lsf", "100", 0.3, 100.0, {"monitors": {"1": {"eq": {"low_frequency": 100.0}}}})
+_tf("monitor-eq-band-gain", "/cfg/mon/1/eq/5g", "-6.0", 0.3, -6.0, {"monitors": {"1": {"eq": {"bands": {"5": {"gain": -6.0}}}}}})
+_tf("monitor-eq-band-frequency", "/cfg/mon/2/eq/2f", "2k00", 0.55, 2000.0, {"monitors": {"2": {"eq": {"bands": {"2": {"frequency": 2000.0}}}}}})
+_tf("monitor-eq-band-q", "/cfg/mon/2/eq/6q", "0.75", 0.1, 0.75, {"monitors": {"2": {"eq": {"bands": {"6": {"q": 0.75}}}}}})
+_tf("monitor-eq-high-gain", "/cfg/mon/1/eq/hsg", "-1.5", 0.45, -1.5, {"monitors": {"1": {"eq": {"high_gain": -1.5}}}})
+_tf("monitor-eq-high-frequency", "/cfg/mon/1/eq/hsf", "10k0", 0.8, 10000.0, {"monitors": {"1": {"eq": {"high_frequency": 10000.0}}}})
+_tf("monitor-limiter", "/cfg/mon/1/lim", "-6", 0.85, -6.0, {"monitors": {"1": {"limiter": -6.0}}})
+_ti("monitor-delay", "/cfg/mon/1/dly/on", 1, {"monitors": {"1": {"delay": {"on": True}}}})
+_tf("monitor-delay-distance", "/cfg/mon/1/dly/m", "3.5", 0.03, 3.5, {"monitors": {"1": {"delay": {"distance": 3.5}}}})
+_tf("monitor-dim", "/cfg/mon/2/dim", "-20", 0.5, -20.0, {"monitors": {"2": {"dim": -20.0}}})
+_tf("monitor-pfl-dim", "/cfg/mon/2/pfldim", "-10", 0.75, -10.0, {"monitors": {"2": {"pfl_dim": -10.0}}})
+_tf("monitor-band-solo-trim", "/cfg/mon/2/eqbdtrim", "12", 0.5, 12.0, {"monitors": {"2": {"band_solo_trim": 12.0}}})
+_tf("monitor-source-level", "/cfg/mon/1/srclvl", "0.0", 0.75, 0.0, {"monitors": {"1": {"source_level": 0.0}}})
+_tf("monitor-source-mix", "/cfg/mon/1/srcmix", "-oo", 0.0, -144.0, {"monitors": {"1": {"source_mix": -144.0}}})
+_tf("monitor-fader-level", "/cfg/mon/1/$lvlact", "-10.0", 0.5, -10.0, {"monitors": {"1": {"fader_level": -10.0}}})
+_ts("monitor-tags", "/cfg/mon/2/tags", "#PH", {"monitors": {"2": {"tags": "#PH"}}})
+_ts("solo-mode", "/cfg/solo/mode", "LIVE", {"solo": {"mode": "LIVE"}})
+_ts("solo-monitor", "/cfg/solo/mon", "SPK", {"solo": {"monitor": "SPK"}})
+_ti("solo-mute", "/cfg/solo/mute", 1, {"solo": {"mute": True}})
+_ti("solo-flip", "/cfg/solo/$flip", 0, {"solo": {"flip": False}})
+_ts("solo-tap", "/cfg/solo/chtap", "PFL", {"solo": {"taps": {"ch": "PFL"}}})
+_ts("source-solo-enable", "/cfg/solo/srcsolo", "OFF", {"solo": {"source_solo": {"enable": "OFF"}}})
+_ti("source-solo", "/cfg/solo/$srcsolo", 1, {"solo": {"source_solo": {"on": True}}})
+_ti("source-solo-group", "/cfg/solo/$srcsgrp", 3, {"solo": {"source_solo": {"group": 3}}})
+_ti("source-solo-input", "/cfg/solo/$srcsin", 48, {"solo": {"source_solo": {"input": 48}}})
+_ti("solo-in-place", "/$stat/sip", 1, {"solo": {"in_place": True}})
+for node, P in _PLURAL.items():
+    _ti(f"{node}-solo-led", f"/{node}/2/$sololed", 1, {P: {"2": {"solo_led": True}}})
+_ts("talkback-assign", "/cfg/talk/assign", "CH40", {"talkback": {"assign": "CH40"}})
+_tf("talkback-level", "/cfg/talk/$lvl", "-10.0", 0.5, -10.0, {"talkback": {"level": -10.0}})
+for t in ("A", "B"):
+    lt = t.lower()
+    _tf(f"talkback-{lt}-monitor-dim", f"/cfg/talk/{t}/mondim", "-20", 0.5, -20.0, {"talkback": {lt: {"monitor_dim": -20.0}}})
+    _tf(f"talkback-{lt}-bus-dim", f"/cfg/talk/{t}/busdim", "-6", 0.85, -6.0, {"talkback": {lt: {"bus_dim": -6.0}}})
+    _ti(f"talkback-{lt}-individual", f"/cfg/talk/{t}/indiv", 1, {"talkback": {lt: {"individual_levels": True}}})
+_ts("main-link", "/cfg/mainlink", "2-3", {"config": {"main_link": "2-3"}})
+_ti("dca-mute-groups", "/cfg/dcamgrp", 0, {"config": {"dca_mute_groups": False}})
+_ti("automix-x", "/cfg/amix/x", 1, {"automix": {"x": True}})
+_ti("rta-source", "/cfg/rta/rtasrc", 12, {"rta": {"source": 12}})
+_ts("rta-tap", "/cfg/rta/rtatap", "PREEQ", {"rta": {"tap": "PREEQ"}})
+_ts("rta-decay", "/cfg/rta/rtadecay", "MED", {"rta": {"decay": "MED"}})
+_ts("rta-detector", "/cfg/rta/rtadet", "RMS", {"rta": {"detector": "RMS"}})
+_tf("rta-range", "/cfg/rta/rtarange", "60", 1.0, 60.0, {"rta": {"range": 60.0}})
+_tf("rta-gain", "/cfg/rta/rtagain", "10", 0.27, 10.0, {"rta": {"gain": 10.0}})
+_ti("rta-autogain", "/cfg/rta/rtaauto", 1, {"rta": {"autogain": True}})
+_ts("eq-rta-decay", "/cfg/rta/eqdecay", "SLOW", {"rta": {"eq": {"decay": "SLOW"}}})
+_ts("eq-rta-detector", "/cfg/rta/eqdet", "PEAK", {"rta": {"eq": {"detector": "PEAK"}}})
+_tf("eq-rta-range", "/cfg/rta/eqrange", "30", 0.0, 30.0, {"rta": {"eq": {"range": 30.0}}})
+_tf("eq-rta-gain", "/cfg/rta/eqgain", "0", 0.09, 0.0, {"rta": {"eq": {"gain": 0.0}}})
+_ti("eq-rta-autogain", "/cfg/rta/eqauto", 0, {"rta": {"eq": {"autogain": False}}})
+_ti("rta-active-source", "/cfg/rta/$src", 5, {"rta": {"active": {"source": 5}}})
+_ts("rta-active-tap", "/cfg/rta/$tap", "POST", {"rta": {"active": {"tap": "POST"}}})
+_ts("rta-active-decay", "/cfg/rta/$dec", "FAST", {"rta": {"active": {"decay": "FAST"}}})
+_ts("rta-active-detector", "/cfg/rta/$det", "PEAK", {"rta": {"active": {"detector": "PEAK"}}})
+_ti("meter-scope-source", "/cfg/mtr/scopesrc", 40, {"meters": {"scope_source": 40}})
+_ts("meter-scope-tap", "/cfg/mtr/scopetap", "SOLO", {"meters": {"scope_tap": "SOLO"}})
+_ti("meter-active-scope-source", "/cfg/mtr/$scopesrc", 41, {"meters": {"active_scope_source": 41}})
+_ts("meter-active-scope-tap", "/cfg/mtr/$scopetap", "IN", {"meters": {"active_scope_tap": "IN"}})
+_ts("main-meter", "/cfg/mtr/mainmtr", "MTX.8", {"meters": {"main_meter": "MTX.8"}})
+_ts("main-meter-position", "/cfg/mtr/mainpos", "PRE", {"meters": {"main_position": "PRE"}})
+_ts("fader-meter-tap", "/cfg/mtr/mtrsfc/bus", "POST", {"meters": {"fader_taps": {"bus": "POST"}}})
+_ts("meter-page-tap", "/cfg/mtr/mtrpage/mtx", "PRE", {"meters": {"page_taps": {"mtx": "PRE"}}})
