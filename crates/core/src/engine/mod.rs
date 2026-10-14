@@ -715,6 +715,12 @@ pub(crate) struct SpecEngine {
     push_backoff: Millis,
     /// `telemetry.sse`: an event stream beside an HTTP transport.
     events: Option<HttpRequest>,
+    /// `telemetry.sse.format: json`: each part of the stream is a JSON
+    /// document, offered as it is rather than as `{event, data}`.
+    events_json: bool,
+    /// `telemetry.sse.as_reply`: JSON paths to the path and the body each
+    /// part is offered under, as that GET's reply would be.
+    events_reply: Option<(String, String)>,
     events_backoff: Millis,
     /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
     /// opened: no subscription, poll or push websocket. Replies and anything
@@ -1577,7 +1583,49 @@ impl SpecEngine {
                 let path = str_field(e, "path").ok_or("telemetry.sse needs a path")?;
                 let mut headers = auth_headers(*auth, &auth_header, &ctx.settings);
                 headers.extend(side_headers.iter().cloned());
-                headers.push(("Accept".into(), "text/event-stream".into()));
+                let json = match str_field(e, "format") {
+                    None | Some("sse") => false,
+                    Some("json") => true,
+                    Some(other) => {
+                        return Err(format!("telemetry.sse format '{other}' is sse or json"))
+                    }
+                };
+                headers.push((
+                    "Accept".into(),
+                    if json {
+                        "application/json"
+                    } else {
+                        "text/event-stream"
+                    }
+                    .into(),
+                ));
+                let method: &'static str = match str_field(e, "method") {
+                    None | Some("GET") => "GET",
+                    Some("POST") => "POST",
+                    Some(other) => {
+                        return Err(format!("telemetry.sse method '{other}' is GET or POST"))
+                    }
+                };
+                // A body is a template over settings, as on_connect's are.
+                let body = match str_field(e, "body") {
+                    None => None,
+                    Some(template) => {
+                        let empty = Params::new();
+                        let empty_specs = BTreeMap::new();
+                        let values = Values {
+                            params: &empty,
+                            param_specs: &empty_specs,
+                            settings: &ctx.settings,
+                            setting_specs: &spec.settings,
+                            conversions: &conversions,
+                            maps: &maps,
+                        };
+                        Some(render(template, &values, no_escape)?.into_bytes())
+                    }
+                };
+                if let Some(ct) = str_field(e, "content_type") {
+                    headers.push(("Content-Type".into(), ct.to_string()));
+                }
                 let setting = |name: &str| {
                     ctx.settings
                         .get(name)
@@ -1586,10 +1634,10 @@ impl SpecEngine {
                         .to_string()
                 };
                 Some(HttpRequest {
-                    method: "GET",
+                    method,
                     url: format!("{base}{path}"),
                     headers,
-                    body: None,
+                    body,
                     // A stream stays open; the session watches it for activity.
                     timeout: None,
                     accept_invalid_certs: *accept_invalid_certs,
@@ -1601,6 +1649,19 @@ impl SpecEngine {
                     ),
                 })
             }
+        };
+        let sse = spec.telemetry.as_ref().and_then(|t| t.get("sse"));
+        let events_json = sse.and_then(|e| str_field(e, "format")) == Some("json");
+        let events_reply = match sse.and_then(|e| e.get("as_reply")) {
+            None => None,
+            Some(r) => Some((
+                str_field(r, "path")
+                    .ok_or("telemetry.sse.as_reply needs path")?
+                    .to_string(),
+                str_field(r, "body")
+                    .ok_or("telemetry.sse.as_reply needs body")?
+                    .to_string(),
+            )),
         };
         let oauth = match &transport {
             Transport::Http {
@@ -1646,6 +1707,8 @@ impl SpecEngine {
             push,
             push_backoff: RECONNECT_MIN,
             events,
+            events_json,
+            events_reply,
             events_backoff: RECONNECT_MIN,
         })
     }
@@ -3074,8 +3137,34 @@ impl SpecEngine {
             SseInput::Event(event) => {
                 let data = serde_json::from_str::<Value>(&event.data)
                     .unwrap_or_else(|_| Value::String(event.data.clone()));
-                let doc = serde_json::json!({"event": event.event, "data": data});
+                // `format: json`: the part is the document; otherwise the
+                // event's name and data.
+                let doc = if self.events_json {
+                    data
+                } else {
+                    serde_json::json!({"event": event.event, "data": data})
+                };
                 self.offer(cx, &telemetry::Inbound::Json(&doc));
+                // `as_reply`: also the reply to a GET of the path it names.
+                if let Some((path, body)) = &self.events_reply {
+                    let path = match expect::json_path(&doc, path) {
+                        Some(Value::String(p)) if p.starts_with('/') => Some(p.clone()),
+                        Some(Value::String(p)) => Some(format!("/{p}")),
+                        _ => None,
+                    };
+                    if let (Some(path), Some(body)) = (path, expect::json_path(&doc, body)) {
+                        let body = body.to_string().into_bytes();
+                        self.offer(
+                            cx,
+                            &telemetry::Inbound::Http {
+                                path: &path,
+                                headers: &[],
+                                body: &body,
+                                request: None,
+                            },
+                        );
+                    }
+                }
                 self.apply_text(cx, &event.data);
                 self.last_heard = cx.now();
                 cx.alive();
@@ -5191,6 +5280,65 @@ mod tests {
         assert!(!a
             .iter()
             .any(|x| matches!(x, Action::SetTimer { key: POLL, .. })));
+    }
+
+    #[test]
+    fn a_json_stream_is_posted_for_and_read_as_replies() {
+        let telemetry = json!({
+            "sse": {"method": "POST", "path": "/v1/status/updates", "body": r#"["status/slide"]"#,
+                    "content_type": "application/json", "format": "json",
+                    "as_reply": {"path": "$.url", "body": "$.data"}},
+            "updates": [
+                {"path": "^/v1/status/slide$", "json": {"text": "$.current.text"},
+                 "state": {"slide.text": "{text}"}},
+                {"json_match": {"$.url": "^status/countdown$"}, "json": {"t": "$.data"},
+                 "state": {"countdown": "{t}"}},
+            ],
+        });
+        let state = json!({
+            "slide.text": {"type": "string", "description": "x"},
+            "countdown": {"type": "string", "description": "x"},
+        });
+        let mut e = http_with(telemetry, state, true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let (stream, request) = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::SseOpen { stream, request } => Some((stream, request)),
+                _ => None,
+            })
+            .expect("the update stream");
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.body.as_deref(), Some(&br#"["status/slide"]"#[..]));
+        assert!(request
+            .headers
+            .contains(&("Accept".to_string(), "application/json".to_string())));
+        assert!(request
+            .headers
+            .contains(&("Content-Type".to_string(), "application/json".to_string())));
+        let part = |e: &mut SpecEngine, data: &str| {
+            let mut cx = Cx::new(10);
+            e.sse(
+                &mut cx,
+                stream,
+                SseInput::Event(crate::sse::SseEvent {
+                    event: "message".into(),
+                    data: data.into(),
+                }),
+            );
+            cx.take()
+        };
+        // Read as the GET of its url would be, by the path rules.
+        assert!(part(
+            &mut e,
+            r#"{"url":"/v1/status/slide","data":{"current":{"text":"Amazing"}}}"#
+        )
+        .contains(&Action::State(json!({"slide": {"text": "Amazing"}}))));
+        // And as the document it is, by the JSON rules.
+        assert!(part(&mut e, r#"{"url":"status/countdown","data":"00:01"}"#)
+            .contains(&Action::State(json!({"countdown": "00:01"}))));
     }
 
     #[test]

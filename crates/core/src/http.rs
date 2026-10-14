@@ -183,6 +183,10 @@ impl HttpClients {
         inbound: mpsc::Sender<Inbound>,
     ) -> tokio::task::JoinHandle<()> {
         let builder = self.build(request);
+        let json = request
+            .headers
+            .iter()
+            .any(|(k, v)| k.eq_ignore_ascii_case("accept") && !v.contains("text/event-stream"));
         tokio::spawn(async move {
             let send = |input: SseInput| {
                 let inbound = inbound.clone();
@@ -220,7 +224,13 @@ impl HttpClients {
             if !send(SseInput::Opened).await {
                 return;
             }
-            let mut parser = SseParser::default();
+            // A stream asked for as JSON (telemetry.sse `format: json`) is
+            // split into documents at blank lines, not read as event-stream.
+            let mut parser = if json {
+                SseParser::json()
+            } else {
+                SseParser::default()
+            };
             let mut body = response.bytes_stream();
             let reason = loop {
                 match body.next().await {

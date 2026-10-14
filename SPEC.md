@@ -1857,8 +1857,35 @@ Each event goes to the `json_match` rules as `{"event": <name>, "data":
 <data>}`, with `data` parsed where it is JSON (the event name is `message`
 when the stream gives none), and its data to the text rules.
 
+A stream opened with a request of its own takes `method` (`GET`, the
+default, or `POST`), a `body`, a template over settings, and its
+`content_type`. A service whose stream is chunked JSON rather than
+event-stream, one document per part with a blank line between parts, says
+`format: json`: the stream is asked for as `application/json`, and each
+part goes to the `json_match` rules as the document it is (not as `{event,
+data}`) and to the text rules as its text. With `as_reply`, each part (or,
+for event-stream, each `{event, data}`) is also offered to the `path`
+rules as the reply to a GET of the path at `as_reply.path`, with the value
+at `as_reply.body` as its body, so the rules that read a poll's reply read
+the stream's updates too, and the polls can stay as the fallback.
+ProPresenter's update stream names each part's endpoint in `url`:
+
+```yaml
+telemetry:
+  sse:
+    method: POST
+    path: /v1/status/updates
+    body: '["status/slide","timer/video_countdown"]'
+    content_type: application/json
+    format: json
+    as_reply: { path: "$.url", body: "$.data" }
+```
+
+A path without a leading `/` is given one.
+
 A telemetry vector for an event stream gives `inbound_sse: { event, data }`,
-one event as the stream would deliver it (`event` defaults to `message`).
+one event as the stream would deliver it (`event` defaults to `message`);
+for `format: json`, `data` is the part's text.
 
 ## Native modules
 

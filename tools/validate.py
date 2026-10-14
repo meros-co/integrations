@@ -503,6 +503,9 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 re.compile(pattern)
             except re.error as e:
                 errors.append(f"telemetry.updates[{i}].arg_match.{index} does not compile: {e}")
+    sse_ = (doc.get("telemetry") or {}).get("sse") or {}
+    if "body" in sse_:
+        errors += check_template("text", sse_["body"], {}, settings, "telemetry.sse.body")
     if (transport.get("reply_framing") == "fenced") != ("reply_fence" in transport):
         errors.append("transport: reply_framing fenced and reply_fence go together")
     if "reply_fence" in transport:
