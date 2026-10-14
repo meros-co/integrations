@@ -160,15 +160,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## avolites-titan — Avolites Titan
 
-- [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1353](specs/avolites-titan.yaml#L1353))
-- [ ] Confirm the handle record field names on Titan 19 (Active or active, Legend or legend, userNumber.hashCode) and that `active` reflects a running playback. ([specs/avolites-titan.yaml:1377](specs/avolites-titan.yaml#L1377))
-- [ ] Confirm that times sent with two decimals (fadeTime=5.00) and levels with three (level_level=1.000) are accepted like the documentation's whole numbers. ([specs/avolites-titan.yaml:1385](specs/avolites-titan.yaml#L1385))
-- [ ] Check the grand master value range (0-100 as sent here, or 0-1). ([specs/avolites-titan.yaml:1387](specs/avolites-titan.yaml#L1387))
-- [ ] Check that an empty panelTimeStamp works for tap tempo and an empty oldValue for the grand master. ([specs/avolites-titan.yaml:1395](specs/avolites-titan.yaml#L1395))
-- [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1345](specs/avolites-titan.yaml#L1345))
-- [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1369](specs/avolites-titan.yaml#L1369))
-- [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1210](specs/avolites-titan.yaml#L1210))
-- [ ] Confirm /titan/handles lists every programmed handle on the console in one answer: each poll replaces the handles state. ([specs/avolites-titan.yaml:1459](specs/avolites-titan.yaml#L1459))
+- [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1779](specs/avolites-titan.yaml#L1779))
+- [ ] Confirm the handle record field names on Titan 19 (Active or active, Legend or legend, userNumber.hashCode) and that `active` reflects a running playback. ([specs/avolites-titan.yaml:1806](specs/avolites-titan.yaml#L1806))
+- [ ] Confirm that times sent with two decimals (fadeTime=5.00) and levels with three (level_level=1.000) are accepted like the documentation's whole numbers. ([specs/avolites-titan.yaml:1814](specs/avolites-titan.yaml#L1814))
+- [ ] Check the grand master value range (0-100 as sent here, or 0-1). ([specs/avolites-titan.yaml:1816](specs/avolites-titan.yaml#L1816))
+- [ ] Check that an empty panelTimeStamp works for tap tempo and an empty oldValue for the grand master. ([specs/avolites-titan.yaml:1824](specs/avolites-titan.yaml#L1824))
+- [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1771](specs/avolites-titan.yaml#L1771))
+- [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1801](specs/avolites-titan.yaml#L1801))
+- [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1271](specs/avolites-titan.yaml#L1271))
+- [ ] Confirm /titan/handles lists every programmed handle on the console in one answer: each poll replaces the handles state. ([specs/avolites-titan.yaml:2014](specs/avolites-titan.yaml#L2014))
+- [ ] Find the wire form of AcwHSI for set_selected_colour_hsi (hsi_hue, hsi_saturation and hsi_intensity assumed) and the ranges of hue, saturation and intensity. ([specs/avolites-titan.yaml:1839](specs/avolites-titan.yaml#L1839))
+- [ ] Find the values AcwRecordMask and AcwShapeType take in a query (names, comma-separated names or a number) for the masked clears and clear_effects. ([specs/avolites-titan.yaml:1842](specs/avolites-titan.yaml#L1842))
+- [ ] Find the MenuEventTypes names handle_key_action and handle_fader_action take (Press, Release, Move assumed), and whether an empty timeStamp is accepted. ([specs/avolites-titan.yaml:1844](specs/avolites-titan.yaml#L1844))
+- [ ] Find the text form of TimecodeTime (hh:mm:ss:ff assumed) for set_timer_start_time and timeline_play_from_time. ([specs/avolites-titan.yaml:1845](specs/avolites-titan.yaml#L1845))
+- [ ] Confirm the AcwTimecodeSource names (Internal, UsbExpert, Winamp, System, Smpte) against Titan 19. ([specs/avolites-titan.yaml:1847](specs/avolites-titan.yaml#L1847))
+- [ ] Check whether the WebAPI has any read of a playback's or master's current level, for per-handle levels in state. ([specs/avolites-titan.yaml:1868](specs/avolites-titan.yaml#L1868))
+- [ ] Confirm a property set takes its value as the POST body text (the introduction's False), for set_palette_number, set_palette_name and the other set_ commands, and the record types set_record_type takes. ([specs/avolites-titan.yaml:1429](specs/avolites-titan.yaml#L1429))
+- [ ] Check that store_cue's group and index are a handle's group and handleLocation.index, and what the Int32 it returns is. ([specs/avolites-titan.yaml:1857](specs/avolites-titan.yaml#L1857))
 
 ## avstumpfl-pixera — AV Stumpfl PIXERA
 

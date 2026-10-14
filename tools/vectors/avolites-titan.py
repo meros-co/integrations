@@ -187,3 +187,102 @@ telemetry(AV, "blind", inbound_http={"path": "/titan/get/2/Programmer/BlindActiv
           expect_state={"programmer": {"blind": False}})
 telemetry(AV, "highlight", inbound_http={"path": "/titan/get/2/Programmer/Editor/Fixtures/Highlight", "body": "true"},
           expect_state={"programmer": {"highlight": True}})
+
+
+# ── Full control: recording, colour, masked clears, timers, timelines, levels ──
+# Property sets are a POST of the value as text (introduction, Set Property
+# Value). Types the documentation gives no wire form for are written as the
+# spec's quirks describe them (hsi_hue/hsi_saturation/hsi_intensity, mask
+# names, hh:mm:ss:ff times, event type names, an empty timeStamp).
+def av_set(command, input, target, body, **extra):
+    V.append({"spec": AV, "command": command, "input": input,
+              "expect_request": {"method": "POST", "target": target, "body": body}, **extra})
+
+
+G = "/titan/set/2/"
+av("store_cue", {"group": "PlaybackWindow", "index": 4},
+   S + "Playbacks/StoreCue?group=PlaybackWindow&index=4&updateOnly=false",
+   http_reply={"status": 200, "body": "12"}, expect_result={"ok": {"kind": "ack"}})
+av("set_record_type", {"record_type": "CueList"}, S + "Playbacks/SetRecordType?recordType=CueList")
+av_set("set_palette_number", {"user_number": 12}, G + "Palette/CurrentPaletteNumber", "12.000")
+av_set("set_palette_name", {"name": "Deep Blue"}, G + "Palette/CurrentPaletteName", "Deep Blue")
+av_set("set_palette_shared", {"shared": False}, G + "Palette/StorePaletteMode", "false")
+av("store_palette", {}, S + "Palette/StoreCurrentPalette")
+av("store_palette_replace", {}, S + "Palette/StoreCurrentPaletteReplace")
+av("delete_current_palette", {}, S + "Palette/DeleteCurrentPalette")
+av("store_group", {"user_number": 3.5}, S + "Group/StoreGroup?userNumber=3.500")
+av("store_group_replace", {"group_id": 2041}, S + "Group/StoreGroupReplace?groupId=2041")
+av("delete_group", {"titan_id": 2041}, S + "Group/DeleteGroup?titanId=2041")
+av("set_selected_colour_hsi", {"hue": 240.0, "saturation": 1.0, "intensity": 0.5},
+   S + "Programmer/Editor/Fixtures/SetColourControlValues?hsi_hue=240.00&hsi_saturation=1.000"
+       "&hsi_intensity=0.500&programmer=true&createRestorePoint=true")
+av("clear_programmer_masked", {"mask": "Colour,Position", "fade_time": 2.0},
+   S + "Programmer/Editor/Clear?mask=Colour,Position&presets=false&clearAllProgrammers=false&fadeTime=2.00")
+av("clear_selected_fixtures_masked", {"mask": "Intensity", "clear_selection": True},
+   S + "Programmer/Editor/ClearSelectedFixtures?mask=Intensity&presets=false&fadeTime=0.00&clearSelection=true")
+av_set("set_clear_selected_only", {"selected_only": True}, G + "Programmer/Editor/Clear/Selected", "true")
+av("clear_effects", {"effect_mask": "Colour", "selected": True},
+   S + "Programmer/Editor/ClearEffects?effectMask=Colour&selected=true")
+av("set_timer_source", {"timer": "TimecodeTwo", "source": "Smpte"}, S + "Timecode/TimecodeTwo/SetSource?source=Smpte")
+av("timer_play", {"timer": "TimecodeOne"}, S + "Timecode/TimecodeOne/Play")
+av("timer_pause", {"timer": "TimecodeOne"}, S + "Timecode/TimecodeOne/Pause")
+av("timer_reset", {"timer": "TimecodeFour"}, S + "Timecode/TimecodeFour/Reset")
+av("set_timer_start_time", {"timer": "TimecodeThree", "time": "01:00:00:00"},
+   S + "Timecode/TimecodeThree/SetStartTime?time=01:00:00:00")
+av("set_timecode_source_by_id", {"timecode": 1, "source": "Internal"},
+   S + "Timecode/SetTimecodeSource?timecodeId=1&source=Internal")
+av("set_timecode_port", {"timecode": 1, "port": 2}, S + "Timecode/SetTimecodePort?timecodeId=1&port=2")
+av("timeline_play_from_time", {**UN, "time": "00:01:30:12"},
+   S + "Timelines/PlayTimelineFromTime?handle_userNumber=6&time=00:01:30:12")
+av("timeline_play_from_time_by_id", {"timeline_id": 1895, "time": "00:00:10:00"},
+   S + "Timelines/PlayTimelineFromTimeById?timelineId=1895&time=00:00:10:00")
+av("timeline_play_from_cursor", {"by": "titanId", "handle": "1895"},
+   S + "Timelines/PlayTimelineFromCursor?handle_titanId=1895")
+av("timeline_play_reset", UN, S + "Timelines/PlayResetTimeline?handle_userNumber=6")
+for name, member in [("timeline_play_by_id", "PlayTimelineById"), ("timeline_pause_by_id", "PauseTimelineById"),
+                     ("timeline_stop_by_id", "StopTimelineById"), ("timeline_reset_by_id", "ResetTimelineById")]:
+    av(name, {"timeline_id": 1895}, S + "Timelines/%s?timelineId=1895" % member)
+av("set_timeline_level", {"by": "location", "handle": "playback_2_1", "level": 0.75},
+   S + "Timelines/SetTimelineHandleFaderLevel?handle_location=playback_2_1&value_level=0.750")
+av("set_timeline_fader_level", {"group": "PlaybackWindow", "index": 2, "level": 1.0},
+   S + "Timelines/SetTimelineFaderLevel?group=PlaybackWindow&index=2&value_level=1.000&accuracy=1.000")
+av("set_master_level", {"group": "playback", "index": 1, "level": 0.5},
+   S + "Masters/SetMasterLevel?group=playback&index=1&value_level=0.500&accuracy=1.000&initialise=false")
+av("set_master_level_delta", {"group": "playback", "index": 1, "delta": 0.5},
+   S + "Masters/SetMasterLevel?group=playback&index=1&value_leveldelta=0.500&accuracy=1.000&initialise=false")
+av("set_group_fader_level", {"group": "Groups", "index": 0, "level": 0.25, "accuracy": 0.5},
+   S + "Group/SetGroupFaderLevel?group=Groups&index=0&value_level=0.250&accuracy=0.500")
+av("set_group_level", {"by": "titanId", "handle": "2041", "level": 1.0},
+   S + "Group/SetGroupHandleFaderLevel?handle_titanId=2041&value_level=1.000&accuracy=1.000")
+av("handle_key_action", {"key_class": "PlaybackWindow", "event_type": "Press", "key_group": "PlaybackWindow",
+                         "key_index": 3, "key_name": "Go 1"},
+   S + "Handles/HandleKeyAction?keyClass=PlaybackWindow&eventType=Press&keyGroup=PlaybackWindow&keyIndex=3"
+       "&keyName=Go%201&timeStamp=")
+av("handle_fader_action", {"event_type": "Move", "handle_group": "PlaybackWindow", "handle_index": 3, "level": 0.5},
+   S + "Handles/HandleFaderAction?eventType=Move&handleGroup=PlaybackWindow&handleIndex=3&timeStamp=&level_level=0.500")
+
+# Telemetry of the polled properties (each reply a JSON value).
+for name, path, body, state in [
+        ("grand-master-output", "Masters/GrandMasterOutputLevel", "0.8", {"masters": {"grand_master_output": 0.8}}),
+        ("live-cue", "CueLists/LiveCueNumber", "3", {"cue_lists": {"live_cue_number": "3"}}),
+        ("next-cue", "CueLists/NextCueNumber", "4.5", {"cue_lists": {"next_cue_number": "4.5"}}),
+        ("command-line", "Command/CommandLineText", '"Record Cue"', {"command": {"line": "Record Cue"}}),
+        ("show-name", "Show/ShowName", '"V10 Demo Show"', {"show": {"name": "V10 Demo Show"}}),
+        ("desk-mode", "System/DeskMode", '"Run"', {"system": {"desk_mode": "Run"}}),
+        ("dmx-output", "Titan/DmxOutputEnabled", "true", {"titan": {"dmx_output_enabled": True}}),
+        ("timecode-enabled", "Timecode/Enabled", "false", {"timecode": {"enabled": False}}),
+        ("world", "Handles/CurrentWorldName", '"World 1"', {"handles_world": {"name": "World 1"}}),
+        ("palette-number", "Palette/CurrentPaletteNumber", "12", {"palette": {"current_number": 12.0}}),
+        ("palette-name", "Palette/CurrentPaletteName", '"Deep Blue"', {"palette": {"current_name": "Deep Blue"}}),
+        ("palette-shared", "Palette/StorePaletteMode", "true", {"palette": {"store_shared": True}}),
+        ("clear-selected", "Programmer/Editor/Clear/Selected", "false",
+         {"programmer": {"clear_selected_only": False}}),
+        ("timer-live-time", "Timecode/TimecodeOne/LiveTime", '"00:01:02:03"',
+         {"timecode": {"timers": {"TimecodeOne": {"live_time": "00:01:02:03"}}}}),
+        ("timer-paused", "Timecode/TimecodeTwo/Paused", "true",
+         {"timecode": {"timers": {"TimecodeTwo": {"paused": True}}}}),
+        ("timer-source", "Timecode/TimecodeThree/Source", '"Smpte"',
+         {"timecode": {"timers": {"TimecodeThree": {"source": "Smpte"}}}}),
+        ("timer-start-time", "Timecode/TimecodeFour/StartTime", '"10:00:00:00"',
+         {"timecode": {"timers": {"TimecodeFour": {"start_time": "10:00:00:00"}}}})]:
+    telemetry(AV, name, inbound_http={"path": "/titan/get/2/" + path, "body": body}, expect_state=state)
