@@ -39,12 +39,18 @@ async fn simulated_ulxd() -> (u16, Arc<Mutex<String>>) {
                 match message.as_str() {
                     "< GET 1 ALL >" => reply.push_str(
                         "< REP 1 CHAN_NAME {Pulpit  } >< REP 1 AUDIO_MUTE OFF >\
-                         < REP 1 AUDIO_GAIN 024 >< REP 1 FREQUENCY 578350 >< REP 1 BATT_BARS 004 >",
+                         < REP 1 AUDIO_GAIN 024 >< REP 1 FREQUENCY 578350 >< REP 1 BATT_BARS 004 >                         < REP 1 GROUP_CHAN 01,01 >< REP 1 TX_TYPE ULXD2 >< REP 1 TX_OFFSET 015 >",
                     ),
                     "< SET 1 METER_RATE 01000 >" => {
                         reply.push_str("< REP 1 METER_RATE 01000 >< SAMPLE 1 ALL AX 078 032 >")
                     }
                     "< SET 1 AUDIO_MUTE ON >" => reply.push_str("< REP 1 AUDIO_MUTE ON >"),
+                    "< SET 1 GROUP_CHAN 03,07 >" => {
+                        reply.push_str("< REP 1 FREQUENCY 582125 >< REP 1 GROUP_CHAN 03,07 >")
+                    }
+                    "< SET ENCRYPTION AUTO >" => reply.push_str("< REP ENCRYPTION AUTO >"),
+                    // A malformed or out-of-range SET is refused without naming it.
+                    "< SET 1 FREQUENCY 100000 >" => reply.push_str("< REP ERR >"),
                     _ => {}
                 }
             }
@@ -97,6 +103,42 @@ async fn shure_end_to_end() {
     assert_eq!(ch["gain_db"], 6);
     assert_eq!(ch["frequency_khz"], 578350);
     assert_eq!(ch["transmitter"]["battery_bars"], 4);
+    assert_eq!(ch["transmitter"]["model"], "ulxd2");
+    assert_eq!(ch["transmitter"]["offset_db"], 3);
+    assert_eq!(ch["group"], "1");
+
+    // Tuning by group and channel reports the frequency it lands on.
+    let outcome = core
+        .execute(
+            id,
+            "set_group_channel",
+            params(json!({"channel": 1, "group": "3", "group_channel": "7"})),
+        )
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    let ch = core.snapshot(id).unwrap().state["channels"]["1"].clone();
+    assert_eq!(ch["frequency_khz"], 582125);
+    assert_eq!(ch["group_channel"], "7");
+
+    let outcome = core
+        .execute(id, "set_encryption", params(json!({"mode": "auto"})))
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    assert_eq!(
+        core.snapshot(id).unwrap().state["device"]["encryption"],
+        "auto"
+    );
+    let refused = core
+        .execute(
+            id,
+            "set_frequency",
+            params(json!({"channel": 1, "frequency_khz": 100000})),
+        )
+        .await;
+    assert!(matches!(
+        refused,
+        Err(meros_integrations::CommandError::DeviceError { .. })
+    ));
 
     let outcome = core
         .execute(id, "mute", params(json!({"channel": 1, "muted": true})))
