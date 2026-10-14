@@ -261,6 +261,34 @@ telemetry(H, "slot", inbound="502 slot info:\r\nslot id: 2\r\nslot name: SD2\r\n
                                         "volume_name": "Show", "recording_time": 3600, "video_format": "1080p50",
                                         "blocked": False, "remaining_size": 1000000000,
                                         "total_size": 64000000000}}})
+# A slot change has that slot's clip list read again.
+telemetry(H, "slot-reread", inbound="502 slot info:\r\nslot id: 2\r\nstatus: mounted\r\n\r\n",
+          expect_then_send=["disk list: slot id: 2\r\n"],
+          expect_state={"slots": {"2": {"status": "mounted"}}})
+# 206 disk list (p.18): the slot on its own line, then the clips, in response
+# version 1 "{index}: {name} {file format} {video format} {duration}"; the
+# slot's list is replaced whole, other slots' kept.
+telemetry(H, "disk-list", inbound="206 disk list:\r\nslot id: 1\r\n1: Clip 0001 QuickTimeProRes 1080p30 00:00:10:00\r\n"
+          "2: Interview QuickTimeDNxHD 1080p25 00:01:00:12\r\n\r\n",
+          state_before={"slots": {"1": {"name": "SD1", "clips": {"3": {"name": "Old"}}},
+                                  "2": {"clips": {"1": {"name": "Other"}}}}},
+          expect_state={"slots": {"1": {"name": "SD1", "clips": {
+              "1": {"name": "Clip 0001", "file_format": "QuickTimeProRes", "video_format": "1080p30",
+                    "duration": "00:00:10:00"},
+              "2": {"name": "Interview", "file_format": "QuickTimeDNxHD", "video_format": "1080p25",
+                    "duration": "00:01:00:12"}}},
+              "2": {"clips": {"1": {"name": "Other"}}}}})
+# Response version 2 (p.8): "{index}: {codec} {format} {duration} {folder/filename}".
+telemetry(H, "disk-list-v2", inbound="206 disk list:\r\nslot id: 2\r\n1: H.264 1080p30 00:00:10:00 Show/Clip 1.mov\r\n\r\n",
+          expect_state={"slots": {"2": {"clips": {"1": {"name": "Show/Clip 1.mov", "file_format": "H.264",
+                                                        "video_format": "1080p30", "duration": "00:00:10:00"}}}}})
+# An empty disk clears the slot's list.
+telemetry(H, "disk-list-empty", inbound="206 disk list:\r\nslot id: 1\r\n\r\n",
+          state_before={"slots": {"1": {"clips": {"1": {"name": "Clip 0001"}}}}},
+          expect_state={"slots": {"1": {}}})
+# A disk clips notification has the active disk's list read again.
+telemetry(H, "disk-notify", inbound="520 disk list info:\r\n\r\n", expect_then_send=["disk list\r\n"],
+          expect_state={})
 telemetry(H, "remote", inbound="510 remote info:\r\nenabled: false\r\noverride: true\r\n\r\n",
           expect_state={"remote": {"enabled": False, "override": True}})
 telemetry(H, "configuration", inbound="511 configuration:\r\naudio input: XLR\r\naudio mapping: 0\r\n"
