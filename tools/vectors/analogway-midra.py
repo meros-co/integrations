@@ -107,3 +107,67 @@ telemetry(MD, "audio-output-mute", inbound="AUomu1,0\r\n",
           expect_state={"audio": {"outputs": {"2": {"muted": False}}}})
 telemetry(MD, "audio-output-input", inbound="AUodi0,5\r\n",
           expect_state={"audio": {"outputs": {"1": {"input": 5}}}})
+
+# Registers from the commands document: borders (applied with PUscu), audio
+# mode, input plug settings and the clock. Commands sending several registers
+# state the first line and feed every answer.
+text(MD, "set_layer_border", {"screen": 1, "layer": 2, "style": 4}, "0,1,2,4PRbst\n",
+     device_reply="PRbst0,1,2,4\r\nPUscu0,1\r\n", expect_result=ACK)
+text(MD, "set_layer_border_alpha", {"screen": 2, "layer": 1, "alpha": 128, "preview": False}, "1,0,1,128PRbal\n",
+     device_reply="PRbal1,0,1,128\r\nPUscu1,1\r\n", expect_result=ACK)
+text(MD, "set_audio_mode", {"mode": 2}, "2SGsam\n", device_reply="SGsam2\r\n", expect_result=ACK)
+text(MD, "autocenter_input", {"input": 1, "mode": 1}, "0,1INain\n", device_reply="INain0,1\r\n", expect_result=ACK)
+text(MD, "set_input_hdcp", {"input": 5, "plug": 3, "enabled": False}, "4,3,0INhdc\n", device_reply="INhdc4,3,0\r\n",
+     expect_result=ACK)
+text(MD, "set_input_long_reach", {"input": 10, "plug": 4, "enabled": True}, "9,4,1INlre\n",
+     device_reply="INlre9,4,1\r\n", expect_result=ACK)
+text(MD, "set_output_long_reach", {"output": 2, "enabled": True}, "1,1OUlre\n", device_reply="OUlre1,1\r\n",
+     expect_result=ACK)
+text(MD, "set_input_aspect", {"input": 1, "plug": 3, "aspect": 5}, "0,3,5IEain\n", device_reply="IEain0,3,5\r\n",
+     expect_result=ACK)
+text(MD, "set_input_aspect_mode", {"input": 1, "plug": 3, "mode": 1}, "0,3,1IEaou\n", device_reply="IEaou0,3,1\r\n",
+     expect_result=ACK)
+text(MD, "set_input_crop", {"input": 2, "plug": 2, "crop": 3}, "1,2,3IEpcr\n", device_reply="IEpcr1,2,3\r\n",
+     expect_result=ACK)
+text(MD, "set_clock", {"year": 2026, "month": 10, "day": 14, "hour": 9, "minute": 30, "second": 0}, "2026RTyea\n",
+     device_reply="RTyea2026\r\nRTmon9\r\nRTday14\r\nRThou9\r\nRTmin30\r\nRTsec0\r\nRTreq2\r\n", expect_result=ACK)
+text(MD, "refresh_clock", {}, "1RTreq\n", device_reply="RTreq1\r\n", expect_result=ACK)
+telemetry(MD, "border", inbound="PRbst0,1,2,4\r\n",
+          expect_state={"screens": {"1": {"preview": {"layers": {"2": {"border": 4}}}}}})
+telemetry(MD, "border-program", inbound="PRbst0,0,1,1\r\n",
+          expect_state={"screens": {"1": {"program": {"layers": {"1": {"border": 1}}}}}})
+telemetry(MD, "border-alpha", inbound="PRbal1,0,1,128\r\n",
+          expect_state={"screens": {"2": {"program": {"layers": {"1": {"border_alpha": 128}}}}}})
+telemetry(MD, "border-alpha-preview", inbound="PRbal1,1,1,255\r\n",
+          expect_state={"screens": {"2": {"preview": {"layers": {"1": {"border_alpha": 255}}}}}})
+telemetry(MD, "audio-mode", inbound="SGsam1\r\n", expect_state={"device": {"audio_mode": 1}})
+telemetry(MD, "standby-progress", inbound="SBprg40\r\n", expect_state={"device": {"standby_progress": 40}})
+telemetry(MD, "autocenter-progress", inbound="INaip0,80\r\n", expect_state={"inputs": {"1": {"autocenter_progress": 80}}})
+telemetry(MD, "autoset-progress", inbound="INapi0,100\r\n", expect_state={"inputs": {"1": {"autoset_progress": 100}}})
+telemetry(MD, "input-hdcp", inbound="INhdc4,3,0\r\n",
+          expect_state={"inputs": {"5": {"plugs": {"3": {"hdcp_enabled": False}}}}})
+telemetry(MD, "input-long-reach", inbound="INlre9,4,1\r\n",
+          expect_state={"inputs": {"10": {"plugs": {"4": {"long_reach": True}}}}})
+telemetry(MD, "output-long-reach", inbound="OUlre1,0\r\n", expect_state={"outputs": {"2": {"long_reach": False}}})
+telemetry(MD, "aspect", inbound="IEain0,3,5\r\n", expect_state={"inputs": {"1": {"plugs": {"3": {"aspect": 5}}}}})
+telemetry(MD, "aspect-mode", inbound="IEaou0,3,2\r\n",
+          expect_state={"inputs": {"1": {"plugs": {"3": {"aspect_mode": 2}}}}})
+telemetry(MD, "crop", inbound="IEpcr1,2,3\r\n", expect_state={"inputs": {"2": {"plugs": {"2": {"crop": 3}}}}})
+telemetry(MD, "plug-available", inbound="INpav0,4,0\r\n",
+          expect_state={"inputs": {"1": {"plugs": {"4": {"available": False}}}}})
+telemetry(MD, "plug-hdcp", inbound="IShdc0,3,1\r\n", expect_state={"inputs": {"1": {"plugs": {"3": {"hdcp": True}}}}})
+telemetry(MD, "plug-audio", inbound="ISaud0,3,1\r\n",
+          expect_state={"inputs": {"1": {"plugs": {"3": {"embedded_audio": True}}}}})
+telemetry(MD, "plug-width", inbound="ISiwi0,3,1920\r\n", expect_state={"inputs": {"1": {"plugs": {"3": {"width": 1920}}}}})
+telemetry(MD, "plug-height", inbound="ISihe0,3,1080\r\n",
+          expect_state={"inputs": {"1": {"plugs": {"3": {"height": 1080}}}}})
+telemetry(MD, "plug-format", inbound="IScfo0,3,30\r\n", expect_state={"inputs": {"1": {"plugs": {"3": {"format": 30}}}}})
+telemetry(MD, "output-hdcp", inbound="OUihc0,6,1\r\n", expect_state={"outputs": {"1": {"plugs": {"6": {"hdcp": True}}}}})
+telemetry(MD, "clock-year", inbound="RTyea2026\r\n", expect_state={"clock": {"year": 2026}})
+telemetry(MD, "clock-month", inbound="RTmon9\r\n", expect_state={"clock": {"month": 10}})
+telemetry(MD, "clock-day", inbound="RTday14\r\n", expect_state={"clock": {"day": 14}})
+telemetry(MD, "clock-hour", inbound="RThou9\r\n", expect_state={"clock": {"hour": 9}})
+telemetry(MD, "clock-minute", inbound="RTmin30\r\n", expect_state={"clock": {"minute": 30}})
+telemetry(MD, "clock-second", inbound="RTsec5\r\n", expect_state={"clock": {"second": 5}})
+telemetry(MD, "clock-valid", inbound="RTval1\r\n", expect_state={"clock": {"valid": True}})
+telemetry(MD, "transitions", inbound="DFtra2,1,1\r\n", expect_state={"transitions": {"2": {"layers": {"1": True}}}})

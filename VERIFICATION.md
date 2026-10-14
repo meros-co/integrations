@@ -149,9 +149,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## analogway-midra — Analog Way Midra
 
-- [ ] Confirm TAKE ALL is accepted as "1GCtal" (the guide also shows "1,GCtal"). ([specs/analogway-midra.yaml:495](specs/analogway-midra.yaml#L495))
-- [ ] Confirm LF alone is accepted as the command terminator. ([specs/analogway-midra.yaml:497](specs/analogway-midra.yaml#L497))
-- [ ] Check what the device answers to a TAKE sent while TAKEAVA is 0. ([specs/analogway-midra.yaml:483](specs/analogway-midra.yaml#L483))
+- [ ] Confirm TAKE ALL is accepted as "1GCtal" (the guide also shows "1,GCtal"). ([specs/analogway-midra.yaml:884](specs/analogway-midra.yaml#L884))
+- [ ] Confirm LF alone is accepted as the command terminator. ([specs/analogway-midra.yaml:886](specs/analogway-midra.yaml#L886))
+- [ ] Check what the device answers to a TAKE sent while TAKEAVA is 0. ([specs/analogway-midra.yaml:872](specs/analogway-midra.yaml#L872))
+- [ ] Check that PRbst and PRbal take the same indexes as PRinp (screen, 0 program or 1 preview, layer) and are applied by PUscu. ([specs/analogway-midra.yaml:300](specs/analogway-midra.yaml#L300))
+- [ ] Check the clock is set by writing RTyea to RTsec and then 2RTreq, and that RTmon counts months from 0. ([specs/analogway-midra.yaml:452](specs/analogway-midra.yaml#L452))
 
 ## analogway-midra4k — Analog Way Midra 4K
 
