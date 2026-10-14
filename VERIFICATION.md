@@ -366,18 +366,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-camera — Blackmagic cameras
 
-- [ ] Find the event websocket URL, which the document does not give, so telemetry can use pushes instead of polling. ([specs/blackmagic-camera.yaml:2818](specs/blackmagic-camera.yaml#L2818))
-- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2784](specs/blackmagic-camera.yaml#L2784))
-- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2790](specs/blackmagic-camera.yaml#L2790))
-- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2808](specs/blackmagic-camera.yaml#L2808))
-- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2805](specs/blackmagic-camera.yaml#L2805))
-- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2843](specs/blackmagic-camera.yaml#L2843))
-- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2852](specs/blackmagic-camera.yaml#L2852))
-- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2865](specs/blackmagic-camera.yaml#L2865))
-- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2866](specs/blackmagic-camera.yaml#L2866))
-- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2875](specs/blackmagic-camera.yaml#L2875))
+- [ ] Find the event websocket URL, which the document does not give, so telemetry can use pushes instead of polling. ([specs/blackmagic-camera.yaml:2831](specs/blackmagic-camera.yaml#L2831))
+- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2797](specs/blackmagic-camera.yaml#L2797))
+- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2803](specs/blackmagic-camera.yaml#L2803))
+- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2821](specs/blackmagic-camera.yaml#L2821))
+- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2818](specs/blackmagic-camera.yaml#L2818))
+- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2856](specs/blackmagic-camera.yaml#L2856))
+- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2865](specs/blackmagic-camera.yaml#L2865))
+- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2878](specs/blackmagic-camera.yaml#L2878))
+- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2879](specs/blackmagic-camera.yaml#L2879))
+- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2891](specs/blackmagic-camera.yaml#L2891))
 - [ ] Record what the camera advertises over mDNS besides its `<name>.local` host name (service types, TXT `class`). No public source names it, so mDNS discovery does not identify cameras. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
-- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2555](specs/blackmagic-camera.yaml#L2555))
+- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2568](specs/blackmagic-camera.yaml#L2568))
+- [ ] Confirm POST /presets takes the .cset file as the request body with a Content-Disposition header naming it (the document only implies this through its 400 answer), not a multipart/form-data part, and answers 200 with presetAdded. ([specs/blackmagic-camera.yaml:1696](specs/blackmagic-camera.yaml#L1696))
 
 ## blackmagic-hyperdeck — Blackmagic HyperDeck
 

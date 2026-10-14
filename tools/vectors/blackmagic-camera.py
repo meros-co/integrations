@@ -217,6 +217,13 @@ _bc("get_active_preset", {}, "GET", "/presets/active", http_reply={"status": 200
 _bc("set_active_preset", {"preset": "Studio A.cset"}, "PUT", "/presets/active", '{"preset":"Studio A.cset"}',
     http_reply={"status": 404}, expect_result=_err(404))
 _bc("save_preset", {"preset": "Studio A"}, "PUT", "/presets/Studio%20A", http_reply={"status": 204}, expect_result=_ACK)
+# The file's bytes are the body as they are (here a made-up file of four
+# bytes, 00 01 fe ff, given as base64).
+V.append({"spec": BC, "command": "upload_preset", "input": {"preset": "Studio A", "file": "AAH+/w=="},
+          "expect_request": {"method": "POST", "target": _BA + "/presets", "body_hex": "0001feff",
+                             "content_type": "application/octet-stream"},
+          "http_reply": {"status": 200, "body": '{"presetAdded":"Studio A"}'},
+          "expect_result": _val("Studio A")})
 _bc("delete_preset", {"preset": "Studio A.cset"}, "DELETE", "/presets/Studio%20A.cset",
     http_reply={"status": 404}, expect_result=_err(404))
 
