@@ -947,13 +947,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 
-- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:2640](specs/lightware-lw3.yaml#L2640))
-- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:2622](specs/lightware-lw3.yaml#L2622))
-- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:2674](specs/lightware-lw3.yaml#L2674))
-- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:2692](specs/lightware-lw3.yaml#L2692))
-- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2712](specs/lightware-lw3.yaml#L2712))
-- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2656](specs/lightware-lw3.yaml#L2656))
-- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:2718](specs/lightware-lw3.yaml#L2718))
+- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:4375](specs/lightware-lw3.yaml#L4375))
+- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:4357](specs/lightware-lw3.yaml#L4357))
+- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:4409](specs/lightware-lw3.yaml#L4409))
+- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:4427](specs/lightware-lw3.yaml#L4427))
+- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:4447](specs/lightware-lw3.yaml#L4447))
+- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:4391](specs/lightware-lw3.yaml#L4391))
+- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:4453](specs/lightware-lw3.yaml#L4453))
+- [ ] On MX2, record the answer to applySettings (the manual prints m0 where other methods answer mO). ([specs/lightware-lw3.yaml:1970](specs/lightware-lw3.yaml#L1970))
+- [ ] Check the /V1 GPIO pin range (P1-P6 assumed from the 8-pole connector; the manuals give no range) and that Direction and Output answer pw with = as in the examples. ([specs/lightware-lw3.yaml:1612](specs/lightware-lw3.yaml#L1612))
+- [ ] On UMX, check the GPIO pins P1-P7, and that the UART's numbered ControlProtocol, Rs232Mode, Baudrate, StopBits and Parity codes are as translated. ([specs/lightware-lw3.yaml:4510](specs/lightware-lw3.yaml#L4510))
+- [ ] On UMX-HDMI-140-Plus, record an Event Manager condition and action as GET answers them, and the RS-232 recognizer's Rx after a received message. ([specs/lightware-lw3.yaml:4510](specs/lightware-lw3.yaml#L4510))
+- [ ] Check whether the /V1 LW3 service can be disabled over LW3 (SERVICES/LW3.Enabled is not documented) and whether set_web_service_enabled answers before the service stops. ([specs/lightware-lw3.yaml:1738](specs/lightware-lw3.yaml#L1738))
+- [ ] On UCX and MMX2, check which remote syslog format property exists (UCX LogFormat, MMX2 SyslogFormat); it is left out. ([specs/lightware-lw3.yaml:1781](specs/lightware-lw3.yaml#L1781))
+- [ ] Check that the reads on connecting (about 390 single GETs across the three trees, most answered with errors on the other trees) complete without the device dropping the connection. ([specs/lightware-lw3.yaml:2760](specs/lightware-lw3.yaml#L2760))
+- [ ] On MX2, record the answers to PRESET:create and PRESET:rename, and whether GET /MEDIA/PRESET lists the presets as child nodes. ([specs/lightware-lw3.yaml:3392](specs/lightware-lw3.yaml#L3392))
+- [ ] On MX2, confirm that port names cannot be set over LW3 (no property in the manual's LW3 chapter). ([specs/lightware-lw3.yaml:4496](specs/lightware-lw3.yaml#L4496))
 
 ## magewell-proconvert — Magewell Pro Convert
 
