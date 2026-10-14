@@ -403,7 +403,9 @@ async fn ewdx_legacy_mode_carries_what_sscv2_cannot() {
     // The legacy subscription's answer reaches the state (it may come before
     // SSCv2 connects, so the snapshot is read).
     tokio::time::timeout(Duration::from_secs(10), async {
-        while core.snapshot(id).unwrap().state["device"]["brightness"] != 5 {
+        while core.snapshot(id).unwrap().state["device"]["brightness"] != 5
+            || core.snapshot(id).unwrap().state["device"]["name"] != "EWDXEM2"
+        {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
     })
