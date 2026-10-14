@@ -214,3 +214,206 @@ telemetry(K, "x-mute", inbound="~01@X-MUTE OUT.ANALOG_AUDIO.1.AUDIO.1,OFF\r\n",
           expect_state={"signals": {"OUT": {"ANALOG_AUDIO": {"1": {"AUDIO": {"1": {"mute": False}}}}}}})
 telemetry(K, "x-audio-level", inbound="~01@X-AUD-LVL OUT.ANALOG_AUDIO.1.AUDIO.1,-10.00\r\n",
           expect_state={"signals": {"OUT": {"ANALOG_AUDIO": {"1": {"AUDIO": {"1": {"level": -10.0}}}}}}})
+
+# EDID, multiviewer and scaler, step-in, I/O gateway, streamer, network, time
+# and audio DSP (guide p.16-131). Wire forms from the guide's syntax boxes and
+# examples, "#CMD p1,p2" + CR; replies "~nn@CMD p1,p2" + CR LF.
+_OK = {"ok": {"kind": "ack"}}
+
+
+def _kv(x):
+    return {"ok": {"kind": "value", "value": x}}
+
+
+_FULL = [
+    ("copy_edid", {"src_type": 1, "src_id": 1, "dst_type": 0, "dest_bitmap": "0x13", "safe_mode": True},
+     "#CPEDID 1,1,0,0x13,1", "~01@CPEDID 1,1,0,0x13,1", _OK),
+    ("get_edid_size", {"stage": 0, "stage_id": 1}, "#GEDID? 0,1", "~01@GEDID 0,1,256", _kv("256")),
+    ("set_edid_audio", {"input": 1, "format": 2}, "#EDID-AUDIO 1,2", "~01@EDID-AUDIO 1,2", _OK),
+    ("get_edid_audio", {"input": 1}, "#EDID-AUDIO? 1", "~01@EDID-AUDIO 1,2", _kv("2")),
+    ("set_edid_color_space", {"input": 2, "color_space": 4}, "#EDID-CS 2,4", "~01@EDID-CS 2,4", _OK),
+    ("get_edid_color_space", {"input": 2}, "#EDID-CS? 2", "~01@EDID-CS 2,0", _kv("0")),
+    ("set_edid_deep_color", {"input": 1, "remove": True}, "#EDID-DC 1,1", "~01@EDID-DC 1,1", _OK),
+    ("get_edid_deep_color", {"input": 1}, "#EDID-DC? 1", "~01@EDID-DC 1,1", _kv("1")),
+    ("set_edid_lock", {"input": 2, "locked": False}, "#LOCK-EDID 2,0", "~01@LOCK-EDID 2,0", _OK),
+    ("get_edid_lock", {"input": 2}, "#LOCK-EDID? 2", "~01@LOCK-EDID 2,ON", _kv("ON")),
+    ("set_view_mode", {"mode": 3}, "#VIEW-MOD 3", "~01@VIEW-MOD 3", _OK),
+    ("get_view_mode", {}, "#VIEW-MOD?", "~01@VIEW-MOD 3", _kv("3")),
+    ("set_window_source", {"window": 2, "value": 4}, "#W-SRC 2,4", "~01@W-SRC 2,4", _OK),
+    ("get_window_source", {"window": 2}, "#W-SRC? 2", "~01@W-SRC 2,4", _kv("4")),
+    ("set_window_layer", {"window": 1, "value": 4}, "#W-LAYER 1,4", "~01@W-LAYER 1,4", _OK),
+    ("get_window_layer", {"window": 1}, "#W-LAYER? 1", "~01@W-LAYER 1,4", _kv("4")),
+    ("set_window_color", {"window": 1, "value": 2}, "#W-COLOR 1,2", "~01@W-COLOR 1,2", _OK),
+    ("get_window_color", {"window": 1}, "#W-COLOR? 1", "~01@W-COLOR 1,2", _kv("2")),
+    ("set_window_hue", {"window": 1, "value": 50}, "#W-HUE 1,50", "~01@W-HUE 1,50", _OK),
+    ("get_window_hue", {"window": 1}, "#W-HUE? 1", "~01@W-HUE 1,50", _kv("50")),
+    ("set_window_saturation", {"window": 3, "value": 60}, "#W-SATURATION 3,60", "~01@W-SATURATION 3,60", _OK),
+    ("get_window_saturation", {"window": 3}, "#W-SATURATION? 3", "~01@W-SATURATION 3,60", _kv("60")),
+    ("set_window_sharpness", {"window": 3, "value": 10}, "#W-SHARP 3,10", "~01@W-SHARP 3,10", _OK),
+    ("get_window_sharpness", {"window": 3}, "#W-SHARP? 3", "~01@W-SHARP 3,10", _kv("10")),
+    ("set_window_zoom", {"window": 1, "value": 150}, "#W-ZOOM 1,150", "~01@W-ZOOM 1,150", _OK),
+    ("get_window_zoom", {"window": 1}, "#W-ZOOM? 1", "~01@W-ZOOM 1,150", _kv("150")),
+    ("set_brightness", {"window": 1, "value": 55}, "#BRIGHTNESS 1,55", "~01@BRIGHTNESS 1,55", _OK),
+    ("get_brightness", {"window": 1}, "#BRIGHTNESS? 1", "~01@BRIGHTNESS 1,55", _kv("55")),
+    ("set_contrast", {"window": 2, "value": 45}, "#CONTRAST 2,45", "~01@CONTRAST 2,45", _OK),
+    ("get_contrast", {"window": 2}, "#CONTRAST? 2", "~01@CONTRAST 2,45", _kv("45")),
+    ("set_window_enabled", {"window": 4, "enabled": False}, "#W-ENABLE 4,0", "~01@W-ENABLE 4,0", _OK),
+    ("get_window_enabled", {"window": 4}, "#W-ENABLE? 4", "~01@W-ENABLE 4,0", _kv("0")),
+    ("set_window_freeze", {"window": 1, "enabled": True}, "#W-FRZ 1,1", "~01@W-FRZ 1,1", _OK),
+    ("get_window_freeze", {"window": 1}, "#W-FRZ? 1", "~01@W-FRZ 1,1", _kv("1")),
+    ("set_window_border", {"window": 1, "enabled": True}, "#WND-BRD 1,1", "~01@WND-BRD 1,1", _OK),
+    ("get_window_border", {"window": 1}, "#WND-BRD? 1", "~01@WND-BRD 1,1", _kv("1")),
+    ("set_window_position", {"window": 1, "x": 205, "y": 117, "width": 840, "height": 472}, "#W-POS 1,205,117,840,472",
+     "~01@W-POS 1,205,117,840,472", _OK),
+    ("get_window_position", {"window": 1}, "#W-POS? 1", "~01@W-POS 1,205,117,840,472", _kv("205,117,840,472")),
+    ("set_image_mode", {"scaler": 1, "mode": 2}, "#IMAGE-PROP 1,2", "~01@IMAGE-PROP 1,2", _OK),
+    ("get_image_mode", {"scaler": 1}, "#IMAGE-PROP? 1", "~01@IMAGE-PROP 1,2", _kv("2")),
+    ("set_auto_sync", {"scaler": 1, "mode": 1}, "#SCLR-AS 1,1", "~01@SCLR-AS 1,1", _OK),
+    ("get_auto_sync", {"scaler": 1}, "#SCLR-AS? 1", "~01@SCLR-AS 1,1", _kv("1")),
+    ("set_scaler_audio_delay", {"output": 1, "delay": 2}, "#SCLR-AUDIO-DELAY 1,2", "~01@SCLR-AUDIO-DELAY 1,2", _OK),
+    ("get_scaler_audio_delay", {"output": 1}, "#SCLR-AUDIO-DELAY? 1", "~01@SCLR-AUDIO-DELAY 1,2", _kv("2")),
+    ("scaler_pc_auto_adjust", {"scaler": 1}, "#SCLR-PCAUTO 1,1", "~01@SCLR-PCAUTO 1,1", _OK),
+    ("set_osd", {"id": 1, "mode": 2}, "#SHOW-OSD 1,2", "~01@SHOW-OSD 1,2", _OK),
+    ("get_osd", {"id": 1}, "#SHOW-OSD? 1", "~01@SHOW-OSD 1,0", _kv("0")),
+    ("set_output_resolution", {"output": 1, "resolution": 225}, "#VID-RES 1,1,0,225", "~01@VID-RES 1,1,0,225", _OK),
+    ("get_output_resolution", {"output": 1}, "#VID-RES? 1,1,0", "~01@VID-RES 1,1,0,225", _kv("225")),
+    ("get_input_resolution", {"input": 2}, "#VID-RES? 0,2,0", "~01@VID-RES 0,2,0,16", _kv("16")),
+    ("set_stepin_button", {"button": 1, "mode": 1}, "#BTN 1,1", "~01@BTN 1,1", _OK),
+    ("get_stepin_button", {"button": 1}, "#BTN? 1", "~01@BTN 1,255", _kv("255")),
+    ("get_stepin_capabilities", {}, "#STEPIN-CP?", "~01@STEPIN-CP 1,4,4", _kv("1,4,4")),
+    ("set_gpio_config", {"pin": 1, "type": 1, "direction": 1, "pullup": False}, "#GPIO-CFG 1,1,1,0", "~01@GPIO-CFG 1,1,1", _OK),
+    ("get_gpio_config", {"pin": 1}, "#GPIO-CFG? 1", "~01@GPIO-CFG 1,1,0", _kv("1,0")),
+    ("set_gpio_state", {"pin": 2, "state": 1}, "#GPIO-STATE 2,1", "~01@GPIO-STATE 2,1", _OK),
+    ("get_gpio_state", {"pin": 2}, "#GPIO-STATE? 2", "~01@GPIO-STATE 2,1", _kv("1")),
+    ("set_gpio_thresholds", {"pin": 3, "low_mv": 1000, "high_mv": 4000}, "#GPIO-THR 3,1000,4000", "~01@GPIO-THR 3,1000,4000", _OK),
+    ("get_gpio_thresholds", {"pin": 3}, "#GPIO-THR? 3", "~01@GPIO-THR 3,1000,4000", _kv("1000,4000")),
+    ("get_gpio_voltage", {"pin": 3}, "#GPIO-VOLT? 3", "~01@GPIO-VOLT 3,4800", _kv("4800")),
+    ("set_relay", {"relay": 1, "closed": True}, "#RELAY-STATE 1,1", "~01@RELAY-STATE 1,1", _OK),
+    ("get_relay", {"relay": 1}, "#RELAY-STATE? 1", "~01@RELAY-STATE 1,1", _kv("1")),
+    ("set_uart", {"port": 1, "baud": "9600", "data_bits": 8, "parity": 0, "stop_bits": "1", "serial_type": 0},
+     "#UART 1,9600,8,0,1,0", "~01@UART 1,9600,8,0,1,0", _OK),
+    ("get_uart", {"port": 1}, "#UART? 1", "~01@UART 1,9600,8,0,1,0", _kv("9600,8,0,1,0")),
+    ("set_baud", {"rate": "115200"}, "#BAUD 115200", "~01@BAUD 115200", _OK),
+    ("get_baud", {}, "#BAUD?", "~01@BAUD 115200", _kv("115200")),
+    ("set_port_direction", {"port": 5, "direction": "OUT"}, "#PORT-DIRECTION 5,OUT", "~01@PORT-DIRECTION 5,OUT", _OK),
+    ("get_port_direction", {"port": 5}, "#PORT-DIRECTION? 5", "~01@PORT-DIRECTION 5,OUT", _kv("OUT")),
+    ("set_com_route", {"com": 1, "port_type": 0, "eth_port": 5001, "replies": True, "keepalive": 60},
+     "#COM-ROUTE 1,0,5001,1,60", "~01@COM-ROUTE 1,0,5001,1,60", _OK),
+    ("get_com_route", {"com": 1}, "#COM-ROUTE? 1", "~01@COM-ROUTE 1,0,5001,1,60", _kv("0,5001,1,60")),
+    ("remove_com_route", {"com": 1}, "#COM-ROUTE-REMOVE 1", "~01@COM-ROUTE-REMOVE 1", _OK),
+    ("get_eth_tunnel", {"id": 1}, "#ETH-TUNNEL? 1", "~01@ETH-TUNNEL 1,1,0,5001,192.168.1.10,6000,1,1",
+     _kv("1,1,0,5001,192.168.1.10,6000,1,1")),
+    ("set_kds_action", {"value": 1}, "#KDS-ACTION 1", "~01@KDS-ACTION 1", _OK),
+    ("get_kds_action", {}, "#KDS-ACTION?", "~01@KDS-ACTION 1", _kv("1")),
+    ("set_kds_audio", {"value": 0}, "#KDS-AUD 0", "~01@KDS-AUD 0", _OK),
+    ("get_kds_audio", {}, "#KDS-AUD?", "~01@KDS-AUD 0", _kv("0")),
+    ("set_kds_encoding", {"value": 0}, "#KDS-EN 0", "~01@KDS-EN 0", _OK),
+    ("get_kds_encoding", {}, "#KDS-EN?", "~01@KDS-EN 0", _kv("0")),
+    ("set_kds_latency", {"value": 10}, "#KDS-LATENCY 10", "~01@KDS-LATENCY 10", _OK),
+    ("get_kds_latency", {}, "#KDS-LATENCY?", "~01@KDS-LATENCY 10", _kv("10")),
+    ("set_kds_scale", {"value": 1}, "#KDS-SCALE 1", "~01@KDS-SCALE 1", _OK),
+    ("get_kds_scale", {}, "#KDS-SCALE?", "~01@KDS-SCALE 1", _kv("1")),
+    ("set_kds_connection", {"address": "192.168.1.39", "port": 554, "folder": "live"}, "#KDS-CONN 192.168.1.39,554,live",
+     "~01@KDS-CONN 192.168.1.39,554,live", _OK),
+    ("get_kds_connection", {}, "#KDS-CONN?", "~01@KDS-CONN 192.168.1.39,554,live", _kv("192.168.1.39,554,live")),
+    ("get_kds_status", {}, "#KDS-OP-STAT?", "~01@KDS-OP-STAT 0", _kv("0")),
+    ("get_kds_bitrate", {}, "#KDS-BR?", "~01@KDS-BR 8000", _kv("8000")),
+    ("get_kds_frame_rate", {}, "#KDS-FR?", "~01@KDS-FR 30", _kv("30")),
+    ("get_kds_clients", {}, "#KDS-ACTIVE-CLNT?", "~01@KDS-ACTIVE-CLNT 2", _kv("2")),
+    ("get_kds_gop", {}, "#KDS-GOP?", "~01@KDS-GOP 30", _kv("30")),
+    ("get_kds_method", {}, "#KDS-METHOD?", "~01@KDS-METHOD 1", _kv("1")),
+    ("get_kds_protocol", {}, "#KDS-PROT?", "~01@KDS-PROT RTSP", _kv("RTSP")),
+    ("get_kds_mode", {}, "#KDS-MOD?", "~01@KDS-MOD 3", _kv("3")),
+    ("set_dhcp", {"mode": 1}, "#NET-DHCP 1", "~01@NET-DHCP 1", _OK),
+    ("get_dhcp", {}, "#NET-DHCP?", "~01@NET-DHCP 0", _kv("0")),
+    ("set_ip_address", {"value": "192.168.1.39"}, "#NET-IP 192.168.1.39", "~01@NET-IP 192.168.1.39", _OK),
+    ("get_ip_address", {}, "#NET-IP?", "~01@NET-IP 192.168.001.039", _kv("192.168.001.039")),
+    ("set_netmask", {"value": "255.255.0.0"}, "#NET-MASK 255.255.0.0", "~01@NET-MASK 255.255.0.0", _OK),
+    ("get_netmask", {}, "#NET-MASK?", "~01@NET-MASK 255.255.000.000", _kv("255.255.000.000")),
+    ("set_gateway", {"value": "192.168.1.1"}, "#NET-GATE 192.168.1.1", "~01@NET-GATE 192.168.1.1", _OK),
+    ("get_gateway", {}, "#NET-GATE?", "~01@NET-GATE 192.168.000.001", _kv("192.168.000.001")),
+    ("set_net_config", {"id": 0, "address": "192.168.1.39", "netmask": "255.255.255.0", "gateway": "192.168.1.1"},
+     "#NET-CONFIG 0,192.168.1.39,255.255.255.0,192.168.1.1", "~01@NET-CONFIG 0,192.168.1.39,255.255.255.0,192.168.1.1", _OK),
+    ("get_net_config", {"id": 0}, "#NET-CONFIG? 0", "~01@NET-CONFIG 0,192.168.1.39,255.255.255.0,192.168.1.1",
+     _kv("192.168.1.39,255.255.255.0,192.168.1.1")),
+    ("get_mac_address", {}, "#NET-MAC?", "~01@NET-MAC 00-1D-56-00-12-34", _kv("00-1D-56-00-12-34")),
+    ("get_dns", {"id": 0}, "#NET-DNS? 0", "~01@NET-DNS 0,8.8.8.8", _kv("8.8.8.8")),
+    ("set_control_port", {"protocol": "TCP", "port": 5000}, "#ETH-PORT TCP,5000", "~01@ETH-PORT TCP,5000", _OK),
+    ("get_control_port", {"protocol": "UDP"}, "#ETH-PORT? UDP", "~01@ETH-PORT UDP,50000", _kv("50000")),
+    ("set_time", {"day": "TUE", "date": "25-04-2017", "time": "16:30:00"}, "#TIME TUE,25-04-2017,16:30:00",
+     "~01@TIME TUE,25-04-2017,16:30:00", _OK),
+    ("get_time", {}, "#TIME?", "~01@TIME TUE,25-04-2017,16:30:00", _kv("TUE,25-04-2017,16:30:00")),
+    ("set_time_location", {"utc_offset": 2, "dst": True}, "#TIME-LOC 2,1", "~01@TIME-LOC 2,1", _OK),
+    ("get_time_location", {}, "#TIME-LOC?", "~01@TIME-LOC 2,1", _kv("2,1")),
+    ("set_time_server", {"enabled": True, "address": "128.138.140.44", "sync_hour": 0}, "#TIME-SRV 1,128.138.140.44,0",
+     "~01@TIME-SRV 1,128.138.140.44,0", _OK),
+    ("get_time_server", {}, "#TIME-SRV?", "~01@TIME-SRV 1,128.138.140.44,0,ON", _kv("1,128.138.140.44,0,ON")),
+    ("set_audio_embedding", {"input": 1, "output": 0, "mode": 1}, "#AUD-EMB 1,0,1", "~01@AUD-EMB 1,0,1", _OK),
+    ("get_audio_embedding", {"input": 1, "output": 0}, "#AUD-EMB? 1,0", "~01@AUD-EMB 1,0,1", _kv("1")),
+    ("set_audio_filter", {"channel": 1, "type": 0, "frequency": 3, "enabled": True}, "#AUD-FILTER 1,0,3,1",
+     "~01@AUD-FILTER 1,0,3,1", _OK),
+    ("get_audio_filter", {"channel": 1}, "#AUD-FILTER? 1", "~01@AUD-FILTER 1,0,3,1", _kv("0,3,1")),
+    ("set_audio_mix", {"channel": 1, "knob": 2, "level": -20}, "#AUD-MIX 1,2,-20", "~01@AUD-MIX 1,2,-20", _OK),
+    ("get_audio_mix", {"channel": 1, "knob": 2}, "#AUD-MIX? 1,2", "~01@AUD-MIX 1,2,-20", _kv("-20")),
+    ("set_eq_frequency", {"stage": 1, "channel": 1, "band": 0, "index": 2}, "#EQ-FREQ 1,1,0,2", "~01@EQ-FREQ 1,1,0,2", _OK),
+    ("get_eq_frequency", {"stage": 1, "channel": 1, "band": 0}, "#EQ-FREQ? 1,1,0", "~01@EQ-FREQ 1,1,0,2", _kv("2")),
+    ("set_eq_level", {"stage": 1, "channel": 1, "band": 2, "level": 25}, "#EQ-LVL 1,1,2,25", "~01@EQ-LVL 1,1,2,25", _OK),
+    ("get_eq_level", {"stage": 1, "channel": 1, "band": 2}, "#EQ-LVL? 1,1,2", "~01@EQ-LVL 1,1,2,25", _kv("25")),
+    ("set_eq_q", {"channel": 1, "band": 1, "q": 7}, "#EQ-Q 1,1,7", "~01@EQ-Q 1,1,7", _OK),
+    ("get_eq_q", {"channel": 1, "band": 1}, "#EQ-Q? 1,1", "~01@EQ-Q 1,1,7", _kv("7")),
+    ("set_mic_gain", {"input": 0, "level": 70}, "#MIC-GAIN 0,70", "~01@MIC-GAIN 0,70", _OK),
+    ("get_mic_gain", {"input": 0}, "#MIC-GAIN? 0", "~01@MIC-GAIN 0,70", _kv("70")),
+    ("set_talkover_parameter", {"channel": 0, "parameter": 0, "value": 80}, "#MIC-TLK 0,0,80", "~01@MIC-TLK 0,0,80", _OK),
+    ("get_talkover_parameter", {"channel": 0, "parameter": 0}, "#MIC-TLK? 0,0", "~01@MIC-TLK 0,0,80", _kv("80")),
+    ("set_talkover_mode", {"channel": 1, "mode": 2}, "#TLK 1,2", "~01@TLK 1,2", _OK),
+    ("get_talkover_mode", {"channel": 1}, "#TLK? 1", "~01@TLK 1,2", _kv("2")),
+    ("set_bass", {"channel": 1, "value": 15}, "#BASS 1,15", "~01@BASS 1,15", _OK),
+    ("get_bass", {"channel": 1}, "#BASS? 1", "~01@BASS 1,15", _kv("15")),
+    ("set_treble", {"channel": 1, "value": 12}, "#TREBLE 1,12", "~01@TREBLE 1,12", _OK),
+    ("get_treble", {"channel": 1}, "#TREBLE? 1", "~01@TREBLE 1,12", _kv("12")),
+    ("set_midrange", {"channel": 1, "value": -3}, "#MIDRANGE 1,-3", "~01@MIDRANGE 1,-3", _OK),
+    ("get_midrange", {"channel": 1}, "#MIDRANGE? 1", "~01@MIDRANGE 1,-3", _kv("-3")),
+    ("set_balance", {"channel": 1, "value": -10}, "#BALANCE 1,-10", "~01@BALANCE 1,-10", _OK),
+    ("get_balance", {"channel": 1}, "#BALANCE? 1", "~01@BALANCE 1,-10", _kv("-10")),
+    ("set_loudness", {"channel": 1, "enabled": True}, "#LOUDNESS 1,1", "~01@LOUDNESS 1,1", _OK),
+    ("get_loudness", {"channel": 1}, "#LOUDNESS? 1", "~01@LOUDNESS 1,1", _kv("1")),
+    ("set_mic_delay", {"input": 1, "ms": 40}, "#MIC-DELAY 1,40", "~01@MIC-DELAY 1,40", _OK),
+    ("get_mic_delay", {"input": 1}, "#MIC-DELAY? 1", "~01@MIC-DELAY 1,40", _kv("40")),
+]
+for _name, _input, _wire, _reply, _result in _FULL:
+    text(K, _name, _input, _wire + "\r", device_reply=_reply + "\r\n", expect_result=_result)
+text(K, "set_edid_lock", {"input": 9, "locked": True}, "#LOCK-EDID 9,1\r", device_reply="~01@LOCK-EDID 9,1 ERR 003\r\n",
+     expect_result={"error": {"error": "device_error"}}, file="set_edid_lock-error")
+
+telemetry(K, "edid-audio", inbound="~01@EDID-AUDIO 1,2\r\n", expect_state={"edid": {"inputs": {"1": {"audio_format": 2}}}})
+telemetry(K, "edid-lock", inbound="~01@LOCK-EDID 2,ON\r\n", expect_state={"edid": {"inputs": {"2": {"locked": True}}}})
+telemetry(K, "view-mode", inbound="~01@VIEW-MOD 3\r\n", expect_state={"view_mode": 3})
+telemetry(K, "window-source", inbound="~01@W-SRC 2,4\r\n", expect_state={"windows": {"2": {"source": 4}}})
+telemetry(K, "window-enabled", inbound="~01@W-ENABLE 4,0\r\n", expect_state={"windows": {"4": {"enabled": False}}})
+telemetry(K, "window-position", inbound="~01@W-POS 1,205,117,840,472\r\n",
+          expect_state={"windows": {"1": {"position": "205,117,840,472"}}})
+telemetry(K, "image-mode", inbound="~01@IMAGE-PROP 1,2\r\n", expect_state={"scalers": {"1": {"image_mode": 2}}})
+telemetry(K, "output-resolution", inbound="~01@VID-RES 1,1,0,225\r\n", expect_state={"outputs": {"1": {"resolution": 225}}})
+telemetry(K, "gpio-state", inbound="~01@GPIO-STATE 2,1\r\n", expect_state={"gpio": {"2": {"state": 1}}})
+telemetry(K, "gpio-config", inbound="~01@GPIO-CFG 1,1,0\r\n", expect_state={"gpio": {"1": {"type": 1, "direction": 0}}})
+telemetry(K, "relay", inbound="~01@RELAY-STATE 1,1\r\n", expect_state={"relays": {"1": {"closed": True}}})
+telemetry(K, "uart", inbound="~01@UART 1,9600,8,0,1,0\r\n", expect_state={"serial": {"1": {"settings": "9600,8,0,1,0"}}})
+telemetry(K, "streamer-status", inbound="~01@KDS-OP-STAT 2\r\n", expect_state={"streamer": {"status": 2}})
+telemetry(K, "streamer-connection", inbound="~01@KDS-CONN 192.168.1.39,554,live\r\n",
+          expect_state={"streamer": {"connection": "192.168.1.39,554,live"}})
+telemetry(K, "dhcp", inbound="~01@NET-DHCP 1\r\n", expect_state={"network": {"dhcp": True}})
+telemetry(K, "ip", inbound="~01@NET-IP 192.168.001.039\r\n", expect_state={"network": {"address": "192.168.001.039"}})
+telemetry(K, "net-config", inbound="~01@NET-CONFIG 0,192.168.1.39,255.255.255.0,192.168.1.1\r\n",
+          expect_state={"network": {"interfaces": {"0": {"address": "192.168.1.39", "netmask": "255.255.255.0",
+                                                         "gateway": "192.168.1.1"}}}})
+telemetry(K, "mac", inbound="~01@NET-MAC 00-1D-56-00-12-34\r\n", expect_state={"network": {"mac": "00-1D-56-00-12-34"}})
+telemetry(K, "control-port", inbound="~01@ETH-PORT TCP,5000\r\n", expect_state={"network": {"control_ports": {"TCP": 5000}}})
+telemetry(K, "time", inbound="~01@TIME TUE,25-04-2017,16:30:00\r\n", expect_state={"clock": {"time": "TUE,25-04-2017,16:30:00"}})
+telemetry(K, "time-server", inbound="~01@TIME-SRV 1,128.138.140.44,0,ON\r\n",
+          expect_state={"clock": {"server": "1,128.138.140.44,0,ON"}})
+telemetry(K, "audio-embedding", inbound="~01@AUD-EMB 1,0,1\r\n", expect_state={"audio": {"embedding": {"1": {"0": 1}}}})
+telemetry(K, "eq-level", inbound="~01@EQ-LVL 1,1,2,25\r\n", expect_state={"audio": {"eq": {"1": {"1": {"2": {"level": 25}}}}}})
+telemetry(K, "talkover", inbound="~01@MIC-TLK 0,0,80\r\n", expect_state={"audio": {"talkover": {"0": {"0": 80}}}})
+telemetry(K, "mix", inbound="~01@AUD-MIX 1,2,-20\r\n", expect_state={"audio": {"channels": {"1": {"mix": {"2": -20.0}}}}})
+telemetry(K, "bass", inbound="~01@BASS 1,15\r\n", expect_state={"audio": {"channels": {"1": {"bass": 15}}}})
+telemetry(K, "edid-error-not-state", inbound="~01@LOCK-EDID 9,1 ERR 003\r\n", expect_state={})

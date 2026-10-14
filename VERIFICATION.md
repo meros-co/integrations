@@ -903,12 +903,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## kramer-p3000 — Kramer Protocol 3000
 
-- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:1135](specs/kramer-p3000.yaml#L1135))
-- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:1164](specs/kramer-p3000.yaml#L1164))
-- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:1151](specs/kramer-p3000.yaml#L1151))
-- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:1176](specs/kramer-p3000.yaml#L1176))
-- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:1187](specs/kramer-p3000.yaml#L1187))
-- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:1162](specs/kramer-p3000.yaml#L1162))
+- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:2628](specs/kramer-p3000.yaml#L2628))
+- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:2734](specs/kramer-p3000.yaml#L2734))
+- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:2644](specs/kramer-p3000.yaml#L2644))
+- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:2769](specs/kramer-p3000.yaml#L2769))
+- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:2780](specs/kramer-p3000.yaml#L2780))
+- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:2732](specs/kramer-p3000.yaml#L2732))
+- [ ] On a presentation switcher (VP-440X, VP-551X or VP-427X2), a multiviewer (MV-4X) and a streamer (KDS-EN7), record the values VID-RES, IMAGE-PROP, SCLR-AS, VIEW-MOD and W-COLOR take and answer, and which channels count from 0. ([specs/kramer-p3000.yaml:3139](specs/kramer-p3000.yaml#L3139))
+- [ ] Check whether EDID-AUDIO takes the guide's single mode or the per-input form (input,format) on each product. ([specs/kramer-p3000.yaml:1448](specs/kramer-p3000.yaml#L1448))
+- [ ] Confirm GPIO-CFG answers type,direction without the pull-up, and that GPIO-STATE is pushed on a change. ([specs/kramer-p3000.yaml:1878](specs/kramer-p3000.yaml#L1878))
+- [ ] Confirm the KDS-ACTION values (0 stop, 1 play, 2 save), since the guide's table is a copy of another. ([specs/kramer-p3000.yaml:2045](specs/kramer-p3000.yaml#L2045))
+- [ ] Record how ETH-PORT names the protocol in its reply (TCP/UDP or 0/1) and whether a TCP port change ends the connection before the answer. ([specs/kramer-p3000.yaml:2268](specs/kramer-p3000.yaml#L2268))
+- [ ] Record the TIME? reply's date form (the guide's DD-MM-YYYY or SWT3's YYYY/MM/DD). ([specs/kramer-p3000.yaml:2295](specs/kramer-p3000.yaml#L2295))
+- [ ] Check which network changes end the connection at once, and that NET-IP answers before the address changes. ([specs/kramer-p3000.yaml:3128](specs/kramer-p3000.yaml#L3128))
+- [ ] On the VP-551X, check MIC-GAIN's three-parameter form (0,mic,level) against the two-parameter command offered. ([specs/kramer-p3000.yaml:2450](specs/kramer-p3000.yaml#L2450))
+- [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:3156](specs/kramer-p3000.yaml#L3156))
 
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 

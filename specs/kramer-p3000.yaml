@@ -10,9 +10,11 @@ category: router
 # The guide is the protocol's master command list, not any one product's: each
 # product implements a subset, listed in that product's own user manual, and
 # answers "ERR 002" (command not available) to the rest. Operator commands for
-# matrix and presentation switchers are covered here; firmware/FPGA/file
-# loading, EDID, multiviewer/scaler, step-in, I/O gateway, streamer, network
-# configuration, time and audio DSP (EQ, filters, talkover) are not.
+# matrix and presentation switchers, EDID, multiviewer and scaler, step-in,
+# I/O gateway, streamer, network, time and audio DSP are covered here as the
+# guide defines them; firmware/FPGA/file loading, the multi-step EDID load and
+# multi-packet IR are not, nor commands that only a product's own manual
+# defines (see the quirks).
 source:
   - title: "Protocol 3000 Reference Guide, Version 3.0 (User), P/N 2900-300489 Rev 5 (revision 3.0, 26/7/2017)"
     author: Kramer Electronics Ltd.
@@ -32,6 +34,33 @@ source:
       p.62, VID-PATTERN p.63, VMUTE p.64, X-MUTE p.66); audio p.69-88 (AUD-LVL
       p.73, AUD-SIGNAL? p.76, MUTE p.83, X-AUD-LVL p.85); device-initiated
       messages and error codes p.132-133; parameter tables p.136-147.
+      Retrieved again 2026-10-14 for the remaining chapters: video (VID-RES
+      p.64); audio (AUD-EMB p.71, AUD-FILTER p.72, AUD-MIX p.74, BALANCE p.77,
+      BASS and EQ-FREQ p.78, EQ-LVL and EQ-Q p.79, LOUDNESS and MIC-DELAY
+      p.80, MIC-GAIN and MIC-TLK p.81, MIDRANGE p.82, TLK p.84, TREBLE p.85);
+      communication (ETH-PORT and NET-CONFIG p.90, NET-DHCP and NET-DNS p.91,
+      NET-GATE and NET-IP p.92, NET-MAC and NET-MASK p.93, TIME-SRV and UART
+      p.94); BAUD p.16, PORT-DIRECTION p.29, TIME and TIME-LOC p.36-37;
+      multiviewer and scaler p.96-108 (BRIGHTNESS, CONTRAST, IMAGE-PROP,
+      SCLR-AS, SCLR-AUDIO-DELAY, SCLR-PCAUTO, SHOW-OSD, VIEW-MOD, W-ACTIVE,
+      WND-BRD, W-COLOR, W-ENABLE, W-FRZ, W-HUE, W-LAYER, W-POS, W-SATURATION,
+      W-SHARP, W-SRC, W-ZOOM); EDID p.109-113 (CPEDID, EDID-AUDIO, EDID-CS,
+      EDID-DC, GEDID, LDEDID, LOCK-EDID); step-in p.114-115 (BTN, STEPIN-CP);
+      I/O gateway p.116-123 (COM-ROUTE, COM-ROUTE-REMOVE, ETH-TUNNEL,
+      GPIO-CFG, GPIO-STATE, GPIO-THR, GPIO-VOLT, RELAY-STATE); streamer
+      p.124-131 (KDS-*); packet protocol p.134-135.
+  - title: "Kramer product user manuals with Protocol 3000 tables: VP-440X (P/N 2900-301382 Rev 4), VP-551X (2900-301296 Rev 6), VP-427X2 (2900-301500 Rev 1), MV-4X (2900-301566 Rev 1), KDS-EN7/DEC7 (2900-301543 Rev 1), DSP-62-AEC/UC (2900-301432 Rev 2), SWT3-21-H/41-H (2900-301680 Rev 6), VS-88UT (2900-300582 Rev 7)"
+    author: Kramer Electronics Ltd.
+    url: https://www.kramerav.com/downloads
+    note: >
+      Manufacturer documents, read for the values each product gives the
+      guide's commands (quirks): VID-RES indices 200-233 on the VP-440X,
+      VP-551X and VP-427X2 and 0-40 on the MV-4X; IMAGE-PROP as window and
+      aspect on the MV-4X and 7 follow input on the scalers; SCLR-AS 3
+      immediate on the VP-427X2 and swapped on the MV-4X; 0-based AUD-LVL,
+      AUD-EMB and MIC-GAIN channels on the presentation switchers; MIC-GAIN
+      with a third parameter on the VP-551X; the per-input EDID-AUDIO form on
+      the VS-88UT, DSP-62 and AFM-20DSP.
 
 transport:
   type: line-tcp
@@ -127,6 +156,148 @@ models:
       - get_standby
       - set_power_save
       - get_power_save
+      - copy_edid
+      - get_edid_size
+      - set_edid_audio
+      - get_edid_audio
+      - set_edid_color_space
+      - get_edid_color_space
+      - set_edid_deep_color
+      - get_edid_deep_color
+      - set_edid_lock
+      - get_edid_lock
+      - set_view_mode
+      - get_view_mode
+      - set_window_source
+      - get_window_source
+      - set_window_layer
+      - get_window_layer
+      - set_window_color
+      - get_window_color
+      - set_window_hue
+      - get_window_hue
+      - set_window_saturation
+      - get_window_saturation
+      - set_window_sharpness
+      - get_window_sharpness
+      - set_window_zoom
+      - get_window_zoom
+      - set_brightness
+      - get_brightness
+      - set_contrast
+      - get_contrast
+      - set_window_enabled
+      - get_window_enabled
+      - set_window_freeze
+      - get_window_freeze
+      - set_window_border
+      - get_window_border
+      - set_window_position
+      - get_window_position
+      - set_image_mode
+      - get_image_mode
+      - set_auto_sync
+      - get_auto_sync
+      - set_scaler_audio_delay
+      - get_scaler_audio_delay
+      - scaler_pc_auto_adjust
+      - set_osd
+      - get_osd
+      - set_output_resolution
+      - get_output_resolution
+      - get_input_resolution
+      - set_stepin_button
+      - get_stepin_button
+      - get_stepin_capabilities
+      - set_gpio_config
+      - get_gpio_config
+      - set_gpio_state
+      - get_gpio_state
+      - set_gpio_thresholds
+      - get_gpio_thresholds
+      - get_gpio_voltage
+      - set_relay
+      - get_relay
+      - set_uart
+      - get_uart
+      - set_baud
+      - get_baud
+      - set_port_direction
+      - get_port_direction
+      - set_com_route
+      - get_com_route
+      - remove_com_route
+      - get_eth_tunnel
+      - set_kds_action
+      - get_kds_action
+      - set_kds_audio
+      - get_kds_audio
+      - set_kds_encoding
+      - get_kds_encoding
+      - set_kds_latency
+      - get_kds_latency
+      - set_kds_scale
+      - get_kds_scale
+      - set_kds_connection
+      - get_kds_connection
+      - get_kds_status
+      - get_kds_bitrate
+      - get_kds_frame_rate
+      - get_kds_clients
+      - get_kds_gop
+      - get_kds_method
+      - get_kds_protocol
+      - get_kds_mode
+      - set_dhcp
+      - get_dhcp
+      - set_ip_address
+      - get_ip_address
+      - set_netmask
+      - get_netmask
+      - set_gateway
+      - get_gateway
+      - set_net_config
+      - get_net_config
+      - get_mac_address
+      - get_dns
+      - set_control_port
+      - get_control_port
+      - set_time
+      - get_time
+      - set_time_location
+      - get_time_location
+      - set_time_server
+      - get_time_server
+      - set_audio_embedding
+      - get_audio_embedding
+      - set_audio_filter
+      - get_audio_filter
+      - set_audio_mix
+      - get_audio_mix
+      - set_eq_frequency
+      - get_eq_frequency
+      - set_eq_level
+      - get_eq_level
+      - set_eq_q
+      - get_eq_q
+      - set_mic_gain
+      - get_mic_gain
+      - set_talkover_parameter
+      - get_talkover_parameter
+      - set_talkover_mode
+      - get_talkover_mode
+      - set_bass
+      - get_bass
+      - set_treble
+      - get_treble
+      - set_midrange
+      - get_midrange
+      - set_balance
+      - get_balance
+      - set_loudness
+      - get_loudness
+      - set_mic_delay
+      - get_mic_delay
     verification: none
     notes: >
       The Protocol 3000 command set as the reference guide defines it, without
@@ -209,6 +380,148 @@ models:
       - get_standby
       - set_power_save
       - get_power_save
+      - copy_edid
+      - get_edid_size
+      - set_edid_audio
+      - get_edid_audio
+      - set_edid_color_space
+      - get_edid_color_space
+      - set_edid_deep_color
+      - get_edid_deep_color
+      - set_edid_lock
+      - get_edid_lock
+      - set_view_mode
+      - get_view_mode
+      - set_window_source
+      - get_window_source
+      - set_window_layer
+      - get_window_layer
+      - set_window_color
+      - get_window_color
+      - set_window_hue
+      - get_window_hue
+      - set_window_saturation
+      - get_window_saturation
+      - set_window_sharpness
+      - get_window_sharpness
+      - set_window_zoom
+      - get_window_zoom
+      - set_brightness
+      - get_brightness
+      - set_contrast
+      - get_contrast
+      - set_window_enabled
+      - get_window_enabled
+      - set_window_freeze
+      - get_window_freeze
+      - set_window_border
+      - get_window_border
+      - set_window_position
+      - get_window_position
+      - set_image_mode
+      - get_image_mode
+      - set_auto_sync
+      - get_auto_sync
+      - set_scaler_audio_delay
+      - get_scaler_audio_delay
+      - scaler_pc_auto_adjust
+      - set_osd
+      - get_osd
+      - set_output_resolution
+      - get_output_resolution
+      - get_input_resolution
+      - set_stepin_button
+      - get_stepin_button
+      - get_stepin_capabilities
+      - set_gpio_config
+      - get_gpio_config
+      - set_gpio_state
+      - get_gpio_state
+      - set_gpio_thresholds
+      - get_gpio_thresholds
+      - get_gpio_voltage
+      - set_relay
+      - get_relay
+      - set_uart
+      - get_uart
+      - set_baud
+      - get_baud
+      - set_port_direction
+      - get_port_direction
+      - set_com_route
+      - get_com_route
+      - remove_com_route
+      - get_eth_tunnel
+      - set_kds_action
+      - get_kds_action
+      - set_kds_audio
+      - get_kds_audio
+      - set_kds_encoding
+      - get_kds_encoding
+      - set_kds_latency
+      - get_kds_latency
+      - set_kds_scale
+      - get_kds_scale
+      - set_kds_connection
+      - get_kds_connection
+      - get_kds_status
+      - get_kds_bitrate
+      - get_kds_frame_rate
+      - get_kds_clients
+      - get_kds_gop
+      - get_kds_method
+      - get_kds_protocol
+      - get_kds_mode
+      - set_dhcp
+      - get_dhcp
+      - set_ip_address
+      - get_ip_address
+      - set_netmask
+      - get_netmask
+      - set_gateway
+      - get_gateway
+      - set_net_config
+      - get_net_config
+      - get_mac_address
+      - get_dns
+      - set_control_port
+      - get_control_port
+      - set_time
+      - get_time
+      - set_time_location
+      - get_time_location
+      - set_time_server
+      - get_time_server
+      - set_audio_embedding
+      - get_audio_embedding
+      - set_audio_filter
+      - get_audio_filter
+      - set_audio_mix
+      - get_audio_mix
+      - set_eq_frequency
+      - get_eq_frequency
+      - set_eq_level
+      - get_eq_level
+      - set_eq_q
+      - get_eq_q
+      - set_mic_gain
+      - get_mic_gain
+      - set_talkover_parameter
+      - get_talkover_parameter
+      - set_talkover_mode
+      - get_talkover_mode
+      - set_bass
+      - get_bass
+      - set_treble
+      - get_treble
+      - set_midrange
+      - get_midrange
+      - set_balance
+      - get_balance
+      - set_loudness
+      - get_loudness
+      - set_mic_delay
+      - get_mic_delay
       - route_signal
       - get_signal_route
       - get_matrix_status
@@ -1109,6 +1422,1186 @@ commands:
     expect: { matches: '^~\d+@\s*X-SIGNAL\??\s+[^,]+,\s*(\d+)', not_contains: "ERR" }
     returns: value
 
+  # ── Full control: EDID, multiviewer and scaler, step-in, I/O gateway,
+  # streamer, network, time and audio DSP (guide p.89-131) ──────────────
+  copy_edid:
+    summary: "Copy an EDID from an input, output, the default or a custom EDID to the inputs a bitmap names (p.109)"
+    params:
+      src_type: { type: int, min: 0, max: 3, required: true, label: Source type, description: "Where the EDID comes from: 0 an input, 1 an output, 2 the default EDID, 3 a custom EDID." }
+      src_id: { type: int, min: 0, required: true, label: Source, description: "The input, output or EDID number to copy from, as the product numbers them." }
+      dst_type: { type: int, min: 0, max: 3, default: 0, label: Destination type, description: "What receives it: 0 inputs (the usual case), as the EDID Source table numbers them." }
+      dest_bitmap: { type: string, pattern: '^0x[0-9A-Fa-f]{1,8}$', required: true, label: Destinations, description: "Hex bitmap of the destinations, bit 0 the first, such as 0x13 for inputs 1, 2 and 5." }
+      safe_mode: { type: bool, default: true, label: Safe mode, description: "On lets the device adjust the EDID to what it supports, off copies it as it is." }
+    send: "#CPEDID {src_type},{src_id},{dst_type},{dest_bitmap},{safe_mode:bool01}"
+    expect: { matches: '^~\d+@CPEDID\s', not_contains: "ERR" }
+    returns: ack
+
+  get_edid_size:
+    summary: "Get the size in bytes of an input's or output's EDID, 0 when it has none (p.111)"
+    params:
+      stage: { type: int, min: 0, max: 3, required: true, label: Stage, description: "0 input, 1 output, 2 default, as the EDID Source table numbers them." }
+      stage_id: { type: int, min: 0, required: true, label: Port, description: "The input or output number." }
+    send: "#GEDID? {stage},{stage_id}"
+    expect: { matches: '^~\d+@GEDID\s+\d+,\s*\d+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+  set_edid_audio:
+    summary: "Set the audio an input's EDID announces: 0 auto, 1 LPCM 2 ch, 2 LPCM 6 ch, 3 LPCM 8 ch, 4 bitstream, 5 HD (p.110)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+      format: { type: int, min: 0, max: 5, required: true, label: Audio format, description: "0 auto, 1 LPCM 2 channels, 2 LPCM 6, 3 LPCM 8, 4 bitstream, 5 HD audio." }
+    send: "#EDID-AUDIO {input},{format}"
+    expect: { matches: '^~\d+@EDID-AUDIO\s', not_contains: "ERR" }
+    returns: ack
+
+  get_edid_audio:
+    summary: "Get the audio an input's EDID announces: 0 auto, 1 LPCM 2 ch, 2 LPCM 6 ch, 3 LPCM 8 ch, 4 bitstream, 5 HD (p.110)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+    send: "#EDID-AUDIO? {input}"
+    expect: { matches: '^~\d+@EDID-AUDIO\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_edid_color_space:
+    summary: "Set the colour space an input's EDID announces: 0 RGB, 1 YCbCr 4:2:2, 2 YCbCr 4:4:4, 3 all, 4 auto (p.110)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+      color_space: { type: int, min: 0, max: 4, required: true, label: Colour space, description: "0 RGB, 1 YCbCr 4:2:2, 2 YCbCr 4:4:4, 3 all, 4 auto or original." }
+    send: "#EDID-CS {input},{color_space}"
+    expect: { matches: '^~\d+@EDID-CS\s', not_contains: "ERR" }
+    returns: ack
+
+  get_edid_color_space:
+    summary: "Get the colour space an input's EDID announces: 0 RGB, 1 YCbCr 4:2:2, 2 YCbCr 4:4:4, 3 all, 4 auto (p.110)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+    send: "#EDID-CS? {input}"
+    expect: { matches: '^~\d+@EDID-CS\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_edid_deep_color:
+    summary: "Remove deep colour from an input's EDID, or keep it (p.111)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+      remove: { type: bool, required: true, label: Remove deep colour, description: "On removes deep colour from the EDID, off leaves it." }
+    send: "#EDID-DC {input},{remove:bool01}"
+    expect: { matches: '^~\d+@EDID-DC\s', not_contains: "ERR" }
+    returns: ack
+
+  get_edid_deep_color:
+    summary: "Remove deep colour from an input's EDID, or keep it (p.111)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+    send: "#EDID-DC? {input}"
+    expect: { matches: '^~\d+@EDID-DC\??\s+(?:(?:\d+),\s*)?(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_edid_lock:
+    summary: "Lock or unlock an input's EDID against changes (p.113)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+      locked: { type: bool, required: true, label: Lock, description: "On locks the input's EDID, off unlocks it." }
+    send: "#LOCK-EDID {input},{locked:bool01}"
+    expect: { matches: '^~\d+@LOCK-EDID\s', not_contains: "ERR" }
+    returns: ack
+
+  get_edid_lock:
+    summary: "Lock or unlock an input's EDID against changes (p.113)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+    send: "#LOCK-EDID? {input}"
+    expect: { matches: '^~\d+@LOCK-EDID\??\s+(?:(?:\d+),\s*)?(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_view_mode:
+    summary: "Set the multiviewer layout: 0 PIP off, 1 PIP, 2 preview, 3 quad, 4 video wall, 5 POP (product tables differ) (p.102)"
+    params:
+      mode: { type: int, min: 0, required: true, label: Layout, description: "Layout number from the product's table; the guide's is 0 PIP off, 1 PIP on, 2 preview, 3 quad, 4 video wall, 5 POP." }
+    send: "#VIEW-MOD {mode}"
+    expect: { matches: '^~\d+@VIEW-MOD\s', not_contains: "ERR" }
+    returns: ack
+
+  get_view_mode:
+    summary: "Get the multiviewer layout: 0 PIP off, 1 PIP, 2 preview, 3 quad, 4 video wall, 5 POP (product tables differ) (p.102)"
+    send: "#VIEW-MOD?"
+    expect: { matches: '^~\d+@VIEW-MOD\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_source:
+    summary: "Set a window's source (p.108)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Source, description: "Input shown in the window, numbered as the product does." }
+    send: "#W-SRC {window},{value}"
+    expect: { matches: '^~\d+@W-SRC\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_source:
+    summary: "Get a window's source (p.108)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-SRC? {window}"
+    expect: { matches: '^~\d+@W-SRC\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_layer:
+    summary: "Set a window's layer (p.106)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 1, required: true, label: Layer, description: "Stacking order, 1 the bottom." }
+    send: "#W-LAYER {window},{value}"
+    expect: { matches: '^~\d+@W-LAYER\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_layer:
+    summary: "Get a window's layer (p.106)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-LAYER? {window}"
+    expect: { matches: '^~\d+@W-LAYER\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_color:
+    summary: "Set a window's colour (p.104)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Colour, description: "Colour value; its meaning (intensity or border colour) is the product's." }
+    send: "#W-COLOR {window},{value}"
+    expect: { matches: '^~\d+@W-COLOR\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_color:
+    summary: "Get a window's colour (p.104)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-COLOR? {window}"
+    expect: { matches: '^~\d+@W-COLOR\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_hue:
+    summary: "Set a window's hue (p.105)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Hue, description: "Hue value in the product's range, such as 0 to 100." }
+    send: "#W-HUE {window},{value}"
+    expect: { matches: '^~\d+@W-HUE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_hue:
+    summary: "Get a window's hue (p.105)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-HUE? {window}"
+    expect: { matches: '^~\d+@W-HUE\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_saturation:
+    summary: "Set a window's saturation (p.107)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Saturation, description: "Saturation in the product's range, such as 0 to 100." }
+    send: "#W-SATURATION {window},{value}"
+    expect: { matches: '^~\d+@W-SATURATION\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_saturation:
+    summary: "Get a window's saturation (p.107)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-SATURATION? {window}"
+    expect: { matches: '^~\d+@W-SATURATION\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_sharpness:
+    summary: "Set a window's sharpness (p.107)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Sharpness, description: "Sharpness in the product's range." }
+    send: "#W-SHARP {window},{value}"
+    expect: { matches: '^~\d+@W-SHARP\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_sharpness:
+    summary: "Get a window's sharpness (p.107)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-SHARP? {window}"
+    expect: { matches: '^~\d+@W-SHARP\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_zoom:
+    summary: "Set a window's zoom (p.108)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Zoom, description: "Zoom in percent." }
+    send: "#W-ZOOM {window},{value}"
+    expect: { matches: '^~\d+@W-ZOOM\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_zoom:
+    summary: "Get a window's zoom (p.108)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-ZOOM? {window}"
+    expect: { matches: '^~\d+@W-ZOOM\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_brightness:
+    summary: "Set a window's brightness (p.97)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Brightness, description: "Brightness in the product's range, such as 0 to 100." }
+    send: "#BRIGHTNESS {window},{value}"
+    expect: { matches: '^~\d+@BRIGHTNESS\s', not_contains: "ERR" }
+    returns: ack
+
+  get_brightness:
+    summary: "Get a window's brightness (p.97)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#BRIGHTNESS? {window}"
+    expect: { matches: '^~\d+@BRIGHTNESS\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_contrast:
+    summary: "Set a window's contrast (p.97)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      value: { type: int, min: 0, required: true, label: Contrast, description: "Contrast in the product's range, such as 0 to 100." }
+    send: "#CONTRAST {window},{value}"
+    expect: { matches: '^~\d+@CONTRAST\s', not_contains: "ERR" }
+    returns: ack
+
+  get_contrast:
+    summary: "Get a window's contrast (p.97)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#CONTRAST? {window}"
+    expect: { matches: '^~\d+@CONTRAST\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_enabled:
+    summary: "Set whether a window is shown (p.104)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      enabled: { type: bool, required: true, label: Shown, description: "On shows the window, off hides it." }
+    send: "#W-ENABLE {window},{enabled:bool01}"
+    expect: { matches: '^~\d+@W-ENABLE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_enabled:
+    summary: "Get whether a window is shown (p.104)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-ENABLE? {window}"
+    expect: { matches: '^~\d+@W-ENABLE\??\s+(?:(?:\d+),\s*)?(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_freeze:
+    summary: "Freeze or unfreeze a window (p.105)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      enabled: { type: bool, required: true, label: Freeze, description: "On freezes the window's picture, off releases it." }
+    send: "#W-FRZ {window},{enabled:bool01}"
+    expect: { matches: '^~\d+@W-FRZ\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_freeze:
+    summary: "Freeze or unfreeze a window (p.105)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-FRZ? {window}"
+    expect: { matches: '^~\d+@W-FRZ\??\s+(?:(?:\d+),\s*)?(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_border:
+    summary: "Set whether a window is border (p.103)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      enabled: { type: bool, required: true, label: Border, description: "On shows the window's border, off hides it." }
+    send: "#WND-BRD {window},{enabled:bool01}"
+    expect: { matches: '^~\d+@WND-BRD\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_border:
+    summary: "Get whether a window is border (p.103)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#WND-BRD? {window}"
+    expect: { matches: '^~\d+@WND-BRD\??\s+(?:(?:\d+),\s*)?(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_window_position:
+    summary: "Place and size a window, in pixels from the top left (p.106)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+      x: { type: int, min: 0, required: true, label: X, description: "Left edge in pixels." }
+      y: { type: int, min: 0, required: true, label: Y, description: "Top edge in pixels." }
+      width: { type: int, min: 1, required: true, label: Width, description: "Width in pixels." }
+      height: { type: int, min: 1, required: true, label: Height, description: "Height in pixels." }
+    send: "#W-POS {window},{x},{y},{width},{height}"
+    expect: { matches: '^~\d+@W-POS\s', not_contains: "ERR" }
+    returns: ack
+
+  get_window_position:
+    summary: "Get a window's position and size as x,y,width,height (p.106)"
+    params:
+      window: { type: int, min: 0, required: true, label: Window, description: "Multiviewer window number, from 1 (0 the whole output on some products)." }
+    send: "#W-POS? {window}"
+    expect: { matches: '^~\d+@W-POS\??\s+\d+,\s*(\d+,\s*\d+,\s*\d+,\s*\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_image_mode:
+    summary: "Set a scaler's aspect handling: 0 overscan, 1 full, 2 best fit, 3 pan-scan, 4 letterbox, 5 underscan 2, 6 underscan 1 (7 follow input on some) (p.98)"
+    params:
+      scaler: { type: int, min: 1, required: true, label: Scaler, description: "Scaler number, from 1 as on the device." }
+      mode: { type: int, min: 0, required: true, label: Image mode, description: "Mode number from the product's table; the guide's is 0 overscan, 1 full, 2 best fit, 3 pan-scan, 4 letterbox, 5 underscan 2, 6 underscan 1." }
+    send: "#IMAGE-PROP {scaler},{mode}"
+    expect: { matches: '^~\d+@IMAGE-PROP\s', not_contains: "ERR" }
+    returns: ack
+
+  get_image_mode:
+    summary: "Get a scaler's aspect handling: 0 overscan, 1 full, 2 best fit, 3 pan-scan, 4 letterbox, 5 underscan 2, 6 underscan 1 (7 follow input on some) (p.98)"
+    params:
+      scaler: { type: int, min: 1, required: true, label: Scaler, description: "Scaler number, from 1 as on the device." }
+    send: "#IMAGE-PROP? {scaler}"
+    expect: { matches: '^~\d+@IMAGE-PROP\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_auto_sync:
+    summary: "Set a scaler's auto-sync off: 0 off, 1 fast, 2 slow (product tables differ) (p.100)"
+    params:
+      scaler: { type: int, min: 1, required: true, label: Scaler, description: "Scaler number, from 1 as on the device." }
+      mode: { type: int, min: 0, max: 3, required: true, label: Auto-sync off, description: "0 off, 1 fast, 2 slow in the guide; some products add 3 immediate or swap 1 and 2." }
+    send: "#SCLR-AS {scaler},{mode}"
+    expect: { matches: '^~\d+@SCLR-AS\s', not_contains: "ERR" }
+    returns: ack
+
+  get_auto_sync:
+    summary: "Get a scaler's auto-sync off: 0 off, 1 fast, 2 slow (product tables differ) (p.100)"
+    params:
+      scaler: { type: int, min: 1, required: true, label: Scaler, description: "Scaler number, from 1 as on the device." }
+    send: "#SCLR-AS? {scaler}"
+    expect: { matches: '^~\d+@SCLR-AS\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_scaler_audio_delay:
+    summary: "Set an output's audio delay step (the guide's table: 0 off, 1-8 10-80 ms, 9 auto; products differ) (p.101)"
+    params:
+      output: { type: int, min: 1, required: true, label: Output, description: "Output number, from 1 as on the device." }
+      delay: { type: int, min: 0, required: true, label: Delay, description: "Delay step from the product's table; the guide's is 0 off, 1 to 8 for 10 to 80 ms, 9 auto." }
+    send: "#SCLR-AUDIO-DELAY {output},{delay}"
+    expect: { matches: '^~\d+@SCLR-AUDIO-DELAY\s', not_contains: "ERR" }
+    returns: ack
+
+  get_scaler_audio_delay:
+    summary: "Get an output's audio delay step (the guide's table: 0 off, 1-8 10-80 ms, 9 auto; products differ) (p.101)"
+    params:
+      output: { type: int, min: 1, required: true, label: Output, description: "Output number, from 1 as on the device." }
+    send: "#SCLR-AUDIO-DELAY? {output}"
+    expect: { matches: '^~\d+@SCLR-AUDIO-DELAY\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  scaler_pc_auto_adjust:
+    summary: "Auto-adjust a scaler's PC input once (p.101)"
+    params:
+      scaler: { type: int, min: 1, required: true, label: Scaler, description: "Scaler number, from 1 as on the device." }
+    send: "#SCLR-PCAUTO {scaler},1"
+    expect: { matches: '^~\d+@SCLR-PCAUTO\s', not_contains: "ERR" }
+    returns: ack
+
+  set_osd:
+    summary: "Show or hide the on-screen display: 0 off, 1 on, 2 info (p.102)"
+    params:
+      id: { type: int, min: 0, required: true, label: OSD, description: "OSD number, usually 1." }
+      mode: { type: int, min: 0, max: 2, required: true, label: Mode, description: "0 off, 1 on, 2 information." }
+    send: "#SHOW-OSD {id},{mode}"
+    expect: { matches: '^~\d+@SHOW-OSD\s', not_contains: "ERR" }
+    returns: ack
+
+  get_osd:
+    summary: "Show or hide the on-screen display: 0 off, 1 on, 2 info (p.102)"
+    params:
+      id: { type: int, min: 0, required: true, label: OSD, description: "OSD number, usually 1." }
+    send: "#SHOW-OSD? {id}"
+    expect: { matches: '^~\d+@SHOW-OSD\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_output_resolution:
+    summary: "Set an output's resolution by the product's resolution index (p.64)"
+    params:
+      output: { type: int, min: 1, required: true, label: Output, description: "Output number, from 1 as on the device." }
+      resolution: { type: int, min: 0, required: true, label: Resolution, description: "Resolution index from the product's table; the guide uses the CEA VIC numbers (0 native), presentation switchers 200 native to 233." }
+    send: "#VID-RES 1,{output},0,{resolution}"
+    expect: { matches: '^~\d+@VID-RES\s', not_contains: "ERR" }
+    returns: ack
+
+  get_output_resolution:
+    summary: "Get an output's resolution index (p.64)"
+    params:
+      output: { type: int, min: 1, required: true, label: Output, description: "Output number, from 1 as on the device." }
+    send: "#VID-RES? 1,{output},0"
+    expect: { matches: '^~\d+@VID-RES\??\s+1,\s*\d+,\s*0,\s*(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_input_resolution:
+    summary: "Get an input's resolution index (p.64)"
+    params:
+      input: { type: int, min: 1, required: true, label: Input, description: "Input number, from 1 as on the device." }
+    send: "#VID-RES? 0,{input},0"
+    expect: { matches: '^~\d+@VID-RES\??\s+0,\s*\d+,\s*0,\s*(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_stepin_button:
+    summary: "Set a Step-in button: 0 mute, 1 active (p.114)"
+    params:
+      button: { type: int, min: 1, required: true, label: Button, description: "Step-in button number." }
+      mode: { type: int, min: 0, max: 1, required: true, label: Mode, description: "0 mute, 1 active." }
+    send: "#BTN {button},{mode}"
+    expect: { matches: '^~\d+@BTN\s', not_contains: "ERR" }
+    returns: ack
+
+  get_stepin_button:
+    summary: "Get a Step-in button: 0 mute, 1 active (p.114)"
+    params:
+      button: { type: int, min: 1, required: true, label: Button, description: "Step-in button number." }
+    send: "#BTN? {button}"
+    expect: { matches: '^~\d+@BTN\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_stepin_capabilities:
+    summary: "Get the Step-in capabilities, inputs and control buttons (p.115)"
+    send: "#STEPIN-CP?"
+    expect: { matches: '^~\d+@STEPIN-CP\??\s+(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_gpio_config:
+    summary: "Set a GPIO pin's type (0 analog, 1 digital) and direction (0 in, 1 out), and its pull-up (p.119)"
+    params:
+      pin: { type: int, min: 1, required: true, label: GPIO pin, description: "GPIO pin number." }
+      type: { type: int, min: 0, max: 1, required: true, label: Type, description: "0 analog, 1 digital." }
+      direction: { type: int, min: 0, max: 1, required: true, label: Direction, description: "0 input, 1 output." }
+      pullup: { type: bool, required: true, label: Pull-up, description: "On enables the pull-up, off disables it." }
+    send: "#GPIO-CFG {pin},{type},{direction},{pullup:bool01}"
+    expect: { matches: '^~\d+@GPIO-CFG\s', not_contains: "ERR" }
+    returns: ack
+
+  get_gpio_config:
+    summary: "Get a GPIO pin's type and direction as type,direction (p.119)"
+    params:
+      pin: { type: int, min: 1, required: true, label: GPIO pin, description: "GPIO pin number." }
+    send: "#GPIO-CFG? {pin}"
+    expect: { matches: '^~\d+@GPIO-CFG\??\s+\d+,\s*([01],\s*[01])', not_contains: "ERR" }
+    returns: value
+
+  set_gpio_state:
+    summary: "Set a digital output pin (0 or 1), or an analog one (0-100) (p.119)"
+    params:
+      pin: { type: int, min: 1, required: true, label: GPIO pin, description: "GPIO pin number." }
+      state: { type: int, min: 0, max: 100, required: true, label: State, description: "0 or 1 for a digital pin, 0 to 100 for an analog one." }
+    send: "#GPIO-STATE {pin},{state}"
+    expect: { matches: '^~\d+@GPIO-STATE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_gpio_state:
+    summary: "Get a digital output pin (0 or 1), or an analog one (0-100) (p.119)"
+    params:
+      pin: { type: int, min: 1, required: true, label: GPIO pin, description: "GPIO pin number." }
+    send: "#GPIO-STATE? {pin}"
+    expect: { matches: '^~\d+@GPIO-STATE\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_gpio_thresholds:
+    summary: "Set a digital input pin's low and high thresholds in mV (p.121)"
+    params:
+      pin: { type: int, min: 1, required: true, label: GPIO pin, description: "GPIO pin number." }
+      low_mv: { type: int, min: 500, max: 28000, required: true, label: Low threshold, description: "Low threshold in mV, 500 to 28000." }
+      high_mv: { type: int, min: 2000, max: 30000, required: true, label: High threshold, description: "High threshold in mV, 2000 to 30000." }
+    send: "#GPIO-THR {pin},{low_mv},{high_mv}"
+    expect: { matches: '^~\d+@GPIO-THR\s', not_contains: "ERR" }
+    returns: ack
+
+  get_gpio_thresholds:
+    summary: "Get a pin's thresholds as low,high in mV (p.121)"
+    params:
+      pin: { type: int, min: 1, required: true, label: GPIO pin, description: "GPIO pin number." }
+    send: "#GPIO-THR? {pin}"
+    expect: { matches: '^~\d+@GPIO-THR\??\s+\d+,\s*(\d+,\s*\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_gpio_voltage:
+    summary: "Get a GPIO pin's voltage in mV, 0-30000 (p.121)"
+    params:
+      pin: { type: int, min: 1, required: true, label: GPIO pin, description: "GPIO pin number." }
+    send: "#GPIO-VOLT? {pin}"
+    expect: { matches: '^~\d+@GPIO-VOLT\??\s+\d+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+  set_relay:
+    summary: "Open or close a relay (p.122)"
+    params:
+      relay: { type: int, min: 1, required: true, label: Relay, description: "Relay number." }
+      closed: { type: bool, required: true, label: Closed, description: "On closes the relay, off opens it." }
+    send: "#RELAY-STATE {relay},{closed:bool01}"
+    expect: { matches: '^~\d+@RELAY-STATE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_relay:
+    summary: "Open or close a relay (p.122)"
+    params:
+      relay: { type: int, min: 1, required: true, label: Relay, description: "Relay number." }
+    send: "#RELAY-STATE? {relay}"
+    expect: { matches: '^~\d+@RELAY-STATE\??\s+(?:(?:\d+),\s*)?(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_uart:
+    summary: "Set a serial port's baud rate, data bits, parity (0 none, 1 odd, 2 even, 3 mark, 4 space), stop bits and type (0 RS-232, 1 RS-485) (p.94)"
+    params:
+      port: { type: int, min: 1, required: true, label: Port, description: "Serial port number." }
+      baud: { type: enum, values: ['9600', '19200', '38400', '57600', '115200'], required: true, label: Baud rate, description: "Baud rate." }
+      data_bits: { type: int, min: 5, max: 8, required: true, label: Data bits, description: "5 to 8 data bits." }
+      parity: { type: int, min: 0, max: 4, required: true, label: Parity, description: "0 none, 1 odd, 2 even, 3 mark, 4 space." }
+      stop_bits: { type: enum, values: ['1', '1.5', '2'], required: true, label: Stop bits, description: "1, 1.5 or 2 stop bits." }
+      serial_type: { type: int, min: 0, max: 1, required: true, label: Type, description: "0 RS-232, 1 RS-485." }
+    send: "#UART {port},{baud},{data_bits},{parity},{stop_bits},{serial_type}"
+    expect: { matches: '^~\d+@UART\s', not_contains: "ERR" }
+    returns: ack
+
+  get_uart:
+    summary: "Get a serial port's settings as baud,data,parity,stop,type (p.94)"
+    params:
+      port: { type: int, min: 1, required: true, label: Port, description: "Serial port number." }
+    send: "#UART? {port}"
+    expect: { matches: '^~\d+@UART\??\s+\d+,\s*(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_baud:
+    summary: "Set the control port's baud rate, kept across restarts (p.16)"
+    params:
+      rate: { type: enum, values: ['9600', '19200', '38400', '57600', '115200'], required: true, label: Baud rate, description: "Baud rate of the device's control port." }
+    send: "#BAUD {rate}"
+    expect: { matches: '^~\d+@BAUD\s', not_contains: "ERR" }
+    returns: ack
+
+  get_baud:
+    summary: "Get the control port's baud rate, kept across restarts (p.16)"
+    send: "#BAUD?"
+    expect: { matches: '^~\d+@BAUD\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_port_direction:
+    summary: "Set a port's direction, IN or OUT (p.29)"
+    params:
+      port: { type: int, min: 1, required: true, label: Port, description: "Port number." }
+      direction: { type: enum, values: [IN, OUT], required: true, label: Direction, description: "IN or OUT." }
+    send: "#PORT-DIRECTION {port},{direction}"
+    expect: { matches: '^~\d+@PORT-DIRECTION\s', not_contains: "ERR" }
+    returns: ack
+
+  get_port_direction:
+    summary: "Get a port's direction, IN or OUT (p.29)"
+    params:
+      port: { type: int, min: 1, required: true, label: Port, description: "Port number." }
+    send: "#PORT-DIRECTION? {port}"
+    expect: { matches: '^~\d+@PORT-DIRECTION\??\s+(?:(?:\d+),\s*)?(IN|OUT)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_com_route:
+    summary: "Tunnel a serial port to an Ethernet port: type 0 TCP or 1 UDP, replies on or off, keep-alive 0-3600 s (p.116)"
+    params:
+      com: { type: int, min: 1, required: true, label: Serial port, description: "Serial port number." }
+      port_type: { type: int, min: 0, max: 1, required: true, label: Protocol, description: "0 TCP, 1 UDP." }
+      eth_port: { type: int, min: 1, max: 65535, required: true, label: Ethernet port, description: "TCP or UDP port number." }
+      replies: { type: bool, required: true, label: Replies, description: "On sends the port's replies back, off does not." }
+      keepalive: { type: int, min: 0, max: 3600, required: true, label: Keep-alive, description: "Keep-alive interval in seconds, 0 to 3600." }
+    send: "#COM-ROUTE {com},{port_type},{eth_port},{replies:bool01},{keepalive}"
+    expect: { matches: '^~\d+@COM-ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_com_route:
+    summary: "Get a serial port's tunnel as type,port,replies,keep-alive (p.116)"
+    params:
+      com: { type: int, min: 1, required: true, label: Serial port, description: "Serial port number." }
+    send: "#COM-ROUTE? {com}"
+    expect: { matches: '^~\d+@COM-ROUTE\??\s+\d+,\s*(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  remove_com_route:
+    summary: "Remove a serial port's tunnel (p.117)"
+    params:
+      com: { type: int, min: 1, required: true, label: Serial port, description: "Serial port number." }
+    send: "#COM-ROUTE-REMOVE {com}"
+    expect: { matches: '^~\d+@COM-ROUTE-REMOVE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_eth_tunnel:
+    summary: "Get an Ethernet tunnel as id,com,type,port,ip,remote port,replies,wired (p.118)"
+    params:
+      id: { type: int, min: 1, required: true, label: Tunnel, description: "Tunnel number." }
+    send: "#ETH-TUNNEL? {id}"
+    expect: { matches: '^~\d+@ETH-TUNNEL\??\s+(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_kds_action:
+    summary: "Set the streamer's action (p.124-131)"
+    params:
+      value: { type: int, min: 0, max: 2, required: true, label: Action, description: "0 stop, 1 play, 2 save the configuration." }
+    send: "#KDS-ACTION {value}"
+    expect: { matches: '^~\d+@KDS-ACTION\s', not_contains: "ERR" }
+    returns: ack
+
+  get_kds_action:
+    summary: "Get the streamer's action (p.124-131)"
+    send: "#KDS-ACTION?"
+    expect: { matches: '^~\d+@KDS-ACTION\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_kds_audio:
+    summary: "Set the streamer's audio (p.124-131)"
+    params:
+      value: { type: int, min: 0, max: 4, required: true, label: Audio, description: "Encoder 0 HDMI, 1 analog, 2 none; decoder 0 HDMI, 1 analog, 2 both, 3 none." }
+    send: "#KDS-AUD {value}"
+    expect: { matches: '^~\d+@KDS-AUD\s', not_contains: "ERR" }
+    returns: ack
+
+  get_kds_audio:
+    summary: "Get the streamer's audio (p.124-131)"
+    send: "#KDS-AUD?"
+    expect: { matches: '^~\d+@KDS-AUD\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_kds_encoding:
+    summary: "Set the streamer's encoding (p.124-131)"
+    params:
+      value: { type: int, min: 0, max: 1, required: true, label: Encoding, description: "0 H.264, 1 MJPEG." }
+    send: "#KDS-EN {value}"
+    expect: { matches: '^~\d+@KDS-EN\s', not_contains: "ERR" }
+    returns: ack
+
+  get_kds_encoding:
+    summary: "Get the streamer's encoding (p.124-131)"
+    send: "#KDS-EN?"
+    expect: { matches: '^~\d+@KDS-EN\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_kds_latency:
+    summary: "Set the streamer's latency (p.124-131)"
+    params:
+      value: { type: int, min: 0, required: true, label: Latency, description: "Decoder latency in ms." }
+    send: "#KDS-LATENCY {value}"
+    expect: { matches: '^~\d+@KDS-LATENCY\s', not_contains: "ERR" }
+    returns: ack
+
+  get_kds_latency:
+    summary: "Get the streamer's latency (p.124-131)"
+    send: "#KDS-LATENCY?"
+    expect: { matches: '^~\d+@KDS-LATENCY\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_kds_scale:
+    summary: "Set the streamer's scaling (p.124-131)"
+    params:
+      value: { type: int, min: 0, max: 1, required: true, label: Scaling, description: "0 pass-through, 1 scaling; the device restarts." }
+    send: "#KDS-SCALE {value}"
+    expect: { matches: '^~\d+@KDS-SCALE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_kds_scale:
+    summary: "Get the streamer's scaling (p.124-131)"
+    send: "#KDS-SCALE?"
+    expect: { matches: '^~\d+@KDS-SCALE\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_kds_connection:
+    summary: "Set the streamer's RTSP connection: address, stream port and folder (p.125)"
+    params:
+      address: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Address, description: "IPv4 address of the RTSP stream." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Stream port." }
+      folder: { type: string, max_length: 32, pattern: '^[A-Za-z0-9_./-]+$', required: true, label: Folder, description: "Stream folder name, without spaces or commas." }
+    send: "#KDS-CONN {address},{port},{folder}"
+    expect: { matches: '^~\d+@KDS-CONN\s', not_contains: "ERR" }
+    returns: ack
+
+  get_kds_connection:
+    summary: "Get the streamer's RTSP connection: address, stream port and folder (p.125)"
+    send: "#KDS-CONN?"
+    expect: { matches: '^~\d+@KDS-CONN\??\s+(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_status:
+    summary: "Get the streamer's state, 0 running, 1 stopped, 2 error (p.124-131)"
+    send: "#KDS-OP-STAT?"
+    expect: { matches: '^~\d+@KDS-OP-STAT\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_bitrate:
+    summary: "Get the stream's bit rate in kbit/s (H.264) (p.124-131)"
+    send: "#KDS-BR?"
+    expect: { matches: '^~\d+@KDS-BR\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_frame_rate:
+    summary: "Get the stream's frame rate (MJPEG) (p.124-131)"
+    send: "#KDS-FR?"
+    expect: { matches: '^~\d+@KDS-FR\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_clients:
+    summary: "Get the number of RTSP clients (p.124-131)"
+    send: "#KDS-ACTIVE-CLNT?"
+    expect: { matches: '^~\d+@KDS-ACTIVE-CLNT\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_gop:
+    summary: "Get the stream's GOP size (p.124-131)"
+    send: "#KDS-GOP?"
+    expect: { matches: '^~\d+@KDS-GOP\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_method:
+    summary: "Get the streaming method, 1 unicast (p.124-131)"
+    send: "#KDS-METHOD?"
+    expect: { matches: '^~\d+@KDS-METHOD\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_protocol:
+    summary: "Get the streaming protocol (p.124-131)"
+    send: "#KDS-PROT?"
+    expect: { matches: '^~\d+@KDS-PROT\??\s+(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_kds_mode:
+    summary: "Get the working mode, 3 high quality (p.124-131)"
+    send: "#KDS-MOD?"
+    expect: { matches: '^~\d+@KDS-MOD\??\s+(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_dhcp:
+    summary: "Set DHCP: 1 tries DHCP, 0 uses the static address; the connection may drop (p.91)"
+    params:
+      mode: { type: int, min: 0, max: 1, required: true, label: DHCP, description: "1 tries DHCP, 0 uses the static address." }
+    send: "#NET-DHCP {mode}"
+    expect: { matches: '^~\d+@NET-DHCP\s', not_contains: "ERR" }
+    returns: ack
+
+  get_dhcp:
+    summary: "Get DHCP: 1 tries DHCP, 0 uses the static address (p.91)"
+    send: "#NET-DHCP?"
+    expect: { matches: '^~\d+@NET-DHCP\??\s+([01])\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_ip_address:
+    summary: "Set the IP address; the connection drops when the address changes (p.92)"
+    params:
+      value: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Ip address, description: "The IP address, such as 192.168.1.39." }
+    send: "#NET-IP {value}"
+    expect: { matches: '^~\d+@NET-IP\s', not_contains: "ERR" }
+    returns: ack
+
+  get_ip_address:
+    summary: "Get the IP address (p.92)"
+    send: "#NET-IP?"
+    expect: { matches: '^~\d+@NET-IP\??\s+([0-9.]+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_netmask:
+    summary: "Set the subnet mask; the connection drops when the address changes (p.93)"
+    params:
+      value: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Subnet mask, description: "The subnet mask, such as 192.168.1.39." }
+    send: "#NET-MASK {value}"
+    expect: { matches: '^~\d+@NET-MASK\s', not_contains: "ERR" }
+    returns: ack
+
+  get_netmask:
+    summary: "Get the subnet mask (p.93)"
+    send: "#NET-MASK?"
+    expect: { matches: '^~\d+@NET-MASK\??\s+([0-9.]+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_gateway:
+    summary: "Set the gateway; the connection drops when the address changes (p.92)"
+    params:
+      value: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Gateway, description: "The gateway, such as 192.168.1.39." }
+    send: "#NET-GATE {value}"
+    expect: { matches: '^~\d+@NET-GATE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_gateway:
+    summary: "Get the gateway (p.92)"
+    send: "#NET-GATE?"
+    expect: { matches: '^~\d+@NET-GATE\??\s+([0-9.]+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_net_config:
+    summary: "Set an interface's address, mask and gateway in one command (p.90)"
+    params:
+      id: { type: int, min: 0, required: true, label: Interface, description: "Network interface number, from 0." }
+      address: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: IP address, description: "IPv4 address." }
+      netmask: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Subnet mask, description: "IPv4 subnet mask." }
+      gateway: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Gateway, description: "IPv4 gateway, in the same subnet." }
+    send: "#NET-CONFIG {id},{address},{netmask},{gateway}"
+    expect: { matches: '^~\d+@NET-CONFIG\s', not_contains: "ERR" }
+    returns: ack
+
+  get_net_config:
+    summary: "Get an interface's address, mask and gateway (p.90)"
+    params:
+      id: { type: int, min: 0, required: true, label: Interface, description: "Network interface number, from 0." }
+    send: "#NET-CONFIG? {id}"
+    expect: { matches: '^~\d+@NET-CONFIG\??\s+\d+,\s*(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_mac_address:
+    summary: "Get the MAC address (p.93)"
+    send: "#NET-MAC?"
+    expect: { matches: '^~\d+@NET-MAC\??\s+(?:\d+,\s*)?([0-9A-Fa-f]{2}(?:[-:][0-9A-Fa-f]{2}){5})', not_contains: "ERR" }
+    returns: value
+
+  get_dns:
+    summary: "Get a DNS server address, numbered from 0 (p.91)"
+    params:
+      id: { type: int, min: 0, required: true, label: DNS server, description: "DNS server number, from 0." }
+    send: "#NET-DNS? {id}"
+    expect: { matches: '^~\d+@NET-DNS\??\s+\d+,\s*([0-9.]+)', not_contains: "ERR" }
+    returns: value
+
+  set_control_port:
+    summary: "Set the TCP or UDP control port; the connection drops when the TCP port changes (p.90)"
+    params:
+      protocol: { type: enum, values: [TCP, UDP], required: true, label: Protocol, description: "TCP or UDP." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "Port number, 1 to 65535." }
+    send: "#ETH-PORT {protocol},{port}"
+    expect: { matches: '^~\d+@ETH-PORT\s', not_contains: "ERR" }
+    returns: ack
+
+  get_control_port:
+    summary: "Get the TCP or UDP control port (p.90)"
+    params:
+      protocol: { type: enum, values: [TCP, UDP], required: true, label: Protocol, description: "TCP or UDP." }
+    send: "#ETH-PORT? {protocol}"
+    expect: { matches: '^~\d+@ETH-PORT\??\s+(?:(?:TCP|UDP|0|1),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_time:
+    summary: "Set the clock: day of week, DD-MM-YYYY and hh:mm:ss (p.36)"
+    params:
+      day: { type: enum, values: [SUN, MON, TUE, WED, THU, FRI, SAT], required: true, label: Day, description: "Day of the week." }
+      date: { type: string, pattern: '^\d\d-\d\d-\d{4}$', required: true, label: Date, description: "Date as DD-MM-YYYY." }
+      time: { type: string, pattern: '^\d\d:\d\d:\d\d$', required: true, label: Time, description: "24-hour time as hh:mm:ss." }
+    send: "#TIME {day},{date},{time}"
+    expect: { matches: '^~\d+@TIME\s', not_contains: "ERR" }
+    returns: ack
+
+  get_time:
+    summary: "Get the clock as day,date,time (p.36)"
+    send: "#TIME?"
+    expect: { matches: '^~\d+@TIME\??\s+(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_time_location:
+    summary: "Set the UTC offset in hours and daylight saving (p.37)"
+    params:
+      utc_offset: { type: int, min: -12, max: 14, required: true, label: UTC offset, description: "Offset from UTC in hours." }
+      dst: { type: bool, required: true, label: Daylight saving, description: "On applies daylight saving, off does not." }
+    send: "#TIME-LOC {utc_offset},{dst:bool01}"
+    expect: { matches: '^~\d+@TIME-LOC\s', not_contains: "ERR" }
+    returns: ack
+
+  get_time_location:
+    summary: "Get the UTC offset in hours and daylight saving (p.37)"
+    send: "#TIME-LOC?"
+    expect: { matches: '^~\d+@TIME-LOC\??\s+(-?\d+,\s*\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_time_server:
+    summary: "Use a time server or not, with its address and the hour to synchronise (p.94)"
+    params:
+      enabled: { type: bool, required: true, label: Time server, description: "On synchronises with the server, off does not." }
+      address: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true, label: Server, description: "IPv4 address of the time server." }
+      sync_hour: { type: int, min: 0, max: 23, required: true, label: Hour, description: "Hour of the day to synchronise, 0 to 23." }
+    send: "#TIME-SRV {enabled:bool01},{address},{sync_hour}"
+    expect: { matches: '^~\d+@TIME-SRV\s', not_contains: "ERR" }
+    returns: ack
+
+  get_time_server:
+    summary: "Get the time server as mode,address,hour,status (p.94)"
+    send: "#TIME-SRV?"
+    expect: { matches: '^~\d+@TIME-SRV\??\s+(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_audio_embedding:
+    summary: "Set where an output's audio comes from: 0 analog, 1 embedded, 2 auto (p.71)"
+    params:
+      input: { type: int, min: 0, required: true, label: Input, description: "Input number, as the product numbers it (some count from 0)." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number, as the product numbers it." }
+      mode: { type: int, min: 0, max: 2, required: true, label: Source, description: "0 analog, 1 embedded, 2 auto." }
+    send: "#AUD-EMB {input},{output},{mode}"
+    expect: { matches: '^~\d+@AUD-EMB\s', not_contains: "ERR" }
+    returns: ack
+
+  get_audio_embedding:
+    summary: "Get where an output's audio comes from: 0 analog, 1 embedded, 2 auto (p.71)"
+    params:
+      input: { type: int, min: 0, required: true, label: Input, description: "Input number, as the product numbers it (some count from 0)." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number, as the product numbers it." }
+    send: "#AUD-EMB? {input},{output}"
+    expect: { matches: '^~\d+@AUD-EMB\??\s+(?:(?:\d+),\s*(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_audio_filter:
+    summary: "Set a channel's filter: type 0 high-pass, 1 low-pass, 2 band-pass, at a frequency index, on or off (p.72)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      type: { type: int, min: 0, max: 2, required: true, label: Type, description: "0 high-pass, 1 low-pass, 2 band-pass." }
+      frequency: { type: int, min: 0, required: true, label: Frequency, description: "Frequency index from the Equalizer Frequency table." }
+      enabled: { type: bool, required: true, label: Enabled, description: "On enables the filter, off bypasses it." }
+    send: "#AUD-FILTER {channel},{type},{frequency},{enabled:bool01}"
+    expect: { matches: '^~\d+@AUD-FILTER\s', not_contains: "ERR" }
+    returns: ack
+
+  get_audio_filter:
+    summary: "Get a channel's filter as type,frequency,state (p.72)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+    send: "#AUD-FILTER? {channel}"
+    expect: { matches: '^~\d+@AUD-FILTER\??\s+\d+,\s*(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_audio_mix:
+    summary: "Set a channel's mix knob level in dB (p.74)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      knob: { type: int, min: 1, max: 2, required: true, label: Knob, description: "Mix knob, 1 or 2." }
+      level: { type: int, min: -80, max: 10, required: true, label: Level, description: "Level in dB, -80 to 10." }
+    send: "#AUD-MIX {channel},{knob},{level}"
+    expect: { matches: '^~\d+@AUD-MIX\s', not_contains: "ERR" }
+    returns: ack
+
+  get_audio_mix:
+    summary: "Get a channel's mix knob level in dB (p.74)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      knob: { type: int, min: 1, max: 2, required: true, label: Knob, description: "Mix knob, 1 or 2." }
+    send: "#AUD-MIX? {channel},{knob}"
+    expect: { matches: '^~\d+@AUD-MIX\??\s+(?:(?:\d+),\s*(?:\d+),\s*)?(-?\d+(?:\.\d+)?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_eq_frequency:
+    summary: "Set an EQ band's frequency index: band 0 bass, 1 middle, 2 treble; index 0-3 (p.78)"
+    params:
+      stage: { type: int, min: 0, max: 1, required: true, label: Stage, description: "0 input, 1 output." }
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      band: { type: int, min: 0, max: 2, required: true, label: Band, description: "0 bass, 1 middle, 2 treble." }
+      index: { type: int, min: 0, max: 3, required: true, label: Frequency, description: "0 to 3: bass 60, 80, 100, 200 Hz; middle 500 Hz, 1, 1.5, 2.5 kHz; treble 10, 12.5, 15, 17.5 kHz." }
+    send: "#EQ-FREQ {stage},{channel},{band},{index}"
+    expect: { matches: '^~\d+@EQ-FREQ\s', not_contains: "ERR" }
+    returns: ack
+
+  get_eq_frequency:
+    summary: "Get an EQ band's frequency index: band 0 bass, 1 middle, 2 treble; index 0-3 (p.78)"
+    params:
+      stage: { type: int, min: 0, max: 1, required: true, label: Stage, description: "0 input, 1 output." }
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      band: { type: int, min: 0, max: 2, required: true, label: Band, description: "0 bass, 1 middle, 2 treble." }
+    send: "#EQ-FREQ? {stage},{channel},{band}"
+    expect: { matches: '^~\d+@EQ-FREQ\??\s+(?:(?:\d+),\s*(?:\d+),\s*(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_eq_level:
+    summary: "Set an EQ band's level in the product's units (p.79)"
+    params:
+      stage: { type: int, min: 0, max: 1, required: true, label: Stage, description: "0 input, 1 output." }
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      band: { type: int, min: 0, required: true, label: Band, description: "0 bass, 1 middle, 2 treble, or the product's band." }
+      level: { type: int, min: -100, max: 100, required: true, label: Level, description: "Level in the product's units, such as 0 to 40 for -10 to +10 dB." }
+    send: "#EQ-LVL {stage},{channel},{band},{level}"
+    expect: { matches: '^~\d+@EQ-LVL\s', not_contains: "ERR" }
+    returns: ack
+
+  get_eq_level:
+    summary: "Get an EQ band's level in the product's units (p.79)"
+    params:
+      stage: { type: int, min: 0, max: 1, required: true, label: Stage, description: "0 input, 1 output." }
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      band: { type: int, min: 0, required: true, label: Band, description: "0 bass, 1 middle, 2 treble, or the product's band." }
+    send: "#EQ-LVL? {stage},{channel},{band}"
+    expect: { matches: '^~\d+@EQ-LVL\??\s+(?:(?:\d+),\s*(?:\d+),\s*(?:\d+),\s*)?(-?\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_eq_q:
+    summary: "Set an EQ band's Q, 0-15 (p.79)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      band: { type: int, min: 0, max: 2, required: true, label: Band, description: "0 bass, 1 middle, 2 treble." }
+      q: { type: int, min: 0, max: 15, required: true, label: Q, description: "Q factor, 0 to 15." }
+    send: "#EQ-Q {channel},{band},{q}"
+    expect: { matches: '^~\d+@EQ-Q\s', not_contains: "ERR" }
+    returns: ack
+
+  get_eq_q:
+    summary: "Get an EQ band's Q, 0-15 (p.79)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      band: { type: int, min: 0, max: 2, required: true, label: Band, description: "0 bass, 1 middle, 2 treble." }
+    send: "#EQ-Q? {channel},{band}"
+    expect: { matches: '^~\d+@EQ-Q\??\s+(?:(?:\d+),\s*(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_mic_gain:
+    summary: "Set a microphone input's gain, 0-100 (p.81)"
+    params:
+      input: { type: int, min: 0, required: true, label: Microphone, description: "Microphone input, as the product numbers it (some count from 0)." }
+      level: { type: int, min: 0, max: 100, required: true, label: Gain, description: "Gain, 0 to 100." }
+    send: "#MIC-GAIN {input},{level}"
+    expect: { matches: '^~\d+@MIC-GAIN\s', not_contains: "ERR" }
+    returns: ack
+
+  get_mic_gain:
+    summary: "Get a microphone input's gain, 0-100 (p.81)"
+    params:
+      input: { type: int, min: 0, required: true, label: Microphone, description: "Microphone input, as the product numbers it (some count from 0)." }
+    send: "#MIC-GAIN? {input}"
+    expect: { matches: '^~\d+@MIC-GAIN\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_talkover_parameter:
+    summary: "Set a talkover parameter: 0 depth %, 1 trigger level, 2 attack, 3 hold, 4 release (p.81)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      parameter: { type: int, min: 0, max: 4, required: true, label: Parameter, description: "0 depth in %, 1 trigger level, 2 attack, 3 hold, 4 release, in the product's units." }
+      value: { type: int, min: 0, required: true, label: Value, description: "The parameter's value in the product's units." }
+    send: "#MIC-TLK {channel},{parameter},{value}"
+    expect: { matches: '^~\d+@MIC-TLK\s', not_contains: "ERR" }
+    returns: ack
+
+  get_talkover_parameter:
+    summary: "Get a talkover parameter: 0 depth %, 1 trigger level, 2 attack, 3 hold, 4 release (p.81)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      parameter: { type: int, min: 0, max: 4, required: true, label: Parameter, description: "0 depth in %, 1 trigger level, 2 attack, 3 hold, 4 release, in the product's units." }
+    send: "#MIC-TLK? {channel},{parameter}"
+    expect: { matches: '^~\d+@MIC-TLK\??\s+(?:(?:\d+),\s*(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_talkover_mode:
+    summary: "Set a channel's talkover mode: 0 off, 1 mixer, 2 talkover, 3 microphone only (p.84)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      mode: { type: int, min: 0, max: 3, required: true, label: Mode, description: "0 off, 1 mixer, 2 talkover, 3 microphone only." }
+    send: "#TLK {channel},{mode}"
+    expect: { matches: '^~\d+@TLK\s', not_contains: "ERR" }
+    returns: ack
+
+  get_talkover_mode:
+    summary: "Get a channel's talkover mode: 0 off, 1 mixer, 2 talkover, 3 microphone only (p.84)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+    send: "#TLK? {channel}"
+    expect: { matches: '^~\d+@TLK\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_bass:
+    summary: "Set a channel's bass in the product's units (p.78)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      value: { type: int, min: -100, max: 100, required: true, label: Bass, description: "The bass in the product's units." }
+    send: "#BASS {channel},{value}"
+    expect: { matches: '^~\d+@BASS\s', not_contains: "ERR" }
+    returns: ack
+
+  get_bass:
+    summary: "Get a channel's bass in the product's units (p.78)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+    send: "#BASS? {channel}"
+    expect: { matches: '^~\d+@BASS\??\s+(?:(?:\d+),\s*)?(-?\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_treble:
+    summary: "Set a channel's treble in the product's units (p.85)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      value: { type: int, min: -100, max: 100, required: true, label: Treble, description: "The treble in the product's units." }
+    send: "#TREBLE {channel},{value}"
+    expect: { matches: '^~\d+@TREBLE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_treble:
+    summary: "Get a channel's treble in the product's units (p.85)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+    send: "#TREBLE? {channel}"
+    expect: { matches: '^~\d+@TREBLE\??\s+(?:(?:\d+),\s*)?(-?\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_midrange:
+    summary: "Set a channel's midrange in the product's units (p.82)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      value: { type: int, min: -100, max: 100, required: true, label: Midrange, description: "The midrange in the product's units." }
+    send: "#MIDRANGE {channel},{value}"
+    expect: { matches: '^~\d+@MIDRANGE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_midrange:
+    summary: "Get a channel's midrange in the product's units (p.82)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+    send: "#MIDRANGE? {channel}"
+    expect: { matches: '^~\d+@MIDRANGE\??\s+(?:(?:\d+),\s*)?(-?\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_balance:
+    summary: "Set a channel's balance in the product's units (p.77)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      value: { type: int, min: -100, max: 100, required: true, label: Balance, description: "The balance in the product's units." }
+    send: "#BALANCE {channel},{value}"
+    expect: { matches: '^~\d+@BALANCE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_balance:
+    summary: "Get a channel's balance in the product's units (p.77)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+    send: "#BALANCE? {channel}"
+    expect: { matches: '^~\d+@BALANCE\??\s+(?:(?:\d+),\s*)?(-?\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_loudness:
+    summary: "Turn a channel's loudness on or off (p.80)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+      enabled: { type: bool, required: true, label: Loudness, description: "On turns loudness on, off turns it off." }
+    send: "#LOUDNESS {channel},{enabled:bool01}"
+    expect: { matches: '^~\d+@LOUDNESS\s', not_contains: "ERR" }
+    returns: ack
+
+  get_loudness:
+    summary: "Turn a channel's loudness on or off (p.80)"
+    params:
+      channel: { type: int, min: 0, required: true, label: Channel, description: "Audio channel or port, as the product numbers it (some count from 0)." }
+    send: "#LOUDNESS? {channel}"
+    expect: { matches: '^~\d+@LOUDNESS\??\s+(?:(?:\d+),\s*)?(\S+)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_mic_delay:
+    summary: "Set a microphone's delay, 0-85 ms (p.80)"
+    params:
+      input: { type: int, min: 0, required: true, label: Microphone, description: "Microphone input, as the product numbers it." }
+      ms: { type: int, min: 0, max: 85, required: true, label: Delay, description: "Delay in ms, 0 to 85." }
+    send: "#MIC-DELAY {input},{ms}"
+    expect: { matches: '^~\d+@MIC-DELAY\s', not_contains: "ERR" }
+    returns: ack
+
+  get_mic_delay:
+    summary: "Get a microphone's delay, 0-85 ms (p.80)"
+    params:
+      input: { type: int, min: 0, required: true, label: Microphone, description: "Microphone input, as the product numbers it." }
+    send: "#MIC-DELAY? {input}"
+    expect: { matches: '^~\d+@MIC-DELAY\??\s+(?:(?:\d+),\s*)?(\d+)\s*$', not_contains: "ERR" }
+    returns: value
+
 state:
   device.model:            { type: string, description: "Model name (MODEL?)" }
   device.firmware:         { type: string, description: "Firmware version, major.minor.build (VERSION?)" }
@@ -1154,6 +2647,83 @@ state:
   signals.*.*.*.*.*.afv:    { type: bool, description: "Extended audio-follow-video of an output signal (X-AFV)" }
   ports.*.*.*.label:        { type: string, description: "Extended port label, keyed by direction, port type and port index (X-LABEL)" }
 
+  edid.inputs.*.audio_format: { type: int, description: "Audio the input's EDID announces (EDID-AUDIO)" }
+  edid.inputs.*.color_space: { type: int, description: "Colour space the input's EDID announces (EDID-CS)" }
+  edid.inputs.*.deep_color_removed: { type: bool, description: "Deep colour removed from the input's EDID (EDID-DC)" }
+  edid.inputs.*.locked: { type: bool, description: "The input's EDID is locked (LOCK-EDID)" }
+  view_mode: { type: int, description: "Multiviewer layout number (VIEW-MOD)" }
+  windows.*.source: { type: int, description: "Window source (W-SRC)" }
+  windows.*.layer: { type: int, description: "Window layer (W-LAYER)" }
+  windows.*.color: { type: int, description: "Window colour (W-COLOR)" }
+  windows.*.hue: { type: int, description: "Window hue (W-HUE)" }
+  windows.*.saturation: { type: int, description: "Window saturation (W-SATURATION)" }
+  windows.*.sharpness: { type: int, description: "Window sharpness (W-SHARP)" }
+  windows.*.zoom: { type: int, description: "Window zoom (W-ZOOM)" }
+  windows.*.brightness: { type: int, description: "Window brightness (BRIGHTNESS)" }
+  windows.*.contrast: { type: int, description: "Window contrast (CONTRAST)" }
+  windows.*.enabled: { type: bool, description: "Window enabled (W-ENABLE)" }
+  windows.*.frozen: { type: bool, description: "Window frozen (W-FRZ)" }
+  windows.*.border: { type: bool, description: "Window border (WND-BRD)" }
+  windows.*.position: { type: string, description: "Window position and size as x,y,width,height (W-POS)" }
+  scalers.*.image_mode: { type: int, description: "Scaler aspect handling (IMAGE-PROP)" }
+  scalers.*.auto_sync_off: { type: int, description: "Scaler auto-sync-off mode (SCLR-AS)" }
+  outputs.*.audio_delay: { type: int, description: "Output audio delay step (SCLR-AUDIO-DELAY)" }
+  osd.*.mode: { type: int, description: "On-screen display mode (SHOW-OSD)" }
+  outputs.*.resolution: { type: int, description: "Output resolution index, in the product's table (VID-RES)" }
+  inputs.*.resolution: { type: int, description: "Input resolution index, in the product's table (VID-RES)" }
+  stepin.buttons.*.mode: { type: int, description: "Step-in button mode: 0 mute, 1 active, 255 pending, or the client input in a notification (BTN)" }
+  gpio.*.type: { type: int, description: "GPIO pin type, 0 analog, 1 digital (GPIO-CFG)" }
+  gpio.*.direction: { type: int, description: "GPIO pin direction, 0 input, 1 output (GPIO-CFG)" }
+  gpio.*.state: { type: int, description: "GPIO pin state, 0/1 digital or 0-100 analog; pushed on change (GPIO-STATE)" }
+  gpio.*.voltage_mv: { type: int, unit: mV, description: "GPIO pin voltage (GPIO-VOLT)" }
+  relays.*.closed: { type: bool, description: "The relay is closed (RELAY-STATE)" }
+  serial.*.settings: { type: string, description: "Serial port settings as baud,data,parity,stop,type (UART)" }
+  control_baud: { type: int, description: "Control port baud rate (BAUD)" }
+  ports.*.direction: { type: string, description: "Port direction, IN or OUT (PORT-DIRECTION)" }
+  serial.*.tunnel: { type: string, description: "Serial port tunnel as type,port,replies,keep-alive (COM-ROUTE)" }
+  streamer.action: { type: int, description: "Streamer action (KDS-ACTION)" }
+  streamer.audio: { type: int, description: "Streamer audio (KDS-AUD)" }
+  streamer.encoding: { type: int, description: "Streamer encoding (KDS-EN)" }
+  streamer.latency_ms: { type: int, description: "Streamer latency (KDS-LATENCY)" }
+  streamer.scale: { type: int, description: "Streamer scaling (KDS-SCALE)" }
+  streamer.connection: { type: string, description: "Streamer RTSP connection as address,port,folder (KDS-CONN)" }
+  streamer.status: { type: int, description: "Streamer: the streamer's state, 0 running, 1 stopped, 2 error (KDS-OP-STAT)" }
+  streamer.bitrate_kbps: { type: int, description: "Streamer: the stream's bit rate in kbit/s (H.264) (KDS-BR)" }
+  streamer.frame_rate: { type: int, description: "Streamer: the stream's frame rate (MJPEG) (KDS-FR)" }
+  streamer.clients: { type: int, description: "Streamer: the number of RTSP clients (KDS-ACTIVE-CLNT)" }
+  streamer.gop: { type: int, description: "Streamer: the stream's GOP size (KDS-GOP)" }
+  streamer.method: { type: int, description: "Streamer: the streaming method, 1 unicast (KDS-METHOD)" }
+  streamer.protocol: { type: string, description: "Streamer: the streaming protocol (KDS-PROT)" }
+  streamer.mode: { type: int, description: "Streamer: the working mode, 3 high quality (KDS-MOD)" }
+  network.dhcp: { type: bool, description: "DHCP enabled (NET-DHCP)" }
+  network.address: { type: string, description: "Network IP address (NET-IP)" }
+  network.netmask: { type: string, description: "Network subnet mask (NET-MASK)" }
+  network.gateway: { type: string, description: "Network gateway (NET-GATE)" }
+  network.interfaces.*.address: { type: string, description: "Interface address (NET-CONFIG)" }
+  network.interfaces.*.netmask: { type: string, description: "Interface subnet mask (NET-CONFIG)" }
+  network.interfaces.*.gateway: { type: string, description: "Interface gateway (NET-CONFIG)" }
+  network.mac: { type: string, description: "MAC address (NET-MAC)" }
+  network.dns.*: { type: string, description: "DNS server address, by number from 0 (NET-DNS)" }
+  network.control_ports.*: { type: int, description: "Control port number, keyed by TCP or UDP (ETH-PORT)" }
+  clock.location: { type: string, description: "UTC offset and daylight saving as offset,dst (TIME-LOC)" }
+  clock.server: { type: string, description: "Time server as mode,address,hour,status (TIME-SRV)" }
+  clock.time: { type: string, description: "Clock as day,date,time when last read (TIME)" }
+  audio.embedding.*.*: { type: int, description: "Audio source for the input (first number) on the output (second): 0 analog, 1 embedded, 2 auto (AUD-EMB)" }
+  audio.channels.*.filter: { type: string, description: "Channel filter as type,frequency,state (AUD-FILTER)" }
+  audio.channels.*.mix.*: { type: float, description: "Channel mix knob level in dB, keyed by knob (AUD-MIX)" }
+  audio.eq.*.*.*.frequency: { type: int, description: "EQ band frequency index, keyed by stage, channel and band (EQ-FREQ)" }
+  audio.eq.*.*.*.level: { type: int, description: "EQ band level, keyed by stage, channel and band (EQ-LVL)" }
+  audio.channels.*.eq_q.*: { type: int, description: "EQ band Q, keyed by band (EQ-Q)" }
+  audio.mics.*.gain: { type: int, description: "Microphone gain, 0-100 (MIC-GAIN)" }
+  audio.talkover.*.*: { type: int, description: "Talkover parameter, keyed by channel and parameter number (MIC-TLK)" }
+  audio.channels.*.talkover_mode: { type: int, description: "Talkover mode: 0 off, 1 mixer, 2 talkover, 3 microphone only (TLK)" }
+  audio.channels.*.bass: { type: int, description: "Channel bass in the product's units (BASS)" }
+  audio.channels.*.treble: { type: int, description: "Channel treble in the product's units (TREBLE)" }
+  audio.channels.*.midrange: { type: int, description: "Channel midrange in the product's units (MIDRANGE)" }
+  audio.channels.*.balance: { type: int, description: "Channel balance in the product's units (BALANCE)" }
+  audio.channels.*.loudness: { type: bool, description: "Loudness on (LOUDNESS)" }
+  audio.mics.*.delay_ms: { type: int, description: "Microphone delay in ms (MIC-DELAY)" }
+
 telemetry:
   # Identity is asked once on connecting. Changes are pushed: every command is
   # bidirectional, so an action from the front panel, IR or another controller
@@ -1169,6 +2739,29 @@ telemetry:
       - "#PROT-VER?"
       - "#NAME?"
       - "#INFO-IO?"
+      - "#NET-DHCP?"
+      - "#NET-IP?"
+      - "#NET-MASK?"
+      - "#NET-GATE?"
+      - "#NET-MAC?"
+      - "#ETH-PORT? TCP"
+      - "#ETH-PORT? UDP"
+      - "#TIME-LOC?"
+      - "#TIME-SRV?"
+      - "#BAUD?"
+      - "#VIEW-MOD?"
+      - "#IMAGE-PROP? 1"
+      - "#SCLR-AS? 1"
+      - "#VID-RES? 1,1,0"
+      - "#KDS-OP-STAT?"
+      - "#W-SRC? 1"
+      - "#W-ENABLE? 1"
+      - "#W-SRC? 2"
+      - "#W-ENABLE? 2"
+      - "#W-SRC? 3"
+      - "#W-ENABLE? 3"
+      - "#W-SRC? 4"
+      - "#W-ENABLE? 4"
   updates:
     - match: '^~\d+@Protocol Start\s*$'
       state: { "device.started": { value: "Start", map: { Start: true } } }
@@ -1256,6 +2849,154 @@ telemetry:
       state: { "standby": { value: "{1}", map: { "0": false, "1": true, "OFF": false, "ON": true } } }
     - match: '^~\d+@POWER-SAVE\s+(\S+)\s*$'
       state: { "power_save": { value: "{1}", map: { "0": false, "1": true, "OFF": false, "ON": true } } }
+    # Full control: EDID, multiviewer, I/O, streamer, network, audio DSP (the
+    # replies to sets and queries, and the same messages pushed on change).
+    - match: '^~\d+@EDID-AUDIO\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "edid.inputs.{1}.audio_format": "{2}" }
+    - match: '^~\d+@EDID-CS\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "edid.inputs.{1}.color_space": "{2}" }
+    - match: '^~\d+@EDID-DC\??\s+(\d+),\s*(\S+)\s*$'
+      state: { "edid.inputs.{1}.deep_color_removed": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@LOCK-EDID\??\s+(\d+),\s*(\S+)\s*$'
+      state: { "edid.inputs.{1}.locked": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@VIEW-MOD\??\s+(\d+)\s*$'
+      state: { "view_mode": "{1}" }
+    - match: '^~\d+@W-SRC\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.source": "{2}" }
+    - match: '^~\d+@W-LAYER\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.layer": "{2}" }
+    - match: '^~\d+@W-COLOR\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.color": "{2}" }
+    - match: '^~\d+@W-HUE\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.hue": "{2}" }
+    - match: '^~\d+@W-SATURATION\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.saturation": "{2}" }
+    - match: '^~\d+@W-SHARP\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.sharpness": "{2}" }
+    - match: '^~\d+@W-ZOOM\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.zoom": "{2}" }
+    - match: '^~\d+@BRIGHTNESS\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.brightness": "{2}" }
+    - match: '^~\d+@CONTRAST\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "windows.{1}.contrast": "{2}" }
+    - match: '^~\d+@W-ENABLE\??\s+(\d+),\s*(\S+)\s*$'
+      state: { "windows.{1}.enabled": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@W-FRZ\??\s+(\d+),\s*(\S+)\s*$'
+      state: { "windows.{1}.frozen": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@WND-BRD\??\s+(\d+),\s*(\S+)\s*$'
+      state: { "windows.{1}.border": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@W-POS\??\s+(\d+),\s*(\d+,\s*\d+,\s*\d+,\s*\d+)\s*$'
+      state: { "windows.{1}.position": "{2}" }
+    - match: '^~\d+@IMAGE-PROP\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "scalers.{1}.image_mode": "{2}" }
+    - match: '^~\d+@SCLR-AS\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "scalers.{1}.auto_sync_off": "{2}" }
+    - match: '^~\d+@SCLR-AUDIO-DELAY\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "outputs.{1}.audio_delay": "{2}" }
+    - match: '^~\d+@SHOW-OSD\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "osd.{1}.mode": "{2}" }
+    - match: '^~\d+@VID-RES\??\s+1,\s*(\d+),\s*0,\s*(\d+)\s*$'
+      state: { "outputs.{1}.resolution": "{2}" }
+    - match: '^~\d+@VID-RES\??\s+0,\s*(\d+),\s*0,\s*(\d+)\s*$'
+      state: { "inputs.{1}.resolution": "{2}" }
+    - match: '^~\d+@BTN\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "stepin.buttons.{1}.mode": "{2}" }
+    - match: '^~\d+@GPIO-CFG\??\s+(\d+),\s*([01]),\s*([01])'
+      state: { "gpio.{1}.type": "{2}", "gpio.{1}.direction": "{3}" }
+    - match: '^~\d+@GPIO-STATE\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "gpio.{1}.state": "{2}" }
+    - match: '^~\d+@GPIO-VOLT\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "gpio.{1}.voltage_mv": "{2}" }
+    - match: '^~\d+@RELAY-STATE\??\s+(\d+),\s*(\S+)\s*$'
+      state: { "relays.{1}.closed": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@UART\??\s+(\d+),\s*(\d+,.+?)\s*$'
+      state: { "serial.{1}.settings": "{2}" }
+    - match: '^~\d+@BAUD\??\s+(\d+)\s*$'
+      state: { "control_baud": "{1}" }
+    - match: '^~\d+@PORT-DIRECTION\??\s+(\d+),\s*(IN|OUT)\s*$'
+      state: { "ports.{1}.direction": "{2}" }
+    - match: '^~\d+@COM-ROUTE\??\s+(\d+),\s*(\d+,.+?)\s*$'
+      state: { "serial.{1}.tunnel": "{2}" }
+    - match: '^~\d+@KDS-ACTION\??\s+(\d+)\s*$'
+      state: { "streamer.action": "{1}" }
+    - match: '^~\d+@KDS-AUD\??\s+(\d+)\s*$'
+      state: { "streamer.audio": "{1}" }
+    - match: '^~\d+@KDS-EN\??\s+(\d+)\s*$'
+      state: { "streamer.encoding": "{1}" }
+    - match: '^~\d+@KDS-LATENCY\??\s+(\d+)\s*$'
+      state: { "streamer.latency_ms": "{1}" }
+    - match: '^~\d+@KDS-SCALE\??\s+(\d+)\s*$'
+      state: { "streamer.scale": "{1}" }
+    - match: '^~\d+@KDS-CONN\??\s+(\S+)\s*$'
+      state: { "streamer.connection": "{1}" }
+    - match: '^~\d+@KDS-OP-STAT\??\s+(\d+)\s*$'
+      state: { "streamer.status": "{1}" }
+    - match: '^~\d+@KDS-BR\??\s+(\d+)\s*$'
+      state: { "streamer.bitrate_kbps": "{1}" }
+    - match: '^~\d+@KDS-FR\??\s+(\d+)\s*$'
+      state: { "streamer.frame_rate": "{1}" }
+    - match: '^~\d+@KDS-ACTIVE-CLNT\??\s+(\d+)\s*$'
+      state: { "streamer.clients": "{1}" }
+    - match: '^~\d+@KDS-GOP\??\s+(\d+)\s*$'
+      state: { "streamer.gop": "{1}" }
+    - match: '^~\d+@KDS-METHOD\??\s+(\d+)\s*$'
+      state: { "streamer.method": "{1}" }
+    - match: '^~\d+@KDS-PROT\??\s+(\S+)\s*$'
+      state: { "streamer.protocol": "{1}" }
+    - match: '^~\d+@KDS-MOD\??\s+(\d+)\s*$'
+      state: { "streamer.mode": "{1}" }
+    - match: '^~\d+@NET-DHCP\??\s+([01])\s*$'
+      state: { "network.dhcp": { value: "{1}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@NET-IP\??\s+([0-9.]+)\s*$'
+      state: { "network.address": "{1}" }
+    - match: '^~\d+@NET-MASK\??\s+([0-9.]+)\s*$'
+      state: { "network.netmask": "{1}" }
+    - match: '^~\d+@NET-GATE\??\s+([0-9.]+)\s*$'
+      state: { "network.gateway": "{1}" }
+    - match: '^~\d+@NET-CONFIG\??\s+(\d+),\s*([0-9.]+),\s*([0-9.]+),\s*([0-9.]+)'
+      state: { "network.interfaces.{1}.address": "{2}", "network.interfaces.{1}.netmask": "{3}", "network.interfaces.{1}.gateway": "{4}" }
+    - match: '^~\d+@NET-MAC\??\s+(?:\d+,\s*)?([0-9A-Fa-f]{2}(?:[-:][0-9A-Fa-f]{2}){5})\s*$'
+      state: { network.mac: "{1}" }
+    - match: '^~\d+@NET-DNS\??\s+(\d+),\s*([0-9.]+)\s*$'
+      state: { "network.dns.{1}": "{2}" }
+    - match: '^~\d+@ETH-PORT\??\s+(TCP|UDP|0|1),\s*(\d+)\s*$'
+      state: { "network.control_ports.{1}": "{2}" }
+    - match: '^~\d+@TIME-LOC\??\s+(-?\d+,\s*\S+)\s*$'
+      state: { "clock.location": "{1}" }
+    - match: '^~\d+@TIME-SRV\??\s+(\d.+?)\s*$'
+      state: { clock.server: "{1}" }
+    - match: '^~\d+@TIME\??\s+([A-Za-z]{3},.+?)\s*$'
+      state: { clock.time: "{1}" }
+    - match: '^~\d+@AUD-EMB\??\s+(\d+),\s*(\d+),\s*(\d+)\s*$'
+      state: { "audio.embedding.{1}.{2}": "{3}" }
+    - match: '^~\d+@AUD-FILTER\??\s+(\d+),\s*(\d+,.+?)\s*$'
+      state: { "audio.channels.{1}.filter": "{2}" }
+    - match: '^~\d+@AUD-MIX\??\s+(\d+),\s*(\d+),\s*(-?\d+(?:\.\d+)?)\s*$'
+      state: { "audio.channels.{1}.mix.{2}": "{3}" }
+    - match: '^~\d+@EQ-FREQ\??\s+(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*$'
+      state: { "audio.eq.{1}.{2}.{3}.frequency": "{4}" }
+    - match: '^~\d+@EQ-LVL\??\s+(\d+),\s*(\d+),\s*(\d+),\s*(-?\d+)\s*$'
+      state: { "audio.eq.{1}.{2}.{3}.level": "{4}" }
+    - match: '^~\d+@EQ-Q\??\s+(\d+),\s*(\d+),\s*(\d+)\s*$'
+      state: { "audio.channels.{1}.eq_q.{2}": "{3}" }
+    - match: '^~\d+@MIC-GAIN\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "audio.mics.{1}.gain": "{2}" }
+    - match: '^~\d+@MIC-TLK\??\s+(\d+),\s*(\d+),\s*(\d+)\s*$'
+      state: { "audio.talkover.{1}.{2}": "{3}" }
+    - match: '^~\d+@TLK\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "audio.channels.{1}.talkover_mode": "{2}" }
+    - match: '^~\d+@BASS\??\s+(\d+),\s*(-?\d+)\s*$'
+      state: { "audio.channels.{1}.bass": "{2}" }
+    - match: '^~\d+@TREBLE\??\s+(\d+),\s*(-?\d+)\s*$'
+      state: { "audio.channels.{1}.treble": "{2}" }
+    - match: '^~\d+@MIDRANGE\??\s+(\d+),\s*(-?\d+)\s*$'
+      state: { "audio.channels.{1}.midrange": "{2}" }
+    - match: '^~\d+@BALANCE\??\s+(\d+),\s*(-?\d+)\s*$'
+      state: { "audio.channels.{1}.balance": "{2}" }
+    - match: '^~\d+@LOUDNESS\??\s+(\d+),\s*(\S+)\s*$'
+      state: { "audio.channels.{1}.loudness": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true, "off": false, "on": true } } }
+    - match: '^~\d+@MIC-DELAY\??\s+(\d+),\s*(\d+)\s*$'
+      state: { "audio.mics.{1}.delay_ms": "{2}" }
     # Extended (X-) replies and notifications, keyed by the signal ID's fields.
     - match: '^~\d+@X-ROUTE\s+(OUT|BOTH)\.(\w+)\.(\d+)\.(\w+)\.(\d+),\s*(\S+?)\s*$'
       state: { "signals.{1}.{2}.{3}.{4}.{5}.source": "{6}" }
@@ -1380,3 +3121,51 @@ quirks:
       the IDs a product has. The guide's X-SIGNAL and X-AFV entries carry typing
       errors in their syntax and examples (a stray space after "@" or "X-"), so
       their replies are matched leniently.
+
+  - models: [all]
+    severity: critical
+    text: >
+      NET-DHCP, NET-IP, NET-MASK, NET-GATE, NET-CONFIG and ETH-PORT TCP change
+      how the device is reached and can end this connection at once (Admin
+      permission when security is on, p.90-93); the device may come back at
+      another address or port. KDS-SCALE restarts a streamer. copy_edid
+      replaces the destination inputs' EDIDs, which makes their sources
+      re-read them and can blank them briefly. set_com_route takes over a
+      serial port for a network tunnel.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The guide gives the command syntax; each product gives its own values,
+      which the commands pass through unchecked (no maxima are enforced).
+      VID-RES takes the guide's CEA VIC numbers (0 native) on some products,
+      200 native to 233 on the VP-440X, VP-551X and VP-427X2, and 0-40 on the
+      MV-4X. IMAGE-PROP on the MV-4X takes a window and an aspect (0 full,
+      1 16:9, 2 16:10, 3 4:3, 4 best fit, 5 user), and the scalers add 7
+      follow input. SCLR-AS has 3 immediate on the VP-427X2, and the MV-4X
+      swaps fast and slow. AUD-EMB, AUD-LVL and MIC-GAIN count channels from 0
+      on the presentation switchers; the VP-551X's MIC-GAIN takes a third
+      parameter (0,mic,level), which is not offered. EQ-LVL's units and band
+      numbers are the product's. VIEW-MOD and W-COLOR tables differ by
+      product. The product's manual and #HELP say which commands and values
+      it has.
+
+  - models: [all]
+    severity: info
+    text: >
+      Format limits: LDEDID loads an EDID in a second step of CRC-checked
+      binary packets (p.112, p.134-135), GEDID sends the EDID as data lines
+      after its first answer (p.111), and IR-SND splits a Pronto code into
+      numbered packets to stay within the 64-character command limit
+      (p.120): none of them can be expressed as a fixed message, so only
+      CPEDID and GEDID? are offered. Commands defined only by a product's own
+      manual are not modelled, since the generic models cannot list them
+      accurately: the KDS-EN7/DEC7's channel selection, VLAN, video wall and
+      overlay commands; the DSP-62's DSP-EQ, DSP-HPF, DSP-COMP, DSP-LIMITER,
+      DSP-DELAY and X-MIX-LVL; the MV-4X's ROTATE and RSTWIN; CS-CONVERT,
+      CEC-PASS and AUDIO-BYPASS. The guide names the audio delay command both
+      AUD-DELAY and AUX-DELAY (p.71), so it is left out, and its KDS-ACTION
+      table is a copy of another table (the KDS-EN7 manual's 0 stop, 1 play,
+      2 save is used). The poll on connecting also reads the network, time,
+      baud rate, layout, scaler 1, output 1's resolution, windows 1-4 and the
+      streamer's state; a product answers what it lacks with ERR 002.
