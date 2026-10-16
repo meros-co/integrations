@@ -867,7 +867,15 @@ impl Session {
         self.drop_socket(key);
         match bind {
             Bind::Ephemeral => {
-                let socket = UdpSocket::bind((self.services.bind_address, 0))
+                // An IPv4 socket cannot reach an IPv6 device: with no bind
+                // address chosen, take the device's family.
+                let address = match self.services.bind_address {
+                    IpAddr::V4(a) if a.is_unspecified() && self.host.is_ipv6() => {
+                        IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED)
+                    }
+                    a => a,
+                };
+                let socket = UdpSocket::bind((address, 0))
                     .await
                     .map_err(|e| format!("bind: {e}"))?;
                 let socket = Arc::new(socket);
