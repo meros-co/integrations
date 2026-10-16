@@ -631,11 +631,12 @@ impl Core {
     /// network changed or that comes back from being suspended (a mobile app
     /// returning to the foreground), where a connection can be dead without
     /// either end having noticed. The device keeps its id, state and stream
-    /// watchers; commands in flight fail with `transport`; it is restarted
-    /// as [`Core::update_settings`] restarts a native device, so anything
-    /// asked of it only for this connection (a subscription a command
-    /// started) is asked again by the caller. Returns false if the device is
-    /// not open.
+    /// watchers, and commands in flight fail with `transport`. What the
+    /// consumer asked for that the device forgets with the connection (an
+    /// OMT receiver's tally, an ATEM level subscription) is asked for again;
+    /// any other device is restarted from its settings as
+    /// [`Core::update_settings`] restarts a native device. Returns false if
+    /// the device is not open.
     pub async fn reconnect(&self, device: DeviceId) -> bool {
         let tx = match self.devices.lock().unwrap().get(&device) {
             Some(entry) => entry.tx.clone(),

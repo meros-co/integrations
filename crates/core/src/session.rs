@@ -338,6 +338,11 @@ impl Session {
     /// whose app came back from the background, where connections may be
     /// dead without either end having noticed.
     async fn reconnect(&mut self) {
+        let mut cx = self.cx();
+        if self.module.reconnect(&mut cx) {
+            self.apply(cx.take()).await;
+            return;
+        }
         let built = self
             .reconfigure
             .as_ref()
