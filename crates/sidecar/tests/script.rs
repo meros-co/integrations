@@ -312,6 +312,16 @@ async fn the_shared_binding_script() {
                 let result = client.post("/v1/settings", body).await;
                 assert_eq!(strip_messages(&result), step["expect"], "{label}");
             }
+            "reconnect" => {
+                let result = client
+                    .post("/v1/reconnect", json!({"device": device}))
+                    .await;
+                assert_eq!(result, json!({"reconnected": step["expect"]}), "{label}");
+            }
+            "reconnect_all" => {
+                let result = client.post("/v1/reconnect_all", json!({})).await;
+                assert_eq!(result, json!({}), "{label}");
+            }
             "close" => {
                 client.post("/v1/close", json!({"device": device})).await;
             }
@@ -383,6 +393,17 @@ async fn a_sidecar_started_for_some_devices() {
         )
         .await;
     assert_eq!(refused["error"]["error"], "invalid_request");
+    // Reconnecting a device that is not open says so; every device, none.
+    let result = client.post("/v1/reconnect", json!({"device": 1})).await;
+    assert_eq!(result, json!({"reconnected": false}));
+    assert_eq!(client.post("/v1/reconnect_all", json!({})).await, json!({}));
+    let anonymous = client
+        .http
+        .post(format!("{}/v1/reconnect_all", client.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(anonymous.status(), 401);
     drop(sidecar);
     let _ = std::fs::remove_file(&token_file);
 
