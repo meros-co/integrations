@@ -626,6 +626,34 @@ impl Core {
         }
     }
 
+    /// Drop the device's connections and open them afresh from its current
+    /// settings, now rather than after a retry delay. For a host whose
+    /// network changed or that comes back from being suspended (a mobile app
+    /// returning to the foreground), where a connection can be dead without
+    /// either end having noticed. The device keeps its id, state and stream
+    /// watchers; commands in flight fail with `transport`; it is restarted
+    /// as [`Core::update_settings`] restarts a native device, so anything
+    /// asked of it only for this connection (a subscription a command
+    /// started) is asked again by the caller. Returns false if the device is
+    /// not open.
+    pub async fn reconnect(&self, device: DeviceId) -> bool {
+        let tx = match self.devices.lock().unwrap().get(&device) {
+            Some(entry) => entry.tx.clone(),
+            None => return false,
+        };
+        let (done, finished) = oneshot::channel();
+        if tx.send(SessionMsg::Reconnect { done }).await.is_err() {
+            return false;
+        }
+        finished.await.is_ok()
+    }
+
+    /// [`Core::reconnect`] every open device.
+    pub async fn reconnect_all(&self) {
+        let devices: Vec<DeviceId> = self.devices.lock().unwrap().keys().copied().collect();
+        futures_util::future::join_all(devices.into_iter().map(|d| self.reconnect(d))).await;
+    }
+
     /// Shut down cleanly, for a host that is about to exit: refuse new
     /// devices and commands, give commands already sent up to `grace` to
     /// finish, then close every device as [`Core::close`] does, so each

@@ -51,6 +51,10 @@ pub(crate) enum SessionMsg {
         settings: Params,
         reply: oneshot::Sender<Result<(), SettingsError>>,
     },
+    /// Drop every connection and open them afresh (`Core::reconnect`).
+    Reconnect {
+        done: oneshot::Sender<()>,
+    },
 }
 
 /// Builds a device's module from its settings.
@@ -298,7 +302,8 @@ impl Session {
                         if let Some(r) = self.reconfigure.as_mut() {
                             r.settings = settings;
                         }
-                        self.restart(module).await;
+                        self.restart(module, "the device's settings changed; it is reconnecting")
+                            .await;
                         Ok(())
                     }
                     Some(Err(message)) => Err(invalid(message)),
@@ -309,10 +314,11 @@ impl Session {
     }
 
     /// Replace the module: stop the old one as on closing, then start the
-    /// new one under the same device, state and stream watchers.
-    async fn restart(&mut self, module: Box<dyn Module>) {
+    /// new one under the same device, state and stream watchers. Commands in
+    /// flight fail with `transport` and `reason`.
+    async fn restart(&mut self, module: Box<dyn Module>, reason: &str) {
         self.teardown(CommandError::Transport {
-            message: "the device's settings changed; it is reconnecting".into(),
+            message: reason.into(),
         })
         .await;
         self.timers.clear();
@@ -325,6 +331,20 @@ impl Session {
         self.module.start(&mut cx);
         self.apply(cx.take()).await;
         self.sync_watched().await;
+    }
+
+    /// Start again from the device's current settings, on fresh sockets and
+    /// without waiting out a retry delay: for a host whose network changed or
+    /// whose app came back from the background, where connections may be
+    /// dead without either end having noticed.
+    async fn reconnect(&mut self) {
+        let built = self
+            .reconfigure
+            .as_ref()
+            .map(|r| (r.build)(r.settings.clone()));
+        if let Some(Ok(module)) = built {
+            self.restart(module, "the device is reconnecting").await;
+        }
     }
 
     pub(crate) async fn run(mut self, mut messages: mpsc::Receiver<SessionMsg>) {
@@ -350,6 +370,10 @@ impl Session {
                     Some(SessionMsg::Settings { settings, reply }) => {
                         let result = self.update_settings(settings).await;
                         let _ = reply.send(result);
+                    }
+                    Some(SessionMsg::Reconnect { done }) => {
+                        self.reconnect().await;
+                        let _ = done.send(());
                     }
                     Some(SessionMsg::Close { done }) => {
                         self.shutdown().await;
