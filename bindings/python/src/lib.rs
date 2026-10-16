@@ -177,6 +177,17 @@ impl NativeCore {
         py.detach(|| self.core.block_on(self.core.close(device)));
     }
 
+    /// Drop the device's connections and open them again now
+    /// (`Core::reconnect`); false if it is not open.
+    fn reconnect(&self, py: Python<'_>, device: u64) -> bool {
+        py.detach(|| self.core.block_on(self.core.reconnect(device)))
+    }
+
+    /// `reconnect` every open device (`Core::reconnect_all`).
+    fn reconnect_all(&self, py: Python<'_>) {
+        py.detach(|| self.core.block_on(self.core.reconnect_all()));
+    }
+
     fn close_all(&self, py: Python<'_>, grace_ms: u64) {
         py.detach(|| {
             self.core

@@ -208,6 +208,25 @@ class Core:
     def close(self, device: int) -> None:
         self._native.close(device)
 
+    def reconnect(self, device: int) -> bool:
+        """Drop a device's connections and open them again now, from its
+        current settings, rather than after a retry delay: for a host that
+        resumes after being suspended or whose network changed. The device
+        keeps its id and last known state, which is read afresh; commands in
+        flight fail with "transport". Returns True once the device has
+        restarted (not once it is connected), or False if it is not open."""
+        return self._native.reconnect(device)
+
+    async def reconnect_async(self, device: int) -> bool:
+        return await asyncio.to_thread(self.reconnect, device)
+
+    def reconnect_all(self) -> None:
+        """reconnect() every open device."""
+        self._native.reconnect_all()
+
+    async def reconnect_all_async(self) -> None:
+        await asyncio.to_thread(self.reconnect_all)
+
     def close_all(self, grace_ms: int = 5_000) -> None:
         """Shut down cleanly before the process exits: refuse new devices and
         commands ("closing"), give commands in flight up to grace_ms, then close
