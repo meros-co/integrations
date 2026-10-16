@@ -19,6 +19,16 @@ use crate::session::Inbound;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+/// TCP keepalive: idle time before the first probe, then the interval
+/// between probes and how many go unanswered before the connection is
+/// dropped. A peer that vanished without closing (a network change, a
+/// suspended mobile app, a device switched off) is then noticed in about
+/// half a minute even by a protocol that never replies, rather than after
+/// the operating system's default of hours.
+const KEEPALIVE_IDLE: Duration = Duration::from_secs(10);
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(5);
+#[cfg(not(windows))]
+const KEEPALIVE_PROBES: u32 = 4;
 
 pub(crate) struct Connection {
     pub(crate) generation: u64,
@@ -64,12 +74,24 @@ enum Stream {
 async fn connect(to: SocketAddr) -> Result<TcpStream, String> {
     match tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(to)).await {
         Ok(Ok(s)) => {
-            let _ = s.set_nodelay(true);
+            tune(&s);
             Ok(s)
         }
         Ok(Err(e)) => Err(format!("connect: {e}")),
         Err(_) => Err("connect: timed out".into()),
     }
+}
+
+/// No Nagle delay, and keepalive probes (see `KEEPALIVE_IDLE`).
+fn tune(stream: &TcpStream) {
+    let _ = stream.set_nodelay(true);
+    let keepalive = socket2::TcpKeepalive::new()
+        .with_time(KEEPALIVE_IDLE)
+        .with_interval(KEEPALIVE_INTERVAL);
+    // Windows always sends ten probes.
+    #[cfg(not(windows))]
+    let keepalive = keepalive.with_retries(KEEPALIVE_PROBES);
+    let _ = socket2::SockRef::from(stream).set_tcp_keepalive(&keepalive);
 }
 
 async fn handshake(
@@ -96,7 +118,7 @@ fn start(socket: Key, generation: u64, inbound: mpsc::Sender<Inbound>, how: Stre
         };
         match how {
             Stream::Accepted(stream) => {
-                let _ = stream.set_nodelay(true);
+                tune(&stream);
                 pump(stream, outgoing, &report).await;
             }
             Stream::Connect(to) => match connect(to).await {
@@ -273,5 +295,32 @@ mod tests {
             TcpInput::Closed { reason } => assert!(reason.starts_with("tls:"), "{reason}"),
             other => panic!("expected a close, got {other:?}"),
         }
+    }
+
+    /// A peer that vanishes without closing is noticed by keepalive probes,
+    /// including on connections the device opened to us.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn connections_probe_a_silent_peer() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let accepted = tokio::spawn(async move { listener.accept().await.unwrap().0 });
+        let stream = connect(addr).await.unwrap();
+        let sock = socket2::SockRef::from(&stream);
+        assert!(sock.keepalive().unwrap());
+        assert!(sock.nodelay().unwrap());
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "macos",
+            target_os = "ios"
+        ))]
+        {
+            assert_eq!(sock.keepalive_time().unwrap(), KEEPALIVE_IDLE);
+            assert_eq!(sock.keepalive_interval().unwrap(), KEEPALIVE_INTERVAL);
+            assert_eq!(sock.keepalive_retries().unwrap(), KEEPALIVE_PROBES);
+        }
+        let peer = accepted.await.unwrap();
+        tune(&peer);
+        assert!(socket2::SockRef::from(&peer).keepalive().unwrap());
     }
 }
