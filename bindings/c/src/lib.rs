@@ -270,6 +270,32 @@ pub unsafe extern "C" fn mi_interrupt_events(core: *const MiCore) {
     let _ = catch_unwind(AssertUnwindSafe(|| (*core).core.interrupt_events()));
 }
 
+/// Drop a device's connections and open them again now (`Core::reconnect`).
+/// Returns 1, or 0 if the device is not open.
+///
+/// # Safety
+/// `core` must be a live core. Do not call from inside an async runtime.
+#[no_mangle]
+pub unsafe extern "C" fn mi_reconnect(core: *const MiCore, device: u64) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        let core = &(*core).core;
+        i32::from(core.block_on(core.reconnect(device)))
+    }))
+    .unwrap_or(0)
+}
+
+/// `mi_reconnect` every open device (`Core::reconnect_all`).
+///
+/// # Safety
+/// `core` must be a live core. Do not call from inside an async runtime.
+#[no_mangle]
+pub unsafe extern "C" fn mi_reconnect_all(core: *const MiCore) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let core = &(*core).core;
+        core.block_on(core.reconnect_all());
+    }));
+}
+
 /// Shut down cleanly before the host exits: refuse new devices and
 /// commands, give commands in flight up to `grace_ms` to finish, then close
 /// every device so each ends what it started on the device. Returns once all

@@ -17,6 +17,13 @@ library and the network stack use:
 | Windows (MSVC, `/MD`) | `ws2_32 userenv ntdll bcrypt advapi32 kernel32 crypt32 secur32 ncrypt ole32 oleaut32 iphlpapi` |
 | Linux | `-lpthread -ldl -lm` |
 | macOS | `-framework Security -framework CoreFoundation` |
+| Android | `-llog -lunwind -ldl -lm -lc` (from the NDK; API level 24 or later) |
+| iOS | none beyond the system library |
+
+Android (`aarch64-linux-android`, `armv7-linux-androideabi`) and iOS
+(`aarch64-apple-ios`) builds, the permissions and background handling a
+mobile app needs, and an xcframework recipe are in
+[docs/MOBILE.md](../../docs/MOBILE.md).
 
 `examples/smoke.c` builds against the header and the static library and checks
 the interface end to end. `cargo test -p meros-integrations-c` plays the shared
@@ -49,6 +56,14 @@ to build with.
 
 `cargo test -p meros-integrations-c` plays the shared script, which needs a
 build with every integration (the default).
+
+## Resuming
+
+A host whose network changes, or that resumes after being suspended (a
+mobile app coming back to the foreground), calls `mi_reconnect_all`: every
+device drops its connections and opens them again at once, rather than
+waiting for its own timeouts and retry delays to find out they are dead.
+`mi_reconnect` does one device.
 
 ## Threads and streams
 

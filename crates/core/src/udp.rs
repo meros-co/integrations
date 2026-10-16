@@ -54,15 +54,17 @@ struct Port {
     fallback: Arc<Mutex<Option<Fallback>>>,
 }
 
+type Ports = Arc<Mutex<HashMap<u16, Port>>>;
+
 pub(crate) struct SharedUdp {
-    ports: Mutex<HashMap<u16, Port>>,
+    ports: Ports,
     events: Arc<EventQueue>,
 }
 
 impl SharedUdp {
     pub(crate) fn new(events: Arc<EventQueue>) -> SharedUdp {
         SharedUdp {
-            ports: Mutex::new(HashMap::new()),
+            ports: Default::default(),
             events,
         }
     }
@@ -89,6 +91,7 @@ impl SharedUdp {
                     routes.clone(),
                     fallback.clone(),
                     self.events.clone(),
+                    (self.ports.clone(), port),
                 );
                 bound = Some(buffers);
                 e.insert(Port {
@@ -201,6 +204,7 @@ fn spawn_router(
     routes: Arc<Mutex<HashMap<IpAddr, Route>>>,
     fallback: Arc<Mutex<Option<Fallback>>>,
     events: Arc<EventQueue>,
+    (ports, port): (Ports, u16),
 ) {
     tokio::spawn(async move {
         let mut buf = vec![0u8; 65_536];
@@ -230,10 +234,39 @@ fn spawn_router(
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => continue,
-                Err(_) => return,
+                Err(e) => {
+                    close_failed(&ports, port, &routes, &e.to_string());
+                    return;
+                }
             }
         }
     });
+}
+
+/// The socket failed for good (a suspended mobile app's sockets can be
+/// reclaimed by the OS): forget the port, so the next session to ask for it
+/// binds it afresh, and tell every session routed to it, so each can open it
+/// again.
+fn close_failed(
+    ports: &Ports,
+    port: u16,
+    routes: &Arc<Mutex<HashMap<IpAddr, Route>>>,
+    error: &str,
+) {
+    let mut ports = ports.lock().unwrap();
+    if ports
+        .get(&port)
+        .is_some_and(|p| Arc::ptr_eq(&p.routes, routes))
+    {
+        ports.remove(&port);
+    }
+    drop(ports);
+    for route in routes.lock().unwrap().values() {
+        let _ = route.inbound.try_send(Inbound::SocketError {
+            socket: route.key,
+            message: format!("shared port {port} failed: {error}"),
+        });
+    }
 }
 
 /// Datagrams dropped because a session fell behind are lost telemetry with no
@@ -304,5 +337,27 @@ mod tests {
         assert!(second.is_none(), "the second session binds nothing");
         assert_eq!(shared.ports.lock().unwrap().len(), 1);
         assert!(shared.register(LOCAL, 0, a, "mcp", 1, tx).is_err());
+    }
+
+    /// A shared socket that fails is forgotten, so the next session binds
+    /// the port afresh, and every session on it is told.
+    #[tokio::test]
+    async fn a_failed_port_is_forgotten_and_its_sessions_told() {
+        let shared = SharedUdp::new(Arc::new(EventQueue::new(16)));
+        let (tx, mut rx) = mpsc::channel(8);
+        let a = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+        shared.register(LOCAL, 0, a, "tsl", 1, tx.clone()).unwrap();
+        let routes = shared.ports.lock().unwrap()[&0].routes.clone();
+        close_failed(&shared.ports, 0, &routes, "reclaimed");
+        assert!(shared.ports.lock().unwrap().is_empty());
+        match rx.try_recv() {
+            Ok(Inbound::SocketError { socket, message }) => {
+                assert_eq!(socket, "tsl");
+                assert!(message.contains("reclaimed"), "{message}");
+            }
+            _ => panic!("expected a socket error"),
+        }
+        let again = shared.register(LOCAL, 0, a, "tsl", 1, tx).unwrap();
+        assert!(again.is_some(), "the port is bound again");
     }
 }

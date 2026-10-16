@@ -772,6 +772,19 @@ pub trait Module: Send + 'static {
         let _ = (cx, settings);
         SettingsUpdate::Restart
     }
+
+    /// The consumer asked for the device to reconnect now
+    /// (`Core::reconnect`): its network changed, or it resumed after being
+    /// suspended, so a connection may be dead without either end knowing. A
+    /// module holding something the consumer asked for that the device
+    /// forgets with the connection (a tally, a level subscription) drops its
+    /// connections, opens them again at once and asks for it again, then
+    /// answers true. The default answers false: the session restarts the
+    /// module from the device's settings, as for a settings change.
+    fn reconnect(&mut self, cx: &mut Cx) -> bool {
+        let _ = cx;
+        false
+    }
 }
 
 /// What a module did with new settings.

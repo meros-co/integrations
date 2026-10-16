@@ -376,6 +376,15 @@ impl Module for Sender {
         }
     }
 
+    /// A fresh connection now, which sends the tally again.
+    fn reconnect(&mut self, cx: &mut Cx) -> bool {
+        self.lost(cx, "reconnecting".into());
+        self.retry_after = RETRY_MIN;
+        cx.cancel_timer(RETRY);
+        self.timer(cx, RETRY);
+        true
+    }
+
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         match key {
             RETRY => {
@@ -686,6 +695,39 @@ mod tests {
                 metadata_frame(r#"<OMTTally Preview="true" Program=="false" />"#)
             ]
         );
+    }
+
+    /// Asked to reconnect (the host resumed), it opens a new connection at
+    /// once, without the retry delay, and sends its tally again on it.
+    #[test]
+    fn reconnect_on_request_sends_the_tally_again_at_once() {
+        let (mut m, _) = connected(true);
+        let mut cx = Cx::new(10);
+        m.command(
+            &mut cx,
+            1,
+            "set_tally",
+            &params(json!({"preview": false, "program": true})),
+        );
+        cx.take();
+        let mut cx = Cx::new(20);
+        assert!(m.reconnect(&mut cx));
+        let a = cx.take();
+        assert!(a.contains(&Action::TcpOpen {
+            socket: SOCKET,
+            to: m.device
+        }));
+        // The retry the loss armed is cancelled after it.
+        let set = a
+            .iter()
+            .rposition(|x| matches!(x, Action::SetTimer { key: RETRY, .. }));
+        let cancelled = a
+            .iter()
+            .rposition(|x| matches!(x, Action::CancelTimer { key: RETRY }));
+        assert!(cancelled > set);
+        let mut cx = Cx::new(30);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        assert!(sent(&cx.take()).contains(&metadata_frame(&tally_xml(false, true))));
     }
 
     #[test]

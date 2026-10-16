@@ -27,9 +27,11 @@ struct Port {
     task: JoinHandle<()>,
 }
 
+type Ports = Arc<Mutex<HashMap<u16, Port>>>;
+
 #[derive(Default)]
 pub(crate) struct SharedTcp {
-    ports: Mutex<HashMap<u16, Port>>,
+    ports: Ports,
 }
 
 impl SharedTcp {
@@ -50,7 +52,7 @@ impl SharedTcp {
                 let listener =
                     bind(bind_address, port).map_err(|e| format!("listen :{port}: {e}"))?;
                 let routes: Arc<Mutex<HashMap<IpAddr, Route>>> = Default::default();
-                let task = spawn_acceptor(listener, routes.clone());
+                let task = spawn_acceptor(listener, routes.clone(), (self.ports.clone(), port));
                 e.insert(Port { routes, task })
             }
         };
@@ -89,16 +91,35 @@ fn bind(address: IpAddr, port: u16) -> std::io::Result<TcpListener> {
     TcpListener::from_std(listener)
 }
 
+/// Consecutive accept errors, 100 ms apart, after which the listener is
+/// taken to have failed for good rather than to be short of descriptors.
+const FAILED_AFTER: u32 = 20;
+
 fn spawn_acceptor(
     listener: TcpListener,
     routes: Arc<Mutex<HashMap<IpAddr, Route>>>,
+    (ports, port): (Ports, u16),
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let mut errors = 0;
         loop {
             let (stream, peer) = match listener.accept().await {
-                Ok(accepted) => accepted,
-                // Out of descriptors and the like: wait rather than spin.
-                Err(_) => {
+                Ok(accepted) => {
+                    errors = 0;
+                    accepted
+                }
+                // A connection that went away before it was accepted.
+                Err(e) if e.kind() == std::io::ErrorKind::ConnectionAborted => continue,
+                // Out of descriptors and the like: wait rather than spin. A
+                // listener that keeps failing (a suspended mobile app's
+                // sockets can be reclaimed by the OS) is closed, and every
+                // session on it told, so each can listen again.
+                Err(e) => {
+                    errors += 1;
+                    if errors >= FAILED_AFTER {
+                        close_failed(&ports, port, &routes, &e.to_string()).await;
+                        return;
+                    }
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     continue;
                 }
@@ -119,4 +140,35 @@ fn spawn_acceptor(
             }
         }
     })
+}
+
+async fn close_failed(
+    ports: &Ports,
+    port: u16,
+    routes: &Arc<Mutex<HashMap<IpAddr, Route>>>,
+    error: &str,
+) {
+    {
+        let mut ports = ports.lock().unwrap();
+        if ports
+            .get(&port)
+            .is_some_and(|p| Arc::ptr_eq(&p.routes, routes))
+        {
+            ports.remove(&port);
+        }
+    }
+    let targets: Vec<(Key, mpsc::Sender<Inbound>)> = routes
+        .lock()
+        .unwrap()
+        .values()
+        .map(|r| (r.key, r.inbound.clone()))
+        .collect();
+    for (socket, inbound) in targets {
+        let _ = inbound
+            .send(Inbound::SocketError {
+                socket,
+                message: format!("listening on TCP port {port} failed: {error}"),
+            })
+            .await;
+    }
 }

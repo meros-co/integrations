@@ -248,3 +248,31 @@ fn a_core_started_for_some_devices() {
             .contains("no-such-device"));
     }
 }
+
+/// A device reconnected on request keeps its id; one not open is refused.
+#[test]
+fn reconnect_through_the_c_interface() {
+    unsafe {
+        let options = cs(r#"{"bind_address":"127.0.0.1"}"#);
+        let core = mi_core_new_with_options(options.as_ptr());
+        assert!(!core.is_null());
+        // A listener reaches out to no device: the core only binds a port.
+        let port = std::net::UdpSocket::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let request = cs(&format!(
+            r#"{{"device":"tsl-umd-listener","model":"tsl-umd","host":"127.0.0.1","port":{port}}}"#
+        ));
+        let opened = take(mi_open(core, request.as_ptr()));
+        let device = opened["device"].as_u64().expect("opened");
+        assert_eq!(mi_reconnect(core, device), 1);
+        assert_eq!(mi_reconnect(core, device + 1000), 0);
+        mi_reconnect_all(core);
+        assert!(!take(mi_snapshot(core, device)).is_null());
+        mi_close(core, device);
+        assert_eq!(mi_reconnect(core, device), 0);
+        mi_core_free(core);
+    }
+}

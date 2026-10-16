@@ -51,6 +51,10 @@ pub(crate) enum SessionMsg {
         settings: Params,
         reply: oneshot::Sender<Result<(), SettingsError>>,
     },
+    /// Drop every connection and open them afresh (`Core::reconnect`).
+    Reconnect {
+        done: oneshot::Sender<()>,
+    },
 }
 
 /// Builds a device's module from its settings.
@@ -298,7 +302,8 @@ impl Session {
                         if let Some(r) = self.reconfigure.as_mut() {
                             r.settings = settings;
                         }
-                        self.restart(module).await;
+                        self.restart(module, "the device's settings changed; it is reconnecting")
+                            .await;
                         Ok(())
                     }
                     Some(Err(message)) => Err(invalid(message)),
@@ -309,10 +314,11 @@ impl Session {
     }
 
     /// Replace the module: stop the old one as on closing, then start the
-    /// new one under the same device, state and stream watchers.
-    async fn restart(&mut self, module: Box<dyn Module>) {
+    /// new one under the same device, state and stream watchers. Commands in
+    /// flight fail with `transport` and `reason`.
+    async fn restart(&mut self, module: Box<dyn Module>, reason: &str) {
         self.teardown(CommandError::Transport {
-            message: "the device's settings changed; it is reconnecting".into(),
+            message: reason.into(),
         })
         .await;
         self.timers.clear();
@@ -325,6 +331,25 @@ impl Session {
         self.module.start(&mut cx);
         self.apply(cx.take()).await;
         self.sync_watched().await;
+    }
+
+    /// Start again from the device's current settings, on fresh sockets and
+    /// without waiting out a retry delay: for a host whose network changed or
+    /// whose app came back from the background, where connections may be
+    /// dead without either end having noticed.
+    async fn reconnect(&mut self) {
+        let mut cx = self.cx();
+        if self.module.reconnect(&mut cx) {
+            self.apply(cx.take()).await;
+            return;
+        }
+        let built = self
+            .reconfigure
+            .as_ref()
+            .map(|r| (r.build)(r.settings.clone()));
+        if let Some(Ok(module)) = built {
+            self.restart(module, "the device is reconnecting").await;
+        }
     }
 
     pub(crate) async fn run(mut self, mut messages: mpsc::Receiver<SessionMsg>) {
@@ -350,6 +375,10 @@ impl Session {
                     Some(SessionMsg::Settings { settings, reply }) => {
                         let result = self.update_settings(settings).await;
                         let _ = reply.send(result);
+                    }
+                    Some(SessionMsg::Reconnect { done }) => {
+                        self.reconnect().await;
+                        let _ = done.send(());
                     }
                     Some(SessionMsg::Close { done }) => {
                         self.shutdown().await;
@@ -867,7 +896,15 @@ impl Session {
         self.drop_socket(key);
         match bind {
             Bind::Ephemeral => {
-                let socket = UdpSocket::bind((self.services.bind_address, 0))
+                // An IPv4 socket cannot reach an IPv6 device: with no bind
+                // address chosen, take the device's family.
+                let address = match self.services.bind_address {
+                    IpAddr::V4(a) if a.is_unspecified() && self.host.is_ipv6() => {
+                        IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED)
+                    }
+                    a => a,
+                };
+                let socket = UdpSocket::bind((address, 0))
                     .await
                     .map_err(|e| format!("bind: {e}"))?;
                 let socket = Arc::new(socket);
@@ -954,6 +991,10 @@ impl Session {
             Some(Socket::Own { reader, .. }) => reader.abort(),
             Some(Socket::Shared { port }) => self.services.shared_udp.unregister(port, self.host),
             None => {}
+        }
+        // A TCP port listened on whose listener failed.
+        if let Some(port) = self.listening.remove(key) {
+            self.services.shared_tcp.unregister(port, self.host);
         }
     }
 

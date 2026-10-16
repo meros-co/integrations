@@ -2747,6 +2747,13 @@ impl Module for Atem {
         self.lost(cx, &format!("socket error: {message}"));
     }
 
+    /// A fresh socket and handshake now; a level subscription asked for is
+    /// renewed once the switcher has sent its state, as after any reconnect.
+    fn reconnect(&mut self, cx: &mut Cx) -> bool {
+        self.lost(cx, "reconnecting");
+        true
+    }
+
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         match key {
             HELLO if self.phase == Phase::Hello => self.hello(cx),
@@ -4267,6 +4274,27 @@ mod tests {
                 .any(|p| p.len() > 12 && p[12..] == command(b"SFLN", &[1, 0, 0, 0])[..]),
             "{packets:?}"
         );
+    }
+
+    /// Asked to reconnect (the host resumed), it starts a fresh session at
+    /// once and still renews the level subscription it was asked for.
+    #[test]
+    fn reconnect_on_request_keeps_the_level_subscription() {
+        let (mut m, _) = ready();
+        payload(&mut m, "set_audio_levels", json!({"enabled": true}));
+        let mut cx = Cx::new(10_000);
+        assert!(m.reconnect(&mut cx));
+        let a = cx.take();
+        assert!(a.contains(&Action::UdpOpen {
+            socket: SOCKET,
+            bind: Bind::Ephemeral
+        }));
+        assert_eq!(sent(&a), [HELLO_PACKET.to_vec()]);
+        feed(&mut m, 10_010, syn_reply());
+        let a = feed(&mut m, 10_020, reliable(0x8002, 1, &dump()));
+        assert!(sent(&a)
+            .iter()
+            .any(|p| p.len() > 12 && p[12..] == command(b"SFLN", &[1, 0, 0, 0])[..]));
     }
 
     #[test]
