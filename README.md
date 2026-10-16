@@ -22,7 +22,8 @@ been tested against real hardware yet.
 | HTTP service | `meros-integrations serve` (`crates/sidecar`) |
 
 All of them run the same library, so a device behaves the same way whichever
-one you use.
+one you use. The C library also builds for Android and iOS: see
+[docs/MOBILE.md](docs/MOBILE.md).
 
 Pin an exact version. A new release can change what is sent to your hardware.
 
@@ -99,6 +100,11 @@ Events). A listener such as `osc-listener`, which hears OSC from any control
 surface and is opened with no host, reports each message it receives as a
 `message` event, even when it repeats the last, so a button pressed twice
 arrives twice; a slow consumer loses state patches before it loses those.
+
+**When resuming** after being suspended, or after the network changed, call
+`Core::reconnect_all` in Rust or `mi_reconnect_all` in C: every device's
+connections are opened again at once, rather than after its own timeouts
+find them dead.
 
 **When shutting down**, call `close_all` (`closeAll` in Node, `mi_close_all`
 in C) before the process exits. The core refuses new work, gives commands in
