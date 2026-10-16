@@ -67,7 +67,8 @@ The build gives `libmeros_integrations_c.so` (load it with
 - The library has no JNI entry points of its own: the app's JNI code calls
   the C functions in `include/meros_integrations.h` and passes the JSON
   strings across.
-- No Android system library beyond libc, libm and libdl is linked.
+- The `.so` needs only libc, libm and libdl. Linking the static library into
+  the app's own JNI library also takes `-llog -lunwind -ldl -lm -lc`.
 
 ## iOS
 

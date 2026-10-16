@@ -17,7 +17,7 @@ library and the network stack use:
 | Windows (MSVC, `/MD`) | `ws2_32 userenv ntdll bcrypt advapi32 kernel32 crypt32 secur32 ncrypt ole32 oleaut32 iphlpapi` |
 | Linux | `-lpthread -ldl -lm` |
 | macOS | `-framework Security -framework CoreFoundation` |
-| Android | `-lm -ldl` (from the NDK; API level 24 or later) |
+| Android | `-llog -lunwind -ldl -lm -lc` (from the NDK; API level 24 or later) |
 | iOS | none beyond the system library |
 
 Android (`aarch64-linux-android`, `armv7-linux-androideabi`) and iOS
