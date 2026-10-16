@@ -963,6 +963,10 @@ impl Session {
             Some(Socket::Shared { port }) => self.services.shared_udp.unregister(port, self.host),
             None => {}
         }
+        // A TCP port listened on whose listener failed.
+        if let Some(port) = self.listening.remove(key) {
+            self.services.shared_tcp.unregister(port, self.host);
+        }
     }
 
     async fn shutdown(&mut self) {

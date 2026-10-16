@@ -374,6 +374,8 @@ pub(crate) struct Listener {
     v3: V3Stream,
     /// Displays seen per screen, for V5.0 broadcasts.
     known: BTreeMap<u16, BTreeSet<u16>>,
+    /// How long to wait before listening again after the port failed.
+    retry_after: Millis,
 }
 
 impl Listener {
@@ -388,11 +390,13 @@ impl Listener {
             deframer: Deframer::default(),
             v3: V3Stream::default(),
             known: BTreeMap::new(),
+            retry_after: RETRY_MIN,
         }
     }
 
     fn receive(&mut self, cx: &mut Cx, data: &[u8]) {
         cx.alive();
+        self.retry_after = RETRY_MIN;
         match decode(data) {
             Some((version, updates)) => {
                 let patch = self.patch(version, updates);
@@ -486,11 +490,20 @@ impl Module for Listener {
         }
     }
 
+    /// The port could not be bound, or failed later (a suspended mobile
+    /// app's sockets can be reclaimed): listen again after a delay.
     fn socket_error(&mut self, cx: &mut Cx, _socket: Key, message: &str) {
-        cx.log(Level::Warning, message.to_string());
-        cx.connection(Connection::Disconnected {
-            reason: message.to_string(),
-        });
+        let reason = if self.port < 1024 {
+            format!(
+                "{message} (ports below 1024 can need privileges an app does not                  have, and Android refuses them: use port 1024 or above)"
+            )
+        } else {
+            message.to_string()
+        };
+        cx.log(Level::Warning, reason.clone());
+        cx.connection(Connection::Disconnected { reason });
+        cx.set_timer(RETRY, self.retry_after);
+        self.retry_after = (self.retry_after * 2).min(RETRY_MAX);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, _params: &Params) {
@@ -506,7 +519,11 @@ impl Module for Listener {
         self.receive(cx, data);
     }
 
-    fn timer(&mut self, _cx: &mut Cx, _key: Key) {}
+    fn timer(&mut self, cx: &mut Cx, key: Key) {
+        if key == RETRY {
+            self.start(cx);
+        }
+    }
 }
 
 // ── Sending ──────────────────────────────────────────────────────────────
@@ -976,6 +993,48 @@ mod tests {
             })
             .unwrap();
         assert_eq!(patch["screens"]["0"]["displays"]["3"]["text"], "ALL");
+    }
+
+    /// A port that could not be bound, or failed later (a suspended mobile
+    /// app's sockets), is listened on again after a growing delay, with a
+    /// hint for a port the platform may refuse.
+    #[test]
+    fn the_listener_listens_again_after_its_port_failed() {
+        let mut l = Listener::new(900, "tsl-umd");
+        l.start(&mut Cx::new(0));
+        let mut cx = Cx::new(0);
+        l.socket_error(&mut cx, SOCKET, "bind :900: permission denied");
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: RETRY,
+            after: RETRY_MIN
+        }));
+        assert!(a.iter().any(|a| matches!(a,
+            Action::Connection(Connection::Disconnected { reason }) if reason.contains("1024"))));
+        let mut cx = Cx::new(0);
+        l.timer(&mut cx, RETRY);
+        assert!(cx.take().contains(&Action::UdpOpen {
+            socket: SOCKET,
+            bind: Bind::Shared(900)
+        }));
+        let mut cx = Cx::new(0);
+        l.socket_error(&mut cx, SOCKET, "failed again");
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: RETRY,
+            after: RETRY_MIN * 2
+        }));
+
+        let mut l = Listener::new(9000, "tsl-umd-5-tcp");
+        let mut cx = Cx::new(0);
+        l.socket_error(&mut cx, SOCKET, "listening on TCP port 9000 failed");
+        assert!(!cx.take().iter().any(|a| matches!(a,
+            Action::Connection(Connection::Disconnected { reason }) if reason.contains("1024"))));
+        let mut cx = Cx::new(0);
+        l.timer(&mut cx, RETRY);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::TcpListen { port: 9000, .. })));
     }
 
     #[test]
