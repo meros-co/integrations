@@ -1,7 +1,7 @@
 /* Builds against meros_integrations.h and the static library, and exercises
  * the interface from C: start a core, read the catalogue, refuse a bad open
- * and a stream of a device that is not open, poll events, and free
- * everything it was given. */
+ * and a stream or reconnect of a device that is not open, poll events, and
+ * free everything it was given. */
 #include <stdio.h>
 #include <string.h>
 #include "meros_integrations.h"
@@ -25,11 +25,14 @@ int main(void) {
     mi_string_free(no_stream);
     mi_stream_free(stream);
 
+    int reconnect_refused = mi_reconnect(core, 999) == 0;
+    mi_reconnect_all(core);
+
     char *events = mi_poll_events(core, 16);
     mi_string_free(events);
 
     mi_core_free(core);
-    if (!has_kramer || !is_error || !stream_refused) { fprintf(stderr, "unexpected result\n"); return 1; }
+    if (!has_kramer || !is_error || !stream_refused || !reconnect_refused) { fprintf(stderr, "unexpected result\n"); return 1; }
     printf("ok\n");
     return 0;
 }

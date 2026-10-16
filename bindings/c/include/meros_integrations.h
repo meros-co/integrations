@@ -90,6 +90,16 @@ void mi_interrupt_events(const MiCore *core);
 /* End a device's session and wait until it has closed. */
 void mi_close(const MiCore *core, uint64_t device);
 
+/* Drop a device's connections and open them again now, from its current
+ * settings, rather than after a retry delay: for a host whose network
+ * changed or that resumes after being suspended (a mobile app returning to
+ * the foreground). The device keeps its id and state; commands in flight
+ * fail with "transport". Returns 1, or 0 if the device is not open.
+ * mi_reconnect_all does the same for every open device. Both wait until
+ * the devices have restarted (not until they are connected). */
+int mi_reconnect(const MiCore *core, uint64_t device);
+void mi_reconnect_all(const MiCore *core);
+
 /* Shut down cleanly before exiting: refuse new devices and commands
  * (open answers {"error":{"error":"closing"}}), give commands in flight up
  * to grace_ms, then close every device so each ends what it started on the
