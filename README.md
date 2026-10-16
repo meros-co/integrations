@@ -102,9 +102,11 @@ surface and is opened with no host, reports each message it receives as a
 arrives twice; a slow consumer loses state patches before it loses those.
 
 **When resuming** after being suspended, or after the network changed, call
-`Core::reconnect_all` in Rust or `mi_reconnect_all` in C: every device's
-connections are opened again at once, rather than after its own timeouts
-find them dead.
+`reconnect_all` (`Core::reconnect_all` in Rust, `reconnectAll` in Node,
+`reconnect_all` in Python, `mi_reconnect_all` in C, `POST /v1/reconnect_all`
+from the HTTP service): every device's connections are opened again at once,
+rather than after its own timeouts find them dead. `reconnect` (`POST
+/v1/reconnect` with `{device}`) does one device.
 
 **When shutting down**, call `close_all` (`closeAll` in Node, `mi_close_all`
 in C) before the process exits. The core refuses new work, gives commands in
