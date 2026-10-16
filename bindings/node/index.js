@@ -141,6 +141,23 @@ class Core extends EventEmitter {
   }
 
   /**
+   * Drop a device's connections and open them again now, from its current
+   * settings, rather than after a retry delay: for a host that resumes after
+   * being suspended or whose network changed. The device keeps its id and
+   * state; commands in flight fail with 'transport'. Resolves true once the
+   * device has restarted (not once it is connected), or false if it is not
+   * open.
+   */
+  async reconnect(device) {
+    return this.#native.reconnect(device);
+  }
+
+  /** `reconnect` every open device. */
+  async reconnectAll() {
+    await this.#native.reconnectAll();
+  }
+
+  /**
    * Shut down cleanly before the process exits: refuse new devices and
    * commands, give commands in flight up to `graceMs`, then close every
    * device so each ends what it started on the device.

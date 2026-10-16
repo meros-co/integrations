@@ -190,6 +190,12 @@ fn the_shared_binding_script() {
                     let result = take(mi_update_settings(core, device, settings.as_ptr()));
                     assert_eq!(strip_messages(&result), step["expect"], "{label}");
                 }
+                "reconnect" => assert_eq!(
+                    Value::Bool(mi_reconnect(core, device) == 1),
+                    step["expect"],
+                    "{label}"
+                ),
+                "reconnect_all" => mi_reconnect_all(core),
                 "close" => mi_close(core, device),
                 other => panic!("unknown op {other}"),
             }

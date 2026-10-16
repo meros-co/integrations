@@ -118,6 +118,20 @@ again at once; `mi_reconnect` does one device. Devices keep their ids and
 last known state, and the state is read afresh on the new connections.
 What the app asked for that a device forgets with its connection (an OMT
 receiver's tally, an ATEM audio level subscription) is asked for again.
+Every delivery has the same two calls, for a mobile consumer built on one
+of the other packages or on the HTTP service:
+
+| Delivery | One device | Every open device |
+|---|---|---|
+| Rust | `Core::reconnect(device)` | `Core::reconnect_all()` |
+| C | `mi_reconnect(core, device)` | `mi_reconnect_all(core)` |
+| Node | `await core.reconnect(device)` | `await core.reconnectAll()` |
+| Python | `core.reconnect(device)` (`reconnect_async`) | `core.reconnect_all()` (`reconnect_all_async`) |
+| HTTP service | `POST /v1/reconnect` `{device}` | `POST /v1/reconnect_all` |
+
+Each returns once the devices have restarted, not once they are connected;
+the single-device call answers false (`{"reconnected": false}`) for a
+device that is not open.
 
 Without it the core still recovers by itself:
 

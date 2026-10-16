@@ -125,6 +125,12 @@ test('the shared binding script', async () => {
           assert.deepStrictEqual(stripMessages(result), step.expect, label);
           break;
         }
+        case 'reconnect':
+          assert.strictEqual(await core.reconnect(step.device), step.expect, label);
+          break;
+        case 'reconnect_all':
+          await core.reconnectAll();
+          break;
         case 'close':
           await core.close(step.device);
           break;

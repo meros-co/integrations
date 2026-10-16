@@ -28,6 +28,8 @@
 //! | POST /v1/settings            | {device, settings}                    | {ok: true} or {error}      |
 //! | GET  /v1/snapshot/{device}   |                                       | snapshot, or null          |
 //! | POST /v1/close               | {device}                              | {}                         |
+//! | POST /v1/reconnect           | {device}                              | {reconnected: true/false}  |
+//! | POST /v1/reconnect_all       |                                       | {}                         |
 //! | GET  /v1/events              | ?max=256&wait_ms=25000                | [events], empty on timeout |
 //! | GET  /v1/devices/{device}/streams/{stream}.mjpg |                    | MJPEG, until closed        |
 //! | GET  /v1/devices/{device}/streams/{stream}.jpg  | ?wait_ms=5000      | the newest JPEG            |
@@ -45,6 +47,15 @@
 //! takes them live, and one whose credential was refused connects again; a
 //! native one is restarted under the same id. After a sign-in the consumer
 //! passes the new OAuth tokens here.
+//!
+//! `/v1/reconnect` drops a device's connections and opens them again now,
+//! from its current settings, rather than after a retry delay, as
+//! `reconnect` does in every delivery: for a host that resumes after being
+//! suspended or whose network changed. The device keeps its id and last
+//! known state, which is read afresh; commands in flight fail with
+//! `transport`. It answers once the device has restarted (not once it is
+//! connected), with `reconnected: false` if the device is not open.
+//! `/v1/reconnect_all` does the same for every open device.
 //!
 //! An `auth: oauth2` device (YouTube, Planning Center) refreshes its access
 //! token itself and reports each new token in a `credentials` event (SPEC.md,
@@ -223,6 +234,25 @@ async fn close(State(app): State<Shared>, headers: HeaderMap, Json(body): Json<C
     Json(json!({})).into_response()
 }
 
+async fn reconnect(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Json(body): Json<Close>,
+) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    Json(json!({"reconnected": app.core.reconnect(body.device).await})).into_response()
+}
+
+async fn reconnect_all(State(app): State<Shared>, headers: HeaderMap) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    app.core.reconnect_all().await;
+    Json(json!({})).into_response()
+}
+
 #[derive(Deserialize)]
 struct EventsQuery {
     max: Option<usize>,
@@ -373,6 +403,8 @@ fn router(app: Shared) -> Router {
         .route("/v1/settings", post(settings))
         .route("/v1/snapshot/{device}", get(snapshot))
         .route("/v1/close", post(close))
+        .route("/v1/reconnect", post(reconnect))
+        .route("/v1/reconnect_all", post(reconnect_all))
         .route("/v1/events", get(events))
         .route("/v1/devices/{device}/streams/{file}", get(device_stream))
         .with_state(app)

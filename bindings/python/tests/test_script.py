@@ -3,6 +3,7 @@ integrations-sim, the same script every other delivery runs.
 
     python build_dev.py && python -m unittest discover -s tests
 """
+import asyncio
 import json
 import subprocess
 import sys
@@ -112,6 +113,10 @@ class SharedScript(unittest.TestCase):
             elif op == "update_settings":
                 result = json.loads(native.update_settings(step["device"], json.dumps(step["settings"])))
                 self.assertEqual(strip_messages(result), step["expect"], label)
+            elif op == "reconnect":
+                self.assertEqual(native.reconnect(step["device"]), step["expect"], label)
+            elif op == "reconnect_all":
+                native.reconnect_all()
             elif op == "close":
                 native.close(step["device"])
             else:
@@ -133,6 +138,29 @@ class SharedScript(unittest.TestCase):
             core.execute(device, "route_video", {"input": -1, "output": 1})
         self.assertEqual(caught.exception.code, "invalid_params")
         core.close(device)
+
+    def test_reconnect(self):
+        core = Core(bind_address=LOOPBACK)
+        device = core.open({"device": "kramer-p3000", "model": "p3000-generic", "host": "127.0.0.1",
+                            "port": self.ports["kramer"]})
+
+        def connected():
+            deadline = time.monotonic() + 5
+            while core.snapshot(device)["connection"]["status"] != "connected":
+                self.assertLess(time.monotonic(), deadline)
+                time.sleep(0.02)
+
+        connected()
+        self.assertTrue(core.reconnect(device))
+        self.assertFalse(core.reconnect(device + 1000))
+        connected()
+        self.assertEqual(core.execute(device, "get_model"), {"kind": "value", "value": "VS-88UT"})
+        asyncio.run(core.reconnect_all_async())
+        self.assertTrue(asyncio.run(core.reconnect_async(device)))
+        connected()
+        self.assertEqual(core.execute(device, "get_model"), {"kind": "value", "value": "VS-88UT"})
+        core.close(device)
+        self.assertFalse(core.reconnect(device))
 
     def test_streams(self):
         core = Core(bind_address=LOOPBACK)

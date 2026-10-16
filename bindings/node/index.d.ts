@@ -210,6 +210,17 @@ export class Core extends EventEmitter {
   snapshot(device: DeviceId): Snapshot | null;
   close(device: DeviceId): Promise<void>;
   /**
+   * Drop a device's connections and open them again now, from its current
+   * settings, rather than after a retry delay: for a host that resumes after
+   * being suspended or whose network changed. The device keeps its id and
+   * last known state, which is read afresh; commands in flight fail with
+   * 'transport'. Resolves true once the device has restarted (not once it is
+   * connected), or false if it is not open.
+   */
+  reconnect(device: DeviceId): Promise<boolean>;
+  /** `reconnect` every open device. */
+  reconnectAll(): Promise<void>;
+  /**
    * Shut down cleanly before the process exits: refuse new devices and
    * commands ('closing'), give commands in flight up to `graceMs` (default
    * 5000), then close every device so each ends what it started on it.

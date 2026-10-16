@@ -170,6 +170,12 @@ async fn the_shared_binding_script() {
                 let result = api::update_settings(&core, device, &step["settings"]).await;
                 assert_eq!(strip_messages(&result), step["expect"], "{label}");
             }
+            "reconnect" => assert_eq!(
+                Value::Bool(core.reconnect(device).await),
+                step["expect"],
+                "{label}"
+            ),
+            "reconnect_all" => core.reconnect_all().await,
             "close" => core.close(device).await,
             other => panic!("unknown op {other}"),
         }
