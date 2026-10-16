@@ -162,6 +162,20 @@ impl NativeCore {
         Ok(())
     }
 
+    /// Drop the device's connections and open them again now
+    /// (`Core::reconnect`); false if it is not open.
+    #[napi]
+    pub async fn reconnect(&self, device: f64) -> Result<bool> {
+        Ok(self.core.reconnect(device_id(device)?).await)
+    }
+
+    /// `reconnect` every open device (`Core::reconnect_all`).
+    #[napi]
+    pub async fn reconnect_all(&self) -> Result<()> {
+        self.core.reconnect_all().await;
+        Ok(())
+    }
+
     #[napi]
     pub async fn close_all(&self, grace_ms: u32) -> Result<()> {
         self.core

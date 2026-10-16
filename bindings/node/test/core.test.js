@@ -74,6 +74,41 @@ test('drives a device through the binding', async () => {
   }
 });
 
+test('a device reconnected on request keeps its id and connects again', async () => {
+  const device = await simulatedEm6000();
+  const core = new Core({ bindAddress: '127.0.0.1' });
+  const until = recorder(core);
+  try {
+    const id = core.open({
+      device: 'sennheiser-digital-6000',
+      model: 'em-6000',
+      host: '127.0.0.1',
+      port: device.address().port,
+    });
+    let connected = 0;
+    core.on('event', (e) => {
+      if (e.event === 'connection' && e.device === id && e.connection.status === 'connected') connected += 1;
+    });
+    await until((e) => e.event === 'connection' && e.device === id && e.connection.status === 'connected');
+
+    assert.strictEqual(await core.reconnect(id), true);
+    assert.strictEqual(await core.reconnect(id + 1000), false);
+    await core.reconnectAll();
+    const deadline = Date.now() + 5000;
+    while (connected < 2 || core.snapshot(id).connection.status !== 'connected') {
+      assert.ok(Date.now() < deadline, 'timed out');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    assert.deepStrictEqual(await core.execute(id, 'mute', { channel: 1, muted: true }), { kind: 'ack' });
+
+    await core.close(id);
+    assert.strictEqual(await core.reconnect(id), false);
+  } finally {
+    core.dispose();
+    device.close();
+  }
+});
+
 test('the catalogue lists every spec', () => {
   const core = new Core({ bindAddress: '127.0.0.1' });
   try {
