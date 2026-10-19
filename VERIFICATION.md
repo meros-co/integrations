@@ -1167,6 +1167,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that a receiver's x, y and groupId can be written by MAC address. ([specs/megapixel-helios.yaml:426](specs/megapixel-helios.yaml#L426))
 - [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:458](specs/megapixel-helios.yaml#L458))
 
+## meros-camera — Meros Camera
+
+- [ ] Confirm that a command the camera carried out answers error null: the app's answers carry its current error, which could be one left from an earlier failure, and any error fails the command. ([specs/meros-camera.yaml:466](specs/meros-camera.yaml#L466))
+- [ ] Confirm that the settings answer's resolved is the whole resolved settings (kept as resolved_settings), as the capabilities answer's is, while the status's resolved is only width, height, fps and highSpeed. ([specs/meros-camera.yaml:583](specs/meros-camera.yaml#L583))
+- [ ] Confirm that the status's outputs.problems is an object keyed by output kind, as §7.1 says (the simulator sends an empty array), and that an output with a problem is not listed in outputs.on. ([specs/meros-camera.yaml:606](specs/meros-camera.yaml#L606))
+- [ ] Check that battery, freeBytes and signalDbm are whole numbers on a phone; the simulator writes freeBytes as a float, which the driver turns into an integer. ([specs/meros-camera.yaml:602](specs/meros-camera.yaml#L602))
+- [ ] On a phone, confirm the event stream's first line arrives at once and a line follows at least every 5 s while nothing changes, so the driver's 10 s silence check never drops a healthy stream, and that a stream ended by the camera is reopened after the status is read again. ([specs/meros-camera.yaml:420](specs/meros-camera.yaml#L420))
+- [ ] Confirm that the battery reads -1 while unknown (no battery_low event is sent from -1), and that warnings and error are plain sentences the derived warning and error events can repeat. ([specs/meros-camera.yaml:432](specs/meros-camera.yaml#L432))
+- [ ] Confirm that the capabilities answer's ops lists every op the app carries out (capabilities, settings, record, preset, lens, focusAt, look, monitoring, outputs, slate, circle, tally, talkback, return, visca), and that an unlisted op answers {"error": "unknown op ..."}. ([specs/meros-camera.yaml:459](specs/meros-camera.yaml#L459))
+- [ ] Confirm that the preview's first frame after a viewer joins is a keyframe carrying its parameter sets (SPS and PPS, and VPS under HEVC), and record how often keyframes recur afterwards, which bounds how long a watcher that dropped frames waits. ([specs/meros-camera.yaml:475](specs/meros-camera.yaml#L475))
+- [ ] Confirm the clip server's ranges: a range ending past the file is cut at its last byte (206), a range starting at or past the end answers 416 with Content-Range bytes */<size>, and a slate sidecar (.json) is read the same way. ([specs/meros-camera.yaml:86](specs/meros-camera.yaml#L86))
+- [ ] Confirm that the status carries talkback only while talkback is on, and never its latch, which the driver knows only from set_talkback's answer. ([specs/meros-camera.yaml:611](specs/meros-camera.yaml#L611))
+- [ ] Confirm zebra2Level's range: 0.3 to 1 is taken from the app's clamp, as §7.4 gives only the band's width. ([specs/meros-camera.yaml:255](specs/meros-camera.yaml#L255))
+- [ ] On a network with several cameras, confirm each announces _meros-cam._tcp with TXT id, name, model and proto and its port in SRV, that a camera whose address changes announces the new A record with the cache-flush bit, and that turning remote control off sends a goodbye. ([specs/meros-camera.yaml:46](specs/meros-camera.yaml#L46))
+- [ ] Confirm that a camera given a new fleet key answers 401 to the old one at once, including on an event stream or preview already open. ([specs/meros-camera.yaml:442](specs/meros-camera.yaml#L442))
+- [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:546](specs/meros-camera.yaml#L546))
+
 ## millumin — Millumin
 
 - [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:903](specs/millumin.yaml#L903))

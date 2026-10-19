@@ -64,6 +64,10 @@ mod generic_tcp_udp;
 mod http_snapshot;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
+#[cfg(feature = "meros-camera")]
+mod meros_camera;
+#[cfg(feature = "meros-camera")]
+mod meros_camera_wire;
 #[cfg(feature = "novastar-central-control")]
 mod novastar_ccp;
 #[cfg(feature = "novastar-h")]
@@ -240,6 +244,8 @@ pub(crate) fn construct(
                     .into(),
             ),
         },
+        #[cfg(feature = "meros-camera")]
+        "meros-camera" => Ok(Box::new(meros_camera::MerosCamera::new(context))),
         #[cfg(feature = "labgruppen-lake")]
         "labgruppen-lake" => Ok(Box::new(lake_dlm::LakeDlm::new(context)?)),
         #[cfg(feature = "emberplus")]

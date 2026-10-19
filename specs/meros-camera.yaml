@@ -1,0 +1,624 @@
+spec: 1
+id: meros-camera
+name: Meros Camera
+vendor: Meros
+category: camera
+implementation: native
+reason: >
+  The status arrives as an NDJSON stream that never ends (a status document per change and a keepalive
+  every 5 s), which must be reconnected and the status re-read when it ends or goes quiet; events are
+  derived by comparing consecutive documents; the preview is a binary stream of length-prefixed frames
+  opened only while watched; clips are read in byte ranges; ops are gated by the list the camera's
+  capabilities answer gives; and fleet links are base64url of raw DEFLATE.
+
+source:
+  - title: Meros Camera Control protocol, version 1
+    author: Meros
+    note: >
+      The protocol as the camera implements it, at camera commit 1d52c4d: availability (§1), mDNS
+      discovery as _meros-cam._tcp with TXT id, name, model and proto and the port in SRV (§2), HTTP/1.1
+      with one request per connection, JSON bodies and the error statuses (§3), the fleet key and fleet
+      links (§4), the requests (§5), every command op (§6), the status, capabilities, settings, monitoring
+      and outputs documents (§7), the NDJSON event stream and its reconnection rule (§8), the preview's
+      frame format (§9), versioning (§11) and timing (§12).
+  - title: Meros Camera, camera-remote crate and the app's controller (camera_controller.dart, outputs.dart)
+    author: Meros
+    note: >
+      Read at commit 1d52c4d to confirm wire shapes the document leaves open: the response heads (no
+      length on streams, which end by closing), the Range handling and its 416 Content-Range, the
+      answer of each op (lens, look, talkback, return, circle, slate), the outputs' field names and
+      defaults, the monitoring fields and their clamps (zebra2Level 0.3 to 1), and the fleet link's
+      DEFLATE and base64url encoding.
+
+settings:
+  fleet_key: { type: string, secret: true, default: "", pattern: "^([0-9a-f]{32})?$",
+               label: Fleet key,
+               description: "The camera's fleet key, 32 lowercase hex characters: from its fleet QR code (decode_fleet_link), or typed or pasted; empty is refused by every camera." }
+  battery_low_percent: { type: int, min: 0, max: 100, default: 20,
+                         label: Low battery,
+                         description: "A battery_low message event is sent when the camera's battery falls below this percentage; 0 sends none." }
+  storage_low_gib: { type: float, min: 0, max: 100000, default: 10,
+                     label: Low storage,
+                     description: "A storage_low message event is sent when the camera's free storage falls below this many GiB; 0 sends none." }
+
+ports:
+  - { port: 8790, protocol: http, role: control, note: "Meros Camera Control: requests, the NDJSON event stream, the preview and clip files" }
+  - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD (_meros-cam._tcp); the camera's port is in its SRV record" }
+
+models:
+  - id: meros-camera
+    name: Meros Camera (Meros Camera Control protocol, version 1)
+    supports: [get_hello, get_status, get_capabilities, list_clips, read_clip, clip_url, decode_fleet_link,
+               set_settings, set_exposure, set_white_balance, measure_white_balance, set_focus, set_zoom,
+               set_format, set_profile, set_stabilization, set_torch, set_aperture, set_exact_frame_rate,
+               set_recording_settings, select_lens, focus_at, recall_preset,
+               start_recording, stop_recording, set_slate, circle_clip,
+               set_monitoring, set_false_color, set_zebra, set_zebra2, set_peaking, set_scope,
+               set_frame_guide, set_guides, set_monitor_display, set_look,
+               set_outputs, set_srt_output, set_rtmp_output, set_hls_output, set_whip_output,
+               set_whep_output, set_omt_output, set_ndi_output, set_external_output,
+               set_output_interface, set_output_look, set_output_format,
+               set_tally, set_talkback, new_talkback_address, set_return, visca, send_op]
+    verification: none
+    notes: >
+      Remote control is a Pro feature of each camera and is served only while Remote control is on
+      (Settings, Remote). The controller side needs nothing.
+
+streams:
+  live:
+    format: meros-preview
+    summary: "The camera's live preview (H.264, or HEVC under HLG; at most 1080p), while watched: each frame as the camera sends it"
+
+commands:
+  # ---- reads ----
+  get_hello:
+    summary: Read who the camera is (GET /v1/hello, no key needed) {id, name, model, app, protocol}
+    returns: value
+  get_status:
+    summary: Read the status document now (GET /v1/status), also applied to state
+    returns: value
+  get_capabilities:
+    summary: Read what the camera can do (op capabilities) {protocol, ops, capabilities, settings, resolved, monitoring, outputs, luts, presets}
+    returns: value
+  list_clips:
+    summary: Read the clip list (GET /v1/clips), oldest first, also applied to state
+    returns: value
+  read_clip:
+    summary: Read a byte range of a clip file or its slate sidecar (GET /v1/clips/<name> with Range) as {name, offset, length, total, eof, data (base64)}; past the end, length 0 and eof true
+    params:
+      name: { type: string, required: true, max_length: 255, pattern: "^[^./\\\\][^/\\\\]*$", label: Clip, description: "The file's name from clips (A001C007.mov), or its slate sidecar (A001C007.json)." }
+      offset: { type: int, min: 0, max: 9007199254740991, default: 0, label: Offset, description: "The first byte to read, from 0." }
+      length: { type: int, min: 1, max: 16777216, default: 1048576, label: Length, description: "How many bytes to read, at most 16 MiB." }
+    returns: value
+  clip_url:
+    summary: A URL a player or downloader can open for a clip, with the fleet key in its query ({url}); made here, nothing is sent
+    params:
+      name: { type: string, required: true, max_length: 255, pattern: "^[^./\\\\][^/\\\\]*$", label: Clip, description: "The file's name from clips." }
+    returns: value
+  decode_fleet_link:
+    summary: Decode a fleet link (meros-camera://fleet?d=...) from a camera's fleet QR code into {key, preset?}; done here, nothing is sent
+    params:
+      link: { type: string, required: true, max_length: 8192, label: Fleet link, description: "The link the QR code carries." }
+    returns: value
+
+  # ---- camera: exposure, white balance, focus, zoom, lens, format (§6.2) ----
+  set_settings:
+    summary: Merge a partial settings document (protocol §7.3) into the camera's settings (op settings); answers {resolved, warnings}
+    params:
+      settings: { type: json, required: true, label: Settings, description: "A partial settings document, e.g. {\"exposure\": {\"mode\": \"manual\", \"iso\": 800}}." }
+    returns: value
+  set_exposure:
+    summary: Set exposure (op settings, exposure); give the fields to change
+    params:
+      mode: { type: enum, values: [auto, shutterPriority, isoPriority, manual], label: Mode, description: "Exposure mode." }
+      iso: { type: float, min: 1, max: 409600, label: ISO, description: "ISO, within the lens's range (capabilities); the camera clamps it." }
+      shutter_angle: { type: float, min: 1, max: 360, label: Shutter angle, description: "Shutter as an angle of the frame interval, in degrees." }
+      shutter_seconds: { type: float, min: 0.000001, max: 60, label: Shutter time, description: "Shutter as an exposure time in seconds; give this or shutter_angle." }
+      ev: { type: float, min: -10, max: 10, label: Exposure compensation, description: "Exposure compensation in EV, in the lens's steps and range." }
+      lock: { type: bool, label: AE lock, description: "Hold the automatic exposure." }
+      antibanding: { type: enum, values: ["off", 50hz, 60hz, auto], label: Antibanding, description: "Flicker reduction for the mains frequency." }
+    returns: value
+  set_white_balance:
+    summary: Set white balance (op settings, whiteBalance); give the fields to change
+    params:
+      mode: { type: enum, values: [auto, preset, manual], label: Mode, description: "White balance mode." }
+      preset: { type: string, max_length: 64, label: Preset, description: "A white balance preset name from the lens's presets, for mode preset." }
+      kelvin: { type: float, min: 1000, max: 20000, label: Color temperature, description: "Color temperature in kelvin, for mode manual; the camera clamps it to the lens's range." }
+      tint: { type: float, min: -100, max: 100, label: Tint, description: "Tint from -100 (green) to +100 (magenta)." }
+      lock: { type: bool, label: AWB lock, description: "Hold the automatic white balance." }
+    returns: value
+  measure_white_balance:
+    summary: Measure auto white balance at a point (a grey card) and then lock it (op settings, whiteBalance.point)
+    params:
+      x: { type: float, min: 0, max: 1, required: true, label: X, description: "Horizontal position, 0 to 1 across the sensor." }
+      y: { type: float, min: 0, max: 1, required: true, label: Y, description: "Vertical position, 0 to 1 down the sensor." }
+    returns: value
+  set_focus:
+    summary: Set focus (op settings, focus); give the fields to change
+    params:
+      mode: { type: enum, values: [continuous, single, manual], label: Mode, description: "Focus mode." }
+      position: { type: float, min: 0, max: 1, label: Position, description: "Manual focus position: 0 is infinity, 1 the closest." }
+      faces: { type: bool, label: Faces, description: "Continuous autofocus follows faces." }
+      lock: { type: bool, label: Focus lock, description: "Hold the focus." }
+    returns: value
+  set_zoom:
+    summary: Set the zoom ratio (op settings, zoom), within the lens's zoom range
+    params:
+      ratio: { type: float, min: 0.1, max: 100, required: true, label: Zoom, description: "Zoom ratio; the camera clamps it to the lens's range." }
+    returns: value
+  set_format:
+    summary: Set the recording format (op settings, width, height, fps), among the lens's video formats and rates; refused mid-clip
+    params:
+      width: { type: int, min: 16, max: 16384, label: Width, description: "Frame width in pixels." }
+      height: { type: int, min: 16, max: 16384, label: Height, description: "Frame height in pixels." }
+      fps: { type: float, min: 1, max: 1000, label: Frame rate, description: "Frames per second." }
+    returns: value
+  set_profile:
+    summary: Set the picture profile (op settings, profile)
+    params:
+      profile: { type: enum, values: [standard, flat, log, linear], required: true, label: Profile, description: "Picture profile." }
+    returns: value
+  set_stabilization:
+    summary: Set stabilization (op settings, stabilization)
+    params:
+      mode: { type: enum, values: ["off", standard, cinematic], required: true, label: Stabilization, description: "Stabilization mode, among the lens's modes." }
+    returns: value
+  set_torch:
+    summary: Set the torch level (op settings, torch)
+    params:
+      level: { type: float, min: 0, max: 1, required: true, label: Torch, description: "Torch level from 0 (off) to 1." }
+    returns: value
+  set_aperture:
+    summary: Set the aperture (op settings, aperture), on a variable-iris lens
+    params:
+      f_number: { type: float, min: 0.5, max: 64, required: true, label: Aperture, description: "f-number, among the lens's apertures." }
+    returns: value
+  set_exact_frame_rate:
+    summary: Hold the exact frame rate (op settings, exactFrameRate)
+    params:
+      enabled: { type: bool, required: true, label: Exact frame rate, description: "Hold the frame rate exactly." }
+    returns: value
+  set_recording_settings:
+    summary: Set how clips are recorded (op settings, recording); give the fields to change
+    params:
+      codec: { type: enum, values: [h264, hevc], label: Codec, description: "Video codec." }
+      dynamic_range: { type: enum, values: [sdr, hlg], label: Dynamic range, description: "SDR, or HLG (10-bit HEVC)." }
+      bitrate_mbps: { type: float, min: 0, max: 2000, label: Bitrate, description: "Video bitrate in Mbit/s; 0 is automatic." }
+      container: { type: enum, values: [mov, mp4], label: Container, description: "File format." }
+      audio: { type: enum, values: [none, aac, pcm16, pcm24, f32], label: Audio, description: "Audio coding; PCM in MOV only." }
+      timecode: { type: enum, values: [timeOfDay, recordRun], label: Timecode, description: "Timecode mode." }
+      audio_input: { type: string, max_length: 256, label: Audio input, description: "An audio input id from the capabilities; empty for the default input." }
+      gain_db: { type: float, min: -24, max: 24, label: Audio gain, description: "Audio gain in dB." }
+      safety_track: { type: bool, label: Safety track, description: "Record a second track at lower gain." }
+      split_channels: { type: bool, label: Split channels, description: "Record each input channel as its own track." }
+    returns: value
+  select_lens:
+    summary: Switch to a lens (op lens); answers {lens}
+    params:
+      id: { type: string, required: true, max_length: 64, label: Lens, description: "A lens id from lenses." }
+    returns: value
+  focus_at:
+    summary: Focus and expose at a point (op focusAt)
+    params:
+      x: { type: float, min: 0, max: 1, required: true, label: X, description: "Horizontal position, 0 to 1 from the left of the sensor in its native orientation." }
+      y: { type: float, min: 0, max: 1, required: true, label: Y, description: "Vertical position, 0 to 1 from the top of the sensor in its native orientation." }
+      lock: { type: bool, default: false, label: Lock, description: "Hold focus and exposure there." }
+    returns: value
+  recall_preset:
+    summary: Apply a preset, the camera's whole setup (camera, monitoring, output format and look) (op preset)
+    params:
+      name: { type: string, required: true, max_length: 128, label: Preset, description: "A preset name from presets." }
+    returns: value
+
+  # ---- record and clips (§6.3) ----
+  start_recording:
+    summary: Start a clip (op record, on true); answers once it has started
+    returns: value
+  stop_recording:
+    summary: Stop the clip (op record, on false); answers once it is written, with {recording, files}
+    returns: value
+  set_slate:
+    summary: Set the slate for the next clip (op slate); give the fields to change
+    params:
+      camera: { type: string, max_length: 16, label: Camera, description: "The camera letter in clip names (A)." }
+      reel: { type: int, min: 1, max: 999, label: Reel, description: "Reel number." }
+      project: { type: string, max_length: 256, label: Project, description: "Project name." }
+      scene: { type: string, max_length: 64, label: Scene, description: "Scene." }
+      shot: { type: string, max_length: 64, label: Shot, description: "Shot." }
+      take: { type: int, min: 1, max: 9999, label: Take, description: "Take number." }
+      notes: { type: string, max_length: 4096, multiline: true, label: Notes, description: "Notes written with the clip." }
+    returns: value
+  circle_clip:
+    summary: Circle or uncircle a clip (op circle)
+    params:
+      name: { type: string, required: true, max_length: 255, pattern: "^[^./\\\\][^/\\\\]*$", label: Clip, description: "The clip's name from clips." }
+      circled: { type: bool, default: true, label: Circled, description: "Circle (true) or uncircle (false)." }
+    returns: value
+
+  # ---- monitoring and looks (§6.4) ----
+  set_monitoring:
+    summary: Merge partial monitoring settings (protocol §7.4) into the camera's monitor (op monitoring); answers {monitoring}
+    params:
+      monitoring: { type: json, required: true, label: Monitoring, description: "A partial monitoring document, e.g. {\"zebra\": true, \"zebraLevel\": 0.95}." }
+    returns: value
+  set_false_color:
+    summary: Show or hide false color on the monitor (op monitoring, falseColour)
+    params:
+      enabled: { type: bool, required: true, label: False color, description: "Show false color." }
+    returns: value
+  set_zebra:
+    summary: Set the first zebra (op monitoring, zebra and zebraLevel)
+    params:
+      enabled: { type: bool, label: Zebra, description: "Show the zebra." }
+      level: { type: float, min: 0.5, max: 1, label: Level, description: "Level the zebra shows above, 0.5 to 1." }
+    returns: value
+  set_zebra2:
+    summary: Set the second zebra, a band around its level (op monitoring, zebra2 and zebra2Level)
+    params:
+      enabled: { type: bool, label: Zebra 2, description: "Show the second zebra." }
+      level: { type: float, min: 0.3, max: 1, label: Level, description: "Center of the band (plus or minus 2.5 %)." }
+    returns: value
+  set_peaking:
+    summary: Set focus peaking (op monitoring, peaking, peakColour, peakSensitivity)
+    params:
+      enabled: { type: bool, label: Peaking, description: "Show focus peaking." }
+      color: { type: enum, values: [red, green, blue, white], label: Color, description: "Peaking color." }
+      sensitivity: { type: enum, values: [low, medium, high], label: Sensitivity, description: "Peaking sensitivity." }
+    returns: value
+  set_scope:
+    summary: Set the scope on the monitor (op monitoring, scope, scopeLarge, scopeFloating)
+    params:
+      scope: { type: enum, values: [none, histogram, waveform, parade, vectorscope], label: Scope, description: "The scope shown." }
+      large: { type: bool, label: Large, description: "Show the scope large." }
+      floating: { type: bool, label: Floating, description: "Show the scope floating over the picture." }
+    returns: value
+  set_frame_guide:
+    summary: Set the frame guide (op monitoring, frameGuide, customGuide)
+    params:
+      guide: { type: enum, values: [none, "2.39", "2.35", "1.85", "16:9", "4:3", "9:16", "1:1", "4:5", custom], required: true, label: Frame guide, description: "The aspect ratio guide shown." }
+      custom: { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)?:[0-9]+(\\.[0-9]+)?$", label: Custom guide, description: "The custom guide as width:height, for guide custom." }
+    returns: value
+  set_guides:
+    summary: Show or hide the monitor's guides (op monitoring, safeAreas, grid, centerMark, level)
+    params:
+      safe_areas: { type: bool, label: Safe areas, description: "Show safe areas." }
+      grid: { type: bool, label: Grid, description: "Show the grid." }
+      center_mark: { type: bool, label: Center mark, description: "Show the center mark." }
+      level: { type: bool, label: Level, description: "Show the level." }
+    returns: value
+  set_monitor_display:
+    summary: Set the monitor's display (op monitoring, desqueeze, recBorder, meter, punchIn, clean)
+    params:
+      desqueeze: { type: float, min: 1, max: 2, label: Desqueeze, description: "Anamorphic desqueeze factor, 1 to 2." }
+      rec_border: { type: bool, label: Record border, description: "Show a border while recording." }
+      meter: { type: enum, values: [peak, ppm, vu, lufs], label: Audio meter, description: "Audio meter scale." }
+      punch_in: { type: bool, label: Punch in, description: "Magnify the picture." }
+      clean: { type: bool, label: Clean, description: "Hide every overlay." }
+    returns: value
+  set_look:
+    summary: Put a LUT on the monitor, the outputs or the recording (op look); answers {looks}
+    params:
+      target: { type: enum, values: [monitor, outputs, recording], required: true, label: Target, description: "Where the LUT goes." }
+      lut: { type: string, required: true, max_length: 256, pattern: "^(none|rec709|custom:.+)$", label: LUT, description: "none, rec709 or custom:<name> from luts." }
+    returns: value
+
+  # ---- outputs (§6.5) ----
+  set_outputs:
+    summary: Merge a partial outputs document (protocol §7.5), kind by kind, into the camera's outputs (op outputs); answers {outputs, problems}
+    params:
+      outputs: { type: json, required: true, label: Outputs, description: "A partial outputs document, e.g. {\"srt\": {\"on\": true, \"mode\": \"listener\"}}; credentials are sent, never kept or returned." }
+    returns: value
+  set_srt_output:
+    summary: Set the SRT output (op outputs, srt); give the fields to change
+    params:
+      enabled: { type: bool, label: "On", description: "Run the SRT output." }
+      mode: { type: enum, values: [listener, caller], label: Mode, description: "Wait for a receiver (listener) or call one (caller)." }
+      port: { type: int, min: 1, max: 65535, label: Port, description: "The port to listen on." }
+      target: { type: string, max_length: 256, label: Receiver, description: "The receiver as host:port, for caller." }
+      latency_ms: { type: int, min: 0, max: 60000, label: Latency, description: "SRT latency in milliseconds." }
+    returns: value
+  set_rtmp_output:
+    summary: Set the RTMP output (op outputs, rtmp); give the fields to change
+    params:
+      enabled: { type: bool, label: "On", description: "Run the RTMP output." }
+      url: { type: string, max_length: 2048, label: Server URL, description: "The rtmp:// or rtmps:// server URL." }
+      stream_key: { type: string, max_length: 1024, label: Stream key, description: "The stream key; sent to the camera and never kept, logged or returned." }
+    returns: value
+  set_hls_output:
+    summary: Set the HLS output (op outputs, hls)
+    params:
+      enabled: { type: bool, label: "On", description: "Serve HLS." }
+      port: { type: int, min: 1, max: 65535, label: Port, description: "The port HLS is served on." }
+    returns: value
+  set_whip_output:
+    summary: Set the WHIP output (op outputs, whip); give the fields to change
+    params:
+      enabled: { type: bool, label: "On", description: "Run the WHIP output." }
+      url: { type: string, max_length: 2048, label: WHIP URL, description: "The WHIP endpoint." }
+      token: { type: string, max_length: 2048, label: Token, description: "The WHIP bearer token; sent to the camera and never kept, logged or returned." }
+    returns: value
+  set_whep_output:
+    summary: Set the WHEP output (op outputs, whep)
+    params:
+      enabled: { type: bool, label: "On", description: "Serve WHEP." }
+      port: { type: int, min: 1, max: 65535, label: Port, description: "The port WHEP is served on." }
+    returns: value
+  set_omt_output:
+    summary: Set the OMT output (op outputs, omt)
+    params:
+      enabled: { type: bool, label: "On", description: "Send OMT." }
+      name: { type: string, max_length: 128, label: Source name, description: "The OMT source name." }
+    returns: value
+  set_ndi_output:
+    summary: Set the NDI output (op outputs, ndi)
+    params:
+      enabled: { type: bool, label: "On", description: "Send NDI." }
+      name: { type: string, max_length: 128, label: Source name, description: "The NDI source name." }
+    returns: value
+  set_external_output:
+    summary: Show the clean feed on an external display, or stop (op outputs, external)
+    params:
+      enabled: { type: bool, required: true, label: "On", description: "Show the clean feed on the external display." }
+    returns: value
+  set_output_interface:
+    summary: Keep every output to one network interface (op outputs, network.interface)
+    params:
+      interface: { type: string, required: true, max_length: 15, pattern: "^([0-9]{1,3}(\\.[0-9]{1,3}){3})?$", label: Interface, description: "The interface's IPv4 address; empty for all." }
+    returns: value
+  set_output_look:
+    summary: Set the look and overlays every output carries (op outputs, look)
+    params:
+      look: { type: string, max_length: 256, pattern: "^(recording|rec709|custom:.+)$", label: Look, description: "recording (the recording's own picture), rec709 or custom:<name>." }
+      overlays: { type: enum, values: [clean, monitor], label: Overlays, description: "clean, or monitor (the monitor's guides, aids and timecode burned in)." }
+    returns: value
+  set_output_format:
+    summary: Set what the outputs carry apart from the recording (op outputs, format)
+    params:
+      height: { type: enum, values: ["1080", "720", "540"], label: Lines, description: "The outputs' height in lines." }
+      bitrate_mbps: { type: float, min: 0.1, max: 200, label: Bitrate, description: "The live encoder's bitrate in Mbit/s." }
+      half_rate: { type: bool, label: Half rate, description: "Half the camera's frame rate, from 48 fps up." }
+    returns: value
+
+  # ---- production: tally, talkback, return video (§6.6) ----
+  set_tally:
+    summary: Set the tally light as the tally source, or hand tally back to the camera's own sources (op tally)
+    params:
+      light: { type: enum, values: [program, preview, "off", auto], required: true, label: Tally, description: "program, preview or off; auto hands tally back to the camera's switchers and receivers." }
+    returns: value
+  set_talkback:
+    summary: Turn talkback on or off, or latch the operator's talk (op talkback); answers {on, latch, url}
+    params:
+      enabled: { type: bool, label: "On", description: "Talkback on." }
+      latch: { type: bool, label: Latch, description: "The operator's talk latched rather than push to talk." }
+    returns: value
+  new_talkback_address:
+    summary: Give talkback a new secret address (op talkback, newAddress); directors on the old one are cut off
+    returns: value
+  set_return:
+    summary: Route a return feed to the camera (op return)
+    params:
+      kind: { type: enum, values: [srt, whep, ndi, omt, rtmp, rtsp, hls], label: Kind, description: "How the feed arrives." }
+      address: { type: string, max_length: 2048, label: Address, description: "A URL, or an NDI or OMT source name." }
+      enabled: { type: bool, label: "On", description: "Show the return feed." }
+    returns: value
+
+  # ---- internal and forward-compatible ----
+  visca:
+    summary: Relay a decoded VISCA action (op visca), as the camera's own VISCA server does; internal, prefer the commands above
+    params:
+      fields: { type: json, required: true, label: Action, description: "The op's fields, e.g. {\"action\": \"zoom\", \"direction\": 1, \"speed\": 3}." }
+    returns: value
+  send_op:
+    summary: Send an op this driver does not know by name (POST /v1/command {op, ...fields}), for ops later version 1 cameras add
+    params:
+      op: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z][A-Za-z0-9_]*$", label: Op, description: "The op's name, as the camera's ops list gives it." }
+      fields: { type: json, label: Fields, description: "The op's other fields as a JSON object." }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      State follows the status document (protocol §7.1), kept current from GET /v1/events. Top-level
+      fields keep their names except clips (clip_count), freeBytes (free_bytes), signalDbm (signal_dbm),
+      talkback (talkback.url, with talkback.on), return (return_source), previewCodec (preview_codec) and
+      previewNote (preview_note). The camera's own documents (settings, resolved, looks, slate, visca,
+      monitoring, capabilities) keep the camera's field names, so a partial for set_settings,
+      set_monitoring or set_outputs is written in the same names. The capabilities answer, read on every
+      connection, adds ops, capabilities, monitoring, output_settings (credentials removed) and
+      resolved_settings (everything the camera resolved; resolved is the format running now). A field
+      that is null or absent in the status is absent from state.
+  - models: [all]
+    severity: info
+    text: >
+      Protocol version 1 has no event types: the driver compares consecutive status documents and
+      sends message events: record_started and record_stopped {clip}, tally_changed, thermal_changed
+      and lens_changed {from, to}, error {error} and error_cleared, warning and warning_cleared
+      {warning}, battery_low {battery} and storage_low {free_bytes} (when crossing the thresholds in
+      settings), output_up and output_down {kind}, output_problem {kind, problem}, talkback_changed {on}
+      and settings_changed {paths}, the dotted settings paths that changed. The first document after
+      opening sends none.
+  - models: [all]
+    severity: warning
+    text: >
+      The fleet key is the whole credential: every request but the hello carries it, and an empty key
+      is refused by every camera. A 401 reports the camera unauthorized and nothing more is asked until
+      the settings change or the consumer reconnects it (the camera has no lockout, so a reconnect asks
+      again). A camera given a new fleet key refuses every controller holding the old one until they
+      pair again. The key is never logged or put in state; clip_url's value carries it in a query and
+      must be treated as the key.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_recording ends the clip being recorded. recall_preset replaces the camera's whole setup
+      (camera settings, monitoring, output format and look) at once. set_format, and turning outputs on
+      or off, can reopen the camera, so they are refused mid-clip; turning a live output off ends that
+      stream. new_talkback_address cuts every director on the old address off. None can be undone
+      live.
+  - models: [all]
+    severity: info
+    text: >
+      A command the camera does not list in its capabilities' ops fails with device_error code
+      unsupported_op before anything is sent. The list is read on connecting; a device opened for
+      commands only has none until get_capabilities is run, and sends every op, which a camera refuses
+      with "unknown op" when it does not know it. send_op reaches ops added after this driver.
+  - models: [all]
+    severity: warning
+    text: >
+      An answer carrying error means the camera refused the command or it failed (the camera's own rules
+      apply as for its operator: no format change mid-clip, Pro gating, ranges clamped), and the command
+      fails with device_error; the status then carries the same error. A command the camera's app does
+      not answer within 10 s answers 504, reported as timeout. Values outside a lens's range are
+      clamped by the camera, which answers what it set (resolved) and warnings for what it could not do;
+      the ranges declared here are wide bounds, and the lens's own ranges are in capabilities.
+  - models: [all]
+    severity: info
+    text: >
+      The live stream is the camera's preview, opened (GET /v1/preview) only while watched, since the
+      camera runs its preview encoder only then. Each frame is published unchanged as the camera framed
+      it, format meros-preview: u32 length (big-endian), i64 pts in microseconds (big-endian), u8 flags
+      (bit 0 keyframe), then one access unit in Annex-B, H.264, or HEVC under HLG (preview_codec). The
+      first frame is a keyframe carrying its parameter sets. Frames over 8 MiB are corrupt: the preview
+      is reopened. The core keeps only a watcher's newest frame, so a watcher whose frame carries a
+      dropped count above 0 must wait for the next keyframe before decoding again. During a high-speed
+      clip there is no preview, and preview_note says why.
+  - models: [all]
+    severity: info
+    text: >
+      Talkback voice is the consumer's: the driver sets talkback on or off and keeps its address in
+      talkback.url. A director joins with WebRTC: POST <url>offer?name=<director name> with an SDP
+      offer (one send and receive Opus audio track, 48 kHz) is answered 201 with the SDP answer and a
+      Location for the session, and DELETE of that location leaves. The address is HTTPS with the
+      camera's self-signed certificate, and its secret path is the credential, so treat talkback.url as
+      one. A director is heard by the operator; the operator talks to every director. The status does
+      not carry the latch; talkback_latch is known once set_talkback has answered.
+  - models: [all]
+    severity: info
+    text: >
+      Clips are listed in clips.<file name> (size in bytes, modified in Unix seconds, circled), read on
+      connecting and again when clip_count changes or a recording stops. read_clip returns at most
+      16 MiB of a file per call, base64, with the file's total size; the consumer writes the file. Each
+      clip's slate is beside it as <clip>.json; its proxy, when one is recorded, is Proxy/<clip>.mp4,
+      which the list does not show and read_clip cannot name. clip_url gives a URL a player can open
+      directly.
+  - models: [all]
+    severity: info
+    text: >
+      visca is the op the camera's own VISCA server relays decoded VISCA through; it is included for
+      completeness, and controllers should use the commands above. VISCA over IP on UDP 52381 is a
+      separate route for third-party PTZ controllers (the visca integration).
+  - models: [all]
+    severity: info
+    text: >
+      The protocol is plain HTTP for a trusted production LAN, with no TLS. One camera is one server; a
+      camera is told apart by its id (16 lowercase hex characters), never by name or address, since its
+      address can change with DHCP: mDNS discovery (_meros-cam._tcp) reports it by TXT id with the port
+      from its SRV record, and where mDNS does not reach, a camera opened by address identifies itself
+      with its hello. A different id answering at a device's address is logged.
+  - models: [all]
+    severity: info
+    text: >
+      On a phone or tablet (docs/MOBILE.md): every connection is outgoing TCP to the camera's port
+      (8790 by default), so no listening or privileged port is needed and nothing blocks the caller.
+      The event stream sends a line at least every 5 s; 10 s without one drops it and reads the status
+      again, and the core's reconnect (mi_reconnect_all on resume) reopens everything at once, the
+      preview too while it is watched.
+
+state:
+  id:                     { type: string, description: "The camera's id, 16 lowercase hex characters; stable and unique" }
+  name:                   { type: string, description: "The camera's name, a user setting (Camera A)" }
+  model:                  { type: string, description: "The device model (SM-S926U)" }
+  app:                    { type: string, description: "The camera core's version (hello)" }
+  protocol:               { type: int, description: "The protocol version the camera speaks (hello, capabilities)" }
+  recording:              { type: bool, description: "A clip is being recorded" }
+  clip:                   { type: string, description: "The clip being recorded (file name)" }
+  error:                  { type: string, description: "The camera's last error, a sentence" }
+  warnings:               { type: array, description: "Current warnings, sentences (heat, low battery, low storage, a lens that cannot do what was asked)" }
+  tally:                  { type: string, description: "program, preview or off, as the camera shows it" }
+  lens:                   { type: string, description: "The lens in use (an id from lenses)" }
+  lenses:                 { type: array, description: "The camera's lenses, each {id, name}" }
+  settings:               { type: object, description: "The full settings document (protocol §7.3); its fields follow" }
+  settings.lensId:        { type: string, description: "The lens the settings are for" }
+  settings.width:         { type: int, unit: px, description: "Recording width" }
+  settings.height:        { type: int, unit: px, description: "Recording height" }
+  settings.fps:           { type: float, unit: fps, description: "Recording frame rate" }
+  settings.exposure.mode: { type: string, description: "auto, shutterPriority, isoPriority or manual" }
+  settings.exposure.iso:  { type: float, description: "ISO; absent in auto" }
+  settings.exposure.shutter.angle: { type: float, unit: deg, description: "Shutter angle, when the shutter is set as an angle" }
+  settings.exposure.shutter.seconds: { type: float, unit: s, description: "Shutter time, when the shutter is set as a time" }
+  settings.exposure.ev:   { type: float, unit: EV, description: "Exposure compensation" }
+  settings.exposure.lock: { type: bool, description: "AE lock" }
+  settings.exposure.antibanding: { type: string, description: "off, 50hz, 60hz or auto" }
+  settings.whiteBalance.mode: { type: string, description: "auto, preset or manual" }
+  settings.whiteBalance.preset: { type: string, description: "The white balance preset, in mode preset" }
+  settings.whiteBalance.kelvin: { type: float, unit: K, description: "Color temperature" }
+  settings.whiteBalance.tint: { type: float, description: "Tint, -100 (green) to +100 (magenta)" }
+  settings.whiteBalance.lock: { type: bool, description: "AWB lock" }
+  settings.whiteBalance.point: { type: array, description: "Where auto white balance was last measured, [x, y]" }
+  settings.focus.mode:    { type: string, description: "continuous, single or manual" }
+  settings.focus.position: { type: float, description: "Focus position, 0 infinity to 1 closest" }
+  settings.focus.point:   { type: array, description: "The focus point, [x, y], sensor-normalized" }
+  settings.focus.lock:    { type: bool, description: "Focus lock" }
+  settings.focus.faces:   { type: bool, description: "Continuous autofocus follows faces" }
+  settings.zoom:          { type: float, description: "Zoom ratio" }
+  settings.stabilization: { type: string, description: "off, standard or cinematic" }
+  settings.torch:         { type: float, description: "Torch level, 0 to 1" }
+  settings.aperture:      { type: float, description: "f-number, on a variable-iris lens" }
+  settings.profile:       { type: string, description: "standard, flat, log or linear" }
+  settings.recording.codec: { type: string, description: "h264 or hevc" }
+  settings.recording.dynamicRange: { type: string, description: "sdr or hlg" }
+  settings.recording.bitrateMbps: { type: float, unit: Mbit/s, description: "Video bitrate; absent when automatic" }
+  settings.recording.container: { type: string, description: "mov or mp4" }
+  settings.recording.audio: { type: string, description: "none, aac, pcm16, pcm24 or f32" }
+  settings.recording.timecode: { type: string, description: "timeOfDay or recordRun" }
+  settings.recording.audioInput: { type: string, description: "The audio input id; absent for the default" }
+  settings.recording.gainDb: { type: float, unit: dB, description: "Audio gain" }
+  settings.recording.safetyTrack: { type: bool, description: "A safety track is recorded" }
+  settings.recording.splitChannels: { type: bool, description: "Each input channel is its own track" }
+  settings.exactFrameRate: { type: bool, description: "The frame rate is held exactly" }
+  resolved.width:         { type: int, unit: px, description: "The width running now" }
+  resolved.height:        { type: int, unit: px, description: "The height running now" }
+  resolved.fps:           { type: float, unit: fps, description: "The frame rate running now" }
+  resolved.highSpeed:     { type: bool, description: "A high-speed format is running (no preview)" }
+  resolved_settings:      { type: object, description: "Everything the camera resolved the settings to, from the capabilities and settings answers" }
+  presets:                { type: array, description: "The camera's preset names" }
+  luts:                   { type: array, description: "The LUT ids: rec709, custom:<name>" }
+  looks.monitor:          { type: string, description: "The LUT on the monitor" }
+  looks.outputs:          { type: string, description: "The look on the outputs" }
+  looks.recording:        { type: string, description: "The LUT on the recording" }
+  slate.camera:           { type: string, description: "The next clip's camera letter" }
+  slate.reel:             { type: int, description: "The next clip's reel" }
+  slate.project:          { type: string, description: "Project" }
+  slate.scene:            { type: string, description: "Scene" }
+  slate.shot:             { type: string, description: "Shot" }
+  slate.take:             { type: int, description: "Take" }
+  slate.notes:            { type: string, description: "Notes" }
+  clip_count:             { type: int, description: "How many clips are on the camera" }
+  clips.*.size:           { type: int, unit: bytes, description: "The clip file's size, keyed by file name" }
+  clips.*.modified:       { type: int, unit: s, description: "When the clip was last written, Unix seconds" }
+  clips.*.circled:        { type: bool, description: "The clip is circled" }
+  battery:                { type: int, unit: "%", description: "Battery, -1 when unknown" }
+  thermal:                { type: string, description: "none, light, moderate, severe, critical or shutdown" }
+  free_bytes:             { type: int, unit: bytes, description: "Free storage where clips go" }
+  network:                { type: string, description: "wifi, ethernet, cellular or none" }
+  signal_dbm:             { type: int, unit: dBm, description: "The network's signal" }
+  outputs.on:             { type: array, description: "The output kinds running" }
+  outputs.problems:       { type: object, description: "Why an output that is on cannot run, a sentence keyed by kind" }
+  output_settings:        { type: object, description: "The outputs document (protocol §7.5) by kind (srt, rtmp, hls, whip, whep, omt, ndi, external, network, look, format), credentials removed: keySet and tokenSet say whether one is set" }
+  audio:                  { type: array, unit: dBFS, description: "Input peak levels, one per channel" }
+  talkback.on:            { type: bool, description: "Talkback is on" }
+  talkback.url:           { type: string, description: "The talkback address for directors, while on; its secret path is a credential" }
+  talkback_latch:         { type: bool, description: "The operator's talk is latched; known once set_talkback has answered" }
+  return_source:          { type: string, description: "The return feed's source while it is on" }
+  return_settings:        { type: object, description: "The return feed's settings {on, kind, addresses, large}, from set_return's answer" }
+  visca.power:            { type: bool, description: "VISCA's view: power" }
+  visca.zoom:             { type: int, description: "VISCA's view: zoom position" }
+  visca.focus:            { type: int, description: "VISCA's view: focus position" }
+  visca.focusAuto:        { type: bool, description: "VISCA's view: autofocus" }
+  visca.whiteBalance:     { type: int, description: "VISCA's view: white balance mode byte" }
+  visca.exposure:         { type: int, description: "VISCA's view: exposure mode byte" }
+  preview_codec:          { type: string, description: "The preview's codec: h264, or hevc under HLG" }
+  preview_note:           { type: string, description: "Why the preview is not running, if it is not" }
+  ops:                    { type: array, description: "The ops the camera offers (capabilities)" }
+  capabilities:           { type: object, description: "The camera's capability document (protocol §7.2): model, platform, lenses with their exposure, white balance, focus, zoom, stabilization, torch and video formats, encoders and audio inputs" }
+  monitoring:             { type: object, description: "The monitoring settings (protocol §7.4): lut, falseColour, zebra, zebraLevel, zebra2, zebra2Level, peaking, peakColour, peakSensitivity, scope, scopeLarge, scopeFloating, frameGuide, customGuide, safeAreas, grid, centerMark, level, desqueeze, recBorder, meter, punchIn, clean" }

@@ -45,6 +45,7 @@ NATIVE = {
     "generic-tcp-udp": "Text or bytes over TCP or UDP",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
     "http-snapshot": "HTTP JPEG snapshots",
+    "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
     "novastar-central-control": "Binary frames over TCP 5200",
     "novastar-h": "Signed JSON over HTTP 8000",
     "obs-studio": "obs-websocket 5 over WebSocket 4455",
