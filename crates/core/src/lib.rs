@@ -54,7 +54,8 @@ mod mcp_discovery;
     feature = "blackmagic-hyperdeck",
     feature = "blackmagic-multiview",
     feature = "blackmagic-smartview",
-    feature = "blackmagic-videohub"
+    feature = "blackmagic-videohub",
+    feature = "meros-camera"
 ))]
 mod mdns;
 pub mod module;

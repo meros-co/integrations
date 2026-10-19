@@ -134,9 +134,9 @@ class Core:
         {"action": "listen" | "scan" | "stop", "protocols": [...], "hints": [...]}.
         Protocols: "mcp" (Sennheiser G3/G4), "ssdp" (Sony cameras), "pjlink"
         (PJLink projectors), "mdns" (Blackmagic ATEM, Videohub, HyperDeck,
-        SmartView and MultiView); none means every protocol that finds a
-        device in this core's catalogue. Hints are addresses where devices
-        were last seen. Found devices arrive as {"event": "discovered", ...}
+        SmartView and MultiView, and Meros Cameras); none means every
+        protocol that finds a device in this core's catalogue. Hints are
+        addresses where devices were last seen. Found devices arrive as {"event": "discovered", ...}
         events."""
         result = json.loads(self._native.discover(json.dumps(request)))
         if "error" in result:

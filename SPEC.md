@@ -2068,8 +2068,12 @@ streams:
 ```
 
 `format` is from a closed set: `jpeg` (one complete JPEG, ITU-T T.81, per
-frame). `live` is the conventional name for a device's main picture, so a
-consumer can show a preview of any device without knowing it.
+frame), or `meros-preview` (one frame of a Meros Camera's preview exactly as
+the camera frames it: a u32 length and an i64 presentation time in
+microseconds, both big-endian, a flags byte whose bit 0 marks a keyframe,
+then one H.264 or HEVC access unit in Annex-B; the consumer decodes it).
+`live` is the conventional name for a device's main picture, so a consumer
+can show a preview of any device without knowing it.
 
 A stream runs only while it is watched. The module learns that through its
 `stream_watch` callback, called once when a stream gains its first watcher and

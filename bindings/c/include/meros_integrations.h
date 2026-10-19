@@ -52,8 +52,8 @@ char *mi_open(const MiCore *core, const char *request);
  *           "hints":["<address where a device was last seen>",...]}
  * protocols: "mcp" (Sennheiser G3/G4), "ssdp" (Sony cameras), "pjlink"
  * (PJLink projectors), "mdns" (Blackmagic ATEM, Videohub, HyperDeck,
- * SmartView and MultiView); none means every protocol that finds a device
- * in this core's catalogue.
+ * SmartView and MultiView, and Meros Cameras); none means every protocol
+ * that finds a device in this core's catalogue.
  * returns: {"ok":true} or {"error":{...}}; found devices arrive as
  * {"event":"discovered",...} events. */
 char *mi_discover(const MiCore *core, const char *request);
