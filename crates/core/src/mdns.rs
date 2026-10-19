@@ -1,4 +1,5 @@
-//! Finding Blackmagic Design devices over Multicast DNS and DNS-SD (Bonjour).
+//! Finding Blackmagic Design devices and Meros Cameras over Multicast DNS
+//! and DNS-SD (Bonjour).
 //!
 //! Multicast DNS (RFC 6762) carries ordinary DNS messages to 224.0.0.251 on
 //! UDP 5353; DNS-SD (RFC 6763) names each advertised service instance
@@ -19,6 +20,13 @@
 //!   -bmd-hyperdeck browses `_hyperdeck_ctrl._tcp`, each with no TXT filter.
 //! - smartview-client (Jan Schär) finds SmartView and SmartScope monitors by
 //!   browsing `_smartview._tcp`.
+//!
+//! Meros Camera documents its advertisement (Meros Camera Control protocol,
+//! version 1, §2): `_meros-cam._tcp`, the instance named by the camera's id,
+//! TXT `id` (16 lowercase hex characters, stable and unique), `name` (a user
+//! setting), `model` (the phone or tablet's model) and `proto`, and the port
+//! in SRV (8790 by default). A camera is told apart by its id, never by name
+//! or address, since its address can change with DHCP.
 //!
 //! What is inferred, and listed in VERIFICATION.md: that TXT `class` names the
 //! product family exactly as Companion filters on it, and that TXT `name` is
@@ -56,15 +64,23 @@
 //!   SRV and TXT, and the addresses of the hosts those SRVs name. At most 256
 //!   instances and 256 hosts are remembered until discovery stops.
 //! - An instance is identified once it has an SRV and, for `_blackmagic._tcp`,
-//!   a TXT carrying a known `class`. Its address is the SRV target's A
-//!   record, or the address the answer came from when no A record was given.
-//!   The port reported is the integration's control port; the SRV port is
-//!   evidence only, since no source says what it is for `_blackmagic._tcp`.
-//!   Each (address, integration) is reported once, and again only when its
-//!   models or name change.
-//! - `models` is the one catalogue model whose name is TXT `name` (with or
-//!   without the "Blackmagic " prefix, ignoring case), or every model of the
-//!   integration when TXT `name` is absent or names none of them.
+//!   a TXT carrying a known `class`, or for `_meros-cam._tcp` a TXT carrying
+//!   `id`. Its address is the SRV target's A record, or the address the
+//!   answer came from when no A record was given. For Blackmagic the port
+//!   reported is the integration's control port and the SRV port is evidence
+//!   only, since no source says what it is for `_blackmagic._tcp`; for a Meros
+//!   Camera it is the SRV port, which the camera documents as its own. Each
+//!   (address, integration) is reported once, and a Meros Camera once per
+//!   TXT `id`; either is reported again only when its models, name, address
+//!   or port change.
+//! - For Blackmagic, `models` is the one catalogue model whose name is TXT
+//!   `name` (with or without the "Blackmagic " prefix, ignoring case), or
+//!   every model of the integration when TXT `name` is absent or names none of
+//!   them. A Meros Camera's TXT `name` is the camera's own name, reported as
+//!   its name; the integration has one model.
+//! - An address record with the cache-flush bit replaces the host's earlier
+//!   addresses of its type (RFC 6762 §10.2), so a device whose address
+//!   changed is reported at its new one.
 //! - A goodbye (a PTR with TTL 0, RFC 6762 §10.1) is reported as a
 //!   `Discovery` message; there is no removal event. TTLs are not otherwise
 //!   tracked.
@@ -97,6 +113,7 @@ pub(crate) const SPECS: &[&str] = &[
     "blackmagic-multiview",
     "blackmagic-smartview",
     "blackmagic-videohub",
+    "meros-camera",
 ];
 
 /// One way to recognise a device: instances of `service` (whose TXT `class`
@@ -108,7 +125,18 @@ struct Rule {
     class: Option<&'static str>,
     spec: &'static str,
     source: &'static str,
+    /// The TXT key whose value identifies the device: an instance without it
+    /// is not identified, and the device is reported once per value rather
+    /// than once per address.
+    key_txt: Option<&'static str>,
+    /// The SRV record's port is the device's control port.
+    srv_port: bool,
+    /// The TXT key holding the device's own name, reported as its name
+    /// rather than read as a product name.
+    name_txt: Option<&'static str>,
 }
+
+const MEROS_CAMERA: &str = "_meros-cam._tcp.local";
 
 const BLACKMAGIC: &str = "_blackmagic._tcp.local";
 
@@ -118,42 +146,72 @@ const RULES: &[Rule] = &[
         class: Some("AtemSwitcher"),
         spec: "blackmagic-atem",
         source: "companion-module-bmd-atem: _blackmagic._tcp with TXT class=AtemSwitcher",
+        key_txt: None,
+        srv_port: false,
+        name_txt: None,
     },
     Rule {
         service: "_switcher_ctrl._udp.local",
         class: None,
         spec: "blackmagic-atem",
         source: "companion-module-bmd-atem: _switcher_ctrl._udp, any TXT",
+        key_txt: None,
+        srv_port: false,
+        name_txt: None,
     },
     Rule {
         service: BLACKMAGIC,
         class: Some("Videohub"),
         spec: "blackmagic-videohub",
         source: "companion-module-bmd-videohub: _blackmagic._tcp with TXT class=Videohub",
+        key_txt: None,
+        srv_port: false,
+        name_txt: None,
     },
     Rule {
         service: "_hyperdeck_ctrl._tcp.local",
         class: None,
         spec: "blackmagic-hyperdeck",
         source: "companion-module-bmd-hyperdeck: _hyperdeck_ctrl._tcp, any TXT",
+        key_txt: None,
+        srv_port: false,
+        name_txt: None,
     },
     Rule {
         service: BLACKMAGIC,
         class: Some("SmartView"),
         spec: "blackmagic-smartview",
         source: "companion-module-bmd-smartview: _blackmagic._tcp with TXT class=SmartView",
+        key_txt: None,
+        srv_port: false,
+        name_txt: None,
     },
     Rule {
         service: "_smartview._tcp.local",
         class: None,
         spec: "blackmagic-smartview",
         source: "smartview-client (MIT) README: browses _smartview._tcp for SmartView and SmartScope",
+        key_txt: None,
+        srv_port: false,
+        name_txt: None,
     },
     Rule {
         service: BLACKMAGIC,
         class: Some("MultiView"),
         spec: "blackmagic-multiview",
         source: "companion-module-bmd-multiview4: _blackmagic._tcp with TXT class=MultiView and name=Blackmagic MultiView 4",
+        key_txt: None,
+        srv_port: false,
+        name_txt: None,
+    },
+    Rule {
+        service: MEROS_CAMERA,
+        class: None,
+        spec: "meros-camera",
+        source: "Meros Camera Control protocol, version 1, §2: _meros-cam._tcp, TXT id, name, model and proto, the port in SRV",
+        key_txt: Some("id"),
+        srv_port: true,
+        name_txt: Some("name"),
     },
 ];
 
@@ -267,6 +325,9 @@ struct Record {
     name: Name,
     ttl: u32,
     data: Data,
+    /// The cache-flush bit (RFC 6762 §10.2): this record replaces what was
+    /// heard before for its name and type.
+    flush: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -343,7 +404,9 @@ fn parse(packet: &[u8]) -> Option<Message> {
     for _ in 0..answers + authority + additional {
         let (name, next) = read_name(packet, at)?;
         let rtype = u16_at(packet, next)?;
-        let class = u16_at(packet, next + 2)? & CLASS_MASK;
+        let raw_class = u16_at(packet, next + 2)?;
+        let class = raw_class & CLASS_MASK;
+        let flush = raw_class & !CLASS_MASK != 0;
         let ttl = u32_at(packet, next + 4)?;
         let start = next + 10;
         let end = start + usize::from(u16_at(packet, next + 8)?);
@@ -383,7 +446,12 @@ fn parse(packet: &[u8]) -> Option<Message> {
             }
             _ => continue,
         };
-        records.push(Record { name, ttl, data });
+        records.push(Record {
+            name,
+            ttl,
+            data,
+            flush,
+        });
     }
     Some(Message {
         response: flags & 0x8000 != 0,
@@ -449,12 +517,21 @@ enum Identity {
     NeedsTxt,
     /// A `class` (or none) no rule knows.
     Unknown(Option<String>),
+    /// The TXT lacks the key that identifies the device.
+    MissingKey(&'static Rule),
 }
 
 fn identify(service: &str, txt: Option<&[(String, Option<String>)]>) -> Identity {
     let rules: Vec<&'static Rule> = RULES.iter().filter(|r| r.service == service).collect();
     if let Some(rule) = rules.iter().find(|r| r.class.is_none()) {
-        return Identity::Found(rule);
+        let Some(key) = rule.key_txt else {
+            return Identity::Found(rule);
+        };
+        return match txt {
+            None => Identity::NeedsTxt,
+            Some(t) if txt_get(t, key).is_some_and(|v| !v.is_empty()) => Identity::Found(rule),
+            Some(_) => Identity::MissingKey(rule),
+        };
     }
     let Some(txt) = txt else {
         return Identity::NeedsTxt;
@@ -555,8 +632,16 @@ struct Instance {
     /// Where its records last came from.
     source: IpAddr,
     unknown_reported: bool,
-    reported: Option<(IpAddr, &'static str)>,
+    /// What it was reported under, and the address reported.
+    reported: Option<(ReportKey, IpAddr)>,
 }
+
+/// What a device is reported once under: its address, or `id <value>` for
+/// a rule keyed by a TXT value; and its integration.
+type ReportKey = (String, &'static str);
+
+/// What was reported: address, port, models and name.
+type Reported = (IpAddr, u16, Vec<String>, String);
 
 #[derive(Default)]
 struct Host {
@@ -569,7 +654,7 @@ struct Cache {
     table: Arc<Table>,
     instances: HashMap<String, Instance>,
     hosts: HashMap<String, Host>,
-    reported: HashMap<(IpAddr, &'static str), (Vec<String>, String)>,
+    reported: HashMap<ReportKey, Reported>,
     full_reported: bool,
 }
 
@@ -679,12 +764,16 @@ impl Cache {
             }
             touched.push(r.name.key());
         }
-        // The addresses of the hosts those SRVs name, and nothing else.
+        // The addresses of the hosts those SRVs name, and nothing else. An
+        // address record with the cache-flush bit replaces the host's earlier
+        // addresses of its type (RFC 6762 §10.2): a device whose address
+        // changed (DHCP) announces the new one that way.
         let targets: BTreeSet<String> = self
             .instances
             .values()
             .filter_map(|i| i.srv.as_ref().map(|(_, t)| t.key()))
             .collect();
+        let mut flushed: BTreeSet<(String, bool)> = BTreeSet::new();
         for r in &message.records {
             if r.ttl == 0 || !matches!(r.data, Data::A(_) | Data::Aaaa(_)) {
                 continue;
@@ -698,6 +787,14 @@ impl Cache {
                 continue;
             }
             let host = self.hosts.entry(key.clone()).or_default();
+            let v4 = matches!(r.data, Data::A(_));
+            if r.flush && flushed.insert((key.clone(), v4)) {
+                if v4 {
+                    host.v4.clear();
+                } else {
+                    host.v6.clear();
+                }
+            }
             match r.data {
                 Data::A(a) if !host.v4.contains(&a) && host.v4.len() < MAX_ADDRESSES => {
                     host.v4.push(a)
@@ -724,11 +821,11 @@ impl Cache {
 
     fn goodbye(&mut self, key: &str) -> Option<Event> {
         let instance = self.instances.remove(key)?;
-        let reported = instance.reported?;
+        let (reported, address) = instance.reported?;
         if !self
             .instances
             .values()
-            .any(|i| i.reported == Some(reported))
+            .any(|i| i.reported.as_ref().is_some_and(|(k, _)| *k == reported))
         {
             self.reported.remove(&reported);
         }
@@ -736,7 +833,7 @@ impl Cache {
             "{} ({}) at {} announced it is leaving (mDNS goodbye)",
             instance.name.first(),
             instance.service,
-            reported.0
+            address
         )))
     }
 
@@ -748,6 +845,21 @@ impl Cache {
         let rule = match identify(instance.service, instance.txt.as_deref()) {
             Identity::Found(rule) => rule,
             Identity::NeedsTxt => return None,
+            Identity::MissingKey(rule) => {
+                if instance.unknown_reported {
+                    return None;
+                }
+                instance.unknown_reported = true;
+                return Some(message(format!(
+                    "{} at {} advertises {} without TXT {}, which identifies {}; it is not \
+                     identified",
+                    instance.name.first(),
+                    instance.source,
+                    instance.service,
+                    rule.key_txt.unwrap_or_default(),
+                    rule.spec,
+                )));
+            }
             Identity::Unknown(class) => {
                 if instance.unknown_reported {
                     return None;
@@ -783,24 +895,37 @@ impl Cache {
                 ),
                 ),
             };
-        let product = txt_get(&txt, "name");
+        // A rule whose TXT name is the device's own name names no product.
+        let product = match rule.name_txt {
+            Some(_) => None,
+            None => txt_get(&txt, "name"),
+        };
         let named = product.and_then(|p| model_named(&spec.models, p));
         let models: Vec<String> = match &named {
             Some(id) => vec![id.clone()],
             None => spec.models.iter().map(|(id, _)| id.clone()).collect(),
         };
-        let name = instance_name.first();
-        let reported_key = (address, rule.spec);
-        if self.reported.get(&reported_key) == Some(&(models.clone(), name.clone())) {
+        let own_name = rule
+            .name_txt
+            .and_then(|k| txt_get(&txt, k))
+            .filter(|n| !n.trim().is_empty());
+        let name = own_name.map_or_else(|| instance_name.first(), String::from);
+        let identity = rule.key_txt.and_then(|k| txt_get(&txt, k));
+        let port = if rule.srv_port { srv_port } else { spec.port };
+        let reported_key: ReportKey = match identity {
+            Some(id) => (format!("id {id}"), rule.spec),
+            None => (address.to_string(), rule.spec),
+        };
+        let reported = (address, port, models.clone(), name.clone());
+        if self.reported.get(&reported_key) == Some(&reported) {
             return None;
         }
         if !self.reported.contains_key(&reported_key) && self.reported.len() >= MAX_KNOWN {
             return None;
         }
-        self.reported
-            .insert(reported_key, (models.clone(), name.clone()));
+        self.reported.insert(reported_key.clone(), reported);
         if let Some(instance) = self.instances.get_mut(key) {
-            instance.reported = Some(reported_key);
+            instance.reported = Some((reported_key, address));
         }
         let host = self.hosts.get(&target.key());
         let model_basis = match (product, &named) {
@@ -810,6 +935,11 @@ impl Cache {
             ),
             (Some(p), None) => format!(
                 "TXT name '{p}' is not the name of one catalogue model; every model of {} is possible",
+                rule.spec
+            ),
+            (None, _) if rule.name_txt.is_some() => format!(
+                "TXT name is the device's own name, not a product; every model of {} is possible \
+                 (TXT model, where given, is the hardware's model)",
                 rule.spec
             ),
             (None, _) => format!(
@@ -828,30 +958,44 @@ impl Cache {
         for (k, v) in &txt {
             txt_json.insert(k.clone(), v.as_ref().map_or(Value::Null, |v| json!(v)));
         }
+        let mut evidence = json!({
+            "protocol": match heard {
+                Heard::Scan => "answered an mDNS query (DNS-SD browse)",
+                Heard::Listener => "heard on UDP 5353: an mDNS announcement or multicast answer",
+            },
+            "service": rule.service,
+            "instance": instance_name.text(),
+            "txt": if heard_txt { Value::Object(txt_json) } else { Value::Null },
+            "srv": {"port": srv_port, "target": target.text()},
+            "ipv4": host.map(|h| h.v4.iter().map(|a| a.to_string()).collect::<Vec<_>>()),
+            "ipv6": host.map(|h| h.v6.iter().map(|a| a.to_string()).collect::<Vec<_>>()),
+            "address": address_basis,
+            "port": if rule.srv_port {
+                "the SRV record's port, which the service documents as the device's"
+            } else {
+                "the integration's control port; the SRV port is evidence only"
+            },
+            "identification": identification,
+            "model": model_basis,
+            "name": if own_name.is_some() {
+                "TXT name, the device's own name (a user setting), so weak evidence of identity"
+            } else {
+                "the DNS-SD instance name, which can usually be changed on the device, so weak evidence of identity"
+            },
+        });
+        if let (Some(k), Some(id)) = (rule.key_txt, identity) {
+            evidence["id"] = json!(format!(
+                "TXT {k} '{id}': the device's stable id; it is reported once per id"
+            ));
+        }
         Some(Event::Discovered {
             protocol: PROTOCOL.into(),
             address: address.to_string(),
-            port: spec.port,
+            port,
             device: rule.spec.into(),
             models,
             name: Some(name),
-            evidence: json!({
-                "protocol": match heard {
-                    Heard::Scan => "answered an mDNS query (DNS-SD browse)",
-                    Heard::Listener => "heard on UDP 5353: an mDNS announcement or multicast answer",
-                },
-                "service": rule.service,
-                "instance": instance_name.text(),
-                "txt": if heard_txt { Value::Object(txt_json) } else { Value::Null },
-                "srv": {"port": srv_port, "target": target.text()},
-                "ipv4": host.map(|h| h.v4.iter().map(|a| a.to_string()).collect::<Vec<_>>()),
-                "ipv6": host.map(|h| h.v6.iter().map(|a| a.to_string()).collect::<Vec<_>>()),
-                "address": address_basis,
-                "port": "the integration's control port; the SRV port is evidence only",
-                "identification": identification,
-                "model": model_basis,
-                "name": "the DNS-SD instance name, which can usually be changed on the device, so weak evidence of identity",
-            }),
+            evidence,
         })
     }
 
@@ -863,7 +1007,10 @@ impl Cache {
         let mut questions = Vec::new();
         for key in keys {
             let i = &self.instances[key];
-            if matches!(identify(i.service, i.txt.as_deref()), Identity::Unknown(_)) {
+            if matches!(
+                identify(i.service, i.txt.as_deref()),
+                Identity::Unknown(_) | Identity::MissingKey(_)
+            ) {
                 continue;
             }
             if i.srv.is_none() {
@@ -1463,7 +1610,8 @@ mod tests {
                 BLACKMAGIC,
                 "_switcher_ctrl._udp.local",
                 "_hyperdeck_ctrl._tcp.local",
-                "_smartview._tcp.local"
+                "_smartview._tcp.local",
+                MEROS_CAMERA
             ]
         );
         let catalog = Catalog::source_tree();
@@ -1623,6 +1771,151 @@ mod tests {
         rr(&mut p, TYPE_A, true, 120, &[10, 0, 0, 99]);
         cache.absorb(DEVICE, &parse(&p).unwrap(), Heard::Listener);
         assert!(!cache.hosts.contains_key("other.local"));
+    }
+
+    /// An uncompressed name from its labels.
+    fn labels(parts: &[&str]) -> Vec<u8> {
+        let mut out = Vec::new();
+        for p in parts {
+            out.push(p.len() as u8);
+            out.extend_from_slice(p.as_bytes());
+        }
+        out.push(0);
+        out
+    }
+
+    /// A Meros Camera's answer, as the protocol documents it (§2): PTR to the
+    /// instance named by its id, SRV with its port and host
+    /// meros-cam-<id>.local, TXT and the host's A record.
+    fn meros_response(id: &str, port: u16, ip: [u8; 4], txt: &[&str]) -> Vec<u8> {
+        let service = labels(&["_meros-cam", "_tcp", "local"]);
+        let instance = labels(&[id, "_meros-cam", "_tcp", "local"]);
+        let host_label = format!("meros-cam-{id}");
+        let host = labels(&[host_label.as_str(), "local"]);
+        let mut p = header(1, 3);
+        p.extend_from_slice(&service);
+        rr(&mut p, TYPE_PTR, false, 4500, &instance);
+        p.extend_from_slice(&instance);
+        let mut srv = vec![0, 0, 0, 0];
+        srv.extend_from_slice(&port.to_be_bytes());
+        srv.extend_from_slice(&host);
+        rr(&mut p, TYPE_SRV, true, 120, &srv);
+        p.extend_from_slice(&instance);
+        rr(&mut p, TYPE_TXT, true, 4500, &txt_rdata(txt));
+        p.extend_from_slice(&host);
+        rr(&mut p, TYPE_A, true, 120, &ip);
+        p
+    }
+
+    const CAMERA_ID: &str = "00112233aabbccdd";
+
+    fn camera_txt() -> Vec<&'static str> {
+        vec![
+            "id=00112233aabbccdd",
+            "name=Camera A",
+            "model=SM-S926U",
+            "proto=1",
+        ]
+    }
+
+    #[test]
+    fn a_meros_camera_is_reported_by_id_with_its_srv_port() {
+        let mut cache = Cache::new(table());
+        let packet = parse(&meros_response(
+            CAMERA_ID,
+            8801,
+            [10, 0, 0, 31],
+            &camera_txt(),
+        ))
+        .unwrap();
+        let events = cache.absorb(LOCAL, &packet, Heard::Scan);
+        assert_eq!(events.len(), 1);
+        let (protocol, address, port, device, models, evidence) = discovered(&events[0]);
+        assert_eq!(
+            (protocol, address, port, device),
+            ("mdns", "10.0.0.31", 8801, "meros-camera")
+        );
+        assert_eq!(models, ["meros-camera"]);
+        let Event::Discovered { name, .. } = &events[0] else {
+            unreachable!()
+        };
+        assert_eq!(name.as_deref(), Some("Camera A"));
+        assert_eq!(evidence["txt"]["id"], CAMERA_ID);
+        assert_eq!(evidence["txt"]["model"], "SM-S926U");
+        assert_eq!(evidence["txt"]["proto"], "1");
+        assert!(evidence["id"].as_str().unwrap().contains(CAMERA_ID));
+        assert!(evidence["port"].as_str().unwrap().starts_with("the SRV"));
+        assert_eq!(
+            evidence["instance"],
+            format!("{CAMERA_ID}._meros-cam._tcp.local")
+        );
+
+        // Heard again: nothing new.
+        assert!(cache.absorb(LOCAL, &packet, Heard::Listener).is_empty());
+
+        // The same camera at a new address (DHCP) is reported again, once.
+        let moved = parse(&meros_response(
+            CAMERA_ID,
+            8801,
+            [10, 0, 0, 44],
+            &camera_txt(),
+        ))
+        .unwrap();
+        let events = cache.absorb(LOCAL, &moved, Heard::Listener);
+        assert_eq!(events.len(), 1);
+        assert_eq!(discovered(&events[0]).1, "10.0.0.44");
+        assert!(cache.absorb(LOCAL, &moved, Heard::Listener).is_empty());
+
+        // A second camera on the same address is its own device.
+        let other = parse(&meros_response(
+            "ffeeddccbbaa9988",
+            8802,
+            [10, 0, 0, 44],
+            &[
+                "id=ffeeddccbbaa9988",
+                "name=Camera B",
+                "model=iPad",
+                "proto=1",
+            ],
+        ))
+        .unwrap();
+        let events = cache.absorb(LOCAL, &other, Heard::Scan);
+        assert_eq!(discovered(&events[0]).2, 8802);
+    }
+
+    #[test]
+    fn a_meros_camera_without_its_id_is_not_identified() {
+        let mut cache = Cache::new(table());
+        let packet = parse(&meros_response(
+            CAMERA_ID,
+            8790,
+            [10, 0, 0, 31],
+            &["name=Camera A"],
+        ))
+        .unwrap();
+        let events = cache.absorb(LOCAL, &packet, Heard::Scan);
+        let [Event::Discovery { message, .. }] = &events[..] else {
+            panic!("{events:?}");
+        };
+        assert!(message.contains("without TXT id"), "{message}");
+        assert!(cache.absorb(LOCAL, &packet, Heard::Scan).is_empty());
+        // Without any TXT, the TXT is asked for.
+        let mut cache = Cache::new(table());
+        let mut ptr_srv = header(2, 0);
+        ptr_srv.extend_from_slice(&labels(&["_meros-cam", "_tcp", "local"]));
+        let instance = labels(&[CAMERA_ID, "_meros-cam", "_tcp", "local"]);
+        rr(&mut ptr_srv, TYPE_PTR, false, 4500, &instance);
+        ptr_srv.extend_from_slice(&instance);
+        let mut srv = vec![0, 0, 0, 0, 0x22, 0x56];
+        srv.extend_from_slice(&labels(&["meros-cam-x", "local"]));
+        rr(&mut ptr_srv, TYPE_SRV, true, 120, &srv);
+        assert!(cache
+            .absorb(LOCAL, &parse(&ptr_srv).unwrap(), Heard::Scan)
+            .is_empty());
+        assert!(cache
+            .follow_ups()
+            .iter()
+            .any(|(n, t)| *t == TYPE_TXT && n.text().starts_with(CAMERA_ID)));
     }
 
     #[test]

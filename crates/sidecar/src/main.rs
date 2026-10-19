@@ -36,9 +36,9 @@
 //!
 //! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
 //! (Sony cameras), `pjlink` (PJLink projectors) and `mdns` (Blackmagic ATEM,
-//! Videohub, HyperDeck, SmartView and MultiView); none means every protocol
-//! that finds a device in the service's catalogue. `hints` are addresses
-//! where devices were last seen.
+//! Videohub, HyperDeck, SmartView and MultiView, and Meros Cameras); none
+//! means every protocol that finds a device in the service's catalogue.
+//! `hints` are addresses where devices were last seen.
 //!
 //! `/v1/settings` changes an open device's settings without closing it, as
 //! `update_settings` does in every delivery: `settings` are merged into the
