@@ -174,6 +174,7 @@ socket.
 | `tsl-umd-listener` | UDP, or TCP that the switcher connects to, on the port given at open | The core listens, so the switcher must be set to send to the phone's address, which changes with DHCP: reserve one for it. Use a port of 1024 or above: Android refuses lower ports to apps, and iOS can too. The port is bound on every interface (IPv4), and only datagrams or connections from the switcher's address are taken. |
 | `omt` | TCP to the source, 6400 and up | The source sends its combined tally to subscribed receivers. A tally this app sets (`set_tally`) is sent again after every reconnection. |
 | `omt-discovery` | TCP 6399 to a discovery server | Lists sources with no multicast. Without a discovery server, browse `_omt._tcp` with the platform's DNS-SD. |
+| `tally-arbiter` | WebSocket 4455 (Socket.IO), outgoing only | With `device_id` set, the app registers as a listener client and that device's tally is pushed; every device's tally is pushed when signed in with an admin or producer account, and otherwise read every `poll_ms` (raise it to save battery). A version request every 5 s is the liveness check; `mi_reconnect_all` on resume reopens the connection and registers the listener client again. |
 
 ## What has been verified
 

@@ -62,6 +62,7 @@ NATIVE = {
     "shure-wireless": "Command strings over TCP 2202",
     "softouch-easyworship": "JSON lines over TCP (the port EasyWorship advertises over Bonjour)",
     "sony-camera": "PTP-IP over TCP 15740, or through SSH",
+    "tally-arbiter": "Socket.IO 4 over a WebSocket on 4455",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
     "tsl-umd-listener": "TSL UMD over UDP, or TCP for V3.1 and V5.0; receives",
     "visca": "VISCA over IP (UDP 52381), raw VISCA over TCP or UDP",

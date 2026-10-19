@@ -1,0 +1,717 @@
+spec: 1
+id: tally-arbiter
+name: Tally Arbiter
+vendor: Tally Arbiter
+category: other
+implementation: native
+reason: >
+  Tally Arbiter has had no REST API since 3.0.0: every read and change is a
+  Socket.IO event on its web server's port. Changes need a session: a login
+  event answered with an access token, which is sent back before the settings
+  or producer room is joined, and refreshed when the server says it expired.
+  Tally per device comes from joining two pushed lists (each device's active
+  buses, and each bus's type), and replies are tied to requests by event name.
+
+source:
+  - title: Tally Arbiter documentation, "Creating your own listener client"
+    author: Joseph Adams and contributors
+    url: https://github.com/josephdadams/TallyArbiter/blob/main/docs/docs/developers/01-own-listener-client.md
+    note: >
+      The documented Socket.IO events for listener clients: bus_options,
+      devices, device_listen and device_states.
+  - title: Tally Arbiter documentation, "Former REST API"
+    author: Joseph Adams and contributors
+    url: https://github.com/josephdadams/TallyArbiter/blob/main/docs/docs/developers/03-rest-api.md
+    note: There is no REST API since 3.0.0; all communication is Socket.IO.
+  - title: Tally Arbiter documentation, "Control Interface"
+    author: Joseph Adams and contributors
+    url: https://github.com/josephdadams/TallyArbiter/blob/main/docs/docs/usage/control-interface.md
+    note: >
+      HTTP server on port 4455; the settings page's admin account and the
+      producer account; the first sign-in's forced password change.
+  - title: Tally Arbiter documentation, "Remote Tally Viewing (Listener Clients)", "TSL Protocol Conversion", "Configuring and Using Tally Arbiter Cloud"
+    author: Joseph Adams and contributors
+    url: https://github.com/josephdadams/TallyArbiter/tree/main/docs/docs/usage/sections
+    note: >
+      Listener clients (flash, reassign, messaging with the producer), the
+      server-wide chat switch, TSL clients and cloud destinations and keys.
+  - title: Tally Arbiter source (src/index.ts, src/_models, src/_helpers/auth.ts, UI/src/app/_services/socket.service.ts)
+    author: Joseph Adams and contributors (MIT licence)
+    url: https://github.com/josephdadams/TallyArbiter/blob/main/src/index.ts
+    note: >
+      Version 3.3.0 (package.json), main branch at a8a3d8b, 2026-10-16. Read for what the documentation leaves out: every Socket.IO event the
+      server handles and emits, their arguments, the roles each requires, the
+      manage events' object shapes and result strings, the rooms each list is
+      pushed to, and the login, access token and password change exchange.
+      The release tag v3.3.0 was compared: set_chat_enabled, duplicate_device,
+      duplicate_device_action and the invalid_access_token event exist only
+      after it.
+
+settings:
+  device_id: { type: string, default: "", max_length: 256,
+               label: Device,
+               description: "The Tally Arbiter device id (or exact name) this connection registers as a listener client for; empty to register as none." }
+  register_listener: { type: bool, default: true,
+                       label: Register as a listener client,
+                       description: "Whether to appear in Tally Arbiter's listener client list for the device, so its operator can flash, message and reassign this connection." }
+  listener_type: { type: string, default: "meros", max_length: 64,
+                   label: Listener type,
+                   description: "The name Tally Arbiter shows for this connection in its listener client list." }
+  chat: { type: bool, default: true,
+          label: Receive chat,
+          description: "Whether this listener client says it supports chat, so it receives producer and server messages." }
+  username: { type: string, default: "", max_length: 128,
+              label: Username,
+              description: "A Tally Arbiter account (admin for full control, producer for flash and reassign); empty to connect without signing in." }
+  password: { type: string, secret: true, default: "", max_length: 256,
+              label: Password,
+              description: "The account's password." }
+  poll_ms: { type: int, min: 0, max: 60000, default: 1000,
+             label: Tally read interval,
+             description: "Milliseconds between reads of every device's tally when not signed in to a room that pushes it; 0 reads it only on connecting." }
+
+ports:
+  - { port: 4455, protocol: ws, role: control, note: "Tally Arbiter's web server, Socket.IO on /socket.io/ (Engine.IO 4, WebSocket transport)" }
+
+models:
+  - id: tally-arbiter-3
+    name: Tally Arbiter 3.x
+    supports: [get_version, get_ui_version, get_external_address, get_interfaces,
+               get_sources, get_devices, get_device_sources, get_device_actions,
+               get_bus_options, get_device_states, get_listener_clients, get_tsl_clients,
+               get_cloud_destinations, get_cloud_keys, get_cloud_clients, get_initial_data,
+               get_error_reports, get_unread_error_reports, get_error_report, get_users,
+               get_default_password_users, get_config,
+               flash_listener, send_listener_message, reassign_listener, delete_listener,
+               send_chat, set_test_mode, set_tsl_clients_1sec_update, set_chat_enabled,
+               set_remote_error_reporting, set_config, mark_error_reports_read,
+               delete_all_error_reports, change_password,
+               reconnect_source, add_source, edit_source, delete_source,
+               add_device, edit_device, delete_device, duplicate_device,
+               add_device_source, edit_device_source, delete_device_source,
+               add_device_action, edit_device_action, delete_device_action, duplicate_device_action,
+               add_tsl_client, edit_tsl_client, delete_tsl_client,
+               add_bus_option, edit_bus_option, delete_bus_option,
+               add_cloud_destination, edit_cloud_destination, delete_cloud_destination,
+               reconnect_cloud_destination, disconnect_cloud_destination,
+               add_cloud_key, delete_cloud_key, remove_cloud_client,
+               add_user, edit_user, delete_user]
+    verification: none
+
+commands:
+  # ---- reads: each emits the event and returns what Tally Arbiter answers ----
+  get_version:
+    summary: Read the server's version (event version)
+    returns: value
+  get_ui_version:
+    summary: Read the web interface's version (event uiVersion)
+    returns: value
+  get_external_address:
+    summary: Read the external address the server advertises for its tally page (event externalAddress)
+    returns: value
+  get_interfaces:
+    summary: Read the server's network interfaces (event interfaces)
+    returns: value
+  get_sources:
+    summary: Read every source and whether it is connected (event sources)
+    returns: value
+  get_devices:
+    summary: Read every device (event devices)
+    returns: value
+  get_device_sources:
+    summary: Read every device source mapping (event device_sources)
+    returns: value
+  get_device_actions:
+    summary: Read every device action (event device_actions)
+    returns: value
+  get_bus_options:
+    summary: Read the bus options, preview, program and aux busses (event bus_options)
+    returns: value
+  get_device_states:
+    summary: Read the busses each device is active on, for one device or every device (event device_states)
+    params:
+      device_id: { type: string, max_length: 256, label: Device, description: "The device to read; left out, every device is read." }
+    returns: value
+  get_listener_clients:
+    summary: Read every listener client, connected or inactive (event listener_clients)
+    returns: value
+  get_tsl_clients:
+    summary: Read every TSL client Tally Arbiter sends to (event tsl_clients)
+    returns: value
+  get_cloud_destinations:
+    summary: Read the cloud destinations this server relays to (event cloud_destinations)
+    returns: value
+  get_cloud_keys:
+    summary: Read the keys other servers relay to this one with (event cloud_keys)
+    returns: value
+  get_cloud_clients:
+    summary: Read the servers relaying to this one (event cloud_clients)
+    returns: value
+  get_initial_data:
+    summary: >
+      Join the settings room and read everything the settings page loads with
+      (event initialdata): source types and their fields, addresses, output
+      types and their fields, bus options, sources, devices, camera models,
+      device sources and actions, device states, TSL clients, cloud
+      destinations, keys and clients. Admin only.
+    returns: value
+  get_error_reports:
+    summary: Read the list of error reports (event error_reports)
+    returns: value
+  get_unread_error_reports:
+    summary: Read the unread error reports (event unread_error_reports). Admin only.
+    returns: value
+  get_error_report:
+    summary: Read one error report and mark it read (event error_report). Admin only.
+    params:
+      error_report_id: { type: string, required: true, max_length: 256, label: Error report, description: "The id of the error report, from the error report list." }
+    returns: value
+  get_users:
+    summary: Read the user accounts and their roles, without passwords (event users). Needs settings:users or admin.
+    returns: value
+  get_default_password_users:
+    summary: Read the accounts still on the shipped default password (event default_password_users). Needs settings:users or admin.
+    returns: value
+  get_config:
+    summary: Read the whole configuration file's contents (event config). Needs settings:config or admin.
+    returns: value
+
+  # ---- listener clients and messaging ----
+  flash_listener:
+    summary: Flash a listener client to get its operator's attention (event flash). Needs producer or admin.
+    params:
+      listener_client_id: { type: string, required: true, max_length: 256, label: Listener client, description: "The listener client's id, from listener_clients." }
+    returns: none
+  send_listener_message:
+    summary: Send a message to one listener client that supports chat (event messaging_client). Needs producer or admin.
+    params:
+      listener_client_id: { type: string, required: true, max_length: 256, label: Listener client, description: "The listener client's id, from listener_clients." }
+      message: { type: string, required: true, max_length: 1024, label: Message, description: "The text the listener client shows." }
+    returns: none
+  reassign_listener:
+    summary: Move a listener client to another device (event reassign). Needs producer or admin.
+    params:
+      listener_client_id: { type: string, required: true, max_length: 256, label: Listener client, description: "The listener client's id, from listener_clients." }
+      device_id: { type: string, required: true, max_length: 256, label: Device, description: "The device the listener client shows the tally of from now on." }
+      old_device_id: { type: string, max_length: 256, label: Current device, description: "The device the listener client shows now; left out, it is taken from listener_clients." }
+    returns: none
+  delete_listener:
+    summary: Remove an inactive listener client from the list (event listener_delete). Needs settings:listeners or admin.
+    params:
+      listener_client_id: { type: string, required: true, max_length: 256, label: Listener client, description: "The listener client's id, from listener_clients." }
+    returns: none
+  send_chat:
+    summary: Send a chat message to the producer page and every listener client that supports chat (event messaging)
+    params:
+      message: { type: string, required: true, max_length: 1024, label: Message, description: "The chat text." }
+      sender: { type: enum, values: [producer, client], default: producer, label: Sent as, description: "Whether the message shows as from the producer or from a listener client." }
+    returns: none
+
+  # ---- server settings ----
+  set_test_mode:
+    summary: Turn test mode on or off; on, a test source cycles every device through preview and program (event testmode). Needs settings:testing or admin.
+    params:
+      enabled: { type: bool, required: true, label: Test mode, description: "True turns test mode on, false off." }
+      interval_ms: { type: int, min: 1, default: 1000, label: Interval, description: "Milliseconds between the test source's tally changes." }
+    returns: ack
+  set_tsl_clients_1sec_update:
+    summary: Turn on or off sending every device's tally to the TSL clients every second (event tslclients_1secupdate). Needs settings:listeners or admin.
+    params:
+      enabled: { type: bool, required: true, label: Send every second, description: "True sends every device's state to the TSL clients once a second; false sends changes only." }
+    returns: none
+  set_chat_enabled:
+    summary: Turn chat on or off for the whole server (event chat_enabled). Needs settings:listeners or admin; after 3.3.0 only.
+    params:
+      enabled: { type: bool, required: true, label: Chat, description: "True allows chat between the producer and listener clients; false blocks it." }
+    returns: ack
+  set_remote_error_reporting:
+    summary: Opt in or out of sending error reports to the Tally Arbiter developers (event remote_error_opt)
+    params:
+      enabled: { type: bool, required: true, label: Remote error reporting, description: "True sends crash reports to the developers; false keeps them local." }
+    returns: ack
+  set_config:
+    summary: Replace the whole configuration with a config.json object (event set_config). Needs settings:config or admin.
+    params:
+      config: { type: json, required: true, label: Configuration, description: "A whole Tally Arbiter config.json object, as get_config returns it, which the server checks against its config schema." }
+    returns: none
+  mark_error_reports_read:
+    summary: Mark every error report read (event mark_error_reports_as_read). Admin only.
+    returns: none
+  delete_all_error_reports:
+    summary: Delete every error report (event delete_every_error_report). Admin only.
+    returns: none
+  change_password:
+    summary: Change the signed-in account's own password (event change_password); the session carries on with the new access token.
+    params:
+      current_password: { type: string, required: true, max_length: 256, label: Current password, description: "The account's password now." }
+      new_password: { type: string, required: true, max_length: 256, label: New password, description: "The new password, which Tally Arbiter requires to differ from the current one and from the shipped default." }
+    returns: value
+
+  # ---- sources ----
+  reconnect_source:
+    summary: Reconnect a source to its switcher or tally input (event reconnect_source)
+    params:
+      source_id: { type: string, required: true, max_length: 256, label: Source, description: "The source's id, from sources." }
+    returns: none
+  add_source:
+    summary: Add a source (manage source add). Needs settings:sources_devices or admin.
+    params:
+      name: { type: string, required: true, max_length: 256, label: Name, description: "The source's name." }
+      source_type_id: { type: string, required: true, max_length: 256, label: Source type, description: "The source type's id, from source_types (an ATEM, vMix, OBS, TSL listener and so on)." }
+      enabled: { type: bool, default: true, label: Enabled, description: "Whether Tally Arbiter connects to the source." }
+      reconnect: { type: bool, default: true, label: Reconnect, description: "Whether Tally Arbiter reconnects when the source's connection drops." }
+      reconnect_interval: { type: int, min: 0, default: 5000, label: Reconnect interval, description: "Milliseconds between reconnection attempts." }
+      max_reconnects: { type: int, min: 0, default: 5, label: Reconnection attempts, description: "How many times Tally Arbiter tries to reconnect before giving up." }
+      data: { type: json, default: {}, label: Connection settings, description: "The source type's fields as an object keyed by field name, as source_types.<id>.fields lists them (the switcher's address, port and so on)." }
+    returns: ack
+  edit_source:
+    summary: Change a source (manage source edit); a field left out keeps its current value. Needs settings:sources_devices or admin.
+    params:
+      source_id: { type: string, required: true, max_length: 256, label: Source, description: "The source's id, from sources." }
+      name: { type: string, max_length: 256, label: Name, description: "The source's name." }
+      enabled: { type: bool, label: Enabled, description: "Whether Tally Arbiter connects to the source." }
+      reconnect: { type: bool, label: Reconnect, description: "Whether Tally Arbiter reconnects when the source's connection drops." }
+      reconnect_interval: { type: int, min: 0, label: Reconnect interval, description: "Milliseconds between reconnection attempts." }
+      max_reconnects: { type: int, min: 0, label: Reconnection attempts, description: "How many times Tally Arbiter tries to reconnect before giving up." }
+      data: { type: json, label: Connection settings, description: "The source type's fields as an object keyed by field name; replaces the current object whole." }
+    returns: ack
+  delete_source:
+    summary: Delete a source and every device source mapping to it (manage source delete). Needs settings:sources_devices or admin.
+    params:
+      source_id: { type: string, required: true, max_length: 256, label: Source, description: "The source's id, from sources." }
+    returns: ack
+
+  # ---- devices ----
+  add_device:
+    summary: Add a device (manage device add). Needs settings:sources_devices or admin.
+    params:
+      name: { type: string, required: true, max_length: 256, label: Name, description: "The device's name, as listener clients show it." }
+      description: { type: string, default: "", max_length: 1024, label: Description, description: "A note on the device." }
+      enabled: { type: bool, default: true, label: Enabled, description: "Whether the device's actions run." }
+      tsl_address: { type: string, default: "", max_length: 5, pattern: "^[0-9]*$", label: TSL address, description: "The address the device's tally is sent to TSL clients on; empty or 0 sends none." }
+      linked_buses: { type: json, default: [], label: Linked busses, description: "An array of bus ids on which the device is active only when every one of its sources is." }
+      camera_ip: { type: string, default: "", max_length: 256, label: Camera address, description: "The address of a camera whose tally lamp Tally Arbiter drives for the device; empty for none." }
+      camera_model: { type: string, default: "", max_length: 64, label: Camera model, description: "The camera protocol, an id from camera_models (canon_xc, sony_visca, sony_visca_rg); empty for none." }
+      camera_preview_disabled: { type: bool, default: false, label: No camera preview lamp, description: "True lights the camera's lamp for program only." }
+    returns: ack
+  edit_device:
+    summary: Change a device (manage device edit); a field left out keeps its current value. Needs settings:sources_devices or admin.
+    params:
+      device_id: { type: string, required: true, max_length: 256, label: Device, description: "The device's id, from devices." }
+      name: { type: string, max_length: 256, label: Name, description: "The device's name, as listener clients show it." }
+      description: { type: string, max_length: 1024, label: Description, description: "A note on the device." }
+      enabled: { type: bool, label: Enabled, description: "Whether the device's actions run." }
+      tsl_address: { type: string, max_length: 5, pattern: "^[0-9]*$", label: TSL address, description: "The address the device's tally is sent to TSL clients on; empty or 0 sends none." }
+      linked_buses: { type: json, label: Linked busses, description: "An array of bus ids on which the device is active only when every one of its sources is." }
+      camera_ip: { type: string, max_length: 256, label: Camera address, description: "The address of a camera whose tally lamp Tally Arbiter drives for the device; empty for none." }
+      camera_model: { type: string, max_length: 64, label: Camera model, description: "The camera protocol, an id from camera_models; empty for none." }
+      camera_preview_disabled: { type: bool, label: No camera preview lamp, description: "True lights the camera's lamp for program only." }
+    returns: ack
+  delete_device:
+    summary: Delete a device with its device sources and actions (manage device delete). Needs settings:sources_devices or admin.
+    params:
+      device_id: { type: string, required: true, max_length: 256, label: Device, description: "The device's id, from devices." }
+    returns: ack
+  duplicate_device:
+    summary: Copy a device with its device sources and actions, created disabled, and return the copy's id (manage device duplicate). After 3.3.0 only.
+    params:
+      device_id: { type: string, required: true, max_length: 256, label: Device, description: "The device to copy, from devices." }
+    returns: value
+
+  # ---- device sources ----
+  add_device_source:
+    summary: Map a source's address to a device (manage device_source add). Needs settings:sources_devices or admin.
+    params:
+      device_id: { type: string, required: true, max_length: 256, label: Device, description: "The device's id, from devices." }
+      source_id: { type: string, required: true, max_length: 256, label: Source, description: "The source's id, from sources." }
+      address: { type: string, required: true, max_length: 256, label: Address, description: "The source's input, camera or address that is this device (a switcher input number, a vMix input and so on)." }
+      bus: { type: string, default: "", max_length: 64, label: Source bus, description: "For a source type with busses of its own (source_types.<id>.buses), the one this mapping follows; empty otherwise." }
+      rename: { type: bool, default: false, label: Rename, description: "Whether Tally Arbiter renames the input on the source after the device, where the source type can." }
+      reconnect_interval: { type: int, min: 0, default: 5000, label: Reconnect interval, description: "Milliseconds between reconnection attempts." }
+      max_reconnects: { type: int, min: 0, default: 5, label: Reconnection attempts, description: "How many times Tally Arbiter tries to reconnect before giving up." }
+    returns: ack
+  edit_device_source:
+    summary: Change a device source mapping (manage device_source edit); a field left out keeps its current value. Needs settings:sources_devices or admin.
+    params:
+      device_source_id: { type: string, required: true, max_length: 256, label: Device source, description: "The mapping's id, from device_sources." }
+      source_id: { type: string, max_length: 256, label: Source, description: "The source's id, from sources." }
+      address: { type: string, max_length: 256, label: Address, description: "The source's input, camera or address that is this device." }
+      bus: { type: string, max_length: 64, label: Source bus, description: "For a source type with busses of its own, the one this mapping follows." }
+      rename: { type: bool, label: Rename, description: "Whether Tally Arbiter renames the input on the source after the device, where the source type can." }
+      reconnect_interval: { type: int, min: 0, label: Reconnect interval, description: "Milliseconds between reconnection attempts." }
+      max_reconnects: { type: int, min: 0, label: Reconnection attempts, description: "How many times Tally Arbiter tries to reconnect before giving up." }
+    returns: ack
+  delete_device_source:
+    summary: Remove a device source mapping (manage device_source delete). Needs settings:sources_devices or admin.
+    params:
+      device_source_id: { type: string, required: true, max_length: 256, label: Device source, description: "The mapping's id, from device_sources." }
+    returns: ack
+
+  # ---- device actions ----
+  add_device_action:
+    summary: Add an action that runs when a device enters or leaves a bus (manage device_action add). Needs settings:sources_devices or admin.
+    params:
+      device_id: { type: string, required: true, max_length: 256, label: Device, description: "The device's id, from devices." }
+      bus_id: { type: string, required: true, max_length: 256, label: Bus, description: "The bus whose change runs the action, from buses." }
+      active: { type: bool, default: true, label: On entering, description: "True runs the action when the device enters the bus, false when it leaves it." }
+      output_type_id: { type: string, required: true, max_length: 256, label: Action type, description: "The action type's id, from output_types (TSL, OSC, webhook, TCP, UDP and so on)." }
+      data: { type: json, default: {}, label: Action settings, description: "The action type's fields as an object keyed by field name, as output_types.<id>.fields lists them." }
+    returns: ack
+  edit_device_action:
+    summary: Change a device action (manage device_action edit); a field left out keeps its current value. Needs settings:sources_devices or admin.
+    params:
+      device_action_id: { type: string, required: true, max_length: 256, label: Device action, description: "The action's id, from device_actions." }
+      bus_id: { type: string, max_length: 256, label: Bus, description: "The bus whose change runs the action." }
+      active: { type: bool, label: On entering, description: "True runs the action when the device enters the bus, false when it leaves it." }
+      output_type_id: { type: string, max_length: 256, label: Action type, description: "The action type's id, from output_types." }
+      data: { type: json, label: Action settings, description: "The action type's fields as an object keyed by field name; replaces the current object whole." }
+    returns: ack
+  delete_device_action:
+    summary: Delete a device action (manage device_action delete). Needs settings:sources_devices or admin.
+    params:
+      device_action_id: { type: string, required: true, max_length: 256, label: Device action, description: "The action's id, from device_actions." }
+    returns: ack
+  duplicate_device_action:
+    summary: Copy a device action on the same device (manage device_action duplicate). After 3.3.0 only.
+    params:
+      device_action_id: { type: string, required: true, max_length: 256, label: Device action, description: "The action to copy, from device_actions." }
+    returns: ack
+
+  # ---- TSL clients ----
+  add_tsl_client:
+    summary: Add a TSL client Tally Arbiter sends every device's tally to (manage tsl_client add). Needs settings:listeners or admin.
+    params:
+      ip: { type: string, required: true, max_length: 256, label: Address, description: "The TSL display or multiviewer's address." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Port, description: "The port the TSL client listens on." }
+      transport: { type: enum, values: [udp, tcp], default: udp, label: Transport, description: "Whether TSL is sent over UDP or TCP." }
+      protocol: { type: enum, values: ["3.1", "5.0"], default: "3.1", label: Protocol, description: "The TSL UMD protocol version." }
+      protocol_options: { type: json, default: {}, label: Protocol options, description: "Tally bit mapping as Tally Arbiter takes it: tally1 to tally4 for 3.1, lh_tally, rh_tally, text_tally and sequence for 5.0, each pvw, pgm or off, and brightness 0 to 3." }
+    returns: ack
+  edit_tsl_client:
+    summary: Change a TSL client (manage tsl_client edit); a field left out keeps its current value. Needs settings:listeners or admin.
+    params:
+      tsl_client_id: { type: string, required: true, max_length: 256, label: TSL client, description: "The TSL client's id, from tsl_clients." }
+      ip: { type: string, max_length: 256, label: Address, description: "The TSL display or multiviewer's address." }
+      port: { type: int, min: 1, max: 65535, label: Port, description: "The port the TSL client listens on." }
+      transport: { type: enum, values: [udp, tcp], label: Transport, description: "Whether TSL is sent over UDP or TCP." }
+      protocol: { type: enum, values: ["3.1", "5.0"], label: Protocol, description: "The TSL UMD protocol version." }
+      protocol_options: { type: json, label: Protocol options, description: "Tally bit mapping as Tally Arbiter takes it; replaces the current object whole." }
+    returns: ack
+  delete_tsl_client:
+    summary: Delete a TSL client (manage tsl_client delete). Needs settings:listeners or admin.
+    params:
+      tsl_client_id: { type: string, required: true, max_length: 256, label: TSL client, description: "The TSL client's id, from tsl_clients." }
+    returns: ack
+
+  # ---- bus options ----
+  add_bus_option:
+    summary: Add a bus (manage bus_option add). Needs settings:config or admin.
+    params:
+      label: { type: string, required: true, max_length: 64, label: Label, description: "The bus's name, as listener clients show it." }
+      type: { type: string, required: true, max_length: 32, label: Type, description: "The bus's type: preview, program, or another word such as aux for any other bus." }
+      color: { type: string, default: "#000000", pattern: "^#[0-9A-Fa-f]{6}$", label: Colour, description: "The colour listener clients show for the bus, as #RRGGBB." }
+      priority: { type: int, default: 100, label: Priority, description: "Which bus a listener shows when a device is on several; the highest wins (program 200, aux 100 and preview 50 by default)." }
+      visible: { type: bool, default: true, label: Visible, description: "Whether the bus shows in Tally Arbiter's pages." }
+    returns: ack
+  edit_bus_option:
+    summary: Change a bus's label, type, colour or visibility (manage bus_option edit); a field left out keeps its current value. Needs settings:config or admin.
+    params:
+      bus_id: { type: string, required: true, max_length: 256, label: Bus, description: "The bus's id, from buses." }
+      label: { type: string, max_length: 64, label: Label, description: "The bus's name, as listener clients show it." }
+      type: { type: string, max_length: 32, label: Type, description: "The bus's type: preview, program, or another word such as aux." }
+      color: { type: string, pattern: "^#[0-9A-Fa-f]{6}$", label: Colour, description: "The colour listener clients show for the bus, as #RRGGBB." }
+      visible: { type: bool, label: Visible, description: "Whether the bus shows in Tally Arbiter's pages." }
+    returns: ack
+  delete_bus_option:
+    summary: Delete a bus (manage bus_option delete). Needs settings:config or admin.
+    params:
+      bus_id: { type: string, required: true, max_length: 256, label: Bus, description: "The bus's id, from buses." }
+    returns: ack
+
+  # ---- cloud ----
+  add_cloud_destination:
+    summary: Relay this server's sources, devices and tally to another Tally Arbiter (manage cloud_destination add). Needs settings:cloud or admin.
+    params:
+      host: { type: string, required: true, max_length: 256, label: Host, description: "The other server's address." }
+      port: { type: int, min: 1, max: 65535, default: 4455, label: Port, description: "The other server's port." }
+      key: { type: string, required: true, max_length: 256, label: Cloud key, description: "A cloud key created on the other server." }
+    returns: ack
+  edit_cloud_destination:
+    summary: Change a cloud destination (manage cloud_destination edit); a field left out keeps its current value. Needs settings:cloud or admin.
+    params:
+      cloud_destination_id: { type: string, required: true, max_length: 256, label: Cloud destination, description: "The destination's id, from cloud_destinations." }
+      host: { type: string, max_length: 256, label: Host, description: "The other server's address." }
+      port: { type: int, min: 1, max: 65535, label: Port, description: "The other server's port." }
+      key: { type: string, max_length: 256, label: Cloud key, description: "A cloud key created on the other server." }
+    returns: ack
+  delete_cloud_destination:
+    summary: Stop relaying to a cloud destination and delete it (manage cloud_destination delete). Needs settings:cloud or admin.
+    params:
+      cloud_destination_id: { type: string, required: true, max_length: 256, label: Cloud destination, description: "The destination's id, from cloud_destinations." }
+    returns: ack
+  reconnect_cloud_destination:
+    summary: Connect to a cloud destination again (event cloud_destination_reconnect)
+    params:
+      cloud_destination_id: { type: string, required: true, max_length: 256, label: Cloud destination, description: "The destination's id, from cloud_destinations." }
+    returns: none
+  disconnect_cloud_destination:
+    summary: Disconnect from a cloud destination (event cloud_destination_disconnect)
+    params:
+      cloud_destination_id: { type: string, required: true, max_length: 256, label: Cloud destination, description: "The destination's id, from cloud_destinations." }
+    returns: none
+  add_cloud_key:
+    summary: Add a key other servers relay to this one with (manage cloud_key add). Needs settings:cloud or admin.
+    params:
+      key: { type: string, required: true, max_length: 256, label: Cloud key, description: "The key, which a relaying server is given as its password." }
+    returns: ack
+  delete_cloud_key:
+    summary: Delete a cloud key and disconnect the servers using it (manage cloud_key delete). Needs settings:cloud or admin.
+    params:
+      key: { type: string, required: true, max_length: 256, label: Cloud key, description: "The key, from cloud_keys." }
+    returns: ack
+  remove_cloud_client:
+    summary: Disconnect a relaying server, removing its sources and devices (manage cloud_client remove). Needs settings:cloud or admin.
+    params:
+      cloud_client_id: { type: string, required: true, max_length: 256, label: Cloud client, description: "The relaying server's id, from cloud_clients." }
+    returns: ack
+
+  # ---- users ----
+  add_user:
+    summary: Add a user account (manage user add). Needs settings:users or admin.
+    params:
+      username: { type: string, required: true, max_length: 128, label: Username, description: "The account's name." }
+      password: { type: string, required: true, max_length: 256, label: Password, description: "The account's password; the shipped default makes the account replace it on first sign-in." }
+      roles: { type: string, default: "producer", max_length: 512, pattern: "^[a-z_:;]+$", label: Roles, description: "Roles separated by semicolons: admin, settings:sources_devices, settings:listeners, settings:cloud, settings:testing, settings:config, settings:users, producer, tally_viewer." }
+    returns: ack
+  edit_user:
+    summary: Change a user account's roles or password (manage user edit); a field left out keeps its current value. Needs settings:users or admin.
+    params:
+      username: { type: string, required: true, max_length: 128, label: Username, description: "The account's name, from users." }
+      roles: { type: string, max_length: 512, pattern: "^[a-z_:;]+$", label: Roles, description: "Roles separated by semicolons, as for add_user." }
+      password: { type: string, max_length: 256, label: Password, description: "A new password; left out, the password is unchanged." }
+    returns: ack
+  delete_user:
+    summary: Delete a user account (manage user delete). Needs settings:users or admin.
+    params:
+      username: { type: string, required: true, max_length: 128, label: Username, description: "The account's name, from users." }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Tally for a device is at devices.<device id>.program and
+      devices.<device id>.preview (true while the device is on any bus of
+      that type), and each bus at devices.<device id>.buses.<bus id>. A bus
+      is active while any of the device's sources is on it, or for a linked
+      bus while all of them are; Tally Arbiter works that out and sends each
+      device's busses (device_states), and the module marks a device program
+      or preview from the type of each active bus (bus_options). A
+      device_states entry with no sources is an inactive bus.
+  - models: [all]
+    severity: info
+    text: >
+      With device_id set, the connection registers as a listener client of
+      that device (listenerclient_connect), as Tally Arbiter's own tally page
+      does: the device's tally is pushed as it changes, and Tally Arbiter's
+      operator can flash it, message it and reassign it (listener.*). The
+      device may be given by id or exact name; a device Tally Arbiter does
+      not have is not registered (Tally Arbiter itself would move the client
+      to its first device), and is registered once a device list names it.
+      Set register_listener false to read tally without appearing in the
+      list.
+  - models: [all]
+    severity: info
+    text: >
+      Every device's tally, not only device_id's, is kept current. Signed in
+      with an admin account the connection joins the settings room, and with
+      a producer account the room Tally Arbiter's Companion module joins:
+      both push every list and every device's tally as it changes. Without
+      signing in, or with an account that has neither role (tally_viewer),
+      Tally Arbiter pushes nothing beyond the listener client's device, so
+      every device's tally is read every poll_ms and the lists every 30 s.
+  - models: [all]
+    severity: warning
+    text: >
+      Tally Arbiter answers most changes with nothing at all. The manage
+      events (adding, editing and deleting sources, devices, mappings,
+      actions, TSL clients, busses, cloud destinations, keys and users) are
+      answered with manage_response, sent to the settings room only, so they
+      need an admin account; the module reads the changed lists back after
+      each. flash_listener, send_listener_message, reassign_listener,
+      delete_listener, send_chat, set_tsl_clients_1sec_update, set_config,
+      reconnect_source, the cloud destination reconnects and the error report
+      changes are sent unconfirmed: a refusal (a missing role) comes back as
+      Tally Arbiter's error event, which is logged and kept in
+      session.last_error.
+  - models: [all]
+    severity: warning
+    text: >
+      A wrong username or password is refused by Tally Arbiter
+      (login_response) and is final: nothing is sent again until the device
+      is opened again or its settings change, since Tally Arbiter locks out
+      an address and username after repeated failures. An account still on
+      the shipped password (12345) is refused everything but change_password
+      until it is changed (session.must_change_password); change_password
+      carries on with the new password, which the consumer then stores with
+      update_settings. Access tokens last two days; when Tally Arbiter says
+      one expired (invalid_access_token, after 3.3.0) the module signs in
+      again.
+  - models: [all]
+    severity: critical
+    text: >
+      delete_source, delete_device, delete_bus_option, delete_cloud_key,
+      remove_cloud_client and set_config cannot be undone. Deleting a source
+      or device also deletes every device source mapping (and for a device,
+      every action) using it; deleting a cloud key or client removes every
+      source and device the relaying server brought; set_config replaces the
+      whole configuration, users and their password hashes included.
+  - models: [all]
+    severity: warning
+    text: >
+      Tally Arbiter answers delete_user with an error ("User not found.")
+      even when it deleted the account: its deleteUser returns false in
+      every case. The command is therefore sent unconfirmed and the user
+      list read back.
+  - models: [all]
+    severity: info
+    text: >
+      Without signing in, Tally Arbiter answers every list read, including
+      cloud_keys and the error report list, and takes reconnect_source,
+      the cloud destination reconnects, set_remote_error_reporting and chat
+      (when chat is on) from anyone; the rest need a role. edit_bus_option
+      cannot change a bus's priority: Tally Arbiter keeps it.
+  - models: [all]
+    severity: info
+    text: >
+      set_chat_enabled, duplicate_device, duplicate_device_action and the
+      expired-token signal exist only in Tally Arbiter after 3.3.0. A 3.3.0
+      server ignores chat_enabled (the command times out) and answers a
+      duplicate with no result, which fails the command.
+  - models: [all]
+    severity: info
+    text: >
+      On a phone or tablet (docs/MOBILE.md): the connection is one outgoing
+      WebSocket to port 4455, so no listening or privileged port is needed,
+      and nothing blocks the caller. Tally Arbiter pings over Engine.IO, and
+      the module also asks for the version every 5 s, so a dead connection
+      is dropped after two unanswered asks; the core's reconnect
+      (mi_reconnect_all on resume) reopens it at once, registers the
+      listener client again and reads every list afresh. Without signing in,
+      raise poll_ms to save battery: device_id's tally is still pushed.
+
+state:
+  server.version:            { type: string, description: "Tally Arbiter's version (version)" }
+  server.ui_version:         { type: string, description: "The web interface's version (uiVersion)" }
+  server.external_address:   { type: string, description: "The external address the server advertises for its tally page" }
+  server.interfaces:         { type: array, description: "The server's network interfaces, each {label, name, address}" }
+  server.chat_enabled:       { type: bool, description: "Chat allowed between the producer and listener clients, server-wide" }
+  server.test_mode:          { type: bool, description: "Test mode on; known once set while in the settings room" }
+  server.tsl_clients_1sec_update: { type: bool, description: "Every device's tally sent to the TSL clients once a second; read on joining the settings room" }
+  server.remote_error_reporting: { type: bool, description: "Error reports sent to the developers; known once set" }
+  server.ports_in_use:       { type: array, description: "Ports the server's sources use, each {port, sourceId} (settings room)" }
+  server.network_discovery:  { type: array, description: "Sources found on the network, each {sourceId, name, addresses, ip, port} (settings room)" }
+  server.vmix_clients:       { type: array, description: "vMix tally clients connected to the server's vMix emulation, each {host, socketId, inactive} (settings room)" }
+  session.access:            { type: string, description: "What the connection is signed in for: none, signed_in (no room), producer or settings" }
+  session.must_change_password: { type: bool, description: "The account is on the shipped password and can do nothing until change_password" }
+  session.last_error:        { type: string, description: "The last error Tally Arbiter sent this connection (a missing role, an invalid device)" }
+  listener.device_id:        { type: string, description: "The device this connection is registered as a listener client for, after any reassignment" }
+  listener.registered:       { type: bool, description: "Registered as a listener client" }
+  listener.client_id:        { type: string, description: "This connection's listener client id in listener_clients" }
+  listener.flashes:          { type: int, description: "Flashes received from Tally Arbiter since the device was opened; each is also a message event (address flash)" }
+  listener.messages:         { type: int, description: "Messages sent to this listener client since the device was opened; each is also a message event (address messaging_client)" }
+  listener.last_message.type: { type: string, description: "Who sent the last message to this listener client (producer, server)" }
+  listener.last_message.from: { type: string, description: "The sender's socket id" }
+  listener.last_message.text: { type: string, description: "The last message's text" }
+  chat.messages:             { type: int, description: "Chat messages received since the device was opened; each is also a message event (address messaging)" }
+  chat.last.type:            { type: string, description: "Who sent the last chat message: producer, client or server" }
+  chat.last.from:            { type: string, description: "The sender's socket id" }
+  chat.last.text:            { type: string, description: "The last chat message's text" }
+  log.last.datetime:         { type: string, description: "When the last log item was written (settings room)" }
+  log.last.type:             { type: string, description: "The last log item's type: info, info-quiet, error or console_action" }
+  log.last.text:             { type: string, description: "The last log item's text" }
+  devices.*.name:            { type: string, description: "Device name, keyed by device id" }
+  devices.*.description:     { type: string, description: "Device description" }
+  devices.*.enabled:         { type: bool, description: "Device enabled: its actions run" }
+  devices.*.index:           { type: int, description: "The device's place in Tally Arbiter's list, from 0" }
+  devices.*.tsl_address:     { type: string, description: "TSL address the device's tally is sent on; empty or 0 for none" }
+  devices.*.linked_buses:    { type: array, description: "Bus ids on which the device is active only when all its sources are" }
+  devices.*.camera_ip:       { type: string, description: "Camera whose tally lamp Tally Arbiter drives for the device" }
+  devices.*.camera_model:    { type: string, description: "The camera's protocol (camera_models)" }
+  devices.*.camera_preview_disabled: { type: bool, description: "The camera's lamp lights for program only" }
+  devices.*.cloud:           { type: bool, description: "The device came from a relaying server" }
+  devices.*.program:         { type: bool, description: "The device is on a bus of type program" }
+  devices.*.preview:         { type: bool, description: "The device is on a bus of type preview" }
+  devices.*.buses.*:         { type: bool, description: "The device is on the bus, keyed by bus id" }
+  buses.*.label:             { type: string, description: "Bus label, keyed by bus id" }
+  buses.*.type:              { type: string, description: "Bus type: preview, program, aux or another" }
+  buses.*.color:             { type: string, description: "Bus colour, #RRGGBB" }
+  buses.*.priority:          { type: int, description: "Bus priority; the highest wins where a device is on several" }
+  buses.*.visible:           { type: bool, description: "Bus shown in Tally Arbiter's pages" }
+  sources.*.name:            { type: string, description: "Source name, keyed by source id" }
+  sources.*.type:            { type: string, description: "Source type id (source_types)" }
+  sources.*.enabled:         { type: bool, description: "Source enabled" }
+  sources.*.connected:       { type: bool, description: "Tally Arbiter is connected to the source" }
+  sources.*.reconnect:       { type: bool, description: "Reconnects when its connection drops" }
+  sources.*.reconnect_interval: { type: int, unit: ms, description: "Time between reconnection attempts" }
+  sources.*.max_reconnects:  { type: int, description: "Reconnection attempts before giving up" }
+  sources.*.data:            { type: object, description: "The source type's fields, keyed by field name" }
+  sources.*.cloud:           { type: bool, description: "The source came from a relaying server" }
+  sources.*.tally.*:         { type: array, description: "Bus ids each address of the source is on, as the source last reported it (settings room)" }
+  addresses.*:               { type: array, description: "Addresses a source reports, each {label, address}, keyed by source id (settings room)" }
+  source_types.*.label:      { type: string, description: "Source type name, keyed by source type id" }
+  source_types.*.help:       { type: string, description: "Help text for the source type" }
+  source_types.*.enabled:    { type: bool, description: "Source type available" }
+  source_types.*.buses:      { type: array, description: "The source type's own busses, each {bus, name}" }
+  source_types.*.fields:     { type: array, description: "The fields of the source type's data, each {fieldName, fieldLabel, fieldType, help, optional, options}" }
+  output_types.*.label:      { type: string, description: "Device action type name, keyed by output type id" }
+  output_types.*.enabled:    { type: bool, description: "Action type available" }
+  output_types.*.fields:     { type: array, description: "The fields of the action type's data" }
+  camera_models.*.label:     { type: string, description: "Camera protocol name, keyed by camera model id" }
+  camera_models.*.visible:   { type: bool, description: "Camera protocol offered" }
+  device_sources.*.device_id: { type: string, description: "Device of the mapping, keyed by device source id" }
+  device_sources.*.source_id: { type: string, description: "Source of the mapping" }
+  device_sources.*.address:  { type: string, description: "The source's address that is the device" }
+  device_sources.*.bus:      { type: string, description: "The source type's bus the mapping follows; empty for none" }
+  device_sources.*.rename:   { type: bool, description: "Renames the input on the source after the device" }
+  device_sources.*.reconnect_interval: { type: int, unit: ms, description: "Time between reconnection attempts" }
+  device_sources.*.max_reconnects: { type: int, description: "Reconnection attempts before giving up" }
+  device_sources.*.cloud:    { type: bool, description: "The mapping came from a relaying server" }
+  device_actions.*.device_id: { type: string, description: "Device of the action, keyed by device action id" }
+  device_actions.*.bus_id:   { type: string, description: "Bus whose change runs the action" }
+  device_actions.*.active:   { type: bool, description: "Runs on entering the bus (true) or leaving it (false)" }
+  device_actions.*.output_type_id: { type: string, description: "Action type (output_types)" }
+  device_actions.*.data:     { type: object, description: "The action type's fields, keyed by field name" }
+  listener_clients.*.device_id: { type: string, description: "Device the listener client shows, keyed by listener client id" }
+  listener_clients.*.internal_id: { type: string, description: "The listener client's own id for itself" }
+  listener_clients.*.listener_type: { type: string, description: "What the listener client is (web, m5stickc, relay and so on)" }
+  listener_clients.*.ip_address: { type: string, description: "The listener client's address" }
+  listener_clients.*.connected_at: { type: int, unit: ms, description: "When it connected, in Unix milliseconds" }
+  listener_clients.*.inactive: { type: bool, description: "Disconnected; removed after an hour" }
+  listener_clients.*.inactive_at: { type: int, unit: ms, description: "When it disconnected, in Unix milliseconds" }
+  listener_clients.*.can_be_flashed: { type: bool, description: "Takes flash" }
+  listener_clients.*.can_be_reassigned: { type: bool, description: "Takes reassign" }
+  listener_clients.*.supports_chat: { type: bool, description: "Takes messages" }
+  listener_clients.*.cloud:  { type: bool, description: "The listener client is on a relaying server" }
+  tsl_clients.*.ip:          { type: string, description: "TSL client address, keyed by TSL client id" }
+  tsl_clients.*.port:        { type: int, description: "TSL client port" }
+  tsl_clients.*.transport:   { type: string, description: "udp or tcp" }
+  tsl_clients.*.protocol:    { type: string, description: "TSL protocol version: 3.1 or 5.0" }
+  tsl_clients.*.protocol_options: { type: object, description: "Tally bit mapping and brightness" }
+  tsl_clients.*.connected:   { type: bool, description: "Connected (TCP)" }
+  tsl_clients.*.error:       { type: bool, description: "The last send failed" }
+  cloud_destinations.*.host: { type: string, description: "Destination server, keyed by cloud destination id" }
+  cloud_destinations.*.port: { type: int, description: "Destination port" }
+  cloud_destinations.*.key:  { type: string, description: "Cloud key the destination is relayed to with" }
+  cloud_destinations.*.status: { type: string, description: "connected, disconnected, invalid_key or error" }
+  cloud_destinations.*.connected: { type: bool, description: "Connected to the destination" }
+  cloud_keys:                { type: array, description: "Keys other servers relay to this one with" }
+  cloud_clients.*.ip_address: { type: string, description: "Relaying server's address, keyed by cloud client id" }
+  cloud_clients.*.key:       { type: string, description: "Key it relays with" }
+  cloud_clients.*.connected_at: { type: int, unit: ms, description: "When it connected, in Unix milliseconds" }
+  cloud_clients.*.inactive:  { type: bool, description: "Disconnected" }
+  users.*.roles:             { type: string, description: "The account's roles separated by semicolons, keyed by username (read with get_users, and after each user change)" }
+  users.*.must_change_password: { type: bool, description: "The account must replace the shipped password before anything else" }
+  default_password_users:    { type: array, description: "Accounts still on the shipped default password" }
+  error_reports:             { type: array, description: "Error reports, each {id, datetime}" }
+  unread_error_reports:      { type: array, description: "Unread error reports, each {id, datetime}" }
