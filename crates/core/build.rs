@@ -178,6 +178,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-symetrix",
         &["symetrix-composer", "symetrix-jupiter"],
     ),
+    ("vendor-tallyarbiter", &["tally-arbiter"]),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
     (
         "vendor-turtleav",

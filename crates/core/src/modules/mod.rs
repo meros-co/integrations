@@ -116,6 +116,8 @@ mod sony_camera_ptpip;
 mod sscv2;
 #[cfg(feature = "probel-swp08")]
 mod swp08;
+#[cfg(feature = "tally-arbiter")]
+mod tally_arbiter;
 #[cfg(feature = "biamp-tesira")]
 mod tesira;
 #[cfg(any(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
@@ -206,6 +208,8 @@ pub(crate) fn construct(
             Some(port) => Ok(Box::new(tsl::Sender::new(&context, port))),
             None => Err("TSL UMD has no standard port: give the display's port".into()),
         },
+        #[cfg(feature = "tally-arbiter")]
+        "tally-arbiter" => Ok(Box::new(tally_arbiter::TallyArbiter::new(context))),
         #[cfg(feature = "vmix")]
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         #[cfg(feature = "visca")]
