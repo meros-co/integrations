@@ -101,6 +101,15 @@ surface and is opened with no host, reports each message it receives as a
 `message` event, even when it repeats the last, so a button pressed twice
 arrives twice; a slow consumer loses state patches before it loses those.
 
+**Streams** (a camera's live view, under a device's `streams` in the
+catalogue) run only while watched, and a slow reader gets the newest frame,
+never a backlog (SPEC.md, Streams). The HTTP service serves a `jpeg` stream
+at `GET /v1/devices/{device}/streams/{stream}.mjpg` (MJPEG, which an `<img>`
+shows) and `.jpg` (one frame), and a Meros Camera's `meros-preview` stream
+at `.frames` (`application/x-meros-preview`): its frames back to back in the
+camera's framing, starting on a keyframe and, after frames the reader
+missed, resuming only at the next keyframe.
+
 **When resuming** after being suspended, or after the network changed, call
 `reconnect_all` (`Core::reconnect_all` in Rust, `reconnectAll` in Node,
 `reconnect_all` in Python, `mi_reconnect_all` in C, `POST /v1/reconnect_all`
