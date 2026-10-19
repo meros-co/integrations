@@ -222,7 +222,8 @@ pub struct StateField {
 /// A stream a native module publishes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamSpec {
-    /// The frame encoding: `jpeg`.
+    /// The frame encoding: `jpeg`, or `meros-preview` (a Meros Camera's
+    /// preview frame as the camera frames it).
     pub format: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
