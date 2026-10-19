@@ -33,6 +33,7 @@
 //! | GET  /v1/events              | ?max=256&wait_ms=25000                | [events], empty on timeout |
 //! | GET  /v1/devices/{device}/streams/{stream}.mjpg |                    | MJPEG, until closed        |
 //! | GET  /v1/devices/{device}/streams/{stream}.jpg  | ?wait_ms=5000      | the newest JPEG            |
+//! | GET  /v1/devices/{device}/streams/{stream}.frames |                  | preview frames, until closed |
 //!
 //! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
 //! (Sony cameras), `pjlink` (PJLink projectors) and `mdns` (Blackmagic ATEM,
@@ -67,15 +68,30 @@
 //! listens on loopback unless told otherwise.
 //!
 //! Streams (a camera's live view, declared under a device's `streams` in the
-//! catalogue) are served as images rather than JSON: `.mjpg` as
-//! `multipart/x-mixed-replace`, which a browser's `<img>` shows as live video,
-//! and `.jpg` as one JPEG. Since an `<img>` cannot send a header, these two
-//! also accept the token as `?access_token=<token>` (RFC 6750 §2.3); a URL
-//! holding the token can end up in logs and history, so prefer the header
-//! where the client can send one. The device produces frames only while a
-//! stream is being read, and a slow reader gets the newest frame, never a
-//! backlog. A refused stream is answered with a JSON error and status 404
-//! (unknown stream, or device not open) or 406 (not a JPEG stream).
+//! catalogue) are served as media rather than JSON, by their format. A `jpeg`
+//! stream is served as `.mjpg`, `multipart/x-mixed-replace`, which a browser's
+//! `<img>` shows as live video, and as `.jpg`, one JPEG. Since an `<img>`
+//! cannot send a header, these two also accept the token as
+//! `?access_token=<token>` (RFC 6750 §2.3); a URL holding the token can end up
+//! in logs and history, so prefer the header where the client can send one.
+//! The device produces frames only while a stream is being read, and a slow
+//! reader gets the newest frame, never a backlog.
+//!
+//! A `meros-preview` stream (a Meros Camera's `live`) is served as `.frames`,
+//! `Content-Type: application/x-meros-preview`, chunked until the client
+//! closes: the frames back to back exactly as the camera frames them (SPEC.md,
+//! Streams), each a u32 length and an i64 presentation time in microseconds,
+//! both big-endian, a flags byte whose bit 0 marks a keyframe, then the
+//! H.264 or HEVC access unit in Annex-B. The first frame is a keyframe, and
+//! after frames a slow reader missed the next frame sent is again a
+//! keyframe, so a decoder never gets a frame whose references it lacks; the
+//! presentation times show the gap. `.frames` needs the header: it does not
+//! take the token in the query.
+//!
+//! A refused stream is answered with a JSON error and status 404 (unknown
+//! stream, or device not open) or 406 (a stream whose format that extension
+//! does not carry, such as `.frames` for a `jpeg` stream or `.mjpg` for a
+//! `meros-preview` one).
 //!
 //! Events are one queue: run one event consumer per service. Their kinds and
 //! shapes are those of every delivery (SPEC.md, Events), including `message`
@@ -307,24 +323,88 @@ fn mjpeg_part(frame: &meros_integrations::Frame) -> Vec<u8> {
     part
 }
 
+/// What a stream URL asks for, by its extension.
+#[derive(Clone, Copy, PartialEq)]
+enum StreamFile {
+    /// `.mjpg`: JPEG frames as `multipart/x-mixed-replace`.
+    Mjpeg,
+    /// `.jpg`: one JPEG.
+    Jpeg,
+    /// `.frames`: `meros-preview` frames back to back.
+    Frames,
+}
+
+impl StreamFile {
+    fn parse(file: &str) -> Option<(&str, Self)> {
+        [
+            (".mjpg", Self::Mjpeg),
+            (".jpg", Self::Jpeg),
+            (".frames", Self::Frames),
+        ]
+        .into_iter()
+        .find_map(|(suffix, kind)| file.strip_suffix(suffix).map(|name| (name, kind)))
+    }
+
+    /// The one stream format this URL carries.
+    fn format(self) -> &'static str {
+        match self {
+            Self::Mjpeg | Self::Jpeg => "jpeg",
+            Self::Frames => PREVIEW_FORMAT,
+        }
+    }
+}
+
+const PREVIEW_FORMAT: &str = "meros-preview";
+const PREVIEW_CONTENT_TYPE: &str = "application/x-meros-preview";
+/// A `meros-preview` frame's header: u32 length, i64 pts, u8 flags.
+const PREVIEW_HEADER: usize = 13;
+
+/// Passes a `meros-preview` stream's frames from its first keyframe on and,
+/// after any frame this reader missed (one replaced in its slot, or a gap in
+/// the sequence), none until the next keyframe: a decoder never gets a frame
+/// whose reference frames it did not get.
+#[derive(Default)]
+struct KeyframeGate {
+    next_sequence: Option<u64>,
+    in_sync: bool,
+}
+
+impl KeyframeGate {
+    fn pass(&mut self, frame: &meros_integrations::Frame) -> bool {
+        let contiguous =
+            frame.dropped == 0 && self.next_sequence.is_none_or(|n| frame.sequence == n);
+        self.next_sequence = Some(frame.sequence + 1);
+        if !contiguous {
+            self.in_sync = false;
+        }
+        if frame.data.len() >= PREVIEW_HEADER && frame.data[PREVIEW_HEADER - 1] & 1 == 1 {
+            self.in_sync = true;
+        }
+        self.in_sync
+    }
+}
+
 async fn device_stream(
     State(app): State<Shared>,
     headers: HeaderMap,
     Path((device, file)): Path<(u64, String)>,
     Query(q): Query<StreamQuery>,
 ) -> Response {
-    if !authorized_or_query(&app, &headers, q.access_token.as_deref()) {
+    let parsed = StreamFile::parse(&file);
+    // `.frames` is read by a player that can send the header, never by an
+    // `<img>`, so it does not take the token in the query.
+    let allowed = match parsed {
+        Some((_, StreamFile::Frames)) => authorized(&app, &headers),
+        _ => authorized_or_query(&app, &headers, q.access_token.as_deref()),
+    };
+    if !allowed {
         return unauthorized();
     }
-    let (name, mjpeg) = if let Some(name) = file.strip_suffix(".mjpg") {
-        (name, true)
-    } else if let Some(name) = file.strip_suffix(".jpg") {
-        (name, false)
-    } else {
+    let Some((name, kind)) = parsed else {
         return (
             StatusCode::NOT_FOUND,
             Json(json!({"error": {"error": "invalid_request",
-                "message": "ask for <stream>.mjpg or <stream>.jpg"}})),
+                "message": "ask for <stream>.mjpg, <stream>.jpg or <stream>.frames"}})),
         )
             .into_response();
     };
@@ -332,11 +412,39 @@ async fn device_stream(
         Ok(handle) => handle,
         Err(error) => return stream_refused(error),
     };
-    if handle.format() != "jpeg" {
+    if handle.format() != kind.format() {
+        let instead = match handle.format() {
+            "jpeg" => format!("; ask for {name}.mjpg or {name}.jpg"),
+            PREVIEW_FORMAT => format!("; ask for {name}.frames"),
+            _ => String::new(),
+        };
         return stream_refused(json!({"error": {"error": "not_acceptable",
-            "message": format!("stream '{name}' is {}, not jpeg", handle.format())}}));
+            "message": format!("stream '{name}' is {}, not {}{instead}",
+                handle.format(), kind.format())}}));
     }
-    if mjpeg {
+    if kind == StreamFile::Frames {
+        let frames = futures_util::stream::unfold(
+            (handle, KeyframeGate::default()),
+            |(handle, mut gate)| async move {
+                loop {
+                    let frame = handle.next_frame().await?;
+                    if gate.pass(&frame) {
+                        let bytes = frame.data.to_vec();
+                        return Some((Ok::<_, std::convert::Infallible>(bytes), (handle, gate)));
+                    }
+                }
+            },
+        );
+        return (
+            [
+                (header::CONTENT_TYPE, PREVIEW_CONTENT_TYPE.to_string()),
+                (header::CACHE_CONTROL, "no-store".to_string()),
+            ],
+            Body::from_stream(frames),
+        )
+            .into_response();
+    }
+    if kind == StreamFile::Mjpeg {
         use futures_util::StreamExt;
         let frames = futures_util::stream::unfold(handle, |handle| async move {
             let frame = handle.next_frame().await?;
@@ -565,5 +673,64 @@ async fn shutdown_signal() {
     #[cfg(not(any(unix, windows)))]
     {
         let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn frame(sequence: u64, dropped: u64, keyframe: bool) -> meros_integrations::Frame {
+        let mut data = 2u32.to_be_bytes().to_vec();
+        data.extend_from_slice(&(sequence as i64 * 40_000).to_be_bytes());
+        data.push(keyframe as u8);
+        data.extend_from_slice(&[0x65, 0]);
+        meros_integrations::Frame {
+            format: PREVIEW_FORMAT,
+            data: data.into(),
+            sequence,
+            dropped,
+        }
+    }
+
+    #[test]
+    fn the_preview_starts_on_a_keyframe_and_resyncs_after_a_gap() {
+        let mut gate = KeyframeGate::default();
+        let passed: Vec<bool> = [
+            frame(7, 0, false),  // joined mid-GOP: held back
+            frame(8, 0, true),   // the first keyframe
+            frame(9, 0, false),  // its GOP
+            frame(11, 1, false), // one replaced in the slot
+            frame(12, 0, false), // still waiting
+            frame(13, 0, true),  // in sync again
+            frame(14, 0, false),
+            frame(16, 0, false), // a gap in the sequence alone
+            frame(17, 0, true),
+        ]
+        .iter()
+        .map(|f| gate.pass(f))
+        .collect();
+        assert_eq!(
+            passed,
+            [false, true, true, false, false, true, true, false, true]
+        );
+    }
+
+    #[test]
+    fn stream_urls_name_their_format() {
+        assert!(matches!(
+            StreamFile::parse("live.frames"),
+            Some(("live", StreamFile::Frames))
+        ));
+        assert!(matches!(
+            StreamFile::parse("live.mjpg"),
+            Some(("live", StreamFile::Mjpeg))
+        ));
+        assert!(matches!(
+            StreamFile::parse("live.jpg"),
+            Some(("live", StreamFile::Jpeg))
+        ));
+        assert!(StreamFile::parse("live.h264").is_none());
+        assert_eq!(StreamFile::Frames.format(), "meros-preview");
     }
 }

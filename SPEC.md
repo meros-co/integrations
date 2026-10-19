@@ -2072,6 +2072,12 @@ frame), or `meros-preview` (one frame of a Meros Camera's preview exactly as
 the camera frames it: a u32 length and an i64 presentation time in
 microseconds, both big-endian, a flags byte whose bit 0 marks a keyframe,
 then one H.264 or HEVC access unit in Annex-B; the consumer decodes it).
+The HTTP service serves a `jpeg` stream as `.mjpg` (MJPEG) and `.jpg` (one
+frame), and a `meros-preview` stream as `.frames`
+(`application/x-meros-preview`): the frames back to back in that framing,
+from a keyframe, and after frames the reader missed again only from the next
+keyframe, so a decoder never sees a broken group of pictures. Each extension
+answers 406 for a stream of the other format.
 `live` is the conventional name for a device's main picture, so a consumer
 can show a preview of any device without knowing it.
 
