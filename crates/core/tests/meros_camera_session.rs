@@ -6,7 +6,8 @@
 //! stream as NDJSON, a line per change and a keepalive, ending the first
 //! stream after its first line; carries out commands, refusing ops it does
 //! not list and a preset it does not have, each answer carrying only its own
-//! error; gives talkback a secret address; serves clips with byte ranges
+//! error, and an OMT quality outside its limits; gives talkback a secret
+//! address; serves clips with byte ranges
 //! (206, and 416 past the end); and streams preview frames while watched.
 
 #![cfg(feature = "meros-camera")]
@@ -32,6 +33,8 @@ const TALKBACK: &str = "https://127.0.0.1:8791/talkback-s3cr3t/";
 const STREAM_KEY: &str = "live_rtmp_k3y_leak";
 /// The camera's refusal of a format change mid-clip.
 const MID_CLIP: &str = "Stop recording to change the lens, format or recording settings";
+/// The OMT qualities the fake lists in its limits.
+const OMT_QUALITY: [&str; 3] = ["low", "standard", "high"];
 /// Every op of protocol version 1.
 const OPS: [&str; 15] = [
     "capabilities",
@@ -86,6 +89,7 @@ fn initial_status() -> Value {
         "outputs": {"on": [], "problems": {}},
         "monitoring": {"zebra": false, "lut": "none"},
         "outputSettings": {"rtmp": {"on": false, "url": "", "keySet": false},
+                           "omt": {"on": false, "name": "Camera A", "quality": "standard"},
                            "format": {"height": 1080, "bitrateMbps": 8, "halfRate": false}},
         "talkback": null, "talkbackOn": false, "talkbackLatch": false,
         "previewCodec": "h264", "previewNote": null
@@ -209,7 +213,8 @@ async fn serve(camera: Arc<Camera>, mut stream: TcpStream) {
                     "limits": {
                         "outputs": {"heights": [1080, 720, 540], "bitrateMbps": {"min": 1, "max": 50},
                                     "srtLatencyMs": {"min": 20, "max": 8000},
-                                    "port": {"min": 1024, "max": 65535}},
+                                    "port": {"min": 1024, "max": 65535},
+                                    "omtQuality": OMT_QUALITY},
                         "monitoring": {"zebraLevel": {"min": 0.5, "max": 1},
                                        "zebra2Level": {"min": 0.3, "max": 1},
                                        "customGuide": {"min": 0.25, "max": 4},
@@ -293,6 +298,14 @@ async fn serve(camera: Arc<Camera>, mut stream: TcpStream) {
                 "outputs" => {
                     // Wrongly, the key set is carried into the status as sent.
                     let patch = command["outputs"].as_object().cloned().unwrap_or_default();
+                    let quality = &command["outputs"]["omt"]["quality"];
+                    if !quality.is_null()
+                        && !quality.as_str().is_some_and(|q| OMT_QUALITY.contains(&q))
+                    {
+                        let error =
+                            format!("omt quality {quality} is not one of low, standard, high");
+                        return json_reply(&mut stream, 200, &json!({"error": error})).await;
+                    }
                     camera.update(|s| {
                         for (kind, fields) in &patch {
                             for (k, v) in fields.as_object().unwrap() {
@@ -788,5 +801,77 @@ async fn monitoring_and_output_settings_follow_the_status_without_credentials() 
         .state
         .to_string()
         .contains(STREAM_KEY));
+    core.close(id).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn omt_quality_is_set_checked_and_followed() {
+    let (port, camera) = simulated_camera().await;
+    let core = common::core().unwrap();
+    let id = open(&core, port, KEY);
+    let state = |p: &str| core.snapshot(id).unwrap().state.pointer(p).cloned();
+    until("capabilities", || state("/ops").is_some()).await;
+    assert_eq!(
+        state("/limits/outputs/omtQuality"),
+        Some(json!(["low", "standard", "high"]))
+    );
+    until("the OMT quality", || {
+        state("/output_settings/omt/quality") == Some(json!("standard"))
+    })
+    .await;
+
+    for q in ["low", "high", "standard"] {
+        let answer = run(&core, id, "set_omt_output", json!({"quality": q}))
+            .await
+            .unwrap();
+        assert_eq!(answer["outputs"]["omt"]["quality"], q);
+        until(q, || {
+            state("/output_settings/omt/quality") == Some(json!(q))
+        })
+        .await;
+    }
+
+    // Outside the list: refused before anything is sent.
+    let sent = camera.counts.commands.load(Ordering::SeqCst);
+    for (name, params) in [
+        (
+            "set_outputs",
+            json!({"outputs": {"omt": {"quality": "ultra"}}}),
+        ),
+        (
+            "send_op",
+            json!({"op": "outputs", "fields": {"outputs": {"omt": {"quality": "best"}}}}),
+        ),
+    ] {
+        match run(&core, id, name, params).await {
+            Err(CommandError::InvalidParams { message }) => {
+                assert!(message.contains("low, standard, high"), "{message}")
+            }
+            other => panic!("{name}: {other:?}"),
+        }
+    }
+    assert_eq!(camera.counts.commands.load(Ordering::SeqCst), sent);
+
+    // The operator changes it on the camera.
+    camera.update(|s| s["outputSettings"]["omt"]["quality"] = json!("low"));
+    until("the operator's quality", || {
+        state("/output_settings/omt/quality") == Some(json!("low"))
+    })
+    .await;
+    let all: Vec<String> = core
+        .poll_events(10_000)
+        .iter()
+        .filter_map(|e| match e {
+            Event::Message { address, args, .. } if address == "settings_changed" => {
+                Some(args["paths"].to_string())
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        all.iter()
+            .any(|p| p.contains("output_settings.omt.quality")),
+        "{all:?}"
+    );
     core.close(id).await;
 }
