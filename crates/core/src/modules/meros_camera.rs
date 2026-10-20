@@ -27,14 +27,26 @@
 //! while the `live` stream is watched, and each frame is published whole, as
 //! the camera framed it.
 //!
+//! An op command is sent only once the camera's capabilities are known: it
+//! fails before anything is sent when the camera does not list its op, and
+//! a value outside the connected camera's ranges (its `limits`, and the
+//! lens's ISO, exposure time, EV, Kelvin, zoom and video formats) fails
+//! with invalid parameters, as the camera itself refuses out-of-range
+//! output values. A command given before the capabilities are known waits
+//! for them; when they cannot be read, it fails saying so.
+//!
 //! Opened for commands only (`monitor` false), the module reads the hello on
-//! connecting and every 10 s as its liveness check, and reads no status,
-//! capabilities or clips and opens no event stream; what a command's answer
-//! carries is still applied to state. Each request's time to its answer is
-//! reported as the camera's latency.
+//! connecting and every 10 s as its liveness check, and reads no status or
+//! clips and opens no event stream; the capabilities are read only when the
+//! first op command needs them. What a command's answer carries is still
+//! applied to state. Each request's time to its answer is reported as the
+//! camera's latency.
 //!
 //! The fleet key is never logged and never put in state; it is in a request
-//! header, and in a clip URL only as `clip_url`'s value.
+//! header, and in a clip URL only as `clip_url`'s value. The talkback
+//! address is a credential too (§6.6): state, logs and every answer show it
+//! only as set (`talkback.url_set`, `"talkback": "set"`), and only
+//! `get_talkback_url` returns it, for the director joining.
 
 use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, SocketAddr};
@@ -90,6 +102,7 @@ const SAME_NAME: &[&str] = &[
     "lens",
     "lenses",
     "settings",
+    "running",
     "resolved",
     "presets",
     "luts",
@@ -105,6 +118,22 @@ const SAME_NAME: &[&str] = &[
 /// Output fields that hold a credential; the camera never sends them back,
 /// and the module drops them from anything it keeps or returns.
 const CREDENTIALS: &[&str] = &["key", "token"];
+
+/// How the talkback address is shown wherever it would be shown (§6.6).
+const SET: &str = "set";
+
+/// The ranges outside the capability document (§7.6), as the protocol
+/// gives them; a camera's own `limits` replace them once read.
+fn default_limits() -> Value {
+    json!({
+        "outputs": {"heights": [1080, 720, 540], "bitrateMbps": {"min": 1, "max": 50},
+                    "srtLatencyMs": {"min": 20, "max": 8000}, "port": {"min": 1024, "max": 65535}},
+        "monitoring": {"zebraLevel": {"min": 0.5, "max": 1}, "zebra2Level": {"min": 0.3, "max": 1},
+                       "customGuide": {"min": 0.25, "max": 4}, "desqueeze": {"min": 1, "max": 2}},
+        "recording": {"gainDb": {"min": -24, "max": 24}},
+        "whiteBalance": {"tint": {"min": -100, "max": 100}}
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
@@ -122,7 +151,9 @@ enum Purpose {
     /// The connect-time hello, or (commands only) the liveness check.
     Hello,
     Status,
-    Capabilities,
+    /// The capabilities op: on connecting, for commands waiting for them,
+    /// or for `get_capabilities`.
+    Capabilities(Option<CommandId>),
     Clips,
     /// A command reading something.
     Read(CommandId, Read),
@@ -134,6 +165,8 @@ enum Purpose {
 enum Read {
     Hello,
     Status,
+    /// The status, for its talkback address alone.
+    TalkbackUrl,
     Clips,
     Clip {
         name: String,
@@ -191,6 +224,10 @@ pub(crate) struct MerosCamera {
     camera_id: Option<String>,
     /// The ops the camera offers, once its capabilities are read.
     ops: Option<Vec<String>>,
+    /// A capabilities request is out.
+    caps_in_flight: bool,
+    /// Op commands waiting for the capabilities: their ids and bodies.
+    pending: Vec<(CommandId, Value)>,
     clips_in_flight: bool,
     clips_again: bool,
 }
@@ -235,6 +272,8 @@ impl MerosCamera {
             last_status: None,
             camera_id: None,
             ops: None,
+            caps_in_flight: false,
+            pending: Vec::new(),
             clips_in_flight: false,
             clips_again: false,
         }
@@ -372,6 +411,12 @@ impl MerosCamera {
             "the camera refused the fleet key: pair again with its current key".to_string()
         };
         self.last_reason = Some(reason.clone());
+        self.fail_pending(
+            cx,
+            CommandError::Auth {
+                message: reason.clone(),
+            },
+        );
         cx.connection(Connection::Unauthorized { reason });
     }
 
@@ -475,6 +520,8 @@ impl MerosCamera {
                     ),
                 );
                 self.last_status = None;
+                // Its ops and ranges are its own: read them again.
+                self.ops = None;
             }
         }
         if id.is_some() {
@@ -614,11 +661,12 @@ impl MerosCamera {
                 }
             }
         }
-        if prev["talkback"].is_string() != doc["talkback"].is_string() {
+        let (before, after) = (talkback(prev), talkback(doc));
+        if before["on"] != after["on"] || before["latch"] != after["latch"] {
             say(
                 cx,
                 "talkback_changed",
-                json!({ "on": doc["talkback"].is_string() }),
+                json!({ "on": after["on"], "latch": after["latch"] }),
             );
         }
         let mut paths = Vec::new();
@@ -655,7 +703,208 @@ impl MerosCamera {
         if let Some(outputs) = answer.get("outputs") {
             m.insert("output_settings".into(), redact(outputs));
         }
+        // Absent from a camera that does not send them: §7.6's are used.
+        m.insert(
+            "limits".into(),
+            answer
+                .get("limits")
+                .filter(|l| l.is_object())
+                .cloned()
+                .unwrap_or(Value::Null),
+        );
         self.publish(cx, m);
+    }
+
+    // --- ranges ----------------------------------------------------------------
+
+    /// The camera's limits (§7.6), or the protocol's until it gives its own.
+    fn limits(&self) -> Value {
+        self.mirror
+            .get("limits")
+            .filter(|l| l.is_object())
+            .cloned()
+            .unwrap_or_else(default_limits)
+    }
+
+    /// The capability document's entry for the lens a settings patch is for:
+    /// the one it names, else the one in use.
+    fn lens_caps(&self, patch: &Value) -> Option<&Value> {
+        let id = patch
+            .get("lensId")
+            .or_else(|| self.mirror.pointer("/settings/lensId"))
+            .or_else(|| self.mirror.get("lens"))
+            .and_then(Value::as_str)?;
+        self.mirror
+            .pointer("/capabilities/lenses")?
+            .as_array()?
+            .iter()
+            .find(|l| l.get("id").and_then(Value::as_str) == Some(id))
+    }
+
+    /// Refuse, before sending, a value outside the connected camera's ranges.
+    fn check(&self, body: &Value) -> Result<(), CommandError> {
+        let limits = self.limits();
+        match body["op"].as_str() {
+            Some("settings") => self.check_settings(&body["settings"], &limits),
+            Some("monitoring") => {
+                let m = &body["monitoring"];
+                for k in ["zebraLevel", "zebra2Level", "customGuide", "desqueeze"] {
+                    within(
+                        m.get(k),
+                        limits.pointer(&format!("/monitoring/{k}")),
+                        k,
+                        "the camera's",
+                    )?;
+                }
+                Ok(())
+            }
+            Some("outputs") => check_outputs(&body["outputs"], &limits),
+            _ => Ok(()),
+        }
+    }
+
+    fn check_settings(&self, s: &Value, limits: &Value) -> Result<(), CommandError> {
+        within(
+            s.pointer("/recording/gainDb"),
+            limits.pointer("/recording/gainDb"),
+            "recording.gainDb",
+            "the camera's",
+        )?;
+        within(
+            s.pointer("/whiteBalance/tint"),
+            limits.pointer("/whiteBalance/tint"),
+            "whiteBalance.tint",
+            "the camera's",
+        )?;
+        let Some(lens) = self.lens_caps(s) else {
+            return Ok(());
+        };
+        let lens_range = |path: &str| lens.pointer(path).filter(|r| r.is_object());
+        const LENS: &str = "this lens's";
+        within(
+            s.pointer("/exposure/iso"),
+            lens_range("/exposure/iso"),
+            "exposure.iso",
+            LENS,
+        )?;
+        within(
+            s.pointer("/exposure/ev"),
+            lens_range("/exposure/ev"),
+            "exposure.ev",
+            LENS,
+        )?;
+        let kelvin = lens_range("/whiteBalance/kelvin")
+            .cloned()
+            .unwrap_or_else(|| json!({"min": 2000, "max": 10000}));
+        within(
+            s.pointer("/whiteBalance/kelvin"),
+            Some(&kelvin),
+            "whiteBalance.kelvin",
+            LENS,
+        )?;
+        within(s.get("zoom"), lens_range("/zoom"), "zoom", LENS)?;
+        // The shutter as an exposure time, in the lens's exposureTimeNs.
+        if let Some(times) = lens_range("/exposure/exposureTimeNs") {
+            let fps = s
+                .get("fps")
+                .or_else(|| self.mirror.pointer("/settings/fps"))
+                .and_then(Value::as_f64)
+                .filter(|f| *f > 0.0);
+            let shutter = s.pointer("/exposure/shutter");
+            let ns = match (
+                shutter
+                    .and_then(|x| x.get("seconds"))
+                    .and_then(Value::as_f64),
+                shutter.and_then(|x| x.get("angle")).and_then(Value::as_f64),
+            ) {
+                (Some(seconds), _) => Some((seconds * 1e9, format!("{seconds} s"))),
+                (None, Some(angle)) => fps.map(|f| {
+                    (
+                        angle / 360.0 / f * 1e9,
+                        format!("{angle}° at {f} fps ({} s)", angle / 360.0 / f),
+                    )
+                }),
+                _ => None,
+            };
+            if let (Some((ns, what)), Some((min, max))) = (ns, range(times)) {
+                if ns < min * 0.999 || ns > max * 1.001 {
+                    return Err(invalid(format!(
+                        "the shutter {what} is outside this lens's exposure times ({} to {} s)",
+                        min / 1e9,
+                        max / 1e9
+                    )));
+                }
+            }
+        }
+        self.check_format(s, lens)
+    }
+
+    /// A format among the lens's video formats (or its high-speed ones), at
+    /// one of that format's rates.
+    fn check_format(&self, s: &Value, lens: &Value) -> Result<(), CommandError> {
+        if !["width", "height", "fps"]
+            .iter()
+            .any(|k| s.get(*k).is_some())
+        {
+            return Ok(());
+        }
+        let current = |k: &str| {
+            s.get(k)
+                .or_else(|| self.mirror.pointer(&format!("/settings/{k}")))
+                .and_then(Value::as_f64)
+        };
+        let formats: Vec<&Value> = ["videoFormats", "highSpeedFormats"]
+            .iter()
+            .filter_map(|k| lens.get(*k).and_then(Value::as_array))
+            .flatten()
+            .collect();
+        if formats.is_empty() {
+            return Ok(());
+        }
+        let (Some(w), Some(h)) = (current("width"), current("height")) else {
+            return Ok(());
+        };
+        let same = |a: Option<f64>, b: f64| a.is_some_and(|a| (a - b).abs() < 0.01);
+        let sized: Vec<&&Value> = formats
+            .iter()
+            .filter(|f| {
+                same(f.get("width").and_then(Value::as_f64), w)
+                    && same(f.get("height").and_then(Value::as_f64), h)
+            })
+            .collect();
+        if sized.is_empty() {
+            let mut sizes: Vec<String> = formats
+                .iter()
+                .map(|f| format!("{}x{}", f["width"], f["height"]))
+                .collect();
+            sizes.dedup();
+            return Err(invalid(format!(
+                "{w}x{h} is not one of this lens's video formats ({})",
+                sizes.join(", ")
+            )));
+        }
+        let Some(fps) = current("fps") else {
+            return Ok(());
+        };
+        let rates: Vec<f64> = sized
+            .iter()
+            .flat_map(|f| {
+                ["fps", "manualFps"]
+                    .iter()
+                    .filter_map(|k| f.get(*k).and_then(Value::as_array))
+                    .flatten()
+                    .filter_map(Value::as_f64)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        if !rates.is_empty() && !rates.iter().any(|r| same(Some(fps), *r)) {
+            let list: Vec<String> = rates.iter().map(|r| r.to_string()).collect();
+            return Err(invalid(format!(
+                "{fps} fps is not one of this lens's rates at {w}x{h} ({})",
+                list.join(", ")
+            )));
+        }
+        Ok(())
     }
 
     fn apply_clips(&mut self, cx: &mut Cx, list: &Value) {
@@ -749,14 +998,12 @@ impl MerosCamera {
                 }
             }
             "talkback" => {
-                let url = get("url").unwrap_or(Value::Null);
-                let on = get("on")
-                    .filter(Value::is_boolean)
-                    .unwrap_or(Value::Bool(url.is_string()));
-                self.publish_one(cx, "talkback", json!({ "on": on, "url": url }));
-                if let Some(l) = get("latch").filter(Value::is_boolean) {
-                    self.publish_one(cx, "talkback_latch", l);
-                }
+                let doc = json!({
+                    "talkback": get("url"),
+                    "talkbackOn": get("on"),
+                    "talkbackLatch": get("latch"),
+                });
+                self.publish_one(cx, "talkback", talkback(&doc));
             }
             "return" => {
                 if let Some(r) = get("return").filter(Value::is_object) {
@@ -886,13 +1133,84 @@ impl MerosCamera {
                 return Ok(());
             }
             "read_clip" => return self.read_clip(cx, id, p),
+            "get_talkback_url" => {
+                self.send(
+                    cx,
+                    "/v1/status",
+                    None,
+                    STATUS_TIMEOUT,
+                    vec![],
+                    Purpose::Read(id, Read::TalkbackUrl),
+                );
+                return Ok(());
+            }
+            "get_capabilities" => {
+                self.request_capabilities(cx, Some(id));
+                return Ok(());
+            }
             _ => {}
         }
         let body = op_body(name, p)?;
+        if self.ops.is_none() {
+            // Which ops it offers and its ranges are needed first.
+            self.pending.push((id, body));
+            if !self.caps_in_flight {
+                self.request_capabilities(cx, None);
+            }
+            return Ok(());
+        }
+        self.dispatch(cx, id, body)
+    }
+
+    /// Send an op command the camera offers, its values within its ranges.
+    fn dispatch(&mut self, cx: &mut Cx, id: CommandId, body: Value) -> Result<(), CommandError> {
         let op = body["op"].as_str().unwrap_or_default().to_string();
         self.gate(&op)?;
+        self.check(&body)?;
         self.command_op(cx, &body, Purpose::Op(id, op));
         Ok(())
+    }
+
+    fn request_capabilities(&mut self, cx: &mut Cx, id: Option<CommandId>) {
+        self.caps_in_flight = true;
+        self.command_op(
+            cx,
+            &json!({ "op": "capabilities" }),
+            Purpose::Capabilities(id),
+        );
+    }
+
+    /// The capabilities are known: send the commands that waited for them.
+    fn flush_pending(&mut self, cx: &mut Cx) {
+        for (id, body) in std::mem::take(&mut self.pending) {
+            if let Err(e) = self.dispatch(cx, id, body) {
+                cx.complete(id, Err(e));
+            }
+        }
+    }
+
+    fn fail_pending(&mut self, cx: &mut Cx, error: CommandError) {
+        for (id, _) in std::mem::take(&mut self.pending) {
+            cx.complete(id, Err(error.clone()));
+        }
+    }
+
+    /// The capabilities could not be read: the commands waiting fail.
+    fn capabilities_unread(&mut self, cx: &mut Cx, why: &str) {
+        cx.log(
+            Level::Warning,
+            format!("the camera's capabilities could not be read: {why}"),
+        );
+        self.fail_pending(
+            cx,
+            CommandError::DeviceError {
+                code: Some("capabilities_unavailable".into()),
+                message: format!(
+                    "the camera's capabilities could not be read ({why}), so the ops it \
+                     offers and their ranges are unknown"
+                ),
+            },
+        );
     }
 
     // --- answers -------------------------------------------------------------
@@ -911,7 +1229,12 @@ impl MerosCamera {
         let status = response.status;
         let body: Value = serde_json::from_slice(&response.body).unwrap_or(Value::Null);
         if status == 401 {
-            if let Purpose::Read(id, _) | Purpose::Op(id, _) = &purpose {
+            if let Purpose::Capabilities(_) = purpose {
+                self.caps_in_flight = false;
+            }
+            if let Purpose::Read(id, _) | Purpose::Op(id, _) | Purpose::Capabilities(Some(id)) =
+                &purpose
+            {
                 cx.complete(
                     *id,
                     Err(CommandError::Auth {
@@ -963,20 +1286,35 @@ impl MerosCamera {
                 self.apply_status(cx, body);
                 self.report_connected(cx);
                 self.phase = Phase::Ready;
-                self.command_op(cx, &json!({ "op": "capabilities" }), Purpose::Capabilities);
+                self.request_capabilities(cx, None);
                 self.refresh_clips(cx);
                 self.open_events(cx);
             }
-            Purpose::Capabilities => {
-                if stale {
-                    return;
-                }
-                match answer_error(status, &body) {
-                    None => self.apply_capabilities(cx, &body),
-                    Some(e) => cx.log(
-                        Level::Info,
-                        format!("capabilities: {e}; every op is offered unchecked"),
-                    ),
+            Purpose::Capabilities(id) => {
+                // Applied even from an earlier connection attempt: commands
+                // may be waiting for it.
+                self.caps_in_flight = false;
+                let error = answer_error(status, &body).or_else(|| {
+                    (!body["ops"].is_array()).then(|| CommandError::DeviceError {
+                        code: None,
+                        message: "the capabilities answer lists no ops".into(),
+                    })
+                });
+                match error {
+                    None => {
+                        self.apply_capabilities(cx, &body);
+                        if let Some(id) = id {
+                            let value = redact_answer(&body, "capabilities");
+                            cx.complete(id, Ok(Outcome::Value { value }));
+                        }
+                        self.flush_pending(cx);
+                    }
+                    Some(e) => {
+                        if let Some(id) = id {
+                            cx.complete(id, Err(e.clone()));
+                        }
+                        self.capabilities_unread(cx, &e.to_string());
+                    }
                 }
             }
             Purpose::Clips => {
@@ -994,15 +1332,28 @@ impl MerosCamera {
             }
             Purpose::Op(id, op) => {
                 let result = match answer_error(status, &body) {
-                    Some(e) => Err(e),
+                    Some(e) => {
+                        // A refusal: the status carries the same error.
+                        if let CommandError::DeviceError {
+                            code: None,
+                            message,
+                        } = &e
+                        {
+                            self.publish_one(cx, "error", json!(message));
+                        }
+                        Err(e)
+                    }
                     None => {
-                        self.apply_answer(cx, &op, &body);
-                        let value = if op == "outputs" || op == "capabilities" {
-                            redact_answer(&body)
+                        // A command that succeeded clears the status error.
+                        self.publish_one(cx, "error", Value::Null);
+                        if op == "capabilities" {
+                            self.apply_capabilities(cx, &body);
                         } else {
-                            body
-                        };
-                        Ok(Outcome::Value { value })
+                            self.apply_answer(cx, &op, &body);
+                        }
+                        Ok(Outcome::Value {
+                            value: redact_answer(&body, &op),
+                        })
                     }
                 };
                 cx.complete(id, result);
@@ -1033,7 +1384,17 @@ impl MerosCamera {
             }
             Read::Status => {
                 self.apply_status(cx, body.clone());
-                Ok(Outcome::Value { value: body })
+                Ok(Outcome::Value {
+                    value: redact_answer(&body, "status"),
+                })
+            }
+            Read::TalkbackUrl => {
+                let value = json!({
+                    "on": talkback(&body)["on"],
+                    "url": body.get("talkback").filter(|u| u.is_string()),
+                });
+                self.apply_status(cx, body);
+                Ok(Outcome::Value { value })
             }
             Read::Clips => {
                 self.apply_clips(cx, &body);
@@ -1051,6 +1412,22 @@ impl MerosCamera {
             Purpose::Clips => {
                 self.clips_in_flight = false;
                 self.clips_again = false;
+            }
+            Purpose::Capabilities(id) => {
+                self.caps_in_flight = false;
+                if let Some(id) = id {
+                    cx.complete(
+                        id,
+                        Err(if timeout {
+                            CommandError::Timeout
+                        } else {
+                            CommandError::Transport {
+                                message: error.clone(),
+                            }
+                        }),
+                    );
+                }
+                self.capabilities_unread(cx, &format!("the camera did not answer: {error}"));
             }
             Purpose::Read(id, _) | Purpose::Op(id, _) => cx.complete(
                 id,
@@ -1287,6 +1664,8 @@ impl Module for MerosCamera {
         }
         self.retry_delay = RETRY_MIN;
         self.preview_delay = RETRY_MIN;
+        // Read the ops and ranges again before the next op command.
+        self.ops = None;
         self.connect(cx);
         if self.watched {
             self.open_preview(cx);
@@ -1310,18 +1689,107 @@ fn as_text(v: &Value) -> String {
     }
 }
 
-/// The error an answer carries: a refusal (`error`), or an HTTP failure.
+/// The error an answer carries: a refusal (`error`, a string, belongs to
+/// this command alone, §6; absent or null is success), or an HTTP failure.
 fn answer_error(status: u16, body: &Value) -> Option<CommandError> {
     if status != 200 {
         return Some(http_error(status, body));
     }
-    body.get("error")
-        .and_then(Value::as_str)
-        .filter(|e| !e.trim().is_empty())
-        .map(|e| CommandError::DeviceError {
+    body.get("error").and_then(Value::as_str).map(|e| {
+        let e = e.trim();
+        CommandError::DeviceError {
             code: None,
-            message: e.to_string(),
-        })
+            message: if e.is_empty() {
+                "the camera refused the command".into()
+            } else {
+                e.to_string()
+            },
+        }
+    })
+}
+
+/// The `[min, max]` of a `{min, max}` range.
+fn range(r: &Value) -> Option<(f64, f64)> {
+    Some((r.get("min")?.as_f64()?, r.get("max")?.as_f64()?))
+}
+
+/// A number given for `name` within `limit` (`{min, max}`), when both are
+/// there.
+fn within(
+    value: Option<&Value>,
+    limit: Option<&Value>,
+    name: &str,
+    whose: &str,
+) -> Result<(), CommandError> {
+    let (Some(v), Some((min, max))) = (value.and_then(Value::as_f64), limit.and_then(range)) else {
+        return Ok(());
+    };
+    // A little slack for values sent as decimals.
+    let slack = (max - min).abs() * 1e-9;
+    if v < min - slack || v > max + slack {
+        return Err(invalid(format!(
+            "{name} {v} is outside {whose} range ({min} to {max})"
+        )));
+    }
+    Ok(())
+}
+
+/// Output values the camera refuses outside its limits (§6.5, §7.6).
+fn check_outputs(o: &Value, limits: &Value) -> Result<(), CommandError> {
+    const CAMERA: &str = "the camera's";
+    if let Some(h) = o.pointer("/format/height").and_then(Value::as_f64) {
+        if let Some(heights) = limits.pointer("/outputs/heights").and_then(Value::as_array) {
+            if !heights.iter().any(|x| x.as_f64() == Some(h)) {
+                let list: Vec<String> = heights.iter().map(Value::to_string).collect();
+                return Err(invalid(format!(
+                    "format.height {h} is not one of the camera's output heights ({})",
+                    list.join(", ")
+                )));
+            }
+        }
+    }
+    within(
+        o.pointer("/format/bitrateMbps"),
+        limits.pointer("/outputs/bitrateMbps"),
+        "format.bitrateMbps",
+        CAMERA,
+    )?;
+    within(
+        o.pointer("/srt/latency_ms"),
+        limits.pointer("/outputs/srtLatencyMs"),
+        "srt.latency_ms",
+        CAMERA,
+    )?;
+    for kind in ["srt", "hls", "whep"] {
+        within(
+            o.pointer(&format!("/{kind}/port")),
+            limits.pointer("/outputs/port"),
+            &format!("{kind}.port"),
+            CAMERA,
+        )?;
+    }
+    Ok(())
+}
+
+/// The talkback state a status document (or a talkback answer, in the same
+/// names) gives: whether it is on and latched, and whether an address is
+/// set. The address itself is a credential and is left out (§6.6).
+fn talkback(doc: &Value) -> Value {
+    let url_set = doc
+        .get("talkback")
+        .and_then(Value::as_str)
+        .is_some_and(|u| !u.is_empty());
+    let on = doc
+        .get("talkbackOn")
+        .filter(|o| o.is_boolean())
+        .cloned()
+        .unwrap_or(Value::Bool(url_set));
+    let latch = doc
+        .get("talkbackLatch")
+        .filter(|l| l.is_boolean())
+        .cloned()
+        .unwrap_or(Value::Null);
+    json!({ "on": on, "latch": latch, "url_set": url_set })
 }
 
 fn http_error(status: u16, body: &Value) -> CommandError {
@@ -1410,10 +1878,20 @@ fn redact(outputs: &Value) -> Value {
     Value::Object(out)
 }
 
-fn redact_answer(answer: &Value) -> Value {
+/// An answer or a status document as it may be returned: output credentials
+/// removed, and the talkback address (a status's `talkback`, the talkback
+/// op's `url`) shown only as set.
+fn redact_answer(answer: &Value, op: &str) -> Value {
     let mut answer = answer.clone();
     if let Some(o) = answer.get("outputs").cloned() {
-        answer["outputs"] = redact(&o);
+        // The status's outputs ({on, problems}) hold no credentials.
+        if o.get("on").is_none_or(Value::is_object) {
+            answer["outputs"] = redact(&o);
+        }
+    }
+    let address = if op == "talkback" { "url" } else { "talkback" };
+    if answer.get(address).is_some_and(Value::is_string) {
+        answer[address] = json!(SET);
     }
     answer
 }
@@ -1426,7 +1904,11 @@ fn status_view(doc: &Value) -> Map<String, Value> {
     for k in SAME_NAME {
         v.insert((*k).into(), get(k));
     }
-    v.insert("clip_count".into(), get("clips"));
+    // A camera from before `running` gives the same under `resolved`.
+    if !doc.get("running").is_some_and(Value::is_object) {
+        v.insert("running".into(), get("resolved"));
+    }
+    v.insert("clip_count".into(), whole(get("clips")));
     v.insert("free_bytes".into(), whole(get("freeBytes")));
     v.insert("signal_dbm".into(), get("signalDbm"));
     v.insert("battery".into(), whole(get("battery")));
@@ -1444,11 +1926,7 @@ fn status_view(doc: &Value) -> Map<String, Value> {
             Value::Null
         },
     );
-    let talkback = get("talkback");
-    v.insert(
-        "talkback".into(),
-        json!({ "on": talkback.is_string(), "url": talkback }),
-    );
+    v.insert("talkback".into(), talkback(doc));
     v.insert("return_source".into(), get("return"));
     v.insert("preview_codec".into(), get("previewCodec"));
     v.insert("preview_note".into(), get("previewNote"));
@@ -1572,7 +2050,6 @@ fn object(p: &Params, name: &str) -> Result<Value, CommandError> {
 /// The `POST /v1/command` body for a command.
 fn op_body(name: &str, p: &Params) -> Result<Value, CommandError> {
     let body = match name {
-        "get_capabilities" => json!({ "op": "capabilities" }),
         "set_settings" => settings(object(p, "settings")?),
         "set_exposure" => {
             let mut e = fields(
@@ -1986,17 +2463,93 @@ mod tests {
             "settings": {"lensId": "0", "width": 1920, "height": 1080, "fps": 25,
                          "exposure": {"mode": "auto", "iso": null, "ev": 0},
                          "whiteBalance": {"mode": "auto", "kelvin": 5600, "tint": 0}},
+            "running": {"width": 1920, "height": 1080, "fps": 25, "highSpeed": false},
             "resolved": {"width": 1920, "height": 1080, "fps": 25, "highSpeed": false},
             "presets": ["Wide"], "luts": ["rec709"],
             "looks": {"monitor": "none", "outputs": "recording", "recording": "none"},
             "slate": {"camera": "A", "reel": 1, "project": "", "scene": "", "shot": "", "take": 1, "notes": ""},
-            "clips": 2, "battery": 80, "thermal": "none", "freeBytes": 64e9,
+            "clips": 2, "battery": 80, "thermal": "none", "freeBytes": 64_000_000_000i64,
             "network": "wifi", "signalDbm": -50,
             "outputs": {"on": [], "problems": {}},
-            "audio": [-20.0, -21.5], "talkback": null, "return": null,
+            "audio": [-20.0, -21.5], "talkback": null, "talkbackOn": false,
+            "talkbackLatch": false, "return": null,
             "visca": {"power": true, "zoom": 0, "focus": 0, "focusAuto": true, "whiteBalance": 0, "exposure": 0},
             "previewCodec": "h264", "previewNote": null
         })
+    }
+
+    /// Every op of protocol version 1.
+    const OPS: [&str; 15] = [
+        "capabilities",
+        "settings",
+        "record",
+        "preset",
+        "lens",
+        "focusAt",
+        "look",
+        "monitoring",
+        "outputs",
+        "slate",
+        "circle",
+        "tally",
+        "talkback",
+        "return",
+        "visca",
+    ];
+
+    /// A capabilities answer: one lens with its ranges, and limits narrower
+    /// than §7.6's on the output bitrate.
+    fn caps() -> Value {
+        json!({
+            "protocol": 1, "ops": OPS,
+            "capabilities": {"model": "SM-S926U", "platform": "android", "lenses": [{
+                "id": "0", "name": "Wide", "facing": "back",
+                "exposure": {"iso": {"min": 50, "max": 3200}, "exposureTimeNs": {"min": 1e5, "max": 1e8},
+                             "ev": {"min": -2, "max": 2}, "manual": true},
+                "whiteBalance": {"presets": ["daylight"], "kelvin": {"min": 2500, "max": 8000}},
+                "zoom": {"min": 1, "max": 8},
+                "videoFormats": [{"width": 1920, "height": 1080, "fps": [24, 25, 30], "manualFps": [50]},
+                                 {"width": 3840, "height": 2160, "fps": [24, 25, 30]}],
+                "highSpeedFormats": [{"width": 1280, "height": 720, "fps": [120, 240]}]
+            }]},
+            "settings": status()["settings"],
+            "resolved": {"lensId": "0", "width": 1920, "height": 1080, "fps": 25, "highSpeed": false},
+            "monitoring": {"zebra": false}, "luts": ["rec709"], "presets": ["Wide"],
+            "outputs": {"srt": {"on": false, "mode": "listener", "port": 9710, "latency_ms": 120}},
+            "limits": {
+                "outputs": {"heights": [1080, 720, 540], "bitrateMbps": {"min": 1, "max": 40},
+                            "srtLatencyMs": {"min": 20, "max": 8000}, "port": {"min": 1024, "max": 65535}},
+                "monitoring": {"zebraLevel": {"min": 0.5, "max": 1}, "zebra2Level": {"min": 0.3, "max": 1},
+                               "customGuide": {"min": 0.25, "max": 4}, "desqueeze": {"min": 1, "max": 2}},
+                "recording": {"gainDb": {"min": -24, "max": 24}},
+                "whiteBalance": {"tint": {"min": -100, "max": 100}}
+            }
+        })
+    }
+
+    /// Connect and answer the capabilities and the clip list.
+    fn ready(m: &mut MerosCamera) {
+        let a = connected(m);
+        let r = requests(&a);
+        respond(m, 12, r[0].0, 200, caps());
+        respond(m, 13, r[1].0, 200, json!([]));
+    }
+
+    /// Run a command: its actions.
+    fn command(
+        m: &mut MerosCamera,
+        now: Millis,
+        id: CommandId,
+        name: &str,
+        p: Value,
+    ) -> Vec<Action> {
+        let mut cx = Cx::new(now);
+        m.command(&mut cx, id, name, p.as_object().unwrap());
+        cx.take()
+    }
+
+    fn body(r: &HttpRequest) -> Value {
+        serde_json::from_slice(r.body.as_ref().unwrap()).unwrap()
     }
 
     /// Start, answer the hello and the status: the actions after the status.
@@ -2062,7 +2615,12 @@ mod tests {
         assert_eq!(s["signal_dbm"], -50);
         assert_eq!(s["settings"]["whiteBalance"]["kelvin"], 5600);
         assert_eq!(s["outputs"], json!({"on": [], "problems": {}}));
-        assert_eq!(s["talkback"], json!({"on": false}));
+        assert_eq!(
+            s["talkback"],
+            json!({"on": false, "latch": false, "url_set": false})
+        );
+        assert_eq!(s["running"]["fps"], 25);
+        assert_eq!(s["resolved"]["highSpeed"], false);
         assert_eq!(s["preview_codec"], "h264");
         assert!(s.get("clip").is_none(), "null is left out");
         assert!(a.iter().any(|x| matches!(x, Action::RoundTrip(5))));
@@ -2263,24 +2821,61 @@ mod tests {
         let mut cx = Cx::new(10_004);
         m.timer(&mut cx, LIVENESS);
         assert_eq!(paths(&cx.take()), ["GET /v1/hello"]);
-        // Commands still work, and their answers reach state.
-        let mut cx = Cx::new(10_010);
-        m.command(
-            &mut cx,
-            3,
-            "set_tally",
-            &json!({"light": "program"}).as_object().unwrap().clone(),
-        );
-        let a = cx.take();
+        // The first op command reads the capabilities, then is sent.
+        let a = command(&mut m, 10_010, 3, "set_tally", json!({"light": "program"}));
+        assert_eq!(paths(&a), ["POST /v1/command capabilities"]);
+        let a = respond(&mut m, 10_015, requests(&a)[0].0, 200, caps());
+        assert!(completed(&a).is_empty());
         let (id, r) = requests(&a)[0].clone();
-        assert_eq!(
-            serde_json::from_slice::<Value>(r.body.as_ref().unwrap()).unwrap(),
-            json!({"op": "tally", "light": "program"})
-        );
-        let a = respond(&mut m, 10_020, id, 200, json!({"tally": "program"}));
+        assert_eq!(body(&r), json!({"op": "tally", "light": "program"}));
+        // Its answer reaches state.
+        let a = respond(&mut m, 10_025, id, 200, json!({"tally": "program"}));
         assert_eq!(state(&a)["tally"], "program");
         assert!(a.iter().any(|x| matches!(x, Action::RoundTrip(10))));
         assert!(matches!(completed(&a)[0].1, Ok(Outcome::Value { .. })));
+        // The next is sent at once.
+        let a = command(&mut m, 10_030, 4, "start_recording", json!({}));
+        assert_eq!(paths(&a), ["POST /v1/command record"]);
+    }
+
+    #[test]
+    fn commands_fail_clearly_when_the_capabilities_cannot_be_read() {
+        let mut m = keyed(false);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let (id, _) = requests(&cx.take())[0].clone();
+        respond(&mut m, 4, id, 200, hello());
+        let a = command(&mut m, 10, 3, "set_tally", json!({"light": "program"}));
+        let caps_id = requests(&a)[0].0;
+        // A second command waits on the same read.
+        let a = command(&mut m, 11, 4, "start_recording", json!({}));
+        assert!(requests(&a).is_empty());
+        let a = respond(&mut m, 20, caps_id, 200, json!({"error": "not now"}));
+        let done = completed(&a);
+        assert_eq!(done.len(), 2);
+        for (_, result) in done {
+            match result {
+                Err(CommandError::DeviceError { code, message }) => {
+                    assert_eq!(code.as_deref(), Some("capabilities_unavailable"));
+                    assert!(message.contains("not now"), "{message}");
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert!(requests(&a).is_empty());
+        // The next command tries again.
+        let a = command(&mut m, 30, 5, "start_recording", json!({}));
+        assert_eq!(paths(&a), ["POST /v1/command capabilities"]);
+        let mut cx = Cx::new(40);
+        m.http_response(
+            &mut cx,
+            requests(&a)[0].0,
+            Err("operation timed out".into()),
+        );
+        assert!(matches!(
+            &completed(&cx.take())[0].1,
+            Err(CommandError::DeviceError { code: Some(c), .. }) if c == "capabilities_unavailable"
+        ));
     }
 
     #[test]
@@ -2324,7 +2919,7 @@ mod tests {
     #[test]
     fn a_refusal_in_the_answer_fails_the_command() {
         let mut m = keyed(true);
-        connected(&mut m);
+        ready(&mut m);
         let mut cx = Cx::new(50);
         m.command(
             &mut cx,
@@ -2341,6 +2936,26 @@ mod tests {
                 message: "no preset Nope".into()
             })
         );
+        // The status carries the same error; a command that succeeds (error
+        // null) clears it.
+        assert_eq!(state(&a)["error"], "no preset Nope");
+        let a = command(&mut m, 62, 9, "set_tally", json!({"light": "off"}));
+        let a = respond(
+            &mut m,
+            64,
+            requests(&a)[0].0,
+            200,
+            json!({"tally": "off", "error": null}),
+        );
+        assert!(completed(&a)[0].1.is_ok());
+        assert!(a.contains(&Action::State(json!({"error": null}))));
+        // Any string error fails its command, even an empty one.
+        let a = command(&mut m, 66, 10, "set_tally", json!({"light": "off"}));
+        let a = respond(&mut m, 68, requests(&a)[0].0, 200, json!({"error": ""}));
+        assert!(matches!(
+            completed(&a)[0].1,
+            Err(CommandError::DeviceError { .. })
+        ));
         let mut cx = Cx::new(70);
         m.command(&mut cx, 7, "start_recording", &Params::new());
         let (id, _) = requests(&cx.take())[0].clone();
@@ -2450,7 +3065,7 @@ mod tests {
     #[test]
     fn credentials_are_dropped_from_answers_and_state() {
         let mut m = keyed(true);
-        connected(&mut m);
+        ready(&mut m);
         let mut cx = Cx::new(50);
         m.command(
             &mut cx,
@@ -2472,6 +3087,170 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn the_talkback_address_is_returned_only_by_get_talkback_url() {
+        const URL: &str = "https://10.0.0.7:8791/s3cr3tpath/";
+        let mut m = keyed(true);
+        ready(&mut m);
+        let mut all = Vec::new();
+        // The status carries it while talkback is on.
+        let mut cx = Cx::new(20);
+        m.tcp(&mut cx, EVENTS, TcpInput::Connected);
+        m.tcp(
+            &mut cx,
+            EVENTS,
+            TcpInput::Data(b"HTTP/1.1 200 OK\r\n\r\n".to_vec()),
+        );
+        all.extend(cx.take());
+        let mut doc = status();
+        doc["talkback"] = json!(URL);
+        doc["talkbackOn"] = json!(true);
+        doc["talkbackLatch"] = json!(true);
+        let a = line(&mut m, 100, &doc);
+        assert_eq!(
+            state(&a)["talkback"],
+            json!({"on": true, "latch": true, "url_set": true})
+        );
+        assert!(messages(&a)
+            .iter()
+            .any(|(k, v)| k == "talkback_changed" && *v == json!({"on": true, "latch": true})));
+        all.extend(a);
+        // The talkback op's answer, and get_status, show it only as set.
+        let a = command(&mut m, 110, 1, "new_talkback_address", json!({}));
+        let a2 = respond(
+            &mut m,
+            120,
+            requests(&a)[0].0,
+            200,
+            json!({"on": true, "latch": true, "url": URL, "error": null}),
+        );
+        match &completed(&a2)[0].1 {
+            Ok(Outcome::Value { value }) => assert_eq!(value["url"], "set"),
+            other => panic!("{other:?}"),
+        }
+        all.extend(a2);
+        let a = command(&mut m, 130, 2, "get_status", json!({}));
+        let a2 = respond(&mut m, 140, requests(&a)[0].0, 200, doc.clone());
+        match &completed(&a2)[0].1 {
+            Ok(Outcome::Value { value }) => assert_eq!(value["talkback"], "set"),
+            other => panic!("{other:?}"),
+        }
+        all.extend(a2);
+        // get_talkback_url gives it, for the director joining.
+        let a = command(&mut m, 150, 3, "get_talkback_url", json!({}));
+        assert_eq!(paths(&a), ["GET /v1/status"]);
+        let a2 = respond(&mut m, 160, requests(&a)[0].0, 200, doc.clone());
+        assert_eq!(
+            completed(&a2)[0].1,
+            Ok(Outcome::Value {
+                value: json!({"on": true, "url": URL})
+            })
+        );
+        // Nowhere else: not in state, logs or messages.
+        for a in all.iter().chain(&a2) {
+            match a {
+                Action::Log { message, .. } => assert!(!message.contains("s3cr3t")),
+                Action::State(p) => assert!(!p.to_string().contains("s3cr3t")),
+                Action::Message { args, .. } => assert!(!args.to_string().contains("s3cr3t")),
+                _ => {}
+            }
+        }
+    }
+
+    fn refused(a: &[Action]) -> String {
+        assert!(requests(a).is_empty(), "nothing is sent");
+        match &completed(a)[0].1 {
+            Err(CommandError::InvalidParams { message }) => message.clone(),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn values_outside_the_cameras_ranges_fail_before_sending() {
+        let mut m = keyed(true);
+        ready(&mut m);
+        assert_eq!(m.mirror["limits"]["outputs"]["bitrateMbps"]["max"], 40);
+        let cases = [
+            ("set_exposure", json!({"iso": 6400}), "exposure.iso 6400"),
+            ("set_exposure", json!({"ev": 3}), "exposure.ev 3"),
+            (
+                "set_exposure",
+                json!({"shutter_seconds": 0.5}),
+                "shutter 0.5 s",
+            ),
+            // 360° at 1 fps is 1 s, past the lens's 0.1 s.
+            (
+                "set_settings",
+                json!({"settings": {"fps": 1, "exposure": {"shutter": {"angle": 360}}}}),
+                "shutter 360° at 1 fps",
+            ),
+            (
+                "set_white_balance",
+                json!({"kelvin": 9000}),
+                "whiteBalance.kelvin 9000",
+            ),
+            ("set_zoom", json!({"ratio": 10}), "zoom 10"),
+            (
+                "set_format",
+                json!({"width": 2560, "height": 1440}),
+                "2560x1440",
+            ),
+            ("set_format", json!({"fps": 60}), "60 fps"),
+            (
+                "set_output_format",
+                json!({"bitrate_mbps": 45}),
+                "format.bitrateMbps 45",
+            ),
+            (
+                "set_outputs",
+                json!({"outputs": {"hls": {"port": 80}}}),
+                "hls.port 80",
+            ),
+            (
+                "set_outputs",
+                json!({"outputs": {"format": {"height": 480}}}),
+                "format.height 480",
+            ),
+            (
+                "set_monitoring",
+                json!({"monitoring": {"desqueeze": 3}}),
+                "desqueeze 3",
+            ),
+        ];
+        for (n, (name, p, want)) in cases.into_iter().enumerate() {
+            let a = command(&mut m, 50, 100 + n as u64, name, p);
+            let message = refused(&a);
+            assert!(message.contains(want), "{name}: {message}");
+        }
+        // Within range, including a manual-exposure rate and a high-speed
+        // format, they are sent.
+        for (name, p) in [
+            ("set_exposure", json!({"iso": 800, "shutter_angle": 180})),
+            ("set_format", json!({"fps": 50})),
+            (
+                "set_format",
+                json!({"width": 1280, "height": 720, "fps": 240}),
+            ),
+            ("set_white_balance", json!({"kelvin": 3200})),
+            ("set_output_format", json!({"bitrate_mbps": 40})),
+        ] {
+            let a = command(&mut m, 60, 200, name, p);
+            assert_eq!(requests(&a).len(), 1, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_status_without_running_gives_it_from_resolved() {
+        let mut m = keyed(true);
+        streaming(&mut m);
+        let mut doc = status();
+        doc.as_object_mut().unwrap().remove("running");
+        doc["resolved"]["fps"] = json!(30);
+        let a = line(&mut m, 100, &doc);
+        assert_eq!(state(&a)["running"], json!({"fps": 30}));
+        assert_eq!(state(&a)["resolved"], json!({"fps": 30}));
     }
 
     fn clip_response(

@@ -9,26 +9,30 @@ reason: >
   every 5 s), which must be reconnected and the status re-read when it ends or goes quiet; events are
   derived by comparing consecutive documents; the preview is a binary stream of length-prefixed frames
   opened only while watched; clips are read in byte ranges; ops are gated by the list the camera's
-  capabilities answer gives; and fleet links are base64url of raw DEFLATE.
+  capabilities answer gives, and their values checked against the connected camera's own ranges; and
+  fleet links are base64url of raw DEFLATE.
 
 source:
   - title: Meros Camera Control protocol, version 1
     author: Meros
     note: >
-      The protocol as the camera implements it, at camera commit 1d52c4d: availability (§1), mDNS
+      The protocol as the camera implements it, at camera commit 697f9fe: availability (§1), mDNS
       discovery as _meros-cam._tcp with TXT id, name, model and proto and the port in SRV (§2), HTTP/1.1
       with one request per connection, JSON bodies and the error statuses (§3), the fleet key and fleet
-      links (§4), the requests (§5), every command op (§6), the status, capabilities, settings, monitoring
-      and outputs documents (§7), the NDJSON event stream and its reconnection rule (§8), the preview's
-      frame format (§9), versioning (§11) and timing (§12).
-  - title: Meros Camera, camera-remote crate and the app's controller (camera_controller.dart, outputs.dart)
+      links (§4), the requests (§5), every command op and each answer's own error (§6), the talkback
+      address as a credential (§6.6), the status (running, talkbackOn, talkbackLatch, integer counts),
+      capabilities (per-lens ISO, exposure time, EV, Kelvin, zoom and video formats), settings,
+      monitoring, outputs and limits documents (§7), the NDJSON event stream and its reconnection rule
+      (§8), the preview's frame format and keyframe interval (§9), versioning (§11) and timing (§12).
+  - title: Meros Camera, camera-remote crate, camera-control crate (caps.rs), camera-sim, and the app's controller (camera_controller.dart, monitoring.dart, outputs.dart)
     author: Meros
     note: >
-      Read at commit 1d52c4d to confirm wire shapes the document leaves open: the response heads (no
+      Read at commit 697f9fe to confirm wire shapes the document leaves open: the response heads (no
       length on streams, which end by closing), the Range handling and its 416 Content-Range, the
-      answer of each op (lens, look, talkback, return, circle, slate), the outputs' field names and
-      defaults, the monitoring fields and their clamps (zebra2Level 0.3 to 1), and the fleet link's
-      DEFLATE and base64url encoding.
+      answer of each op (lens, look, talkback, return, circle, slate), the capability document's lens
+      fields (videoFormats with fps and manualFps, highSpeedFormats), the outputs' field names,
+      defaults and refused ranges, the monitoring fields and their clamps (customGuide a width/height
+      ratio, a number from 0.25 to 4), and the fleet link's DEFLATE and base64url encoding.
 
 settings:
   fleet_key: { type: string, secret: true, default: "", pattern: "^([0-9a-f]{32})?$",
@@ -48,7 +52,8 @@ ports:
 models:
   - id: meros-camera
     name: Meros Camera (Meros Camera Control protocol, version 1)
-    supports: [get_hello, get_status, get_capabilities, list_clips, read_clip, clip_url, decode_fleet_link,
+    supports: [get_hello, get_status, get_capabilities, get_talkback_url, list_clips, read_clip, clip_url,
+               decode_fleet_link,
                set_settings, set_exposure, set_white_balance, measure_white_balance, set_focus, set_zoom,
                set_format, set_profile, set_stabilization, set_torch, set_aperture, set_exact_frame_rate,
                set_recording_settings, select_lens, focus_at, recall_preset,
@@ -75,10 +80,13 @@ commands:
     summary: Read who the camera is (GET /v1/hello, no key needed) {id, name, model, app, protocol}
     returns: value
   get_status:
-    summary: Read the status document now (GET /v1/status), also applied to state
+    summary: Read the status document now (GET /v1/status), also applied to state; its talkback address is shown only as "set"
     returns: value
   get_capabilities:
-    summary: Read what the camera can do (op capabilities) {protocol, ops, capabilities, settings, resolved, monitoring, outputs, luts, presets}
+    summary: Read what the camera can do (op capabilities) {protocol, ops, capabilities, settings, resolved, monitoring, outputs, luts, presets, limits}
+    returns: value
+  get_talkback_url:
+    summary: Read the talkback address a director joins (the status's talkback) as {on, url}, url null while talkback is off; a credential, returned nowhere else
     returns: value
   list_clips:
     summary: Read the clip list (GET /v1/clips), oldest first, also applied to state
@@ -111,10 +119,10 @@ commands:
     summary: Set exposure (op settings, exposure); give the fields to change
     params:
       mode: { type: enum, values: [auto, shutterPriority, isoPriority, manual], label: Mode, description: "Exposure mode." }
-      iso: { type: float, min: 1, max: 409600, label: ISO, description: "ISO, within the lens's range (capabilities); the camera clamps it." }
-      shutter_angle: { type: float, min: 1, max: 360, label: Shutter angle, description: "Shutter as an angle of the frame interval, in degrees." }
-      shutter_seconds: { type: float, min: 0.000001, max: 60, label: Shutter time, description: "Shutter as an exposure time in seconds; give this or shutter_angle." }
-      ev: { type: float, min: -10, max: 10, label: Exposure compensation, description: "Exposure compensation in EV, in the lens's steps and range." }
+      iso: { type: float, min: 1, max: 409600, label: ISO, description: "ISO, within the lens's exposure.iso range (capabilities), checked before sending." }
+      shutter_angle: { type: float, min: 1, max: 360, label: Shutter angle, description: "Shutter as an angle of the frame interval, in degrees; as a time at the current rate, within the lens's exposure.exposureTimeNs." }
+      shutter_seconds: { type: float, min: 0.000001, max: 60, label: Shutter time, description: "Shutter as an exposure time in seconds, within the lens's exposure.exposureTimeNs; give this or shutter_angle." }
+      ev: { type: float, min: -10, max: 10, label: Exposure compensation, description: "Exposure compensation in EV, within the lens's exposure.ev range and in its steps." }
       lock: { type: bool, label: AE lock, description: "Hold the automatic exposure." }
       antibanding: { type: enum, values: ["off", 50hz, 60hz, auto], label: Antibanding, description: "Flicker reduction for the mains frequency." }
     returns: value
@@ -123,7 +131,7 @@ commands:
     params:
       mode: { type: enum, values: [auto, preset, manual], label: Mode, description: "White balance mode." }
       preset: { type: string, max_length: 64, label: Preset, description: "A white balance preset name from the lens's presets, for mode preset." }
-      kelvin: { type: float, min: 1000, max: 20000, label: Color temperature, description: "Color temperature in kelvin, for mode manual; the camera clamps it to the lens's range." }
+      kelvin: { type: float, min: 1000, max: 20000, label: Color temperature, description: "Color temperature in kelvin, for mode manual, within the lens's whiteBalance.kelvin range (2000 to 10000 where the lens gives none)." }
       tint: { type: float, min: -100, max: 100, label: Tint, description: "Tint from -100 (green) to +100 (magenta)." }
       lock: { type: bool, label: AWB lock, description: "Hold the automatic white balance." }
     returns: value
@@ -144,14 +152,14 @@ commands:
   set_zoom:
     summary: Set the zoom ratio (op settings, zoom), within the lens's zoom range
     params:
-      ratio: { type: float, min: 0.1, max: 100, required: true, label: Zoom, description: "Zoom ratio; the camera clamps it to the lens's range." }
+      ratio: { type: float, min: 0.1, max: 100, required: true, label: Zoom, description: "Zoom ratio, within the lens's zoom range (capabilities)." }
     returns: value
   set_format:
-    summary: Set the recording format (op settings, width, height, fps), among the lens's video formats and rates; refused mid-clip
+    summary: Set the recording format (op settings, width, height, fps), among the lens's video formats and rates (checked before sending); refused mid-clip
     params:
-      width: { type: int, min: 16, max: 16384, label: Width, description: "Frame width in pixels." }
-      height: { type: int, min: 16, max: 16384, label: Height, description: "Frame height in pixels." }
-      fps: { type: float, min: 1, max: 1000, label: Frame rate, description: "Frames per second." }
+      width: { type: int, min: 16, max: 16384, label: Width, description: "Frame width in pixels, a size in the lens's videoFormats or highSpeedFormats." }
+      height: { type: int, min: 16, max: 16384, label: Height, description: "Frame height in pixels, a size in the lens's videoFormats or highSpeedFormats." }
+      fps: { type: float, min: 1, max: 1000, label: Frame rate, description: "Frames per second, one of that size's fps or manualFps (manual exposure only)." }
     returns: value
   set_profile:
     summary: Set the picture profile (op settings, profile)
@@ -276,7 +284,7 @@ commands:
     summary: Set the frame guide (op monitoring, frameGuide, customGuide)
     params:
       guide: { type: enum, values: [none, "2.39", "2.35", "1.85", "16:9", "4:3", "9:16", "1:1", "4:5", custom], required: true, label: Frame guide, description: "The aspect ratio guide shown." }
-      custom: { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)?:[0-9]+(\\.[0-9]+)?$", label: Custom guide, description: "The custom guide as width:height, for guide custom." }
+      custom: { type: float, min: 0.25, max: 4, label: Custom guide, description: "The custom guide's aspect ratio as width divided by height (2.0 for 2:1), for guide custom." }
     returns: value
   set_guides:
     summary: Show or hide the monitor's guides (op monitoring, safeAreas, grid, centerMark, level)
@@ -313,9 +321,9 @@ commands:
     params:
       enabled: { type: bool, label: "On", description: "Run the SRT output." }
       mode: { type: enum, values: [listener, caller], label: Mode, description: "Wait for a receiver (listener) or call one (caller)." }
-      port: { type: int, min: 1, max: 65535, label: Port, description: "The port to listen on." }
+      port: { type: int, min: 1024, max: 65535, label: Port, description: "The port to listen on." }
       target: { type: string, max_length: 256, label: Receiver, description: "The receiver as host:port, for caller." }
-      latency_ms: { type: int, min: 0, max: 60000, label: Latency, description: "SRT latency in milliseconds." }
+      latency_ms: { type: int, min: 20, max: 8000, label: Latency, description: "SRT latency in milliseconds." }
     returns: value
   set_rtmp_output:
     summary: Set the RTMP output (op outputs, rtmp); give the fields to change
@@ -328,7 +336,7 @@ commands:
     summary: Set the HLS output (op outputs, hls)
     params:
       enabled: { type: bool, label: "On", description: "Serve HLS." }
-      port: { type: int, min: 1, max: 65535, label: Port, description: "The port HLS is served on." }
+      port: { type: int, min: 1024, max: 65535, label: Port, description: "The port HLS is served on." }
     returns: value
   set_whip_output:
     summary: Set the WHIP output (op outputs, whip); give the fields to change
@@ -341,7 +349,7 @@ commands:
     summary: Set the WHEP output (op outputs, whep)
     params:
       enabled: { type: bool, label: "On", description: "Serve WHEP." }
-      port: { type: int, min: 1, max: 65535, label: Port, description: "The port WHEP is served on." }
+      port: { type: int, min: 1024, max: 65535, label: Port, description: "The port WHEP is served on." }
     returns: value
   set_omt_output:
     summary: Set the OMT output (op outputs, omt)
@@ -375,7 +383,7 @@ commands:
     summary: Set what the outputs carry apart from the recording (op outputs, format)
     params:
       height: { type: enum, values: ["1080", "720", "540"], label: Lines, description: "The outputs' height in lines." }
-      bitrate_mbps: { type: float, min: 0.1, max: 200, label: Bitrate, description: "The live encoder's bitrate in Mbit/s." }
+      bitrate_mbps: { type: float, min: 1, max: 50, label: Bitrate, description: "The live encoder's bitrate in Mbit/s, within the camera's limits.outputs.bitrateMbps." }
       half_rate: { type: bool, label: Half rate, description: "Half the camera's frame rate, from 48 fps up." }
     returns: value
 
@@ -386,13 +394,13 @@ commands:
       light: { type: enum, values: [program, preview, "off", auto], required: true, label: Tally, description: "program, preview or off; auto hands tally back to the camera's switchers and receivers." }
     returns: value
   set_talkback:
-    summary: Turn talkback on or off, or latch the operator's talk (op talkback); answers {on, latch, url}
+    summary: Turn talkback on or off, or latch the operator's talk (op talkback); answers {on, latch, url}, url shown only as "set" (get_talkback_url reads it)
     params:
       enabled: { type: bool, label: "On", description: "Talkback on." }
       latch: { type: bool, label: Latch, description: "The operator's talk latched rather than push to talk." }
     returns: value
   new_talkback_address:
-    summary: Give talkback a new secret address (op talkback, newAddress); directors on the old one are cut off
+    summary: Give talkback a new secret address (op talkback, newAddress); directors on the old one are cut off; answers {on, latch, url}, url shown only as "set"
     returns: value
   set_return:
     summary: Route a return feed to the camera (op return)
@@ -421,13 +429,16 @@ quirks:
     text: >
       State follows the status document (protocol §7.1), kept current from GET /v1/events. Top-level
       fields keep their names except clips (clip_count), freeBytes (free_bytes), signalDbm (signal_dbm),
-      talkback (talkback.url, with talkback.on), return (return_source), previewCodec (preview_codec) and
-      previewNote (preview_note). The camera's own documents (settings, resolved, looks, slate, visca,
-      monitoring, capabilities) keep the camera's field names, so a partial for set_settings,
-      set_monitoring or set_outputs is written in the same names. The capabilities answer, read on every
-      connection, adds ops, capabilities, monitoring, output_settings (credentials removed) and
-      resolved_settings (everything the camera resolved; resolved is the format running now). A field
-      that is null or absent in the status is absent from state.
+      talkback, talkbackOn and talkbackLatch (talkback.url_set, talkback.on, talkback.latch), return
+      (return_source), previewCodec (preview_codec) and previewNote (preview_note). The camera's own
+      documents (settings, running, resolved, looks, slate, visca, monitoring, capabilities, limits) keep
+      the camera's field names, so a partial for set_settings, set_monitoring or set_outputs is written
+      in the same names. running is the format running now; the status's resolved is the same, under its
+      first name, and fills running for a camera that does not send it. The capabilities answer, read on
+      every monitored connection, adds ops, capabilities, monitoring, output_settings (credentials
+      removed), limits and resolved_settings, the full settings as the camera resolved them, which each
+      set_settings answer replaces. A field that is null or absent in the status is absent from state,
+      so error is absent while there is none.
   - models: [all]
     severity: info
     text: >
@@ -435,8 +446,8 @@ quirks:
       sends message events: record_started and record_stopped {clip}, tally_changed, thermal_changed
       and lens_changed {from, to}, error {error} and error_cleared, warning and warning_cleared
       {warning}, battery_low {battery} and storage_low {free_bytes} (when crossing the thresholds in
-      settings), output_up and output_down {kind}, output_problem {kind, problem}, talkback_changed {on}
-      and settings_changed {paths}, the dotted settings paths that changed. The first document after
+      settings), output_up and output_down {kind}, output_problem {kind, problem}, talkback_changed {on,
+      latch} and settings_changed {paths}, the dotted settings paths that changed. The first document after
       opening sends none.
   - models: [all]
     severity: warning
@@ -459,18 +470,34 @@ quirks:
     severity: info
     text: >
       A command the camera does not list in its capabilities' ops fails with device_error code
-      unsupported_op before anything is sent. The list is read on connecting; a device opened for
-      commands only has none until get_capabilities is run, and sends every op, which a camera refuses
-      with "unknown op" when it does not know it. send_op reaches ops added after this driver.
+      unsupported_op before anything is sent. The capabilities are read on every monitored connection;
+      a device opened for commands only reads them before its first op command, and again after a
+      reconnect or when a different camera answers. A command given before they are known waits for
+      them, and when they cannot be read it fails with device_error code capabilities_unavailable,
+      saying why; nothing is sent unchecked. send_op reaches ops added after this driver.
   - models: [all]
     severity: warning
     text: >
-      An answer carrying error means the camera refused the command or it failed (the camera's own rules
-      apply as for its operator: no format change mid-clip, Pro gating, ranges clamped), and the command
-      fails with device_error; the status then carries the same error. A command the camera's app does
-      not answer within 10 s answers 504, reported as timeout. Values outside a lens's range are
-      clamped by the camera, which answers what it set (resolved) and warnings for what it could not do;
-      the ranges declared here are wide bounds, and the lens's own ranges are in capabilities.
+      An answer's error belongs to that command alone: a string means the camera refused the command or
+      it failed (the camera's own rules apply as for its operator: no format change mid-clip, Pro
+      gating), and the command fails with device_error, the same error going into state as the status
+      carries it; absent or null is success, which clears the status error. A command the camera's app
+      does not answer within 10 s answers 504, reported as timeout.
+  - models: [all]
+    severity: warning
+    text: >
+      Values are checked against the connected camera's own ranges before anything is sent, and one
+      outside them fails with invalid_params naming the range: the lens in use (or the one a settings
+      partial names) for exposure.iso, exposure.ev, the shutter as an exposure time
+      (exposure.exposureTimeNs; an angle at the current or given frame rate), whiteBalance.kelvin (2000
+      to 10000 where the lens gives none), zoom and the format (a width and height in videoFormats or
+      highSpeedFormats, at one of that size's fps or manualFps), and the camera's limits (protocol §7.6:
+      output heights, bitrate, SRT latency and ports, zebraLevel, zebra2Level, customGuide, desqueeze,
+      recording.gainDb, whiteBalance.tint) for the typed commands and the set_settings, set_monitoring
+      and set_outputs partials alike. The camera refuses out-of-range output values itself and clamps
+      the rest. The ranges declared on the parameters are §7.6's where it gives them, and wide bounds
+      where they are the lens's; the lens's own are in capabilities.lenses, and the camera's limits in
+      limits (§7.6's are used until a camera gives its own).
   - models: [all]
     severity: info
     text: >
@@ -478,20 +505,24 @@ quirks:
       camera runs its preview encoder only then. Each frame is published unchanged as the camera framed
       it, format meros-preview: u32 length (big-endian), i64 pts in microseconds (big-endian), u8 flags
       (bit 0 keyframe), then one access unit in Annex-B, H.264, or HEVC under HLG (preview_codec). The
-      first frame is a keyframe carrying its parameter sets. Frames over 8 MiB are corrupt: the preview
-      is reopened. The core keeps only a watcher's newest frame, so a watcher whose frame carries a
-      dropped count above 0 must wait for the next keyframe before decoding again. During a high-speed
-      clip there is no preview, and preview_note says why.
+      first frame is a keyframe carrying its parameter sets, and keyframes, each with its parameter sets,
+      follow at least once a second, and at once when a viewer joins or falls behind. Frames over 8 MiB
+      are corrupt: the preview is reopened. The core keeps only a watcher's newest frame, so a watcher
+      whose frame carries a dropped count above 0 must wait for the next keyframe, at most about a
+      second away, before decoding again. During a high-speed clip there is no preview, and
+      preview_note says why.
   - models: [all]
     severity: info
     text: >
-      Talkback voice is the consumer's: the driver sets talkback on or off and keeps its address in
-      talkback.url. A director joins with WebRTC: POST <url>offer?name=<director name> with an SDP
-      offer (one send and receive Opus audio track, 48 kHz) is answered 201 with the SDP answer and a
-      Location for the session, and DELETE of that location leaves. The address is HTTPS with the
-      camera's self-signed certificate, and its secret path is the credential, so treat talkback.url as
-      one. A director is heard by the operator; the operator talks to every director. The status does
-      not carry the latch; talkback_latch is known once set_talkback has answered.
+      Talkback voice is the consumer's: the driver sets talkback on or off and latched, and keeps
+      talkback.on and talkback.latch current from the status. The address is HTTPS with the camera's
+      self-signed certificate, and its secret path is the credential (protocol §6.6), so the driver
+      never logs it or puts it in state, messages or answers: state has talkback.url_set, and get_status
+      and the talkback answers show it as "set". get_talkback_url returns it, to be passed only to the
+      director joining and never logged or shown in full. A director joins with WebRTC: POST
+      <url>offer?name=<director name> with an SDP offer (one send and receive Opus audio track, 48 kHz)
+      is answered 201 with the SDP answer and a Location for the session, and DELETE of that location
+      leaves. A director is heard by the operator; the operator talks to every director.
   - models: [all]
     severity: info
     text: >
@@ -532,7 +563,7 @@ state:
   protocol:               { type: int, description: "The protocol version the camera speaks (hello, capabilities)" }
   recording:              { type: bool, description: "A clip is being recorded" }
   clip:                   { type: string, description: "The clip being recorded (file name)" }
-  error:                  { type: string, description: "The camera's last error, a sentence" }
+  error:                  { type: string, description: "The camera's current error, a sentence; absent when there is none (a command that succeeds clears it)" }
   warnings:               { type: array, description: "Current warnings, sentences (heat, low battery, low storage, a lens that cannot do what was asked)" }
   tally:                  { type: string, description: "program, preview or off, as the camera shows it" }
   lens:                   { type: string, description: "The lens in use (an id from lenses)" }
@@ -576,11 +607,15 @@ state:
   settings.recording.safetyTrack: { type: bool, description: "A safety track is recorded" }
   settings.recording.splitChannels: { type: bool, description: "Each input channel is its own track" }
   settings.exactFrameRate: { type: bool, description: "The frame rate is held exactly" }
-  resolved.width:         { type: int, unit: px, description: "The width running now" }
-  resolved.height:        { type: int, unit: px, description: "The height running now" }
-  resolved.fps:           { type: float, unit: fps, description: "The frame rate running now" }
-  resolved.highSpeed:     { type: bool, description: "A high-speed format is running (no preview)" }
-  resolved_settings:      { type: object, description: "Everything the camera resolved the settings to, from the capabilities and settings answers" }
+  running.width:          { type: int, unit: px, description: "The width running now" }
+  running.height:         { type: int, unit: px, description: "The height running now" }
+  running.fps:            { type: float, unit: fps, description: "The frame rate running now" }
+  running.highSpeed:      { type: bool, description: "A high-speed format is running (no preview)" }
+  resolved.width:         { type: int, unit: px, description: "The width running now (the status's first name for running, kept for protocol version 1)" }
+  resolved.height:        { type: int, unit: px, description: "The height running now (as running.height)" }
+  resolved.fps:           { type: float, unit: fps, description: "The frame rate running now (as running.fps)" }
+  resolved.highSpeed:     { type: bool, description: "A high-speed format is running (as running.highSpeed)" }
+  resolved_settings:      { type: object, description: "The full settings document (protocol §7.3) as the camera resolved it, from the capabilities and settings answers" }
   presets:                { type: array, description: "The camera's preset names" }
   luts:                   { type: array, description: "The LUT ids: rec709, custom:<name>" }
   looks.monitor:          { type: string, description: "The LUT on the monitor" }
@@ -606,9 +641,9 @@ state:
   outputs.problems:       { type: object, description: "Why an output that is on cannot run, a sentence keyed by kind" }
   output_settings:        { type: object, description: "The outputs document (protocol §7.5) by kind (srt, rtmp, hls, whip, whep, omt, ndi, external, network, look, format), credentials removed: keySet and tokenSet say whether one is set" }
   audio:                  { type: array, unit: dBFS, description: "Input peak levels, one per channel" }
-  talkback.on:            { type: bool, description: "Talkback is on" }
-  talkback.url:           { type: string, description: "The talkback address for directors, while on; its secret path is a credential" }
-  talkback_latch:         { type: bool, description: "The operator's talk is latched; known once set_talkback has answered" }
+  talkback.on:            { type: bool, description: "Talkback is on (talkbackOn)" }
+  talkback.latch:         { type: bool, description: "The operator's talk is latched on rather than push to talk (talkbackLatch)" }
+  talkback.url_set:       { type: bool, description: "The camera gives a talkback address for directors; the address itself is a credential, read with get_talkback_url" }
   return_source:          { type: string, description: "The return feed's source while it is on" }
   return_settings:        { type: object, description: "The return feed's settings {on, kind, addresses, large}, from set_return's answer" }
   visca.power:            { type: bool, description: "VISCA's view: power" }
@@ -620,5 +655,6 @@ state:
   preview_codec:          { type: string, description: "The preview's codec: h264, or hevc under HLG" }
   preview_note:           { type: string, description: "Why the preview is not running, if it is not" }
   ops:                    { type: array, description: "The ops the camera offers (capabilities)" }
-  capabilities:           { type: object, description: "The camera's capability document (protocol §7.2): model, platform, lenses with their exposure, white balance, focus, zoom, stabilization, torch and video formats, encoders and audio inputs" }
+  capabilities:           { type: object, description: "The camera's capability document (protocol §7.2): model, platform, lenses with their exposure (iso, exposureTimeNs, ev ranges), white balance (presets, kelvin range), focus, zoom range, stabilization, torch and video formats, encoders and audio inputs" }
+  limits:                 { type: object, description: "The camera's ranges outside the capability document (protocol §7.6): outputs (heights, bitrateMbps, srtLatencyMs, port), monitoring (zebraLevel, zebra2Level, customGuide, desqueeze), recording.gainDb and whiteBalance.tint, each {min, max}" }
   monitoring:             { type: object, description: "The monitoring settings (protocol §7.4): lut, falseColour, zebra, zebraLevel, zebra2, zebra2Level, peaking, peakColour, peakSensitivity, scope, scopeLarge, scopeFloating, frameGuide, customGuide, safeAreas, grid, centerMark, level, desqueeze, recBorder, meter, punchIn, clean" }

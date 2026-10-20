@@ -5,7 +5,8 @@
 //! with the fleet key (401 otherwise); serves the status, and the event
 //! stream as NDJSON, a line per change and a keepalive, ending the first
 //! stream after its first line; carries out commands, refusing ops it does
-//! not list and a preset it does not have; serves clips with byte ranges
+//! not list and a preset it does not have, each answer carrying only its own
+//! error; gives talkback a secret address; serves clips with byte ranges
 //! (206, and 416 past the end); and streams preview frames while watched.
 
 #![cfg(feature = "meros-camera")]
@@ -26,6 +27,25 @@ use tokio::sync::watch;
 
 const KEY: &str = "0123456789abcdef0123456789abcdef";
 const CLIP: &[u8] = b"0123456789abcdefghij";
+const TALKBACK: &str = "https://127.0.0.1:8791/talkback-s3cr3t/";
+/// Every op of protocol version 1.
+const OPS: [&str; 15] = [
+    "capabilities",
+    "settings",
+    "record",
+    "preset",
+    "lens",
+    "focusAt",
+    "look",
+    "monitoring",
+    "outputs",
+    "slate",
+    "circle",
+    "tally",
+    "talkback",
+    "return",
+    "visca",
+];
 
 #[derive(Default)]
 struct Counts {
@@ -55,11 +75,13 @@ fn initial_status() -> Value {
         "tally": "off", "lens": "0", "lenses": [{"id": "0", "name": "Wide"}],
         "settings": {"lensId": "0", "width": 1920, "height": 1080, "fps": 25,
                      "whiteBalance": {"mode": "auto", "kelvin": 5600, "tint": 0}},
+        "running": {"width": 1920, "height": 1080, "fps": 25, "highSpeed": false},
         "resolved": {"width": 1920, "height": 1080, "fps": 25, "highSpeed": false},
         "presets": ["Wide"], "luts": ["rec709"],
-        "clips": 1, "battery": 80, "thermal": "none", "freeBytes": 64e9,
+        "clips": 1, "battery": 80, "thermal": "none", "freeBytes": 64_000_000_000i64,
         "outputs": {"on": [], "problems": {}},
-        "talkback": null, "previewCodec": "h264", "previewNote": null
+        "talkback": null, "talkbackOn": false, "talkbackLatch": false,
+        "previewCodec": "h264", "previewNote": null
     })
 }
 
@@ -162,13 +184,32 @@ async fn serve(camera: Arc<Camera>, mut stream: TcpStream) {
             let answer = match command["op"].as_str().unwrap() {
                 "capabilities" => json!({
                     "protocol": 1,
-                    "ops": ["capabilities", "settings", "record", "preset", "tally", "outputs", "circle"],
-                    "capabilities": {"model": "SM-S926U", "lenses": [{"id": "0", "name": "Wide"}]},
+                    "ops": OPS,
+                    "capabilities": {"model": "SM-S926U", "platform": "android", "lenses": [{
+                        "id": "0", "name": "Wide", "facing": "back",
+                        "exposure": {"iso": {"min": 50, "max": 3200},
+                                     "exposureTimeNs": {"min": 1e5, "max": 1e8},
+                                     "ev": {"min": -2, "max": 2}, "manual": true},
+                        "whiteBalance": {"presets": [], "kelvin": {"min": 2000, "max": 10000}},
+                        "zoom": {"min": 1, "max": 8},
+                        "videoFormats": [{"width": 1920, "height": 1080, "fps": [24, 25, 30]}]
+                    }]},
                     "settings": camera.status.lock().unwrap()["settings"].clone(),
-                    "resolved": {"width": 1920, "height": 1080, "fps": 25},
+                    "resolved": camera.status.lock().unwrap()["settings"].clone(),
                     "monitoring": {"zebra": false, "lut": "none"},
                     "outputs": {"rtmp": {"on": false, "url": "", "keySet": false}},
                     "luts": ["rec709"], "presets": ["Wide"],
+                    "limits": {
+                        "outputs": {"heights": [1080, 720, 540], "bitrateMbps": {"min": 1, "max": 50},
+                                    "srtLatencyMs": {"min": 20, "max": 8000},
+                                    "port": {"min": 1024, "max": 65535}},
+                        "monitoring": {"zebraLevel": {"min": 0.5, "max": 1},
+                                       "zebra2Level": {"min": 0.3, "max": 1},
+                                       "customGuide": {"min": 0.25, "max": 4},
+                                       "desqueeze": {"min": 1, "max": 2}},
+                        "recording": {"gainDb": {"min": -24, "max": 24}},
+                        "whiteBalance": {"tint": {"min": -100, "max": 100}}
+                    }
                 }),
                 "record" => {
                     let on = command["on"] == true;
@@ -184,11 +225,29 @@ async fn serve(camera: Arc<Camera>, mut stream: TcpStream) {
                 }
                 "tally" => {
                     let light = command["light"].clone();
-                    camera.update(|s| s["tally"] = light.clone());
+                    camera.update(|s| {
+                        s["tally"] = light.clone();
+                        s["error"] = Value::Null;
+                    });
                     json!({"tally": light})
                 }
                 "preset" => {
-                    json!({"error": format!("no preset {}", command["name"].as_str().unwrap())})
+                    let error = format!("no preset {}", command["name"].as_str().unwrap());
+                    camera.update(|s| s["error"] = json!(error));
+                    json!({"error": error})
+                }
+                "talkback" => {
+                    let on = command["on"].as_bool();
+                    camera.update(|s| {
+                        if let Some(on) = on {
+                            s["talkbackOn"] = json!(on);
+                            s["talkback"] = if on { json!(TALKBACK) } else { Value::Null };
+                        }
+                        s["error"] = Value::Null;
+                    });
+                    let s = camera.status.lock().unwrap().clone();
+                    json!({"on": s["talkbackOn"], "latch": s["talkbackLatch"],
+                           "url": s["talkback"], "error": null})
                 }
                 "settings" => {
                     json!({"resolved": camera.status.lock().unwrap()["settings"].clone(), "error": null})
@@ -360,15 +419,59 @@ async fn a_camera_is_monitored_and_controlled() {
         })
     );
 
-    // An op the camera does not list fails before anything is sent.
+    assert_eq!(state("/error"), Some(json!("no preset Nope")));
+    // A command that succeeds clears it.
+    run(&core, id, "set_tally", json!({"light": "preview"}))
+        .await
+        .unwrap();
+    until("the error cleared", || state("/error").is_none()).await;
+
+    // An op the camera does not list, and a value outside the lens's range,
+    // fail before anything is sent.
     let sent = camera.counts.commands.load(Ordering::SeqCst);
-    match run(&core, id, "set_talkback", json!({"enabled": true})).await {
+    match run(&core, id, "send_op", json!({"op": "future"})).await {
         Err(CommandError::DeviceError { code, .. }) => {
             assert_eq!(code.as_deref(), Some("unsupported_op"))
         }
         other => panic!("{other:?}"),
     }
+    match run(&core, id, "set_exposure", json!({"iso": 6400})).await {
+        Err(CommandError::InvalidParams { message }) => {
+            assert!(message.contains("50 to 3200"), "{message}")
+        }
+        other => panic!("{other:?}"),
+    }
     assert_eq!(camera.counts.commands.load(Ordering::SeqCst), sent);
+    assert_eq!(
+        state("/limits/outputs/srtLatencyMs"),
+        Some(json!({"min": 20, "max": 8000}))
+    );
+
+    // Talkback: on, its address kept out of state and answers, and given
+    // only by get_talkback_url.
+    let answer = run(&core, id, "set_talkback", json!({"enabled": true}))
+        .await
+        .unwrap();
+    assert_eq!(
+        (answer["on"].clone(), answer["url"].clone()),
+        (json!(true), json!("set"))
+    );
+    until("talkback on", || {
+        state("/talkback") == Some(json!({"on": true, "latch": false, "url_set": true}))
+    })
+    .await;
+    let status = run(&core, id, "get_status", json!({})).await.unwrap();
+    assert_eq!(status["talkback"], "set");
+    assert_eq!(
+        run(&core, id, "get_talkback_url", json!({})).await.unwrap(),
+        json!({"on": true, "url": TALKBACK})
+    );
+    assert!(!core
+        .snapshot(id)
+        .unwrap()
+        .state
+        .to_string()
+        .contains("s3cr3t"));
 
     // Clips: a range, then past the end.
     let chunk = run(
@@ -451,9 +554,11 @@ async fn a_camera_is_monitored_and_controlled() {
     for want in ["warning", "tally_changed", "record_started"] {
         assert!(messages.contains(&want), "{want} in {messages:?}");
     }
+    assert!(messages.contains(&"talkback_changed"), "{messages:?}");
     for e in &events {
         let text = serde_json::to_string(e).unwrap();
         assert!(!text.contains(KEY), "the key in {text}");
+        assert!(!text.contains("s3cr3t"), "the talkback address in {text}");
     }
 
     // A fleet link is decoded without the camera.
@@ -493,5 +598,43 @@ async fn a_wrong_fleet_key_is_unauthorized() {
     tokio::time::sleep(Duration::from_millis(300)).await;
     assert_eq!(camera.counts.status.load(Ordering::SeqCst), 0);
     assert_eq!(camera.counts.commands.load(Ordering::SeqCst), 0);
+    core.close(id).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_camera_opened_for_commands_reads_its_capabilities_for_the_first_op() {
+    let (port, camera) = simulated_camera().await;
+    let core = common::core().unwrap();
+    let id = core
+        .open(OpenRequest {
+            device: "meros-camera".into(),
+            model: "meros-camera".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: json!({ "fleet_key": KEY }).as_object().unwrap().clone(),
+            monitor: false,
+        })
+        .unwrap();
+    until("connected", || {
+        core.snapshot(id).unwrap().connection == Connection::Connected
+    })
+    .await;
+    assert_eq!(camera.counts.commands.load(Ordering::SeqCst), 0);
+    assert_eq!(camera.counts.status.load(Ordering::SeqCst), 0);
+    // The capabilities, then the op.
+    let answer = run(&core, id, "set_tally", json!({"light": "program"}))
+        .await
+        .unwrap();
+    assert_eq!(answer["tally"], "program");
+    assert_eq!(camera.counts.commands.load(Ordering::SeqCst), 2);
+    let state = core.snapshot(id).unwrap().state;
+    assert_eq!(state["tally"], "program");
+    assert_eq!(state["ops"].as_array().unwrap().len(), OPS.len());
+    // Ranges are known from then on.
+    assert!(matches!(
+        run(&core, id, "set_zoom", json!({"ratio": 9})).await,
+        Err(CommandError::InvalidParams { .. })
+    ));
+    assert_eq!(camera.counts.events.load(Ordering::SeqCst), 0);
     core.close(id).await;
 }
