@@ -81,6 +81,7 @@ mod tcp_listen;
 mod tls;
 mod udp;
 mod ws;
+mod yaml;
 
 use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, ToSocketAddrs};

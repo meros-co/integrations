@@ -1594,7 +1594,7 @@ mod tests {
     #[test]
     fn title_field_commands_take_a_field_selector() {
         let spec: Value =
-            serde_yaml::from_str(include_str!("../../../../specs/vmix.yaml")).unwrap();
+            crate::yaml::from_str(include_str!("../../../../specs/vmix.yaml")).unwrap();
         for name in [
             "set_text",
             "set_text_colour",

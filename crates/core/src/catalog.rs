@@ -264,7 +264,7 @@ impl Catalog {
     pub fn embedded() -> Catalog {
         let mut devices = BTreeMap::new();
         for (file, text) in EMBEDDED_SPECS {
-            let spec: DeviceSpec = serde_yaml::from_str(text)
+            let spec: DeviceSpec = crate::yaml::from_str(text)
                 .unwrap_or_else(|e| panic!("embedded spec {file}.yaml does not parse: {e}"));
             devices.insert(spec.id.clone(), spec);
         }
@@ -333,7 +333,7 @@ impl Catalog {
             let path = entry.path();
             if path.extension().is_some_and(|e| e == "yaml") {
                 let spec: DeviceSpec =
-                    serde_yaml::from_str(&std::fs::read_to_string(&path).unwrap())
+                    crate::yaml::from_str(&std::fs::read_to_string(&path).unwrap())
                         .unwrap_or_else(|e| panic!("{} does not parse: {e}", path.display()));
                 devices.insert(spec.id.clone(), spec);
             }
@@ -478,7 +478,7 @@ mod tests {
     use serde_json::json;
 
     fn spec(yaml: &str) -> BTreeMap<String, ParamSpec> {
-        serde_yaml::from_str(yaml).unwrap()
+        crate::yaml::from_str(yaml).unwrap()
     }
 
     fn params(v: Value) -> Params {

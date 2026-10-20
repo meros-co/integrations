@@ -614,7 +614,7 @@ mod tests {
     fn values(params: Value, specs: &str) -> (Params, BTreeMap<String, ParamSpec>) {
         (
             params.as_object().unwrap().clone(),
-            serde_yaml::from_str(specs).unwrap(),
+            crate::yaml::from_str(specs).unwrap(),
         )
     }
 

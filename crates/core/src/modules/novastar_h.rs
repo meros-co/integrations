@@ -1434,7 +1434,7 @@ mod tests {
     #[test]
     fn every_spec_command_has_an_endpoint() {
         let spec: Value =
-            serde_yaml::from_str(include_str!("../../../../specs/novastar-h.yaml")).unwrap();
+            crate::yaml::from_str(include_str!("../../../../specs/novastar-h.yaml")).unwrap();
         for name in spec["commands"].as_object().unwrap().keys() {
             assert!(
                 name == "call" || ENDPOINTS.iter().any(|e| e.name == name),
