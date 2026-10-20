@@ -19,7 +19,11 @@
 //! Consecutive status documents are compared, and what changed between them
 //! (recording started or stopped, tally, errors and warnings, battery, heat
 //! and storage, outputs up or down, the operator's settings) is reported as
-//! message events, since version 1 has no event types of its own.
+//! message events, since version 1 has no event types of its own. The
+//! status's `monitoring` and `outputSettings` documents keep `monitoring`
+//! and `output_settings` current whoever changed them; output credentials
+//! (key, token, passphrase) are dropped wherever they arrive, leaving only
+//! `keySet`, `tokenSet` or `passphraseSet`.
 //!
 //! The clip list is read again when the status's clip count changes or a
 //! recording stops. Clips are read in byte ranges returned to the caller; the
@@ -116,8 +120,9 @@ const SAME_NAME: &[&str] = &[
 ];
 
 /// Output fields that hold a credential; the camera never sends them back,
-/// and the module drops them from anything it keeps or returns.
-const CREDENTIALS: &[&str] = &["key", "token"];
+/// and the module drops them from anything it keeps or returns, keeping
+/// only whether one is set (`keySet`, `tokenSet`, `passphraseSet`).
+const CREDENTIALS: &[&str] = &["key", "token", "passphrase"];
 
 /// How the talkback address is shown wherever it would be shown (§6.6).
 const SET: &str = "set";
@@ -550,6 +555,11 @@ impl MerosCamera {
         if !doc.is_object() {
             return;
         }
+        // Credentials never kept, even from a camera that wrongly sends them.
+        let mut doc = doc;
+        if let Some(o) = doc.get("outputSettings").cloned() {
+            doc["outputSettings"] = redact(&o);
+        }
         let previous = self.last_status.take();
         if let Some(prev) = &previous {
             self.derive(cx, prev, &doc);
@@ -671,6 +681,19 @@ impl MerosCamera {
         }
         let mut paths = Vec::new();
         changed_paths(prev.get("settings"), doc.get("settings"), "", &mut paths);
+        // The monitoring and outputs documents (a camera from before they
+        // were in the status has neither), under their state names.
+        for (field, prefix) in [
+            ("monitoring", "monitoring"),
+            ("outputSettings", "output_settings"),
+        ] {
+            if let (Some(old), Some(new)) = (
+                prev.get(field).filter(|v| v.is_object()),
+                doc.get(field).filter(|v| v.is_object()),
+            ) {
+                changed_paths(Some(old), Some(new), prefix, &mut paths);
+            }
+        }
         if !paths.is_empty() {
             say(cx, "settings_changed", json!({ "paths": paths }));
         }
@@ -1870,7 +1893,10 @@ fn redact(outputs: &Value) -> Value {
         let mut fields = fields.clone();
         if let Some(f) = fields.as_object_mut() {
             for c in CREDENTIALS {
-                f.remove(*c);
+                if let Some(v) = f.remove(*c) {
+                    let set = v.as_str().is_some_and(|s| !s.is_empty());
+                    f.insert(format!("{c}Set"), json!(set));
+                }
             }
         }
         out.insert(kind.clone(), fields);
@@ -1888,6 +1914,9 @@ fn redact_answer(answer: &Value, op: &str) -> Value {
         if o.get("on").is_none_or(Value::is_object) {
             answer["outputs"] = redact(&o);
         }
+    }
+    if let Some(o) = answer.get("outputSettings").cloned() {
+        answer["outputSettings"] = redact(&o);
     }
     let address = if op == "talkback" { "url" } else { "talkback" };
     if answer.get(address).is_some_and(Value::is_string) {
@@ -1926,6 +1955,14 @@ fn status_view(doc: &Value) -> Map<String, Value> {
             Value::Null
         },
     );
+    // Only from a camera that sends them: otherwise the capabilities
+    // answer's and the monitoring and outputs answers' stand.
+    if let Some(m) = doc.get("monitoring").filter(|m| m.is_object()) {
+        v.insert("monitoring".into(), m.clone());
+    }
+    if let Some(o) = doc.get("outputSettings").filter(|o| o.is_object()) {
+        v.insert("output_settings".into(), redact(o));
+    }
     v.insert("talkback".into(), talkback(doc));
     v.insert("return_source".into(), get("return"));
     v.insert("preview_codec".into(), get("previewCodec"));
@@ -3087,6 +3124,73 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn monitoring_and_output_settings_come_from_the_status_without_credentials() {
+        const SECRET: &str = "wr0ngly-s3nt";
+        let mut m = keyed(true);
+        ready(&mut m);
+        let mut cx = Cx::new(20);
+        m.tcp(&mut cx, EVENTS, TcpInput::Connected);
+        m.tcp(
+            &mut cx,
+            EVENTS,
+            TcpInput::Data(b"HTTP/1.1 200 OK\r\n\r\n".to_vec()),
+        );
+        cx.take();
+        let mut all = Vec::new();
+        // A status without them leaves the capabilities answer's in state.
+        let a = line(&mut m, 90, &status());
+        assert_eq!(m.mirror["monitoring"], json!({"zebra": false}));
+        all.extend(a);
+        let mut doc = status();
+        doc["monitoring"] = json!({"zebra": false, "lut": "none"});
+        doc["outputSettings"] = json!({
+            "rtmp": {"on": false, "url": "", "key": SECRET},
+            "whip": {"on": false, "url": "", "token": "", "tokenSet": false},
+            "srt": {"on": false, "passphrase": SECRET},
+            "format": {"height": 1080}
+        });
+        let a = line(&mut m, 100, &doc);
+        assert_eq!(
+            m.mirror["monitoring"],
+            json!({"zebra": false, "lut": "none"})
+        );
+        assert_eq!(
+            m.mirror["output_settings"],
+            json!({
+                "rtmp": {"on": false, "url": "", "keySet": true},
+                "whip": {"on": false, "url": "", "tokenSet": false},
+                "srt": {"on": false, "passphraseSet": true},
+                "format": {"height": 1080}
+            })
+        );
+        all.extend(a);
+        // Whoever changed them, the change is in state and settings_changed.
+        doc["monitoring"]["zebra"] = json!(true);
+        doc["outputSettings"]["format"]["height"] = json!(720);
+        let a = line(&mut m, 110, &doc);
+        assert_eq!(state(&a)["monitoring"]["zebra"], true);
+        assert_eq!(state(&a)["output_settings"]["format"]["height"], 720);
+        assert!(messages(&a).contains(&(
+            "settings_changed".into(),
+            json!({"paths": ["monitoring.zebra", "output_settings.format.height"]})
+        )));
+        all.extend(a);
+        // get_status returns it without the credential.
+        let a = command(&mut m, 130, 2, "get_status", json!({}));
+        let a2 = respond(&mut m, 140, requests(&a)[0].0, 200, doc.clone());
+        match &completed(&a2)[0].1 {
+            Ok(Outcome::Value { value }) => {
+                assert_eq!(value["outputSettings"]["rtmp"]["keySet"], true)
+            }
+            other => panic!("{other:?}"),
+        }
+        all.extend(a2);
+        assert!(!format!("{all:?}").contains(SECRET));
+        assert!(!m.mirror.to_string().contains(SECRET));
+        assert!(!format!("{:?}", m.last_status).contains(SECRET));
     }
 
     #[test]

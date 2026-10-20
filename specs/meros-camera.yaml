@@ -434,11 +434,14 @@ quirks:
       documents (settings, running, resolved, looks, slate, visca, monitoring, capabilities, limits) keep
       the camera's field names, so a partial for set_settings, set_monitoring or set_outputs is written
       in the same names. running is the format running now; the status's resolved is the same, under its
-      first name, and fills running for a camera that does not send it. The capabilities answer, read on
-      every monitored connection, adds ops, capabilities, monitoring, output_settings (credentials
-      removed), limits and resolved_settings, the full settings as the camera resolved them, which each
-      set_settings answer replaces. A field that is null or absent in the status is absent from state,
-      so error is absent while there is none.
+      first name, and fills running for a camera that does not send it. The status's monitoring and
+      outputSettings (as output_settings) keep those documents current whoever changes them: a command,
+      a preset or the operator. Credentials are never kept: a key, token or passphrase a camera sends
+      anyway is dropped, leaving keySet, tokenSet or passphraseSet. The capabilities answer, read on
+      every monitored connection, adds ops, capabilities, limits and resolved_settings, the full settings
+      as the camera resolved them, which each set_settings answer replaces, and gives monitoring and
+      output_settings for a camera whose status has neither. A field that is null or absent in the
+      status is absent from state, so error is absent while there is none.
   - models: [all]
     severity: info
     text: >
@@ -447,8 +450,9 @@ quirks:
       and lens_changed {from, to}, error {error} and error_cleared, warning and warning_cleared
       {warning}, battery_low {battery} and storage_low {free_bytes} (when crossing the thresholds in
       settings), output_up and output_down {kind}, output_problem {kind, problem}, talkback_changed {on,
-      latch} and settings_changed {paths}, the dotted settings paths that changed. The first document after
-      opening sends none.
+      latch} and settings_changed {paths}: the dotted settings paths that changed, and monitoring.<field>
+      and output_settings.<kind>.<field> for the monitoring and outputs documents. The first document
+      after opening sends none.
   - models: [all]
     severity: warning
     text: >
@@ -490,10 +494,10 @@ quirks:
     severity: warning
     text: >
       An answer's error belongs to that command alone: a string means the camera refused the command or
-      it failed (the camera's own rules apply as for its operator: no format change mid-clip, Pro
-      gating), and the command fails with device_error, the same error going into state as the status
-      carries it; absent or null is success, which clears the status error. A command the camera's app
-      does not answer within 10 s answers 504, reported as timeout.
+      it failed (the camera's own rules apply as for its operator: no lens, format or recording change
+      mid-clip, Pro gating), and the command fails with device_error, the same error going into state as
+      the status carries it; absent or null is success, which clears the status error. A command the
+      camera's app does not answer within 10 s answers 504, reported as timeout.
   - models: [all]
     severity: warning
     text: >
@@ -650,7 +654,7 @@ state:
   signal_dbm:             { type: int, unit: dBm, description: "The network's signal" }
   outputs.on:             { type: array, description: "The output kinds running" }
   outputs.problems:       { type: object, description: "Why an output that is on cannot run, a sentence keyed by kind" }
-  output_settings:        { type: object, description: "The outputs document (protocol §7.5) by kind (srt, rtmp, hls, whip, whep, omt, ndi, external, network, look, format), credentials removed: keySet and tokenSet say whether one is set" }
+  output_settings:        { type: object, description: "The outputs document (protocol §7.5) by kind (srt, rtmp, hls, whip, whep, omt, ndi, external, network, look, format), credentials removed: keySet, tokenSet and passphraseSet say whether one is set; from the status's outputSettings, or the capabilities answer for a camera whose status has none" }
   audio:                  { type: array, unit: dBFS, description: "Input peak levels, one per channel" }
   talkback.on:            { type: bool, description: "Talkback is on (talkbackOn)" }
   talkback.latch:         { type: bool, description: "The operator's talk is latched on rather than push to talk (talkbackLatch)" }
@@ -668,4 +672,4 @@ state:
   ops:                    { type: array, description: "The ops the camera offers (capabilities)" }
   capabilities:           { type: object, description: "The camera's capability document (protocol §7.2): model, platform, lenses with their exposure (iso, exposureTimeNs, ev ranges), white balance (presets, kelvin range), focus, zoom range, stabilization, torch and video formats, encoders and audio inputs" }
   limits:                 { type: object, description: "The camera's ranges outside the capability document (protocol §7.6): outputs (heights, bitrateMbps, srtLatencyMs, port), monitoring (zebraLevel, zebra2Level, customGuide, desqueeze), recording.gainDb and whiteBalance.tint, each {min, max}" }
-  monitoring:             { type: object, description: "The monitoring settings (protocol §7.4): lut, falseColour, zebra, zebraLevel, zebra2, zebra2Level, peaking, peakColour, peakSensitivity, scope, scopeLarge, scopeFloating, frameGuide, customGuide, safeAreas, grid, centerMark, level, desqueeze, recBorder, meter, punchIn, clean" }
+  monitoring:             { type: object, description: "The monitoring settings (protocol §7.4), from the status (or the capabilities answer for a camera whose status has none): lut, falseColour, zebra, zebraLevel, zebra2, zebra2Level, peaking, peakColour, peakSensitivity, scope, scopeLarge, scopeFloating, frameGuide, customGuide, safeAreas, grid, centerMark, level, desqueeze, recBorder, meter, punchIn, clean" }
