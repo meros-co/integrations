@@ -6810,7 +6810,7 @@ state:
 "#;
 
     fn endpoints_device(port: Option<u16>, settings: Value, monitor: bool) -> SpecEngine {
-        let spec: DeviceSpec = serde_yaml::from_str(ENDPOINTS).unwrap();
+        let spec: DeviceSpec = crate::yaml::from_str(ENDPOINTS).unwrap();
         let settings =
             crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
         SpecEngine::new(
@@ -6989,7 +6989,7 @@ state:
 
     #[test]
     fn an_endpoint_carries_no_session_and_the_probe_names_none() {
-        let mut spec: DeviceSpec = serde_yaml::from_str(ENDPOINTS).unwrap();
+        let mut spec: DeviceSpec = crate::yaml::from_str(ENDPOINTS).unwrap();
         let t = spec.transport.as_mut().unwrap();
         t["session"] = json!({"login": {"method": "POST", "path": "/login"}});
         let ctx = OpenContext {
@@ -7097,7 +7097,7 @@ commands:
 
     #[test]
     fn binary_parameters_go_out_as_bytes_whole_or_in_multipart_parts() {
-        let spec: DeviceSpec = serde_yaml::from_str(BINARY).unwrap();
+        let spec: DeviceSpec = crate::yaml::from_str(BINARY).unwrap();
         let mut e = SpecEngine::new(
             Arc::new(spec),
             OpenContext {
@@ -7212,7 +7212,7 @@ state:
 
     #[test]
     fn a_command_can_take_several_replies() {
-        let spec: DeviceSpec = serde_yaml::from_str(TWO_REPLIES).unwrap();
+        let spec: DeviceSpec = crate::yaml::from_str(TWO_REPLIES).unwrap();
         let mut e = SpecEngine::new(
             Arc::new(spec),
             OpenContext {
@@ -7296,7 +7296,7 @@ telemetry:
 
     #[test]
     fn line_messages_can_name_their_models() {
-        let spec: DeviceSpec = serde_yaml::from_str(LINE_MODELS).unwrap();
+        let spec: DeviceSpec = crate::yaml::from_str(LINE_MODELS).unwrap();
         let open = |model: &str| {
             let mut e = SpecEngine::new(
                 Arc::new(spec.clone()),
