@@ -24,6 +24,8 @@ source:
       capabilities (per-lens ISO, exposure time, EV, Kelvin, zoom and video formats), settings,
       monitoring, outputs and limits documents (§7), the NDJSON event stream and its reconnection rule
       (§8), the preview's frame format and keyframe interval (§9), versioning (§11) and timing (§12).
+      The OMT output's quality (§7.5) and its limits list outputs.omtQuality (§7.6) as of camera commit
+      119430f.
   - title: Meros Camera, camera-remote crate, camera-control crate (caps.rs), camera-sim, and the app's controller (camera_controller.dart, monitoring.dart, outputs.dart)
     author: Meros
     note: >
@@ -356,6 +358,7 @@ commands:
     params:
       enabled: { type: bool, label: "On", description: "Send OMT." }
       name: { type: string, max_length: 128, label: Source name, description: "The OMT source name." }
+      quality: { type: enum, values: [low, standard, high], label: Quality, description: "The VMX profile: low for the least bandwidth and latency, high for the best fidelity; the camera's default is standard." }
     returns: value
   set_ndi_output:
     summary: Set the NDI output (op outputs, ndi)
@@ -507,7 +510,8 @@ quirks:
       (exposure.exposureTimeNs; an angle at the current or given frame rate), whiteBalance.kelvin (2000
       to 10000 where the lens gives none), zoom and the format (a width and height in videoFormats or
       highSpeedFormats, at one of that size's fps or manualFps), and the camera's limits (protocol §7.6:
-      output heights, bitrate, SRT latency and ports, zebraLevel, zebra2Level, customGuide, desqueeze,
+      output heights, bitrate, SRT latency and ports, OMT quality (omt.quality one of omtQuality, low,
+      standard and high where the camera's limits leave the list out), zebraLevel, zebra2Level, customGuide, desqueeze,
       recording.gainDb, whiteBalance.tint) for the typed commands and the set_settings, set_monitoring
       and set_outputs partials alike. The camera refuses out-of-range output values itself and clamps
       the rest. The ranges declared on the parameters are §7.6's where it gives them, and wide bounds
@@ -654,7 +658,7 @@ state:
   signal_dbm:             { type: int, unit: dBm, description: "The network's signal" }
   outputs.on:             { type: array, description: "The output kinds running" }
   outputs.problems:       { type: object, description: "Why an output that is on cannot run, a sentence keyed by kind" }
-  output_settings:        { type: object, description: "The outputs document (protocol §7.5) by kind (srt, rtmp, hls, whip, whep, omt, ndi, external, network, look, format), credentials removed: keySet, tokenSet and passphraseSet say whether one is set; from the status's outputSettings, or the capabilities answer for a camera whose status has none" }
+  output_settings:        { type: object, description: "The outputs document (protocol §7.5) by kind (srt, rtmp, hls, whip, whep, omt, ndi, external, network, look, format; omt.quality is the VMX profile, low, standard or high), credentials removed: keySet, tokenSet and passphraseSet say whether one is set; from the status's outputSettings, or the capabilities answer for a camera whose status has none" }
   audio:                  { type: array, unit: dBFS, description: "Input peak levels, one per channel" }
   talkback.on:            { type: bool, description: "Talkback is on (talkbackOn)" }
   talkback.latch:         { type: bool, description: "The operator's talk is latched on rather than push to talk (talkbackLatch)" }
@@ -671,5 +675,5 @@ state:
   preview_note:           { type: string, description: "Why the preview is not running, if it is not" }
   ops:                    { type: array, description: "The ops the camera offers (capabilities)" }
   capabilities:           { type: object, description: "The camera's capability document (protocol §7.2): model, platform, lenses with their exposure (iso, exposureTimeNs, ev ranges), white balance (presets, kelvin range), focus, zoom range, stabilization, torch and video formats, encoders and audio inputs" }
-  limits:                 { type: object, description: "The camera's ranges outside the capability document (protocol §7.6): outputs (heights, bitrateMbps, srtLatencyMs, port), monitoring (zebraLevel, zebra2Level, customGuide, desqueeze), recording.gainDb and whiteBalance.tint, each {min, max}" }
+  limits:                 { type: object, description: "The camera's ranges outside the capability document (protocol §7.6): outputs (heights and omtQuality, lists; bitrateMbps, srtLatencyMs, port), monitoring (zebraLevel, zebra2Level, customGuide, desqueeze), recording.gainDb and whiteBalance.tint; ranges are {min, max}" }
   monitoring:             { type: object, description: "The monitoring settings (protocol §7.4), from the status (or the capabilities answer for a camera whose status has none): lut, falseColour, zebra, zebraLevel, zebra2, zebra2Level, peaking, peakColour, peakSensitivity, scope, scopeLarge, scopeFloating, frameGuide, customGuide, safeAreas, grid, centerMark, level, desqueeze, recBorder, meter, punchIn, clean" }

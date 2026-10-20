@@ -127,12 +127,16 @@ const CREDENTIALS: &[&str] = &["key", "token", "passphrase"];
 /// How the talkback address is shown wherever it would be shown (§6.6).
 const SET: &str = "set";
 
+/// The OMT output's qualities (its VMX profiles, §7.5), as §7.6 lists them.
+const OMT_QUALITY: &[&str] = &["low", "standard", "high"];
+
 /// The ranges outside the capability document (§7.6), as the protocol
 /// gives them; a camera's own `limits` replace them once read.
 fn default_limits() -> Value {
     json!({
         "outputs": {"heights": [1080, 720, 540], "bitrateMbps": {"min": 1, "max": 50},
-                    "srtLatencyMs": {"min": 20, "max": 8000}, "port": {"min": 1024, "max": 65535}},
+                    "srtLatencyMs": {"min": 20, "max": 8000}, "port": {"min": 1024, "max": 65535},
+                    "omtQuality": OMT_QUALITY},
         "monitoring": {"zebraLevel": {"min": 0.5, "max": 1}, "zebra2Level": {"min": 0.3, "max": 1},
                        "customGuide": {"min": 0.25, "max": 4}, "desqueeze": {"min": 1, "max": 2}},
         "recording": {"gainDb": {"min": -24, "max": 24}},
@@ -1791,6 +1795,22 @@ fn check_outputs(o: &Value, limits: &Value) -> Result<(), CommandError> {
             CAMERA,
         )?;
     }
+    if let Some(q) = o.pointer("/omt/quality") {
+        // A camera whose limits leave the list out takes §7.6's.
+        let allowed: Vec<&str> = limits
+            .pointer("/outputs/omtQuality")
+            .and_then(Value::as_array)
+            .map(|l| l.iter().filter_map(Value::as_str).collect())
+            .filter(|l: &Vec<&str>| !l.is_empty())
+            .unwrap_or_else(|| OMT_QUALITY.to_vec());
+        if !q.as_str().is_some_and(|q| allowed.contains(&q)) {
+            return Err(invalid(format!(
+                "omt.quality {} is not one of the camera's OMT qualities ({})",
+                as_text(q),
+                allowed.join(", ")
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -2315,7 +2335,13 @@ fn op_body(name: &str, p: &Params) -> Result<Value, CommandError> {
         ),
         "set_omt_output" => outputs(
             "omt",
-            nonempty(fields(p, &[("enabled", "on"), ("name", "name")]), name)?,
+            nonempty(
+                fields(
+                    p,
+                    &[("enabled", "on"), ("name", "name"), ("quality", "quality")],
+                ),
+                name,
+            )?,
         ),
         "set_ndi_output" => outputs(
             "ndi",
@@ -3343,6 +3369,103 @@ mod tests {
             let a = command(&mut m, 60, 200, name, p);
             assert_eq!(requests(&a).len(), 1, "{name}");
         }
+    }
+
+    #[test]
+    fn omt_quality_is_one_of_the_cameras_qualities() {
+        // limits without omtQuality: §7.6's low, standard and high.
+        let mut m = keyed(true);
+        ready(&mut m);
+        assert!(m.mirror["limits"]["outputs"].get("omtQuality").is_none());
+        for (n, (name, p, want)) in [
+            (
+                "set_omt_output",
+                json!({"quality": "best"}),
+                "omt.quality best is not one of the camera's OMT qualities (low, standard, high)",
+            ),
+            (
+                "set_outputs",
+                json!({"outputs": {"omt": {"quality": "ultra"}}}),
+                "omt.quality ultra",
+            ),
+            (
+                "set_outputs",
+                json!({"outputs": {"omt": {"quality": 2}}}),
+                "omt.quality 2",
+            ),
+            (
+                "send_op",
+                json!({"op": "outputs", "fields": {"outputs": {"omt": {"quality": null}}}}),
+                "omt.quality null",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let message = refused(&command(&mut m, 50, 100 + n as u64, name, p));
+            assert!(message.contains(want), "{name}: {message}");
+        }
+        for (n, q) in ["low", "standard", "high"].into_iter().enumerate() {
+            let a = command(
+                &mut m,
+                60,
+                200 + n as u64,
+                "set_omt_output",
+                json!({"enabled": true, "quality": q}),
+            );
+            assert_eq!(
+                body(&requests(&a)[0].1),
+                json!({"op": "outputs", "outputs": {"omt": {"on": true, "quality": q}}})
+            );
+        }
+
+        // A camera listing fewer is held to its own list.
+        let mut m = keyed(true);
+        let a = connected(&mut m);
+        let r = requests(&a);
+        let mut c = caps();
+        c["limits"]["outputs"]["omtQuality"] = json!(["standard", "high"]);
+        c["outputs"]["omt"] = json!({"on": false, "name": "Camera A", "quality": "standard"});
+        let a = respond(&mut m, 12, r[0].0, 200, c);
+        assert_eq!(state(&a)["output_settings"]["omt"]["quality"], "standard");
+        respond(&mut m, 13, r[1].0, 200, json!([]));
+        let message = refused(&command(
+            &mut m,
+            50,
+            1,
+            "set_omt_output",
+            json!({"quality": "low"}),
+        ));
+        assert!(message.contains("(standard, high)"), "{message}");
+        // The outputs answer carries the new quality into state.
+        let a = command(&mut m, 60, 2, "set_omt_output", json!({"quality": "high"}));
+        let a = respond(
+            &mut m,
+            70,
+            requests(&a)[0].0,
+            200,
+            json!({"outputs": {"omt": {"on": false, "name": "Camera A", "quality": "high"}},
+                   "problems": {}, "error": null}),
+        );
+        assert_eq!(state(&a)["output_settings"]["omt"]["quality"], "high");
+    }
+
+    #[test]
+    fn omt_quality_changes_follow_the_status() {
+        let mut m = keyed(true);
+        streaming(&mut m);
+        let mut doc = status();
+        doc["outputSettings"] =
+            json!({"omt": {"on": true, "name": "Camera A", "quality": "standard"}});
+        let a = line(&mut m, 100, &doc);
+        assert_eq!(state(&a)["output_settings"]["omt"]["quality"], "standard");
+        doc["outputSettings"]["omt"]["quality"] = json!("low");
+        let a = line(&mut m, 110, &doc);
+        assert_eq!(state(&a)["output_settings"]["omt"]["quality"], "low");
+        assert!(messages(&a).contains(&(
+            "settings_changed".into(),
+            json!({"paths": ["output_settings.omt.quality"]})
+        )));
     }
 
     #[test]
