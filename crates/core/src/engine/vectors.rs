@@ -475,7 +475,7 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
 
 fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let text = std::fs::read_to_string(path).unwrap();
-    let v: Value = serde_yaml::from_str(&text).map_err(|e| format!("parse: {e}"))?;
+    let v: Value = crate::yaml::from_str(&text).map_err(|e| format!("parse: {e}"))?;
     if [
         "inbound",
         "inbound_hex",
@@ -812,7 +812,7 @@ fn every_spec_driven_command_has_a_vector() {
     let catalog = Catalog::source_tree();
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
-        let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
+        let v: Value = crate::yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
         let Some(command) = v["command"].as_str() else {
             continue;
         };
@@ -837,7 +837,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
     let catalog = Catalog::source_tree();
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
-        let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
+        let v: Value = crate::yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
         if [
             "inbound",
             "inbound_hex",
