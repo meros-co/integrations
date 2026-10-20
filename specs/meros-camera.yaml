@@ -19,7 +19,7 @@ source:
       The protocol as the camera implements it, at camera commit 697f9fe: availability (§1), mDNS
       discovery as _meros-cam._tcp with TXT id, name, model and proto and the port in SRV (§2), HTTP/1.1
       with one request per connection, JSON bodies and the error statuses (§3), the fleet key and fleet
-      links (§4), the requests (§5), every command op and each answer's own error (§6), the talkback
+      links with their preset (§4, as of camera commit a3cf48c), the requests (§5), every command op and each answer's own error (§6), the talkback
       address as a credential (§6.6), the status (running, talkbackOn, talkbackLatch, integer counts),
       capabilities (per-lens ISO, exposure time, EV, Kelvin, zoom and video formats), settings,
       monitoring, outputs and limits documents (§7), the NDJSON event stream and its reconnection rule
@@ -104,7 +104,7 @@ commands:
       name: { type: string, required: true, max_length: 255, pattern: "^[^./\\\\][^/\\\\]*$", label: Clip, description: "The file's name from clips." }
     returns: value
   decode_fleet_link:
-    summary: Decode a fleet link (meros-camera://fleet?d=...) from a camera's fleet QR code into {key, preset?}; done here, nothing is sent
+    summary: Decode a fleet link (meros-camera://fleet?d=...) from a camera's fleet QR code into {key, preset?}, the preset {name, version, settings, monitoring?, outputs?} with outputs cut to format and look; a preset without name or settings refuses the whole link; done here, nothing is sent or applied
     params:
       link: { type: string, required: true, max_length: 8192, label: Fleet link, description: "The link the QR code carries." }
     returns: value
@@ -458,6 +458,17 @@ quirks:
       again). A camera given a new fleet key refuses every controller holding the old one until they
       pair again. The key is never logged or put in state; clip_url's value carries it in a query and
       must be treated as the key.
+  - models: [all]
+    severity: info
+    text: >
+      A fleet link may carry a preset (protocol §4): name and settings (a partial settings document)
+      are required, monitoring (a partial monitoring document) is optional, and outputs may hold only
+      format and look. decode_fleet_link refuses a link whose preset lacks name or settings whole,
+      returning neither key nor preset, and drops every other output kind (destinations such as srt,
+      rtmp or whip, and so any credential) from the preset it returns. The driver does not apply the
+      preset: a consumer that takes the link applies it to each camera of the fleet once, as it joins,
+      with set_settings, then set_monitoring if present, then set_outputs {format, look} if present, and
+      shows any refusal (a recording camera refuses a format change).
   - models: [all]
     severity: critical
     text: >

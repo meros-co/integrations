@@ -1169,18 +1169,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## meros-camera — Meros Camera
 
-- [ ] Confirm that an output with a problem (outputs.problems) is not listed in outputs.on. ([specs/meros-camera.yaml:641](specs/meros-camera.yaml#L641))
+- [ ] Confirm that an output with a problem (outputs.problems) is not listed in outputs.on. ([specs/meros-camera.yaml:652](specs/meros-camera.yaml#L652))
 - [ ] Check that signalDbm is a whole number on a phone, as battery and freeBytes are. ([specs/meros-camera.yaml:430](specs/meros-camera.yaml#L430))
 - [ ] On a phone, confirm the event stream's first line arrives at once and a line follows at least every 5 s while nothing changes, so the driver's 10 s silence check never drops a healthy stream, and that a stream ended by the camera is reopened after the status is read again. ([specs/meros-camera.yaml:430](specs/meros-camera.yaml#L430))
 - [ ] Confirm that the battery reads -1 while unknown (no battery_low event is sent from -1), and that warnings and error are plain sentences the derived warning and error events can repeat. ([specs/meros-camera.yaml:445](specs/meros-camera.yaml#L445))
-- [ ] On a phone, confirm the capabilities answer carries limits (camera-sim's does not, so §7.6's are used for it), with the same ranges the app refuses and clamps to. ([specs/meros-camera.yaml:659](specs/meros-camera.yaml#L659))
-- [ ] Confirm that a lens's videoFormats (fps and manualFps) and highSpeedFormats list every size and rate the camera records, and that exposureTimeNs bounds the shutter at every rate, since the driver refuses anything outside them before sending. ([specs/meros-camera.yaml:489](specs/meros-camera.yaml#L489))
+- [ ] On a phone, confirm the capabilities answer carries limits (camera-sim's does not, so §7.6's are used for it), with the same ranges the app refuses and clamps to. ([specs/meros-camera.yaml:670](specs/meros-camera.yaml#L670))
+- [ ] Confirm that a lens's videoFormats (fps and manualFps) and highSpeedFormats list every size and rate the camera records, and that exposureTimeNs bounds the shutter at every rate, since the driver refuses anything outside them before sending. ([specs/meros-camera.yaml:500](specs/meros-camera.yaml#L500))
 - [ ] Confirm customGuide is a number (width divided by height, 0.25 to 4) as the app reads it, where §7.4 writes width:height. ([specs/meros-camera.yaml:287](specs/meros-camera.yaml#L287))
 - [ ] Confirm the clip server's ranges: a range ending past the file is cut at its last byte (206), a range starting at or past the end answers 416 with Content-Range bytes */<size>, and a slate sidecar (.json) is read the same way. ([specs/meros-camera.yaml:94](specs/meros-camera.yaml#L94))
 - [ ] On a network with several cameras, confirm each announces _meros-cam._tcp with TXT id, name, model and proto and its port in SRV, that a camera whose address changes announces the new A record with the cache-flush bit, and that turning remote control off sends a goodbye. ([specs/meros-camera.yaml:50](specs/meros-camera.yaml#L50))
 - [ ] Confirm that a camera given a new fleet key answers 401 to the old one at once, including on an event stream or preview already open. ([specs/meros-camera.yaml:455](specs/meros-camera.yaml#L455))
-- [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:577](specs/meros-camera.yaml#L577))
-- [ ] On a phone with talkback on, confirm that get_talkback_url's address takes a director's WebRTC offer, and that new_talkback_address cuts off a director on the old one. ([specs/meros-camera.yaml:517](specs/meros-camera.yaml#L517))
+- [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:588](specs/meros-camera.yaml#L588))
+- [ ] On a phone with talkback on, confirm that get_talkback_url's address takes a director's WebRTC offer, and that new_talkback_address cuts off a director on the old one. ([specs/meros-camera.yaml:528](specs/meros-camera.yaml#L528))
 
 ## millumin — Millumin
 

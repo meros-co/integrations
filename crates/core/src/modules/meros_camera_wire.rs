@@ -272,9 +272,58 @@ pub(crate) fn decode_fleet_link(link: &str) -> Result<Value, String> {
     }
     let mut out = json!({ "key": key });
     if let Some(preset) = doc.get("preset").filter(|p| !p.is_null()) {
-        out["preset"] = preset.clone();
+        out["preset"] = fleet_preset(preset)?;
     }
     Ok(out)
+}
+
+/// A fleet link's preset (§4): `name` and `settings` required, `monitoring`
+/// optional, and `outputs` cut to `format` and `look`, since a preset never
+/// carries a destination. A preset without its name or settings refuses the
+/// whole link.
+fn fleet_preset(preset: &Value) -> Result<Value, String> {
+    let refused = |why: &str| format!("the link's preset {why}, so the link is refused");
+    let p = preset
+        .as_object()
+        .ok_or_else(|| refused("is not an object"))?;
+    if !p
+        .get("name")
+        .and_then(Value::as_str)
+        .is_some_and(|n| !n.trim().is_empty())
+    {
+        return Err(refused("has no name"));
+    }
+    if !p.get("settings").is_some_and(Value::is_object) {
+        return Err(refused("has no settings"));
+    }
+    if p.get("monitoring")
+        .is_some_and(|m| !m.is_null() && !m.is_object())
+    {
+        return Err(refused("has monitoring that is not an object"));
+    }
+    let mut out = p.clone();
+    match p.get("outputs") {
+        None | Some(Value::Null) => {
+            out.remove("outputs");
+        }
+        Some(Value::Object(outputs)) => {
+            let kept: serde_json::Map<String, Value> = outputs
+                .iter()
+                .filter(|(kind, _)| matches!(kind.as_str(), "format" | "look"))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            if kept.is_empty() {
+                out.remove("outputs");
+            } else {
+                out.insert("outputs".into(), Value::Object(kept));
+            }
+        }
+        Some(_) => return Err(refused("has outputs that are not an object")),
+    }
+    if out.get("monitoring").is_some_and(Value::is_null) {
+        out.remove("monitoring");
+    }
+    Ok(Value::Object(out))
 }
 
 /// 32 lowercase hex characters (16 random bytes).
@@ -340,11 +389,53 @@ mod tests {
 
     #[test]
     fn a_fleet_link_with_a_preset_gives_both() {
-        let preset = json!({"name": "Interview", "settings": {"fps": 25, "zoom": 1.5}});
+        let preset = json!({"name": "Interview", "version": 1,
+                            "settings": {"fps": 25, "exposure": {"shutter": {"angle": 180}}},
+                            "monitoring": {"lut": "rec709", "zebra": true},
+                            "outputs": {"format": {"height": 720, "bitrateMbps": 8, "halfRate": false},
+                                        "look": {"look": "rec709", "overlays": "clean"}}});
         let l = link("fleet", &json!({ "key": KEY, "preset": preset }));
         assert_eq!(
             decode_fleet_link(&format!("  {l}\n")).unwrap(),
             json!({ "key": KEY, "preset": preset })
+        );
+    }
+
+    #[test]
+    fn a_preset_without_its_name_or_settings_refuses_the_whole_link() {
+        for preset in [
+            json!({"settings": {"fps": 25}}),
+            json!({"name": "", "settings": {"fps": 25}}),
+            json!({"name": "Interview"}),
+            json!({"name": "Interview", "settings": null}),
+            json!("Interview"),
+        ] {
+            let l = link("fleet", &json!({ "key": KEY, "preset": preset }));
+            let e = decode_fleet_link(&l).unwrap_err();
+            assert!(e.contains("refused"), "{e}");
+            assert!(!e.contains(KEY), "the key in {e}");
+        }
+    }
+
+    #[test]
+    fn a_presets_destinations_are_dropped() {
+        let preset = json!({"name": "Live", "version": 1, "settings": {"fps": 25},
+                            "outputs": {"srt": {"on": true, "target": "10.0.0.2:9730"},
+                                        "rtmp": {"url": "rtmp://x/live", "key": "secret"},
+                                        "whip": {"token": "t"},
+                                        "format": {"height": 720}}});
+        let l = link("fleet", &json!({ "key": KEY, "preset": preset }));
+        assert_eq!(
+            decode_fleet_link(&l).unwrap()["preset"],
+            json!({"name": "Live", "version": 1, "settings": {"fps": 25},
+                   "outputs": {"format": {"height": 720}}})
+        );
+        // Destinations alone: no outputs left.
+        let preset = json!({"name": "Live", "settings": {}, "outputs": {"ndi": {"on": true}}});
+        let l = link("fleet", &json!({ "key": KEY, "preset": preset }));
+        assert_eq!(
+            decode_fleet_link(&l).unwrap()["preset"],
+            json!({"name": "Live", "settings": {}})
         );
     }
 
