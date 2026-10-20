@@ -28,6 +28,10 @@ use tokio::sync::watch;
 const KEY: &str = "0123456789abcdef0123456789abcdef";
 const CLIP: &[u8] = b"0123456789abcdefghij";
 const TALKBACK: &str = "https://127.0.0.1:8791/talkback-s3cr3t/";
+/// An RTMP stream key the fake wrongly puts in its status.
+const STREAM_KEY: &str = "live_rtmp_k3y_leak";
+/// The camera's refusal of a format change mid-clip.
+const MID_CLIP: &str = "Stop recording to change the lens, format or recording settings";
 /// Every op of protocol version 1.
 const OPS: [&str; 15] = [
     "capabilities",
@@ -80,6 +84,9 @@ fn initial_status() -> Value {
         "presets": ["Wide"], "luts": ["rec709"],
         "clips": 1, "battery": 80, "thermal": "none", "freeBytes": 64_000_000_000i64,
         "outputs": {"on": [], "problems": {}},
+        "monitoring": {"zebra": false, "lut": "none"},
+        "outputSettings": {"rtmp": {"on": false, "url": "", "keySet": false},
+                           "format": {"height": 1080, "bitrateMbps": 8, "halfRate": false}},
         "talkback": null, "talkbackOn": false, "talkbackLatch": false,
         "previewCodec": "h264", "previewNote": null
     })
@@ -196,8 +203,8 @@ async fn serve(camera: Arc<Camera>, mut stream: TcpStream) {
                     }]},
                     "settings": camera.status.lock().unwrap()["settings"].clone(),
                     "resolved": camera.status.lock().unwrap()["settings"].clone(),
-                    "monitoring": {"zebra": false, "lut": "none"},
-                    "outputs": {"rtmp": {"on": false, "url": "", "keySet": false}},
+                    "monitoring": camera.status.lock().unwrap()["monitoring"].clone(),
+                    "outputs": camera.status.lock().unwrap()["outputSettings"].clone(),
                     "luts": ["rec709"], "presets": ["Wide"],
                     "limits": {
                         "outputs": {"heights": [1080, 720, 540], "bitrateMbps": {"min": 1, "max": 50},
@@ -250,7 +257,52 @@ async fn serve(camera: Arc<Camera>, mut stream: TcpStream) {
                            "url": s["talkback"], "error": null})
                 }
                 "settings" => {
-                    json!({"resolved": camera.status.lock().unwrap()["settings"].clone(), "error": null})
+                    // A clip fixes the lens, format and recording settings.
+                    let patch = command["settings"].as_object().cloned().unwrap_or_default();
+                    let fixed = ["lensId", "width", "height", "fps", "recording"];
+                    let s = camera.status.lock().unwrap().clone();
+                    let error = (s["recording"] == true
+                        && patch
+                            .iter()
+                            .any(|(k, v)| fixed.contains(&k.as_str()) && s["settings"][k] != *v))
+                    .then_some(MID_CLIP);
+                    camera.update(|s| {
+                        if error.is_none() {
+                            for (k, v) in &patch {
+                                s["settings"][k] = v.clone();
+                            }
+                        }
+                        s["error"] = json!(error);
+                    });
+                    let resolved = camera.status.lock().unwrap()["settings"].clone();
+                    json!({"resolved": resolved, "error": error})
+                }
+                "monitoring" => {
+                    let patch = command["monitoring"]
+                        .as_object()
+                        .cloned()
+                        .unwrap_or_default();
+                    camera.update(|s| {
+                        for (k, v) in &patch {
+                            s["monitoring"][k] = v.clone();
+                        }
+                        s["error"] = Value::Null;
+                    });
+                    json!({"monitoring": camera.status.lock().unwrap()["monitoring"].clone(), "error": null})
+                }
+                "outputs" => {
+                    // Wrongly, the key set is carried into the status as sent.
+                    let patch = command["outputs"].as_object().cloned().unwrap_or_default();
+                    camera.update(|s| {
+                        for (kind, fields) in &patch {
+                            for (k, v) in fields.as_object().unwrap() {
+                                s["outputSettings"][kind][k] = v.clone();
+                            }
+                        }
+                        s["error"] = Value::Null;
+                    });
+                    json!({"outputs": camera.status.lock().unwrap()["outputSettings"].clone(),
+                           "problems": {}, "error": null})
                 }
                 other => json!({"error": format!("unknown op {other}")}),
             };
@@ -636,5 +688,105 @@ async fn a_camera_opened_for_commands_reads_its_capabilities_for_the_first_op() 
         Err(CommandError::InvalidParams { .. })
     ));
     assert_eq!(camera.counts.events.load(Ordering::SeqCst), 0);
+    core.close(id).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn monitoring_and_output_settings_follow_the_status_without_credentials() {
+    let (port, camera) = simulated_camera().await;
+    let core = common::core().unwrap();
+    let id = open(&core, port, KEY);
+    let state = |p: &str| core.snapshot(id).unwrap().state.pointer(p).cloned();
+    until("capabilities", || state("/ops").is_some()).await;
+    until("the stream reopened", || {
+        camera.counts.events.load(Ordering::SeqCst) >= 2
+    })
+    .await;
+    until("the outputs document", || {
+        state("/output_settings/format/height") == Some(json!(1080))
+    })
+    .await;
+
+    // The operator changes the monitor and an output on the camera.
+    camera.update(|s| {
+        s["monitoring"]["zebra"] = json!(true);
+        s["outputSettings"]["format"]["height"] = json!(720);
+    });
+    until("monitoring and outputs from the stream", || {
+        state("/monitoring/zebra") == Some(json!(true))
+            && state("/output_settings/format/height") == Some(json!(720))
+    })
+    .await;
+
+    // A stream key set through the driver, which the camera wrongly sends
+    // back in its status: only keySet reaches state.
+    run(
+        &core,
+        id,
+        "set_outputs",
+        json!({"outputs": {"rtmp": {"url": "rtmp://127.0.0.1/live", "key": STREAM_KEY}}}),
+    )
+    .await
+    .unwrap();
+    until("keySet", || {
+        state("/output_settings/rtmp/keySet") == Some(json!(true))
+            && state("/output_settings/rtmp/url") == Some(json!("rtmp://127.0.0.1/live"))
+    })
+    .await;
+    assert_eq!(state("/output_settings/rtmp/key"), None);
+    let status = run(&core, id, "get_status", json!({})).await.unwrap();
+    assert_eq!(status["outputSettings"]["rtmp"]["keySet"], true);
+    assert!(!status.to_string().contains(STREAM_KEY));
+
+    // A format change mid-clip is refused: the command fails with the
+    // camera's sentence, which state shows until a command succeeds.
+    run(&core, id, "start_recording", json!({})).await.unwrap();
+    assert_eq!(
+        run(&core, id, "set_settings", json!({"settings": {"fps": 30}})).await,
+        Err(CommandError::DeviceError {
+            code: None,
+            message: MID_CLIP.into()
+        })
+    );
+    assert_eq!(state("/error"), Some(json!(MID_CLIP)));
+    assert_eq!(state("/settings/fps"), Some(json!(25)));
+    run(&core, id, "stop_recording", json!({})).await.unwrap();
+    run(&core, id, "set_settings", json!({"settings": {"fps": 30}}))
+        .await
+        .unwrap();
+    until("the error cleared and the rate changed", || {
+        state("/error").is_none() && state("/settings/fps") == Some(json!(30))
+    })
+    .await;
+
+    let events = core.poll_events(10_000);
+    let changed: Vec<String> = events
+        .iter()
+        .filter_map(|e| match e {
+            Event::Message { address, args, .. } if address == "settings_changed" => {
+                Some(args["paths"].to_string())
+            }
+            _ => None,
+        })
+        .collect();
+    let all = changed.join(" ");
+    for want in [
+        "monitoring.zebra",
+        "output_settings.format.height",
+        "output_settings.rtmp.keySet",
+        "\"fps\"",
+    ] {
+        assert!(all.contains(want), "{want} in {all}");
+    }
+    for e in &events {
+        let text = serde_json::to_string(e).unwrap();
+        assert!(!text.contains(STREAM_KEY), "the stream key in {text}");
+    }
+    assert!(!core
+        .snapshot(id)
+        .unwrap()
+        .state
+        .to_string()
+        .contains(STREAM_KEY));
     core.close(id).await;
 }
