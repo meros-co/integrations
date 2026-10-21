@@ -50,6 +50,18 @@ source:
     note: >
       Media pool still and clip counts per model, the clip length table, PNG
       among the still formats and WAV for clip audio.
+  - title: Sofie atem-connection, multiviewer labels (v3.10.3, src/lib/multiviewLabel.ts, read 2026-10-21)
+    author: Norsk rikskringkasting AS
+    url: https://github.com/Sofie-Automation/sofie-atem-connection/blob/main/src/lib/multiviewLabel.ts
+    note: >
+      MIT-licensed. The label bitmap no Blackmagic document describes: one
+      palette byte per pixel, a label per multiviewer resolution (4K, 1080,
+      720) stacked in one buffer, the box sizes, padding, font sizes, border
+      and corner pixels, and the palette's mapping from 8-bit coverage, which
+      are the switcher's encoding and are kept as that file gives them; the
+      models that draw their own labels. The text is drawn with Roboto
+      Regular 2.137 (Google, Apache License 2.0), the font atem-connection
+      uses, embedded in the core, rasterized with swash.
   - title: bmdwire, atemwire/docs/MEDIA_LOCK.md (read 2026-10-21)
     url: https://github.com/lucas-romanenko/bmdwire/blob/HEAD/atemwire/docs/MEDIA_LOCK.md
     note: >
@@ -459,7 +471,7 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
                download_still, upload_macro, download_macro, upload_multiviewer_label,
-               cancel_transfer]
+               set_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-television-studio-pro-hd
     name: Blackmagic ATEM Television Studio Pro HD
@@ -489,7 +501,7 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
                download_still, upload_macro, download_macro, upload_multiviewer_label,
-               cancel_transfer]
+               set_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-television-studio-pro-4k
     name: Blackmagic ATEM Television Studio Pro 4K
@@ -525,7 +537,7 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
                download_still, upload_macro, download_macro, upload_multiviewer_label,
-               cancel_transfer]
+               set_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-television-studio-hd8
     name: Blackmagic ATEM Television Studio HD8
@@ -680,7 +692,7 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-2-me-production-studio-4k
     name: Blackmagic ATEM 2 M/E Production Studio 4K
@@ -712,7 +724,7 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-2-me-broadcast-studio-4k
     name: Blackmagic ATEM 2 M/E Broadcast Studio 4K
@@ -744,7 +756,7 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-1-me-constellation-hd
     name: Blackmagic ATEM 1 M/E Constellation HD
@@ -1047,7 +1059,7 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
     verification: none
 
 commands:
@@ -2925,6 +2937,23 @@ commands:
               description: "Path of the label bitmap file on the host running the core." }
     returns: value
 
+  set_multiviewer_label:
+    summary: >
+      Set a source's multiviewer label from text: the core draws the label
+      as the switcher's label bitmap (a bordered box per multiviewer
+      resolution the switcher runs, in the Roboto font) and uploads it.
+      Empty text clears the label. Only switchers that do not draw their own
+      labels (models before the ATEM Mini) take it. Answers at once with the
+      transfer's number.
+    params:
+      source: { type: int, min: 0, max: 65535, required: true,
+                label: Source,
+                description: "Video source ID as listed in the sources state whose label this is." }
+      text: { type: string, max_length: 64, required: true,
+              label: Label,
+              description: "The label's text; text wider than the label is cut at the last character that fits." }
+    returns: value
+
   cancel_transfer:
     summary: >
       Cancel a queued or running transfer, or every one when no transfer is
@@ -3597,8 +3626,11 @@ state:
   media_players.*.at_beginning: { type: bool, description: "Clip at its first frame" }
   media_players.*.clip_frame:  { type: int, description: "Current clip frame" }
   media_pool.stills.*.name:    { type: string, description: "Still file name, keyed by slot from 1; only slots in use" }
-  media_pool.clips.*.name:     { type: string, description: "Clip name, keyed by slot from 1; only slots in use" }
-  media_pool.clips.*.frames:   { type: int, description: "Clip length in frames" }
+  media_pool.clips.*.valid:    { type: bool, description: "The clip is whole and playable (MPCS), keyed by clip from 1; false while it is empty or being uploaded" }
+  media_pool.clips.*.name:     { type: string, description: "Clip name; absent while the clip is not valid" }
+  media_pool.clips.*.frames:   { type: int, description: "Clip length in frames; absent while the clip is not valid" }
+  media_pool.clips.*.frames_valid: { type: int, description: "Frames of the clip's memory the switcher reports holding a picture (MPfe), counted rather than listed" }
+  media_pool.clips.*.frames_hashed: { type: int, description: "Of those, frames the switcher gave a hash for" }
   supersources.*.boxes.*.enabled: { type: bool, description: "Box on, keyed by SuperSource and box from 1" }
   supersources.*.boxes.*.source: { type: int, description: "Box source id" }
   supersources.*.boxes.*.x:    { type: float, description: "Box x, -48 to 48" }
@@ -3758,7 +3790,7 @@ state:
   media_pool.stills.*.hash:    { type: string, description: "The switcher's 16-byte hash of the still, as 32 lowercase hex digits; it changes when the picture does" }
   media_pool.locks.stills:     { type: bool, description: "Some client holds the stills lock, as the switcher announces it (LKST)" }
   media_pool.locks.clips.*:    { type: bool, description: "Some client holds clip N's lock, keyed by clip from 1 (LKST)" }
-  transfers.*.kind:            { type: string, description: "upload_still, download_still, upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro or upload_multiviewer_label, keyed by the transfer's number" }
+  transfers.*.kind:            { type: string, description: "upload_still, download_still, upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro, upload_multiviewer_label or set_multiviewer_label, keyed by the transfer's number" }
   transfers.*.status:          { type: string, description: "queued, reading (the host file), waiting (giving other clients a turn), locking, transferring, writing (the host file), then done, failed or canceled" }
   transfers.*.progress:        { type: float, description: "How much is done, 0 to 1" }
   transfers.*.frame:           { type: int, description: "The clip frame being transferred, counted from 1 among the transfer's frames (clip transfers)" }
@@ -3855,6 +3887,18 @@ quirks:
       Blackmagic does not document the number). A dropped connection holds its
       place until the switcher times it out. The core reconnects on a fresh
       socket after five seconds of silence.
+
+  - models: [all]
+    severity: info
+    text: >
+      Closing the device, changing its settings and reconnecting end the
+      session with a goodbye (the hello packet with the session's id and 4
+      in place of 1), so the switcher frees the session's place and its
+      media pool locks at once (about 10 ms, as bmdwire measured) instead of
+      timing it out. No public source gives the goodbye's bytes: they are
+      inferred from the hello and bmdwire's description of the goodbye as
+      the hello's opcode 4. Every packet of the state the switcher sends on
+      connecting is acknowledged as it arrives.
 
   - models: [all]
     severity: info
@@ -4004,8 +4048,8 @@ quirks:
     text: >
       File transfers (upload_still, download_still, upload_clip,
       download_clip, upload_clip_audio, upload_macro, download_macro,
-      upload_multiviewer_label) run in the background, one at a time in the
-      order asked. Each command answers at once with {transfer, ahead}: the
+      upload_multiviewer_label, set_multiviewer_label) run in the
+      background, one at a time in the order asked. Each command answers at once with {transfer, ahead}: the
       transfer's number and how many are before it. transfers.<number> then
       follows it (queued, reading, waiting, locking, transferring, writing,
       then done, failed or canceled), and message events mark its ends:
@@ -4054,6 +4098,18 @@ quirks:
   - models: [all]
     severity: info
     text: >
+      Multiviewer labels: switchers before the ATEM Mini take each source's
+      label as a bitmap; later ones draw their own and refuse both label
+      commands as unsupported. set_multiviewer_label draws the text as
+      atem-connection does (no Blackmagic document describes the bitmap): a
+      bordered box per multiviewer resolution the switcher can run without
+      reconfiguring (4K, 1080 and 720; none for SD or 8K), in Roboto
+      Regular, cut at the last character that fits. upload_multiviewer_label
+      takes a bitmap in that encoding as it is. Neither label is read back.
+
+  - models: [all]
+    severity: info
+    text: >
       Pictures are the switcher's frame size in its current video mode
       (720 by 576 for 625-line SD, 640 by 480 for 525-line SD, 1280 by 720,
       1920 by 1080, 3840 by 2160 or 7680 by 4320) and are not scaled. PNG
@@ -4064,8 +4120,9 @@ quirks:
       words unchanged, for a lossless copy of a still or frame. Clip audio
       is a 48 kHz 24-bit stereo PCM WAV file; macros travel as the
       switcher's own macro data (download one to get a file upload_macro
-      takes). The core converts pictures itself, which takes a moment for a
-      large frame.
+      takes). The core converts pictures itself on a worker thread, so a
+      large frame takes a moment (the transfer stays reading meanwhile) but
+      never holds up the switcher's commands and state.
 
   - models: [all]
     severity: info
@@ -4075,8 +4132,18 @@ quirks:
       still or clip audio without uploading again (Blackmagic's SDK has
       both, through calls whose messages are not documented), and canceling
       on the switcher's side (cancel_transfer stops sending or acknowledging
-      and lets go of the lock). capture_still, clear_still, clear_clip and
-      set_clip manage the pool without a transfer.
+      and lets go of the lock). Clip audio's validity, name and hash are not
+      in the state for the same reason. capture_still, clear_still,
+      clear_clip and set_clip manage the pool without a transfer.
+
+  - models: [all]
+    severity: info
+    text: >
+      A clip's state is a summary, not a list of its frames (a clip holds up
+      to thousands): whether it is valid with its name and length, and how
+      many of its frames the switcher reports holding a picture
+      (frames_valid) and giving a hash for (frames_hashed). While an upload
+      runs, valid is false and frames_valid rises frame by frame.
 
   - models: [all]
     severity: info

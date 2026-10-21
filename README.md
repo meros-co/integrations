@@ -225,3 +225,8 @@ and new devices are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 MIT, see [LICENSE](LICENSE). Product names and trademarks belong to their
 owners.
+
+Builds with the `blackmagic-atem` integration embed one font, Roboto Regular
+2.137 by Google, to draw ATEM multiviewer labels from text. It is licensed
+under the Apache License 2.0, included as
+[crates/core/assets/fonts/LICENSE-Roboto.txt](crates/core/assets/fonts/LICENSE-Roboto.txt).

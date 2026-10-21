@@ -43,15 +43,17 @@
 //!   SetValid). Macros and labels take no lock (Sofie's simple queues).
 //!
 //! Every path ends with the lock released: done, failed, canceled, timed
-//! out and closed. A lost connection needs nothing sent: the switcher frees
-//! a dead session's locks when it times the session out (bmdwire: about
-//! 5 s).
+//! out and closed. A lost connection ends with a goodbye on the old
+//! session, which frees its locks at once; a switcher that does not hear it
+//! frees a dead session's locks when it times the session out (bmdwire:
+//! about 5 s).
 
 use std::collections::{BTreeMap, VecDeque};
 
 use md5::{Digest, Md5};
 use serde_json::{json, Map, Value};
 
+use super::label::{self, Resolutions};
 use super::media;
 use super::{
     invalid, opt_int, opt_str, put16, put32, u16_at, unsupported, Atem, CommandError, CommandId,
@@ -60,7 +62,7 @@ use super::{
 use crate::module::FileInput;
 
 /// The commands this file handles.
-pub(super) const COMMANDS: [&str; 9] = [
+pub(super) const COMMANDS: [&str; 10] = [
     "upload_still",
     "download_still",
     "upload_clip",
@@ -69,11 +71,22 @@ pub(super) const COMMANDS: [&str; 9] = [
     "upload_macro",
     "download_macro",
     "upload_multiviewer_label",
+    "set_multiviewer_label",
     "cancel_transfer",
 ];
 
 pub(super) const TIMER: Key = "transfer";
 const READ: Key = "atem-read";
+/// An upload's file, converted off the session.
+const PREPARE: Key = "atem-prepare";
+/// Downloaded frames converted off the session, each slot then written by
+/// the writer of the same position.
+const CONVERTERS: [Key; 4] = [
+    "atem-convert-1",
+    "atem-convert-2",
+    "atem-convert-3",
+    "atem-convert-4",
+];
 const WRITERS: [Key; 4] = [
     "atem-write-1",
     "atem-write-2",
@@ -155,6 +168,8 @@ enum What {
     },
     UploadLabel {
         source: u16,
+        /// Text drawn into the label here, rather than a bitmap file.
+        text: Option<(String, Resolutions)>,
     },
 }
 
@@ -168,7 +183,8 @@ impl What {
             What::UploadAudio { .. } => "upload_clip_audio",
             What::UploadMacro { .. } => "upload_macro",
             What::DownloadMacro { .. } => "download_macro",
-            What::UploadLabel { .. } => "upload_multiviewer_label",
+            What::UploadLabel { text: None, .. } => "upload_multiviewer_label",
+            What::UploadLabel { .. } => "set_multiviewer_label",
         }
     }
 
@@ -214,7 +230,7 @@ impl What {
             What::UploadClip { .. } => unit as u16,
             What::DownloadClip { first, .. } => first + unit as u16,
             What::UploadAudio { .. } => 0,
-            What::UploadLabel { source } => *source,
+            What::UploadLabel { source, .. } => *source,
         }
     }
 
@@ -233,7 +249,7 @@ impl What {
             What::UploadMacro { slot, .. } | What::DownloadMacro { slot } => {
                 m.insert("macro".into(), json!(slot + 1));
             }
-            What::UploadLabel { source } => {
+            What::UploadLabel { source, .. } => {
                 m.insert("source".into(), json!(source));
             }
         }
@@ -293,6 +309,8 @@ impl Job {
 enum Step {
     /// Reading the current unit's file from the host.
     Reading,
+    /// Converting it for the switcher, off the session.
+    Preparing,
     /// Giving other clients a turn before asking for the store again.
     Yielding,
     Locking {
@@ -325,6 +343,8 @@ pub(super) struct Transfers {
     activity: Millis,
     /// File writers in use, with their transfer.
     writing: BTreeMap<Key, u64>,
+    /// Downloaded units being converted, with their transfer and file.
+    converting: BTreeMap<Key, (u64, String)>,
     /// Downloads off the wire whose files are still being written.
     draining: BTreeMap<u64, Job>,
     finished: VecDeque<u64>,
@@ -378,6 +398,101 @@ fn format_param(params: &Params) -> Format {
 
 fn md5(data: &[u8]) -> [u8; 16] {
     Md5::digest(data).into()
+}
+
+/// How an upload's file becomes what is sent.
+#[derive(Clone, Copy)]
+enum Prep {
+    Frame { format: Format, size: (u32, u32) },
+    Audio { reversed: bool },
+    Macro,
+    Label,
+}
+
+/// An upload's file as it is sent: the raw length, the MD5 for FTFD,
+/// whether it is run-length encoded, then the bytes, packed for a task's
+/// result. Runs off the session: a large frame takes a while.
+fn encode_upload(prep: Prep, file: Vec<u8>) -> Result<Vec<u8>, String> {
+    let (raw_len, hash, rle, data) = match prep {
+        Prep::Frame {
+            format,
+            size: (w, h),
+        } => {
+            let frame = (w * h * 4) as usize;
+            let yuva = match format {
+                Format::Png => {
+                    let (pw, ph, rgba) = media::png_decode(&file)?;
+                    if (pw, ph) != (w, h) {
+                        return Err(format!(
+                            "the picture is {pw} by {ph}; the switcher's video mode takes {w} by {h}"
+                        ));
+                    }
+                    media::rgba_to_yuva(w, h, &rgba)
+                }
+                Format::Rgba | Format::Native if file.len() != frame => {
+                    return Err(format!(
+                        "{} bytes; a {w} by {h} frame is {frame}",
+                        file.len()
+                    ))
+                }
+                Format::Rgba => media::rgba_to_yuva(w, h, &file),
+                Format::Native => {
+                    if !media::plausible_yuva(&file) {
+                        return Err(
+                            "not the switcher's 10-bit YUVA words (a word has its top bits set)"
+                                .into(),
+                        );
+                    }
+                    file
+                }
+            };
+            (yuva.len(), md5(&yuva), true, media::rle_encode(&yuva))
+        }
+        Prep::Audio { reversed } => {
+            let audio = media::wav_to_clip_audio(&file, reversed)?;
+            (audio.len(), md5(&audio), false, audio)
+        }
+        Prep::Macro => {
+            if file.is_empty() {
+                return Err("the macro file is empty".into());
+            }
+            // Sofie sends a macro with no hash.
+            (file.len(), [0; 16], false, file)
+        }
+        Prep::Label => {
+            // Values 254 and 255 crash a switcher (Sofie `atem.ts:572-578`).
+            if file.is_empty() || file.iter().any(|b| *b >= 254) {
+                return Err("a label holds bytes from 0 to 253 only".into());
+            }
+            (file.len(), md5(&file), false, file)
+        }
+    };
+    let raw_len = u32::try_from(raw_len).map_err(|_| "the file is too large".to_string())?;
+    let mut out = Vec::with_capacity(21 + data.len());
+    out.extend_from_slice(&raw_len.to_be_bytes());
+    out.extend_from_slice(&hash);
+    out.push(rle as u8);
+    out.extend_from_slice(&data);
+    Ok(out)
+}
+
+/// A downloaded unit as its host file holds it. Runs off the session.
+fn decode_download(
+    frames: bool,
+    format: Format,
+    (w, h): (u32, u32),
+    data: Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    if !frames {
+        return Ok(data);
+    }
+    let yuva = media::rle_decode(&data, (w * h * 4) as usize)
+        .map_err(|e| format!("the switcher's frame is damaged: {e}"))?;
+    Ok(match format {
+        Format::Png => media::png_encode(w, h, &media::yuva_to_rgba(w, h, &yuva)),
+        Format::Rgba => media::yuva_to_rgba(w, h, &yuva),
+        Format::Native => yuva,
+    })
 }
 
 fn lock_body(store: u16, locked: bool) -> Vec<u8> {
@@ -521,8 +636,24 @@ impl Atem {
                         "this switcher (it draws its own multiviewer labels)",
                     ));
                 }
+                let text = if name == "set_multiviewer_label" {
+                    let resolutions = self.topology.label_resolutions;
+                    if !resolutions.any() {
+                        return Err(invalid(
+                            "the switcher has reported no multiviewer resolution a label is drawn for"
+                                .into(),
+                        ));
+                    }
+                    Some((
+                        opt_str(params, "text").unwrap_or_default().to_owned(),
+                        resolutions,
+                    ))
+                } else {
+                    None
+                };
                 What::UploadLabel {
                     source: self.check_source(params)?,
+                    text,
                 }
             }
         };
@@ -654,7 +785,20 @@ impl Atem {
         job.sent = 0;
         job.described = false;
         job.chunks = 0;
-        if job.what.upload() {
+        if let What::UploadLabel {
+            text: Some((text, resolutions)),
+            ..
+        } = &job.what
+        {
+            // Drawn off the session, then sent as an uploaded label is.
+            let (text, resolutions) = (text.clone(), *resolutions);
+            self.transfers.step = Some(Step::Preparing);
+            cx.compute(PREPARE, move || {
+                encode_upload(Prep::Label, label::render(&text, resolutions)?)
+            });
+            let job = self.transfers.active.as_ref().unwrap();
+            self.transfer_patch(cx, job, "reading");
+        } else if job.what.upload() {
             let max = match job.what {
                 What::UploadMacro { .. } => MAX_MACRO,
                 What::UploadLabel { .. } => MAX_LABEL,
@@ -671,73 +815,20 @@ impl Atem {
         }
     }
 
-    /// The bytes to send for an upload's file, or why it cannot be sent.
-    fn prepare(&self, job: &mut Job, file: Vec<u8>) -> Result<(), String> {
-        let (w, h) = job.size;
-        let frame = job.frame_bytes();
+    /// What converting the active upload's file needs, captured for a task.
+    fn prep(&self, job: &Job) -> Prep {
         match job.what {
-            What::UploadStill { .. } | What::UploadClip { .. } => {
-                let yuva = match job.format {
-                    Format::Png => {
-                        let (pw, ph, rgba) = media::png_decode(&file)?;
-                        if (pw, ph) != (w, h) {
-                            return Err(format!(
-                                "the picture is {pw} by {ph}; the switcher's video mode takes {w} by {h}"
-                            ));
-                        }
-                        media::rgba_to_yuva(w, h, &rgba)
-                    }
-                    Format::Rgba | Format::Native if file.len() != frame => {
-                        return Err(format!(
-                            "{} bytes; a {w} by {h} frame is {frame}",
-                            file.len()
-                        ))
-                    }
-                    Format::Rgba => media::rgba_to_yuva(w, h, &file),
-                    Format::Native => {
-                        if !media::plausible_yuva(&file) {
-                            return Err("not the switcher's 10-bit YUVA words (a word has its top bits set)".into());
-                        }
-                        file
-                    }
-                };
-                job.raw_len = yuva.len() as u32;
-                job.hash = md5(&yuva);
-                job.data = media::rle_encode(&yuva);
-                job.rle = true;
-            }
-            What::UploadAudio { .. } => {
-                // Unknown models are taken as newer, as Sofie does.
-                let reversed = self.topology.model_id == 0 || self.topology.model_id >= 4;
-                let audio = media::wav_to_clip_audio(&file, reversed)?;
-                job.raw_len = audio.len() as u32;
-                job.hash = md5(&audio);
-                job.data = audio;
-                job.rle = false;
-            }
-            What::UploadMacro { .. } => {
-                if file.is_empty() {
-                    return Err("the macro file is empty".into());
-                }
-                // Sofie sends a macro with no hash.
-                job.raw_len = file.len() as u32;
-                job.hash = [0; 16];
-                job.data = file;
-                job.rle = false;
-            }
-            What::UploadLabel { .. } => {
-                // Values 254 and 255 crash a switcher (Sofie `atem.ts:572-578`).
-                if file.is_empty() || file.iter().any(|b| *b >= 254) {
-                    return Err("a label holds bytes from 0 to 253 only".into());
-                }
-                job.raw_len = file.len() as u32;
-                job.hash = md5(&file);
-                job.data = file;
-                job.rle = false;
-            }
-            _ => {}
+            What::UploadStill { .. } | What::UploadClip { .. } => Prep::Frame {
+                format: job.format,
+                size: job.size,
+            },
+            // Unknown models are taken as newer, as Sofie does.
+            What::UploadAudio { .. } => Prep::Audio {
+                reversed: self.topology.model_id == 0 || self.topology.model_id >= 4,
+            },
+            What::UploadMacro { .. } => Prep::Macro,
+            _ => Prep::Label,
         }
-        Ok(())
     }
 
     /// Take the lock the active transfer needs, or start it when it needs
@@ -956,18 +1047,17 @@ impl Atem {
             if self.transfers.step != Some(Step::Reading) {
                 return;
             }
-            let Some(mut job) = self.transfers.active.take() else {
+            let Some(job) = self.transfers.active.as_ref() else {
                 return;
             };
-            let prepared = match input {
-                FileInput::Read { data } => self.prepare(&mut job, data),
-                FileInput::Failed { message } => Err(message),
-                _ => return,
-            };
-            self.transfers.active = Some(job);
-            match prepared {
-                Ok(()) => self.acquire(cx),
-                Err(e) => self.end_active(cx, "failed", Some(e)),
+            match input {
+                FileInput::Read { data } => {
+                    let prep = self.prep(job);
+                    self.transfers.step = Some(Step::Preparing);
+                    cx.compute(PREPARE, move || encode_upload(prep, data));
+                }
+                FileInput::Failed { message } => self.end_active(cx, "failed", Some(message)),
+                _ => {}
             }
             return;
         }
@@ -982,6 +1072,69 @@ impl Atem {
                 return;
             }
         };
+        self.file_stored(cx, number, failed);
+    }
+
+    /// A task this module handed off finished: an upload's file prepared,
+    /// or a downloaded unit converted for its file.
+    pub(super) fn transfer_computed(
+        &mut self,
+        cx: &mut Cx,
+        key: Key,
+        result: Result<Vec<u8>, String>,
+    ) {
+        if key == PREPARE {
+            if self.transfers.step != Some(Step::Preparing) {
+                return;
+            }
+            let Some(job) = self.transfers.active.as_mut() else {
+                return;
+            };
+            match result {
+                Ok(mut packed) if packed.len() >= 21 => {
+                    job.raw_len = u32::from_be_bytes(packed[0..4].try_into().unwrap());
+                    job.hash.copy_from_slice(&packed[4..20]);
+                    job.rle = packed[20] == 1;
+                    packed.drain(..21);
+                    job.data = packed;
+                    self.acquire(cx);
+                }
+                Ok(_) => self.end_active(cx, "failed", Some("nothing to send".into())),
+                Err(e) => self.end_active(cx, "failed", Some(e)),
+            }
+            return;
+        }
+        let Some(slot) = CONVERTERS.iter().position(|k| *k == key) else {
+            return;
+        };
+        let Some((number, path)) = self.transfers.converting.remove(key) else {
+            return;
+        };
+        let alive = self.transfers.draining.contains_key(&number)
+            || self
+                .transfers
+                .active
+                .as_ref()
+                .is_some_and(|j| j.number == number);
+        if alive {
+            match result {
+                Ok(file) => {
+                    let writer = WRITERS[slot];
+                    cx.file_open(writer, path);
+                    cx.file_write(writer, file);
+                    cx.file_close(writer);
+                    self.transfers.writing.insert(writer, number);
+                }
+                Err(e) => self.file_stored(cx, number, Some(e)),
+            }
+        }
+        if self.transfers.step == Some(Step::WaitingWriter) {
+            self.store_download(cx);
+        }
+    }
+
+    /// One downloaded file written, or not.
+    fn file_stored(&mut self, cx: &mut Cx, number: u64, failed: Option<String>) {
         if let Some(job) = self.transfers.draining.get_mut(&number) {
             job.writes -= 1;
             if failed.is_some() {
@@ -1305,46 +1458,26 @@ impl Atem {
         self.end_active(cx, "done", None);
     }
 
-    /// Write the downloaded unit to its host file and go on.
+    /// Hand the downloaded unit to a converter for its host file, and go on.
+    /// A slot (converter, then writer) is held from conversion until the
+    /// file is closed; with all four busy, the next unit waits.
     fn store_download(&mut self, cx: &mut Cx) {
-        let Some(key) = WRITERS
-            .iter()
-            .copied()
-            .find(|k| !self.transfers.writing.contains_key(k))
-        else {
-            self.transfers.step = Some(Step::WaitingWriter);
+        let t = &mut self.transfers;
+        let Some(slot) = (0..CONVERTERS.len()).find(|i| {
+            !t.converting.contains_key(CONVERTERS[*i]) && !t.writing.contains_key(WRITERS[*i])
+        }) else {
+            t.step = Some(Step::WaitingWriter);
             return;
         };
-        let job = self.transfers.active.as_mut().unwrap();
+        let job = t.active.as_mut().unwrap();
         let data = std::mem::take(&mut job.data);
-        let (w, h) = job.size;
-        let file = if job.what.frames() {
-            media::rle_decode(&data, job.frame_bytes()).map(|yuva| match job.format {
-                Format::Png => media::png_encode(w, h, &media::yuva_to_rgba(w, h, &yuva)),
-                Format::Rgba => media::yuva_to_rgba(w, h, &yuva),
-                Format::Native => yuva,
-            })
-        } else {
-            Ok(data)
-        };
-        let file = match file {
-            Ok(f) => f,
-            Err(e) => {
-                self.end_active(
-                    cx,
-                    "failed",
-                    Some(format!("the switcher's frame is damaged: {e}")),
-                );
-                return;
-            }
-        };
-        cx.file_open(key, job.paths[job.unit].clone());
-        cx.file_write(key, file);
-        cx.file_close(key);
+        let (frames, format, size) = (job.what.frames(), job.format, job.size);
         job.writes += 1;
-        let number = job.number;
-        self.transfers.writing.insert(key, number);
-        let job = self.transfers.active.as_mut().unwrap();
+        t.converting
+            .insert(CONVERTERS[slot], (job.number, job.paths[job.unit].clone()));
+        cx.compute(CONVERTERS[slot], move || {
+            decode_download(frames, format, size, data)
+        });
         job.unit += 1;
         if job.unit < job.paths.len() {
             // The lock stays held for the clip's next frame.
@@ -1396,6 +1529,7 @@ mod tests {
     use super::super::tests::{cmd, dump, feed, ready, ready_with, reliable, sent, state};
     use super::*;
     use crate::module::{Action, Module};
+    use std::net::SocketAddr;
 
     const W: u32 = 640;
     const H: u32 = 480;
@@ -1440,7 +1574,8 @@ mod tests {
     /// A switcher packet with the next id.
     fn from_switcher(m: &mut Atem, now: Millis, commands: &[Vec<u8>]) -> Vec<Action> {
         let id = (m.last_received + 1) % super::super::ID_MODULO;
-        feed(m, now, reliable(0x8001, id, commands))
+        let a = feed(m, now, reliable(0x8001, id, commands));
+        settle(m, now, a)
     }
 
     fn run(
@@ -1471,7 +1606,23 @@ mod tests {
     fn file(m: &mut Atem, now: Millis, key: Key, input: FileInput) -> Vec<Action> {
         let mut cx = Cx::new(now);
         m.file(&mut cx, key, input);
-        cx.take()
+        settle(m, now, cx.take())
+    }
+
+    /// Run the tasks the actions hand off, as the session would, and add
+    /// what their results lead to.
+    fn settle(m: &mut Atem, now: Millis, mut actions: Vec<Action>) -> Vec<Action> {
+        let mut at = 0;
+        while at < actions.len() {
+            if let Action::Compute { key, task } = &actions[at] {
+                let (key, result) = (*key, task.run());
+                let mut cx = Cx::new(now);
+                m.computed(&mut cx, key, result);
+                actions.extend(cx.take());
+            }
+            at += 1;
+        }
+        actions
     }
 
     fn timer(m: &mut Atem, now: Millis) -> Vec<Action> {
@@ -2043,6 +2194,148 @@ mod tests {
             (u16_at(&ftsd, 2), u16_at(&ftsd, 6), u16_at(&ftsd, 12)),
             (0xFFFF, 2, 0x0201)
         );
+    }
+
+    #[test]
+    fn pictures_are_converted_off_the_session_and_a_stale_result_is_dropped() {
+        let mut m = switcher();
+        let _ = run(
+            &mut m,
+            100,
+            "upload_still",
+            json!({"still": 1, "path": "/a"}),
+        );
+        let mut cx = Cx::new(110);
+        m.file(
+            &mut cx,
+            READ,
+            FileInput::Read {
+                data: media::png_encode(W, H, &picture()),
+            },
+        );
+        let a = cx.take();
+        // Nothing is converted here: the work is handed off, and nothing is
+        // asked of the switcher until it comes back.
+        let task = a
+            .iter()
+            .find_map(|x| match x {
+                Action::Compute { key, task } if *key == PREPARE => Some(task.clone()),
+                _ => None,
+            })
+            .expect("the conversion is handed off");
+        assert!(sent(&a).is_empty());
+        // Canceled meanwhile: the result that comes back changes nothing.
+        let _ = run(&mut m, 120, "cancel_transfer", json!({}));
+        let mut cx = Cx::new(130);
+        m.computed(&mut cx, PREPARE, task.run());
+        assert!(sent(&cx.take()).is_empty());
+        assert!(m.transfers.held.is_none() && m.transfers.asked.is_none());
+
+        // A download's frame is converted off the session too, then written.
+        let _ = run(
+            &mut m,
+            200,
+            "download_still",
+            json!({"still": 1, "path": "/d.png"}),
+        );
+        let a = from_switcher(&mut m, 210, &[lock_msg(b"LKOB", 0, true)]);
+        let id = u16_at(named(&out(&a), b"FTSU")[0], 0);
+        // A flat frame: one run, one chunk.
+        let flat = [10u8, 20, 30, 255].repeat((W * H) as usize);
+        let rle = media::rle_encode(&media::rgba_to_yuva(W, H, &flat));
+        let mut body = id.to_be_bytes().to_vec();
+        body.extend_from_slice(&(rle.len() as u16).to_be_bytes());
+        body.extend_from_slice(&rle);
+        from_switcher(&mut m, 220, &[cmd(b"FTDa", &body)]);
+        let mut cx = Cx::new(230);
+        let id_bytes = id.to_be_bytes();
+        let ftdc = reliable(
+            0x8001,
+            (m.last_received + 1) % super::super::ID_MODULO,
+            &[cmd(b"FTDC", &[id_bytes[0], id_bytes[1], 0, 0])],
+        );
+        m.datagram(
+            &mut cx,
+            super::super::SOCKET,
+            SocketAddr::new(m.host(), 9910),
+            &ftdc,
+        );
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::Compute { key, .. } if *key == CONVERTERS[0])));
+        assert!(!a.iter().any(|x| matches!(x, Action::FileWrite { .. })));
+        let a = settle(&mut m, 240, a);
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::FileOpen { file, path } if *file == WRITERS[0] && path == "/d.png")));
+    }
+
+    #[test]
+    fn a_label_is_drawn_from_text_and_sent_as_a_label_bitmap() {
+        // An older switcher, whose 1080p50 multiviewer runs in 1080 and 720.
+        let mut d = dump();
+        let mut pin = vec![0u8; 44];
+        pin[..12].copy_from_slice(b"ATEM TVS Pro");
+        pin[40] = 9;
+        d[1] = cmd(b"_pin", &pin);
+        let without = ready_with(d.clone());
+        // One video mode, 1080p50; its multiviewer runs in 1080p50 and
+        // 720p50, with no reconfiguring.
+        let mut vmc = vec![0, 1, 0, 0, 12, 0, 0, 0];
+        vmc.extend_from_slice(&((1u32 << 12) | (1 << 4)).to_be_bytes());
+        vmc.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0]);
+        d.insert(3, cmd(b"_VMC", &vmc));
+        let mut m = ready_with(d);
+        let resolutions = m.topology.label_resolutions;
+        assert!(resolutions.hd1080 && resolutions.hd720 && !resolutions.uhd);
+        let expected = label::render("CAM 2", resolutions).unwrap();
+        assert_eq!(expected.len(), 320 * 90);
+
+        // The drawing is handed off; settle it as the session would.
+        let mut cx = Cx::new(100);
+        m.command(
+            &mut cx,
+            7,
+            "set_multiviewer_label",
+            json!({"source": 2, "text": "CAM 2"}).as_object().unwrap(),
+        );
+        let a = settle(&mut m, 100, cx.take());
+        let list = out(&a);
+        let ftsd = named(&list, b"FTSD")[0].clone();
+        let id = u16_at(&ftsd, 0);
+        assert_eq!(
+            (u16_at(&ftsd, 2), u16_at(&ftsd, 6), u16_at(&ftsd, 12)),
+            (0xFFFF, 2, 0x0201)
+        );
+        assert_eq!(super::super::u32_at(&ftsd, 8), expected.len() as u32);
+        let a = from_switcher(&mut m, 120, &[ftcd(id, 1396, 1000)]);
+        let list = out(&a);
+        assert_eq!(&named(&list, b"FTFD")[0][2..8], b"Label\0");
+        let sent_label: Vec<u8> = named(&list, b"FTDa")
+            .iter()
+            .flat_map(|c| c[4..].to_vec())
+            .collect();
+        assert_eq!(sent_label, expected);
+
+        // Without the multiviewer modes there is nothing to draw for.
+        let mut without = without;
+        let (r, _) = run(
+            &mut without,
+            100,
+            "set_multiviewer_label",
+            json!({"source": 2, "text": "x"}),
+        );
+        assert!(matches!(r, Err(CommandError::InvalidParams { .. })));
+        // A switcher that draws its own labels refuses it.
+        let mut m = switcher();
+        let (r, _) = run(
+            &mut m,
+            100,
+            "set_multiviewer_label",
+            json!({"source": 1, "text": "x"}),
+        );
+        assert!(matches!(r, Err(CommandError::UnsupportedForModel { .. })));
     }
 
     #[test]

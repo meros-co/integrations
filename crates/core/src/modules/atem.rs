@@ -59,6 +59,8 @@ mod audio;
 mod camera;
 #[path = "atem_keyers.rs"]
 mod keyers;
+#[path = "atem_label.rs"]
+mod label;
 #[path = "atem_media.rs"]
 mod media;
 #[path = "atem_settings.rs"]
@@ -273,6 +275,11 @@ struct Topology {
     stills_used: BTreeSet<u16>,
     /// Clips in use, from 0, with their frame counts (MPCS).
     clip_frames: BTreeMap<u8, u16>,
+    /// Each clip's frames the switcher reports valid, from 0, with whether
+    /// it gave a hash for them (MPfe pools 1 and up).
+    clip_frame_hashes: BTreeMap<u8, BTreeMap<u16, bool>>,
+    /// The multiviewer resolutions a label is drawn for (_VMC).
+    label_resolutions: label::Resolutions,
 }
 
 pub(crate) struct Atem {
@@ -757,8 +764,26 @@ impl Atem {
         );
     }
 
+    /// Say goodbye on the session: the hello with the session's id and
+    /// opcode 4 in place of 1. The switcher then frees the session and the
+    /// locks it holds at once (about 10 ms, as bmdwire measured) rather
+    /// than when it times the session out (about 5 s). No public source
+    /// gives the packet's bytes; they are inferred from the hello and
+    /// bmdwire's description of the goodbye as the hello's opcode 4.
+    fn goodbye(&self, cx: &mut Cx) {
+        if self.phase == Phase::Hello {
+            return;
+        }
+        let mut packet = HELLO_PACKET.to_vec();
+        packet[2..4].copy_from_slice(&self.session.to_be_bytes());
+        packet[12] = 0x04;
+        cx.udp_send(SOCKET, self.device, packet);
+    }
+
     fn lost(&mut self, cx: &mut Cx, reason: &str) {
         self.transfers_lost(cx, reason);
+        // The old session may still be alive at the switcher's end.
+        self.goodbye(cx);
         for sent in self.in_flight.drain(..) {
             if let Some(command) = sent.command {
                 cx.complete(
@@ -1283,22 +1308,38 @@ impl Atem {
             // `Media/MediaPoolClipDescription.ts:17-24`).
             b"MPCS" => {
                 need(68)?;
+                // A clip is reported whether valid or not: an upload makes
+                // it invalid first, so the change is worth seeing.
                 let clip = if b[1] == 1 {
                     self.topology.clip_frames.insert(b[0], u16_at(b, 66));
-                    json!({"name": text(&b[2..66]), "frames": u16_at(b, 66)})
+                    json!({"valid": true, "name": text(&b[2..66]), "frames": u16_at(b, 66)})
                 } else {
                     self.topology.clip_frames.remove(&b[0]);
-                    Value::Null
+                    json!({"valid": false, "name": null, "frames": null})
                 };
                 Some(json!({"media_pool": {"clips": {one(b[0]): clip}}}))
             }
             // Pool (0 stills), rsv, u16 index, used, hash[16], name length,
             // name (Sofie `Media/MediaPoolFrameDescription.ts:19-27`). Pools
-            // 1 and up are clip frames, not kept.
+            // 1 and up are clip n's frames (Sofie `MediaPoolFrameDescription.ts:37-45`),
+            // summed up per clip rather than listed: a clip holds up to
+            // thousands of frames.
             b"MPfe" => {
                 need(24)?;
                 if b[0] != 0 {
-                    return None;
+                    let frames = self.topology.clip_frame_hashes.entry(b[0] - 1).or_default();
+                    let index = u16_at(b, 2);
+                    if b[4] == 1 {
+                        frames.insert(index, b[5..21].iter().any(|x| *x != 0));
+                    } else {
+                        frames.remove(&index);
+                    }
+                    let valid = frames.len();
+                    let hashed = frames.values().filter(|h| **h).count();
+                    return Some(json!({"media_pool": {"clips": {one(b[0] - 1): {
+                        "frames_valid": valid,
+                        "frames_hashed": hashed,
+                    }}}}));
                 }
                 let index = u16_at(b, 2);
                 let slot = (index as u32 + 1).to_string();
@@ -2783,6 +2824,10 @@ impl Module for Atem {
         self.transfer_file(cx, file, input);
     }
 
+    fn computed(&mut self, cx: &mut Cx, key: Key, result: Result<Vec<u8>, String>) {
+        self.transfer_computed(cx, key, result);
+    }
+
     /// A fresh socket and handshake now; a level subscription asked for is
     /// renewed once the switcher has sent its state, as after any reconnect.
     fn reconnect(&mut self, cx: &mut Cx) -> bool {
@@ -2845,6 +2890,7 @@ impl Module for Atem {
 
     fn stop(&mut self, cx: &mut Cx) {
         self.transfers_stop(cx);
+        self.goodbye(cx);
         cx.udp_close(SOCKET);
     }
 }
@@ -3076,6 +3122,48 @@ mod tests {
         let mut cx = Cx::new(1_000);
         m.timer(&mut cx, HELLO);
         assert_eq!(sent(&cx.take()).len(), 1);
+    }
+
+    #[test]
+    fn closing_says_goodbye_on_the_session() {
+        let (mut m, _) = ready();
+        let mut cx = Cx::new(100);
+        m.stop(&mut cx);
+        let a = cx.take();
+        assert_eq!(
+            sent(&a),
+            [vec![
+                0x10, 0x14, 0x80, 0x01, 0, 0, 0, 0, 0, 0x3a, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0
+            ]]
+        );
+        assert_eq!(a.last(), Some(&Action::UdpClose { socket: SOCKET }));
+
+        // Before the switcher answered there is no session to leave.
+        let mut m = atem();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let mut cx = Cx::new(10);
+        m.stop(&mut cx);
+        assert!(sent(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn every_packet_of_the_dump_is_acknowledged_as_it_arrives() {
+        let mut m = atem();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        feed(&mut m, 10, syn_reply());
+        let d = dump();
+        for (i, c) in d.iter().enumerate() {
+            let id = i as u16 + 1;
+            let a = feed(&mut m, 20, reliable(0x8001, id, std::slice::from_ref(c)));
+            assert_eq!(
+                sent(&a)[0],
+                header(FLAG_ACK, HEADER, 0x8001, id, 0),
+                "packet {id} acknowledged at once"
+            );
+        }
+        assert_eq!(m.phase, Phase::Ready);
     }
 
     #[test]
@@ -3386,7 +3474,11 @@ mod tests {
             socket: SOCKET,
             bind: Bind::Ephemeral
         }));
-        assert_eq!(sent(&a), [HELLO_PACKET.to_vec()]);
+        // A goodbye on the old session, then a hello for a new one.
+        let mut bye = HELLO_PACKET.to_vec();
+        bye[2..4].copy_from_slice(&0x8001u16.to_be_bytes());
+        bye[12] = 4;
+        assert_eq!(sent(&a), [bye, HELLO_PACKET.to_vec()]);
         // Commands wait for the new session's dump.
         let mut cx = Cx::new(10_001);
         m.command(
@@ -4031,7 +4123,7 @@ mod tests {
         );
         assert_eq!(
             s["media_pool"]["clips"]["2"],
-            json!({"name": "Intro", "frames": 120})
+            json!({"valid": true, "name": "Intro", "frames": 120})
         );
         assert_eq!(
             s["media_pool"]["stills"]["5"],
@@ -4071,6 +4163,43 @@ mod tests {
         assert_eq!(s["cameras"]["1"]["iris"], 0.5);
         assert_eq!(s["cameras"]["1"]["white_balance"], 5600);
         assert_eq!(s["cameras"]["1"]["tint"], -10);
+    }
+
+    #[test]
+    fn clips_are_summed_up_not_listed_frame_by_frame() {
+        let (mut m, _) = ready();
+        let frame = |clip_pool: u8, index: u16, used: bool, hash: u8| {
+            let mut b = vec![0u8; 24];
+            b[0] = clip_pool;
+            put16(&mut b, 2, index);
+            b[4] = used as u8;
+            b[20] = hash;
+            cmd(b"MPfe", &b)
+        };
+        let s = decoded(
+            &mut m,
+            &[
+                frame(1, 0, true, 7),
+                frame(1, 1, true, 0),
+                frame(1, 2, true, 9),
+                frame(2, 0, true, 1),
+            ],
+        );
+        assert_eq!(
+            s["media_pool"]["clips"]["1"],
+            json!({"frames_valid": 3, "frames_hashed": 2})
+        );
+        assert_eq!(s["media_pool"]["clips"]["2"]["frames_valid"], 1);
+        // A frame cleared, and the clip made invalid: the summary follows.
+        let mut mpcs = vec![0u8; 68];
+        mpcs[0] = 0;
+        let s = decoded(&mut m, &[frame(1, 2, false, 0), cmd(b"MPCS", &mpcs)]);
+        assert_eq!(
+            s["media_pool"]["clips"]["1"],
+            json!({"frames_valid": 2, "frames_hashed": 1, "valid": false})
+        );
+        // No still was touched by clip frames.
+        assert!(s["media_pool"]["stills"].is_null());
     }
 
     #[test]
@@ -4336,7 +4465,11 @@ mod tests {
             socket: SOCKET,
             bind: Bind::Ephemeral
         }));
-        assert_eq!(sent(&a), [HELLO_PACKET.to_vec()]);
+        // A goodbye on the old session, then a hello for a new one.
+        let mut bye = HELLO_PACKET.to_vec();
+        bye[2..4].copy_from_slice(&0x8001u16.to_be_bytes());
+        bye[12] = 4;
+        assert_eq!(sent(&a), [bye, HELLO_PACKET.to_vec()]);
         feed(&mut m, 10_010, syn_reply());
         let a = feed(&mut m, 10_020, reliable(0x8002, 1, &dump()));
         assert!(sent(&a)

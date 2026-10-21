@@ -249,6 +249,46 @@ pub enum Bind {
     },
 }
 
+/// Work too heavy for the session's own task, such as decoding or encoding
+/// a large picture: the session runs it on a blocking thread and reports
+/// its result to [`Module::computed`], so the device keeps being served
+/// meanwhile. The work is a pure function of what it captured; it touches
+/// no socket, file or clock.
+#[derive(Clone)]
+#[allow(clippy::type_complexity)]
+pub struct Task(
+    std::sync::Arc<std::sync::Mutex<Option<Box<dyn FnOnce() -> Result<Vec<u8>, String> + Send>>>>,
+);
+
+impl Task {
+    pub fn new(work: impl FnOnce() -> Result<Vec<u8>, String> + Send + 'static) -> Task {
+        Task(std::sync::Arc::new(std::sync::Mutex::new(Some(Box::new(
+            work,
+        )))))
+    }
+
+    /// Run the work; a task runs once, and a second run is an error.
+    pub fn run(&self) -> Result<Vec<u8>, String> {
+        let work = self.0.lock().map(|mut w| w.take()).unwrap_or(None);
+        match work {
+            Some(work) => work(),
+            None => Err("the task has already run".into()),
+        }
+    }
+}
+
+impl std::fmt::Debug for Task {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Task")
+    }
+}
+
+impl PartialEq for Task {
+    fn eq(&self, other: &Task) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 /// Whether the device is reachable, as the module judges it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -346,6 +386,13 @@ pub enum Action {
     },
     TcpClose {
         socket: Key,
+    },
+    /// Run a [`Task`] off the session's task; its result goes to
+    /// [`Module::computed`] under `key`. A newer task under the same key
+    /// replaces an older one still running, whose result is then dropped.
+    Compute {
+        key: Key,
+        task: Task,
     },
     /// Accept connections from the device on a local TCP port, shared with
     /// other sessions and routed by peer address. Each accepted connection is
@@ -557,6 +604,18 @@ impl Cx {
         });
     }
 
+    /// Run work off the session's task; see [`Action::Compute`].
+    pub fn compute(
+        &mut self,
+        key: Key,
+        work: impl FnOnce() -> Result<Vec<u8>, String> + Send + 'static,
+    ) {
+        self.push(Action::Compute {
+            key,
+            task: Task::new(work),
+        });
+    }
+
     /// Open a TCP stream through an SSH tunnel; see [`Action::TcpOpenSsh`].
     pub fn tcp_open_ssh(&mut self, socket: Key, tunnel: SshTunnel) {
         self.push(Action::TcpOpenSsh { socket, tunnel });
@@ -742,6 +801,11 @@ pub trait Module: Send + 'static {
     /// A file this module writes was closed, or failed.
     fn file(&mut self, cx: &mut Cx, file: Key, input: FileInput) {
         let _ = (cx, file, input);
+    }
+
+    /// A task started with [`Cx::compute`] finished.
+    fn computed(&mut self, cx: &mut Cx, key: Key, result: Result<Vec<u8>, String>) {
+        let _ = (cx, key, result);
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key);

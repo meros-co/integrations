@@ -108,6 +108,7 @@ struct Upload {
     index: u16,
     size: usize,
     rle: bool,
+    label: bool,
     data: Vec<u8>,
     budget: u32,
 }
@@ -128,6 +129,17 @@ struct Sim {
     drop_after: Option<usize>,
     silent: bool,
     acks: usize,
+    /// Goodbyes received.
+    goodbyes: usize,
+    /// Answer an upload request with no budget, so the upload holds its
+    /// lock and waits.
+    stall: bool,
+    /// Be an older switcher (a TVS Pro HD, model 9), which takes
+    /// multiviewer labels as bitmaps; its 1080p50 multiviewer runs in
+    /// 1080p50 and 720p50.
+    older: bool,
+    /// Labels uploaded, by source.
+    labels: HashMap<u16, Vec<u8>>,
     upload: Option<Upload>,
 }
 
@@ -152,7 +164,8 @@ impl Switcher {
     async fn dump(&mut self, from: SocketAddr) {
         let mut pin = vec![0u8; 44];
         pin[..9].copy_from_slice(b"ATEM Mini");
-        pin[40] = 13;
+        let older = self.sim.lock().unwrap().older;
+        pin[40] = if older { 9 } else { 13 };
         let mut top = vec![0u8; 24];
         top[0] = 1;
         top[1] = 2;
@@ -169,6 +182,12 @@ impl Switcher {
             cmd(b"VidM", &[0, 0, 0, 0]),
             cmd(b"_mpl", &[20, 0, 0, 0]),
             cmd(b"_MAC", &[10, 0, 0, 0]),
+            cmd(b"_VMC", &{
+                let mut vmc = vec![0, 1, 0, 0, 12, 0, 0, 0];
+                vmc.extend_from_slice(&((1u32 << 12) | (1 << 4)).to_be_bytes());
+                vmc.extend_from_slice(&[0; 8]);
+                vmc
+            }),
         ];
         for slot in stills {
             let mut mpfe = vec![0u8; 24];
@@ -268,10 +287,13 @@ impl Switcher {
                     index,
                     size: u32_at(b, 8) as usize,
                     rle: store != 0xFFFF,
+                    label: u16_at(b, 12) == 0x0201,
                     data: Vec::new(),
                     budget: 64,
                 });
-                self.budget(id).await;
+                if !self.sim.lock().unwrap().stall {
+                    self.budget(id).await;
+                }
             }
             b"FTFD" => {
                 let name: Vec<u8> = b[2..66].iter().copied().take_while(|c| *c != 0).collect();
@@ -306,7 +328,11 @@ impl Switcher {
                         let u = sim.upload.take().unwrap();
                         let still = (u.store == 0).then_some(u.index);
                         if u.store == 0xFFFF {
-                            sim.macros.insert(u.index, u.data);
+                            if u.label {
+                                sim.labels.insert(u.index, u.data);
+                            } else {
+                                sim.macros.insert(u.index, u.data);
+                            }
                         } else {
                             sim.stills.insert(u.index, u.data);
                         }
@@ -413,6 +439,17 @@ impl Switcher {
             };
             let data = buf[..n].to_vec();
             let flags = data[0] >> 3;
+            if flags & 0x02 != 0 && data.get(12) == Some(&0x04) {
+                // Goodbye: the session ends and its locks are freed at once.
+                let mut sim = self.sim.lock().unwrap();
+                sim.goodbyes += 1;
+                sim.upload = None;
+                if sim.holder == Some(Holder::Client) {
+                    sim.holder = None;
+                }
+                self.client = None;
+                continue;
+            }
             if flags & 0x02 != 0 {
                 // Hello: a new session. A silent (dead) session's lock is
                 // freed, as the switcher reaps it.
@@ -553,10 +590,17 @@ async fn open(core: &Core, port: u16) -> u64 {
     id
 }
 
+/// Start a transfer; while the device is reconnecting, try again.
 async fn start(core: &Core, id: u64, name: &str, p: Value) -> u64 {
-    match core.execute(id, name, params(p)).await {
-        Ok(Outcome::Value { value }) => value["transfer"].as_u64().unwrap(),
-        other => panic!("{name}: {other:?}"),
+    let until = Instant::now() + Duration::from_secs(20);
+    loop {
+        match core.execute(id, name, params(p.clone())).await {
+            Ok(Outcome::Value { value }) => return value["transfer"].as_u64().unwrap(),
+            Err(CommandError::NotConnected) if Instant::now() < until => {
+                tokio::time::sleep(Duration::from_millis(20)).await
+            }
+            other => panic!("{name}: {other:?}"),
+        }
     }
 }
 
@@ -858,14 +902,8 @@ async fn atem_upload_cut_off_by_a_lost_connection_fails_and_frees_the_lock() {
         "{failed}"
     );
 
-    // Connected again: the dead session's lock is gone and transfers work.
-    tokio::time::timeout(Duration::from_secs(20), async {
-        while core.snapshot(id).unwrap().connection != Connection::Connected {
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-    })
-    .await
-    .expect("connected again within 20 s");
+    // Connected again (start waits for it): the dead session's lock is gone
+    // and transfers work.
     let t = start(
         &core,
         id,
@@ -879,4 +917,79 @@ async fn atem_upload_cut_off_by_a_lost_connection_fails_and_frees_the_lock() {
 
     core.close(id).await;
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn atem_closing_says_goodbye_and_frees_the_lock_at_once() {
+    let sim: Arc<Mutex<Sim>> = Arc::default();
+    sim.lock().unwrap().stall = true;
+    let port = simulated_atem(sim.clone()).await;
+    let core = common::core().unwrap();
+    let id = open(&core, port).await;
+    let dir = scratch("goodbye");
+    let source = dir.join("flat.rgba");
+    std::fs::write(&source, picture()).unwrap();
+    start(
+        &core,
+        id,
+        "upload_still",
+        json!({"still": 1, "path": source.to_str().unwrap(), "format": "rgba"}),
+    )
+    .await;
+    // The upload holds the stills lock, waiting for a budget that never
+    // comes.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while sim.lock().unwrap().upload.is_none() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the upload starts");
+    assert_eq!(sim.lock().unwrap().holder, Some(Holder::Client));
+    core.close(id).await;
+    released(&sim).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while sim.lock().unwrap().goodbyes == 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the session says goodbye");
+    let goodbyes = sim.lock().unwrap().goodbyes;
+    assert_eq!(goodbyes, 1);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn atem_label_drawn_from_text_reaches_an_older_switcher() {
+    let sim: Arc<Mutex<Sim>> = Arc::default();
+    sim.lock().unwrap().older = true;
+    let port = simulated_atem(sim.clone()).await;
+    let core = common::core().unwrap();
+    let id = core
+        .open(OpenRequest {
+            device: "blackmagic-atem".into(),
+            model: "atem-television-studio-pro-hd".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: Default::default(),
+            monitor: true,
+        })
+        .unwrap();
+    let t = start(
+        &core,
+        id,
+        "set_multiviewer_label",
+        json!({"source": 2, "text": "Camera 2"}),
+    )
+    .await;
+    let done = finished(&core, t).await;
+    assert_eq!(done["status"], "done", "{done}");
+    assert_eq!(done["kind"], "set_multiviewer_label");
+    let label = sim.lock().unwrap().labels.get(&2).cloned().unwrap();
+    // A 1080 and a 720 label stacked, 320 wide: 50 and 40 rows.
+    assert_eq!(label.len(), 320 * 90);
+    assert!(label.iter().all(|b| *b < 254));
+    assert!(label.iter().any(|b| *b != 0));
+    core.close(id).await;
 }
