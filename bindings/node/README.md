@@ -41,5 +41,22 @@ only those devices, opening any other throws `not_selected`, and discovery
 runs only the protocols that find them. Opening a device whose integration
 was not built in throws `not_built`, naming the feature to build with.
 
+## Files sent to devices
+
+A command's `binary` parameter (a show file, a media file, an image) takes
+the file's bytes as base64 text or a file on this machine as
+`{ file: '<path>' }`:
+
+```js
+await core.execute(device, 'load_show_file', { file: { file: 'D:/Shows/Main.watch' } });
+```
+
+The core reads the file from disk as the request goes out, never all at once,
+so its size does not matter; there is no need to read it into a `Buffer`. A
+file that is missing or cannot be read rejects with an `IntegrationsError`
+`invalid_params` naming the parameter (SPEC.md §4, "Binary request bodies").
+
+## Tests
+
 `npm test` drives devices of several integrations, so it needs an addon built
 with every integration (the default).

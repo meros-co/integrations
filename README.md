@@ -119,6 +119,12 @@ body, streamed; `?name=` keeps its name), or reserves an output with `POST
 `path`; it fetches an output with `GET /v1/files/<id>`, lists with `GET
 /v1/files` and deletes with `DELETE /v1/files/<id>`. The service resolves the
 id inside its own transfer folder, so a client never names a host path.
+A command that sends a file to a device as a `binary` parameter (a WATCHOUT
+show file, a Hippotizer media file, a camera preset, a thumbnail) takes its
+bytes as base64 or, in every package, a host file as `{"file": "<path>"}`
+(`{"file": "transfer:<id>"}` through the HTTP service): the file is streamed
+from disk into the request, never encoded or held whole, so its size does not
+matter (SPEC.md §4, "Binary request bodies").
 Neither the core nor the service limits a file's size or how long it is kept:
 a file stays until the client deletes it, and the folder (`serve
 --transfer-dir`) is cleared of the service's files at startup and on a clean

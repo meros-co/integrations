@@ -57,6 +57,17 @@ to build with.
 `cargo test -p meros-integrations-c` plays the shared script, which needs a
 build with every integration (the default).
 
+## Files sent to devices
+
+A command's `binary` parameter (a show file, a media file, an image) takes
+the file's bytes as base64 text or a file on this machine as
+`{"file": "<path>"}` in the params JSON:
+`mi_execute(core, device, "load_show_file", "{\"file\":{\"file\":\"D:/Shows/Main.watch\"}}")`.
+The core reads the file from disk as the request goes out, never all at once,
+so its size does not matter. A file that is missing or cannot be read returns
+`{"error":{"error":"invalid_params"}}` naming the parameter (SPEC.md §4,
+"Binary request bodies").
+
 ## Resuming
 
 A host whose network changes, or that resumes after being suspended (a
