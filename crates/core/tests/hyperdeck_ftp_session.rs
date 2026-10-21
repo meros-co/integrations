@@ -1,8 +1,8 @@
 //! HyperDeck files over FTP (the hyperdeck-ftp extension) against an FTP
 //! server simulated on loopback, as the HyperDeck manuals describe the
 //! deck's: anonymous login, the media as top folders, passive data
-//! connections. Its PASV replies name 0.0.0.0, as servers that bind every
-//! interface do, so the data connections must go to the control
+//! connections. Its PASV replies name the zero address, as servers on
+//! every interface do, so the data connections must go to the control
 //! connection's peer. Switches make it refuse the login, refuse STOR, not
 //! know MLSD, drop a download's data connection halfway, or send a download
 //! slowly enough to cancel.
