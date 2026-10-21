@@ -129,9 +129,10 @@
 //! name from the file (an ATEM still's) or checks its extension (a `.cube`
 //! LUT) sees the client's. Only ids the service handed out are ever joined to
 //! the folder's path, a link in the folder is never followed, and anything
-//! else in the folder is left alone. An ATEM transfer answers with its number
-//! at once and reads or writes the file afterwards: fetch an output after its
-//! `transfer_finished` event.
+//! else in the folder is left alone. An ATEM or HyperDeck transfer answers
+//! with its number at once and reads or writes the file afterwards: fetch an
+//! output after its `transfer_finished` event. A HyperDeck clip larger than
+//! `--transfer-max-file` needs the limit (and the quota) raised.
 //!
 //! An upload over `--transfer-max-file` (default 512 MiB: an 8K PNG with
 //! 16-bit RGBA is at most about 266 MB, and 512 MiB also holds about 31

@@ -48,7 +48,33 @@ source:
       common name, subject alternative name, country, state, location and
       organization, and import), the Settings chapter's date and time (p.24:
       time.cloudflare.com the default NTP server) and "Transferring Files
-      over a Network" (p.52-53)
+      over a Network" (p.52-55: FTP on every model it covers, any file both
+      ways, only the deck's codecs play, transfers while recording slowed so
+      recording is not affected, anonymous login, SD cards and SSDs as top
+      folders by slot, USB drives under a usb folder; the web media manager
+      names the slots sd1, sd2, ssd1, ssd2 and USB/)
+  - title: Blackmagic HyperDeck Extreme Installation and Operation Manual, August 2025
+    url: https://documents.blackmagicdesign.com/UserManuals/HyperDeckExtremeManual.pdf
+    note: >
+      Manufacturer manual. "Transferring Files over a Network" (p.92-95):
+      FTP as on the Studio models, anonymous login, CFast cards as top
+      folders cfast1 and cfast2, USB drives under a usb folder, the optional
+      M.2 SSD as Internal in the web media manager, transfers while
+      recording
+  - title: Blackmagic HyperDeck Shuttle Installation and Operation Manual, September 2025
+    url: https://documents.blackmagicdesign.com/UserManuals/HyperDeckShuttleHDManual.pdf
+    note: >
+      Manufacturer manual. "Transferring Files over a Network" (p.105-108):
+      FTP as on the Studio models, anonymous login, the SD card as the top
+      folder sd1, transfers while recording
+  - title: Blackmagic HyperDeck Disk Recorders Installation and Operation Manual, March 2020
+    url: https://documents.blackmagicdesign.com/UserManuals/HyperDeckManual.pdf
+    note: >
+      Manufacturer manual for the earlier decks. "Transferring Files over a
+      Network" (p.35-36) offers FTP on HyperDeck Studio Mini only, with no
+      user name or password (anonymous login), any file both ways and
+      transfers while recording; no FTP is described for the earlier Studio
+      models with SSD slots
   - title: REST API for HyperDeck (Developer Information, December 2024)
     url: https://documents.blackmagicdesign.com/DeveloperManuals/RESTAPIForHyperDeck.pdf
     note: >
@@ -67,7 +93,13 @@ source:
       HyperDeck Studio HD Mini on software 9.0.2), that reads answer while
       a write is refused with HTTP 401 when utility administration is USB
       only, and that the reboot takes a key from a GET first. Its README
-      reports port 80 closed on the HD Mini's software 8.1.1
+      reports port 80 closed on the HD Mini's software 8.1.1. For FTP
+      (upload.py, docs/API.md "FTP upload"): port 21, anonymous login (USER
+      anonymous when a bare login is refused), top folders named by slot
+      number (1, 2, 3) on the HD Mini on 8.1.1 and by medium (sd1, ssd1,
+      usb) on other models, STOR at the root refused with 550, STOR in a
+      slot folder taken, and a stored clip listed by disk list on 9993 at
+      once; measured 47.6 MB/s on a 50 MB clip
 
 transport:
   type: line-tcp
@@ -96,6 +128,15 @@ settings:
   password: { type: string, max_length: 255, secret: true, default: "", label: Password, description: "Password for a deck set up for secure access, case sensitive." }
   admin_port: { type: int, min: 1, max: 65535, default: 80, label: Configuration API port, description: "The deck's HTTP port, where HyperDeck Setup's configuration API answers; 80 unless the deck serves it elsewhere." }
   admin_scheme: { type: enum, values: [http, https], default: http, label: Configuration API scheme, description: "http, or https for a deck that serves its configuration API encrypted (set the port to 443 with it)." }
+  ftp_port: { type: int, min: 1, max: 65535, default: 21, label: FTP port, description: "The deck's FTP server port, where files move to and from its media; 21 on every deck." }
+  # Empty logs in anonymously, as the manuals say to (USER anonymous).
+  ftp_username: { type: string, max_length: 255, default: "", label: FTP user name, description: "User name for the deck's FTP server; leave empty to log in anonymously, as a deck as it ships expects." }
+  ftp_password: { type: string, max_length: 255, secret: true, default: "", label: FTP password, description: "Password for the FTP user name; ignored for an anonymous login." }
+
+# FTP file transfer (list, download, upload, delete, rename, folders), which
+# the format cannot express: a control connection, passive data connections
+# and transfers longer than a command's timeout (SPEC.md, Native extensions).
+extension: hyperdeck-ftp
 
 on_connect:
   # Multiline-only "authenticate:" (p.8): username and password, each case
@@ -110,6 +151,8 @@ ports:
   - { port: 9993, protocol: tcp, role: control }
   - { port: 80, protocol: http, role: control, setting: admin_port, note: "configuration API (/admin/api/v1) on HyperDeck Studio, Extreme and Shuttle; 443 over https" }
   - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD (Bonjour)" }
+  - { port: 21, protocol: tcp, role: control, setting: ftp_port, note: "FTP control connection, for files on the deck's media (hyperdeck-ftp extension)" }
+  - { port: null, protocol: tcp, role: control, note: "FTP passive data connections, on the port the deck names in each PASV or EPSV reply" }
 
 models:
   - id: hyperdeck-1-8
@@ -133,7 +176,8 @@ models:
        get_clip_count, get_clips, get_configuration, disk_list, disk_list_slot,
        preview_enable, preview_disable, get_playrange, set_playrange_clip,
        set_playrange_clips, set_playrange_timecode, set_playrange_frames,
-       clear_playrange, set_playback_stop_mode]
+       clear_playrange, set_playback_stop_mode, list_files, download_file,
+       upload_file, delete_file, rename_file, create_folder, cancel_transfer]
     verification: none
     notes: >
       Earlier-generation decks. Play speed range is -5000 to 5000 percent.
@@ -347,6 +391,13 @@ models:
       - set_timezone
       - get_reboot_key
       - admin_reboot
+      - list_files
+      - download_file
+      - upload_file
+      - delete_file
+      - rename_file
+      - create_folder
+      - cancel_transfer
     verification: none
     notes: >
       December 2024 protocol. HD video formats on every Studio; Studio Pro and
@@ -560,6 +611,13 @@ models:
       - set_timezone
       - get_reboot_key
       - admin_reboot
+      - list_files
+      - download_file
+      - upload_file
+      - delete_file
+      - rename_file
+      - create_folder
+      - cancel_transfer
     verification: none
     notes: >
       December 2024 protocol. Adds SD, 2160p and 4K formats; Extreme 8K HDR
@@ -773,6 +831,13 @@ models:
       - set_timezone
       - get_reboot_key
       - admin_reboot
+      - list_files
+      - download_file
+      - upload_file
+      - delete_file
+      - rename_file
+      - create_folder
+      - cancel_transfer
     verification: none
     notes: >
       December 2024 protocol. HD video formats and the file formats common to
@@ -2466,6 +2531,77 @@ commands:
     expect: { status: [200, 204] }
     returns: ack
 
+  # Files on the deck's media over its FTP server, answered by the
+  # hyperdeck-ftp extension (no message of the spec's). Paths on the deck
+  # start at its FTP root, whose folders are the media by slot (sd1, ssd2,
+  # cfast1, usb/<drive>, or 1, 2 on some decks; list_files with no path
+  # shows them).
+  list_files:
+    summary: List a folder on the deck's media over FTP (the root, with no path, lists the media) with each entry's name, type, size and modification time
+    params:
+      path: { type: string, max_length: 1024, default: "", label: Folder, description: "Folder on the deck from its FTP root, such as sd1 or usb/Drive/Clips; empty for the root, which lists the media by slot." }
+    returns: value
+    # HyperDeck manuals, Transferring Files via FTP; MLSD (RFC 3659), or LIST where the deck has no MLSD.
+    # The result: {path, entries: [{name, type (file, folder, link or other), size (bytes, files only),
+    # modified}], unparsed (listing lines not read, when any)}.
+
+  download_file:
+    summary: >
+      Download a file from the deck's media to a file on the host over FTP.
+      Answers at once with the transfer's number; transfers.<number> follows
+      it to done or failed.
+    params:
+      remote: { type: string, max_length: 1024, required: true, label: File on the deck, description: "Path of the file on the deck from its FTP root, such as sd1/Clip 0001.mov." }
+      path: { type: string, max_length: 4096, required: true, label: Host path, description: "Path of the file on the host running the core; created, or replaced if it exists." }
+    returns: value
+    # SIZE, then RETR on a passive data connection. The result: {transfer, ahead}.
+
+  upload_file:
+    summary: >
+      Upload a file on the host into a folder on the deck's media over FTP;
+      a file of that name on the deck is replaced only with overwrite.
+      Answers at once with the transfer's number; transfers.<number> follows
+      it to done or failed.
+    params:
+      path: { type: string, max_length: 4096, required: true, label: Host path, description: "Path of the file on the host running the core." }
+      folder: { type: string, max_length: 1024, required: true, label: Folder on the deck, description: "Folder on the deck from its FTP root, such as sd1 or ssd2/Show; the root itself refuses files." }
+      name: { type: string, max_length: 255, label: Name on the deck, description: "File name on the deck; the host file's name when not given." }
+      overwrite: { type: bool, default: false, label: Overwrite, description: "Replace a file of the same name on the deck; when false such an upload fails before anything is sent." }
+    returns: value
+    # SIZE says whether the file exists, then STOR on a passive data connection. The result: {transfer, ahead}.
+
+  delete_file:
+    summary: Delete a file from the deck's media over FTP; it cannot be undone
+    params:
+      remote: { type: string, max_length: 1024, required: true, label: File on the deck, description: "Path of the file on the deck from its FTP root, such as sd1/Clip 0001.mov." }
+    returns: ack
+    # DELE.
+
+  rename_file:
+    summary: Rename or move a file on the deck's media over FTP; a file already at the new path is replaced only with overwrite
+    params:
+      remote: { type: string, max_length: 1024, required: true, label: File on the deck, description: "Path of the file on the deck from its FTP root, such as sd1/Clip 0001.mov." }
+      to: { type: string, max_length: 1024, required: true, label: New path, description: "Its new path on the deck from the FTP root, such as sd1/Opener.mov." }
+      overwrite: { type: bool, default: false, label: Overwrite, description: "Replace a file already at the new path; when false such a rename fails before anything changes." }
+    returns: ack
+    # SIZE on the new path, then RNFR and RNTO.
+
+  create_folder:
+    summary: Create a folder on the deck's media over FTP
+    params:
+      remote: { type: string, max_length: 1024, required: true, label: Folder on the deck, description: "Path of the new folder on the deck from its FTP root, such as sd1/Show." }
+    returns: ack
+    # MKD.
+
+  cancel_transfer:
+    summary: >
+      Cancel a queued or running FTP transfer, or every one when no
+      transfer is given. The value lists the transfers canceled.
+    params:
+      transfer: { type: int, min: 1, max: 4294967295, label: Transfer, description: "Number of the transfer, as its command answered; all when not given." }
+    returns: value
+    # Closes the data connection and sends ABOR. The result: {canceled}.
+
 codes:
   "100": syntax error
   "101": unsupported parameter
@@ -3211,6 +3347,14 @@ state:
   admin.date_time.ntp.enabled: { type: bool, description: "The deck sets its clock from NTP (set_ntp writes it)" }
   admin.date_time.ntp.server_url: { type: string, description: "NTP server (set_ntp writes it)" }
   admin.date_time.ntp.state: { type: string, description: "NTP synchronization state as the deck words it, such as OffsetCorrection" }
+  transfers.*.kind:     { type: string, description: "download_file or upload_file, keyed by the transfer's number" }
+  transfers.*.status:   { type: string, description: "queued, connecting, transferring, writing (the host file), then done, failed or canceled" }
+  transfers.*.remote:   { type: string, description: "The file's path on the deck from its FTP root" }
+  transfers.*.path:     { type: string, description: "The file's path on the host" }
+  transfers.*.progress: { type: float, description: "How much is done, 0 to 1, once the size is known" }
+  transfers.*.bytes:    { type: int, unit: bytes, description: "Bytes moved so far" }
+  transfers.*.size:     { type: int, unit: bytes, description: "The file's size: the deck's answer to SIZE for a download, the host file's for an upload; null while not known" }
+  transfers.*.error:    { type: string, description: "Why it failed; null otherwise" }
 
 quirks:
   - models: [all]
@@ -3510,3 +3654,76 @@ quirks:
       A certificate is passed as PEM text, as the API takes it in a JSON
       body ({"certificate": ...}); no file on the host is read. The signing
       request comes back as text from download_signing_request.
+
+  - models: [hyperdeck-1-11, hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: critical
+    text: >
+      upload_file with overwrite, and rename_file with overwrite, replace a
+      file of that name on the deck's media, and delete_file removes one;
+      none can be undone, and a clip replaced or removed while it plays or
+      is cued may stop playback (not measured). Without overwrite, SIZE is
+      asked first and an existing file fails the command before anything
+      is sent; a deck whose server does not answer SIZE fails it too. A
+      canceled or failed upload leaves the part sent on the deck under the
+      new name (delete_file removes it); an upload replacing a file has
+      then already lost the old one. The manuals say files can be
+      transferred while the deck records, which slows transfers so
+      recording is not affected; what the deck does to a file deleted or
+      replaced while it is being recorded is not documented.
+
+  - models: [hyperdeck-1-11, hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: info
+    text: >
+      Files move over the deck's FTP server (port 21), which every deck the
+      manuals describe since the Studio Mini offers, logged in anonymously
+      unless ftp_username is set; the earlier Studio models with SSD slots
+      have none. FTP access is switched in HyperDeck Setup
+      (set_network_access); while it is off, every FTP command fails to
+      connect. The top folders are the media by slot, named as the deck
+      chooses: sd1, sd2, ssd1, ssd2 (Studio), cfast1, cfast2 (Extreme),
+      sd1 (Shuttle) with USB drives under usb, or slot numbers 1, 2, 3
+      (hyperdeckwire, HD Mini on software 8.1.1); list_files with no path
+      shows them, and the root itself refuses files (hyperdeckwire: 550).
+      Any file can be stored, but only files in the deck's codecs and
+      formats play; a clip stored is listed by disk list at once
+      (hyperdeckwire).
+
+  - models: [hyperdeck-1-11, hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: info
+    text: >
+      download_file and upload_file run in the background, one at a time in
+      the order asked, on an FTP connection of their own; each command
+      answers at once with {transfer, ahead}: the transfer's number and how
+      many are before it. transfers.<number> then follows it (queued,
+      connecting, transferring, writing, then done, failed or canceled),
+      with bytes, size and progress, and message events mark its ends:
+      transfer_started {transfer, kind, remote, path} and transfer_finished
+      with status, error and bytes too. The last 32 finished transfers stay
+      in the state. list_files, delete_file, rename_file and create_folder
+      answer when done, one at a time, on another connection, so they run
+      while a transfer does. A download is checked against the deck's SIZE
+      answer; one cut off fails and leaves the part received in the host
+      file. Every connection logs in, works and quits; a reply is waited
+      for 15 s and a transfer may be silent 30 s before it fails.
+
+  - models: [hyperdeck-1-11, hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: warning
+    text: >
+      The manuals name no FTP command, listing format or passive port range;
+      what this extension sends follows the FTP standards and the clients
+      the manuals recommend (Cyberduck, FileZilla, Transmit). A listing is
+      asked for with MLSD, then LIST where the deck answers MLSD as not
+      understood; LIST is read in the Unix and DOS forms, and lines in
+      neither come back as unparsed. Data connections are passive (PASV,
+      falling back to EPSV, EPSV only over IPv6) and always go to the
+      deck's own address, whatever address its PASV reply names. Whether the
+      deck takes two FTP sessions at once (a transfer and a listing), SIZE,
+      DELE, RNFR and RNTO, MKD and ABOR has not been measured.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: info
+    text: >
+      FTP travels in plain text, the anonymous login included. SecureOnly
+      for FTP (set_network_access), where a deck offers it (the HD Mini does
+      not), is not reached: no FTP over TLS is spoken, and how the deck
+      offers it (explicit AUTH TLS or implicit TLS) is not documented.
