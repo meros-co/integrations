@@ -108,6 +108,7 @@ struct Upload {
     index: u16,
     size: usize,
     rle: bool,
+    label: bool,
     data: Vec<u8>,
     budget: u32,
 }
@@ -133,6 +134,12 @@ struct Sim {
     /// Answer an upload request with no budget, so the upload holds its
     /// lock and waits.
     stall: bool,
+    /// Be an older switcher (a TVS Pro HD, model 9), which takes
+    /// multiviewer labels as bitmaps; its 1080p50 multiviewer runs in
+    /// 1080p50 and 720p50.
+    older: bool,
+    /// Labels uploaded, by source.
+    labels: HashMap<u16, Vec<u8>>,
     upload: Option<Upload>,
 }
 
@@ -157,7 +164,8 @@ impl Switcher {
     async fn dump(&mut self, from: SocketAddr) {
         let mut pin = vec![0u8; 44];
         pin[..9].copy_from_slice(b"ATEM Mini");
-        pin[40] = 13;
+        let older = self.sim.lock().unwrap().older;
+        pin[40] = if older { 9 } else { 13 };
         let mut top = vec![0u8; 24];
         top[0] = 1;
         top[1] = 2;
@@ -174,6 +182,12 @@ impl Switcher {
             cmd(b"VidM", &[0, 0, 0, 0]),
             cmd(b"_mpl", &[20, 0, 0, 0]),
             cmd(b"_MAC", &[10, 0, 0, 0]),
+            cmd(b"_VMC", &{
+                let mut vmc = vec![0, 1, 0, 0, 12, 0, 0, 0];
+                vmc.extend_from_slice(&((1u32 << 12) | (1 << 4)).to_be_bytes());
+                vmc.extend_from_slice(&[0; 8]);
+                vmc
+            }),
         ];
         for slot in stills {
             let mut mpfe = vec![0u8; 24];
@@ -273,6 +287,7 @@ impl Switcher {
                     index,
                     size: u32_at(b, 8) as usize,
                     rle: store != 0xFFFF,
+                    label: u16_at(b, 12) == 0x0201,
                     data: Vec::new(),
                     budget: 64,
                 });
@@ -313,7 +328,11 @@ impl Switcher {
                         let u = sim.upload.take().unwrap();
                         let still = (u.store == 0).then_some(u.index);
                         if u.store == 0xFFFF {
-                            sim.macros.insert(u.index, u.data);
+                            if u.label {
+                                sim.labels.insert(u.index, u.data);
+                            } else {
+                                sim.macros.insert(u.index, u.data);
+                            }
                         } else {
                             sim.stills.insert(u.index, u.data);
                         }
@@ -939,4 +958,38 @@ async fn atem_closing_says_goodbye_and_frees_the_lock_at_once() {
     let goodbyes = sim.lock().unwrap().goodbyes;
     assert_eq!(goodbyes, 1);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn atem_label_drawn_from_text_reaches_an_older_switcher() {
+    let sim: Arc<Mutex<Sim>> = Arc::default();
+    sim.lock().unwrap().older = true;
+    let port = simulated_atem(sim.clone()).await;
+    let core = common::core().unwrap();
+    let id = core
+        .open(OpenRequest {
+            device: "blackmagic-atem".into(),
+            model: "atem-television-studio-pro-hd".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: Default::default(),
+            monitor: true,
+        })
+        .unwrap();
+    let t = start(
+        &core,
+        id,
+        "set_multiviewer_label",
+        json!({"source": 2, "text": "Camera 2"}),
+    )
+    .await;
+    let done = finished(&core, t).await;
+    assert_eq!(done["status"], "done", "{done}");
+    assert_eq!(done["kind"], "set_multiviewer_label");
+    let label = sim.lock().unwrap().labels.get(&2).cloned().unwrap();
+    // A 1080 and a 720 label stacked, 320 wide: 50 and 40 rows.
+    assert_eq!(label.len(), 320 * 90);
+    assert!(label.iter().all(|b| *b < 254));
+    assert!(label.iter().any(|b| *b != 0));
+    core.close(id).await;
 }

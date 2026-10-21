@@ -59,6 +59,8 @@ mod audio;
 mod camera;
 #[path = "atem_keyers.rs"]
 mod keyers;
+#[path = "atem_label.rs"]
+mod label;
 #[path = "atem_media.rs"]
 mod media;
 #[path = "atem_settings.rs"]
@@ -276,6 +278,8 @@ struct Topology {
     /// Each clip's frames the switcher reports valid, from 0, with whether
     /// it gave a hash for them (MPfe pools 1 and up).
     clip_frame_hashes: BTreeMap<u8, BTreeMap<u16, bool>>,
+    /// The multiviewer resolutions a label is drawn for (_VMC).
+    label_resolutions: label::Resolutions,
 }
 
 pub(crate) struct Atem {

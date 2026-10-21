@@ -100,13 +100,28 @@ impl Atem {
                 need(2)?;
                 let size = if self.version >= V2_28 { 13 } else { 12 };
                 let mut modes = Vec::new();
+                let mut labels = super::label::Resolutions::default();
                 for i in 0..u16_at(b, 0) as usize {
                     let at = 4 + i * size;
                     if at + size > b.len() {
                         break;
                     }
                     modes.push(b[at]);
+                    // The multiviewer modes, one bit per video mode, of a
+                    // mode the switcher runs without reconfiguring: the
+                    // resolutions a multiviewer label is drawn for (Sofie
+                    // `lib/multiviewLabel.ts:318-345`).
+                    let reconfigure = size == 13 && b[at + 12] == 1;
+                    if !reconfigure {
+                        let mask = u32_at(b, at + 4);
+                        for bit in 0..32 {
+                            if mask & (1 << bit) != 0 {
+                                labels.add_mode(bit);
+                            }
+                        }
+                    }
                 }
+                self.topology.label_resolutions = labels;
                 self.topology.video_modes = modes.clone();
                 let names: Vec<_> = modes
                     .iter()

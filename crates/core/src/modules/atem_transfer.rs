@@ -53,6 +53,7 @@ use std::collections::{BTreeMap, VecDeque};
 use md5::{Digest, Md5};
 use serde_json::{json, Map, Value};
 
+use super::label::{self, Resolutions};
 use super::media;
 use super::{
     invalid, opt_int, opt_str, put16, put32, u16_at, unsupported, Atem, CommandError, CommandId,
@@ -61,7 +62,7 @@ use super::{
 use crate::module::FileInput;
 
 /// The commands this file handles.
-pub(super) const COMMANDS: [&str; 9] = [
+pub(super) const COMMANDS: [&str; 10] = [
     "upload_still",
     "download_still",
     "upload_clip",
@@ -70,6 +71,7 @@ pub(super) const COMMANDS: [&str; 9] = [
     "upload_macro",
     "download_macro",
     "upload_multiviewer_label",
+    "set_multiviewer_label",
     "cancel_transfer",
 ];
 
@@ -166,6 +168,8 @@ enum What {
     },
     UploadLabel {
         source: u16,
+        /// Text drawn into the label here, rather than a bitmap file.
+        text: Option<(String, Resolutions)>,
     },
 }
 
@@ -179,7 +183,8 @@ impl What {
             What::UploadAudio { .. } => "upload_clip_audio",
             What::UploadMacro { .. } => "upload_macro",
             What::DownloadMacro { .. } => "download_macro",
-            What::UploadLabel { .. } => "upload_multiviewer_label",
+            What::UploadLabel { text: None, .. } => "upload_multiviewer_label",
+            What::UploadLabel { .. } => "set_multiviewer_label",
         }
     }
 
@@ -225,7 +230,7 @@ impl What {
             What::UploadClip { .. } => unit as u16,
             What::DownloadClip { first, .. } => first + unit as u16,
             What::UploadAudio { .. } => 0,
-            What::UploadLabel { source } => *source,
+            What::UploadLabel { source, .. } => *source,
         }
     }
 
@@ -244,7 +249,7 @@ impl What {
             What::UploadMacro { slot, .. } | What::DownloadMacro { slot } => {
                 m.insert("macro".into(), json!(slot + 1));
             }
-            What::UploadLabel { source } => {
+            What::UploadLabel { source, .. } => {
                 m.insert("source".into(), json!(source));
             }
         }
@@ -631,8 +636,24 @@ impl Atem {
                         "this switcher (it draws its own multiviewer labels)",
                     ));
                 }
+                let text = if name == "set_multiviewer_label" {
+                    let resolutions = self.topology.label_resolutions;
+                    if !resolutions.any() {
+                        return Err(invalid(
+                            "the switcher has reported no multiviewer resolution a label is drawn for"
+                                .into(),
+                        ));
+                    }
+                    Some((
+                        opt_str(params, "text").unwrap_or_default().to_owned(),
+                        resolutions,
+                    ))
+                } else {
+                    None
+                };
                 What::UploadLabel {
                     source: self.check_source(params)?,
+                    text,
                 }
             }
         };
@@ -764,7 +785,20 @@ impl Atem {
         job.sent = 0;
         job.described = false;
         job.chunks = 0;
-        if job.what.upload() {
+        if let What::UploadLabel {
+            text: Some((text, resolutions)),
+            ..
+        } = &job.what
+        {
+            // Drawn off the session, then sent as an uploaded label is.
+            let (text, resolutions) = (text.clone(), *resolutions);
+            self.transfers.step = Some(Step::Preparing);
+            cx.compute(PREPARE, move || {
+                encode_upload(Prep::Label, label::render(&text, resolutions)?)
+            });
+            let job = self.transfers.active.as_ref().unwrap();
+            self.transfer_patch(cx, job, "reading");
+        } else if job.what.upload() {
             let max = match job.what {
                 What::UploadMacro { .. } => MAX_MACRO,
                 What::UploadLabel { .. } => MAX_LABEL,
@@ -2235,6 +2269,73 @@ mod tests {
         assert!(a
             .iter()
             .any(|x| matches!(x, Action::FileOpen { file, path } if *file == WRITERS[0] && path == "/d.png")));
+    }
+
+    #[test]
+    fn a_label_is_drawn_from_text_and_sent_as_a_label_bitmap() {
+        // An older switcher, whose 1080p50 multiviewer runs in 1080 and 720.
+        let mut d = dump();
+        let mut pin = vec![0u8; 44];
+        pin[..12].copy_from_slice(b"ATEM TVS Pro");
+        pin[40] = 9;
+        d[1] = cmd(b"_pin", &pin);
+        let without = ready_with(d.clone());
+        // One video mode, 1080p50; its multiviewer runs in 1080p50 and
+        // 720p50, with no reconfiguring.
+        let mut vmc = vec![0, 1, 0, 0, 12, 0, 0, 0];
+        vmc.extend_from_slice(&((1u32 << 12) | (1 << 4)).to_be_bytes());
+        vmc.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0]);
+        d.insert(3, cmd(b"_VMC", &vmc));
+        let mut m = ready_with(d);
+        let resolutions = m.topology.label_resolutions;
+        assert!(resolutions.hd1080 && resolutions.hd720 && !resolutions.uhd);
+        let expected = label::render("CAM 2", resolutions).unwrap();
+        assert_eq!(expected.len(), 320 * 90);
+
+        // The drawing is handed off; settle it as the session would.
+        let mut cx = Cx::new(100);
+        m.command(
+            &mut cx,
+            7,
+            "set_multiviewer_label",
+            json!({"source": 2, "text": "CAM 2"}).as_object().unwrap(),
+        );
+        let a = settle(&mut m, 100, cx.take());
+        let list = out(&a);
+        let ftsd = named(&list, b"FTSD")[0].clone();
+        let id = u16_at(&ftsd, 0);
+        assert_eq!(
+            (u16_at(&ftsd, 2), u16_at(&ftsd, 6), u16_at(&ftsd, 12)),
+            (0xFFFF, 2, 0x0201)
+        );
+        assert_eq!(super::super::u32_at(&ftsd, 8), expected.len() as u32);
+        let a = from_switcher(&mut m, 120, &[ftcd(id, 1396, 1000)]);
+        let list = out(&a);
+        assert_eq!(&named(&list, b"FTFD")[0][2..8], b"Label\0");
+        let sent_label: Vec<u8> = named(&list, b"FTDa")
+            .iter()
+            .flat_map(|c| c[4..].to_vec())
+            .collect();
+        assert_eq!(sent_label, expected);
+
+        // Without the multiviewer modes there is nothing to draw for.
+        let mut without = without;
+        let (r, _) = run(
+            &mut without,
+            100,
+            "set_multiviewer_label",
+            json!({"source": 2, "text": "x"}),
+        );
+        assert!(matches!(r, Err(CommandError::InvalidParams { .. })));
+        // A switcher that draws its own labels refuses it.
+        let mut m = switcher();
+        let (r, _) = run(
+            &mut m,
+            100,
+            "set_multiviewer_label",
+            json!({"source": 1, "text": "x"}),
+        );
+        assert!(matches!(r, Err(CommandError::UnsupportedForModel { .. })));
     }
 
     #[test]
