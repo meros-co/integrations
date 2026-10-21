@@ -1051,7 +1051,9 @@ commands:
     returns: none
 ```
 
-OSC argument types: `int`, `float`, `string`, `blob`.
+OSC argument types: `int`, `float`, `string`, `blob`. A `blob` carries its
+rendered template's text as UTF-8 bytes, for a device that takes text beyond
+ASCII that way (OSCPoint's section and file names).
 
 A query is a message carrying no arguments. For a device that answers on the
 same address, the spec declares the reply address, and the value is the
@@ -1769,6 +1771,13 @@ scenes among them:
       replace: scene.list
       state: { "scene.list.{index:+1}": "{2}" }
 ```
+
+A blob argument holding UTF-8 text is read as that text, wherever a rule
+reads an argument: as `{argN}`, by `arg_match` and as the JSON at
+`json_arg`. OSCPoint sends each name twice in one message, as an ASCII
+string and then as a UTF-8 blob (`,sb`), so a rule limited to `arg_types: sb`
+after the plain one keeps the full text. A blob that is not UTF-8 stays its
+bytes, which no text rule reads.
 
 #### JSON messages
 
