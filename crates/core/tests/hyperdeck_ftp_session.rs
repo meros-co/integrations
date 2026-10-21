@@ -247,8 +247,10 @@ async fn simulate() -> (u16, u16, Shared) {
         protocol.local_addr().unwrap().port(),
         ftp.local_addr().unwrap().port(),
     );
-    let mut deck = Deck::default();
-    deck.folders = vec!["sd1".into(), "sd2".into(), "usb".into()];
+    let mut deck = Deck {
+        folders: vec!["sd1".into(), "sd2".into(), "usb".into()],
+        ..Deck::default()
+    };
     deck.files.insert(
         "sd1/Clip 0001.mov".into(),
         (0..200_000u32).map(|i| i as u8).collect(),
