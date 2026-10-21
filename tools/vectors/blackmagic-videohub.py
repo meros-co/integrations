@@ -53,6 +53,10 @@ text(VH, "lock_frame_buffer", {"frame": 2}, "FRAME BUFFER LOCKS:\n1 O\n\n", mode
 text(VH, "unlock_frame_buffer", {"frame": 2}, "FRAME BUFFER LOCKS:\n1 U\n\n", model="workgroup-videohub")
 text(VH, "force_unlock_frame_buffer", {"frame": 2}, "FRAME BUFFER LOCKS:\n1 F\n\n",
      model="workgroup-videohub")
+# Routing an output another client has locked is answered NAK (bmdwire, see
+# the spec's quirks): the command fails.
+text(VH, "set_route", {"input": 1, "output": 2}, "VIDEO OUTPUT ROUTING:\n1 0\n\n",
+     device_reply="NAK\n\n", expect_result={"error": {"error": "device_error"}}, file="set_route-locked")
 
 # Serial port directions (p.5): control, slave or auto.
 text(VH, "set_serial_port_direction", {"port": 3, "direction": "auto"}, "SERIAL PORT DIRECTIONS:\n2 auto\n\n")
@@ -121,15 +125,15 @@ telemetry(VH, "device-identity", inbound="VIDEOHUB DEVICE:\nDevice present: true
                                    "inputs": 10, "outputs": 10}})
 telemetry(VH, "input-labels", inbound="INPUT LABELS:\n0 VTR 1\n1 VTR 2\n\n",
           expect_state={"inputs": {"1": {"label": "VTR 1"}, "2": {"label": "VTR 2"}}})
-# A change notice carries only the changed lines (p.6).
-telemetry(VH, "output-labels", inbound="OUTPUT LABELS:\n7 New output 8 label\n10 New output 11 label\n\n",
-          expect_state={"outputs": {"8": {"label": "New output 8 label"}, "11": {"label": "New output 11 label"}}})
-telemetry(VH, "monitoring-output-labels", inbound="MONITORING OUTPUT LABELS:\n0 Monitor feed 1\n1 Monitor feed 2\n\n",
 # A cleared label is the port number alone (bmdwire): an empty label.
 telemetry(VH, "input-label-cleared", inbound="INPUT LABELS:\n3 \n4 Cam 5\n\n",
           expect_state={"inputs": {"4": {"label": ""}, "5": {"label": "Cam 5"}}})
 telemetry(VH, "output-label-cleared", inbound="OUTPUT LABELS:\n0 Desk\n1 \n\n",
           expect_state={"outputs": {"1": {"label": "Desk"}, "2": {"label": ""}}})
+# A change notice carries only the changed lines (p.6).
+telemetry(VH, "output-labels", inbound="OUTPUT LABELS:\n7 New output 8 label\n10 New output 11 label\n\n",
+          expect_state={"outputs": {"8": {"label": "New output 8 label"}, "11": {"label": "New output 11 label"}}})
+telemetry(VH, "monitoring-output-labels", inbound="MONITORING OUTPUT LABELS:\n0 Monitor feed 1\n1 Monitor feed 2\n\n",
           expect_state={"monitoring_outputs": {"1": {"label": "Monitor feed 1"}, "2": {"label": "Monitor feed 2"}}})
 telemetry(VH, "serial-port-labels", inbound="SERIAL PORT LABELS:\n0 Deck 1\n1 Deck 2\n\n",
           expect_state={"serial_ports": {"1": {"label": "Deck 1"}, "2": {"label": "Deck 2"}}})
@@ -156,6 +160,19 @@ telemetry(VH, "processing-unit-locks", inbound="PROCESSING UNIT LOCKS:\n0 O\n\n"
           expect_state={"processing_units": {"1": {"lock": "ours"}}})
 telemetry(VH, "frame-buffer-locks", inbound="FRAME BUFFER LOCKS:\n1 L\n\n",
           expect_state={"frame_buffers": {"2": {"lock": "other"}}})
+# Every lock kind reports all three letters, O, L and U (p.4-5).
+for name, header, key in [
+    ("monitoring-output", "MONITORING OUTPUT LOCKS", "monitoring_outputs"),
+    ("serial-port", "SERIAL PORT LOCKS", "serial_ports"),
+    ("processing-unit", "PROCESSING UNIT LOCKS", "processing_units"),
+    ("frame-buffer", "FRAME BUFFER LOCKS", "frame_buffers"),
+]:
+    telemetry(VH, f"{name}-locks-all", inbound=f"{header}:\n0 O\n1 L\n2 U\n\n",
+              expect_state={key: {"1": {"lock": "ours"}, "2": {"lock": "other"}, "3": {"lock": "unlocked"}}})
+# The p.7 forced unlock: after F the router reports the port U, not ours.
+telemetry(VH, "serial-port-forced-unlock", inbound="SERIAL PORT LOCKS:\n7 U\n\n",
+          state_before={"serial_ports": {"8": {"lock": "other"}}},
+          expect_state={"serial_ports": {"8": {"lock": "unlocked"}}})
 telemetry(VH, "serial-port-directions", inbound="SERIAL PORT DIRECTIONS:\n0 control\n1 slave\n2 auto\n\n",
           expect_state={"serial_ports": {"1": {"direction": "control"}, "2": {"direction": "slave"},
                                          "3": {"direction": "auto"}}})
