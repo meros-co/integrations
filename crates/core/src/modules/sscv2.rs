@@ -234,6 +234,7 @@ impl<D: SscDevice> Sscv2<D> {
             url: format!("{}{}", self.base, path),
             headers,
             body: body.map(|b| b.to_string().into_bytes()),
+            body_stream: None,
             timeout,
             accept_invalid_certs: true,
             digest: None,

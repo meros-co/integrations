@@ -193,10 +193,33 @@ pub enum ParamType {
     /// Any JSON value, for a request body whose shape the device's own API
     /// documents and validates. Sent as compact JSON.
     Json,
-    /// Bytes, given as a base64 string (RFC 4648, padding optional) and sent
-    /// as they are: an HTTP request body or a multipart part (an image, a
-    /// show file). `max_length` limits the decoded bytes.
+    /// Bytes, given as a base64 string (RFC 4648, padding optional) or as a
+    /// host file, `{"file": "<path>"}`, and sent as they are: an HTTP request
+    /// body or a multipart part (an image, a show file). A file is streamed
+    /// from disk as it is sent. `max_length` limits the bytes.
     Binary,
+}
+
+/// The path of a `binary` parameter given as a host file: an object whose
+/// only member is `file`, a non-empty string.
+pub(crate) fn binary_file(value: &Value) -> Option<&str> {
+    let map = value.as_object()?;
+    match (map.len(), map.get("file")) {
+        (1, Some(Value::String(path))) if !path.is_empty() => Some(path),
+        _ => None,
+    }
+}
+
+/// The length of the host file a `binary` parameter names, once it has been
+/// opened for reading. Its contents are never read here, nor quoted.
+pub(crate) fn binary_file_len(name: &str, path: &str) -> Result<u64, String> {
+    let meta = std::fs::File::open(path)
+        .and_then(|file| file.metadata())
+        .map_err(|e| format!("'{name}': the file {path} cannot be read: {e}"))?;
+    if !meta.is_file() {
+        return Err(format!("'{name}': {path} is not a file"));
+    }
+    Ok(meta.len())
 }
 
 /// A `binary` parameter's bytes: standard base64, with or without padding.
@@ -426,12 +449,19 @@ fn check_value(name: &str, spec: &ParamSpec, value: &Value) -> Result<(), String
             .ok_or_else(|| format!("'{name}' must be true or false")),
         ParamType::Json => Ok(()),
         ParamType::Binary => {
-            let s = value
-                .as_str()
-                .ok_or_else(|| format!("'{name}' must be a base64 string"))?;
-            let bytes = decode_binary(s).ok_or_else(|| format!("'{name}' is not base64"))?;
+            let len = match (value.as_str(), binary_file(value)) {
+                (Some(s), _) => decode_binary(s)
+                    .ok_or_else(|| format!("'{name}' is not base64"))?
+                    .len() as u64,
+                (None, Some(path)) => binary_file_len(name, path)?,
+                (None, None) => {
+                    return Err(format!(
+                        "'{name}' must be a base64 string or {{\"file\": \"<path>\"}}"
+                    ))
+                }
+            };
             if let Some(max) = spec.max_length {
-                if bytes.len() > max {
+                if len > max as u64 {
                     return Err(format!("'{name}' is longer than {max} bytes"));
                 }
             }

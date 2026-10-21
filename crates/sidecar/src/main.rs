@@ -114,7 +114,10 @@
 //!   real path in its place before the command reaches the core: `{"path":
 //!   "transfer:<id>"}`, or one per line in a multi-line param such as
 //!   `download_clip`'s `paths`. Other lines are passed on unchanged. An id the
-//!   service did not hand out refuses the command with `invalid_params`.
+//!   service did not hand out refuses the command with `invalid_params`. A
+//!   `binary` param takes an uploaded file as `{"file": "transfer:<id>"}`
+//!   (SPEC.md §4, "Binary request bodies"), which the core streams from the
+//!   folder to the device instead of the client sending it as base64.
 //!   Every real path of the folder in a command's result, an event or a
 //!   snapshot reads `transfer:<id>` again.
 //! - `GET /v1/files/{file}` fetches a file once it is written (404 until
@@ -139,7 +142,7 @@
 //! `?delete=true`. Limiting what a client may send, and removing what it
 //! no longer needs, is the client's call; the only bound is the disk. An
 //! upload cut off before its end is not kept. `/v1/execute` has no body
-//! limit either, since a command's `binary` params carry a file's bytes
+//! limit either, since a command's `binary` params may carry a file's bytes
 //! (base64) in it. The folder (`--transfer-dir`,
 //! default `<temp>/meros-integrations-transfer-<port>`) is cleared of its
 //! ids at startup and on a clean stop; give each service on a host its own.
@@ -648,8 +651,9 @@ fn router(app: Shared) -> Router {
         .route("/v1/catalog", get(catalog))
         .route("/v1/open", post(open))
         .route("/v1/discover", post(discover))
-        // A command's `binary` params carry a file's bytes in the JSON body
-        // (a show file, a still): no limit beyond the host's own.
+        // A command's `binary` params may carry a file's bytes as base64 in
+        // the JSON body (a show file, a still): no limit beyond the host's
+        // own. `{"file": "transfer:<id>"}` streams one from the folder instead.
         .route(
             "/v1/execute",
             post(execute).layer(DefaultBodyLimit::disable()),

@@ -53,5 +53,22 @@ only those devices, opening any other raises `IntegrationsError`
 a device whose integration was not built in raises `not_built`, naming the
 feature to build with.
 
+## Files sent to devices
+
+A command's `binary` parameter (a show file, a media file, an image) takes
+the file's bytes as base64 text or a file on this machine as
+`{"file": "<path>"}`:
+
+```python
+core.execute(device, "load_show_file", {"file": {"file": "D:/Shows/Main.watch"}})
+```
+
+The core reads the file from disk as the request goes out, never all at once,
+so its size does not matter; there is no need to read it into `bytes`. A file
+that is missing or cannot be read raises `IntegrationsError` `invalid_params`
+naming the parameter (SPEC.md §4, "Binary request bodies").
+
+## Tests
+
 The tests drive devices of several integrations, so they need an extension
 built with every integration (the default).

@@ -147,7 +147,12 @@ fn wire(actions: &[Action]) -> Vec<Wire> {
                     method: request.method.to_string(),
                     port: url_port(&request.url),
                     target: format!("/{after_host}"),
-                    body: request.body.as_deref().map(body_text),
+                    // A body streamed from host files, read whole to compare.
+                    body: request
+                        .body_bytes()
+                        .unwrap_or_else(|e| panic!("reading the body's files: {e}"))
+                        .as_deref()
+                        .map(body_text),
                     content_type: request
                         .headers
                         .iter()

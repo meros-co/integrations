@@ -317,6 +317,7 @@ impl MerosCamera {
                 url: format!("http://{}{path}", self.authority),
                 headers,
                 body: body.map(|b| b.to_string().into_bytes()),
+                body_stream: None,
                 timeout: Some(timeout),
                 accept_invalid_certs: false,
                 digest: None,

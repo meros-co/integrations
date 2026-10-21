@@ -7,7 +7,9 @@
 //! where `<name>` is the client's file name made safe (so a command that
 //! takes a default name or checks an extension from the file's name sees the
 //! client's). In a command's params, a line `transfer:<id>` is replaced by
-//! that real path before the command reaches the core, and every real path
+//! that real path before the command reaches the core (in a string param,
+//! or in a `binary` param's host file form, `{"file": "transfer:<id>"}`, at
+//! any depth), and every real path
 //! of the folder in a command's result, an event or a snapshot is shown as
 //! `transfer:<id>` again. Only ids this service handed out resolve; anything
 //! else in the folder is never served, listed or resolved.
@@ -486,7 +488,9 @@ impl Transfers {
     }
 
     /// Replace each `transfer:<id>` line in a command's string params with
-    /// the file's real path. An id this service did not hand out (or one
+    /// the file's real path, strings inside objects and lists included, so
+    /// a `binary` param's `{"file": "transfer:<id>"}` names the real file
+    /// too. An id this service did not hand out (or one
     /// still uploading) refuses the command before it reaches the core.
     pub fn resolve(&self, params: &Value) -> Result<Value, Value> {
         if !mentions_scheme(params) {
@@ -685,6 +689,15 @@ mod tests {
         assert_eq!(resolved["paths"], format!("{pa}\r\n{pb}\n/kept/as/is.png"));
         assert_eq!(resolved["name"], "not transfer");
         assert_eq!(resolved["scene"], "transfer: wide");
+        // A binary parameter's host file form, and base64 beside it.
+        let resolved = t
+            .resolve(&json!({"file": {"file": format!("transfer:{a}")}, "image": "AAEC"}))
+            .unwrap();
+        assert_eq!(resolved, json!({"file": {"file": pa}, "image": "AAEC"}));
+        let refused = t
+            .resolve(&json!({"file": {"file": "transfer:0123456789abcdef0123456789abcdef"}}))
+            .unwrap_err();
+        assert_eq!(refused["error"]["error"], "invalid_params");
 
         // A fake command writes the first and reports both paths.
         std::fs::write(&pa, b"frame one").unwrap();

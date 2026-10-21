@@ -126,6 +126,7 @@ impl PanasonicNotify {
                 ),
                 headers: Vec::new(),
                 body: None,
+                body_stream: None,
                 timeout: Some(4_000),
                 accept_invalid_certs: false,
                 digest: None,
