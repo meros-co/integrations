@@ -48,7 +48,8 @@ use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
+    Bind, CommandError, CommandId, Connection, Cx, FileInput, Key, Level, Millis, Module,
+    OpenContext, Outcome,
 };
 use crate::session::merge_patch;
 
@@ -58,8 +59,12 @@ mod audio;
 mod camera;
 #[path = "atem_keyers.rs"]
 mod keyers;
+#[path = "atem_media.rs"]
+mod media;
 #[path = "atem_settings.rs"]
 mod settings;
+#[path = "atem_transfer.rs"]
+mod transfer;
 
 const PORT: u16 = 9910;
 const SOCKET: Key = "atem";
@@ -260,6 +265,14 @@ struct Topology {
     usk_can_fly: BTreeMap<(u8, u8), bool>,
     /// M/E to its next-transition selection (TrSS byte 4).
     next_selection: BTreeMap<u8, u8>,
+    /// The video mode's wire value (VidM), which sets the frame size.
+    video_mode: Option<u8>,
+    /// The model number the switcher reports (_pin byte 40).
+    model_id: u8,
+    /// Still slots in use, from 0 (MPfe pool 0).
+    stills_used: BTreeSet<u16>,
+    /// Clips in use, from 0, with their frame counts (MPCS).
+    clip_frames: BTreeMap<u8, u16>,
 }
 
 pub(crate) struct Atem {
@@ -281,6 +294,8 @@ pub(crate) struct Atem {
     levels_wanted: bool,
     /// False: commands only, no duration polling and no level renewal.
     monitor: bool,
+    /// File transfers, queued and on the wire.
+    transfers: transfer::Transfers,
 }
 
 /// A command to send: its name and body.
@@ -703,6 +718,7 @@ impl Atem {
             duration_armed: false,
             levels_wanted: false,
             monitor: true,
+            transfers: transfer::Transfers::default(),
         }
     }
 
@@ -742,6 +758,7 @@ impl Atem {
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: &str) {
+        self.transfers_lost(cx, reason);
         for sent in self.in_flight.drain(..) {
             if let Some(command) = sent.command {
                 cx.complete(
@@ -924,6 +941,8 @@ impl Atem {
         if patch.as_object().is_some_and(|m| !m.is_empty()) {
             cx.state(patch);
         }
+        self.flush_transfer_acks(cx);
+        self.pump_transfers(cx);
         self.arm_duration(cx);
     }
 
@@ -956,6 +975,7 @@ impl Atem {
             }
             b"_pin" => {
                 need(41)?;
+                self.topology.model_id = b[40];
                 Some(json!({"device": {"product": text(&b[..40]), "model_id": b[40]}}))
             }
             b"_top" => {
@@ -1264,8 +1284,10 @@ impl Atem {
             b"MPCS" => {
                 need(68)?;
                 let clip = if b[1] == 1 {
+                    self.topology.clip_frames.insert(b[0], u16_at(b, 66));
                     json!({"name": text(&b[2..66]), "frames": u16_at(b, 66)})
                 } else {
+                    self.topology.clip_frames.remove(&b[0]);
                     Value::Null
                 };
                 Some(json!({"media_pool": {"clips": {one(b[0]): clip}}}))
@@ -1278,11 +1300,15 @@ impl Atem {
                 if b[0] != 0 {
                     return None;
                 }
-                let slot = (u16_at(b, 2) as u32 + 1).to_string();
+                let index = u16_at(b, 2);
+                let slot = (index as u32 + 1).to_string();
                 let still = if b[4] == 1 {
+                    self.topology.stills_used.insert(index);
                     let end = (24 + b[23] as usize).min(b.len());
-                    json!({"name": text(&b[24..end])})
+                    let hash: String = b[5..21].iter().map(|x| format!("{x:02x}")).collect();
+                    json!({"name": text(&b[24..end]), "hash": hash})
                 } else {
+                    self.topology.stills_used.remove(&index);
                     Value::Null
                 };
                 Some(json!({"media_pool": {"stills": {slot: still}}}))
@@ -1611,6 +1637,9 @@ impl Atem {
             }
             // Camera control (Sofie `CameraControlCommand.ts:177-249`).
             b"CCdP" => self.decode_camera(b),
+            b"LKST" | b"LKOB" | b"FTCD" | b"FTDa" | b"FTDC" | b"FTDE" => {
+                self.decode_transfer(cx, name, b)
+            }
             b"InCm" => {
                 if self.phase == Phase::Loading {
                     self.phase = Phase::Ready;
@@ -2725,6 +2754,9 @@ impl Module for Atem {
             cx.complete(id, Err(CommandError::NotConnected));
             return;
         }
+        if self.transfer_command(cx, id, name, params) {
+            return;
+        }
         match self.build(name, params) {
             Ok(commands) => {
                 if name == "set_audio_levels" {
@@ -2747,6 +2779,10 @@ impl Module for Atem {
         self.lost(cx, &format!("socket error: {message}"));
     }
 
+    fn file(&mut self, cx: &mut Cx, file: Key, input: FileInput) {
+        self.transfer_file(cx, file, input);
+    }
+
     /// A fresh socket and handshake now; a level subscription asked for is
     /// renewed once the switcher has sent its state, as after any reconnect.
     fn reconnect(&mut self, cx: &mut Cx) -> bool {
@@ -2758,6 +2794,7 @@ impl Module for Atem {
         match key {
             HELLO if self.phase == Phase::Hello => self.hello(cx),
             SILENCE => self.lost(cx, "no data from the switcher for 5 s"),
+            transfer::TIMER => self.transfer_timer(cx),
             RESEND => {
                 let now = cx.now();
                 let mut give_up = false;
@@ -2807,6 +2844,7 @@ impl Module for Atem {
     }
 
     fn stop(&mut self, cx: &mut Cx) {
+        self.transfers_stop(cx);
         cx.udp_close(SOCKET);
     }
 }
@@ -2997,6 +3035,10 @@ mod tests {
                     _ => json!("x"),
                 };
                 params.insert(p.clone(), v);
+            }
+            // Transfers run beside the packet builders.
+            if transfer::COMMANDS.contains(&name.as_str()) {
+                continue;
             }
             match m.build(name, &params) {
                 Err(CommandError::UnknownCommand { .. }) => {
@@ -3876,6 +3918,8 @@ mod tests {
         let mut mpfe = vec![0u8; 24];
         put16(&mut mpfe, 2, 4);
         mpfe[4] = 1;
+        mpfe[5] = 0xAB;
+        mpfe[20] = 0x01;
         mpfe[23] = 8;
         mpfe.extend_from_slice(b"logo.png");
         let mut ssbp = vec![0u8; 24];
@@ -3989,7 +4033,10 @@ mod tests {
             s["media_pool"]["clips"]["2"],
             json!({"name": "Intro", "frames": 120})
         );
-        assert_eq!(s["media_pool"]["stills"]["5"], json!({"name": "logo.png"}));
+        assert_eq!(
+            s["media_pool"]["stills"]["5"],
+            json!({"name": "logo.png", "hash": "ab000000000000000000000000000001"})
+        );
         let bx = &s["supersources"]["1"]["boxes"]["2"];
         assert_eq!(bx["enabled"], true);
         assert_eq!(bx["source"], 2);
