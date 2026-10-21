@@ -98,7 +98,7 @@ commands:
     params:
       name: { type: string, required: true, max_length: 255, pattern: "^[^./\\\\][^/\\\\]*$", label: Clip, description: "The file's name from clips (A001C007.mov), or its slate sidecar (A001C007.json)." }
       offset: { type: int, min: 0, max: 9007199254740991, default: 0, label: Offset, description: "The first byte to read, from 0." }
-      length: { type: int, min: 1, max: 16777216, default: 1048576, label: Length, description: "How many bytes to read, at most 16 MiB." }
+      length: { type: int, min: 1, max: 9007199254740991, default: 1048576, label: Length, description: "How many bytes to read; the whole range is returned at once, so the consumer picks a size it can hold." }
     returns: value
   clip_url:
     summary: A URL a player or downloader can open for a clip, with the fleet key in its query ({url}); made here, nothing is sent
@@ -546,8 +546,8 @@ quirks:
     severity: info
     text: >
       Clips are listed in clips.<file name> (size in bytes, modified in Unix seconds, circled), read on
-      connecting and again when clip_count changes or a recording stops. read_clip returns at most
-      16 MiB of a file per call, base64, with the file's total size; the consumer writes the file. Each
+      connecting and again when clip_count changes or a recording stops. read_clip returns the range
+      asked for (no size is refused), base64, with the file's total size; the consumer writes the file. Each
       clip's slate is beside it as <clip>.json; its proxy, when one is recorded, is Proxy/<clip>.mp4,
       which the list does not show and read_clip cannot name. clip_url gives a URL a player can open
       directly.
