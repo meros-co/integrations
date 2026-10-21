@@ -8,7 +8,8 @@
 //! bottom in one buffer as wide as the first, each a rounded box with a
 //! two-pixel border, centered, holding the text. The palette's mapping from
 //! 8-bit coverage, the box sizes and the corner pixels below are that
-//! file's data, which describe the switcher's encoding. The text is drawn
+//! file's data, which describe the switcher's encoding (its MIT notice is in
+//! `third-party/LICENSE-atem-connection.txt`). The text is drawn
 //! with Roboto Regular 2.137 (Google, Apache License 2.0, in
 //! `assets/fonts/`), the font atem-connection uses, rasterized with swash.
 

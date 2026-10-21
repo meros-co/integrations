@@ -230,3 +230,8 @@ Builds with the `blackmagic-atem` integration embed one font, Roboto Regular
 2.137 by Google, to draw ATEM multiviewer labels from text. It is licensed
 under the Apache License 2.0, included as
 [crates/core/assets/fonts/LICENSE-Roboto.txt](crates/core/assets/fonts/LICENSE-Roboto.txt).
+
+The ATEM multiviewer label renderer carries the label box sizes, corner pixels
+and coverage-to-palette table from atem-connection (Sofie), which is MIT
+licensed; its notice is included as
+[crates/core/third-party/LICENSE-atem-connection.txt](crates/core/third-party/LICENSE-atem-connection.txt).
