@@ -541,6 +541,42 @@ logged for a poll, without reporting the device disconnected. Replies go to
 the telemetry rules like any other, matched by their path: an endpoint's
 paths should not be the transport's own.
 
+A device whose transport is not HTTP can serve an HTTP API beside it too: a
+Blackmagic HyperDeck takes its Ethernet Protocol on TCP 9993 and its
+configuration on a REST API on port 80. Its spec keeps its line transport and
+names the HTTP server under `endpoints` the same way:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 9993
+  endpoints:
+    admin:
+      port: { setting: admin_port }
+      scheme: { setting: admin_scheme }      # defaults to http
+      accept_invalid_certs: true             # over https, a self-signed certificate
+commands:
+  set_device_name:
+    params: { name: { type: string, max_length: 64, required: true } }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/setupBasic/name, body: '{"name":{name:json}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/setupBasic }
+```
+
+Such an endpoint has no credential to inherit: its `auth` is `none` (the
+default there), and its requests carry no header but their own. A request
+item names the endpoint, as above; its message is an HTTP request like an
+HTTP command's, and its reply goes to the `path` rules. Requests are still
+sent one at a time with the line's messages, in the same queue. Beside a
+stream transport (`line-tcp`, `osc-tcp`, `ws`), a command whose every message
+names an endpoint goes while the stream is down, and a request to an
+endpoint already sent when the stream drops is answered: the device may be
+reachable on one and not the other, and a command on the endpoint may be
+what turns the stream back on. A request to an endpoint that is not answered
+in time fails its command without resetting the stream, since its reply
+cannot be mistaken for a line's. An endpoint's `accept_invalid_certs` (any
+transport) overrides the transport's.
+
 Each endpoint is a `control` entry in `ports` (below), with its `setting` when
 its port comes from one; `tools/validate.py` checks the pairing, that each
 `endpoint` named is declared, and that the probe and login name none. A
@@ -1165,7 +1201,7 @@ expect:
   contains: "REP"           # literal substring
   not_contains: "ERR"       # success is the absence of an error marker
   matches: "^OK (\\d+)$"    # RE2-safe regex; capture group 1 is the value
-  status: 200               # HTTP only
+  status: 200               # HTTP only; or a list of statuses, any of which is success
   json_path: "$.transport.status"   # JSON: the HTTP body, or the OSC argument at `arg`
   json_equals: { "$.status": "ok" } # JSON values the reply must hold
   code_range: [200, 299]    # leading numeric response code
@@ -1184,6 +1220,11 @@ Some OSC devices answer with JSON inside a string argument: QLab replies on
 `json_path` and `json_equals` read the string argument at `arg` as JSON, so
 `json_path: "$.data"` returns the data and `json_equals: { "$.status": "ok" }`
 fails the command on an error or denied reply.
+
+`status: [200, 204]` takes any status listed as success, for a device whose
+writes are answered with a body by some firmware and without one by others.
+Without `status`, any HTTP status passes the check, so a command over HTTP
+names the statuses it succeeds with.
 
 `not_contains` covers devices that acknowledge by not complaining. Kramer
 Protocol 3000 replies `~01@ROUTE 1,2,3 OK` on success and includes `ERR` on

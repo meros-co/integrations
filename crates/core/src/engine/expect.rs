@@ -70,15 +70,23 @@ pub(crate) fn evaluate(
         Err(CommandError::DeviceError { code, message })
     };
 
-    if let Some(want) = expect.get("status").and_then(Value::as_u64) {
+    // `status`: the HTTP status, or a list of the statuses that are success
+    // (a device answering a write with 200 and a body, or 204 without).
+    let wanted: Option<Vec<u64>> = match expect.get("status") {
+        Some(Value::Array(list)) => Some(list.iter().filter_map(Value::as_u64).collect()),
+        Some(one) => one.as_u64().map(|s| vec![s]),
+        None => None,
+    };
+    if let Some(want) = wanted {
         let status = match reply {
             Reply::Http { status, .. } => *status as u64,
             _ => 0,
         };
-        if status != want {
+        if !want.contains(&status) {
+            let want: Vec<String> = want.iter().map(u64::to_string).collect();
             return Err(CommandError::DeviceError {
                 code: Some(status.to_string()),
-                message: format!("HTTP {status}, expected {want}"),
+                message: format!("HTTP {status}, expected {}", want.join(" or ")),
             });
         }
     }
@@ -268,6 +276,29 @@ mod tests {
             Err(CommandError::DeviceError {
                 code: Some("111".into()),
                 message: "remote control disabled".into()
+            })
+        );
+    }
+
+    #[test]
+    fn a_status_list_accepts_any_of_its_statuses() {
+        let e = expect(json!({"status": [200, 204]}));
+        let answer = |status| Reply::Http {
+            status,
+            headers: Vec::new(),
+            body: Vec::new(),
+        };
+        for status in [200, 204] {
+            assert_eq!(
+                evaluate(&e, "ack", &codes(), &answer(status), false),
+                Ok(Outcome::Ack)
+            );
+        }
+        assert_eq!(
+            evaluate(&e, "ack", &codes(), &answer(401), false),
+            Err(CommandError::DeviceError {
+                code: Some("401".into()),
+                message: "HTTP 401, expected 200 or 204".into()
             })
         );
     }

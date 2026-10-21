@@ -463,6 +463,20 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
             engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &reply);
         }
         Some(super::Await::Ws(_)) => engine.ws(cx, "device", WsInput::Text("{}".into())),
+        // A query to an endpoint beside a line transport (a HyperDeck's
+        // configuration API): an empty JSON answer.
+        Some(super::Await::Http(id)) => {
+            let id = *id;
+            engine.http_response(
+                cx,
+                id,
+                Ok(HttpResponse {
+                    headers: Vec::new(),
+                    status: 200,
+                    body: b"{}".to_vec(),
+                }),
+            );
+        }
         // One reply line per datagram.
         _ if matches!(engine.transport, super::Transport::LineUdp { .. }) => {
             let line = String::from_utf8_lossy(success);
