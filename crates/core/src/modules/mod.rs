@@ -126,6 +126,10 @@ mod tally_arbiter;
 mod tesira;
 #[cfg(any(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
 mod tsl;
+#[cfg(feature = "blackmagic-ultimatte")]
+mod ultimatte_presets;
+#[cfg(feature = "blackmagic-ultimatte")]
+mod ultimatte_zip;
 #[cfg(feature = "visca")]
 mod visca;
 #[cfg(feature = "vmix")]
@@ -147,8 +151,16 @@ pub(crate) fn construct(
     if spec.implementation == Implementation::Spec {
         let extension = spec.extension.as_deref();
         let engine = SpecEngine::new(Arc::new(spec.clone()), context.clone())?;
-        // The native extensions only keep state current, so a device opened
-        // for commands only runs on the engine alone.
+        // An extension that adds commands runs whether or not the device is
+        // monitored.
+        #[cfg(feature = "blackmagic-ultimatte")]
+        if extension == Some("ultimatte-preset-archive") {
+            return Ok(Box::new(ultimatte_presets::UltimattePresets::new(
+                engine, &context,
+            )));
+        }
+        // The other native extensions only keep state current, so a device
+        // opened for commands only runs on the engine alone.
         let extension = if context.monitor { extension } else { None };
         return match extension {
             None => Ok(Box::new(engine)),

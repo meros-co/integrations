@@ -300,6 +300,16 @@ def non_string_keys(node, trail: str = "") -> list[str]:
     return found
 
 
+# The commands each native extension answers itself (SPEC.md, "Native
+# extensions"), as its module lists them.
+EXTENSION_COMMANDS = {
+    "ultimatte-preset-archive": {
+        "export_presets", "import_presets", "export_preset", "import_preset",
+        "export_settings", "import_settings",
+    },
+}
+
+
 def cross_field_checks(doc: dict, path: str) -> list[str]:
     """Rules the schema cannot express on its own."""
     errors: list[str] = []
@@ -332,9 +342,19 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     else:
         if not doc.get("transport"):
             errors.append("a spec-implemented device requires a 'transport'")
+        # Commands a native extension answers itself have no message of the
+        # spec's; every other command of a spec-driven device has one.
+        own = EXTENSION_COMMANDS.get(doc.get("extension"), set())
         for name, command in commands.items():
-            if "send" not in command:
+            if name in own:
+                for key in ("send", "expect"):
+                    if key in command:
+                        errors.append(f"commands.{name}: the extension '{doc['extension']}' sends it; "
+                                      f"it must not declare '{key}'")
+            elif "send" not in command:
                 errors.append(f"commands.{name}: a spec-driven command requires 'send'")
+        for name in sorted(own - set(commands)):
+            errors.append(f"the extension '{doc['extension']}' answers '{name}', which the spec must declare")
 
     model_ids = set()
     for model in doc.get("models", []):
@@ -415,7 +435,9 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
         expect = command.get("expect") or {}
         returns = command.get("returns", "ack")
-        if not native and returns == "value" and not ({"matches", "json_path", "address"} & set(expect)):
+        extension_own = name in EXTENSION_COMMANDS.get(doc.get("extension"), set())
+        if (not native and not extension_own and returns == "value"
+                and not ({"matches", "json_path", "address"} & set(expect))):
             errors.append(
                 f"commands.{name}: returns 'value' needs an extractor "
                 f"(matches, json_path or address); use 'fields' or 'text' otherwise"

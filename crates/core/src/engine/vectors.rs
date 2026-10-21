@@ -836,7 +836,14 @@ fn every_spec_driven_command_has_a_vector() {
         .devices
         .values()
         .filter(|s| s.implementation == crate::catalog::Implementation::Spec)
-        .flat_map(|s| s.commands.keys().map(move |c| format!("{}/{c}", s.id)))
+        // A command without a message is answered by the spec's native
+        // extension, and tested in its session test instead.
+        .flat_map(|s| {
+            s.commands
+                .iter()
+                .filter(|(_, c)| c.send.is_some())
+                .map(move |(c, _)| format!("{}/{c}", s.id))
+        })
         .filter(|k| !covered.contains(k))
         .collect();
     assert!(
