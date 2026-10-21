@@ -4,17 +4,21 @@
 //! received chunk and writes whatever the session hands it. Framing is the
 //! module's job; this only moves bytes. A TLS stream is the same once its
 //! handshake is done; a failed handshake closes it with a reason starting
-//! `tls:`.
+//! `tls:`. A host file can be sent over a connection too, read on a thread
+//! a few chunks ahead of the socket, so a file of any size streams at the
+//! pace the peer takes it (an FTP data connection).
 
+use std::io::Read;
 use std::net::SocketAddr;
-use std::time::Duration;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use crate::module::{Key, TcpInput, TlsTarget};
+use crate::module::{FileInput, Key, TcpInput, TlsTarget};
 use crate::session::Inbound;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -32,9 +36,30 @@ const KEEPALIVE_PROBES: u32 = 4;
 
 pub(crate) struct Connection {
     pub(crate) generation: u64,
-    pub(crate) writer: mpsc::UnboundedSender<Vec<u8>>,
+    pub(crate) writer: mpsc::UnboundedSender<Outgoing>,
     pub(crate) task: JoinHandle<()>,
 }
+
+/// What the session hands a connection to send.
+pub(crate) enum Outgoing {
+    Data(Vec<u8>),
+    /// A host file, sent whole after what was handed over before it, then
+    /// the sending side shut down; what is handed over after it is not
+    /// sent. Reported on `file`: `Progress`, then `Closed` with the bytes
+    /// sent, or `Failed`.
+    File {
+        file: Key,
+        generation: u64,
+        path: PathBuf,
+    },
+}
+
+/// The chunk a host file is read and sent in.
+const FILE_CHUNK: usize = 64 * 1024;
+/// Chunks read ahead of the socket.
+const FILE_AHEAD: usize = 4;
+/// How often a file being sent reports its progress.
+const PROGRESS_EVERY: Duration = Duration::from_millis(200);
 
 pub(crate) fn spawn(
     socket: Key,
@@ -109,7 +134,7 @@ async fn handshake(
 }
 
 fn start(socket: Key, generation: u64, inbound: mpsc::Sender<Inbound>, how: Stream) -> Connection {
-    let (writer, outgoing) = mpsc::unbounded_channel::<Vec<u8>>();
+    let (writer, outgoing) = mpsc::unbounded_channel::<Outgoing>();
     let task = tokio::spawn(async move {
         let report = Report {
             socket,
@@ -150,6 +175,17 @@ pub(crate) struct Report {
 }
 
 impl Report {
+    async fn file(&self, file: Key, generation: u64, input: FileInput) -> bool {
+        self.inbound
+            .send(Inbound::File {
+                file,
+                generation,
+                input,
+            })
+            .await
+            .is_ok()
+    }
+
     /// False once the session is gone.
     pub(crate) async fn send(&self, input: TcpInput) -> bool {
         self.inbound
@@ -163,11 +199,81 @@ impl Report {
     }
 }
 
+/// A host file being sent: its chunks arrive from a reader thread.
+struct Sending {
+    file: Key,
+    generation: u64,
+    chunks: mpsc::Receiver<Chunk>,
+    bytes: u64,
+    reported: Instant,
+}
+
+/// What the reader thread of a file being sent hands over.
+enum Chunk {
+    /// The file is open and this long; first.
+    Length(u64),
+    Data(Vec<u8>),
+    Failed(String),
+}
+
+/// Read `path` on a thread, a few chunks ahead of whoever takes them. An
+/// error ends the chunks; so does the receiver going away.
+fn read_ahead(path: PathBuf) -> mpsc::Receiver<Chunk> {
+    let (tx, rx) = mpsc::channel(FILE_AHEAD);
+    std::thread::spawn(move || {
+        let failed = |e: std::io::Error| Chunk::Failed(format!("{}: {e}", path.display()));
+        let opened = std::fs::File::open(&path).and_then(|f| {
+            let m = f.metadata()?;
+            if m.is_file() {
+                Ok((f, m.len()))
+            } else {
+                Err(std::io::Error::other("not a file"))
+            }
+        });
+        let mut f = match opened {
+            Ok((f, length)) => {
+                if tx.blocking_send(Chunk::Length(length)).is_err() {
+                    return;
+                }
+                f
+            }
+            Err(e) => {
+                let _ = tx.blocking_send(failed(e));
+                return;
+            }
+        };
+        loop {
+            let mut chunk = vec![0u8; FILE_CHUNK];
+            match f.read(&mut chunk) {
+                Ok(0) => return,
+                Ok(n) => {
+                    chunk.truncate(n);
+                    if tx.blocking_send(Chunk::Data(chunk)).is_err() {
+                        return;
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(e) => {
+                    let _ = tx.blocking_send(failed(e));
+                    return;
+                }
+            }
+        }
+    });
+    rx
+}
+
+async fn write_out<W: AsyncWrite + Unpin>(write: &mut W, data: &[u8]) -> std::io::Result<()> {
+    write.write_all(data).await?;
+    // TLS buffers records until flushed.
+    write.flush().await
+}
+
 /// Report the stream connected, then move bytes both ways until either side
 /// ends it.
 pub(crate) async fn pump<S>(
     stream: S,
-    mut outgoing: mpsc::UnboundedReceiver<Vec<u8>>,
+    mut outgoing: mpsc::UnboundedReceiver<Outgoing>,
     report: &Report,
 ) where
     S: AsyncRead + AsyncWrite + Unpin,
@@ -177,6 +283,9 @@ pub(crate) async fn pump<S>(
     }
     let (mut read, mut write) = tokio::io::split(stream);
     let mut buf = vec![0u8; 16 * 1024];
+    let mut sending: Option<Sending> = None;
+    // Once a file has been sent the sending side is shut down.
+    let mut shut = false;
     let reason = loop {
         tokio::select! {
             result = read.read(&mut buf) => match result {
@@ -188,16 +297,68 @@ pub(crate) async fn pump<S>(
                 }
                 Err(e) => break e.to_string(),
             },
-            data = outgoing.recv() => match data {
-                Some(data) => {
-                    let written = match write.write_all(&data).await {
-                        // TLS buffers records until flushed.
-                        Ok(()) => write.flush().await,
-                        Err(e) => Err(e),
-                    };
-                    if let Err(e) = written {
+            chunk = next_chunk(&mut sending), if sending.is_some() => {
+                let Some(s) = sending.as_mut() else { continue };
+                match chunk {
+                    Some(Chunk::Length(bytes)) => {
+                        if !report.file(s.file, s.generation, FileInput::Opened { bytes }).await {
+                            return;
+                        }
+                    }
+                    Some(Chunk::Data(data)) => {
+                        if let Err(e) = write_out(&mut write, &data).await {
+                            let message = e.to_string();
+                            let input = FileInput::Failed { message: message.clone() };
+                            report.file(s.file, s.generation, input).await;
+                            break message;
+                        }
+                        s.bytes += data.len() as u64;
+                        if s.reported.elapsed() >= PROGRESS_EVERY {
+                            s.reported = Instant::now();
+                            let input = FileInput::Progress { bytes: s.bytes };
+                            if !report.file(s.file, s.generation, input).await {
+                                return;
+                            }
+                        }
+                    }
+                    Some(Chunk::Failed(message)) => {
+                        // A file cut short must not look sent whole.
+                        let input = FileInput::Failed { message: message.clone() };
+                        report.file(s.file, s.generation, input).await;
+                        break format!("host file: {message}");
+                    }
+                    None => {
+                        let (file, generation, bytes) = (s.file, s.generation, s.bytes);
+                        sending = None;
+                        let _ = write.shutdown().await;
+                        shut = true;
+                        if !report.file(file, generation, FileInput::Closed { bytes }).await {
+                            return;
+                        }
+                    }
+                }
+            },
+            data = outgoing.recv(), if sending.is_none() => match data {
+                Some(Outgoing::Data(_)) if shut => {}
+                Some(Outgoing::Data(data)) => {
+                    if let Err(e) = write_out(&mut write, &data).await {
                         break e.to_string();
                     }
+                }
+                Some(Outgoing::File { file, generation, .. }) if shut => {
+                    let message = "the connection's sending side is already shut down".to_string();
+                    if !report.file(file, generation, FileInput::Failed { message }).await {
+                        return;
+                    }
+                }
+                Some(Outgoing::File { file, generation, path }) => {
+                    sending = Some(Sending {
+                        file,
+                        generation,
+                        chunks: read_ahead(path),
+                        bytes: 0,
+                        reported: Instant::now(),
+                    });
                 }
                 None => {
                     let _ = write.shutdown().await;
@@ -207,6 +368,14 @@ pub(crate) async fn pump<S>(
         }
     };
     report.send(TcpInput::Closed { reason }).await;
+}
+
+/// The next chunk of the file being sent; never ready without one.
+async fn next_chunk(sending: &mut Option<Sending>) -> Option<Chunk> {
+    match sending {
+        Some(s) => s.chunks.recv().await,
+        None => std::future::pending().await,
+    }
 }
 
 #[cfg(test)]
@@ -263,7 +432,7 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(16);
         let c = spawn_tls("a", 1, target(addr, true), tx);
         assert_eq!(next(&mut rx).await, TcpInput::Connected);
-        c.writer.send(b"hello".to_vec()).unwrap();
+        c.writer.send(Outgoing::Data(b"hello".to_vec())).unwrap();
         assert_eq!(next(&mut rx).await, TcpInput::Data(b"hello".to_vec()));
     }
 
@@ -295,6 +464,92 @@ mod tests {
             TcpInput::Closed { reason } => assert!(reason.starts_with("tls:"), "{reason}"),
             other => panic!("expected a close, got {other:?}"),
         }
+    }
+
+    /// A host file goes out whole after what was sent before it, then the
+    /// sending side is shut down; a missing file fails without sending.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_host_file_is_sent_then_the_sending_side_shut() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let received = tokio::spawn(async move {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut got = Vec::new();
+            s.read_to_end(&mut got).await.unwrap();
+            got
+        });
+        let dir = std::env::temp_dir().join(format!("meros-tcp-file-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("clip.bin");
+        let body: Vec<u8> = (0..300_000u32).map(|i| (i % 253) as u8).collect();
+        std::fs::write(&path, &body).unwrap();
+
+        let (tx, mut rx) = mpsc::channel(64);
+        let c = spawn("data", 1, addr, tx);
+        c.writer.send(Outgoing::Data(b"head".to_vec())).unwrap();
+        c.writer
+            .send(Outgoing::File {
+                file: "f",
+                generation: 7,
+                path: path.clone(),
+            })
+            .unwrap();
+        let mut file_inputs = Vec::new();
+        loop {
+            match tokio::time::timeout(Duration::from_secs(10), rx.recv()).await {
+                Ok(Some(Inbound::File {
+                    file: "f",
+                    generation: 7,
+                    input,
+                })) => {
+                    let end = matches!(input, FileInput::Closed { .. } | FileInput::Failed { .. });
+                    file_inputs.push(input);
+                    if end {
+                        break;
+                    }
+                }
+                Ok(Some(_)) => {}
+                _ => panic!("expected the file to be sent"),
+            }
+        }
+        assert_eq!(
+            file_inputs.first(),
+            Some(&FileInput::Opened { bytes: 300_000 })
+        );
+        assert_eq!(
+            file_inputs.last(),
+            Some(&FileInput::Closed { bytes: 300_000 })
+        );
+        let mut expected = b"head".to_vec();
+        expected.extend_from_slice(&body);
+        assert_eq!(received.await.unwrap(), expected);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _keep = listener.accept().await;
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        });
+        let (tx, mut rx) = mpsc::channel(64);
+        let c = spawn("data", 2, addr, tx);
+        c.writer
+            .send(Outgoing::File {
+                file: "f",
+                generation: 8,
+                path: dir.join("missing.bin"),
+            })
+            .unwrap();
+        loop {
+            match tokio::time::timeout(Duration::from_secs(10), rx.recv()).await {
+                Ok(Some(Inbound::File { input, .. })) => {
+                    assert!(matches!(input, FileInput::Failed { .. }), "{input:?}");
+                    break;
+                }
+                Ok(Some(_)) => {}
+                _ => panic!("expected the file to fail"),
+            }
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A peer that vanishes without closing is noticed by keepalive probes,

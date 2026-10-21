@@ -198,6 +198,9 @@ pub(crate) struct Session {
     files: HashMap<Key, crate::files::Writer>,
     /// Files being read, by key, with the generation of the read.
     reads: HashMap<Key, u64>,
+    /// Host files being sent over a connection, by file key, with their
+    /// generation.
+    sends: HashMap<Key, u64>,
     /// Tasks running off the session, by key, with their generation.
     computes: HashMap<Key, u64>,
     ws: HashMap<Key, crate::ws::Connection>,
@@ -246,6 +249,7 @@ impl Session {
             ssh: crate::ssh::Sessions::default(),
             files: HashMap::new(),
             reads: HashMap::new(),
+            sends: HashMap::new(),
             computes: HashMap::new(),
             ws: HashMap::new(),
             listening: HashMap::new(),
@@ -457,6 +461,15 @@ impl Session {
                         Inbound::File { file, generation, input } => {
                             if self.reads.get(file) == Some(&generation) {
                                 self.reads.remove(file);
+                            } else if self.sends.get(file) == Some(&generation) {
+                                // Opened and Progress are followed by Closed or Failed.
+                                if !matches!(
+                                    input,
+                                    crate::module::FileInput::Opened { .. }
+                                        | crate::module::FileInput::Progress { .. }
+                                ) {
+                                    self.sends.remove(file);
+                                }
                             } else if self.files.get(file).map(|w| w.generation) == Some(generation) {
                                 // Opened is followed by Closed or Failed.
                                 if !matches!(input, crate::module::FileInput::Opened { .. }) {
@@ -625,7 +638,28 @@ impl Session {
                 }
                 Action::TcpSend { socket, data } => {
                     if let Some(c) = self.tcp.get(socket) {
-                        let _ = c.writer.send(data);
+                        let _ = c.writer.send(crate::tcp::Outgoing::Data(data));
+                    }
+                }
+                Action::TcpSendFile { socket, file, path } => {
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    self.sends.insert(file, generation);
+                    let item = crate::tcp::Outgoing::File {
+                        file,
+                        generation,
+                        path: path.into(),
+                    };
+                    let sent = self.tcp.get(socket).map(|c| c.writer.send(item).is_ok());
+                    if sent != Some(true) {
+                        let input = crate::module::FileInput::Failed {
+                            message: "the connection is not open".into(),
+                        };
+                        let _ = self.inbound_tx.try_send(Inbound::File {
+                            file,
+                            generation,
+                            input,
+                        });
                     }
                 }
                 Action::TcpOpenTls { socket, target } => {
@@ -765,7 +799,7 @@ impl Session {
                 }
                 Action::TcpClientSend { socket, peer, data } => {
                     if let Some(c) = self.servers.get(socket).and_then(|s| s.clients.get(&peer)) {
-                        let _ = c.writer.send(data);
+                        let _ = c.writer.send(crate::tcp::Outgoing::Data(data));
                     }
                 }
                 Action::TcpClientClose { socket, peer } => {
@@ -1056,7 +1090,7 @@ impl Session {
                 Action::UdpSend { socket, to, data } => self.send(socket, to, data).await,
                 Action::TcpSend { socket, data } => {
                     if let Some(c) = self.tcp.get(socket) {
-                        let _ = c.writer.send(data);
+                        let _ = c.writer.send(crate::tcp::Outgoing::Data(data));
                     }
                 }
                 Action::WsSend { socket, text } => {

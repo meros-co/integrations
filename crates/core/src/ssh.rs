@@ -152,7 +152,7 @@ pub(crate) fn spawn(
     sessions: Sessions,
     inbound: mpsc::Sender<Inbound>,
 ) -> crate::tcp::Connection {
-    let (writer, mut outgoing) = mpsc::unbounded_channel::<Vec<u8>>();
+    let (writer, mut outgoing) = mpsc::unbounded_channel::<crate::tcp::Outgoing>();
     let task = tokio::spawn(async move {
         let send = |input: TcpInput| {
             let inbound = inbound.clone();
@@ -208,9 +208,17 @@ pub(crate) fn spawn(
                     Err(e) => break e.to_string(),
                 },
                 data = outgoing.recv() => match data {
-                    Some(data) => {
+                    Some(crate::tcp::Outgoing::Data(data)) => {
                         if let Err(e) = write.write_all(&data).await {
                             break e.to_string();
+                        }
+                    }
+                    Some(crate::tcp::Outgoing::File { file, generation, .. }) => {
+                        let message = "a host file is not sent through an SSH tunnel".to_string();
+                        let input = crate::module::FileInput::Failed { message };
+                        let report = Inbound::File { file, generation, input };
+                        if inbound.send(report).await.is_err() {
+                            return;
                         }
                     }
                     None => return,
@@ -366,7 +374,10 @@ mod tests {
             tx.clone(),
         );
         assert_eq!(next(&mut rx).await, TcpInput::Connected);
-        first.writer.send(b"hello".to_vec()).unwrap();
+        first
+            .writer
+            .send(crate::tcp::Outgoing::Data(b"hello".to_vec()))
+            .unwrap();
         assert_eq!(next(&mut rx).await, TcpInput::Data(b"hello".to_vec()));
 
         // A second stream to the same device reuses the SSH session.
@@ -378,7 +389,10 @@ mod tests {
             tx,
         );
         assert_eq!(next(&mut rx).await, TcpInput::Connected);
-        second.writer.send(b"again".to_vec()).unwrap();
+        second
+            .writer
+            .send(crate::tcp::Outgoing::Data(b"again".to_vec()))
+            .unwrap();
         assert_eq!(next(&mut rx).await, TcpInput::Data(b"again".to_vec()));
         assert_eq!(accepted.load(Ordering::SeqCst), 1);
     }

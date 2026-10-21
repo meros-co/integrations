@@ -18,7 +18,7 @@ pub(crate) fn spawn(
     _sessions: Sessions,
     inbound: mpsc::Sender<Inbound>,
 ) -> crate::tcp::Connection {
-    let (writer, _outgoing) = mpsc::unbounded_channel::<Vec<u8>>();
+    let (writer, _outgoing) = mpsc::unbounded_channel::<crate::tcp::Outgoing>();
     let task = tokio::spawn(async move {
         let _ = inbound
             .send(Inbound::Tcp {
