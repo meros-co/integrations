@@ -427,3 +427,203 @@ telemetry(H, "notify-accepted", inbound="200 ok", request="notify: dropped frame
           expect_then_send=[], expect_state={"notify": {"dropped_frames": False}})
 # Playing reads nothing again: the transport notification reports it.
 telemetry(H, "play-no-reread", inbound="200 ok", request="play", expect_then_send=[], expect_state={})
+
+
+# ── Configuration API (admin endpoint on port 80) ─────────────────────────
+# Paths, bodies and replies from hyperdeckwire (MIT): hyperdeckwire/setup.py
+# and the HyperDeck Studio HD Mini 9.0.2 replies in its
+# tests/test_hyperdeckwire_setup.py. Each command's first request is stated;
+# a write's read-back follows its answer.
+def admin(command, input, method, target, body=None, **extra):
+    request = {"method": method, "target": target, "port": 80}
+    if body is not None:
+        request["body"] = body
+    V.append({"spec": H, "command": command, "input": input, "model": "hyperdeck-studio",
+              "expect_request": request, **extra})
+
+
+_A = "/admin/api/v1"
+admin("get_admin_heartbeat", {}, "GET", f"{_A}/heartBeat",
+      http_reply={"status": 200, "body": '{"success": true}'},
+      expect_result={"ok": {"kind": "value", "value": True}})
+admin("get_admin_capabilities", {}, "GET", f"{_A}/capabilities")
+admin("get_setup", {}, "GET", f"{_A}/setupBasic",
+      http_reply={"status": 200, "body": '{"response": {"deviceName": "Deck A", "software": "9.0.2"}, "success": true}'},
+      expect_result={"ok": {"kind": "value", "value": {"deviceName": "Deck A", "software": "9.0.2"}}})
+admin("set_device_name", {"name": "Deck \"4\""}, "PUT", f"{_A}/setupBasic/name", '{"name":"Deck \\"4\\""}')
+admin("get_languages", {}, "GET", f"{_A}/languages")
+admin("set_language", {"language": "en_US.UTF-8"}, "PUT", f"{_A}/setupBasic/language",
+      '{"language":"en_US.UTF-8"}')
+admin("start_admin_identify", {}, "PUT", f"{_A}/setupBasic/identify")
+admin("stop_admin_identify", {}, "DELETE", f"{_A}/setupBasic/identify")
+admin("get_remote_admin", {}, "GET", f"{_A}/remoteAdmin")
+admin("get_network_interface", {}, "GET", f"{_A}/network/interface/0")
+admin("set_network_interface",
+      {"type": "Static", "address": "192.0.2.11", "netmask": "255.255.248.0", "gateway": "192.0.2.1",
+       "dns_primary": "192.0.2.53", "dns_secondary": "192.0.2.54"},
+      "PUT", f"{_A}/network/interface/0",
+      '{"id":"0","type":"Static","address":"192.0.2.11","netmask":"255.255.248.0","gateway":"192.0.2.1",'
+      '"dnsServers":["192.0.2.53","192.0.2.54"]}')
+admin("set_network_interface_one_dns",
+      {"interface": 1, "type": "DHCP", "address": "192.0.2.11", "netmask": "255.255.255.0", "gateway": "192.0.2.1",
+       "dns": "192.0.2.53"},
+      "PUT", f"{_A}/network/interface/1",
+      '{"id":"1","type":"DHCP","address":"192.0.2.11","netmask":"255.255.255.0","gateway":"192.0.2.1",'
+      '"dnsServers":["192.0.2.53"]}')
+admin("set_network_interface_no_dns",
+      {"type": "Static", "address": "192.0.2.11", "netmask": "255.255.255.0", "gateway": "192.0.2.1"},
+      "PUT", f"{_A}/network/interface/0",
+      '{"id":"0","type":"Static","address":"192.0.2.11","netmask":"255.255.255.0","gateway":"192.0.2.1",'
+      '"dnsServers":[]}')
+admin("get_network_access", {}, "GET", f"{_A}/networkAccess")
+admin("get_network_access_options", {}, "GET", f"{_A}/networkAccess/options")
+admin("set_network_access", {"ftp": "Enabled", "http": "SecureOnly"}, "PUT", f"{_A}/networkAccess",
+      '{"protocols":[{"id":"FTP","state":"Enabled"},{"id":"HTTP","state":"SecureOnly"}]}')
+admin("get_ethernet_protocol", {}, "GET", f"{_A}/hyperDeckEthernetProtocol",
+      http_reply={"status": 200, "body": '{"response": {"state": "Enabled"}, "success": true}'},
+      expect_result={"ok": {"kind": "value", "value": "Enabled"}})
+# Utility administration over USB only: the deck refuses the write.
+admin("set_ethernet_protocol", {"state": "Disabled"}, "PUT", f"{_A}/hyperDeckEthernetProtocol",
+      '{"state":"Disabled"}', http_reply={"status": 401, "body": ""},
+      expect_result={"error": {"error": "device_error", "code": "401"}})
+admin("get_certificate", {}, "GET", f"{_A}/certificate/summary")
+admin("create_self_signed_certificate", {}, "PUT", f"{_A}/certificate/selfSigned")
+admin("install_certificate", {"certificate": "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"},
+      "POST", f"{_A}/certificate",
+      '{"certificate":"-----BEGIN CERTIFICATE-----\\nMIIB\\n-----END CERTIFICATE-----\\n"}')
+admin("delete_certificate", {}, "DELETE", f"{_A}/certificate")
+admin("create_signing_request",
+      {"common_name": "hyperdeck.example.com", "country": "AU", "state_name": "Victoria",
+       "locality": "Port Melbourne", "organization": "Example"},
+      "POST", f"{_A}/certificate/signingRequest",
+      '{"commonName":"hyperdeck.example.com","country":"AU","stateName":"Victoria",'
+      '"locality":"Port Melbourne","organization":"Example"}')
+admin("create_signing_request_with_alternative_name",
+      {"common_name": "hyperdeck.example.com", "subject_alternative_name": "hyperdeck.example.net",
+       "country": "AU", "state_name": "Victoria", "locality": "Port Melbourne", "organization": "Example"},
+      "POST", f"{_A}/certificate/signingRequest",
+      '{"commonName":"hyperdeck.example.com","country":"AU","stateName":"Victoria",'
+      '"locality":"Port Melbourne","organization":"Example","subjectAlternativeName":"hyperdeck.example.net"}')
+admin("download_signing_request", {"id": "csr-1"}, "GET", f"{_A}/certificate/signingRequest/csr-1",
+      http_reply={"status": 200, "body": "-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----\n"},
+      expect_result={"ok": {"kind": "value",
+                            "value": "-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----"}})
+admin("get_admin_status", {}, "GET", f"{_A}/auth/adminStatus")
+admin("get_users", {}, "GET", f"{_A}/auth/users")
+admin("create_user", {"username": "ops", "password": "pa\"ss", "remote_admin_utility_access": True},
+      "POST", f"{_A}/auth/user", '{"username":"ops","password":"pa\\"ss","remoteAdminUtilityAccess":true}')
+admin("rename_user", {"user_id": "2", "username": "ops2"}, "PUT", f"{_A}/auth/user",
+      '{"authUserId":"2","username":"ops2"}')
+admin("set_user_password", {"user_id": "2", "password": "new"}, "PUT", f"{_A}/auth/user",
+      '{"authUserId":"2","password":"new"}')
+admin("set_user_admin_access", {"user_id": "2", "enabled": False}, "PUT", f"{_A}/auth/user",
+      '{"authUserId":"2","remoteAdminUtilityAccess":false}')
+admin("delete_user", {"user_id": "2"}, "DELETE", f"{_A}/auth/user", '{"authUserId":"2"}')
+admin("get_date_time", {}, "GET", f"{_A}/dateAndTime")
+admin("set_date_time", {"time": 1789584763, "timezone_offset": -300}, "PUT", f"{_A}/dateAndTime",
+      '{"time":"1789584763","timezoneOffset":-300}')
+admin("get_ntp", {}, "GET", f"{_A}/dateAndTime/ntp")
+admin("set_ntp", {"server_url": "time.cloudflare.com"}, "PUT", f"{_A}/dateAndTime/ntp",
+      '{"serverUrl":"time.cloudflare.com","enabled":true}')
+admin("get_timezone", {}, "GET", f"{_A}/dateAndTime/timezone")
+admin("set_timezone", {"timezone_offset": 600}, "PUT", f"{_A}/dateAndTime/timezone", '{"timezoneOffset":600}')
+admin("get_reboot_key", {}, "GET", f"{_A}/reboot",
+      http_reply={"status": 200, "body": '{"response": {"key": "ABC123"}, "success": true}'},
+      expect_result={"ok": {"kind": "value", "value": "ABC123"}})
+admin("admin_reboot", {"key": "ABC123"}, "PUT", f"{_A}/reboot", '{"key":"ABC123"}',
+      http_reply={"status": 200, "body": '{"success": true}'}, expect_result={"ok": {"kind": "ack"}})
+
+
+def admin_reply(name, path, response, expect_state, **extra):
+    """A configuration API reply as the deck wraps it."""
+    import json
+    body = json.dumps({"response": response, "success": True})
+    telemetry(H, f"admin-{name}", model="hyperdeck-studio", inbound_http={"path": f"{_A}{path}", "body": body},
+              expect_state=expect_state, **extra)
+
+
+admin_reply("capabilities", "/capabilities",
+            {"capabilities": {"version": 1}, "networkAccess": {"version": 1}, "hyperDeckEthernetProtocol": {"version": 2}},
+            {"admin": {"capabilities": {"capabilities": {"version": 1}, "networkAccess": {"version": 1},
+                                        "hyperDeckEthernetProtocol": {"version": 2}}}})
+admin_reply("setup", "/setupBasic",
+            {"build": "586FB398", "deviceName": "Deck A", "hardware": "0300", "hostname": "Deck-A",
+             "language": "en_US.UTF-8", "productId": "BE76", "productName": "HyperDeck Studio HD Mini",
+             "shortProductName": "HyperDeck Studio HD Mini", "software": "9.0.2"},
+            {"admin": {"setup": {"product_name": "HyperDeck Studio HD Mini",
+                                 "short_product_name": "HyperDeck Studio HD Mini", "product_id": "BE76",
+                                 "device_name": "Deck A", "hostname": "Deck-A", "software": "9.0.2",
+                                 "build": "586FB398", "hardware": "0300", "language": "en_US.UTF-8"}}})
+admin_reply("languages", "/languages",
+            {"languages": [{"code": "en_US.UTF-8", "name": "English"}, {"code": "ja_JP.UTF-8", "name": "Japanese"}]},
+            {"admin": {"languages": {"en_US.UTF-8": {"name": "English"}, "ja_JP.UTF-8": {"name": "Japanese"}}}},
+            state_before={"admin": {"languages": {"de_DE.UTF-8": {"name": "German"}}}})
+admin_reply("remote-admin", "/remoteAdmin", {"enabled": False, "isUSBRequestSource": False},
+            {"admin": {"remote_admin": {"enabled": False, "usb_request": False}}})
+admin_reply("network-interface", "/network/interface/0", {
+    "hostname": "HyperDeck-Studio-HD-Mini-3.local",
+    "interface": {
+        "activeConfig": {"address": "192.0.2.12", "dnsServers": ["192.0.2.1"],
+                         "gateway": "192.0.2.1", "netmask": "255.255.255.0"},
+        "currentMtu": 1500, "currentSpeedBps": 1000000000, "currentState": "GloballyBound",
+        "defaultRoute": True, "id": "0", "macAddress": "7C-2E-0D-18-DC-78",
+        "manualConfig": {"address": "192.0.2.11", "dnsServers": ["8.8.8.8", "8.8.4.4"],
+                         "gateway": "192.0.2.1", "netmask": "255.255.252.0"},
+        "name": "1GbE", "physicallyLinked": 1, "physicallyPresent": 1, "priority": 1, "type": "DHCP"}},
+    {"admin": {"network": {"interfaces": {"0": {
+        "hostname": "HyperDeck-Studio-HD-Mini-3.local", "name": "1GbE", "mac_address": "7C-2E-0D-18-DC-78",
+        "type": "DHCP", "address": "192.0.2.11", "netmask": "255.255.252.0", "gateway": "192.0.2.1",
+        "active_address": "192.0.2.12", "active_netmask": "255.255.255.0", "active_gateway": "192.0.2.1",
+        "linked": True, "present": True, "speed": 1000000000, "mtu": 1500, "state": "GloballyBound",
+        "default_route": True, "priority": 1,
+        "dns_servers": {"1": "8.8.8.8", "2": "8.8.4.4"}, "active_dns_servers": {"1": "192.0.2.1"}}}}}},
+    state_before={"admin": {"network": {"interfaces": {"0": {"dns_servers": {"3": "192.0.2.99"}}}}}})
+# A network write's answer: the interface is read again, and nothing else
+# changes (its DNS lists are not cleared by an answer without them).
+telemetry(H, "admin-network-write", model="hyperdeck-studio",
+          inbound_http={"path": f"{_A}/network/interface/0", "body": '{"success": true}',
+                        "request": {"id": "0", "type": "Static", "address": "192.0.2.40", "netmask": "255.255.255.0",
+                                    "gateway": "192.0.2.1", "dnsServers": []}},
+          state_before={"admin": {"network": {"interfaces": {"0": {"dns_servers": {"1": "8.8.8.8"}}}}}},
+          expect_then_send=[{"method": "GET", "target": f"{_A}/network/interface/0", "port": 80}],
+          expect_state={"admin": {"network": {"interfaces": {"0": {"dns_servers": {"1": "8.8.8.8"}}}}}})
+admin_reply("network-access", "/networkAccess", {"protocols": [
+    {"id": "FTP", "state": "Enabled", "url": "ftp://Deck-A.local"},
+    {"id": "HTTP", "state": "SecureOnly", "url": "https://Deck-A.local"}]},
+    {"admin": {"network_access": {"protocols": {
+        "FTP": {"state": "Enabled", "url": "ftp://Deck-A.local"},
+        "HTTP": {"state": "SecureOnly", "url": "https://Deck-A.local"}}}}})
+admin_reply("network-access-reboot", "/networkAccess", {"rebootRequired": True},
+            {"admin": {"network_access": {"reboot_required": True}}})
+admin_reply("network-access-options", "/networkAccess/options", {"options": [
+    {"protocol": "FTP", "secureOption": False, "showURL": True},
+    {"protocol": "HTTP", "secureOption": True, "showURL": True}]},
+    {"admin": {"network_access": {"protocols": {
+        "FTP": {"secure_option": False, "show_url": True},
+        "HTTP": {"secure_option": True, "show_url": True}}}}})
+admin_reply("ethernet-protocol", "/hyperDeckEthernetProtocol", {"state": "Disabled"},
+            {"admin": {"ethernet_protocol": "Disabled"}})
+# A removed certificate leaves only the host name.
+admin_reply("certificate", "/certificate/summary", {"hostname": "Deck-A.local"},
+            {"admin": {"certificate": {"summary": '{"hostname":"Deck-A.local"}', "hostname": "Deck-A.local"}}},
+            state_before={"admin": {"certificate": {"summary": "{}", "hostname": "Deck-A.local",
+                                                    "domain": "deck-a.example", "issuer": "Example CA"}}})
+admin_reply("certificate-installed", "/certificate/summary",
+            {"hostname": "Deck-A.local", "domain": "deck-a.example", "issuer": "Example CA"},
+            {"admin": {"certificate": {
+                "summary": '{"hostname":"Deck-A.local","domain":"deck-a.example","issuer":"Example CA"}',
+                "hostname": "Deck-A.local", "domain": "deck-a.example", "issuer": "Example CA"}}})
+admin_reply("admin-status", "/auth/adminStatus", {"adminRequired": False},
+            {"admin": {"auth": {"admin_required": False}}})
+admin_reply("users", "/auth/users", {"users": [
+    {"authUserId": "1", "remoteAdminUtilityAccess": False, "sharedFolderPermissions": [], "username": "Guest"}]},
+    {"admin": {"auth": {"users": {"1": {"username": "Guest", "remote_admin_utility_access": False,
+                                        "shared_folder_permissions": "[]"}}}}},
+    state_before={"admin": {"auth": {"users": {"2": {"username": "ops"}}}}})
+admin_reply("date-time", "/dateAndTime", {"time": "1789584763", "timeFriendly": "20260916-185243", "timezoneOffset": 0},
+            {"admin": {"date_time": {"time": 1789584763, "time_friendly": "20260916-185243", "timezone_offset": 0}}})
+admin_reply("ntp", "/dateAndTime/ntp", {"enabled": True, "serverUrl": "time.cloudflare.com", "state": "OffsetCorrection"},
+            {"admin": {"date_time": {"ntp": {"enabled": True, "server_url": "time.cloudflare.com",
+                                              "state": "OffsetCorrection"}}}})
+admin_reply("timezone", "/dateAndTime/timezone", {"timezoneOffset": -300},
+            {"admin": {"date_time": {"timezone_offset": -300}}})

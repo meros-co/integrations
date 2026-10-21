@@ -128,9 +128,6 @@ enum Transport {
         /// refusal only when its body matches this too (Twitch answers a
         /// missing scope with 401, as it answers a refused token).
         refusal_body: Option<RefusalBody>,
-        /// `transport.endpoints`: other HTTP servers of the same device, on
-        /// other ports, by name (MediaMTX's playback server).
-        endpoints: BTreeMap<String, Endpoint>,
     },
     /// Text messages over a websocket, usually JSON.
     Ws {
@@ -145,7 +142,9 @@ enum Transport {
 }
 
 /// A second HTTP server of the device (`transport.endpoints`): the same host,
-/// another port and scheme.
+/// another port and scheme. Beside a transport that is not HTTP (a
+/// HyperDeck's configuration API beside its Ethernet Protocol), it is the
+/// device's only HTTP server.
 #[derive(Debug, Clone)]
 struct Endpoint {
     /// `scheme://host:port`.
@@ -153,6 +152,9 @@ struct Endpoint {
     /// `auth: inherit`: the transport's credential and `headers` go there
     /// too; `auth: none` sends neither.
     credentialed: bool,
+    /// Over HTTPS, accept a self-signed certificate: the endpoint's own
+    /// `accept_invalid_certs`, or the HTTP transport's.
+    accept_invalid_certs: bool,
 }
 
 /// Where an HTTP request goes: the transport's own port, or an endpoint.
@@ -163,12 +165,16 @@ enum Route {
     Endpoint { credentialed: bool },
 }
 
-/// `transport.endpoints`, resolved against the settings.
+/// `transport.endpoints`, resolved against the settings. `http` is false
+/// beside a transport that is not HTTP: there is no credential to inherit,
+/// so `auth` is `none`, and the scheme defaults to `http`.
 fn endpoints_of(
     t: &Value,
     settings: &Params,
     host: &str,
     scheme: &str,
+    accept_invalid_certs: bool,
+    http: bool,
 ) -> Result<BTreeMap<String, Endpoint>, String> {
     let Some(map) = t.get("endpoints") else {
         return Ok(BTreeMap::new());
@@ -207,7 +213,8 @@ fn endpoints_of(
                 .map_err(|m| format!("transport.endpoints.{name}: {m}"))?,
         };
         let auth = match e.get("auth") {
-            None => "inherit".to_string(),
+            None if http => "inherit".to_string(),
+            None => "none".to_string(),
             Some(Value::String(s)) => s.clone(),
             Some(Value::Object(o)) => {
                 let setting = o.get("setting").and_then(Value::as_str).ok_or(format!(
@@ -226,11 +233,25 @@ fn endpoints_of(
             }
         };
         let credentialed = match auth.as_str() {
-            "inherit" => true,
+            "inherit" if http => true,
+            "inherit" => {
+                return Err(format!(
+                    "transport.endpoints.{name}.auth is none: only an http transport has a credential to inherit"
+                ))
+            }
             "none" => false,
             other => {
                 return Err(format!(
                     "transport.endpoints.{name}.auth '{other}' is not inherit or none"
+                ))
+            }
+        };
+        let accept_invalid_certs = match e.get("accept_invalid_certs") {
+            None => accept_invalid_certs,
+            Some(Value::Bool(b)) => *b,
+            Some(_) => {
+                return Err(format!(
+                    "transport.endpoints.{name}.accept_invalid_certs is true or false"
                 ))
             }
         };
@@ -239,6 +260,7 @@ fn endpoints_of(
             Endpoint {
                 base: format!("{scheme}://{host}:{port}"),
                 credentialed,
+                accept_invalid_certs,
             },
         );
     }
@@ -618,9 +640,11 @@ impl Await {
     /// A reply that names what it answers: a late one cannot be taken for
     /// the answer to a later message, so a timeout need not reset a stream.
     fn addressed(&self) -> bool {
+        // An HTTP reply is its request's own (an endpoint's, beside a
+        // stream transport).
         matches!(
             self,
-            Await::Osc(Some(_)) | Await::Ws(Some(_)) | Await::Text(Some(_))
+            Await::Osc(Some(_)) | Await::Ws(Some(_)) | Await::Text(Some(_)) | Await::Http(_)
         )
     }
 }
@@ -712,6 +736,10 @@ pub(crate) struct SpecEngine {
     host: IpAddr,
     settings: Params,
     transport: Transport,
+    /// `transport.endpoints`: other HTTP servers of the same device, on
+    /// other ports, by name (MediaMTX's playback server, a HyperDeck's
+    /// configuration API beside its Ethernet Protocol).
+    endpoints: BTreeMap<String, Endpoint>,
     timeout: Millis,
     probe: Option<Value>,
     link: Connection,
@@ -1238,9 +1266,6 @@ impl SpecEngine {
         if kind != "http" && t.get("refusal_status_body").is_some() {
             return Err("transport.refusal_status_body is for the http transport".into());
         }
-        if kind != "http" && t.get("endpoints").is_some() {
-            return Err("transport.endpoints is for the http transport".into());
-        }
         // Liveness and the session are the transport's own port's.
         let names_endpoint = |v: Option<&Value>| match v {
             Some(Value::Array(items)) => items.iter().any(|i| i.get("endpoint").is_some()),
@@ -1387,7 +1412,6 @@ impl SpecEngine {
                 let host = url_host(&ctx);
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
-                    endpoints: endpoints_of(&t, &ctx.settings, &host, &scheme)?,
                     auth,
                     headers: header_templates(&t)?,
                     refusal_json: refusal_json(&t)?,
@@ -1409,6 +1433,27 @@ impl SpecEngine {
             other => return Err(format!("transport '{other}' is not implemented")),
         };
 
+        // Other HTTP servers of the device: beside an HTTP transport, with
+        // its scheme and certificate choice as defaults; beside any other,
+        // plain HTTP without a credential unless they say otherwise.
+        let endpoints = match &transport {
+            Transport::Http {
+                base,
+                accept_invalid_certs,
+                ..
+            } => {
+                let scheme = base.split("://").next().unwrap_or("http");
+                endpoints_of(
+                    &t,
+                    &ctx.settings,
+                    &url_host(&ctx),
+                    scheme,
+                    *accept_invalid_certs,
+                    true,
+                )?
+            }
+            _ => endpoints_of(&t, &ctx.settings, &url_host(&ctx), "http", false, false)?,
+        };
         // A list of probes, each for some models: the first for this one.
         let probe = match t.get("probe") {
             Some(Value::Array(items)) => items.iter().find(|i| for_model(i, &ctx.model)).cloned(),
@@ -1720,6 +1765,7 @@ impl SpecEngine {
             monitor: ctx.monitor,
             settings: ctx.settings,
             transport,
+            endpoints,
             timeout,
             probe,
             link: Connection::Connecting,
@@ -1788,6 +1834,24 @@ impl SpecEngine {
     /// `expect.address`, nothing extra: the awaited address is rendered
     /// separately.
     fn build(&self, item: &Value, values: &Values) -> Result<Outgoing, String> {
+        // A request to an HTTP server of a device whose transport is not
+        // HTTP (SPEC.md §2, Endpoints): no credential, header or session.
+        if !matches!(self.transport, Transport::Http { .. }) {
+            if let Some(name) = str_field(item, "endpoint") {
+                let e = self.endpoint(name)?;
+                return self.http_request(
+                    item,
+                    values,
+                    &e.base,
+                    Route::Endpoint {
+                        credentialed: false,
+                    },
+                    HttpAuth::None,
+                    e.accept_invalid_certs,
+                    &[],
+                );
+            }
+        }
         match &self.transport {
             Transport::LineTcp { send, ascii, .. } | Transport::LineUdp { send, ascii, .. } => {
                 let template = line_message(item).ok_or("a line message must be a string")?;
@@ -1814,23 +1878,21 @@ impl SpecEngine {
                 auth,
                 accept_invalid_certs,
                 headers: extra,
-                endpoints,
                 ..
             } => {
                 // `endpoint`: another HTTP server of the device, on the same
                 // host; the transport's credential and headers go there only
                 // with `auth: inherit`, and the session never does.
-                let (base, route) = match str_field(item, "endpoint") {
-                    None => (base, Route::Main),
+                let (base, route, insecure) = match str_field(item, "endpoint") {
+                    None => (base, Route::Main, *accept_invalid_certs),
                     Some(name) => {
-                        let e = endpoints.get(name).ok_or_else(|| {
-                            format!("no endpoint '{name}' in transport.endpoints")
-                        })?;
+                        let e = self.endpoint(name)?;
                         (
                             &e.base,
                             Route::Endpoint {
                                 credentialed: e.credentialed,
                             },
+                            e.accept_invalid_certs,
                         )
                     }
                 };
@@ -1839,83 +1901,104 @@ impl SpecEngine {
                         credentialed: false,
                     };
                 let auth = if credentialed { *auth } else { HttpAuth::None };
-                let method = str_field(item, "method").unwrap_or("GET");
-                let method: &'static str = match method {
-                    "GET" => "GET",
-                    "POST" => "POST",
-                    "PUT" => "PUT",
-                    "PATCH" => "PATCH",
-                    "DELETE" => "DELETE",
-                    other => return Err(format!("method {other} is not supported")),
-                };
-                let path = render(
-                    str_field(item, "path").unwrap_or("/"),
-                    values,
-                    percent_encode,
-                )?;
-                let mut url = format!("{base}{path}");
-                if let Some(raw) = str_field(item, "raw_query") {
-                    url.push('?');
-                    url.push_str(&render(raw, values, no_escape)?);
-                } else if let Some(query) = item.get("query").and_then(Value::as_object) {
-                    let mut pairs = Vec::new();
-                    for (k, v) in query {
-                        let v = render(v.as_str().unwrap_or(""), values, no_escape)?;
-                        pairs.push(format!("{}={}", percent_encode(k), percent_encode(&v)));
-                    }
-                    url.push('?');
-                    url.push_str(&pairs.join("&"));
-                }
-                let mut headers = auth_headers(auth, &self.auth_header, &self.settings);
-                if credentialed {
-                    headers.extend(render_headers(extra, values)?);
-                }
-                // The session held (`transport.session`), on every request
-                // but one sent without it.
-                if let Some((name, value)) = &self.session_token {
-                    if item.get("session") != Some(&Value::Bool(false)) && route == Route::Main {
-                        headers.push((name.clone(), value.clone()));
-                    }
-                }
-                let setting = |name: &str| {
-                    self.settings
-                        .get(name)
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .to_string()
-                };
-                let (user, pass) = (setting("username"), setting("password"));
-                // Headers of this message alone (a file name in
-                // Content-Disposition), templates over its parameters.
-                if item.get("headers").is_some() {
-                    let templates = header_templates(item)?;
-                    headers.extend(render_headers(&templates, values)?);
-                }
-                let (body, content_type) = request_body(item, values)?;
-                if let Some(ct) = content_type {
-                    headers.push(("Content-Type".into(), ct));
-                }
-                Ok(Outgoing::Http(
-                    HttpRequest {
-                        method,
-                        url,
-                        headers,
-                        body,
-                        timeout: Some(self.timeout),
-                        accept_invalid_certs: *accept_invalid_certs,
-                        // Basic devices that answer with a Digest challenge get it
-                        // answered too (SPEC.md §2).
-                        digest: matches!(auth, HttpAuth::Basic | HttpAuth::Digest).then_some(
-                            Credentials {
-                                username: user,
-                                password: pass,
-                            },
-                        ),
-                    },
-                    route,
-                ))
+                let extra: &[(String, String)] = if credentialed { extra } else { &[] };
+                self.http_request(item, values, base, route, auth, insecure, extra)
             }
         }
+    }
+
+    /// A declared endpoint (`transport.endpoints`), by name.
+    fn endpoint(&self, name: &str) -> Result<&Endpoint, String> {
+        self.endpoints
+            .get(name)
+            .ok_or_else(|| format!("no endpoint '{name}' in transport.endpoints"))
+    }
+
+    /// One HTTP request: to the transport's own server or an endpoint, with
+    /// the credential `auth` and the transport headers `extra` (both empty
+    /// where they do not go).
+    #[allow(clippy::too_many_arguments)]
+    fn http_request(
+        &self,
+        item: &Value,
+        values: &Values,
+        base: &str,
+        route: Route,
+        auth: HttpAuth,
+        accept_invalid_certs: bool,
+        extra: &[(String, String)],
+    ) -> Result<Outgoing, String> {
+        let method = str_field(item, "method").unwrap_or("GET");
+        let method: &'static str = match method {
+            "GET" => "GET",
+            "POST" => "POST",
+            "PUT" => "PUT",
+            "PATCH" => "PATCH",
+            "DELETE" => "DELETE",
+            other => return Err(format!("method {other} is not supported")),
+        };
+        let path = render(
+            str_field(item, "path").unwrap_or("/"),
+            values,
+            percent_encode,
+        )?;
+        let mut url = format!("{base}{path}");
+        if let Some(raw) = str_field(item, "raw_query") {
+            url.push('?');
+            url.push_str(&render(raw, values, no_escape)?);
+        } else if let Some(query) = item.get("query").and_then(Value::as_object) {
+            let mut pairs = Vec::new();
+            for (k, v) in query {
+                let v = render(v.as_str().unwrap_or(""), values, no_escape)?;
+                pairs.push(format!("{}={}", percent_encode(k), percent_encode(&v)));
+            }
+            url.push('?');
+            url.push_str(&pairs.join("&"));
+        }
+        let mut headers = auth_headers(auth, &self.auth_header, &self.settings);
+        headers.extend(render_headers(extra, values)?);
+        // The session held (`transport.session`), on every request
+        // but one sent without it.
+        if let Some((name, value)) = &self.session_token {
+            if item.get("session") != Some(&Value::Bool(false)) && route == Route::Main {
+                headers.push((name.clone(), value.clone()));
+            }
+        }
+        let setting = |name: &str| {
+            self.settings
+                .get(name)
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string()
+        };
+        let (user, pass) = (setting("username"), setting("password"));
+        // Headers of this message alone (a file name in
+        // Content-Disposition), templates over its parameters.
+        if item.get("headers").is_some() {
+            let templates = header_templates(item)?;
+            headers.extend(render_headers(&templates, values)?);
+        }
+        let (body, content_type) = request_body(item, values)?;
+        if let Some(ct) = content_type {
+            headers.push(("Content-Type".into(), ct));
+        }
+        Ok(Outgoing::Http(
+            HttpRequest {
+                method,
+                url,
+                headers,
+                body,
+                timeout: Some(self.timeout),
+                accept_invalid_certs,
+                // Basic devices that answer with a Digest challenge get it
+                // answered too (SPEC.md §2).
+                digest: matches!(auth, HttpAuth::Basic | HttpAuth::Digest).then_some(Credentials {
+                    username: user,
+                    password: pass,
+                }),
+            },
+            route,
+        ))
     }
 
     fn prepare(&mut self, job: &Job) -> Result<InFlight, String> {
@@ -1990,6 +2073,7 @@ impl SpecEngine {
             };
             let outgoing = self.build(&item, &values)?;
             let text = match (&self.transport, line_message(&item)) {
+                (_, _) if matches!(outgoing, Outgoing::Http(..)) => None,
                 (Transport::LineTcp { .. } | Transport::LineUdp { .. }, Some(template)) => {
                     Some(render(template, &values, no_escape)?)
                 }
@@ -2086,12 +2170,28 @@ impl SpecEngine {
         }
     }
 
+    /// Whether every message of a command goes to an endpoint: beside a
+    /// stream transport it is sent while the stream is down (a HyperDeck
+    /// whose Ethernet Protocol is off is turned back on over its
+    /// configuration API).
+    fn on_endpoints(&self, job: &Job) -> bool {
+        job.id.is_some()
+            && self
+                .command_items(&job.name)
+                .is_ok_and(|items| items.iter().all(|i| i.get("endpoint").is_some()))
+    }
+
     fn pump(&mut self, cx: &mut Cx) {
         while self.current.is_none() {
             if !self.queue.is_empty() && self.oauth_holds(cx) {
                 return;
             }
-            if !self.can_send() && self.queue.front().is_some_and(|j| j.id.is_some()) {
+            if !self.can_send()
+                && self
+                    .queue
+                    .front()
+                    .is_some_and(|j| j.id.is_some() && !self.on_endpoints(j))
+            {
                 // Fail rather than hold: the caller should not wait out a
                 // reconnect it cannot see.
                 let job = self.queue.pop_front().unwrap();
@@ -2488,13 +2588,15 @@ impl SpecEngine {
             return;
         }
 
+        // An endpoint's HTTP reply has no header line, whatever the
+        // transport's line replies have.
         let headed = matches!(
             self.transport,
             Transport::LineTcp {
                 reply: ReplyFraming::HeadedBlock,
                 ..
             }
-        );
+        ) && matches!(reply, Reply::Text(_));
         let result = expect::evaluate(
             &flight.expect,
             &flight.returns,
@@ -2655,10 +2757,19 @@ impl SpecEngine {
     }
 
     fn fail_all(&mut self, cx: &mut Cx, error: CommandError) {
-        cx.cancel_timer(REPLY);
-        if let Some(flight) = self.current.take() {
-            if let Some(id) = flight.id {
-                cx.complete(id, Err(error.clone()));
+        // A request to an endpoint, beside a stream that has dropped (a
+        // HyperDeck's Ethernet Protocol turned off over its configuration
+        // API), is answered over its own connection: it goes on.
+        let on_endpoint = !matches!(self.transport, Transport::Http { .. })
+            && self.current.as_ref().is_some_and(|f| {
+                matches!(f.awaiting, Some(Await::Http(_))) && f.route != Route::Main
+            });
+        if !on_endpoint {
+            cx.cancel_timer(REPLY);
+            if let Some(flight) = self.current.take() {
+                if let Some(id) = flight.id {
+                    cx.complete(id, Err(error.clone()));
+                }
             }
         }
         for job in self.queue.drain(..) {
@@ -2883,7 +2994,9 @@ impl SpecEngine {
             specs,
         } in items
         {
-            if queued {
+            // A request to an endpoint is an HTTP request, queued whatever
+            // the transport.
+            if queued || item.get("endpoint").is_some() {
                 // A slow device must not fall behind: a poll item still
                 // waiting from the last round is not queued again, and a
                 // re-read already waiting serves a second push too.
@@ -3990,6 +4103,7 @@ impl Module for SpecEngine {
         self.ctx = fresh.ctx;
         self.settings = fresh.settings;
         self.transport = fresh.transport;
+        self.endpoints = fresh.endpoints;
         self.events = fresh.events;
         // A session was opened with the old credential: the next request
         // logs in with the new one.
@@ -7049,6 +7163,281 @@ state:
             &completed(&cx.take())[..],
             [(1, Err(CommandError::InvalidParams { .. }))]
         ));
+    }
+
+    /// A line device with a configuration API on HTTP beside it (a
+    /// HyperDeck's Ethernet Protocol and its admin API).
+    const LINE_ENDPOINT: &str = r#"
+spec: 1
+id: line-endpoint-test
+name: Line endpoint test
+vendor: Test
+category: other
+source: [{ title: test }]
+transport:
+  type: line-tcp
+  port: 9993
+  framing: terminated
+  terminator: crlf
+  reply_framing: headed-block
+  reply_match: "^[12][0-9][0-9] "
+  probe: ping
+  endpoints:
+    admin: { port: { setting: admin_port }, scheme: { setting: admin_scheme }, accept_invalid_certs: true }
+settings:
+  admin_port: { type: int, min: 1, max: 65535, default: 80 }
+  admin_scheme: { type: enum, values: [http, https], default: http }
+ports:
+  - { port: 9993, protocol: tcp, role: control }
+  - { port: 80, protocol: http, role: control, setting: admin_port }
+models: [{ id: m, name: M, supports: [stop, name, csr], verification: none }]
+commands:
+  stop: { send: stop, expect: { code_range: [200, 299] }, returns: ack }
+  name:
+    params: { name: { type: string, required: true } }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/setupBasic/name, body: '{"name":{name:json}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/setupBasic }
+    expect: { status: [200, 204] }
+    returns: ack
+  csr: { send: { endpoint: admin, method: GET, path: /admin/api/v1/csr }, expect: { status: 200 }, returns: text }
+telemetry:
+  poll:
+    - every_ms: 30000
+      send: [{ endpoint: admin, method: GET, path: /admin/api/v1/setupBasic }]
+  updates:
+    - path: "^/admin/api/v1/setupBasic$"
+      json: { name: "$.response.deviceName" }
+      state: { admin.name: "{name}" }
+state:
+  admin.name: { type: string, description: "Name" }
+"#;
+
+    fn line_endpoint(settings: Value, monitor: bool) -> SpecEngine {
+        let spec: DeviceSpec = crate::yaml::from_str(LINE_ENDPOINT).unwrap();
+        let settings =
+            crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings,
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    fn named(name: &str) -> Params {
+        json!({ "name": name }).as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn an_endpoint_beside_a_line_transport_takes_http_requests() {
+        let mut e = line_endpoint(json!({}), false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.tcp(&mut cx, "device", TcpInput::Connected);
+        assert!(connected(&cx.take()));
+
+        // The write and its read-back go to the endpoint, without a
+        // credential, while line commands keep their socket.
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "name", &named("Deck 4"));
+        let a = cx.take();
+        assert!(tcp_sent(&a).is_empty());
+        let (rid, request) = requests(&a).remove(0);
+        assert_eq!(request.method, "PUT");
+        assert_eq!(
+            request.url,
+            "http://127.0.0.1:80/admin/api/v1/setupBasic/name"
+        );
+        assert_eq!(request.body.as_deref(), Some(&b"{\"name\":\"Deck 4\"}"[..]));
+        assert!(request.accept_invalid_certs);
+        assert_eq!(header(&request, "Authorization"), None);
+        assert!(request.digest.is_none());
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, rid, answer(r#"{"success":true}"#, None));
+        let (rid, request) = requests(&cx.take()).remove(0);
+        assert_eq!(request.method, "GET");
+        let mut cx = Cx::new(4);
+        e.http_response(
+            &mut cx,
+            rid,
+            answer(
+                r#"{"response":{"deviceName":"Deck 4"},"success":true}"#,
+                None,
+            ),
+        );
+        let a = cx.take();
+        // The read-back goes to the rules, though the device is not
+        // monitored; an endpoint's answer is not the line's round trip.
+        assert!(a.contains(&Action::State(json!({"admin": {"name": "Deck 4"}}))));
+        assert!(!a.iter().any(|a| matches!(a, Action::RoundTrip(_))));
+        assert_eq!(completed(&a), vec![(1, Ok(Outcome::Ack))]);
+
+        // A text answer keeps its first line: it is not a headed block.
+        let mut cx = Cx::new(5);
+        e.command(&mut cx, 2, "csr", &Params::new());
+        let (rid, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(6);
+        e.http_response(
+            &mut cx,
+            rid,
+            Ok(HttpResponse {
+                status: 200,
+                headers: Vec::new(),
+                body: b"-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n".to_vec(),
+            }),
+        );
+        assert_eq!(
+            completed(&cx.take()),
+            vec![(
+                2,
+                Ok(Outcome::Value {
+                    value: json!("-----BEGIN CERTIFICATE REQUEST-----\nMIIB")
+                })
+            )]
+        );
+
+        // A refusal is that request's answer only: nothing is terminal.
+        let mut cx = Cx::new(7);
+        e.command(&mut cx, 3, "name", &named("Deck 5"));
+        let (rid, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(8);
+        e.http_response(
+            &mut cx,
+            rid,
+            Ok(HttpResponse {
+                status: 401,
+                headers: Vec::new(),
+                body: Vec::new(),
+            }),
+        );
+        let a = cx.take();
+        assert!(matches!(
+            &completed(&a)[..],
+            [(3, Err(CommandError::DeviceError { code: Some(c), .. }))] if c == "401"
+        ));
+        assert!(e.refused.is_none());
+
+        // An endpoint that does not answer in time fails its command and
+        // leaves the line's stream open.
+        let mut cx = Cx::new(9);
+        e.command(&mut cx, 4, "name", &named("Deck 6"));
+        cx.take();
+        let mut cx = Cx::new(3000);
+        e.timer(&mut cx, REPLY);
+        let a = cx.take();
+        assert_eq!(completed(&a), vec![(4, Err(CommandError::Timeout))]);
+        assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
+        assert_eq!(e.link, Connection::Connected);
+    }
+
+    #[test]
+    fn an_endpoint_command_goes_while_the_line_is_down() {
+        let mut e = line_endpoint(json!({"admin_scheme": "https", "admin_port": 443}), false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let mut cx = Cx::new(1);
+        e.tcp(&mut cx, "device", TcpInput::Connected);
+        cx.take();
+
+        // The line drops while the endpoint's request is out (the deck's
+        // Ethernet Protocol turned off): the request goes on.
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "name", &named("Deck 4"));
+        let (rid, request) = requests(&cx.take()).remove(0);
+        assert_eq!(
+            request.url,
+            "https://127.0.0.1:443/admin/api/v1/setupBasic/name"
+        );
+        let mut cx = Cx::new(3);
+        e.tcp(
+            &mut cx,
+            "device",
+            TcpInput::Closed {
+                reason: "closed by the device".into(),
+            },
+        );
+        let a = cx.take();
+        assert!(completed(&a).is_empty());
+        assert!(matches!(e.link, Connection::Disconnected { .. }));
+        let mut cx = Cx::new(4);
+        e.http_response(&mut cx, rid, answer("{}", None));
+        let (rid, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(5);
+        e.http_response(&mut cx, rid, answer("{}", None));
+        assert_eq!(completed(&cx.take()), vec![(1, Ok(Outcome::Ack))]);
+
+        // While it is down, an endpoint's command still goes; a line
+        // command fails at once.
+        let mut cx = Cx::new(6);
+        e.command(&mut cx, 2, "stop", &Params::new());
+        e.command(&mut cx, 3, "name", &named("Deck 5"));
+        let a = cx.take();
+        assert_eq!(completed(&a), vec![(2, Err(CommandError::NotConnected))]);
+        assert!(tcp_sent(&a).is_empty());
+        assert_eq!(requests(&a).len(), 1);
+    }
+
+    #[test]
+    fn an_endpoint_poll_beside_a_line_transport_is_queued() {
+        let mut e = line_endpoint(json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let mut cx = Cx::new(1);
+        e.tcp(&mut cx, "device", TcpInput::Connected);
+        let a = cx.take();
+        let (rid, request) = requests(&a).remove(0);
+        assert!(request.url.ends_with(":80/admin/api/v1/setupBasic"));
+        // A line command waits behind it, and goes once it is answered.
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "stop", &Params::new());
+        assert!(tcp_sent(&cx.take()).is_empty());
+        let mut cx = Cx::new(3);
+        e.http_response(
+            &mut cx,
+            rid,
+            answer(r#"{"response":{"deviceName":"Deck A"}}"#, None),
+        );
+        let a = cx.take();
+        assert!(a.contains(&Action::State(json!({"admin": {"name": "Deck A"}}))));
+        assert_eq!(tcp_sent(&a), vec!["stop\r\n".to_string()]);
+        // An unreachable endpoint is logged, not a lost device.
+        let mut cx = Cx::new(4);
+        e.tcp(&mut cx, "device", TcpInput::Data(b"200 ok\r\n".to_vec()));
+        assert_eq!(completed(&cx.take()), vec![(1, Ok(Outcome::Ack))]);
+        let mut cx = Cx::new(30_000);
+        e.timer(&mut cx, POLL);
+        let (rid, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(30_001);
+        e.http_response(&mut cx, rid, Err("connection refused".into()));
+        assert!(!cx.take().iter().any(|a| matches!(a, Action::Connection(_))));
+        assert_eq!(e.link, Connection::Connected);
+    }
+
+    #[test]
+    fn an_endpoint_beside_a_line_transport_has_no_credential_to_inherit() {
+        let mut spec: DeviceSpec = crate::yaml::from_str(LINE_ENDPOINT).unwrap();
+        spec.transport.as_mut().unwrap()["endpoints"]["admin"]["auth"] = json!("inherit");
+        let ctx = OpenContext {
+            host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
+            port: None,
+            model: "m".into(),
+            channels: None,
+            settings: crate::catalog::validate(&spec.settings, &Params::new()).unwrap(),
+            monitor: false,
+        };
+        let err = SpecEngine::new(Arc::new(spec), ctx).err().unwrap();
+        assert!(err.contains("credential to inherit"), "{err}");
     }
 
     const BINARY: &str = r#"

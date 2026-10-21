@@ -36,6 +36,38 @@ source:
       field names, and the 513 display timecode, 514 timeline position and
       515 playrange notifications with their fields (src/codes.ts,
       src/asyncHandlers, src/commands)
+  - title: Blackmagic HyperDeck Operation Manual (HyperDeck Studio HD Mini, HD Plus, HD Pro, 4K Pro), 20 February 2026
+    url: https://documents.blackmagicdesign.com/UserManuals/HyperDeckHDManual.pdf
+    note: >
+      Manufacturer manual. What each configuration setting is and does, not
+      its API: "Blackmagic HyperDeck Setup" chapter (p.45-50: name, identify,
+      date and time with NTP and time zone, DHCP or static network, network
+      access for FTP, the web media manager and the Ethernet Protocol, allow
+      utility administration over the network or USB only, secure login
+      settings, the secure certificate: self-signed, signing request with
+      common name, subject alternative name, country, state, location and
+      organization, and import), the Settings chapter's date and time (p.24:
+      time.cloudflare.com the default NTP server) and "Transferring Files
+      over a Network" (p.52-53)
+  - title: REST API for HyperDeck (Developer Information, December 2024)
+    url: https://documents.blackmagicdesign.com/DeveloperManuals/RESTAPIForHyperDeck.pdf
+    note: >
+      Manufacturer document for /control/api/v1 (transport, media, system).
+      Read to establish that it does not cover the configuration API at
+      /admin/api/v1: nothing here is taken from it
+  - title: bmdwire, hyperdeckwire package (MIT), version 1.6.0
+    url: https://github.com/lucas-romanenko/bmdwire/tree/main/hyperdeckwire
+    note: >
+      hyperdeckwire/LICENSE is MIT (the repository's LICENSE gives each
+      package its own; only hyperdeckwire was read). Read, not copied, for
+      the configuration API at /admin/api/v1, which Blackmagic does not
+      document: every path, request body and reply shape (setup.py,
+      docs/API.md "Configuration", and the replies in
+      tests/test_hyperdeckwire_setup.py, which it says were taken from a
+      HyperDeck Studio HD Mini on software 9.0.2), that reads answer while
+      a write is refused with HTTP 401 when utility administration is USB
+      only, and that the reboot takes a key from a GET first. Its README
+      reports port 80 closed on the HD Mini's software 8.1.1
 
 transport:
   type: line-tcp
@@ -48,11 +80,22 @@ transport:
   reply_framing: headed-block
   reply_match: "^[12][0-9][0-9] "
   probe: "ping"
+  # The configuration API HyperDeck Setup drives, on the deck's HTTP port
+  # (SPEC.md §2, Endpoints). It takes no credential (hyperdeckwire, measured
+  # on software 9.0.2); over HTTPS the deck's certificate is usually its own
+  # self-signed one.
+  endpoints:
+    admin:
+      port: { setting: admin_port }
+      scheme: { setting: admin_scheme }
+      accept_invalid_certs: true
 
 settings:
   # Only for decks set up for secure access; left empty, nothing is sent.
   username: { type: string, max_length: 255, label: Username, description: "User name for a deck set up for secure access, case sensitive; leave empty when the deck has none." }
   password: { type: string, max_length: 255, secret: true, default: "", label: Password, description: "Password for a deck set up for secure access, case sensitive." }
+  admin_port: { type: int, min: 1, max: 65535, default: 80, label: Configuration API port, description: "The deck's HTTP port, where HyperDeck Setup's configuration API answers; 80 unless the deck serves it elsewhere." }
+  admin_scheme: { type: enum, values: [http, https], default: http, label: Configuration API scheme, description: "http, or https for a deck that serves its configuration API encrypted (set the port to 443 with it)." }
 
 on_connect:
   # Multiline-only "authenticate:" (p.8): username and password, each case
@@ -65,6 +108,7 @@ on_connect:
 
 ports:
   - { port: 9993, protocol: tcp, role: control }
+  - { port: 80, protocol: http, role: control, setting: admin_port, note: "configuration API (/admin/api/v1) on HyperDeck Studio, Extreme and Shuttle; 443 over https" }
   - { port: 5353, protocol: udp, role: discovery, note: "mDNS / DNS-SD (Bonjour)" }
 
 models:
@@ -263,6 +307,46 @@ models:
       - add_nas_with_credentials
       - remove_nas
       - select_nas
+      - get_admin_heartbeat
+      - get_admin_capabilities
+      - get_setup
+      - set_device_name
+      - get_languages
+      - set_language
+      - start_admin_identify
+      - stop_admin_identify
+      - get_remote_admin
+      - get_network_interface
+      - set_network_interface
+      - set_network_interface_one_dns
+      - set_network_interface_no_dns
+      - get_network_access
+      - get_network_access_options
+      - set_network_access
+      - get_ethernet_protocol
+      - set_ethernet_protocol
+      - get_certificate
+      - create_self_signed_certificate
+      - install_certificate
+      - delete_certificate
+      - create_signing_request
+      - create_signing_request_with_alternative_name
+      - download_signing_request
+      - get_admin_status
+      - get_users
+      - create_user
+      - rename_user
+      - set_user_password
+      - set_user_admin_access
+      - delete_user
+      - get_date_time
+      - set_date_time
+      - get_ntp
+      - set_ntp
+      - get_timezone
+      - set_timezone
+      - get_reboot_key
+      - admin_reboot
     verification: none
     notes: >
       December 2024 protocol. HD video formats on every Studio; Studio Pro and
@@ -436,6 +520,46 @@ models:
       - add_nas_with_credentials
       - remove_nas
       - select_nas
+      - get_admin_heartbeat
+      - get_admin_capabilities
+      - get_setup
+      - set_device_name
+      - get_languages
+      - set_language
+      - start_admin_identify
+      - stop_admin_identify
+      - get_remote_admin
+      - get_network_interface
+      - set_network_interface
+      - set_network_interface_one_dns
+      - set_network_interface_no_dns
+      - get_network_access
+      - get_network_access_options
+      - set_network_access
+      - get_ethernet_protocol
+      - set_ethernet_protocol
+      - get_certificate
+      - create_self_signed_certificate
+      - install_certificate
+      - delete_certificate
+      - create_signing_request
+      - create_signing_request_with_alternative_name
+      - download_signing_request
+      - get_admin_status
+      - get_users
+      - create_user
+      - rename_user
+      - set_user_password
+      - set_user_admin_access
+      - delete_user
+      - get_date_time
+      - set_date_time
+      - get_ntp
+      - set_ntp
+      - get_timezone
+      - set_timezone
+      - get_reboot_key
+      - admin_reboot
     verification: none
     notes: >
       December 2024 protocol. Adds SD, 2160p and 4K formats; Extreme 8K HDR
@@ -609,6 +733,46 @@ models:
       - add_nas_with_credentials
       - remove_nas
       - select_nas
+      - get_admin_heartbeat
+      - get_admin_capabilities
+      - get_setup
+      - set_device_name
+      - get_languages
+      - set_language
+      - start_admin_identify
+      - stop_admin_identify
+      - get_remote_admin
+      - get_network_interface
+      - set_network_interface
+      - set_network_interface_one_dns
+      - set_network_interface_no_dns
+      - get_network_access
+      - get_network_access_options
+      - set_network_access
+      - get_ethernet_protocol
+      - set_ethernet_protocol
+      - get_certificate
+      - create_self_signed_certificate
+      - install_certificate
+      - delete_certificate
+      - create_signing_request
+      - create_signing_request_with_alternative_name
+      - download_signing_request
+      - get_admin_status
+      - get_users
+      - create_user
+      - rename_user
+      - set_user_password
+      - set_user_admin_access
+      - delete_user
+      - get_date_time
+      - set_date_time
+      - get_ntp
+      - set_ntp
+      - get_timezone
+      - set_timezone
+      - get_reboot_key
+      - admin_reboot
     verification: none
     notes: >
       December 2024 protocol. HD video formats and the file formats common to
@@ -1935,6 +2099,373 @@ commands:
     expect: { code_range: [200, 299] }
     returns: ack
 
+  # ── Configuration API (admin endpoint, HTTP) ───────────────────────────
+  # What Blackmagic HyperDeck Setup shows for a networked deck (the manual's
+  # "Blackmagic HyperDeck Setup" chapter) lives on a REST API at
+  # /admin/api/v1 on the deck's HTTP port. Blackmagic does not document the
+  # API itself; its paths, bodies and replies are hyperdeckwire's (MIT),
+  # measured on two HyperDeck Studio HD Mini units on software 9.0.2. Every
+  # reply wraps its value as {"response": ..., "success": true}. A write is
+  # followed by a read of what it changed, so state holds what the deck
+  # keeps; a write the deck refuses (HTTP 401 while utility administration
+  # is limited to USB) fails with that status.
+  get_admin_heartbeat:
+    summary: Whether the configuration API answers (GET /admin/api/v1/heartBeat)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/heartBeat }
+    expect: { status: 200, json_path: "$.success" }
+    returns: value
+
+  get_admin_capabilities:
+    summary: The configuration API's sections and their versions (GET /admin/api/v1/capabilities)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/capabilities }
+    expect: { status: 200, json_path: "$.response" }
+    returns: value
+
+  get_setup:
+    summary: Product, name, host name, software, build, hardware and language (GET /admin/api/v1/setupBasic)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/setupBasic }
+    expect: { status: 200, json_path: "$.response" }
+    returns: value
+
+  set_device_name:
+    summary: Name the deck (the name 204 device info reports); the deck derives its host name from it
+    params:
+      name: { type: string, max_length: 64, required: true, label: Name, description: "The deck's name, as HyperDeck Setup and device info show it." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/setupBasic/name, body: '{"name":{name:json}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/setupBasic }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_languages:
+    summary: The languages the deck offers, each a locale code and a name (GET /admin/api/v1/languages)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/languages }
+    expect: { status: 200, json_path: "$.response.languages" }
+    returns: value
+
+  set_language:
+    summary: Set the deck's language by locale code, one of those get_languages lists
+    params:
+      language: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_.@-]+$", required: true, label: Language, description: "A locale code from the deck's language list, such as en_US.UTF-8." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/setupBasic/language, body: '{"language":{language:json}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/setupBasic }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  start_admin_identify:
+    summary: Flash the deck's front panel over the configuration API, as HyperDeck Setup's identify does
+    send: { endpoint: admin, method: PUT, path: /admin/api/v1/setupBasic/identify }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  stop_admin_identify:
+    summary: Stop the front panel flashing that start_admin_identify started
+    send: { endpoint: admin, method: DELETE, path: /admin/api/v1/setupBasic/identify }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_remote_admin:
+    summary: Whether utility administration is allowed over the network as well as USB, and whether this request came over USB (GET /admin/api/v1/remoteAdmin)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/remoteAdmin }
+    expect: { status: 200, json_path: "$.response" }
+    returns: value
+
+  get_network_interface:
+    summary: A network interface's configured and running address, netmask, gateway and DNS, DHCP or static, link and speed
+    params:
+      interface: { type: int, min: 0, max: 7, default: 0, label: Interface, description: "Interface id, 0 for the deck's Ethernet port." }
+    send: { endpoint: admin, method: GET, path: "/admin/api/v1/network/interface/{interface}" }
+    expect: { status: 200, json_path: "$.response" }
+    returns: value
+
+  set_network_interface:
+    summary: Set a network interface whole, with two DNS servers; the deck may move to another address at once
+    params:
+      interface: { type: int, min: 0, max: 7, default: 0, label: Interface, description: "Interface id, 0 for the deck's Ethernet port." }
+      type: { type: enum, values: [DHCP, Static], required: true, label: Addressing, description: "DHCP takes an address from the network, Static uses the address below." }
+      address: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Address, description: "The static IPv4 address, kept for when the interface is static." }
+      netmask: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Netmask, description: "The static subnet mask, such as 255.255.255.0." }
+      gateway: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Gateway, description: "The static default gateway's IPv4 address." }
+      dns_primary: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Primary DNS, description: "The first DNS server's IPv4 address." }
+      dns_secondary: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Secondary DNS, description: "The second DNS server's IPv4 address." }
+    send:
+      endpoint: admin
+      method: PUT
+      path: "/admin/api/v1/network/interface/{interface}"
+      body: '{"id":"{interface}","type":"{type}","address":{address:json},"netmask":{netmask:json},"gateway":{gateway:json},"dnsServers":[{dns_primary:json},{dns_secondary:json}]}'
+      content_type: application/json
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_network_interface_one_dns:
+    summary: Set a network interface whole, with one DNS server; the deck may move to another address at once
+    params:
+      interface: { type: int, min: 0, max: 7, default: 0, label: Interface, description: "Interface id, 0 for the deck's Ethernet port." }
+      type: { type: enum, values: [DHCP, Static], required: true, label: Addressing, description: "DHCP takes an address from the network, Static uses the address below." }
+      address: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Address, description: "The static IPv4 address, kept for when the interface is static." }
+      netmask: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Netmask, description: "The static subnet mask, such as 255.255.255.0." }
+      gateway: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Gateway, description: "The static default gateway's IPv4 address." }
+      dns: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: DNS, description: "The DNS server's IPv4 address." }
+    send:
+      endpoint: admin
+      method: PUT
+      path: "/admin/api/v1/network/interface/{interface}"
+      body: '{"id":"{interface}","type":"{type}","address":{address:json},"netmask":{netmask:json},"gateway":{gateway:json},"dnsServers":[{dns:json}]}'
+      content_type: application/json
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_network_interface_no_dns:
+    summary: Set a network interface whole, with no DNS server; the deck may move to another address at once
+    params:
+      interface: { type: int, min: 0, max: 7, default: 0, label: Interface, description: "Interface id, 0 for the deck's Ethernet port." }
+      type: { type: enum, values: [DHCP, Static], required: true, label: Addressing, description: "DHCP takes an address from the network, Static uses the address below." }
+      address: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Address, description: "The static IPv4 address, kept for when the interface is static." }
+      netmask: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Netmask, description: "The static subnet mask, such as 255.255.255.0." }
+      gateway: { type: string, max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: Gateway, description: "The static default gateway's IPv4 address." }
+    send:
+      endpoint: admin
+      method: PUT
+      path: "/admin/api/v1/network/interface/{interface}"
+      body: '{"id":"{interface}","type":"{type}","address":{address:json},"netmask":{netmask:json},"gateway":{gateway:json},"dnsServers":[]}'
+      content_type: application/json
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_network_access:
+    summary: The FTP and web media manager (HTTP) access states and the URLs the deck gives for them (GET /admin/api/v1/networkAccess)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/networkAccess }
+    expect: { status: 200, json_path: "$.response.protocols" }
+    returns: value
+
+  get_network_access_options:
+    summary: Which access protocols offer a secure-only state, and which show a URL (GET /admin/api/v1/networkAccess/options)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/networkAccess/options }
+    expect: { status: 200, json_path: "$.response.options" }
+    returns: value
+
+  set_network_access:
+    summary: Set FTP and web media manager (HTTP) access together; the deck may answer that a reboot applies it
+    params:
+      ftp: { type: enum, values: [Disabled, Enabled, SecureOnly], required: true, label: FTP, description: "File transfer over FTP: off, on, or secure only where the deck offers it (it does not for FTP on the HD Mini)." }
+      http: { type: enum, values: [Disabled, Enabled, SecureOnly], required: true, label: Web media manager, description: "The web media manager: off, on over HTTP, or HTTPS only with the deck's certificate." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/networkAccess, body: '{"protocols":[{"id":"FTP","state":"{ftp}"},{"id":"HTTP","state":"{http}"}]}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/networkAccess }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_ethernet_protocol:
+    summary: Whether the HyperDeck Ethernet Protocol (TCP 9993) is enabled (GET /admin/api/v1/hyperDeckEthernetProtocol)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/hyperDeckEthernetProtocol }
+    expect: { status: 200, json_path: "$.response.state" }
+    returns: value
+
+  set_ethernet_protocol:
+    summary: Turn the HyperDeck Ethernet Protocol (TCP 9993) on, off or secure only; off drops this connection's protocol port
+    params:
+      state: { type: enum, values: [Disabled, Enabled, SecureOnly], required: true, label: Ethernet Protocol, description: "Disabled closes TCP 9993, Enabled opens it, SecureOnly requires the secure login." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/hyperDeckEthernetProtocol, body: '{"state":"{state}"}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/hyperDeckEthernetProtocol }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_certificate:
+    summary: The deck's host name and, with a certificate installed, its domain, issuer and validity (GET /admin/api/v1/certificate/summary)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/certificate/summary }
+    expect: { status: 200, json_path: "$.response" }
+    returns: value
+
+  create_self_signed_certificate:
+    summary: Have the deck issue itself a certificate for its host name, replacing any installed
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/certificate/selfSigned }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/certificate/summary }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  install_certificate:
+    summary: Import a signed certificate, the PEM text of the .cert, .crt or .pem file a certificate authority returned
+    params:
+      certificate: { type: string, multiline: true, max_length: 65536, required: true, label: Certificate, description: "The signed certificate as PEM text, from -----BEGIN CERTIFICATE----- to its end line." }
+    send:
+      - { endpoint: admin, method: POST, path: /admin/api/v1/certificate, body: '{"certificate":{certificate:json}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/certificate/summary }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  delete_certificate:
+    summary: Remove the installed certificate; HTTPS access then has none
+    send:
+      - { endpoint: admin, method: DELETE, path: /admin/api/v1/certificate }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/certificate/summary }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  create_signing_request:
+    summary: Have the deck generate a key pair and a certificate signing request; returns what the deck answers, which names the request to download
+    params:
+      common_name: { type: string, max_length: 255, required: true, label: Common name, description: "The domain name the deck will be reached by, such as hyperdeck.example.com." }
+      country: { type: string, max_length: 2, pattern: "^[A-Za-z]{2}$", required: true, label: Country, description: "The organization's two-letter country code, such as AU." }
+      state_name: { type: string, max_length: 128, required: true, label: State, description: "The organization's province, region, county or state." }
+      locality: { type: string, max_length: 128, required: true, label: Location, description: "The organization's town or city." }
+      organization: { type: string, max_length: 128, required: true, label: Organization, description: "The organization's name." }
+    send: { endpoint: admin, method: POST, path: /admin/api/v1/certificate/signingRequest, body: '{"commonName":{common_name:json},"country":{country:json},"stateName":{state_name:json},"locality":{locality:json},"organization":{organization:json}}', content_type: application/json }
+    expect: { status: [200, 201, 204], json_path: "$" }
+    returns: value
+
+  create_signing_request_with_alternative_name:
+    summary: As create_signing_request, with a subject alternative name, a second domain name for the deck
+    params:
+      common_name: { type: string, max_length: 255, required: true, label: Common name, description: "The domain name the deck will be reached by, such as hyperdeck.example.com." }
+      subject_alternative_name: { type: string, max_length: 255, required: true, label: Alternative name, description: "A second domain name for the deck, such as hyperdeck.example.net." }
+      country: { type: string, max_length: 2, pattern: "^[A-Za-z]{2}$", required: true, label: Country, description: "The organization's two-letter country code, such as AU." }
+      state_name: { type: string, max_length: 128, required: true, label: State, description: "The organization's province, region, county or state." }
+      locality: { type: string, max_length: 128, required: true, label: Location, description: "The organization's town or city." }
+      organization: { type: string, max_length: 128, required: true, label: Organization, description: "The organization's name." }
+    send: { endpoint: admin, method: POST, path: /admin/api/v1/certificate/signingRequest, body: '{"commonName":{common_name:json},"country":{country:json},"stateName":{state_name:json},"locality":{locality:json},"organization":{organization:json},"subjectAlternativeName":{subject_alternative_name:json}}', content_type: application/json }
+    expect: { status: [200, 201, 204], json_path: "$" }
+    returns: value
+
+  download_signing_request:
+    summary: The certificate signing request's file (.csr) as text, by the id the deck gave when creating it
+    params:
+      id: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Request id, description: "The signing request's id from create_signing_request's answer." }
+    send: { endpoint: admin, method: GET, path: "/admin/api/v1/certificate/signingRequest/{id}" }
+    expect: { status: 200 }
+    returns: text
+
+  get_admin_status:
+    summary: Whether the deck requires an administrator login (GET /admin/api/v1/auth/adminStatus)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/auth/adminStatus }
+    expect: { status: 200, json_path: "$.response.adminRequired" }
+    returns: value
+
+  get_users:
+    summary: The secure login users, each with its id, name, utility administration access and shared folder permissions (GET /admin/api/v1/auth/users)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/auth/users }
+    expect: { status: 200, json_path: "$.response.users" }
+    returns: value
+
+  create_user:
+    summary: Add a secure login user, for the web media manager and the Ethernet Protocol when set to secure only
+    params:
+      username: { type: string, max_length: 64, required: true, label: Username, description: "The new user's name, case sensitive." }
+      password: { type: string, max_length: 128, secret: true, required: true, label: Password, description: "The new user's password, case sensitive." }
+      remote_admin_utility_access: { type: bool, default: false, label: Utility administration, description: "On lets this user administer the deck with HyperDeck Setup over the network." }
+    send:
+      - { endpoint: admin, method: POST, path: /admin/api/v1/auth/user, body: '{"username":{username:json},"password":{password:json},"remoteAdminUtilityAccess":{remote_admin_utility_access}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/auth/users }
+    expect: { status: [200, 201, 204] }
+    returns: ack
+
+  rename_user:
+    summary: Change a secure login user's name
+    params:
+      user_id: { type: string, max_length: 32, pattern: "^[0-9A-Za-z_-]+$", required: true, label: User id, description: "The user's id, as the user list gives it (the guest user is 1)." }
+      username: { type: string, max_length: 64, required: true, label: Username, description: "The user's new name, case sensitive." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/auth/user, body: '{"authUserId":{user_id:json},"username":{username:json}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/auth/users }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_user_password:
+    summary: Change a secure login user's password
+    params:
+      user_id: { type: string, max_length: 32, pattern: "^[0-9A-Za-z_-]+$", required: true, label: User id, description: "The user's id, as the user list gives it (the guest user is 1)." }
+      password: { type: string, max_length: 128, secret: true, required: true, label: Password, description: "The user's new password, case sensitive." }
+    send: { endpoint: admin, method: PUT, path: /admin/api/v1/auth/user, body: '{"authUserId":{user_id:json},"password":{password:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  set_user_admin_access:
+    summary: Allow or refuse a secure login user administering the deck with HyperDeck Setup over the network
+    params:
+      user_id: { type: string, max_length: 32, pattern: "^[0-9A-Za-z_-]+$", required: true, label: User id, description: "The user's id, as the user list gives it (the guest user is 1)." }
+      enabled: { type: bool, required: true, label: Utility administration, description: "On lets the user administer the deck over the network, off does not." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/auth/user, body: '{"authUserId":{user_id:json},"remoteAdminUtilityAccess":{enabled}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/auth/users }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  delete_user:
+    summary: Remove a secure login user
+    params:
+      user_id: { type: string, max_length: 32, pattern: "^[0-9A-Za-z_-]+$", required: true, label: User id, description: "The user's id, as the user list gives it." }
+    send:
+      - { endpoint: admin, method: DELETE, path: /admin/api/v1/auth/user, body: '{"authUserId":{user_id:json}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/auth/users }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_date_time:
+    summary: The deck's clock in Unix seconds and as YYYYMMDD-HHMMSS, and its time zone offset (GET /admin/api/v1/dateAndTime)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime }
+    expect: { status: 200, json_path: "$.response" }
+    returns: value
+
+  set_date_time:
+    summary: Set the deck's clock and time zone offset by hand; with NTP on, the deck sets the clock itself
+    params:
+      time: { type: int, min: 0, max: 4294967295, required: true, label: Time, description: "The time to set, in Unix seconds (since 1970-01-01 UTC)." }
+      timezone_offset: { type: int, min: -720, max: 840, default: 0, label: Time zone offset, description: "Minutes ahead of UTC, negative behind it, such as -300 for UTC-5." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/dateAndTime, body: '{"time":"{time}","timezoneOffset":{timezone_offset}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_ntp:
+    summary: Whether the deck sets its clock from NTP, the server, and the synchronization state (GET /admin/api/v1/dateAndTime/ntp)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime/ntp }
+    expect: { status: 200, json_path: "$.response" }
+    returns: value
+
+  set_ntp:
+    summary: Set the NTP server and whether the deck sets its clock from it (time.cloudflare.com by default)
+    params:
+      server_url: { type: string, max_length: 255, pattern: "^[A-Za-z0-9.:_\\[\\]-]+$", required: true, label: NTP server, description: "The NTP server's host name or address, such as time.cloudflare.com." }
+      enabled: { type: bool, default: true, label: Auto set date and time, description: "On sets the clock from the server, off keeps the time set by hand." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/dateAndTime/ntp, body: '{"serverUrl":{server_url:json},"enabled":{enabled}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime/ntp }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_timezone:
+    summary: The deck's time zone offset from UTC in minutes (GET /admin/api/v1/dateAndTime/timezone)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime/timezone }
+    expect: { status: 200, json_path: "$.response.timezoneOffset" }
+    returns: value
+
+  set_timezone:
+    summary: Set the deck's time zone offset from UTC
+    params:
+      timezone_offset: { type: int, min: -720, max: 840, required: true, label: Time zone offset, description: "Minutes ahead of UTC, negative behind it, such as -300 for UTC-5." }
+    send:
+      - { endpoint: admin, method: PUT, path: /admin/api/v1/dateAndTime/timezone, body: '{"timezoneOffset":{timezone_offset}}', content_type: application/json }
+      - { endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime/timezone }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  get_reboot_key:
+    summary: The key admin_reboot must return, which the deck hands out so a stray request cannot reboot it (GET /admin/api/v1/reboot)
+    send: { endpoint: admin, method: GET, path: /admin/api/v1/reboot }
+    expect: { status: 200, json_path: "$.response.key" }
+    returns: value
+
+  admin_reboot:
+    summary: Reboot the deck over the configuration API with the key get_reboot_key gave; playback and recording stop
+    params:
+      key: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._~+/=-]+$", required: true, label: Reboot key, description: "The key get_reboot_key returned just before." }
+    send: { endpoint: admin, method: PUT, path: /admin/api/v1/reboot, body: '{"key":{key:json}}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
 codes:
   "100": syntax error
   "101": unsupported parameter
@@ -1992,34 +2523,55 @@ telemetry:
   # configuration and the timeline, and on 1.11 the playrange), and told to
   # send only the notifications of its era.
   poll:
-    send:
-      - "device info"
-      - "transport info"
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 1" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 2" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 3" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 4" }
-      - "disk list: slot id: 1"
-      - "disk list: slot id: 2"
-      - "disk list: slot id: 3"
-      - "disk list: slot id: 4"
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "remote" }
-      - "configuration"
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify" }
-      - "clips get"
-      - { models: [hyperdeck-1-11, hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "playrange" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "play on startup" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "play option" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "cache info" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "dynamic range" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate clips" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate project" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate lens" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "nas list" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "nas selected" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "external drive list" }
-      - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "external drive selected" }
+    - send:
+        - "device info"
+        - "transport info"
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 1" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 2" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 3" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slot info: slot id: 4" }
+        - "disk list: slot id: 1"
+        - "disk list: slot id: 2"
+        - "disk list: slot id: 3"
+        - "disk list: slot id: 4"
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "remote" }
+        - "configuration"
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "notify" }
+        - "clips get"
+        - { models: [hyperdeck-1-11, hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "playrange" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "play on startup" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "play option" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "cache info" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "dynamic range" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate clips" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate project" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "slate lens" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "nas list" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "nas selected" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "external drive list" }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], message: "external drive selected" }
+    # The configuration API (hyperdeckwire): what changes only when someone
+    # sets it up, asked once on connecting...
+    - send:
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/capabilities }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/languages }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/networkAccess/options }
+    # ...and what HyperDeck Setup or the front panel can change, once a
+    # minute: the deck pushes none of it.
+    - every_ms: 60000
+      send:
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/setupBasic }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/remoteAdmin }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/network/interface/0 }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/networkAccess }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/hyperDeckEthernetProtocol }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/certificate/summary }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/auth/adminStatus }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/auth/users }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime/ntp }
+        - { models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle], endpoint: admin, method: GET, path: /admin/api/v1/dateAndTime/timezone }
   updates:
     - header: "^500 connection info:$"
       fields:
@@ -2330,6 +2882,167 @@ telemetry:
       request_match: "^(?:clips (?:add|remove|clear|rebuild)|slot select)"
       then_send: ["clips get"]
 
+    # ── Configuration API (hyperdeckwire) ──────────────────────────────────
+    # Each reply is {"response": {...}, "success": true}; the polls above and
+    # every write's read-back come here alike.
+    - path: "^/admin/api/v1/capabilities$"
+      json_each: "$.response.*"
+      json: { version: "$.version" }
+      state: { "admin.capabilities.{key:key}.version": "{version}" }
+    - path: "^/admin/api/v1/setupBasic$"
+      json:
+        product_name: "$.response.productName"
+        short_product_name: "$.response.shortProductName"
+        product_id: "$.response.productId"
+        device_name: "$.response.deviceName"
+        hostname: "$.response.hostname"
+        software: "$.response.software"
+        build: "$.response.build"
+        hardware: "$.response.hardware"
+        language: "$.response.language"
+      state:
+        admin.setup.product_name: "{product_name}"
+        admin.setup.short_product_name: "{short_product_name}"
+        admin.setup.product_id: "{product_id}"
+        admin.setup.device_name: "{device_name}"
+        admin.setup.hostname: "{hostname}"
+        admin.setup.software: "{software}"
+        admin.setup.build: "{build}"
+        admin.setup.hardware: "{hardware}"
+        admin.setup.language: "{language}"
+    - path: "^/admin/api/v1/languages$"
+      json_match: { "$.response.languages": "^\\[" }
+      json_each: "$.response.languages"
+      json: { code: "$.code", name: "$.name" }
+      replace: admin.languages
+      state: { "admin.languages.{code:key}.name": "{name}" }
+    - path: "^/admin/api/v1/remoteAdmin$"
+      json: { enabled: "$.response.enabled", usb: "$.response.isUSBRequestSource" }
+      state:
+        admin.remote_admin.enabled: "{enabled}"
+        admin.remote_admin.usb_request: "{usb}"
+    # One interface, by the id in the path. Configured (manualConfig) and
+    # running (activeConfig) values differ on DHCP, and for about a second
+    # after a static change while the deck applies it.
+    - path: "^/admin/api/v1/network/interface/(\\d+)$"
+      json:
+        hostname: "$.response.hostname"
+        name: "$.response.interface.name"
+        mac: "$.response.interface.macAddress"
+        type: "$.response.interface.type"
+        address: "$.response.interface.manualConfig.address"
+        netmask: "$.response.interface.manualConfig.netmask"
+        gateway: "$.response.interface.manualConfig.gateway"
+        active_address: "$.response.interface.activeConfig.address"
+        active_netmask: "$.response.interface.activeConfig.netmask"
+        active_gateway: "$.response.interface.activeConfig.gateway"
+        linked: "$.response.interface.physicallyLinked"
+        present: "$.response.interface.physicallyPresent"
+        speed: "$.response.interface.currentSpeedBps"
+        mtu: "$.response.interface.currentMtu"
+        current_state: "$.response.interface.currentState"
+        default_route: "$.response.interface.defaultRoute"
+        priority: "$.response.interface.priority"
+      state:
+        "admin.network.interfaces.{1}.hostname": "{hostname}"
+        "admin.network.interfaces.{1}.name": "{name}"
+        "admin.network.interfaces.{1}.mac_address": "{mac}"
+        "admin.network.interfaces.{1}.type": "{type}"
+        "admin.network.interfaces.{1}.address": "{address}"
+        "admin.network.interfaces.{1}.netmask": "{netmask}"
+        "admin.network.interfaces.{1}.gateway": "{gateway}"
+        "admin.network.interfaces.{1}.active_address": "{active_address}"
+        "admin.network.interfaces.{1}.active_netmask": "{active_netmask}"
+        "admin.network.interfaces.{1}.active_gateway": "{active_gateway}"
+        "admin.network.interfaces.{1}.linked": { value: "{linked}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "admin.network.interfaces.{1}.present": { value: "{present}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "admin.network.interfaces.{1}.speed": "{speed}"
+        "admin.network.interfaces.{1}.mtu": "{mtu}"
+        "admin.network.interfaces.{1}.state": "{current_state}"
+        "admin.network.interfaces.{1}.default_route": { value: "{default_route}", map: { "1": true, "0": false, "true": true, "false": false } }
+        "admin.network.interfaces.{1}.priority": "{priority}"
+    # The DNS lists, whole, from a reply that holds them (not a write's
+    # answer on the same path).
+    - path: "^/admin/api/v1/network/interface/(\\d+)$"
+      json_match: { "$.response.interface.manualConfig.dnsServers": "^\\[" }
+      json_each: "$.response.interface.manualConfig.dnsServers"
+      json: { server: "$" }
+      replace: "admin.network.interfaces.{1}.dns_servers"
+      state: { "admin.network.interfaces.{1}.dns_servers.{index:+1}": "{server}" }
+    - path: "^/admin/api/v1/network/interface/(\\d+)$"
+      json_match: { "$.response.interface.activeConfig.dnsServers": "^\\[" }
+      json_each: "$.response.interface.activeConfig.dnsServers"
+      json: { server: "$" }
+      replace: "admin.network.interfaces.{1}.active_dns_servers"
+      state: { "admin.network.interfaces.{1}.active_dns_servers.{index:+1}": "{server}" }
+    # A network write's answer: the interface is read again. When the write
+    # moved the deck to another address, the read goes to the old one and
+    # fails; the deck is then opened at its new address.
+    - path: "^/admin/api/v1/network/interface/(\\d+)$"
+      request_match: { "$.type": "^(DHCP|Static)$" }
+      json: {}
+      then_send:
+        - { endpoint: admin, method: GET, path: "/admin/api/v1/network/interface/{1}" }
+    - path: "^/admin/api/v1/networkAccess$"
+      json_each: "$.response.protocols"
+      json: { id: "$.id", state: "$.state", url: "$.url" }
+      state:
+        "admin.network_access.protocols.{id:key}.state": "{state}"
+        "admin.network_access.protocols.{id:key}.url": "{url}"
+    # A network access write's answer says whether the change waits for a
+    # reboot.
+    - path: "^/admin/api/v1/networkAccess$"
+      json: { reboot: "$.response.rebootRequired" }
+      state: { admin.network_access.reboot_required: "{reboot}" }
+    - path: "^/admin/api/v1/networkAccess/options$"
+      json_each: "$.response.options"
+      json: { protocol: "$.protocol", secure: "$.secureOption", show: "$.showURL" }
+      state:
+        "admin.network_access.protocols.{protocol:key}.secure_option": "{secure}"
+        "admin.network_access.protocols.{protocol:key}.show_url": "{show}"
+    - path: "^/admin/api/v1/hyperDeckEthernetProtocol$"
+      json: { state: "$.response.state" }
+      state: { admin.ethernet_protocol: "{state}" }
+    # The summary whole: a removed certificate leaves only the host name.
+    # The validity fields' names are not known, so the summary is also kept
+    # as the JSON the deck gives.
+    - path: "^/admin/api/v1/certificate/summary$"
+      json_match: { "$.response": "^\\{" }
+      json: { summary: "$.response", hostname: "$.response.hostname", domain: "$.response.domain", issuer: "$.response.issuer" }
+      replace: admin.certificate
+      state:
+        admin.certificate.summary: "{summary}"
+        admin.certificate.hostname: "{hostname}"
+        admin.certificate.domain: "{domain}"
+        admin.certificate.issuer: "{issuer}"
+    - path: "^/admin/api/v1/auth/adminStatus$"
+      json: { required: "$.response.adminRequired" }
+      state: { admin.auth.admin_required: "{required}" }
+    - path: "^/admin/api/v1/auth/users$"
+      json_match: { "$.response.users": "^\\[" }
+      json_each: "$.response.users"
+      json: { id: "$.authUserId", username: "$.username", access: "$.remoteAdminUtilityAccess", folders: "$.sharedFolderPermissions" }
+      replace: admin.auth.users
+      state:
+        "admin.auth.users.{id:key}.username": "{username}"
+        "admin.auth.users.{id:key}.remote_admin_utility_access": "{access}"
+        "admin.auth.users.{id:key}.shared_folder_permissions": "{folders}"
+    - path: "^/admin/api/v1/dateAndTime$"
+      json: { time: "$.response.time", friendly: "$.response.timeFriendly", offset: "$.response.timezoneOffset" }
+      state:
+        admin.date_time.time: "{time}"
+        admin.date_time.time_friendly: "{friendly}"
+        admin.date_time.timezone_offset: "{offset}"
+    - path: "^/admin/api/v1/dateAndTime/ntp$"
+      json: { enabled: "$.response.enabled", server: "$.response.serverUrl", state: "$.response.state" }
+      state:
+        admin.date_time.ntp.enabled: "{enabled}"
+        admin.date_time.ntp.server_url: "{server}"
+        admin.date_time.ntp.state: "{state}"
+    - path: "^/admin/api/v1/dateAndTime/timezone$"
+      json: { offset: "$.response.timezoneOffset" }
+      state: { admin.date_time.timezone_offset: "{offset}" }
+
 state:
   device.protocol_version:   { type: string, description: "Protocol version, from 500 connection info and 204 device info" }
   device.model:              { type: string, description: "Model name" }
@@ -2445,6 +3158,59 @@ state:
   nas.selected:              { type: string, description: "The selected NAS share, the nas selected reply's lines as the deck gives them; empty when none" }
   external_drives.available: { type: string, description: "USB and network drives available to the external slot, the external drive list reply's lines" }
   external_drives.selected:  { type: string, description: "The drive selected for the external slot, the external drive selected reply's lines" }
+  # The configuration API (admin endpoint): HyperDeck Studio, Extreme and Shuttle.
+  admin.capabilities.*.version: { type: int, description: "Version of each section of the configuration API this software has, keyed by section name (networkAccess, hyperDeckEthernetProtocol, ...)" }
+  admin.setup.product_name:  { type: string, description: "Product name, such as HyperDeck Studio HD Mini" }
+  admin.setup.short_product_name: { type: string, description: "Short product name" }
+  admin.setup.product_id:    { type: string, description: "Product id, such as BE76" }
+  admin.setup.device_name:   { type: string, description: "The deck's name (set_device_name writes it; device info reports the same name)" }
+  admin.setup.hostname:      { type: string, description: "Host name the deck derives from its name" }
+  admin.setup.software:      { type: string, description: "Software version, such as 9.0.2" }
+  admin.setup.build:         { type: string, description: "Software build" }
+  admin.setup.hardware:      { type: string, description: "Hardware revision" }
+  admin.setup.language:      { type: string, description: "Language as a locale code, such as en_US.UTF-8 (set_language writes it)" }
+  admin.languages.*.name:    { type: string, description: "The name of each language the deck offers, keyed by its locale code" }
+  admin.remote_admin.enabled: { type: bool, description: "Utility administration allowed over the network as well as USB; while false the deck refuses every write here with HTTP 401, and only HyperDeck Setup over USB changes it" }
+  admin.remote_admin.usb_request: { type: bool, description: "The deck's isUSBRequestSource for this request: false over the network" }
+  admin.network.interfaces.*.hostname: { type: string, description: "The deck's network host name, such as Deck-A.local, keyed by interface id" }
+  admin.network.interfaces.*.name: { type: string, description: "Interface name, such as 1GbE" }
+  admin.network.interfaces.*.mac_address: { type: string, description: "MAC address, such as 7C-2E-0D-18-DC-78" }
+  admin.network.interfaces.*.type: { type: string, description: "DHCP or Static (set_network_interface writes it)" }
+  admin.network.interfaces.*.address: { type: string, description: "Configured static address, kept while on DHCP" }
+  admin.network.interfaces.*.netmask: { type: string, description: "Configured static netmask" }
+  admin.network.interfaces.*.gateway: { type: string, description: "Configured static gateway" }
+  admin.network.interfaces.*.dns_servers.*: { type: string, description: "Configured DNS servers, numbered from 1" }
+  admin.network.interfaces.*.active_address: { type: string, description: "Address the interface is running on" }
+  admin.network.interfaces.*.active_netmask: { type: string, description: "Netmask the interface is running on" }
+  admin.network.interfaces.*.active_gateway: { type: string, description: "Gateway the interface is running on" }
+  admin.network.interfaces.*.active_dns_servers.*: { type: string, description: "DNS servers the interface is running on, numbered from 1" }
+  admin.network.interfaces.*.linked: { type: bool, description: "A cable is linked (physicallyLinked)" }
+  admin.network.interfaces.*.present: { type: bool, description: "The interface is present (physicallyPresent)" }
+  admin.network.interfaces.*.speed: { type: int, unit: "bit/s", description: "Link speed, such as 1000000000" }
+  admin.network.interfaces.*.mtu: { type: int, unit: bytes, description: "Current MTU" }
+  admin.network.interfaces.*.state: { type: string, description: "Interface state as the deck words it, such as GloballyBound" }
+  admin.network.interfaces.*.default_route: { type: bool, description: "The interface holds the default route" }
+  admin.network.interfaces.*.priority: { type: int, description: "Interface priority" }
+  admin.network_access.protocols.*.state: { type: string, description: "Disabled, Enabled or SecureOnly, keyed by protocol (FTP, and HTTP for the web media manager; set_network_access writes them)" }
+  admin.network_access.protocols.*.url: { type: string, description: "URL the deck gives for the protocol, such as ftp://Deck-A.local" }
+  admin.network_access.protocols.*.secure_option: { type: bool, description: "The protocol offers SecureOnly" }
+  admin.network_access.protocols.*.show_url: { type: bool, description: "HyperDeck Setup shows the protocol's URL" }
+  admin.network_access.reboot_required: { type: bool, description: "The deck's answer to the last network access change: true when it applies only after a reboot" }
+  admin.ethernet_protocol:   { type: string, description: "HyperDeck Ethernet Protocol (TCP 9993): Disabled, Enabled or SecureOnly (set_ethernet_protocol writes it)" }
+  admin.certificate.summary: { type: string, description: "The certificate summary as the JSON the deck gives: the host name, and with a certificate its domain, issuer and validity" }
+  admin.certificate.hostname: { type: string, description: "Host name a self-signed certificate is issued for" }
+  admin.certificate.domain:  { type: string, description: "Domain of the installed certificate; absent with none" }
+  admin.certificate.issuer:  { type: string, description: "Issuer of the installed certificate; absent with none" }
+  admin.auth.admin_required: { type: bool, description: "The deck requires an administrator login (false on a deck as it ships)" }
+  admin.auth.users.*.username: { type: string, description: "Secure login user name, keyed by user id (a deck as it ships has only Guest, 1)" }
+  admin.auth.users.*.remote_admin_utility_access: { type: bool, description: "The user may administer the deck with HyperDeck Setup over the network (set_user_admin_access writes it)" }
+  admin.auth.users.*.shared_folder_permissions: { type: string, description: "The user's shared folder permissions as the JSON list the deck gives" }
+  admin.date_time.time:      { type: int, unit: s, description: "The deck's clock in Unix seconds when last read (set_date_time writes it)" }
+  admin.date_time.time_friendly: { type: string, description: "The deck's clock as YYYYMMDD-HHMMSS" }
+  admin.date_time.timezone_offset: { type: int, unit: min, description: "Time zone offset from UTC (set_timezone and set_date_time write it)" }
+  admin.date_time.ntp.enabled: { type: bool, description: "The deck sets its clock from NTP (set_ntp writes it)" }
+  admin.date_time.ntp.server_url: { type: string, description: "NTP server (set_ntp writes it)" }
+  admin.date_time.ntp.state: { type: string, description: "NTP synchronization state as the deck words it, such as OffsetCorrection" }
 
 quirks:
   - models: [all]
@@ -2613,3 +3379,134 @@ quirks:
       limits. These models keep the command lists this spec has always given
       them; the other documented commands may work but are not offered without
       a source.
+
+  # ── Configuration API (admin endpoint) ────────────────────────────────
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: warning
+    text: >
+      Blackmagic does not document the configuration API (/admin/api/v1 on
+      the HTTP port); its REST API document covers /control/api/v1 only. Its
+      paths, bodies and replies are hyperdeckwire's (MIT), measured on two
+      HyperDeck Studio HD Mini units on software 9.0.2; hyperdeckwire says
+      the other Studio models, Extreme and Shuttle serve the same API, but
+      only the HD Mini was measured, and it reports port 80 closed on the HD
+      Mini's software 8.1.1. A deck without the API answers its polls with
+      errors, which are logged, and its admin state stays absent. Decks on
+      protocol 1.8 and 1.11 are not offered it.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: critical
+    text: >
+      The manual's "Allow Utility Administration" lets HyperDeck Setup reach
+      the deck over the network or over USB only (p.47). hyperdeckwire
+      reports, from software 9.0.2, that while network administration is off
+      ("Configure via USB and Ethernet" in HyperDeck Setup) the deck still
+      answers every GET but refuses every PUT with HTTP 401, including one
+      that would turn it on: admin.remote_admin.enabled reads it, and only
+      HyperDeck Setup over USB changes it. That is an API limit, so no
+      command writes it. The manual also says HyperDeck Setup shows the
+      network access settings over USB or Ethernet but disables them when
+      only Ethernet is connected (p.53). Whether POST and DELETE are refused
+      the same way was not measured; a refused write fails with the HTTP
+      status as its code.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: critical
+    text: >
+      set_ethernet_protocol Disabled closes TCP 9993: this connection drops,
+      reconnecting fails and the device reports disconnected, while commands
+      on the configuration API still go, so set_ethernet_protocol Enabled
+      turns the protocol back on. The admin polls run only while the
+      protocol is connected, so admin state is not read meanwhile.
+      SecureOnly requires the secure login (the username and password
+      settings, sent with authenticate on connecting).
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: critical
+    text: >
+      set_network_interface and its one-DNS and no-DNS forms write the
+      interface whole (the API takes the whole object, so every field is
+      given; read admin.network.interfaces first to keep what should not
+      change). The deck applies it at once and takes about a second to run
+      on it. A changed address or a switch to DHCP moves the deck: this
+      connection drops, and the read-back sent after the write goes to the
+      old address and fails, so the device is opened again at its new
+      address. A wrong address or gateway leaves the deck unreachable until
+      someone reaches it over USB or its front panel.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: critical
+    text: >
+      set_network_access sets FTP and the web media manager (HTTP) together,
+      as the API takes the whole list. The configuration API is served on
+      the same HTTP port; hyperdeckwire did not test what Disabled for HTTP
+      does to it, so turning it off may cut off this API too, leaving only
+      USB. SecureOnly for HTTP serves HTTPS with the deck's certificate,
+      where admin_scheme https and admin_port 443 may be needed. The deck
+      may answer that the change applies only after a reboot
+      (admin.network_access.reboot_required); until then the read-back shows
+      the old states.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: critical
+    text: >
+      admin_reboot reboots the deck at once, stopping playback and
+      recording, and the protocol connection drops and reconnects. The API
+      hands out a key on GET /reboot that the PUT must return, so the key is
+      read with get_reboot_key just before; hyperdeckwire calls it one-time,
+      which was not measured. The protocol's own reboot command (p.24) does
+      the same over TCP 9993.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: warning
+    text: >
+      set_device_name also changes the host name the deck derives from it
+      (mDNS, and the FTP and web media manager URLs); hyperdeckwire notes
+      that this invalidates a certificate issued for the old host name. The
+      name is the one device info reports on TCP 9993.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: warning
+    text: >
+      hyperdeckwire exercised on hardware only the reads and same-value
+      writes of the name, network interface, network access, Ethernet
+      Protocol, NTP, time zone and identify. The language, date and time,
+      certificate (self-signed, import, removal, signing request), user and
+      reboot writes follow its client code without a measured answer; the
+      signing request's answer, and the id it gives for download, are not
+      known, so create_signing_request returns the answer whole. Write
+      statuses were not recorded, so 200 and 204 (and 201 for a creation)
+      are taken as success; a 2xx answer whose body says "success": false is
+      not seen as a failure, but the read-back then shows the deck unchanged.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: info
+    text: >
+      The configuration API takes no credential on a deck as it ships
+      (hyperdeckwire: unauthenticated on the LAN, as TCP 9993 and FTP are).
+      With admin.auth.admin_required true the deck wants an administrator
+      login, and how the API takes one is not known: nothing is sent. User
+      passwords (create_user, set_user_password) are secret parameters,
+      never logged, and travel in the request body: in plain text unless
+      admin_scheme is https. A user's shared folder permissions are read as
+      JSON text; their shape is not known (a fresh deck lists none), so no
+      command writes them.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: info
+    text: >
+      Nothing on the configuration API is pushed. It is read on connecting
+      (capabilities, languages, access options once; the rest once a minute)
+      and after each write, whose read-back is part of the command. Only
+      interface 0 is polled; get_network_interface reads another into state.
+      The clock (admin.date_time.time) is in Unix seconds, sent and received
+      as a string; with NTP on the deck sets its clock itself. The identify
+      the configuration API starts is not readable, and the protocol's
+      set_identify (p.24) does the same over TCP 9993.
+
+  - models: [hyperdeck-studio, hyperdeck-extreme, hyperdeck-shuttle]
+    severity: info
+    text: >
+      A certificate is passed as PEM text, as the API takes it in a JSON
+      body ({"certificate": ...}); no file on the host is read. The signing
+      request comes back as text from download_signing_request.
