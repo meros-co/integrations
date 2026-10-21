@@ -1,9 +1,10 @@
 //! The transfer folder through the service, bound to 127.0.0.1: files go up
 //! and come back, are listed and deleted; every route needs the bearer
-//! header; ids that try to leave the folder are refused; the size limit and
-//! the quota answer 413; unused files expire; and an ATEM simulated on
-//! loopback UDP takes a still and a macro from uploaded files and writes
-//! them back into reserved ones.
+//! header; ids that try to leave the folder are refused; no size, quota or
+//! expiry limits a file, and the flags that once set them are unknown;
+//! startup clears the folder's ids; and an ATEM simulated on loopback UDP
+//! takes a still and a macro from uploaded files and writes them back into
+//! reserved ones.
 
 #![cfg(feature = "all")]
 
@@ -195,9 +196,11 @@ async fn files_go_up_come_back_are_listed_and_deleted() {
     assert_eq!(list["files"][0]["file"], id.as_str());
     assert_eq!(list["files"][0]["written"], true);
     assert_eq!(list["used"], data.len());
-    assert_eq!(list["quota"], 4u64 << 30);
-    assert_eq!(list["max_file"], 512u64 << 20);
-    assert_eq!(list["expiry_s"], 3600.0);
+    // No limits to report: the list is the files and their total.
+    for gone in ["quota", "max_file", "expiry_s"] {
+        assert!(list.get(gone).is_none(), "{gone} in {list}");
+    }
+    assert!(list["files"][0].get("idle_ms").is_none(), "{list}");
 
     let response = service
         .http
@@ -395,79 +398,149 @@ async fn a_link_in_the_folder_is_not_followed() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_size_limit_and_the_quota_answer_413() {
-    let service = start(
-        "limits",
-        &["--transfer-max-file", "1000", "--transfer-quota", "2500"],
-    );
-    let (status, refused) = service.upload("big.bin", pattern(1001)).await;
-    assert_eq!(status, 413, "{refused}");
-    assert_eq!(refused["error"]["error"], "too_large");
+async fn no_size_or_quota_limits_an_upload() {
+    let service = start("limits", &[]);
 
-    // A chunked body is counted as it arrives.
-    let mut request = format!(
-        "POST /v1/files HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer {}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+    // A body declared larger than the old 512 MiB default is taken as it
+    // arrives, not refused up front: the service answers only once the
+    // client stops sending, here part way, so nothing of it is kept.
+    let declared: u64 = 600 << 20;
+    let mut stream = std::net::TcpStream::connect(&service.addr).unwrap();
+    write!(
+        stream,
+        "POST /v1/files?name=clip.mov HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer {}\r\nContent-Length: {declared}\r\n\r\n",
         service.token
     )
-    .into_bytes();
-    for _ in 0..3 {
-        request.extend_from_slice(b"190\r\n");
-        request.extend_from_slice(&[7u8; 0x190]);
-        request.extend_from_slice(b"\r\n");
+    .unwrap();
+    stream.write_all(&pattern(256 * 1024)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_millis(500)))
+        .unwrap();
+    let mut early = [0u8; 64];
+    let read = stream.read(&mut early);
+    assert!(
+        matches!(&read, Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut)),
+        "answered while the body was still coming: {read:?} {}",
+        String::from_utf8_lossy(&early)
+    );
+    // Part of it is on disk, counted but not yet listed.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let on_disk = std::fs::read_dir(&service.dir).unwrap().count();
+        if on_disk == 1 {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the upload never reached the folder"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    request.extend_from_slice(b"0\r\n\r\n");
-    let reply = service.raw(&request);
-    assert!(reply.starts_with("HTTP/1.1 413"), "{reply}");
-    assert!(reply.contains("too_large"), "{reply}");
-
-    let (status, first) = service.upload("a.bin", pattern(1000)).await;
-    assert_eq!(status, 201, "{first}");
-    let (status, _) = service.upload("b.bin", pattern(1000)).await;
-    assert_eq!(status, 201);
-    let (status, refused) = service.upload("c.bin", pattern(1000)).await;
-    assert_eq!(status, 413, "{refused}");
-    assert_eq!(refused["error"]["error"], "quota_exceeded");
-    // Nothing of the refused uploads is left behind.
     let list = service.get_json("/v1/files").await;
-    assert_eq!(list["used"], 2000);
-    assert_eq!(list["files"].as_array().unwrap().len(), 2);
-    assert_eq!(std::fs::read_dir(&service.dir).unwrap().count(), 2);
-    // Room again once one is deleted.
-    let id = first["file"].as_str().unwrap();
-    assert_eq!(service.delete(&format!("/v1/files/{id}")).await.0, 200);
-    let (status, _) = service.upload("c.bin", pattern(1000)).await;
-    assert_eq!(status, 201);
+    assert_eq!(list["files"].as_array().unwrap().len(), 0, "{list}");
+    stream.shutdown(std::net::Shutdown::Write).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+    let mut reply = Vec::new();
+    let _ = stream.read_to_end(&mut reply);
+    let reply = String::from_utf8_lossy(&reply);
+    assert!(reply.starts_with("HTTP/1.1 400"), "{reply}");
+    assert!(reply.contains("cut off"), "{reply}");
+    assert!(!reply.contains("too_large"), "{reply}");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while std::fs::read_dir(&service.dir).unwrap().count() != 0 {
+        assert!(Instant::now() < deadline, "the cut-off upload was kept");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    // Files add up past the old quota's share without a refusal, and
+    // reservations are handed out whatever the folder holds.
+    for i in 0..4 {
+        let (status, up) = service.upload(&format!("{i}.bin"), pattern(300_000)).await;
+        assert_eq!(status, 201, "{up}");
+    }
+    let (status, reserved) = service.post("/v1/files/reserve", json!({"count": 2})).await;
+    assert_eq!(status, 201, "{reserved}");
+    let list = service.get_json("/v1/files").await;
+    assert_eq!(list["used"], 1_200_000);
+    assert_eq!(list["files"].as_array().unwrap().len(), 6);
+
+    // A command's JSON body carries a binary param's bytes: larger than
+    // axum's 2 MB default, it still reaches the command (refused here only
+    // because no such device is open).
+    let blob = "A".repeat(3 * 1024 * 1024);
+    let (status, refused) = service
+        .post(
+            "/v1/execute",
+            json!({"device": 987_654, "command": "upload_media", "params": {"file": blob}}),
+        )
+        .await;
+    assert_ne!(status, 413, "{refused}");
+    assert!(refused.get("error").is_some(), "{refused}");
+}
+
+#[test]
+fn the_removed_limit_flags_are_unknown() {
+    for flag in [
+        "--transfer-max-file",
+        "--transfer-quota",
+        "--transfer-expiry",
+    ] {
+        let dir = scratch("flags");
+        let token_file = dir.with_extension("token");
+        let out = Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
+            .args([
+                "serve",
+                "--listen",
+                "127.0.0.1:0",
+                "--bind-address",
+                "127.0.0.1",
+                flag,
+                "1000",
+            ])
+            .arg("--token-file")
+            .arg(&token_file)
+            .arg("--transfer-dir")
+            .arg(&dir)
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(2), "{flag}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(&format!("unknown flag {flag}")),
+            "{flag}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_file(&token_file);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn unused_files_expire_and_startup_clears_the_folder() {
+async fn startup_clears_the_folder_and_files_stay_until_deleted() {
     // What an earlier run left: an id's folder goes, anything else stays.
-    let dir = scratch("expiry");
+    let dir = scratch("startup");
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("0123456789abcdef0123456789abcdef")).unwrap();
     std::fs::write(dir.join("0123456789abcdef0123456789abcdef/old.png"), b"x").unwrap();
     std::fs::write(dir.join("keep.txt"), b"not the service's").unwrap();
     let token_file = dir.with_extension("token");
-    let service = start_in(dir, token_file, &["--transfer-expiry", "1"]);
+    let service = start_in(dir, token_file, &[]);
     assert!(!service
         .dir
         .join("0123456789abcdef0123456789abcdef")
         .exists());
     assert!(service.dir.join("keep.txt").exists());
 
+    // Left alone, a file is not removed by the service.
     let (_, up) = service.upload("a.bin", pattern(10)).await;
     let id = up["file"].as_str().unwrap().to_string();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    loop {
-        let list = service.get_json("/v1/files").await;
-        if list["files"].as_array().unwrap().is_empty() {
-            break;
-        }
-        assert!(Instant::now() < deadline, "never expired: {list}");
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    assert!(!service.dir.join(&id).exists());
-    assert_eq!(service.get(&format!("/v1/files/{id}")).await.0, 404);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let list = service.get_json("/v1/files").await;
+    assert_eq!(list["files"][0]["file"], id.as_str(), "{list}");
+    assert_eq!(
+        service.get(&format!("/v1/files/{id}")).await,
+        (200, pattern(10))
+    );
 }
 
 // --- A simulated ATEM: enough of the switcher for stills and macros. ---
