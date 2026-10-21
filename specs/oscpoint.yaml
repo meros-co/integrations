@@ -1,0 +1,676 @@
+spec: 1
+id: oscpoint
+name: OSCPoint (PowerPoint add-in, OSC)
+vendor: Zinc Event Production
+category: playback
+
+source:
+  - title: OSCPoint documentation (README, ACTIONS.md, FEEDBACKS.md, EVENTS.md, FILES.md, PRESENTATION.md, add-in.md, CONFIGURATION.md, FAQ.md, TROUBLESHOOTING.md, ChangeLog.md)
+    author: Zinc Event Production (Nick Roberts)
+    url: https://github.com/phuvf/oscpoint
+    note: >
+      The official documentation, linked from oscpoint.com as "the official OSCPoint
+      documentation"; MIT licence; retrieved 2026-10-21, change log up to 2.3.0.0
+      (2026-02-06). ACTIONS.md: every action address and argument (slide control,
+      slide show control, media control, file control, system control); string
+      arguments ASCII or a blob of UTF-8 text, not both (UTF-8 from 2.1). FEEDBACKS.md:
+      every feedback address and argument, grouped by when it is valid; media
+      feedback every 500 ms while playing; notes truncated past 32,000 characters.
+      EVENTS.md: /oscpoint/v2/event and its event types and arguments. FILES.md: the
+      active folder (default Desktop\oscpoint), the file list JSON, file access off by
+      default. PRESENTATION.md: the presentation JSON object. add-in.md: action port
+      35551, feedback host 127.0.0.1 and port 35550 by default, ports 1024-65535,
+      set on the OSCPoint ribbon tab. CONFIGURATION.md: one feedback port per
+      PowerPoint machine for Companion, broadcast feedback. ChangeLog.md: feedback
+      bundled about every 200 ms from 2.0, notes and events sent at once. FAQ.md:
+      Presenter View cannot be controlled.
+  - title: oscpoint.com
+    author: Zinc Event Production
+    url: https://oscpoint.com/
+    note: >
+      Manufacturer site, retrieved 2026-10-21: OSCPoint is a product of Zinc Event
+      Production Ltd., MIT licensed, Windows PowerPoint only, intended for a local
+      network.
+  - title: companion-module-zinc-oscpoint (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS / Zinc Event Production
+    url: https://github.com/bitfocus/companion-module-zinc-oscpoint
+    note: >
+      Corroboration only, licence checked: asks /oscpoint/feedbacks/refresh on
+      connecting; takes a name from the UTF-8 blob argument when the message holds
+      one, else from the string; reads UTF-8 notes on /oscpoint/slideshow/notes-utf-8
+      (the documentation says notes-utf8; both are read here); the media percent
+      position runs 0 to 100. No code taken.
+
+# OSCPoint is a PowerPoint add-in for Windows that takes OSC actions over UDP on its
+# action port (35551 by default) and sends feedback over UDP to one host and port set
+# on its ribbon tab (127.0.0.1 and 35550 by default), not back to the sender. The core
+# receives feedback on the fixed local feedback_port; set OSCPoint's feedback host to
+# this host and its feedback port to that value. OSCPoint answers nothing, so every
+# command reports unverified; the state follows from its feedback. On connecting, and
+# every 30 s, the core asks OSCPoint to resend its feedback and the active folder's
+# file list.
+transport:
+  type: osc-udp
+  port: 35551
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 35550, label: Feedback port, description: "Local UDP port that receives OSCPoint's feedback; set the OSCPoint ribbon tab's feedback host to this host and its feedback port to this value, or leave it empty to read nothing back." }
+
+ports:
+  - { port: 35551, protocol: udp, role: control, note: "OSCPoint's action port, set on its ribbon tab (1024-65535)" }
+  - { port: 35550, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "where OSCPoint sends its feedback: the feedback host and port set on its ribbon tab" }
+
+models:
+  - id: oscpoint-2
+    name: OSCPoint 2.1 and later
+    supports: [next, previous, go_to_slide, go_to_first_slide, go_to_last_slide, go_to_section,
+               hide_slide, unhide_slide, start_slideshow, start_slideshow_at, start_slideshow_current,
+               start_slideshow_section, end_slideshow, set_black, toggle_black, set_white, toggle_white,
+               set_laser_pointer, toggle_laser_pointer, set_wallpaper, pause_slideshow, resume_slideshow,
+               media_play, media_pause, media_play_pause, media_stop, media_go_to_from_start,
+               media_go_to_before_end, media_forward, media_back, media_go_to_percent,
+               media_next_bookmark, media_previous_bookmark, set_active_folder, list_files, open_file,
+               activate_presentation, close_presentation, close_active_presentation, set_actions_enabled,
+               set_feedbacks_enabled, refresh_feedbacks]
+    verification: none
+    notes: >
+      Covers the add-in from 2.1 (current 2.3), which takes names as UTF-8 blobs and
+      has pause and resume, visible slide counts, slides remaining and media trim
+      points. OSCPoint runs on Windows with PowerPoint 2016 or later.
+
+maps:
+  enable_disable: { "true": enable, "false": disable }
+  close_mode: { abort: "", force: /force, save: /save }
+
+commands:
+  # ── Slide control ────────────────────────────────────────────────────────
+  next:
+    summary: Go to the next slide, or the next build on this slide, in the running slide show (/oscpoint/next)
+    send: { address: /oscpoint/next }
+    returns: none
+
+  previous:
+    summary: Go back one slide, or one build, in the running slide show (/oscpoint/previous)
+    send: { address: /oscpoint/previous }
+    returns: none
+
+  go_to_slide:
+    summary: Go to a slide by number; a number out of range goes to the first or last slide (/oscpoint/goto/slide int)
+    params:
+      slide: { type: int, min: 1, required: true, label: Slide, description: "Slide number, counted from 1 as in PowerPoint." }
+    send: { address: /oscpoint/goto/slide, args: [ { value: "{slide}", type: int } ] }
+    returns: none
+
+  go_to_first_slide:
+    summary: Go to the first slide of the presentation, even when it is hidden (/oscpoint/goto/slide/first)
+    send: { address: /oscpoint/goto/slide/first }
+    returns: none
+
+  go_to_last_slide:
+    summary: Go to the last slide of the presentation, even when it is hidden (/oscpoint/goto/slide/last)
+    send: { address: /oscpoint/goto/slide/last }
+    returns: none
+
+  go_to_section:
+    summary: Go to the first slide of a section, by name; nothing happens when no section has that name (/oscpoint/goto/section)
+    params:
+      section: { type: string, max_length: 1024, required: true, label: Section, description: "Section name exactly as in PowerPoint, case sensitive." }
+    send: { address: /oscpoint/goto/section, args: [ { value: "{section}", type: blob } ] }
+    returns: none
+
+  hide_slide:
+    summary: Hide a slide; nothing happens when the number is out of range (/oscpoint/slide/hide int)
+    params:
+      slide: { type: int, min: 1, required: true, label: Slide, description: "Slide number, counted from 1 as in PowerPoint." }
+    send: { address: /oscpoint/slide/hide, args: [ { value: "{slide}", type: int } ] }
+    returns: none
+
+  unhide_slide:
+    summary: Show a hidden slide again; nothing happens when the number is out of range (/oscpoint/slide/unhide int)
+    params:
+      slide: { type: int, min: 1, required: true, label: Slide, description: "Slide number, counted from 1 as in PowerPoint." }
+    send: { address: /oscpoint/slide/unhide, args: [ { value: "{slide}", type: int } ] }
+    returns: none
+
+  # ── Slide show control ───────────────────────────────────────────────────
+  start_slideshow:
+    summary: Start the slide show of the focused presentation from slide 1 (/oscpoint/slideshow/start)
+    send: { address: /oscpoint/slideshow/start }
+    returns: none
+
+  start_slideshow_at:
+    summary: Start the slide show of the focused presentation from a slide (/oscpoint/slideshow/start int)
+    params:
+      slide: { type: int, min: 1, required: true, label: Slide, description: "Slide number to start from, counted from 1 as in PowerPoint." }
+    send: { address: /oscpoint/slideshow/start, args: [ { value: "{slide}", type: int } ] }
+    returns: none
+
+  start_slideshow_current:
+    summary: Start the slide show of the focused presentation from its current slide (/oscpoint/slideshow/start/current)
+    send: { address: /oscpoint/slideshow/start/current }
+    returns: none
+
+  start_slideshow_section:
+    summary: Start the slide show from the first slide of a section, by name; nothing happens when no section has that name (/oscpoint/slideshow/start/section)
+    params:
+      section: { type: string, max_length: 1024, required: true, label: Section, description: "Section name exactly as in PowerPoint, case sensitive." }
+    send: { address: /oscpoint/slideshow/start/section, args: [ { value: "{section}", type: blob } ] }
+    returns: none
+
+  end_slideshow:
+    summary: End the running slide show (/oscpoint/slideshow/end)
+    send: { address: /oscpoint/slideshow/end }
+    returns: none
+
+  set_black:
+    summary: Turn the black screen on or off in the running slide show (/oscpoint/slideshow/black int)
+    params:
+      black: { type: bool, required: true, label: Black, description: "True shows a black screen over the slide, false removes it." }
+    send: { address: /oscpoint/slideshow/black, args: [ { value: "{black:bool01}", type: int } ] }
+    returns: none
+
+  toggle_black:
+    summary: Toggle the black screen in the running slide show (/oscpoint/slideshow/black)
+    send: { address: /oscpoint/slideshow/black }
+    returns: none
+
+  set_white:
+    summary: Turn the white screen on or off in the running slide show (/oscpoint/slideshow/white int)
+    params:
+      white: { type: bool, required: true, label: White, description: "True shows a white screen over the slide, false removes it." }
+    send: { address: /oscpoint/slideshow/white, args: [ { value: "{white:bool01}", type: int } ] }
+    returns: none
+
+  toggle_white:
+    summary: Toggle the white screen in the running slide show (/oscpoint/slideshow/white)
+    send: { address: /oscpoint/slideshow/white }
+    returns: none
+
+  set_laser_pointer:
+    summary: Turn PowerPoint's laser pointer on or off in the running slide show (/oscpoint/slideshow/laserpointer int)
+    params:
+      enabled: { type: bool, required: true, label: Laser pointer, description: "True turns the laser pointer on, false turns it off." }
+    send: { address: /oscpoint/slideshow/laserpointer, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  toggle_laser_pointer:
+    summary: Toggle PowerPoint's laser pointer in the running slide show (/oscpoint/slideshow/laserpointer)
+    send: { address: /oscpoint/slideshow/laserpointer }
+    returns: none
+
+  set_wallpaper:
+    summary: Export the current slide and set it as the desktop wallpaper of every monitor of the PowerPoint machine (/oscpoint/slideshow/setwallpaper int int)
+    params:
+      width: { type: int, min: 1, default: 1920, label: Width, description: "Width in pixels of the slide image exported for the wallpaper." }
+      height: { type: int, min: 1, default: 1080, label: Height, description: "Height in pixels of the slide image exported for the wallpaper." }
+    send: { address: /oscpoint/slideshow/setwallpaper, args: [ { value: "{width}", type: int }, { value: "{height}", type: int } ] }
+    returns: none
+
+  pause_slideshow:
+    summary: Pause the slide show's timed auto-advance (/oscpoint/slideshow/pause)
+    send: { address: /oscpoint/slideshow/pause }
+    returns: none
+
+  resume_slideshow:
+    summary: Resume the slide show's timed auto-advance (/oscpoint/slideshow/resume)
+    send: { address: /oscpoint/slideshow/resume }
+    returns: none
+
+  # ── Media control (the one media element on the current slide) ──────────
+  media_play:
+    summary: Play the media on the current slide (/oscpoint/media/play)
+    send: { address: /oscpoint/media/play }
+    returns: none
+
+  media_pause:
+    summary: Pause the media on the current slide (/oscpoint/media/pause)
+    send: { address: /oscpoint/media/pause }
+    returns: none
+
+  media_play_pause:
+    summary: Toggle play and pause of the media on the current slide (/oscpoint/media/playpause)
+    send: { address: /oscpoint/media/playpause }
+    returns: none
+
+  media_stop:
+    summary: Stop the media on the current slide and put the playhead back at its start (/oscpoint/media/stop)
+    send: { address: /oscpoint/media/stop }
+    returns: none
+
+  media_go_to_from_start:
+    summary: Move the media playhead to a time after the clip's start point (/oscpoint/media/goto/position/fromstart int)
+    params:
+      ms: { type: int, min: 0, required: true, label: Time, description: "Milliseconds after the clip's start point." }
+    send: { address: /oscpoint/media/goto/position/fromstart, args: [ { value: "{ms}", type: int } ] }
+    returns: none
+
+  media_go_to_before_end:
+    summary: Move the media playhead to a time before the clip's end point (/oscpoint/media/goto/position/beforeend int)
+    params:
+      ms: { type: int, min: 0, required: true, label: Time, description: "Milliseconds before the clip's end point." }
+    send: { address: /oscpoint/media/goto/position/beforeend, args: [ { value: "{ms}", type: int } ] }
+    returns: none
+
+  media_forward:
+    summary: Move the media playhead forward (/oscpoint/media/goto/position/forward int)
+    params:
+      ms: { type: int, min: 0, required: true, label: Time, description: "Milliseconds to move forward from the current position." }
+    send: { address: /oscpoint/media/goto/position/forward, args: [ { value: "{ms}", type: int } ] }
+    returns: none
+
+  media_back:
+    summary: Move the media playhead back (/oscpoint/media/goto/position/back int)
+    params:
+      ms: { type: int, min: 0, required: true, label: Time, description: "Milliseconds to move back from the current position." }
+    send: { address: /oscpoint/media/goto/position/back, args: [ { value: "{ms}", type: int } ] }
+    returns: none
+
+  media_go_to_percent:
+    summary: Move the media playhead to a percentage of the way through the clip (/oscpoint/media/goto/position/percent float)
+    params:
+      percent: { type: float, min: 0, max: 100, required: true, label: Position, description: "Percent of the clip from its start point, 0 at the start and 100 at the end." }
+    send: { address: /oscpoint/media/goto/position/percent, args: [ { value: "{percent}", type: float } ] }
+    returns: none
+
+  media_next_bookmark:
+    summary: Move the media playhead to the next bookmark (/oscpoint/media/goto/bookmark/next)
+    send: { address: /oscpoint/media/goto/bookmark/next }
+    returns: none
+
+  media_previous_bookmark:
+    summary: Move the media playhead to the previous bookmark (/oscpoint/media/goto/bookmark/previous)
+    send: { address: /oscpoint/media/goto/bookmark/previous }
+    returns: none
+
+  # ── Files and presentations ──────────────────────────────────────────────
+  set_active_folder:
+    summary: Set the active folder, relative to the user's home folder, creating it when missing; needs file system access (/oscpoint/files/setpath)
+    params:
+      path: { type: string, max_length: 1024, required: true, label: Folder, description: "Folder relative to the Windows user's home folder, such as Desktop\\myfolder\\oscpoint." }
+    send: { address: /oscpoint/files/setpath, args: [ { value: "{path}", type: blob } ] }
+    returns: none
+
+  list_files:
+    summary: Ask for the list of presentations in the active folder, which arrives as feedback; needs file system access (/oscpoint/files/list)
+    send: { address: /oscpoint/files/list }
+    returns: none
+
+  open_file:
+    summary: Open a .ppt or .pptx file of the active folder, or switch to it when it is open; needs file system access (/oscpoint/files/open)
+    params:
+      filename: { type: string, max_length: 260, required: true, label: File name, description: "Name of a .ppt or .pptx file in the active folder, matching exactly." }
+    send: { address: /oscpoint/files/open, args: [ { value: "{filename}", type: blob } ] }
+    returns: none
+
+  activate_presentation:
+    summary: Switch to an open presentation by file name; nothing happens when it is not open (/oscpoint/presentations/activate)
+    params:
+      filename: { type: string, max_length: 260, required: true, label: File name, description: "File name of an open presentation, as the presentations list gives it." }
+    send: { address: /oscpoint/presentations/activate, args: [ { value: "{filename}", type: blob } ] }
+    returns: none
+
+  close_presentation:
+    summary: Close an open presentation by file name, choosing what happens to unsaved changes; needs file system access (/oscpoint/files/close, /close/force, /close/save)
+    params:
+      filename: { type: string, max_length: 260, required: true, label: File name, description: "File name of an open presentation, as the presentations list gives it." }
+      mode: { type: enum, values: [abort, force, save], default: abort, label: Unsaved changes, description: "abort leaves a presentation with unsaved changes open, force discards the changes and closes it, save saves over the file and closes it." }
+    send: { address: "/oscpoint/files/close{mode:map.close_mode}", args: [ { value: "{filename}", type: blob } ] }
+    returns: none
+
+  close_active_presentation:
+    summary: Close the active presentation, choosing what happens to unsaved changes; needs file system access (/oscpoint/files/close, /close/force, /close/save)
+    params:
+      mode: { type: enum, values: [abort, force, save], default: abort, label: Unsaved changes, description: "abort leaves a presentation with unsaved changes open, force discards the changes and closes it, save saves over the file and closes it." }
+    send: { address: "/oscpoint/files/close{mode:map.close_mode}" }
+    returns: none
+
+  # ── System control ───────────────────────────────────────────────────────
+  set_actions_enabled:
+    summary: Enable or disable OSC actions; while disabled OSCPoint ignores every action but enabling (/oscpoint/actions/enable, /disable)
+    params:
+      enabled: { type: bool, required: true, label: Actions enabled, description: "True makes OSCPoint act on OSC actions, false makes it ignore all of them except the one enabling them again." }
+    send: { address: "/oscpoint/actions/{enabled:map.enable_disable}" }
+    returns: none
+
+  set_feedbacks_enabled:
+    summary: Enable or disable OSC feedback; enabling also resends every feedback (/oscpoint/feedbacks/enable, /disable)
+    params:
+      enabled: { type: bool, required: true, label: Feedback enabled, description: "True makes OSCPoint send its feedback and resend the current values, false stops its feedback." }
+    send: { address: "/oscpoint/feedbacks/{enabled:map.enable_disable}" }
+    returns: none
+
+  refresh_feedbacks:
+    summary: Ask OSCPoint to resend its most recent feedback values (/oscpoint/feedbacks/refresh)
+    send: { address: /oscpoint/feedbacks/refresh }
+    returns: none
+
+telemetry:
+  # Feedback arrives on feedback_port from the host and port set on OSCPoint's ribbon
+  # tab. A name or JSON document comes as an ASCII string and, from 2.1, the same
+  # text as a UTF-8 blob in the same message: each rule reads the string, and the
+  # rule after it, limited to messages holding both, reads the blob over it.
+  subscribe:
+    send:
+      - /oscpoint/feedbacks/refresh
+      - /oscpoint/files/list
+    every_ms: 30000
+  updates:
+    # ── Valid at any time ──
+    - address: "^/oscpoint/v2/presentation$"
+      json: { name: "$.name", path: "$.path", slides: "$.slideCount", saved: "$.saved", active: "$.active", slideshow: "$.slideshow" }
+      state:
+        presentation.name: "{name}"
+        presentation.path: "{path}"
+        presentation.slide_count: "{slides}"
+        presentation.saved: "{saved}"
+        presentation.active: "{active}"
+        presentation.in_slideshow: "{slideshow}"
+    - address: "^/oscpoint/v2/presentation$"
+      arg_types: sb
+      json_arg: 1
+      json: { name: "$.name", path: "$.path" }
+      state:
+        presentation.name: "{name}"
+        presentation.path: "{path}"
+    - address: "^/oscpoint/v2/presentation$"
+      json_each: "$.sections"
+      json: { id: "$.id", name: "$.name", first: "$.firstSlide", last: "$.lastSlide", count: "$.slideCount" }
+      replace: presentation.sections
+      state:
+        "presentation.sections.{index:+1}.id": "{id}"
+        "presentation.sections.{index:+1}.name": "{name}"
+        "presentation.sections.{index:+1}.first_slide": "{first}"
+        "presentation.sections.{index:+1}.last_slide": "{last}"
+        "presentation.sections.{index:+1}.slide_count": "{count}"
+    - address: "^/oscpoint/v2/presentation$"
+      arg_types: sb
+      json_arg: 1
+      json_each: "$.sections"
+      json: { name: "$.name" }
+      state:
+        "presentation.sections.{index:+1}.name": "{name}"
+    - address: "^/oscpoint/v2/presentations$"
+      json_each: "$"
+      json: { name: "$.name", path: "$.path", slides: "$.slideCount", saved: "$.saved", active: "$.active", slideshow: "$.slideshow" }
+      replace: presentations
+      state:
+        "presentations.{index:+1}.name": "{name}"
+        "presentations.{index:+1}.path": "{path}"
+        "presentations.{index:+1}.slide_count": "{slides}"
+        "presentations.{index:+1}.saved": "{saved}"
+        "presentations.{index:+1}.active": "{active}"
+        "presentations.{index:+1}.in_slideshow": "{slideshow}"
+    - address: "^/oscpoint/v2/presentations$"
+      json_each: "$[*].sections"
+      json: { id: "$.id", name: "$.name", first: "$.firstSlide", last: "$.lastSlide", count: "$.slideCount" }
+      state:
+        "presentations.{^index:+1}.sections.{index:+1}.id": "{id}"
+        "presentations.{^index:+1}.sections.{index:+1}.name": "{name}"
+        "presentations.{^index:+1}.sections.{index:+1}.first_slide": "{first}"
+        "presentations.{^index:+1}.sections.{index:+1}.last_slide": "{last}"
+        "presentations.{^index:+1}.sections.{index:+1}.slide_count": "{count}"
+    - address: "^/oscpoint/v2/presentations$"
+      arg_types: sb
+      json_arg: 1
+      json_each: "$"
+      json: { name: "$.name", path: "$.path" }
+      state:
+        "presentations.{index:+1}.name": "{name}"
+        "presentations.{index:+1}.path": "{path}"
+    - address: "^/oscpoint/v2/presentations$"
+      arg_types: sb
+      json_arg: 1
+      json_each: "$[*].sections"
+      json: { name: "$.name" }
+      state:
+        "presentations.{^index:+1}.sections.{index:+1}.name": "{name}"
+    - address: "^/oscpoint/v2/files/enabled$"
+      state: { files.access_enabled: { value: "{arg0}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/oscpoint/v2/files/activefolder$"
+      state: { files.active_folder: "{arg0}" }
+    - address: "^/oscpoint/v2/files/activefolder$"
+      arg_types: sb
+      state: { files.active_folder: "{arg1}" }
+    - address: "^/oscpoint/v2/files/activefolder/fullpath$"
+      state: { files.active_folder_full_path: "{arg0}" }
+    - address: "^/oscpoint/v2/files/activefolder/fullpath$"
+      arg_types: sb
+      state: { files.active_folder_full_path: "{arg1}" }
+    - address: "^/oscpoint/v2/files$"
+      json_each: "$"
+      json: { name: "$.name", full: "$.fullName", ext: "$.extension", size: "$.length", accessed: "$.lastAccessTime", written: "$.lastWriteTime", created: "$.creationTime", ro: "$.isReadOnly" }
+      replace: files.list
+      state:
+        "files.list.{index:+1}.name": "{name}"
+        "files.list.{index:+1}.full_name": "{full}"
+        "files.list.{index:+1}.extension": "{ext}"
+        "files.list.{index:+1}.size": "{size}"
+        "files.list.{index:+1}.last_access_time": "{accessed}"
+        "files.list.{index:+1}.last_write_time": "{written}"
+        "files.list.{index:+1}.creation_time": "{created}"
+        "files.list.{index:+1}.read_only": "{ro}"
+    - address: "^/oscpoint/v2/files$"
+      arg_types: sb
+      json_arg: 1
+      json_each: "$"
+      json: { name: "$.name", full: "$.fullName" }
+      state:
+        "files.list.{index:+1}.name": "{name}"
+        "files.list.{index:+1}.full_name": "{full}"
+    # Events: the last one, its type and arguments; each event replaces the last.
+    - address: "^/oscpoint/v2/event$"
+      replace: last_event
+      state: { last_event.type: "{arg0}" }
+    - address: "^/oscpoint/v2/event$"
+      arg_match: { "0": "^add_in_startup$" }
+      state:
+        add_in.version: "{arg1}"
+        last_event.version: "{arg1}"
+    - address: "^/oscpoint/v2/event$"
+      arg_match: { "0": "^(?:presentation_open|presentation_close|window_activate|slideshow_begin|slideshow_end)$" }
+      state: { last_event.filename: "{arg1}" }
+    - address: "^/oscpoint/v2/event$"
+      arg_types: ssb
+      arg_match: { "0": "^(?:presentation_open|presentation_close|window_activate|slideshow_end)$" }
+      state: { last_event.filename: "{arg2}" }
+    - address: "^/oscpoint/v2/event$"
+      arg_types: ssbi
+      arg_match: { "0": "^slideshow_begin$" }
+      state: { last_event.filename: "{arg2}" }
+    - address: "^/oscpoint/v2/event$"
+      arg_match: { "0": "^slideshow_begin$" }
+      state: { last_event.slide: "{arg3}" }
+    - address: "^/oscpoint/v2/event$"
+      arg_match: { "0": "^slideshow_(?:next_slide|on_next|next_click|next_build)$" }
+      state:
+        last_event.slide: "{arg1}"
+        last_event.click_index: "{arg2}"
+        last_event.click_count: "{arg3}"
+    # ── Valid whenever a presentation is open (the focused one) ──
+    - address: "^/oscpoint/presentation/name$"
+      state: { presentation.name: "{arg0}" }
+    - address: "^/oscpoint/presentation/name$"
+      arg_types: sb
+      state: { presentation.name: "{arg1}" }
+    - address: "^/oscpoint/presentation/slides/count$"
+      state: { presentation.slide_count: "{arg0}" }
+    - address: "^/oscpoint/presentation/slides/count/visible$"
+      state: { presentation.visible_slide_count: "{arg0}" }
+    - address: "^/oscpoint/slideshow/state$"
+      state: { slideshow.state: "{arg0}" }
+    # ── Valid only during a slide show ──
+    - address: "^/oscpoint/slideshow/currentslide$"
+      state: { slideshow.current_slide: "{arg0}" }
+    - address: "^/oscpoint/slideshow/builds/position$"
+      state: { slideshow.build_position: "{arg0}" }
+    - address: "^/oscpoint/slideshow/builds/count$"
+      state: { slideshow.build_count: "{arg0}" }
+    - address: "^/oscpoint/slideshow/builds/remaining$"
+      state: { slideshow.builds_remaining: "{arg0}" }
+    - address: "^/oscpoint/slideshow/slidesremaining$"
+      state: { slideshow.slides_remaining: "{arg0}" }
+    - address: "^/oscpoint/slideshow/notes$"
+      state: { slideshow.notes_ascii: "{arg0}" }
+    - address: "^/oscpoint/slideshow/notes-utf-?8$"
+      state: { slideshow.notes: "{arg0}" }
+    - address: "^/oscpoint/slideshow/section/index$"
+      state: { slideshow.section.index: "{arg0}" }
+    - address: "^/oscpoint/slideshow/section/name$"
+      state: { slideshow.section.name: "{arg0}" }
+    - address: "^/oscpoint/slideshow/section/name$"
+      arg_types: sb
+      state: { slideshow.section.name: "{arg1}" }
+    - address: "^/oscpoint/slideshow/section/slidesremaining$"
+      state: { slideshow.section.slides_remaining: "{arg0}" }
+    # ── Valid during a slide show with media on the current slide ──
+    - address: "^/oscpoint/slideshow/media/state$"
+      state: { slideshow.media.state: "{arg0}" }
+    - address: "^/oscpoint/slideshow/media/duration$"
+      state: { slideshow.media.duration_ms: "{arg0}" }
+    - address: "^/oscpoint/slideshow/media/durationtrimmed$"
+      state: { slideshow.media.duration_trimmed_ms: "{arg0}" }
+    - address: "^/oscpoint/slideshow/media/startpoint$"
+      state: { slideshow.media.start_point_ms: "{arg0}" }
+    - address: "^/oscpoint/slideshow/media/endpoint$"
+      state: { slideshow.media.end_point_ms: "{arg0}" }
+    - address: "^/oscpoint/slideshow/media/position$"
+      state: { slideshow.media.position_ms: "{arg0}" }
+    - address: "^/oscpoint/slideshow/media/remaining$"
+      state: { slideshow.media.remaining_ms: "{arg0}" }
+
+state:
+  presentation.name:                 { type: string, description: "File name of the focused presentation, empty when none is open" }
+  presentation.path:                 { type: string, description: "Folder of the focused presentation, empty when none is open" }
+  presentation.slide_count:          { type: int, description: "Number of slides in the focused presentation, hidden ones included" }
+  presentation.visible_slide_count:  { type: int, description: "Number of slides in the focused presentation, hidden ones left out" }
+  presentation.saved:                { type: bool, description: "The focused presentation has no unsaved changes" }
+  presentation.active:               { type: bool, description: "The presentation is PowerPoint's active one, as OSCPoint's presentation object reports it" }
+  presentation.in_slideshow:         { type: bool, description: "The focused presentation is in slide show mode" }
+  presentation.sections.*.id:        { type: string, description: "Section's PowerPoint id (a GUID), keyed by the section's place from 1" }
+  presentation.sections.*.name:      { type: string, description: "Section name" }
+  presentation.sections.*.first_slide: { type: int, description: "Number of the section's first slide, from 1" }
+  presentation.sections.*.last_slide: { type: int, description: "Number of the section's last slide, from 1" }
+  presentation.sections.*.slide_count: { type: int, description: "Number of slides in the section" }
+  presentations.*.name:              { type: string, description: "File name of an open presentation, keyed by its place from 1 in OSCPoint's list" }
+  presentations.*.path:              { type: string, description: "Folder of the open presentation" }
+  presentations.*.slide_count:       { type: int, description: "Number of slides in the open presentation" }
+  presentations.*.saved:             { type: bool, description: "The open presentation has no unsaved changes" }
+  presentations.*.active:            { type: bool, description: "The open presentation is PowerPoint's active one" }
+  presentations.*.in_slideshow:      { type: bool, description: "The open presentation is in slide show mode" }
+  presentations.*.sections.*.id:     { type: string, description: "Section's PowerPoint id, keyed by presentation and the section's place from 1" }
+  presentations.*.sections.*.name:   { type: string, description: "Section name" }
+  presentations.*.sections.*.first_slide: { type: int, description: "Number of the section's first slide, from 1" }
+  presentations.*.sections.*.last_slide: { type: int, description: "Number of the section's last slide, from 1" }
+  presentations.*.sections.*.slide_count: { type: int, description: "Number of slides in the section" }
+  files.access_enabled:              { type: bool, description: "OSCPoint may use the PowerPoint machine's file system (set only on its ribbon tab); the file commands need it" }
+  files.active_folder:               { type: string, description: "The active folder, relative to the Windows user's home folder" }
+  files.active_folder_full_path:     { type: string, description: "The active folder's full path" }
+  files.list.*.name:                 { type: string, description: "File name of a .ppt or .pptx file in the active folder, keyed by its place from 1 in OSCPoint's list" }
+  files.list.*.full_name:            { type: string, description: "The file's full path" }
+  files.list.*.extension:            { type: string, description: "The file's extension, .ppt or .pptx" }
+  files.list.*.size:                 { type: int, unit: bytes, description: "The file's size" }
+  files.list.*.last_access_time:     { type: string, description: "When the file was last read, as OSCPoint formats it (the Windows machine's local date and time)" }
+  files.list.*.last_write_time:      { type: string, description: "When the file was last written, as OSCPoint formats it" }
+  files.list.*.creation_time:        { type: string, description: "When the file was created, as OSCPoint formats it" }
+  files.list.*.read_only:            { type: bool, description: "The file is read-only" }
+  slideshow.state:                   { type: string, description: "edit, running or paused (slideshow before 2.1)" }
+  slideshow.current_slide:           { type: int, description: "Number of the slide showing, from 1" }
+  slideshow.build_position:          { type: int, description: "Build (animation step) reached on the current slide" }
+  slideshow.build_count:             { type: int, description: "Number of builds on the current slide" }
+  slideshow.builds_remaining:        { type: int, description: "Builds left on the current slide" }
+  slideshow.slides_remaining:        { type: int, description: "Slides left in the slide show, hidden ones left out" }
+  slideshow.notes:                   { type: string, description: "The current slide's notes, UTF-8, line breaks as CR, at most 32,000 characters" }
+  slideshow.notes_ascii:             { type: string, description: "The current slide's notes as OSCPoint's ASCII copy, line breaks as CR" }
+  slideshow.section.index:           { type: int, description: "Place of the current slide's section, from 1" }
+  slideshow.section.name:            { type: string, description: "Name of the current slide's section" }
+  slideshow.section.slides_remaining: { type: int, description: "Slides left in the current section, hidden ones left out" }
+  slideshow.media.state:             { type: string, description: "playing, paused, stopped or notready, for the one media element on the current slide" }
+  slideshow.media.duration_ms:       { type: int, unit: ms, description: "Full length of the media clip" }
+  slideshow.media.duration_trimmed_ms: { type: int, unit: ms, description: "Length from the clip's start point to its end point" }
+  slideshow.media.start_point_ms:    { type: int, unit: ms, description: "The clip's start point, from the start of the full clip; 0 when not trimmed" }
+  slideshow.media.end_point_ms:      { type: int, unit: ms, description: "The clip's end point, from the start of the full clip" }
+  slideshow.media.position_ms:       { type: int, unit: ms, description: "Playhead, from the clip's start point" }
+  slideshow.media.remaining_ms:      { type: int, unit: ms, description: "Play time left up to the clip's end point" }
+  add_in.version:                    { type: string, description: "OSCPoint's version, as its add_in_startup event gives it" }
+  last_event.type:                   { type: string, description: "Type of the last PowerPoint event OSCPoint reported: add_in_startup, presentation_open, presentation_close, window_activate, slideshow_begin, slideshow_end, slideshow_next_slide, slideshow_on_next, slideshow_next_click or slideshow_next_build" }
+  last_event.version:                { type: string, description: "The add-in version, for add_in_startup" }
+  last_event.filename:               { type: string, description: "The presentation's file name, for the presentation, window and slide show begin and end events" }
+  last_event.slide:                  { type: int, description: "Slide number from 1, for slideshow_begin and the next slide, click and build events" }
+  last_event.click_index:            { type: int, description: "Click index on the slide, for the next slide, click and build events" }
+  last_event.click_count:            { type: int, description: "Number of clicks on the slide, for the next slide, click and build events" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      OSCPoint sends its feedback only to the one host and port set on its ribbon tab in
+      PowerPoint (127.0.0.1 and 35550 by default), not to the sender of actions, and
+      neither can be set over OSC. Set the feedback host to this host and the feedback
+      port to the feedback_port setting, and enable actions and feedbacks on the tab.
+      The action port (35551 by default) is also set only there. Feedback can go to a
+      broadcast address for several receivers. Several PowerPoint machines may send to
+      the same feedback_port here, since each datagram is routed by its source address.
+  - models: [all]
+    severity: info
+    text: >
+      OSCPoint answers no action, so every command reports unverified; state changes
+      arrive as feedback, which OSCPoint queues and sends in bundles about every 200 ms
+      (notes and events at once). Feedback is UDP: on connecting and every 30 s the core
+      sends /oscpoint/feedbacks/refresh, which resends the most recent values, and
+      /oscpoint/files/list. Slide show feedback may not update while a slide show
+      auto-advances (a known OSCPoint issue).
+  - models: [all]
+    severity: info
+    text: >
+      API limits: OSCPoint reports no state for the black and white screens, the laser
+      pointer, whether a slide is hidden, whether actions or feedbacks are enabled, or
+      its own ports, so those commands have no state to read back; its documentation
+      lists no slide titles or thumbnails. Presenter View (its clock, layout and notes)
+      cannot be controlled through PowerPoint's object model, which OSCPoint uses. File
+      system access is switched only on the ribbon tab (files.access_enabled reports it),
+      and set_active_folder, list_files, open_file and the close commands need it.
+  - models: [all]
+    severity: info
+    text: >
+      Commands act on the focused presentation window, and the presentation feedback
+      follows focus when several presentations are open. Media commands and media
+      feedback work only in slide show mode with a single media element on the current
+      slide; media feedback is sent every 500 ms while it plays. Media, transitions and
+      feedback may not work correctly while PowerPoint is not the focused window.
+  - models: [all]
+    severity: info
+    text: >
+      Names (sections, folders and files) are sent as UTF-8 blobs, which OSCPoint takes
+      from 2.1. Feedback carries names and the presentation JSON as an ASCII string and,
+      from 2.1, also as a UTF-8 blob; the blob is read when present. Notes come as ASCII
+      on /oscpoint/slideshow/notes (slideshow.notes_ascii, which OSCPoint may deprecate)
+      and as UTF-8 on /oscpoint/slideshow/notes-utf8 (slideshow.notes), truncated past
+      32,000 characters, with CR line breaks. Section names are case sensitive.
+  - models: [all]
+    severity: info
+    text: >
+      Lists are keyed by their place from 1 in OSCPoint's own order (presentations,
+      sections, files) and replaced whole each time they arrive. Presentation and slide
+      show values are those OSCPoint last sent: it documents no reset of the slide show
+      and media values when a slide show ends. last_event holds only the latest event.
+  - models: [all]
+    severity: info
+    text: >
+      go_to_first_slide and go_to_last_slide go to the first or last slide even when it
+      is hidden. A slide hidden during a slide show may still show when going back.
+      Starting a slide show other than from slide 1 may flash slide 1 first, and
+      starting a slide show marks the presentation as having unsaved changes.
+  - models: [all]
+    severity: warning
+    text: >
+      set_actions_enabled false makes OSCPoint ignore every action except the one
+      enabling them again; set_feedbacks_enabled false stops all state updates.
+  - models: [all]
+    severity: critical
+    text: >
+      close_presentation and close_active_presentation with mode force discard unsaved
+      changes without warning, and with mode save overwrite the file; neither can be
+      undone. set_wallpaper replaces the desktop wallpaper of every monitor on the
+      PowerPoint machine. set_active_folder creates the folder when it does not exist.
