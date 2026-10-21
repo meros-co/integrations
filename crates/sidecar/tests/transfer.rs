@@ -2,9 +2,10 @@
 //! and come back, are listed and deleted; every route needs the bearer
 //! header; ids that try to leave the folder are refused; no size, quota or
 //! expiry limits a file, and the flags that once set them are unknown;
-//! startup clears the folder's ids; and an ATEM simulated on loopback UDP
+//! startup clears the folder's ids; an ATEM simulated on loopback UDP
 //! takes a still and a macro from uploaded files and writes them back into
-//! reserved ones.
+//! reserved ones; and a binary parameter given as `{"file": "transfer:<id>"}`
+//! is streamed to an HTTP device faked on loopback.
 
 #![cfg(feature = "all")]
 
@@ -1001,6 +1002,160 @@ async fn an_atem_takes_uploaded_files_and_writes_reserved_ones() {
     let root = std::path::absolute(&service.dir).unwrap();
     let root = root.to_string_lossy();
     assert!(all.iter().all(|s| !s.contains(root.as_ref())), "{all:?}");
+
+    service.post("/v1/close", json!({"device": device})).await;
+}
+
+/// One request a fake HTTP device received: its head, lowercased, and body.
+type Received = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+
+/// An HTTP device on loopback that answers every request `200 {}` and keeps
+/// what it was sent; its port.
+async fn http_device(received: Received) -> u16 {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        loop {
+            let Ok((mut stream, _)) = listener.accept().await else {
+                return;
+            };
+            let received = received.clone();
+            tokio::spawn(async move {
+                let mut buf = Vec::new();
+                let mut chunk = vec![0u8; 65536];
+                loop {
+                    let Some(end) = buf.windows(4).position(|w| w == b"\r\n\r\n") else {
+                        match stream.read(&mut chunk).await {
+                            Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
+                            _ => return,
+                        }
+                        continue;
+                    };
+                    let head = String::from_utf8_lossy(&buf[..end]).to_ascii_lowercase();
+                    let length: usize = head
+                        .lines()
+                        .find_map(|l| l.strip_prefix("content-length: "))
+                        .map_or(0, |v| v.trim().parse().unwrap());
+                    buf.drain(..end + 4);
+                    while buf.len() < length {
+                        match stream.read(&mut chunk).await {
+                            Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
+                            _ => return,
+                        }
+                    }
+                    let body: Vec<u8> = buf.drain(..length).collect();
+                    received.lock().unwrap().push((head, body));
+                    let reply = b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 2\r\n\r\n{}";
+                    if stream.write_all(reply).await.is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    port
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_binary_param_takes_an_uploaded_file_streamed_to_the_device() {
+    let received: Received = Arc::default();
+    let port = http_device(received.clone()).await;
+    let service = start("binary", &[]);
+    let mut events = Events {
+        service: &service,
+        seen: Vec::new(),
+    };
+    let (_, opened) = service
+        .post(
+            "/v1/open",
+            json!({"device": "dataton-watchout7", "model": "watchout7",
+                   "host": "127.0.0.1", "port": port, "monitor": false}),
+        )
+        .await;
+    let device = opened["device"].clone();
+    assert!(device.is_u64(), "{opened}");
+    events
+        .until(|e| {
+            e["event"] == "connection"
+                && e["device"] == device
+                && e["connection"]["status"] == "connected"
+        })
+        .await;
+
+    // A show file goes up to the service, then to the device as the
+    // request's body, with its length.
+    let show = pattern(3 * 1024 * 1024 + 5);
+    let (status, up) = service.upload("Main show.watch", show.clone()).await;
+    assert_eq!(status, 201, "{up}");
+    let (_, done) = service
+        .post(
+            "/v1/execute",
+            json!({"device": device, "command": "load_show_file",
+                   "params": {"file": {"file": up["path"]}}}),
+        )
+        .await;
+    assert_eq!(done, json!({"ok": {"kind": "ack"}}));
+    let (head, body) = received
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(head, _)| head.starts_with("post /v0/showfile"))
+        .cloned()
+        .expect("no show file request");
+    assert!(
+        head.contains(&format!("content-length: {}", show.len())),
+        "{head}"
+    );
+    assert!(!head.contains("transfer-encoding"), "{head}");
+    assert_eq!(body.len(), show.len());
+    assert!(body == show, "the body is not the file");
+
+    // An id the service never handed out is refused before the core.
+    let (_, refused) = service
+        .post(
+            "/v1/execute",
+            json!({"device": device, "command": "load_show_file",
+                   "params": {"file": {"file": "transfer:0123456789abcdef0123456789abcdef"}}}),
+        )
+        .await;
+    assert_eq!(refused["error"]["error"], "invalid_params", "{refused}");
+
+    // A reserved file not yet written is refused naming the parameter, and
+    // the message shows the file as transfer:<id>, never the folder.
+    let (_, reserved) = service.post("/v1/files/reserve", json!({})).await;
+    let output = reserved["files"][0].clone();
+    let (_, refused) = service
+        .post(
+            "/v1/execute",
+            json!({"device": device, "command": "load_show_file",
+                   "params": {"file": {"file": output["path"]}}}),
+        )
+        .await;
+    assert_eq!(refused["error"]["error"], "invalid_params", "{refused}");
+    let message = refused["error"]["message"].as_str().unwrap();
+    assert!(message.contains("'file': the file transfer:"), "{message}");
+    assert!(
+        message.contains(output["path"].as_str().unwrap()),
+        "{message}"
+    );
+    let root = std::path::absolute(&service.dir).unwrap();
+    assert!(
+        !message.contains(root.to_string_lossy().as_ref()),
+        "{message}"
+    );
+
+    // Base64 in the same parameter is as it was.
+    let (_, done) = service
+        .post(
+            "/v1/execute",
+            json!({"device": device, "command": "load_show_file",
+                   "params": {"file": "AAEC"}}),
+        )
+        .await;
+    assert_eq!(done, json!({"ok": {"kind": "ack"}}));
+    let last = received.lock().unwrap().last().cloned().unwrap();
+    assert_eq!(last.1, vec![0, 1, 2]);
 
     service.post("/v1/close", json!({"device": device})).await;
 }
