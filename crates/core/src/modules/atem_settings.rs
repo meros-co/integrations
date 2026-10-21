@@ -1,16 +1,22 @@
 //! Media pool management, recording and streaming settings, multiviewer
-//! layout and window overlays, the video mode, the startup state, and macro
-//! recording.
+//! layout and window overlays, the video mode, the startup state, macro
+//! recording, the HyperDecks the switcher controls, the 3G-SDI output
+//! level, the fade to black enable and the switcher's network identity.
 //!
 //! Layouts from Sofie `commands/Media/`, `commands/Recording/`,
 //! `commands/Streaming/`, `commands/Settings/`, `commands/Macro/` and
 //! `commands/StartupStateCommand.ts`, with the LibAtem samples in Sofie
-//! `commands/__tests__/libatem-data.json` for the field positions.
+//! `commands/__tests__/libatem-data.json` for the field positions. Sofie
+//! has no HyperDeck, 3G-SDI level, fade to black enable or identity
+//! messages: RXMS, CXMS, V3sl and C3sl come from the LibAtem samples alone,
+//! and FEna and WhoI from the switchers' captures in Sofie's
+//! `src/__tests__/connection/*.data`, with Blackmagic's SDK manual for what
+//! each setting means.
 
 use serde_json::{json, Value};
 
 use super::{
-    fits, int, invalid, one, opt_bool, opt_int, opt_str, put16, put32, text, u16_at, u32_at,
+    fits, flag, int, invalid, one, opt_bool, opt_int, opt_str, put16, put32, text, u16_at, u32_at,
     unsupported, Atem, CommandError, Out, Params, V2_28, V2_30,
 };
 
@@ -62,6 +68,15 @@ pub(super) const LAYOUTS: [(&str, u8); 9] = [
 
 /// Recording disk status bits (Sofie `enums/index.ts:332-339`).
 const DISK_STATUS: [&str; 4] = ["idle", "unformatted", "active", "recording"];
+
+/// HyperDeck connection states, in the order Blackmagic's SDK manual lists
+/// them (10.2.6); their wire values are inferred from that order.
+const HYPERDECK_STATUS: [&str; 4] = ["not_connected", "connecting", "connected", "incompatible"];
+
+/// Four address bytes as dotted IPv4, in the order they are sent.
+fn address(b: &[u8]) -> String {
+    format!("{}.{}.{}.{}", b[0], b[1], b[2], b[3])
+}
 
 fn layout_name(v: u8) -> &'static str {
     LAYOUTS
@@ -254,6 +269,51 @@ impl Atem {
                     } else {
                         Value::Null
                     },
+                }}))
+            }
+            // u16 slot, 2 rsv, IPv4 in written order, u16 input, auto roll,
+            // rsv, u16 frame delay, status, rsv, u16 storage media count,
+            // remote access enabled (the LibAtem samples; neither Sofie nor
+            // Blackmagic gives the bytes).
+            b"RXMS" => {
+                need(19)?;
+                Some(
+                    json!({"hyperdecks": {(u16_at(b, 0) as u32 + 1).to_string(): {
+                        "address": address(&b[4..8]),
+                        "input": u16_at(b, 8),
+                        "auto_roll": b[10] != 0,
+                        "auto_roll_frame_delay": u16_at(b, 12),
+                        "status": super::named(&HYPERDECK_STATUS, b[14]),
+                        "storage_media_count": u16_at(b, 16),
+                        "remote_enabled": b[18] != 0,
+                    }}}),
+                )
+            }
+            // Level, 3 bytes the switcher leaves unset (the LibAtem samples
+            // and the captures in Sofie's tests). 0 is level B and 1 level A
+            // (bmdwire's documentation).
+            b"V3sl" => {
+                need(1)?;
+                self.topology.sdi_level = true;
+                Some(json!({"sdi_3g_level": if b[0] == 1 { "a" } else { "b" }}))
+            }
+            // Byte 1 is the enable; bytes 0, 2 and 3 vary between captures
+            // and are taken as unset (the captures in Sofie's tests).
+            b"FEna" => {
+                need(2)?;
+                self.topology.ftb_enable = true;
+                Some(json!({"fade_to_black_enabled": b[1] != 0}))
+            }
+            // Device id (32 characters, unterminated), IPv4 address text at
+            // 32, host name at 48 and name at 112, each NUL-padded (the
+            // captures in Sofie's tests).
+            b"WhoI" => {
+                need(176)?;
+                Some(json!({"device": {
+                    "id": text(&b[0..32]),
+                    "address": text(&b[32..48]),
+                    "hostname": text(&b[48..112]),
+                    "name": text(&b[112..176]),
                 }}))
             }
             _ => None,
@@ -568,6 +628,72 @@ impl Atem {
                 put16(&mut head, 6, d.len() as u16);
                 one(b"CMPr", named_body(head, &n, &d))
             }
+            // Mask, rsv, u16 slot, IPv4, u16 input, auto roll, rsv, u16
+            // frame delay, 2 rsv (the LibAtem samples). The mask bits follow
+            // the fields' order (address, input, auto roll, frame delay):
+            // inferred, since every sample sets every field.
+            "set_hyperdeck" => {
+                if self.topology.hyperdecks == 0 {
+                    return Err(unsupported(name, "this switcher (no HyperDeck control)"));
+                }
+                let slot = self.check_index(params, "hyperdeck", self.topology.hyperdecks)?;
+                let mut b = vec![0u8; 16];
+                put16(&mut b, 2, slot as u16);
+                if let Some(a) = opt_str(params, "address") {
+                    let ip: std::net::Ipv4Addr = a
+                        .parse()
+                        .map_err(|_| invalid(format!("{a} is not an IPv4 address")))?;
+                    b[0] |= 1;
+                    b[4..8].copy_from_slice(&ip.octets());
+                }
+                if let Some(input) = opt_int(params, "input") {
+                    // 0 is none; otherwise one of the switcher's external
+                    // inputs (SDK manual 10.3.2.11).
+                    if input != 0 && self.topology.sources.get(&(input as u16)) != Some(&0) {
+                        return Err(invalid(format!(
+                            "input {input} is not one of the switcher's external inputs"
+                        )));
+                    }
+                    b[0] |= 2;
+                    put16(&mut b, 8, input as u16);
+                }
+                if let Some(on) = opt_bool(params, "auto_roll") {
+                    b[0] |= 4;
+                    b[10] = on as u8;
+                }
+                if let Some(frames) = opt_int(params, "auto_roll_frame_delay") {
+                    b[0] |= 8;
+                    put16(&mut b, 12, frames as u16);
+                }
+                if b[0] == 0 {
+                    return Err(super::nothing_to_set());
+                }
+                one(b"CXMS", b)
+            }
+            // Level (1 A, 0 B), 3 rsv (the LibAtem samples; bmdwire names the
+            // values).
+            "set_3g_sdi_level" => {
+                if !self.topology.sdi_level {
+                    return Err(unsupported(
+                        name,
+                        "this switcher (it reports no 3G-SDI output level)",
+                    ));
+                }
+                let level = (opt_str(params, "level") == Some("a")) as u8;
+                one(b"C3sl", vec![level, 0, 0, 0])
+            }
+            // The switcher's own message name, enable at byte 1 as it reports
+            // it (inferred from the captures in Sofie's tests and bmdwire's
+            // documentation; no public source gives the command's bytes).
+            "set_fade_to_black_enabled" => {
+                if !self.topology.ftb_enable {
+                    return Err(unsupported(
+                        name,
+                        "this switcher (it reports no fade to black enable)",
+                    ));
+                }
+                one(b"FEna", vec![0, flag(params, "enabled") as u8, 0, 0])
+            }
             _ => Ok(None),
         }
     }
@@ -575,7 +701,7 @@ impl Atem {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{cmd, decoded, hex, payload, ready, refused};
+    use super::super::tests::{cmd, decoded, hex, payload, ready, refused, state};
     use super::super::{command, CommandError};
     use serde_json::json;
 
@@ -788,6 +914,159 @@ mod tests {
             ),
             CommandError::InvalidParams { .. }
         ));
+    }
+
+    #[test]
+    fn hyperdecks_sdi_level_fade_to_black_enable_and_identity() {
+        let (mut m, a) = ready();
+        assert_eq!(state(&a)["topology"]["hyperdecks"], 4);
+        // Two LibAtem samples of RXMS.
+        let s = decoded(
+            &mut m,
+            &[
+                cmd(
+                    b"RXMS",
+                    &hex("00-03-00-00-BC-6C-D4-65-0B-CD-01-00-00-1C-00-00-AE-92-00-00"),
+                ),
+                cmd(
+                    b"RXMS",
+                    &hex("00-02-00-00-AD-9D-C9-C8-27-24-01-00-00-39-02-00-7D-A8-01-00"),
+                ),
+                cmd(b"V3sl", &hex("01-00-00-00")),
+                // Bytes 0, 2 and 3 as one capture has them: not meaningful.
+                cmd(b"FEna", &hex("69-01-6E-20")),
+            ],
+        );
+        assert_eq!(
+            s["hyperdecks"]["4"],
+            json!({"address": "188.108.212.101", "input": 3021, "auto_roll": true,
+                   "auto_roll_frame_delay": 28, "status": "not_connected",
+                   "storage_media_count": 44690, "remote_enabled": false})
+        );
+        assert_eq!(s["hyperdecks"]["3"]["status"], "connected");
+        assert_eq!(s["hyperdecks"]["3"]["remote_enabled"], true);
+        assert_eq!(s["hyperdecks"]["3"]["address"], "173.157.201.200");
+        assert_eq!(s["sdi_3g_level"], "a");
+        assert_eq!(s["fade_to_black_enabled"], true);
+        let s = decoded(
+            &mut m,
+            &[
+                cmd(b"V3sl", &hex("00-60-21-21")),
+                cmd(b"FEna", &[0, 0, 0, 0]),
+            ],
+        );
+        assert_eq!(s["sdi_3g_level"], "b");
+        assert_eq!(s["fade_to_black_enabled"], false);
+
+        // WhoI, laid out as the captured ones are.
+        let mut whoi = vec![0u8; 176];
+        whoi[..32].copy_from_slice(b"0123456789abcdef0123456789abcdef");
+        whoi[32..43].copy_from_slice(b"192.0.2.10\0");
+        whoi[48..63].copy_from_slice(b"ATEM-Test.local");
+        whoi[112..121].copy_from_slice(b"ATEM Test");
+        let s = decoded(&mut m, &[cmd(b"WhoI", &whoi)]);
+        assert_eq!(
+            s["device"],
+            json!({"id": "0123456789abcdef0123456789abcdef", "address": "192.0.2.10",
+                   "hostname": "ATEM-Test.local", "name": "ATEM Test"})
+        );
+    }
+
+    #[test]
+    fn hyperdeck_sdi_level_and_fade_to_black_enable_layouts() {
+        let (mut m, _) = ready();
+        // Every field, as LibAtem's CXMS sample for HyperDeck 3 lays them
+        // out (its mask aside, which here names all four).
+        assert_eq!(
+            payload(
+                &mut m,
+                "set_hyperdeck",
+                json!({"hyperdeck": 3, "address": "29.55.232.81", "input": 2,
+                       "auto_roll": true, "auto_roll_frame_delay": 43})
+            ),
+            command(
+                b"CXMS",
+                &hex("0F-00-00-02-1D-37-E8-51-00-02-01-00-00-2B-00-00")
+            )
+        );
+        // One field: one mask bit.
+        assert_eq!(
+            payload(
+                &mut m,
+                "set_hyperdeck",
+                json!({"hyperdeck": 1, "address": "0.0.0.0"})
+            ),
+            command(b"CXMS", &[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        );
+        assert_eq!(
+            payload(
+                &mut m,
+                "set_hyperdeck",
+                json!({"hyperdeck": 2, "auto_roll_frame_delay": 300})
+            ),
+            command(b"CXMS", &[8, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 44, 0, 0])
+        );
+        for (p, why) in [
+            (json!({"hyperdeck": 5, "input": 1}), "a fifth HyperDeck"),
+            (json!({"hyperdeck": 1, "input": 0x7FFF}), "an unknown input"),
+            (json!({"hyperdeck": 1, "input": 0}), "Black is not external"),
+            (
+                json!({"hyperdeck": 1, "address": "10.0.0"}),
+                "a short address",
+            ),
+            (json!({"hyperdeck": 1}), "nothing to set"),
+        ] {
+            if p["input"] == 0 {
+                // 0 is the documented "no input", not Black.
+                assert_eq!(
+                    payload(&mut m, "set_hyperdeck", p),
+                    command(b"CXMS", &[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                );
+                continue;
+            }
+            assert!(
+                matches!(
+                    refused(&mut m, "set_hyperdeck", p),
+                    CommandError::InvalidParams { .. }
+                ),
+                "{why}"
+            );
+        }
+
+        // The 3G-SDI level and the fade to black enable wait for the
+        // switcher to report them.
+        assert!(matches!(
+            refused(&mut m, "set_3g_sdi_level", json!({"level": "a"})),
+            CommandError::UnsupportedForModel { .. }
+        ));
+        assert!(matches!(
+            refused(
+                &mut m,
+                "set_fade_to_black_enabled",
+                json!({"enabled": false})
+            ),
+            CommandError::UnsupportedForModel { .. }
+        ));
+        decoded(
+            &mut m,
+            &[cmd(b"V3sl", &[0, 0, 0, 0]), cmd(b"FEna", &[0, 1, 0, 0])],
+        );
+        assert_eq!(
+            payload(&mut m, "set_3g_sdi_level", json!({"level": "a"})),
+            command(b"C3sl", &[1, 0, 0, 0])
+        );
+        assert_eq!(
+            payload(&mut m, "set_3g_sdi_level", json!({"level": "b"})),
+            command(b"C3sl", &[0, 0, 0, 0])
+        );
+        assert_eq!(
+            payload(
+                &mut m,
+                "set_fade_to_black_enabled",
+                json!({"enabled": false})
+            ),
+            command(b"FEna", &[0, 0, 0, 0])
+        );
     }
 
     #[test]

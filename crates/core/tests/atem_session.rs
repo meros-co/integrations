@@ -14,7 +14,12 @@
 //! downloads (`FTSU`, `FTDa`, `FTDC`) and macros, which take no lock. It can
 //! hold the stills lock for another client for a while, and can fall silent
 //! in the middle of an upload; a new session then finds the old one's lock
-//! freed, as a switcher frees a dead session's.
+//! freed, as a switcher frees a dead session's. A clear still (`CSTL`) is
+//! taken only from the client holding the stills lock.
+//!
+//! It also reports four HyperDeck slots (`RXMS`), applying `CXMS` to them,
+//! the fade to black enable (`FEna`), applying the client's `FEna`, and its
+//! network identity (`WhoI`).
 
 #![cfg(feature = "blackmagic-atem")]
 
@@ -142,6 +147,10 @@ struct Sim {
     labels: HashMap<u16, Vec<u8>>,
     /// Clears (CSTL) ignored for want of the stills lock.
     bare_clears: usize,
+    /// HyperDeck slots: address, input, auto roll, auto roll delay.
+    hyperdecks: [([u8; 4], u16, bool, u16); 4],
+    /// Fade to black control switched off (FEna).
+    ftb_disabled: bool,
     upload: Option<Upload>,
 }
 
@@ -173,6 +182,9 @@ impl Switcher {
         top[1] = 2;
         top[2] = 1;
         top[3] = 1;
+        // Four HyperDeck slots (offset 8 from protocol 2.30).
+        top[8] = 4;
+        let ftb_enabled = !self.sim.lock().unwrap().ftb_disabled;
         let (stills, macros): (Vec<u16>, Vec<u16>) = {
             let sim = self.sim.lock().unwrap();
             (
@@ -225,6 +237,16 @@ impl Switcher {
                 cmd(b"PrvI", &[0, 0, 0, 2, 0, 0, 0, 0]),
                 tally(1, 2),
                 media.concat(),
+                self.hyperdecks(),
+                cmd(b"FEna", &[0, ftb_enabled as u8, 0, 0]),
+                cmd(b"WhoI", &{
+                    let mut b = vec![0u8; 176];
+                    b[..32].copy_from_slice(b"00112233445566778899aabbccddeeff");
+                    b[32..41].copy_from_slice(b"127.0.0.1");
+                    b[48..63].copy_from_slice(b"ATEM-Mini.local");
+                    b[112..121].copy_from_slice(b"ATEM Mini");
+                    b
+                }),
             ]
             .concat(),
             cmd(b"InCm", &[1, 0, 0, 0]),
@@ -245,6 +267,27 @@ impl Switcher {
             let p = packet(0x01 | 0x04, SESSION, 0, i as u16 + 1, payload);
             self.socket.send_to(&p, from).await.unwrap();
         }
+    }
+
+    /// RXMS for every HyperDeck slot: u16 slot, 2 rsv, address, u16 input,
+    /// auto roll, rsv, u16 delay, status, rsv, u16 media count, remote.
+    fn hyperdecks(&self) -> Vec<u8> {
+        let slots = self.sim.lock().unwrap().hyperdecks;
+        let mut out = Vec::new();
+        for (i, (address, input, auto, delay)) in slots.iter().enumerate() {
+            let mut b = vec![0u8; 20];
+            b[0..2].copy_from_slice(&(i as u16).to_be_bytes());
+            b[4..8].copy_from_slice(address);
+            b[8..10].copy_from_slice(&input.to_be_bytes());
+            b[10] = *auto as u8;
+            b[12..14].copy_from_slice(&delay.to_be_bytes());
+            // Connecting while an address is set, as a switcher does with
+            // no HyperDeck there.
+            b[14] = (*address != [0; 4]) as u8;
+            b[17] = 2;
+            out.extend(cmd(b"RXMS", &b));
+        }
+        out
     }
 
     async fn grant(&mut self) {
@@ -393,6 +436,31 @@ impl Switcher {
                 self.send(&cmd(b"FTDC", &[idb[0], idb[1], 0, 0])).await;
             }
             b"FTUA" => self.sim.lock().unwrap().acks += 1,
+            b"CXMS" => {
+                // Apply the fields the mask names, then report every slot.
+                {
+                    let mut sim = self.sim.lock().unwrap();
+                    let slot = &mut sim.hyperdecks[u16_at(b, 2) as usize];
+                    if b[0] & 1 != 0 {
+                        slot.0.copy_from_slice(&b[4..8]);
+                    }
+                    if b[0] & 2 != 0 {
+                        slot.1 = u16_at(b, 8);
+                    }
+                    if b[0] & 4 != 0 {
+                        slot.2 = b[10] != 0;
+                    }
+                    if b[0] & 8 != 0 {
+                        slot.3 = u16_at(b, 12);
+                    }
+                }
+                let report = self.hyperdecks();
+                self.send(&report).await;
+            }
+            b"FEna" => {
+                self.sim.lock().unwrap().ftb_disabled = b[1] == 0;
+                self.send(&cmd(b"FEna", &[0, b[1], 0, 0])).await;
+            }
             b"CSTL" => {
                 // Like the models bmdwire describes, a clear is taken only
                 // from the client holding the stills lock; a bare one is
@@ -894,6 +962,96 @@ async fn atem_transfer_waits_while_another_client_holds_the_stills() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Wait until the device's state passes a check, draining events meanwhile.
+async fn state_until(core: &Core, id: u64, what: &str, check: impl Fn(&Value) -> bool) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !check(&core.snapshot(id).unwrap().state) {
+            core.poll_events(256);
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("{what}"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn atem_hyperdeck_slots_fade_to_black_enable_and_identity() {
+    let sim: Arc<Mutex<Sim>> = Arc::default();
+    let port = simulated_atem(sim.clone()).await;
+    let core = common::core().unwrap();
+    let id = open(&core, port).await;
+    let state = core.snapshot(id).unwrap().state;
+    assert_eq!(state["topology"]["hyperdecks"], 4);
+    assert_eq!(state["hyperdecks"]["4"]["address"], "0.0.0.0");
+    assert_eq!(state["hyperdecks"]["4"]["status"], "not_connected");
+    assert_eq!(state["fade_to_black_enabled"], true);
+    assert_eq!(state["device"]["name"], "ATEM Mini");
+    assert_eq!(state["device"]["hostname"], "ATEM-Mini.local");
+
+    let outcome = core
+        .execute(
+            id,
+            "set_hyperdeck",
+            params(json!({"hyperdeck": 2, "address": "192.0.2.20", "input": 1,
+                          "auto_roll": true, "auto_roll_frame_delay": 10})),
+        )
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    state_until(&core, id, "HyperDeck 2 bound", |s| {
+        s["hyperdecks"]["2"]
+            == json!({"address": "192.0.2.20", "input": 1, "auto_roll": true,
+                      "auto_roll_frame_delay": 10, "status": "connecting",
+                      "storage_media_count": 2, "remote_enabled": false})
+    })
+    .await;
+    // Only what is given changes.
+    let outcome = core
+        .execute(
+            id,
+            "set_hyperdeck",
+            params(json!({"hyperdeck": 2, "auto_roll": false})),
+        )
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    state_until(&core, id, "auto roll off", |s| {
+        s["hyperdecks"]["2"]["auto_roll"] == false
+            && s["hyperdecks"]["2"]["address"] == "192.0.2.20"
+    })
+    .await;
+    // The spec's pattern refuses a malformed address before anything is sent.
+    let outcome = core
+        .execute(
+            id,
+            "set_hyperdeck",
+            params(json!({"hyperdeck": 1, "address": "192.0.2"})),
+        )
+        .await;
+    assert!(matches!(outcome, Err(CommandError::InvalidParams { .. })));
+
+    let outcome = core
+        .execute(
+            id,
+            "set_fade_to_black_enabled",
+            params(json!({"enabled": false})),
+        )
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    state_until(&core, id, "fade to black disabled", |s| {
+        s["fade_to_black_enabled"] == false
+    })
+    .await;
+    assert!(sim.lock().unwrap().ftb_disabled);
+    // The ATEM Mini has no 3G-SDI outputs.
+    let outcome = core
+        .execute(id, "set_3g_sdi_level", params(json!({"level": "a"})))
+        .await;
+    assert!(matches!(
+        outcome,
+        Err(CommandError::UnsupportedForModel { .. })
+    ));
+    core.close(id).await;
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn atem_clear_still_takes_the_stills_lock_and_waits_its_turn() {
     let sim: Arc<Mutex<Sim>> = Arc::default();
@@ -922,18 +1080,15 @@ async fn atem_clear_still_takes_the_stills_lock_and_waits_its_turn() {
     );
     assert!(asked.elapsed() >= Duration::from_millis(700), "it waited");
     released(&sim).await;
-    tokio::time::timeout(Duration::from_secs(5), async {
-        while !core.snapshot(id).unwrap().state["media_pool"]["stills"]["4"].is_null() {
-            core.poll_events(256);
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
+    state_until(&core, id, "the pool reports the slot empty", |s| {
+        s["media_pool"]["stills"]["4"].is_null()
     })
-    .await
-    .expect("the pool reports the slot empty");
-    let s = sim.lock().unwrap();
-    assert!(!s.stills.contains_key(&3));
-    assert_eq!(s.bare_clears, 0);
-    drop(s);
+    .await;
+    {
+        let s = sim.lock().unwrap();
+        assert!(!s.stills.contains_key(&3));
+        assert_eq!(s.bare_clears, 0);
+    }
     core.close(id).await;
 }
 

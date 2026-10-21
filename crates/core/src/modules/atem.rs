@@ -279,6 +279,12 @@ struct Topology {
     clip_frame_hashes: BTreeMap<u8, BTreeMap<u16, bool>>,
     /// The multiviewer resolutions a label is drawn for (_VMC).
     label_resolutions: label::Resolutions,
+    /// HyperDeck slots the switcher can control (_top).
+    hyperdecks: u8,
+    /// The switcher reported its 3G-SDI output level (V3sl).
+    sdi_level: bool,
+    /// The switcher reported the fade to black enable (FEna).
+    ftb_enable: bool,
 }
 
 pub(crate) struct Atem {
@@ -1031,6 +1037,7 @@ impl Atem {
                 t.dsks = b[2];
                 t.auxes = b[3];
                 t.media_players = b[5];
+                t.hyperdecks = b[7 + shift];
                 t.dves = b[8 + shift];
                 t.stingers = b[9 + shift];
                 t.supersources = b[10 + shift];
@@ -1041,6 +1048,7 @@ impl Atem {
                     "dsks": b[2],
                     "auxes": b[3],
                     "media_players": b[5],
+                    "hyperdecks": b[7 + shift],
                     "dves": b[8 + shift],
                     "stingers": b[9 + shift],
                     "supersources": b[10 + shift],
@@ -3015,6 +3023,7 @@ mod tests {
         top[3] = 1; // auxes
         top[5] = 2; // media players
         top[6] = 1; // multiviewers (from 2.30)
+        top[8] = 4; // HyperDecks (offset 8 from 2.30)
         top[9] = 1; // DVEs (offset 9 from 2.30)
         top[10] = 1; // stingers (offset 10 from 2.30)
         top[11] = 1; // SuperSources (offset 11 from 2.30)
