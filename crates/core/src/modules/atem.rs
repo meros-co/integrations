@@ -2801,6 +2801,10 @@ impl Module for Atem {
         self.transfer_file(cx, file, input);
     }
 
+    fn computed(&mut self, cx: &mut Cx, key: Key, result: Result<Vec<u8>, String>) {
+        self.transfer_computed(cx, key, result);
+    }
+
     /// A fresh socket and handshake now; a level subscription asked for is
     /// renewed once the switcher has sent its state, as after any reconnect.
     fn reconnect(&mut self, cx: &mut Cx) -> bool {

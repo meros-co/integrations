@@ -107,6 +107,12 @@ pub(crate) enum Inbound {
         generation: u64,
         input: crate::module::FileInput,
     },
+    /// A task the module handed off finished.
+    Computed {
+        key: Key,
+        generation: u64,
+        result: Result<Vec<u8>, String>,
+    },
     /// A connection the device opened to a port this session listens on.
     Accepted {
         socket: Key,
@@ -192,6 +198,8 @@ pub(crate) struct Session {
     files: HashMap<Key, crate::files::Writer>,
     /// Files being read, by key, with the generation of the read.
     reads: HashMap<Key, u64>,
+    /// Tasks running off the session, by key, with their generation.
+    computes: HashMap<Key, u64>,
     ws: HashMap<Key, crate::ws::Connection>,
     /// TCP ports this session listens on, by key.
     listening: HashMap<Key, u16>,
@@ -238,6 +246,7 @@ impl Session {
             ssh: crate::ssh::Sessions::default(),
             files: HashMap::new(),
             reads: HashMap::new(),
+            computes: HashMap::new(),
             ws: HashMap::new(),
             listening: HashMap::new(),
             servers: HashMap::new(),
@@ -457,6 +466,13 @@ impl Session {
                                 continue;
                             }
                             self.module.file(&mut cx, file, input);
+                        }
+                        Inbound::Computed { key, generation, result } => {
+                            if self.computes.get(key) != Some(&generation) {
+                                continue;
+                            }
+                            self.computes.remove(key);
+                            self.module.computed(&mut cx, key, result);
                         }
                         Inbound::Accepted { socket, stream } => {
                             // The newest connection from the device replaces
@@ -685,6 +701,24 @@ impl Session {
                         max_bytes,
                         self.inbound_tx.clone(),
                     );
+                }
+                Action::Compute { key, task } => {
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    self.computes.insert(key, generation);
+                    let inbound = self.inbound_tx.clone();
+                    tokio::spawn(async move {
+                        let result = tokio::task::spawn_blocking(move || task.run())
+                            .await
+                            .unwrap_or_else(|e| Err(format!("the task failed: {e}")));
+                        let _ = inbound
+                            .send(Inbound::Computed {
+                                key,
+                                generation,
+                                result,
+                            })
+                            .await;
+                    });
                 }
                 Action::TcpListen { socket, port } => {
                     let result = self.services.shared_tcp.register(
@@ -1085,6 +1119,7 @@ impl Session {
         }
         self.reads.clear();
         self.files.clear();
+        self.computes.clear();
     }
 }
 
@@ -1211,6 +1246,128 @@ pub(crate) fn merge_patch(target: &mut Value, patch: &Value) {
 mod tests {
     use super::merge_patch;
     use serde_json::json;
+
+    type Computed = (String, Result<Vec<u8>, String>);
+
+    /// Starts a task that waits to be let go, and answers commands at once.
+    struct Slow {
+        gate: std::sync::Arc<std::sync::Mutex<Option<std::sync::mpsc::Receiver<()>>>>,
+        results: std::sync::Arc<std::sync::Mutex<Vec<Computed>>>,
+    }
+
+    impl crate::module::Module for Slow {
+        fn start(&mut self, cx: &mut crate::module::Cx) {
+            let gate = self.gate.lock().unwrap().take().unwrap();
+            cx.compute("slow", move || {
+                gate.recv().map_err(|e| e.to_string())?;
+                Ok(vec![1, 2, 3])
+            });
+            // A second task under another key, and one replaced by a newer.
+            cx.compute("quick", || Ok(vec![9]));
+            cx.compute("twice", || Ok(vec![1]));
+            cx.compute("twice", || Ok(vec![2]));
+        }
+
+        fn command(
+            &mut self,
+            cx: &mut crate::module::Cx,
+            id: crate::module::CommandId,
+            _: &str,
+            _: &crate::catalog::Params,
+        ) {
+            cx.complete(id, Ok(crate::module::Outcome::Ack));
+        }
+
+        fn computed(
+            &mut self,
+            _: &mut crate::module::Cx,
+            key: crate::module::Key,
+            result: Result<Vec<u8>, String>,
+        ) {
+            self.results.lock().unwrap().push((key.to_string(), result));
+        }
+
+        fn timer(&mut self, _: &mut crate::module::Cx, _: crate::module::Key) {}
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_task_runs_off_the_session_while_it_answers_commands() {
+        use crate::events::EventQueue;
+        use crate::session::{DeviceSnapshot, Services, Session, SessionMsg};
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+
+        let events = Arc::new(EventQueue::new(16));
+        let services = Arc::new(Services {
+            events: events.clone(),
+            bind_address: "127.0.0.1".parse().unwrap(),
+            shared_udp: crate::udp::SharedUdp::new(events),
+            shared_tcp: Default::default(),
+            http: crate::http::HttpClients::new().unwrap(),
+            streams: Default::default(),
+        });
+        let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
+            connection: crate::module::Connection::Connecting,
+            state: serde_json::Value::Null,
+            latency_ms: None,
+        }));
+        let (release, gate) = std::sync::mpsc::channel();
+        let results = Arc::new(Mutex::new(Vec::new()));
+        let module = Slow {
+            gate: Arc::new(Mutex::new(Some(gate))),
+            results: results.clone(),
+        };
+        let session = Session::new(
+            9,
+            "127.0.0.1".parse().unwrap(),
+            Box::new(module),
+            services,
+            snapshot,
+        );
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
+        let task = tokio::spawn(session.run(rx));
+
+        // The slow task is still waiting, yet a command is answered.
+        let (reply, answer) = tokio::sync::oneshot::channel();
+        tx.send(SessionMsg::Command {
+            name: "x".into(),
+            params: Default::default(),
+            reply,
+        })
+        .await
+        .ok()
+        .unwrap();
+        let answered = tokio::time::timeout(Duration::from_secs(5), answer)
+            .await
+            .expect("answered while the task runs")
+            .unwrap();
+        assert_eq!(answered, Ok(crate::module::Outcome::Ack));
+        assert!(results.lock().unwrap().iter().all(|(k, _)| k != "slow"));
+
+        release.send(()).unwrap();
+        for _ in 0..500 {
+            if results.lock().unwrap().len() == 3 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let mut got = results.lock().unwrap().clone();
+        got.sort();
+        assert_eq!(
+            got,
+            [
+                ("quick".to_string(), Ok(vec![9])),
+                ("slow".to_string(), Ok(vec![1, 2, 3])),
+                // Only the newer of two tasks under one key is reported.
+                ("twice".to_string(), Ok(vec![2])),
+            ]
+        );
+
+        let (done, finished) = tokio::sync::oneshot::channel();
+        tx.send(SessionMsg::Close { done }).await.ok().unwrap();
+        finished.await.unwrap();
+        task.await.unwrap();
+    }
 
     #[test]
     fn merge_patch_follows_rfc_7386() {
