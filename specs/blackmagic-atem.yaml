@@ -43,7 +43,8 @@ source:
       for each transfer so other clients get a turn; a clip is made invalid
       before its frames are uploaded and valid with its name and frame count
       after; the 10-bit YUVA pixel order (a0, Cb, y0, a1, Cr, y1); frames
-      match the switcher's video mode.
+      match the switcher's video mode. Section 3.2.7: the DVE transition
+      has a logo rate in frames beside its rate.
   - title: Blackmagic ATEM Switchers Installation and Operation Manual (December 2024)
     author: Blackmagic Design
     url: https://documents.blackmagicdesign.com/UserManuals/ATEMSwitchersManual.pdf
@@ -72,6 +73,13 @@ source:
       another client's transfer wins the store, FTDC broadcast with the
       owner's transfer id, 1,396-byte chunks in budgets of up to 768, and
       dead sessions' locks freed after about 5 s.
+  - title: bmdwire, atemwire/README.md and atemwire/docs/SURFACE.md (read 2026-10-21)
+    url: https://github.com/lucas-romanenko/bmdwire/blob/HEAD/atemwire/docs/SURFACE.md
+    note: >
+      Prose only, restated in our own words; atemwire's code is
+      LGPL-3.0-only and was not read. Its claim that the DVE transition's
+      logo rate comes before the transition rate, which conflicts with
+      atem-connection (see the quirks).
   - title: OpenSwitcher protocol documentation
     url: https://docs.openswitcher.org/udptransport.html
     note: >
@@ -1305,8 +1313,9 @@ commands:
 
   set_dve_transition:
     summary: >
-      Set the DVE transition: rate (frames), style, key sources and key
-      settings. Clip and gain are percent. Give at least one setting.
+      Set the DVE transition: rate and logo rate (frames), style, key
+      sources and key settings. Clip and gain are percent. Give at least one
+      setting.
     params:
       me: { type: int, min: 1, max: 4, default: 1,
             label: M/E,
@@ -1314,6 +1323,9 @@ commands:
       rate: { type: int, min: 1, max: 250,
               label: Rate,
               description: "DVE transition duration in frames." }
+      logo_rate: { type: int, min: 1, max: 250,
+                   label: Logo rate,
+                   description: "Duration in frames of the graphic logo wipe style." }
       style:
         type: enum
         values: [swoosh_top_left, swoosh_top, swoosh_top_right, swoosh_left,
@@ -3487,6 +3499,7 @@ state:
   mes.*.transition.wipe.reverse: { type: bool, description: "Wipe reversed" }
   mes.*.transition.wipe.flip_flop: { type: bool, description: "Wipe flip flop" }
   mes.*.transition.dve.rate:   { type: int, unit: frames, description: "DVE transition rate" }
+  mes.*.transition.dve.logo_rate: { type: int, unit: frames, description: "Rate of the graphic logo wipe DVE style" }
   mes.*.transition.dve.style:  { type: string, description: "DVE transition style, as set_dve_transition names them" }
   mes.*.transition.dve.fill_source: { type: int, description: "DVE transition key fill source id" }
   mes.*.transition.dve.key_source: { type: int, description: "DVE transition key source id" }
@@ -4160,3 +4173,19 @@ quirks:
       camera_auto_white_balance, camera_color_reset, camera_record) have no
       state to read back. The camera reports what it applied as cameras.*
       state only for the parameters listed there.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The sources disagree on which of the DVE transition's two rates comes
+      first. atem-connection, LibAtem's samples in its tests and the
+      OpenSwitcher tables put the transition rate first (TDvP byte 1, CTDv
+      byte 3 under mask bit 0) and the logo rate second (TDvP byte 2, CTDv
+      byte 4 under bit 1); this module follows them. bmdwire's documentation
+      says the reverse, corrected against ATEM Software Control: the logo
+      wipe rate first and the DVE rate second. No Blackmagic document gives
+      the bytes (the SDK only has both rates), and the captures of real
+      switchers in atem-connection's tests all carry the same value in both
+      bytes, so they cannot settle it. If bmdwire is right, rate and
+      logo_rate are swapped in both set_dve_transition and
+      mes.*.transition.dve.

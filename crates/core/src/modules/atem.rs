@@ -1142,11 +1142,14 @@ impl Atem {
                     "flip_flop": b[17] == 1,
                 }}}}}))
             }
-            // Sofie `TransitionDVECommand.ts:66-85`; OpenSwitcher TDvP.
+            // Sofie `TransitionDVECommand.ts:66-85`; OpenSwitcher TDvP. The
+            // rate at 1 and the logo rate at 2 as Sofie and LibAtem's samples
+            // have them; bmdwire's prose swaps the two (see the spec's quirk).
             b"TDvP" => {
                 need(17)?;
                 Some(json!({"mes": {one(b[0]): {"transition": {"dve": {
                     "rate": b[1],
+                    "logo_rate": b[2],
                     "style": named(&DVE_STYLES, b[3]),
                     "fill_source": u16_at(b, 4),
                     "key_source": u16_at(b, 6),
@@ -1949,7 +1952,9 @@ impl Atem {
             // key, pre-multiplied, u16 clip, u16 gain, invert, reverse, flip
             // flop (Sofie `TransitionDVECommand.ts:5-52`). OpenSwitcher's CTDv
             // table puts the style at 4; Sofie's, consistent with its TDvP
-            // decoder and OpenSwitcher's own TDvP table, puts it at 5.
+            // decoder and OpenSwitcher's own TDvP table, puts it at 5. Rate at
+            // 3 (bit 0) and logo rate at 4 (bit 1) as Sofie and LibAtem's
+            // samples have them; bmdwire's prose swaps the two.
             "set_dve_transition" => {
                 if self.topology.dves == 0 {
                     return Err(unsupported(name, "this switcher (no DVE)"));
@@ -1961,6 +1966,10 @@ impl Atem {
                 if let Some(rate) = opt_int(params, "rate") {
                     mask |= 1;
                     b[3] = rate as u8;
+                }
+                if let Some(rate) = opt_int(params, "logo_rate") {
+                    mask |= 1 << 1;
+                    b[4] = rate as u8;
                 }
                 if let Some(s) = enum_param(params, "style", &DVE_STYLES)? {
                     mask |= 1 << 2;
@@ -3580,6 +3589,18 @@ mod tests {
                 &[0, 0x9C, 0, 0, 0, 27, 0, 1, 0, 2, 0, 0, 0x01, 0xF4, 0, 0, 0, 0, 0, 0]
             )
         );
+        // The rate at byte 3 under bit 0, the logo rate at 4 under bit 1
+        // (Sofie's layout; bmdwire's prose has the two the other way round).
+        let p = payload(
+            &mut m,
+            "set_dve_transition",
+            json!({"me": 1, "rate": 30, "logo_rate": 40}),
+        );
+        let mut ctdv = vec![0u8; 20];
+        ctdv[1] = 0x03;
+        ctdv[3] = 30;
+        ctdv[4] = 40;
+        assert_eq!(p, command(b"CTDv", &ctdv));
         let p = payload(
             &mut m,
             "set_stinger",
@@ -3986,6 +4007,7 @@ mod tests {
         twpp[16] = 1;
         let mut tdvp = vec![0u8; 20];
         tdvp[1] = 30;
+        tdvp[2] = 40;
         tdvp[3] = 27;
         put16(&mut tdvp, 4, 1);
         put16(&mut tdvp, 10, 500);
@@ -4093,6 +4115,7 @@ mod tests {
         );
         assert_eq!(me["transition"]["dve"]["style"], "push_left");
         assert_eq!(me["transition"]["dve"]["rate"], 30);
+        assert_eq!(me["transition"]["dve"]["logo_rate"], 40);
         assert_eq!(me["transition"]["dve"]["clip"], 50.0);
         assert_eq!(me["transition"]["sting"]["media_player"], 2);
         assert_eq!(me["transition"]["sting"]["clip"], 50.0);
