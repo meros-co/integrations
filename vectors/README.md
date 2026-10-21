@@ -38,6 +38,9 @@ expect_request: { method: GET, target: "/cgi-bin/ptzctrl.cgi?ptzcmd&home" }   # 
 # `body`; `content_type`, when given, must be the request's Content-Type:
 # { method: POST, target: /v0/showfile, body_hex: "504b0304", content_type: application/octet-stream }
 # A command sending several messages lists them: expect_wire: [ …, … ]
+# On a transport whose device answers, each goes after the reply to the one
+# before: give a device_reply answering them, and the messages it lets go are
+# compared too.
 
 # Optionally, a reply to feed back and the result it must produce:
 device_reply: "< REP 1 CHAN_NAME {Pulpit        } >"   # text stream

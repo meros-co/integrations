@@ -10,7 +10,7 @@
 //! same reason.
 
 mod expect;
-mod framing;
+pub(crate) mod framing;
 mod oauth;
 mod osc;
 mod telemetry;

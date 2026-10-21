@@ -2161,13 +2161,19 @@ extension: panasonic-update-notification
 ```
 
 The extension is a small Rust module that wraps the spec engine. The set is
-closed and each is named in the spec, so it is never hidden:
+closed and each is named in the spec, so it is never hidden. Most only keep
+state current, and a device opened for commands only runs without them. One
+that answers commands of its own (Ultimatte's preset archive) runs either
+way: the spec declares those commands with their parameters and `returns`
+and no `send`, and `tools/validate.py` checks that the spec declares every
+command the extension answers and gives none of them a message.
 
 | Extension | Adds |
 |---|---|
 | `panasonic-update-notification` | Panasonic AW-series cameras' update notifications: registers a local TCP port with the camera (`/cgi-bin/event?connect=start`), receives the changed settings it pushes there, and passes each one, a response text such as `p1`, to the spec's telemetry rules. Registers again when the camera's 60-second version notices stop, and unregisters on closing |
 | `aja-config-events` | AJA's event connection (Ki Pro, KUMO): sends the spec's `open_event_connection` request, then its `wait_for_events` request with the returned connection id, again as each reply arrives, beside the command queue. Each element of the reply, `{param_id, param_type, int_value, str_value}`, is offered to the spec's telemetry rules as two text messages, `event <param_id> value=<value>` and `event <param_id> value_name=<name>`: as a `/config?action=get` reply gives them, a string parameter's value is `str_value` and its name empty, and any other's value is `int_value` and its name `str_value`, or the value when that is empty. Opens a new connection when the id has expired or a request fails, after 1 s doubling to 30 s |
 | `resolume-push` | Resolume Arena and Avenue's websocket API (`ws://host:port/api/v1`): reads the composition Resolume sends on connecting and after each structural change into state keyed by unique id (composition, layers, columns, clips, decks, layer groups, and the effects in their chains), subscribes to every parameter that state shows with `{"action":"subscribe","parameter":"/parameter/by-id/<id>"}`, and applies each `parameter_subscribed` and `parameter_update`. A new composition is diffed against the last: removed items leave state and are unsubscribed, new ones are subscribed. Reads the composition again over REST after a deck switch, after a structural command of the session's own, and as a slow safety refresh (`composition_refresh_s`) for a deck's `closed`, which is not a parameter. Reopens the websocket after 1 s doubling to 30 s |
+| `ultimatte-preset-archive` | Blackmagic Ultimatte 12's binary settings channel (TCP 9996, `archive_port`), which the vendor's Smart Remote 4 and Software Control use for Archive All and Restore: `export_presets` reads every preset of the FILE LIST the unit last sent on its text port, and its `GPISettings` and `SavedSettings`, one request per connection, into a zip in Archive All's layout on the host; `import_presets` writes such a zip's presets in name order, then `GPISettings`, then `SavedSettings`, stopping at the first refusal; `export_preset`, `import_preset`, `export_settings` and `import_settings` move one of them to or from a host file. A connection that does not open, or a read the unit drops unanswered, is tried once more after 250 ms |
 
 ## HTTP service
 
@@ -2182,8 +2188,9 @@ Some commands read or write a file on the host running the core: their
 `path` (or multi-line `paths`) parameter is a host path, for instance an
 ATEM's `upload_still`, `download_still`, `upload_clip`, `download_clip`,
 `upload_clip_audio`, `upload_macro`, `download_macro` and
-`upload_multiviewer_label`, and a Sony camera's `import_*`, `export_*`,
-`apply_settings_file`, `download_content` and `download_captured_image`. A client of the HTTP service
+`upload_multiviewer_label`, a Sony camera's `import_*`, `export_*`,
+`apply_settings_file`, `download_content` and `download_captured_image`, and
+an Ultimatte's `export_*` and `import_*`. A client of the HTTP service
 on another machine runs them through the service's transfer folder, never
 naming a real path:
 

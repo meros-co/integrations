@@ -60,6 +60,23 @@ ul("set_frame_buffer_enable", {"buffer": "BG 1", "state": "off"}, "FRAME BUFFER:
 ul("set_ccu_camera_id", {"value": 5}, "CAMERA CONTROL:\nCCU Camera Id: 5", **MINI)
 ul("request_status", {"block": "CONTROL"}, "CONTROL:", device_reply="ACK\n\n", expect_result={"ok": {"kind": "ack"}})
 ul("ping", {}, "PING:")
+ul("request_status", {"block": "NETWORK INTERFACE 0"}, "NETWORK INTERFACE 0:", file="request_status-network-interface")
+
+# Network: a block of the form the unit sends (p.86, p.89), then the header
+# alone to read the whole block back (p.90), sent once the first is answered.
+# Static Addresses carries the address and dotted netmask as one field
+# (bmdwire ultimattewire, MIT).
+NET_READ = "NETWORK INTERFACE 0:\n\n"
+text(UL, "set_network", {"address": "10.0.0.20", "netmask": "255.255.252.0", "gateway": "10.0.0.1"},
+     ["NETWORK INTERFACE 0:\nDynamicIP: false\nStatic Addresses: 10.0.0.20/255.255.252.0\n"
+      "Static Gateway: 10.0.0.1\n\n", NET_READ],
+     device_reply="ACK\n\nNETWORK INTERFACE 0:\nStatic Addresses: 10.0.0.20/255.255.252.0\n\nACK\n\n",
+     expect_result={"ok": {"kind": "ack"}})
+text(UL, "set_network_dhcp", {"enabled": True}, ["NETWORK INTERFACE 0:\nDynamicIP: true\n\n", NET_READ],
+     device_reply="ACK\n\nACK\n\n", expect_result={"ok": {"kind": "ack"}})
+text(UL, "set_network_dns", {"servers": "8.8.8.8, 8.8.4.4"},
+     ["NETWORK INTERFACE 0:\nStatic DNS Servers: 8.8.8.8, 8.8.4.4\n\n", NET_READ],
+     device_reply="ACK\n\nNAK\n\n", expect_result={"error": {"error": "device_error"}})
 
 
 # ── Telemetry, from the document's status dump examples (p.86-89) ──
@@ -69,10 +86,24 @@ telemetry(UL, "identity", inbound="IDENTITY:\nModel: Ultimatte 12 8K\nLabel: Ult
           expect_state={"device": {"model": "Ultimatte 12 8K", "label": "Ultimatte 12 8K", "unique_id": "12345678"}})
 telemetry(UL, "network-interface", inbound="NETWORK INTERFACE 0:\nName: Cadence GigE Ethernet MAC\nPriority: 0\n"
           "DynamicIP: false\nCurrent Addresses: 10.0.0.2/255.255.255.0\nCurrent Gateway: 10.0.0.1\n\n",
-          expect_state={"network": {"interface": {"name": "Cadence GigE Ethernet MAC", "dynamic_ip": False,
+          expect_state={"network": {"interface": {"name": "Cadence GigE Ethernet MAC", "priority": 0, "dynamic_ip": False,
                                                   "current_addresses": "10.0.0.2/255.255.255.0",
                                                   "current_gateway": "10.0.0.1"}}})
-telemetry(UL, "version", inbound="VERSION:\nProduct ID: BE85\nHardware Version: 0100\nSoftware Version: 1135E1AF\n"
+# The block as bmdwire's ultimattewire (MIT) captured it from an Ultimatte 12 4K
+# on protocol 2.1: Dynamic IP with a space, and the interface's Priority.
+telemetry(UL, "network-interface-dynamic-ip", inbound="NETWORK INTERFACE 0:\nName: BMD 10G Ethernet MAC\n"
+          "Priority: 0\nMAC Address: 7c:2e:0d:00:00:01\nDynamic IP: true\n"
+          "Current Addresses: 192.0.2.98/255.255.252.0\nStatic Addresses: 192.0.2.98/255.255.252.0\n"
+          "Static Gateway: 192.0.2.1\n\n",
+          expect_state={"network": {"interface": {"name": "BMD 10G Ethernet MAC", "priority": 0,
+                                                  "mac_address": "7c:2e:0d:00:00:01", "dynamic_ip": True,
+                                                  "current_addresses": "192.0.2.98/255.255.252.0",
+                                                  "static_addresses": "192.0.2.98/255.255.252.0",
+                                                  "static_gateway": "192.0.2.1"}}})
+telemetry(UL, "control-default", inbound="CONTROL DEFAULT:\nMatte Density: 0\nMatte Enable: On\n"
+          "Backing Color: Green\n\n",
+          expect_state={"control_default": {"Matte Density": "0", "Matte Enable": "On", "Backing Color": "Green"}})
+telemetry(UL, "version",inbound="VERSION:\nProduct ID: BE85\nHardware Version: 0100\nSoftware Version: 1135E1AF\n"
           "Software Release: 2.3\n\n",
           expect_state={"device": {"product_id": "BE85", "hardware_version": "0100", "software_version": "1135E1AF",
                                    "software_release": "2.3"}})

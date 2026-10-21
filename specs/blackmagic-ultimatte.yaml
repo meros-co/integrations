@@ -32,6 +32,20 @@ source:
       functions such as Sample Wall as Yes, uses the same 0-10000 ranges, lists a PING
       header, and names the quick memories Quick Load and Quick Save where the document
       writes Quickload and Quicksave.
+  - title: bmdwire, ultimattewire package (version 1.6.0)
+    author: Lucas Romanenko
+    url: https://github.com/lucas-romanenko/bmdwire/tree/main/ultimattewire
+    note: >
+      Community source (MIT licence, ultimattewire/LICENSE; the repository's other packages are
+      under other licences and were not read), reverse-engineered from captures of Blackmagic's
+      Ultimatte Smart Remote 4 / Software Control against an Ultimatte 12 4K (protocol 2.1) and
+      checked by round trips through the vendor app. Used only where the manual is silent: the
+      NETWORK INTERFACE 0 write (Static Addresses as address/netmask in one field, ACK and an
+      echo of the fields sent, Current Addresses at 0.0.0.0 while the interface reapplies, the
+      field sent as Dynamic IP), and the binary settings channel on TCP 9996 that Archive All
+      and Restore use (one request per connection; reads with opcodes 0x0000 for a preset and
+      0x0003 for GPISettings and SavedSettings, writes with 0x0100 and 0x0103, a trailing zero
+      byte, an all-zero acknowledgement; the archive's zip layout and the restore order).
 
 transport:
   type: line-tcp
@@ -42,8 +56,14 @@ transport:
   reply: expected
   reply_match: ^(ACK|NAK)
 
+settings:
+  archive_port: {type: int, min: 1, max: 65535, default: 9996, label: Settings channel port, description: 'TCP port of the binary settings channel that preset archives and restores use, 9996 on every unit.'}
+
+extension: ultimatte-preset-archive
+
 ports:
   - {port: 9998, protocol: tcp, role: control}
+  - {port: 9996, protocol: tcp, role: control, setting: archive_port, note: 'binary settings channel, one connection per request: preset archive and restore'}
 
 models:
   - id: ultimatte-12-4k
@@ -57,7 +77,9 @@ models:
        set_gp_out_level, set_output_range, run_function, factory_defaults, user_defaults,
        set_input_source, set_ip_output_enable, load_file, save_file, delete_file,
        rename_file, gpi_insert_event, gpi_remove_event, gpi_set_index, set_frame_buffer,
-       set_frame_buffer_enable, request_status, ping]
+       set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       12G-SDI keyer with bidirectional 2110 IP video on its 10G Ethernet port (p.10,
@@ -72,7 +94,9 @@ models:
        set_filter_median, set_filter_average, set_3g_sdi_level, set_color_space,
        set_gp_out_level, set_output_range, run_function, factory_defaults, user_defaults,
        load_file, save_file, delete_file, rename_file, gpi_insert_event, gpi_remove_event,
-       gpi_set_index, set_frame_buffer, set_frame_buffer_enable, request_status, ping]
+       gpi_set_index, set_frame_buffer, set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       8K keyer; 4320p formats and the 0-6 correction size range (p.100 footnotes 1 and 4).
@@ -86,7 +110,9 @@ models:
        set_filter_median, set_filter_average, set_3g_sdi_level, set_color_space,
        set_gp_out_level, set_output_range, run_function, factory_defaults, user_defaults,
        load_file, save_file, delete_file, rename_file, gpi_insert_event, gpi_remove_event,
-       gpi_set_index, set_frame_buffer, set_frame_buffer_enable, request_status, ping]
+       gpi_set_index, set_frame_buffer, set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       HD keyer with FG, BG, garbage and holdout matte, monitor and reference inputs
@@ -100,7 +126,9 @@ models:
        set_video_format, set_ly_in_mix_mode, set_filter_mode, set_filter_median,
        set_filter_average, set_3g_sdi_level, set_output_range, run_function,
        factory_defaults, user_defaults, load_file, save_file, delete_file, rename_file,
-       set_frame_buffer, set_frame_buffer_enable, set_ccu_camera_id, request_status, ping]
+       set_frame_buffer, set_frame_buffer_enable, set_ccu_camera_id, set_network,
+       set_network_dhcp, set_network_dns, export_presets, import_presets, export_preset,
+       import_preset, export_settings, import_settings, request_status, ping]
     verification: none
     notes: >
       Compact HD keyer with FG and BG inputs only, no GPI and no PsF formats, and SDI/HDMI
@@ -116,7 +144,9 @@ models:
        set_filter_median, set_filter_average, set_3g_sdi_level, set_color_space,
        set_gp_out_level, set_output_range, run_function, factory_defaults, user_defaults,
        load_file, save_file, delete_file, rename_file, gpi_insert_event, gpi_remove_event,
-       gpi_set_index, set_frame_buffer, set_frame_buffer_enable, request_status, ping]
+       gpi_set_index, set_frame_buffer, set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       The original Ultimatte 12 (4K, with loop outputs for the garbage and holdout matte
@@ -579,10 +609,107 @@ commands:
     returns: ack
     # Ultimatte 12 Ethernet Protocol 2.3 (Ultimatte 12 manual, February 2026), p.91, Camera Control
 
+  set_network:
+    summary: 'Set the Ethernet interface''s static address, netmask and gateway, and DHCP on or off; the unit may drop the connection'
+    params:
+      address: {type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$', required: true, label: IP address, description: 'Static IPv4 address in dotted form, such as 10.0.0.2.'}
+      netmask: {type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$', required: true, label: Subnet mask, description: 'Static subnet mask in dotted form, such as 255.255.255.0; it is sent with the address as one field.'}
+      gateway: {type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$', required: true, label: Gateway, description: 'Static default gateway in dotted form, such as 10.0.0.1.'}
+      dhcp: {type: bool, default: false, label: DHCP, description: 'True takes the address from DHCP and keeps the static values for later; false uses the static values.'}
+    send:
+      - |
+        NETWORK INTERFACE 0:
+        DynamicIP: {dhcp}
+        Static Addresses: {address}/{netmask}
+        Static Gateway: {gateway}
+      - 'NETWORK INTERFACE 0:'
+    expect: {matches: ^ACK}
+    returns: ack
+    # Ultimatte 12 Ethernet Protocol 2.3 (Ultimatte 12 manual, February 2026), p.86 NETWORK INTERFACE 0
+    # block, p.89 Requesting Changes (a block of the form the unit sends), p.90 status request; the
+    # write itself is from bmdwire's ultimattewire (MIT), see quirks. The second message reads the
+    # whole block back.
+
+  set_network_dhcp:
+    summary: Turn DHCP on or off on the Ethernet interface; the unit may drop the connection
+    params:
+      enabled: {type: bool, required: true, label: DHCP, description: 'True takes the address from DHCP; false uses the static address, netmask and gateway.'}
+    send:
+      - |
+        NETWORK INTERFACE 0:
+        DynamicIP: {enabled}
+      - 'NETWORK INTERFACE 0:'
+    expect: {matches: ^ACK}
+    returns: ack
+    # Ultimatte 12 Ethernet Protocol 2.3 (Ultimatte 12 manual, February 2026), p.86, p.89-90; bmdwire
+    # ultimattewire (MIT) set_network(dynamic=...)
+
+  set_network_dns:
+    summary: Set the Ethernet interface's static DNS servers
+    params:
+      servers: {type: string, max_length: 160, pattern: '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}(, ((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}))*)?$', required: true, label: DNS servers, description: 'IPv4 addresses separated by a comma and a space, as the unit lists them (8.8.8.8, 8.8.4.4); empty clears the list.'}
+    send:
+      - |
+        NETWORK INTERFACE 0:
+        Static DNS Servers: {servers}
+      - 'NETWORK INTERFACE 0:'
+    expect: {matches: ^ACK}
+    returns: ack
+    # Ultimatte 12 Ethernet Protocol 2.3 (Ultimatte 12 manual, February 2026), p.86 (Static DNS Servers:
+    # 8.8.8.8, 8.8.4.4), p.89-90; bmdwire ultimattewire (MIT) set_network(dns=...)
+
+  export_presets:
+    summary: 'Archive every preset, GPISettings and SavedSettings into a zip on the host, as Smart Remote''s Archive All does'
+    params:
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # Not in the document. The binary settings channel on TCP 9996 and the archive's layout are bmdwire
+    # ultimattewire's (MIT); answered by the ultimatte-preset-archive extension, see quirks. The result:
+    # {path, bytes, presets, settings, warnings}.
+
+  import_presets:
+    summary: 'Restore an archive zip (Smart Remote''s Archive All, or export_presets) onto the unit: presets, then GPISettings, then SavedSettings, which changes the live key'
+    params:
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # bmdwire ultimattewire (MIT) restore order; the result: {presets, settings} written.
+
+  export_preset:
+    summary: Save one preset, by its FILE LIST name, to a host file as the unit holds it
+    params:
+      name: {type: string, max_length: 64, pattern: '^[^:/]+$', required: true, label: Preset, description: The preset's name as listed in the file list.}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # TCP 9996 opcode 0x0000 (bmdwire ultimattewire, MIT); the result: {path, bytes}.
+
+  import_preset:
+    summary: Write a host file saved by export_preset to the unit as a preset, overwriting one of that name
+    params:
+      name: {type: string, max_length: 64, pattern: '^[^:/]+$', required: true, label: Preset, description: The preset's name on the unit.}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: ack
+    # TCP 9996 opcode 0x0100 (bmdwire ultimattewire, MIT).
+
+  export_settings:
+    summary: Save the unit's GPISettings or SavedSettings to a host file as the unit holds it
+    params:
+      resource: {type: enum, values: [GPISettings, SavedSettings], required: true, label: Settings, description: 'GPISettings holds the GPI setup; SavedSettings the unit''s saved live state.'}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # TCP 9996 opcode 0x0003 (bmdwire ultimattewire, MIT); the result: {path, bytes}.
+
+  import_settings:
+    summary: Write a host file saved by export_settings to the unit's GPISettings or SavedSettings; SavedSettings changes the live key
+    params:
+      resource: {type: enum, values: [GPISettings, SavedSettings], required: true, label: Settings, description: 'GPISettings holds the GPI setup; SavedSettings the unit''s saved live state.'}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: ack
+    # TCP 9996 opcode 0x0103 (bmdwire ultimattewire, MIT).
+
   request_status:
     summary: Ask the unit to resend one status block in full; it follows the ACK and updates state
     params:
-      block: {type: enum, values: [IDENTITY, NETWORK, VERSION, DEVICE, IP VIDEO, VIDEO FORMATS, CONTROL, CONTROL DEFAULT, CURRENT FILE, FILE LIST, GPI LIST, IMAGE LIST, FRAME BUFFER, CAMERA CONTROL], required: true, label: Block, description: 'The status block to resend, by its header.'}
+      block: {type: enum, values: [IDENTITY, NETWORK, NETWORK INTERFACE 0, VERSION, DEVICE, IP VIDEO, VIDEO FORMATS, CONTROL, CONTROL DEFAULT, CURRENT FILE, FILE LIST, GPI LIST, IMAGE LIST, FRAME BUFFER, CAMERA CONTROL], required: true, label: Block, description: 'The status block to resend, by its header.'}
     send: '{block}:'
     expect: {matches: ^ACK}
     returns: ack
@@ -627,7 +754,11 @@ telemetry:
         Static Addresses: network.interface.static_addresses
         Static Gateway: network.interface.static_gateway
         Static DNS Servers: network.interface.static_dns
+        Priority: network.interface.priority
+        # The document writes DynamicIP (p.86); a unit on protocol 2.1 was seen sending Dynamic IP
+        # (bmdwire ultimattewire, MIT). Both are read.
         DynamicIP: {path: network.interface.dynamic_ip, map: {'On': true, 'Off': false, 'on': true, 'off': false, 'ON': true, 'OFF': false, 'true': true, 'false': false}}
+        Dynamic IP: {path: network.interface.dynamic_ip, map: {'On': true, 'Off': false, 'on': true, 'off': false, 'ON': true, 'OFF': false, 'true': true, 'false': false}}
     - header: ^DEVICE:$
       fields:
         Video Format: device.video_format
@@ -967,6 +1098,11 @@ telemetry:
     - header: ^IMAGE LIST:$
       each_line: ^([^:]+)$
       state: {'media.images.{index}': '{1}'}
+    # CONTROL DEFAULT holds each control's default as "Name: value" lines (p.88), kept by the
+    # control's protocol name as the unit writes it.
+    - header: ^CONTROL DEFAULT:$
+      each_line: '^([^:]+): ?(.*)$'
+      state: {'control_default.{1:key}': '{2}'}
 
 state:
   device.protocol_version:                {type: string, description: 'Protocol version, e.g. 2.3'}
@@ -988,6 +1124,7 @@ state:
   network.interface.static_gateway:       {type: string, description: Configured static gateway of interface 0}
   network.interface.static_dns:           {type: string, description: Configured static DNS servers of interface 0}
   network.interface.dynamic_ip:           {type: bool, description: DHCP in use on interface 0}
+  network.interface.priority:             {type: int, description: 'Priority of interface 0 as the unit reports it (0 in the document); its meaning is not documented'}
   device.video_format:                    {type: string, description: Current video format}
   device.reference_source:                {type: string, description: 'Reference source, e.g. Foreground'}
   inputs.fg:                              {type: string, description: 'FG input status, e.g. Locked; absent on models without the input'}
@@ -1294,6 +1431,7 @@ state:
   files.*:                                {type: string, description: 'A setup file on the unit, by position from 0 (FILE LIST)'}
   gpi.events.*:                           {type: string, description: 'The file of each event of the GPI list last reported, by event index from 0 (GPI LIST)'}
   media.images.*:                         {type: string, description: 'An image in the media pool, by position from 0 (IMAGE LIST)'}
+  control_default.*:                      {type: string, description: 'A control''s default value as the unit writes it (CONTROL DEFAULT), keyed by the control''s protocol name, such as Matte Density'}
 
 quirks:
   - models: [all]
@@ -1304,6 +1442,77 @@ quirks:
       output format at once on air, and run_function's screen samples and resets recompute
       the key at once. quicksave, save_file and delete_file overwrite or remove stored
       setups. None of them asks for confirmation.
+
+  - models: [all]
+    severity: critical
+    text: >
+      set_network, set_network_dhcp and set_network_dns change the unit's Ethernet settings at
+      once, with no confirmation. A new address, a netmask or gateway that does not fit the
+      network, or DHCP on a network without a DHCP server can put the unit out of reach until
+      someone sets it up locally (USB, Ultimatte Setup). When the address changes the unit
+      drops this connection: the read-back the command sends after the change then gets no
+      answer, so the command can fail although the change was made, and the device must be
+      opened again at its new address. A gateway or DNS change keeps the address.
+
+  - models: [all]
+    severity: critical
+    text: >
+      import_presets and import_settings overwrite the unit's presets of the same names, its
+      GPI setup and its SavedSettings with no confirmation, and SavedSettings replaces the live
+      state, so the key changes at once on air; import_preset overwrites one preset. A restore
+      stops at the first write the unit refuses, leaving what was written before it (named in
+      the error).
+
+  - models: [all]
+    severity: warning
+    text: >
+      The archive and restore commands use a binary settings channel on TCP 9996 that the
+      document does not describe; it is the one Ultimatte Smart Remote 4 and Software Control
+      use for Archive All and Restore, as bmdwire's ultimattewire (MIT) recorded it against an
+      Ultimatte 12 4K, untested on the other models.
+      Each request opens its own TCP connection and the unit closes it after answering: a read
+      sends a big-endian opcode (0x0000 for a preset by its FILE LIST name, 0x0003 for
+      GPISettings or SavedSettings), a length and the name, and is answered by a length and
+      that many bytes; a write (0x0100 for a preset, 0x0103 for the two resources) sends the
+      name, a length, the data and a zero byte, and is answered by zero bytes, any other byte
+      being a refusal.
+      The write's name field is the vendor app's own path to the archive member it extracted
+      (a macOS temporary folder), of which the unit reads the last segment and presets/; it is
+      sent the same way. A connection that does not open, or a read the unit drops unanswered,
+      is tried once more after 250 ms, since a cold unit often refuses or drops the first; a
+      write is not sent twice. The contents are not documented and are moved unchanged.
+
+  - models: [all]
+    severity: info
+    text: >
+      export_presets writes the zip in the layout of Smart Remote's Archive All, which its
+      Restore needs: an images/ directory, GPISettings, SavedSettings, quickfiles/, presets/
+      and presets/<name> for each preset of the last FILE LIST, the files deflated. A read
+      that fails is left out of the archive and listed in the result's warnings rather than
+      written empty, so a later restore never sends it.
+      images/ and quickfiles/ are written empty: no request for the Media Pool images or the
+      quick-save memories is known on this channel, so neither is archived or restored.
+      import_presets takes such a zip (members stored or deflated) and ignores any other
+      member. export_presets needs the unit's FILE LIST, which it sends on connecting; before
+      that it fails as not connected.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The document shows the NETWORK INTERFACE 0 block (p.86) and says a change is a block of
+      the form the unit sends (p.89), but gives no network example; the write is corroborated
+      by bmdwire's ultimattewire (MIT, captured from an Ultimatte 12 4K on protocol 2.1).
+      Static Addresses is the address and the dotted netmask as one field (10.0.0.2/255.255.255.0);
+      the address alone tells the unit to drop the mask, so set_network always sends both. The
+      unit answers ACK and echoes only the fields sent, which say what it accepted, not what it
+      runs; set_network's second message asks for the whole block, and that is what updates
+      state. For about a second after an address change Current Addresses reads
+      0.0.0.0/255.255.0.0 while Static Addresses already holds the new value; request_status
+      NETWORK INTERFACE 0 reads it again. The document names the DHCP field DynamicIP and lists
+      DNS servers separated by a comma and a space; the unit bmdwire captured sends Dynamic IP
+      and takes DNS servers separated by spaces. Both field names are read; the commands write
+      the document's forms, and a NAK means the unit wants the other one. The meaning of
+      Priority is not documented.
 
   - models: [all]
     severity: warning
@@ -1372,7 +1581,19 @@ quirks:
       are kept by position from 0 (video_formats, files, gpi.events, media.images), each
       block replacing the list it carries, except IMAGE LIST, whose names are only added to,
       since an update may carry the media pool's space alone. CONTROL DEFAULT holds each
-      control's default value and is not kept in state.
+      control's default value; it is kept as text under control_default, keyed by the
+      control's protocol name (control_default."Matte Density"), since its values are numbers,
+      On/Off and names alike.
+
+  - models: [all]
+    severity: info
+    text: >
+      Limits of the protocol: the document gives no way to load images into or remove them
+      from the Media Pool (Smart Remote 4 or Software Control only, p.91), to set the unit's
+      label, to turn the 4K's PTP clock off (Ultimatte Setup or Software Control), or to set
+      the frame buffers' mix and transition durations, which FRAME BUFFER only reports. The
+      HD Mini's CEC Camera Id and Camera Control Mode (the camera control connection: idle,
+      SDI or HDMI) are reported; only the CCU Camera Id, the ATEM camera ID, is set (p.91).
 
   - models: [ultimatte-12-hd-mini]
     severity: info

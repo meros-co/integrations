@@ -68,5 +68,31 @@ class Templates(unittest.TestCase):
         self.assertEqual(names, ["^index", "index", "^^key"])
 
 
+class ExtensionCommands(unittest.TestCase):
+    DOC = {"id": "x", "transport": {"type": "line-tcp"}, "extension": "ultimatte-preset-archive",
+           "models": [{"id": "m", "supports": []}]}
+
+    def commands(self, **extra):
+        own = validate.EXTENSION_COMMANDS["ultimatte-preset-archive"]
+        commands = {name: {"returns": "value"} for name in own}
+        commands.update(extra)
+        return dict(self.DOC, commands=commands)
+
+    def test_the_extensions_commands_need_no_message(self):
+        errors = validate.cross_field_checks(self.commands(ping={"send": "PING:"}), "x")
+        self.assertFalse([e for e in errors if "send" in e or "extension" in e or "extractor" in e], errors)
+
+    def test_other_commands_still_need_one_and_the_extensions_may_not_have_one(self):
+        doc = self.commands(ping={"returns": "ack"}, import_preset={"send": "X", "returns": "ack"})
+        errors = validate.cross_field_checks(doc, "x")
+        self.assertIn("commands.ping: a spec-driven command requires 'send'", errors)
+        self.assertTrue(any("import_preset" in e and "must not declare 'send'" in e for e in errors), errors)
+
+    def test_every_command_the_extension_answers_is_declared(self):
+        doc = dict(self.DOC, commands={"ping": {"send": "PING:"}})
+        errors = validate.cross_field_checks(doc, "x")
+        self.assertTrue(any("answers 'export_presets'" in e for e in errors), errors)
+
+
 if __name__ == "__main__":
     unittest.main()

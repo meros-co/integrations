@@ -689,7 +689,23 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let mut cx = Cx::new(2);
     engine.command(&mut cx, 1, command, &params);
     let actions = cx.take();
-    let sent = wire(&actions);
+    let mut sent = wire(&actions);
+
+    // On a transport whose device answers, a command of several messages
+    // sends each after the reply to the one before: the device's reply lets
+    // the rest go, and when the vector states more messages than went out at
+    // once, what the reply let go is compared too.
+    let mut reply_actions = None;
+    if let Some(reply) = v.get("device_reply").and_then(Value::as_str) {
+        let mut cx = Cx::new(3);
+        engine.tcp(&mut cx, "device", TcpInput::Data(reply.as_bytes().to_vec()));
+        let after = cx.take();
+        let stated = expected_wire(&v, main_port(&engine)).map_or(0, |w| w.len());
+        if stated > sent.len() {
+            sent.extend(wire(&after));
+        }
+        reply_actions = Some(after);
+    }
 
     if let Some(expected) = expected_wire(&v, main_port(&engine)) {
         if sent != expected {
@@ -719,10 +735,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         })
         .collect();
 
-    if let Some(reply) = v.get("device_reply").and_then(Value::as_str) {
-        let mut cx = Cx::new(3);
-        engine.tcp(&mut cx, "device", TcpInput::Data(reply.as_bytes().to_vec()));
-        done.extend(cx.take().iter().filter_map(|a| match a {
+    if let Some(after) = reply_actions {
+        done.extend(after.iter().filter_map(|a| match a {
             Action::Complete { result, .. } => Some(crate::json::result(result)),
             _ => None,
         }));
@@ -836,7 +850,14 @@ fn every_spec_driven_command_has_a_vector() {
         .devices
         .values()
         .filter(|s| s.implementation == crate::catalog::Implementation::Spec)
-        .flat_map(|s| s.commands.keys().map(move |c| format!("{}/{c}", s.id)))
+        // A command without a message is answered by the spec's native
+        // extension, and tested in its session test instead.
+        .flat_map(|s| {
+            s.commands
+                .iter()
+                .filter(|(_, c)| c.send.is_some())
+                .map(move |(c, _)| format!("{}/{c}", s.id))
+        })
         .filter(|k| !covered.contains(k))
         .collect();
     assert!(

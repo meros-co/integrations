@@ -546,15 +546,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-ultimatte — Blackmagic Ultimatte 12
 
-- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1320](specs/blackmagic-ultimatte.yaml#L1320))
-- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1330](specs/blackmagic-ultimatte.yaml#L1330))
-- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1352](specs/blackmagic-ultimatte.yaml#L1352))
-- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1353](specs/blackmagic-ultimatte.yaml#L1353))
-- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1362](specs/blackmagic-ultimatte.yaml#L1362))
-- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1345](specs/blackmagic-ultimatte.yaml#L1345))
+- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1529](specs/blackmagic-ultimatte.yaml#L1529))
+- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1547](specs/blackmagic-ultimatte.yaml#L1547))
+- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1561](specs/blackmagic-ultimatte.yaml#L1561))
+- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1563](specs/blackmagic-ultimatte.yaml#L1563))
+- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1571](specs/blackmagic-ultimatte.yaml#L1571))
+- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1554](specs/blackmagic-ultimatte.yaml#L1554))
 
-- [ ] Confirm that a VIDEO FORMATS, FILE LIST or GPI LIST block always carries the whole list (an update replaces the list kept), that list lines never hold a colon, and whether an IMAGE LIST update can carry Capacity or Available alone. ([specs/blackmagic-ultimatte.yaml:957](specs/blackmagic-ultimatte.yaml#L957))
-- [ ] Record the GPI LIST block's event lines (the file of each event, in event order, assumed). ([specs/blackmagic-ultimatte.yaml:961](specs/blackmagic-ultimatte.yaml#L961))
+- [ ] Confirm that a VIDEO FORMATS, FILE LIST or GPI LIST block always carries the whole list (an update replaces the list kept), that list lines never hold a colon, and whether an IMAGE LIST update can carry Capacity or Available alone. ([specs/blackmagic-ultimatte.yaml:1084](specs/blackmagic-ultimatte.yaml#L1084))
+- [ ] Record the GPI LIST block's event lines (the file of each event, in event order, assumed). ([specs/blackmagic-ultimatte.yaml:1092](specs/blackmagic-ultimatte.yaml#L1092))
+- [ ] Check which name the unit sends and takes for the DHCP field: DynamicIP (the document's NETWORK INTERFACE example) or Dynamic IP (seen by bmdwire on protocol 2.1); both are read, and the commands write DynamicIP. ([specs/blackmagic-ultimatte.yaml:622](specs/blackmagic-ultimatte.yaml#L622))
+- [ ] Check that a NETWORK INTERFACE 0 block with Static Addresses: <address>/<netmask> and Static Gateway changes the interface, that the unit answers ACK and echoes the fields sent, and that the header alone answers the whole block. ([specs/blackmagic-ultimatte.yaml:1505](specs/blackmagic-ultimatte.yaml#L1505))
+- [ ] Check whether the unit pushes NETWORK INTERFACE 0 when the interface has reapplied (Current Addresses reads 0.0.0.0/255.255.0.0 for about a second after an address change). ([specs/blackmagic-ultimatte.yaml:1510](specs/blackmagic-ultimatte.yaml#L1510))
+- [ ] Check whether the connection drops on a new address only, or on a netmask, gateway or DHCP change too, and how long the unit takes to answer again. ([specs/blackmagic-ultimatte.yaml:1452](specs/blackmagic-ultimatte.yaml#L1452))
+- [ ] Check how Static DNS Servers is written: separated by a comma and a space (the document's listing, sent here) or by spaces (bmdwire), and that an empty value clears the list. ([specs/blackmagic-ultimatte.yaml:654](specs/blackmagic-ultimatte.yaml#L654))
+- [ ] Find out what the NETWORK INTERFACE 0 Priority line means (0 in the document and in bmdwire's capture), and whether it can be set. ([specs/blackmagic-ultimatte.yaml:757](specs/blackmagic-ultimatte.yaml#L757))
+- [ ] Confirm that CONTROL DEFAULT lines are Name: value as in CONTROL, and that its values never change while connected. ([specs/blackmagic-ultimatte.yaml:1103](specs/blackmagic-ultimatte.yaml#L1103))
+- [ ] Check that a TCP 9996 read (opcode 0x0000 with a FILE LIST name, 0x0003 with GPISettings or SavedSettings) answers a big-endian length and that many bytes, then closes, on every model (only an Ultimatte 12 4K was captured). ([specs/blackmagic-ultimatte.yaml:1473](specs/blackmagic-ultimatte.yaml#L1473))
+- [ ] Check that a TCP 9996 write (opcode 0x0100 for a preset, 0x0103 for GPISettings or SavedSettings) needs the trailing zero byte and is acknowledged with zero bytes, how the unit answers a refused write, and which parts of the name field it reads (the vendor app's macOS path is sent). ([specs/blackmagic-ultimatte.yaml:1479](specs/blackmagic-ultimatte.yaml#L1479))
+- [ ] Check that a Smart Remote 4 Restore accepts an archive export_presets writes (members deflated, the layout of Archive All) and that import_presets takes a Smart Remote Archive All zip. ([specs/blackmagic-ultimatte.yaml:1488](specs/blackmagic-ultimatte.yaml#L1488))
+- [ ] Check whether writing a preset under a name not in FILE LIST adds it, and whether the unit sends FILE LIST or CURRENT FILE after import_presets; and whether SavedSettings changes the live key at once. ([specs/blackmagic-ultimatte.yaml:1460](specs/blackmagic-ultimatte.yaml#L1460))
+- [ ] Find out whether the Media Pool images and the quick-save memories have their own 9996 opcodes (images/ and quickfiles/ are written empty here), what a Smart Remote archive of a unit holding images puts in them, and whether the HD Mini has GPISettings. ([specs/blackmagic-ultimatte.yaml:1493](specs/blackmagic-ultimatte.yaml#L1493))
+- [ ] Check that a cold unit refuses or drops the first 9996 connection and answers a second one 250 ms later. ([specs/blackmagic-ultimatte.yaml:1482](specs/blackmagic-ultimatte.yaml#L1482))
 
 ## blackmagic-videohub — Blackmagic Videohub
 
