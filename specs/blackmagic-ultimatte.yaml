@@ -56,8 +56,14 @@ transport:
   reply: expected
   reply_match: ^(ACK|NAK)
 
+settings:
+  archive_port: {type: int, min: 1, max: 65535, default: 9996, label: Settings channel port, description: 'TCP port of the binary settings channel that preset archives and restores use, 9996 on every unit.'}
+
+extension: ultimatte-preset-archive
+
 ports:
   - {port: 9998, protocol: tcp, role: control}
+  - {port: 9996, protocol: tcp, role: control, setting: archive_port, note: 'binary settings channel, one connection per request: preset archive and restore'}
 
 models:
   - id: ultimatte-12-4k
@@ -72,7 +78,8 @@ models:
        set_input_source, set_ip_output_enable, load_file, save_file, delete_file,
        rename_file, gpi_insert_event, gpi_remove_event, gpi_set_index, set_frame_buffer,
        set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
-       request_status, ping]
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       12G-SDI keyer with bidirectional 2110 IP video on its 10G Ethernet port (p.10,
@@ -88,7 +95,8 @@ models:
        set_gp_out_level, set_output_range, run_function, factory_defaults, user_defaults,
        load_file, save_file, delete_file, rename_file, gpi_insert_event, gpi_remove_event,
        gpi_set_index, set_frame_buffer, set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
-       request_status, ping]
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       8K keyer; 4320p formats and the 0-6 correction size range (p.100 footnotes 1 and 4).
@@ -103,7 +111,8 @@ models:
        set_gp_out_level, set_output_range, run_function, factory_defaults, user_defaults,
        load_file, save_file, delete_file, rename_file, gpi_insert_event, gpi_remove_event,
        gpi_set_index, set_frame_buffer, set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
-       request_status, ping]
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       HD keyer with FG, BG, garbage and holdout matte, monitor and reference inputs
@@ -118,7 +127,8 @@ models:
        set_filter_average, set_3g_sdi_level, set_output_range, run_function,
        factory_defaults, user_defaults, load_file, save_file, delete_file, rename_file,
        set_frame_buffer, set_frame_buffer_enable, set_ccu_camera_id, set_network,
-       set_network_dhcp, set_network_dns, request_status, ping]
+       set_network_dhcp, set_network_dns, export_presets, import_presets, export_preset,
+       import_preset, export_settings, import_settings, request_status, ping]
     verification: none
     notes: >
       Compact HD keyer with FG and BG inputs only, no GPI and no PsF formats, and SDI/HDMI
@@ -135,7 +145,8 @@ models:
        set_gp_out_level, set_output_range, run_function, factory_defaults, user_defaults,
        load_file, save_file, delete_file, rename_file, gpi_insert_event, gpi_remove_event,
        gpi_set_index, set_frame_buffer, set_frame_buffer_enable, set_network, set_network_dhcp, set_network_dns,
-       request_status, ping]
+       export_presets, import_presets, export_preset, import_preset, export_settings,
+       import_settings, request_status, ping]
     verification: none
     notes: >
       The original Ultimatte 12 (4K, with loop outputs for the garbage and holdout matte
@@ -646,6 +657,54 @@ commands:
     returns: ack
     # Ultimatte 12 Ethernet Protocol 2.3 (Ultimatte 12 manual, February 2026), p.86 (Static DNS Servers:
     # 8.8.8.8, 8.8.4.4), p.89-90; bmdwire ultimattewire (MIT) set_network(dns=...)
+
+  export_presets:
+    summary: 'Archive every preset, GPISettings and SavedSettings into a zip on the host, as Smart Remote''s Archive All does'
+    params:
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # Not in the document. The binary settings channel on TCP 9996 and the archive's layout are bmdwire
+    # ultimattewire's (MIT); answered by the ultimatte-preset-archive extension, see quirks. The result:
+    # {path, bytes, presets, settings, warnings}.
+
+  import_presets:
+    summary: 'Restore an archive zip (Smart Remote''s Archive All, or export_presets) onto the unit: presets, then GPISettings, then SavedSettings, which changes the live key'
+    params:
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # bmdwire ultimattewire (MIT) restore order; the result: {presets, settings} written.
+
+  export_preset:
+    summary: Save one preset, by its FILE LIST name, to a host file as the unit holds it
+    params:
+      name: {type: string, max_length: 64, pattern: '^[^:/]+$', required: true, label: Preset, description: The preset's name as listed in the file list.}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # TCP 9996 opcode 0x0000 (bmdwire ultimattewire, MIT); the result: {path, bytes}.
+
+  import_preset:
+    summary: Write a host file saved by export_preset to the unit as a preset, overwriting one of that name
+    params:
+      name: {type: string, max_length: 64, pattern: '^[^:/]+$', required: true, label: Preset, description: The preset's name on the unit.}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: ack
+    # TCP 9996 opcode 0x0100 (bmdwire ultimattewire, MIT).
+
+  export_settings:
+    summary: Save the unit's GPISettings or SavedSettings to a host file as the unit holds it
+    params:
+      resource: {type: enum, values: [GPISettings, SavedSettings], required: true, label: Settings, description: 'GPISettings holds the GPI setup; SavedSettings the unit''s saved live state.'}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: value
+    # TCP 9996 opcode 0x0003 (bmdwire ultimattewire, MIT); the result: {path, bytes}.
+
+  import_settings:
+    summary: Write a host file saved by export_settings to the unit's GPISettings or SavedSettings; SavedSettings changes the live key
+    params:
+      resource: {type: enum, values: [GPISettings, SavedSettings], required: true, label: Settings, description: 'GPISettings holds the GPI setup; SavedSettings the unit''s saved live state.'}
+      path: {type: string, max_length: 4096, required: true, label: Host path, description: Path of the file on the host to read or write.}
+    returns: ack
+    # TCP 9996 opcode 0x0103 (bmdwire ultimattewire, MIT).
 
   request_status:
     summary: Ask the unit to resend one status block in full; it follows the ACK and updates state
@@ -1396,6 +1455,48 @@ quirks:
       opened again at its new address. A gateway or DNS change keeps the address.
 
   - models: [all]
+    severity: critical
+    text: >
+      import_presets and import_settings overwrite the unit's presets of the same names, its
+      GPI setup and its SavedSettings with no confirmation, and SavedSettings replaces the live
+      state, so the key changes at once on air; import_preset overwrites one preset. A restore
+      stops at the first write the unit refuses, leaving what was written before it (named in
+      the error).
+
+  - models: [all]
+    severity: warning
+    text: >
+      The archive and restore commands use a binary settings channel on TCP 9996 that the
+      document does not describe; it is the one Ultimatte Smart Remote 4 and Software Control
+      use for Archive All and Restore, as bmdwire's ultimattewire (MIT) recorded it against an
+      Ultimatte 12 4K, untested on the other models.
+      Each request opens its own TCP connection and the unit closes it after answering: a read
+      sends a big-endian opcode (0x0000 for a preset by its FILE LIST name, 0x0003 for
+      GPISettings or SavedSettings), a length and the name, and is answered by a length and
+      that many bytes; a write (0x0100 for a preset, 0x0103 for the two resources) sends the
+      name, a length, the data and a zero byte, and is answered by zero bytes, any other byte
+      being a refusal.
+      The write's name field is the vendor app's own path to the archive member it extracted
+      (a macOS temporary folder), of which the unit reads the last segment and presets/; it is
+      sent the same way. A connection that does not open, or a read the unit drops unanswered,
+      is tried once more after 250 ms, since a cold unit often refuses or drops the first; a
+      write is not sent twice. The contents are not documented and are moved unchanged.
+
+  - models: [all]
+    severity: info
+    text: >
+      export_presets writes the zip in the layout of Smart Remote's Archive All, which its
+      Restore needs: an images/ directory, GPISettings, SavedSettings, quickfiles/, presets/
+      and presets/<name> for each preset of the last FILE LIST, the files deflated. A read
+      that fails is left out of the archive and listed in the result's warnings rather than
+      written empty, so a later restore never sends it.
+      images/ and quickfiles/ are written empty: no request for the Media Pool images or the
+      quick-save memories is known on this channel, so neither is archived or restored.
+      import_presets takes such a zip (members stored or deflated) and ignores any other
+      member. export_presets needs the unit's FILE LIST, which it sends on connecting; before
+      that it fails as not connected.
+
+  - models: [all]
     severity: warning
     text: >
       The document shows the NETWORK INTERFACE 0 block (p.86) and says a change is a block of
@@ -1483,6 +1584,16 @@ quirks:
       control's default value; it is kept as text under control_default, keyed by the
       control's protocol name (control_default."Matte Density"), since its values are numbers,
       On/Off and names alike.
+
+  - models: [all]
+    severity: info
+    text: >
+      Limits of the protocol: the document gives no way to load images into or remove them
+      from the Media Pool (Smart Remote 4 or Software Control only, p.91), to set the unit's
+      label, to turn the 4K's PTP clock off (Ultimatte Setup or Software Control), or to set
+      the frame buffers' mix and transition durations, which FRAME BUFFER only reports. The
+      HD Mini's CEC Camera Id and Camera Control Mode (the camera control connection: idle,
+      SDI or HDMI) are reported; only the CCU Camera Id, the ATEM camera ID, is set (p.91).
 
   - models: [ultimatte-12-hd-mini]
     severity: info
