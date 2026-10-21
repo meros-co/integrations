@@ -67,7 +67,19 @@ source:
       HyperDeck Studio HD Mini on software 9.0.2), that reads answer while
       a write is refused with HTTP 401 when utility administration is USB
       only, and that the reboot takes a key from a GET first. Its README
-      reports port 80 closed on the HD Mini's software 8.1.1
+      reports port 80 closed on the HD Mini's software 8.1.1. For the
+      Ethernet Protocol on TCP 9993 it only corroborates the document, from
+      an HD Mini on 8.1.1 (client.py, README "Protocol notes", docs/API.md):
+      the command and reply names used here (device info, remote, slot info,
+      transport info, configuration and its field names, disk list, clips
+      count, clips get, clips add, remove and clear, goto clip id, play with
+      clip id, loop, single clip and speed, slot select, ping, quit), the
+      version 1 clip lines with names holding spaces, "120 connection failed"
+      answering a client past the limit before the deck closes the socket,
+      and "213 deck rebooting" as a success answer to a file format change
+      (its HD Mini did not reboot for the changes it tried). It moves clips to
+      the deck over the deck's FTP server, which this spec does not drive (see
+      quirks)
 
 transport:
   type: line-tcp
@@ -3510,3 +3522,15 @@ quirks:
       A certificate is passed as PEM text, as the API takes it in a JSON
       body ({"certificate": ...}); no file on the host is read. The signing
       request comes back as text from download_signing_request.
+
+  - models: [all]
+    severity: info
+    text: >
+      Clips reach the deck and leave it over its built-in FTP server
+      (Transferring Files over a Network, manual p.52-53), which the core does
+      not speak: this spec turns FTP on and off (set_network_access) and lists
+      the clips each slot holds, but neither uploads nor downloads a file.
+      hyperdeckwire, which uploads, reports each storage volume as a top-level
+      directory (a slot number on the HD Mini, sd1, ssd1, usb or nas on other
+      models), an anonymous login, and a new clip in disk list as soon as its
+      upload completes.
