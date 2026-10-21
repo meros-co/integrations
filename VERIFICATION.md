@@ -571,14 +571,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-videohub — Blackmagic Videohub
 
-- [ ] Check how the router answers a port number beyond its count. ([specs/blackmagic-videohub.yaml:1054](specs/blackmagic-videohub.yaml#L1054))
-- [ ] Record the exact spelling of the device block's needs-update value. ([specs/blackmagic-videohub.yaml:1064](specs/blackmagic-videohub.yaml#L1064))
-- [ ] Check whether SERIAL PORT DIRECTIONS can be set by sending the block. ([specs/blackmagic-videohub.yaml:1096](specs/blackmagic-videohub.yaml#L1096))
-- [ ] On Workgroup Videohub, confirm what the two numbers in PROCESSING UNIT ROUTING and FRAME BUFFER ROUTING index. ([specs/blackmagic-videohub.yaml:1105](specs/blackmagic-videohub.yaml#L1105))
-- [ ] On 12G routers, check whether CONFIGURATION (Take Mode) and TAKE MODE can be set by a client and how the two relate. ([specs/blackmagic-videohub.yaml:1114](specs/blackmagic-videohub.yaml#L1114))
-- [ ] Check whether a 12G router reports more than one network interface. ([specs/blackmagic-videohub.yaml:1125](specs/blackmagic-videohub.yaml#L1125))
-- [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1132](specs/blackmagic-videohub.yaml#L1132))
-- [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1075](specs/blackmagic-videohub.yaml#L1075))
+- [ ] Check how the router answers a port number beyond its count. ([specs/blackmagic-videohub.yaml:1141](specs/blackmagic-videohub.yaml#L1141))
+- [ ] Record the exact spelling of the device block's needs-update value. ([specs/blackmagic-videohub.yaml:1152](specs/blackmagic-videohub.yaml#L1152))
+- [ ] Check whether SERIAL PORT DIRECTIONS can be set by sending the block. ([specs/blackmagic-videohub.yaml:1194](specs/blackmagic-videohub.yaml#L1194))
+- [ ] On Workgroup Videohub, confirm what the two numbers in PROCESSING UNIT ROUTING and FRAME BUFFER ROUTING index. ([specs/blackmagic-videohub.yaml:1203](specs/blackmagic-videohub.yaml#L1203))
+- [ ] On 12G routers, check whether CONFIGURATION (Take Mode) and TAKE MODE can be set by a client and how the two relate. ([specs/blackmagic-videohub.yaml:1212](specs/blackmagic-videohub.yaml#L1212))
+- [ ] Check whether a 12G router reports more than one network interface. ([specs/blackmagic-videohub.yaml:1223](specs/blackmagic-videohub.yaml#L1223))
+- [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1231](specs/blackmagic-videohub.yaml#L1231))
+- [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1163](specs/blackmagic-videohub.yaml#L1163))
+- [ ] Find each router's label length limit (64 characters assumed from a community client's Smart Videohub 40x40 and 80x80) and whether a longer label is truncated, refused with NAK or kept; check monitoring output, serial port and frame labels as well as input and output labels. ([specs/blackmagic-videohub.yaml:1179](specs/blackmagic-videohub.yaml#L1179))
+- [ ] Check that an empty label clears it, and that the router then reports the port number alone ("3 ", or "3" with no space). ([specs/blackmagic-videohub.yaml:1179](specs/blackmagic-videohub.yaml#L1179))
 - [ ] Confirm routers advertise `_blackmagic._tcp` with TXT `class=Videohub` (Companion's Videohub module) ([crates/core/src/mdns.rs:130](crates/core/src/mdns.rs#L130)), and whether any also advertise `_videohub._tcp`, which no public source confirms and discovery does not ask for.
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
 - [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))

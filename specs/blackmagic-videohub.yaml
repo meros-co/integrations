@@ -53,6 +53,17 @@ source:
       Blackmagic does not document; its parser reads that block as "name: status"
       lines. Its captured CleanSwitch 12x12 dump (protocol 2.8) also corroborates the
       documented CONFIGURATION and END PRELUDE blocks.
+  - title: bmdwire, videohubwire package (MIT), version 1.6.0
+    author: Lucas Romanenko
+    url: https://github.com/lucas-romanenko/bmdwire/tree/main/videohubwire
+    note: >
+      videohubwire/LICENSE is MIT (the repository's LICENSE gives each package
+      its own; only videohubwire was read). Read, not copied, for what the
+      Blackmagic documents leave open, from a client run against Smart Videohub
+      40x40 and 80x80 routers (README, client.py): labels capped at about 64
+      characters, an empty label clearing it, older firmware ending the initial
+      dump without END PRELUDE, and NAK when routing an output another client
+      has locked. Its lock letters U, O and L match the document's.
 
 transport:
   type: line-tcp
@@ -426,9 +437,9 @@ commands:
       input: { type: int, min: 1, max: 288, required: true,
         label: Input,
         description: "Video input, numbered from 1 as on the router's labels." }
-      label: { type: string, required: true,
+      label: { type: string, required: true, max_length: 64,
         label: Label,
-        description: "The input's new name, as shown on the router and in Videohub software." }
+        description: "The input's new name, as shown on the router and in Videohub software. Up to 64 characters; empty clears it." }
     send: |
       INPUT LABELS:
       {input:-1} {label}
@@ -442,9 +453,9 @@ commands:
       output: { type: int, min: 1, max: 288, required: true,
         label: Output,
         description: "Video output, numbered from 1 as on the router's labels." }
-      label:  { type: string, required: true,
+      label:  { type: string, required: true, max_length: 64,
         label: Label,
-        description: "The output's new name, as shown on the router and in Videohub software." }
+        description: "The output's new name, as shown on the router and in Videohub software. Up to 64 characters; empty clears it." }
     send: |
       OUTPUT LABELS:
       {output:-1} {label}
@@ -458,9 +469,9 @@ commands:
       monitoring_output: { type: int, min: 1, max: 288, required: true,
         label: Monitoring output,
         description: "Monitoring output, numbered from 1." }
-      label:             { type: string, required: true,
+      label:             { type: string, required: true, max_length: 64,
         label: Label,
-        description: "The monitoring output's new name." }
+        description: "The monitoring output's new name. Up to 64 characters; empty clears it." }
     send: |
       MONITORING OUTPUT LABELS:
       {monitoring_output:-1} {label}
@@ -474,9 +485,9 @@ commands:
       port:  { type: int, min: 1, max: 288, required: true,
         label: Serial port,
         description: "Serial (RS-422 deck control) port, numbered from 1." }
-      label: { type: string, required: true,
+      label: { type: string, required: true, max_length: 64,
         label: Label,
-        description: "The serial port's new name." }
+        description: "The serial port's new name. Up to 64 characters; empty clears it." }
     send: |
       SERIAL PORT LABELS:
       {port:-1} {label}
@@ -490,9 +501,9 @@ commands:
       frame: { type: int, min: 1, max: 288, required: true,
         label: Frame buffer,
         description: "Frame buffer, numbered from 1 (Workgroup Videohub)." }
-      label: { type: string, required: true,
+      label: { type: string, required: true, max_length: 64,
         label: Label,
-        description: "The frame buffer's new name." }
+        description: "The frame buffer's new name. Up to 64 characters; empty clears it." }
     send: |
       FRAME LABELS:
       {frame:-1} {label}
@@ -944,19 +955,19 @@ telemetry:
         Video monitoring outputs: device.monitoring_outputs
         Serial ports: device.serial_ports
     - header: "^INPUT LABELS:$"
-      each_line: "^(\\d+) (.*)$"
+      each_line: "^(\\d+) ?(.*)$"
       state: { "inputs.{1:+1}.label": "{2}" }
     - header: "^OUTPUT LABELS:$"
-      each_line: "^(\\d+) (.*)$"
+      each_line: "^(\\d+) ?(.*)$"
       state: { "outputs.{1:+1}.label": "{2}" }
     - header: "^MONITORING OUTPUT LABELS:$"
-      each_line: "^(\\d+) (.*)$"
+      each_line: "^(\\d+) ?(.*)$"
       state: { "monitoring_outputs.{1:+1}.label": "{2}" }
     - header: "^SERIAL PORT LABELS:$"
-      each_line: "^(\\d+) (.*)$"
+      each_line: "^(\\d+) ?(.*)$"
       state: { "serial_ports.{1:+1}.label": "{2}" }
     - header: "^FRAME LABELS:$"
-      each_line: "^(\\d+) (.*)$"
+      each_line: "^(\\d+) ?(.*)$"
       state: { "frame_buffers.{1:+1}.label": "{2}" }
     - header: "^VIDEO OUTPUT ROUTING:$"
       each_line: "^(\\d+) (\\d+)$"
@@ -1168,9 +1179,17 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Labels are free text with no documented length limit. A label holding CR or LF
-      would end the block early and is rejected before sending. One block may carry
-      several routes, labels or locks (p.6); these commands send one line per block.
+      Labels are free text, and the document gives no length limit. A community
+      client run against Smart Videohub 40x40 and 80x80 routers (bmdwire, see
+      sources) reports labels capped at about 64 characters and refuses longer ones;
+      the label commands do the same (max_length 64), for every label kind, though
+      it was observed only for input and output labels. Whether a router truncates
+      or refuses a longer label, and the exact limit, are unconfirmed. The same
+      client reports that an empty label clears it, which the router reports as a
+      line holding only the port number ("3 "), read here as an empty label. A
+      label holding CR or LF would end the block early and is rejected before
+      sending. One block may carry several routes, labels or locks (p.6); these
+      commands send one line per block.
 
   - models: [studio-videohub, broadcast-videohub, universal-videohub-72, universal-videohub-288, workgroup-videohub]
     severity: warning

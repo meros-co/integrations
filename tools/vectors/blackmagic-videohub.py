@@ -27,6 +27,12 @@ text(VH, "set_monitoring_output_label", {"monitoring_output": 2, "label": "Monit
 text(VH, "set_serial_port_label", {"port": 1, "label": "Deck 1"}, "SERIAL PORT LABELS:\n0 Deck 1\n\n")
 text(VH, "set_frame_label", {"frame": 2, "label": "Frame two"}, "FRAME LABELS:\n1 Frame two\n\n",
      model="workgroup-videohub")
+# Labels are capped at 64 characters (bmdwire, see the spec's quirks): the
+# longest accepted label, and an empty one, which clears it.
+text(VH, "set_input_label", {"input": 2, "label": "L" * 64}, "INPUT LABELS:\n1 " + "L" * 64 + "\n\n",
+     file="set_input_label-64-characters")
+text(VH, "set_output_label", {"output": 4, "label": ""}, "OUTPUT LABELS:\n3 \n\n",
+     file="set_output_label-empty")
 
 # Locks (p.4-5, p.7): O to lock, U to unlock, F to force-unlock.
 text(VH, "lock_output", {"output": 3}, "VIDEO OUTPUT LOCKS:\n2 O\n\n")
@@ -119,6 +125,11 @@ telemetry(VH, "input-labels", inbound="INPUT LABELS:\n0 VTR 1\n1 VTR 2\n\n",
 telemetry(VH, "output-labels", inbound="OUTPUT LABELS:\n7 New output 8 label\n10 New output 11 label\n\n",
           expect_state={"outputs": {"8": {"label": "New output 8 label"}, "11": {"label": "New output 11 label"}}})
 telemetry(VH, "monitoring-output-labels", inbound="MONITORING OUTPUT LABELS:\n0 Monitor feed 1\n1 Monitor feed 2\n\n",
+# A cleared label is the port number alone (bmdwire): an empty label.
+telemetry(VH, "input-label-cleared", inbound="INPUT LABELS:\n3 \n4 Cam 5\n\n",
+          expect_state={"inputs": {"4": {"label": ""}, "5": {"label": "Cam 5"}}})
+telemetry(VH, "output-label-cleared", inbound="OUTPUT LABELS:\n0 Desk\n1 \n\n",
+          expect_state={"outputs": {"1": {"label": "Desk"}, "2": {"label": ""}}})
           expect_state={"monitoring_outputs": {"1": {"label": "Monitor feed 1"}, "2": {"label": "Monitor feed 2"}}})
 telemetry(VH, "serial-port-labels", inbound="SERIAL PORT LABELS:\n0 Deck 1\n1 Deck 2\n\n",
           expect_state={"serial_ports": {"1": {"label": "Deck 1"}, "2": {"label": "Deck 2"}}})
