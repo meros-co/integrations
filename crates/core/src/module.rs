@@ -7,6 +7,7 @@
 //! means no module can differ from another in how it uses the network.
 
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -75,6 +76,10 @@ pub struct HttpRequest {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub body: Option<Vec<u8>>,
+    /// A body sent in pieces in place of `body`, with `Content-Length` their
+    /// total: each file among them is read from disk as it is sent, never
+    /// held whole (a binary parameter given as a host file, SPEC.md §4).
+    pub body_stream: Option<Vec<BodyPiece>>,
     /// Overall deadline for the response. `None` only for streams.
     pub timeout: Option<Millis>,
     /// Accept a certificate that does not chain to a trusted root, such as a
@@ -85,6 +90,59 @@ pub struct HttpRequest {
     /// session retries the request once with the answer and reuses the
     /// challenge for later requests to the same origin.
     pub digest: Option<Credentials>,
+}
+
+/// One piece of a streamed request body.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BodyPiece {
+    Bytes(Vec<u8>),
+    /// The first `len` bytes of the host file at `path`, read as they are
+    /// sent. A file shorter than that when it is sent fails the request.
+    File {
+        path: PathBuf,
+        len: u64,
+    },
+}
+
+impl BodyPiece {
+    /// The piece's length in bytes.
+    pub fn len(&self) -> u64 {
+        match self {
+            BodyPiece::Bytes(bytes) => bytes.len() as u64,
+            BodyPiece::File { len, .. } => *len,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl HttpRequest {
+    /// The whole body in memory, its files read in full: for checking what
+    /// a request sends (conformance vectors, tests), never for sending it.
+    pub fn body_bytes(&self) -> std::io::Result<Option<Vec<u8>>> {
+        let Some(pieces) = &self.body_stream else {
+            return Ok(self.body.clone());
+        };
+        let mut out = Vec::new();
+        for piece in pieces {
+            match piece {
+                BodyPiece::Bytes(bytes) => out.extend_from_slice(bytes),
+                BodyPiece::File { path, len } => {
+                    use std::io::Read;
+                    let start = out.len();
+                    std::fs::File::open(path)?
+                        .take(*len)
+                        .read_to_end(&mut out)?;
+                    if ((out.len() - start) as u64) < *len {
+                        return Err(std::io::ErrorKind::UnexpectedEof.into());
+                    }
+                }
+            }
+        }
+        Ok(Some(out))
+    }
 }
 
 /// A TCP stream opened through an SSH tunnel (`direct-tcpip`), for devices

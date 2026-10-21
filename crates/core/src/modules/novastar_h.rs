@@ -542,6 +542,7 @@ impl NovastarH {
                 url: format!("{}{path}", self.base),
                 headers: vec![("Content-Type".into(), "application/json".into())],
                 body: Some(request.to_string().into_bytes()),
+                body_stream: None,
                 timeout: Some(TIMEOUT),
                 accept_invalid_certs: false,
                 digest: None,

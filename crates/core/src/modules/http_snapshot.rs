@@ -125,6 +125,7 @@ impl HttpSnapshot {
                 url: self.url.clone(),
                 headers,
                 body: None,
+                body_stream: None,
                 timeout: Some(self.timeout),
                 accept_invalid_certs: self.accept_invalid_certs,
                 digest: self.credentials.clone(),

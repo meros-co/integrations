@@ -856,7 +856,7 @@ commands:
 | `enum` | `values`, `default` |
 | `string` | `max_length`, `pattern` (RE2-safe), `default` |
 | `json` | Any JSON value, sent as compact JSON. Only for a request body whose shape the device's own API documents and validates; the command's summary names that schema |
-| `binary` | Bytes given as base64, sent as they are in an HTTP body (§4, "Binary request bodies"); `max_length` in bytes |
+| `binary` | Bytes given as base64 or as a host file (`{"file": "<path>"}`), sent as they are in an HTTP body (§4, "Binary request bodies"); `max_length` in bytes |
 
 Values outside the declared range are rejected before transmission. The core
 does not clamp, because a clamped value masks a caller error and produces a
@@ -1160,9 +1160,26 @@ alone, each a template over its parameters and the settings, as
 
 A file a device takes as a request body (an image, a show file, a media
 clip) is a `binary` parameter: the caller gives its bytes as a base64 string
-(RFC 4648, padding optional), and the core sends them as they are.
-`max_length` limits the decoded bytes. A binary parameter is `required`, and
-is never rendered in a template; it is sent in one of two ways:
+(RFC 4648, padding optional), or names a file on the host running the core
+as an object whose only member is `file`, a path (an object, so it is never
+taken for base64 text). WATCHOUT's `load_show_file` takes either:
+
+```json
+{"file": "AAECAwQ="}
+{"file": {"file": "D:/Shows/Main.watch"}}
+```
+
+and the core sends the bytes as they are. A file is opened when the command
+is checked, and one that is missing, cannot be read or is not a file refuses
+the command with `invalid_params` naming the parameter (the message names the
+path, never the contents). It is then read from disk as the request goes out
+and never held whole: the body, or the multipart body around it, is streamed
+with `Content-Length` the file's size, so no size is too large for the core
+(binary parameters go only over HTTP, so nothing reads one whole). A file
+that shrinks before it is sent fails the request. `max_length`, given only
+for a limit the vendor documents, bounds the decoded bytes and a file's size
+alike; the core sets no limit of its own. A binary parameter is `required`,
+and is never rendered in a template; it is sent in one of two ways:
 
 ```yaml
 commands:
@@ -1193,8 +1210,11 @@ optional `filename` and `content_type`, both templates (a line break or a
 quote in them, or in `name`, is refused before transmission). The core writes
 the body with a boundary derived from its content, so the same parts always
 give the same bytes, and sends `Content-Type: multipart/form-data;
-boundary=...`. A vector for such a command gives the body as `body_hex`, and
-may give `content_type`, in `expect_request`. `tools/validate.py` checks that
+boundary=...`. A host file's part counts by its size in that derivation and
+is not read for it; with one, the boundary carries at least 128 bits of the
+hash, which a file holds only if it was made to. A vector for such a command
+gives the body as `body_hex`, and may give `content_type`, in
+`expect_request`. `tools/validate.py` checks that
 a binary parameter is required, named only by `body.binary` or a part's
 `binary`, and used only over HTTP.
 
@@ -2234,7 +2254,10 @@ naming a real path:
 
 In a command's params, a line `transfer:<file>` in any string parameter is
 replaced by that file's real path before the command reaches the core, one
-per line in a multi-line parameter; other lines pass unchanged. An id the
+per line in a multi-line parameter; other lines pass unchanged. A `binary`
+parameter (§4, "Binary request bodies") takes an uploaded file the same way,
+as `{"file": "transfer:<file>"}`, and the core streams it from the folder to
+the device, so the file never travels inside `/v1/execute`'s JSON. An id the
 service did not hand out refuses the command with `invalid_params`. Every
 real path of the folder in a command's result, an event or a snapshot reads
 `transfer:<file>` again. For a command that writes a file, reserve an id,
@@ -2254,7 +2277,8 @@ is the host's disk. Limiting what a client may send, and removing files it no
 longer needs, is the client's call: a file is kept until it is deleted or
 fetched with `?delete=true`. An upload cut off before its end is not kept.
 `POST /v1/execute` has no body limit either, since a command's `binary`
-parameters (§4, "Binary request bodies") carry a file's bytes in it.
+parameters (§4, "Binary request bodies") may carry a file's bytes in it as
+base64; `{"file": "transfer:<file>"}` keeps them out of it.
 The folder (`--transfer-dir`, default
 `<temp>/meros-integrations-transfer-<port>`) is cleared of its ids at startup
 and on a clean stop.

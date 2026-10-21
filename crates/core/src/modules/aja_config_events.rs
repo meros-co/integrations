@@ -304,6 +304,7 @@ impl AjaConfigEvents {
                 // once the engine holds one.
                 headers: self.engine.session_header().into_iter().collect(),
                 body: None,
+                body_stream: None,
                 timeout: Some(timeout),
                 accept_invalid_certs: false,
                 digest: None,

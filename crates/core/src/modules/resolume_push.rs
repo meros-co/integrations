@@ -951,6 +951,7 @@ impl ResolumePush {
                 url: format!("{}/api/v1/composition", self.origin),
                 headers: Vec::new(),
                 body: None,
+                body_stream: None,
                 timeout: Some(REFRESH_TIMEOUT),
                 accept_invalid_certs: false,
                 digest: None,

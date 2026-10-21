@@ -25,9 +25,9 @@ use serde_json::{Map, Value};
 
 use crate::catalog::{DeviceSpec, ParamSpec, Params};
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Credentials, Cx, HttpRequest, HttpResponse, Key,
-    Level, Millis, Module, OpenContext, Outcome, RequestId, SettingsUpdate, SseInput, TcpInput,
-    WsInput, WsRequest,
+    Bind, BodyPiece, CommandError, CommandId, Connection, Credentials, Cx, HttpRequest,
+    HttpResponse, Key, Level, Millis, Module, OpenContext, Outcome, RequestId, SettingsUpdate,
+    SseInput, TcpInput, WsInput, WsRequest,
 };
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
@@ -1066,11 +1066,14 @@ fn render_headers(
 
 /// An HTTP message's body and its content type (SPEC.md §4, "Binary request
 /// bodies"): a template (`body: "..."`), a binary parameter's bytes as they
-/// are (`body: { binary: name }`), or `multipart/form-data` parts.
+/// are (`body: { binary: name }`), or `multipart/form-data` parts. A body
+/// holding a binary parameter given as a host file comes back as pieces to
+/// stream (the second value); any other, whole (the first).
+#[allow(clippy::type_complexity)]
 fn request_body(
     item: &Value,
     values: &Values,
-) -> Result<(Option<Vec<u8>>, Option<String>), String> {
+) -> Result<(Option<Vec<u8>>, Option<Vec<BodyPiece>>, Option<String>), String> {
     let content_type = match str_field(item, "content_type") {
         Some(ct) => {
             let ct = render(ct, values, no_escape)?;
@@ -1103,7 +1106,7 @@ fn request_body(
             let name = field("name")?.ok_or("a multipart part needs a name")?;
             let data = match (str_field(part, "binary"), str_field(part, "value")) {
                 (Some(param), None) => values.binary(param)?,
-                (None, Some(t)) => render(t, values, no_escape)?.into_bytes(),
+                (None, Some(t)) => BodyPiece::Bytes(render(t, values, no_escape)?.into_bytes()),
                 _ => return Err(format!("multipart part {name} has one of binary or value")),
             };
             rendered.push(Part {
@@ -1113,21 +1116,47 @@ fn request_body(
                 data,
             });
         }
-        let (body, boundary) = multipart(&rendered);
+        let (pieces, boundary) = multipart(rendered);
+        let (body, stream) = whole_or_streamed(pieces);
         return Ok((
-            Some(body),
+            body,
+            stream,
             Some(format!("multipart/form-data; boundary={boundary}")),
         ));
     }
-    let body = match item.get("body") {
-        None => None,
-        Some(Value::String(b)) => Some(render(b, values, no_escape)?.into_bytes()),
+    let piece = match item.get("body") {
+        None => return Ok((None, None, content_type)),
+        Some(Value::String(b)) => BodyPiece::Bytes(render(b, values, no_escape)?.into_bytes()),
         Some(other) => match other.get("binary").and_then(Value::as_str) {
-            Some(param) => Some(values.binary(param)?),
+            Some(param) => values.binary(param)?,
             None => return Err("body is a template or {binary: parameter}".into()),
         },
     };
-    Ok((body, content_type))
+    let (body, stream) = whole_or_streamed(vec![piece]);
+    Ok((body, stream, content_type))
+}
+
+/// A body whole when it holds no host file; otherwise its pieces to stream,
+/// neighboring bytes joined.
+fn whole_or_streamed(pieces: Vec<BodyPiece>) -> (Option<Vec<u8>>, Option<Vec<BodyPiece>>) {
+    let mut out: Vec<BodyPiece> = Vec::new();
+    for piece in pieces {
+        match (out.last_mut(), piece) {
+            (Some(BodyPiece::Bytes(last)), BodyPiece::Bytes(more)) => last.extend(more),
+            (_, piece) => out.push(piece),
+        }
+    }
+    if out.iter().any(|p| matches!(p, BodyPiece::File { .. })) {
+        return (None, Some(out));
+    }
+    let bytes = out
+        .into_iter()
+        .flat_map(|p| match p {
+            BodyPiece::Bytes(bytes) => bytes,
+            BodyPiece::File { .. } => Vec::new(),
+        })
+        .collect();
+    (Some(bytes), None)
 }
 
 /// One part of a `multipart/form-data` body (RFC 7578).
@@ -1135,33 +1164,46 @@ struct Part {
     name: String,
     filename: Option<String>,
     content_type: Option<String>,
-    data: Vec<u8>,
+    data: BodyPiece,
 }
 
-/// The `multipart/form-data` body of `parts` and its boundary. The boundary
-/// is derived from the content, so the same parts always give the same
-/// bytes, and is lengthened until no part holds it.
-fn multipart(parts: &[Part]) -> (Vec<u8>, String) {
+/// The `multipart/form-data` body of `parts`, in pieces, and its boundary.
+/// The boundary is derived from the content, so the same parts always give
+/// the same bytes, and is lengthened until no part in memory holds it. A
+/// host file's part is hashed by its length, never read here: with one, the
+/// boundary starts at 128 bits of the hash, which a file holds only if it
+/// was made to.
+fn multipart(parts: Vec<Part>) -> (Vec<BodyPiece>, String) {
     use sha2::Digest;
     let mut hash = sha2::Sha256::new();
-    for p in parts {
+    let mut files = false;
+    for p in &parts {
         hash.update(p.name.as_bytes());
         hash.update([0]);
-        hash.update(&p.data);
+        match &p.data {
+            BodyPiece::Bytes(data) => hash.update(data),
+            BodyPiece::File { len, .. } => {
+                files = true;
+                hash.update(b"\x01file");
+                hash.update(len.to_le_bytes());
+            }
+        }
         hash.update([0]);
     }
     let digest: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
-    let mut length = 16;
+    let mut length = if files { 32 } else { 16 };
     let boundary = loop {
         let candidate = format!("----form-{}", &digest[..length]);
-        let held = parts
-            .iter()
-            .any(|p| find(&p.data, candidate.as_bytes()).is_some());
+        let held = parts.iter().any(|p| match &p.data {
+            BodyPiece::Bytes(data) => find(data, candidate.as_bytes()).is_some(),
+            BodyPiece::File { .. } => false,
+        });
         if !held || length == digest.len() {
             break candidate;
         }
         length += 8;
     };
+    let mut pieces = Vec::new();
     let mut body = Vec::new();
     for p in parts {
         body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
@@ -1175,11 +1217,18 @@ fn multipart(parts: &[Part]) -> (Vec<u8>, String) {
             body.extend_from_slice(format!("Content-Type: {ct}\r\n").as_bytes());
         }
         body.extend_from_slice(b"\r\n");
-        body.extend_from_slice(&p.data);
+        match p.data {
+            BodyPiece::Bytes(data) => body.extend_from_slice(&data),
+            file => {
+                pieces.push(BodyPiece::Bytes(std::mem::take(&mut body)));
+                pieces.push(file);
+            }
+        }
         body.extend_from_slice(b"\r\n");
     }
     body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
-    (body, boundary)
+    pieces.push(BodyPiece::Bytes(body));
+    (pieces, boundary)
 }
 
 fn host_text(host: IpAddr) -> String {
@@ -1734,6 +1783,7 @@ impl SpecEngine {
                     headers,
                     body,
                     // A stream stays open; the session watches it for activity.
+                    body_stream: None,
                     timeout: None,
                     accept_invalid_certs: *accept_invalid_certs,
                     digest: matches!(auth, HttpAuth::Basic | HttpAuth::Digest).then_some(
@@ -1983,7 +2033,7 @@ impl SpecEngine {
             let templates = header_templates(item)?;
             headers.extend(render_headers(&templates, values)?);
         }
-        let (body, content_type) = request_body(item, values)?;
+        let (body, body_stream, content_type) = request_body(item, values)?;
         if let Some(ct) = content_type {
             headers.push(("Content-Type".into(), ct));
         }
@@ -1993,6 +2043,7 @@ impl SpecEngine {
                 url,
                 headers,
                 body,
+                body_stream,
                 timeout: Some(self.timeout),
                 accept_invalid_certs,
                 // Basic devices that answer with a Digest challenge get it
@@ -7700,6 +7751,183 @@ commands:
             Some("attachment; filename=\"Look.cset\"")
         );
         assert_eq!(r.body.as_deref(), Some(&[0, 1, 2][..]));
+    }
+
+    /// A file in the temp folder, removed when dropped.
+    struct TempFile(std::path::PathBuf);
+
+    impl TempFile {
+        fn new(name: &str, data: &[u8]) -> TempFile {
+            let path = std::env::temp_dir().join(format!(
+                "meros-binary-{name}-{}-{:?}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            std::fs::write(&path, data).unwrap();
+            TempFile(path)
+        }
+
+        fn param(&self) -> Value {
+            json!({"file": self.0.to_str().unwrap()})
+        }
+    }
+
+    impl Drop for TempFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    #[test]
+    fn binary_parameters_given_as_host_files_are_streamed_not_read() {
+        let spec: DeviceSpec = crate::yaml::from_str(BINARY).unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        endpoints_connected(&mut e);
+        let send = |e: &mut SpecEngine, name: &str, params: Value| {
+            let mut cx = Cx::new(2);
+            e.command(&mut cx, 1, name, params.as_object().unwrap());
+            let actions = cx.take();
+            match requests(&actions).pop() {
+                Some((rid, request)) => {
+                    let mut cx = Cx::new(3);
+                    e.http_response(&mut cx, rid, answer("{}", None));
+                    assert_eq!(completed(&cx.take()), vec![(1, Ok(Outcome::Ack))]);
+                    Ok(request)
+                }
+                None => Err(completed(&actions)),
+            }
+        };
+        let refusal = |err: Vec<(CommandId, crate::module::CommandResult)>| match &err[..] {
+            [(1, Err(CommandError::InvalidParams { message }))] => message.clone(),
+            other => panic!("not refused: {other:?}"),
+        };
+
+        // The whole body: the file by its path and length, never in memory.
+        let png = TempFile::new("raw", &[0x89, b'P', b'N', b'G']);
+        let r = send(
+            &mut e,
+            "raw",
+            json!({"data": png.param(), "kind": "image/png"}),
+        )
+        .unwrap();
+        assert_eq!(r.body, None);
+        assert_eq!(
+            r.body_stream,
+            Some(vec![BodyPiece::File {
+                path: png.0.clone(),
+                len: 4
+            }])
+        );
+        assert_eq!(
+            r.body_bytes().unwrap().as_deref(),
+            Some(&[0x89, b'P', b'N', b'G'][..])
+        );
+        assert_eq!(header(&r, "Content-Type"), Some("image/png"));
+        // max_length, which a vendor documents, holds for a file's size too
+        // (checked with the other parameters before the command is sent).
+        let raw = &e.spec.commands["raw"].params;
+        let big = TempFile::new("big", &[0; 5]);
+        let refused =
+            crate::catalog::validate(raw, json!({"data": big.param()}).as_object().unwrap())
+                .unwrap_err();
+        assert_eq!(refused, "'data' is longer than 4 bytes");
+        assert!(
+            crate::catalog::validate(raw, json!({"data": png.param()}).as_object().unwrap())
+                .is_ok()
+        );
+        // Base64 is as it was.
+        let r = send(
+            &mut e,
+            "raw",
+            json!({"data": "iVBORw==", "kind": "image/png"}),
+        )
+        .unwrap();
+        assert_eq!(r.body.as_deref(), Some(&[0x89, b'P', b'N', b'G'][..]));
+        assert_eq!(r.body_stream, None);
+
+        // A multipart part: the file between the parts in memory.
+        let clip = TempFile::new("form", &[0, 1, 2]);
+        let form = json!({"data": clip.param(), "name": "clip.mov"});
+        let a = send(&mut e, "form", form.clone()).unwrap();
+        let b = send(&mut e, "form", form).unwrap();
+        assert_eq!(a.body, None);
+        assert_eq!(a.body_stream, b.body_stream);
+        let pieces = a.body_stream.clone().unwrap();
+        assert_eq!(pieces.len(), 3, "{pieces:?}");
+        assert_eq!(
+            pieces[1],
+            BodyPiece::File {
+                path: clip.0.clone(),
+                len: 3
+            }
+        );
+        let ct = header(&a, "Content-Type").unwrap().to_string();
+        let boundary = ct
+            .strip_prefix("multipart/form-data; boundary=")
+            .unwrap()
+            .to_string();
+        assert_eq!(boundary.len(), "----form-".len() + 32, "{boundary}");
+        let mut want = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"addToMap\"\r\n\r\ntrue\r\n\
+             --{boundary}\r\nContent-Disposition: form-data; name=\"MediaFile\"; filename=\"clip.mov\"\r\n\
+             Content-Type: application/octet-stream\r\n\r\n"
+        )
+        .into_bytes();
+        want.extend_from_slice(&[0, 1, 2]);
+        want.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        assert_eq!(a.body_bytes().unwrap().unwrap(), want);
+        let total: u64 = pieces.iter().map(BodyPiece::len).sum();
+        assert_eq!(total, want.len() as u64);
+
+        // A file that is not there, a folder, or a shape that is neither
+        // form: refused naming the parameter, before anything is sent.
+        let gone = std::env::temp_dir().join(format!("meros-binary-gone-{}", std::process::id()));
+        let gone = gone.to_str().unwrap();
+        let message = refusal(
+            send(
+                &mut e,
+                "raw",
+                json!({"data": {"file": gone}, "kind": "image/png"}),
+            )
+            .unwrap_err(),
+        );
+        assert!(message.starts_with("'data': the file"), "{message}");
+        let folder = std::env::temp_dir();
+        let message = refusal(
+            send(
+                &mut e,
+                "named",
+                json!({"data": {"file": folder.to_str().unwrap()}, "name": "x"}),
+            )
+            .unwrap_err(),
+        );
+        assert!(message.starts_with("'data'"), "{message}");
+        for bad in [
+            json!({"file": ""}),
+            json!({"file": 3}),
+            json!({"path": gone}),
+            json!({"file": gone, "name": "x"}),
+            json!(["AAEC"]),
+        ] {
+            let given = json!({"data": bad, "name": "x"});
+            let message = refusal(send(&mut e, "named", given.clone()).unwrap_err());
+            assert!(message.starts_with("'data'"), "{message}");
+            let named = &e.spec.commands["named"].params;
+            let message = crate::catalog::validate(named, given.as_object().unwrap()).unwrap_err();
+            assert!(message.starts_with("'data'"), "{message}");
+        }
     }
 
     const TWO_REPLIES: &str = r#"

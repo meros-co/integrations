@@ -12,7 +12,7 @@ use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
 use crate::digest::{self, Challenge};
-use crate::module::{Credentials, HttpRequest, HttpResponse, Key, RequestId, SseInput};
+use crate::module::{BodyPiece, Credentials, HttpRequest, HttpResponse, Key, RequestId, SseInput};
 use crate::session::Inbound;
 use crate::sse::SseParser;
 
@@ -63,6 +63,15 @@ impl HttpClients {
         }
         if let Some(body) = &request.body {
             builder = builder.body(body.clone());
+        }
+        if let Some(pieces) = &request.body_stream {
+            // Sent with its length, so a device that needs Content-Length
+            // (most take no chunked upload) gets it; the files are read as
+            // the body goes out, a new reading for each attempt.
+            let length: u64 = pieces.iter().map(BodyPiece::len).sum();
+            builder = builder
+                .header(reqwest::header::CONTENT_LENGTH, length)
+                .body(reqwest::Body::wrap_stream(stream_pieces(pieces.clone())));
         }
         if let Some(ms) = request.timeout {
             builder = builder.timeout(Duration::from_millis(ms));
@@ -257,6 +266,70 @@ impl HttpClients {
     }
 }
 
+/// How much of a body's file is read at a time.
+const FILE_CHUNK: usize = 64 * 1024;
+
+/// A streamed body's bytes: its pieces in order, each file read a chunk at a
+/// time on a blocking thread as the request takes them, so no file is ever
+/// held whole. A file that cannot be opened, fails a read or ends before
+/// its length fails the request; one that has grown is sent only up to its
+/// length. The reading stops when the request is dropped.
+fn stream_pieces(
+    pieces: Vec<BodyPiece>,
+) -> impl futures_util::Stream<Item = std::io::Result<Vec<u8>>> + Send + 'static {
+    let (chunks, receiver) = mpsc::channel::<std::io::Result<Vec<u8>>>(4);
+    tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        for piece in pieces {
+            let (path, len) = match piece {
+                BodyPiece::Bytes(bytes) => {
+                    if chunks.blocking_send(Ok(bytes)).is_err() {
+                        return;
+                    }
+                    continue;
+                }
+                BodyPiece::File { path, len } => (path, len),
+            };
+            let mut file = match std::fs::File::open(&path) {
+                Ok(file) => file.take(len),
+                Err(e) => {
+                    let _ = chunks.blocking_send(Err(e));
+                    return;
+                }
+            };
+            let mut sent = 0u64;
+            loop {
+                let mut chunk = vec![0; FILE_CHUNK];
+                match file.read(&mut chunk) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        chunk.truncate(n);
+                        sent += n as u64;
+                        if chunks.blocking_send(Ok(chunk)).is_err() {
+                            return;
+                        }
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                    Err(e) => {
+                        let _ = chunks.blocking_send(Err(e));
+                        return;
+                    }
+                }
+            }
+            if sent < len {
+                let _ = chunks.blocking_send(Err(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    format!("the file is shorter than the {len} bytes it had when the command was checked"),
+                )));
+                return;
+            }
+        }
+    });
+    futures_util::stream::unfold(receiver, |mut receiver| async move {
+        receiver.recv().await.map(|chunk| (chunk, receiver))
+    })
+}
+
 /// `scheme://host:port` and the request target (path and query).
 fn split_url(url: &str) -> (&str, &str) {
     let after_scheme = url.find("://").map_or(0, |i| i + 3);
@@ -370,6 +443,7 @@ mod tests {
             url,
             headers: Vec::new(),
             body: None,
+            body_stream: None,
             timeout: Some(4000),
             accept_invalid_certs: false,
             digest: Some(Credentials {
@@ -416,6 +490,115 @@ mod tests {
             .unwrap();
         assert_eq!(response.status, 401);
         assert_eq!(refusals.load(Ordering::SeqCst), 2);
+    }
+
+    /// A device on loopback that reads one request's head and its
+    /// Content-Length body, answers 200 and hands both over.
+    async fn receiver() -> (String, tokio::sync::oneshot::Receiver<(String, Vec<u8>)>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buf = Vec::new();
+            let mut chunk = vec![0u8; 65536];
+            let end = loop {
+                if let Some(end) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                    break end;
+                }
+                match stream.read(&mut chunk).await {
+                    Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
+                    _ => return,
+                }
+            };
+            let head = String::from_utf8_lossy(&buf[..end]).to_ascii_lowercase();
+            let length: usize = head
+                .lines()
+                .find_map(|l| l.strip_prefix("content-length: "))
+                .map_or(0, |v| v.trim().parse().unwrap());
+            let mut body = buf.split_off(end + 4);
+            while body.len() < length {
+                match stream.read(&mut chunk).await {
+                    Ok(n) if n > 0 => body.extend_from_slice(&chunk[..n]),
+                    _ => return,
+                }
+            }
+            let _ = stream
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+                .await;
+            let _ = tx.send((head, body));
+        });
+        (base, rx)
+    }
+
+    fn post(url: String, pieces: Vec<BodyPiece>) -> HttpRequest {
+        HttpRequest {
+            method: "POST",
+            url,
+            headers: Vec::new(),
+            body: None,
+            body_stream: Some(pieces),
+            timeout: Some(20_000),
+            accept_invalid_certs: false,
+            digest: None,
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_streamed_body_reads_its_files_as_it_goes_with_their_length() {
+        let data: Vec<u8> = (0..3 * 1024 * 1024 + 17).map(|i| (i * 7) as u8).collect();
+        let path = std::env::temp_dir().join(format!("meros-http-stream-{}", std::process::id()));
+        std::fs::write(&path, &data).unwrap();
+        let (base, got) = receiver().await;
+        let clients = HttpClients::new().unwrap();
+        let pieces = vec![
+            BodyPiece::Bytes(b"head-".to_vec()),
+            BodyPiece::File {
+                path: path.clone(),
+                len: data.len() as u64,
+            },
+            BodyPiece::Bytes(b"-tail".to_vec()),
+        ];
+        let response = clients
+            .execute(&post(format!("{base}/upload"), pieces))
+            .await;
+        let (head, body) = got.await.unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(response.unwrap().status, 200);
+        let total = data.len() + 10;
+        assert!(head.contains(&format!("content-length: {total}")), "{head}");
+        assert!(!head.contains("transfer-encoding"), "{head}");
+        assert_eq!(body.len(), total);
+        assert_eq!(&body[..5], b"head-");
+        assert_eq!(&body[5..total - 5], &data[..]);
+        assert_eq!(&body[total - 5..], b"-tail");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_file_gone_or_shorter_than_its_length_fails_the_request() {
+        let path = std::env::temp_dir().join(format!("meros-http-short-{}", std::process::id()));
+        std::fs::write(&path, b"abc").unwrap();
+        let clients = HttpClients::new().unwrap();
+        let (base, _got) = receiver().await;
+        let short = clients
+            .execute(&post(
+                format!("{base}/upload"),
+                vec![BodyPiece::File {
+                    path: path.clone(),
+                    len: 10,
+                }],
+            ))
+            .await;
+        let _ = std::fs::remove_file(&path);
+        assert!(short.is_err(), "{short:?}");
+        let (base, _got) = receiver().await;
+        let gone = clients
+            .execute(&post(
+                format!("{base}/upload"),
+                vec![BodyPiece::File { path, len: 3 }],
+            ))
+            .await;
+        assert!(gone.is_err(), "{gone:?}");
     }
 
     #[test]

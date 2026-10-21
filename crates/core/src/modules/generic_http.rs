@@ -286,6 +286,7 @@ impl GenericHttp {
             url: format!("{}{path}", self.base),
             headers: all,
             body,
+            body_stream: None,
             timeout: Some(timeout),
             accept_invalid_certs: self.accept_invalid_certs,
             digest: matches!(self.auth, Auth::Basic | Auth::Digest).then(|| Credentials {

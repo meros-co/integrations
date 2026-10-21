@@ -10,6 +10,7 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::catalog::{ParamSpec, ParamType, Params};
+use crate::module::BodyPiece;
 use std::collections::BTreeMap;
 
 fn placeholder() -> &'static Regex {
@@ -167,13 +168,25 @@ fn apply_conversion(x: f64, d: &str, values: &Values) -> Result<f64, String> {
 }
 
 impl Values<'_> {
-    /// A `binary` parameter's bytes, decoded from the base64 it is given in.
-    pub(crate) fn binary(&self, name: &str) -> Result<Vec<u8>, String> {
+    /// A `binary` parameter's bytes: decoded from the base64 it is given in,
+    /// or the host file it names with the file's length now, to be read as
+    /// it is sent.
+    pub(crate) fn binary(&self, name: &str) -> Result<BodyPiece, String> {
         let (value, kind) = self.lookup(name)?;
         if kind != ParamType::Binary {
             return Err(format!("'{name}' is not a binary parameter"));
         }
-        crate::catalog::decode_binary(value.as_str().unwrap_or(""))
+        if let Some(path) = crate::catalog::binary_file(value) {
+            let len = crate::catalog::binary_file_len(name, path)?;
+            return Ok(BodyPiece::File {
+                path: path.into(),
+                len,
+            });
+        }
+        value
+            .as_str()
+            .and_then(crate::catalog::decode_binary)
+            .map(BodyPiece::Bytes)
             .ok_or_else(|| format!("'{name}' is not base64"))
     }
 
