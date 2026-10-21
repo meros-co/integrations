@@ -1040,6 +1040,10 @@ telemetry:
         "outputs.{1:+1}.take_mode": { value: "{2}", map: { "true": true, "false": false } }
     - match: "^END PRELUDE:$"
       state: { device.prelude_complete: "true" }
+    # Older firmware ends the dump without END PRELUDE (see quirks): the
+    # dump is taken as complete once the router has been silent for a second.
+    - quiet_ms: 1000
+      state: { device.prelude_complete: "true" }
     # Not in Blackmagic's documents; community-observed (see sources and quirks).
     - header: "^ALARM STATUS:$"
       each_line: "^([^:]+): (.+)$"
@@ -1056,7 +1060,7 @@ state:
   device.outputs:              { type: int, description: "Number of video outputs" }
   device.monitoring_outputs:   { type: int, description: "Number of video monitoring outputs" }
   device.serial_ports:         { type: int, description: "Number of serial ports" }
-  device.prelude_complete:     { type: bool, description: "True once END PRELUDE arrives, marking the end of the initial status dump (protocol 2.8)" }
+  device.prelude_complete:     { type: bool, description: "True once the initial status dump is over: when END PRELUDE arrives (protocol 2.8), or when the router has sent nothing for a second, which is how older firmware ends it" }
   inputs.*.label:              { type: string, description: "Input label, keyed by input number from 1" }
   inputs.*.hardware:           { type: string, description: "Input hardware: None, BNC or Optical (Universal Videohub)" }
   outputs.*.label:             { type: string, description: "Output label, keyed by output number from 1" }
@@ -1227,6 +1231,19 @@ quirks:
       number (p.46), so state holds one interface; a router reporting an Interface
       Count above 1 would overwrite it. Network settings are reported only: the manual
       documents no way to change them over this protocol.
+
+  - models: [all]
+    severity: info
+    text: >
+      END PRELUDE, which marks the end of the initial status dump, is documented
+      only for protocol 2.8 (May 2025 manual, p.50); v2.3 has no end marker, and a
+      community client (bmdwire, see sources) reports older firmware simply stops
+      sending. device.prelude_complete therefore also turns true once the router
+      has sent nothing for one second after it last sent anything on the
+      connection: the dump comes in one burst, so a second's silence ends it. A
+      router reporting Device present false sends nothing more (p.3), so it too
+      reads as complete. Once true it stays true across a reconnection, so it does
+      not show the new connection's dump in progress.
 
   - models: [universal-videohub-72, universal-videohub-288]
     severity: warning
