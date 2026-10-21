@@ -9,10 +9,13 @@
 /// The PTP-IP protocol version an initiator announces: 1.0.
 pub(crate) const PROTOCOL_VERSION: u32 = 0x0001_0000;
 
-/// A packet larger than this is treated as a broken stream. Downloads ask
-/// for 4 MiB at a time, but a captured image comes in one GetObject whose
-/// data a camera may send as a single packet the size of a RAW file.
+/// A packet larger than this is treated as a broken stream, unless it is a
+/// data packet within the length its Start Data announced: downloads ask for
+/// 4 MiB at a time, but a captured image comes in one GetObject whose data a
+/// camera may send as a single packet the size of the file, whatever that is.
 const MAX_PACKET: usize = 256 * 1024 * 1024;
+/// A data packet's header: length, type and transaction id.
+const DATA_HEADER: u64 = 12;
 
 const INIT_COMMAND_REQUEST: u32 = 1;
 const INIT_COMMAND_ACK: u32 = 2;
@@ -372,6 +375,8 @@ impl Packet {
 #[derive(Default)]
 pub(crate) struct Framer {
     buffer: Vec<u8>,
+    /// The data length the last Start Data announced.
+    announced: u64,
 }
 
 impl Framer {
@@ -385,16 +390,26 @@ impl Framer {
                 break;
             }
             let length = u32_at(&self.buffer, 0)? as usize;
-            if !(8..=MAX_PACKET).contains(&length) {
+            let kind = u32_at(&self.buffer, 4)?;
+            let most = match kind {
+                DATA | END_DATA => MAX_PACKET.max(
+                    usize::try_from(self.announced.saturating_add(DATA_HEADER))
+                        .unwrap_or(usize::MAX),
+                ),
+                _ => MAX_PACKET,
+            };
+            if !(8..=most).contains(&length) {
                 return Err(format!("PTP-IP packet length {length} is not valid"));
             }
             if self.buffer.len() < length {
                 break;
             }
-            let kind = u32_at(&self.buffer, 4)?;
             let packet = Packet::decode(kind, &self.buffer[8..length])
                 .map_err(|e| format!("malformed PTP-IP packet type {kind}: {e}"))?;
             self.buffer.drain(..length);
+            if let Packet::StartData { total, .. } = &packet {
+                self.announced = *total;
+            }
             out.push(packet);
         }
         Ok(out)
@@ -542,6 +557,33 @@ mod tests {
     fn a_bad_length_is_an_error() {
         let mut framer = Framer::default();
         assert!(framer.feed(&[4, 0, 0, 0, 1, 0, 0, 0]).is_err());
+    }
+
+    /// The header of a data packet `length` bytes long.
+    fn data_header(length: u32) -> Vec<u8> {
+        let mut b = length.to_le_bytes().to_vec();
+        b.extend_from_slice(&DATA.to_le_bytes());
+        b
+    }
+
+    #[test]
+    fn a_data_packet_may_be_as_large_as_its_start_data_announced() {
+        let big = 1_000_000_000u32;
+        // Unannounced, a packet this large is a broken stream.
+        assert!(Framer::default().feed(&data_header(big)).is_err());
+        // Announced, the framer waits for the rest of it.
+        let mut framer = Framer::default();
+        let start = Packet::StartData {
+            transaction: 9,
+            total: u64::from(big) - 12,
+        }
+        .encode();
+        assert_eq!(framer.feed(&start).unwrap().len(), 1);
+        assert!(framer.feed(&data_header(big)).unwrap().is_empty());
+        // But not beyond it.
+        let mut framer = Framer::default();
+        framer.feed(&start).unwrap();
+        assert!(framer.feed(&data_header(big + 1)).is_err());
     }
 
     #[test]
