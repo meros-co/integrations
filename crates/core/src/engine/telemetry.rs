@@ -396,6 +396,28 @@ fn arg_selectors(v: Option<&Value>) -> Result<Vec<(usize, Regex)>, String> {
     Ok(out)
 }
 
+/// OSC arguments with each blob (`b`) that holds UTF-8 text replaced by that
+/// text, so rules read it as they read a string; a blob that is not UTF-8 is
+/// kept as its bytes.
+fn blobs_as_text(types: &str, args: &[Value]) -> Vec<Value> {
+    types
+        .chars()
+        .zip(args)
+        .map(|(tag, arg)| {
+            let text = match (tag, arg) {
+                ('b', Value::Array(bytes)) => bytes
+                    .iter()
+                    .map(|b| b.as_u64().and_then(|b| u8::try_from(b).ok()))
+                    .collect::<Option<Vec<u8>>>()
+                    .and_then(|b| String::from_utf8(b).ok()),
+                _ => None,
+            };
+            text.map_or_else(|| arg.clone(), Value::String)
+        })
+        .chain(args.iter().skip(types.chars().count()).cloned())
+        .collect()
+}
+
 /// Whether each `arg_match` regex matches its argument's text (a string as
 /// it is, a number as its decimal text); their captures are appended to
 /// `base`, numbered on from those already there.
@@ -980,6 +1002,26 @@ impl Telemetry {
         let (message, request) = match message {
             Inbound::Answer { text, request } => (&Inbound::Text(text), Some(*request)),
             other => (other, None),
+        };
+        // An OSC blob holding UTF-8 text (OSCPoint's names, notes and JSON)
+        // is read as that text; one that is not UTF-8 stays its bytes.
+        let texts;
+        let with_text;
+        let message = match message {
+            Inbound::Osc {
+                address,
+                types,
+                args,
+            } if types.contains('b') => {
+                texts = blobs_as_text(types, args);
+                with_text = Inbound::Osc {
+                    address,
+                    types,
+                    args: &texts,
+                };
+                &with_text
+            }
+            other => other,
         };
         let mut patch = Value::Object(Map::new());
         let mut any = false;
@@ -2017,6 +2059,54 @@ mod tests {
         );
         // Outside the conversion's points: nothing is assigned.
         assert!(fader(1.5).is_none());
+    }
+
+    #[test]
+    fn osc_blobs_holding_utf8_are_read_as_text() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"address": "^/name$", "state": {"name": "{arg0}"}},
+                {"address": "^/event$", "arg_match": {"1": "^Caf(é)"},
+                 "state": {"accent": "{1}"}},
+                {"address": "^/doc$", "json_arg": 1, "json": {"n": "$.name"},
+                 "state": {"doc": "{n}"}},
+            ]})),
+            &state(json!({
+                "name": {"type": "string", "description": "x"},
+                "accent": {"type": "string", "description": "x"},
+                "doc": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let bytes = |s: &str| json!(s.as_bytes());
+        let osc = |address, types, args: &[Value]| {
+            t.apply(&Inbound::Osc {
+                address,
+                types,
+                args,
+            })
+        };
+        // A blob's UTF-8 text, as a value, for arg_match and as JSON.
+        assert_eq!(
+            osc("/name", "b", &[bytes("Grüße")]).unwrap(),
+            json!({"name": "Grüße"})
+        );
+        assert_eq!(
+            osc("/event", "sb", &[json!("open"), bytes("Café.pptx")]).unwrap(),
+            json!({"accent": "é"})
+        );
+        assert_eq!(
+            osc(
+                "/doc",
+                "sb",
+                &[json!("{}"), bytes(r#"{"name":"Ünï.pptx"}"#)]
+            )
+            .unwrap(),
+            json!({"doc": "Ünï.pptx"})
+        );
+        // A blob that is not UTF-8 stays bytes, which a JSON rule cannot read.
+        assert!(osc("/doc", "sb", &[json!("{}"), json!([0xff, 0xfe])]).is_none());
     }
 
     #[test]

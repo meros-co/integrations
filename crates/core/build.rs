@@ -206,6 +206,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "yamaha-tf",
         ],
     ),
+    ("vendor-zinc", &["oscpoint"]),
 ];
 
 fn enabled(feature: &str) -> bool {

@@ -1350,6 +1350,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that a surface's press and release, and a repeated press, each arrive as a message event, including surfaces that send bundles. ([specs/osc-listener.yaml:70](specs/osc-listener.yaml#L70))
 - [ ] Check that 64 simultaneous TCP senders is enough for a busy show. ([specs/osc-listener.yaml:87](specs/osc-listener.yaml#L87))
 
+## oscpoint — OSCPoint (PowerPoint add-in)
+
+- [ ] Confirm that OSCPoint 2.1 and later take section, folder and file names as a blob of UTF-8 text (its actions page says UTF-8 needs 2.1, while one note says v3.0.0), including names that are plain ASCII. ([specs/oscpoint.yaml:120](specs/oscpoint.yaml#L120))
+- [ ] Confirm that name and presentation feedback arrives as one message holding the ASCII string and then the UTF-8 blob (`,sb`), and whether /oscpoint/v2/presentations and /oscpoint/v2/files carry a blob too (only a string is documented). ([specs/oscpoint.yaml:370](specs/oscpoint.yaml#L370))
+- [ ] Confirm the argument layout of /oscpoint/v2/event: the ASCII file name then the UTF-8 blob (`,ssb`), slideshow_begin's slide number after them (`,ssbi`), the slide, click index and click count as ints, and add_in_startup's version as a string. ([specs/oscpoint.yaml:463](specs/oscpoint.yaml#L463))
+- [ ] Check which OSC type /oscpoint/v2/files/enabled uses for its boolean (`T`/`F` and an int 1/0 are both read). ([specs/oscpoint.yaml:429](specs/oscpoint.yaml#L429))
+- [ ] Confirm the UTF-8 notes address: the documentation says /oscpoint/slideshow/notes-utf8 and the Companion module listens on notes-utf-8; both are read. ([specs/oscpoint.yaml:516](specs/oscpoint.yaml#L516))
+- [ ] Confirm that the media percent position runs from 0 to 100 (taken from the Companion module; the documentation gives no range). ([specs/oscpoint.yaml:274](specs/oscpoint.yaml#L274))
+- [ ] Check what width and height set_wallpaper accepts (the Companion module limits both to 100-10000). ([specs/oscpoint.yaml:208](specs/oscpoint.yaml#L208))
+- [ ] Confirm that /oscpoint/feedbacks/refresh resends every feedback, the v2 presentation and presentations JSON included, and that /oscpoint/files/list is harmless while file access is off. ([specs/oscpoint.yaml:356](specs/oscpoint.yaml#L356))
+- [ ] Check the slide show state values (edit, running, paused from 2.1) and what OSCPoint sends for the slide show, section and media values when a slide show ends or a slide has no media. ([specs/oscpoint.yaml:501](specs/oscpoint.yaml#L501))
+
 ## panasonic-ptz — Panasonic PTZ
 
 - [ ] On an HE camera, check whether menu up and down take DUP:1 and DDW:1, as sent, or the bare DUP and DDW the v1.12 HE rows show. ([specs/panasonic-ptz.yaml:13650](specs/panasonic-ptz.yaml#L13650))
