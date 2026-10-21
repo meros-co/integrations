@@ -320,18 +320,6 @@ impl Atem {
                 }
                 one(b"Capt", Vec::new())
             }
-            // Slot, 3 rsv (Sofie `Media/MediaPoolClearStillCommand.ts:10-14`).
-            "clear_still" => {
-                let slot = self.check_index(params, "still", self.topology.stills)?;
-                one(b"CSTL", vec![slot, 0, 0, 0])
-            }
-            "clear_clip" => {
-                if self.topology.clips == 0 {
-                    return Err(unsupported(name, "this switcher (no clip pool)"));
-                }
-                let slot = self.check_index(params, "clip", self.topology.clips)?;
-                one(b"CMPC", vec![slot, 0, 0, 0])
-            }
             // 3, clip, name at 2 (Sofie writes at most 44 bytes), u16 frames at
             // 66 (Sofie `Media/MediaPoolSetClipCommand.ts:15-25`).
             "set_clip" => {
@@ -598,14 +586,8 @@ mod tests {
             payload(&mut m, "capture_still", json!({})),
             command(b"Capt", &[])
         );
-        assert_eq!(
-            payload(&mut m, "clear_still", json!({"still": 5})),
-            command(b"CSTL", &[4, 0, 0, 0])
-        );
-        assert_eq!(
-            payload(&mut m, "clear_clip", json!({"clip": 2})),
-            command(b"CMPC", &[1, 0, 0, 0])
-        );
+        // clear_still and clear_clip run under the store's lock, with the
+        // transfers (atem_transfer.rs).
         let p = payload(
             &mut m,
             "set_clip",

@@ -41,6 +41,12 @@
 //! - Clips are cleared (`CMPC`) before their first frame and named and made
 //!   valid (`SMPC`) after the last (Sofie; the SDK manual's SetInvalid and
 //!   SetValid). Macros and labels take no lock (Sofie's simple queues).
+//! - Clearing a still or a clip (`CSTL`, `CMPC`) runs in the same queue,
+//!   moving no data: the store's lock is taken, the clear sent and the
+//!   lock released. The SDK manual (4.3.8.6, 4.3.12.6) says a clear works
+//!   only for a client holding the lock or while no other client holds
+//!   it, and bmdwire reports a 1 M/E Production Studio 4K ignoring a bare
+//!   `CSTL`.
 //!
 //! Every path ends with the lock released: done, failed, canceled, timed
 //! out and closed. A lost connection ends with a goodbye on the old
@@ -62,7 +68,9 @@ use super::{
 use crate::module::FileInput;
 
 /// The commands this file handles.
-pub(super) const COMMANDS: [&str; 10] = [
+pub(super) const COMMANDS: [&str; 12] = [
+    "clear_still",
+    "clear_clip",
     "upload_still",
     "download_still",
     "upload_clip",
@@ -171,11 +179,24 @@ enum What {
         /// Text drawn into the label here, rather than a bitmap file.
         text: Option<(String, Resolutions)>,
     },
+    /// A clear: no data moves, but it runs under the store's lock like a
+    /// transfer, since the switcher takes it only from a client holding the
+    /// lock or while no other client holds it (SDK manual 4.3.8.6 and
+    /// 4.3.12.6), and some models ignore it unless the lock is held
+    /// (bmdwire).
+    ClearStill {
+        slot: u16,
+    },
+    ClearClip {
+        clip: u8,
+    },
 }
 
 impl What {
     fn kind(&self) -> &'static str {
         match self {
+            What::ClearStill { .. } => "clear_still",
+            What::ClearClip { .. } => "clear_clip",
             What::UploadStill { .. } => "upload_still",
             What::DownloadStill { .. } => "download_still",
             What::UploadClip { .. } => "upload_clip",
@@ -191,8 +212,16 @@ impl What {
     fn upload(&self) -> bool {
         !matches!(
             self,
-            What::DownloadStill { .. } | What::DownloadClip { .. } | What::DownloadMacro { .. }
+            What::DownloadStill { .. }
+                | What::DownloadClip { .. }
+                | What::DownloadMacro { .. }
+                | What::ClearStill { .. }
+                | What::ClearClip { .. }
         )
+    }
+
+    fn clear(&self) -> bool {
+        matches!(self, What::ClearStill { .. } | What::ClearClip { .. })
     }
 
     fn frames(&self) -> bool {
@@ -208,10 +237,13 @@ impl What {
     /// The store whose lock the transfer needs: stills 0, clip n at n.
     fn lock(&self) -> Option<u16> {
         match self {
-            What::UploadStill { .. } | What::DownloadStill { .. } => Some(0),
+            What::UploadStill { .. } | What::DownloadStill { .. } | What::ClearStill { .. } => {
+                Some(0)
+            }
             What::UploadClip { clip, .. }
             | What::DownloadClip { clip, .. }
-            | What::UploadAudio { clip, .. } => Some(*clip as u16 + 1),
+            | What::UploadAudio { clip, .. }
+            | What::ClearClip { clip } => Some(*clip as u16 + 1),
             _ => None,
         }
     }
@@ -226,7 +258,9 @@ impl What {
             What::UploadStill { slot, .. }
             | What::DownloadStill { slot }
             | What::UploadMacro { slot, .. }
-            | What::DownloadMacro { slot } => *slot,
+            | What::DownloadMacro { slot }
+            | What::ClearStill { slot } => *slot,
+            What::ClearClip { clip } => *clip as u16,
             What::UploadClip { .. } => unit as u16,
             What::DownloadClip { first, .. } => first + unit as u16,
             What::UploadAudio { .. } => 0,
@@ -238,12 +272,15 @@ impl What {
     fn target(&self) -> Map<String, Value> {
         let mut m = Map::new();
         match self {
-            What::UploadStill { slot, .. } | What::DownloadStill { slot } => {
+            What::UploadStill { slot, .. }
+            | What::DownloadStill { slot }
+            | What::ClearStill { slot } => {
                 m.insert("still".into(), json!(slot + 1));
             }
             What::UploadClip { clip, .. }
             | What::DownloadClip { clip, .. }
-            | What::UploadAudio { clip, .. } => {
+            | What::UploadAudio { clip, .. }
+            | What::ClearClip { clip } => {
                 m.insert("clip".into(), json!(clip + 1));
             }
             What::UploadMacro { slot, .. } | What::DownloadMacro { slot } => {
@@ -545,6 +582,18 @@ impl Atem {
         let mut size = (0, 0);
         let mut paths = vec![path()];
         let what = match name {
+            "clear_still" => {
+                paths.clear();
+                What::ClearStill {
+                    slot: self.check_index(params, "still", self.topology.stills)? as u16,
+                }
+            }
+            "clear_clip" => {
+                paths.clear();
+                What::ClearClip {
+                    clip: self.check_clip(name, params)?,
+                }
+            }
             "upload_still" => {
                 let slot = self.check_index(params, "still", self.topology.stills)? as u16;
                 size = self.frame_size_now()?;
@@ -880,6 +929,20 @@ impl Atem {
     }
 
     fn start_unit(&mut self, cx: &mut Cx) {
+        let clear = match self.transfers.active.as_ref().map(|j| &j.what) {
+            // Slot, 3 rsv (Sofie `Media/MediaPoolClearStillCommand.ts:10-14`
+            // and `MediaPoolClearClipCommand.ts`).
+            Some(What::ClearStill { slot }) => Some((*b"CSTL", *slot as u8)),
+            Some(What::ClearClip { clip }) => Some((*b"CMPC", *clip)),
+            _ => None,
+        };
+        if let Some((name, index)) = clear {
+            // Sent under the lock; the release goes in a later packet, which
+            // the switcher takes after this one.
+            self.send_commands(cx, None, &[(name, vec![index, 0, 0, 0])]);
+            self.end_active(cx, "done", None);
+            return;
+        }
         let t = &mut self.transfers;
         let id = t
             .next_id
@@ -2039,6 +2102,52 @@ mod tests {
         );
         assert_eq!(named(&list, b"LOCK"), [&vec![0, 1, 0, 0]]);
         assert_eq!(state(&a)["transfers"]["1"]["status"], "done");
+    }
+
+    #[test]
+    fn clears_are_sent_under_the_stores_lock_then_released() {
+        let mut m = switcher();
+        let (r, a) = run(&mut m, 100, "clear_still", json!({"still": 5}));
+        assert_eq!(r.unwrap(), json!({"transfer": 1, "ahead": 0}));
+        let list = out(&a);
+        assert_eq!(named(&list, b"LOCK"), [&vec![0, 0, 1, 0]]);
+        assert!(named(&list, b"CSTL").is_empty(), "not before the grant");
+        assert_eq!(state(&a)["transfers"]["1"]["kind"], "clear_still");
+        assert_eq!(state(&a)["transfers"]["1"]["still"], 5);
+        let a = from_switcher(&mut m, 110, &[lock_msg(b"LKOB", 0, true)]);
+        let list = out(&a);
+        let order: Vec<&[u8; 4]> = list.iter().map(|(n, _)| n).collect();
+        assert_eq!(order, [b"CSTL", b"LOCK"], "cleared, then released");
+        assert_eq!(list[0].1, vec![4, 0, 0, 0]);
+        assert_eq!(list[1].1, vec![0, 0, 0, 0]);
+        assert_eq!(state(&a)["transfers"]["1"]["status"], "done");
+        let done = messages(&a)
+            .into_iter()
+            .find(|(n, _)| n == "transfer_finished")
+            .unwrap()
+            .1;
+        assert_eq!(
+            (&done["kind"], &done["still"], &done["status"]),
+            (&json!("clear_still"), &json!(5), &json!("done"))
+        );
+
+        // A clip's clear takes that clip's lock, and waits while another
+        // client holds it.
+        let a = from_switcher(&mut m, 2_000, &[lock_msg(b"LKST", 2, true)]);
+        assert_eq!(state(&a)["media_pool"]["locks"]["clips"]["2"], true);
+        let (r, a) = run(&mut m, 2_010, "clear_clip", json!({"clip": 2}));
+        assert_eq!(r.unwrap()["transfer"], 2);
+        assert_eq!(named(&out(&a), b"LOCK"), [&vec![0, 2, 1, 0]]);
+        let a = from_switcher(&mut m, 3_000, &[lock_msg(b"LKOB", 2, true)]);
+        let list = out(&a);
+        assert_eq!(list[0], (*b"CMPC", vec![1, 0, 0, 0]));
+        assert_eq!(named(&list, b"LOCK"), [&vec![0, 2, 0, 0]]);
+
+        // Checked against the pool like any other command.
+        assert!(matches!(
+            run(&mut m, 3_100, "clear_still", json!({"still": 21})).0,
+            Err(CommandError::InvalidParams { .. })
+        ));
     }
 
     #[test]

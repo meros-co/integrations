@@ -140,6 +140,8 @@ struct Sim {
     older: bool,
     /// Labels uploaded, by source.
     labels: HashMap<u16, Vec<u8>>,
+    /// Clears (CSTL) ignored for want of the stills lock.
+    bare_clears: usize,
     upload: Option<Upload>,
 }
 
@@ -391,6 +393,25 @@ impl Switcher {
                 self.send(&cmd(b"FTDC", &[idb[0], idb[1], 0, 0])).await;
             }
             b"FTUA" => self.sim.lock().unwrap().acks += 1,
+            b"CSTL" => {
+                // Like the models bmdwire describes, a clear is taken only
+                // from the client holding the stills lock; a bare one is
+                // ignored.
+                let slot = b[0] as u16;
+                let taken = {
+                    let mut sim = self.sim.lock().unwrap();
+                    let locked = sim.holder == Some(Holder::Client);
+                    if !locked {
+                        sim.bare_clears += 1;
+                    }
+                    locked && sim.stills.remove(&slot).is_some()
+                };
+                if taken {
+                    let mut mpfe = vec![0u8; 24];
+                    mpfe[2..4].copy_from_slice(&slot.to_be_bytes());
+                    self.send(&cmd(b"MPfe", &mpfe)).await;
+                }
+            }
             _ => {}
         }
     }
@@ -871,6 +892,49 @@ async fn atem_transfer_waits_while_another_client_holds_the_stills() {
 
     core.close(id).await;
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn atem_clear_still_takes_the_stills_lock_and_waits_its_turn() {
+    let sim: Arc<Mutex<Sim>> = Arc::default();
+    sim.lock().unwrap().stills.insert(3, vec![0; 8]);
+    let port = simulated_atem(sim.clone()).await;
+    let core = common::core().unwrap();
+    let id = open(&core, port).await;
+    assert_eq!(
+        core.snapshot(id).unwrap().state["media_pool"]["stills"]["4"]["name"],
+        "pict"
+    );
+    // Another client holds the stills: the clear waits for the lock rather
+    // than going out bare, which this switcher would ignore.
+    {
+        let mut s = sim.lock().unwrap();
+        s.holder = Some(Holder::Other);
+        s.other_until = Some(Instant::now() + Duration::from_millis(800));
+    }
+    let asked = Instant::now();
+    let t = start(&core, id, "clear_still", json!({"still": 4})).await;
+    let done = finished(&core, t).await;
+    assert_eq!(
+        (&done["status"], &done["kind"], &done["still"]),
+        (&json!("done"), &json!("clear_still"), &json!(4)),
+        "{done}"
+    );
+    assert!(asked.elapsed() >= Duration::from_millis(700), "it waited");
+    released(&sim).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !core.snapshot(id).unwrap().state["media_pool"]["stills"]["4"].is_null() {
+            core.poll_events(256);
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the pool reports the slot empty");
+    let s = sim.lock().unwrap();
+    assert!(!s.stills.contains_key(&3));
+    assert_eq!(s.bare_clears, 0);
+    drop(s);
+    core.close(id).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

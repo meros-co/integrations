@@ -44,7 +44,9 @@ source:
       before its frames are uploaded and valid with its name and frame count
       after; the 10-bit YUVA pixel order (a0, Cb, y0, a1, Cr, y1); frames
       match the switcher's video mode. Section 3.2.7: the DVE transition
-      has a logo rate in frames beside its rate.
+      has a logo rate in frames beside its rate. Sections 4.3.8.6 and
+      4.3.12.6: clearing a still or a clip (SetInvalid) succeeds only with
+      the lock or while no other client holds it.
   - title: Blackmagic ATEM Switchers Installation and Operation Manual (December 2024)
     author: Blackmagic Design
     url: https://documents.blackmagicdesign.com/UserManuals/ATEMSwitchersManual.pdf
@@ -79,7 +81,8 @@ source:
       Prose only, restated in our own words; atemwire's code is
       LGPL-3.0-only and was not read. Its claim that the DVE transition's
       logo rate comes before the transition rate, which conflicts with
-      atem-connection (see the quirks).
+      atem-connection (see the quirks); a 1 M/E Production Studio 4K
+      ignoring a clear still (CSTL) sent without the stills lock.
   - title: OpenSwitcher protocol documentation
     url: https://docs.openswitcher.org/udptransport.html
     note: >
@@ -2754,20 +2757,26 @@ commands:
     returns: ack
 
   clear_still:
-    summary: Clear a still slot in the media pool
+    summary: >
+      Clear a still slot in the media pool, under the stills lock: it waits
+      in the transfer queue and for the lock like a transfer. Answers at
+      once with the transfer's number; transfers.<number> follows it.
     params:
       still: { type: int, min: 1, max: 255, required: true,
                label: Still,
                description: "Still slot in the media pool, numbered from 1." }
-    returns: ack
+    returns: value
 
   clear_clip:
-    summary: Clear a clip slot in the media pool
+    summary: >
+      Clear a clip slot in the media pool, under the clip's lock: it waits
+      in the transfer queue and for the lock like a transfer. Answers at
+      once with the transfer's number; transfers.<number> follows it.
     params:
       clip: { type: int, min: 1, max: 4, required: true,
               label: Clip,
               description: "Clip slot in the media pool, numbered from 1." }
-    returns: ack
+    returns: value
 
   set_clip:
     summary: >
@@ -3803,15 +3812,15 @@ state:
   media_pool.stills.*.hash:    { type: string, description: "The switcher's 16-byte hash of the still, as 32 lowercase hex digits; it changes when the picture does" }
   media_pool.locks.stills:     { type: bool, description: "Some client holds the stills lock, as the switcher announces it (LKST)" }
   media_pool.locks.clips.*:    { type: bool, description: "Some client holds clip N's lock, keyed by clip from 1 (LKST)" }
-  transfers.*.kind:            { type: string, description: "upload_still, download_still, upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro, upload_multiviewer_label or set_multiviewer_label, keyed by the transfer's number" }
+  transfers.*.kind:            { type: string, description: "upload_still, download_still, upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro, upload_multiviewer_label, set_multiviewer_label, clear_still or clear_clip, keyed by the transfer's number" }
   transfers.*.status:          { type: string, description: "queued, reading (the host file), waiting (giving other clients a turn), locking, transferring, writing (the host file), then done, failed or canceled" }
   transfers.*.progress:        { type: float, description: "How much is done, 0 to 1" }
   transfers.*.frame:           { type: int, description: "The clip frame being transferred, counted from 1 among the transfer's frames (clip transfers)" }
-  transfers.*.frames:          { type: int, description: "Files the transfer moves: a clip's frames, otherwise 1" }
+  transfers.*.frames:          { type: int, description: "Files the transfer moves: a clip's frames, 0 for a clear, otherwise 1" }
   transfers.*.error:           { type: string, description: "Why it failed; null otherwise" }
   transfers.*.bytes:           { type: int, unit: bytes, description: "Bytes sent or received on the wire, once finished" }
-  transfers.*.still:           { type: int, description: "The still slot, from 1 (still transfers)" }
-  transfers.*.clip:            { type: int, description: "The clip, from 1 (clip and clip audio transfers)" }
+  transfers.*.still:           { type: int, description: "The still slot, from 1 (still transfers and clears)" }
+  transfers.*.clip:            { type: int, description: "The clip, from 1 (clip and clip audio transfers, clip clears)" }
   transfers.*.macro:           { type: int, description: "The macro slot, from 1 (macro transfers)" }
   transfers.*.source:          { type: int, description: "The source whose label is uploaded (multiviewer label transfers)" }
   multiviewers.*.layout:       { type: string, description: "Multiviewer layout, as set_multiviewer_properties names them" }
@@ -4061,8 +4070,9 @@ quirks:
     text: >
       File transfers (upload_still, download_still, upload_clip,
       download_clip, upload_clip_audio, upload_macro, download_macro,
-      upload_multiviewer_label, set_multiviewer_label) run in the
-      background, one at a time in the order asked. Each command answers at once with {transfer, ahead}: the
+      upload_multiviewer_label, set_multiviewer_label) and the media pool
+      clears (clear_still, clear_clip) run in the background, one at a time
+      in the order asked. Each command answers at once with {transfer, ahead}: the
       transfer's number and how many are before it. transfers.<number> then
       follows it (queued, reading, waiting, locking, transferring, writing,
       then done, failed or canceled), and message events mark its ends:
@@ -4146,8 +4156,20 @@ quirks:
       both, through calls whose messages are not documented), and canceling
       on the switcher's side (cancel_transfer stops sending or acknowledging
       and lets go of the lock). Clip audio's validity, name and hash are not
-      in the state for the same reason. capture_still, clear_still,
-      clear_clip and set_clip manage the pool without a transfer.
+      in the state for the same reason. capture_still and set_clip manage
+      the pool without a transfer or a lock.
+
+  - models: [all]
+    severity: info
+    text: >
+      clear_still and clear_clip take the store's lock, send the clear and
+      let the lock go, waiting their turn as a transfer does. Blackmagic's
+      SDK manual says a clear succeeds only for a client holding the lock
+      or while no other client holds it, and bmdwire reports that some
+      models (a 1 M/E Production Studio 4K) ignore a clear sent without the
+      lock. A clear is done once it is sent: the switcher does not answer
+      it, and media_pool.stills or media_pool.clips shows the slot empty
+      when it has taken it.
 
   - models: [all]
     severity: info
