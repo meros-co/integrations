@@ -2123,3 +2123,57 @@ closed and each is named in the spec, so it is never hidden:
 | `panasonic-update-notification` | Panasonic AW-series cameras' update notifications: registers a local TCP port with the camera (`/cgi-bin/event?connect=start`), receives the changed settings it pushes there, and passes each one, a response text such as `p1`, to the spec's telemetry rules. Registers again when the camera's 60-second version notices stop, and unregisters on closing |
 | `aja-config-events` | AJA's event connection (Ki Pro, KUMO): sends the spec's `open_event_connection` request, then its `wait_for_events` request with the returned connection id, again as each reply arrives, beside the command queue. Each element of the reply, `{param_id, param_type, int_value, str_value}`, is offered to the spec's telemetry rules as two text messages, `event <param_id> value=<value>` and `event <param_id> value_name=<name>`: as a `/config?action=get` reply gives them, a string parameter's value is `str_value` and its name empty, and any other's value is `int_value` and its name `str_value`, or the value when that is empty. Opens a new connection when the id has expired or a request fails, after 1 s doubling to 30 s |
 | `resolume-push` | Resolume Arena and Avenue's websocket API (`ws://host:port/api/v1`): reads the composition Resolume sends on connecting and after each structural change into state keyed by unique id (composition, layers, columns, clips, decks, layer groups, and the effects in their chains), subscribes to every parameter that state shows with `{"action":"subscribe","parameter":"/parameter/by-id/<id>"}`, and applies each `parameter_subscribed` and `parameter_update`. A new composition is diffed against the last: removed items leave state and are unsubscribed, new ones are subscribed. Reads the composition again over REST after a deck switch, after a structural command of the session's own, and as a slow safety refresh (`composition_refresh_s`) for a deck's `closed`, which is not a parameter. Reopens the websocket after 1 s doubling to 30 s |
+
+## HTTP service
+
+The HTTP service (`meros-integrations serve`, `crates/sidecar`) offers the
+core's API over HTTP for hosts that cannot link it; its routes are listed in
+`crates/sidecar/src/main.rs`. Every route needs `Authorization: Bearer
+<token>`, and every JSON body is the one the other deliveries produce.
+
+### File transfers
+
+Some commands read or write a file on the host running the core: their
+`path` (or multi-line `paths`) parameter is a host path, for instance an
+ATEM's `upload_still`, `download_still`, `upload_clip`, `download_clip`,
+`upload_clip_audio`, `upload_macro`, `download_macro` and
+`upload_multiviewer_label`, and a Sony camera's `import_*`, `export_*`,
+`apply_settings_file`, `download_content` and `download_captured_image`. A client of the HTTP service
+on another machine runs them through the service's transfer folder, never
+naming a real path:
+
+| Route | Does |
+|---|---|
+| `POST /v1/files?name=<name>` | Streams the request body to a new file. 201 with `{file, name, path, size}`: `file` is an opaque id (32 hex digits), `path` is `transfer:<file>` |
+| `POST /v1/files/reserve` `{count?, name?}` | Ids for files a command will write (`count` 1 to 65535, default 1). 201 with `{files: [...]}` |
+| `GET /v1/files` | `{files, used, quota, max_file, expiry_s}`; each file with its `size`, whether it is `written` yet and `idle_ms` |
+| `GET /v1/files/<file>` | The file's bytes (`application/octet-stream`); 404 until written. `?delete=true` removes it once sent in full |
+| `DELETE /v1/files/<file>` | `{deleted: true}`; 409 while it is being downloaded |
+
+In a command's params, a line `transfer:<file>` in any string parameter is
+replaced by that file's real path before the command reaches the core, one
+per line in a multi-line parameter; other lines pass unchanged. An id the
+service did not hand out refuses the command with `invalid_params`. Every
+real path of the folder in a command's result, an event or a snapshot reads
+`transfer:<file>` again. For a command that writes a file, reserve an id,
+pass its `path`, and fetch the file once the command (for an ATEM, its
+transfer's `transfer_finished` event) is done.
+
+A file is stored as `<folder>/<file>/<name>`, where `<name>` is the client's
+name with only letters, digits, space and `._()-` kept (`file` when none is
+given), so a command that defaults a name from the file or checks its
+extension sees the client's. Only ids the service handed out are joined to
+the folder's path, and a link in the folder is never followed.
+
+An upload over the size limit (`--transfer-max-file`, default 512 MiB,
+enough for an 8K PNG with 16-bit RGBA, at most about 266 MB, and about 31
+minutes of a clip's 48 kHz 24-bit stereo audio) or that would take the folder
+over its quota (`--transfer-quota`, default 4 GiB) is refused with 413,
+`too_large` or `quota_exceeded`, and nothing of it is kept. A reservation is
+refused with 413 while the folder is full; a device's download is not cut
+off, but counts toward the quota once written. Files are kept until deleted,
+fetched with `?delete=true`, or unused (not uploaded, fetched, named in a
+command or written by a device) for the expiry (`--transfer-expiry`, default
+3600 s). The folder (`--transfer-dir`, default
+`<temp>/meros-integrations-transfer-<port>`) is cleared of its ids at startup
+and on a clean stop.
