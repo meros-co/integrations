@@ -29,7 +29,7 @@ def _pad(b: bytes) -> bytes:
 
 def osc(address: str, *args) -> bytes:
     """args: ("i", int) | ("f", float) | ("s", str) | ("b", bytes), a blob
-    given as str being its UTF-8 bytes."""
+    given as str being its UTF-8 bytes | ("T", None) | ("F", None)."""
     out = _pad(address.encode())
     out += _pad(("," + "".join(t for t, _ in args)).encode())
     for t, v in args:
