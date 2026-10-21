@@ -652,6 +652,12 @@ def endpoint_checks(doc: dict) -> list[str]:
             elif decl.get("type") != kind or (values and set(decl.get("values", [])) - values):
                 errors.append(f"{where}.{key}'s setting must be "
                               + ("an int" if kind == "int" else f"an enum of {' and '.join(sorted(values))}"))
+        # Beside a transport that is not HTTP there is no credential to
+        # inherit: the endpoint's requests go without one.
+        if transport.get("type") != "http" and ("auth" in e and e.get("auth") != "none"):
+            errors.append(f"{where}.auth is none beside a {transport.get('type')} transport")
+        if "accept_invalid_certs" in e and not isinstance(e["accept_invalid_certs"], bool):
+            errors.append(f"{where}.accept_invalid_certs is true or false")
     telemetry = doc.get("telemetry") or {}
     places = [(f"commands.{n}.send", c.get("send")) for n, c in (doc.get("commands") or {}).items()]
     places += [(where, group.get("send")) for where, group in poll_groups(telemetry)]
