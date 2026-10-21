@@ -1666,7 +1666,13 @@ impl Atem {
                     "no_media"
                 };
                 self.recording_active = status & 1 != 0;
-                let mut r = json!({"active": status & 1 != 0, "error": error});
+                // Bit 7: stopping (Sofie `enums/index.ts`, RecordingStatus;
+                // bmdwire's documentation lists the same flag).
+                let mut r = json!({
+                    "active": status & 1 != 0,
+                    "stopping": status & 128 != 0,
+                    "error": error,
+                });
                 // Seconds of recording time left, 0xFFFFFFFF with no disk
                 // (Sofie `Recording/RecordingStatusCommand.ts:49-52`).
                 if b.len() >= 8 {
@@ -4238,7 +4244,12 @@ mod tests {
         assert!(s["streaming"].get("key").is_none(), "the key stays out");
         assert_eq!(
             s["recording"],
-            json!({"active": true, "error": "none", "time_available": 3600})
+            json!({"active": true, "stopping": false, "error": "none", "time_available": 3600})
+        );
+        let stopping = decoded(&mut m, &[cmd(b"RTMS", &[0, 0x82, 0, 0])]);
+        assert_eq!(
+            stopping["recording"],
+            json!({"active": false, "stopping": true, "error": "none"})
         );
         assert_eq!(s["cameras"]["1"]["iris"], 0.5);
         assert_eq!(s["cameras"]["1"]["white_balance"], 5600);
