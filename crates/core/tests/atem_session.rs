@@ -128,6 +128,11 @@ struct Sim {
     drop_after: Option<usize>,
     silent: bool,
     acks: usize,
+    /// Goodbyes received.
+    goodbyes: usize,
+    /// Answer an upload request with no budget, so the upload holds its
+    /// lock and waits.
+    stall: bool,
     upload: Option<Upload>,
 }
 
@@ -271,7 +276,9 @@ impl Switcher {
                     data: Vec::new(),
                     budget: 64,
                 });
-                self.budget(id).await;
+                if !self.sim.lock().unwrap().stall {
+                    self.budget(id).await;
+                }
             }
             b"FTFD" => {
                 let name: Vec<u8> = b[2..66].iter().copied().take_while(|c| *c != 0).collect();
@@ -413,6 +420,17 @@ impl Switcher {
             };
             let data = buf[..n].to_vec();
             let flags = data[0] >> 3;
+            if flags & 0x02 != 0 && data.get(12) == Some(&0x04) {
+                // Goodbye: the session ends and its locks are freed at once.
+                let mut sim = self.sim.lock().unwrap();
+                sim.goodbyes += 1;
+                sim.upload = None;
+                if sim.holder == Some(Holder::Client) {
+                    sim.holder = None;
+                }
+                self.client = None;
+                continue;
+            }
             if flags & 0x02 != 0 {
                 // Hello: a new session. A silent (dead) session's lock is
                 // freed, as the switcher reaps it.
@@ -553,10 +571,17 @@ async fn open(core: &Core, port: u16) -> u64 {
     id
 }
 
+/// Start a transfer; while the device is reconnecting, try again.
 async fn start(core: &Core, id: u64, name: &str, p: Value) -> u64 {
-    match core.execute(id, name, params(p)).await {
-        Ok(Outcome::Value { value }) => value["transfer"].as_u64().unwrap(),
-        other => panic!("{name}: {other:?}"),
+    let until = Instant::now() + Duration::from_secs(20);
+    loop {
+        match core.execute(id, name, params(p.clone())).await {
+            Ok(Outcome::Value { value }) => return value["transfer"].as_u64().unwrap(),
+            Err(CommandError::NotConnected) if Instant::now() < until => {
+                tokio::time::sleep(Duration::from_millis(20)).await
+            }
+            other => panic!("{name}: {other:?}"),
+        }
     }
 }
 
@@ -858,14 +883,8 @@ async fn atem_upload_cut_off_by_a_lost_connection_fails_and_frees_the_lock() {
         "{failed}"
     );
 
-    // Connected again: the dead session's lock is gone and transfers work.
-    tokio::time::timeout(Duration::from_secs(20), async {
-        while core.snapshot(id).unwrap().connection != Connection::Connected {
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-    })
-    .await
-    .expect("connected again within 20 s");
+    // Connected again (start waits for it): the dead session's lock is gone
+    // and transfers work.
     let t = start(
         &core,
         id,
@@ -878,5 +897,46 @@ async fn atem_upload_cut_off_by_a_lost_connection_fails_and_frees_the_lock() {
     released(&sim).await;
 
     core.close(id).await;
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn atem_closing_says_goodbye_and_frees_the_lock_at_once() {
+    let sim: Arc<Mutex<Sim>> = Arc::default();
+    sim.lock().unwrap().stall = true;
+    let port = simulated_atem(sim.clone()).await;
+    let core = common::core().unwrap();
+    let id = open(&core, port).await;
+    let dir = scratch("goodbye");
+    let source = dir.join("flat.rgba");
+    std::fs::write(&source, picture()).unwrap();
+    start(
+        &core,
+        id,
+        "upload_still",
+        json!({"still": 1, "path": source.to_str().unwrap(), "format": "rgba"}),
+    )
+    .await;
+    // The upload holds the stills lock, waiting for a budget that never
+    // comes.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while sim.lock().unwrap().upload.is_none() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the upload starts");
+    assert_eq!(sim.lock().unwrap().holder, Some(Holder::Client));
+    core.close(id).await;
+    released(&sim).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while sim.lock().unwrap().goodbyes == 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the session says goodbye");
+    let goodbyes = sim.lock().unwrap().goodbyes;
+    assert_eq!(goodbyes, 1);
     let _ = std::fs::remove_dir_all(&dir);
 }

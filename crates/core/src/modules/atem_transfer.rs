@@ -43,9 +43,10 @@
 //!   SetValid). Macros and labels take no lock (Sofie's simple queues).
 //!
 //! Every path ends with the lock released: done, failed, canceled, timed
-//! out and closed. A lost connection needs nothing sent: the switcher frees
-//! a dead session's locks when it times the session out (bmdwire: about
-//! 5 s).
+//! out and closed. A lost connection ends with a goodbye on the old
+//! session, which frees its locks at once; a switcher that does not hear it
+//! frees a dead session's locks when it times the session out (bmdwire:
+//! about 5 s).
 
 use std::collections::{BTreeMap, VecDeque};
 
