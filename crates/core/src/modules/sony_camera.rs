@@ -515,8 +515,8 @@ enum Plan {
     Http(HttpPurpose, Url),
     Download(Download, Vec<Op>),
     HttpDownload(Download, Url),
-    /// An upload: the host file to read, and the most it may be.
-    Upload(Upload, String, u64),
+    /// An upload: the host file to read.
+    Upload(Upload, String),
     Delete(Deletion, Op),
     Listing(u32, u32, Op),
     Switch(Function),
@@ -3467,7 +3467,7 @@ impl Module for SonyCamera {
                 self.commands.extend(ops);
                 self.pump(cx);
             }
-            Ok(Plan::Upload(upload, path, max)) => self.begin_upload(cx, upload, path, max),
+            Ok(Plan::Upload(upload, path)) => self.begin_upload(cx, upload, path),
             Ok(Plan::LiveDuringTransfers(keep, interval)) => {
                 self.set_live_during_transfers(cx, keep, interval);
                 cx.complete(id, Ok(Outcome::Ack));
@@ -5194,13 +5194,9 @@ mod tests {
 
     // ----- uploads, setting files and deletion -----
 
-    fn file_read_of(actions: &[Action]) -> Option<(String, u64)> {
+    fn file_read_of(actions: &[Action]) -> Option<String> {
         actions.iter().find_map(|a| match a {
-            Action::FileRead {
-                file,
-                path,
-                max_bytes,
-            } if *file == files::READ => Some((path.clone(), *max_bytes)),
+            Action::FileRead { file, path } if *file == files::READ => Some(path.clone()),
             _ => None,
         })
     }
@@ -5257,7 +5253,7 @@ mod tests {
             "import_lut",
             json!({"path": "/luts/Show.cube", "user_base_look": 3}),
         );
-        assert_eq!(file_read_of(&a).unwrap().0, "/luts/Show.cube");
+        assert_eq!(file_read_of(&a).unwrap(), "/luts/Show.cube");
         let cube = b"LUT_3D_SIZE 2\n0 0 0\n";
         let a = read_done(&mut m, cube);
         let packets = sent(&a, CMD);

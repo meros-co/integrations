@@ -55,10 +55,9 @@ const ANSWER_WITHIN: u64 = 30_000;
 /// A cold unit often refuses or drops the first connection and answers the
 /// next one.
 const RETRY_AFTER: u64 = 250;
-/// No preset or resource comes near this; a larger length is not a reply.
+/// No preset or resource comes near this; a larger length is not a reply
+/// (a frame guard against a broken stream, not a limit on host files).
 const MAX_BODY: usize = 64 << 20;
-/// The largest archive or file taken from the host.
-const MAX_FILE: u64 = 256 << 20;
 
 const OP_READ_PRESET: u16 = 0x0000;
 const OP_READ_RESOURCE: u16 = 0x0003;
@@ -317,7 +316,7 @@ impl UltimattePresets {
             && job.ops.is_empty()
         {
             self.on_file = true;
-            cx.file_read(READ_FILE, job.path.clone(), MAX_FILE);
+            cx.file_read(READ_FILE, job.path.clone());
             return;
         }
         if job.ops.is_empty() {
@@ -633,7 +632,7 @@ fn archive(done: &[(Op, Result<Vec<u8>, String>)], unix_millis: u64) -> Vec<u8> 
 /// GPISettings, then SavedSettings. Other members (a text dump, the macOS
 /// metadata a Finder zip adds) are not sent.
 fn restore_ops(data: &[u8]) -> Result<Vec<Op>, String> {
-    let members = zip::read(data, MAX_FILE as usize)?;
+    let members = zip::read(data)?;
     let mut presets: Vec<(&str, &Vec<u8>)> = members
         .iter()
         .filter_map(|(name, data)| {
@@ -820,7 +819,7 @@ mod tests {
             (Op::read_resource("SavedSettings"), Ok(b"S".to_vec())),
         ];
         let zip = archive(&done, 0);
-        let names: Vec<String> = zip::read(&zip, 1 << 20)
+        let names: Vec<String> = zip::read(&zip)
             .unwrap()
             .into_iter()
             .map(|(n, _)| n)
