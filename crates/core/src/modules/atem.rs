@@ -51,7 +51,6 @@ use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, FileInput, Key, Level, Millis, Module,
     OpenContext, Outcome,
 };
-use crate::session::merge_patch;
 
 #[path = "atem_audio.rs"]
 mod audio;
@@ -345,6 +344,25 @@ fn put_i32(b: &mut [u8], at: usize, v: i32) {
 fn text(b: &[u8]) -> String {
     let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
     String::from_utf8_lossy(&b[..end]).into_owned()
+}
+
+/// Add one command's patch to a packet's: like a merge patch, but a null
+/// is kept, so a removal (a still cleared, a disk gone) still reaches the
+/// state when the packet's patches go out as one.
+fn combine(target: &mut Value, patch: Value) {
+    match (target, patch) {
+        (Value::Object(t), Value::Object(p)) => {
+            for (k, v) in p {
+                match t.get_mut(&k) {
+                    Some(existing) if existing.is_object() && v.is_object() => combine(existing, v),
+                    _ => {
+                        t.insert(k, v);
+                    }
+                }
+            }
+        }
+        (t, p) => *t = p,
+    }
 }
 
 /// `a` is at or before `b` in 15-bit sequence space.
@@ -959,7 +977,7 @@ impl Atem {
             let name: [u8; 4] = payload[4..8].try_into().unwrap();
             let body = &payload[8..length];
             if let Some(p) = self.decode(cx, &name, body) {
-                merge_patch(&mut patch, &p);
+                combine(&mut patch, p);
             }
             payload = &payload[length..];
         }
@@ -2916,6 +2934,7 @@ impl Atem {
 mod tests {
     use super::*;
     use crate::module::Action;
+    use crate::session::merge_patch;
     use std::net::{IpAddr, Ipv4Addr};
 
     const HOST: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 9));
@@ -3519,6 +3538,35 @@ mod tests {
             &syn_reply(),
         );
         assert!(cx.take().is_empty());
+    }
+
+    /// A packet's commands go out as one patch, and a removal among them
+    /// stays a null rather than vanishing in the merge.
+    #[test]
+    fn a_removal_in_a_packet_reaches_the_state_as_null() {
+        let (mut m, _) = ready();
+        let mut used = vec![0u8; 24];
+        used[3] = 1;
+        used[4] = 1;
+        let mut empty = vec![0u8; 24];
+        empty[3] = 4;
+        let a = feed(
+            &mut m,
+            30,
+            reliable(0x8001, 2, &[cmd(b"MPfe", &used), cmd(b"MPfe", &empty)]),
+        );
+        let patches: Vec<&Value> = a
+            .iter()
+            .filter_map(|x| match x {
+                Action::State(p) => Some(p),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(patches.len(), 1);
+        let stills = &patches[0]["media_pool"]["stills"];
+        assert_eq!(stills["2"]["name"], "");
+        assert!(stills.as_object().unwrap().contains_key("5"));
+        assert!(stills["5"].is_null());
     }
 
     /// The one packet a command sends, after the packet header.
