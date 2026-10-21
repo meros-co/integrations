@@ -220,10 +220,6 @@ impl What {
         )
     }
 
-    fn clear(&self) -> bool {
-        matches!(self, What::ClearStill { .. } | What::ClearClip { .. })
-    }
-
     fn frames(&self) -> bool {
         matches!(
             self,
