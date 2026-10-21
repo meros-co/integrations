@@ -12,14 +12,16 @@
 //! `transfer:<id>` again. Only ids this service handed out resolve; anything
 //! else in the folder is never served, listed or resolved.
 //!
-//! Files are kept until the client deletes them (or fetches one with
-//! `?delete=true`), or until they go unused for the expiry; the folder's
-//! ids are cleared when the service starts and when it stops.
+//! The service puts no limit on a file's size, on the folder's total or on
+//! how long a file is kept: bodies are streamed to and from disk, and what
+//! to keep is the client's call. A file is kept until the client deletes it
+//! (or fetches it with `?delete=true`); the folder's ids are cleared when
+//! the service starts and when it stops cleanly.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::SystemTime;
 
 use axum::body::Body;
 use axum::http::{header, StatusCode};
@@ -31,14 +33,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// The prefix that marks a transfer-folder file in a command's params.
 pub const SCHEME: &str = "transfer:";
-/// Largest single upload by default: 512 MiB. An 8K (7680 by 4320) PNG with
-/// 16-bit RGBA, the largest a still can come as, is at most about 266 MB;
-/// 512 MiB also holds about 31 minutes of a clip's 48 kHz 24-bit stereo WAV.
-pub const DEFAULT_MAX_FILE: u64 = 512 * 1024 * 1024;
-/// The folder's total by default: 4 GiB.
-pub const DEFAULT_QUOTA: u64 = 4 * 1024 * 1024 * 1024;
-/// How long a file is kept after its last use by default: one hour.
-pub const DEFAULT_EXPIRY: Duration = Duration::from_secs(3600);
 /// Most outputs one `reserve` hands out: as many frames as a clip transfer
 /// can name.
 pub const MAX_RESERVE: u64 = 65_535;
@@ -46,24 +40,11 @@ pub const MAX_RESERVE: u64 = 65_535;
 const MAX_NAME: usize = 128;
 const READ_CHUNK: usize = 64 * 1024;
 
-/// How the transfer folder is set up (`serve --transfer-*`).
+/// How the transfer folder is set up (`serve --transfer-dir`).
+#[derive(Default)]
 pub struct Options {
     /// The folder; `<temp>/meros-integrations-transfer-<port>` when absent.
     pub dir: Option<PathBuf>,
-    pub max_file: u64,
-    pub quota: u64,
-    pub expiry: Duration,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self {
-            dir: None,
-            max_file: DEFAULT_MAX_FILE,
-            quota: DEFAULT_QUOTA,
-            expiry: DEFAULT_EXPIRY,
-        }
-    }
 }
 
 struct Entry {
@@ -71,7 +52,6 @@ struct Entry {
     /// The file's length as last seen (while uploading, as received).
     size: u64,
     created: SystemTime,
-    last_used: Instant,
     /// Being uploaded: not yet listed, served or resolved.
     uploading: bool,
     /// Downloads of it in progress.
@@ -104,9 +84,6 @@ pub struct Transfers {
     root: PathBuf,
     /// `root` as given to the core, to find it again in results.
     root_text: String,
-    max_file: u64,
-    quota: u64,
-    expiry: Duration,
     index: Mutex<Index>,
 }
 
@@ -180,9 +157,6 @@ impl Transfers {
         let transfers = Arc::new(Self {
             root_text: root.to_string_lossy().into_owned(),
             root,
-            max_file: options.max_file,
-            quota: options.quota,
-            expiry: options.expiry,
             index: Mutex::default(),
         });
         transfers.clear();
@@ -273,27 +247,12 @@ impl Transfers {
             "path": format!("{SCHEME}{id}"),
             "size": entry.size,
             "written": written,
-            "idle_ms": entry.last_used.elapsed().as_millis() as u64,
         })
     }
 
-    /// `POST /v1/files?name=`: the request body, streamed to a new file.
-    pub async fn upload(
-        self: &Arc<Self>,
-        name: Option<&str>,
-        length: Option<u64>,
-        body: Body,
-    ) -> Response {
-        if let Some(length) = length {
-            if length > self.max_file {
-                return self.too_large(length);
-            }
-            let mut index = self.index.lock().unwrap();
-            self.refresh(&mut index);
-            if index.total + length > self.quota {
-                return self.over_quota(index.total, length);
-            }
-        }
+    /// `POST /v1/files?name=`: the request body, streamed to a new file
+    /// whatever its length.
+    pub async fn upload(self: &Arc<Self>, name: Option<&str>, body: Body) -> Response {
         let id = new_id();
         let name = safe_name(name);
         if let Err(e) = std::fs::create_dir(self.root.join(&id)) {
@@ -306,7 +265,6 @@ impl Transfers {
                 name: name.clone(),
                 size: 0,
                 created: SystemTime::now(),
-                last_used: Instant::now(),
                 uploading: true,
                 readers: 0,
             },
@@ -317,7 +275,6 @@ impl Transfers {
             Ok(()) => {
                 let entry = index.entries.get_mut(&id).expect("uploading entry");
                 entry.uploading = false;
-                entry.last_used = Instant::now();
                 let size = entry.size;
                 drop(index);
                 (
@@ -359,44 +316,15 @@ impl Transfers {
                     format!("the upload was cut off: {e}"),
                 ))
             })?;
-            let len = chunk.len() as u64;
             {
                 let mut index = self.index.lock().unwrap();
-                let size = index.entries[id].size + len;
-                if size > self.max_file {
-                    return Err(Box::new(self.too_large(size)));
-                }
-                if index.total + len > self.quota {
-                    return Err(Box::new(self.over_quota(index.total, len)));
-                }
+                let size = index.entries[id].size + chunk.len() as u64;
                 index.resize(id, size);
             }
             file.write_all(&chunk).await.map_err(io)?;
         }
         file.flush().await.map_err(io)?;
         Ok(())
-    }
-
-    fn too_large(&self, size: u64) -> Response {
-        error(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "too_large",
-            format!(
-                "{size} bytes is more than the {} a file may hold",
-                self.max_file
-            ),
-        )
-    }
-
-    fn over_quota(&self, used: u64, more: u64) -> Response {
-        error(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "quota_exceeded",
-            format!(
-                "the transfer folder holds {used} bytes; {more} more is over its {} byte quota",
-                self.quota
-            ),
-        )
     }
 
     /// `POST /v1/files/reserve`: ids for files a device command will write.
@@ -410,10 +338,6 @@ impl Transfers {
         }
         let name = safe_name(name);
         let mut index = self.index.lock().unwrap();
-        self.refresh(&mut index);
-        if index.total >= self.quota {
-            return self.over_quota(index.total, 0);
-        }
         let mut files = Vec::new();
         for _ in 0..count {
             let id = new_id();
@@ -424,7 +348,6 @@ impl Transfers {
                 name: name.clone(),
                 size: 0,
                 created: SystemTime::now(),
-                last_used: Instant::now(),
                 uploading: false,
                 readers: 0,
             };
@@ -448,9 +371,6 @@ impl Transfers {
         Json(json!({
             "files": files,
             "used": index.total,
-            "quota": self.quota,
-            "max_file": self.max_file,
-            "expiry_s": self.expiry.as_secs_f64(),
         }))
         .into_response()
     }
@@ -497,7 +417,6 @@ impl Transfers {
             index.resize(id, len);
             let entry = index.entries.get_mut(id).expect("known entry");
             entry.readers += 1;
-            entry.last_used = Instant::now();
             (name, file, len)
         };
         let reading = Reading {
@@ -516,7 +435,7 @@ impl Transfers {
                     drop(file);
                     return None;
                 }
-                let mut buf = vec![0u8; READ_CHUNK.min(left as usize)];
+                let mut buf = vec![0u8; left.min(READ_CHUNK as u64) as usize];
                 match file.read(&mut buf).await {
                     Ok(0) => None,
                     Ok(n) => {
@@ -573,11 +492,11 @@ impl Transfers {
         if !mentions_scheme(params) {
             return Ok(params.clone());
         }
-        let mut index = self.index.lock().unwrap();
-        self.resolve_in(&mut index, params)
+        let index = self.index.lock().unwrap();
+        self.resolve_in(&index, params)
     }
 
-    fn resolve_in(&self, index: &mut Index, value: &Value) -> Result<Value, Value> {
+    fn resolve_in(&self, index: &Index, value: &Value) -> Result<Value, Value> {
         Ok(match value {
             Value::String(text) if text.contains(SCHEME) => {
                 let mut lines = Vec::new();
@@ -598,13 +517,12 @@ impl Transfers {
                     };
                     let entry = index
                         .entries
-                        .get_mut(id)
+                        .get(id)
                         .filter(|e| is_id(id) && !e.uploading)
                         .ok_or_else(|| {
                             json!({"error": {"error": "invalid_params",
                                 "message": format!("{SCHEME}{id} is not a file in the transfer folder; upload or reserve one first")}})
                         })?;
-                    entry.last_used = Instant::now();
                     let path = self.file_path(id, &entry.name);
                     lines.push(format!("{}{cr}", path.to_string_lossy()));
                 }
@@ -668,50 +586,6 @@ impl Transfers {
         out.push_str(rest);
         out
     }
-
-    /// Remove every file unused for the expiry: not uploaded, fetched,
-    /// named in a command or written by a device since.
-    pub fn sweep(&self) {
-        let mut index = self.index.lock().unwrap();
-        let written = self.refresh(&mut index);
-        let now = SystemTime::now();
-        let expired: Vec<String> = index
-            .entries
-            .iter()
-            .filter(|(_, e)| !e.uploading && e.readers == 0)
-            .filter(|(id, e)| {
-                let written_ago = written
-                    .get(*id)
-                    .copied()
-                    .flatten()
-                    .map(|m| now.duration_since(m).unwrap_or_default());
-                let idle = e.last_used.elapsed();
-                written_ago.map_or(idle, |w| w.min(idle)) >= self.expiry
-            })
-            .map(|(id, _)| id.clone())
-            .collect();
-        for id in expired {
-            if self.remove_files(&id).is_ok() {
-                index.remove(&id);
-            }
-        }
-    }
-
-    /// Sweep for as long as the service runs.
-    pub fn spawn_sweeper(self: &Arc<Self>) {
-        let transfers = Arc::downgrade(self);
-        let every = (self.expiry / 4).clamp(Duration::from_millis(100), Duration::from_secs(60));
-        tokio::spawn(async move {
-            let mut tick = tokio::time::interval(every);
-            loop {
-                tick.tick().await;
-                let Some(transfers) = transfers.upgrade() else {
-                    return;
-                };
-                transfers.sweep();
-            }
-        });
-    }
 }
 
 fn mentions_scheme(value: &Value) -> bool {
@@ -723,7 +597,7 @@ fn mentions_scheme(value: &Value) -> bool {
     }
 }
 
-/// A download in progress: the file is not swept or deleted meanwhile.
+/// A download in progress: the file is not deleted meanwhile.
 struct Reading {
     transfers: Arc<Transfers>,
     id: String,
@@ -738,7 +612,6 @@ impl Drop for Reading {
             return;
         };
         entry.readers -= 1;
-        entry.last_used = Instant::now();
         if self.delete
             && self.complete
             && entry.readers == 0
@@ -764,7 +637,6 @@ mod tests {
         Transfers::start(
             Options {
                 dir: Some(dir.to_path_buf()),
-                ..Options::default()
             },
             0,
         )
@@ -846,7 +718,7 @@ mod tests {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap();
-        let up = runtime.block_on(t.upload(Some("in.cube"), None, Body::from("LUT_3D_SIZE 2")));
+        let up = runtime.block_on(t.upload(Some("in.cube"), Body::from("LUT_3D_SIZE 2")));
         assert_eq!(up.status(), StatusCode::CREATED);
         t.reserve(1, Some("out.bin"));
         let (input, output) = {

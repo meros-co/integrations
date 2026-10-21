@@ -147,9 +147,9 @@ fn u32_at(b: &[u8], at: usize) -> Option<u32> {
 }
 
 /// Every file member of an archive (directories left out), in central
-/// directory order, each read whole and its CRC checked. `limit` bounds the
-/// total of the members' uncompressed sizes.
-pub(crate) fn read(zip: &[u8], limit: usize) -> Result<Vec<(String, Vec<u8>)>, String> {
+/// directory order, each read whole and its CRC checked. A member inflates
+/// to no more than the size its entry gives.
+pub(crate) fn read(zip: &[u8]) -> Result<Vec<(String, Vec<u8>)>, String> {
     let bad = |what: &str| format!("not a zip archive the unit's app writes: {what}");
     // The end record is the last 22 bytes, unless a comment follows it.
     let floor = zip.len().saturating_sub(22 + 0xFFFF);
@@ -163,7 +163,6 @@ pub(crate) fn read(zip: &[u8], limit: usize) -> Result<Vec<(String, Vec<u8>)>, S
         return Err(bad("zip64 is not read"));
     }
     let mut members = Vec::new();
-    let mut total = 0usize;
     for _ in 0..count {
         if u32_at(zip, at) != Some(CENTRAL) {
             return Err(bad("broken central directory"));
@@ -191,10 +190,6 @@ pub(crate) fn read(zip: &[u8], limit: usize) -> Result<Vec<(String, Vec<u8>)>, S
         }
         if packed == 0xFFFF_FFFF || size == 0xFFFF_FFFF {
             return Err(bad("zip64 is not read"));
-        }
-        total = total.saturating_add(size);
-        if total > limit {
-            return Err(format!("the archive holds more than {limit} bytes"));
         }
         if u32_at(zip, local) != Some(LOCAL) {
             return Err(bad("broken local header"));
@@ -260,7 +255,7 @@ mod tests {
             ],
             0,
         );
-        let members = read(&zip, 1 << 20).unwrap();
+        let members = read(&zip).unwrap();
         assert_eq!(members.len(), 2);
         assert_eq!(members[0], ("GPISettings".into(), b"gpi".to_vec()));
         assert_eq!(members[1], ("presets/Studio A".into(), big));
@@ -269,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn corrupt_and_oversized_archives_are_refused() {
+    fn corrupt_archives_are_refused() {
         let zip = write(
             &[Member {
                 name: "SavedSettings",
@@ -277,11 +272,10 @@ mod tests {
             }],
             0,
         );
-        assert!(read(&zip, 3).unwrap_err().contains("more than 3 bytes"));
-        let mut broken = zip.clone();
+        let mut broken = zip;
         // The stored data's first byte.
         broken[30 + "SavedSettings".len()] ^= 0xFF;
-        assert!(read(&broken, 100).unwrap_err().contains("CRC"));
-        assert!(read(b"not a zip", 100).is_err());
+        assert!(read(&broken).unwrap_err().contains("CRC"));
+        assert!(read(b"not a zip").is_err());
     }
 }

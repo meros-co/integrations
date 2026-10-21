@@ -134,10 +134,6 @@ const MODE_AUDIO: u16 = 0x0100;
 const MODE_LABEL: u16 = 0x0201;
 const MODE_MACRO: u16 = 0x0300;
 
-const MAX_MACRO: u64 = 1 << 20;
-const MAX_AUDIO: u64 = 256 << 20;
-const MAX_LABEL: u64 = 1 << 20;
-
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Format {
     Png,
@@ -500,7 +496,9 @@ fn encode_upload(prep: Prep, file: Vec<u8>) -> Result<Vec<u8>, String> {
             (file.len(), md5(&file), false, file)
         }
     };
-    let raw_len = u32::try_from(raw_len).map_err(|_| "the file is too large".to_string())?;
+    // FTSD gives the size in 32 bits: the protocol's own bound, not ours.
+    let raw_len = u32::try_from(raw_len)
+        .map_err(|_| "the file is larger than the switcher's 32-bit transfer size".to_string())?;
     let mut out = Vec::with_capacity(21 + data.len());
     out.extend_from_slice(&raw_len.to_be_bytes());
     out.extend_from_slice(&hash);
@@ -844,14 +842,10 @@ impl Atem {
             let job = self.transfers.active.as_ref().unwrap();
             self.transfer_patch(cx, job, "reading");
         } else if job.what.upload() {
-            let max = match job.what {
-                What::UploadMacro { .. } => MAX_MACRO,
-                What::UploadLabel { .. } => MAX_LABEL,
-                What::UploadAudio { .. } => MAX_AUDIO,
-                // A PNG can be a little larger than the raw frame.
-                _ => job.frame_bytes() as u64 * 2 + (1 << 20),
-            };
-            cx.file_read(READ, job.paths[job.unit].clone(), max);
+            // Whatever its size: a picture is checked against the video
+            // mode once decoded, and anything else the switcher refuses is
+            // the transfer's error.
+            cx.file_read(READ, job.paths[job.unit].clone());
             self.transfers.step = Some(Step::Reading);
             let job = self.transfers.active.as_ref().unwrap();
             self.transfer_patch(cx, job, "reading");
@@ -1394,16 +1388,13 @@ impl Atem {
         t.activity = now;
         let id = t.id;
         let job = t.active.as_mut().unwrap();
-        let cap = if job.what.frames() {
-            job.frame_bytes() + 64
-        } else {
-            MAX_MACRO as usize
-        };
         job.data.extend_from_slice(data);
         job.bytes += data.len() as u64;
         job.chunks += 1;
         let index = job.what.index(job.unit) as u8;
-        let over = job.data.len() > cap;
+        // A frame's data, run-length encoded, is never longer than the
+        // frame: more means the stream is broken. A macro has no such bound.
+        let over = job.what.frames() && job.data.len() > job.frame_bytes() + 64;
         let report = job.chunks % 256 == 1;
         t.acks.push((id, index));
         if over {

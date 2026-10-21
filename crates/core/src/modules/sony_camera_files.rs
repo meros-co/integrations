@@ -49,9 +49,8 @@ const RESULT_TIMEOUT: Millis = 120_000;
 const DELETE_TIMEOUT: Millis = 30_000;
 /// The reference asks for this much time between deletions.
 const DELETE_SPACING: Millis = 600;
-/// Uploads are read whole; nothing documented comes near this.
-const MAX_UPLOAD: u64 = 64 * 1024 * 1024;
-/// A custom grid line file of dataset version 1.00 is at most 1 MB.
+/// A custom grid line file of dataset version 1.00 is at most 1 MB (the
+/// camera's documented format, checked before the file is sent).
 const MAX_GRID_LINE: u64 = 1024 * 1024;
 const MAX_FILE_NAME: usize = 255;
 
@@ -293,7 +292,6 @@ impl SonyCamera {
         id: CommandId,
         kind: UploadKind,
         params: &Params,
-        max: u64,
     ) -> Result<Plan, CommandError> {
         if self.upload.is_some() {
             return Err(refused("busy", "another upload is in progress"));
@@ -315,7 +313,6 @@ impl SonyCamera {
                 result: None,
             },
             path,
-            max,
         ))
     }
 
@@ -366,37 +363,27 @@ impl SonyCamera {
                     self.require_enabled(0xD08B, "import a LUT")?;
                     self.command_version(0xD059, "import a LUT", true)?;
                     let index = index("user_base_look", 16)? as u16;
-                    self.upload(
-                        id,
-                        UploadKind::Lut { index },
-                        params,
-                        self.largest_dataset().unwrap_or(MAX_UPLOAD),
-                    )
+                    self.upload(id, UploadKind::Lut { index }, params)
                 }
                 "import_scene_file" => {
                     self.command_version(0xE0E6, "import a scene file", false)?;
                     self.require_enabled(0xE101, "import a scene file")?;
                     let index = index("scene", 16)? as u32;
-                    self.upload(
-                        id,
-                        UploadKind::Scene { index },
-                        params,
-                        self.largest_dataset().unwrap_or(MAX_UPLOAD),
-                    )
+                    self.upload(id, UploadKind::Scene { index }, params)
                 }
                 "import_grid_line_file" => {
                     self.command_version(0xE110, "import a grid line file", false)?;
                     let index = index("custom", 4)? as u8 + 0x10;
-                    self.upload(id, UploadKind::GridLine { index }, params, MAX_GRID_LINE)
+                    self.upload(id, UploadKind::GridLine { index }, params)
                 }
                 "import_camera_settings" => {
                     self.require_enabled(0xD272, "read a camera-setting file")?;
-                    self.upload(id, UploadKind::CameraSettings, params, MAX_UPLOAD)
+                    self.upload(id, UploadKind::CameraSettings, params)
                 }
                 "import_ftp_settings_file" => {
                     self.require_enabled(0xD275, "read an FTP-setting file")?;
                     let password = Self::ftp_password(params)?;
-                    self.upload(id, UploadKind::FtpSettings { password }, params, MAX_UPLOAD)
+                    self.upload(id, UploadKind::FtpSettings { password }, params)
                 }
                 "apply_settings_file" => {
                     self.require_enabled(0xE081, "take a general setting file")?;
@@ -405,7 +392,7 @@ impl SonyCamera {
                     } else {
                         2
                     };
-                    self.upload(id, UploadKind::General { control }, params, MAX_UPLOAD)
+                    self.upload(id, UploadKind::General { control }, params)
                 }
                 "export_camera_settings" => {
                     self.require_enabled(0xD271, "save a camera-setting file")?;
@@ -509,9 +496,9 @@ impl SonyCamera {
     }
 
     /// Starts an upload: the host file is read first.
-    pub(super) fn begin_upload(&mut self, cx: &mut Cx, upload: Upload, path: String, max: u64) {
+    pub(super) fn begin_upload(&mut self, cx: &mut Cx, upload: Upload, path: String) {
         self.upload = Some(upload);
-        cx.file_read(READ, path, max);
+        cx.file_read(READ, path);
     }
 
     /// The host file of an upload has been read: check it and send it.

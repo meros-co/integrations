@@ -90,8 +90,8 @@ const SILENCE: Millis = 10_000;
 const LIVENESS_EVERY: Millis = 10_000;
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
-/// The most `read_clip` returns at once.
-const MAX_READ: u64 = 16 << 20;
+/// What `read_clip` reads when no length is given (the spec's default).
+const DEFAULT_READ: u64 = 1 << 20;
 
 /// Status document fields copied into state under the same name.
 const SAME_NAME: &[&str] = &[
@@ -1071,8 +1071,8 @@ impl MerosCamera {
         let length = p
             .get("length")
             .and_then(Value::as_u64)
-            .unwrap_or(MAX_READ)
-            .clamp(1, MAX_READ);
+            .unwrap_or(DEFAULT_READ)
+            .max(1);
         let last = offset
             .checked_add(length - 1)
             .ok_or_else(|| invalid("offset and length run past 2^64"))?;

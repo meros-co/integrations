@@ -720,21 +720,11 @@ impl Session {
                         w.close();
                     }
                 }
-                Action::FileRead {
-                    file,
-                    path,
-                    max_bytes,
-                } => {
+                Action::FileRead { file, path } => {
                     let generation = self.next_generation;
                     self.next_generation += 1;
                     self.reads.insert(file, generation);
-                    crate::files::read(
-                        file,
-                        generation,
-                        path.into(),
-                        max_bytes,
-                        self.inbound_tx.clone(),
-                    );
+                    crate::files::read(file, generation, path.into(), self.inbound_tx.clone());
                 }
                 Action::Compute { key, task } => {
                     let generation = self.next_generation;

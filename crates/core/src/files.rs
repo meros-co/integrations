@@ -110,14 +110,8 @@ pub(crate) fn open(
 }
 
 /// Read `path` whole on a thread and report it as `Read`, or `Failed` when it
-/// is missing, unreadable or larger than `max_bytes`.
-pub(crate) fn read(
-    file: Key,
-    generation: u64,
-    path: PathBuf,
-    max_bytes: u64,
-    inbound: mpsc::Sender<Inbound>,
-) {
+/// is missing or unreadable, whatever its size.
+pub(crate) fn read(file: Key, generation: u64, path: PathBuf, inbound: mpsc::Sender<Inbound>) {
     std::thread::spawn(move || {
         let failed = |e: String| FileInput::Failed {
             message: format!("{}: {e}", path.display()),
@@ -125,9 +119,6 @@ pub(crate) fn read(
         let input = match std::fs::metadata(&path) {
             Err(e) => failed(e.to_string()),
             Ok(m) if !m.is_file() => failed("not a file".into()),
-            Ok(m) if m.len() > max_bytes => {
-                failed(format!("{} bytes, more than {max_bytes}", m.len()))
-            }
             Ok(_) => match std::fs::read(&path) {
                 Ok(data) => FileInput::Read { data },
                 Err(e) => failed(e.to_string()),
@@ -209,13 +200,13 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn files_are_read_whole_up_to_a_limit() {
+    async fn files_are_read_whole_whatever_their_size() {
         let dir = std::env::temp_dir().join(format!("meros-read-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("look.cube");
         std::fs::write(&path, b"LUT_3D_SIZE 2").unwrap();
         let (tx, mut rx) = mpsc::channel(8);
-        read("lut", 1, path.clone(), 1024, tx.clone());
+        read("lut", 1, path.clone(), tx.clone());
         match rx.recv().await {
             Some(Inbound::File {
                 input: FileInput::Read { data },
@@ -223,7 +214,19 @@ mod tests {
             }) => assert_eq!(data, b"LUT_3D_SIZE 2"),
             _ => panic!("expected the file"),
         }
-        read("lut", 2, path, 4, tx);
+        // Larger than any cap a caller once set: read all the same.
+        let big = dir.join("macro.xml");
+        let data: Vec<u8> = (0..3 * 1024 * 1024 + 7).map(|i| (i % 251) as u8).collect();
+        std::fs::write(&big, &data).unwrap();
+        read("big", 2, big, tx.clone());
+        match rx.recv().await {
+            Some(Inbound::File {
+                input: FileInput::Read { data: got },
+                ..
+            }) => assert!(got == data),
+            _ => panic!("expected the large file"),
+        }
+        read("lut", 3, dir.join("missing.cube"), tx);
         assert!(matches!(
             rx.recv().await,
             Some(Inbound::File {

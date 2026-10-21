@@ -2228,7 +2228,7 @@ naming a real path:
 |---|---|
 | `POST /v1/files?name=<name>` | Streams the request body to a new file. 201 with `{file, name, path, size}`: `file` is an opaque id (32 hex digits), `path` is `transfer:<file>` |
 | `POST /v1/files/reserve` `{count?, name?}` | Ids for files a command will write (`count` 1 to 65535, default 1). 201 with `{files: [...]}` |
-| `GET /v1/files` | `{files, used, quota, max_file, expiry_s}`; each file with its `size`, whether it is `written` yet and `idle_ms` |
+| `GET /v1/files` | `{files, used}`; each file with its `size` and whether it is `written` yet; `used` is their total in bytes |
 | `GET /v1/files/<file>` | The file's bytes (`application/octet-stream`); 404 until written. `?delete=true` removes it once sent in full |
 | `DELETE /v1/files/<file>` | `{deleted: true}`; 409 while it is being downloaded |
 
@@ -2247,15 +2247,19 @@ given), so a command that defaults a name from the file or checks its
 extension sees the client's. Only ids the service handed out are joined to
 the folder's path, and a link in the folder is never followed.
 
-An upload over the size limit (`--transfer-max-file`, default 512 MiB,
-enough for an 8K PNG with 16-bit RGBA, at most about 266 MB, and about 31
-minutes of a clip's 48 kHz 24-bit stereo audio) or that would take the folder
-over its quota (`--transfer-quota`, default 4 GiB) is refused with 413,
-`too_large` or `quota_exceeded`, and nothing of it is kept. A reservation is
-refused with 413 while the folder is full; a device's download is not cut
-off, but counts toward the quota once written. Files are kept until deleted,
-fetched with `?delete=true`, or unused (not uploaded, fetched, named in a
-command or written by a device) for the expiry (`--transfer-expiry`, default
-3600 s). The folder (`--transfer-dir`, default
+The service sets no limit on a file's size, on the folder's total or on how
+long a file is kept: uploads and downloads are streamed with no length
+assumed, whether the body comes with a length or chunked, and the only bound
+is the host's disk. Limiting what a client may send, and removing files it no
+longer needs, is the client's call: a file is kept until it is deleted or
+fetched with `?delete=true`. An upload cut off before its end is not kept.
+`POST /v1/execute` has no body limit either, since a command's `binary`
+parameters (§4, "Binary request bodies") carry a file's bytes in it.
+The folder (`--transfer-dir`, default
 `<temp>/meros-integrations-transfer-<port>`) is cleared of its ids at startup
 and on a clean stop.
+
+The core likewise sets no limit of its own on a host file a command reads or
+writes: a device's own limits (an ATEM's media pool, a Sony camera's largest
+operation) are the device's, and its refusal is the command's or the
+transfer's error.

@@ -382,11 +382,11 @@ pub enum Action {
     },
     /// Read a whole file on the host, for an upload (a LUT, a scene file).
     /// Reported as `FileInput::Read`, or `Failed` for a missing or unreadable
-    /// file or one larger than `max_bytes`.
+    /// file. No size is refused here: what the file may hold is the
+    /// device's to judge.
     FileRead {
         file: Key,
         path: String,
-        max_bytes: u64,
     },
     TcpClose {
         socket: Key,
@@ -614,11 +614,10 @@ impl Cx {
     }
 
     /// Read a whole file on the host; see [`Action::FileRead`].
-    pub fn file_read(&mut self, file: Key, path: impl Into<String>, max_bytes: u64) {
+    pub fn file_read(&mut self, file: Key, path: impl Into<String>) {
         self.push(Action::FileRead {
             file,
             path: path.into(),
-            max_bytes,
         });
     }
 

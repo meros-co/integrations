@@ -37,8 +37,6 @@ pub(crate) const REPLY_WITHIN: Millis = 15_000;
 pub(crate) const STALL: Millis = 30_000;
 /// The longest wait for QUIT's answer before closing anyway.
 const QUIT_WITHIN: Millis = 2_000;
-/// The largest directory listing taken.
-const MAX_LISTING: usize = 16 << 20;
 /// A control line longer than this is not FTP.
 const MAX_LINE: usize = 64 << 10;
 
@@ -892,12 +890,6 @@ impl Lane {
                 cx.set_timer(self.keys.timer, STALL);
                 match self.op.clone() {
                     Some(Op::List { .. }) => {
-                        if self.xfer.listing.len() + data.len() > MAX_LISTING {
-                            return self.fail(
-                                cx,
-                                Failure::Transport("the listing is larger than 16 MiB".into()),
-                            );
-                        }
                         self.xfer.listing.extend_from_slice(&data);
                     }
                     Some(Op::Download { host, .. }) => {

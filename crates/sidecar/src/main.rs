@@ -8,8 +8,7 @@
 //! ```text
 //! meros-integrations serve [--listen 127.0.0.1:47800] [--token-file PATH]
 //!                          [--bind-address ADDR] [--devices ID,ID,...]
-//!                          [--transfer-dir PATH] [--transfer-max-file BYTES]
-//!                          [--transfer-quota BYTES] [--transfer-expiry SECONDS]
+//!                          [--transfer-dir PATH]
 //! ```
 //!
 //! `--devices` names the only integrations the service works with (spec ids,
@@ -38,7 +37,7 @@
 //! | GET  /v1/devices/{device}/streams/{stream}.frames |                  | preview frames, until closed |
 //! | POST /v1/files               | the file's bytes; ?name=              | 201 {file, name, path, size} |
 //! | POST /v1/files/reserve       | {count?, name?}                       | 201 {files: [...]}         |
-//! | GET  /v1/files               |                                       | {files, used, quota, max_file, expiry_s} |
+//! | GET  /v1/files               |                                       | {files, used}              |
 //! | GET  /v1/files/{file}        | ?delete=true                          | the file's bytes           |
 //! | DELETE /v1/files/{file}      |                                       | {deleted: true}            |
 //!
@@ -120,9 +119,9 @@
 //!   snapshot reads `transfer:<id>` again.
 //! - `GET /v1/files/{file}` fetches a file once it is written (404 until
 //!   then); with `?delete=true` it is removed once sent in full. `GET
-//!   /v1/files` lists the files with their size, whether a device has written
-//!   them yet, and how long they have been idle. `DELETE /v1/files/{file}`
-//!   removes one (409 while it is being downloaded).
+//!   /v1/files` lists the files with their size and whether a device has
+//!   written them yet, and `used`, their total in bytes. `DELETE
+//!   /v1/files/{file}` removes one (409 while it is being downloaded).
 //!
 //! Each file is kept at `<folder>/<id>/<name>`, the name the client gave with
 //! only letters, digits, space and `._()-` kept, so a command that defaults a
@@ -131,21 +130,19 @@
 //! the folder's path, a link in the folder is never followed, and anything
 //! else in the folder is left alone. An ATEM or HyperDeck transfer answers
 //! with its number at once and reads or writes the file afterwards: fetch an
-//! output after its `transfer_finished` event. A HyperDeck clip larger than
-//! `--transfer-max-file` needs the limit (and the quota) raised.
+//! output after its `transfer_finished` event.
 //!
-//! An upload over `--transfer-max-file` (default 512 MiB: an 8K PNG with
-//! 16-bit RGBA is at most about 266 MB, and 512 MiB also holds about 31
-//! minutes of 48 kHz 24-bit stereo clip audio) or one that would take the
-//! folder over `--transfer-quota` (default 4 GiB) is refused with 413,
-//! `too_large` or `quota_exceeded`, and nothing of it is kept; a reservation
-//! is refused with 413 while the folder is full. A device's download is not
-//! cut off by the quota, but counts toward it once written. A file the
-//! client neither uploaded, fetched, named in a command nor had written by a
-//! device for `--transfer-expiry` seconds (default 3600) is removed, so set
-//! it above the longest transfer. The folder (`--transfer-dir`, default
-//! `<temp>/meros-integrations-transfer-<port>`) is cleared of its ids at
-//! startup and on a clean stop; give each service on a host its own.
+//! The service sets no limit on a file's size, on the folder's total or on
+//! how long a file is kept: uploads and downloads are streamed with no
+//! length assumed (a HyperDeck clip can be far larger than any fixed limit), and
+//! a file stays until the client deletes it or fetches it with
+//! `?delete=true`. Limiting what a client may send, and removing what it
+//! no longer needs, is the client's call; the only bound is the disk. An
+//! upload cut off before its end is not kept. `/v1/execute` has no body
+//! limit either, since a command's `binary` params carry a file's bytes
+//! (base64) in it. The folder (`--transfer-dir`,
+//! default `<temp>/meros-integrations-transfer-<port>`) is cleared of its
+//! ids at startup and on a clean stop; give each service on a host its own.
 //! These routes take the token in the header only.
 //!
 //! Events are one queue: run one event consumer per service. Their kinds and
@@ -166,7 +163,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Body;
-use axum::extract::{Path, Query, State};
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::{header, HeaderMap, HeaderName, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -374,11 +371,7 @@ async fn upload_file(
     if !authorized(&app, &headers) {
         return unauthorized();
     }
-    let length = headers
-        .get(header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse().ok());
-    app.transfers.upload(q.name.as_deref(), length, body).await
+    app.transfers.upload(q.name.as_deref(), body).await
 }
 
 #[derive(Deserialize)]
@@ -655,7 +648,12 @@ fn router(app: Shared) -> Router {
         .route("/v1/catalog", get(catalog))
         .route("/v1/open", post(open))
         .route("/v1/discover", post(discover))
-        .route("/v1/execute", post(execute))
+        // A command's `binary` params carry a file's bytes in the JSON body
+        // (a show file, a still): no limit beyond the host's own.
+        .route(
+            "/v1/execute",
+            post(execute).layer(DefaultBodyLimit::disable()),
+        )
         .route("/v1/settings", post(settings))
         .route("/v1/snapshot/{device}", get(snapshot))
         .route("/v1/close", post(close))
@@ -663,6 +661,7 @@ fn router(app: Shared) -> Router {
         .route("/v1/reconnect_all", post(reconnect_all))
         .route("/v1/events", get(events))
         .route("/v1/devices/{device}/streams/{file}", get(device_stream))
+        // Uploads take the raw body as a stream: no body limit applies.
         .route("/v1/files", get(list_files).post(upload_file))
         .route("/v1/files/reserve", post(reserve_files))
         .route("/v1/files/{file}", get(download_file).delete(delete_file))
@@ -693,14 +692,7 @@ struct Args {
     transfer: transfer::Options,
 }
 
-const USAGE: &str = "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH] [--bind-address ADDR] [--devices ID,ID,...] [--transfer-dir PATH] [--transfer-max-file BYTES] [--transfer-quota BYTES] [--transfer-expiry SECONDS]";
-
-fn positive(flag: &str, value: &str) -> Result<u64, String> {
-    match value.parse::<u64>() {
-        Ok(n) if n > 0 => Ok(n),
-        _ => Err(format!("{flag}: a whole number above 0")),
-    }
-}
+const USAGE: &str = "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH] [--bind-address ADDR] [--devices ID,ID,...] [--transfer-dir PATH]";
 
 fn parse_args() -> Result<Args, String> {
     let mut args = std::env::args().skip(1);
@@ -729,9 +721,6 @@ fn parse_args() -> Result<Args, String> {
             }
             // The transfer folder (see `transfer.rs`).
             "--transfer-dir" => transfer.dir = Some(PathBuf::from(value)),
-            "--transfer-max-file" => transfer.max_file = positive(&flag, &value)?,
-            "--transfer-quota" => transfer.quota = positive(&flag, &value)?,
-            "--transfer-expiry" => transfer.expiry = Duration::from_secs(positive(&flag, &value)?),
             other => return Err(format!("unknown flag {other}")),
         }
     }
@@ -775,7 +764,6 @@ fn main() {
             eprintln!("cannot set up the transfer folder: {e}");
             std::process::exit(1);
         });
-        transfers.spawn_sweeper();
         // One line for supervisors and tests: where it is listening.
         println!("{}", json!({"listening": local.to_string()}));
         let app = Arc::new(App {
