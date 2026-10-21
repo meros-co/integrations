@@ -8,6 +8,8 @@
 //! ```text
 //! meros-integrations serve [--listen 127.0.0.1:47800] [--token-file PATH]
 //!                          [--bind-address ADDR] [--devices ID,ID,...]
+//!                          [--transfer-dir PATH] [--transfer-max-file BYTES]
+//!                          [--transfer-quota BYTES] [--transfer-expiry SECONDS]
 //! ```
 //!
 //! `--devices` names the only integrations the service works with (spec ids,
@@ -34,6 +36,11 @@
 //! | GET  /v1/devices/{device}/streams/{stream}.mjpg |                    | MJPEG, until closed        |
 //! | GET  /v1/devices/{device}/streams/{stream}.jpg  | ?wait_ms=5000      | the newest JPEG            |
 //! | GET  /v1/devices/{device}/streams/{stream}.frames |                  | preview frames, until closed |
+//! | POST /v1/files               | the file's bytes; ?name=              | 201 {file, name, path, size} |
+//! | POST /v1/files/reserve       | {count?, name?}                       | 201 {files: [...]}         |
+//! | GET  /v1/files               |                                       | {files, used, quota, max_file, expiry_s} |
+//! | GET  /v1/files/{file}        | ?delete=true                          | the file's bytes           |
+//! | DELETE /v1/files/{file}      |                                       | {deleted: true}            |
 //!
 //! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
 //! (Sony cameras), `pjlink` (PJLink projectors) and `mdns` (Blackmagic ATEM,
@@ -93,6 +100,53 @@
 //! does not carry, such as `.frames` for a `jpeg` stream or `.mjpg` for a
 //! `meros-preview` one).
 //!
+//! The transfer folder carries files to and from device commands that read
+//! or write a file on the host running the service (an ATEM's
+//! `upload_still`, `download_clip` or `upload_macro`, a Sony camera's
+//! `import_lut`, `export_scene_file` or `download_content`), so a client on another machine can
+//! run them. The client never names a real path:
+//!
+//! - `POST /v1/files?name=still.png` streams the request body (sent as is,
+//!   any content type, with a length or chunked) to a new file and answers
+//!   201 with its `file` id (32 hex digits) and `path`, `transfer:<id>`.
+//! - `POST /v1/files/reserve` with `{"count": 3, "name": "frame.png"}` hands
+//!   out ids for files a command will write (`count` 1 to 65535, default 1).
+//! - A command's string param whose line is `transfer:<id>` gets that file's
+//!   real path in its place before the command reaches the core: `{"path":
+//!   "transfer:<id>"}`, or one per line in a multi-line param such as
+//!   `download_clip`'s `paths`. Other lines are passed on unchanged. An id the
+//!   service did not hand out refuses the command with `invalid_params`.
+//!   Every real path of the folder in a command's result, an event or a
+//!   snapshot reads `transfer:<id>` again.
+//! - `GET /v1/files/{file}` fetches a file once it is written (404 until
+//!   then); with `?delete=true` it is removed once sent in full. `GET
+//!   /v1/files` lists the files with their size, whether a device has written
+//!   them yet, and how long they have been idle. `DELETE /v1/files/{file}`
+//!   removes one (409 while it is being downloaded).
+//!
+//! Each file is kept at `<folder>/<id>/<name>`, the name the client gave with
+//! only letters, digits, space and `._()-` kept, so a command that defaults a
+//! name from the file (an ATEM still's) or checks its extension (a `.cube`
+//! LUT) sees the client's. Only ids the service handed out are ever joined to
+//! the folder's path, a link in the folder is never followed, and anything
+//! else in the folder is left alone. An ATEM transfer answers with its number
+//! at once and reads or writes the file afterwards: fetch an output after its
+//! `transfer_finished` event.
+//!
+//! An upload over `--transfer-max-file` (default 512 MiB: an 8K PNG with
+//! 16-bit RGBA is at most about 266 MB, and 512 MiB also holds about 31
+//! minutes of 48 kHz 24-bit stereo clip audio) or one that would take the
+//! folder over `--transfer-quota` (default 4 GiB) is refused with 413,
+//! `too_large` or `quota_exceeded`, and nothing of it is kept; a reservation
+//! is refused with 413 while the folder is full. A device's download is not
+//! cut off by the quota, but counts toward it once written. A file the
+//! client neither uploaded, fetched, named in a command nor had written by a
+//! device for `--transfer-expiry` seconds (default 3600) is removed, so set
+//! it above the longest transfer. The folder (`--transfer-dir`, default
+//! `<temp>/meros-integrations-transfer-<port>`) is cleared of its ids at
+//! startup and on a clean stop; give each service on a host its own.
+//! These routes take the token in the header only.
+//!
 //! Events are one queue: run one event consumer per service. Their kinds and
 //! shapes are those of every delivery (SPEC.md, Events), including `message`
 //! events from a listener such as `osc-listener`, which a POST /v1/open opens
@@ -120,6 +174,9 @@ use meros_integrations::{json as api, Core};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+mod transfer;
+use transfer::Transfers;
+
 const DEFAULT_LISTEN: &str = "127.0.0.1:47800";
 /// Long-poll ceiling, under common HTTP client timeouts.
 const MAX_WAIT: Duration = Duration::from_secs(25);
@@ -127,6 +184,7 @@ const MAX_WAIT: Duration = Duration::from_secs(25);
 struct App {
     core: Core,
     token: String,
+    transfers: Arc<Transfers>,
 }
 
 type Shared = Arc<App>;
@@ -205,7 +263,13 @@ async fn execute(
     if !authorized(&app, &headers) {
         return unauthorized();
     }
-    Json(api::execute(&app.core, body.device, &body.command, &body.params).await).into_response()
+    let params = match app.transfers.resolve(&body.params) {
+        Ok(params) => params,
+        Err(refusal) => return Json(refusal).into_response(),
+    };
+    let mut result = api::execute(&app.core, body.device, &body.command, &params).await;
+    app.transfers.hide(&mut result);
+    Json(result).into_response()
 }
 
 async fn snapshot(
@@ -216,7 +280,9 @@ async fn snapshot(
     if !authorized(&app, &headers) {
         return unauthorized();
     }
-    Json(api::snapshot(&app.core, device)).into_response()
+    let mut snapshot = api::snapshot(&app.core, device);
+    app.transfers.hide(&mut snapshot);
+    Json(snapshot).into_response()
 }
 
 #[derive(Deserialize)]
@@ -288,7 +354,88 @@ async fn events(
     let events = tokio::time::timeout(wait, app.core.next_events(max))
         .await
         .unwrap_or_default();
-    Json(api::events(&events)).into_response()
+    let mut events = api::events(&events);
+    app.transfers.hide(&mut events);
+    Json(events).into_response()
+}
+
+#[derive(Deserialize)]
+struct UploadQuery {
+    name: Option<String>,
+}
+
+async fn upload_file(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Query(q): Query<UploadQuery>,
+    body: Body,
+) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    let length = headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse().ok());
+    app.transfers.upload(q.name.as_deref(), length, body).await
+}
+
+#[derive(Deserialize)]
+struct Reserve {
+    #[serde(default = "one")]
+    count: u64,
+    name: Option<String>,
+}
+
+fn one() -> u64 {
+    1
+}
+
+async fn reserve_files(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Json(body): Json<Reserve>,
+) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    app.transfers.reserve(body.count, body.name.as_deref())
+}
+
+async fn list_files(State(app): State<Shared>, headers: HeaderMap) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    app.transfers.list()
+}
+
+#[derive(Deserialize)]
+struct DownloadQuery {
+    #[serde(default)]
+    delete: bool,
+}
+
+async fn download_file(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Path(file): Path<String>,
+    Query(q): Query<DownloadQuery>,
+) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    app.transfers.download(&file, q.delete).await
+}
+
+async fn delete_file(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Path(file): Path<String>,
+) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    app.transfers.delete(&file)
 }
 
 #[derive(Deserialize)]
@@ -515,6 +662,9 @@ fn router(app: Shared) -> Router {
         .route("/v1/reconnect_all", post(reconnect_all))
         .route("/v1/events", get(events))
         .route("/v1/devices/{device}/streams/{file}", get(device_stream))
+        .route("/v1/files", get(list_files).post(upload_file))
+        .route("/v1/files/reserve", post(reserve_files))
+        .route("/v1/files/{file}", get(download_file).delete(delete_file))
         .with_state(app)
 }
 
@@ -539,21 +689,28 @@ struct Args {
     listen: SocketAddr,
     token_file: PathBuf,
     options: meros_integrations::CoreOptions,
+    transfer: transfer::Options,
+}
+
+const USAGE: &str = "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH] [--bind-address ADDR] [--devices ID,ID,...] [--transfer-dir PATH] [--transfer-max-file BYTES] [--transfer-quota BYTES] [--transfer-expiry SECONDS]";
+
+fn positive(flag: &str, value: &str) -> Result<u64, String> {
+    match value.parse::<u64>() {
+        Ok(n) if n > 0 => Ok(n),
+        _ => Err(format!("{flag}: a whole number above 0")),
+    }
 }
 
 fn parse_args() -> Result<Args, String> {
     let mut args = std::env::args().skip(1);
     match args.next().as_deref() {
         Some("serve") => {}
-        _ => {
-            return Err(
-                "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH] [--bind-address ADDR] [--devices ID,ID,...]".into(),
-            )
-        }
+        _ => return Err(USAGE.into()),
     }
     let mut listen: SocketAddr = DEFAULT_LISTEN.parse().unwrap();
     let mut token_file = PathBuf::from("meros-integrations.token");
     let mut options = meros_integrations::CoreOptions::new();
+    let mut transfer = transfer::Options::default();
     while let Some(flag) = args.next() {
         let value = args.next().ok_or(format!("{flag} needs a value"))?;
         match flag.as_str() {
@@ -569,6 +726,11 @@ fn parse_args() -> Result<Args, String> {
                 options =
                     options.devices(value.split(',').map(str::trim).filter(|id| !id.is_empty()))
             }
+            // The transfer folder (see `transfer.rs`).
+            "--transfer-dir" => transfer.dir = Some(PathBuf::from(value)),
+            "--transfer-max-file" => transfer.max_file = positive(&flag, &value)?,
+            "--transfer-quota" => transfer.quota = positive(&flag, &value)?,
+            "--transfer-expiry" => transfer.expiry = Duration::from_secs(positive(&flag, &value)?),
             other => return Err(format!("unknown flag {other}")),
         }
     }
@@ -576,6 +738,7 @@ fn parse_args() -> Result<Args, String> {
         listen,
         token_file,
         options,
+        transfer,
     })
 }
 
@@ -606,12 +769,19 @@ fn main() {
                 eprintln!("cannot listen on {}: {e}", args.listen);
                 std::process::exit(1);
             });
+        let local = listener.local_addr().unwrap();
+        let transfers = Transfers::start(args.transfer, local.port()).unwrap_or_else(|e| {
+            eprintln!("cannot set up the transfer folder: {e}");
+            std::process::exit(1);
+        });
+        transfers.spawn_sweeper();
         // One line for supervisors and tests: where it is listening.
-        println!(
-            "{}",
-            json!({"listening": listener.local_addr().unwrap().to_string()})
-        );
-        let app = Arc::new(App { core, token });
+        println!("{}", json!({"listening": local.to_string()}));
+        let app = Arc::new(App {
+            core,
+            token,
+            transfers,
+        });
         let (stop, stopping) = tokio::sync::watch::channel(false);
         let signalled = app.clone();
         tokio::spawn(async move {
@@ -638,6 +808,7 @@ fn main() {
         // Then every device is closed cleanly: subscriptions and metering
         // ended, last messages written.
         app.core.close_all(CLOSE_GRACE).await;
+        app.transfers.clear();
         eprintln!("stopped");
     });
 }
