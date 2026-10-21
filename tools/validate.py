@@ -303,6 +303,10 @@ def non_string_keys(node, trail: str = "") -> list[str]:
 # The commands each native extension answers itself (SPEC.md, "Native
 # extensions"), as its module lists them.
 EXTENSION_COMMANDS = {
+    "hyperdeck-ftp": {
+        "list_files", "download_file", "upload_file", "delete_file", "rename_file",
+        "create_folder", "cancel_transfer",
+    },
     "ultimatte-preset-archive": {
         "export_presets", "import_presets", "export_preset", "import_preset",
         "export_settings", "import_settings",

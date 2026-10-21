@@ -3602,7 +3602,9 @@ impl Module for SonyCamera {
                         cx.complete(upload.id, Err(refused("file", message)));
                     }
                 }
-                FileInput::Closed { .. } | FileInput::Opened { .. } => {}
+                FileInput::Closed { .. }
+                | FileInput::Opened { .. }
+                | FileInput::Progress { .. } => {}
             }
             return;
         }
@@ -3631,8 +3633,11 @@ impl Module for SonyCamera {
             return;
         };
         match input {
-            // Reads are reported on their own key; Opened only on resuming.
-            FileInput::Read { .. } | FileInput::Opened { .. } => self.download = Some(d),
+            // Reads are reported on their own key; Opened only on resuming;
+            // Progress only for files sent, which this does not.
+            FileInput::Read { .. } | FileInput::Opened { .. } | FileInput::Progress { .. } => {
+                self.download = Some(d)
+            }
             FileInput::Closed { bytes } => {
                 let result = match d.error {
                     Some(e) => Err(refused("download_failed", e)),

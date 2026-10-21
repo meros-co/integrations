@@ -179,7 +179,8 @@ pub enum SseInput {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FileInput {
     /// A file opened with `file_open_append` is open; `bytes` is its length
-    /// before anything is appended.
+    /// before anything is appended. For a file sent with `tcp_send_file`,
+    /// it is open for reading and `bytes` is its length.
     Opened { bytes: u64 },
     /// Every chunk was written and the file closed. `bytes` is the file's
     /// length: what was written, plus, when appending, what was there before.
@@ -189,6 +190,9 @@ pub enum FileInput {
     Failed { message: String },
     /// A file asked for with `file_read`, whole.
     Read { data: Vec<u8> },
+    /// A file sent with `tcp_send_file`: `bytes` have gone out so far.
+    /// Reported every 200 ms or so while it is sent.
+    Progress { bytes: u64 },
 }
 
 /// What happens on a TCP connection.
@@ -386,6 +390,20 @@ pub enum Action {
     },
     TcpClose {
         socket: Key,
+    },
+    /// Send a host file over an open connection, after what was sent on it
+    /// before, then shut down the connection's sending side (the end of an
+    /// FTP upload); nothing sent after it goes out. The file is read a few
+    /// chunks ahead of the socket, so it streams at the peer's pace whatever
+    /// its size, while what the peer sends keeps arriving. Reported on
+    /// `file` as `FileInput::Opened` with the file's length, `Progress`
+    /// while it goes out, then `Closed` with the bytes sent,
+    /// or `Failed` (the file cannot be read, the connection is not open or
+    /// fails). Closing the connection stops it, unreported.
+    TcpSendFile {
+        socket: Key,
+        file: Key,
+        path: String,
     },
     /// Run a [`Task`] off the session's task; its result goes to
     /// [`Module::computed`] under `key`. A newer task under the same key
@@ -635,6 +653,15 @@ impl Cx {
 
     pub fn tcp_close(&mut self, socket: Key) {
         self.push(Action::TcpClose { socket });
+    }
+
+    /// Send a host file over a connection; see [`Action::TcpSendFile`].
+    pub fn tcp_send_file(&mut self, socket: Key, file: Key, path: impl Into<String>) {
+        self.push(Action::TcpSendFile {
+            socket,
+            file,
+            path: path.into(),
+        });
     }
 
     pub fn tcp_listen(&mut self, socket: Key, port: u16) {

@@ -50,6 +50,8 @@ mod easyworship;
 mod emberplus;
 #[cfg(feature = "focusrite-rednet")]
 mod focusrite_rednet;
+#[cfg(feature = "blackmagic-hyperdeck")]
+mod ftp;
 #[cfg(feature = "generic-http")]
 mod generic_http;
 #[cfg(any(feature = "generic-osc", feature = "osc-listener"))]
@@ -62,6 +64,8 @@ mod generic_osc;
 mod generic_tcp_udp;
 #[cfg(feature = "http-snapshot")]
 mod http_snapshot;
+#[cfg(feature = "blackmagic-hyperdeck")]
+mod hyperdeck_ftp;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
 #[cfg(feature = "meros-camera")]
@@ -158,6 +162,10 @@ pub(crate) fn construct(
             return Ok(Box::new(ultimatte_presets::UltimattePresets::new(
                 engine, &context,
             )));
+        }
+        #[cfg(feature = "blackmagic-hyperdeck")]
+        if extension == Some("hyperdeck-ftp") {
+            return Ok(Box::new(hyperdeck_ftp::HyperdeckFtp::new(engine, &context)));
         }
         // The other native extensions only keep state current, so a device
         // opened for commands only runs on the engine alone.
