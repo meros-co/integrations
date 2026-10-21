@@ -110,6 +110,19 @@ at `.frames` (`application/x-meros-preview`): its frames back to back in the
 camera's framing, starting on a keyframe and, after frames the reader
 missed, resuming only at the next keyframe.
 
+**Files on the host.** Some commands read or write a file on the machine
+running the core (an ATEM's still, clip, audio, macro and multiviewer label
+transfers; a Sony camera's imports, exports and downloads). A client of the
+HTTP service on another machine uploads the file with `POST /v1/files` (the
+body, streamed; `?name=` keeps its name), or reserves an output with `POST
+/v1/files/reserve`, and passes the returned `transfer:<id>` as the command's
+`path`; it fetches an output with `GET /v1/files/<id>`, lists with `GET
+/v1/files` and deletes with `DELETE /v1/files/<id>`. The service resolves the
+id inside its own transfer folder, so a client never names a host path. Each
+upload is limited to 512 MiB and the folder to 4 GiB (413 above them), files
+unused for an hour are removed, and the folder is cleared at startup; all four
+are options of `serve` (SPEC.md, HTTP service).
+
 **When resuming** after being suspended, or after the network changed, call
 `reconnect_all` (`Core::reconnect_all` in Rust, `reconnectAll` in Node,
 `reconnect_all` in Python, `mi_reconnect_all` in C, `POST /v1/reconnect_all`
