@@ -68,6 +68,23 @@ class Templates(unittest.TestCase):
         self.assertEqual(names, ["^index", "index", "^^key"])
 
 
+class QuietRules(unittest.TestCase):
+    def doc(self, transport, *rules):
+        return {"transport": {"type": transport}, "state": {"done": {"type": "bool"}},
+                "telemetry": {"updates": list(rules)}}
+
+    def test_a_quiet_rule_stands_alone_on_a_stream(self):
+        quiet = {"quiet_ms": 1000, "state": {"done": "true"}}
+        self.assertEqual(validate.telemetry_checks(self.doc("line-tcp", quiet)), [])
+        self.assertEqual(validate.telemetry_checks(self.doc("http", quiet)),
+                         ["telemetry.updates[0]: quiet_ms needs a line-tcp, osc-tcp or ws transport"])
+        self.assertIn("telemetry.updates: at most one quiet_ms rule",
+                      validate.telemetry_checks(self.doc("ws", quiet, quiet)))
+        mixed = dict(quiet, match="^END$", then_send=["X"])
+        self.assertIn("telemetry.updates[0]: a quiet_ms rule has no match, then_send",
+                      validate.telemetry_checks(self.doc("line-tcp", mixed)))
+
+
 class ExtensionCommands(unittest.TestCase):
     DOC = {"id": "x", "transport": {"type": "line-tcp"}, "extension": "ultimatte-preset-archive",
            "models": [{"id": "m", "supports": []}]}
