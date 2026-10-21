@@ -1156,6 +1156,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "endpoints": {
+              "$ref": "#/$defs/endpoints"
             }
           },
           "required": [
@@ -1228,6 +1231,9 @@
             "reply_match": {
               "type": "string",
               "description": "RE2-safe regex. A datagram matching it is a command reply; any other is unsolicited."
+            },
+            "endpoints": {
+              "$ref": "#/$defs/endpoints"
             }
           },
           "required": [
@@ -1280,6 +1286,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "endpoints": {
+              "$ref": "#/$defs/endpoints"
             }
           },
           "required": [
@@ -1309,6 +1318,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "endpoints": {
+              "$ref": "#/$defs/endpoints"
             }
           },
           "required": [
@@ -1444,88 +1456,7 @@
               }
             },
             "endpoints": {
-              "type": "object",
-              "description": "Other HTTP servers of the same device, on other ports, by name (MediaMTX's playback server on 9996). A request item names one with endpoint: it goes to the same host, on that port and scheme; the transport's credential and headers go there unless auth is none, the session never does, and its answers do not decide whether the device is connected (SPEC.md §2, Endpoints).",
-              "propertyNames": {
-                "pattern": "^[a-z0-9_]+$"
-              },
-              "additionalProperties": {
-                "type": "object",
-                "required": [
-                  "port"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "port": {
-                    "description": "The endpoint's port, or {setting: name} naming an int setting. The port given when opening the device does not change it.",
-                    "oneOf": [
-                      {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 65535
-                      },
-                      {
-                        "type": "object",
-                        "required": [
-                          "setting"
-                        ],
-                        "additionalProperties": false,
-                        "properties": {
-                          "setting": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  "scheme": {
-                    "description": "http or https, or {setting: name} naming an enum setting of the two; the transport's scheme when absent.",
-                    "oneOf": [
-                      {
-                        "enum": [
-                          "http",
-                          "https"
-                        ]
-                      },
-                      {
-                        "type": "object",
-                        "required": [
-                          "setting"
-                        ],
-                        "additionalProperties": false,
-                        "properties": {
-                          "setting": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  "auth": {
-                    "description": "inherit (the default): the transport's credential and headers go with every request to the endpoint; none: neither does. Or {setting: name} naming an enum setting of the two.",
-                    "oneOf": [
-                      {
-                        "enum": [
-                          "inherit",
-                          "none"
-                        ]
-                      },
-                      {
-                        "type": "object",
-                        "required": [
-                          "setting"
-                        ],
-                        "additionalProperties": false,
-                        "properties": {
-                          "setting": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
+              "$ref": "#/$defs/endpoints"
             },
             "auth_header": {
               "type": "string",
@@ -1754,6 +1685,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "endpoints": {
+              "$ref": "#/$defs/endpoints"
             }
           },
           "required": [
@@ -1763,6 +1697,94 @@
           "additionalProperties": false
         }
       ]
+    },
+    "endpoints": {
+      "type": "object",
+      "description": "Other HTTP servers of the same device, on other ports, by name (MediaMTX's playback server on 9996; beside a line transport, a HyperDeck's configuration API on 80). A request item names one with endpoint: it goes to the same host, on that port and scheme; the transport's credential and headers go there unless auth is none, the session never does, and its answers do not decide whether the device is connected (SPEC.md §2, Endpoints).",
+      "propertyNames": {
+        "pattern": "^[a-z0-9_]+$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "port"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "port": {
+            "description": "The endpoint's port, or {setting: name} naming an int setting. The port given when opening the device does not change it.",
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              {
+                "type": "object",
+                "required": [
+                  "setting"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "setting": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          },
+          "scheme": {
+            "description": "http or https, or {setting: name} naming an enum setting of the two; the transport's scheme when absent.",
+            "oneOf": [
+              {
+                "enum": [
+                  "http",
+                  "https"
+                ]
+              },
+              {
+                "type": "object",
+                "required": [
+                  "setting"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "setting": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          },
+          "accept_invalid_certs": {
+            "type": "boolean",
+            "description": "Over https, accept the endpoint's self-signed certificate; the http transport's choice when absent, false beside any other transport."
+          },
+          "auth": {
+            "description": "inherit (the default beside an http transport): the transport's credential and headers go with every request to the endpoint; none (the only value beside any other transport): neither does. Or {setting: name} naming an enum setting of the two.",
+            "oneOf": [
+              {
+                "enum": [
+                  "inherit",
+                  "none"
+                ]
+              },
+              {
+                "type": "object",
+                "required": [
+                  "setting"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "setting": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
     },
     "model": {
       "type": "object",
@@ -1921,6 +1943,11 @@
           "type": "boolean",
           "default": false,
           "description": "A string that may hold line breaks and other control characters, sent only through the json directive, which escapes them (SPEC.md §4, Templates)."
+        },
+        "secret": {
+          "type": "boolean",
+          "default": false,
+          "description": "A credential (a password the command sets): a consumer masks it, and the core never logs or echoes it (SPEC.md §4, Parameter types)."
         },
         "label": {
           "type": "string",
@@ -2200,9 +2227,23 @@
           "description": "RE2-safe regex; capture group 1 is the returned value."
         },
         "status": {
-          "type": "integer",
-          "minimum": 100,
-          "maximum": 599
+          "description": "The HTTP status the reply must have, or a list of statuses any of which is success.",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              }
+            }
+          ]
         },
         "json_path": {
           "type": "string",

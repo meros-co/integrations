@@ -877,6 +877,10 @@ params:
     description: Input channel to change, numbered from 1 as on the console.
 ```
 
+A parameter that is a credential (a password a command sets on the device)
+takes `secret: true`, as a setting does: the catalogue serves it, so a
+consumer masks the field, and the core never logs or echoes the value.
+
 The label is a short noun phrase in sentence case, the way a form names the
 field. The description is one plain sentence on what the value means: its
 unit, how it is numbered, what its ends or values do. It shouldn't just
