@@ -273,6 +273,9 @@ struct Topology {
     stills_used: BTreeSet<u16>,
     /// Clips in use, from 0, with their frame counts (MPCS).
     clip_frames: BTreeMap<u8, u16>,
+    /// Each clip's frames the switcher reports valid, from 0, with whether
+    /// it gave a hash for them (MPfe pools 1 and up).
+    clip_frame_hashes: BTreeMap<u8, BTreeMap<u16, bool>>,
 }
 
 pub(crate) struct Atem {
@@ -1301,22 +1304,38 @@ impl Atem {
             // `Media/MediaPoolClipDescription.ts:17-24`).
             b"MPCS" => {
                 need(68)?;
+                // A clip is reported whether valid or not: an upload makes
+                // it invalid first, so the change is worth seeing.
                 let clip = if b[1] == 1 {
                     self.topology.clip_frames.insert(b[0], u16_at(b, 66));
-                    json!({"name": text(&b[2..66]), "frames": u16_at(b, 66)})
+                    json!({"valid": true, "name": text(&b[2..66]), "frames": u16_at(b, 66)})
                 } else {
                     self.topology.clip_frames.remove(&b[0]);
-                    Value::Null
+                    json!({"valid": false, "name": null, "frames": null})
                 };
                 Some(json!({"media_pool": {"clips": {one(b[0]): clip}}}))
             }
             // Pool (0 stills), rsv, u16 index, used, hash[16], name length,
             // name (Sofie `Media/MediaPoolFrameDescription.ts:19-27`). Pools
-            // 1 and up are clip frames, not kept.
+            // 1 and up are clip n's frames (Sofie `MediaPoolFrameDescription.ts:37-45`),
+            // summed up per clip rather than listed: a clip holds up to
+            // thousands of frames.
             b"MPfe" => {
                 need(24)?;
                 if b[0] != 0 {
-                    return None;
+                    let frames = self.topology.clip_frame_hashes.entry(b[0] - 1).or_default();
+                    let index = u16_at(b, 2);
+                    if b[4] == 1 {
+                        frames.insert(index, b[5..21].iter().any(|x| *x != 0));
+                    } else {
+                        frames.remove(&index);
+                    }
+                    let valid = frames.len();
+                    let hashed = frames.values().filter(|h| **h).count();
+                    return Some(json!({"media_pool": {"clips": {one(b[0] - 1): {
+                        "frames_valid": valid,
+                        "frames_hashed": hashed,
+                    }}}}));
                 }
                 let index = u16_at(b, 2);
                 let slot = (index as u32 + 1).to_string();
@@ -4100,7 +4119,7 @@ mod tests {
         );
         assert_eq!(
             s["media_pool"]["clips"]["2"],
-            json!({"name": "Intro", "frames": 120})
+            json!({"valid": true, "name": "Intro", "frames": 120})
         );
         assert_eq!(
             s["media_pool"]["stills"]["5"],
@@ -4140,6 +4159,43 @@ mod tests {
         assert_eq!(s["cameras"]["1"]["iris"], 0.5);
         assert_eq!(s["cameras"]["1"]["white_balance"], 5600);
         assert_eq!(s["cameras"]["1"]["tint"], -10);
+    }
+
+    #[test]
+    fn clips_are_summed_up_not_listed_frame_by_frame() {
+        let (mut m, _) = ready();
+        let frame = |clip_pool: u8, index: u16, used: bool, hash: u8| {
+            let mut b = vec![0u8; 24];
+            b[0] = clip_pool;
+            put16(&mut b, 2, index);
+            b[4] = used as u8;
+            b[20] = hash;
+            cmd(b"MPfe", &b)
+        };
+        let s = decoded(
+            &mut m,
+            &[
+                frame(1, 0, true, 7),
+                frame(1, 1, true, 0),
+                frame(1, 2, true, 9),
+                frame(2, 0, true, 1),
+            ],
+        );
+        assert_eq!(
+            s["media_pool"]["clips"]["1"],
+            json!({"frames_valid": 3, "frames_hashed": 2})
+        );
+        assert_eq!(s["media_pool"]["clips"]["2"]["frames_valid"], 1);
+        // A frame cleared, and the clip made invalid: the summary follows.
+        let mut mpcs = vec![0u8; 68];
+        mpcs[0] = 0;
+        let s = decoded(&mut m, &[frame(1, 2, false, 0), cmd(b"MPCS", &mpcs)]);
+        assert_eq!(
+            s["media_pool"]["clips"]["1"],
+            json!({"frames_valid": 2, "frames_hashed": 1, "valid": false})
+        );
+        // No still was touched by clip frames.
+        assert!(s["media_pool"]["stills"].is_null());
     }
 
     #[test]

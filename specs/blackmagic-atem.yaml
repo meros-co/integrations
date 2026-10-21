@@ -3597,8 +3597,11 @@ state:
   media_players.*.at_beginning: { type: bool, description: "Clip at its first frame" }
   media_players.*.clip_frame:  { type: int, description: "Current clip frame" }
   media_pool.stills.*.name:    { type: string, description: "Still file name, keyed by slot from 1; only slots in use" }
-  media_pool.clips.*.name:     { type: string, description: "Clip name, keyed by slot from 1; only slots in use" }
-  media_pool.clips.*.frames:   { type: int, description: "Clip length in frames" }
+  media_pool.clips.*.valid:    { type: bool, description: "The clip is whole and playable (MPCS), keyed by clip from 1; false while it is empty or being uploaded" }
+  media_pool.clips.*.name:     { type: string, description: "Clip name; absent while the clip is not valid" }
+  media_pool.clips.*.frames:   { type: int, description: "Clip length in frames; absent while the clip is not valid" }
+  media_pool.clips.*.frames_valid: { type: int, description: "Frames of the clip's memory the switcher reports holding a picture (MPfe), counted rather than listed" }
+  media_pool.clips.*.frames_hashed: { type: int, description: "Of those, frames the switcher gave a hash for" }
   supersources.*.boxes.*.enabled: { type: bool, description: "Box on, keyed by SuperSource and box from 1" }
   supersources.*.boxes.*.source: { type: int, description: "Box source id" }
   supersources.*.boxes.*.x:    { type: float, description: "Box x, -48 to 48" }
@@ -4088,8 +4091,18 @@ quirks:
       still or clip audio without uploading again (Blackmagic's SDK has
       both, through calls whose messages are not documented), and canceling
       on the switcher's side (cancel_transfer stops sending or acknowledging
-      and lets go of the lock). capture_still, clear_still, clear_clip and
-      set_clip manage the pool without a transfer.
+      and lets go of the lock). Clip audio's validity, name and hash are not
+      in the state for the same reason. capture_still, clear_still,
+      clear_clip and set_clip manage the pool without a transfer.
+
+  - models: [all]
+    severity: info
+    text: >
+      A clip's state is a summary, not a list of its frames (a clip holds up
+      to thousands): whether it is valid with its name and length, and how
+      many of its frames the switcher reports holding a picture
+      (frames_valid) and giving a hash for (frames_hashed). While an upload
+      runs, valid is false and frames_valid rises frame by frame.
 
   - models: [all]
     severity: info
