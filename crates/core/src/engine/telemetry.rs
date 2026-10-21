@@ -116,6 +116,11 @@ enum Matcher {
     /// them. For CGI devices that answer `key=value` lines whose keys other
     /// replies share (Panasonic's `status=1` from both RTMP and SRT).
     HttpText { path: Regex, re: Regex },
+    /// `quiet_ms`: no message. The rule's values are assigned once per
+    /// connection, when the stream has been silent this long after the
+    /// device last sent anything: the end of a status dump the device does
+    /// not mark (older Videohub firmware sends no END PRELUDE).
+    Quiet { ms: u64 },
 }
 
 /// One element `json_each` reaches: the element, its index in its array
@@ -732,7 +737,36 @@ impl Telemetry {
             {
                 assigns.push(assign(path, v)?);
             }
-            let matcher = if let (Some(p), Some(m)) = (rule.get("path"), rule.get("match")) {
+            let matcher = if let Some(q) = rule.get("quiet_ms") {
+                let ms = q
+                    .as_u64()
+                    .filter(|ms| *ms >= 1)
+                    .ok_or("telemetry: quiet_ms is a positive number of milliseconds")?;
+                let alone = [
+                    "match",
+                    "address",
+                    "header",
+                    "path",
+                    "json_match",
+                    "then_send",
+                    "replace",
+                ]
+                .iter()
+                .all(|k| rule.get(k).is_none());
+                if !alone || assigns.is_empty() {
+                    return Err(
+                        "telemetry: a quiet_ms rule has state and no message selector, then_send or replace"
+                            .into(),
+                    );
+                }
+                if t.rules
+                    .iter()
+                    .any(|r| matches!(r.matcher, Matcher::Quiet { .. }))
+                {
+                    return Err("telemetry: at most one quiet_ms rule".into());
+                }
+                Matcher::Quiet { ms }
+            } else if let (Some(p), Some(m)) = (rule.get("path"), rule.get("match")) {
                 Matcher::HttpText {
                     path: regex(p, "path")?,
                     re: regex(m, "match")?,
@@ -923,6 +957,28 @@ impl Telemetry {
     /// Whether any rule replaces a list whole (`replace`).
     pub(crate) fn replaces(&self) -> bool {
         self.rules.iter().any(|r| !r.replace.is_empty())
+    }
+
+    /// `quiet_ms`: how long the stream must be silent before the quiet
+    /// rule's values are assigned, when the spec has one.
+    pub(crate) fn quiet_ms(&self) -> Option<u64> {
+        self.rules.iter().find_map(|r| match r.matcher {
+            Matcher::Quiet { ms } => Some(ms),
+            _ => None,
+        })
+    }
+
+    /// The state patch of the quiet rule, its values rendered with no
+    /// captures.
+    pub(crate) fn quiet_patch(&self) -> Option<Value> {
+        let mut patch = Value::Object(Map::new());
+        let mut any = false;
+        for rule in &self.rules {
+            if matches!(rule.matcher, Matcher::Quiet { .. }) {
+                any |= self.assign_all(&rule.assign, &[], &mut patch);
+            }
+        }
+        any.then_some(patch)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -1695,6 +1751,49 @@ mod tests {
             json!({"outputs": {"1": {"input": 6}, "2": {"input": 4}}})
         );
         assert!(t.apply(&Inbound::Text("INPUT LABELS:\n0 Cam\n")).is_none());
+    }
+
+    #[test]
+    fn a_quiet_rule_stands_alone_and_matches_no_message() {
+        let declared = || state(json!({"complete": {"type": "bool", "description": "x"}}));
+        for (rule, ok) in [
+            (
+                json!({"quiet_ms": 500, "state": {"complete": "true"}}),
+                true,
+            ),
+            (json!({"quiet_ms": 0, "state": {"complete": "true"}}), false),
+            (json!({"quiet_ms": 500}), false),
+            (
+                json!({"quiet_ms": 500, "match": "^X$", "state": {"complete": "true"}}),
+                false,
+            ),
+            (
+                json!({"quiet_ms": 500, "then_send": ["X"], "state": {"complete": "true"}}),
+                false,
+            ),
+        ] {
+            let parsed = Telemetry::parse(
+                Some(&json!({ "updates": [rule] })),
+                &declared(),
+                Conversions::new(),
+            );
+            assert_eq!(parsed.is_ok(), ok, "{rule}");
+        }
+        let two = json!({"updates": [
+            {"quiet_ms": 500, "state": {"complete": "true"}},
+            {"quiet_ms": 900, "state": {"complete": "true"}}
+        ]});
+        assert!(Telemetry::parse(Some(&two), &declared(), Conversions::new()).is_err());
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [{"quiet_ms": 500, "state": {"complete": "true"}}]})),
+            &declared(),
+            Conversions::new(),
+        )
+        .unwrap();
+        assert_eq!(t.quiet_ms(), Some(500));
+        assert_eq!(t.quiet_patch(), Some(json!({"complete": true})));
+        assert!(t.apply(&Inbound::Text("anything")).is_none());
+        assert!(!t.is_empty());
     }
 
     #[test]

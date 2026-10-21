@@ -54,6 +54,8 @@ const REPLY: Key = "reply";
 const PROBE: Key = "probe";
 const RECONNECT: Key = "reconnect";
 const RENEW: Key = "telemetry-renew";
+/// `quiet_ms`: the stream silent long enough for the quiet rule.
+const QUIET: Key = "telemetry-quiet";
 /// One timer per poll group (`telemetry.poll` as a list); the first is the
 /// one a single `poll` uses.
 const POLLS: [Key; telemetry::MAX_POLLS] = [
@@ -796,6 +798,8 @@ pub(crate) struct SpecEngine {
     /// opened: no subscription, poll or push websocket. Replies and anything
     /// the device sends unasked still go to the rules.
     monitor: bool,
+    /// The quiet rule (`quiet_ms`) has applied on this connection.
+    quiet_done: bool,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -1763,6 +1767,7 @@ impl SpecEngine {
             auth_header,
             host: ctx.host,
             monitor: ctx.monitor,
+            quiet_done: false,
             settings: ctx.settings,
             transport,
             endpoints,
@@ -2831,6 +2836,7 @@ impl SpecEngine {
         }
         cx.cancel_timer(PROBE);
         cx.cancel_timer(RENEW);
+        cx.cancel_timer(QUIET);
         for key in POLLS {
             cx.cancel_timer(key);
         }
@@ -2928,6 +2934,7 @@ impl SpecEngine {
         self.last_heard = cx.now();
         self.prompt_wait = None;
         self.refusals.clear();
+        self.quiet_done = false;
         if self.send_on_connect(cx, 0, false) {
             self.ready(cx);
         }
@@ -3073,6 +3080,33 @@ impl SpecEngine {
         }
         if !triggered.is_empty() && self.monitor && self.refused.is_none() {
             self.send_items(cx, triggered, true);
+        }
+    }
+
+    /// `quiet_ms`: the device sent something, so the silence that marks the
+    /// end of its unmarked status dump starts again, until the quiet rule has
+    /// applied on this connection.
+    fn rearm_quiet(&mut self, cx: &mut Cx) {
+        if self.quiet_done || !self.transport.is_stream() {
+            return;
+        }
+        if let Some(ms) = self.telemetry.quiet_ms() {
+            cx.set_timer(QUIET, ms);
+        }
+    }
+
+    /// The stream has been silent for `quiet_ms`: the quiet rule's values,
+    /// once per connection.
+    fn quiet(&mut self, cx: &mut Cx) {
+        if self.quiet_done {
+            return;
+        }
+        self.quiet_done = true;
+        if let Some(patch) = self.telemetry.quiet_patch() {
+            if let Some(mirror) = &mut self.mirror {
+                crate::session::merge_patch(mirror, &patch);
+            }
+            cx.state(patch);
         }
     }
 
@@ -3773,6 +3807,7 @@ impl Module for SpecEngine {
                         self.inbound_osc(cx, &packet);
                     }
                 }
+                self.rearm_quiet(cx);
             }
             TcpInput::Closed { reason } => self.lost(cx, reason),
         }
@@ -3788,7 +3823,10 @@ impl Module for SpecEngine {
         }
         match input {
             WsInput::Opened => self.opened(cx),
-            WsInput::Text(text) => self.inbound_ws(cx, text),
+            WsInput::Text(text) => {
+                self.inbound_ws(cx, text);
+                self.rearm_quiet(cx);
+            }
             WsInput::Binary(_) | WsInput::Activity => {
                 self.last_heard = cx.now();
                 cx.alive();
@@ -4001,6 +4039,7 @@ impl Module for SpecEngine {
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
             }
             RECONNECT => self.connect(cx),
+            QUIET => self.quiet(cx),
             PUSH_RECONNECT => self.open_push(cx),
             // `idle_ms`: nothing heard, so the connection is dead.
             PUSH_IDLE => {
@@ -6776,6 +6815,106 @@ mod tests {
                 ..
             }
         )));
+    }
+
+    /// A block device whose status dump ends with a marker on newer
+    /// firmware and with silence on older.
+    const QUIET_DUMP: &str = r#"
+spec: 1
+id: quiet-test
+name: Quiet test
+vendor: Test
+category: router
+source: [{ title: test }]
+transport: { type: line-tcp, port: 9990, framing: block, reply_match: "^(ACK|NAK)" }
+ports: [{ port: 9990, protocol: tcp, role: control }]
+models: [{ id: m, name: M, supports: [ping], verification: none }]
+commands:
+  ping: { send: "PING:", expect: { contains: ACK }, returns: ack }
+telemetry:
+  updates:
+    - header: "^LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "labels.{1}": "{2}" }
+    - match: "^END PRELUDE:$"
+      state: { complete: "true" }
+    - quiet_ms: 1000
+      state: { complete: "true" }
+state:
+  labels.*: { type: string, description: "Label" }
+  complete: { type: bool, description: "Dump done" }
+"#;
+
+    #[test]
+    fn a_quiet_rule_applies_once_the_stream_is_silent() {
+        let spec: DeviceSpec = crate::yaml::from_str(QUIET_DUMP).unwrap();
+        for monitor in [true, false] {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "m".into(),
+                    channels: None,
+                    settings: Params::new(),
+                    monitor,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+            // Nothing heard yet: no silence is timed.
+            assert!(!cx
+                .take()
+                .iter()
+                .any(|a| matches!(a, Action::SetTimer { key: QUIET, .. })));
+            // Each message starts the silence again.
+            for (at, bytes) in [(1, &b"LABELS:\n0 Cam 1\n\n"[..]), (2, b"LABELS:\n1 Ca")] {
+                let mut cx = Cx::new(at);
+                e.tcp(&mut cx, SOCKET, TcpInput::Data(bytes.to_vec()));
+                assert!(cx.take().contains(&Action::SetTimer {
+                    key: QUIET,
+                    after: 1000
+                }));
+            }
+            let mut cx = Cx::new(1002);
+            e.timer(&mut cx, QUIET);
+            assert_eq!(cx.take(), vec![Action::State(json!({"complete": true}))]);
+            // Once per connection: later messages time nothing.
+            let mut cx = Cx::new(1003);
+            e.tcp(&mut cx, SOCKET, TcpInput::Data(b"m 2\n\n".to_vec()));
+            let a = cx.take();
+            assert!(a.contains(&Action::State(json!({"labels": {"1": "Cam 2"}}))));
+            assert!(!a
+                .iter()
+                .any(|a| matches!(a, Action::SetTimer { key: QUIET, .. })));
+            let mut cx = Cx::new(1004);
+            e.timer(&mut cx, QUIET);
+            assert!(cx.take().is_empty());
+            // A new connection times its own dump; a lost one stops timing.
+            let mut cx = Cx::new(2000);
+            e.tcp(
+                &mut cx,
+                SOCKET,
+                TcpInput::Closed {
+                    reason: "gone".into(),
+                },
+            );
+            assert!(cx.take().contains(&Action::CancelTimer { key: QUIET }));
+            let mut cx = Cx::new(3000);
+            e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+            e.tcp(
+                &mut cx,
+                SOCKET,
+                TcpInput::Data(b"LABELS:\n0 A\n\n".to_vec()),
+            );
+            assert!(cx.take().contains(&Action::SetTimer {
+                key: QUIET,
+                after: 1000
+            }));
+        }
     }
 
     fn openlp(monitor: bool) -> SpecEngine {
