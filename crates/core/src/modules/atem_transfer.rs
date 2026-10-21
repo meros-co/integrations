@@ -291,7 +291,6 @@ impl Job {
 
 #[derive(Debug, PartialEq)]
 enum Step {
-    Idle,
     /// Reading the current unit's file from the host.
     Reading,
     /// Giving other clients a turn before asking for the store again.
