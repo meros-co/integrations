@@ -90,6 +90,7 @@ impl Atem {
             // Video mode (Sofie `Settings/VideoMode.ts:29-34`).
             b"VidM" => {
                 need(1)?;
+                self.topology.video_mode = Some(b[0]);
                 Some(json!({"video_mode": super::named(&VIDEO_MODES, b[0])}))
             }
             // u16 count, 2 rsv, then per mode: mode, 3 rsv, u32 multiviewer

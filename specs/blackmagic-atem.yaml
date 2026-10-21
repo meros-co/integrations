@@ -24,6 +24,42 @@ source:
       (src/commands/__tests__/libatem-data.json) give each command both as
       bytes and in the user's units, which fixes the fixed-point scaling of
       the keyer, Fairlight dynamics and EQ, monitor and multiviewer fields.
+  - title: Sofie atem-connection, data transfers (v3.10.3, main branch, read 2026-10-21)
+    author: Norsk rikskringkasting AS
+    url: https://github.com/Sofie-Automation/sofie-atem-connection/tree/main/src/dataTransfer
+    note: >
+      MIT-licensed; read as a reference, not copied. The file transfer
+      commands (LOCK, LKOB, LKST, FTSD, FTSU, FTCD, FTFD, FTDa, FTUA, FTDC,
+      FTDE) and their layouts, the upload and download flows, the stores,
+      modes and types for stills, clip frames, clip audio, macros and
+      multiviewer labels, the RGBA to 10-bit YUVA conversion, the run-length
+      encoding and the clip audio byte order.
+  - title: Blackmagic ATEM Switchers SDK manual (December 2025)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/at/DeveloperManuals/ATEMSDKManual.pdf
+    note: >
+      Section 4 (Switcher Media): a transfer needs the stills or clip lock
+      for its whole length and one transfer runs at a time; lock and unlock
+      for each transfer so other clients get a turn; a clip is made invalid
+      before its frames are uploaded and valid with its name and frame count
+      after; the 10-bit YUVA pixel order (a0, Cb, y0, a1, Cr, y1); frames
+      match the switcher's video mode.
+  - title: Blackmagic ATEM Switchers Installation and Operation Manual (December 2024)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/ATEMSwitchersManual.pdf
+    note: >
+      Media pool still and clip counts per model, the clip length table, PNG
+      among the still formats and WAV for clip audio.
+  - title: bmdwire, atemwire/docs/MEDIA_LOCK.md (read 2026-10-21)
+    url: https://github.com/lucas-romanenko/bmdwire/blob/HEAD/atemwire/docs/MEDIA_LOCK.md
+    note: >
+      Prose measured on an ATEM 1 M/E Constellation HD, restated in our own
+      words; atemwire's code is LGPL-3.0-only and was not read. Lock grants
+      held until the client's own release, requests queued by the switcher,
+      a release's broadcast arriving after the next grant, FTDE 6 when
+      another client's transfer wins the store, FTDC broadcast with the
+      owner's transfer id, 1,396-byte chunks in budgets of up to 768, and
+      dead sessions' locks freed after about 5 s.
   - title: OpenSwitcher protocol documentation
     url: https://docs.openswitcher.org/udptransport.html
     note: >
@@ -91,7 +127,8 @@ models:
                camera_auto_white_balance, camera_iris_fstop, camera_stabilisation,
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
-               camera_hue_saturation, camera_color_reset, camera_record]
+               camera_hue_saturation, camera_color_reset, camera_record, upload_still,
+               download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-mini-pro
     name: Blackmagic ATEM Mini Pro
@@ -127,7 +164,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
-               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates]
+               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-mini-pro-iso
     name: Blackmagic ATEM Mini Pro ISO
@@ -163,7 +201,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
-               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates]
+               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-mini-extreme
     name: Blackmagic ATEM Mini Extreme
@@ -200,7 +239,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
-               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates]
+               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-mini-extreme-iso
     name: Blackmagic ATEM Mini Extreme ISO
@@ -237,7 +277,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
-               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates]
+               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-mini-extreme-iso-g2
     name: Blackmagic ATEM Mini Extreme ISO G2
@@ -276,7 +317,9 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
-               set_recording_iso, set_streaming_audio_bitrates]
+               set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
+               upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
+               cancel_transfer]
     verification: none
   - id: atem-sdi
     name: Blackmagic ATEM SDI
@@ -310,7 +353,8 @@ models:
                camera_auto_white_balance, camera_iris_fstop, camera_stabilisation,
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
-               camera_hue_saturation, camera_color_reset, camera_record]
+               camera_hue_saturation, camera_color_reset, camera_record, upload_still,
+               download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-sdi-pro-iso
     name: Blackmagic ATEM SDI Pro ISO
@@ -346,7 +390,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
-               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates]
+               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-sdi-extreme-iso
     name: Blackmagic ATEM SDI Extreme ISO
@@ -383,7 +428,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
-               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates]
+               switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-television-studio-hd
     name: Blackmagic ATEM Television Studio HD
@@ -411,7 +457,9 @@ models:
                camera_auto_white_balance, camera_iris_fstop, camera_stabilisation,
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
-               camera_hue_saturation, camera_color_reset, camera_record]
+               camera_hue_saturation, camera_color_reset, camera_record, upload_still,
+               download_still, upload_macro, download_macro, upload_multiviewer_label,
+               cancel_transfer]
     verification: none
   - id: atem-television-studio-pro-hd
     name: Blackmagic ATEM Television Studio Pro HD
@@ -439,7 +487,9 @@ models:
                camera_auto_white_balance, camera_iris_fstop, camera_stabilisation,
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
-               camera_hue_saturation, camera_color_reset, camera_record]
+               camera_hue_saturation, camera_color_reset, camera_record, upload_still,
+               download_still, upload_macro, download_macro, upload_multiviewer_label,
+               cancel_transfer]
     verification: none
   - id: atem-television-studio-pro-4k
     name: Blackmagic ATEM Television Studio Pro 4K
@@ -473,7 +523,9 @@ models:
                camera_auto_white_balance, camera_iris_fstop, camera_stabilisation,
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
-               camera_hue_saturation, camera_color_reset, camera_record]
+               camera_hue_saturation, camera_color_reset, camera_record, upload_still,
+               download_still, upload_macro, download_macro, upload_multiviewer_label,
+               cancel_transfer]
     verification: none
   - id: atem-television-studio-hd8
     name: Blackmagic ATEM Television Studio HD8
@@ -512,7 +564,9 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
-               set_recording_iso, set_streaming_audio_bitrates]
+               set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
+               upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
+               cancel_transfer]
     verification: none
   - id: atem-television-studio-hd8-iso
     name: Blackmagic ATEM Television Studio HD8 ISO
@@ -551,7 +605,9 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
-               set_recording_iso, set_streaming_audio_bitrates]
+               set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
+               upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
+               cancel_transfer]
     verification: none
   - id: atem-television-studio-4k8
     name: Blackmagic ATEM Television Studio 4K8
@@ -590,7 +646,9 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
-               set_recording_iso, set_streaming_audio_bitrates]
+               set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
+               upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
+               cancel_transfer]
     verification: none
   - id: atem-1-me-production-studio-4k
     name: Blackmagic ATEM 1 M/E Production Studio 4K
@@ -620,7 +678,9 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro,
+               upload_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-2-me-production-studio-4k
     name: Blackmagic ATEM 2 M/E Production Studio 4K
@@ -650,7 +710,9 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro,
+               upload_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-2-me-broadcast-studio-4k
     name: Blackmagic ATEM 2 M/E Broadcast Studio 4K
@@ -680,7 +742,9 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro,
+               upload_multiviewer_label, cancel_transfer]
     verification: none
   - id: atem-1-me-constellation-hd
     name: Blackmagic ATEM 1 M/E Constellation HD
@@ -716,7 +780,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-2-me-constellation-hd
     name: Blackmagic ATEM 2 M/E Constellation HD
@@ -753,7 +818,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-4-me-constellation-hd
     name: Blackmagic ATEM 4 M/E Constellation HD
@@ -790,7 +856,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-1-me-constellation-4k
     name: Blackmagic ATEM 1 M/E Constellation 4K
@@ -826,7 +893,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-2-me-constellation-4k
     name: Blackmagic ATEM 2 M/E Constellation 4K
@@ -863,7 +931,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-4-me-constellation-4k
     name: Blackmagic ATEM 4 M/E Constellation 4K
@@ -900,7 +969,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-4-me-constellation-4k-plus
     name: Blackmagic ATEM 4 M/E Constellation 4K Plus
@@ -937,7 +1007,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
     verification: none
   - id: atem-constellation-8k
     name: Blackmagic ATEM Constellation 8K
@@ -974,7 +1045,9 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
-               set_clip, set_clip_lengths]
+               set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
+               download_clip, upload_clip_audio, upload_macro, download_macro,
+               upload_multiviewer_label, cancel_transfer]
     verification: none
 
 commands:
@@ -2707,6 +2780,162 @@ commands:
                description: "Most frames clip 4 can hold." }
     returns: ack
 
+  upload_still:
+    summary: >
+      Upload a picture from a file on the host into a still slot, replacing
+      what is there. The picture is the switcher's frame size in its current
+      video mode (1920 by 1080 in a 1080 mode). Answers at once with the
+      transfer's number; transfers.<number> follows it to done or failed.
+    params:
+      still: { type: int, min: 1, max: 255, required: true,
+               label: Still,
+               description: "Still slot in the media pool, numbered from 1." }
+      path: { type: string, max_length: 4096, required: true,
+              label: Host path,
+              description: "Path of the picture file on the host running the core." }
+      format: { type: enum, values: [png, rgba, native], default: png,
+                label: File format,
+                description: "png: a PNG file of any color type, its alpha used as the key; rgba: raw 8-bit RGBA, row after row; native: the switcher's own 10-bit YUVA words, as download_still saves them." }
+      name: { type: string, max_length: 63,
+              label: Name,
+              description: "Name shown for the still in the media pool, up to 63 bytes; the file's name when not given." }
+      description: { type: string, max_length: 127,
+                     label: Description,
+                     description: "Description kept with the still, up to 127 bytes." }
+    returns: value
+
+  download_still:
+    summary: >
+      Save the picture in a still slot to a file on the host. Answers at once
+      with the transfer's number; transfers.<number> follows it until the
+      file is written.
+    params:
+      still: { type: int, min: 1, max: 255, required: true,
+               label: Still,
+               description: "Still slot in the media pool, numbered from 1; it must hold a still." }
+      path: { type: string, max_length: 4096, required: true,
+              label: Host path,
+              description: "Path of the file to write on the host running the core; an existing file is replaced." }
+      format: { type: enum, values: [png, rgba, native], default: png,
+                label: File format,
+                description: "png: an 8-bit RGBA PNG; rgba: raw 8-bit RGBA, row after row; native: the switcher's own 10-bit YUVA words, which upload_still takes back unchanged." }
+    returns: value
+
+  upload_clip:
+    summary: >
+      Replace a clip with frames from files on the host: the clip is
+      cleared, every frame uploaded in order under the clip's lock, then the
+      clip named and made playable. Each frame is the switcher's frame size.
+      Answers at once with the transfer's number.
+    params:
+      clip: { type: int, min: 1, max: 4, required: true,
+              label: Clip,
+              description: "Clip slot in the media pool, numbered from 1." }
+      paths: { type: string, max_length: 4194304, required: true, multiline: true,
+               label: Frame files,
+               description: "Paths of the frame files on the host, one per line, in playing order; at most the frames the clip can hold (media_pool.clip_max_frames)." }
+      name: { type: string, max_length: 43, required: true,
+              label: Name,
+              description: "Clip name, up to 43 bytes." }
+      format: { type: enum, values: [png, rgba, native], default: png,
+                label: File format,
+                description: "Format of every frame file: png, raw 8-bit rgba, or the switcher's native 10-bit YUVA words." }
+    returns: value
+
+  download_clip:
+    summary: >
+      Save frames of a clip to files on the host, one file per frame, from
+      first_frame on. Answers at once with the transfer's number.
+    params:
+      clip: { type: int, min: 1, max: 4, required: true,
+              label: Clip,
+              description: "Clip slot in the media pool, numbered from 1; it must hold a clip." }
+      paths: { type: string, max_length: 4194304, required: true, multiline: true,
+               label: Frame files,
+               description: "Paths of the files to write on the host, one per line: the first gets first_frame, the next the frame after it." }
+      first_frame: { type: int, min: 1, max: 65535, default: 1,
+                     label: First frame,
+                     description: "The clip frame the first path gets, numbered from 1." }
+      format: { type: enum, values: [png, rgba, native], default: png,
+                label: File format,
+                description: "png: 8-bit RGBA PNG files; rgba: raw 8-bit RGBA; native: the switcher's own 10-bit YUVA words." }
+    returns: value
+
+  upload_clip_audio:
+    summary: >
+      Upload a clip's audio from a WAV file on the host (48 kHz, 24-bit,
+      stereo PCM), replacing the clip's audio. Answers at once with the
+      transfer's number.
+    params:
+      clip: { type: int, min: 1, max: 4, required: true,
+              label: Clip,
+              description: "Clip slot in the media pool, numbered from 1." }
+      path: { type: string, max_length: 4096, required: true,
+              label: Host path,
+              description: "Path of the WAV file on the host running the core." }
+      name: { type: string, max_length: 63,
+              label: Name,
+              description: "Name shown for the audio, up to 63 bytes; the file's name when not given." }
+    returns: value
+
+  upload_macro:
+    summary: >
+      Upload a macro from a file on the host into a macro slot, replacing
+      what is there. The file holds the macro exactly as download_macro saves
+      it (the switcher's own macro data, not ATEM Software Control's XML).
+      Answers at once with the transfer's number.
+    params:
+      macro: { type: int, min: 1, max: 100, required: true,
+               label: Macro,
+               description: "Macro slot, numbered from 1." }
+      path: { type: string, max_length: 4096, required: true,
+              label: Host path,
+              description: "Path of the macro file on the host running the core." }
+      name: { type: string, max_length: 63, required: true,
+              label: Name,
+              description: "Macro name, up to 63 bytes." }
+    returns: value
+
+  download_macro:
+    summary: >
+      Save a macro to a file on the host, as the switcher's own macro data.
+      Answers at once with the transfer's number.
+    params:
+      macro: { type: int, min: 1, max: 100, required: true,
+               label: Macro,
+               description: "Macro slot, numbered from 1; it must hold a macro." }
+      path: { type: string, max_length: 4096, required: true,
+              label: Host path,
+              description: "Path of the file to write on the host running the core; an existing file is replaced." }
+    returns: value
+
+  upload_multiviewer_label:
+    summary: >
+      Upload a source's multiviewer label from a file on the host holding a
+      label bitmap in the switcher's own encoding (one byte per pixel, values
+      0 to 253). Only switchers that do not draw their own labels (models
+      before the ATEM Mini) take it. Answers at once with the transfer's
+      number.
+    params:
+      source: { type: int, min: 0, max: 65535, required: true,
+                label: Source,
+                description: "Video source ID as listed in the sources state whose label this is." }
+      path: { type: string, max_length: 4096, required: true,
+              label: Host path,
+              description: "Path of the label bitmap file on the host running the core." }
+    returns: value
+
+  cancel_transfer:
+    summary: >
+      Cancel a queued or running transfer, or every one when no transfer is
+      given; the lock it holds is released. The value lists the transfers
+      canceled.
+    params:
+      transfer: { type: int, min: 1, max: 4294967295,
+                  label: Transfer,
+                  description: "Number of the transfer, as its command answered; all when not given." }
+    returns: value
+
   set_recording:
     summary: >
       Set the recording file name, the two working-set disks (ids as in the
@@ -3526,6 +3755,20 @@ state:
   macro_recording.macro:       { type: int, description: "Slot of the macro being recorded, from 1; null when none" }
   media_pool.clip_max_frames:  { type: array, description: "Most frames each clip slot can hold (protocol 2.28 and later)" }
   media_pool.unassigned_frames: { type: int, description: "Clip memory not given to any slot, in frames" }
+  media_pool.stills.*.hash:    { type: string, description: "The switcher's 16-byte hash of the still, as 32 lowercase hex digits; it changes when the picture does" }
+  media_pool.locks.stills:     { type: bool, description: "Some client holds the stills lock, as the switcher announces it (LKST)" }
+  media_pool.locks.clips.*:    { type: bool, description: "Some client holds clip N's lock, keyed by clip from 1 (LKST)" }
+  transfers.*.kind:            { type: string, description: "upload_still, download_still, upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro or upload_multiviewer_label, keyed by the transfer's number" }
+  transfers.*.status:          { type: string, description: "queued, reading (the host file), waiting (giving other clients a turn), locking, transferring, writing (the host file), then done, failed or canceled" }
+  transfers.*.progress:        { type: float, description: "How much is done, 0 to 1" }
+  transfers.*.frame:           { type: int, description: "The clip frame being transferred, counted from 1 among the transfer's frames (clip transfers)" }
+  transfers.*.frames:          { type: int, description: "Files the transfer moves: a clip's frames, otherwise 1" }
+  transfers.*.error:           { type: string, description: "Why it failed; null otherwise" }
+  transfers.*.bytes:           { type: int, unit: bytes, description: "Bytes sent or received on the wire, once finished" }
+  transfers.*.still:           { type: int, description: "The still slot, from 1 (still transfers)" }
+  transfers.*.clip:            { type: int, description: "The clip, from 1 (clip and clip audio transfers)" }
+  transfers.*.macro:           { type: int, description: "The macro slot, from 1 (macro transfers)" }
+  transfers.*.source:          { type: int, description: "The source whose label is uploaded (multiviewer label transfers)" }
   multiviewers.*.layout:       { type: string, description: "Multiviewer layout, as set_multiviewer_properties names them" }
   multiviewers.*.program_preview_swapped: { type: bool, description: "Program and preview swapped" }
   multiviewers.*.vu_opacity:   { type: int, unit: percent, description: "Audio meter opacity" }
@@ -3759,11 +4002,81 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Media pool uploads and downloads (still images, clip frames, macro
-      files and multiviewer labels) use the switcher's locked file transfer,
-      which this integration does not implement; a still is renamed only by
-      uploading it again. capture_still, clear_still, clear_clip and set_clip
-      manage the pool without a transfer.
+      File transfers (upload_still, download_still, upload_clip,
+      download_clip, upload_clip_audio, upload_macro, download_macro,
+      upload_multiviewer_label) run in the background, one at a time in the
+      order asked. Each command answers at once with {transfer, ahead}: the
+      transfer's number and how many are before it. transfers.<number> then
+      follows it (queued, reading, waiting, locking, transferring, writing,
+      then done, failed or canceled), and message events mark its ends:
+      transfer_started and transfer_finished {transfer, kind, status, error,
+      bytes, and the still, clip, macro or source}. The last 32 finished
+      transfers stay in the state. Files are read from and written to the
+      host running the core, at the paths given; a problem with a file (not
+      found, not a PNG, the wrong size) fails the transfer, not the command.
+      A transfer on the wire when the connection drops fails; those queued
+      wait for the next connection.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Stills and each clip have a lock that only one client holds; a
+      transfer takes it, and lets it go when it ends, fails, is canceled or
+      the device is closed. While another client (ATEM Software Control
+      fetching thumbnails, for one) holds it, a transfer waits its turn, at
+      most 120 s, then fails. A transfer that loses the store to another
+      client's (switcher error 6) lets go, waits for the store to be free,
+      and starts again, up to 20 times. A transfer the switcher stops
+      answering fails after 5 s. Uploads replace what is in the slot: a
+      clip is cleared before its first frame and is playable only once its
+      last frame is in.
+
+  - models: [all]
+    severity: info
+    text: >
+      Lock and transfer behavior no Blackmagic document describes, taken
+      from measurements on an ATEM 1 M/E Constellation HD that bmdwire's
+      documentation reports, or inferred: a lock is held from its grant
+      (LKOB) until this client releases it, whatever the announcements (LKST)
+      say, since the announcement of a release can arrive after the next
+      grant; a request made while another client holds the store is queued
+      by the switcher and granted later, so a grant that arrives after a
+      transfer gave up or was canceled is released at once; error 5 means
+      the transfer was not locked and error 6 that another client's transfer
+      won the store (this client still holds its lock, lets go and asks
+      again once the store is free, or after 10 s); the end of a transfer
+      (FTDC) goes to every client, so only one with this transfer's id ends
+      it; a dead session's locks are freed by the switcher after about 5 s.
+      A further transfer to a store just released waits 60 ms first so
+      other clients get a turn. Chunks are whole 8-byte blocks of at most
+      1,392 bytes, as atem-connection sends them, never splitting a run.
+
+  - models: [all]
+    severity: info
+    text: >
+      Pictures are the switcher's frame size in its current video mode
+      (720 by 576 for 625-line SD, 640 by 480 for 525-line SD, 1280 by 720,
+      1920 by 1080, 3840 by 2160 or 7680 by 4320) and are not scaled. PNG
+      and raw RGBA are converted to and from the switcher's 10-bit YUVA with
+      video levels (BT.709 from 720 lines, BT.601 below), the alpha kept as
+      the key; a pair of pixels shares one chroma sample, so a round trip
+      through RGBA is close, not exact. native passes the switcher's own
+      words unchanged, for a lossless copy of a still or frame. Clip audio
+      is a 48 kHz 24-bit stereo PCM WAV file; macros travel as the
+      switcher's own macro data (download one to get a file upload_macro
+      takes). The core converts pictures itself, which takes a moment for a
+      large frame.
+
+  - models: [all]
+    severity: info
+    text: >
+      What the switcher's transfer protocol is not known to carry, from any
+      public source, is not offered: downloading clip audio and renaming a
+      still or clip audio without uploading again (Blackmagic's SDK has
+      both, through calls whose messages are not documented), and canceling
+      on the switcher's side (cancel_transfer stops sending or acknowledging
+      and lets go of the lock). capture_still, clear_still, clear_clip and
+      set_clip manage the pool without a transfer.
 
   - models: [all]
     severity: info
