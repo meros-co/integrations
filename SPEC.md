@@ -1391,6 +1391,7 @@ of:
 | `address` | An OSC message whose address matches | `{1}`, … from the address; `{arg0}`, `{arg1}`, … the arguments |
 | `address` + `arg_match` | As `address`, where the text of each argument named matches its regex | as `address`, then `arg_match`'s |
 | `address` + `json` | As `address`, where the string argument at `json_arg` (default 0) holds JSON; with `json_match`, `json_each` and `each_match` it is read as a JSON message is (below) | as `address`, then `json_match`'s, plus `json` names by JSON path |
+| `quiet_ms` | No message: the stream silent this long, once per connection (below, "A status dump that ends in silence") | none |
 
 `state` maps a path template to a value template. Both use the template rules
 of §4: a numeric capture is an integer, so `{1:+1}` converts a 0-based wire
@@ -1961,6 +1962,29 @@ over settings. Its messages go through the rules like any other.
 
 A telemetry vector for a websocket gives `inbound_ws` (the message text), and
 optionally `expect_connect_ws`, the messages sent when it opens.
+
+#### A status dump that ends in silence
+
+A device that sends its whole state on connecting may mark the end of it
+(a Videohub's `END PRELUDE:`), or, on older firmware, just stop. A rule with
+`quiet_ms` in place of a message selector assigns its `state` once per
+connection, when the stream (`line-tcp`, `osc-tcp` or `ws`) has been silent
+that long after the device last sent anything; each message starts the
+silence again. It matches no message, takes no captures, and stands beside
+the rule for the marker, which still applies at once where it is sent:
+
+```yaml
+    - match: "^END PRELUDE:$"
+      state: { device.prelude_complete: "true" }
+    - quiet_ms: 1000
+      state: { device.prelude_complete: "true" }
+```
+
+Nothing is timed until the device has sent something. A spec has at most
+one such rule, with `state` only (no `then_send` or `replace`). Choose a
+silence longer than any pause within the dump; a value written this way only
+says the device went quiet, so its description says so. A quiet rule has no
+telemetry vector: the engine's own tests cover the timing.
 
 #### Re-reads on a push
 

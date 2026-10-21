@@ -838,6 +838,20 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
             for d in declared
         )
 
+    # A quiet rule matches no message: it times the stream's silence
+    # (SPEC.md §8, A status dump that ends in silence).
+    quiet = [i for i, r in enumerate(telemetry.get("updates", [])) if "quiet_ms" in r]
+    if len(quiet) > 1:
+        errors.append("telemetry.updates: at most one quiet_ms rule")
+    for i in quiet:
+        rule = telemetry["updates"][i]
+        if transport_type not in ("line-tcp", "osc-tcp", "ws"):
+            errors.append(f"telemetry.updates[{i}]: quiet_ms needs a line-tcp, osc-tcp or ws transport")
+        others = sorted(k for k in ("match", "address", "header", "path", "json_match",
+                                    "then_send", "replace") if k in rule)
+        if others:
+            errors.append(f"telemetry.updates[{i}]: a quiet_ms rule has no {', '.join(others)}")
+
     for i, rule in enumerate(telemetry.get("updates", [])):
         where = f"telemetry.updates[{i}]"
         for key in ("match", "match_each", "header", "each_line", "address", "path"):

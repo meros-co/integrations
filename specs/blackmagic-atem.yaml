@@ -24,6 +24,9 @@ source:
       (src/commands/__tests__/libatem-data.json) give each command both as
       bytes and in the user's units, which fixes the fixed-point scaling of
       the keyer, Fairlight dynamics and EQ, monitor and multiviewer fields.
+      Those samples are the only layouts for the HyperDeck slots (RXMS,
+      CXMS) and the 3G-SDI level (V3sl, C3sl), and the captures the only
+      ones for FEna and WhoI, which atem-connection itself does not decode.
   - title: Sofie atem-connection, data transfers (v3.10.3, main branch, read 2026-10-21)
     author: Norsk rikskringkasting AS
     url: https://github.com/Sofie-Automation/sofie-atem-connection/tree/main/src/dataTransfer
@@ -43,7 +46,15 @@ source:
       for each transfer so other clients get a turn; a clip is made invalid
       before its frames are uploaded and valid with its name and frame count
       after; the 10-bit YUVA pixel order (a0, Cb, y0, a1, Cr, y1); frames
-      match the switcher's video mode.
+      match the switcher's video mode. Section 3.2.7: the DVE transition
+      has a logo rate in frames beside its rate. Sections 4.3.8.6 and
+      4.3.12.6: clearing a still or a clip (SetInvalid) succeeds only with
+      the lock or while no other client holds it. Sections 2.3.2.13 and
+      2.3.2.14 (one 3G-SDI output level, A or B, for every output),
+      2.3.2.34 to 2.3.2.36 (the switcher-wide fade to black enable) and
+      section 10 (HyperDeck slots: network address as an IPv4 address,
+      switcher input, roll on take and its frame delay, connection status,
+      remote access, storage media count).
   - title: Blackmagic ATEM Switchers Installation and Operation Manual (December 2024)
     author: Blackmagic Design
     url: https://documents.blackmagicdesign.com/UserManuals/ATEMSwitchersManual.pdf
@@ -72,6 +83,32 @@ source:
       another client's transfer wins the store, FTDC broadcast with the
       owner's transfer id, 1,396-byte chunks in budgets of up to 768, and
       dead sessions' locks freed after about 5 s.
+  - title: bmdwire, atemwire/README.md and atemwire/docs/SURFACE.md (read 2026-10-21)
+    url: https://github.com/lucas-romanenko/bmdwire/blob/HEAD/atemwire/docs/SURFACE.md
+    note: >
+      Prose only, restated in our own words; atemwire's code is
+      LGPL-3.0-only and was not read. Its claim that the DVE transition's
+      logo rate comes before the transition rate, which conflicts with
+      atem-connection (see the quirks); a 1 M/E Production Studio 4K
+      ignoring a clear still (CSTL) sent without the stills lock; V3sl's
+      values (0 level B, 1 level A); FEna as both the report and the
+      command, its M/E addressing ambiguous; WhoI's fields (id, address,
+      host name, name); CXMS for HyperDeck binding. Its tables corroborate,
+      without a capture, this module's CFMP (EQ enable, EQ gain ±20 dB,
+      make-up gain 0 to 20 dB, fader −100 to +10 dB, follow fade to
+      black), CFSP (input and source, delay, input gain −100 to
+      +6 dB, EQ, make-up gain, balance ±100, fader, mix 1 off, 2 on, 4
+      audio follow video; it leaves mask bit 2, stereo simulation, unused),
+      FMLv and FDLv (input levels and peaks, expander, compressor and
+      limiter reduction, levels after dynamics and after the fader, sent
+      only after SFLN, which a new session sends again), RTMS (the recording
+      and stopping flags, the error bits and the time available), TrPr and
+      CTPr (M/E, preview on), MSRc (macro, name and description, padded to
+      4 bytes), MAct (macro or 0xFFFF, then 0 run, 1 stop, 2 stop
+      recording, 3 user wait, 4 continue, 5 delete) and MSlp (a frame count
+      that bmdwire writes as a u32: the same bytes as atem-connection's u16
+      after two reserved bytes, for the 1 to 65535 frames the command
+      takes).
   - title: OpenSwitcher protocol documentation
     url: https://docs.openswitcher.org/udptransport.html
     note: >
@@ -140,7 +177,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
-               download_still, upload_macro, download_macro, cancel_transfer]
+               download_still, upload_macro, download_macro, cancel_transfer,
+               set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-mini-pro
     name: Blackmagic ATEM Mini Pro
@@ -177,7 +215,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
                switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
-               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer,
+               set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-mini-pro-iso
     name: Blackmagic ATEM Mini Pro ISO
@@ -214,7 +253,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
                switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
-               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer,
+               set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-mini-extreme
     name: Blackmagic ATEM Mini Extreme
@@ -252,7 +292,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
                switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
-               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer,
+               set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-mini-extreme-iso
     name: Blackmagic ATEM Mini Extreme ISO
@@ -290,7 +331,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
                switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
-               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer,
+               set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-mini-extreme-iso-g2
     name: Blackmagic ATEM Mini Extreme ISO G2
@@ -331,7 +373,8 @@ models:
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
                set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
                upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
-               cancel_transfer]
+               cancel_transfer,
+               set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-sdi
     name: Blackmagic ATEM SDI
@@ -366,7 +409,8 @@ models:
                camera_sharpening, camera_nd_filter, camera_color_bars, camera_display_tools,
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
-               download_still, upload_macro, download_macro, cancel_transfer]
+               download_still, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-sdi-pro-iso
     name: Blackmagic ATEM SDI Pro ISO
@@ -403,7 +447,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
                switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
-               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-sdi-extreme-iso
     name: Blackmagic ATEM SDI Extreme ISO
@@ -441,7 +486,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, set_recording,
                switch_recording_disk, set_recording_iso, set_streaming_audio_bitrates,
-               upload_still, download_still, upload_macro, download_macro, cancel_transfer]
+               upload_still, download_still, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-television-studio-hd
     name: Blackmagic ATEM Television Studio HD
@@ -471,7 +517,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
                download_still, upload_macro, download_macro, upload_multiviewer_label,
-               set_multiviewer_label, cancel_transfer]
+               set_multiviewer_label, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-television-studio-pro-hd
     name: Blackmagic ATEM Television Studio Pro HD
@@ -501,7 +548,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
                download_still, upload_macro, download_macro, upload_multiviewer_label,
-               set_multiviewer_label, cancel_transfer]
+               set_multiviewer_label, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-television-studio-pro-4k
     name: Blackmagic ATEM Television Studio Pro 4K
@@ -537,7 +585,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, upload_still,
                download_still, upload_macro, download_macro, upload_multiviewer_label,
-               set_multiviewer_label, cancel_transfer]
+               set_multiviewer_label, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-television-studio-hd8
     name: Blackmagic ATEM Television Studio HD8
@@ -578,7 +627,8 @@ models:
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
                set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
                upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
-               cancel_transfer]
+               cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-television-studio-hd8-iso
     name: Blackmagic ATEM Television Studio HD8 ISO
@@ -619,7 +669,8 @@ models:
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
                set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
                upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
-               cancel_transfer]
+               cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-television-studio-4k8
     name: Blackmagic ATEM Television Studio 4K8
@@ -660,7 +711,8 @@ models:
                set_clip, set_clip_lengths, set_recording, switch_recording_disk,
                set_recording_iso, set_streaming_audio_bitrates, upload_still, download_still,
                upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro,
-               cancel_transfer]
+               cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-1-me-production-studio-4k
     name: Blackmagic ATEM 1 M/E Production Studio 4K
@@ -692,7 +744,8 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-2-me-production-studio-4k
     name: Blackmagic ATEM 2 M/E Production Studio 4K
@@ -724,7 +777,8 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-2-me-broadcast-studio-4k
     name: Blackmagic ATEM 2 M/E Broadcast Studio 4K
@@ -756,7 +810,8 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-1-me-constellation-hd
     name: Blackmagic ATEM 1 M/E Constellation HD
@@ -793,7 +848,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
-               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-2-me-constellation-hd
     name: Blackmagic ATEM 2 M/E Constellation HD
@@ -831,7 +887,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
-               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-4-me-constellation-hd
     name: Blackmagic ATEM 4 M/E Constellation HD
@@ -869,7 +926,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
-               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-1-me-constellation-4k
     name: Blackmagic ATEM 1 M/E Constellation 4K
@@ -906,7 +964,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
-               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-2-me-constellation-4k
     name: Blackmagic ATEM 2 M/E Constellation 4K
@@ -944,7 +1003,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
-               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-4-me-constellation-4k
     name: Blackmagic ATEM 4 M/E Constellation 4K
@@ -982,7 +1042,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
-               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-4-me-constellation-4k-plus
     name: Blackmagic ATEM 4 M/E Constellation 4K Plus
@@ -1020,7 +1081,8 @@ models:
                camera_overlays, camera_color_wheel, camera_contrast, camera_luma_mix,
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
-               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer]
+               download_clip, upload_clip_audio, upload_macro, download_macro, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
   - id: atem-constellation-8k
     name: Blackmagic ATEM Constellation 8K
@@ -1059,7 +1121,8 @@ models:
                camera_hue_saturation, camera_color_reset, camera_record, clear_clip,
                set_clip, set_clip_lengths, upload_still, download_still, upload_clip,
                download_clip, upload_clip_audio, upload_macro, download_macro,
-               upload_multiviewer_label, set_multiviewer_label, cancel_transfer]
+               upload_multiviewer_label, set_multiviewer_label, cancel_transfer,
+               set_3g_sdi_level, set_fade_to_black_enabled, set_hyperdeck]
     verification: none
 
 commands:
@@ -1305,8 +1368,9 @@ commands:
 
   set_dve_transition:
     summary: >
-      Set the DVE transition: rate (frames), style, key sources and key
-      settings. Clip and gain are percent. Give at least one setting.
+      Set the DVE transition: rate and logo rate (frames), style, key
+      sources and key settings. Clip and gain are percent. Give at least one
+      setting.
     params:
       me: { type: int, min: 1, max: 4, default: 1,
             label: M/E,
@@ -1314,6 +1378,9 @@ commands:
       rate: { type: int, min: 1, max: 250,
               label: Rate,
               description: "DVE transition duration in frames." }
+      logo_rate: { type: int, min: 1, max: 250,
+                   label: Logo rate,
+                   description: "Duration in frames of the graphic logo wipe style." }
       style:
         type: enum
         values: [swoosh_top_left, swoosh_top, swoosh_top_right, swoosh_left,
@@ -2742,20 +2809,26 @@ commands:
     returns: ack
 
   clear_still:
-    summary: Clear a still slot in the media pool
+    summary: >
+      Clear a still slot in the media pool, under the stills lock: it waits
+      in the transfer queue and for the lock like a transfer. Answers at
+      once with the transfer's number; transfers.<number> follows it.
     params:
       still: { type: int, min: 1, max: 255, required: true,
                label: Still,
                description: "Still slot in the media pool, numbered from 1." }
-    returns: ack
+    returns: value
 
   clear_clip:
-    summary: Clear a clip slot in the media pool
+    summary: >
+      Clear a clip slot in the media pool, under the clip's lock: it waits
+      in the transfer queue and for the lock like a transfer. Answers at
+      once with the transfer's number; transfers.<number> follows it.
     params:
       clip: { type: int, min: 1, max: 4, required: true,
               label: Clip,
               description: "Clip slot in the media pool, numbered from 1." }
-    returns: ack
+    returns: value
 
   set_clip:
     summary: >
@@ -3101,6 +3174,53 @@ commands:
         description: "Video standard: lines, scan (i or p) and frame rate, e.g. 1080p25 or 1080i59_94."
     returns: ack
 
+  set_3g_sdi_level:
+    summary: >
+      Set the encoding level of every 3G-SDI output (level A or B), on
+      switchers that report one (sdi_3g_level).
+    params:
+      level: { type: enum, values: [a, b], required: true,
+               label: 3G-SDI level,
+               description: "a for level A, b for level B, for all of the switcher's 3G-SDI outputs." }
+    returns: ack
+
+  set_fade_to_black_enabled:
+    summary: >
+      Enable or disable fade to black control for the whole switcher; fade
+      to black can only run while it is enabled. Only on switchers that
+      report the setting (fade_to_black_enabled).
+    params:
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "Whether fade to black can be used." }
+    returns: ack
+
+  set_hyperdeck:
+    summary: >
+      Set how the switcher controls one of its HyperDeck slots: the
+      HyperDeck's address (0.0.0.0 to stop using the slot), the switcher
+      input it is plugged into, and whether it starts playing when that
+      input is taken to program (auto roll) after a delay. Give at least
+      one setting.
+    params:
+      hyperdeck: { type: int, min: 1, max: 10, required: true,
+                   label: HyperDeck,
+                   description: "HyperDeck slot on the switcher, numbered from 1; topology.hyperdecks gives how many." }
+      address: { type: string, max_length: 15,
+                 pattern: "^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}$",
+                 label: Address,
+                 description: "The HyperDeck's IPv4 address, e.g. 192.168.10.50; 0.0.0.0 stops the switcher connecting." }
+      input: { type: int, min: 0, max: 65535,
+               label: Switcher input,
+               description: "Source ID of the external input the HyperDeck's output is plugged into, as listed in the sources state; 0 for none." }
+      auto_roll: { type: bool,
+                   label: Auto roll,
+                   description: "Whether the HyperDeck starts playing when its input goes to program." }
+      auto_roll_frame_delay: { type: int, min: 0, max: 65535,
+                               label: Auto roll delay,
+                               description: "Frames the switcher waits after the take before the HyperDeck plays." }
+    returns: ack
+
   save_startup_state:
     summary: Save the switcher's current state as the state it starts up in
     returns: ack
@@ -3433,6 +3553,20 @@ state:
   device.product:              { type: string, description: "Product name the switcher reports (_pin)" }
   device.model_id:             { type: int, description: "Model number the switcher reports (_pin); see the models' comments" }
   device.protocol_version:     { type: string, description: "Protocol version (_ver), such as 2.30; not the firmware version" }
+  device.id:                   { type: string, description: "The switcher's unique id, 32 hex digits (WhoI); not sent by every firmware" }
+  device.address:              { type: string, description: "IPv4 address the switcher reports for itself (WhoI)" }
+  device.hostname:             { type: string, description: "Host name the switcher announces on the network, such as ATEM-Mini-Extreme-ISO-G2.local (WhoI)" }
+  device.name:                 { type: string, description: "The switcher's name on the network (WhoI)" }
+  topology.hyperdecks:         { type: int, description: "HyperDeck slots the switcher can control (4 or 10)" }
+  hyperdecks.*.address:        { type: string, description: "IPv4 address of the HyperDeck in the slot, keyed by slot from 1; 0.0.0.0 when unused" }
+  hyperdecks.*.input:          { type: int, description: "Source id of the switcher input the HyperDeck feeds; 0 for none" }
+  hyperdecks.*.auto_roll:      { type: bool, description: "The HyperDeck plays when its input goes to program" }
+  hyperdecks.*.auto_roll_frame_delay: { type: int, unit: frames, description: "Delay before an auto roll starts playback" }
+  hyperdecks.*.status:         { type: string, description: "not_connected, connecting, connected or incompatible (firmware the switcher cannot control)" }
+  hyperdecks.*.storage_media_count: { type: int, description: "Media slots the HyperDeck reports" }
+  hyperdecks.*.remote_enabled: { type: bool, description: "The HyperDeck allows remote control" }
+  sdi_3g_level:                { type: string, description: "a or b: the encoding level of every 3G-SDI output" }
+  fade_to_black_enabled:       { type: bool, description: "Fade to black control is enabled (switcher-wide); only some switchers report it" }
   topology.mes:                { type: int, description: "Number of M/Es" }
   topology.sources:            { type: int, description: "Number of video sources" }
   topology.auxes:              { type: int, description: "Number of aux outputs" }
@@ -3462,6 +3596,7 @@ state:
   macro_running:               { type: int, description: "Slot number of the running macro; absent when none runs" }
   streaming.state:             { type: string, description: "idle, connecting, streaming or stopping" }
   recording.active:            { type: bool, description: "Recording" }
+  recording.stopping:          { type: bool, description: "Recording is stopping (finishing its files)" }
   recording.error:             { type: string, description: "none, no_media, media_full, media_error, media_unformatted, dropping_frames or unknown" }
   topology.dves:               { type: int, description: "Number of DVEs; set_dve_transition and the dve key type need one" }
   topology.stingers:           { type: int, description: "Number of stinger engines; set_stinger needs one" }
@@ -3487,6 +3622,7 @@ state:
   mes.*.transition.wipe.reverse: { type: bool, description: "Wipe reversed" }
   mes.*.transition.wipe.flip_flop: { type: bool, description: "Wipe flip flop" }
   mes.*.transition.dve.rate:   { type: int, unit: frames, description: "DVE transition rate" }
+  mes.*.transition.dve.logo_rate: { type: int, unit: frames, description: "Rate of the graphic logo wipe DVE style" }
   mes.*.transition.dve.style:  { type: string, description: "DVE transition style, as set_dve_transition names them" }
   mes.*.transition.dve.fill_source: { type: int, description: "DVE transition key fill source id" }
   mes.*.transition.dve.key_source: { type: int, description: "DVE transition key source id" }
@@ -3790,15 +3926,15 @@ state:
   media_pool.stills.*.hash:    { type: string, description: "The switcher's 16-byte hash of the still, as 32 lowercase hex digits; it changes when the picture does" }
   media_pool.locks.stills:     { type: bool, description: "Some client holds the stills lock, as the switcher announces it (LKST)" }
   media_pool.locks.clips.*:    { type: bool, description: "Some client holds clip N's lock, keyed by clip from 1 (LKST)" }
-  transfers.*.kind:            { type: string, description: "upload_still, download_still, upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro, upload_multiviewer_label or set_multiviewer_label, keyed by the transfer's number" }
+  transfers.*.kind:            { type: string, description: "upload_still, download_still, upload_clip, download_clip, upload_clip_audio, upload_macro, download_macro, upload_multiviewer_label, set_multiviewer_label, clear_still or clear_clip, keyed by the transfer's number" }
   transfers.*.status:          { type: string, description: "queued, reading (the host file), waiting (giving other clients a turn), locking, transferring, writing (the host file), then done, failed or canceled" }
   transfers.*.progress:        { type: float, description: "How much is done, 0 to 1" }
   transfers.*.frame:           { type: int, description: "The clip frame being transferred, counted from 1 among the transfer's frames (clip transfers)" }
-  transfers.*.frames:          { type: int, description: "Files the transfer moves: a clip's frames, otherwise 1" }
+  transfers.*.frames:          { type: int, description: "Files the transfer moves: a clip's frames, 0 for a clear, otherwise 1" }
   transfers.*.error:           { type: string, description: "Why it failed; null otherwise" }
   transfers.*.bytes:           { type: int, unit: bytes, description: "Bytes sent or received on the wire, once finished" }
-  transfers.*.still:           { type: int, description: "The still slot, from 1 (still transfers)" }
-  transfers.*.clip:            { type: int, description: "The clip, from 1 (clip and clip audio transfers)" }
+  transfers.*.still:           { type: int, description: "The still slot, from 1 (still transfers and clears)" }
+  transfers.*.clip:            { type: int, description: "The clip, from 1 (clip and clip audio transfers, clip clears)" }
   transfers.*.macro:           { type: int, description: "The macro slot, from 1 (macro transfers)" }
   transfers.*.source:          { type: int, description: "The source whose label is uploaded (multiviewer label transfers)" }
   multiviewers.*.layout:       { type: string, description: "Multiviewer layout, as set_multiviewer_properties names them" }
@@ -4048,8 +4184,9 @@ quirks:
     text: >
       File transfers (upload_still, download_still, upload_clip,
       download_clip, upload_clip_audio, upload_macro, download_macro,
-      upload_multiviewer_label, set_multiviewer_label) run in the
-      background, one at a time in the order asked. Each command answers at once with {transfer, ahead}: the
+      upload_multiviewer_label, set_multiviewer_label) and the media pool
+      clears (clear_still, clear_clip) run in the background, one at a time
+      in the order asked. Each command answers at once with {transfer, ahead}: the
       transfer's number and how many are before it. transfers.<number> then
       follows it (queued, reading, waiting, locking, transferring, writing,
       then done, failed or canceled), and message events mark its ends:
@@ -4133,8 +4270,20 @@ quirks:
       both, through calls whose messages are not documented), and canceling
       on the switcher's side (cancel_transfer stops sending or acknowledging
       and lets go of the lock). Clip audio's validity, name and hash are not
-      in the state for the same reason. capture_still, clear_still,
-      clear_clip and set_clip manage the pool without a transfer.
+      in the state for the same reason. capture_still and set_clip manage
+      the pool without a transfer or a lock.
+
+  - models: [all]
+    severity: info
+    text: >
+      clear_still and clear_clip take the store's lock, send the clear and
+      let the lock go, waiting their turn as a transfer does. Blackmagic's
+      SDK manual says a clear succeeds only for a client holding the lock
+      or while no other client holds it, and bmdwire reports that some
+      models (a 1 M/E Production Studio 4K) ignore a clear sent without the
+      lock. A clear is done once it is sent: the switcher does not answer
+      it, and media_pool.stills or media_pool.clips shows the slot empty
+      when it has taken it.
 
   - models: [all]
     severity: info
@@ -4160,3 +4309,68 @@ quirks:
       camera_auto_white_balance, camera_color_reset, camera_record) have no
       state to read back. The camera reports what it applied as cameras.*
       state only for the parameters listed there.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The sources disagree on which of the DVE transition's two rates comes
+      first. atem-connection, LibAtem's samples in its tests and the
+      OpenSwitcher tables put the transition rate first (TDvP byte 1, CTDv
+      byte 3 under mask bit 0) and the logo rate second (TDvP byte 2, CTDv
+      byte 4 under bit 1); this module follows them. bmdwire's documentation
+      says the reverse, corrected against ATEM Software Control: the logo
+      wipe rate first and the DVE rate second. No Blackmagic document gives
+      the bytes (the SDK only has both rates), and the captures of real
+      switchers in atem-connection's tests all carry the same value in both
+      bytes, so they cannot settle it. If bmdwire is right, rate and
+      logo_rate are swapped in both set_dve_transition and
+      mes.*.transition.dve.
+
+  - models: [all]
+    severity: info
+    text: >
+      HyperDeck slots (set_hyperdeck, hyperdecks.*) tell the switcher which
+      HyperDeck to control for an input; every switcher captured reports 4
+      or 10 slots. Neither Blackmagic nor atem-connection gives the bytes:
+      the layouts of RXMS and CXMS come from LibAtem's samples in
+      atem-connection's tests, the order of CXMS's mask bits (address,
+      input, auto roll, delay) and the status names (in the order the SDK
+      manual lists them) are inferred, and the address is taken in the
+      order the bytes arrive, as the samples read it. Controlling the
+      HyperDeck's transport through the switcher (play, record, shuttle,
+      jog, clip and media selection, RXCP, RXSS, RXCC, RXCS) is not
+      offered: the samples give those layouts, but no source gives the
+      player and storage states' values, and the captured switchers report
+      unconnected slots as player state 1, which does not fit the order the
+      SDK lists them in. Use the HyperDeck's own integration instead.
+
+  - models: [all]
+    severity: info
+    text: >
+      sdi_3g_level and set_3g_sdi_level exist only where the switcher
+      reports the level (V3sl: SDI models, not the ATEM Mini family); the
+      others refuse the command as unsupported. 1 is level A and 0 level B
+      as bmdwire documents it; Blackmagic's SDK manual lists level A first,
+      so the values are not confirmed.
+
+  - models: [all]
+    severity: info
+    text: >
+      fade_to_black_enabled is one switcher-wide setting (Blackmagic's SDK
+      manual), sent as FEna only by newer firmware (9.x captures of
+      Constellation, ATEM Mini Extreme ISO and Television Studio 4K8
+      models); elsewhere set_fade_to_black_enabled is refused as
+      unsupported. The enable is byte 1 of FEna; the other bytes vary
+      between captures and carry nothing. No source gives the command's
+      bytes: the core sends FEna with the enable at byte 1, as the switcher
+      reports it. bmdwire describes the command as carrying an M/E index,
+      with "disable on M/E 2" identical to "enable on M/E 1" on the wire,
+      which fits a single setting with no M/E.
+
+  - models: [all]
+    severity: info
+    text: >
+      device.id, device.address, device.hostname and device.name (WhoI) are
+      read only: newer firmware sends them, and the switcher's name and
+      network settings are changed in ATEM Setup, through no message this
+      protocol is known to carry.
