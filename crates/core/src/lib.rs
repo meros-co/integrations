@@ -402,12 +402,42 @@ impl Core {
             })?;
         let settings = catalog::validate(&spec.settings, &request.settings)
             .map_err(|message| OpenError::InvalidSettings { message })?;
-        let host =
-            if request.host.trim().is_empty() && (spec.core_listens_only() || spec.uses_serial()) {
-                IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
-            } else {
-                resolve(&request.host)?
-            };
+        // A spec reaching the device over TCP or a serial port (a `serial`
+        // block): link serial needs the port and no host, link tcp a host.
+        let serial_link = spec.serial_link(&model.id, &settings);
+        if serial_link == Some(true) {
+            if !spec.serial_model(&model.id) {
+                return Err(OpenError::InvalidSettings {
+                    message: format!(
+                        "model {} has no serial port for link serial: use link tcp",
+                        model.id
+                    ),
+                });
+            }
+            if settings
+                .get("serial_port")
+                .and_then(serde_json::Value::as_str)
+                .is_none_or(|p| p.trim().is_empty())
+            {
+                return Err(OpenError::InvalidSettings {
+                    message: "link serial needs the serial_port setting: the host's serial port"
+                        .into(),
+                });
+            }
+        }
+        if serial_link == Some(false) && request.host.trim().is_empty() {
+            return Err(OpenError::UnresolvableHost {
+                host: String::new(),
+                message: "link tcp needs the device's host; link serial needs none".into(),
+            });
+        }
+        let host = if request.host.trim().is_empty()
+            && (spec.core_listens_only() || (spec.uses_serial() && serial_link != Some(false)))
+        {
+            IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
+        } else {
+            resolve(&request.host)?
+        };
 
         let context = module::OpenContext {
             host,

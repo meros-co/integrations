@@ -118,6 +118,9 @@ def main():
                 kind = "HTTPS"
             # A serial port has no number.
             transport = f"{kind} {t['port']}" if "port" in t else kind
+            # The same protocol on a serial port of the host (transport.serial).
+            if "serial" in t:
+                transport += " or serial"
         rows.append(
             f"| `{sid}` | {doc['name']} | `{groups[sid]}` | {transport} | {'yes' if native else ''} "
             f"| {len(models)} | {commands} | {verification(models)} |"

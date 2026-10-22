@@ -261,10 +261,12 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         settings,
         monitor: true,
     };
+    let link = spec.serial_link(&model.id, &ctx.settings);
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
     let mut cx = Cx::new(0);
     engine.start(&mut cx);
     let mut connected = cx.take();
+    check_link(link, &connected)?;
     if connected
         .iter()
         .any(|a| matches!(a, Action::TcpOpen { .. } | Action::SerialOpen { .. }))
@@ -560,6 +562,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         settings,
         monitor: true,
     };
+    let link = spec.serial_link(&model.id, &ctx.settings);
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
 
     // Bring the session up: connect, and answer any probe the engine sends
@@ -567,6 +570,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let mut cx = Cx::new(0);
     engine.start(&mut cx);
     let started = cx.take();
+    check_link(link, &started)?;
     let mut cx = Cx::new(1);
     if started
         .iter()
@@ -889,6 +893,21 @@ fn every_spec_driven_command_has_a_vector() {
         "commands without a vector:\n{}",
         missing.join("\n")
     );
+}
+
+/// A spec reaching its device over TCP or a serial port (a `serial` block):
+/// the engine opened the link the vector's settings choose, so a vector with
+/// `link: serial` is played on the serial port.
+fn check_link(serial: Option<bool>, started: &[Action]) -> Result<(), String> {
+    let opened_serial = started
+        .iter()
+        .any(|a| matches!(a, Action::SerialOpen { .. }));
+    let opened_tcp = started.iter().any(|a| matches!(a, Action::TcpOpen { .. }));
+    match serial {
+        Some(true) if !opened_serial => Err("link serial did not open the serial port".into()),
+        Some(false) if !opened_tcp => Err("link tcp did not open a TCP connection".into()),
+        _ => Ok(()),
+    }
 }
 
 /// A serial port for a spec that declares one, which has no default.

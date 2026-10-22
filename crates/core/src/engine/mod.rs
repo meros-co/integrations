@@ -1429,13 +1429,24 @@ impl SpecEngine {
                     Some(p) => Some(Regex::new(p).map_err(|e| format!("reply_match: {e}"))?),
                     None => None,
                 };
+                // `line-serial`, or a `line-tcp` transport's `serial` block
+                // with the device's link on its serial port (SPEC.md §2).
+                let on_serial = kind == "line-serial"
+                    || spec.serial_link(&ctx.model, &ctx.settings) == Some(true);
+                if on_serial && !spec.serial_model(&ctx.model) {
+                    return Err(format!(
+                        "model {} has no serial port for link serial: use link tcp",
+                        ctx.model
+                    ));
+                }
+                if !on_serial && spec.serial_block().is_some() && ctx.host.is_unspecified() {
+                    return Err("a TCP link needs the device's host".into());
+                }
                 Transport::LineTcp {
                     port,
-                    serial: match kind {
-                        "line-serial" => {
-                            Some(crate::module::SerialPort::from_settings(&ctx.settings)?)
-                        }
-                        _ => None,
+                    serial: match on_serial {
+                        true => Some(crate::module::SerialPort::from_settings(&ctx.settings)?),
+                        false => None,
                     },
                     send,
                     reply,
@@ -2959,6 +2970,19 @@ impl SpecEngine {
         for (index, step) in steps.iter().enumerate().skip(from) {
             if !for_model(step, &self.ctx.model) {
                 continue;
+            }
+            // `link`: a step for the network or for the serial port only.
+            if let Some(link) = step.get("link").and_then(Value::as_str) {
+                let serial = matches!(
+                    self.transport,
+                    Transport::LineTcp {
+                        serial: Some(_),
+                        ..
+                    }
+                );
+                if (link == "serial") != serial {
+                    continue;
+                }
             }
             let (item, when_set, prompt, refused, accepted, await_reply) = match step {
                 Value::Object(m) if m.contains_key("send") => (

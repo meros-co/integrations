@@ -300,3 +300,287 @@ fn line_settings_come_from_the_settings_with_defaults() {
             .is_err()
     );
 }
+
+// ── One spec over TCP or a serial port (`transport.serial`) ──────────────
+
+const DUAL: &str = r#"
+spec: 1
+id: dual-test
+name: Dual test
+vendor: Test
+category: switcher
+source: [{ title: test }]
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  timeout_ms: 1000
+  reply_match: '^(Ok|Ver)'
+  serial:
+    serial_only: [rs232-only]
+    models: [networked, rs232-only]
+    baud_rate: { default: 9600, values: [9600, 19200, 115200] }
+    data_bits: 8
+    parity: { default: none, values: [none, even] }
+    stop_bits: 1
+    flow_control: none
+settings:
+  password: { type: string, default: "", label: Password, description: "The password." }
+on_connect:
+  - { when_set: password, link: tcp, send: "PW {settings.password}" }
+  - { link: serial, send: "SERIAL" }
+  - "HELLO"
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232" }
+models:
+  - { id: networked, name: N, supports: [cut], verification: none }
+  - { id: rs232-only, name: R, supports: [cut], verification: none }
+  - { id: no-serial, name: X, supports: [cut], verification: none }
+commands:
+  cut:
+    send: "CUT"
+    expect: { contains: "Ok" }
+    returns: ack
+"#;
+
+fn dual_core(ports: Arc<MemoryPorts>) -> Core {
+    let spec = DeviceSpec::from_yaml(DUAL).unwrap();
+    let catalog = Catalog {
+        devices: [(spec.id.clone(), spec)].into(),
+    };
+    Core::with_catalog(
+        catalog,
+        CoreOptions::new().bind_address([127, 0, 0, 1].into()),
+    )
+    .unwrap()
+    .with_serial_ports(ports)
+}
+
+fn dual_open(
+    core: &Core,
+    model: &str,
+    host: &str,
+    settings: serde_json::Value,
+) -> Result<u64, crate::OpenError> {
+    core.open(OpenRequest {
+        device: "dual-test".into(),
+        model: model.into(),
+        host: host.into(),
+        port: None,
+        settings: settings.as_object().unwrap().clone(),
+        monitor: true,
+    })
+}
+
+/// The next CR-terminated line the core sent the device.
+async fn line(device: &mut (impl tokio::io::AsyncRead + Unpin)) -> String {
+    let mut out = Vec::new();
+    let mut byte = [0u8; 1];
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            device.read_exact(&mut byte).await.unwrap();
+            if byte[0] == b'\r' {
+                break;
+            }
+            out.push(byte[0]);
+        }
+    })
+    .await
+    .expect("a line within 5 s");
+    String::from_utf8(out).unwrap()
+}
+
+#[test]
+fn a_serial_block_adds_the_link_and_the_line_settings() {
+    let spec = DeviceSpec::from_yaml(DUAL).unwrap();
+    let s = &spec.settings;
+    assert_eq!(
+        s["link"].values.as_deref().unwrap(),
+        ["tcp".to_string(), "serial".to_string()]
+    );
+    // serial_only: no one default, the model decides.
+    assert_eq!(s["link"].default, None);
+    assert!(!s["serial_port"].required);
+    assert_eq!(
+        s["baud_rate"].values.as_deref().unwrap(),
+        ["9600", "19200", "115200"]
+    );
+    assert_eq!(s["baud_rate"].default, Some(json!("9600")));
+    assert_eq!(
+        (s["data_bits"].min, s["data_bits"].max),
+        (Some(8.0), Some(8.0))
+    );
+    assert_eq!(s["parity"].values.as_deref().unwrap(), ["none", "even"]);
+    assert_eq!(s["flow_control"].default, Some(json!("none")));
+    for (name, p) in s {
+        assert!(p.label.is_some() && p.description.is_some(), "{name}");
+    }
+    // The other way round: tcp by default, or serial when the block says so.
+    let plain = DUAL.replace("    serial_only: [rs232-only]\n", "");
+    let spec = DeviceSpec::from_yaml(&plain).unwrap();
+    assert_eq!(spec.settings["link"].default, Some(json!("tcp")));
+    let serial = plain.replace("    models:", "    link: serial\n    models:");
+    let spec = DeviceSpec::from_yaml(&serial).unwrap();
+    assert_eq!(spec.settings["link"].default, Some(json!("serial")));
+    let defaults = crate::catalog::validate(&spec.settings, &Params::new()).unwrap();
+    assert_eq!(spec.serial_link("networked", &defaults), Some(true));
+
+    // What a block may not be.
+    for (from, to, says) in [
+        ("    stop_bits: 1\n", "", "stop_bits"),
+        ("stop_bits: 1", "stop_bits: 3", "stop_bits"),
+        (
+            "data_bits: 8",
+            "data_bits: { default: 8, values: [6, 8] }",
+            "no gaps",
+        ),
+        (
+            "parity: { default: none, values: [none, even] }",
+            "parity: mark",
+            "parity",
+        ),
+        ("default: 9600, values", "default: 4800, values", "default"),
+        ("serial_only: [rs232-only]", "serial_only: [nope]", "nope"),
+        (
+            "    flow_control: none\n",
+            "    flow_control: none\n    speed: 1\n",
+            "speed",
+        ),
+        ("  type: line-tcp", "  type: line-udp", "line-tcp"),
+        (
+            "settings:\n",
+            "settings:\n  baud_rate: { type: int, default: 1, label: B, description: B }\n",
+            "leave it out",
+        ),
+    ] {
+        assert!(DUAL.contains(from), "{from}");
+        let e = DeviceSpec::from_yaml(&DUAL.replace(from, to)).unwrap_err();
+        assert!(e.contains(says), "{from}: {e}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn link_serial_speaks_the_same_protocol_on_the_port() {
+    let ports = Arc::new(MemoryPorts::default());
+    let mut device = ports.plug("COM4");
+    let core = dual_core(ports.clone());
+    // No host: the port is the device's address. The network-only login is
+    // left out, the serial-only step sent.
+    let id = dual_open(
+        &core,
+        "networked",
+        "",
+        json!({"link": "serial", "serial_port": "COM4", "baud_rate": "115200", "password": "x"}),
+    )
+    .unwrap();
+    assert_eq!(line(&mut device).await, "SERIAL");
+    assert_eq!(line(&mut device).await, "HELLO");
+    assert_eq!(
+        ports.opened.lock().unwrap()[0],
+        SerialPort {
+            path: "COM4".into(),
+            baud_rate: 115200,
+            data_bits: 8,
+            parity: Parity::None,
+            stop_bits: 1,
+            flow_control: FlowControl::None,
+        }
+    );
+    wait_connection(&core, id, |c| *c == Connection::Connected).await;
+    let command = core.execute(id, "cut", Params::new());
+    let answer = async {
+        assert_eq!(line(&mut device).await, "CUT");
+        device.write_all(b"Ok\r\n").await.unwrap();
+    };
+    let (result, ()) = tokio::join!(command, answer);
+    assert_eq!(result, Ok(Outcome::Ack));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn link_tcp_uses_the_network_and_a_serial_only_model_defaults_to_its_port() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let ports = Arc::new(MemoryPorts::default());
+    let mut rs232 = ports.plug("COM5");
+    let core = dual_core(ports.clone());
+    let id = core
+        .open(OpenRequest {
+            device: "dual-test".into(),
+            model: "networked".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: json!({"password": "x"}).as_object().unwrap().clone(),
+            monitor: true,
+        })
+        .unwrap();
+    let (mut socket, _) = tokio::time::timeout(Duration::from_secs(5), listener.accept())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(line(&mut socket).await, "PW x");
+    assert_eq!(line(&mut socket).await, "HELLO");
+    wait_connection(&core, id, |c| *c == Connection::Connected).await;
+    let command = core.execute(id, "cut", Params::new());
+    let answer = async {
+        assert_eq!(line(&mut socket).await, "CUT");
+        socket.write_all(b"Ok\r\n").await.unwrap();
+    };
+    let (result, ()) = tokio::join!(command, answer);
+    assert_eq!(result, Ok(Outcome::Ack));
+
+    // Switched to its serial port while open: the port is opened at once.
+    core.update_settings(
+        id,
+        json!({"link": "serial", "serial_port": "COM5"})
+            .as_object()
+            .unwrap()
+            .clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(line(&mut rs232).await, "SERIAL");
+
+    // A model reached only on its serial port uses it unless told otherwise.
+    let _second = ports.plug("COM6");
+    let only = dual_open(&core, "rs232-only", "", json!({"serial_port": "COM6"})).unwrap();
+    wait_connection(&core, only, |c| *c == Connection::Connected).await;
+    assert!(ports
+        .opened
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|p| p.path == "COM6"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_link_without_what_it_needs_is_refused_on_opening() {
+    let core = dual_core(Arc::new(MemoryPorts::default()));
+    let invalid = |r: Result<u64, crate::OpenError>, says: &str| match r {
+        Err(crate::OpenError::InvalidSettings { message }) => {
+            assert!(message.contains(says), "{message}")
+        }
+        other => panic!("{other:?}"),
+    };
+    invalid(
+        dual_open(&core, "networked", "", json!({"link": "serial"})),
+        "serial_port",
+    );
+    invalid(dual_open(&core, "rs232-only", "", json!({})), "serial_port");
+    invalid(
+        dual_open(
+            &core,
+            "no-serial",
+            "",
+            json!({"link": "serial", "serial_port": "COM1"}),
+        ),
+        "no serial port",
+    );
+    // Link tcp needs a host, as any network device does.
+    assert!(matches!(
+        dual_open(&core, "networked", "", json!({})),
+        Err(crate::OpenError::UnresolvableHost { .. })
+    ));
+}
+

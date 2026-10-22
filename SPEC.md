@@ -225,6 +225,77 @@ systems the `serial2` crate supports). Phones have no serial port an app can
 open, so on Android and iOS the port fails to open with a reason saying so,
 and the device stays `disconnected` (docs/MOBILE.md).
 
+#### The same protocol on a serial port
+
+Many devices speak their network protocol unchanged on an RS-232 or RS-422
+port as well (Extron SIS, Kramer Protocol 3000, Lightware LW2 and LW3, most
+Roland switchers), and some models of a family have only the serial port. A
+`line-tcp` transport then adds a `serial` block, and one spec serves the
+device either way: the framing, replies, probe, `on_connect`, telemetry,
+polls and commands are shared, and only what is opened differs.
+
+```yaml
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  serial:
+    serial_only: [in1604-dtp, in1604-hd]   # optional
+    models: [in1806-1808, in1604-dtp, in1604-hd]   # optional
+    baud_rate: { default: 9600, values: [9600, 19200, 38400, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial",
+      note: "Remote RS-232 port, 3-pole captive screw" }
+```
+
+The block stands for settings the spec does not declare itself (the core
+and `tools/validate.py` add them, and the catalogue lists them like any
+other):
+
+- `link`, `tcp` or `serial`: the consumer's choice for each device. `tcp`
+  reaches the device at its host and port, `serial` opens `serial_port` and
+  needs no host. Its default is the block's `link`, `tcp` unless given.
+  With `serial_only`, a list of the models reached only on a serial port
+  (RS-232-only units), `link` has no default: left out, those models use
+  `serial` and the others `tcp`.
+- `serial_port`, optional, and required by opening with link serial.
+- `baud_rate`, `data_bits`, `parity`, `stop_bits` and `flow_control`, as
+  for `line-serial`, each from the block: the vendor's one documented value
+  (a fixed setting), or `{ default, values }` when the device's port can be
+  set to others (`baud_rate` is then an enum of digits, `data_bits` and
+  `stop_bits` an int range without gaps). All five are given, as the vendor
+  documents them; a value the vendor leaves undocumented (flow control,
+  often) is `none` and a quirk with a VERIFICATION.md item.
+
+`models`, when given, lists the models that have the serial port; opening
+another model with link serial fails with `invalid_settings`, as does link
+serial without `serial_port`. Link tcp without a host fails as for any
+network device. Changing `link` or a line setting with `update_settings`
+opens the new link at once, as for `line-serial`; on Android and iOS link
+serial fails to open as `line-serial` does.
+
+The ports list both links, the transport's port with `when: "link tcp"` and
+a `serial` control entry with `when: "link serial"`. A step of `on_connect`
+can name the link it is for, `link: tcp` or `link: serial`, when the vendor
+documents a difference between them, such as a login asked for on the
+network only:
+
+```yaml
+on_connect:
+  - { when_set: password, link: tcp, after_prompt: "Password:", send: "{settings.password}" }
+```
+
+A vector plays a command or a telemetry message on the serial port by giving
+`link: serial` in its `settings` (and on TCP otherwise, unless `serial_only`
+names its model); the vector runner checks that the link opened is the one
+chosen.
+
 ### `line-udp`
 
 Text messages over UDP, one message per datagram (ChamSys MagicQ's remote

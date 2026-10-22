@@ -158,5 +158,43 @@ class Serial(unittest.TestCase):
         self.assertIn("ports[0]: a serial port's setting is serial_port", errors)
 
 
+
+class SerialBlock(unittest.TestCase):
+    def doc(self, **block):
+        serial = {"baud_rate": {"default": 9600, "values": [9600, 38400]}, "data_bits": 8,
+                  "parity": "none", "stop_bits": 1, "flow_control": "none", **block}
+        return {
+            "transport": {"type": "line-tcp", "port": 23, "serial": serial},
+            "models": [{"id": "a"}, {"id": "b"}],
+            "settings": {},
+            "ports": [{"port": 23, "protocol": "tcp", "role": "control", "when": "link tcp"},
+                      {"port": None, "protocol": "serial", "role": "control", "setting": "serial_port",
+                       "when": "link serial", "note": "RS-232"}],
+        }
+
+    def test_the_block_stands_for_the_link_and_serial_settings(self):
+        doc = self.doc()
+        self.assertEqual(validate.expand_serial(doc), [])
+        self.assertEqual(validate.serial_checks(doc) + validate.port_checks(doc), [])
+        s = doc["settings"]
+        self.assertEqual(s["link"]["default"], "tcp")
+        self.assertEqual(s["baud_rate"]["values"], ["9600", "38400"])
+        self.assertEqual((s["data_bits"]["min"], s["data_bits"]["max"]), (8, 8))
+
+    def test_what_a_block_may_not_be(self):
+        doc = self.doc(serial_only=["c"], link="serial")
+        errors = validate.expand_serial(doc)
+        self.assertIn("transport.serial.serial_only: no model 'c'", errors)
+        self.assertTrue(any("link stays tcp" in e for e in errors))
+        doc = self.doc()
+        doc["settings"]["baud_rate"] = {"type": "int"}
+        doc["ports"] = doc["ports"][:1]
+        errors = validate.expand_serial(doc)
+        self.assertIn("settings.baud_rate: transport.serial declares it; leave it out", errors)
+        self.assertTrue(any("when: \"link serial\"" in e for e in errors))
+        doc = {"transport": {"type": "line-tcp", "port": 1}, "on_connect": [{"send": "x", "link": "tcp"}]}
+        self.assertEqual(validate.expand_serial(doc), ["on_connect[0]: link needs transport.serial"])
+
+
 if __name__ == "__main__":
     unittest.main()
