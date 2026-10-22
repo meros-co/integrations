@@ -802,6 +802,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:407](specs/dataton-watchout7.yaml#L407))
 - [ ] Confirm POST /v0/showfile takes the .watch file as the raw request body with Content-Type application/octet-stream, answers 200, and that showName names the loaded show; and record whether WATCHOUT 7 before 7.8 has it. ([specs/dataton-watchout7.yaml:318](specs/dataton-watchout7.yaml#L318))
 
+## dhd-aes67 — DHD audio AES67 / RAVENNA interfaces (Control API)
+
+- [ ] Check the module path /modules/1/api/ws on an AES67 interface itself, and the module ID Toolbox gives an XC3 52-7010 AES67 module. ([specs/dhd-aes67.yaml:40](specs/dhd-aes67.yaml#L40))
+- [ ] Check that the PTP, stream and route values whose names do not begin with _ can be set: DHD's AES67 OpenAPI document gives none of them a set parameter. ([specs/dhd-aes67.yaml:138](specs/dhd-aes67.yaml#L138))
+- [ ] Check that the current value sent after a subscribe arrives as an update rooted at the tree's root, as on cores. ([specs/dhd-aes67.yaml:770](specs/dhd-aes67.yaml#L770))
+- [ ] Check the auth answer and error codes 1280 and 1281 on an AES67 module, as on cores. ([specs/dhd-aes67.yaml:52](specs/dhd-aes67.yaml#L52))
+
+## dhd-control-api — DHD audio XC3 / XD3 / XS3 / RM1 cores (Control API)
+
+- [ ] Check that the current value sent after a subscribe arrives as an update message rooted at the tree's root (`{"method":"update","payload":{"audio":...}}`), as later changes do, and not only inside the subscribe answer. ([specs/dhd-control-api.yaml:3808](specs/dhd-control-api.yaml#L3808))
+- [ ] Check that every answer, including RPC answers and errors, returns the msgID the request carried as a string, which is how the core ties each command to its answer. ([specs/dhd-control-api.yaml:319](specs/dhd-control-api.yaml#L319))
+- [ ] Check the auth answer: success given as the string "true" (as DHD's example shows) or a boolean, error code 1281 for a wrong token and 1280 for none; and that the subscriptions sent once auth is answered are accepted. ([specs/dhd-control-api.yaml:70](specs/dhd-control-api.yaml#L70))
+- [ ] Check that an access group's access, brightnessconsole, brightnessdisplay and colorscheme can be set: their names do not begin with _, but DHD's OpenAPI document gives them no set parameter. ([specs/dhd-control-api.yaml:2736](specs/dhd-control-api.yaml#L2736))
+- [ ] Check the path of the "channel on key sets fader" option: DHD's document gives /control/mixers/<mixer>/faderoptionschonkeysetsfader, which looks like faderoptions/chonkeysetsfader with a slash missing. ([specs/dhd-control-api.yaml:2872](specs/dhd-control-api.yaml#L2872))
+- [ ] Check that fadetovalue takes its fade time as time (as DHD's example request and answer do) rather than fadetime (as its parameter list says). ([specs/dhd-control-api.yaml:485](specs/dhd-control-api.yaml#L485))
+- [ ] Check that a reverb's decay/min is read only like its _max and _step (it is named without the underscore) and that eq q is a whole number in flex processings and a decimal on faders, as the document's types say. ([specs/dhd-control-api.yaml:2963](specs/dhd-control-api.yaml#L2963))
+- [ ] Check that a level detect's _name and _mode are text, as their descriptions say, though DHD's document types them as numbers. ([specs/dhd-control-api.yaml:2971](specs/dhd-control-api.yaml#L2971))
+- [ ] Check that decimals sent with three places (fader -6.500) are accepted, and the nearest-value clamping answer of a set out of range. ([specs/dhd-control-api.yaml:3818](specs/dhd-control-api.yaml#L3818))
+
 ## dhd-ecp — DHD audio ECP (RM4200D, Series 52 cores)
 
 - [ ] Check that an answer to a request addressed by fader channel (FaderHi 0x10) repeats 0x10 and the channel, for get_fader_level and get_pfl, rather than naming the logic fader the channel sits on; the core matches the answer by those bytes. ([specs/dhd-ecp.yaml:567](specs/dhd-ecp.yaml#L567))
