@@ -144,7 +144,11 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-omt", &["omt", "omt-discovery"]),
     (
         "vendor-panasonic",
-        &["panasonic-projector", "panasonic-ptz"],
+        &[
+            "panasonic-projector",
+            "panasonic-ptz",
+            "panasonic-ptz-serial",
+        ],
     ),
     ("vendor-philips", &["philips-sicp"]),
     ("vendor-pjlink", &["pjlink"]),
