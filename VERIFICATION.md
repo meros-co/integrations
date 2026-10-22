@@ -1262,6 +1262,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what `Subnet.VDN<n> ?` answers for a named slot (name and serial separated by one space assumed) and an empty one (* assumed). ([specs/labgruppen-nlb60e.yaml:246](specs/labgruppen-nlb60e.yaml#L246))
 - [ ] Record an amplifier's `Status ?` answer for 2-, 4- and 8-channel models: three values, then nine per channel from A. ([specs/labgruppen-nlb60e.yaml:275](specs/labgruppen-nlb60e.yaml#L275))
 
+## lg-display — LG signage displays and commercial TVs
+
+- [ ] Confirm the display takes the protocol on TCP 9761 with no greeting or login, and answers as over RS-232C; no LG document read names the port. ([specs/lg-display.yaml:3247](specs/lg-display.yaml#L3247))
+- [ ] Confirm an acknowledgement ends with the literal `x` and nothing after it (no CR or LF), and that its Set ID echo is two hex digits (three above 255). ([specs/lg-display.yaml:99](specs/lg-display.yaml#L99))
+- [ ] Record what a display in standby answers to `ka 01 ff` in each PM mode (Network Ready, Screen Off Always), and whether `ka 01 01` turns it on over TCP and is acknowledged. ([specs/lg-display.yaml:3254](specs/lg-display.yaml#L3254))
+- [ ] Check whether lowercase hex (`kf 01 3c`), as LG's examples write it, and uppercase are both taken. ([specs/lg-display.yaml:103](specs/lg-display.yaml#L103))
+- [ ] Check the OSD lock polarity (`kl 00` locks in the webOS 6.0 and 3.2 guides, unlocks in the L19 guide). ([specs/lg-display.yaml:1243](specs/lg-display.yaml#L1243))
+- [ ] Check the tile mode byte order (columns then rows in the webOS guides, rows then columns in the SE3B manual). ([specs/lg-display.yaml:3290](specs/lg-display.yaml#L3290))
+- [ ] Confirm the color temperature data on webOS 3.2 and L19 displays (70-D2 for 3200-13000 K, as webOS 6.0, or 00-64 as older generations). ([specs/lg-display.yaml:351](specs/lg-display.yaml#L351))
+- [ ] Record whether `xb ff` answers the PC or the DTV code of a port in each input label setting. ([specs/lg-display.yaml:154](specs/lg-display.yaml#L154))
+- [ ] Record the `sv` replies (is there a space between the sub-code and the data?) and the bit order of the temperature sensor health (`sv 07`). ([specs/lg-display.yaml:1975](specs/lg-display.yaml#L1975))
+- [ ] Record the fan speed data of `sv 09` for one and for several fans. ([specs/lg-display.yaml:1980](specs/lg-display.yaml#L1980))
+- [ ] Record the `xc ff` reply and whether `xc` takes 00 for an unused window (PIP with two inputs). ([specs/lg-display.yaml:1761](specs/lg-display.yaml#L1761))
+- [ ] Record the `mj ff` reply and how many port codes each model expects. ([specs/lg-display.yaml:1845](specs/lg-display.yaml#L1845))
+- [ ] Record what a timer, holiday and brightness schedule entry read answers (whether the entry code is echoed before the data) and an empty entry. ([specs/lg-display.yaml:1618](specs/lg-display.yaml#L1618))
+- [ ] Confirm the units of `dn` (degrees Celsius assumed) and `dl` (hours assumed), and the 3-byte `dn` form of the SE3B. ([specs/lg-display.yaml:1935](specs/lg-display.yaml#L1935))
+- [ ] Record the format of the serial number (`fy`) and software version (`fz`) data: plain text, or ASCII in hex digits as `jx` answers. ([specs/lg-display.yaml:1950](specs/lg-display.yaml#L1950))
+- [ ] Confirm the IR codes LG prints only as icons: 7E, and the media keys B0, B1, BA, 8F, 8E, AA on signage. ([specs/lg-display.yaml:2010](specs/lg-display.yaml#L2010))
+- [ ] Confirm the daylight saving read `sd 01 01 ff ff ff ff` answers the start entry with its 01 echoed first. ([specs/lg-display.yaml:866](specs/lg-display.yaml#L866))
+- [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:804](specs/lg-display.yaml#L804))
+
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
 - [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
@@ -1448,6 +1469,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
 
+## nec-display — NEC (Sharp NEC) large-format displays
+
+- [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
+- [ ] Confirm the 15 s wait after power and 10 s after an input change are enough, and whether a message sent sooner is answered with the NULL message (BE). ([specs/nec-display.yaml:825](specs/nec-display.yaml#L825))
+- [ ] Confirm 600 ms between messages is needed on the 2011-2013 generation only. ([specs/nec-display.yaml:49](specs/nec-display.yaml#L49))
+- [ ] Check the green and blue gain codes (00-18, 00-1A) on a P404 or P403 generation display, whose tables swap them. ([specs/nec-display.yaml:233](specs/nec-display.yaml#L233))
+- [ ] Confirm the mute code (00-8D) is not taken by the M series, as its table leaves it out. ([specs/nec-display.yaml:334](specs/nec-display.yaml#L334))
+- [ ] Record the firmware version reply (CA02) on each generation: raw characters on the M series, two hex digits per character before. ([specs/nec-display.yaml:683](specs/nec-display.yaml#L683))
+- [ ] Confirm the date year (C211/C212) is counted from 2000 on the M series, and what its last byte (daylight saving, reserved there) is answered. ([specs/nec-display.yaml:685](specs/nec-display.yaml#L685))
+- [ ] Confirm the temperature readout's 0.5 °C two's complement and how many sensors each model has. ([specs/nec-display.yaml:698](specs/nec-display.yaml#L698))
+- [ ] Record whether a display answers messages addressed to ALL or a group, and whether more than one TCP connection is taken at once. ([specs/nec-display.yaml:849](specs/nec-display.yaml#L849))
+- [ ] Confirm out-of-range sets are ignored with result 00 (PN-ME §8.2) on the other series too. ([specs/nec-display.yaml:831](specs/nec-display.yaml#L831))
+
 ## newtek-tricaster — NewTek TriCaster
 
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:572](specs/newtek-tricaster.yaml#L572))
@@ -1615,6 +1649,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Web CGIs of the AW-HE145 and AW-UE155 match the AW-UE150 supplement (only the AW-UE150 is documented). ([specs/panasonic-ptz.yaml:88](specs/panasonic-ptz.yaml#L88))
 - [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8765](specs/panasonic-ptz.yaml#L8765))
 - [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:124](specs/panasonic-ptz.yaml#L124))
+
+## philips-sicp — Philips professional displays (SICP)
+
+- [ ] Confirm the command set of current models (Q, D, C, E and T Line, 55BDL4107X video walls) against SICP V2.03, the newest public version; record get_platform and get_sicp_version on each. ([specs/philips-sicp.yaml:947](specs/philips-sicp.yaml#L947))
+- [ ] Record whether a display answers over TCP in standby in each power save mode, and whether set_power on is acknowledged from standby. ([specs/philips-sicp.yaml:941](specs/philips-sicp.yaml#L941))
+- [ ] Confirm replies carry the group byte (and none with group_byte off on pre-1.86 firmware). ([specs/philips-sicp.yaml:52](specs/philips-sicp.yaml#L52))
+- [ ] Record the input report (AD): whether a source type byte (FD) comes first, and the playlist byte; check 0x00 is taken for no playlist where Philips's examples send 0x09. ([specs/philips-sicp.yaml:438](specs/philips-sicp.yaml#L438))
+- [ ] Confirm sending one video parameter with the others as last read leaves them unchanged, and the Phoenix 2.0 ranges (sharpness 0-10, signed tint). ([specs/philips-sicp.yaml:485](specs/philips-sicp.yaml#L485))
+- [ ] Confirm the volume message takes two bytes on current models and one on Eagle and Himalaya 1. ([specs/philips-sicp.yaml:566](specs/philips-sicp.yaml#L566))
+- [ ] Record the failover list's length per model. ([specs/philips-sicp.yaml:454](specs/philips-sicp.yaml#L454))
+- [ ] Record a tiling report on a zero-bezel and a 5x5 model, and check the position and size encoding (the document's formula fails when the columns equal the row width). ([specs/philips-sicp.yaml:676](specs/philips-sicp.yaml#L676))
+- [ ] Record whether the schedule report echoes its page, and whether a page set with D1 0x10 is page 1 disabled (the document's example). ([specs/philips-sicp.yaml:759](specs/philips-sicp.yaml#L759))
+- [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
+- [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
 ## pjlink — PJLink
 
@@ -2004,6 +2052,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check polling /api/audio/metering at the chosen interval while subscribed elsewhere does not disturb the stream. ([specs/sennheiser-spectera.yaml:599](specs/sennheiser-spectera.yaml#L599))
 - [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
 - [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
+
+## sharp-display — Sharp professional displays (S-Format)
+
+- [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:77](specs/sharp-display.yaml#L77))
+- [ ] Confirm the login is asked for with no user name or password set, and that CR alone is taken then. ([specs/sharp-display.yaml:80](specs/sharp-display.yaml#L80))
+- [ ] Confirm zero padding (`VOLM0030`) is taken on the PN-HB and PN-R903A, whose manuals show space padding (`VOLM  30`). ([specs/sharp-display.yaml:1230](specs/sharp-display.yaml#L1230))
+- [ ] Confirm a negative value as a minus and three digits (`OFSR-005`) and a positive one zero-padded (`OFSR0005`). ([specs/sharp-display.yaml:344](specs/sharp-display.yaml#L344))
+- [ ] Note whether sending the next command right after a reply, without Sharp's 100 ms gap, is ever refused, and how long WAIT lasts for power, input and size changes against the 15 s timeout. ([specs/sharp-display.yaml:67](specs/sharp-display.yaml#L67))
+- [ ] Confirm query replies carry no leading zeros (`30`, not `0030`) for the enum codes read into names (inputs and others). ([specs/sharp-display.yaml:132](specs/sharp-display.yaml#L132))
+- [ ] Record the `INF1` and `SRNO` replies (padding, quotes) on each family. ([specs/sharp-display.yaml:3466](specs/sharp-display.yaml#L3466))
+- [ ] Confirm `ERRT` is in degrees Celsius and record the PN-R903A's six-value reply. ([specs/sharp-display.yaml:3451](specs/sharp-display.yaml#L3451))
+- [ ] Record the `TSAD????` and `INnE????` replies (with or without quotes). ([specs/sharp-display.yaml:2047](specs/sharp-display.yaml#L2047))
+- [ ] Record what `SCnn????` answers and the meaning of its two weekday digits. ([specs/sharp-display.yaml:2228](specs/sharp-display.yaml#L2228))
+- [ ] Confirm the exact `LOCKED` and `UNSELECTED` texts on the PN-HB and PN-R903A (read from garbled Japanese PDFs). ([specs/sharp-display.yaml:5698](specs/sharp-display.yaml#L5698))
+- [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5671](specs/sharp-display.yaml#L5671))
 
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 

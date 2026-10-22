@@ -1,0 +1,974 @@
+spec: 1
+id: philips-sicp
+name: Philips professional displays (SICP, Serial / Ethernet Interface Communication Protocol)
+vendor: Philips (PPDS)
+category: display
+implementation: native
+reason: >
+  SICP is binary: each message is its own length, the monitor ID, a group byte (absent before SICP 1.86), the
+  command and its data, and an XOR checksum, answered by a generic ACK, NACK or NAV report or by a report
+  under the get's own code. Several settings travel in one message (the video parameters, the color gains and
+  offsets, both volumes, treble and bass, the volume limits), so changing one means sending the others as last
+  read, and the reports' layouts differ per command.
+
+source:
+  - title: "Serial / Ethernet Interface Communication Protocol Specification (SICP V2.03) for Professional Displays (2019-06-14)"
+    author: "Philips Signage (TPV Technology for Koninklijke Philips N.V.)"
+    url: "https://community.xibo.org.uk/uploads/short-url/vwVq2nPyhJKL4kTCYpa6VYhQUa8.pdf"
+    note: >
+      Philips's own document, read from a copy posted on the Xibo community forum; no copy on a Philips domain
+      was found, and later versions (2.05 and on) are not public. Nothing here is quoted from it. RS-232 1200
+      to 57600 bps, 9600 by default, 8 data bits, no parity, 1 stop bit, crossed cable, daisy chain (§2.1);
+      TCP 5000 (§2.2); one message answered before the next, a retry after 500 ms (§2.2); message layout,
+      monitor ID, group, checksum (§2.2.1); ACK, NACK and NAV (§2.4); platform and SICP version labels A2,
+      model, firmware and build date A1 (§3); power 18/19, input locks 1A-1D, cold start A3/A4, input source
+      AC/AD with playlist and OSD bytes, auto signal detecting AE/AF, failover A5/A6, restart 57, backlight
+      71/72 (§4); video parameters 32/33, color temperature 34/35, color parameters 36/37, color temperature in
+      100 K 11/12, picture format 3A/3B, VGA 38/39, PIP 3C/3D and 84/85 (§5); volume 44/45, volume step 41,
+      volume limits B6-B9, treble and bass 42/43, mute 46/47 (§6); operating hours 0F, smart power DD/DE, VGA
+      auto adjust 70, temperature 2F, serial code 15, tiling 22/23, monitor and group IDs C0, show ID 4C,
+      AnyTile 4A/4B and 4E/4F, light sensor 24/25, human sensor B3/B4, OSD rotating 26/27, orientation 16/17,
+      information OSD 2C/2D, MEMC 28/29, touch 1E/1F, noise reduction 2A/2B, scan mode 50/51, scan conversion
+      52/53, switch-on delay 54/55, factory reset 56, power-on logo 3E/3F, fan speed 61/62, APM D0/D1, power
+      save D2/D3, pixel shift B1/B2, off timer 91/92, ECO 63/64, picture style 65/66, screenshot 58, signal 59,
+      frame compensation 5E/5F and 67/68 (§7); scheduling 5A/5B (§8); group ID 5C/5D (§9); custom
+      multi-window FB-FD (§10); LED strip F3/F4 (§12); storage lock F1/F2 (§13); monitor ID 69 (§14);
+      platforms and models (§15); revision history (§17).
+  - title: "User Manual, 43BDL3650Q, 50BDL3650Q, 55BDL3650Q (2023)"
+    author: "Philips / PPDS"
+    url: "https://www.documents.philips.com/assets/20240207/326b8676a5bf4ef98de2b10f00b4e145.pdf"
+    note: >
+      Network SICP on by default on port 5000, configurable 1025-65535 (Settings > Signage Display > Network
+      Application > SICP Network Port); the four power save modes, of which 3 and 4 keep TCP on in standby and
+      1 and 2 wake on LAN; monitor ID 1-255 and group 1-254; RS-232 routing.
+  - title: "Bitfocus Companion module philips-sicp (MIT)"
+    url: "https://github.com/bitfocus/companion-module-philips-sicp"
+    note: "Corroboration only, licence checked, no code copied: the same framing and port."
+
+settings:
+  # The display's Monitor ID (menu, 1-255). 0 broadcasts and is never answered, so it is not offered.
+  monitor_id: { type: int, min: 1, max: 255, default: 1, label: Monitor ID, description: "The display's monitor ID from its menu, 1 to 255; on an RS-232 chain, the display this device addresses." }
+  # Firmware before SICP 1.86 has no group byte; the Himalaya 1.0 platform and later always take it.
+  group_byte: { type: bool, default: true, label: Group byte, description: "On sends the group byte (SICP 1.86 and later); off for older firmware that takes none." }
+  poll_ms: { type: int, min: 500, max: 3600000, default: 5000, label: Read interval, description: "Milliseconds between reads of power, input, volume and mute; other settings are read every minute." }
+  # tcp: SICP over LAN, port 5000 by default (set on the display). serial: its RS-232 port, the same messages.
+  link: { type: enum, values: [tcp, serial], default: tcp, label: Link, description: "tcp reaches the display on the network; serial uses an RS-232 port of the host wired to the display's RS-232 IN." }
+  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the display: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate: { type: enum, values: ["1200", "2400", "4800", "9600", "19200", "38400", "57600"], default: "9600", label: Baud rate, description: "With link serial, the speed set on the display: 9600 by default." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, bits per character; SICP uses 8." }
+  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control: only RXD, TXD and ground are wired." }
+
+ports:
+  - { port: 5000, protocol: tcp, role: control, when: "link tcp", note: "the display's SICP network port, 5000 unless changed in its menu" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232 port of the host wired to the display's RS-232 IN (DB-9 or 2.5 mm jack), crossed cable" }
+
+models:
+- id: android
+  name: 'Philips Android signage (Dragon, Himalaya 2.0, QL3 platforms and later: BDL4050D, BDL4051D/T, BDL4150D, BDL5055P/5057P, BDL3050Q,
+    Q, D, C, E and T Line)'
+  supports: [get_power, set_power, get_power_at_cold_start, set_power_at_cold_start, get_backlight, set_backlight, get_ir_lock, set_ir_lock,
+    get_keypad_lock, set_keypad_lock, get_auto_signal_detecting, set_auto_signal_detecting, get_color_temperature, set_color_temperature,
+    get_color_temperature_kelvin, set_color_temperature_kelvin, get_picture_format, set_picture_format, get_picture_style, set_picture_style,
+    get_noise_reduction, set_noise_reduction, get_memc, set_memc, get_scan_mode, set_scan_mode, get_scan_conversion, set_scan_conversion,
+    get_mute, set_mute, get_switch_on_delay, set_switch_on_delay, get_frame_compensation_h, set_frame_compensation_h, get_frame_compensation_v,
+    set_frame_compensation_v, get_anytile_resolution, set_anytile_resolution, get_group_id, set_group_id, get_light_sensor, set_light_sensor,
+    get_human_sensor, set_human_sensor, get_fan_speed, set_fan_speed, get_smart_power, set_smart_power, get_apm, set_apm, get_power_save,
+    set_power_save, get_pixel_shift, set_pixel_shift, get_off_timer, set_off_timer, get_osd_rotation, set_osd_rotation, get_information_osd,
+    set_information_osd, get_touch, set_touch, get_power_on_logo, set_power_on_logo, get_external_storage_lock, set_external_storage_lock,
+    get_sicp_version, get_platform, get_platform_version, get_model, get_firmware_version, get_build_date, get_android_firmware_version,
+    get_serial_number, get_input, set_input, get_failover_priority, set_failover_priority, restart, get_video_parameters, set_brightness,
+    set_color, set_contrast, set_sharpness, set_tint, set_black_level, set_gamma, get_color_parameters, set_red_gain, set_green_gain,
+    set_blue_gain, set_red_offset, set_green_offset, set_blue_offset, get_vga_parameters, set_vga_h_position, set_vga_v_position, auto_adjust,
+    get_signal, get_volume, set_volume, set_audio_out_volume, volume_up, volume_down, get_audio_parameters, set_treble, set_bass, get_speaker_volume_limits,
+    set_speaker_volume_limits, get_audio_out_volume_limits, set_audio_out_volume_limits, get_pip, set_pip, get_pip_sources, set_pip_source,
+    set_pip_sources, get_tiling, set_tiling, set_tiling_enabled, get_anytile, set_anytile, assign_ids, show_monitor_id, set_monitor_id,
+    get_operating_hours, get_temperature, set_pixel_shift_auto, get_orientation, set_orientation, factory_reset, screenshot, get_schedule,
+    set_schedule, set_multi_window, get_window, set_window]
+  verification: none
+  notes: 'SICP V2.03''s command set. Platforms differ: a command a platform lacks is answered NAV, and fails; read the platform with
+    get_platform.'
+- id: legacy
+  name: Philips signage on the Eagle, Phoenix, MTK and Himalaya 1 platforms (BDLxxxx EL, QL, VL, XL, XU models)
+  supports: [get_power, set_power, get_power_at_cold_start, set_power_at_cold_start, get_backlight, set_backlight, get_ir_lock, set_ir_lock,
+    get_keypad_lock, set_keypad_lock, get_auto_signal_detecting, set_auto_signal_detecting, get_color_temperature, set_color_temperature,
+    get_color_temperature_kelvin, set_color_temperature_kelvin, get_picture_format, set_picture_format, get_picture_style, set_picture_style,
+    get_noise_reduction, set_noise_reduction, get_memc, set_memc, get_scan_mode, set_scan_mode, get_scan_conversion, set_scan_conversion,
+    get_mute, set_mute, get_switch_on_delay, set_switch_on_delay, get_frame_compensation_h, set_frame_compensation_h, get_frame_compensation_v,
+    set_frame_compensation_v, get_group_id, set_group_id, get_light_sensor, set_light_sensor, get_fan_speed, set_fan_speed, get_smart_power,
+    set_smart_power, get_apm, set_apm, get_power_save, set_power_save, get_eco_mode, set_eco_mode, get_pixel_shift, set_pixel_shift,
+    get_off_timer, set_off_timer, get_osd_rotation, set_osd_rotation, get_information_osd, set_information_osd, get_touch, set_touch,
+    get_power_on_logo, set_power_on_logo, get_sicp_version, get_platform, get_platform_version, get_model, get_firmware_version, get_build_date,
+    get_serial_number, get_input, set_input, get_failover_priority, set_failover_priority, get_video_parameters, set_brightness, set_color,
+    set_contrast, set_sharpness, set_tint, set_black_level, set_gamma, get_color_parameters, set_red_gain, set_green_gain, set_blue_gain,
+    set_red_offset, set_green_offset, set_blue_offset, get_vga_parameters, set_vga_h_position, set_vga_v_position, auto_adjust, get_signal,
+    get_volume, set_volume, set_audio_out_volume, volume_up, volume_down, get_audio_parameters, set_treble, set_bass, get_speaker_volume_limits,
+    set_speaker_volume_limits, get_audio_out_volume_limits, set_audio_out_volume_limits, get_pip, set_pip, get_pip_sources, set_pip_source,
+    set_pip_sources, get_tiling, set_tiling, set_tiling_enabled, assign_ids, show_monitor_id, set_monitor_id, get_operating_hours, get_temperature,
+    set_pixel_shift_auto, get_orientation, set_orientation, factory_reset, get_schedule, set_schedule]
+  verification: none
+  notes: 'Firmware before SICP 1.86 takes no group byte: set group_byte off. Phoenix 2.0 models read sharpness 0-10, tint and treble
+    and bass as signed bytes.'
+- id: 10bdl3051t
+  name: Philips 10BDL3051T
+  supports: [get_power, set_power, get_group_id, set_group_id, get_smart_power, set_smart_power, get_touch, set_touch, get_power_on_logo,
+    set_power_on_logo, get_external_storage_lock, set_external_storage_lock, get_sicp_version, get_platform, get_platform_version, get_model,
+    get_firmware_version, get_build_date, get_android_firmware_version, get_serial_number, get_input, set_input, get_volume, set_volume,
+    set_audio_out_volume, get_operating_hours, factory_reset, get_led_strip, set_led_strip, get_schedule, set_schedule]
+  verification: none
+  notes: SICP V1.97 lists the commands this model takes; power only switches the screen.
+commands:
+  get_power: {summary: Read the power state (19), returns: value}
+  set_power:
+    summary: Set the power state (18) and read it back
+    params:
+      'on': {type: bool, required: true, label: Power, description: 'On turns the display on; off puts it in standby (from standby over
+          LAN, power save mode 3 or 4 must keep the network up).'}
+    returns: ack
+  get_power_at_cold_start: {summary: Read the power state after mains power returns (A4), returns: value}
+  set_power_at_cold_start:
+    summary: Set the power state after mains power returns (A3) and read it back
+    params:
+      state:
+        type: enum
+        values: ['off', 'on', last]
+        required: true
+        label: State
+        description: 'The state after mains power returns: off, on, or the last state.'
+    returns: ack
+  get_backlight: {summary: Read the backlight (71), returns: value}
+  set_backlight:
+    summary: Set the backlight (72) and read it back
+    params:
+      'on': {type: bool, required: true, label: Backlight, description: On lights the backlight; off turns it off with the display running.}
+    returns: ack
+  get_ir_lock: {summary: Read the remote control lock (1D), returns: value}
+  set_ir_lock:
+    summary: Set the remote control lock (1C) and read it back
+    params:
+      lock:
+        type: enum
+        values: [unlocked, all, all_but_power, all_but_volume, primary, secondary, all_but_power_and_volume]
+        required: true
+        label: IR lock
+        description: 'What the remote control may do: unlocked, all locked, all but power or volume (or both) locked; primary and secondary
+          set a daisy chain''s IR roles.'
+    returns: ack
+  get_keypad_lock: {summary: Read the keypad lock (1B), returns: value}
+  set_keypad_lock:
+    summary: Set the keypad lock (1A) and read it back
+    params:
+      lock:
+        type: enum
+        values: [unlocked, all, all_but_power, all_but_volume, all_but_power_and_volume]
+        required: true
+        label: Keypad lock
+        description: What the display's keys may do; the partial locks are not on the 10BDL3151T and 24BDL2451T.
+    returns: ack
+  get_auto_signal_detecting: {summary: Read the auto signal detecting (AF), returns: value}
+  set_auto_signal_detecting:
+    summary: Set the auto signal detecting (AE) and read it back
+    params:
+      mode:
+        type: enum
+        values: ['off', all, pc_sources, video_sources, failover]
+        required: true
+        label: Auto signal detecting
+        description: Which sources the display switches to on losing its signal, or failover (the order set_failover_priority sets).
+    returns: ack
+  get_color_temperature: {summary: Read the color temperature preset (35), returns: value}
+  set_color_temperature:
+    summary: Set the color temperature preset (34) and read it back
+    params:
+      preset:
+        type: enum
+        values: [user1, native, 11000k, 10000k, 9300k, 7500k, 6500k, 5770k, 5500k, 5000k, 4000k, 3400k, 3350k, 3000k, 2800k, 2600k,
+          1850k, user2]
+        required: true
+        label: Color temperature
+        description: A preset; most models offer user1, native, 10000k, 9300k, 7500k, 6500k, 5000k, 4000k, 3000k and user2.
+    returns: ack
+  get_color_temperature_kelvin: {summary: Read the color temperature in 100 K steps (12), returns: value}
+  set_color_temperature_kelvin:
+    summary: Set the color temperature in 100 K steps (11) and read it back
+    params:
+      hundreds: {type: int, min: 20, max: 100, required: true, label: Color temperature, description: 'Color temperature in hundreds
+          of kelvin, 20 (2000 K) to 100 (10000 K); 26 at least on Phoenix 2.0.'}
+    returns: ack
+  get_picture_format: {summary: Read the picture format (3B), returns: value}
+  set_picture_format:
+    summary: Set the picture format (3A) and read it back
+    params:
+      format:
+        type: enum
+        values: [normal, custom, real, full, '21_9', dynamic, '16_9']
+        required: true
+        label: Picture format
+        description: normal (4:3), custom, real (1:1), full, 21:9, dynamic or 16:9.
+    returns: ack
+  get_picture_style: {summary: Read the picture style (65), returns: value}
+  set_picture_style:
+    summary: Set the picture style (66) and read it back
+    params:
+      style:
+        type: enum
+        values: [highbright, srgb, vivid, natural, standard, video, static_signage, text, energy_saving, soft, user]
+        required: true
+        label: Picture style
+        description: The picture style; each model offers some of them.
+    returns: ack
+  get_noise_reduction: {summary: Read the noise reduction (2B), returns: value}
+  set_noise_reduction:
+    summary: Set the noise reduction (2A) and read it back
+    params:
+      level:
+        type: enum
+        values: ['off', low, middle, high, default]
+        required: true
+        label: Noise reduction
+        description: Noise reduction level; default is Challenger 2.1's.
+    returns: ack
+  get_memc: {summary: Read the MEMC effect (29), returns: value}
+  set_memc:
+    summary: Set the MEMC effect (28) and read it back
+    params:
+      level:
+        type: enum
+        values: ['off', low, medium, high]
+        required: true
+        label: MEMC
+        description: Motion compensation level.
+    returns: ack
+  get_scan_mode: {summary: Read the scan mode (51), returns: value}
+  set_scan_mode:
+    summary: Set the scan mode (50) and read it back
+    params:
+      mode:
+        type: enum
+        values: [overscan, underscan, 'off']
+        required: true
+        label: Scan mode
+        description: Overscan, underscan or off.
+    returns: ack
+  get_scan_conversion: {summary: Read the scan conversion (53), returns: value}
+  set_scan_conversion:
+    summary: Set the scan conversion (52) and read it back
+    params:
+      mode:
+        type: enum
+        values: [progressive, interlace]
+        required: true
+        label: Scan conversion
+        description: Progressive or interlaced conversion.
+    returns: ack
+  get_mute: {summary: Read the mute (46), returns: value}
+  set_mute:
+    summary: Set the mute (47) and read it back
+    params:
+      muted: {type: bool, required: true, label: Mute, description: On mutes the speakers and the audio out; off restores them.}
+    returns: ack
+  get_switch_on_delay: {summary: Read the tiling switch-on delay (55), returns: value}
+  set_switch_on_delay:
+    summary: Set the tiling switch-on delay (54) and read it back
+    params:
+      delay: {type: int, min: 0, max: 255, required: true, label: Switch-on delay, description: '0 off, 1 auto (by tile position), or
+          2 to 255 seconds before turning on.'}
+    returns: ack
+  get_frame_compensation_h: {summary: Read the horizontal frame compensation (5E), returns: value}
+  set_frame_compensation_h:
+    summary: Set the horizontal frame compensation (5F) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Horizontal frame compensation, description: 'Horizontal bezel compensation,
+          0 to 255.'}
+    returns: ack
+  get_frame_compensation_v: {summary: Read the vertical frame compensation (67), returns: value}
+  set_frame_compensation_v:
+    summary: Set the vertical frame compensation (68) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Vertical frame compensation, description: 'Vertical bezel compensation,
+          0 to 255.'}
+    returns: ack
+  get_anytile_resolution: {summary: Read the AnyTile resolution mode (4E), returns: value}
+  set_anytile_resolution:
+    summary: Set the AnyTile resolution mode (4F) and read it back
+    params:
+      mode:
+        type: enum
+        values: [default, fhd, uhd]
+        required: true
+        label: AnyTile resolution
+        description: 'The canvas resolution: default, FHD or UHD.'
+    returns: ack
+  get_group_id: {summary: Read the group ID (5D), returns: value}
+  set_group_id:
+    summary: Set the group ID (5C) and read it back
+    params:
+      group: {type: int, min: 1, max: 255, required: true, label: Group ID, description: 'The display''s group, 1 to 254, or 255 for
+          off on legacy firmware.'}
+    returns: ack
+  get_light_sensor: {summary: Read the light sensor (25), returns: value}
+  set_light_sensor:
+    summary: Set the light sensor (24) and read it back
+    params:
+      'on': {type: bool, required: true, label: Light sensor, description: On adjusts the backlight to the ambient light (a fitted sensor).}
+    returns: ack
+  get_human_sensor: {summary: Read the human sensor (B3), returns: value}
+  set_human_sensor:
+    summary: Set the human sensor (B4) and read it back
+    params:
+      minutes: {type: int, min: 0, max: 6, required: true, label: Human sensor, description: '0 off, or 1 to 6 for 10 to 60 minutes
+          without a person before the backlight goes off; read 255 when no sensor is fitted.'}
+    returns: ack
+  get_fan_speed: {summary: Read the fan speed setting (62), returns: value}
+  set_fan_speed:
+    summary: Set the fan speed setting (61) and read it back
+    params:
+      speed:
+        type: enum
+        values: ['off', auto, low, middle, high]
+        required: true
+        label: Fan speed
+        description: The fan speed setting.
+    returns: ack
+  get_smart_power: {summary: Read the smart power (DE), returns: value}
+  set_smart_power:
+    summary: Set the smart power (DD) and read it back
+    params:
+      level:
+        type: enum
+        values: ['off', low, medium, high]
+        required: true
+        label: Smart power
+        description: Backlight dimming to save power; low is the same as off.
+    returns: ack
+  get_apm: {summary: Read the advanced power management (D1), returns: value}
+  set_apm:
+    summary: Set the advanced power management (D0) and read it back
+    params:
+      mode:
+        type: enum
+        values: ['off', 'on', mode1, mode2]
+        required: true
+        label: APM
+        description: 'Advanced power management: off, on, mode1 (TCP off, Wake on LAN on) or mode2 (TCP on, Wake on LAN off).'
+    returns: ack
+  get_power_save: {summary: Read the power save mode (D3), returns: value}
+  set_power_save:
+    summary: Set the power save mode (D2) and read it back
+    params:
+      mode:
+        type: enum
+        values: [rgb_off_video_off, rgb_off_video_on, rgb_on_video_off, rgb_on_video_on, mode1, mode2, mode3, mode4]
+        required: true
+        label: Power save
+        description: Power save mode; Android platforms take mode1 to mode4 (modes 3 and 4 keep TCP on in standby), older ones the RGB
+          and video combinations.
+    returns: ack
+  get_eco_mode: {summary: Read the ECO mode (63), returns: value}
+  set_eco_mode:
+    summary: Set the ECO mode (64) and read it back
+    params:
+      mode:
+        type: enum
+        values: [low_power_standby, normal]
+        required: true
+        label: ECO mode
+        description: 'Standby kind: low_power_standby or normal (Phoenix platforms).'
+    returns: ack
+  get_pixel_shift: {summary: Read the pixel shift (B1), returns: value}
+  set_pixel_shift:
+    summary: Set the pixel shift (B2) and read it back
+    params:
+      steps: {type: int, min: 0, max: 90, required: true, label: Pixel shift, description: '0 off, or 1 to 90 for 10 to 900 seconds
+          between shifts (set_pixel_shift_auto for auto); read 91 for auto.'}
+    returns: ack
+  get_off_timer: {summary: Read the off timer (91), returns: value}
+  set_off_timer:
+    summary: Set the off timer (92) and read it back
+    params:
+      hours: {type: int, min: 0, max: 24, required: true, label: Off timer, description: '0 off, or 1 to 24 hours before the display
+          turns off.'}
+    returns: ack
+  get_osd_rotation: {summary: Read the on-screen menu rotation (27), returns: value}
+  set_osd_rotation:
+    summary: Set the on-screen menu rotation (26) and read it back
+    params:
+      'on': {type: bool, required: true, label: OSD rotation, description: On rotates the on-screen menu.}
+    returns: ack
+  get_information_osd: {summary: Read the information OSD (2D), returns: value}
+  set_information_osd:
+    summary: Set the information OSD (2C) and read it back
+    params:
+      seconds: {type: int, min: 0, max: 60, required: true, label: Information OSD, description: '0 off, or 1 to 60 seconds the information
+          box shows.'}
+    returns: ack
+  get_touch: {summary: Read the touch feature (1F), returns: value}
+  set_touch:
+    summary: Set the touch feature (1E) and read it back
+    params:
+      'on': {type: bool, required: true, label: Touch, description: On enables the touch feature.}
+    returns: ack
+  get_power_on_logo: {summary: Read the power-on logo (3F), returns: value}
+  set_power_on_logo:
+    summary: Set the power-on logo (3E) and read it back
+    params:
+      logo:
+        type: enum
+        values: ['off', 'on', user]
+        required: true
+        label: Power-on logo
+        description: 'The logo while starting: off, on (Philips) or user.'
+    returns: ack
+  get_external_storage_lock: {summary: Read the USB and microSD lock (F2), returns: value}
+  set_external_storage_lock:
+    summary: Set the USB and microSD lock (F1) and read it back
+    params:
+      locked: {type: bool, required: true, label: Storage lock, description: On locks every USB and microSD port.}
+    returns: ack
+  get_sicp_version: {summary: Read the SICP version the display implements (A2 00), returns: value}
+  get_platform: {summary: 'Read the platform label (Eagle, Phoenix, Himalaya, Dragon ...) (A2 01)', returns: value}
+  get_platform_version: {summary: Read the platform version (A2 02), returns: value}
+  get_model: {summary: Read the model number (A1 00), returns: value}
+  get_firmware_version: {summary: Read the firmware version (A1 01), returns: value}
+  get_build_date: {summary: Read the firmware build date (A1 02), returns: value}
+  get_android_firmware_version: {summary: Read the Android firmware build (A1 03), returns: value}
+  get_serial_number: {summary: Read the serial code (15), returns: value}
+  get_input: {summary: Read the input source and its playlist or URL number (AD), returns: value}
+  set_input:
+    summary: Select the input source (AC) and read it back
+    params:
+      source:
+        type: enum
+        values: &id001 [video, s_video, component, cvi2, vga, hdmi2, displayport2, usb2, card_dvi_d, displayport, card_ops, usb, hdmi,
+          dvi_d, hdmi3, browser, smartcms, dms, internal_storage, media_player, pdf_player, custom, hdmi4, vga2, vga3, iwb]
+        required: true
+        label: Source
+        description: 'The source; a model has some of them: hdmi is HDMI 1, card_ops the OPS slot, browser, smartcms, media_player,
+          pdf_player and custom the Android sources.'
+      playlist: {type: int, min: 0, max: 7, required: true, label: Playlist, description: 'For media_player and pdf_player the playlist
+          1 to 7, for browser the URL 1 to 7, or 0 for none (Android platforms).'}
+      show_label: {type: bool, required: true, label: Show label, description: On shows the source label on screen as it switches.}
+    returns: ack
+  get_failover_priority: {summary: Read the failover priority list (A6), returns: value}
+  set_failover_priority:
+    summary: Set the failover priority list (A5) and read it back
+    params:
+      sources: {type: string, max_length: 400, pattern: '^[a-z0-9_]+( *, *[a-z0-9_]+)*$', required: true, label: Sources, description: 'Sources
+          in priority order, separated by commas, from: hdmi, component, composite, displayport, dvi_d, vga, ops, usb, browser, smartcms,
+          internal_storage, dms, hdmi2, hdmi3, usb_playlist, usb_autoplay, media_player, pdf_player, custom, hdmi4, vga2, vga3, iwb.'}
+    returns: ack
+  restart:
+    summary: 'Restart the display (57): Android or the scalar; Android platforms only'
+    params:
+      target:
+        type: enum
+        values: [android, scalar]
+        required: true
+        label: Restart
+        description: What to restart.
+    returns: ack
+  get_video_parameters: {summary: 'Read the video parameters (33): brightness, color, contrast, sharpness, tint, black level and gamma',
+    returns: value}
+  set_brightness:
+    summary: Set the brightness (32, with the other video parameters as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Brightness, description: Brightness from 0 to 100 percent of the display's
+          range (sharpness 0 to 10 and tint -50 to 50 as signed bytes on Phoenix 2.0).}
+    returns: ack
+  set_color:
+    summary: Set the color (32, with the other video parameters as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Color, description: Color from 0 to 100 percent of the display's range
+          (sharpness 0 to 10 and tint -50 to 50 as signed bytes on Phoenix 2.0).}
+    returns: ack
+  set_contrast:
+    summary: Set the contrast (32, with the other video parameters as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Contrast, description: Contrast from 0 to 100 percent of the display's
+          range (sharpness 0 to 10 and tint -50 to 50 as signed bytes on Phoenix 2.0).}
+    returns: ack
+  set_sharpness:
+    summary: Set the sharpness (32, with the other video parameters as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Sharpness, description: Sharpness from 0 to 100 percent of the display's
+          range (sharpness 0 to 10 and tint -50 to 50 as signed bytes on Phoenix 2.0).}
+    returns: ack
+  set_tint:
+    summary: Set the tint (32, with the other video parameters as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Tint, description: Tint from 0 to 100 percent of the display's range
+          (sharpness 0 to 10 and tint -50 to 50 as signed bytes on Phoenix 2.0).}
+    returns: ack
+  set_black_level:
+    summary: Set the black level (32, with the other video parameters as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Black level, description: Black level from 0 to 100 percent of the
+          display's range (sharpness 0 to 10 and tint -50 to 50 as signed bytes on Phoenix 2.0).}
+    returns: ack
+  set_gamma:
+    summary: Set the gamma (32, with the other video parameters as read) and read it back
+    params:
+      gamma:
+        type: enum
+        values: [native, s_gamma, '2.2', '2.4', dicom]
+        required: true
+        label: Gamma
+        description: native, S gamma, 2.2, 2.4 or DICOM.
+    returns: ack
+  get_color_parameters: {summary: 'Read the red, green and blue gains and offsets (37)', returns: value}
+  set_red_gain:
+    summary: Set the red gain (36, with the others as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Red gain, description: Red gain from 0 to 255.}
+    returns: ack
+  set_green_gain:
+    summary: Set the green gain (36, with the others as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Green gain, description: Green gain from 0 to 255.}
+    returns: ack
+  set_blue_gain:
+    summary: Set the blue gain (36, with the others as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Blue gain, description: Blue gain from 0 to 255.}
+    returns: ack
+  set_red_offset:
+    summary: Set the red offset (36, with the others as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Red offset, description: Red offset from 0 to 255.}
+    returns: ack
+  set_green_offset:
+    summary: Set the green offset (36, with the others as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Green offset, description: Green offset from 0 to 255.}
+    returns: ack
+  set_blue_offset:
+    summary: Set the blue offset (36, with the others as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Blue offset, description: Blue offset from 0 to 255.}
+    returns: ack
+  get_vga_parameters: {summary: 'Read the VGA clock, phase and position (39)', returns: value}
+  set_vga_h_position:
+    summary: Set the VGA horizontal position (38, with the others as read) and read it back
+    params:
+      position: {type: int, min: 0, max: 100, required: true, label: Horizontal position, description: 'Horizontal position from 0 to
+          100 percent, in steps of 10.'}
+    returns: ack
+  set_vga_v_position:
+    summary: Set the VGA vertical position (38, with the others as read) and read it back
+    params:
+      position: {type: int, min: 0, max: 100, required: true, label: Vertical position, description: 'Vertical position from 0 to 100
+          percent, in steps of 10.'}
+    returns: ack
+  auto_adjust: {summary: Adjust the VGA picture automatically (70 40 00), returns: ack}
+  get_signal: {summary: Read whether the input has a signal (59), returns: value}
+  get_volume: {summary: Read the speaker and audio-out volumes (45), returns: value}
+  set_volume:
+    summary: Set the speaker volume (44, with the audio-out volume as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Volume, description: Speaker volume from 0 to 100; 0 does not mute.}
+    returns: ack
+  set_audio_out_volume:
+    summary: Set the audio-out volume (44, with the speaker volume as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Audio out volume, description: Audio-out volume from 0 to 100.}
+    returns: ack
+  volume_up:
+    summary: Step the volume up (41) and read it back
+    params:
+      audio_out: {type: bool, required: true, label: Audio out too, description: On steps the audio-out volume up with the speakers;
+          off leaves it (newer firmware only).}
+    returns: ack
+  volume_down:
+    summary: Step the volume down (41) and read it back
+    params:
+      audio_out: {type: bool, required: true, label: Audio out too, description: On steps the audio-out volume down with the speakers;
+          off leaves it (newer firmware only).}
+    returns: ack
+  get_audio_parameters: {summary: Read the treble and bass (43), returns: value}
+  set_treble:
+    summary: Set the treble (42, with the other as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Treble, description: Treble from 0 to 100 percent (-8 to 8 as signed
+          bytes on Phoenix 2.0).}
+    returns: ack
+  set_bass:
+    summary: Set the bass (42, with the other as read) and read it back
+    params:
+      level: {type: int, min: 0, max: 255, required: true, label: Bass, description: Bass from 0 to 100 percent (-8 to 8 as signed bytes
+          on Phoenix 2.0).}
+    returns: ack
+  get_speaker_volume_limits: {summary: Read the speaker volume limits (B6), returns: value}
+  set_speaker_volume_limits:
+    summary: Set the speaker volume limits (B8) and read them back
+    params:
+      minimum: {type: int, min: 0, max: 100, required: true, label: Minimum, description: Lowest volume from 0 to 100.}
+      maximum: {type: int, min: 0, max: 100, required: true, label: Maximum, description: Highest volume from 0 to 100 (60 for the audio
+          out on Phoenix 2.0).}
+      switch_on: {type: int, min: 0, max: 100, required: true, label: Switch-on volume, description: 'Volume at power on, between the
+          minimum and the maximum.'}
+    returns: ack
+  get_audio_out_volume_limits: {summary: Read the audio-out volume limits (B7), returns: value}
+  set_audio_out_volume_limits:
+    summary: Set the audio-out volume limits (B9) and read them back
+    params:
+      minimum: {type: int, min: 0, max: 100, required: true, label: Minimum, description: Lowest volume from 0 to 100.}
+      maximum: {type: int, min: 0, max: 100, required: true, label: Maximum, description: Highest volume from 0 to 100 (60 for the audio
+          out on Phoenix 2.0).}
+      switch_on: {type: int, min: 0, max: 100, required: true, label: Switch-on volume, description: 'Volume at power on, between the
+          minimum and the maximum.'}
+    returns: ack
+  get_pip: {summary: Read the PIP mode and position (3D), returns: value}
+  set_pip:
+    summary: Set the PIP mode and position (3C) and read it back
+    params:
+      mode:
+        type: enum
+        values: ['off', pip, pop, quick_swap, pbp_2win, pbp_3win, pbp_4win, pbp_3win_1, pbp_3win_2, pbp_4win_1, custom]
+        required: true
+        label: PIP mode
+        description: Off, PIP, POP, quick swap, the PBP layouts, or custom (the multi-window layout); each platform offers some of them.
+      position:
+        type: enum
+        values: [bottom_left, top_left, top_right, bottom_right, center]
+        required: true
+        label: PIP position
+        description: Where the sub picture shows.
+    returns: ack
+  get_pip_sources: {summary: Read the PIP sources (85), returns: value}
+  set_pip_source:
+    summary: Set the PIP source (84, short form for Dragon platforms) and read it back
+    params:
+      source:
+        type: enum
+        values: *id001
+        required: true
+        label: Source
+        description: 'The source; a model has some of them: hdmi is HDMI 1, card_ops the OPS slot, browser, smartcms, media_player,
+          pdf_player and custom the Android sources.'
+    returns: ack
+  set_pip_sources:
+    summary: Set the sources of PIP windows 2 to 4 (84) and read them back
+    params:
+      q2:
+        type: enum
+        values: *id001
+        required: true
+        label: Window 2 source
+        description: 'The source; a model has some of them: hdmi is HDMI 1, card_ops the OPS slot, browser, smartcms, media_player,
+          pdf_player and custom the Android sources.'
+      q3:
+        type: enum
+        values: *id001
+        required: true
+        label: Window 3 source
+        description: 'The source; a model has some of them: hdmi is HDMI 1, card_ops the OPS slot, browser, smartcms, media_player,
+          pdf_player and custom the Android sources.'
+      q4:
+        type: enum
+        values: *id001
+        required: true
+        label: Window 4 source
+        description: 'The source; a model has some of them: hdmi is HDMI 1, card_ops the OPS slot, browser, smartcms, media_player,
+          pdf_player and custom the Android sources.'
+    returns: ack
+  get_tiling: {summary: Read the tiling settings (23), returns: value}
+  set_tiling:
+    summary: 'Set tiling: on or off, frame compensation, position and the wall''s size (22), and read it back'
+    params:
+      enabled: {type: bool, required: true, label: Tiling, description: On shows this display's part of the wall.}
+      frame_compensation: {type: bool, required: true, label: Frame compensation, description: On hides the picture behind the bezels.}
+      position: {type: int, min: 1, max: 150, required: true, label: Position, description: 'This display''s place in the wall from
+          1, left to right then top to bottom.'}
+      columns: {type: int, min: 1, max: 15, required: true, label: Columns, description: 'Displays across the wall: 1 to 5, or 1 to
+          15 with zero_bezel.'}
+      rows: {type: int, min: 1, max: 10, required: true, label: Rows, description: 'Displays down the wall: 1 to 5, or 1 to 10 with
+          zero_bezel.'}
+      zero_bezel: {type: bool, required: true, label: Zero bezel, description: 'On for a model whose wall can be 15 by 10 (the size
+          is coded 15 to a row), off for a 5 by 5 one.'}
+    returns: ack
+  set_tiling_enabled:
+    summary: Turn tiling on or off, keeping the other tiling settings (22 with keep values), and read it back
+    params:
+      enabled: {type: bool, required: true, label: Tiling, description: On shows this display's part of the wall.}
+    returns: ack
+  get_anytile: {summary: Read the AnyTile canvas settings (4A), returns: value}
+  set_anytile:
+    summary: Set the AnyTile canvas (4B) and read it back; canvas tiling must be enabled in the admin menu
+    params:
+      enabled: {type: bool, required: true, label: AnyTile, description: On shows a part of the canvas.}
+      rotation: {type: int, min: 0, max: 270, required: true, label: Rotation, description: 'Rotation in degrees: 0, 90, 180 or 270.'}
+      h_start: {type: int, min: 0, max: 65535, required: true, label: Horizontal start, description: 'Left edge of this display''s part,
+          in pixels.'}
+      v_start: {type: int, min: 0, max: 65535, required: true, label: Vertical start, description: 'Top edge of this display''s part,
+          in pixels.'}
+      h_size: {type: int, min: 0, max: 65535, required: true, label: Width, description: 'Width of this display''s part, in pixels.'}
+      v_size: {type: int, min: 0, max: 65535, required: true, label: Height, description: 'Height of this display''s part, in pixels.'}
+    returns: ack
+  assign_ids:
+    summary: Set the display's monitor ID and group ID (C0, over LAN only)
+    params:
+      monitor_id: {type: int, min: 1, max: 255, required: true, label: Monitor ID, description: 'The new monitor ID, 1 to 255.'}
+      group_id: {type: int, min: 1, max: 254, required: true, label: Group ID, description: 'The new group ID, 1 to 254.'}
+    returns: ack
+  show_monitor_id:
+    summary: Show the monitor ID on screen (4C)
+    params:
+      monitor_id: {type: int, min: 1, max: 255, required: true, label: Monitor ID, description: 'The monitor ID to show, 1 to 255.'}
+    returns: ack
+  set_monitor_id:
+    summary: Change the display's monitor ID (69)
+    params:
+      monitor_id: {type: int, min: 1, max: 255, required: true, label: Monitor ID, description: 'The new monitor ID, 1 to 255.'}
+    returns: ack
+  get_operating_hours: {summary: Read the operating hours (0F 02), returns: value}
+  get_temperature: {summary: 'Read the temperature sensors (2F), 0 to 100 °C', returns: value}
+  set_pixel_shift_auto: {summary: Set pixel shift to auto (B2 5B) and read it back, returns: ack}
+  get_orientation: {summary: Read the display orientation settings (16), returns: value}
+  set_orientation:
+    summary: Set the on-screen menu and picture rotation (17) and read it back
+    params:
+      osd_portrait: {type: bool, required: true, label: Portrait menu, description: On shows the menu in portrait.}
+      image:
+        type: enum
+        values: ['off', 'on', clockwise, counter_clockwise]
+        required: true
+        label: Picture rotation
+        description: 'The whole picture: off, on, clockwise or counter-clockwise (the last two on the CRD50 only).'
+      window1: {type: bool, required: true, label: Window 1 rotation, description: On rotates window 1.}
+      window2: {type: bool, required: true, label: Window 2 rotation, description: On rotates window 2.}
+      window3: {type: bool, required: true, label: Window 3 rotation, description: On rotates window 3.}
+      window4: {type: bool, required: true, label: Window 4 rotation, description: On rotates window 4.}
+    returns: ack
+  factory_reset: {summary: Restore the factory settings (56), returns: ack}
+  screenshot: {summary: Take a screenshot and e-mail it (58); Android platforms with e-mail notification set up, returns: ack}
+  get_led_strip: {summary: Read the LED strip (F4), returns: value}
+  set_led_strip:
+    summary: Set the LED strip (F3) and read it back
+    params:
+      'on': {type: bool, required: true, label: LED strip, description: On lights the strip.}
+      red: {type: int, min: 0, max: 255, required: true, label: Red, description: Red from 0 to 255.}
+      green: {type: int, min: 0, max: 255, required: true, label: Green, description: Green from 0 to 255.}
+      blue: {type: int, min: 0, max: 255, required: true, label: Blue, description: Blue from 0 to 255.}
+    returns: ack
+  get_schedule:
+    summary: Read a schedule page (5B)
+    params:
+      page: &id002 {type: int, min: 1, max: 7, required: true, label: Page, description: Schedule page from 1 to 7.}
+    returns: value
+  set_schedule:
+    summary: Set a schedule page (5A) and read it back
+    params:
+      page: *id002
+      enabled: {type: bool, required: true, label: Enabled, description: On makes the page take effect.}
+      start_hour: {type: int, min: 0, max: 24, required: true, label: Start hour, description: 'Hour from 0 to 23, or 24 for none.'}
+      start_minute: {type: int, min: 0, max: 60, required: true, label: Start minute, description: 'Minute from 0 to 59, or 60 for none.'}
+      end_hour: {type: int, min: 0, max: 24, required: true, label: End hour, description: 'Hour from 0 to 23, or 24 for none.'}
+      end_minute: {type: int, min: 0, max: 60, required: true, label: End minute, description: 'Minute from 0 to 59, or 60 for none.'}
+      source:
+        type: enum
+        values: *id001
+        required: true
+        label: Source
+        description: 'The source; a model has some of them: hdmi is HDMI 1, card_ops the OPS slot, browser, smartcms, media_player,
+          pdf_player and custom the Android sources.'
+      every_week: {type: bool, required: true, label: Every week, description: On runs the page every week.}
+      monday: {type: bool, required: true, label: Monday, description: On runs the page on Monday.}
+      tuesday: {type: bool, required: true, label: Tuesday, description: On runs the page on Tuesday.}
+      wednesday: {type: bool, required: true, label: Wednesday, description: On runs the page on Wednesday.}
+      thursday: {type: bool, required: true, label: Thursday, description: On runs the page on Thursday.}
+      friday: {type: bool, required: true, label: Friday, description: On runs the page on Friday.}
+      saturday: {type: bool, required: true, label: Saturday, description: On runs the page on Saturday.}
+      sunday: {type: bool, required: true, label: Sunday, description: On runs the page on Sunday.}
+      playlist: {type: int, min: 0, max: 7, required: true, label: Playlist, description: 'Playlist or bookmark 1 to 7, or 0 for none
+          (Dragon and Himalaya 2.0).'}
+    returns: ack
+  set_multi_window:
+    summary: Turn the custom multi-window layout on or off and set its window count (FB)
+    params:
+      enabled: {type: bool, required: true, label: Multi-window, description: On shows the custom layout.}
+      windows: {type: int, min: 1, max: 4, required: true, label: Windows, description: Windows from 1 to 4 (2 on Dragon 1.x).}
+    returns: ack
+  get_window:
+    summary: Read a custom multi-window window (FD)
+    params:
+      window: &id003 {type: int, min: 0, max: 3, required: true, label: Window, description: Window from 0 (main) to 3 (sub 3).}
+    returns: value
+  set_window:
+    summary: Set a custom multi-window window's rotation, place, size and format (FC) and read it back
+    params:
+      window: *id003
+      rotation:
+        type: enum
+        values: [none, rot90, rot270, mirror_h, mirror_v, mirror_hv]
+        required: true
+        label: Rotation
+        description: Rotation or mirroring of the window.
+      x: {type: int, min: 0, max: 65535, required: true, label: X, description: Left edge in pixels.}
+      y: {type: int, min: 0, max: 65535, required: true, label: Y, description: Top edge in pixels.}
+      width: {type: int, min: 0, max: 65535, required: true, label: Width, description: 'Width in pixels, within the panel.'}
+      height: {type: int, min: 0, max: 65535, required: true, label: Height, description: 'Height in pixels, within the panel.'}
+      format:
+        type: enum
+        values: [normal, custom, real, full, '21_9', dynamic, '16_9']
+        required: true
+        label: Picture format
+        description: The window's picture format.
+    returns: ack
+state:
+  anytile.enabled: {type: bool, description: AnyTile on (4A)}
+  anytile.h_size: {type: int, description: AnyTile h size (4A)}
+  anytile.h_start: {type: int, description: AnyTile h start (4A)}
+  anytile.rotation: {type: int, description: AnyTile rotation (4A)}
+  anytile.v_size: {type: int, description: AnyTile v size (4A)}
+  anytile.v_start: {type: int, description: AnyTile v start (4A)}
+  anytile_resolution: {type: string, description: AnyTile resolution mode (4E)}
+  apm: {type: string, description: Advanced power management (D1)}
+  audio.audio_out_volume: {type: int, description: 'Audio-out volume (45), 0 to 100'}
+  audio.bass: {type: int, description: Bass (43)}
+  audio.limits.audio_out.maximum: {type: int, description: 'Audio-out volume limit: maximum volume'}
+  audio.limits.audio_out.minimum: {type: int, description: 'Audio-out volume limit: minimum volume'}
+  audio.limits.audio_out.switch_on: {type: int, description: 'Audio-out volume limit: switch-on volume'}
+  audio.limits.speaker.maximum: {type: int, description: 'Speaker volume limit: maximum volume'}
+  audio.limits.speaker.minimum: {type: int, description: 'Speaker volume limit: minimum volume'}
+  audio.limits.speaker.switch_on: {type: int, description: 'Speaker volume limit: switch-on volume'}
+  audio.treble: {type: int, description: Treble (43)}
+  audio.volume: {type: int, description: 'Speaker volume (45), 0 to 100'}
+  auto_signal_detecting: {type: string, description: Auto signal detecting (AF)}
+  backlight: {type: bool, description: Whether the backlight is on (71)}
+  color_temperature: {type: string, description: Color temperature preset (35)}
+  color_temperature_kelvin: {type: int, description: Color temperature in hundreds of kelvin (12)}
+  eco_mode: {type: string, description: ECO mode (63)}
+  external_storage_lock: {type: bool, description: USB and microSD lock (F2)}
+  failover_priority: {type: string, description: 'Failover sources in priority order, separated by commas (A6)'}
+  fan_speed: {type: string, description: Fan speed setting (62)}
+  frame_compensation_h: {type: int, description: Horizontal frame compensation (5E)}
+  frame_compensation_v: {type: int, description: Vertical frame compensation (67)}
+  group_id: {type: int, description: 'Group ID (5D), 255 off'}
+  human_sensor: {type: int, description: 'Human sensor (B3): 0 off, 1-6 for 10-60 minutes, 255 no sensor fitted'}
+  info.android_firmware_version: {type: string, description: Android firmware build (A1 03)}
+  info.build_date: {type: string, description: Firmware build date (A1 02)}
+  info.firmware_version: {type: string, description: Firmware version (A1 01)}
+  info.model: {type: string, description: Model number (A1 00)}
+  info.platform: {type: string, description: Platform label (A2 01)}
+  info.platform_version: {type: string, description: Platform version (A2 02)}
+  info.serial_number: {type: string, description: Serial code (15)}
+  info.sicp_version: {type: string, description: SICP version (A2 00)}
+  information_osd: {type: int, description: 'Information OSD seconds (2D), 0 off'}
+  input.playlist: {type: int, description: 'Playlist or URL number of the input (AD), 0 none'}
+  input.source: {type: string, description: Input source (AD)}
+  ir_lock: {type: string, description: Remote control lock (1D)}
+  keypad_lock: {type: string, description: Keypad lock (1B)}
+  led_strip.blue: {type: int, description: LED strip blue (F4)}
+  led_strip.green: {type: int, description: LED strip green (F4)}
+  led_strip.on: {type: bool, description: LED strip lit (F4)}
+  led_strip.red: {type: int, description: LED strip red (F4)}
+  light_sensor: {type: bool, description: Light sensor on (25); absent when no sensor is fitted}
+  memc: {type: string, description: MEMC effect (29)}
+  mute: {type: bool, description: Whether the speakers and audio out are muted (46)}
+  noise_reduction: {type: string, description: Noise reduction (2B)}
+  off_timer: {type: int, description: 'Off timer in hours (91), 0 off'}
+  orientation.auto_rotate: {type: bool, description: Auto rotate (16)}
+  orientation.image: {type: string, description: Picture rotation (16)}
+  orientation.osd_portrait: {type: bool, description: Menu in portrait (16)}
+  orientation.windows.*: {type: bool, description: 'Whether a window is rotated (16), keyed 1 to 4'}
+  osd_rotation: {type: bool, description: On-screen menu rotation (27)}
+  picture.black_level: {type: int, description: 'Black level (33), percent'}
+  picture.blue_gain: {type: int, description: 'Blue gain (37), 0 to 255'}
+  picture.blue_offset: {type: int, description: 'Blue offset (37), 0 to 255'}
+  picture.brightness: {type: int, description: 'Brightness (33), percent'}
+  picture.color: {type: int, description: 'Color (33), percent'}
+  picture.contrast: {type: int, description: 'Contrast (33), percent'}
+  picture.gamma: {type: string, description: Gamma (33)}
+  picture.green_gain: {type: int, description: 'Green gain (37), 0 to 255'}
+  picture.green_offset: {type: int, description: 'Green offset (37), 0 to 255'}
+  picture.red_gain: {type: int, description: 'Red gain (37), 0 to 255'}
+  picture.red_offset: {type: int, description: 'Red offset (37), 0 to 255'}
+  picture.sharpness: {type: int, description: 'Sharpness (33), percent'}
+  picture.tint: {type: int, description: 'Tint (33), percent'}
+  picture_format: {type: string, description: Picture format (3B)}
+  picture_style: {type: string, description: Picture style (65)}
+  pip.mode: {type: string, description: PIP mode (3D)}
+  pip.position: {type: string, description: PIP position (3D)}
+  pip.sources.q2: {type: string, description: PIP window 2 source (85)}
+  pip.sources.q3: {type: string, description: PIP window 3 source (85)}
+  pip.sources.q4: {type: string, description: PIP window 4 source (85)}
+  pixel_shift: {type: int, description: 'Pixel shift (B1): 0 off, 1-90 for 10-900 s, 91 auto'}
+  power: {type: bool, description: Whether the display is on (19)}
+  power_at_cold_start: {type: string, description: 'State after mains power returns (A4): off, on or last'}
+  power_on_logo: {type: string, description: Power-on logo (3F)}
+  power_save: {type: string, description: Power save mode (D3)}
+  scan_conversion: {type: string, description: Scan conversion (53)}
+  scan_mode: {type: string, description: Scan mode (51)}
+  schedules.*.days: {type: int, description: 'Schedule page days (5B): bit 0 every week, bit 1 Monday ... bit 7 Sunday'}
+  schedules.*.enabled: {type: bool, description: 'Schedule page enabled (5B), keyed by page 1 to 7'}
+  schedules.*.end_hour: {type: int, description: Schedule page end hour (5B)}
+  schedules.*.end_minute: {type: int, description: Schedule page end minute (5B)}
+  schedules.*.playlist: {type: int, description: Schedule page playlist (5B)}
+  schedules.*.source: {type: string, description: Schedule page source (5B)}
+  schedules.*.start_hour: {type: int, description: Schedule page start hour (5B)}
+  schedules.*.start_minute: {type: int, description: Schedule page start minute (5B)}
+  signal: {type: bool, description: Whether the input has a signal (59)}
+  smart_power: {type: string, description: Smart power (DE)}
+  status.operating_hours: {type: int, description: Operating hours (0F 02), unit: h}
+  status.temperature1: {type: int, description: 'Temperature sensor 1 (2F), °C', unit: °C}
+  status.temperature2: {type: int, description: 'Temperature sensor 2 (2F), °C', unit: °C}
+  switch_on_delay: {type: int, description: 'Tiling switch-on delay (55): 0 off, 1 auto, 2-255 seconds'}
+  tiling.columns: {type: int, description: 'Wall columns, read as a 5 by 5 wall (23)'}
+  tiling.enabled: {type: bool, description: Tiling on (23)}
+  tiling.frame_compensation: {type: bool, description: Tiling frame compensation (23)}
+  tiling.hv_code: {type: int, description: The wall size code as sent (23)}
+  tiling.position: {type: int, description: Tile position (23)}
+  tiling.rows: {type: int, description: 'Wall rows, read as a 5 by 5 wall (23)'}
+  tiling.zero_bezel_columns: {type: int, description: 'Wall columns, read as a zero-bezel 15 by 10 wall (23)'}
+  tiling.zero_bezel_rows: {type: int, description: 'Wall rows, read as a zero-bezel 15 by 10 wall (23)'}
+  touch: {type: bool, description: Touch feature (1F)}
+  vga.clock: {type: int, description: VGA clock (39)}
+  vga.h_position: {type: int, description: VGA horizontal position (39)}
+  vga.phase: {type: int, description: VGA clock phase (39)}
+  vga.v_position: {type: int, description: VGA vertical position (39)}
+  windows.*.format: {type: string, description: Multi-window picture format (FD)}
+  windows.*.height: {type: int, description: 'Multi-window height in pixels (FD), keyed by window 1 to 4'}
+  windows.*.rotation: {type: string, description: Multi-window rotation (FD)}
+  windows.*.width: {type: int, description: 'Multi-window width in pixels (FD), keyed by window 1 to 4'}
+  windows.*.x: {type: int, description: 'Multi-window x in pixels (FD), keyed by window 1 to 4'}
+  windows.*.y: {type: int, description: 'Multi-window y in pixels (FD), keyed by window 1 to 4'}
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      In power save modes 1 and 2 the network is off in standby, so the display cannot be reached to turn it
+      on: use mode 3 or 4 (set_power_save), or Wake on LAN, which this integration does not send. In standby
+      most commands are answered NAV.
+  - models: [all]
+    severity: info
+    text: >
+      A command a display lacks, or cannot run now, is answered NAV and fails; NACK means the display could not
+      read it. Platforms differ widely and Philips publishes no list per current model: get_platform and
+      get_sicp_version say which a display is. Commands added after SICP 2.03 (date and time, power LED, HDMI
+      CEC, freeze and others) are not offered: their document is not public.
+  - models: [all]
+    severity: info
+    text: >
+      Changing one video parameter, color gain or offset, volume, treble or bass, or VGA position sends the
+      others of its message as last read (read first when not yet known), as SICP sets them together; a change
+      made on the display in between is overwritten. Every set is followed by its read.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed: power, input, volume and mute are read every poll_ms, the other settings every minute
+      and the identity on connecting. A tiling report does not say whether the wall is coded 5 or 15 to a row,
+      so both readings are kept.
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset restores the factory settings, network and IDs included, and set_monitor_id and assign_ids
+      change the ID this device addresses: set monitor_id to the new ID afterwards. None can be undone from
+      here.
+  - models: [all]
+    severity: info
+    text: >
+      The group byte of a reply may be other than 0 (the document's own acknowledgements carry 01), so replies
+      are taken from any group. Broadcast (monitor ID 0) and group addressing are never answered and are not
+      offered.

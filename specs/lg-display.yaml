@@ -1,0 +1,3317 @@
+spec: 1
+id: lg-display
+name: LG signage displays and commercial TVs (RS-232C external control protocol over LAN)
+vendor: LG Electronics
+category: display
+
+# LG documents one ASCII protocol for its signage and commercial TVs: "[Command1][Command2] [Set ID] [Data]"
+# ended by CR, acknowledged "[Command2] [Set ID] OK|NG[Data]x". The same messages are carried on TCP 9761 by
+# the network models. A display reached by RS-232C through a serial-to-Ethernet bridge speaks the same
+# protocol at the bridge's TCP port (see the quirks).
+source:
+  - title: "USER GUIDE, LG Digital Signage (MONITOR SIGNAGE), webOS 6.0 (2021-12)"
+    author: LG Electronics
+    url: "https://gscs-b2c.lge.com/open/downloadFile?fileId=JBmCvLSuL8MPkrXyvtoIaA"
+    note: >
+      The current generation's command reference: IR codes (pp.82-83), controlling several products and Set
+      ID 1-1000 (p.84), communication parameters 9600 bps, 8 data bits, no parity, 1 stop bit, ASCII
+      (p.85), the command list (pp.86-90) and the transmission / reception protocol with each command's data
+      (pp.91-115): power ka (00 off, 01 on, 02 restart), input xb, aspect kc, energy saving jq, picture mode
+      dx, contrast kg, brightness kh, sharpness kk, color ki, tint kj, color temperature xu (70-D2 = 3200-13000
+      K), balance kt, sound mode dy, mute ke (00 mutes), volume kf, date fa, time fx, no-signal power off fg,
+      no-IR power off mn, language fi, reset fk, temperature dn, key mc, elapsed time dl, serial number fy,
+      software version fz, white balance jm/jn/jo and sx/sy/sz, backlight mg, screen off kd, tile mode dd and
+      dz, tile ID di, natural mode dj, DPM fj, key lock km, power-on delay fh, failover mi and mj, IR and local
+      key locks tp and to, status sv (02 signal, 03 screen, 07 sensors, 09 fans, 10 screen check, 16
+      humidity, 17 illuminance, 18 tilt), daylight saving sd, the sn family (PM mode 0c, network 80-82, time
+      sync 16, LAN daisy chain 84, input rotation 85, beacon 88, wireless WOL 90, HDMI IT content 99,
+      holidays 9b, UPnP 9c, locks 9d-a0, backup content a1, digital audio a2, booting logo a3, SoftAP a4,
+      natural size a5, password a7, play media a8, no-signal image a9, audio out aa, brightness range ab,
+      gamma ad, black level ae, deep color af, sync mode b0, input label b1, LCIN008 b8, PC power 8b, local
+      dimming c1 and c6, scan inversion 87, frame control b7, APL be, stereo c2, USB2 to HDBaseT c3, HDR
+      picture mode c4, tone mapping c5, quiet mode c7, color calibration d6, Quick Start+ 0e, screen off
+      always 0d, DPM wake-up 0b, apply to all inputs 52, multichannel 76), ISM jp, power-on status tr, wired
+      WOL fw, OSD rotation th, contents sync tg, brightness schedule sm and ss, multi screen xc/xd/xe, freeze
+      kx, OSD lock kl, fan check dw, timers fd and fe, Set ID jx, brightness readings mu, screen fault
+      detection tz. Broadcast Set ID 00 sends no acknowledgement; NG with data 00 is an illegal code.
+  - title: "USER GUIDE, LG Digital Signage (MONITOR SIGNAGE), webOS 3.2"
+    author: LG Electronics
+    url: "https://gscs-b2c.lge.com/open/downloadFile?fileId=zHNEymzqGBUEKbFjxomaEA"
+    note: >
+      The 2017-2018 generation (pp.51-80): the same protocol, plus auto configuration ju, H/V position and
+      H size fq/fr/fs, intelligent auto ti, the weekly schedule sn 9a and Clear Panel Noise sn a6; energy
+      saving adds 05 screen off and the picture modes add expert2 and photo.
+  - title: "USER GUIDE, LG Digital Signage (MONITOR SIGNAGE), L19 platform"
+    author: LG Electronics
+    url: "https://cdn3.evostore.io/documents/fusion/fus_766937_user_guide.pdf"
+    note: >
+      LG's guide, read from a reseller's copy (pp.37-62): tile H/V position and size de/df/dg/dh, the
+      three-digit Set ID form (001-3e8) for IDs above 255, and its own OSD lock polarity (see the quirks).
+  - title: "OWNER'S MANUAL, LG Digital Signage, 32/43/49/55/65SM5B, SM5KB, 43/49/55SM3B (RS-232C section) (2015-09)"
+    author: LG Electronics
+    url: "https://aca.im/driver_docs/LG/SM_models.pdf"
+    note: >
+      LG's manual, read from an integrator's copy: the 2015 generation's aspect ratios (01 4:3 ... 10-1F
+      cinema zoom), picture modes (vivid, standard ...), speaker dv, reset enable tn, timer enables fb/fc and
+      on-timer input fu; while media plays only ka, kf, ke and mc are taken.
+  - title: "OWNER'S MANUAL, LG Digital Signage, 32-65SE3B, SE3KB, 43-55SL5B (2015-06)"
+    author: LG Electronics
+    url: "http://content.etilize.com/User-Manual/1031128130.pdf"
+    note: >
+      LG's manual, read from a distributor's copy (pp.71-84): RS-232C wiring (crossed cable, D-Sub 9 or a
+      3.5 mm jack with LG's adapter), the 2015 command set, and the tile mode byte written row first.
+  - title: "INSTALLATION MANUAL, LED TV (commercial), UV340C-U (2017-08-25)"
+    author: LG Electronics
+    url: "https://www.lg.com/us/business/download/resources/BT00001837/UV340C-U_Install_Manual_170825.pdf"
+    note: >
+      The commercial TV command set (pp.27-36): Set ID 1-99, inputs xb 00 DTV ... 90-93 HDMI, screen mute
+      kd (10 video mute), OSD select kl, treble kr, bass ks, equalizer jv, energy saving jq; during playback
+      or recording only ka and mc are taken.
+  - title: "INSTALLATION MANUAL, LG Digital Signage, 65/75/86UL3E (2018)"
+    author: LG Electronics
+    url: "https://media.dustin.eu/media/d200001001731318/86ul3e-t-usermanual.pdf"
+    note: "LG's manual, read from a reseller's copy (pp.30-37): the TV-style command set on a signage display, NG defined."
+  - title: "RS-232 Protocol Commands (LG Canada help library)"
+    author: LG Electronics
+    url: "https://www.lg.com/ca_en/support/product-support/troubleshoot/help-library/cs-CT52001643-20153058982994/"
+    note: "TV key codes (channel up/down, sleep, Q.Menu, guide, info, the media keys)."
+  - title: "Bitfocus Companion module lgtv-prodisplay (MIT)"
+    url: "https://github.com/bitfocus/companion-module-lgtv-prodisplay"
+    note: >
+      Corroboration only, licence checked, no code copied: these displays take the same ASCII messages on
+      TCP 9761 with no greeting or login, and answer as over RS-232C. No LG document read names the port.
+  - title: "Mira Connect Integration Guide for LG Commercial Displays"
+    author: Aveo Systems
+    url: "https://aveosystems.com/wp-content/uploads/product_pdfs/LG_Mira_Connect.pdf"
+    note: "Corroboration only: TCP port 9761, and PM mode Screen Off Always (or Network Ready) for control over Ethernet in standby."
+
+transport:
+  type: line-tcp
+  port: 9761
+  # Each message is the command, the Set ID and the data, ended by CR (p.91).
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  # An acknowledgement ends with a literal "x" after its data, with no line ending (p.91). Data are hex
+  # digits, so a reply ends at the first hex digit, K (of OK) or G (of NG) followed by x; the leading
+  # Command2 letter, which can itself be x (jx, dx, fx), is followed by a space, never ends one.
+  reply_framing: terminated
+  reply_terminators: ["0x", "1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x", "ax", "bx", "cx", "dx", "ex", "fx", "Ax", "Bx", "Cx", "Dx", "Ex", "Fx", "Kx", "Gx"]
+  reply_match: "^[a-z] [0-9a-fA-F]+ (OK|NG)"
+  timeout_ms: 3000
+  reply: expected
+  probe: "ka {settings.set_id:02x} ff"
+
+settings:
+  # Set in the menu (General > Set ID). 00 broadcasts and is never acknowledged, so it is not offered.
+  set_id: { type: int, min: 1, max: 1000, default: 1, label: Set ID, description: "The display's Set ID from its menu, 1 to 1000 (1 to 99 on a commercial TV); sent in hex, three digits above 255." }
+
+ports:
+  - { port: 9761, protocol: tcp, role: control, note: "the network models' control port; an RS-232C display is reached through a serial-to-Ethernet bridge at the bridge's port, given when the device is opened" }
+
+models:
+  - id: webos6
+    name: "LG webOS signage covered by the webOS 6.0 User Guide (current UH5, UM5, UL3, SM5, XS, XE, TR3 and VH7, VM5, VL5 video wall lines, LED controllers)"
+    supports: [set_power, get_power, restart, set_input, get_input, set_aspect_ratio, get_aspect_ratio, set_energy_saving, get_energy_saving, set_picture_mode, get_picture_mode, set_contrast, get_contrast, set_brightness, get_brightness, set_sharpness, get_sharpness, set_color, get_color, set_tint, get_tint, set_backlight, get_backlight, set_color_temperature, get_color_temperature, set_red_gain, get_red_gain, set_green_gain, get_green_gain, set_blue_gain, get_blue_gain, set_red_offset, get_red_offset, set_green_offset, get_green_offset, set_blue_offset, get_blue_offset, set_gamma, get_gamma, set_black_level, get_black_level, set_ism_method, get_ism_method, set_screen_off, get_screen_off, set_freeze, get_freeze, set_hdr_picture_mode, get_hdr_picture_mode, set_dynamic_tone_mapping, get_dynamic_tone_mapping, set_led_local_dimming_expert, get_led_local_dimming_expert, set_apl_auto_control, get_apl_auto_control, set_color_calibration, get_color_calibration, set_scan_inversion, get_scan_inversion, set_frame_control, get_frame_control, set_led_local_dimming, get_led_local_dimming, set_natural_size, get_natural_size, set_volume, get_volume, set_mute, get_mute, set_balance, get_balance, set_sound_mode, get_sound_mode, set_audio_out, get_audio_out, set_digital_audio_input, get_digital_audio_input, set_stereo_mode, get_stereo_mode, set_date, get_date, set_automatic_time, get_automatic_time, set_time, get_time, set_time_sync, get_time_sync, set_daylight_saving_start, get_daylight_saving_start, set_daylight_saving_end, get_daylight_saving_end, set_daylight_saving_off, set_no_signal_power_off, get_no_signal_power_off, set_no_ir_power_off, get_no_ir_power_off, set_dpm, get_dpm, set_dpm_wake_up, get_dpm_wake_up, set_pm_mode, get_pm_mode, set_power_on_delay, get_power_on_delay, set_power_on_status, get_power_on_status, set_wake_on_lan, get_wake_on_lan, set_wireless_wake_on_lan, get_wireless_wake_on_lan, set_screen_off_always, get_screen_off_always, set_quick_start, get_quick_start, set_quiet_mode, get_quiet_mode, set_pc_power_control, get_pc_power_control, set_tile_mode, tile_mode_off, get_tile_mode, set_tile_id, get_tile_id, set_natural_mode, get_natural_mode, set_key_lock, get_key_lock, set_ir_lock, get_ir_lock, set_local_key_lock, get_local_key_lock, set_osd_lock, get_osd_lock, set_home_dashboard_lock, get_home_dashboard_lock, set_usb_lock, get_usb_lock, set_wifi_lock, get_wifi_lock, set_screen_share_lock, get_screen_share_lock, set_osd_rotation, get_osd_rotation, set_external_input_rotation, get_external_input_rotation, set_language, get_language, set_booting_logo, get_booting_logo, set_no_signal_image, get_no_signal_image, set_beacon, get_beacon, set_upnp, get_upnp, set_soft_ap, get_soft_ap, set_lan_daisy_chain, get_lan_daisy_chain, set_hdmi_it_content, get_hdmi_it_content, set_sync_mode, get_sync_mode, set_contents_sync, get_contents_sync, set_usb2_to_hdbaset, get_usb2_to_hdbaset, set_screen_fault_detection, get_screen_fault_detection, set_multichannel, get_multichannel, set_failover, get_failover, set_brightness_range_minimum, get_brightness_range_minimum, set_brightness_range_maximum, get_brightness_range_maximum, set_brightness_scheduling, get_brightness_scheduling, add_brightness_schedule, get_brightness_schedule, delete_brightness_schedule, clear_brightness_schedules, add_on_timer, get_on_timer, delete_on_timer, clear_on_timers, add_off_timer, get_off_timer, delete_off_timer, clear_off_timers, add_holiday, get_holiday, delete_holiday, clear_holidays, set_multi_screen, get_multi_screen, set_window_aspect_ratio, get_window_aspect_ratio, set_window_screen_off, get_window_screen_off, set_failover_priority, get_failover_priority, set_uhd_deep_color, get_uhd_deep_color, set_input_label, get_input_label, set_backup_content, get_backup_content, set_backup_auto_capture, get_temperature, get_fan_status, get_on_time, get_serial_number, get_software_version, get_set_id, get_signal, get_screen_state, get_temperature_sensors, get_fan_speeds, get_screen_fault, get_humidity, get_illuminance, get_tilt, get_brightness_reading, send_key, reset, apply_to_all_inputs, play_saved_media, set_accessory_power, set_accessory_brightness, get_accessory_brightness, set_network_dhcp, set_network_static, set_dns, apply_network_settings, get_network_settings, get_staged_network_settings, change_password]
+    verification: none
+    notes: >
+      The webOS 6.0 User Guide's command set. LG marks almost every command "may not be available for all
+      models" and publishes no per-model list: a command a model lacks is answered NG, and fails.
+  - id: webos3
+    name: "LG webOS signage covered by the webOS 3.2 User Guide (2017-2018) and the L19 platform"
+    supports: [set_power, get_power, restart, set_input, get_input, set_aspect_ratio, get_aspect_ratio, set_energy_saving, get_energy_saving, set_picture_mode, get_picture_mode, set_contrast, get_contrast, set_brightness, get_brightness, set_sharpness, get_sharpness, set_color, get_color, set_tint, get_tint, set_backlight, get_backlight, set_color_temperature, get_color_temperature, set_red_gain, get_red_gain, set_green_gain, get_green_gain, set_blue_gain, get_blue_gain, set_red_offset, get_red_offset, set_green_offset, get_green_offset, set_blue_offset, get_blue_offset, set_gamma, get_gamma, set_black_level, get_black_level, set_ism_method, get_ism_method, set_screen_off, get_screen_off, set_freeze, get_freeze, set_natural_size, get_natural_size, set_volume, get_volume, set_mute, get_mute, set_balance, get_balance, set_sound_mode, get_sound_mode, set_audio_out, get_audio_out, set_digital_audio_input, get_digital_audio_input, set_date, get_date, set_automatic_time, get_automatic_time, set_time, get_time, set_time_sync, get_time_sync, set_daylight_saving_start, get_daylight_saving_start, set_daylight_saving_end, get_daylight_saving_end, set_daylight_saving_off, set_no_signal_power_off, get_no_signal_power_off, set_no_ir_power_off, get_no_ir_power_off, set_dpm, get_dpm, set_dpm_wake_up, get_dpm_wake_up, set_pm_mode, get_pm_mode, set_power_on_delay, get_power_on_delay, set_power_on_status, get_power_on_status, set_wake_on_lan, get_wake_on_lan, set_wireless_wake_on_lan, get_wireless_wake_on_lan, set_screen_off_always, get_screen_off_always, set_pc_power_control, get_pc_power_control, set_tile_mode, tile_mode_off, get_tile_mode, set_tile_id, get_tile_id, set_natural_mode, get_natural_mode, set_tile_h_position, get_tile_h_position, set_tile_v_position, get_tile_v_position, set_tile_h_size, get_tile_h_size, set_tile_v_size, get_tile_v_size, set_key_lock, get_key_lock, set_ir_lock, get_ir_lock, set_local_key_lock, get_local_key_lock, set_osd_lock, get_osd_lock, set_home_dashboard_lock, get_home_dashboard_lock, set_usb_lock, get_usb_lock, set_wifi_lock, get_wifi_lock, set_screen_share_lock, get_screen_share_lock, set_osd_rotation, get_osd_rotation, set_external_input_rotation, get_external_input_rotation, set_language, get_language, set_booting_logo, get_booting_logo, set_no_signal_image, get_no_signal_image, set_beacon, get_beacon, set_upnp, get_upnp, set_soft_ap, get_soft_ap, set_lan_daisy_chain, get_lan_daisy_chain, set_hdmi_it_content, get_hdmi_it_content, set_sync_mode, get_sync_mode, set_contents_sync, get_contents_sync, set_screen_fault_detection, get_screen_fault_detection, set_multichannel, get_multichannel, set_failover, get_failover, set_brightness_scheduling, get_brightness_scheduling, add_brightness_schedule, get_brightness_schedule, delete_brightness_schedule, clear_brightness_schedules, add_on_timer, get_on_timer, delete_on_timer, clear_on_timers, add_off_timer, get_off_timer, delete_off_timer, clear_off_timers, add_holiday, get_holiday, delete_holiday, clear_holidays, add_weekly_schedule, delete_weekly_schedule, get_weekly_schedule, set_multi_screen, get_multi_screen, set_window_aspect_ratio, get_window_aspect_ratio, set_window_screen_off, get_window_screen_off, set_failover_priority, get_failover_priority, set_uhd_deep_color, get_uhd_deep_color, set_input_label, get_input_label, set_backup_content, get_backup_content, set_backup_auto_capture, get_temperature, get_fan_status, get_on_time, get_serial_number, get_software_version, get_set_id, get_signal, get_screen_state, get_temperature_sensors, get_fan_speeds, get_screen_fault, send_key, reset, auto_configure, apply_to_all_inputs, play_saved_media, clear_panel_noise, set_h_position, get_h_position, set_v_position, get_v_position, set_h_size, get_h_size, set_intelligent_auto, get_intelligent_auto, set_network_dhcp, set_network_static, set_dns, apply_network_settings, get_network_settings, get_staged_network_settings, change_password]
+    verification: none
+    notes: "The webOS 3.2 User Guide's command set, with the RGB input's position and size, the weekly schedule and Clear Panel Noise."
+  - id: signage-2015
+    name: "LG signage, 2015 generation (SM5B, SM5KB, SM3B, SE3B, SE3KB, SL5B and the L15 platform)"
+    supports: [set_power, get_power, set_input, get_input, set_aspect_ratio_legacy, get_aspect_ratio_legacy, set_energy_saving, get_energy_saving, set_picture_mode_legacy, get_picture_mode_legacy, set_contrast, get_contrast, set_brightness, get_brightness, set_sharpness, get_sharpness, set_color, get_color, set_tint, get_tint, set_backlight, get_backlight, set_color_temperature_level, get_color_temperature_level, set_red_gain, get_red_gain, set_green_gain, get_green_gain, set_blue_gain, get_blue_gain, set_red_offset, get_red_offset, set_green_offset, get_green_offset, set_blue_offset, get_blue_offset, set_ism_method, get_ism_method, set_screen_off, get_screen_off, set_volume, get_volume, set_mute, get_mute, set_balance, get_balance, set_sound_mode, get_sound_mode, set_speaker, get_speaker, set_date, get_date, set_time, get_time, set_daylight_saving_start, get_daylight_saving_start, set_daylight_saving_end, get_daylight_saving_end, set_daylight_saving_off, set_no_signal_power_off, get_no_signal_power_off, set_no_ir_power_off_hours, get_no_ir_power_off_hours, set_dpm, get_dpm, set_pm_mode, get_pm_mode, set_power_on_delay, get_power_on_delay, set_tile_mode, tile_mode_off, get_tile_mode, set_tile_id, get_tile_id, set_natural_mode, get_natural_mode, set_tile_h_position, get_tile_h_position, set_tile_v_position, get_tile_v_position, set_tile_h_size, get_tile_h_size, set_tile_v_size, get_tile_v_size, set_key_lock, get_key_lock, set_osd_lock, get_osd_lock, set_osd_rotation, get_osd_rotation, set_language, get_language, set_screen_fault_detection, get_screen_fault_detection, set_failover, get_failover, add_on_timer, get_on_timer, delete_on_timer, clear_on_timers, add_off_timer, get_off_timer, delete_off_timer, clear_off_timers, set_on_timer_schedule, get_on_timer_schedule, set_off_timer_schedule, get_off_timer_schedule, set_failover_priority, get_failover_priority, get_temperature, get_fan_status, get_on_time, get_serial_number, get_software_version, get_set_id, send_key, reset, auto_configure, set_h_position, get_h_position, set_v_position, get_v_position, set_h_size, get_h_size, set_intelligent_auto, get_intelligent_auto, set_reset_enable, get_reset_enable]
+    verification: none
+    notes: "The 2015 owner's manuals' command set: the older aspect ratios and picture modes, and the timer enables."
+  - id: commercial-tv
+    name: "LG commercial TVs and TV-style signage (UV340C, UL3E and similar)"
+    supports: [set_power, get_power, set_input_tv, get_input_tv, set_aspect_ratio_legacy, get_aspect_ratio_legacy, set_energy_saving, get_energy_saving, set_contrast, get_contrast, set_brightness, get_brightness, set_sharpness, get_sharpness, set_color, get_color, set_tint, get_tint, set_backlight, get_backlight, set_color_temperature_level, get_color_temperature_level, set_screen_mute_tv, get_screen_mute_tv, set_volume, get_volume, set_mute, get_mute, set_balance, get_balance, set_treble, get_treble, set_bass, get_bass, set_equalizer, set_key_lock, get_key_lock, set_osd_tv, get_osd_tv, send_key, auto_configure]
+    verification: none
+    notes: "The TV-style command set: Set ID 1 to 99, TV inputs, screen mute, OSD select, treble, bass and the equalizer."
+
+commands:
+  set_power:
+    summary: Turn the display on or off (ka 01 or 00); answered reliably only once the display is fully on
+    params:
+      'on': {type: bool, required: true, label: Power, description: 'On turns the display on, off puts it in standby.'}
+    send: ka {settings.set_id:02x} {on:map.lg_power}
+    expect: {matches: '^a [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_power:
+    summary: Read whether the display is on (ka ff); returns 01 on or 00 off
+    send: ka {settings.set_id:02x} ff
+    expect: {matches: '^a [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  restart:
+    summary: Restart the display (ka 02)
+    send: ka {settings.set_id:02x} 02
+    expect: {matches: '^a [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_input:
+    summary: Select the input (xb)
+    params:
+      input:
+        type: enum
+        values: [av, component, rgb, dvi_d_pc, dvi_d, hdmi1, hdmi1_pc, hdmi2, hdmi2_pc, ops_hdmi3_dvi, ops_hdmi3_dvi_pc, ops_dvi, ops_dvi_pc,
+          hdmi3_dvi, hdmi3_dvi_pc, hdmi3_hdmi2_dvi, hdmi3_hdmi2_dvi_pc, ops, ops_pc, hdmi2_ops, hdmi2_ops_pc, displayport, displayport_pc,
+          displayport_usbc, displayport_usbc_pc, hdmi3, hdmi3_pc, hdbaset, hdbaset_pc, webos_player, others, multi_screen, play_via_url]
+        required: true
+        label: Input
+        description: 'The input and its label: hdmi1 is HDMI 1 labelled DTV, hdmi1_pc the same port labelled PC; the ports a model has
+          vary.'
+    send: xb {settings.set_id:02x} {input:map.lg_input}
+    expect: {matches: '^b [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_input:
+    summary: Read the input (xb ff); returns LG's data in hex digits
+    send: xb {settings.set_id:02x} ff
+    expect: {matches: '^b [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_input_tv:
+    summary: Select the input of a commercial TV (xb)
+    params:
+      input:
+        type: enum
+        values: [dtv, cadtv, atv, catv, av1, av2, component1, component2, rgb, hdmi1, hdmi2, hdmi3, hdmi4]
+        required: true
+        label: Input
+        description: 'The TV''s input: tuner (dtv, cadtv, atv, catv), AV, component, RGB or HDMI 1 to 4.'
+    send: xb {settings.set_id:02x} {input:map.lg_input_tv}
+    expect: {matches: '^b [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_input_tv:
+    summary: Read the input (xb ff); returns LG's data in hex digits
+    send: xb {settings.set_id:02x} ff
+    expect: {matches: '^b [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_aspect_ratio:
+    summary: Set the aspect ratio (kc)
+    params:
+      aspect:
+        type: enum
+        values: [full, original]
+        required: true
+        label: Aspect ratio
+        description: full fills the screen; original keeps the source's shape.
+    send: kc {settings.set_id:02x} {aspect:map.lg_aspect_ratio}
+    expect: {matches: '^c [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_aspect_ratio:
+    summary: Read the aspect ratio (kc ff); returns LG's data in hex digits
+    send: kc {settings.set_id:02x} ff
+    expect: {matches: '^c [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_aspect_ratio_legacy:
+    summary: Set the aspect ratio on a 2015 signage display or a commercial TV (kc)
+    params:
+      aspect:
+        type: enum
+        values: ['4_3', '16_9', zoom, zoom2, set_by_program, '14_9', just_scan, full_wide, '21_9', cinema_zoom_1, cinema_zoom_2, cinema_zoom_3,
+          cinema_zoom_4, cinema_zoom_5, cinema_zoom_6, cinema_zoom_7, cinema_zoom_8, cinema_zoom_9, cinema_zoom_10, cinema_zoom_11,
+          cinema_zoom_12, cinema_zoom_13, cinema_zoom_14, cinema_zoom_15, cinema_zoom_16]
+        required: true
+        label: Aspect ratio
+        description: 4:3, 16:9, zoom, zoom 2, set by program, 14:9, just scan, full wide, 21:9 or cinema zoom 1 to 16; each model offers
+          some of them.
+    send: kc {settings.set_id:02x} {aspect:map.lg_aspect_ratio_legacy}
+    expect: {matches: '^c [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_aspect_ratio_legacy:
+    summary: Read the aspect ratio (kc ff); returns LG's data in hex digits
+    send: kc {settings.set_id:02x} ff
+    expect: {matches: '^c [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_energy_saving:
+    summary: Set energy saving (jq)
+    params:
+      mode:
+        type: enum
+        values: ['off', minimum, medium, maximum, auto, screen_off]
+        required: true
+        label: Energy saving
+        description: How far the backlight is lowered to save energy, auto, or the screen off.
+    send: jq {settings.set_id:02x} {mode:map.lg_energy_saving}
+    expect: {matches: '^q [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_energy_saving:
+    summary: Read the energy saving (jq ff); returns LG's data in hex digits
+    send: jq {settings.set_id:02x} ff
+    expect: {matches: '^q [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_picture_mode:
+    summary: Set the picture mode (dx)
+    params:
+      mode:
+        type: enum
+        values: [mall_qsr, general, gov_corp, transportation, education, expert1, expert2, aps, photo, calibration, hospital]
+        required: true
+        label: Picture mode
+        description: The signage picture mode; each generation offers some of them.
+    send: dx {settings.set_id:02x} {mode:map.lg_picture_mode}
+    expect: {matches: '^x [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_picture_mode:
+    summary: Read the picture mode (dx ff); returns LG's data in hex digits
+    send: dx {settings.set_id:02x} ff
+    expect: {matches: '^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_picture_mode_legacy:
+    summary: Set the picture mode on a 2015 signage display (dx)
+    params:
+      mode:
+        type: enum
+        values: [vivid, standard, cinema, sports, game, expert1, expert2, aps, photos, calibration]
+        required: true
+        label: Picture mode
+        description: The picture mode; 08 is Eco rather than APS on the SE3B.
+    send: dx {settings.set_id:02x} {mode:map.lg_picture_mode_legacy}
+    expect: {matches: '^x [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_picture_mode_legacy:
+    summary: Read the picture mode (dx ff); returns LG's data in hex digits
+    send: dx {settings.set_id:02x} ff
+    expect: {matches: '^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_contrast:
+    summary: Set the contrast (kg)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Contrast, description: Contrast from 0 to 100.}
+    send: kg {settings.set_id:02x} {level:02x}
+    expect: {matches: '^g [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_contrast:
+    summary: Read the contrast (kg ff); returns LG's data in hex digits
+    send: kg {settings.set_id:02x} ff
+    expect: {matches: '^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_brightness:
+    summary: Set the brightness (kh)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Brightness, description: Brightness from 0 to 100.}
+    send: kh {settings.set_id:02x} {level:02x}
+    expect: {matches: '^h [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_brightness:
+    summary: Read the brightness (kh ff); returns LG's data in hex digits
+    send: kh {settings.set_id:02x} ff
+    expect: {matches: '^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_sharpness:
+    summary: Set the sharpness (kk)
+    params:
+      level: {type: int, min: 0, max: 50, required: true, label: Sharpness, description: Sharpness from 0 to 50.}
+    send: kk {settings.set_id:02x} {level:02x}
+    expect: {matches: '^k [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_sharpness:
+    summary: Read the sharpness (kk ff); returns LG's data in hex digits
+    send: kk {settings.set_id:02x} ff
+    expect: {matches: '^k [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_color:
+    summary: Set the color (ki)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Color, description: Color from 0 to 100.}
+    send: ki {settings.set_id:02x} {level:02x}
+    expect: {matches: '^i [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_color:
+    summary: Read the color (ki ff); returns LG's data in hex digits
+    send: ki {settings.set_id:02x} ff
+    expect: {matches: '^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_tint:
+    summary: Set the tint (kj)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Tint, description: Tint from 0 (red 50) to 100 (green 50).}
+    send: kj {settings.set_id:02x} {level:02x}
+    expect: {matches: '^j [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_tint:
+    summary: Read the tint (kj ff); returns LG's data in hex digits
+    send: kj {settings.set_id:02x} ff
+    expect: {matches: '^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_backlight:
+    summary: Set the backlight (mg)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Backlight, description: Backlight from 0 to 100.}
+    send: mg {settings.set_id:02x} {level:02x}
+    expect: {matches: '^g [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_backlight:
+    summary: Read the backlight (mg ff); returns LG's data in hex digits
+    send: mg {settings.set_id:02x} ff
+    expect: {matches: '^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_color_temperature:
+    summary: Set the color temperature (xu)
+    params:
+      temperature: {type: int, min: 32, max: 130, required: true, label: Color temperature, description: 'Color temperature in hundreds
+          of kelvin: 32 is 3200 K, 130 is 13000 K.'}
+    send: xu {settings.set_id:02x} {temperature:+80:02x}
+    expect: {matches: '^u [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_color_temperature:
+    summary: Read the color temperature (xu ff); returns LG's data in hex digits
+    send: xu {settings.set_id:02x} ff
+    expect: {matches: '^u [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_color_temperature_level:
+    summary: Set the color temperature on a 2015 signage display or a commercial TV (xu)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Color temperature, description: Color temperature from 0 (warm) to
+          100 (cool).}
+    send: xu {settings.set_id:02x} {level:02x}
+    expect: {matches: '^u [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_color_temperature_level:
+    summary: Read the color temperature (xu ff); returns LG's data in hex digits
+    send: xu {settings.set_id:02x} ff
+    expect: {matches: '^u [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_red_gain:
+    summary: Set the white balance red gain (jm)
+    params:
+      level: {type: int, min: 0, max: 254, required: true, label: Red gain, description: White balance red gain from 0 to 254.}
+    send: jm {settings.set_id:02x} {level:02x}
+    expect: {matches: '^m [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_red_gain:
+    summary: Read the red gain (jm ff); returns LG's data in hex digits
+    send: jm {settings.set_id:02x} ff
+    expect: {matches: '^m [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_green_gain:
+    summary: Set the white balance green gain (jn)
+    params:
+      level: {type: int, min: 0, max: 254, required: true, label: Green gain, description: White balance green gain from 0 to 254.}
+    send: jn {settings.set_id:02x} {level:02x}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_green_gain:
+    summary: Read the green gain (jn ff); returns LG's data in hex digits
+    send: jn {settings.set_id:02x} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_blue_gain:
+    summary: Set the white balance blue gain (jo)
+    params:
+      level: {type: int, min: 0, max: 254, required: true, label: Blue gain, description: White balance blue gain from 0 to 254.}
+    send: jo {settings.set_id:02x} {level:02x}
+    expect: {matches: '^o [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_blue_gain:
+    summary: Read the blue gain (jo ff); returns LG's data in hex digits
+    send: jo {settings.set_id:02x} ff
+    expect: {matches: '^o [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_red_offset:
+    summary: Set the white balance red offset (sx)
+    params:
+      level: {type: int, min: 0, max: 127, required: true, label: Red offset, description: White balance red offset from 0 to 127.}
+    send: sx {settings.set_id:02x} {level:02x}
+    expect: {matches: '^x [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_red_offset:
+    summary: Read the red offset (sx ff); returns LG's data in hex digits
+    send: sx {settings.set_id:02x} ff
+    expect: {matches: '^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_green_offset:
+    summary: Set the white balance green offset (sy)
+    params:
+      level: {type: int, min: 0, max: 127, required: true, label: Green offset, description: White balance green offset from 0 to 127.}
+    send: sy {settings.set_id:02x} {level:02x}
+    expect: {matches: '^y [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_green_offset:
+    summary: Read the green offset (sy ff); returns LG's data in hex digits
+    send: sy {settings.set_id:02x} ff
+    expect: {matches: '^y [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_blue_offset:
+    summary: Set the white balance blue offset (sz)
+    params:
+      level: {type: int, min: 0, max: 127, required: true, label: Blue offset, description: White balance blue offset from 0 to 127.}
+    send: sz {settings.set_id:02x} {level:02x}
+    expect: {matches: '^z [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_blue_offset:
+    summary: Read the blue offset (sz ff); returns LG's data in hex digits
+    send: sz {settings.set_id:02x} ff
+    expect: {matches: '^z [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_gamma:
+    summary: Set the gamma (sn ad)
+    params:
+      gamma:
+        type: enum
+        values: [low, medium, high1, high2]
+        required: true
+        label: Gamma
+        description: low is 1.9, medium 2.2, high1 2.4 and high2 BT.1886.
+    send: sn {settings.set_id:02x} ad {gamma:map.lg_gamma}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_gamma:
+    summary: Read the gamma (sn ad ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} ad ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:ad) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_black_level:
+    summary: Set the black level (sn ae)
+    params:
+      level:
+        type: enum
+        values: [low, high, auto]
+        required: true
+        label: Black level
+        description: Black level low, high or auto.
+    send: sn {settings.set_id:02x} ae {level:map.lg_black_level}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_black_level:
+    summary: Read the black level (sn ae ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} ae ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:ae) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_ism_method:
+    summary: Set the image sticking minimization method (jp)
+    params:
+      method:
+        type: enum
+        values: [inversion, orbiter, white_wash, normal, color_wash, washing_bar, user_image, user_video]
+        required: true
+        label: ISM method
+        description: normal is off; webOS 6.0 offers orbiter, white_wash, normal, user_image and user_video, earlier generations inversion,
+          color_wash and washing_bar too.
+    send: jp {settings.set_id:02x} {method:map.lg_ism_method}
+    expect: {matches: '^p [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_ism_method:
+    summary: Read the ism method (jp ff); returns LG's data in hex digits
+    send: jp {settings.set_id:02x} ff
+    expect: {matches: '^p [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_screen_off:
+    summary: Turn the screen off or on, leaving the display running (kd)
+    params:
+      'off': {type: bool, required: true, label: Screen off, description: On blanks the screen; off shows the picture again.}
+    send: kd {settings.set_id:02x} {off:map.lg_screen_off}
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_screen_off:
+    summary: Read the screen off (kd ff); returns LG's data in hex digits
+    send: kd {settings.set_id:02x} ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_screen_mute_tv:
+    summary: Mute the picture of a commercial TV (kd)
+    params:
+      mode:
+        type: enum
+        values: [picture_on, screen_mute, video_mute]
+        required: true
+        label: Screen mute
+        description: picture_on shows the picture; screen_mute blanks it with no on-screen display; video_mute blanks the video but
+          keeps the on-screen display.
+    send: kd {settings.set_id:02x} {mode:map.lg_screen_mute_tv}
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_screen_mute_tv:
+    summary: Read the screen mute (kd ff); returns LG's data in hex digits
+    send: kd {settings.set_id:02x} ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_freeze:
+    summary: Freeze or release the picture (single input only) (kx)
+    params:
+      frozen: {type: bool, required: true, label: Freeze, description: On freezes the picture (LG's 00); off releases it (01).}
+    send: kx {settings.set_id:02x} {frozen:map.lg_freeze}
+    expect: {matches: '^x [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_freeze:
+    summary: Read the freeze (kx ff); returns LG's data in hex digits
+    send: kx {settings.set_id:02x} ff
+    expect: {matches: '^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_hdr_picture_mode:
+    summary: Set the picture mode used while HDR content plays (sn c4)
+    params:
+      mode:
+        type: enum
+        values: [mall_qsr, general, gov_corp, education]
+        required: true
+        label: HDR picture mode
+        description: The picture mode for HDR content.
+    send: sn {settings.set_id:02x} c4 {mode:map.lg_hdr_picture_mode}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_hdr_picture_mode:
+    summary: Read the hdr picture mode (sn c4 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} c4 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:c4) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_dynamic_tone_mapping:
+    summary: Turn dynamic tone mapping on or off (sn c5)
+    params:
+      enabled: {type: bool, required: true, label: Dynamic tone mapping, description: On maps HDR tones dynamically.}
+    send: sn {settings.set_id:02x} c5 {enabled:map.lg_dynamic_tone_mapping}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_dynamic_tone_mapping:
+    summary: Read the dynamic tone mapping (sn c5 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} c5 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:c5) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_led_local_dimming_expert:
+    summary: Turn led local dimming (expert) on or off (sn c1)
+    params:
+      enabled: {type: bool, required: true, label: LED local dimming (expert), description: On dims LED zones locally in the expert
+          settings.}
+    send: sn {settings.set_id:02x} c1 {enabled:map.lg_led_local_dimming_expert}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_led_local_dimming_expert:
+    summary: Read the led local dimming (expert) (sn c1 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} c1 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:c1) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_apl_auto_control:
+    summary: Turn average picture level auto control on or off (sn be)
+    params:
+      enabled: {type: bool, required: true, label: Average picture level auto control, description: On limits the average picture level
+          automatically.}
+    send: sn {settings.set_id:02x} be {enabled:map.lg_apl_auto_control}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_apl_auto_control:
+    summary: Read the average picture level auto control (sn be ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} be ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:be) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_color_calibration:
+    summary: Turn color calibration on or off (sn d6)
+    params:
+      enabled: {type: bool, required: true, label: Color calibration, description: On applies the stored color calibration.}
+    send: sn {settings.set_id:02x} d6 {enabled:map.lg_color_calibration}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_color_calibration:
+    summary: Read the color calibration (sn d6 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} d6 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:d6) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_scan_inversion:
+    summary: Turn scan inversion on or off (sn 87)
+    params:
+      enabled: {type: bool, required: true, label: Scan inversion, description: On inverts the scan direction; video wall models reboot.}
+    send: sn {settings.set_id:02x} 87 {enabled:map.lg_scan_inversion}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_scan_inversion:
+    summary: Read the scan inversion (sn 87 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 87 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:87) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_frame_control:
+    summary: Turn frame control on or off (sn b7)
+    params:
+      enabled: {type: bool, required: true, label: Frame control, description: On turns frame control on; video wall models reboot.}
+    send: sn {settings.set_id:02x} b7 {enabled:map.lg_frame_control}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_frame_control:
+    summary: Read the frame control (sn b7 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} b7 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:b7) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_led_local_dimming:
+    summary: Set LED local dimming (sn c6)
+    params:
+      level:
+        type: enum
+        values: ['off', low, medium, high]
+        required: true
+        label: LED local dimming
+        description: LED local dimming off, low, medium or high.
+    send: sn {settings.set_id:02x} c6 {level:map.lg_led_local_dimming}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_led_local_dimming:
+    summary: Read the led local dimming (sn c6 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} c6 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:c6) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_natural_size:
+    summary: Set the natural size (sn a5)
+    params:
+      size: {type: int, min: 0, max: 100, required: true, label: Natural size, description: Natural size from 0 to 100.}
+    send: sn {settings.set_id:02x} a5 {size:02x}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_natural_size:
+    summary: Read the natural size (sn a5 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} a5 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:a5) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_volume:
+    summary: Set the volume (kf)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Volume, description: Volume from 0 to 100.}
+    send: kf {settings.set_id:02x} {level:02x}
+    expect: {matches: '^f [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_volume:
+    summary: Read the volume (kf ff); returns LG's data in hex digits
+    send: kf {settings.set_id:02x} ff
+    expect: {matches: '^f [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_mute:
+    summary: Mute or unmute the sound (ke; LG's 00 mutes, 01 unmutes)
+    params:
+      muted: {type: bool, required: true, label: Mute, description: 'On mutes the sound, off restores it.'}
+    send: ke {settings.set_id:02x} {muted:map.lg_muted}
+    expect: {matches: '^e [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_mute:
+    summary: Read the mute (ke ff); returns 00 muted or 01 not muted
+    send: ke {settings.set_id:02x} ff
+    expect: {matches: '^e [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_balance:
+    summary: Set the balance (kt)
+    params:
+      balance: {type: int, min: 0, max: 100, required: true, label: Balance, description: Balance from 0 (left 50) to 100 (right 50);
+          50 is centered.}
+    send: kt {settings.set_id:02x} {balance:02x}
+    expect: {matches: '^t [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_balance:
+    summary: Read the balance (kt ff); returns LG's data in hex digits
+    send: kt {settings.set_id:02x} ff
+    expect: {matches: '^t [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_sound_mode:
+    summary: Set the sound mode (dy)
+    params:
+      mode:
+        type: enum
+        values: [standard, music, cinema, sports, game, news]
+        required: true
+        label: Sound mode
+        description: The sound mode; news is Clear Voice.
+    send: dy {settings.set_id:02x} {mode:map.lg_sound_mode}
+    expect: {matches: '^y [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_sound_mode:
+    summary: Read the sound mode (dy ff); returns LG's data in hex digits
+    send: dy {settings.set_id:02x} ff
+    expect: {matches: '^y [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_treble:
+    summary: Set the treble (kr)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Treble, description: Treble from 0 to 100.}
+    send: kr {settings.set_id:02x} {level:02x}
+    expect: {matches: '^r [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_treble:
+    summary: Read the treble (kr ff); returns LG's data in hex digits
+    send: kr {settings.set_id:02x} ff
+    expect: {matches: '^r [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_bass:
+    summary: Set the bass (ks)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Bass, description: Bass from 0 to 100.}
+    send: ks {settings.set_id:02x} {level:02x}
+    expect: {matches: '^s [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_bass:
+    summary: Read the bass (ks ff); returns LG's data in hex digits
+    send: ks {settings.set_id:02x} ff
+    expect: {matches: '^s [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_audio_out:
+    summary: Set the audio output (sn aa)
+    params:
+      mode:
+        type: enum
+        values: ['off', variable, fixed]
+        required: true
+        label: Audio out
+        description: The audio output off, at a variable level or fixed.
+    send: sn {settings.set_id:02x} aa {mode:map.lg_audio_out}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_audio_out:
+    summary: Read the audio out (sn aa ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} aa ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:aa) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_digital_audio_input:
+    summary: Set whether the digital input's sound is digital or analog (sn a2)
+    params:
+      source:
+        type: enum
+        values: [digital, analog]
+        required: true
+        label: Digital audio input
+        description: digital takes the input's embedded sound; analog takes the analog audio input.
+    send: sn {settings.set_id:02x} a2 {source:map.lg_digital_audio_input}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_digital_audio_input:
+    summary: Read the digital audio input (sn a2 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} a2 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:a2) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_stereo_mode:
+    summary: Set the stereo mode (sn c2)
+    params:
+      mode:
+        type: enum
+        values: [left_right, left_left, right_right]
+        required: true
+        label: Stereo mode
+        description: 'Which channel each speaker plays: left_right normal, left_left or right_right.'
+    send: sn {settings.set_id:02x} c2 {mode:map.lg_stereo_mode}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_stereo_mode:
+    summary: Read the stereo mode (sn c2 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} c2 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:c2) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_speaker:
+    summary: Turn the internal speaker on or off (dv)
+    params:
+      'on': {type: bool, required: true, label: Speaker, description: On plays sound on the internal speaker.}
+    send: dv {settings.set_id:02x} {on:map.lg_speaker}
+    expect: {matches: '^v [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_speaker:
+    summary: Read the speaker (dv ff); returns LG's data in hex digits
+    send: dv {settings.set_id:02x} ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_equalizer:
+    summary: 'Set one equalizer band of a commercial TV (jv): the band in bits 7-5, the step 0-20 in bits 4-0'
+    params:
+      value: {type: int, min: 0, max: 148, required: true, label: Band and step, description: 'The band (0 to 4) times 32 plus the step
+          (0 to 20): 0 is band 1 at step 0, 148 band 5 at step 20.'}
+    send: jv {settings.set_id:02x} {value:02x}
+    expect: {matches: '^v [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_date:
+    summary: Set the display's date (fa Y M D, year 00 being 2010); set the date before the time
+    params:
+      year: {type: int, min: 2010, max: 2099, required: true, label: Year, description: Year from 2010; the latest a display takes depends
+          on its release year.}
+      month: {type: int, min: 1, max: 12, required: true, label: Month, description: Month from 1 to 12.}
+      day: {type: int, min: 1, max: 31, required: true, label: Day, description: Day of the month from 1 to 31.}
+    send: fa {settings.set_id:02x} {year:-2010:02x} {month:02x} {day:02x}
+    expect: {matches: '^a [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_date:
+    summary: Read the display's date (fa ff); returns year (from 2010), month and day in hex digits
+    send: fa {settings.set_id:02x} ff
+    expect: {matches: '^a [0-9a-fA-F]+ OK([0-9a-fA-F]{6})x$'}
+    returns: value
+  set_automatic_time:
+    summary: 'Set the clock automatically or by hand (fa 00 d: 00 automatic, 01 manual)'
+    params:
+      automatic: {type: bool, required: true, label: Automatic, description: On sets the clock automatically; off keeps the date and
+          time set by hand.}
+    send: fa {settings.set_id:02x} 00 {automatic:map.lg_automatic_time}
+    expect: {matches: '^a [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_automatic_time:
+    summary: Read whether the clock is set automatically (fa 00 ff); returns 00 automatic or 01 manual
+    send: fa {settings.set_id:02x} 00 ff
+    expect: {matches: '^a [0-9a-fA-F]+ OK00([0-9a-fA-F]{2})x$'}
+    returns: value
+  set_time:
+    summary: Set the display's time (fx H M S); the date must be set first
+    params:
+      hour: {type: int, min: 0, max: 23, required: true, label: Hour, description: Hour from 0 to 23.}
+      minute: {type: int, min: 0, max: 59, required: true, label: Minute, description: Minute from 0 to 59.}
+      second: {type: int, min: 0, max: 59, required: true, label: Second, description: Second from 0 to 59.}
+    send: fx {settings.set_id:02x} {hour:02x} {minute:02x} {second:02x}
+    expect: {matches: '^x [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_time:
+    summary: Read the display's time (fx ff); returns hour, minute and second in hex digits
+    send: fx {settings.set_id:02x} ff
+    expect: {matches: '^x [0-9a-fA-F]+ OK([0-9a-fA-F]{6})x$'}
+    returns: value
+  set_time_sync:
+    summary: Turn time sync with the other displays on or off (master only) (sn 16)
+    params:
+      enabled: {type: bool, required: true, label: Time sync, description: On makes this master display send its time to the others.}
+    send: sn {settings.set_id:02x} 16 {enabled:map.lg_time_sync}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_time_sync:
+    summary: Read the time sync (sn 16 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 16 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:16) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_daylight_saving_start:
+    summary: Set when daylight saving starts (sd 01 month week weekday hour); turns daylight saving on
+    params: &id001
+      month: {type: int, min: 1, max: 12, required: true, label: Month, description: Month from 1 to 12.}
+      week: {type: int, min: 1, max: 6, required: true, label: Week, description: Week of the month from 1 to 6.}
+      weekday: {type: int, min: 0, max: 6, required: true, label: Weekday, description: Day of the week from 0 (Sunday) to 6 (Saturday).}
+      hour: {type: int, min: 0, max: 23, required: true, label: Hour, description: Hour from 0 to 23.}
+    send: sd {settings.set_id:02x} 01 {month:02x} {week:02x} {weekday:02x} {hour:02x}
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_daylight_saving_start:
+    summary: Read when daylight saving starts (sd 01 ff ff ff ff)
+    send: sd {settings.set_id:02x} 01 ff ff ff ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK01([0-9a-fA-F]{8})x$'}
+    returns: value
+  set_daylight_saving_end:
+    summary: Set when daylight saving ends (sd 02 month week weekday hour); turns daylight saving on
+    params: *id001
+    send: sd {settings.set_id:02x} 02 {month:02x} {week:02x} {weekday:02x} {hour:02x}
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_daylight_saving_end:
+    summary: Read when daylight saving ends (sd 02 ff ff ff ff)
+    send: sd {settings.set_id:02x} 02 ff ff ff ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK02([0-9a-fA-F]{8})x$'}
+    returns: value
+  set_daylight_saving_off:
+    summary: Turn daylight saving off (sd 00 ff ff ff ff)
+    send: sd {settings.set_id:02x} 00 ff ff ff ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_no_signal_power_off:
+    summary: Turn the 15-minute no-signal power off on or off (fg)
+    params:
+      enabled: {type: bool, required: true, label: No signal power off, description: On puts the display in standby after 15 minutes
+          without a signal.}
+    send: fg {settings.set_id:02x} {enabled:map.lg_no_signal_power_off}
+    expect: {matches: '^g [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_no_signal_power_off:
+    summary: Read the no signal power off (fg ff); returns LG's data in hex digits
+    send: fg {settings.set_id:02x} ff
+    expect: {matches: '^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_no_ir_power_off:
+    summary: Turn the 4-hour no-remote power off on or off (mn)
+    params:
+      enabled: {type: bool, required: true, label: No IR power off, description: On puts the display in standby after 4 hours without
+          a remote control key.}
+    send: mn {settings.set_id:02x} {enabled:map.lg_no_ir_power_off}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_no_ir_power_off:
+    summary: Read the no ir power off (mn ff); returns LG's data in hex digits
+    send: mn {settings.set_id:02x} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_no_ir_power_off_hours:
+    summary: Set the no-remote power off time on a 2015 signage display (mn)
+    params:
+      after:
+        type: enum
+        values: ['off', 4h, 6h, 8h]
+        required: true
+        label: No IR power off
+        description: The time without a remote control key after which the display goes to standby, or off.
+    send: mn {settings.set_id:02x} {after:map.lg_no_ir_power_off_hours}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_no_ir_power_off_hours:
+    summary: Read the no ir power off (mn ff); returns LG's data in hex digits
+    send: mn {settings.set_id:02x} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_dpm:
+    summary: Set the display power management standby delay (fj)
+    params:
+      delay:
+        type: enum
+        values: ['off', 5s, 10s, 15s, 1min, 3min, 5min, 10min]
+        required: true
+        label: DPM
+        description: How long without a signal before the display goes to DPM standby, or off; 5s and 15s are on older generations.
+    send: fj {settings.set_id:02x} {delay:map.lg_dpm}
+    expect: {matches: '^j [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_dpm:
+    summary: Read the dpm (fj ff); returns LG's data in hex digits
+    send: fj {settings.set_id:02x} ff
+    expect: {matches: '^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_dpm_wake_up:
+    summary: Set what wakes the display from DPM (sn 0b)
+    params:
+      signal:
+        type: enum
+        values: [clock, clock_and_data]
+        required: true
+        label: DPM wake-up
+        description: clock wakes on the clock signal only; clock_and_data on the clock and data signals.
+    send: sn {settings.set_id:02x} 0b {signal:map.lg_dpm_wake_up}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_dpm_wake_up:
+    summary: Read the dpm wake-up (sn 0b ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 0b ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:0b) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_pm_mode:
+    summary: Set the power management mode (sn 0c)
+    params:
+      mode:
+        type: enum
+        values: [power_off, sustain_aspect_ratio, screen_off, screen_off_always, screen_off_backlight_on, network_ready]
+        required: true
+        label: PM mode
+        description: What standby turns off; network_ready (or screen_off_always) keeps the network up so the display can be turned
+          on over LAN.
+    send: sn {settings.set_id:02x} 0c {mode:map.lg_pm_mode}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_pm_mode:
+    summary: Read the pm mode (sn 0c ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 0c ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:0c) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_power_on_delay:
+    summary: Set the power on delay (fh)
+    params:
+      seconds: {type: int, min: 0, max: 250, required: true, label: Power on delay, description: 'Seconds from 0 to 250 the display
+          waits before turning on, to stagger a video wall.'}
+    send: fh {settings.set_id:02x} {seconds:02x}
+    expect: {matches: '^h [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_power_on_delay:
+    summary: Read the power on delay (fh ff); returns LG's data in hex digits
+    send: fh {settings.set_id:02x} ff
+    expect: {matches: '^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_power_on_status:
+    summary: Set the state the display starts in after mains power returns (tr)
+    params:
+      status:
+        type: enum
+        values: [last, standby, 'on']
+        required: true
+        label: Power on status
+        description: last restores the state before power was lost; standby or on start that way.
+    send: tr {settings.set_id:02x} {status:map.lg_power_on_status}
+    expect: {matches: '^r [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_power_on_status:
+    summary: Read the power on status (tr ff); returns LG's data in hex digits
+    send: tr {settings.set_id:02x} ff
+    expect: {matches: '^r [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_wake_on_lan:
+    summary: Turn wired Wake on LAN on or off (fw)
+    params:
+      enabled: {type: bool, required: true, label: Wake on LAN, description: On lets a Wake on LAN packet on the wired network turn
+          the display on.}
+    send: fw {settings.set_id:02x} {enabled:map.lg_wake_on_lan}
+    expect: {matches: '^w [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_wake_on_lan:
+    summary: Read the wake on lan (fw ff); returns LG's data in hex digits
+    send: fw {settings.set_id:02x} ff
+    expect: {matches: '^w [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_wireless_wake_on_lan:
+    summary: Turn wireless Wake on LAN on or off (sn 90)
+    params:
+      enabled: {type: bool, required: true, label: Wireless Wake on LAN, description: On lets a Wake on LAN packet over Wi-Fi turn the
+          display on.}
+    send: sn {settings.set_id:02x} 90 {enabled:map.lg_wireless_wake_on_lan}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_wireless_wake_on_lan:
+    summary: Read the wireless wake on lan (sn 90 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 90 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:90) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_screen_off_always:
+    summary: Turn screen off always on or off (sn 0d)
+    params:
+      enabled: {type: bool, required: true, label: Screen off always, description: On keeps the screen off in standby whatever the signal.}
+    send: sn {settings.set_id:02x} 0d {enabled:map.lg_screen_off_always}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_screen_off_always:
+    summary: Read the screen off always (sn 0d ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 0d ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:0d) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_quick_start:
+    summary: Turn Quick Start+ on or off (sn 0e)
+    params:
+      enabled: {type: bool, required: true, label: Quick Start+, description: 'On starts the display faster from standby, using more
+          standby power.'}
+    send: sn {settings.set_id:02x} 0e {enabled:map.lg_quick_start}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_quick_start:
+    summary: Read the quick start+ (sn 0e ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 0e ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:0e) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_quiet_mode:
+    summary: Turn quiet mode on or off (sn c7)
+    params:
+      enabled: {type: bool, required: true, label: Quiet mode, description: On runs the display quieter.}
+    send: sn {settings.set_id:02x} c7 {enabled:map.lg_quiet_mode}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_quiet_mode:
+    summary: Read the quiet mode (sn c7 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} c7 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:c7) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_pc_power_control:
+    summary: Set how the OPS or PC module's power follows the display (sn 8b)
+    params:
+      mode:
+        type: enum
+        values: [disabled, sync_on, sync_on_off]
+        required: true
+        label: PC power control
+        description: disabled leaves it alone; sync_on turns it on with the display; sync_on_off turns it on and off with it.
+    send: sn {settings.set_id:02x} 8b {mode:map.lg_pc_power_control}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_pc_power_control:
+    summary: Read the pc power control (sn 8b ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 8b ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:8b) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_tile_mode:
+    summary: 'Turn tile mode on with a layout (dd: columns in the high nibble, rows in the low); video wall models reboot'
+    params:
+      columns: {type: int, min: 1, max: 15, required: true, label: Columns, description: 'Displays across the wall, 1 to 15; the most
+          a model takes varies.'}
+      rows: {type: int, min: 1, max: 15, required: true, label: Rows, description: 'Displays down the wall, 1 to 15.'}
+    send: dd {settings.set_id:02x} {columns:x}{rows:x}
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  tile_mode_off:
+    summary: Turn tile mode off (dd 00)
+    send: dd {settings.set_id:02x} 00
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_tile_mode:
+    summary: Read tile mode (dz ff); returns on (01) or off, columns and rows in hex digits
+    send: dz {settings.set_id:02x} ff
+    expect: {matches: '^z [0-9a-fA-F]+ OK([0-9a-fA-F]{6})x$'}
+    returns: value
+  set_tile_id:
+    summary: Set the display's tile position (di)
+    params:
+      tile: {type: int, min: 1, max: 225, required: true, label: Tile ID, description: 'Position in the wall from 1, left to right then
+          top to bottom; not more than columns times rows.'}
+    send: di {settings.set_id:02x} {tile:02x}
+    expect: {matches: '^i [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_tile_id:
+    summary: Read the tile id (di ff); returns LG's data in hex digits
+    send: di {settings.set_id:02x} ff
+    expect: {matches: '^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_natural_mode:
+    summary: Turn natural mode (bezel compensation) on or off (dj)
+    params:
+      enabled: {type: bool, required: true, label: Natural mode, description: On hides the part of the picture behind the bezels.}
+    send: dj {settings.set_id:02x} {enabled:map.lg_natural_mode}
+    expect: {matches: '^j [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_natural_mode:
+    summary: Read the natural mode (dj ff); returns LG's data in hex digits
+    send: dj {settings.set_id:02x} ff
+    expect: {matches: '^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_tile_h_position:
+    summary: Set the tile h position (tile mode on, natural mode off) (de)
+    params:
+      value: {type: int, min: 0, max: 50, required: true, label: Tile H position, description: Horizontal position from 0 (left 50)
+          to 50 (right).}
+    send: de {settings.set_id:02x} {value:02x}
+    expect: {matches: '^e [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_tile_h_position:
+    summary: Read the tile h position (de ff); returns LG's data in hex digits
+    send: de {settings.set_id:02x} ff
+    expect: {matches: '^e [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_tile_v_position:
+    summary: Set the tile v position (tile mode on, natural mode off) (df)
+    params:
+      value: {type: int, min: 0, max: 50, required: true, label: Tile V position, description: Vertical position from 0 (bottom) to
+          50 (top).}
+    send: df {settings.set_id:02x} {value:02x}
+    expect: {matches: '^f [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_tile_v_position:
+    summary: Read the tile v position (df ff); returns LG's data in hex digits
+    send: df {settings.set_id:02x} ff
+    expect: {matches: '^f [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_tile_h_size:
+    summary: Set the tile h size (tile mode on, natural mode off) (dg)
+    params:
+      value: {type: int, min: 0, max: 50, required: true, label: Tile H size, description: Horizontal size from 0 to 50.}
+    send: dg {settings.set_id:02x} {value:02x}
+    expect: {matches: '^g [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_tile_h_size:
+    summary: Read the tile h size (dg ff); returns LG's data in hex digits
+    send: dg {settings.set_id:02x} ff
+    expect: {matches: '^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_tile_v_size:
+    summary: Set the tile v size (tile mode on, natural mode off) (dh)
+    params:
+      value: {type: int, min: 0, max: 50, required: true, label: Tile V size, description: Vertical size from 0 to 50.}
+    send: dh {settings.set_id:02x} {value:02x}
+    expect: {matches: '^h [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_tile_v_size:
+    summary: Read the tile v size (dh ff); returns LG's data in hex digits
+    send: dh {settings.set_id:02x} ff
+    expect: {matches: '^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_key_lock:
+    summary: Lock or unlock the remote control and the display's keys (km)
+    params:
+      locked: {type: bool, required: true, label: Remote and key lock, description: On locks both; the power key still works while the
+          display is off.}
+    send: km {settings.set_id:02x} {locked:map.lg_key_lock}
+    expect: {matches: '^m [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_key_lock:
+    summary: Read the remote and key lock (km ff); returns LG's data in hex digits
+    send: km {settings.set_id:02x} ff
+    expect: {matches: '^m [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_ir_lock:
+    summary: Lock the remote control (tp)
+    params:
+      lock:
+        type: enum
+        values: [unlocked, all_but_power, all]
+        required: true
+        label: IR lock
+        description: unlocked, every key but power locked, or every key locked.
+    send: tp {settings.set_id:02x} {lock:map.lg_ir_lock}
+    expect: {matches: '^p [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_ir_lock:
+    summary: Read the ir lock (tp ff); returns LG's data in hex digits
+    send: tp {settings.set_id:02x} ff
+    expect: {matches: '^p [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_local_key_lock:
+    summary: Lock the display's own keys (to)
+    params:
+      lock:
+        type: enum
+        values: [unlocked, all_but_power, all]
+        required: true
+        label: Local key lock
+        description: unlocked, every key but power locked, or every key locked.
+    send: to {settings.set_id:02x} {lock:map.lg_local_key_lock}
+    expect: {matches: '^o [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_local_key_lock:
+    summary: Read the local key lock (to ff); returns LG's data in hex digits
+    send: to {settings.set_id:02x} ff
+    expect: {matches: '^o [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_osd_lock:
+    summary: Lock or unlock the on-screen menu (kl; LG's 00 locks on webOS) (kl)
+    params:
+      locked: {type: bool, required: true, label: OSD lock, description: 'On locks the on-screen menu (00), off unlocks it (01).'}
+    send: kl {settings.set_id:02x} {locked:map.lg_osd_lock}
+    expect: {matches: '^l [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_osd_lock:
+    summary: Read the osd lock (kl ff); returns LG's data in hex digits
+    send: kl {settings.set_id:02x} ff
+    expect: {matches: '^l [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_osd_tv:
+    summary: Show or hide the on-screen display of a commercial TV (kl) (kl)
+    params:
+      shown: {type: bool, required: true, label: On-screen display, description: On shows the on-screen display; off hides it.}
+    send: kl {settings.set_id:02x} {shown:map.lg_osd_tv}
+    expect: {matches: '^l [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_osd_tv:
+    summary: Read the on-screen display (kl ff); returns LG's data in hex digits
+    send: kl {settings.set_id:02x} ff
+    expect: {matches: '^l [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_home_dashboard_lock:
+    summary: Turn the home dashboard lock on or off (sn 9d)
+    params:
+      locked: {type: bool, required: true, label: Home dashboard lock, description: On locks it; off unlocks it.}
+    send: sn {settings.set_id:02x} 9d {locked:map.lg_home_dashboard_lock}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_home_dashboard_lock:
+    summary: Read the home dashboard lock (sn 9d ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 9d ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:9d) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_usb_lock:
+    summary: Turn the usb lock on or off (sn 9e)
+    params:
+      locked: {type: bool, required: true, label: USB lock, description: On locks it; off unlocks it.}
+    send: sn {settings.set_id:02x} 9e {locked:map.lg_usb_lock}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_usb_lock:
+    summary: Read the usb lock (sn 9e ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 9e ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:9e) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_wifi_lock:
+    summary: Turn the wi-fi lock on or off (sn 9f)
+    params:
+      locked: {type: bool, required: true, label: Wi-Fi lock, description: On locks it; off unlocks it.}
+    send: sn {settings.set_id:02x} 9f {locked:map.lg_wifi_lock}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_wifi_lock:
+    summary: Read the wi-fi lock (sn 9f ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 9f ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:9f) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_screen_share_lock:
+    summary: Lock Screen Share (sn a0)
+    params:
+      lock:
+        type: enum
+        values: [unlocked, locked, pin]
+        required: true
+        label: Screen Share lock
+        description: unlocked, locked, or locked behind a PIN.
+    send: sn {settings.set_id:02x} a0 {lock:map.lg_screen_share_lock}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_screen_share_lock:
+    summary: Read the screen share lock (sn a0 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} a0 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:a0) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_osd_rotation:
+    summary: Rotate the on-screen display (th)
+    params:
+      rotation:
+        type: enum
+        values: ['off', '90', '270', '180']
+        required: true
+        label: OSD rotation
+        description: The on-screen display's rotation in degrees, or off.
+    send: th {settings.set_id:02x} {rotation:map.lg_osd_rotation}
+    expect: {matches: '^h [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_osd_rotation:
+    summary: Read the osd rotation (th ff); returns LG's data in hex digits
+    send: th {settings.set_id:02x} ff
+    expect: {matches: '^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_external_input_rotation:
+    summary: Rotate the external input's picture (sn 85)
+    params:
+      rotation:
+        type: enum
+        values: ['off', '90', '270', '180']
+        required: true
+        label: External input rotation
+        description: The external input's rotation in degrees, or off.
+    send: sn {settings.set_id:02x} 85 {rotation:map.lg_external_input_rotation}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_external_input_rotation:
+    summary: Read the external input rotation (sn 85 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 85 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:85) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_language:
+    summary: Set the on-screen menu language (fi)
+    params:
+      language:
+        type: enum
+        values: [czech, danish, german, english, spanish, greek, french, italian, dutch, norwegian, portuguese, portuguese_brazil, russian,
+          finnish, swedish, korean, chinese_mandarin, japanese, chinese_cantonese, arabic, turkish, polish]
+        required: true
+        label: OSD language
+        description: The menu language; older generations list fewer, and the 2015 and L19 guides swap Mandarin and Cantonese.
+    send: fi {settings.set_id:02x} {language:map.lg_language}
+    expect: {matches: '^i [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_language:
+    summary: Read the osd language (fi ff); returns LG's data in hex digits
+    send: fi {settings.set_id:02x} ff
+    expect: {matches: '^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_booting_logo:
+    summary: Show or hide the booting logo (sn a3)
+    params:
+      shown: {type: bool, required: true, label: Booting logo, description: On shows the logo while starting.}
+    send: sn {settings.set_id:02x} a3 {shown:map.lg_booting_logo}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_booting_logo:
+    summary: Read the booting logo (sn a3 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} a3 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:a3) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_no_signal_image:
+    summary: Show or hide the no-signal image (sn a9)
+    params:
+      shown: {type: bool, required: true, label: No signal image, description: On shows an image while there is no signal.}
+    send: sn {settings.set_id:02x} a9 {shown:map.lg_no_signal_image}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_no_signal_image:
+    summary: Read the no signal image (sn a9 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} a9 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:a9) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_beacon:
+    summary: Turn the Bluetooth beacon on or off (sn 88)
+    params:
+      enabled: {type: bool, required: true, label: Beacon, description: On turns the beacon on.}
+    send: sn {settings.set_id:02x} 88 {enabled:map.lg_beacon}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_beacon:
+    summary: Read the beacon (sn 88 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 88 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:88) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_upnp:
+    summary: Turn UPnP on or off; the display reboots (sn 9c)
+    params:
+      enabled: {type: bool, required: true, label: UPnP, description: On turns UPnP discovery on.}
+    send: sn {settings.set_id:02x} 9c {enabled:map.lg_upnp}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_upnp:
+    summary: Read the upnp (sn 9c ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 9c ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:9c) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_soft_ap:
+    summary: Turn the display's own Wi-Fi access point on or off (sn a4)
+    params:
+      enabled: {type: bool, required: true, label: SoftAP, description: On turns the access point on.}
+    send: sn {settings.set_id:02x} a4 {enabled:map.lg_soft_ap}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_soft_ap:
+    summary: Read the softap (sn a4 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} a4 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:a4) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_lan_daisy_chain:
+    summary: Turn LAN daisy chain on or off (sn 84)
+    params:
+      enabled: {type: bool, required: true, label: LAN daisy chain, description: On passes the network through to the next display.}
+    send: sn {settings.set_id:02x} 84 {enabled:map.lg_lan_daisy_chain}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_lan_daisy_chain:
+    summary: Read the lan daisy chain (sn 84 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 84 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:84) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_hdmi_it_content:
+    summary: Turn HDMI IT content handling on or off (sn 99)
+    params:
+      enabled: {type: bool, required: true, label: HDMI IT content, description: On follows the source's HDMI IT content flag.}
+    send: sn {settings.set_id:02x} 99 {enabled:map.lg_hdmi_it_content}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_hdmi_it_content:
+    summary: Read the hdmi it content (sn 99 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 99 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:99) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_sync_mode:
+    summary: Make the display the sync master or a slave (sn b0)
+    params:
+      mode:
+        type: enum
+        values: [slave, master]
+        required: true
+        label: Sync mode
+        description: The display's role in content and time sync.
+    send: sn {settings.set_id:02x} b0 {mode:map.lg_sync_mode}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_sync_mode:
+    summary: Read the sync mode (sn b0 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} b0 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:b0) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_contents_sync:
+    summary: Turn contents sync on or off (tg)
+    params:
+      enabled: {type: bool, required: true, label: Contents sync, description: On keeps content in step with the other displays.}
+    send: tg {settings.set_id:02x} {enabled:map.lg_contents_sync}
+    expect: {matches: '^g [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_contents_sync:
+    summary: Read the contents sync (tg ff); returns LG's data in hex digits
+    send: tg {settings.set_id:02x} ff
+    expect: {matches: '^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_usb2_to_hdbaset:
+    summary: Route USB 2 to HDBaseT or not (sn c3)
+    params:
+      enabled: {type: bool, required: true, label: USB2 to HDBaseT, description: On routes USB 2 over HDBaseT.}
+    send: sn {settings.set_id:02x} c3 {enabled:map.lg_usb2_to_hdbaset}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_usb2_to_hdbaset:
+    summary: Read the usb2 to hdbaset (sn c3 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} c3 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:c3) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_screen_fault_detection:
+    summary: Turn screen fault detection on or off (tz)
+    params:
+      enabled: {type: bool, required: true, label: Screen fault detection, description: On checks the screen for faults.}
+    send: tz {settings.set_id:02x} {enabled:map.lg_screen_fault_detection}
+    expect: {matches: '^z [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_screen_fault_detection:
+    summary: Read the screen fault detection (tz ff); returns LG's data in hex digits
+    send: tz {settings.set_id:02x} ff
+    expect: {matches: '^z [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_multichannel:
+    summary: Set the multichannel (sn 76)
+    params:
+      channel: {type: int, min: 1, max: 9, required: true, label: Multichannel, description: Channel from 1 to 9.}
+    send: sn {settings.set_id:02x} 76 {channel:02x}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_multichannel:
+    summary: Read the multichannel (sn 76 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} 76 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:76) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_failover:
+    summary: Set the input failover mode (mi)
+    params:
+      mode:
+        type: enum
+        values: ['off', auto, manual]
+        required: true
+        label: Failover
+        description: off, automatic priority, or the priority set with set_failover_priority.
+    send: mi {settings.set_id:02x} {mode:map.lg_failover}
+    expect: {matches: '^i [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_failover:
+    summary: Read the failover (mi ff); returns LG's data in hex digits
+    send: mi {settings.set_id:02x} ff
+    expect: {matches: '^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_brightness_range_minimum:
+    summary: Set the brightness range minimum (sn ab 00); the minimum may not exceed the maximum
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Level, description: Backlight from 0 to 100 in steps of 5.}
+    send: sn {settings.set_id:02x} ab 00 {level:02x}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_brightness_range_minimum:
+    summary: Read the brightness range minimum (sn ab 00 ff)
+    send: sn {settings.set_id:02x} ab 00 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:ab) ?00([0-9a-fA-F]{2})x$'}
+    returns: value
+  set_brightness_range_maximum:
+    summary: Set the brightness range maximum (sn ab 01); the minimum may not exceed the maximum
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Level, description: Backlight from 0 to 100 in steps of 5.}
+    send: sn {settings.set_id:02x} ab 01 {level:02x}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_brightness_range_maximum:
+    summary: Read the brightness range maximum (sn ab 01 ff)
+    send: sn {settings.set_id:02x} ab 01 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:ab) ?01([0-9a-fA-F]{2})x$'}
+    returns: value
+  set_brightness_scheduling:
+    summary: Turn brightness scheduling on or off (sm)
+    params:
+      enabled: {type: bool, required: true, label: Brightness scheduling, description: On applies the brightness schedule; the clock
+          must be set.}
+    send: sm {settings.set_id:02x} {enabled:map.lg_brightness_scheduling}
+    expect: {matches: '^m [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_brightness_scheduling:
+    summary: Read the brightness scheduling (sm ff); returns LG's data in hex digits
+    send: sm {settings.set_id:02x} ff
+    expect: {matches: '^m [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  add_brightness_schedule:
+    summary: Add a brightness schedule entry (ss hh mm level)
+    params:
+      hour: {type: int, min: 0, max: 23, required: true, label: Hour, description: Hour from 0 to 23.}
+      minute: {type: int, min: 0, max: 59, required: true, label: Minute, description: Minute from 0 to 59.}
+      level: {type: int, min: 0, max: 100, required: true, label: Backlight, description: Backlight from 0 to 100 from that time.}
+    send: ss {settings.set_id:02x} {hour:02x} {minute:02x} {level:02x}
+    expect: {matches: '^s [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_brightness_schedule:
+    summary: Read one brightness schedule entry (ss f1 to f6 ff ff); returns LG's hex data
+    params:
+      entry: {type: int, min: 1, max: 6, required: true, label: Entry, description: Entry from 1 to 6.}
+    send: ss {settings.set_id:02x} f{entry} ff ff
+    expect: {matches: '^s [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  delete_brightness_schedule:
+    summary: Delete one brightness schedule entry (ss e1 to e6 ff ff)
+    params:
+      entry: {type: int, min: 1, max: 6, required: true, label: Entry, description: Entry from 1 to 6.}
+    send: ss {settings.set_id:02x} e{entry} ff ff
+    expect: {matches: '^s [0-9a-fA-F]+ OK'}
+    returns: ack
+  clear_brightness_schedules:
+    summary: Delete every brightness schedule entry (ss e0)
+    send: ss {settings.set_id:02x} e0
+    expect: {matches: '^s [0-9a-fA-F]+ OK'}
+    returns: ack
+  add_on_timer:
+    summary: Add a power on timer (fd day hh mm); the clock must be set
+    params:
+      days:
+        type: enum
+        values: [once, daily, monday_to_friday, monday_to_saturday, saturday_and_sunday, sunday, monday, tuesday, wednesday, thursday,
+          friday, saturday]
+        required: true
+        label: Days
+        description: Which days the timer runs; once is on older generations.
+      hour: {type: int, min: 0, max: 23, required: true, label: Hour, description: Hour from 0 to 23.}
+      minute: {type: int, min: 0, max: 59, required: true, label: Minute, description: Minute from 0 to 59.}
+    send: fd {settings.set_id:02x} {days:map.lg_timer_days} {hour:02x} {minute:02x}
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_on_timer:
+    summary: Read one power on timer entry (fd f1-ff or a1-a6 ff ff); returns LG's hex data
+    params:
+      entry: {type: int, min: 1, max: 21, required: true, label: Entry, description: 'Entry from 1 to 21; models keep 7, 16 or 21.'}
+    send: fd {settings.set_id:02x} {entry:map.lg_timer_entry} ff ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  delete_on_timer:
+    summary: Delete one power on timer entry (fd e1-ef or b1-b6 ff ff)
+    params:
+      entry: {type: int, min: 1, max: 21, required: true, label: Entry, description: Entry from 1 to 21.}
+    send: fd {settings.set_id:02x} {entry:map.lg_timer_delete} ff ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  clear_on_timers:
+    summary: Delete every power on timer (fd e0)
+    send: fd {settings.set_id:02x} e0
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  add_off_timer:
+    summary: Add a power off timer (fe day hh mm); the clock must be set
+    params:
+      days:
+        type: enum
+        values: [once, daily, monday_to_friday, monday_to_saturday, saturday_and_sunday, sunday, monday, tuesday, wednesday, thursday,
+          friday, saturday]
+        required: true
+        label: Days
+        description: Which days the timer runs; once is on older generations.
+      hour: {type: int, min: 0, max: 23, required: true, label: Hour, description: Hour from 0 to 23.}
+      minute: {type: int, min: 0, max: 59, required: true, label: Minute, description: Minute from 0 to 59.}
+    send: fe {settings.set_id:02x} {days:map.lg_timer_days} {hour:02x} {minute:02x}
+    expect: {matches: '^e [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_off_timer:
+    summary: Read one power off timer entry (fe f1-ff or a1-a6 ff ff); returns LG's hex data
+    params:
+      entry: {type: int, min: 1, max: 21, required: true, label: Entry, description: 'Entry from 1 to 21; models keep 7, 16 or 21.'}
+    send: fe {settings.set_id:02x} {entry:map.lg_timer_entry} ff ff
+    expect: {matches: '^e [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  delete_off_timer:
+    summary: Delete one power off timer entry (fe e1-ef or b1-b6 ff ff)
+    params:
+      entry: {type: int, min: 1, max: 21, required: true, label: Entry, description: Entry from 1 to 21.}
+    send: fe {settings.set_id:02x} {entry:map.lg_timer_delete} ff ff
+    expect: {matches: '^e [0-9a-fA-F]+ OK'}
+    returns: ack
+  clear_off_timers:
+    summary: Delete every power off timer (fe e0)
+    send: fe {settings.set_id:02x} e0
+    expect: {matches: '^e [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_on_timer_schedule:
+    summary: Turn the power on timer schedule on or off (fb)
+    params:
+      enabled: {type: bool, required: true, label: On timer schedule, description: On runs the power on timers.}
+    send: fb {settings.set_id:02x} {enabled:map.lg_on_timer_schedule}
+    expect: {matches: '^b [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_on_timer_schedule:
+    summary: Read the on timer schedule (fb ff); returns LG's data in hex digits
+    send: fb {settings.set_id:02x} ff
+    expect: {matches: '^b [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_off_timer_schedule:
+    summary: Turn the power off timer schedule on or off (fc)
+    params:
+      enabled: {type: bool, required: true, label: Off timer schedule, description: On runs the power off timers.}
+    send: fc {settings.set_id:02x} {enabled:map.lg_off_timer_schedule}
+    expect: {matches: '^c [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_off_timer_schedule:
+    summary: Read the off timer schedule (fc ff); returns LG's data in hex digits
+    send: fc {settings.set_id:02x} ff
+    expect: {matches: '^c [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  add_holiday:
+    summary: Add a holiday, a period with no power on (sn 9b Y M D length repeat basis)
+    params:
+      year: {type: int, min: 2010, max: 2099, required: true, label: Year, description: Starting year from 2010.}
+      month: {type: int, min: 1, max: 12, required: true, label: Month, description: Starting month from 1 to 12.}
+      day: {type: int, min: 1, max: 31, required: true, label: Day, description: Starting day from 1 to 31.}
+      days: {type: int, min: 1, max: 7, required: true, label: Length, description: Length in days from 1 to 7.}
+      repeat:
+        type: enum
+        values: [none, monthly, yearly]
+        required: true
+        label: Repeat
+        description: Whether it repeats every month, every year or not at all.
+      basis:
+        type: enum
+        values: [date, weekday]
+        required: true
+        label: Basis
+        description: Whether a repeat keeps the date or the weekday.
+    send: sn {settings.set_id:02x} 9b {year:-2010:02x} {month:02x} {day:02x} {days:02x} {repeat:map.lg_holiday_repeat} {basis:map.lg_holiday_basis}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_holiday:
+    summary: Read one holiday entry (sn 9b f1-f7 ff); returns LG's hex data
+    params:
+      entry: {type: int, min: 1, max: 7, required: true, label: Entry, description: Entry from 1 to 7.}
+    send: sn {settings.set_id:02x} 9b f{entry} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:9b) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  delete_holiday:
+    summary: Delete one holiday entry (sn 9b e1-e7)
+    params:
+      entry: {type: int, min: 1, max: 7, required: true, label: Entry, description: Entry from 1 to 7.}
+    send: sn {settings.set_id:02x} 9b e{entry}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  clear_holidays:
+    summary: Delete every holiday (sn 9b e0)
+    send: sn {settings.set_id:02x} 9b e0
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  add_weekly_schedule:
+    summary: Set a day's on and off times in the weekly schedule (sn 9a day on-hour on-minute off-hour off-minute)
+    params:
+      day: {type: int, min: 1, max: 7, required: true, label: Day, description: Day from 1 (Sunday) to 7 (Saturday).}
+      on_hour: {type: int, min: 0, max: 23, required: true, label: On hour, description: 'Hour to turn on, 0 to 23.'}
+      on_minute: {type: int, min: 0, max: 59, required: true, label: On minute, description: 'Minute to turn on, 0 to 59.'}
+      off_hour: {type: int, min: 0, max: 23, required: true, label: Off hour, description: 'Hour to turn off, 0 to 23.'}
+      off_minute: {type: int, min: 0, max: 59, required: true, label: Off minute, description: 'Minute to turn off, 0 to 59.'}
+    send: sn {settings.set_id:02x} 9a {day:02x} {on_hour:02x} {on_minute:02x} {off_hour:02x} {off_minute:02x}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  delete_weekly_schedule:
+    summary: Clear a day of the weekly schedule (sn 9a e1-e7)
+    params:
+      day: {type: int, min: 1, max: 7, required: true, label: Day, description: Day from 1 (Sunday) to 7 (Saturday).}
+    send: sn {settings.set_id:02x} 9a e{day}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_weekly_schedule:
+    summary: Read a day of the weekly schedule (sn 9a f1-f7 ff); returns LG's hex data
+    params:
+      day: {type: int, min: 1, max: 7, required: true, label: Day, description: Day from 1 (Sunday) to 7 (Saturday).}
+    send: sn {settings.set_id:02x} 9a f{day} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:9a) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_multi_screen:
+    summary: Set the multi screen layout and each window's input (xc mode main sub1 sub2 sub3)
+    params:
+      mode:
+        type: enum
+        values: [pip, pbp2, pbp3, pbp4, pbp3_121]
+        required: true
+        label: Layout
+        description: pip, pbp2, pbp3, pbp4, or pbp3_121 (three windows 1:2:1).
+      main:
+        type: enum
+        values: [none, rgb, dvi_d_pc, dvi_d, hdmi1, hdmi2, ops_hdmi3_dvi, ops_dvi, hdmi3_dvi, hdmi3_hdmi2_dvi, ops, hdmi2_ops, displayport,
+          displayport_usbc, hdmi3, hdbaset]
+        required: true
+        label: Main input
+        description: 'The main window''s input: rgb, dvi_d, hdmi1 to hdmi3, displayport, displayport_usbc, hdbaset, an OPS combination,
+          or none for an unused window.'
+      sub1:
+        type: enum
+        values: [none, rgb, dvi_d_pc, dvi_d, hdmi1, hdmi2, ops_hdmi3_dvi, ops_dvi, hdmi3_dvi, hdmi3_hdmi2_dvi, ops, hdmi2_ops, displayport,
+          displayport_usbc, hdmi3, hdbaset]
+        required: true
+        label: Sub 1 input
+        description: 'The first sub window''s input: rgb, dvi_d, hdmi1 to hdmi3, displayport, displayport_usbc, hdbaset, an OPS combination,
+          or none for an unused window.'
+      sub2:
+        type: enum
+        values: [none, rgb, dvi_d_pc, dvi_d, hdmi1, hdmi2, ops_hdmi3_dvi, ops_dvi, hdmi3_dvi, hdmi3_hdmi2_dvi, ops, hdmi2_ops, displayport,
+          displayport_usbc, hdmi3, hdbaset]
+        required: true
+        label: Sub 2 input
+        description: 'The second sub window''s input: rgb, dvi_d, hdmi1 to hdmi3, displayport, displayport_usbc, hdbaset, an OPS combination,
+          or none for an unused window.'
+      sub3:
+        type: enum
+        values: [none, rgb, dvi_d_pc, dvi_d, hdmi1, hdmi2, ops_hdmi3_dvi, ops_dvi, hdmi3_dvi, hdmi3_hdmi2_dvi, ops, hdmi2_ops, displayport,
+          displayport_usbc, hdmi3, hdbaset]
+        required: true
+        label: Sub 3 input
+        description: 'The third sub window''s input: rgb, dvi_d, hdmi1 to hdmi3, displayport, displayport_usbc, hdbaset, an OPS combination,
+          or none for an unused window.'
+    send: xc {settings.set_id:02x} {mode:map.lg_multi_screen} {main:map.lg_port} {sub1:map.lg_port} {sub2:map.lg_port} {sub3:map.lg_port}
+    expect: {matches: '^c [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_multi_screen:
+    summary: Read the multi screen layout and inputs (xc ff); returns LG's hex data
+    send: xc {settings.set_id:02x} ff
+    expect: {matches: '^c [0-9a-fA-F]+ OK([0-9a-fA-F]{10})x$'}
+    returns: value
+  set_window_aspect_ratio:
+    summary: Set a multi screen window's aspect ratio (xd window ratio)
+    params:
+      window: &id002 {type: int, min: 1, max: 4, required: true, label: Window, description: Window from 1 (main) to 4 (sub 3).}
+      aspect:
+        type: enum
+        values: [full, original]
+        required: true
+        label: Aspect ratio
+        description: full fills the window; original keeps the source's shape.
+    send: xd {settings.set_id:02x} {window:02x} {aspect:map.lg_window_aspect}
+    expect: {matches: '^d [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_window_aspect_ratio:
+    summary: Read a multi screen window's aspect ratio (xd window ff)
+    params:
+      window: *id002
+    send: xd {settings.set_id:02x} {window:02x} ff
+    expect: {matches: '^d [0-9a-fA-F]+ OK([0-9a-fA-F]{4})x$'}
+    returns: value
+  set_window_screen_off:
+    summary: Turn a multi screen window's screen off or on (xe window value); only while Multi Screen runs with a signal
+    params:
+      window: *id002
+      'off': {type: bool, required: true, label: Screen off, description: On blanks the window; off shows it.}
+    send: xe {settings.set_id:02x} {window:02x} {off:map.lg_window_off}
+    expect: {matches: '^e [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_window_screen_off:
+    summary: Read whether a multi screen window's screen is off (xe window ff)
+    params:
+      window: *id002
+    send: xe {settings.set_id:02x} {window:02x} ff
+    expect: {matches: '^e [0-9a-fA-F]+ OK([0-9a-fA-F]{4})x$'}
+    returns: value
+  set_failover_priority:
+    summary: Set the failover input priority (mj, one port code per priority, first first)
+    params:
+      ports: {type: string, max_length: 64, pattern: '^[0-9a-fA-F]{2}( [0-9a-fA-F]{2})*$', required: true, label: Port codes, description: 'LG''s
+          two-digit hex port codes separated by spaces, highest priority first, as many as the model has ports: 90 HDMI 1, 91 HDMI 2,
+          c0 DisplayPort, 80 DVI-D, 98 OPS and so on.'}
+    send: mj {settings.set_id:02x} {ports}
+    expect: {matches: '^j [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_failover_priority:
+    summary: Read the failover input priority (mj ff); returns the port codes run together
+    send: mj {settings.set_id:02x} ff
+    expect: {matches: '^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_uhd_deep_color:
+    summary: Set the uhd deep color of one port (sn af port value)
+    params:
+      port: &id003
+        type: enum
+        values: [rgb, dvi_d_pc, dvi_d, hdmi1, hdmi2, ops_hdmi3_dvi, ops_dvi, hdmi3_dvi, hdmi3_hdmi2_dvi, ops, hdmi2_ops, displayport,
+          displayport_usbc, hdmi3, hdbaset]
+        required: true
+        label: Port
+        description: 'The port: rgb, dvi_d, hdmi1 to hdmi3, displayport, displayport_usbc, hdbaset, an OPS combination.'
+      value: {type: bool, required: true, label: UHD deep color, description: On turns UHD deep color on for the port.}
+    send: sn {settings.set_id:02x} af {port:map.lg_port} {value:map.lg_uhd_deep_color}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_uhd_deep_color:
+    summary: Read the uhd deep color of one port (sn af port ff)
+    params:
+      port: *id003
+    send: sn {settings.set_id:02x} af {port:map.lg_port} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:af) ?([0-9a-fA-F]{4})x$'}
+    returns: value
+  set_input_label:
+    summary: Set the input label of one port (sn b1 port value)
+    params:
+      port: &id004
+        type: enum
+        values: [rgb, dvi_d_pc, dvi_d, hdmi1, hdmi2, ops_hdmi3_dvi, ops_dvi, hdmi3_dvi, hdmi3_hdmi2_dvi, ops, hdmi2_ops, displayport,
+          displayport_usbc, hdmi3, hdbaset]
+        required: true
+        label: Port
+        description: 'The port: rgb, dvi_d, hdmi1 to hdmi3, displayport, displayport_usbc, hdbaset, an OPS combination.'
+      value:
+        type: enum
+        values: [dtv, pc]
+        required: true
+        label: Input label
+        description: 'dtv or pc: the label the port''s input is read back with.'
+    send: sn {settings.set_id:02x} b1 {port:map.lg_port} {value:map.lg_input_label}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_input_label:
+    summary: Read the input label of one port (sn b1 port ff)
+    params:
+      port: *id004
+    send: sn {settings.set_id:02x} b1 {port:map.lg_port} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:b1) ?([0-9a-fA-F]{4})x$'}
+    returns: value
+  set_backup_content:
+    summary: Set what plays as backup content (sn a1)
+    params:
+      source:
+        type: enum
+        values: ['off', media_storage, supersign, si_app]
+        required: true
+        label: Play backup content
+        description: off, from media storage, SuperSign content, or the SI app or Play via URL; set_backup_auto_capture sets auto capture.
+    send: sn {settings.set_id:02x} a1 {source:map.lg_backup_content}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_backup_content:
+    summary: Read the play backup content (sn a1 ff); returns LG's data in hex digits
+    send: sn {settings.set_id:02x} a1 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:a1) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  set_backup_auto_capture:
+    summary: Play automatically captured images as backup content (sn a1 01 interval)
+    params:
+      interval:
+        type: enum
+        values: [30min, 1h, 2h, 3h]
+        required: true
+        label: Capture interval
+        description: How often the picture is captured.
+    send: sn {settings.set_id:02x} a1 01 {interval:map.lg_capture}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_temperature:
+    summary: Read the internal temperature (dn ff); returns LG's hex data
+    send: dn {settings.set_id:02x} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK([0-9a-fA-F]{2})[0-9a-fA-F]*x$'}
+    returns: value
+  get_fan_status:
+    summary: 'Read the fan check (dw ff): normal or failed, and how many fans failed'
+    send: dw {settings.set_id:02x} ff
+    expect: {matches: '^w [0-9a-fA-F]+ OK(0[01])([0-9a-fA-F]{2})?x$'}
+    returns: value
+  get_on_time:
+    summary: Read the time the display has run (dl ff); returns LG's hex data
+    send: dl {settings.set_id:02x} ff
+    expect: {matches: '^l [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  get_serial_number:
+    summary: Read the serial number (fy ff)
+    send: fy {settings.set_id:02x} ff
+    expect: {matches: '^y [0-9a-fA-F]+ OK([0-9A-Za-z]+)x$'}
+    returns: value
+  get_software_version:
+    summary: Read the software version (fz ff)
+    send: fz {settings.set_id:02x} ff
+    expect: {matches: '^z [0-9a-fA-F]+ OK([0-9A-Za-z.]+)x$'}
+    returns: value
+  get_set_id:
+    summary: Read the Set ID (jx ff), answered even when the Set ID does not match; returns its decimal digits in ASCII hex
+    send: jx {settings.set_id:02x} ff
+    expect: {matches: '^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  get_signal:
+    summary: Read the signal (sv 02 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 02 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:02) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_screen_state:
+    summary: Read the screen state (sv 03 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 03 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:03) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_temperature_sensors:
+    summary: Read the temperature sensor health (sv 07 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 07 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:07) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_fan_speeds:
+    summary: Read the fan speeds (sv 09 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 09 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:09) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_screen_fault:
+    summary: Read the screen fault check (sv 10 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 10 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:10) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_humidity:
+    summary: Read the humidity (sv 16 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 16 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:16) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_illuminance:
+    summary: Read the illuminance (sv 17 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 17 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:17) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_tilt:
+    summary: Read the tilt (sv 18 ff); returns LG's hex data
+    send: sv {settings.set_id:02x} 18 ff
+    expect: {matches: '^v [0-9a-fA-F]+ OK(?i:18) ?([0-9a-fA-F]+)x$'}
+    returns: value
+  get_brightness_reading:
+    summary: Read the backlight drive, the calibrated luminance and the two backlight sensors (mu ff)
+    send: mu {settings.set_id:02x} ff
+    expect: {matches: '^u [0-9a-fA-F]+ OK([0-9a-fA-F]{2})([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]{4})x$'}
+    returns: value
+  send_key:
+    summary: Press a remote control key (mc key code)
+    params:
+      key:
+        type: enum
+        values: [power, monitor_on, monitor_off, energy_saving, input, digit_0, digit_1, digit_2, digit_3, digit_4, digit_5, digit_6,
+          digit_7, digit_8, digit_9, volume_up, volume_down, brightness_up, brightness_down, 3d, 1_a_a, clear, arc, psm, mute, settings,
+          auto_config, up, down, right, left, ok, back, tile, exit, picture_id_on, picture_id_off, yellow, blue, white_balance, s_menu,
+          home, swap, mirror, mark, play, stop, pause, rewind, fast_forward, info, channel_up, channel_down, sleep, q_menu, guide]
+        required: true
+        label: Key
+        description: The remote control key; monitor_on and monitor_off are discrete, power toggles, and the media, channel, sleep,
+          q_menu and guide keys are those of LG's TV key table.
+    send: mc {settings.set_id:02x} {key:map.lg_key}
+    expect: {matches: '^c [0-9a-fA-F]+ OK'}
+    returns: ack
+  reset:
+    summary: Reset the picture settings, the screen (RGB input) or every setting (fk)
+    params:
+      target:
+        type: enum
+        values: [picture, screen, initial_settings]
+        required: true
+        label: Reset
+        description: picture resets the picture settings; screen initializes the RGB screen on older generations; initial_settings restores
+          every setting.
+    send: fk {settings.set_id:02x} {target:map.lg_reset}
+    expect: {matches: '^k [0-9a-fA-F]+ OK'}
+    returns: ack
+  auto_configure:
+    summary: Run auto configuration on the RGB (PC) input (ju 01)
+    send: ju {settings.set_id:02x} 01
+    expect: {matches: '^u [0-9a-fA-F]+ OK'}
+    returns: ack
+  apply_to_all_inputs:
+    summary: Apply the current picture settings to every input (sn 52 01); other commands are refused for a while after
+    send: sn {settings.set_id:02x} 52 01
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  play_saved_media:
+    summary: Play the media saved in internal memory (sn a8 01)
+    send: sn {settings.set_id:02x} a8 01
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  clear_panel_noise:
+    summary: Run Clear Panel Noise (sn a6 01)
+    send: sn {settings.set_id:02x} a6 01
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_h_position:
+    summary: Set the RGB input's h position (tile mode off) (fq)
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: H position, description: H position from 0 to 100; 50 is centered
+          for a position.}
+    send: fq {settings.set_id:02x} {value:02x}
+    expect: {matches: '^q [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_h_position:
+    summary: Read the h position (fq ff); returns LG's data in hex digits
+    send: fq {settings.set_id:02x} ff
+    expect: {matches: '^q [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_v_position:
+    summary: Set the RGB input's v position (tile mode off) (fr)
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: V position, description: V position from 0 to 100; 50 is centered
+          for a position.}
+    send: fr {settings.set_id:02x} {value:02x}
+    expect: {matches: '^r [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_v_position:
+    summary: Read the v position (fr ff); returns LG's data in hex digits
+    send: fr {settings.set_id:02x} ff
+    expect: {matches: '^r [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_h_size:
+    summary: Set the RGB input's h size (tile mode off) (fs)
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: H size, description: H size from 0 to 100; 50 is centered for a position.}
+    send: fs {settings.set_id:02x} {value:02x}
+    expect: {matches: '^s [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_h_size:
+    summary: Read the h size (fs ff); returns LG's data in hex digits
+    send: fs {settings.set_id:02x} ff
+    expect: {matches: '^s [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_intelligent_auto:
+    summary: Turn intelligent auto on or off (ti)
+    params:
+      enabled: {type: bool, required: true, label: Intelligent auto, description: On adjusts the RGB input automatically.}
+    send: ti {settings.set_id:02x} {enabled:map.lg_intelligent_auto}
+    expect: {matches: '^i [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_intelligent_auto:
+    summary: Read the intelligent auto (ti ff); returns LG's data in hex digits
+    send: ti {settings.set_id:02x} ff
+    expect: {matches: '^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_reset_enable:
+    summary: Allow or prevent reset to initial settings (tn)
+    params:
+      enabled: {type: bool, required: true, label: Reset enable, description: On allows reset to initial settings.}
+    send: tn {settings.set_id:02x} {enabled:map.lg_reset_enable}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_reset_enable:
+    summary: Read the reset enable (tn ff); returns LG's data in hex digits
+    send: tn {settings.set_id:02x} ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$'}
+    returns: value
+  set_accessory_power:
+    summary: Turn the LCIN008 accessory on or off (sn b8 00 value)
+    params:
+      'on': {type: bool, required: true, label: Power, description: On turns the accessory on.}
+    send: sn {settings.set_id:02x} b8 00 {on:map.lg_on_off}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_accessory_brightness:
+    summary: Set the LCIN008 accessory brightness (sn b8 01 level)
+    params:
+      level: {type: int, min: 0, max: 100, required: true, label: Brightness, description: Brightness from 0 to 100.}
+    send: sn {settings.set_id:02x} b8 01 {level:02x}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_accessory_brightness:
+    summary: Read the LCIN008 accessory brightness (sn b8 01 ff)
+    send: sn {settings.set_id:02x} b8 01 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:b8) ?01([0-9a-fA-F]{2})x$'}
+    returns: value
+  set_network_dhcp:
+    summary: Stage DHCP for the wired network (sn 80 00); apply_network_settings applies it
+    send: sn {settings.set_id:02x} 80 00
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_network_static:
+    summary: Stage a fixed wired address (sn 80 01 address mask gateway, each 12 decimal digits); apply_network_settings applies it
+    params:
+      address: {type: string, pattern: '^[0-9]{12}$', max_length: 12, required: true, label: IP address, description: 'The address as
+          12 digits, each octet as three: 192.168.1.20 is 192168001020.'}
+      mask: {type: string, pattern: '^[0-9]{12}$', max_length: 12, required: true, label: Subnet mask, description: 'The subnet mask
+          as 12 digits: 255.255.255.0 is 255255255000.'}
+      gateway: {type: string, pattern: '^[0-9]{12}$', max_length: 12, required: true, label: Gateway, description: 'The gateway as 12
+          digits: 192.168.1.1 is 192168001001.'}
+    send: sn {settings.set_id:02x} 80 01 {address} {mask} {gateway}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  set_dns:
+    summary: Stage the DNS server (sn 81 address as 12 decimal digits); apply_network_settings applies it
+    params:
+      dns: {type: string, pattern: '^[0-9]{12}$', max_length: 12, required: true, label: DNS server, description: 'The DNS server as
+          12 digits: 8.8.8.8 is 008008008008.'}
+    send: sn {settings.set_id:02x} 81 {dns}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  apply_network_settings:
+    summary: Apply the staged wired address settings or DNS server (sn 82 80 or 81); the connection may drop
+    params:
+      which:
+        type: enum
+        values: [address, dns]
+        required: true
+        label: Settings
+        description: address applies the staged address, mask and gateway; dns applies the staged DNS server.
+    send: sn {settings.set_id:02x} 82 {which:map.lg_apply_network}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+  get_network_settings:
+    summary: Read the network settings in use (sn 82 ff); returns LG's data
+    send: sn {settings.set_id:02x} 82 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:82) ?(.+)x$'}
+    returns: value
+  get_staged_network_settings:
+    summary: Read the staged wired address settings (sn 80 ff); returns LG's data
+    send: sn {settings.set_id:02x} 80 ff
+    expect: {matches: '^n [0-9a-fA-F]+ OK(?i:80) ?(.+)x$'}
+    returns: value
+  change_password:
+    summary: Change the display's menu password (sn a7, the old six digits then the new; older generations use four)
+    params:
+      old_password: {type: string, pattern: '^[0-9]{4}([0-9]{2})?$', max_length: 6, secret: true, required: true, label: Current password,
+        description: 'The current menu password, 6 digits (4 on older generations).'}
+      new_password: {type: string, pattern: '^[0-9]{4}([0-9]{2})?$', max_length: 6, secret: true, required: true, label: New password,
+        description: 'The new menu password, as many digits as the current one.'}
+    send: sn {settings.set_id:02x} a7 {old_password}{new_password}
+    expect: {matches: '^n [0-9a-fA-F]+ OK'}
+    returns: ack
+maps:
+  lg_power: {'false': '00', 'true': '01'}
+  lg_input: {av: '20', component: '40', rgb: '60', dvi_d_pc: '70', dvi_d: '80', hdmi1: '90', hdmi1_pc: a0, hdmi2: '91', hdmi2_pc: a1,
+    ops_hdmi3_dvi: '92', ops_hdmi3_dvi_pc: a2, ops_dvi: '95', ops_dvi_pc: a5, hdmi3_dvi: '96', hdmi3_dvi_pc: a6, hdmi3_hdmi2_dvi: '97',
+    hdmi3_hdmi2_dvi_pc: a7, ops: '98', ops_pc: a8, hdmi2_ops: '99', hdmi2_ops_pc: a9, displayport: c0, displayport_pc: d0, displayport_usbc: c1,
+    displayport_usbc_pc: d1, hdmi3: c2, hdmi3_pc: d2, hdbaset: c3, hdbaset_pc: d3, webos_player: e0, others: e1, multi_screen: e2, play_via_url: e3}
+  lg_input_tv: {dtv: '00', cadtv: '01', atv: '10', catv: '11', av1: '20', av2: '21', component1: '40', component2: '41', rgb: '60',
+    hdmi1: '90', hdmi2: '91', hdmi3: '92', hdmi4: '93'}
+  lg_aspect_ratio: {full: '02', original: '06'}
+  lg_aspect_ratio_legacy: {'4_3': '01', '16_9': '02', zoom: '04', zoom2: '05', set_by_program: '06', '14_9': '07', just_scan: 09, full_wide: 0b,
+    '21_9': 0c, cinema_zoom_1: '10', cinema_zoom_2: '11', cinema_zoom_3: '12', cinema_zoom_4: '13', cinema_zoom_5: '14', cinema_zoom_6: '15',
+    cinema_zoom_7: '16', cinema_zoom_8: '17', cinema_zoom_9: '18', cinema_zoom_10: '19', cinema_zoom_11: 1a, cinema_zoom_12: 1b, cinema_zoom_13: 1c,
+    cinema_zoom_14: 1d, cinema_zoom_15: 1e, cinema_zoom_16: 1f}
+  lg_energy_saving: {'off': '00', minimum: '01', medium: '02', maximum: '03', auto: '04', screen_off: '05'}
+  lg_picture_mode: {mall_qsr: '00', general: '01', gov_corp: '02', transportation: '03', education: '04', expert1: '05', expert2: '06',
+    aps: 08, photo: 09, calibration: '11', hospital: '12'}
+  lg_picture_mode_legacy: {vivid: '00', standard: '01', cinema: '02', sports: '03', game: '04', expert1: '05', expert2: '06', aps: 08,
+    photos: 09, calibration: '11'}
+  lg_gamma: {low: '00', medium: '01', high1: '02', high2: '03'}
+  lg_black_level: {low: '00', high: '01', auto: '02'}
+  lg_ism_method: {inversion: '01', orbiter: '02', white_wash: '04', normal: 08, color_wash: '20', washing_bar: '80', user_image: '90',
+    user_video: '91'}
+  lg_screen_off: {'false': '00', 'true': '01'}
+  lg_screen_mute_tv: {picture_on: '00', screen_mute: '01', video_mute: '10'}
+  lg_freeze: {'true': '00', 'false': '01'}
+  lg_hdr_picture_mode: {mall_qsr: '00', general: '01', gov_corp: '02', education: '04'}
+  lg_dynamic_tone_mapping: {'false': '00', 'true': '01'}
+  lg_led_local_dimming_expert: {'false': '00', 'true': '01'}
+  lg_apl_auto_control: {'false': '00', 'true': '01'}
+  lg_color_calibration: {'false': '00', 'true': '01'}
+  lg_scan_inversion: {'false': '00', 'true': '01'}
+  lg_frame_control: {'false': '00', 'true': '01'}
+  lg_led_local_dimming: {'off': '00', low: '01', medium: '02', high: '03'}
+  lg_muted: {'true': '00', 'false': '01'}
+  lg_sound_mode: {standard: '01', music: '02', cinema: '03', sports: '04', game: '05', news: '07'}
+  lg_audio_out: {'off': '00', variable: '01', fixed: '02'}
+  lg_digital_audio_input: {digital: '00', analog: '01'}
+  lg_stereo_mode: {left_right: '00', left_left: '01', right_right: '02'}
+  lg_speaker: {'false': '00', 'true': '01'}
+  lg_automatic_time: {'true': '00', 'false': '01'}
+  lg_time_sync: {'false': '00', 'true': '01'}
+  lg_no_signal_power_off: {'false': '00', 'true': '01'}
+  lg_no_ir_power_off: {'false': '00', 'true': '01'}
+  lg_no_ir_power_off_hours: {'off': '00', 4h: '01', 6h: '02', 8h: '03'}
+  lg_dpm: {'off': '00', 5s: '01', 10s: '02', 15s: '03', 1min: '04', 3min: '05', 5min: '06', 10min: '07'}
+  lg_dpm_wake_up: {clock: '00', clock_and_data: '01'}
+  lg_pm_mode: {power_off: '00', sustain_aspect_ratio: '01', screen_off: '02', screen_off_always: '03', screen_off_backlight_on: '04',
+    network_ready: '05'}
+  lg_power_on_status: {last: '00', standby: '01', 'on': '02'}
+  lg_wake_on_lan: {'false': '00', 'true': '01'}
+  lg_wireless_wake_on_lan: {'false': '00', 'true': '01'}
+  lg_screen_off_always: {'false': '00', 'true': '01'}
+  lg_quick_start: {'false': '00', 'true': '01'}
+  lg_quiet_mode: {'false': '00', 'true': '01'}
+  lg_pc_power_control: {disabled: '00', sync_on: '01', sync_on_off: '02'}
+  lg_natural_mode: {'false': '00', 'true': '01'}
+  lg_key_lock: {'false': '00', 'true': '01'}
+  lg_ir_lock: {unlocked: '00', all_but_power: '01', all: '02'}
+  lg_local_key_lock: {unlocked: '00', all_but_power: '01', all: '02'}
+  lg_osd_lock: {'true': '00', 'false': '01'}
+  lg_osd_tv: {'false': '00', 'true': '01'}
+  lg_home_dashboard_lock: {'false': '00', 'true': '01'}
+  lg_usb_lock: {'false': '00', 'true': '01'}
+  lg_wifi_lock: {'false': '00', 'true': '01'}
+  lg_screen_share_lock: {unlocked: '00', locked: '01', pin: '02'}
+  lg_osd_rotation: {'off': '00', '90': '01', '270': '02', '180': '03'}
+  lg_external_input_rotation: {'off': '00', '90': '01', '270': '02', '180': '03'}
+  lg_language: {czech: '00', danish: '01', german: '02', english: '03', spanish: '04', greek: '05', french: '06', italian: '07', dutch: 08,
+    norwegian: 09, portuguese: 0a, portuguese_brazil: 0b, russian: 0c, finnish: 0d, swedish: 0e, korean: 0f, chinese_mandarin: '10',
+    japanese: '11', chinese_cantonese: '12', arabic: '13', turkish: '14', polish: '15'}
+  lg_booting_logo: {'false': '00', 'true': '01'}
+  lg_no_signal_image: {'false': '00', 'true': '01'}
+  lg_beacon: {'false': '00', 'true': '01'}
+  lg_upnp: {'false': '00', 'true': '01'}
+  lg_soft_ap: {'false': '00', 'true': '01'}
+  lg_lan_daisy_chain: {'false': '00', 'true': '01'}
+  lg_hdmi_it_content: {'false': '00', 'true': '01'}
+  lg_sync_mode: {slave: '00', master: '01'}
+  lg_contents_sync: {'false': '00', 'true': '01'}
+  lg_usb2_to_hdbaset: {'false': '00', 'true': '01'}
+  lg_screen_fault_detection: {'false': '00', 'true': '01'}
+  lg_failover: {'off': '00', auto: '01', manual: '02'}
+  lg_brightness_scheduling: {'false': '00', 'true': '01'}
+  lg_timer_days: {once: '01', daily: '02', monday_to_friday: '03', monday_to_saturday: '04', saturday_and_sunday: '05', sunday: '06',
+    monday: '07', tuesday: 08, wednesday: 09, thursday: 0a, friday: 0b, saturday: 0c}
+  lg_timer_entry: {'1': f1, '2': f2, '3': f3, '4': f4, '5': f5, '6': f6, '7': f7, '8': f8, '9': f9, '10': fa, '11': fb, '12': fc, '13': fd,
+    '14': fe, '15': ff, '16': a1, '17': a2, '18': a3, '19': a4, '20': a5, '21': a6}
+  lg_timer_delete: {'1': e1, '2': e2, '3': e3, '4': e4, '5': e5, '6': e6, '7': e7, '8': e8, '9': e9, '10': ea, '11': eb, '12': ec, '13': ed,
+    '14': ee, '15': ef, '16': b1, '17': b2, '18': b3, '19': b4, '20': b5, '21': b6}
+  lg_on_timer_schedule: {'false': '00', 'true': '01'}
+  lg_off_timer_schedule: {'false': '00', 'true': '01'}
+  lg_holiday_repeat: {none: '00', monthly: '01', yearly: '02'}
+  lg_holiday_basis: {date: '01', weekday: '02'}
+  lg_port: {none: '00', rgb: '60', dvi_d_pc: '70', dvi_d: '80', hdmi1: '90', hdmi2: '91', ops_hdmi3_dvi: '92', ops_dvi: '95', hdmi3_dvi: '96',
+    hdmi3_hdmi2_dvi: '97', ops: '98', hdmi2_ops: '99', displayport: c0, displayport_usbc: c1, hdmi3: c2, hdbaset: c3}
+  lg_multi_screen: {pip: '10', pbp2: '22', pbp3: '23', pbp4: '24', pbp3_121: '25'}
+  lg_window_aspect: {full: '00', original: '01'}
+  lg_window_off: {'false': '00', 'true': '01'}
+  lg_input_label: {dtv: '00', pc: '01'}
+  lg_uhd_deep_color: {'false': '00', 'true': '01'}
+  lg_backup_content: {'off': '00', media_storage: '02', supersign: '03', si_app: '04'}
+  lg_capture: {30min: '01', 1h: '02', 2h: '03', 3h: '04'}
+  lg_key: {power: 08, monitor_on: c4, monitor_off: c5, energy_saving: '95', input: 0b, digit_0: '10', digit_1: '11', digit_2: '12',
+    digit_3: '13', digit_4: '14', digit_5: '15', digit_6: '16', digit_7: '17', digit_8: '18', digit_9: '19', volume_up: '02', volume_down: '03',
+    brightness_up: e0, brightness_down: e1, 3d: dc, 1_a_a: '32', clear: 2f, arc: '79', psm: 4d, mute: 09, settings: '43', auto_config: '99',
+    up: '40', down: '41', right: '06', left: '07', ok: '44', back: '28', tile: 7b, exit: 5b, picture_id_on: '72', picture_id_off: '71',
+    yellow: '63', blue: '61', white_balance: 5f, s_menu: 3f, home: 7c, swap: '97', mirror: '96', mark: 7e, play: b0, stop: b1, pause: ba,
+    rewind: 8f, fast_forward: 8e, info: aa, channel_up: '00', channel_down: '01', sleep: 0e, q_menu: '45', guide: ab}
+  lg_reset: {picture: '00', screen: '01', initial_settings: '02'}
+  lg_intelligent_auto: {'false': '00', 'true': '01'}
+  lg_reset_enable: {'false': '00', 'true': '01'}
+  lg_on_off: {'false': '00', 'true': '01'}
+  lg_apply_network: {address: '80', dns: '81'}
+state:
+  accessory.brightness: {type: int, description: 'LCIN008 accessory brightness (sn b8 01), 0 to 100'}
+  accessory.power: {type: bool, description: LCIN008 accessory power (sn b8 00)}
+  aspect_ratio: {type: string, description: 'Aspect ratio: 4_3, 16_9, zoom, zoom2, set_by_program, 14_9, just_scan, full_wide, 21_9,
+      cinema_zoom_1, cinema_zoom_2, cinema_zoom_3, cinema_zoom_4, cinema_zoom_5, cinema_zoom_6, cinema_zoom_7, cinema_zoom_8, cinema_zoom_9,
+      cinema_zoom_10, cinema_zoom_11, cinema_zoom_12, cinema_zoom_13, cinema_zoom_14, cinema_zoom_15, cinema_zoom_16'}
+  audio.balance: {type: int, description: 'Balance, 0 to 100'}
+  audio.bass: {type: int, description: 'Bass, 0 to 100'}
+  audio.digital_input: {type: string, description: 'Digital audio input: digital, analog'}
+  audio.muted: {type: bool, description: Whether the sound is muted (ke 00)}
+  audio.out: {type: string, description: 'Audio out: off, variable, fixed'}
+  audio.sound_mode: {type: string, description: 'Sound mode: standard, music, cinema, sports, game, news'}
+  audio.speaker: {type: bool, description: Speaker}
+  audio.stereo_mode: {type: string, description: 'Stereo mode: left_right, left_left, right_right'}
+  audio.treble: {type: int, description: 'Treble, 0 to 100'}
+  audio.volume: {type: int, description: 'Volume, 0 to 100'}
+  clock.automatic: {type: bool, description: Whether the clock is set automatically (fa 00 00) rather than by hand}
+  clock.date.day: {type: int, description: 'The display''s date: day of the month'}
+  clock.date.month: {type: int, description: 'The display''s date: month, 1 to 12'}
+  clock.date.year: {type: int, description: 'The display''s date: year'}
+  clock.daylight_saving.enabled: {type: bool, description: Whether daylight saving is on (sd)}
+  clock.daylight_saving.end.hour: {type: int, description: 'Daylight saving end: hour, 0 to 23'}
+  clock.daylight_saving.end.month: {type: int, description: 'Daylight saving end: month, 1 to 12'}
+  clock.daylight_saving.end.week: {type: int, description: 'Daylight saving end: week of the month, 1 to 6'}
+  clock.daylight_saving.end.weekday: {type: int, description: 'Daylight saving end: weekday, 0 Sunday to 6 Saturday'}
+  clock.daylight_saving.start.hour: {type: int, description: 'Daylight saving start: hour, 0 to 23'}
+  clock.daylight_saving.start.month: {type: int, description: 'Daylight saving start: month, 1 to 12'}
+  clock.daylight_saving.start.week: {type: int, description: 'Daylight saving start: week of the month, 1 to 6'}
+  clock.daylight_saving.start.weekday: {type: int, description: 'Daylight saving start: weekday, 0 Sunday to 6 Saturday'}
+  clock.time.hour: {type: int, description: 'The display''s time: hour'}
+  clock.time.minute: {type: int, description: 'The display''s time: minute'}
+  clock.time.second: {type: int, description: 'The display''s time: second'}
+  clock.time_sync: {type: bool, description: Time sync}
+  energy_saving: {type: string, description: 'Energy saving: off, minimum, medium, maximum, auto, screen_off'}
+  failover.backup_content: {type: string, description: 'Play backup content: off, media_storage, supersign, si_app'}
+  failover.mode: {type: string, description: 'Failover: off, auto, manual'}
+  failover.priority: {type: string, description: 'The failover input priority (mj), as LG''s hex port codes run together, first priority
+      first'}
+  freeze: {type: bool, description: Freeze}
+  info.serial_number: {type: string, description: 'Serial number (fy), as the display sends it'}
+  info.software_version: {type: string, description: 'Software version (fz), as the display sends it'}
+  input: {type: string, description: 'Input: dtv, cadtv, atv, catv, av1, av2, component1, component2, rgb, hdmi1, hdmi2, hdmi3, hdmi4'}
+  input_settings.hdmi_it_content: {type: bool, description: HDMI IT content}
+  input_settings.input_label.*: {type: string, description: 'Input label per port (sn b1): dtv or pc, keyed by LG''s hex port code'}
+  input_settings.multichannel: {type: int, description: 'Multichannel, 1 to 9'}
+  input_settings.uhd_deep_color.*: {type: bool, description: 'UHD deep color per port (sn af), keyed by LG''s hex port code (90 HDMI
+      1, c0 DisplayPort ...)'}
+  input_settings.usb2_to_hdbaset: {type: bool, description: USB2 to HDBaseT}
+  ism_method: {type: string, description: 'ISM method: inversion, orbiter, white_wash, normal, color_wash, washing_bar, user_image,
+      user_video'}
+  locks.home_dashboard: {type: bool, description: Home dashboard lock}
+  locks.ir: {type: string, description: 'IR lock: unlocked, all_but_power, all'}
+  locks.local_keys: {type: string, description: 'Local key lock: unlocked, all_but_power, all'}
+  locks.osd: {type: bool, description: OSD lock}
+  locks.remote_and_keys: {type: bool, description: Remote and key lock}
+  locks.reset_enabled: {type: bool, description: Reset enable}
+  locks.screen_share: {type: string, description: 'Screen Share lock: unlocked, locked, pin'}
+  locks.usb: {type: bool, description: USB lock}
+  locks.wifi: {type: bool, description: Wi-Fi lock}
+  multi_screen.main: {type: string, description: 'The main window''s input (xc), none when it shows no external input'}
+  multi_screen.mode: {type: string, description: 'Multi screen layout (xc): pip, pbp2, pbp3, pbp4 or pbp3_121'}
+  multi_screen.sub1: {type: string, description: 'The sub1 window''s input (xc), none when it shows no external input'}
+  multi_screen.sub2: {type: string, description: 'The sub2 window''s input (xc), none when it shows no external input'}
+  multi_screen.sub3: {type: string, description: 'The sub3 window''s input (xc), none when it shows no external input'}
+  multi_screen.windows.*.aspect_ratio: {type: string, description: 'Window 1''s aspect ratio (xd): full or original'}
+  multi_screen.windows.*.screen_off: {type: bool, description: Whether window 1's screen is off (xe)}
+  network.beacon: {type: bool, description: Beacon}
+  network.lan_daisy_chain: {type: bool, description: LAN daisy chain}
+  network.soft_ap: {type: bool, description: SoftAP}
+  network.upnp: {type: bool, description: UPnP}
+  osd.booting_logo: {type: bool, description: Booting logo}
+  osd.input_rotation: {type: string, description: 'External input rotation: off, 90, 270, 180'}
+  osd.language: {type: string, description: 'OSD language: czech, danish, german, english, spanish, greek, french, italian, dutch, norwegian,
+      portuguese, portuguese_brazil, russian, finnish, swedish, korean, chinese_mandarin, japanese, chinese_cantonese, arabic, turkish,
+      polish'}
+  osd.no_signal_image: {type: bool, description: No signal image}
+  osd.rotation: {type: string, description: 'OSD rotation: off, 90, 270, 180'}
+  osd.shown: {type: bool, description: On-screen display}
+  picture.apl_auto_control: {type: bool, description: Average picture level auto control}
+  picture.backlight: {type: int, description: 'Backlight, 0 to 100'}
+  picture.black_level: {type: string, description: 'Black level: low, high, auto'}
+  picture.brightness: {type: int, description: 'Brightness, 0 to 100'}
+  picture.brightness_range.maximum: {type: int, description: 'Highest backlight a brightness schedule or sensor may set, 0 to 100'}
+  picture.brightness_range.minimum: {type: int, description: 'Lowest backlight a brightness schedule or sensor may set, 0 to 100'}
+  picture.color: {type: int, description: 'Color, 0 to 100'}
+  picture.color_calibration: {type: bool, description: Color calibration}
+  picture.color_temperature: {type: int, description: 'Color temperature in hundreds of kelvin, 32 (3200 K) to 130 (13000 K)', unit: 100
+      K}
+  picture.color_temperature_level: {type: int, description: Color temperature from 0 (warm) to 100 (cool)}
+  picture.contrast: {type: int, description: 'Contrast, 0 to 100'}
+  picture.dynamic_tone_mapping: {type: bool, description: Dynamic tone mapping}
+  picture.frame_control: {type: bool, description: Frame control}
+  picture.gamma: {type: string, description: 'Gamma: low, medium, high1, high2'}
+  picture.h_position: {type: int, description: 'H position, 0 to 100'}
+  picture.h_size: {type: int, description: 'H size, 0 to 100'}
+  picture.hdr_mode: {type: string, description: 'HDR picture mode: mall_qsr, general, gov_corp, education'}
+  picture.intelligent_auto: {type: bool, description: Intelligent auto}
+  picture.led_local_dimming: {type: string, description: 'LED local dimming: off, low, medium, high'}
+  picture.led_local_dimming_expert: {type: bool, description: LED local dimming (expert)}
+  picture.scan_inversion: {type: bool, description: Scan inversion}
+  picture.sharpness: {type: int, description: 'Sharpness, 0 to 50'}
+  picture.tint: {type: int, description: 'Tint, 0 to 100'}
+  picture.v_position: {type: int, description: 'V position, 0 to 100'}
+  picture.white_balance.blue_gain: {type: int, description: 'Blue gain, 0 to 254'}
+  picture.white_balance.blue_offset: {type: int, description: 'Blue offset, 0 to 127'}
+  picture.white_balance.green_gain: {type: int, description: 'Green gain, 0 to 254'}
+  picture.white_balance.green_offset: {type: int, description: 'Green offset, 0 to 127'}
+  picture.white_balance.red_gain: {type: int, description: 'Red gain, 0 to 254'}
+  picture.white_balance.red_offset: {type: int, description: 'Red offset, 0 to 127'}
+  picture_mode: {type: string, description: 'Picture mode: vivid, standard, cinema, sports, game, expert1, expert2, aps, photos, calibration'}
+  power: {type: bool, description: Whether the display is on (ka); LG answers reliably only while it is fully on}
+  power_management.dpm: {type: string, description: 'DPM: off, 5s, 10s, 15s, 1min, 3min, 5min, 10min'}
+  power_management.dpm_wake_up: {type: string, description: 'DPM wake-up: clock, clock_and_data'}
+  power_management.no_ir_power_off: {type: bool, description: No IR power off}
+  power_management.no_ir_power_off_hours: {type: string, description: 'No IR power off: off, 4h, 6h, 8h'}
+  power_management.no_signal_power_off: {type: bool, description: No signal power off}
+  power_management.pc_power_control: {type: string, description: 'PC power control: disabled, sync_on, sync_on_off'}
+  power_management.pm_mode: {type: string, description: 'PM mode: power_off, sustain_aspect_ratio, screen_off, screen_off_always, screen_off_backlight_on,
+      network_ready'}
+  power_management.power_on_delay: {type: int, description: 'Power on delay, 0 to 250', unit: s}
+  power_management.power_on_status: {type: string, description: 'Power on status: last, standby, on'}
+  power_management.quick_start: {type: bool, description: Quick Start+}
+  power_management.quiet_mode: {type: bool, description: Quiet mode}
+  power_management.screen_off_always: {type: bool, description: Screen off always}
+  power_management.wake_on_lan: {type: bool, description: Wake on LAN}
+  power_management.wireless_wake_on_lan: {type: bool, description: Wireless Wake on LAN}
+  schedules.brightness.*: {type: string, description: 'A brightness schedule entry, keyed 1 to 6, as LG''s hex data: hour, minute and
+      backlight'}
+  schedules.brightness_enabled: {type: bool, description: Brightness scheduling}
+  schedules.holidays.*: {type: string, description: 'A holiday entry, keyed 1 to 7, as LG''s hex data'}
+  schedules.off_timers.*: {type: string, description: 'A power off timer entry, keyed 1 to 21, as LG''s hex data: days, hour and minute'}
+  schedules.off_timers_enabled: {type: bool, description: Off timer schedule}
+  schedules.on_timers.*: {type: string, description: 'A power on timer entry, keyed 1 to 21, as LG''s hex data: days, hour and minute'}
+  schedules.on_timers_enabled: {type: bool, description: On timer schedule}
+  screen_mute: {type: string, description: 'Screen mute: picture_on, screen_mute, video_mute'}
+  screen_off: {type: bool, description: Screen off}
+  status.brightness.backlight_pwm: {type: int, description: 'Backlight drive (mu), 0 to 100'}
+  status.brightness.luminance: {type: int, description: Factory-calibrated luminance (mu)}
+  status.brightness.sensor1: {type: int, description: Backlight unit sensor 1 (mu)}
+  status.brightness.sensor2: {type: int, description: Backlight unit sensor 2 (mu)}
+  status.fan_speeds: {type: string, description: 'Fan speeds (sv 09) as LG''s hex data, two bytes per fan, 0 to 8200 rpm each'}
+  status.fans_ok: {type: bool, description: Whether every fan works (dw)}
+  status.faulty_fans: {type: int, description: 'How many fans have failed (dw), 0 to 10'}
+  status.humidity: {type: int, unit: '%RH', description: Relative humidity (sv 16)}
+  status.illuminance: {type: int, unit: lx, description: 'Ambient illuminance (sv 17), 1 to 1000 lux'}
+  status.on_time: {type: int, unit: h, description: 'Time the display has run (dl); LG does not state the unit, hours assumed'}
+  status.screen: {type: string, description: 'Screen state (sv 03): on, off, off_always, sustain_aspect or off_backlight_on'}
+  status.screen_fault_detection: {type: bool, description: Screen fault detection}
+  status.screen_ok: {type: bool, description: 'Result of the RGB sensing screen check (sv 10): true OK, false a fault'}
+  status.signal: {type: bool, description: Whether the input has a signal (sv 02)}
+  status.temperature: {type: int, unit: °C, description: 'Internal temperature (dn); LG does not state the unit, degrees Celsius assumed'}
+  status.temperature_sensors: {type: int, description: 'Temperature sensor health (sv 07): 7 all three (top, bottom, main) normal, 0
+      all faulty, one bit per sensor'}
+  status.tilt: {type: string, description: 'Installation tilt (sv 18): 0, 90, 180, 270, fallen_forward or fallen_backward'}
+  sync.contents: {type: bool, description: Contents sync}
+  sync.mode: {type: string, description: 'Sync mode: slave, master'}
+  video_wall.columns: {type: int, description: Tile mode columns (dz)}
+  video_wall.enabled: {type: bool, description: Whether tile mode is on (dz)}
+  video_wall.h_position: {type: int, description: 'Tile H position, 0 to 50'}
+  video_wall.h_size: {type: int, description: 'Tile H size, 0 to 50'}
+  video_wall.natural_mode: {type: bool, description: Natural mode}
+  video_wall.natural_size: {type: int, description: 'Natural size, 0 to 100'}
+  video_wall.rows: {type: int, description: Tile mode rows (dz)}
+  video_wall.tile_id: {type: int, description: 'Tile ID, 1 to 225'}
+  video_wall.v_position: {type: int, description: 'Tile V position, 0 to 50'}
+  video_wall.v_size: {type: int, description: 'Tile V size, 0 to 50'}
+telemetry:
+  poll:
+  - every_ms: 5000
+    send: ['ka {settings.set_id:02x} ff', 'xb {settings.set_id:02x} ff', 'xb {settings.set_id:02x} ff', 'kd {settings.set_id:02x} ff',
+      'kf {settings.set_id:02x} ff', 'ke {settings.set_id:02x} ff', 'sv {settings.set_id:02x} 02 ff']
+  - every_ms: 60000
+    send: ['kc {settings.set_id:02x} ff', 'kc {settings.set_id:02x} ff', 'jq {settings.set_id:02x} ff', 'dx {settings.set_id:02x} ff',
+      'dx {settings.set_id:02x} ff', 'kg {settings.set_id:02x} ff', 'kh {settings.set_id:02x} ff', 'kk {settings.set_id:02x} ff', 'ki
+        {settings.set_id:02x} ff', 'kj {settings.set_id:02x} ff', 'mg {settings.set_id:02x} ff', 'xu {settings.set_id:02x} ff', 'xu
+        {settings.set_id:02x} ff', 'jm {settings.set_id:02x} ff', 'jn {settings.set_id:02x} ff', 'jo {settings.set_id:02x} ff', 'sx
+        {settings.set_id:02x} ff', 'sy {settings.set_id:02x} ff', 'sz {settings.set_id:02x} ff', 'sn {settings.set_id:02x} ad ff', 'sn
+        {settings.set_id:02x} ae ff', 'jp {settings.set_id:02x} ff', 'kd {settings.set_id:02x} ff', 'kx {settings.set_id:02x} ff', 'sn
+        {settings.set_id:02x} c4 ff', 'sn {settings.set_id:02x} c5 ff', 'sn {settings.set_id:02x} c1 ff', 'sn {settings.set_id:02x}
+        be ff', 'sn {settings.set_id:02x} d6 ff', 'sn {settings.set_id:02x} 87 ff', 'sn {settings.set_id:02x} b7 ff', 'sn {settings.set_id:02x}
+        c6 ff', 'sn {settings.set_id:02x} a5 ff', 'kt {settings.set_id:02x} ff', 'dy {settings.set_id:02x} ff', 'kr {settings.set_id:02x}
+        ff', 'ks {settings.set_id:02x} ff', 'sn {settings.set_id:02x} aa ff', 'sn {settings.set_id:02x} a2 ff', 'sn {settings.set_id:02x}
+        c2 ff', 'dv {settings.set_id:02x} ff', 'fa {settings.set_id:02x} ff', 'fa {settings.set_id:02x} 00 ff', 'fx {settings.set_id:02x}
+        ff', 'sn {settings.set_id:02x} 16 ff', 'sd {settings.set_id:02x} 01 ff ff ff ff', 'sd {settings.set_id:02x} 02 ff ff ff ff',
+      'fg {settings.set_id:02x} ff', 'mn {settings.set_id:02x} ff', 'mn {settings.set_id:02x} ff', 'fj {settings.set_id:02x} ff', 'sn
+        {settings.set_id:02x} 0b ff', 'sn {settings.set_id:02x} 0c ff', 'fh {settings.set_id:02x} ff', 'tr {settings.set_id:02x} ff',
+      'fw {settings.set_id:02x} ff', 'sn {settings.set_id:02x} 90 ff', 'sn {settings.set_id:02x} 0d ff', 'sn {settings.set_id:02x} 0e
+        ff', 'sn {settings.set_id:02x} c7 ff', 'sn {settings.set_id:02x} 8b ff', 'dz {settings.set_id:02x} ff', 'di {settings.set_id:02x}
+        ff', 'dj {settings.set_id:02x} ff', 'de {settings.set_id:02x} ff', 'df {settings.set_id:02x} ff', 'dg {settings.set_id:02x}
+        ff', 'dh {settings.set_id:02x} ff', 'km {settings.set_id:02x} ff', 'tp {settings.set_id:02x} ff', 'to {settings.set_id:02x}
+        ff', 'kl {settings.set_id:02x} ff', 'kl {settings.set_id:02x} ff', 'sn {settings.set_id:02x} 9d ff', 'sn {settings.set_id:02x}
+        9e ff', 'sn {settings.set_id:02x} 9f ff', 'sn {settings.set_id:02x} a0 ff', 'th {settings.set_id:02x} ff', 'sn {settings.set_id:02x}
+        85 ff', 'fi {settings.set_id:02x} ff', 'sn {settings.set_id:02x} a3 ff', 'sn {settings.set_id:02x} a9 ff', 'sn {settings.set_id:02x}
+        88 ff', 'sn {settings.set_id:02x} 9c ff', 'sn {settings.set_id:02x} a4 ff', 'sn {settings.set_id:02x} 84 ff', 'sn {settings.set_id:02x}
+        99 ff', 'sn {settings.set_id:02x} b0 ff', 'tg {settings.set_id:02x} ff', 'sn {settings.set_id:02x} c3 ff', 'tz {settings.set_id:02x}
+        ff', 'sn {settings.set_id:02x} 76 ff', 'mi {settings.set_id:02x} ff', 'sn {settings.set_id:02x} ab 00 ff', 'sn {settings.set_id:02x}
+        ab 01 ff', 'sm {settings.set_id:02x} ff', 'fb {settings.set_id:02x} ff', 'fc {settings.set_id:02x} ff', 'xc {settings.set_id:02x}
+        ff', 'xd {settings.set_id:02x} 01 ff', 'xe {settings.set_id:02x} 01 ff', 'xd {settings.set_id:02x} 02 ff', 'xe {settings.set_id:02x}
+        02 ff', 'xd {settings.set_id:02x} 03 ff', 'xe {settings.set_id:02x} 03 ff', 'xd {settings.set_id:02x} 04 ff', 'xe {settings.set_id:02x}
+        04 ff', 'mj {settings.set_id:02x} ff', 'sn {settings.set_id:02x} a1 ff', 'dn {settings.set_id:02x} ff', 'dw {settings.set_id:02x}
+        ff', 'dl {settings.set_id:02x} ff', 'fy {settings.set_id:02x} ff', 'fz {settings.set_id:02x} ff', 'jx {settings.set_id:02x}
+        ff', 'sv {settings.set_id:02x} 03 ff', 'sv {settings.set_id:02x} 07 ff', 'sv {settings.set_id:02x} 09 ff', 'sv {settings.set_id:02x}
+        10 ff', 'sv {settings.set_id:02x} 16 ff', 'sv {settings.set_id:02x} 17 ff', 'sv {settings.set_id:02x} 18 ff', 'mu {settings.set_id:02x}
+        ff', 'fq {settings.set_id:02x} ff', 'fr {settings.set_id:02x} ff', 'fs {settings.set_id:02x} ff', 'ti {settings.set_id:02x}
+        ff', 'tn {settings.set_id:02x} ff']
+  - every_ms: 300000
+    send: ['ss {settings.set_id:02x} f1 ff ff', 'ss {settings.set_id:02x} f2 ff ff', 'ss {settings.set_id:02x} f3 ff ff', 'ss {settings.set_id:02x}
+        f4 ff ff', 'ss {settings.set_id:02x} f5 ff ff', 'ss {settings.set_id:02x} f6 ff ff', 'fd {settings.set_id:02x} f1 ff ff', 'fd
+        {settings.set_id:02x} f2 ff ff', 'fd {settings.set_id:02x} f3 ff ff', 'fd {settings.set_id:02x} f4 ff ff', 'fd {settings.set_id:02x}
+        f5 ff ff', 'fd {settings.set_id:02x} f6 ff ff', 'fd {settings.set_id:02x} f7 ff ff', 'fe {settings.set_id:02x} f1 ff ff', 'fe
+        {settings.set_id:02x} f2 ff ff', 'fe {settings.set_id:02x} f3 ff ff', 'fe {settings.set_id:02x} f4 ff ff', 'fe {settings.set_id:02x}
+        f5 ff ff', 'fe {settings.set_id:02x} f6 ff ff', 'fe {settings.set_id:02x} f7 ff ff', 'sn {settings.set_id:02x} 9b f1 ff', 'sn
+        {settings.set_id:02x} 9b f2 ff', 'sn {settings.set_id:02x} 9b f3 ff', 'sn {settings.set_id:02x} 9b f4 ff', 'sn {settings.set_id:02x}
+        9b f5 ff', 'sn {settings.set_id:02x} 9b f6 ff', 'sn {settings.set_id:02x} 9b f7 ff']
+  updates:
+  - match: ^a [0-9a-fA-F]+ OK(0[01])x$
+    request_match: '^ka '
+    state:
+      power:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - models: &id005 [webos6, webos3, signage-2015]
+    match: ^b [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^xb '
+    state:
+      input:
+        value: '{1}'
+        map: {'20': av, '40': component, '60': rgb, '70': dvi_d_pc, '80': dvi_d, '90': hdmi1, a0: hdmi1_pc, A0: hdmi1_pc, '91': hdmi2,
+          a1: hdmi2_pc, A1: hdmi2_pc, '92': ops_hdmi3_dvi, a2: ops_hdmi3_dvi_pc, A2: ops_hdmi3_dvi_pc, '95': ops_dvi, a5: ops_dvi_pc,
+          A5: ops_dvi_pc, '96': hdmi3_dvi, a6: hdmi3_dvi_pc, A6: hdmi3_dvi_pc, '97': hdmi3_hdmi2_dvi, a7: hdmi3_hdmi2_dvi_pc, A7: hdmi3_hdmi2_dvi_pc,
+          '98': ops, a8: ops_pc, A8: ops_pc, '99': hdmi2_ops, a9: hdmi2_ops_pc, A9: hdmi2_ops_pc, c0: displayport, C0: displayport,
+          d0: displayport_pc, D0: displayport_pc, c1: displayport_usbc, C1: displayport_usbc, d1: displayport_usbc_pc, D1: displayport_usbc_pc,
+          c2: hdmi3, C2: hdmi3, d2: hdmi3_pc, D2: hdmi3_pc, c3: hdbaset, C3: hdbaset, d3: hdbaset_pc, D3: hdbaset_pc, e0: webos_player,
+          E0: webos_player, e1: others, E1: others, e2: multi_screen, E2: multi_screen, e3: play_via_url, E3: play_via_url}
+  - models: [commercial-tv]
+    match: ^b [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^xb '
+    state:
+      input:
+        value: '{1}'
+        map: {'00': dtv, '01': cadtv, '10': atv, '11': catv, '20': av1, '21': av2, '40': component1, '41': component2, '60': rgb, '90': hdmi1,
+          '91': hdmi2, '92': hdmi3, '93': hdmi4}
+  - models: [webos6, webos3]
+    match: ^c [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kc '
+    state:
+      aspect_ratio:
+        value: '{1}'
+        map: {'02': full, '06': original}
+  - models: [signage-2015, commercial-tv]
+    match: ^c [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kc '
+    state:
+      aspect_ratio:
+        value: '{1}'
+        map: {'01': '4_3', '02': '16_9', '04': zoom, '05': zoom2, '06': set_by_program, '07': '14_9', 09: just_scan, 0b: full_wide,
+          0B: full_wide, 0c: '21_9', 0C: '21_9', '10': cinema_zoom_1, '11': cinema_zoom_2, '12': cinema_zoom_3, '13': cinema_zoom_4,
+          '14': cinema_zoom_5, '15': cinema_zoom_6, '16': cinema_zoom_7, '17': cinema_zoom_8, '18': cinema_zoom_9, '19': cinema_zoom_10,
+          1a: cinema_zoom_11, 1A: cinema_zoom_11, 1b: cinema_zoom_12, 1B: cinema_zoom_12, 1c: cinema_zoom_13, 1C: cinema_zoom_13, 1d: cinema_zoom_14,
+          1D: cinema_zoom_14, 1e: cinema_zoom_15, 1E: cinema_zoom_15, 1f: cinema_zoom_16, 1F: cinema_zoom_16}
+  - match: ^q [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^jq '
+    state:
+      energy_saving:
+        value: '{1}'
+        map: {'00': 'off', '01': minimum, '02': medium, '03': maximum, '04': auto, '05': screen_off}
+  - models: [webos6, webos3]
+    match: ^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dx '
+    state:
+      picture_mode:
+        value: '{1}'
+        map: {'00': mall_qsr, '01': general, '02': gov_corp, '03': transportation, '04': education, '05': expert1, '06': expert2, 08: aps,
+          09: photo, '11': calibration, '12': hospital}
+  - models: [signage-2015]
+    match: ^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dx '
+    state:
+      picture_mode:
+        value: '{1}'
+        map: {'00': vivid, '01': standard, '02': cinema, '03': sports, '04': game, '05': expert1, '06': expert2, 08: aps, 09: photos,
+          '11': calibration}
+  - match: ^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kg '
+    state: {picture.contrast: '{1:hex}'}
+  - match: ^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kh '
+    state: {picture.brightness: '{1:hex}'}
+  - match: ^k [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kk '
+    state: {picture.sharpness: '{1:hex}'}
+  - match: ^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^ki '
+    state: {picture.color: '{1:hex}'}
+  - match: ^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kj '
+    state: {picture.tint: '{1:hex}'}
+  - match: ^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^mg '
+    state: {picture.backlight: '{1:hex}'}
+  - models: [webos6, webos3]
+    match: ^u [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^xu '
+    state: {picture.color_temperature: '{1:hex:-80}'}
+  - models: [signage-2015, commercial-tv]
+    match: ^u [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^xu '
+    state: {picture.color_temperature_level: '{1:hex}'}
+  - match: ^m [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^jm '
+    state: {picture.white_balance.red_gain: '{1:hex}'}
+  - match: ^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^jn '
+    state: {picture.white_balance.green_gain: '{1:hex}'}
+  - match: ^o [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^jo '
+    state: {picture.white_balance.blue_gain: '{1:hex}'}
+  - match: ^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^sx '
+    state: {picture.white_balance.red_offset: '{1:hex}'}
+  - match: ^y [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^sy '
+    state: {picture.white_balance.green_offset: '{1:hex}'}
+  - match: ^z [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^sz '
+    state: {picture.white_balance.blue_offset: '{1:hex}'}
+  - match: ^n [0-9a-fA-F]+ OK(?i:ad) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ ad '
+    state:
+      picture.gamma:
+        value: '{1}'
+        map: {'00': low, '01': medium, '02': high1, '03': high2}
+  - match: ^n [0-9a-fA-F]+ OK(?i:ae) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ ae '
+    state:
+      picture.black_level:
+        value: '{1}'
+        map: {'00': low, '01': high, '02': auto}
+  - match: ^p [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^jp '
+    state:
+      ism_method:
+        value: '{1}'
+        map: {'01': inversion, '02': orbiter, '04': white_wash, 08: normal, '20': color_wash, '80': washing_bar, '90': user_image, '91': user_video}
+  - models: *id005
+    match: ^d [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kd '
+    state:
+      screen_off:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - models: [commercial-tv]
+    match: ^d [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kd '
+    state:
+      screen_mute:
+        value: '{1}'
+        map: {'00': picture_on, '01': screen_mute, '10': video_mute}
+  - match: ^x [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kx '
+    state:
+      freeze:
+        value: '{1}'
+        map: {'00': true, '01': false}
+  - match: ^n [0-9a-fA-F]+ OK(?i:c4) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ c4 '
+    state:
+      picture.hdr_mode:
+        value: '{1}'
+        map: {'00': mall_qsr, '01': general, '02': gov_corp, '04': education}
+  - match: ^n [0-9a-fA-F]+ OK(?i:c5) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ c5 '
+    state:
+      picture.dynamic_tone_mapping:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:c1) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ c1 '
+    state:
+      picture.led_local_dimming_expert:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:be) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ be '
+    state:
+      picture.apl_auto_control:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:d6) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ d6 '
+    state:
+      picture.color_calibration:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:87) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 87 '
+    state:
+      picture.scan_inversion:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:b7) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ b7 '
+    state:
+      picture.frame_control:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:c6) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ c6 '
+    state:
+      picture.led_local_dimming:
+        value: '{1}'
+        map: {'00': 'off', '01': low, '02': medium, '03': high}
+  - match: ^n [0-9a-fA-F]+ OK(?i:a5) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ a5 '
+    state: {video_wall.natural_size: '{1:hex}'}
+  - match: ^f [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kf '
+    state: {audio.volume: '{1:hex}'}
+  - match: ^e [0-9a-fA-F]+ OK(0[01])x$
+    request_match: '^ke '
+    state:
+      audio.muted:
+        value: '{1}'
+        map: {'00': true, '01': false}
+  - match: ^t [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kt '
+    state: {audio.balance: '{1:hex}'}
+  - match: ^y [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dy '
+    state:
+      audio.sound_mode:
+        value: '{1}'
+        map: {'01': standard, '02': music, '03': cinema, '04': sports, '05': game, '07': news}
+  - match: ^r [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kr '
+    state: {audio.treble: '{1:hex}'}
+  - match: ^s [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^ks '
+    state: {audio.bass: '{1:hex}'}
+  - match: ^n [0-9a-fA-F]+ OK(?i:aa) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ aa '
+    state:
+      audio.out:
+        value: '{1}'
+        map: {'00': 'off', '01': variable, '02': fixed}
+  - match: ^n [0-9a-fA-F]+ OK(?i:a2) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ a2 '
+    state:
+      audio.digital_input:
+        value: '{1}'
+        map: {'00': digital, '01': analog}
+  - match: ^n [0-9a-fA-F]+ OK(?i:c2) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ c2 '
+    state:
+      audio.stereo_mode:
+        value: '{1}'
+        map: {'00': left_right, '01': left_left, '02': right_right}
+  - match: ^v [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dv '
+    state:
+      audio.speaker:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^a [0-9a-fA-F]+ OK([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})x$
+    request_match: ^fa [0-9a-fA-F]+ (?:ff|[0-9a-fA-F]{2} [0-9a-fA-F]{2} [0-9a-fA-F]{2})$
+    state: {clock.date.year: '{1:hex:+2010}', clock.date.month: '{2:hex}', clock.date.day: '{3:hex}'}
+  - match: ^a [0-9a-fA-F]+ OK00(0[01])x$
+    request_match: ^fa [0-9a-fA-F]+ 00 (?:ff|0[01])$
+    state:
+      clock.automatic:
+        value: '{1}'
+        map: {'00': true, '01': false}
+  - match: ^x [0-9a-fA-F]+ OK([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})x$
+    request_match: '^fx '
+    state: {clock.time.hour: '{1:hex}', clock.time.minute: '{2:hex}', clock.time.second: '{3:hex}'}
+  - match: ^n [0-9a-fA-F]+ OK(?i:16) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 16 '
+    state:
+      clock.time_sync:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^d [0-9a-fA-F]+ OK01([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})x$
+    request_match: '^sd [0-9a-fA-F]+ 01 '
+    state: {clock.daylight_saving.start.month: '{1:hex}', clock.daylight_saving.start.week: '{2:hex}', clock.daylight_saving.start.weekday: '{3:hex}',
+      clock.daylight_saving.start.hour: '{4:hex}', clock.daylight_saving.enabled: 'true'}
+  - match: ^d [0-9a-fA-F]+ OK02([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})x$
+    request_match: '^sd [0-9a-fA-F]+ 02 '
+    state: {clock.daylight_saving.end.month: '{1:hex}', clock.daylight_saving.end.week: '{2:hex}', clock.daylight_saving.end.weekday: '{3:hex}',
+      clock.daylight_saving.end.hour: '{4:hex}', clock.daylight_saving.enabled: 'true'}
+  - match: ^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fg '
+    state:
+      power_management.no_signal_power_off:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - models: [webos6, webos3]
+    match: ^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^mn '
+    state:
+      power_management.no_ir_power_off:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - models: [signage-2015]
+    match: ^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^mn '
+    state:
+      power_management.no_ir_power_off_hours:
+        value: '{1}'
+        map: {'00': 'off', '01': 4h, '02': 6h, '03': 8h}
+  - match: ^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fj '
+    state:
+      power_management.dpm:
+        value: '{1}'
+        map: {'00': 'off', '01': 5s, '02': 10s, '03': 15s, '04': 1min, '05': 3min, '06': 5min, '07': 10min}
+  - match: ^n [0-9a-fA-F]+ OK(?i:0b) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 0b '
+    state:
+      power_management.dpm_wake_up:
+        value: '{1}'
+        map: {'00': clock, '01': clock_and_data}
+  - match: ^n [0-9a-fA-F]+ OK(?i:0c) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 0c '
+    state:
+      power_management.pm_mode:
+        value: '{1}'
+        map: {'00': power_off, '01': sustain_aspect_ratio, '02': screen_off, '03': screen_off_always, '04': screen_off_backlight_on,
+          '05': network_ready}
+  - match: ^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fh '
+    state: {power_management.power_on_delay: '{1:hex}'}
+  - match: ^r [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^tr '
+    state:
+      power_management.power_on_status:
+        value: '{1}'
+        map: {'00': last, '01': standby, '02': 'on'}
+  - match: ^w [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fw '
+    state:
+      power_management.wake_on_lan:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:90) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 90 '
+    state:
+      power_management.wireless_wake_on_lan:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:0d) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 0d '
+    state:
+      power_management.screen_off_always:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:0e) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 0e '
+    state:
+      power_management.quick_start:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:c7) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ c7 '
+    state:
+      power_management.quiet_mode:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:8b) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 8b '
+    state:
+      power_management.pc_power_control:
+        value: '{1}'
+        map: {'00': disabled, '01': sync_on, '02': sync_on_off}
+  - match: ^z [0-9a-fA-F]+ OK(0[01])([0-9a-fA-F]{2})([0-9a-fA-F]{2})x$
+    request_match: '^dz '
+    state:
+      video_wall.enabled:
+        value: '{1}'
+        map: {'00': false, '01': true}
+      video_wall.columns: '{2:hex}'
+      video_wall.rows: '{3:hex}'
+  - match: ^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^di '
+    state: {video_wall.tile_id: '{1:hex}'}
+  - match: ^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dj '
+    state:
+      video_wall.natural_mode:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^e [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^de '
+    state: {video_wall.h_position: '{1:hex}'}
+  - match: ^f [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^df '
+    state: {video_wall.v_position: '{1:hex}'}
+  - match: ^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dg '
+    state: {video_wall.h_size: '{1:hex}'}
+  - match: ^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dh '
+    state: {video_wall.v_size: '{1:hex}'}
+  - match: ^m [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^km '
+    state:
+      locks.remote_and_keys:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^p [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^tp '
+    state:
+      locks.ir:
+        value: '{1}'
+        map: {'00': unlocked, '01': all_but_power, '02': all}
+  - match: ^o [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^to '
+    state:
+      locks.local_keys:
+        value: '{1}'
+        map: {'00': unlocked, '01': all_but_power, '02': all}
+  - models: *id005
+    match: ^l [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kl '
+    state:
+      locks.osd:
+        value: '{1}'
+        map: {'00': true, '01': false}
+  - models: [commercial-tv]
+    match: ^l [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^kl '
+    state:
+      osd.shown:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:9d) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 9d '
+    state:
+      locks.home_dashboard:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:9e) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 9e '
+    state:
+      locks.usb:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:9f) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 9f '
+    state:
+      locks.wifi:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:a0) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ a0 '
+    state:
+      locks.screen_share:
+        value: '{1}'
+        map: {'00': unlocked, '01': locked, '02': pin}
+  - match: ^h [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^th '
+    state:
+      osd.rotation:
+        value: '{1}'
+        map: {'00': 'off', '01': '90', '02': '270', '03': '180'}
+  - match: ^n [0-9a-fA-F]+ OK(?i:85) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 85 '
+    state:
+      osd.input_rotation:
+        value: '{1}'
+        map: {'00': 'off', '01': '90', '02': '270', '03': '180'}
+  - match: ^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fi '
+    state:
+      osd.language:
+        value: '{1}'
+        map: {'00': czech, '01': danish, '02': german, '03': english, '04': spanish, '05': greek, '06': french, '07': italian, 08: dutch,
+          09: norwegian, 0a: portuguese, 0A: portuguese, 0b: portuguese_brazil, 0B: portuguese_brazil, 0c: russian, 0C: russian, 0d: finnish,
+          0D: finnish, 0e: swedish, 0E: swedish, 0f: korean, 0F: korean, '10': chinese_mandarin, '11': japanese, '12': chinese_cantonese,
+          '13': arabic, '14': turkish, '15': polish}
+  - match: ^n [0-9a-fA-F]+ OK(?i:a3) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ a3 '
+    state:
+      osd.booting_logo:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:a9) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ a9 '
+    state:
+      osd.no_signal_image:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:88) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 88 '
+    state:
+      network.beacon:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:9c) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 9c '
+    state:
+      network.upnp:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:a4) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ a4 '
+    state:
+      network.soft_ap:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:84) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 84 '
+    state:
+      network.lan_daisy_chain:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:99) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 99 '
+    state:
+      input_settings.hdmi_it_content:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:b0) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ b0 '
+    state:
+      sync.mode:
+        value: '{1}'
+        map: {'00': slave, '01': master}
+  - match: ^g [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^tg '
+    state:
+      sync.contents:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:c3) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ c3 '
+    state:
+      input_settings.usb2_to_hdbaset:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^z [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^tz '
+    state:
+      status.screen_fault_detection:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:76) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ 76 '
+    state: {input_settings.multichannel: '{1:hex}'}
+  - match: ^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^mi '
+    state:
+      failover.mode:
+        value: '{1}'
+        map: {'00': 'off', '01': auto, '02': manual}
+  - match: ^n [0-9a-fA-F]+ OK(?i:ab) ?00([0-9a-fA-F]{2})x$
+    request_match: '^sn [0-9a-fA-F]+ ab 00 '
+    state: {picture.brightness_range.minimum: '{1:hex}'}
+  - match: ^n [0-9a-fA-F]+ OK(?i:ab) ?01([0-9a-fA-F]{2})x$
+    request_match: '^sn [0-9a-fA-F]+ ab 01 '
+    state: {picture.brightness_range.maximum: '{1:hex}'}
+  - match: ^m [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^sm '
+    state:
+      schedules.brightness_enabled:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^s [0-9a-fA-F]+ OK(?:[0-9a-fA-F]{2})?([0-9a-fA-F]{6})x$
+    request_match: ^ss [0-9a-fA-F]+ f([1-6]) ff ff$
+    state: {'schedules.brightness.{2}': '{1}'}
+  - match: ^d [0-9a-fA-F]+ OK(?:[0-9a-fA-F]{2})?([0-9a-fA-F]{6})x$
+    request_match: ^fd [0-9a-fA-F]+ f([1-9a-f]) ff ff$
+    state: {'schedules.on_timers.{2:hex}': '{1}'}
+  - match: ^e [0-9a-fA-F]+ OK(?:[0-9a-fA-F]{2})?([0-9a-fA-F]{6})x$
+    request_match: ^fe [0-9a-fA-F]+ f([1-9a-f]) ff ff$
+    state: {'schedules.off_timers.{2:hex}': '{1}'}
+  - match: ^b [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fb '
+    state:
+      schedules.on_timers_enabled:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^c [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fc '
+    state:
+      schedules.off_timers_enabled:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:9b) ?(?:[0-9a-fA-F]{2})?([0-9a-fA-F]{12})x$
+    request_match: ^sn [0-9a-fA-F]+ 9b f([1-7]) ff$
+    state: {'schedules.holidays.{2}': '{1}'}
+  - match: ^c [0-9a-fA-F]+ OK([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})x$
+    request_match: '^xc '
+    state:
+      multi_screen.mode:
+        value: '{1}'
+        map: {'10': pip, '22': pbp2, '23': pbp3, '24': pbp4, '25': pbp3_121}
+      multi_screen.main:
+        value: '{2}'
+        map: &id006 {'00': none, '60': rgb, '70': dvi_d_pc, '80': dvi_d, '90': hdmi1, '91': hdmi2, '92': ops_hdmi3_dvi, '95': ops_dvi,
+          '96': hdmi3_dvi, '97': hdmi3_hdmi2_dvi, '98': ops, '99': hdmi2_ops, c0: displayport, C0: displayport, c1: displayport_usbc,
+          C1: displayport_usbc, c2: hdmi3, C2: hdmi3, c3: hdbaset, C3: hdbaset}
+      multi_screen.sub1:
+        value: '{3}'
+        map: *id006
+      multi_screen.sub2:
+        value: '{4}'
+        map: *id006
+      multi_screen.sub3:
+        value: '{5}'
+        map: *id006
+  - match: ^d [0-9a-fA-F]+ OK0([1-4])(0[01])x$
+    request_match: '^xd '
+    state:
+      multi_screen.windows.{1}.aspect_ratio:
+        value: '{2}'
+        map: {'00': full, '01': original}
+  - match: ^e [0-9a-fA-F]+ OK0([1-4])(0[01])x$
+    request_match: '^xe '
+    state:
+      multi_screen.windows.{1}.screen_off:
+        value: '{2}'
+        map: {'00': false, '01': true}
+  - match: ^j [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^mj '
+    state: {failover.priority: '{1}'}
+  - match: ^n [0-9a-fA-F]+ OK(?i:af) ?([0-9a-fA-F]{2})(0[01])x$
+    request_match: '^sn [0-9a-fA-F]+ af '
+    state:
+      input_settings.uhd_deep_color.{1}:
+        value: '{2}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:b1) ?([0-9a-fA-F]{2})(0[01])x$
+    request_match: '^sn [0-9a-fA-F]+ b1 '
+    state:
+      input_settings.input_label.{1}:
+        value: '{2}'
+        map: {'00': dtv, '01': pc}
+  - match: ^n [0-9a-fA-F]+ OK(?i:a1) ?([0-9a-fA-F]+)x$
+    request_match: '^sn [0-9a-fA-F]+ a1 '
+    state:
+      failover.backup_content:
+        value: '{1}'
+        map: {'00': 'off', '02': media_storage, '03': supersign, '04': si_app}
+  - match: ^n [0-9a-fA-F]+ OK([0-9a-fA-F]{2})[0-9a-fA-F]*x$
+    request_match: '^dn '
+    state: {status.temperature: '{1:hex}'}
+  - match: ^w [0-9a-fA-F]+ OK(0[01])([0-9a-fA-F]{2})?x$
+    request_match: '^dw '
+    state:
+      status.fans_ok:
+        value: '{1}'
+        map: {'00': false, '01': true}
+      status.faulty_fans: '{2:hex}'
+  - match: ^l [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^dl '
+    state: {status.on_time: '{1:hex}'}
+  - match: ^y [0-9a-fA-F]+ OK([0-9A-Za-z]+)x$
+    request_match: '^fy '
+    state: {info.serial_number: '{1}'}
+  - match: ^z [0-9a-fA-F]+ OK([0-9A-Za-z.]+)x$
+    request_match: '^fz '
+    state: {info.software_version: '{1}'}
+  - match: ^v [0-9a-fA-F]+ OK(?i:02) ?(0[01])x$
+    request_match: '^sv [0-9a-fA-F]+ 02 '
+    state:
+      status.signal:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^v [0-9a-fA-F]+ OK(?i:03) ?([0-9a-fA-F]{2})x$
+    request_match: '^sv [0-9a-fA-F]+ 03 '
+    state:
+      status.screen:
+        value: '{1}'
+        map: {'00': 'on', '01': 'off', '02': off_always, '03': sustain_aspect, '04': off_backlight_on}
+  - match: ^v [0-9a-fA-F]+ OK(?i:07) ?([0-9a-fA-F]{2})x$
+    request_match: '^sv [0-9a-fA-F]+ 07 '
+    state: {status.temperature_sensors: '{1:hex}'}
+  - match: ^v [0-9a-fA-F]+ OK(?i:09) ?([0-9a-fA-F]+)x$
+    request_match: '^sv [0-9a-fA-F]+ 09 '
+    state: {status.fan_speeds: '{1}'}
+  - match: ^v [0-9a-fA-F]+ OK(?i:10) ?([0-9a-fA-F]{2})x$
+    request_match: '^sv [0-9a-fA-F]+ 10 '
+    state:
+      status.screen_ok:
+        value: '{1}'
+        map: {'00': false, '07': true}
+  - match: ^v [0-9a-fA-F]+ OK(?i:16) ?([0-9a-fA-F]+)x$
+    request_match: '^sv [0-9a-fA-F]+ 16 '
+    state: {status.humidity: '{1:hex}'}
+  - match: ^v [0-9a-fA-F]+ OK(?i:17) ?([0-9a-fA-F]+)x$
+    request_match: '^sv [0-9a-fA-F]+ 17 '
+    state: {status.illuminance: '{1:hex}'}
+  - match: ^v [0-9a-fA-F]+ OK(?i:18) ?([0-9a-fA-F]{2})x$
+    request_match: '^sv [0-9a-fA-F]+ 18 '
+    state:
+      status.tilt:
+        value: '{1}'
+        map: {'00': '0', '01': '90', '02': '180', '03': '270', '04': fallen_forward, '05': fallen_backward}
+  - match: ^u [0-9a-fA-F]+ OK([0-9a-fA-F]{2})([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]{4})x$
+    request_match: '^mu '
+    state: {status.brightness.backlight_pwm: '{1:hex}', status.brightness.luminance: '{2:hex}', status.brightness.sensor1: '{3:hex}',
+      status.brightness.sensor2: '{4:hex}'}
+  - match: ^q [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fq '
+    state: {picture.h_position: '{1:hex}'}
+  - match: ^r [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fr '
+    state: {picture.v_position: '{1:hex}'}
+  - match: ^s [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^fs '
+    state: {picture.h_size: '{1:hex}'}
+  - match: ^i [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^ti '
+    state:
+      picture.intelligent_auto:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK([0-9a-fA-F]+)x$
+    request_match: '^tn '
+    state:
+      locks.reset_enabled:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:b8) ?00(0[01])x$
+    request_match: '^sn [0-9a-fA-F]+ b8 00 '
+    state:
+      accessory.power:
+        value: '{1}'
+        map: {'00': false, '01': true}
+  - match: ^n [0-9a-fA-F]+ OK(?i:b8) ?01([0-9a-fA-F]{2})x$
+    request_match: '^sn [0-9a-fA-F]+ b8 01 '
+    state: {accessory.brightness: '{1:hex}'}
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      TCP 9761 comes from integrators' material, not from an LG document: LG's public guides describe the
+      protocol over RS-232C only, and say nothing of a login, which none is sent. A display wired by RS-232C
+      (9600 bps, 8 data bits, no parity, 1 stop bit, crossed cable) is reached through a serial-to-Ethernet
+      bridge, opened at the bridge's TCP port; the messages are the same.
+  - models: [all]
+    severity: warning
+    text: >
+      LG says an acknowledgement is returned reliably only while the display is fully on. In standby a
+      display may answer nothing: a poll then goes unanswered, the connection is opened again, and the
+      device shows as disconnected until it answers. Turning it on over the network needs PM mode Network
+      Ready or Screen Off Always (set_pm_mode), or Wake on LAN, which this integration does not send.
+  - models: [all]
+    severity: info
+    text: >
+      Values are LG's hex data: get_ commands return the data as the display sends it (64 for 100), while
+      state holds the numbers and names. Set ID 00, the broadcast to every display on a chain, is never
+      acknowledged, so it is not offered; commands go to the display whose Set ID is set.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed: power, input, volume, mute, screen off and signal are read every 5 s, other
+      settings every minute, and the timers, holidays and brightness schedule every 5 minutes.
+  - models: [webos6, webos3, signage-2015]
+    severity: warning
+    text: >
+      The mute (ke), freeze (kx) and OSD lock (kl) data are inverted: 00 mutes, freezes and locks. The L19
+      guide gives the OSD lock the other way round (00 unlocked); set_osd_lock follows the webOS 6.0 and 3.2
+      guides.
+  - models: [webos6, webos3, signage-2015]
+    severity: warning
+    text: >
+      Changing the tile mode, tile ID, scan inversion or frame control reboots a video wall model, and UPnP
+      reboots the display. apply_to_all_inputs, the LCIN008 commands and transfer control make the display
+      refuse other commands for a while afterwards.
+  - models: [webos6, webos3]
+    severity: critical
+    text: >
+      apply_network_settings changes the display's address and may end this connection; reset with
+      initial_settings restores every setting, the Set ID and network included. Neither can be undone from
+      here.
+  - models: [webos6, webos3, signage-2015]
+    severity: info
+    text: >
+      The tile mode byte is columns then rows in the webOS guides and rows then columns in the SE3B manual;
+      set_tile_mode follows the webOS guides. A model takes at most its own number of columns and rows, and a
+      tile ID above columns times rows is answered NG.
+  - models: [webos6, webos3, signage-2015]
+    severity: info
+    text: >
+      The schedules are read one entry at a time and kept as LG's hex data per entry: power timers 1 to 7
+      (models keep 7, 16 or 21; get_on_timer and get_off_timer read any of them), holidays 1 to 7 and
+      brightness schedule entries 1 to 6. The date's year is counted from 2010 and the latest year a display
+      takes depends on its release year.
+  - models: [webos6, webos3, signage-2015]
+    severity: info
+    text: >
+      Each input has two codes, the DTV and the PC label of one port (90 and a0 for HDMI 1); the display
+      answers with the label the port is set to (set_input_label), and state names it as set_input does.
+      Multi screen, failover, deep color and input label settings use the DTV codes.
+  - models: [webos6, webos3]
+    severity: info
+    text: >
+      Transfer control (sn cb), which passes data out of the RS-232C OUT port to a chained device, is not
+      offered: LG documents no format for its data. The menu password change (change_password) needs the
+      current password.
+  - models: [commercial-tv]
+    severity: info
+    text: >
+      The TV tuner commands (tune ma, channel add and delete mb) are not offered: their channel formats are
+      region-specific. On a commercial TV the remote and key lock is released when mains power is cycled, and
+      during media playback or recording every command but power and keys is answered NG.

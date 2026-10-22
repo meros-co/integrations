@@ -365,56 +365,28 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
         return Ok(with_sign(fixed(x, places), signed));
     }
 
+    // A number a device sends in hexadecimal: its text read in base 16,
+    // then rendered as any integer. A capture of decimal digits only
+    // arrives as an integer, whose digits are read the same way.
+    if directives.first() == Some(&"hex") {
+        let text = match value {
+            Value::Number(n) if n.is_u64() => n.to_string(),
+            Value::String(s) => s.trim().to_string(),
+            _ => return Err(format!("':hex' on '{name}' needs hexadecimal digits")),
+        };
+        let n = i64::from_str_radix(&text, 16)
+            .ok()
+            .filter(|_| !text.is_empty() && text.bytes().all(|b| b.is_ascii_hexdigit()))
+            .ok_or_else(|| format!("'{text}' is not hexadecimal"))?;
+        return render_int(n, &directives[1..]);
+    }
+
     match kind {
         ParamType::Int => {
-            let mut n = value
+            let n = value
                 .as_i64()
                 .ok_or_else(|| format!("'{name}' is not an integer"))?;
-            let mut width: Option<usize> = None;
-            let mut signed = false;
-            for d in directives {
-                if let Some(offset) = parse_offset(d) {
-                    n += offset;
-                } else if let Some(w) = d.strip_prefix('0').and_then(|r| r.strip_suffix('d')) {
-                    width = Some(w.parse().map_err(|_| format!("bad directive ':{d}'"))?);
-                } else if *d == "signed" {
-                    signed = true;
-                } else if let Some(bit) = d.strip_prefix("bit.") {
-                    // One bit of a flags word, numbered from 0 for the
-                    // value 1: `true` while it is set.
-                    let bit: u32 = bit
-                        .parse()
-                        .ok()
-                        .filter(|b| *b < 64)
-                        .ok_or_else(|| format!("bad directive ':{d}'"))?;
-                    return Ok(((n >> bit) & 1 == 1).to_string());
-                } else if *d == "url_decode" {
-                    // A name that is all digits arrives as a number: there
-                    // is nothing to decode.
-                } else if let Some(places) = d.strip_prefix('.').and_then(|r| r.strip_suffix('f')) {
-                    // A whole number a device sent where a decimal is shown
-                    // (60 for a 60.00 Hz field rate): fixed decimals too.
-                    let places: u32 = places
-                        .parse()
-                        .map_err(|_| format!("bad directive ':{d}'"))?;
-                    return Ok(fixed(n as f64, places));
-                } else {
-                    return Err(format!("directive ':{d}' does not apply to an integer"));
-                }
-            }
-            let digits = n.unsigned_abs().to_string();
-            let digits = match width {
-                Some(w) if digits.len() < w => format!("{}{digits}", "0".repeat(w - digits.len())),
-                _ => digits,
-            };
-            let sign = if n < 0 {
-                "-"
-            } else if signed {
-                "+"
-            } else {
-                ""
-            };
-            Ok(format!("{sign}{digits}"))
+            render_int(n, directives)
         }
         ParamType::Float => {
             let x = value
@@ -515,6 +487,68 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
             Ok(s)
         }
     }
+}
+
+/// An integer as text, through its directives (SPEC.md §4, "Formatting
+/// directives"): offsets, zero padding, a sign, one bit, fixed decimals, or
+/// hexadecimal digits.
+fn render_int(mut n: i64, directives: &[&str]) -> Result<String, String> {
+    let mut width: Option<usize> = None;
+    let mut hex = false;
+    let mut signed = false;
+    for d in directives {
+        if let Some(offset) = parse_offset(d) {
+            n += offset;
+        } else if let Some(w) = d.strip_prefix('0').and_then(|r| r.strip_suffix('d')) {
+            width = Some(w.parse().map_err(|_| format!("bad directive ':{d}'"))?);
+        } else if *d == "x" {
+            hex = true;
+        } else if let Some(w) = d.strip_prefix('0').and_then(|r| r.strip_suffix('x')) {
+            // Lowercase hexadecimal digits, zero-padded: `{n:02x}` → `0a`.
+            width = Some(w.parse().map_err(|_| format!("bad directive ':{d}'"))?);
+            hex = true;
+        } else if *d == "signed" {
+            signed = true;
+        } else if let Some(bit) = d.strip_prefix("bit.") {
+            // One bit of a flags word, numbered from 0 for the
+            // value 1: `true` while it is set.
+            let bit: u32 = bit
+                .parse()
+                .ok()
+                .filter(|b| *b < 64)
+                .ok_or_else(|| format!("bad directive ':{d}'"))?;
+            return Ok(((n >> bit) & 1 == 1).to_string());
+        } else if *d == "url_decode" {
+            // A name that is all digits arrives as a number: there
+            // is nothing to decode.
+        } else if let Some(places) = d.strip_prefix('.').and_then(|r| r.strip_suffix('f')) {
+            // A whole number a device sent where a decimal is shown
+            // (60 for a 60.00 Hz field rate): fixed decimals too.
+            let places: u32 = places
+                .parse()
+                .map_err(|_| format!("bad directive ':{d}'"))?;
+            return Ok(fixed(n as f64, places));
+        } else {
+            return Err(format!("directive ':{d}' does not apply to an integer"));
+        }
+    }
+    let digits = if hex {
+        format!("{:x}", n.unsigned_abs())
+    } else {
+        n.unsigned_abs().to_string()
+    };
+    let digits = match width {
+        Some(w) if digits.len() < w => format!("{}{digits}", "0".repeat(w - digits.len())),
+        _ => digits,
+    };
+    let sign = if n < 0 {
+        "-"
+    } else if signed {
+        "+"
+    } else {
+        ""
+    };
+    Ok(format!("{sign}{digits}"))
 }
 
 /// A fixed-decimal text with an explicit `+` before a value that is not
@@ -733,6 +767,29 @@ mod tests {
         assert_eq!(go("{n:signed}", json!({"n": -7}), s).unwrap(), "-7");
         assert_eq!(go("{n:03d}", json!({"n": -7}), s).unwrap(), "-007");
         assert_eq!(go("#R{n:-1:02d}", json!({"n": 100}), s).unwrap(), "#R99");
+    }
+
+    #[test]
+    fn hexadecimal_both_ways() {
+        let s = "n: { type: int }";
+        // LG's `kf 01 64` for volume 100, and its Set ID 1000 as `3e8`.
+        assert_eq!(
+            go("kf 01 {n:02x}", json!({"n": 100}), s).unwrap(),
+            "kf 01 64"
+        );
+        assert_eq!(go("{n:02x}", json!({"n": 10}), s).unwrap(), "0a");
+        assert_eq!(go("{n:x}", json!({"n": 1000}), s).unwrap(), "3e8");
+        assert_eq!(go("{n:-1:02x}", json!({"n": 1}), s).unwrap(), "00");
+        // A device's hex digits read as a number: a capture of digits only
+        // arrives as an integer, others as text.
+        assert_eq!(go("{n:hex}", json!({"n": 64}), s).unwrap(), "100");
+        let t = "h: { type: string }";
+        assert_eq!(go("{h:hex}", json!({"h": "3E8"}), t).unwrap(), "1000");
+        assert_eq!(go("{h:hex:+1}", json!({"h": "0a"}), t).unwrap(), "11");
+        assert_eq!(go("{h:hex:bit.1}", json!({"h": "02"}), t).unwrap(), "true");
+        assert!(go("{h:hex}", json!({"h": "1g"}), t).is_err());
+        assert!(go("{h:hex}", json!({"h": ""}), t).is_err());
+        assert!(go("{n:hex}", json!({"n": -5}), s).is_err());
     }
 
     #[test]

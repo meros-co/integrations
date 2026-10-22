@@ -1754,6 +1754,31 @@ mod tests {
     }
 
     #[test]
+    fn hexadecimal_captures_become_numbers() {
+        // LG's acknowledgement: data in hex digits, `64` for 100.
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [{
+                "match": "^f (\\w+) OK([0-9a-fA-F]+)x$",
+                "state": {"volume": "{2:hex}", "set_id": "{1:hex}"},
+            }]})),
+            &state(json!({
+                "volume": {"type": "int", "description": "x"},
+                "set_id": {"type": "int", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            t.apply(&Inbound::Text("f 01 OK64x")),
+            Some(json!({"volume": 100, "set_id": 1}))
+        );
+        assert_eq!(
+            t.apply(&Inbound::Text("f 3e8 OK0ax")),
+            Some(json!({"volume": 10, "set_id": 1000}))
+        );
+    }
+
+    #[test]
     fn bits_of_a_flags_word_become_booleans() {
         let t = Telemetry::parse(
             Some(&json!({"updates": [{
