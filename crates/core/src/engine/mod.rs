@@ -1393,6 +1393,7 @@ impl SpecEngine {
                         _ => return Err("terminated framing needs a terminator".into()),
                     }),
                     "block" => SendFraming::Block,
+                    "json" => SendFraming::Json,
                     other => return Err(format!("line-tcp framing '{other}' is not implemented")),
                 };
                 let reply = match (str_field(&t, "reply_framing"), framing) {
@@ -1418,6 +1419,7 @@ impl SpecEngine {
                         Regex::new(fence).map_err(|e| format!("reply_fence: {e}"))?;
                         ReplyFraming::Fenced(fence.to_string())
                     }
+                    (Some("json"), _) | (None, "json") => ReplyFraming::Json,
                     (None, "block") => ReplyFraming::Block,
                     (None, "delimited") => ReplyFraming::Delimited { open, close },
                     (None, _) => ReplyFraming::Line,
@@ -5944,6 +5946,56 @@ mod tests {
             TcpInput::Data(b"{\"type\":\"level\",\"db\":-6.5}\r\n".to_vec()),
         );
         assert!(cx.take().contains(&Action::State(json!({"level": -6.5}))));
+    }
+
+    #[test]
+    fn a_json_stream_is_read_one_value_at_a_time() {
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        spec.transport = Some(json!({"type": "line-tcp", "port": 9090, "framing": "json"}));
+        spec.telemetry = Some(json!({"updates": [{
+            "json_match": {"$.method": "^property\\.changed$"},
+            "json": {"v": "$.params.property[0].v"},
+            "state": {"level": "{v}"},
+        }]}));
+        spec.state =
+            serde_json::from_value(json!({"level": {"type": "float", "description": "x"}}))
+                .unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        // Pretty-printed and split across reads, with no line ending after.
+        let mut cx = Cx::new(1);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(
+                b"{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"property.changed\",".to_vec(),
+            ),
+        );
+        assert!(!cx.take().iter().any(|a| matches!(a, Action::State(_))));
+        let mut cx = Cx::new(2);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"\n  \"params\": {\"property\": [{\"v\": 2.5}]}\n}".to_vec()),
+        );
+        assert!(cx.take().contains(&Action::State(json!({"level": 2.5}))));
     }
 
     #[test]

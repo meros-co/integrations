@@ -672,6 +672,14 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             reply: super::ReplyFraming::Block,
             ..
         } => format!("{line}\r\n\r\n"),
+        // A JSON stream's messages are JSON values (Barco Pulse).
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::Json,
+            ..
+        } => format!(
+            "{{\"jsonrpc\":\"2.0\",\"result\":{}}}",
+            Value::String(line.into())
+        ),
         _ => format!("{line}\r\n"),
     }
     .into_bytes();

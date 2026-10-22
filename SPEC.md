@@ -57,13 +57,13 @@ websocket under `telemetry.websocket` (§8).
 
 ### `line-tcp`
 
-Plaintext over TCP. Four framings cover the devices specced so far.
+Plaintext over TCP. Five framings cover the devices specced so far.
 
 ```yaml
 transport:
   type: line-tcp
   port: 2202
-  framing: delimited          # delimited | terminated | block | length-prefixed
+  framing: delimited          # delimited | terminated | block | length-prefixed | json
   open: "< "                  # framing: delimited
   close: " >"
   encoding: ascii             # ascii | utf-8
@@ -78,6 +78,7 @@ transport:
 | `terminated` | Payload plus `terminator` | Kramer P3000 (`cr`), RossTalk and HyperDeck (`crlf`) |
 | `block` | Multi-line payload ended by a blank line | Blackmagic Videohub |
 | `length-prefixed` | Payload preceded by a byte count | — |
+| `json` | The payload as it is, nothing added: each message is one JSON value | Barco Pulse's JSON-RPC |
 
 `terminated` requires `terminator`: `cr`, `crlf` or `lf`.
 
@@ -103,8 +104,17 @@ command is sent:
 | `headed-block` | The end of the first line, unless that line ends in `:`, in which case a blank line | Blackmagic HyperDeck: `200 ok`, or `208 transport info:` followed by fields |
 | `terminated` | The first of `reply_terminators`, kept as part of the message; no line ending is needed | Roland V-60HD: `VFL:a;`, and a bare ACK byte (`reply_terminators: [";", "\u0006"]`) |
 | `fenced` | The end of the line, unless the line matches `reply_fence`: then the next such line after other text, the lines between being one message | Turtle AV controllers: a status block between lines of `=` (`reply_fence: "^=+\\s*$"`) |
+| `json` | The end of a complete top-level JSON object or array | Barco Pulse: bare JSON-RPC objects back to back, compact or spread over lines |
 
-It defaults to `block` for `framing: block` and to `line` otherwise.
+It defaults to `block` for `framing: block`, to `json` for `framing: json`, and
+to `line` otherwise.
+
+With `json`, a message runs from an opening `{` or `[` to the bracket that
+closes it, brackets inside JSON strings (and escaped quotes) not counting, so
+neither a line ending nor a separator is needed and a value laid out over
+several lines is still one message. Whatever arrives between values
+(whitespace, stray bytes) is no message. Each message is JSON, so it goes to
+the `json_match` rules (§8) as well as the text rules.
 
 With `fenced`, a fence line opens a block and the next fence line after any
 other text closes it, so two fences in a row open one block; the fences, and
