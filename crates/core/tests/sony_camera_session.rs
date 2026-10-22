@@ -33,17 +33,20 @@ const UINT8: u16 = 0x0002;
 const UINT16: u16 = 0x0004;
 const INT8: u16 = 0x0001;
 const UINT32: u16 = 0x0006;
+const INT32: u16 = 0x0005;
 
 /// The file the simulated camera has on its card.
 const CONTENT: &[u8] = b"pretend this is a JPEG from slot one";
 
-/// One property: datatype, writable, current value, accepted values.
+/// One property: datatype, writable, current value, accepted values (or a
+/// range from minimum to maximum in steps of one).
 #[derive(Clone)]
 struct Prop {
     datatype: u16,
     writable: bool,
     value: i64,
     options: Vec<i64>,
+    range: Option<(i64, i64)>,
 }
 
 #[derive(Default)]
@@ -108,7 +111,7 @@ fn utf16z(text: &str) -> Vec<u8> {
 }
 
 /// A property description: code, type, get/set, enabled, default, current,
-/// then an enumeration form listing the options twice.
+/// then a range form or an enumeration form listing the options twice.
 fn prop_dataset(code: u16, p: &Prop) -> Vec<u8> {
     let mut b = Vec::new();
     b.extend_from_slice(&code.to_le_bytes());
@@ -117,6 +120,13 @@ fn prop_dataset(code: u16, p: &Prop) -> Vec<u8> {
     b.push(1);
     b.extend(int_bytes(p.datatype, 0));
     b.extend(int_bytes(p.datatype, p.value));
+    if let Some((min, max)) = p.range {
+        b.push(1);
+        for v in [min, max, 1] {
+            b.extend(int_bytes(p.datatype, v));
+        }
+        return b;
+    }
     b.push(2);
     for _ in 0..2 {
         b.extend_from_slice(&(p.options.len() as u16).to_le_bytes());
@@ -570,6 +580,14 @@ fn prop(datatype: u16, writable: bool, value: i64, options: &[i64]) -> Prop {
         writable,
         value,
         options: options.to_vec(),
+        range: None,
+    }
+}
+
+fn ranged(datatype: u16, writable: bool, value: i64, min: i64, max: i64) -> Prop {
+    Prop {
+        range: Some((min, max)),
+        ..prop(datatype, writable, value, &[])
     }
 }
 
@@ -1248,5 +1266,105 @@ async fn live_view_during_downloads_is_the_operators_choice() {
             .is_some()
     );
     let _ = std::fs::remove_file(&path);
+    core.close(id).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pan_tilt_limits_presets_and_the_af_c_position() {
+    let (port, camera, _events) = simulated_camera(|c| {
+        // SetPresetPTZF 1.00; 100 preset slots over a range from 1.
+        c.props.insert(0xE0CC, prop(UINT16, false, 100, &[]));
+        c.props.insert(0xE0CB, ranged(UINT16, false, 100, 1, 256));
+        // Pan limit from -170 degrees, off.
+        c.props.insert(
+            0xE0BA,
+            ranged(INT32, true, -170_000_000, -170_000_000, 170_000_000),
+        );
+        c.props.insert(0xE0BE, prop(UINT8, true, 1, &[1, 2]));
+        // AF-C area position (150, 100).
+        c.props
+            .insert(0xE079, ranged(UINT32, true, 0x0096_0064, 0, 0xFFFF_FFFF));
+        c.controls = vec![0xF015];
+    })
+    .await;
+    let core = common::core().unwrap();
+    let id = connected(
+        &core,
+        "brc-am7",
+        port,
+        json!({"friendly_name": "Camera Desk", "poll_ms": 60000}),
+    )
+    .await;
+    let state = core.snapshot(id).unwrap().state;
+    assert_eq!(
+        state["pan_tilt"]["preset_numbers"],
+        json!({"first": 1, "last": 100})
+    );
+    assert_eq!(state["pan_tilt"]["pan_limit"]["min"], -170.0);
+    assert_eq!(state["pan_tilt"]["pan_limit"]["enabled"], false);
+    assert_eq!(
+        state["focus"]["af_c_area_position"],
+        json!({"x": 150, "y": 100})
+    );
+
+    // Preset numbers outside the camera's are refused before sending.
+    for preset in [0, 101] {
+        assert!(matches!(
+            core.execute(id, "preset_recall", params(json!({"preset": preset})))
+                .await,
+            Err(CommandError::InvalidParams { .. })
+        ));
+    }
+    assert_eq!(
+        core.execute(id, "preset_recall", params(json!({"preset": 1})))
+            .await,
+        Ok(Outcome::Ack)
+    );
+    assert_eq!(
+        camera.lock().unwrap().writes.last(),
+        Some(&(0xF015, vec![1, 0]))
+    );
+
+    // The pan limit is written in millionths of a degree and read back.
+    assert_eq!(
+        core.execute(id, "set_pan_limit_min", params(json!({"value": -90.5})))
+            .await,
+        Ok(Outcome::Ack)
+    );
+    assert_eq!(
+        camera.lock().unwrap().writes.last(),
+        Some(&(0xE0BA, (-90_500_000i32).to_le_bytes().to_vec()))
+    );
+    assert_eq!(
+        core.execute(id, "set_pan_limit_enabled", params(json!({"value": true})))
+            .await,
+        Ok(Outcome::Ack)
+    );
+    assert_eq!(
+        camera.lock().unwrap().writes.last(),
+        Some(&(0xE0BE, vec![2]))
+    );
+
+    // The AF-C area position, x in the upper half and y in the lower.
+    assert_eq!(
+        core.execute(
+            id,
+            "set_af_c_area_position",
+            params(json!({"x": 639, "y": 479}))
+        )
+        .await,
+        Ok(Outcome::Ack)
+    );
+    assert_eq!(
+        camera.lock().unwrap().writes.last(),
+        Some(&(0xE079, 0x027F_01DFu32.to_le_bytes().to_vec()))
+    );
+    wait_for(&core, |_| {
+        let state = core.snapshot(id).unwrap().state;
+        state["focus"]["af_c_area_position"] == json!({"x": 639, "y": 479})
+            && state["pan_tilt"]["pan_limit"]["min"] == -90.5
+            && state["pan_tilt"]["pan_limit"]["enabled"] == true
+    })
+    .await;
     core.close(id).await;
 }
