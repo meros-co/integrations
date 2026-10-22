@@ -1244,6 +1244,32 @@ fn url_host(ctx: &OpenContext) -> String {
     ctx.host_name.clone().unwrap_or_else(|| host_text(ctx.host))
 }
 
+/// A websocket path with each `{settings.name}` replaced by that setting's
+/// value, percent-encoded as one path segment (a DHD AES67 module's ID in
+/// `/modules/{settings.module}/api/ws`). A setting with no value is an
+/// error, so the path never loses a segment.
+fn ws_path(template: &str, settings: &Params) -> Result<String, String> {
+    let mut out = String::new();
+    let mut rest = template;
+    while let Some(start) = rest.find("{settings.") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + "{settings.".len()..];
+        let end = after
+            .find('}')
+            .ok_or("an unclosed placeholder in the websocket path")?;
+        let name = &after[..end];
+        let value = match settings.get(name) {
+            Some(Value::String(s)) if !s.is_empty() => s.clone(),
+            Some(Value::Number(n)) => n.to_string(),
+            _ => return Err(format!("the websocket path needs setting {name}")),
+        };
+        out.push_str(&percent_encode(&value));
+        rest = &after[end + 1..];
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
 /// A websocket's opening request: `scheme://host:port/path`, the subprotocol
 /// and any credential.
 fn ws_request(
@@ -1255,7 +1281,7 @@ fn ws_request(
     auth_header: &str,
 ) -> Result<WsRequest, String> {
     let scheme = scheme_of(t, settings, "ws", "wss")?;
-    let path = str_field(t, "path").unwrap_or("/");
+    let path = ws_path(str_field(t, "path").unwrap_or("/"), settings)?;
     if !path.starts_with('/') {
         return Err("a websocket path starts with /".into());
     }
@@ -3040,8 +3066,14 @@ impl SpecEngine {
             }
             Transport::OscTcp { .. } => poll,
             // A websocket device pushes; what it sends back after a
-            // subscription goes to the rules like anything else.
-            Transport::Ws { .. } => false,
+            // subscription goes to the rules like anything else. While a
+            // connection step still waits for its answer (a login), they
+            // queue behind it: DHD's Control API takes nothing before its
+            // auth message is answered.
+            Transport::Ws { .. } => {
+                self.queue.iter().any(|j| j.setup)
+                    || self.current.as_ref().is_some_and(|f| f.job.setup)
+            }
         };
         // The items already waiting, by their text, so a long poll list is
         // checked against the queue in linear time.
@@ -3322,6 +3354,15 @@ impl SpecEngine {
     }
 
     fn inbound_ws(&mut self, cx: &mut Cx, text: String) {
+        // A login step's `refused` and `accepted` read websocket messages as
+        // they read lines (DHD's Control API answers a refused token in a
+        // message, not on the opening request).
+        if self.refusals.iter().any(|(re, _)| re.is_match(&text)) {
+            self.refuse(cx, format!("login refused: {}", text.trim()));
+            return;
+        }
+        self.refusals
+            .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&text)));
         self.apply_message(cx, &text);
         let ours =
             match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
@@ -5044,6 +5085,10 @@ mod tests {
     /// A websocket device: JSON requests, replies matched by an id field or
     /// taken in order, pushed messages through the rules.
     fn ws_device(auth: &str) -> SpecEngine {
+        ws_device_with(auth, vec![json!(r#"{"action":"hello"}"#)])
+    }
+
+    fn ws_device_with(auth: &str, on_connect: Vec<Value>) -> SpecEngine {
         let mut spec = Catalog::source_tree()
             .device("kramer-p3000")
             .unwrap()
@@ -5056,7 +5101,7 @@ mod tests {
             "token": {"type": "string", "secret": true, "default": "t0k"},
         }))
         .unwrap();
-        spec.on_connect = vec![json!(r#"{"action":"hello"}"#)];
+        spec.on_connect = on_connect;
         spec.commands = serde_json::from_value(json!({
             "get_level": {
                 "params": {"layer": {"type": "int", "min": 1, "required": true}},
@@ -5211,6 +5256,76 @@ mod tests {
             key: RECONNECT,
             after: RECONNECT_MIN
         }));
+    }
+
+    #[test]
+    fn a_websocket_path_names_settings() {
+        let settings = |v: Value| v.as_object().unwrap().clone();
+        assert_eq!(
+            ws_path(
+                "/modules/{settings.module}/api/ws",
+                &settings(json!({"module": 2}))
+            )
+            .unwrap(),
+            "/modules/2/api/ws"
+        );
+        assert_eq!(
+            ws_path("/m/{settings.name}/ws", &settings(json!({"name": "a b/c"}))).unwrap(),
+            "/m/a%20b%2Fc/ws"
+        );
+        assert!(ws_path("/modules/{settings.module}/api/ws", &settings(json!({}))).is_err());
+        assert!(ws_path("/modules/{settings.module", &settings(json!({"module": 1}))).is_err());
+    }
+
+    #[test]
+    fn a_websocket_login_step_is_refused_or_accepted_by_its_answer() {
+        let device = |answer: &str| {
+            let mut e = ws_device_with(
+                "none",
+                vec![json!({
+                    "send": r#"{"method":"auth","token":{settings.token:json}}"#,
+                    "await_reply": true,
+                    "refused": r#""code":\s*128[01]\b"#,
+                    "accepted": r#""success":\s*"?true"#,
+                })],
+            );
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            e.ws(&mut cx, SOCKET, WsInput::Opened);
+            assert_eq!(
+                ws_sent(&cx.take(), SOCKET),
+                vec![r#"{"method":"auth","token":"t0k"}"#.to_string()]
+            );
+            let mut cx = Cx::new(10);
+            e.ws(&mut cx, SOCKET, WsInput::Text(answer.into()));
+            (e, cx.take())
+        };
+        let (_, a) = device(
+            r#"{"method":"auth","success":"false","error":{"code":1281,"message":"invalid token"}}"#,
+        );
+        assert!(a
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+        // Accepted: a later message naming the code is not about the login.
+        let (mut e, a) = device(r#"{"method":"auth","success":"true"}"#);
+        assert!(!a
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+        // The subscription waited for the login's answer.
+        assert_eq!(
+            ws_sent(&a, SOCKET),
+            vec![r#"{"action":"subscribe","parameter":"/layers/1/level"}"#.to_string()]
+        );
+        let mut cx = Cx::new(20);
+        e.ws(
+            &mut cx,
+            SOCKET,
+            WsInput::Text(r#"{"error":{"code":1280}}"#.into()),
+        );
+        assert!(!cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
     }
 
     #[test]

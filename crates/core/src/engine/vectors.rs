@@ -703,7 +703,13 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let mut reply_actions = None;
     if let Some(reply) = v.get("device_reply").and_then(Value::as_str) {
         let mut cx = Cx::new(3);
-        engine.tcp(&mut cx, "device", TcpInput::Data(reply.as_bytes().to_vec()));
+        // A websocket device's reply is one message; any other is bytes on
+        // the stream.
+        if matches!(engine.transport, super::Transport::Ws { .. }) {
+            engine.ws(&mut cx, "device", WsInput::Text(reply.to_string()));
+        } else {
+            engine.tcp(&mut cx, "device", TcpInput::Data(reply.as_bytes().to_vec()));
+        }
         let after = cx.take();
         let stated = expected_wire(&v, main_port(&engine)).map_or(0, |w| w.len());
         if stated > sent.len() {
@@ -902,7 +908,14 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             port: None,
             model: model.id.clone(),
             channels: model.channels,
-            settings: validate(&spec.settings, &Default::default()).unwrap_or_default(),
+            // With no value for a required setting (a token), the defaults
+            // of the others, as a host opening it would have them.
+            settings: validate(&spec.settings, &Default::default()).unwrap_or_else(|_| {
+                spec.settings
+                    .iter()
+                    .filter_map(|(k, p)| p.default.clone().map(|d| (k.clone(), d)))
+                    .collect()
+            }),
             monitor: true,
         };
         if let Err(e) = SpecEngine::new(Arc::new(spec.clone()), ctx) {

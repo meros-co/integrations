@@ -22,6 +22,7 @@ TRANSPORT = {
     "osc-udp": "OSC/UDP",
     "osc-tcp": "OSC/TCP",
     "http": "HTTP",
+    "ws": "WebSocket",
 }
 
 # Native modules choose their own transport, so it is described here.
