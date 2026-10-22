@@ -277,7 +277,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Midas PRO series / HD96 | OSC / proprietary | Unknown |
 | Roland M-5000 | Roland remote control protocol over TCP | Public |
 | Calrec (Brio, Artemis, Apollo, Argo) | Calrec Serial Control Protocol over TCP | On request |
-| Stagetec (Avatus, Nexus) | Ember+ / RCP / XCI | Public |
+| Stagetec (Avatus, Nexus): RCP and the XCI message channel (Ember+ through the XACI board already works with emberplus) | RCP / NEXUS protocol / SNMP (MATRIX5-MIB) | On request |
 | Wheatstone WheatNet | LIO / ACI over TCP | On request |
 | Audio-Technica digital mixers | TCP | Unknown |
 | Avid VENUE S6L | Unknown | Closed |
