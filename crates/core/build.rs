@@ -48,6 +48,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "barco-encore",
             "barco-eventmaster",
             "barco-eventmaster-telnet",
+            "barco-projection-protocol",
             "barco-pulse",
         ],
     ),
