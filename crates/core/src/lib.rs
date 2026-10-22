@@ -108,6 +108,15 @@ use session::{Services, Session, SessionMsg};
 /// Events held for a consumer that is not draining them.
 const EVENT_CAPACITY: usize = 10_000;
 
+/// A serial port of the host ([`Core::serial_ports`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerialPortInfo {
+    /// What the `serial_port` setting takes: `COM3` on Windows, a device
+    /// path such as `/dev/ttyUSB0` (Linux) or `/dev/cu.usbserial-1420`
+    /// (macOS) elsewhere.
+    pub name: String,
+}
+
 /// How to reach one device.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenRequest {
@@ -361,6 +370,23 @@ impl Core {
             .expect("set before any device is opened")
             .serial = ports;
         self
+    }
+
+    /// The host's serial ports, for a consumer choosing the one a device on
+    /// a serial port is wired to (the `serial_port` setting). Names only:
+    /// the port library gives no description or USB ids. Empty on Android
+    /// and iOS, which have no serial port an app can open.
+    pub fn serial_ports(&self) -> Result<Vec<SerialPortInfo>, String> {
+        self.services
+            .serial
+            .list()
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| SerialPortInfo { name })
+                    .collect()
+            })
+            .map_err(|e| format!("serial ports could not be listed: {e}"))
     }
 
     /// The discovery protocols this core runs: those that find a device in

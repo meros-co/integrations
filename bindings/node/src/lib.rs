@@ -65,6 +65,12 @@ impl NativeCore {
         json::catalog(&self.core)
     }
 
+    /// The host's serial ports: `{ok: [{name}]}` or `{error}`.
+    #[napi]
+    pub fn serial_ports(&self) -> Value {
+        json::serial_ports(&self.core)
+    }
+
     /// `{device}` or `{error}`.
     #[napi]
     pub fn open(&self, request: Value) -> Value {

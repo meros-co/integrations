@@ -217,6 +217,13 @@ async fn the_shared_binding_script() {
         .await
         .unwrap();
     assert_eq!(refused.status(), 401);
+    let refused = client
+        .http
+        .get(format!("{}/v1/serial_ports", client.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 401);
 
     let script: Value = serde_json::from_str(
         &std::fs::read_to_string(root().join("tests/bindings/script.json")).unwrap(),
@@ -234,6 +241,14 @@ async fn the_shared_binding_script() {
                     &step["expect"],
                     "{label}"
                 );
+            }
+            "serial_ports" => {
+                // Whatever ports this machine has: names only.
+                let result = client.get("/v1/serial_ports").await;
+                for port in result["ok"].as_array().expect(&label) {
+                    let port = port.as_object().expect(&label);
+                    assert!(port.len() == 1 && port["name"].is_string(), "{label}");
+                }
             }
             "open" => {
                 let result = client.post("/v1/open", step["request"].clone()).await;

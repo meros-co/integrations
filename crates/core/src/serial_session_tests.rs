@@ -584,3 +584,15 @@ async fn a_link_without_what_it_needs_is_refused_on_opening() {
     ));
 }
 
+#[test]
+fn the_host_serial_ports_are_listed() {
+    let ports = Arc::new(MemoryPorts::default());
+    let core = core(ports.clone());
+    assert_eq!(core.serial_ports(), Ok(vec![]));
+    let _a = ports.plug("COM9");
+    let _b = ports.plug("/dev/ttyUSB0");
+    assert_eq!(
+        crate::json::serial_ports(&core),
+        json!({"ok": [{"name": "/dev/ttyUSB0"}, {"name": "COM9"}]})
+    );
+}

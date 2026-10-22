@@ -185,7 +185,8 @@ transport (`line-serial`, link serial of a spec with a `serial` block, and
 the serial link of the native modules that offer one) is therefore left out of Android and iOS builds,
 which do not depend on the serial crate: a device opened on a serial port
 stays `disconnected`, its reason saying serial ports are not available on
-this platform. Everything else in those integrations builds and works over
+this platform, and the list of the host's serial ports (`serial_ports` in
+every delivery) is empty. Everything else in those integrations builds and works over
 the network as elsewhere.
 
 ## What has been verified

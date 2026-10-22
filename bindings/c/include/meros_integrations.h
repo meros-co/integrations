@@ -40,6 +40,11 @@ void mi_string_free(char *s);
 /* Every device spec: models, commands, parameters, quirks. */
 char *mi_catalog(const MiCore *core);
 
+/* The host's serial ports, for the serial_port setting of a device on one:
+ * {"ok":[{"name":"COM3"},...]} or {"error":{...}}. Names only; empty on
+ * Android and iOS. */
+char *mi_serial_ports(const MiCore *core);
+
 /* request: {"device":"<spec id>","model":"<model id>","host":"<ip or name>",
  *           "port":<optional>,"settings":{...},"monitor":<optional bool>}
  * "monitor":false opens the device for commands only: no subscription,

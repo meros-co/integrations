@@ -225,6 +225,13 @@ systems the `serial2` crate supports). Phones have no serial port an app can
 open, so on Android and iOS the port fails to open with a reason saying so,
 and the device stays `disconnected` (docs/MOBILE.md).
 
+Every delivery lists the host's serial ports, for a consumer offering a
+choice of `serial_port`: `Core::serial_ports` in Rust, `mi_serial_ports` in
+C, `serialPorts()` in Node, `serial_ports()` in Python and
+`GET /v1/serial_ports` in the HTTP service. Each port has its `name`, the
+value `serial_port` takes; the port library gives no description or USB
+ids. The list is empty on Android and iOS.
+
 #### The same protocol on a serial port
 
 Many devices speak their network protocol unchanged on an RS-232 or RS-422
