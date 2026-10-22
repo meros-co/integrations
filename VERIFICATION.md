@@ -1711,6 +1711,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8765](specs/panasonic-ptz.yaml#L8765))
 - [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:124](specs/panasonic-ptz.yaml#L124))
 
+## panasonic-ptz-serial — Panasonic PTZ on RS-422
+
+- [ ] On the RS-422 port, confirm that every camera command, queries included, is answered with ACK (06H) and then its reply between STX and ETX, as chapter 4-1 shows for a control command only. ([specs/panasonic-ptz-serial.yaml:10209](specs/panasonic-ptz-serial.yaml#L10209))
+- [ ] Record what a refused camera command gets on the serial line: ACK and then ER1/ER2/ER3:<command> between STX and ETX, or the error alone (chapter 7 shows the IP sequence only); and that a pan-tilt error is eR<n>:<command> with CR. ([specs/panasonic-ptz-serial.yaml:10218](specs/panasonic-ptz-serial.yaml#L10218))
+- [ ] Check that the camera sends update notifications on the RS-422 line with no registration, and whether the version (qSV, every 60 s), error (rER, every 30 s) and lens (lPI, every 300 ms) notifications of chapter 6 come there too. ([specs/panasonic-ptz-serial.yaml:10227](specs/panasonic-ptz-serial.yaml#L10227))
+- [ ] Check the half-duplex pacing: whether a command sent right after a reply (less than 40 ms, or 16 ms on the AW-UE160, after the last pan-tilt command) is taken, and what happens to a command sent while the camera is sending a notification. ([specs/panasonic-ptz-serial.yaml:10201](specs/panasonic-ptz-serial.yaml#L10201))
+- [ ] Confirm the AW-UE20/HE20 take these commands on the RS-422 connector with Serial Com. Protocol Panasonic, and that Panasonic is the factory setting. ([specs/panasonic-ptz-serial.yaml:10236](specs/panasonic-ptz-serial.yaml#L10236))
+- [ ] Confirm the AW-UE160 leaves the factory at 9600 bps (its interface specification lists 9600, 38400 and 115200 without marking a default). ([specs/panasonic-ptz-serial.yaml:78](specs/panasonic-ptz-serial.yaml#L78))
+- [ ] Confirm the AW-UE30, AW-UE40 and AW-UE50 have the RS-422 port the shared AW-UE80/UE50/UE40/UE30 interface specification describes (chapter 4-1 names no model). ([specs/panasonic-ptz-serial.yaml:85](specs/panasonic-ptz-serial.yaml#L85))
+
 ## panasonic-projector — Panasonic projectors
 
 - [ ] Confirm the NTCONTROL hash against a projector in protect mode: MD5 of "user:password:random" as 32 lowercase hex digits (the manual's example gives no random number to check against). ([specs/panasonic-projector.yaml:54](specs/panasonic-projector.yaml#L54))

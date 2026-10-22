@@ -181,6 +181,12 @@ pub struct ParamSpec {
     /// sends it through `:json`, which escapes them (SPEC.md §4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub multiline: bool,
+    /// The default for the models named here, in place of `default`: a
+    /// serial line setting whose factory value differs by model (a `serial`
+    /// block's `by_model`, SPEC.md §2). Listed in the catalogue; a spec does
+    /// not declare it on a setting itself.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub default_by_model: Option<BTreeMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -479,12 +485,18 @@ impl DeviceSpec {
                 )
             },
         );
-        let line = |name: &str| -> Result<(Value, Vec<Value>), String> {
+        let serial_models = block.get("models").cloned();
+        let line = |name: &str| -> Result<Line, String> {
             match block.get(name) {
                 None => Err(format!(
                     "transport.serial.{name}: give the device's documented value"
                 )),
                 Some(Value::Object(m)) => {
+                    for key in m.keys() {
+                        if !["default", "values", "by_model"].contains(&key.as_str()) {
+                            return Err(format!("transport.serial.{name}.{key}: not a key here"));
+                        }
+                    }
                     let default = m
                         .get("default")
                         .cloned()
@@ -499,12 +511,85 @@ impl DeviceSpec {
                             "transport.serial.{name}: the default is not one of the values"
                         ));
                     }
-                    Ok((default, values))
+                    let entries = match m.get("by_model") {
+                        None => Vec::new(),
+                        Some(Value::Array(list)) if !list.is_empty() => list.clone(),
+                        Some(_) => {
+                            return Err(format!(
+                                "transport.serial.{name}.by_model: a list of {{models, default}}"
+                            ))
+                        }
+                    };
+                    let mut by_model = Vec::new();
+                    let mut seen = std::collections::BTreeSet::new();
+                    for entry in &entries {
+                        let Some(entry) = entry.as_object().filter(|e| {
+                            e.len() == 2 && e.contains_key("models") && e.contains_key("default")
+                        }) else {
+                            return Err(format!(
+                                "transport.serial.{name}.by_model: each entry is {{models, default}}"
+                            ));
+                        };
+                        let value = entry["default"].clone();
+                        if !values.contains(&value) {
+                            return Err(format!(
+                                "transport.serial.{name}.by_model: {value} is not one of the values"
+                            ));
+                        }
+                        let ids =
+                            entry["models"]
+                                .as_array()
+                                .filter(|a| !a.is_empty())
+                                .ok_or(format!(
+                                    "transport.serial.{name}.by_model: models must list model ids"
+                                ))?;
+                        let mut names = Vec::new();
+                        for id in ids {
+                            let id = id.as_str().unwrap_or_default();
+                            if self.model(id).is_none() {
+                                return Err(format!(
+                                    "transport.serial.{name}.by_model: no model '{id}'"
+                                ));
+                            }
+                            if serial_models.is_some() && !names_model(serial_models.as_ref(), id) {
+                                return Err(format!(
+                                    "transport.serial.{name}.by_model: model '{id}' has no \
+                                     serial port"
+                                ));
+                            }
+                            if !seen.insert(id.to_string()) {
+                                return Err(format!(
+                                    "transport.serial.{name}.by_model: model '{id}' is named \
+                                     twice"
+                                ));
+                            }
+                            names.push(id.to_string());
+                        }
+                        by_model.push((names, value));
+                    }
+                    Ok((default, values, by_model))
                 }
-                Some(one) => Ok((one.clone(), vec![one.clone()])),
+                Some(one) => Ok((one.clone(), vec![one.clone()], Vec::new())),
             }
         };
-        let (default, values) = line("baud_rate")?;
+        // Each entry's default for each model it names, as the setting holds
+        // its values, and the words the description adds for them.
+        let per_model = |by_model: &[(Vec<String>, Value)], show: &dyn Fn(&Value) -> Value| {
+            let map: BTreeMap<String, Value> = by_model
+                .iter()
+                .flat_map(|(ids, v)| ids.iter().map(move |id| (id.clone(), show(v))))
+                .collect();
+            let words: String = by_model
+                .iter()
+                .map(|(ids, v)| {
+                    let v = show(v);
+                    let v = v.as_str().map_or_else(|| v.to_string(), str::to_string);
+                    format!(", {v} on {}", ids.join(", "))
+                })
+                .collect();
+            ((!map.is_empty()).then_some(map), words)
+        };
+        let (default, values, by_model) = line("baud_rate")?;
         if values.iter().any(|v| v.as_u64().is_none_or(|n| n == 0)) {
             return Err("transport.serial.baud_rate: bits per second, above 0".into());
         }
@@ -525,15 +610,18 @@ impl DeviceSpec {
                     )
                 }
             } else {
+                let (default_by_model, words) =
+                    per_model(&by_model, &|v| Value::from(v.to_string()));
                 ParamSpec {
                     values: Some(values.iter().map(|v| v.to_string()).collect()),
                     default: Some(Value::from(default.to_string())),
+                    default_by_model,
                     ..setting(
                         ParamType::Enum,
                         "Baud rate",
                         &format!(
                             "With link serial, bits per second, as set on the device's port \
-                             ({default} unless changed there)."
+                             ({default} unless changed there{words})."
                         ),
                     )
                 }
@@ -543,7 +631,7 @@ impl DeviceSpec {
             ("data_bits", "Data bits", 5, 8, "bits per character"),
             ("stop_bits", "Stop bits", 1, 2, "stop bits"),
         ] {
-            let (default, values) = line(name)?;
+            let (default, values, by_model) = line(name)?;
             let mut n: Vec<u64> = values.iter().filter_map(Value::as_u64).collect();
             n.sort_unstable();
             n.dedup();
@@ -555,18 +643,20 @@ impl DeviceSpec {
                     "transport.serial.{name}: whole numbers from {low} to {high}, with no gaps"
                 ));
             }
+            let (default_by_model, words) = per_model(&by_model, &|v| v.clone());
             add.insert(
                 name.to_string(),
                 ParamSpec {
                     min: Some(n[0] as f64),
                     max: Some(n[n.len() - 1] as f64),
                     default: Some(default.clone()),
+                    default_by_model,
                     ..setting(
                         ParamType::Int,
                         label,
                         &format!(
                             "With link serial, {what}, as set on the device's port ({default} \
-                             by default)."
+                             by default{words})."
                         ),
                     )
                 },
@@ -586,7 +676,7 @@ impl DeviceSpec {
                 "how the port paces what is sent",
             ),
         ] {
-            let (default, values) = line(name)?;
+            let (default, values, by_model) = line(name)?;
             let values: Vec<String> = values
                 .iter()
                 .map(|v| v.as_str().unwrap_or_default().to_string())
@@ -597,17 +687,19 @@ impl DeviceSpec {
                     choices.join(", ")
                 ));
             }
+            let (default_by_model, words) = per_model(&by_model, &|v| v.clone());
             add.insert(
                 name.to_string(),
                 ParamSpec {
                     values: Some(values),
                     default: Some(default.clone()),
+                    default_by_model,
                     ..setting(
                         ParamType::Enum,
                         label,
                         &format!(
                             "With link serial, {what}, as set on the device's port ({} by \
-                             default).",
+                             default{words}).",
                             default.as_str().unwrap_or_default()
                         ),
                     )
@@ -625,6 +717,10 @@ impl DeviceSpec {
         Ok(())
     }
 }
+
+/// A serial line setting from a `serial` block: its default, its values,
+/// and the defaults of the models named in `by_model`.
+type Line = (Value, Vec<Value>, Vec<(Vec<String>, Value)>);
 
 /// Whether a list of model ids holds `model`.
 /// The transport keys a `serial` block's `overrides` may change: how a
@@ -662,6 +758,7 @@ fn setting(kind: ParamType, label: &str, description: &str) -> ParamSpec {
         required: false,
         secret: false,
         multiline: false,
+        default_by_model: None,
     }
 }
 
@@ -783,6 +880,24 @@ pub fn vendor_groups() -> &'static [(&'static str, &'static [&'static str])] {
 /// containing control characters. Never clamps or strips: a corrected value
 /// would produce a device state the caller did not ask for.
 pub fn validate(declared: &BTreeMap<String, ParamSpec>, given: &Params) -> Result<Params, String> {
+    validate_inner(declared, given, None)
+}
+
+/// [`validate`] for a device's settings: a setting whose default differs by
+/// model (`default_by_model`) takes the default of `model`.
+pub fn validate_settings(
+    declared: &BTreeMap<String, ParamSpec>,
+    given: &Params,
+    model: &str,
+) -> Result<Params, String> {
+    validate_inner(declared, given, Some(model))
+}
+
+fn validate_inner(
+    declared: &BTreeMap<String, ParamSpec>,
+    given: &Params,
+    model: Option<&str>,
+) -> Result<Params, String> {
     for name in given.keys() {
         if !declared.contains_key(name) {
             return Err(format!("unknown parameter '{name}'"));
@@ -791,8 +906,9 @@ pub fn validate(declared: &BTreeMap<String, ParamSpec>, given: &Params) -> Resul
 
     let mut out = Params::new();
     for (name, spec) in declared {
+        let for_model = model.and_then(|m| spec.default_by_model.as_ref()?.get(m));
         let value = match given.get(name) {
-            Some(Value::Null) | None => match &spec.default {
+            Some(Value::Null) | None => match for_model.or(spec.default.as_ref()) {
                 Some(default) => default.clone(),
                 None if spec.required => return Err(format!("'{name}' is required")),
                 None => continue,

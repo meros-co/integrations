@@ -195,6 +195,17 @@ class SerialBlock(unittest.TestCase):
         doc = {"transport": {"type": "line-tcp", "port": 1}, "on_connect": [{"send": "x", "link": "tcp"}]}
         self.assertEqual(validate.expand_serial(doc), ["on_connect[0]: link needs transport.serial"])
 
+    def test_a_default_can_differ_by_model(self):
+        baud = {"default": 9600, "values": [9600, 38400], "by_model": [{"models": ["b"], "default": 38400}]}
+        self.assertEqual(validate.expand_serial(self.doc(baud_rate=baud)), [])
+        baud = {"default": 9600, "values": [9600, 38400],
+                "by_model": [{"models": ["b", "c"], "default": 19200}, {"models": ["b"], "default": 9600}]}
+        errors = validate.expand_serial(self.doc(baud_rate=baud, models=["a", "c"]))
+        self.assertIn("transport.serial.baud_rate.by_model[0]: the default is not one of the values", errors)
+        self.assertIn("transport.serial.baud_rate.by_model[0]: model 'b' has no serial port", errors)
+        self.assertIn("transport.serial.baud_rate.by_model[0]: no model 'c'", errors)
+        self.assertIn("transport.serial.baud_rate.by_model[1]: model 'b' is named twice", errors)
+
     def test_overrides_change_framing_and_replies_for_the_models_named(self):
         doc = self.doc(overrides=[{"framing": "delimited", "close": "", "reply_framing": "terminated",
                                    "reply_terminators": [";"]},
