@@ -6,9 +6,12 @@
 //! plain or over TLS (the `transport` setting). TCP and WebSocket carry a
 //! byte stream of PDUs; over UDP each datagram is one PDU, kept within one
 //! Ethernet frame, and the device is counted connected when it first answers
-//! the keep-alive the module sends before anything else. Secure OCP.1
-//! (TLS 1.2 with a pre-shared key) is not implemented: the core's TLS does
-//! not offer pre-shared keys.
+//! the keep-alive the module sends before anything else. Secure OCP.1 runs
+//! over TLS 1.2 on TCP (`tls`, advertised as _ocasec._tcp) or DTLS 1.2 on UDP
+//! (`dtls`, _ocasec._udp) with the pre-shared key suite AES70 names; the
+//! client is in [`tls`] and [`dtls`], whose module docs hold its security
+//! note. The keep-alive is the first PDU once the handshake is done, and over
+//! DTLS each PDU is one record in one datagram.
 //!
 //! The AES70 standard itself (AES70-1/2/3) is sold by the AES and was not
 //! used. The module was written from what open implementations and the OCA
@@ -62,6 +65,10 @@ use crate::module::{
 mod classes;
 #[path = "aes70_codec.rs"]
 mod codec;
+#[path = "aes70_dtls.rs"]
+mod dtls;
+#[path = "aes70_tls.rs"]
+mod tls;
 
 use classes::{Prop, Ty};
 use codec::{Command, Id, KeepAlive, Message, Reader, Writer};
@@ -71,6 +78,12 @@ const KEEPALIVE: Key = "keepalive";
 const REPLY: Key = "reply";
 const RETRY: Key = "retry";
 const POLL: Key = "poll";
+/// The secure handshake's deadline.
+const HANDSHAKE: Key = "handshake";
+/// The DTLS retransmission timer.
+const DTLS_TIMER: Key = "dtls";
+/// The Diffie-Hellman computation of the secure handshake.
+const DH: Key = "dh";
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
 
@@ -176,6 +189,24 @@ enum Transport {
     /// WebSocket binary messages, plain or over TLS: a byte stream across
     /// messages.
     Ws { secure: bool },
+    /// Secure OCP.1: TLS 1.2 with a pre-shared key over TCP.
+    Tls,
+    /// Secure OCP.1: DTLS 1.2 with a pre-shared key over UDP, one PDU per
+    /// record and datagram.
+    Dtls,
+}
+
+impl Transport {
+    /// Each datagram carries whole PDUs.
+    fn datagrams(self) -> bool {
+        matches!(self, Transport::Udp | Transport::Dtls)
+    }
+}
+
+/// A secure session under OCP.1.
+enum Secure {
+    Tls(tls::TlsClient),
+    Dtls(dtls::DtlsClient),
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +215,10 @@ struct Settings {
     ws_path: String,
     ws_subprotocol: bool,
     accept_invalid_certs: bool,
+    /// For tls and dtls: the key and identity, or why the settings give
+    /// none.
+    psk: Result<tls::Psk, String>,
+    handshake_timeout: Millis,
     keepalive: Millis,
     request_timeout: Millis,
     walk: bool,
@@ -211,11 +246,20 @@ impl Settings {
                 Some("udp") => Transport::Udp,
                 Some("ws") => Transport::Ws { secure: false },
                 Some("wss") => Transport::Ws { secure: true },
+                Some("tls") => Transport::Tls,
+                Some("dtls") => Transport::Dtls,
                 _ => Transport::Tcp,
             },
             ws_path,
             ws_subprotocol: flag("ws_subprotocol", true),
             accept_invalid_certs: flag("accept_invalid_certs", false),
+            psk: tls::Psk::from_hex(
+                p.get("psk_identity")
+                    .and_then(Value::as_str)
+                    .unwrap_or(tls::HINT),
+                p.get("psk").and_then(Value::as_str).unwrap_or(""),
+            ),
+            handshake_timeout: int("handshake_timeout_ms", 10_000).max(1_000) as Millis,
             keepalive: int("keepalive_interval_ms", 1000).max(100) as Millis,
             request_timeout: int("request_timeout_ms", 5000).max(100) as Millis,
             walk: flag("walk", true),
@@ -343,7 +387,16 @@ pub(crate) struct Aes70 {
     monitor: bool,
     settings: Settings,
     deframer: codec::Deframer,
+    /// The transport carries PDUs: connected, and for tls and dtls the
+    /// handshake done.
     socket_open: bool,
+    /// The TCP connection or UDP socket under a secure session is open.
+    link_open: bool,
+    /// The secure session, for tls and dtls.
+    secure: Option<Secure>,
+    /// Counts secure handshakes, so a key exchange computed for an earlier
+    /// one is not used.
+    handshakes: u64,
     connected: bool,
     retry_after: Millis,
     last_heard: Millis,
@@ -391,6 +444,9 @@ impl Aes70 {
             settings: Settings::from(&ctx.settings),
             deframer: codec::Deframer::default(),
             socket_open: false,
+            link_open: false,
+            secure: None,
+            handshakes: 0,
             connected: false,
             retry_after: RETRY_MIN,
             last_heard: 0,
@@ -428,6 +484,17 @@ impl Aes70 {
     /// state and addressed in commands by the name given (in place of a
     /// role path). Their classes are asked for on connecting; monitored,
     /// they are then read and followed like the objects a walk finds.
+    /// The module, after checking that a secure transport has its key.
+    pub(crate) fn checked(ctx: OpenContext, port: u16) -> Result<Aes70, String> {
+        let a = Aes70::new(ctx, port);
+        if matches!(a.settings.transport, Transport::Tls | Transport::Dtls) {
+            if let Err(e) = &a.settings.psk {
+                return Err(format!("secure OCP.1 needs a pre-shared key: {e}"));
+            }
+        }
+        Ok(a)
+    }
+
     pub(crate) fn with_named(ctx: OpenContext, port: u16, named: Vec<(String, u32)>) -> Aes70 {
         let mut a = Aes70::new(ctx, port);
         a.named = named;
@@ -462,6 +529,12 @@ impl Aes70 {
                 cx.udp_open(SOCKET, Bind::Ephemeral);
                 self.connected_socket(cx);
             }
+            Transport::Tls => cx.tcp_open(SOCKET, self.device),
+            Transport::Dtls => {
+                cx.udp_open(SOCKET, Bind::Ephemeral);
+                self.link_open = true;
+                self.start_secure(cx);
+            }
             Transport::Ws { secure } => {
                 let host = match (&self.host_name, self.device.ip()) {
                     (Some(name), _) => name.clone(),
@@ -494,20 +567,165 @@ impl Aes70 {
     }
 
     /// Send one PDU on whichever transport is in use.
-    fn send_pdu(&self, cx: &mut Cx, pdu: Vec<u8>) {
+    fn send_pdu(&mut self, cx: &mut Cx, pdu: Vec<u8>) {
         match self.settings.transport {
             Transport::Tcp => cx.tcp_send(SOCKET, pdu),
             Transport::Udp => cx.udp_send(SOCKET, self.device, pdu),
             Transport::Ws { .. } => cx.ws_send_binary(SOCKET, pdu),
+            Transport::Tls | Transport::Dtls => {
+                if pdu.len() > tls::MAX_PLAINTEXT && self.settings.transport == Transport::Dtls {
+                    cx.log(
+                        Level::Warning,
+                        format!(
+                            "a PDU of {} bytes is larger than a DTLS record holds and was not sent",
+                            pdu.len()
+                        ),
+                    );
+                    return;
+                }
+                let sealed = match &mut self.secure {
+                    Some(Secure::Tls(t)) if t.is_open() => Some(t.seal(&pdu)),
+                    Some(Secure::Dtls(d)) if d.is_open() => Some(d.seal(&pdu)),
+                    _ => None,
+                };
+                match sealed {
+                    Some(Ok(bytes)) => self.send_raw(cx, bytes),
+                    Some(Err(f)) => self.lost(cx, format!("secure OCP.1: {}", f.reason)),
+                    None => {}
+                }
+            }
         }
     }
 
-    fn close_socket(&self, cx: &mut Cx) {
+    /// Bytes for the link under a secure session.
+    fn send_raw(&self, cx: &mut Cx, bytes: Vec<u8>) {
+        match self.settings.transport {
+            Transport::Dtls => cx.udp_send(SOCKET, self.device, bytes),
+            _ => cx.tcp_send(SOCKET, bytes),
+        }
+    }
+
+    fn close_socket(&mut self, cx: &mut Cx) {
         match self.settings.transport {
             Transport::Tcp => cx.tcp_close(SOCKET),
             Transport::Udp => cx.udp_close(SOCKET),
             Transport::Ws { .. } => cx.ws_close(SOCKET),
+            Transport::Tls | Transport::Dtls => {
+                let bye = match &mut self.secure {
+                    Some(Secure::Tls(t)) => t.close(),
+                    Some(Secure::Dtls(d)) => d.close(),
+                    None => None,
+                };
+                if let Some(bytes) = bye {
+                    self.send_raw(cx, bytes);
+                }
+                self.secure = None;
+                self.link_open = false;
+                if self.settings.transport == Transport::Dtls {
+                    cx.udp_close(SOCKET);
+                } else {
+                    cx.tcp_close(SOCKET);
+                }
+            }
         }
+    }
+
+    // --- Secure OCP.1 -----------------------------------------------------
+
+    /// The link is up: start the TLS or DTLS handshake.
+    fn start_secure(&mut self, cx: &mut Cx) {
+        let psk = match &self.settings.psk {
+            Ok(psk) => psk.clone(),
+            Err(e) => {
+                let reason = format!("secure OCP.1 needs a pre-shared key: {e}");
+                self.lost(cx, reason);
+                return;
+            }
+        };
+        self.handshakes += 1;
+        let mut out = Vec::new();
+        let started = if self.settings.transport == Transport::Dtls {
+            dtls::DtlsClient::new(psk, cx.now(), &mut out).map(Secure::Dtls)
+        } else {
+            tls::TlsClient::new(psk, &mut out).map(Secure::Tls)
+        };
+        match started {
+            Ok(s) => {
+                self.secure = Some(s);
+                cx.set_timer(HANDSHAKE, self.settings.handshake_timeout);
+                self.secure_events(cx, out, Ok(()));
+            }
+            Err(f) => self.lost(cx, format!("secure OCP.1: {}", f.reason)),
+        }
+    }
+
+    /// Act on what the secure session asked for, then on its error if any.
+    fn secure_events(
+        &mut self,
+        cx: &mut Cx,
+        out: Vec<tls::Event>,
+        result: Result<(), tls::Failure>,
+    ) {
+        for e in out {
+            match e {
+                tls::Event::Send(bytes) => self.send_raw(cx, bytes),
+                tls::Event::Dh(req) => {
+                    let generation = self.handshakes;
+                    cx.log(
+                        Level::Debug,
+                        format!("secure OCP.1: a {}-bit Diffie-Hellman group", req.bits()),
+                    );
+                    cx.compute(DH, move || {
+                        let mut bytes = generation.to_be_bytes().to_vec();
+                        bytes.extend(tls::dh_outcome(&req));
+                        Ok(bytes)
+                    });
+                }
+                tls::Event::Established(session) => {
+                    cx.cancel_timer(HANDSHAKE);
+                    cx.log(
+                        Level::Info,
+                        format!("secure OCP.1 established: {}", session.describe()),
+                    );
+                    self.connected_socket(cx);
+                }
+                tls::Event::Data(data) => {
+                    if self.socket_open {
+                        let datagram = self.settings.transport.datagrams();
+                        self.data(cx, &data, datagram);
+                    }
+                }
+                tls::Event::Closed => {
+                    self.lost(
+                        cx,
+                        "the device closed the secure session (close_notify)".into(),
+                    );
+                    return;
+                }
+            }
+        }
+        if let Err(f) = result {
+            self.lost(cx, format!("secure OCP.1: {}", f.reason));
+            return;
+        }
+        if let Some(Secure::Dtls(d)) = &self.secure {
+            match d.deadline() {
+                Some(at) => cx.set_timer(DTLS_TIMER, at.saturating_sub(cx.now()).max(1)),
+                None => cx.cancel_timer(DTLS_TIMER),
+            }
+        }
+    }
+
+    /// Bytes or a datagram from the link under a secure session.
+    fn secure_input(&mut self, cx: &mut Cx, bytes: &[u8]) {
+        let now = cx.now();
+        let mut out = Vec::new();
+        let result = match &mut self.secure {
+            Some(Secure::Tls(t)) => t.receive(bytes, &mut out),
+            Some(Secure::Dtls(d)) => d.receive(bytes, now, &mut out),
+            None => return,
+        };
+        self.secure_events(cx, out, result);
     }
 
     // --- Sending -----------------------------------------------------------
@@ -586,14 +804,17 @@ impl Aes70 {
             return;
         }
         let outbox = std::mem::take(&mut self.outbox);
-        if self.settings.transport == Transport::Udp {
-            // Each datagram is one PDU, kept within one Ethernet frame.
+        if self.settings.transport.datagrams() {
+            // Each datagram is one PDU, kept within one Ethernet frame; over
+            // DTLS with room for the record around it.
+            let max = match self.settings.transport {
+                Transport::Dtls => UDP_PDU_MAX - dtls::OVERHEAD,
+                _ => UDP_PDU_MAX,
+            };
             let mut chunk: Vec<Vec<u8>> = Vec::new();
             let mut size = codec::PDU_HEADER;
             for m in outbox {
-                if !chunk.is_empty()
-                    && (size + m.len() > UDP_PDU_MAX || chunk.len() == PDU_MESSAGES)
-                {
+                if !chunk.is_empty() && (size + m.len() > max || chunk.len() == PDU_MESSAGES) {
                     self.send_pdu(cx, codec::pdu(codec::TYPE_COMMAND_RRQ, &chunk));
                     chunk.clear();
                     size = codec::PDU_HEADER;
@@ -686,13 +907,15 @@ impl Aes70 {
                 message: reason.clone(),
             },
         );
-        if self.socket_open {
+        if self.socket_open || self.link_open {
             self.close_socket(cx);
         }
         self.socket_open = false;
+        self.link_open = false;
+        self.secure = None;
         self.connected = false;
         self.reset();
-        for key in [KEEPALIVE, REPLY, POLL] {
+        for key in [KEEPALIVE, REPLY, POLL, HANDSHAKE, DTLS_TIMER] {
             cx.cancel_timer(key);
         }
         cx.connection(Connection::Disconnected { reason });
@@ -1922,8 +2145,18 @@ impl Module for Aes70 {
     }
 
     fn tcp(&mut self, cx: &mut Cx, _socket: Key, input: TcpInput) {
+        let secure = self.settings.transport == Transport::Tls;
         match input {
+            TcpInput::Connected if secure => {
+                self.link_open = true;
+                self.start_secure(cx);
+            }
             TcpInput::Connected => self.connected_socket(cx),
+            TcpInput::Data(data) if secure => {
+                if self.link_open {
+                    self.secure_input(cx, &data);
+                }
+            }
             TcpInput::Data(data) => {
                 if self.socket_open {
                     self.data(cx, &data, false);
@@ -1931,6 +2164,8 @@ impl Module for Aes70 {
             }
             TcpInput::Closed { reason } => {
                 self.socket_open = false;
+                self.link_open = false;
+                self.secure = None;
                 self.lost(cx, reason);
             }
         }
@@ -1939,15 +2174,52 @@ impl Module for Aes70 {
 
     fn datagram(&mut self, cx: &mut Cx, _socket: Key, from: SocketAddr, data: &[u8]) {
         // Only the device's own address and port are heard.
-        if self.socket_open && from == self.device {
-            self.data(cx, data, true);
+        if from == self.device {
+            if self.settings.transport == Transport::Dtls {
+                if self.link_open {
+                    self.secure_input(cx, data);
+                }
+            } else if self.socket_open {
+                self.data(cx, data, true);
+            }
         }
         self.settle(cx);
     }
 
     fn socket_error(&mut self, cx: &mut Cx, _socket: Key, message: &str) {
         self.socket_open = false;
+        self.link_open = false;
+        self.secure = None;
         self.lost(cx, format!("UDP socket: {message}"));
+        self.settle(cx);
+    }
+
+    fn computed(&mut self, cx: &mut Cx, key: Key, result: Result<Vec<u8>, String>) {
+        if key != DH {
+            return;
+        }
+        let shared = match result {
+            Ok(bytes) if bytes.len() >= 8 => {
+                let generation = u64::from_be_bytes(bytes[..8].try_into().expect("8 bytes"));
+                if generation != self.handshakes {
+                    return;
+                }
+                tls::dh_from_outcome(bytes[8..].to_vec())
+            }
+            Ok(_) => Err(tls::fatal(
+                tls::alert::INTERNAL_ERROR,
+                "no key exchange outcome",
+            )),
+            Err(e) => Err(tls::fatal(tls::alert::INTERNAL_ERROR, e)),
+        };
+        let now = cx.now();
+        let mut out = Vec::new();
+        let result = match &mut self.secure {
+            Some(Secure::Tls(t)) => t.dh_done(shared, &mut out),
+            Some(Secure::Dtls(d)) => d.dh_done(shared, now, &mut out),
+            None => return,
+        };
+        self.secure_events(cx, out, result);
         self.settle(cx);
     }
 
@@ -1991,9 +2263,28 @@ impl Module for Aes70 {
         let now = cx.now();
         match key {
             RETRY => {
-                if !self.socket_open {
+                if !self.socket_open && !self.link_open {
                     self.open(cx);
                 }
+            }
+            HANDSHAKE => {
+                if self.link_open && !self.socket_open {
+                    self.lost(
+                        cx,
+                        format!(
+                            "the secure handshake did not finish within {} ms",
+                            self.settings.handshake_timeout
+                        ),
+                    );
+                }
+            }
+            DTLS_TIMER => {
+                let mut out = Vec::new();
+                let result = match &mut self.secure {
+                    Some(Secure::Dtls(d)) => d.timer(now, &mut out),
+                    _ => Ok(()),
+                };
+                self.secure_events(cx, out, result);
             }
             KEEPALIVE => {
                 if !self.socket_open {
@@ -2028,7 +2319,7 @@ impl Module for Aes70 {
     }
 
     fn stop(&mut self, cx: &mut Cx) {
-        if self.socket_open {
+        if self.socket_open || self.link_open {
             self.close_socket(cx);
             self.socket_open = false;
         }
@@ -3203,5 +3494,282 @@ mod tests {
         let a = feed(&mut m, 3, fake.respond(&a));
         assert_eq!(completed(&a, 8), Some(Ok(Outcome::Ack)));
         assert!(fake.muted);
+    }
+
+    // --- Secure OCP.1 ------------------------------------------------------
+
+    const PSK_HEX: &str = "00112233445566778899aabbccddeeff";
+
+    fn context(settings: Value) -> OpenContext {
+        OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 70)),
+            host_name: None,
+            port: Some(50000),
+            model: "aes70-device".into(),
+            channels: None,
+            settings: params(settings),
+            monitor: true,
+        }
+    }
+
+    /// Hand what the module sends to a fake device, and the device's answers
+    /// and the module's computations back, until neither has more to say.
+    fn secure_exchange(
+        m: &mut Aes70,
+        actions: Vec<Action>,
+        device: &mut dyn FnMut(&Action) -> Vec<Vec<u8>>,
+        dtls: bool,
+    ) -> Vec<Action> {
+        let mut all = Vec::new();
+        let mut pending = actions;
+        for _ in 0..32 {
+            let mut next = Vec::new();
+            for a in std::mem::take(&mut pending) {
+                let mut cx = Cx::new(0);
+                if let Action::Compute { key, task } = &a {
+                    m.computed(&mut cx, key, task.run());
+                } else {
+                    for bytes in device(&a) {
+                        if dtls {
+                            m.datagram(&mut cx, SOCKET, device_addr(), &bytes);
+                        } else {
+                            m.tcp(&mut cx, SOCKET, TcpInput::Data(bytes));
+                        }
+                    }
+                }
+                next.extend(cx.take());
+                all.push(a);
+            }
+            if next.is_empty() {
+                break;
+            }
+            pending = next;
+        }
+        all
+    }
+
+    fn logged(actions: &[Action], text: &str) -> bool {
+        actions
+            .iter()
+            .any(|a| matches!(a, Action::Log { message, .. } if message.contains(text)))
+    }
+
+    #[test]
+    fn a_secure_transport_needs_its_key() {
+        for transport in ["tls", "dtls"] {
+            let e = Aes70::checked(context(json!({"transport": transport})), 50000)
+                .err()
+                .unwrap();
+            assert!(e.contains("pre-shared key"), "{e}");
+            let e = Aes70::checked(
+                context(json!({"transport": transport, "psk": "xyz"})),
+                50000,
+            )
+            .err()
+            .unwrap();
+            assert!(!e.contains("xyz"), "{e}");
+            assert!(Aes70::checked(
+                context(json!({"transport": transport, "psk": PSK_HEX})),
+                50000
+            )
+            .is_ok());
+        }
+        // Plain transports need none.
+        assert!(Aes70::checked(context(json!({})), 50000).is_ok());
+    }
+
+    #[test]
+    fn secure_ocp1_over_tls() {
+        let mut m = module(
+            json!({"transport": "tls", "psk": PSK_HEX, "walk": false}),
+            true,
+        );
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert!(cx.take().contains(&Action::TcpOpen {
+            socket: SOCKET,
+            to: device_addr()
+        }));
+        // Connected: the ClientHello, and no PDU before the handshake.
+        let mut cx = Cx::new(0);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: HANDSHAKE,
+            after: 10_000
+        }));
+        assert!(keepalives(&a).is_empty());
+        assert!(m.command_refused_before_handshake());
+        let mut fake = tls::tests::Fake::new(&tls::tests::KEY);
+        let all = secure_exchange(
+            &mut m,
+            a,
+            &mut |a| match a {
+                Action::TcpSend { data, .. } => {
+                    let answer = fake.receive(data);
+                    if answer.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![answer]
+                    }
+                }
+                _ => Vec::new(),
+            },
+            false,
+        );
+        assert!(fake.finished);
+        assert!(logged(&all, "secure OCP.1 established"), "{all:?}");
+        assert!(!logged(&all, "00112233"));
+        // The first PDU in the session is the keep-alive; the fake echoes it,
+        // which is the device heard from.
+        let (pdus, _) = codec::Deframer::default().feed(&fake.received);
+        assert!(matches!(
+            codec::parse_pdu(&pdus[0]).unwrap().1[0],
+            Message::KeepAlive(_)
+        ));
+        assert!(all.contains(&Action::Connection(Connection::Connected)));
+        assert!(all.contains(&Action::CancelTimer { key: HANDSHAKE }));
+        // Commands go out inside the session.
+        let a = run(&mut m, 5, 1, "set_mute", json!({"ono": 202, "muted": true}));
+        let before = fake.received.len();
+        for x in &a {
+            if let Action::TcpSend { data, .. } = x {
+                fake.receive(data);
+            }
+        }
+        let (pdus, _) = codec::Deframer::default().feed(&fake.received[before..]);
+        assert_eq!(pdus.len(), 1);
+        // Stopping ends the session with close_notify before closing.
+        let mut cx = Cx::new(10);
+        m.stop(&mut cx);
+        let a = cx.take();
+        for x in &a {
+            if let Action::TcpSend { data, .. } = x {
+                fake.receive(data);
+            }
+        }
+        assert_eq!(fake.alerts.last(), Some(&(1, 0)));
+        assert!(a.contains(&Action::TcpClose { socket: SOCKET }));
+    }
+
+    #[test]
+    fn secure_ocp1_over_dtls() {
+        let mut m = module(
+            json!({"transport": "dtls", "psk": PSK_HEX, "walk": false}),
+            true,
+        );
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let a = cx.take();
+        assert!(a.contains(&Action::UdpOpen {
+            socket: SOCKET,
+            bind: Bind::Ephemeral
+        }));
+        assert!(a.iter().any(|x| matches!(
+            x,
+            Action::SetTimer {
+                key: DTLS_TIMER,
+                ..
+            }
+        )));
+        assert!(keepalives(&a).is_empty());
+        let mut fake = dtls::tests::DFake::new(&tls::tests::KEY);
+        let all = secure_exchange(
+            &mut m,
+            a,
+            &mut |a| match a {
+                Action::UdpSend { data, to, .. } => {
+                    assert_eq!(*to, device_addr());
+                    fake.receive(data)
+                }
+                _ => Vec::new(),
+            },
+            true,
+        );
+        assert!(logged(&all, "secure OCP.1 established"), "{all:?}");
+        assert!(all.contains(&Action::Connection(Connection::Connected)));
+        // The keep-alive, then the device manager's reads: each PDU one
+        // record in one datagram.
+        assert_eq!(fake.received.len(), 2);
+        for datagram in &fake.received {
+            let mut d = codec::Deframer::default();
+            let (pdus, _) = d.feed(datagram);
+            assert_eq!((pdus.len(), d.pending()), (1, 0));
+        }
+        // Datagrams from elsewhere are not heard.
+        let mut cx = Cx::new(5);
+        let stranger = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 99)), 50000);
+        m.datagram(&mut cx, SOCKET, stranger, &[0x17, 0xfe, 0xfd]);
+        assert!(cx.take().is_empty());
+        let mut cx = Cx::new(10);
+        m.stop(&mut cx);
+        let a = cx.take();
+        assert!(a.iter().any(|x| matches!(x, Action::UdpSend { .. })));
+        assert!(a.contains(&Action::UdpClose { socket: SOCKET }));
+    }
+
+    #[test]
+    fn a_failed_or_slow_handshake_is_a_lost_connection() {
+        // The device has another key.
+        let mut m = module(json!({"transport": "tls", "psk": PSK_HEX}), true);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = cx.take();
+        let mut fake = tls::tests::Fake::new(&[0x42; 16]);
+        let all = secure_exchange(
+            &mut m,
+            a,
+            &mut |a| match a {
+                Action::TcpSend { data, .. } => vec![fake.receive(data)],
+                _ => Vec::new(),
+            },
+            false,
+        );
+        let reason = all.iter().find_map(|a| match a {
+            Action::Connection(Connection::Disconnected { reason }) => Some(reason.clone()),
+            _ => None,
+        });
+        assert!(
+            reason
+                .as_deref()
+                .is_some_and(|r| r.contains("pre-shared key")),
+            "{reason:?}"
+        );
+        assert!(all.contains(&Action::TcpClose { socket: SOCKET }));
+        assert!(all
+            .iter()
+            .any(|a| matches!(a, Action::SetTimer { key: RETRY, .. })));
+
+        // No answer within the handshake timeout.
+        let mut m = module(
+            json!({"transport": "tls", "psk": PSK_HEX, "handshake_timeout_ms": 3000}),
+            true,
+        );
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = timer(&mut m, 3000, HANDSHAKE);
+        assert!(a.iter().any(|x| matches!(
+            x,
+            Action::Connection(Connection::Disconnected { reason }) if reason.contains("did not finish")
+        )));
+        // A key exchange computed for that attempt is not used for the next.
+        let mut cx = Cx::new(4000);
+        m.computed(&mut cx, DH, Ok(vec![0; 8]));
+        assert!(cx.take().is_empty());
+    }
+
+    impl Aes70 {
+        /// A command before the handshake finishes is refused as not
+        /// connected.
+        fn command_refused_before_handshake(&mut self) -> bool {
+            let mut cx = Cx::new(0);
+            self.command(&mut cx, 99, "set_mute", &params(json!({"ono": 202})));
+            matches!(
+                completed(&cx.take(), 99),
+                Some(Err(CommandError::NotConnected))
+            )
+        }
     }
 }
