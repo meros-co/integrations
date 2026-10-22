@@ -373,6 +373,13 @@ pub(crate) struct Aes70 {
     subscribe_warned: bool,
     /// Objects found by a command's lookup, whose records go into state.
     to_emit: Vec<u32>,
+    /// Objects a vendor's documentation names by number, with the names they
+    /// are keyed by: known without a walk, read and followed when monitored.
+    named: Vec<(String, u32)>,
+    /// Objects whose properties have been read and changes subscribed to.
+    followed: BTreeSet<u32>,
+    /// The level sensor poll is running.
+    poll_armed: bool,
 }
 
 impl Aes70 {
@@ -411,6 +418,37 @@ impl Aes70 {
             device_values: Map::new(),
             subscribe_warned: false,
             to_emit: Vec::new(),
+            named: Vec::new(),
+            followed: BTreeSet::new(),
+            poll_armed: false,
+        }
+    }
+
+    /// The module with objects a vendor documents by number, each keyed in
+    /// state and addressed in commands by the name given (in place of a
+    /// role path). Their classes are asked for on connecting; monitored,
+    /// they are then read and followed like the objects a walk finds.
+    pub(crate) fn with_named(ctx: OpenContext, port: u16, named: Vec<(String, u32)>) -> Aes70 {
+        let mut a = Aes70::new(ctx, port);
+        a.named = named;
+        a
+    }
+
+    fn is_named(&self, ono: u32) -> bool {
+        self.named.iter().any(|(_, o)| *o == ono)
+    }
+
+    /// Put the named objects in the tree under their names; any whose class
+    /// is known goes (back) into state.
+    fn seed_named(&mut self) {
+        for (name, ono) in self.named.clone() {
+            let o = self.objects.entry(ono).or_default();
+            o.path = Some(name.clone());
+            o.emitted = false;
+            if o.class.is_some() {
+                self.to_emit.push(ono);
+            }
+            self.paths.insert(name, ono);
         }
     }
 
@@ -611,6 +649,8 @@ impl Aes70 {
         self.subscribed.clear();
         self.polling.clear();
         self.to_emit.clear();
+        self.followed.clear();
+        self.poll_armed = false;
         self.walking = false;
         self.walked = false;
         self.walk_pending = 0;
@@ -662,6 +702,7 @@ impl Aes70 {
 
     fn connected_socket(&mut self, cx: &mut Cx) {
         self.reset();
+        self.seed_named();
         self.socket_open = true;
         self.last_heard = cx.now();
         // The keep-alive tells the device the heartbeat time it should keep
@@ -672,6 +713,9 @@ impl Aes70 {
             self.read_device_manager();
             if self.settings.subscribe {
                 self.subscribe(DEVICE_MANAGER_ONO);
+            }
+            for ono in self.named.iter().map(|(_, o)| *o).collect::<Vec<_>>() {
+                self.ask_class(ono);
             }
             if self.settings.walk {
                 self.start_walk(cx, true);
@@ -687,14 +731,17 @@ impl Aes70 {
         self.walking = true;
         self.walk_reads = reads;
         self.walk_pending = 0;
-        self.objects.retain(|ono, _| *ono == DEVICE_MANAGER_ONO);
+        let named: BTreeSet<u32> = self.named.iter().map(|(_, o)| *o).collect();
+        self.objects
+            .retain(|ono, _| *ono == DEVICE_MANAGER_ONO || named.contains(ono));
         self.members.clear();
         self.paths.clear();
         self.failed.clear();
         self.asked_members.clear();
         self.asked_role.clear();
-        self.asked_class.clear();
+        self.asked_class.retain(|ono| named.contains(ono));
         cx.state(json!({"objects": null, "discovery": {"complete": false}}));
+        self.seed_named();
         self.ask_members(ROOT_BLOCK, 0, true);
     }
 
@@ -812,41 +859,54 @@ impl Aes70 {
 
     /// Read every known object's properties and subscribe to its changes.
     fn read_and_follow(&mut self, cx: &mut Cx) {
-        let known: Vec<(u32, Vec<u16>)> = self
+        let known: Vec<u32> = self
             .objects
             .iter()
             .filter(|(_, o)| o.path.is_some())
-            .filter_map(|(ono, o)| o.class.clone().map(|c| (*ono, c)))
-            .filter(|(_, c)| classes::is_known(c))
+            .map(|(ono, _)| *ono)
             .collect();
-        for (ono, class) in known {
-            let level = classes::is_a(&class, classes::LEVEL_SENSOR);
-            if level && self.settings.levels == Levels::Off {
-                continue;
-            }
-            for prop in classes::props_of(&class) {
-                if prop.read {
-                    if let Some(get) = prop.get {
-                        self.request(
+        for ono in known {
+            self.follow(cx, ono);
+        }
+    }
+
+    /// Read one object's properties and subscribe to its changes, once, if
+    /// its class is one the module knows.
+    fn follow(&mut self, cx: &mut Cx, ono: u32) {
+        let Some(class) = self.objects.get(&ono).and_then(|o| o.class.clone()) else {
+            return;
+        };
+        if !classes::is_known(&class) || self.followed.contains(&ono) {
+            return;
+        }
+        let level = classes::is_a(&class, classes::LEVEL_SENSOR);
+        if level && self.settings.levels == Levels::Off {
+            return;
+        }
+        self.followed.insert(ono);
+        for prop in classes::props_of(&class) {
+            if prop.read {
+                if let Some(get) = prop.get {
+                    self.request(
+                        ono,
+                        get,
+                        0,
+                        vec![],
+                        Purpose::Read {
                             ono,
-                            get,
-                            0,
-                            vec![],
-                            Purpose::Read {
-                                ono,
-                                prop,
-                                poll: false,
-                            },
-                        );
-                    }
+                            prop,
+                            poll: false,
+                        },
+                    );
                 }
             }
-            let follow = !level || self.settings.levels == Levels::Subscribe;
-            if follow && self.settings.subscribe {
-                self.subscribe(ono);
-            }
         }
-        if self.settings.levels == Levels::Poll && self.has_level_sensors() {
+        let follow = !level || self.settings.levels == Levels::Subscribe;
+        if follow && self.settings.subscribe {
+            self.subscribe(ono);
+        }
+        if level && self.settings.levels == Levels::Poll && !self.poll_armed {
+            self.poll_armed = true;
             cx.set_timer(POLL, self.settings.level_poll);
         }
     }
@@ -910,30 +970,38 @@ impl Aes70 {
     fn target(&mut self, p: &Params, need_class: bool) -> Result<Found, CommandError> {
         let path = p.get("object").and_then(Value::as_str);
         let ono = p.get("ono").and_then(Value::as_u64);
-        match (path, ono) {
-            (Some(_), Some(_)) => Err(invalid("give either 'object' or 'ono', not both")),
-            (None, None) => Err(invalid("give 'object' (a role path) or 'ono'")),
+        let ono = match (path, ono) {
+            (Some(_), Some(_)) => return Err(invalid("give either 'object' or 'ono', not both")),
+            (None, None) => return Err(invalid("give 'object' (a role path) or 'ono'")),
             (None, Some(ono)) => {
-                let ono = u32::try_from(ono).map_err(|_| invalid("'ono' is out of range"))?;
-                if !need_class || self.class_of(ono).is_some() {
-                    Ok(Found::Ono(ono))
-                } else if self.failed.contains(&ono) {
-                    self.asked_class.remove(&ono);
-                    self.failed.remove(&ono);
-                    Err(invalid(format!(
-                        "the device did not say what object {ono} is (no such object?)"
-                    )))
-                } else if self.walked && !self.walking && self.monitor && self.settings.walk {
-                    // The walk found every object in the tree.
-                    Err(invalid(format!(
-                        "no object {ono} was found in the device's tree"
-                    )))
-                } else {
-                    self.ask_class(ono);
-                    Ok(Found::Wait)
-                }
+                u32::try_from(ono).map_err(|_| invalid("'ono' is out of range"))?
             }
-            (Some(path), None) => self.resolve_path(path),
+            (Some(path), None) => match self.resolve_path(path)? {
+                Found::Wait => return Ok(Found::Wait),
+                Found::Ono(ono) => ono,
+            },
+        };
+        if !need_class || self.class_of(ono).is_some() {
+            Ok(Found::Ono(ono))
+        } else if self.failed.contains(&ono) {
+            self.asked_class.remove(&ono);
+            self.failed.remove(&ono);
+            Err(invalid(format!(
+                "the device did not say what object {ono} is (no such object?)"
+            )))
+        } else if self.walked
+            && !self.walking
+            && self.monitor
+            && self.settings.walk
+            && !self.is_named(ono)
+        {
+            // The walk found every object in the tree.
+            Err(invalid(format!(
+                "no object {ono} was found in the device's tree"
+            )))
+        } else {
+            self.ask_class(ono);
+            Ok(Found::Wait)
         }
     }
 
@@ -1595,6 +1663,12 @@ impl Aes70 {
                         let o = self.objects.entry(ono).or_default();
                         o.class = Some(class);
                         o.version = version;
+                        if self.is_named(ono) {
+                            self.to_emit.push(ono);
+                            if self.monitor {
+                                self.follow(cx, ono);
+                            }
+                        }
                     }
                     Err(_) => {
                         self.failed.insert(ono);
@@ -3059,5 +3133,84 @@ mod tests {
         let mut cx = Cx::new(3);
         m.stop(&mut cx);
         assert!(cx.take().contains(&Action::WsClose { socket: SOCKET }));
+    }
+
+    #[test]
+    fn named_objects_are_followed_without_a_walk() {
+        let named = |monitor: bool| {
+            Aes70::with_named(
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 70)),
+                    host_name: None,
+                    port: Some(50000),
+                    model: "aes70-device".into(),
+                    channels: None,
+                    settings: params(json!({"walk": false})),
+                    monitor,
+                },
+                50000,
+                vec![("A/Mute".into(), 202), ("A/Level".into(), 201)],
+            )
+        };
+        let mut fake = Fake {
+            gain: -6.0,
+            muted: false,
+        };
+        // Monitored: the classes are asked for, then each object is read and
+        // followed and put in state under its name.
+        let mut m = named(true);
+        let a = connect(&mut m, 0);
+        let asked: Vec<(u32, Id)> = sent(&a).iter().map(|c| (c.target, c.method)).collect();
+        assert!(asked.contains(&(202, GET_CLASS_IDENTIFICATION)));
+        assert!(asked.contains(&(201, GET_CLASS_IDENTIFICATION)));
+        assert!(!asked.iter().any(|(_, m)| *m == GET_MEMBERS), "no walk");
+        let mut st = json!({});
+        let a = feed(&mut m, 1, fake.respond(&a));
+        state(&mut st, &a);
+        let asked: Vec<(u32, Id)> = sent(&a).iter().map(|c| (c.target, c.method)).collect();
+        assert!(asked.contains(&(202, Id(4, 1))));
+        assert!(asked.contains(&(201, Id(4, 1))));
+        assert_eq!(
+            asked
+                .iter()
+                .filter(|a| **a == (SUBSCRIPTION_MANAGER_ONO, ADD_SUBSCRIPTION))
+                .count(),
+            2
+        );
+        let a = feed(&mut m, 2, fake.respond(&a));
+        state(&mut st, &a);
+        assert_eq!(st["objects"]["A/Mute"]["muted"], false);
+        assert_eq!(st["objects"]["A/Mute"]["ono"], 202);
+        assert_eq!(st["objects"]["A/Level"]["gain_db"], -6.0);
+        // Addressed by name.
+        let a = run(
+            &mut m,
+            3,
+            7,
+            "set_mute",
+            json!({"object": "A/Mute", "muted": true}),
+        );
+        assert_eq!(sent(&a)[0].target, 202);
+
+        // Commands only: nothing is asked until a command names an object,
+        // then its class, then the setter.
+        let mut m = named(false);
+        let a = connect(&mut m, 0);
+        assert!(sent(&a).is_empty());
+        let a = run(
+            &mut m,
+            1,
+            8,
+            "set_mute",
+            json!({"object": "A/Mute", "muted": true}),
+        );
+        let c = sent(&a);
+        assert_eq!((c[0].target, c[0].method), (202, GET_CLASS_IDENTIFICATION));
+        let a = feed(&mut m, 2, fake.respond(&a));
+        let c = sent(&a);
+        assert_eq!((c[0].target, c[0].method), (202, Id(4, 2)));
+        let a = feed(&mut m, 3, fake.respond(&a));
+        assert_eq!(completed(&a, 8), Some(Ok(Outcome::Ack)));
+        assert!(fake.muted);
     }
 }
