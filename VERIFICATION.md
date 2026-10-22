@@ -2102,6 +2102,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which commands EU models with each RED-DA specification refuse. ([specs/sony-bravia-ip.yaml:248](specs/sony-bravia-ip.yaml#L248))
 - [ ] Check that an enquiry the display cannot answer (scene on an unsupported input) is answered sixteen N. ([specs/sony-bravia-ip.yaml:255](specs/sony-bravia-ip.yaml#L255))
 
+## sony-bravia-serial — Sony BRAVIA Professional Displays (RS-232C serial control)
+
+- [ ] Capture the data each query returns (power, input, volume, muting, ID, product information 1-3); the core reads power and muting as one byte, the input as kind and number. ([specs/sony-bravia-serial.yaml:312](specs/sony-bravia-serial.yaml#L312))
+- [ ] Check which functions answer canceled (0x03) in standby. ([specs/sony-bravia-serial.yaml:301](specs/sony-bravia-serial.yaml#L301))
+- [ ] Check the V shift up and down bytes: the document prints function 0x42 for them, the core sends 0x43. ([specs/sony-bravia-serial.yaml:326](specs/sony-bravia-serial.yaml#L326))
+- [ ] Check the hue up/down layout (a color byte, then up or down). ([specs/sony-bravia-serial.yaml:179](specs/sony-bravia-serial.yaml#L179))
+- [ ] Check the answer timing at 9600 bit/s (3 s allowed) and whether the display sends anything unasked. ([specs/sony-bravia-serial.yaml:319](specs/sony-bravia-serial.yaml#L319))
+
 ## sony-camera — Sony cameras
 
 - [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:3187](specs/sony-camera.yaml#L3187))

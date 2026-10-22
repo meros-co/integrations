@@ -69,6 +69,7 @@ NATIVE = {
     "sennheiser-spectera": "HTTPS + SSE (SSCv2)",
     "shure-wireless": "Command strings over TCP 2202",
     "softouch-easyworship": "JSON lines over TCP (the port EasyWorship advertises over Bonjour)",
+    "sony-bravia-serial": "Binary frames on an RS-232C port, or a serial-to-Ethernet converter",
     "sony-camera": "PTP-IP over TCP 15740, or through SSH",
     "tally-arbiter": "Socket.IO 4 over a WebSocket on 4455",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
