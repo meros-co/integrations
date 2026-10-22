@@ -987,9 +987,7 @@ impl Session {
                     }
                     a => a,
                 };
-                let socket = UdpSocket::bind((address, 0))
-                    .await
-                    .map_err(|e| format!("bind: {e}"))?;
+                let socket = bind_ephemeral(address).map_err(|e| format!("bind: {e}"))?;
                 let socket = Arc::new(socket);
                 let reader = spawn_reader(
                     key,
@@ -1186,6 +1184,19 @@ async fn sleep_until(at: Option<Instant>) {
 
 /// A UDP socket on a fixed port for one session, with the large receive
 /// buffer the shared ports have, since a listener's senders can burst too.
+/// A session's own UDP socket on an ephemeral port. It may send to a
+/// broadcast address: a display that is off is woken by a Wake-on-LAN
+/// packet broadcast on its subnet (Samsung MDC), as no unicast reaches a
+/// host whose address the network has forgotten.
+fn bind_ephemeral(address: IpAddr) -> std::io::Result<UdpSocket> {
+    let socket = std::net::UdpSocket::bind((address, 0))?;
+    if address.is_ipv4() {
+        socket.set_broadcast(true)?;
+    }
+    socket.set_nonblocking(true)?;
+    UdpSocket::from_std(socket)
+}
+
 fn bind_any(address: IpAddr, port: u16) -> std::io::Result<UdpSocket> {
     use socket2::{Domain, Protocol, Socket, Type};
     let domain = if address.is_ipv6() {
@@ -1300,6 +1311,13 @@ pub(crate) fn merge_patch(target: &mut Value, patch: &Value) {
 mod tests {
     use super::merge_patch;
     use serde_json::json;
+
+    #[tokio::test]
+    async fn an_ephemeral_ipv4_socket_may_broadcast() {
+        let socket = super::bind_ephemeral("127.0.0.1".parse().unwrap()).unwrap();
+        assert!(socket.broadcast().unwrap());
+        assert_ne!(socket.local_addr().unwrap().port(), 0);
+    }
 
     type Computed = (String, Result<Vec<u8>, String>);
 

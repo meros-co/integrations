@@ -1,0 +1,337 @@
+spec: 1
+id: sony-bravia-serial
+name: Sony BRAVIA Professional Displays (RS-232C serial control)
+vendor: Sony
+category: display
+implementation: native
+reason: >
+  The serial protocol is binary: a control is 0x8C 0x00, a function code, a length and data, a query 0x83 0x00,
+  the function and 0xFF 0xFF, each ended by a checksum (the low byte of the sum of the bytes before it), and the
+  display answers 0x70, a status and, for a query, a size, its data and a checksum. A reply's length depends on
+  whether it answers a control or a query and on its status, so replies are read against the request in
+  flight, one at a time.
+
+source:
+  - title: "BRAVIA Professional Displays Knowledge Center: Serial Control, Structure and Specifications"
+    author: Sony Corporation
+    url: https://pro-bravia.sony.net/remote-display-control/serial-control/
+    note: >
+      Manufacturer document (retrieved 2026-10-22). RS-232C on a 3.5 mm stereo mini jack, enabled with RS232C
+      control "via serial port" in Remotes & Accessories, in Normal or Pro mode; 9600 bit/s, 8 data bits, no
+      parity, 1 start and 1 stop bit, no flow control. Control: 0x8C, category 0x00, function, length (data
+      bytes plus the checksum), data, checksum; query: 0x83, 0x00, function, 0xFF, 0xFF, checksum; answer: 0x70,
+      status (0x00 completed, 0x01 above the upper limit, 0x02 below the lower limit, 0x03 command canceled,
+      0x04 parse error), for a completed query a size (the data bytes plus the checksum) and the data, then a
+      checksum, the low byte of the sum of the bytes before it. The same commands reach the display over HDMI
+      through a converter (not recommended).
+  - title: "BRAVIA Professional Displays Knowledge Center: Serial Control, Command Definitions"
+    author: Sony Corporation
+    url: https://pro-bravia.sony.net/remote-display-control/serial-control/command/
+    note: >
+      Manufacturer document (retrieved 2026-10-22). Function codes, data, and whether each takes a control, a
+      query, and works in standby: power 0x00, standby command 0x01, input select 0x02 (video 2, component 3,
+      HDMI 4, PC 5, shared input 7, each with its number), volume 0x05, muting 0x06, language 0x07, off timer
+      0x0C, picture mode 0x20, picture 0x23, brightness 0x24, color 0x25, hue 0x26, sharpness 0x28, cine motion
+      0x2A, sound mode 0x30, speaker off 0x36, H shift 0x41, V size 0x42, V shift 0x43, wide 0x44, auto wide
+      0x45, 4:3 mode 0x46, SIRCS emulation 0x67 with its code list, product info 0x6C-0x6E and ID 0x6F
+      (queries); each with a worked command byte sequence.
+
+settings:
+  link: { type: enum, values: [serial, tcp], default: serial, label: Link,
+    description: "serial uses an RS-232C port of the host; tcp reaches the display's serial port through a serial-to-Ethernet converter at the device's host and port." }
+  serial_port: { type: string, max_length: 256, label: Serial port,
+    description: "With link serial, the host's serial port wired to the display's RS-232C jack: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate: { type: int, min: 9600, max: 9600, default: 9600, label: Baud rate, description: "The display's serial control runs at 9600 bit/s." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "The display uses 8 data bits." }
+  parity: { type: enum, values: [none], default: none, label: Parity, description: "The display uses no parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "The display uses 1 stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "The display uses no flow control." }
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C on the display's 3.5 mm stereo mini jack, wired to a serial port of the host" }
+  - { port: null, protocol: tcp, role: control, when: "link tcp", note: "a serial-to-Ethernet converter's port, given when the device is opened" }
+
+models:
+  - id: bz
+    name: "Sony BRAVIA Professional Displays with Pro mode and an RS-232C jack (FW-BZ40P, BZ35P, BZ30P, BZ50L, BZ53L, BZ40L, BZ35L, BZ30L, EZ20L, BZ40J, BZ35J, BZ30J, BZ40H, BZ35F series)"
+    supports: [set_power, get_power, set_standby_command, set_input, toggle_input, get_input, set_volume, step_volume,
+               get_volume, set_mute, toggle_mute, get_mute, set_language, set_off_timer, toggle_off_timer,
+               set_picture_mode, toggle_picture_mode, set_picture, step_picture, set_brightness, step_brightness,
+               set_color, step_color, set_hue, step_hue, set_sharpness, step_sharpness, set_cine_motion,
+               set_sound_mode, toggle_sound_mode, set_speaker_off, toggle_speaker_off, set_h_shift, step_h_shift,
+               set_v_size, set_v_shift, step_v_shift, set_wide, toggle_wide, set_auto_wide, toggle_auto_wide,
+               set_4_3_mode, toggle_4_3_mode, press_key, get_id, get_product_info, send_raw]
+    verification: none
+
+commands:
+  set_power:
+    summary: "Turn the display on or off (function 0x00, control), then read the power back"
+    params:
+      power_on: { type: bool, required: true, label: Power, description: "On turns the display on, off turns it off; off works in every state." }
+    returns: ack
+  get_power:
+    summary: "Read the power state (function 0x00, query): the reply's first byte, 1 on and 0 off"
+    returns: value
+  set_standby_command:
+    summary: "Enable or disable the standby command (function 0x01); disable works only through a control box"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On enables the standby command, off disables it." }
+    returns: ack
+  set_input:
+    summary: "Select an input (function 0x02, direct): a kind and its number; which exist depends on the model"
+    params:
+      kind: { type: enum, values: [video, component, hdmi, pc, shared], default: hdmi, label: Input kind, description: "video (or SCART), component, hdmi, pc or shared (the shared input)." }
+      number: { type: int, min: 1, max: 4, required: true, label: Input number, description: "The input's number within its kind: video and component 1-3, hdmi 1-4, pc and shared 1." }
+    returns: ack
+  toggle_input:
+    summary: "Step to the next input as the remote's input button does (function 0x02, toggle)"
+    returns: ack
+  get_input:
+    summary: "Read the input (function 0x02, query): {kind, number} from the reply's two bytes"
+    returns: value
+  set_volume:
+    summary: "Set the volume (function 0x05, direct); the range is set by each region's specification"
+    params:
+      volume: { type: int, min: 0, max: 255, required: true, label: Volume, description: "Volume value; the display answers above or below its limit for one it does not take." }
+    returns: ack
+  step_volume:
+    summary: "Raise or lower the volume one step (function 0x05, up/down)"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  get_volume:
+    summary: "Read the volume (function 0x05, query): the reply's first byte"
+    returns: value
+  set_mute:
+    summary: "Mute or unmute (function 0x06, direct)"
+    params:
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the sound, off unmutes it." }
+    returns: ack
+  toggle_mute:
+    summary: "Toggle muting (function 0x06, toggle)"
+    returns: ack
+  get_mute:
+    summary: "Read muting (function 0x06, query): the reply's first byte, 1 muted"
+    returns: value
+  set_language:
+    summary: "Set the menu language (function 0x07, three-letter code)"
+    params:
+      language:
+        type: enum
+        values: [ara, bul, cat, CHS, CHT, hrv, cze, dan, dut, eng, est, fin, fre, ger, gre, heb, hun, ind, ita, jpn, kaz,
+                 lav, lit, nor, per, pol, por, rum, rus, slo, slv, spa, swa, swe, tha, tur, ukr, vie]
+        required: true
+        label: Language
+        description: "The language's code from the document's list, such as eng for English or CHS for Chinese (Simplified)."
+    returns: ack
+  set_off_timer:
+    summary: "Set the off timer (sleep) (function 0x0C, direct); the values a region takes are its own"
+    params:
+      value: { type: int, min: 0, max: 255, required: true, label: Off timer, description: "Off timer setting value, 0-255, as the region's specification defines it." }
+    returns: ack
+  toggle_off_timer:
+    summary: "Step the off timer to its next value (function 0x0C, toggle)"
+    returns: ack
+  set_picture_mode:
+    summary: "Set the picture mode (function 0x20, direct)"
+    params:
+      mode: { type: enum, values: [vivid, standard, cinema, custom, game, graphics], required: true, label: Picture mode, description: "vivid, standard, cinema, custom, game or graphics." }
+    returns: ack
+  toggle_picture_mode:
+    summary: "Step to the next picture mode (function 0x20, toggle)"
+    returns: ack
+  set_picture:
+    summary: "Set the picture (contrast) level (function 0x23, direct); limits are set by region"
+    params:
+      value: { type: int, min: 0, max: 255, required: true, label: Picture, description: "Picture level; the display answers above or below its limit for one it does not take." }
+    returns: ack
+  step_picture:
+    summary: "Raise or lower the picture level one step (function 0x23)"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  set_brightness:
+    summary: "Set the brightness (function 0x24, direct); limits are set by region"
+    params:
+      value: { type: int, min: 0, max: 255, required: true, label: Brightness, description: "Brightness; the display answers above or below its limit for one it does not take." }
+    returns: ack
+  step_brightness:
+    summary: "Raise or lower the brightness one step (function 0x24)"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  set_color:
+    summary: "Set the color level (function 0x25, direct); limits are set by region"
+    params:
+      value: { type: int, min: 0, max: 255, required: true, label: Color, description: "Color level; the display answers above or below its limit for one it does not take." }
+    returns: ack
+  step_color:
+    summary: "Raise or lower the color one step (function 0x25)"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  set_hue:
+    summary: "Set the hue toward red or green (function 0x26, direct); limits are set by region"
+    params:
+      toward: { type: enum, values: [red, green], required: true, label: Toward, description: "red or green." }
+      value: { type: int, min: 0, max: 255, required: true, label: Hue, description: "Hue value toward that color." }
+    returns: ack
+  step_hue:
+    summary: "Move the red or green hue one step up or down (function 0x26)"
+    params:
+      toward: { type: enum, values: [red, green], required: true, label: Color, description: "The hue to step: red or green." }
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  set_sharpness:
+    summary: "Set the sharpness (function 0x28, direct); limits are set by region"
+    params:
+      value: { type: int, min: 0, max: 255, required: true, label: Sharpness, description: "Sharpness; the display answers above or below its limit for one it does not take." }
+    returns: ack
+  step_sharpness:
+    summary: "Raise or lower the sharpness one step (function 0x28)"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  set_cine_motion:
+    summary: "Set cine motion (cinema drive) for the current input (function 0x2A)"
+    params:
+      mode: { type: enum, values: ["off", auto], required: true, label: Cine motion, description: "off or auto." }
+    returns: ack
+  set_sound_mode:
+    summary: "Set the sound mode (function 0x30, direct)"
+    params:
+      mode: { type: enum, values: [standard, cinema, sports, music, dialogue], required: true, label: Sound mode, description: "standard, cinema, sports, music or dialogue." }
+    returns: ack
+  toggle_sound_mode:
+    summary: "Step to the next sound mode (function 0x30, toggle)"
+    returns: ack
+  set_speaker_off:
+    summary: "Turn the speakers off or on (function 0x36, direct)"
+    params:
+      speaker_off: { type: bool, required: true, label: Speakers off, description: "On turns the speakers off, off turns them on." }
+    returns: ack
+  toggle_speaker_off:
+    summary: "Toggle the speakers (function 0x36, toggle)"
+    returns: ack
+  set_h_shift:
+    summary: "Set the horizontal shift (function 0x41, direct): a direction and amount"
+    params:
+      sign: { type: enum, values: [plus, minus], required: true, label: Direction, description: "plus or minus." }
+      value: { type: int, min: 0, max: 255, required: true, label: Amount, description: "Shift amount, as the region's specification allows." }
+    returns: ack
+  step_h_shift:
+    summary: "Move the horizontal shift one step (function 0x41)"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  set_v_size:
+    summary: "Set the vertical size (function 0x42, direct): a direction and amount"
+    params:
+      sign: { type: enum, values: [plus, minus], required: true, label: Direction, description: "plus or minus." }
+      value: { type: int, min: 0, max: 255, required: true, label: Amount, description: "Size amount, as the region's specification allows." }
+    returns: ack
+  set_v_shift:
+    summary: "Set the vertical shift (function 0x43, direct): a direction and amount"
+    params:
+      sign: { type: enum, values: [plus, minus], required: true, label: Direction, description: "plus or minus." }
+      value: { type: int, min: 0, max: 255, required: true, label: Amount, description: "Shift amount, as the region's specification allows." }
+    returns: ack
+  step_v_shift:
+    summary: "Move the vertical shift one step (function 0x43, up/down)"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down one step." }
+    returns: ack
+  set_wide:
+    summary: "Set the wide mode (function 0x44, direct)"
+    params:
+      mode: { type: enum, values: [wide_zoom, full, zoom, normal, pc_normal, pc_full1, pc_full2], required: true, label: Wide mode, description: "wide_zoom, full, zoom, normal, or the PC modes pc_normal, pc_full1 and pc_full2." }
+    returns: ack
+  toggle_wide:
+    summary: "Step to the next wide mode (function 0x44, toggle)"
+    returns: ack
+  set_auto_wide:
+    summary: "Turn auto wide on or off (function 0x45, direct)"
+    params:
+      enabled: { type: bool, required: true, label: Auto wide, description: "On turns auto wide on." }
+    returns: ack
+  toggle_auto_wide:
+    summary: "Toggle auto wide (function 0x45, toggle)"
+    returns: ack
+  set_4_3_mode:
+    summary: "Set the 4:3 default mode (function 0x46, direct)"
+    params:
+      mode: { type: enum, values: [normal, wide_zoom, "off"], required: true, label: 4:3 mode, description: "normal, wide_zoom or off." }
+    returns: ack
+  toggle_4_3_mode:
+    summary: "Step to the next 4:3 mode (function 0x46, toggle)"
+    returns: ack
+  press_key:
+    summary: "Press a remote control button by SIRCS emulation (function 0x67)"
+    params:
+      key:
+        type: enum
+        values: [input, power, wide_mode, dot, display, return, options, home, up, down, left, right, select, num1, num2,
+                 num3, num4, num5, num6, num7, num8, num9, num0, cc, volume_up, volume_down, muting, channel_up,
+                 channel_down, jump]
+        required: true
+        label: Button
+        description: "The button, from the document's SIRCS code list (cc only on U, C, M and LA models)."
+    returns: ack
+  get_id:
+    summary: "Read the ID command's answer (function 0x6F, query); the data is returned as hex and text"
+    returns: value
+  get_product_info:
+    summary: "Read product information 1, 2 or 3 (functions 0x6E, 0x6D, 0x6C, queries); the data is returned as hex and text"
+    params:
+      part: { type: int, min: 1, max: 3, default: 1, label: Part, description: "Which product information: 1, 2 or 3." }
+    returns: value
+  send_raw:
+    summary: "Send any control or query and return the answer: {status, data} with data as hex"
+    params:
+      kind: { type: enum, values: [control, query], required: true, label: Kind, description: "control (0x8C) or query (0x83)." }
+      function: { type: int, min: 0, max: 255, required: true, label: Function, description: "The function code, such as 0 for power." }
+      data: { type: string, pattern: "^([0-9A-Fa-f]{2})*$", max_length: 64, default: "", label: Data, description: "A control's data bytes as hex; ignored for a query." }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Serial control must be enabled on the display (Remotes & Accessories, RS232C control, via serial port) in
+      Normal or Pro mode. Most functions work only while the display is on; in standby the display takes only
+      power (and answers a power query), and other controls are canceled (answer 0x03).
+  - models: [all]
+    severity: info
+    text: >
+      Answers fail commands with device_error: 0x01 and 0x02 a value above or below the display's limit, 0x03
+      canceled (not possible in the current state), 0x04 a packet the display could not parse. Value limits are
+      defined per regional specification, not in the document, so values are checked only against the byte range.
+  - models: [all]
+    severity: warning
+    text: >
+      The document gives the bytes of every query but not the layout of the data a query returns. The core reads
+      power and muting as the first data byte (1 on or muted), the volume as the first byte, the input as a kind
+      byte and a number byte as the input select command writes them, and returns the ID and product information
+      as hex and, where printable, text. A reply that is shorter than that is kept as hex only.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed: opened with monitoring, the core asks power, input, volume and muting every 5 s (input,
+      volume and muting only while the display is on) and the ID and product information on connecting; opened
+      for commands only, it asks power every 10 s while idle as the liveness check. A serial port gives no sign
+      of the display, so the device is reported connected once the display answers.
+  - models: [all]
+    severity: info
+    text: >
+      The V shift up and down sequences printed in the document use function 0x42 (V size) although the section
+      is 0x43; the core sends step_v_shift on 0x43, the section's code. V size up and down are marked coming soon
+      and are not offered.
+
+state:
+  power: { type: bool, description: "Whether the display is on (power query)" }
+  input.kind: { type: string, description: "Input kind from the input query: video, component, hdmi, pc or shared, or its code" }
+  input.number: { type: int, description: "The input's number within its kind" }
+  volume: { type: int, description: "Volume value from the volume query" }
+  mute: { type: bool, description: "Whether muting is on (muting query)" }
+  id: { type: string, description: "The ID command's answer data, as hex" }
+  product_info.*: { type: string, description: "Product information 1-3 answer data, as hex, keyed by part" }

@@ -1890,6 +1890,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
 - [ ] Capture, on a Carbonite-family and an Acuity-family switcher with Cmd Response on and off, the bytes each documented query answers (XPT, MS, MNEM, TRANSRATE, TRANSTYPE, TRANSINCL, MVBOX, USERVAR and KEYSHAPED with ?, KEYSTATE, ACTIVEID, VERSION, HELP, MEM ?), the answer to an unknown source or ME, the answer to a set, the order of answers to queries sent together, and any unasked messages, so state can be kept. ([specs/rosstalk.yaml:1469](specs/rosstalk.yaml#L1469))
 
+## samsung-mdc — Samsung displays (MDC)
+
+- [ ] Check the secured mode handshake on a display with the secured protocol on: the plain-text MDCSTART<<TLS>> greeting, a TLS handshake on the same connection, the 4-digit PIN sent bare, and MDCAUTH<<PASS>> or MDCAUTH<<FAIL:xxxx>> (taken from a third-party library, not Ver. 15.0). ([specs/samsung-mdc.yaml:2884](specs/samsung-mdc.yaml#L2884))
+- [ ] Check which TLS versions the secured mode offers; the core speaks only TLS 1.2 and 1.3. ([specs/samsung-mdc.yaml:2890](specs/samsung-mdc.yaml#L2890))
+- [ ] Check power on over RJ45: whether a display in standby (Network Standby on and off) still answers MDC, whether Wake-on-LAN to the subnet broadcast wakes it, and whether reconnecting 10 s after an acknowledged power on is needed. ([specs/samsung-mdc.yaml:2875](specs/samsung-mdc.yaml#L2875))
+- [ ] Check the factory display ID (0 assumed) and that a display reached over RJ45 stays silent for any other ID, and that chained displays answer through its RS-232C loop-out. ([specs/samsung-mdc.yaml:40](specs/samsung-mdc.yaml#L40))
+- [ ] Check that a command a model lacks is answered NAK rather than left unanswered, and what error bytes NAKs carry. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
+- [ ] Check which timer layout (13 or 15 values) and which Maintenance Control, Sound Control and multi-screen layouts each model family replies with, and that a display refuses the set layout it does not take. ([specs/samsung-mdc.yaml:2919](specs/samsung-mdc.yaml#L2919))
+- [ ] Check the display status temperature encoding: signed (two's complement) is assumed, with 0xFF taken as invalid. ([specs/samsung-mdc.yaml:251](specs/samsung-mdc.yaml#L251))
+- [ ] Check the panel on time's unit: a counter rising every 10 minutes is assumed (count of 10-minute periods, or minutes). ([specs/samsung-mdc.yaml:1354](specs/samsung-mdc.yaml#L1354))
+- [ ] Check the older color temperature codes 0x00-0x0A (5000 K to 15000 K, steps not given) and whether a display answers a read with the extended (kelvin / 100) code. ([specs/samsung-mdc.yaml:872](specs/samsung-mdc.yaml#L872))
+- [ ] Check whether holiday indexes count from 0 or 1. ([specs/samsung-mdc.yaml:1921](specs/samsung-mdc.yaml#L1921))
+- [ ] Check the byte order of two-byte values whose sections do not state it (custom fit size, screen position, final duty, custom PIP, light sensor and brightness output ranges); high byte first is assumed. ([specs/samsung-mdc.yaml:2929](specs/samsung-mdc.yaml#L2929))
+- [ ] Check the light sensor effective range and brightness output range data width (two bytes per value assumed). ([specs/samsung-mdc.yaml:2288](specs/samsung-mdc.yaml#L2288))
+- [ ] Check the ticker frame: data length 17 plus the message, the message's encoding (UTF-8 sent), and the foreground opacity codes (0-2 opacities, 3-5 flashing and off assumed). ([specs/samsung-mdc.yaml:1194](specs/samsung-mdc.yaml#L1194))
+- [ ] Check the Wi-Fi access point frame: a type byte, a one-byte length and the text for the SSID then the password, and what the display echoes. ([specs/samsung-mdc.yaml:413](specs/samsung-mdc.yaml#L413))
+- [ ] Check what a display answers to set_osd_types (the shown-kinds bit mask, as for a read, is assumed). ([specs/samsung-mdc.yaml:1569](specs/samsung-mdc.yaml#L1569))
+- [ ] Check the latitude and longitude text format a display expects. ([specs/samsung-mdc.yaml:2313](specs/samsung-mdc.yaml#L2313))
+- [ ] Check that the serial number is 15 bytes padded with NULs or spaces. ([specs/samsung-mdc.yaml:246](specs/samsung-mdc.yaml#L246))
+- [ ] Check the LED white balance, color correction, seam correction and gradation bit layouts (sub-commands 0x92, 0x93, 0x97, 0x9B, 0x9C, 0x9F, 0xA2), sent and read as hex. ([specs/samsung-mdc.yaml:2938](specs/samsung-mdc.yaml#L2938))
+- [ ] Check the menu size reply's sub-command echo (the document prints 0x83 for 0x85); any echo is taken as the reply. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
+
 ## sennheiser-chg-70n — Sennheiser CHG 70N
 
 - [ ] Confirm the charger answers a command datagram with the method's new value (or an /osc/error entry) to the sender's port, so each command is acknowledged by its reply. ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))
@@ -2065,6 +2087,32 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what a status sent with only the logo, black and clear flags (before EasyWorship's first status) does. ([specs/softouch-easyworship.yaml:101](specs/softouch-easyworship.yaml#L101))
 - [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
 - [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
+
+## sony-bravia — Sony BRAVIA Professional Displays (REST API and IRCC-IP)
+
+- [ ] Check what a wrong or missing pre-shared key is answered with (HTTP 403 or 401, or a 200 carrying error 403), since that decides whether the core reports unauthorized. ([specs/sony-bravia.yaml:460](specs/sony-bravia.yaml#L460))
+- [ ] Check that getCurrentExternalInputsStatus v1.1 answers on /sony/avContent (the reference lists it under /sony/system). ([specs/sony-bravia.yaml:499](specs/sony-bravia.yaml#L499))
+- [ ] Check which getSystemInformation and getPictureQualitySettings versions each generation answers (v1.7 and v1.1 assumed on the P series). ([specs/sony-bravia.yaml:496](specs/sony-bravia.yaml#L496))
+- [ ] Check the IRCC-IP SOAP envelope of the 2019 page is still accepted, with SOAPACTION and X-Auth-PSK. ([specs/sony-bravia.yaml:438](specs/sony-bravia.yaml#L438))
+- [ ] Check whether getPowerStatus is answered in standby, and setPowerStatus on from standby with remote start on and off. ([specs/sony-bravia.yaml:484](specs/sony-bravia.yaml#L484))
+- [ ] Check the volume range (maxVolume) on each model; 0-100 is assumed. ([specs/sony-bravia.yaml:510](specs/sony-bravia.yaml#L510))
+- [ ] Check set_text (setTextForm v1.0, unencrypted) on P series displays outside Japan and on other models outside Japan and the EU. ([specs/sony-bravia.yaml:393](specs/sony-bravia.yaml#L393))
+
+## sony-bravia-ip — Sony BRAVIA Professional Displays (Simple IP Control)
+
+- [ ] Check the picture mute notification's polarity: the document's notification table gives 0 for muted, its answer table 1. ([specs/sony-bravia-ip.yaml:261](specs/sony-bravia-ip.yaml#L261))
+- [ ] Check the volume range Simple IP control takes (0-100 assumed). ([specs/sony-bravia-ip.yaml:266](specs/sony-bravia-ip.yaml#L266))
+- [ ] Check what the input notification of sixteen 0 means and when it is sent. ([specs/sony-bravia-ip.yaml:256](specs/sony-bravia-ip.yaml#L256))
+- [ ] Check which commands EU models with each RED-DA specification refuse. ([specs/sony-bravia-ip.yaml:248](specs/sony-bravia-ip.yaml#L248))
+- [ ] Check that an enquiry the display cannot answer (scene on an unsupported input) is answered sixteen N. ([specs/sony-bravia-ip.yaml:255](specs/sony-bravia-ip.yaml#L255))
+
+## sony-bravia-serial — Sony BRAVIA Professional Displays (RS-232C serial control)
+
+- [ ] Capture the data each query returns (power, input, volume, muting, ID, product information 1-3); the core reads power and muting as one byte, the input as kind and number. ([specs/sony-bravia-serial.yaml:312](specs/sony-bravia-serial.yaml#L312))
+- [ ] Check which functions answer canceled (0x03) in standby. ([specs/sony-bravia-serial.yaml:301](specs/sony-bravia-serial.yaml#L301))
+- [ ] Check the V shift up and down bytes: the document prints function 0x42 for them, the core sends 0x43. ([specs/sony-bravia-serial.yaml:326](specs/sony-bravia-serial.yaml#L326))
+- [ ] Check the hue up/down layout (a color byte, then up or down). ([specs/sony-bravia-serial.yaml:179](specs/sony-bravia-serial.yaml#L179))
+- [ ] Check the answer timing at 9600 bit/s (3 s allowed) and whether the display sends anything unasked. ([specs/sony-bravia-serial.yaml:319](specs/sony-bravia-serial.yaml#L319))
 
 ## sony-camera — Sony cameras
 

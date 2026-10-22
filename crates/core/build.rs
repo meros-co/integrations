@@ -167,6 +167,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-ross",
         &["ross-xpression", "ross-xpression-udp", "rosstalk"],
     ),
+    ("vendor-samsung", &["samsung-mdc"]),
     (
         "vendor-sennheiser",
         &[
@@ -190,7 +191,16 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-softouch", &["softouch-easyworship"]),
-    ("vendor-sony", &["sony-camera", "visca"]),
+    (
+        "vendor-sony",
+        &[
+            "sony-bravia",
+            "sony-bravia-ip",
+            "sony-bravia-serial",
+            "sony-camera",
+            "visca",
+        ],
+    ),
     ("vendor-studiocoast", &["vmix"]),
     (
         "vendor-symetrix",

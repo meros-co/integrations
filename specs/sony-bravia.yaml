@@ -1,0 +1,783 @@
+spec: 1
+id: sony-bravia
+name: Sony BRAVIA Professional Displays (REST API and IRCC-IP)
+vendor: Sony
+category: display
+
+# The BRAVIA REST API: JSON-RPC over HTTP POST to /sony/<service>, with the
+# pre-shared key in the X-Auth-PSK header, and IRCC-IP (remote control codes
+# in a SOAP request to /sony/ircc) on the same server. Nothing is pushed over
+# HTTP, so state is a paced poll. The Simple IP Control protocol (TCP 20060),
+# which pushes power, input, volume and mute changes, is the sony-bravia-ip
+# spec; the RS-232C protocol is sony-bravia-serial.
+
+source:
+  - title: "BRAVIA Professional Displays Knowledge Center: REST API, Basic Structure and Specifications"
+    author: Sony Corporation
+    url: https://pro-bravia.sony.net/remote-display-control/rest-api/structure/
+    note: >
+      Manufacturer document (retrieved 2026-10-22). Services guide, appControl, audio, avContent, encryption,
+      system, videoScreen and video at http://<address>/sony/<service>, no trailing slash; JSON-RPC requests
+      with method, id (1 to 2147483647), params (a fixed-length array) and version; results as result, errors
+      as error [code, message]; Pre-Shared Key levels private, generic and none, sent as the X-Auth-PSK header;
+      the encryption system (RSA public key, AES key per parameter); input resource URIs extInput:hdmi?port=N,
+      extInput:component?port=N, extInput:composite, extInput:widi?port=1, extInput:cec?type=...&port=N.
+  - title: "BRAVIA Professional Displays Knowledge Center: REST API, API Reference"
+    author: Sony Corporation
+    url: https://pro-bravia.sony.net/remote-display-control/rest-api/reference/
+    note: >
+      Manufacturer document (retrieved 2026-10-22). Every method used here, with its service, version,
+      authentication level, request and response elements, and the notes on model support (BZ40P/BZ35P/BZ30P
+      without getSpeakerSettings, setSpeakerSettings, getSceneSetting and setSceneSetting; setTextForm only in
+      Japan on those and in Japan and the EU on other models) and on methods callable only from the display
+      itself (127.0.0.1: installApp, prepareAppUpload, uninstallApp, getScreenshot, getSettingsSchema,
+      getSettings, setSettings, getScreenRotation, setScreenRotation). getRemoteControllerInfo's appendix lists
+      the IRCC codes. Error codes: HTTP 401, 403, 404, 413, 414, 501, 503 as both status and error code;
+      system errors 1, 2, 3, 5, 7, 12, 14, 15; service errors 40000-42599.
+  - title: "BRAVIA Professional Displays Knowledge Center: IRCC-IP"
+    author: Sony Corporation
+    url: https://pro-bravia.sony.net/remote-display-control/ircc-ip/
+    note: >
+      Manufacturer document (retrieved 2026-10-22): POST /sony/ircc with Content-Type text/xml; charset=UTF-8,
+      SOAPACTION "urn:schemas-sony-com:service:IRCC:1#X_SendIRCC", X-Auth-PSK; the key to IRCC code table; Wake-on-LAN
+      to UDP 9 or 7 to recover a suspended display.
+  - title: "BRAVIA Professional Displays Knowledge Center: IRCC-IP Overview (2019 edition, archived)"
+    author: Sony Corporation
+    url: https://web.archive.org/web/2024/https://pro-bravia.sony.net/develop/integrate/ircc-ip/overview/index.html
+    note: >
+      Manufacturer document, the knowledge center's earlier page as archived: the SOAP envelope the request
+      carries, s:Envelope, s:Body, u:X_SendIRCC with the IRCCCode element, which the current page no longer
+      shows.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: header
+  auth_header: X-Auth-PSK
+  timeout_ms: 5000
+  probe: { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getPowerStatus","id":1,"params":[],"version":"1.0"}' }
+
+settings:
+  token: { type: string, secret: true, default: "", max_length: 256,
+    label: Pre-shared key,
+    description: "The pre-shared key set on the display (Network & Internet, IP control, Authentication), sent as X-Auth-PSK; empty sends none, which leaves only the methods needing no authentication." }
+
+ports:
+  - { port: 80, protocol: http, role: control }
+
+maps:
+  audio_target: { all: '""', speaker: '"speaker"', headphone: '"headphone"' }
+  netif: { all: '""', eth0: '"eth0"', wlan0: '"wlan0"', p2p1: '"p2p1"' }
+  ircc: { Display: "AAAAAQAAAAEAAAA6Aw==", Home: "AAAAAQAAAAEAAABgAw==", Options: "AAAAAgAAAJcAAAA2Aw==", Return: "AAAAAgAAAJcAAAAjAw==", Up: "AAAAAQAAAAEAAAB0Aw==", Down: "AAAAAQAAAAEAAAB1Aw==", Right: "AAAAAQAAAAEAAAAzAw==", Left: "AAAAAQAAAAEAAAA0Aw==", Confirm: "AAAAAQAAAAEAAABlAw==", Red: "AAAAAgAAAJcAAAAlAw==", Green: "AAAAAgAAAJcAAAAmAw==", Yellow: "AAAAAgAAAJcAAAAnAw==", Blue: "AAAAAgAAAJcAAAAkAw==", Num1: "AAAAAQAAAAEAAAAAAw==", Num2: "AAAAAQAAAAEAAAABAw==", Num3: "AAAAAQAAAAEAAAACAw==", Num4: "AAAAAQAAAAEAAAADAw==", Num5: "AAAAAQAAAAEAAAAEAw==", Num6: "AAAAAQAAAAEAAAAFAw==", Num7: "AAAAAQAAAAEAAAAGAw==", Num8: "AAAAAQAAAAEAAAAHAw==", Num9: "AAAAAQAAAAEAAAAIAw==", Num0: "AAAAAQAAAAEAAAAJAw==", VolumeUp: "AAAAAQAAAAEAAAASAw==", VolumeDown: "AAAAAQAAAAEAAAATAw==", Mute: "AAAAAQAAAAEAAAAUAw==", ChannelUp: "AAAAAQAAAAEAAAAQAw==", ChannelDown: "AAAAAQAAAAEAAAARAw==", SubTitle: "AAAAAgAAAJcAAAAoAw==", DOT: "AAAAAgAAAJcAAAAdAw==", PictureOff: "AAAAAQAAAAEAAAA+Aw==", Wide: "AAAAAgAAAKQAAAA9Aw==", Jump: "AAAAAQAAAAEAAAA7Aw==", SyncMenu: "AAAAAgAAABoAAABYAw==", Forward: "AAAAAgAAAJcAAAAcAw==", Play: "AAAAAgAAAJcAAAAaAw==", Rewind: "AAAAAgAAAJcAAAAbAw==", Prev: "AAAAAgAAAJcAAAA8Aw==", Stop: "AAAAAgAAAJcAAAAYAw==", Next: "AAAAAgAAAJcAAAA9Aw==", Pause: "AAAAAgAAAJcAAAAZAw==", FlashPlus: "AAAAAgAAAJcAAAB4Aw==", FlashMinus: "AAAAAgAAAJcAAAB5Aw==", TvPower: "AAAAAQAAAAEAAAAVAw==", Audio: "AAAAAQAAAAEAAAAXAw==", Input: "AAAAAQAAAAEAAAAlAw==", PowerOff: "AAAAAQAAAAEAAAAvAw==", Video2: "AAAAAQAAAAEAAABBAw==", PictureMode: "AAAAAQAAAAEAAABkAw==", DemoSurround: "AAAAAgAAAHcAAAB7Aw==", Hdmi1: "AAAAAgAAABoAAABaAw==", Hdmi2: "AAAAAgAAABoAAABbAw==", Hdmi3: "AAAAAgAAABoAAABcAw==", Hdmi4: "AAAAAgAAABoAAABdAw==", ActionMenu: "AAAAAgAAAMQAAABLAw==", Help: "AAAAAgAAAMQAAABNAw==", AndroidMenu: "AAAAAgAAAMQAAABPAw==" }
+
+models:
+  - id: bz-p
+    name: "Sony BRAVIA Professional Displays FW-BZ40P, FW-BZ35P and FW-BZ30P"
+    supports:
+      [set_power, get_power, reboot, set_power_saving, get_power_saving, set_led_indicator, get_led_indicator,
+      set_wake_on_lan, get_wake_on_lan, get_system_information, get_interface_information, get_network_settings,
+      get_remote_access, get_time, get_supported_functions, get_remote_codes, get_supported_apis, set_volume,
+      set_volume_with_ui, adjust_volume, set_mute, get_volume, set_audio_output, set_input, set_hdmi_input,
+      get_input, get_inputs, get_content_count, get_content_list, get_schemes, get_sources, launch_app,
+      terminate_apps, get_apps, get_app_status, get_web_app_status, set_text, set_picture_setting,
+      get_picture_settings, press_key, send_ircc_code]
+    verification: none
+  - id: bz
+    name: "Sony BRAVIA Professional Displays before the P series (FW-BZ50L, BZ53L, BZ40L, BZ35L, BZ30L, EZ20L, BZ40J, BZ35J, BZ30J, BZ40H, BZ35F and others with the REST API)"
+    supports:
+      [set_power, get_power, reboot, set_power_saving, get_power_saving, set_led_indicator, get_led_indicator,
+      set_wake_on_lan, get_wake_on_lan, get_system_information, get_interface_information, get_network_settings,
+      get_remote_access, get_time, get_supported_functions, get_remote_codes, get_supported_apis, set_volume,
+      set_volume_with_ui, adjust_volume, set_mute, get_volume, set_audio_output, set_speaker_setting,
+      get_speaker_settings, set_input, set_hdmi_input, get_input, get_inputs, get_content_count, get_content_list,
+      get_schemes, get_sources, launch_app, terminate_apps, get_apps, get_app_status, get_web_app_status, set_text,
+      set_picture_setting, get_picture_settings, set_scene, get_scene, press_key, send_ircc_code]
+    verification: none
+
+commands:
+  set_power:
+    summary: "Turn the display on (from its Sleep mode) or off to standby (system.setPowerStatus v1.0), then read the power status back"
+    params:
+      power_on: { type: bool, required: true, label: Power, description: "On wakes the display from standby, off puts it in standby." }
+    send:
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"setPowerStatus\",\"id\":1,\"params\":[{\"status\":{power_on}}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getPowerStatus\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_power:
+    summary: "Read the power status, standby or active (system.getPowerStatus v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getPowerStatus\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0].status" }
+    returns: value
+
+  reboot:
+    summary: "Restart the display (system.requestReboot v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"requestReboot\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  set_power_saving:
+    summary: "Set the power saving mode (system.setPowerSavingMode v1.0), then read it back"
+    params:
+      mode: { type: enum, values: ["off", low, high, pictureOff], required: true, label: Power saving, description: "off, low or high power saving, or pictureOff to turn the panel output off." }
+    send:
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"setPowerSavingMode\",\"id\":1,\"params\":[{\"mode\":\"{mode}\"}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getPowerSavingMode\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_power_saving:
+    summary: "Read the power saving mode (system.getPowerSavingMode v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getPowerSavingMode\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0].mode" }
+    returns: value
+
+  set_led_indicator:
+    summary: "Set the front LED indicator's mode and status (system.setLEDIndicatorStatus v1.1), then read it back"
+    params:
+      mode: { type: enum, values: [Demo, AutoBrightnessAdjust, Dark, SimpleResponse, "Off"], required: true, label: Mode, description: "What the LED indicator shows: Demo, AutoBrightnessAdjust, Dark, SimpleResponse or Off." }
+      status: { type: enum, values: ["true", "false"], required: true, label: Lit, description: "true lights the indicator, false turns it off." }
+    send:
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"setLEDIndicatorStatus\",\"id\":1,\"params\":[{\"mode\":\"{mode}\",\"status\":\"{status}\"}],\"version\":\"1.1\"}" }
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getLEDIndicatorStatus\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_led_indicator:
+    summary: "Read the LED indicator's mode and status (system.getLEDIndicatorStatus v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getLEDIndicatorStatus\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  set_wake_on_lan:
+    summary: "Turn Wake-on-LAN on or off (system.setWolMode v1.0), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: Wake-on-LAN, description: "On lets a Wake-on-LAN packet power the display on." }
+    send:
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"setWolMode\",\"id\":1,\"params\":[{\"enabled\":{enabled}}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getWolMode\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_wake_on_lan:
+    summary: "Read whether Wake-on-LAN is on (system.getWolMode v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getWolMode\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0].enabled" }
+    returns: value
+
+  get_system_information:
+    summary: "Read the model, serial number, MAC address, software version and Pro mode (system.getSystemInformation v1.7; v1.0 on older software)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getSystemInformation\",\"id\":1,\"params\":[],\"version\":\"1.7\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_interface_information:
+    summary: "Read the REST API interface version and model name (system.getInterfaceInformation v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getInterfaceInformation\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_network_settings:
+    summary: "Read the active network interfaces' addresses (system.getNetworkSettings v1.0)"
+    params:
+      interface: { type: enum, values: [all, eth0, wlan0, p2p1], default: all, label: Interface, description: "The interface to read: all, eth0 (wired), wlan0 (Wi-Fi) or p2p1 (Wi-Fi Direct)." }
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getNetworkSettings\",\"id\":1,\"params\":[{\"netif\":{interface:map.netif}}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_remote_access:
+    summary: "Read whether remote devices may start the display (system.getRemoteDeviceSettings v1.0, accessPermission)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getRemoteDeviceSettings\",\"id\":1,\"params\":[{\"target\":\"accessPermission\"}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0][0].currentValue" }
+    returns: value
+
+  get_time:
+    summary: "Read the display's clock, time zone and daylight saving offsets (system.getCurrentTime v1.1)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getCurrentTime\",\"id\":1,\"params\":[],\"version\":\"1.1\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_supported_functions:
+    summary: "Read the system capabilities, such as the Wake-on-LAN MAC address (system.getSystemSupportedFunction v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getSystemSupportedFunction\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_remote_codes:
+    summary: "Read the remote control buttons and their IRCC codes (system.getRemoteControllerInfo v1.0)"
+    send: { method: POST, path: /sony/system, content_type: application/json, body: "{\"method\":\"getRemoteControllerInfo\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[1]" }
+    returns: value
+
+  get_supported_apis:
+    summary: "Read the services, APIs and versions the display supports (guide.getSupportedApiInfo v1.0)"
+    send: { method: POST, path: /sony/guide, content_type: application/json, body: "{\"method\":\"getSupportedApiInfo\",\"id\":1,\"params\":[{\"services\":[]}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  set_volume:
+    summary: "Set the volume to a level (audio.setAudioVolume v1.0), then read the volume back"
+    params:
+      volume: { type: int, min: 0, max: 100, required: true, label: Volume, description: "Volume level; the display's range is in its volume information (maxVolume), 100 on the documented example." }
+      target: { type: enum, values: [all, speaker, headphone], default: all, label: Output, description: "Which output: all outputs, the speakers or the headphones." }
+    send:
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"setAudioVolume\",\"id\":1,\"params\":[{\"target\":{target:map.audio_target},\"volume\":\"{volume}\"}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"getVolumeInformation\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  set_volume_with_ui:
+    summary: "Set the volume to a level, choosing whether the volume bar shows (audio.setAudioVolume v1.2), then read the volume back"
+    params:
+      volume: { type: int, min: 0, max: 100, required: true, label: Volume, description: "Volume level; the display's range is in its volume information (maxVolume)." }
+      target: { type: enum, values: [all, speaker, headphone], default: all, label: Output, description: "Which output: all outputs, the speakers or the headphones." }
+      ui: { type: enum, values: ["on", "off"], required: true, label: Volume bar, description: "on shows the volume bar on screen, off does not." }
+    send:
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"setAudioVolume\",\"id\":1,\"params\":[{\"target\":{target:map.audio_target},\"volume\":\"{volume}\",\"ui\":\"{ui}\"}],\"version\":\"1.2\"}" }
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"getVolumeInformation\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  adjust_volume:
+    summary: "Raise or lower the volume by steps (audio.setAudioVolume v1.0 with +N or -N), then read the volume back"
+    params:
+      steps: { type: int, min: -100, max: 100, required: true, label: Steps, description: "Steps to move the volume, positive up and negative down." }
+      target: { type: enum, values: [all, speaker, headphone], default: all, label: Output, description: "Which output: all outputs, the speakers or the headphones." }
+    send:
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"setAudioVolume\",\"id\":1,\"params\":[{\"target\":{target:map.audio_target},\"volume\":\"{steps:signed}\"}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"getVolumeInformation\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  set_mute:
+    summary: "Mute or unmute the sound (audio.setAudioMute v1.0), then read the volume back"
+    params:
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the sound, off unmutes it." }
+    send:
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"setAudioMute\",\"id\":1,\"params\":[{\"status\":{muted}}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"getVolumeInformation\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_volume:
+    summary: "Read each output's volume, range and mute (audio.getVolumeInformation v1.0)"
+    send: { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"getVolumeInformation\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  set_audio_output:
+    summary: "Choose where the sound goes (audio.setSoundSettings v1.1, outputTerminal)"
+    params:
+      output: { type: enum, values: [speaker, speaker_hdmi, hdmi, audioSystem], required: true, label: Sound output, description: "speaker, speaker_hdmi (speaker and HDMI), hdmi, or audioSystem (HDMI or the digital audio output)." }
+    send: { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"setSoundSettings\",\"id\":1,\"params\":[{\"settings\":[{\"target\":\"outputTerminal\",\"value\":\"{output}\"}]}],\"version\":\"1.1\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  set_speaker_setting:
+    summary: "Change a speaker setting (audio.setSpeakerSettings v1.0), then read the speaker settings back"
+    params:
+      setting: { type: enum, values: [tvPosition, subwooferLevel, subwooferFreq, subwooferPhase, subwooferPower], required: true, label: Setting, description: "tvPosition, subwooferLevel (0-24), subwooferFreq (0-30), subwooferPhase or subwooferPower." }
+      value: { type: string, max_length: 16, pattern: "^(tableTop|wallMount|normal|reverse|on|off|[0-9]{1,2})$", required: true, label: Value, description: "tableTop or wallMount for tvPosition, a number for the subwoofer level (0-24) or frequency (0-30), normal or reverse for its phase, on or off for its power." }
+    send:
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"setSpeakerSettings\",\"id\":1,\"params\":[{\"settings\":[{\"target\":\"{setting}\",\"value\":\"{value}\"}]}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"getSpeakerSettings\",\"id\":1,\"params\":[{\"target\":\"\"}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_speaker_settings:
+    summary: "Read the speaker settings (audio.getSpeakerSettings v1.0)"
+    send: { method: POST, path: /sony/audio, content_type: application/json, body: "{\"method\":\"getSpeakerSettings\",\"id\":1,\"params\":[{\"target\":\"\"}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  set_input:
+    summary: "Show an input or content by its URI (avContent.setPlayContent v1.0), then read what is playing back"
+    params:
+      uri: { type: string, max_length: 256, pattern: "^[A-Za-z]+:[!-~]*$", required: true, label: Input URI, description: "The URI of the input, such as extInput:hdmi?port=2, extInput:component?port=1, extInput:widi?port=1 or extInput:cec?type=player&port=1." }
+    send:
+      - { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"setPlayContent\",\"id\":1,\"params\":[{\"uri\":{uri:json}}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getPlayingContentInfo\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  set_hdmi_input:
+    summary: "Show an HDMI input (avContent.setPlayContent v1.0, extInput:hdmi?port=N), then read what is playing back"
+    params:
+      port: { type: int, min: 1, max: 4, required: true, label: HDMI port, description: "HDMI input number, 1-4." }
+    send:
+      - { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"setPlayContent\",\"id\":1,\"params\":[{\"uri\":\"extInput:hdmi?port={port}\"}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getPlayingContentInfo\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_input:
+    summary: "Read the input or content shown (avContent.getPlayingContentInfo v1.0)"
+    send: { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getPlayingContentInfo\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_inputs:
+    summary: "Read every external input with its name, label, connection and signal (avContent.getCurrentExternalInputsStatus v1.1)"
+    send: { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getCurrentExternalInputsStatus\",\"id\":1,\"params\":[],\"version\":\"1.1\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_content_count:
+    summary: "Count the contents of a source, such as the HDMI inputs (avContent.getContentCount v1.1)"
+    params:
+      source: { type: string, max_length: 64, pattern: "^[A-Za-z]+:[A-Za-z]*$", required: true, label: Source, description: "A source URI from the source list, such as extInput:hdmi." }
+    send: { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getContentCount\",\"id\":1,\"params\":[{\"source\":{source:json}}],\"version\":\"1.1\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0].count" }
+    returns: value
+
+  get_content_list:
+    summary: "List the contents of a source, up to 200 from an index (avContent.getContentList v1.5)"
+    params:
+      uri: { type: string, max_length: 64, pattern: "^[A-Za-z]+:[A-Za-z]*$", required: true, label: Source, description: "A source URI from the source list, such as extInput:hdmi." }
+      start: { type: int, min: 0, max: 100000, default: 0, label: Start index, description: "The index to list from, counted from 0." }
+      count: { type: int, min: 1, max: 200, default: 50, label: Count, description: "How many to list, at most 200." }
+    send: { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getContentList\",\"id\":1,\"params\":[{\"uri\":{uri:json},\"stIdx\":{start},\"cnt\":{count}}],\"version\":\"1.5\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_schemes:
+    summary: "List the content schemes (avContent.getSchemeList v1.0)"
+    send: { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getSchemeList\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_sources:
+    summary: "List the sources of a scheme, such as extInput:hdmi (avContent.getSourceList v1.0)"
+    params:
+      scheme: { type: string, max_length: 32, pattern: "^[A-Za-z]+$", default: extInput, label: Scheme, description: "A scheme from the scheme list, such as extInput." }
+    send: { method: POST, path: /sony/avContent, content_type: application/json, body: "{\"method\":\"getSourceList\",\"id\":1,\"params\":[{\"scheme\":{scheme:json}}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  launch_app:
+    summary: "Launch an application or open a web page in the WebApp runtime (appControl.setActiveApp v1.0), then read the app status back"
+    params:
+      uri: { type: string, max_length: 2048, pattern: "^[A-Za-z][A-Za-z0-9+.-]*:[!-~]*$", required: true, label: App URI, description: "An application URI from the app list, or localapp://webappruntime?url=<percent-encoded URL> to open a web page." }
+    send:
+      - { method: POST, path: /sony/appControl, content_type: application/json, body: "{\"method\":\"setActiveApp\",\"id\":1,\"params\":[{\"uri\":{uri:json}}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/appControl, content_type: application/json, body: "{\"method\":\"getWebAppStatus\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  terminate_apps:
+    summary: "Close every application (appControl.terminateApps v1.0)"
+    send: { method: POST, path: /sony/appControl, content_type: application/json, body: "{\"method\":\"terminateApps\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_apps:
+    summary: "List the applications that can be launched (appControl.getApplicationList v1.0)"
+    send: { method: POST, path: /sony/appControl, content_type: application/json, body: "{\"method\":\"getApplicationList\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_app_status:
+    summary: "Read whether the keyboard, cursor and browser are active (appControl.getApplicationStatusList v1.0)"
+    send: { method: POST, path: /sony/appControl, content_type: application/json, body: "{\"method\":\"getApplicationStatusList\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  get_web_app_status:
+    summary: "Read whether the WebApp runtime is active and its page (appControl.getWebAppStatus v1.0)"
+    send: { method: POST, path: /sony/appControl, content_type: application/json, body: "{\"method\":\"getWebAppStatus\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  set_text:
+    summary: "Type text into the on-screen keyboard's field (appControl.setTextForm v1.0, unencrypted)"
+    params:
+      text: { type: string, max_length: 1024, required: true, label: Text, description: "The text to enter in the software keyboard's field." }
+    send: { method: POST, path: /sony/appControl, content_type: application/json, body: "{\"method\":\"setTextForm\",\"id\":1,\"params\":[{text:json}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  set_picture_setting:
+    summary: "Change a picture quality setting by its target name (video.setPictureQualitySettings), then read the picture settings back"
+    params:
+      setting: { type: string, max_length: 64, pattern: "^[A-Za-z0-9]+$", required: true, label: Setting, description: "The target name, as get_picture_settings lists them: brightness, contrast, color, sharpness, pictureMode, colorTemperature, lightSensor, colorSpace, autoPictureMode, hdrMode, autoLocalDimming, xtendedDynamicRange and others the display offers." }
+      value: { type: string, max_length: 64, pattern: "^[!-~]+$", required: true, label: Value, description: "The value, one of the setting's candidates or a number within its range." }
+    send:
+      - { models: [bz-p], method: POST, path: /sony/video, content_type: application/json, body: "{\"method\":\"setPictureQualitySettings\",\"id\":1,\"params\":[{\"settings\":[{\"target\":\"{setting}\",\"value\":\"{value}\"}]}],\"version\":\"1.1\"}" }
+      - { models: [bz], method: POST, path: /sony/video, content_type: application/json, body: "{\"method\":\"setPictureQualitySettings\",\"id\":1,\"params\":[{\"settings\":[{\"target\":\"{setting}\",\"value\":\"{value}\"}]}],\"version\":\"1.0\"}" }
+      - { models: [bz-p], method: POST, path: /sony/video, content_type: application/json, body: "{\"method\":\"getPictureQualitySettings\",\"id\":1,\"params\":[{\"target\":\"\"}],\"version\":\"1.1\"}" }
+      - { models: [bz], method: POST, path: /sony/video, content_type: application/json, body: "{\"method\":\"getPictureQualitySettings\",\"id\":1,\"params\":[{\"target\":\"\"}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_picture_settings:
+    summary: "Read every picture quality setting with its value, availability and candidates (video.getPictureQualitySettings)"
+    send:
+      - { models: [bz-p], method: POST, path: /sony/video, content_type: application/json, body: "{\"method\":\"getPictureQualitySettings\",\"id\":1,\"params\":[{\"target\":\"\"}],\"version\":\"1.1\"}" }
+      - { models: [bz], method: POST, path: /sony/video, content_type: application/json, body: "{\"method\":\"getPictureQualitySettings\",\"id\":1,\"params\":[{\"target\":\"\"}],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  set_scene:
+    summary: "Set the scene setting (videoScreen.setSceneSetting v1.0), then read it back"
+    params:
+      scene: { type: enum, values: [auto, auto24pSync, general], required: true, label: Scene, description: "auto picks the scene from the content, auto24pSync picks Cinema for 24 Hz signals, general turns scene select off." }
+    send:
+      - { method: POST, path: /sony/videoScreen, content_type: application/json, body: "{\"method\":\"setSceneSetting\",\"id\":1,\"params\":[{\"value\":\"{scene}\"}],\"version\":\"1.0\"}" }
+      - { method: POST, path: /sony/videoScreen, content_type: application/json, body: "{\"method\":\"getSceneSetting\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+
+  get_scene:
+    summary: "Read the scene setting and its candidates (videoScreen.getSceneSetting v1.0)"
+    send: { method: POST, path: /sony/videoScreen, content_type: application/json, body: "{\"method\":\"getSceneSetting\",\"id\":1,\"params\":[],\"version\":\"1.0\"}" }
+    expect: { status: 200, not_contains: '"error"', json_path: "$.result[0]" }
+    returns: value
+
+  press_key:
+    summary: "Press a remote control button by its name (IRCC-IP X_SendIRCC on /sony/ircc)"
+    params:
+      key: { type: enum, values: [Display, Home, Options, Return, Up, Down, Right, Left, Confirm, Red, Green, Yellow, Blue, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9, Num0, VolumeUp, VolumeDown, Mute, ChannelUp, ChannelDown, SubTitle, DOT, PictureOff, Wide, Jump, SyncMenu, Forward, Play, Rewind, Prev, Stop, Next, Pause, FlashPlus, FlashMinus, TvPower, Audio, Input, PowerOff, Video2, PictureMode, DemoSurround, Hdmi1, Hdmi2, Hdmi3, Hdmi4, ActionMenu, Help, AndroidMenu], required: true, label: Button, description: "The remote control button, as getRemoteControllerInfo names it." }
+    send: { method: POST, path: /sony/ircc, content_type: "text/xml; charset=UTF-8", headers: { SOAPACTION: '"urn:schemas-sony-com:service:IRCC:1#X_SendIRCC"' }, body: "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:X_SendIRCC xmlns:u=\"urn:schemas-sony-com:service:IRCC:1\"><IRCCCode>{key:map.ircc}</IRCCCode></u:X_SendIRCC></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+
+  send_ircc_code:
+    summary: "Send an IRCC code, such as one getRemoteControllerInfo lists (IRCC-IP X_SendIRCC on /sony/ircc)"
+    params:
+      code: { type: string, max_length: 64, pattern: "^[A-Za-z0-9+/]+={0,2}$", required: true, label: IRCC code, description: "The base64 IRCC code of a remote button, such as AAAAAQAAAAEAAAAVAw== for power." }
+    send: { method: POST, path: /sony/ircc, content_type: "text/xml; charset=UTF-8", headers: { SOAPACTION: '"urn:schemas-sony-com:service:IRCC:1#X_SendIRCC"' }, body: "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:X_SendIRCC xmlns:u=\"urn:schemas-sony-com:service:IRCC:1\"><IRCCCode>{code}</IRCCCode></u:X_SendIRCC></s:Body></s:Envelope>" }
+    expect: { status: 200 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The display must have Remote device control on (Network & Internet, Remote device settings, Control
+      remotely), and IP control's authentication set to a pre-shared key for anything needing generic or private
+      authentication. A wrong or missing key is answered 403 (or 401), which the core takes as a refused
+      credential: commands fail with auth and nothing more is sent until the token setting changes.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed over HTTP: power, volume and the content shown are read every 5 s; picture settings,
+      power saving, the LED, Wake-on-LAN, the inputs, the apps, the clock and (before the P series) the scene
+      and speaker settings every 30 s; the system and interface information, network settings, remote access
+      setting, app list, remote codes, content schemes and sources and supported APIs every 5 minutes. Every set
+      reads its value back at once. For pushed power, input, volume and mute changes, open the same display
+      with sony-bravia-ip as well.
+  - models: [all]
+    severity: info
+    text: >
+      Sony lists API limits that leave readings without a command here: getTextForm needs the encryption system
+      (an RSA-wrapped AES key the core does not make), so the keyboard's text cannot be read and set_text sends
+      it unencrypted; installApp, prepareAppUpload, uninstallApp, getScreenshot, getSettingsSchema, getSettings,
+      setSettings, getScreenRotation and setScreenRotation answer only requests from the display itself
+      (127.0.0.1), so screen rotation, screenshots, app installation and the generic settings store are out of
+      reach of a remote controller. setSoundSettings has no matching get in the reference, so the sound output
+      is not read back. Network settings, the clock and the language can only be read.
+  - models: [all]
+    severity: warning
+    text: >
+      setPowerStatus turns the display on only from its Sleep (standby) state and only with the remote start
+      setting on; a display that has suspended stops its HTTP server altogether and is woken only by
+      Wake-on-LAN (UDP 9 or 7), which this HTTP integration cannot send; get_supported_functions gives the MAC
+      address to use. getPowerStatus may go unanswered while off, which shows as the display unreachable.
+  - models: [all]
+    severity: critical
+    text: >
+      reboot restarts the display at once; terminate_apps closes every application, the signage player
+      included.
+  - models: [all]
+    severity: info
+    text: >
+      Versions differ by generation: the reference gives getSystemInformation v1.7 (with the software, Android
+      and WebApp runtime versions and the Pro mode) and v1.0, so both are polled and a display answers the one
+      it has; the P series is sent getPictureQualitySettings and setPictureQualitySettings v1.1 and earlier
+      models v1.0. The reference places getCurrentExternalInputsStatus v1.1 under /sony/system but v1.0 under
+      /sony/avContent; the core uses /sony/avContent for both, where the method's service is.
+  - models: [all]
+    severity: info
+    text: >
+      Picture settings are named by target and their values by the display's candidates, both read with
+      get_picture_settings; setting several targets in one request can fail under some HDMI signal formats, so
+      set_picture_setting sends one. Values are kept as the display reports them, as text.
+  - models: [all]
+    severity: info
+    text: >
+      The volume range is the display's maxVolume, which the reference shows as 100 in its example; set_volume
+      takes 0-100 and the display answers 40801 for a level out of its range. A request sent while the previous
+      one is unanswered can be refused with 40003; the core sends one request at a time.
+
+state:
+  power: { type: string, description: "Power status: standby (off) or active (on)" }
+  audio.*.volume: { type: int, description: "Volume of the output (speaker, headphone)" }
+  audio.*.mute: { type: bool, description: "Whether the output is muted" }
+  audio.*.max: { type: int, description: "The output's highest volume level" }
+  audio.*.min: { type: int, description: "The output's lowest volume level" }
+  input.uri: { type: string, description: "URI of the input or content shown, such as extInput:hdmi?port=2" }
+  input.source: { type: string, description: "Source of the content shown, such as extInput:hdmi" }
+  input.title: { type: string, description: "Name of the content shown, such as HDMI 2" }
+  inputs.*.uri: { type: string, description: "External input URI, keyed by the input's place in the list from 0" }
+  inputs.*.title: { type: string, description: "The input's name" }
+  inputs.*.label: { type: string, description: "The label the user gave the input" }
+  inputs.*.connected: { type: bool, description: "Whether something is connected to the input" }
+  inputs.*.icon: { type: string, description: "The input's icon hint, such as meta:hdmi or meta:game" }
+  inputs.*.signal: { type: bool, description: "Whether the input has a signal (absent when unknown)" }
+  power_saving: { type: string, description: "Power saving mode: off, low, high or pictureOff" }
+  led.mode: { type: string, description: "LED indicator mode: Demo, AutoBrightnessAdjust, Dark, SimpleResponse or Off" }
+  led.lit: { type: bool, description: "Whether the LED indicator is lit (absent when unknown)" }
+  wake_on_lan: { type: bool, description: "Whether a Wake-on-LAN packet powers the display on" }
+  picture.*.value: { type: string, description: "A picture quality setting's value, keyed by its target name (brightness, pictureMode and so on)" }
+  picture.*.available: { type: bool, description: "Whether the picture setting can be changed now" }
+  picture.*.candidates: { type: string, description: "The setting's candidate values, or its max, min and step, as the display's JSON" }
+  scene.value: { type: string, description: "Scene setting: auto, auto24pSync or general" }
+  scene.candidates: { type: string, description: "The scene values the current input allows, as the display's JSON" }
+  speaker.*: { type: string, description: "A speaker setting's value, keyed by target: tvPosition, subwooferLevel, subwooferFreq, subwooferPhase, subwooferPower" }
+  clock.time: { type: string, description: "The display's clock, ISO 8601 with its offset" }
+  clock.timezone_offset_min: { type: int, unit: min, description: "Time zone offset in minutes" }
+  clock.dst_offset_min: { type: int, unit: min, description: "Daylight saving offset in minutes" }
+  apps.status.*: { type: string, description: "on or off, keyed by textInput (software keyboard), cursorDisplay or webBrowse" }
+  apps.list.*.title: { type: string, description: "A launchable application's name, keyed by its place in the list from 0" }
+  apps.list.*.uri: { type: string, description: "The application's URI, for launch_app" }
+  apps.list.*.icon: { type: string, description: "URL of the application's icon" }
+  webapp.active: { type: bool, description: "Whether the WebApp runtime is active" }
+  webapp.url: { type: string, description: "The page the WebApp runtime shows" }
+  system.product: { type: string, description: "Device category (TV)" }
+  system.name: { type: string, description: "Product name (BRAVIA)" }
+  system.model: { type: string, description: "Model name, such as FW-85BZ35P" }
+  system.serial: { type: string, description: "Serial number" }
+  system.mac: { type: string, description: "MAC address of the active interface" }
+  system.language: { type: string, description: "Language code (ISO 639 alpha-3)" }
+  system.region: { type: string, description: "Region code" }
+  system.area: { type: string, description: "Area code" }
+  system.cid: { type: string, description: "Device ID (cid)" }
+  system.generation: { type: string, description: "REST API generation, X.Y.Z" }
+  system.firmware: { type: string, description: "BRAVIA software version (v1.7)" }
+  system.android: { type: string, description: "Android version (v1.7)" }
+  system.webapp_runtime: { type: string, description: "WebApp runtime version (v1.7)" }
+  system.mode: { type: string, description: "Pro mode state: Normal, ProSettings or Pro (v1.7)" }
+  interface.product_category: { type: string, description: "Product category (tv)" }
+  interface.product_name: { type: string, description: "Product name (BRAVIA)" }
+  interface.model_name: { type: string, description: "Model name" }
+  interface.server_name: { type: string, description: "REST server name (empty)" }
+  interface.version: { type: string, description: "Interface version, X.Y.Z" }
+  network.*.mac: { type: string, description: "The interface's hardware address, keyed by interface (eth0, wlan0, p2p1)" }
+  network.*.ipv4: { type: string, description: "IPv4 address" }
+  network.*.ipv6: { type: string, description: "IPv6 address" }
+  network.*.netmask: { type: string, description: "Netmask" }
+  network.*.gateway: { type: string, description: "Gateway" }
+  network.*.dns: { type: string, description: "DNS servers, as the display's JSON array" }
+  remote_access: { type: string, description: "Remote start setting: on (remote devices may start the display) or off" }
+  functions.*: { type: string, description: "A system capability's value, keyed by option; WOL gives the MAC address" }
+  ircc_codes.*: { type: string, description: "A remote button's IRCC code, keyed by the button's name" }
+  content.schemes: { type: string, description: "The content schemes, as the display's JSON" }
+  content.sources.*: { type: string, description: "The sources of a scheme, keyed by scheme, as the display's JSON" }
+  supported_apis: { type: string, description: "The services, APIs and versions the display supports, as the display's JSON" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send:
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getPowerStatus","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/audio, content_type: application/json, body: '{"method":"getVolumeInformation","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/avContent, content_type: application/json, body: '{"method":"getPlayingContentInfo","id":1,"params":[],"version":"1.0"}' }
+    - every_ms: 30000
+      send:
+        - { models: [bz-p], method: POST, path: /sony/video, content_type: application/json, body: '{"method":"getPictureQualitySettings","id":1,"params":[{"target":""}],"version":"1.1"}' }
+        - { models: [bz], method: POST, path: /sony/video, content_type: application/json, body: '{"method":"getPictureQualitySettings","id":1,"params":[{"target":""}],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getPowerSavingMode","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getLEDIndicatorStatus","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getWolMode","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/avContent, content_type: application/json, body: '{"method":"getCurrentExternalInputsStatus","id":1,"params":[],"version":"1.1"}' }
+        - { method: POST, path: /sony/appControl, content_type: application/json, body: '{"method":"getApplicationStatusList","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/appControl, content_type: application/json, body: '{"method":"getWebAppStatus","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getCurrentTime","id":1,"params":[],"version":"1.1"}' }
+        - { models: [bz], method: POST, path: /sony/videoScreen, content_type: application/json, body: '{"method":"getSceneSetting","id":1,"params":[],"version":"1.0"}' }
+        - { models: [bz], method: POST, path: /sony/audio, content_type: application/json, body: '{"method":"getSpeakerSettings","id":1,"params":[{"target":""}],"version":"1.0"}' }
+    - every_ms: 300000
+      send:
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getSystemInformation","id":1,"params":[],"version":"1.7"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getSystemInformation","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getInterfaceInformation","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getNetworkSettings","id":1,"params":[{"netif":""}],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getRemoteDeviceSettings","id":1,"params":[{"target":"accessPermission"}],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getSystemSupportedFunction","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/system, content_type: application/json, body: '{"method":"getRemoteControllerInfo","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/appControl, content_type: application/json, body: '{"method":"getApplicationList","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/avContent, content_type: application/json, body: '{"method":"getSchemeList","id":1,"params":[],"version":"1.0"}' }
+        - { method: POST, path: /sony/avContent, content_type: application/json, body: '{"method":"getSourceList","id":1,"params":[{"scheme":"extInput"}],"version":"1.0"}' }
+        - { method: POST, path: /sony/guide, content_type: application/json, body: '{"method":"getSupportedApiInfo","id":1,"params":[{"services":[]}],"version":"1.0"}' }
+  updates:
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getPowerStatus$" }
+      json: { status: "$.result[0].status" }
+      state: { power: "{status}" }
+    - path: "^/sony/audio$"
+      request_match: { "$.method": "^getVolumeInformation$" }
+      json_each: "$.result[0]"
+      json: { target: "$.target", volume: "$.volume", mute: "$.mute", max: "$.maxVolume", min: "$.minVolume" }
+      state:
+        "audio.{target:key}.volume": "{volume}"
+        "audio.{target:key}.mute": "{mute}"
+        "audio.{target:key}.max": "{max}"
+        "audio.{target:key}.min": "{min}"
+    - path: "^/sony/avContent$"
+      request_match: { "$.method": "^getPlayingContentInfo$" }
+      json: { uri: "$.result[0].uri", source: "$.result[0].source", title: "$.result[0].title" }
+      state: { input.uri: "{uri}", input.source: "{source}", input.title: "{title}" }
+    - path: "^/sony/avContent$"
+      request_match: { "$.method": "^getCurrentExternalInputsStatus$" }
+      json_match: { "$.result[0]": "^\\[" }
+      json_each: "$.result[0]"
+      json: { uri: "$.uri", title: "$.title", label: "$.label", connection: "$.connection", icon: "$.icon", status: "$.status" }
+      replace: inputs
+      state:
+        "inputs.{index}.uri": "{uri}"
+        "inputs.{index}.title": "{title}"
+        "inputs.{index}.label": "{label}"
+        "inputs.{index}.connected": "{connection}"
+        "inputs.{index}.icon": "{icon}"
+        "inputs.{index}.signal": "{status}"
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getPowerSavingMode$" }
+      json: { mode: "$.result[0].mode" }
+      state: { power_saving: "{mode}" }
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getLEDIndicatorStatus$" }
+      json: { mode: "$.result[0].mode", status: "$.result[0].status" }
+      state: { led.mode: "{mode}", led.lit: "{status}" }
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getWolMode$" }
+      json: { enabled: "$.result[0].enabled" }
+      state: { wake_on_lan: "{enabled}" }
+    - path: "^/sony/video$"
+      request_match: { "$.method": "^getPictureQualitySettings$" }
+      json_match: { "$.result[0]": "^\\[" }
+      json_each: "$.result[0]"
+      json: { target: "$.target", value: "$.currentValue", available: "$.isAvailable", candidates: "$.candidate" }
+      replace: picture
+      state:
+        "picture.{target:key}.value": "{value}"
+        "picture.{target:key}.available": "{available}"
+        "picture.{target:key}.candidates": "{candidates}"
+    - path: "^/sony/videoScreen$"
+      request_match: { "$.method": "^getSceneSetting$" }
+      json: { value: "$.result[0].currentValue", candidates: "$.result[0].candidate" }
+      state: { scene.value: "{value}", scene.candidates: "{candidates}" }
+    - path: "^/sony/audio$"
+      request_match: { "$.method": "^getSpeakerSettings$" }
+      json_each: "$.result[0]"
+      json: { target: "$.target", value: "$.currentValue" }
+      state: { "speaker.{target:key}": "{value}" }
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getCurrentTime$", "$.version": "^1\\.1$" }
+      json: { time: "$.result[0].dateTime", tz: "$.result[0].timeZoneOffsetMinute", dst: "$.result[0].dstOffsetMinute" }
+      state: { clock.time: "{time}", clock.timezone_offset_min: "{tz}", clock.dst_offset_min: "{dst}" }
+    - path: "^/sony/appControl$"
+      request_match: { "$.method": "^getApplicationStatusList$" }
+      json_each: "$.result[0]"
+      json: { name: "$.name", status: "$.status" }
+      state: { "apps.status.{name:key}": "{status}" }
+    - path: "^/sony/appControl$"
+      request_match: { "$.method": "^getWebAppStatus$" }
+      json: { active: "$.result[0].active", url: "$.result[0].url" }
+      state: { webapp.active: "{active}", webapp.url: "{url}" }
+    - path: "^/sony/appControl$"
+      request_match: { "$.method": "^getApplicationList$" }
+      json_match: { "$.result[0]": "^\\[" }
+      json_each: "$.result[0]"
+      json: { title: "$.title", uri: "$.uri", icon: "$.icon" }
+      replace: apps.list
+      state: { "apps.list.{index}.title": "{title}", "apps.list.{index}.uri": "{uri}", "apps.list.{index}.icon": "{icon}" }
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getSystemInformation$" }
+      json:
+        product: "$.result[0].product"
+        name: "$.result[0].name"
+        model: "$.result[0].model"
+        serial: "$.result[0].serial"
+        mac: "$.result[0].macAddr"
+        language: "$.result[0].language"
+        region: "$.result[0].region"
+        area: "$.result[0].area"
+        cid: "$.result[0].cid"
+        generation: "$.result[0].generation"
+        firmware: "$.result[0].fwVersion"
+        android: "$.result[0].androidOs"
+        webapp: "$.result[0].webAppRuntimeVersion"
+        mode: "$.result[0].mode"
+      state:
+        system.product: "{product}"
+        system.name: "{name}"
+        system.model: "{model}"
+        system.serial: "{serial}"
+        system.mac: "{mac}"
+        system.language: "{language}"
+        system.region: "{region}"
+        system.area: "{area}"
+        system.cid: "{cid}"
+        system.generation: "{generation}"
+        system.firmware: "{firmware}"
+        system.android: "{android}"
+        system.webapp_runtime: "{webapp}"
+        system.mode: "{mode}"
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getInterfaceInformation$" }
+      json:
+        category: "$.result[0].productCategory"
+        product: "$.result[0].productName"
+        model: "$.result[0].modelName"
+        server: "$.result[0].serverName"
+        version: "$.result[0].interfaceVersion"
+      state:
+        interface.product_category: "{category}"
+        interface.product_name: "{product}"
+        interface.model_name: "{model}"
+        interface.server_name: "{server}"
+        interface.version: "{version}"
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getNetworkSettings$", "$.params[0].netif": "^$" }
+      json_match: { "$.result[0]": "^\\[" }
+      json_each: "$.result[0]"
+      json: { netif: "$.netif", mac: "$.hwAddr", ipv4: "$.ipAddrV4", ipv6: "$.ipAddrV6", netmask: "$.netmask", gateway: "$.gateway", dns: "$.dns" }
+      replace: network
+      state:
+        "network.{netif:key}.mac": "{mac}"
+        "network.{netif:key}.ipv4": "{ipv4}"
+        "network.{netif:key}.ipv6": "{ipv6}"
+        "network.{netif:key}.netmask": "{netmask}"
+        "network.{netif:key}.gateway": "{gateway}"
+        "network.{netif:key}.dns": "{dns}"
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getRemoteDeviceSettings$" }
+      json_each: "$.result[0]"
+      each_match: { "$.target": "^accessPermission$" }
+      json: { value: "$.currentValue" }
+      state: { remote_access: "{value}" }
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getSystemSupportedFunction$" }
+      json_each: "$.result[0]"
+      json: { option: "$.option", value: "$.value" }
+      state: { "functions.{option:key}": "{value}" }
+    - path: "^/sony/system$"
+      request_match: { "$.method": "^getRemoteControllerInfo$" }
+      json_match: { "$.result[1]": "^\\[" }
+      json_each: "$.result[1]"
+      json: { name: "$.name", value: "$.value" }
+      replace: ircc_codes
+      state: { "ircc_codes.{name:key}": "{value}" }
+    - path: "^/sony/avContent$"
+      request_match: { "$.method": "^getSchemeList$" }
+      json: { schemes: "$.result[0]" }
+      state: { content.schemes: "{schemes}" }
+    - path: "^/sony/avContent$"
+      request_match: { "$.method": "^getSourceList$", "$.params[0].scheme": "^([A-Za-z]+)$" }
+      json: { sources: "$.result[0]" }
+      state: { "content.sources.{1}": "{sources}" }
+    - path: "^/sony/guide$"
+      request_match: { "$.method": "^getSupportedApiInfo$" }
+      json: { apis: "$.result[0]" }
+      state: { supported_apis: "{apis}" }

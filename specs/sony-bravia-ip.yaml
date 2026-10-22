@@ -1,0 +1,338 @@
+spec: 1
+id: sony-bravia-ip
+name: Sony BRAVIA Professional Displays (Simple IP Control)
+vendor: Sony
+category: display
+
+# Simple IP Control: fixed 24-byte messages on TCP 20060, "*S", a type (C
+# control, E enquiry, A answer, N notify), a four-letter command, sixteen
+# parameter characters and LF. The display answers every control and enquiry
+# with an A message and pushes N messages when power, input, volume, mute or
+# picture mute change, so those stay current without polling. The richer REST
+# API is the sony-bravia spec; the RS-232C protocol is sony-bravia-serial.
+
+source:
+  - title: "BRAVIA Professional Displays Knowledge Center: Simple IP control"
+    author: Sony Corporation
+    url: https://pro-bravia.sony.net/remote-display-control/simple-ip-control/
+    note: >
+      Manufacturer document (retrieved 2026-10-22). TCP 20060; Remote device control and Simple IP control must
+      be on; 24-byte messages: header *S, message type C, E, A or N, FourCC command, 16 parameter bytes, LF; # fills
+      an enquiry's parameters; an answer of sixteen 0 is success, sixteen F an error, sixteen N not found or not
+      available for the input; commands IRCC, POWR, TPOW, VOLU, AMUT, INPT (1 HDMI, 3 composite, 4 component,
+      5 screen mirroring, then the port in the last four digits), PMUT, TPMU, SCEN (not on BZ40P/BZ35P/BZ30P;
+      auto, auto24pSync, general, padded with #), BADR and MADR (eth0 or wlan0, answers padded with #);
+      notifications POWR, INPT, VOLU, AMUT and PMUT; the IR command table for IRCC.
+
+transport:
+  type: line-tcp
+  port: 20060
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # Answers are *SA; notifications (*SN) are never a command's reply.
+  reply_match: "^\\*SA"
+  probe: "*SEPOWR################"
+
+settings: {}
+
+ports:
+  - { port: 20060, protocol: tcp, role: control }
+
+maps:
+  input_kind: { hdmi: "1", composite: "3", component: "4", screen_mirroring: "5" }
+  scene: { auto: "auto############", auto24pSync: "auto24pSync#####", general: "general#########" }
+  netif: { eth0: "eth0############", wlan0: "wlan0###########" }
+  key:
+    display: "0000000000000005"
+    home: "0000000000000006"
+    options: "0000000000000007"
+    return: "0000000000000008"
+    up: "0000000000000009"
+    down: "0000000000000010"
+    right: "0000000000000011"
+    left: "0000000000000012"
+    confirm: "0000000000000013"
+    red: "0000000000000014"
+    green: "0000000000000015"
+    yellow: "0000000000000016"
+    blue: "0000000000000017"
+    num1: "0000000000000018"
+    num2: "0000000000000019"
+    num3: "0000000000000020"
+    num4: "0000000000000021"
+    num5: "0000000000000022"
+    num6: "0000000000000023"
+    num7: "0000000000000024"
+    num8: "0000000000000025"
+    num9: "0000000000000026"
+    num0: "0000000000000027"
+    volume_up: "0000000000000030"
+    volume_down: "0000000000000031"
+    mute: "0000000000000032"
+    channel_up: "0000000000000033"
+    channel_down: "0000000000000034"
+    subtitle: "0000000000000035"
+    dot: "0000000000000038"
+    picture_off: "0000000000000050"
+    wide: "0000000000000061"
+    jump: "0000000000000062"
+    sync_menu: "0000000000000076"
+    forward: "0000000000000077"
+    play: "0000000000000078"
+    rewind: "0000000000000079"
+    prev: "0000000000000080"
+    stop: "0000000000000081"
+    next: "0000000000000082"
+    pause: "0000000000000084"
+    flash_plus: "0000000000000086"
+    flash_minus: "0000000000000087"
+    tv_power: "0000000000000098"
+    audio: "0000000000000099"
+    input: "0000000000000101"
+    sleep: "0000000000000104"
+    sleep_timer: "0000000000000105"
+    video2: "0000000000000108"
+    picture_mode: "0000000000000110"
+    demo_surround: "0000000000000121"
+    hdmi1: "0000000000000124"
+    hdmi2: "0000000000000125"
+    hdmi3: "0000000000000126"
+    hdmi4: "0000000000000127"
+    action_menu: "0000000000000129"
+    help: "0000000000000130"
+
+models:
+  - id: bz-p
+    name: "Sony BRAVIA Professional Displays FW-BZ40P, FW-BZ35P and FW-BZ30P"
+    supports: [set_power, toggle_power, get_power, set_volume, get_volume, set_mute, get_mute, set_input, get_input,
+               set_picture_mute, toggle_picture_mute, get_picture_mute, press_key, get_broadcast_address, get_mac_address]
+    verification: none
+  - id: bz
+    name: "Sony BRAVIA Professional Displays before the P series (FW-BZ50L, BZ53L, BZ40L, BZ35L, BZ30L, EZ20L, BZ40J, BZ35J, BZ30J, BZ40H, BZ35F and others with Simple IP control)"
+    supports: [set_power, toggle_power, get_power, set_volume, get_volume, set_mute, get_mute, set_input, get_input,
+               set_picture_mute, toggle_picture_mute, get_picture_mute, set_scene, get_scene, press_key,
+               get_broadcast_address, get_mac_address]
+    verification: none
+
+commands:
+  set_power:
+    summary: "Turn the display on or put it in standby (*SCPOWR), then read the power back"
+    params:
+      power_on: { type: bool, required: true, label: Power, description: "On turns the display on, off puts it in standby." }
+    send:
+      - "*SCPOWR000000000000000{power_on:bool01}"
+      - "*SEPOWR################"
+    expect: { reply_contains: "*SAPOWR", matches: '^\*SAPOWR0{15}[01]$' }
+    returns: ack
+  toggle_power:
+    summary: "Toggle the power (*SCTPOW), then read the power back"
+    send:
+      - "*SCTPOW################"
+      - "*SEPOWR################"
+    expect: { reply_contains: "*SAPOWR", matches: '^\*SAPOWR0{15}[01]$' }
+    returns: ack
+  get_power:
+    summary: "Read whether the display is on (*SEPOWR): 1 on, 0 standby"
+    send: "*SEPOWR################"
+    expect: { reply_contains: "*SAPOWR", matches: '^\*SAPOWR0{15}([01])$' }
+    returns: value
+  set_volume:
+    summary: "Set the volume (*SCVOLU)"
+    params:
+      volume: { type: int, min: 0, max: 100, required: true, label: Volume, description: "Volume level; the display's own maximum applies (100 on the REST API's example)." }
+    send: "*SCVOLU{volume:016d}"
+    expect: { reply_contains: "*SAVOLU", matches: '^\*SAVOLU0{16}$' }
+    returns: ack
+  get_volume:
+    summary: "Read the volume (*SEVOLU)"
+    send: "*SEVOLU################"
+    expect: { reply_contains: "*SAVOLU", matches: '^\*SAVOLU0*(\d+)$' }
+    returns: value
+  set_mute:
+    summary: "Mute or unmute the sound (*SCAMUT)"
+    params:
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the sound, off unmutes it." }
+    send: "*SCAMUT000000000000000{muted:bool01}"
+    expect: { reply_contains: "*SAAMUT", matches: '^\*SAAMUT0{16}$' }
+    returns: ack
+  get_mute:
+    summary: "Read whether the sound is muted (*SEAMUT): 1 muted, 0 not"
+    send: "*SEAMUT################"
+    expect: { reply_contains: "*SAAMUT", matches: '^\*SAAMUT0{15}([01])$' }
+    returns: value
+  set_input:
+    summary: "Switch the input (*SCINPT): a kind and its number"
+    params:
+      kind: { type: enum, values: [hdmi, composite, component, screen_mirroring], default: hdmi, label: Input kind, description: "hdmi, composite, component or screen_mirroring." }
+      number: { type: int, min: 1, max: 9999, required: true, label: Input number, description: "The input's number within its kind, such as 2 for HDMI 2." }
+    send: "*SCINPT0000000{kind:map.input_kind}0000{number:04d}"
+    expect: { reply_contains: "*SAINPT", matches: '^\*SAINPT0{16}$' }
+    returns: ack
+  get_input:
+    summary: "Read the input (*SEINPT): the kind digit (1 HDMI, 3 composite, 4 component, 5 screen mirroring) then the number, as the display sends them"
+    send: "*SEINPT################"
+    expect: { reply_contains: "*SAINPT", matches: '^\*SAINPT(\d{16})$' }
+    returns: value
+  set_picture_mute:
+    summary: "Turn the picture off (black) or back on (*SCPMUT)"
+    params:
+      muted: { type: bool, default: true, label: Picture mute, description: "On turns the screen black, off shows the picture again." }
+    send: "*SCPMUT000000000000000{muted:bool01}"
+    expect: { reply_contains: "*SAPMUT", matches: '^\*SAPMUT0{16}$' }
+    returns: ack
+  toggle_picture_mute:
+    summary: "Toggle the picture mute (*SCTPMU), then read it back"
+    send:
+      - "*SCTPMU################"
+      - "*SEPMUT################"
+    expect: { reply_contains: "*SAPMUT", matches: '^\*SAPMUT0{15}[01]$' }
+    returns: ack
+  get_picture_mute:
+    summary: "Read whether the picture is muted (*SEPMUT): 1 muted, 0 not"
+    send: "*SEPMUT################"
+    expect: { reply_contains: "*SAPMUT", matches: '^\*SAPMUT0{15}([01])$' }
+    returns: value
+  set_scene:
+    summary: "Set the scene setting (*SCSCEN), then read it back"
+    params:
+      scene: { type: enum, values: [auto, auto24pSync, general], required: true, label: Scene, description: "auto picks the scene from the content, auto24pSync picks Cinema for 24 Hz signals, general turns scene select off." }
+    send:
+      - "*SCSCEN{scene:map.scene}"
+      - "*SESCEN################"
+    expect: { reply_contains: "*SASCEN", matches: '^\*SASCEN(?:0{16}|(?:auto|auto24pSync|general)#*)$' }
+    returns: ack
+  get_scene:
+    summary: "Read the scene setting (*SESCEN); N answers mean it is not available for the input"
+    send: "*SESCEN################"
+    expect: { reply_contains: "*SASCEN", matches: '^\*SASCEN(auto|auto24pSync|general)#*$' }
+    returns: value
+  press_key:
+    summary: "Press a remote control button (*SCIRCC)"
+    params:
+      key:
+        type: enum
+        values: [display, home, options, return, up, down, right, left, confirm, red, green, yellow, blue, num1, num2,
+                 num3, num4, num5, num6, num7, num8, num9, num0, volume_up, volume_down, mute, channel_up, channel_down,
+                 subtitle, dot, picture_off, wide, jump, sync_menu, forward, play, rewind, prev, stop, next, pause,
+                 flash_plus, flash_minus, tv_power, audio, input, sleep, sleep_timer, video2, picture_mode,
+                 demo_surround, hdmi1, hdmi2, hdmi3, hdmi4, action_menu, help]
+        required: true
+        label: Button
+        description: "The remote control button, from the document's IR command table."
+    send: "*SCIRCC{key:map.key}"
+    expect: { reply_contains: "*SAIRCC", matches: '^\*SAIRCC0{16}$' }
+    returns: ack
+  get_broadcast_address:
+    summary: "Read an interface's IPv4 broadcast address (*SEBADR)"
+    params:
+      interface: { type: enum, values: [eth0, wlan0], default: eth0, label: Interface, description: "eth0 (wired) or wlan0 (Wi-Fi)." }
+    send: "*SEBADR{interface:map.netif}"
+    expect: { reply_contains: "*SABADR", matches: '^\*SABADR([0-9.]+)#*$' }
+    returns: value
+  get_mac_address:
+    summary: "Read an interface's MAC address (*SEMADR)"
+    params:
+      interface: { type: enum, values: [eth0, wlan0], default: eth0, label: Interface, description: "eth0 (wired) or wlan0 (Wi-Fi)." }
+    send: "*SEMADR{interface:map.netif}"
+    expect: { reply_contains: "*SAMADR", matches: '^\*SAMADR([0-9A-Fa-f]{12})#*$' }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The display must have Remote device control and Simple IP control on (Network & Internet). There is no
+      authentication. Some EU models (RED-DA compliance) limit the commands; getBroadcastAddress and
+      getMacAddress among them.
+  - models: [all]
+    severity: info
+    text: >
+      Power, input, volume, mute and picture mute are pushed (*SN) on every change and read once on connecting
+      and every minute; the scene setting, which is not pushed, is read every minute too. An answer of sixteen F
+      fails a command (device_error); sixteen N means the input or scene does not exist or is not available for the
+      input. A notification of input sixteen 0, sent when the input changes to something without a kind and
+      number, leaves the input as it was.
+  - models: [all]
+    severity: warning
+    text: >
+      The document's notification table gives picture mute the other way round from its answer table (0 when
+      picture mute is turned on); the core reads both as the answer table has them, 1 muted.
+  - models: [all]
+    severity: info
+    text: >
+      The volume range is not given for Simple IP control; set_volume takes 0-100 as the REST API's volume
+      information shows on its example, and the display answers sixteen F for a level it does not take.
+  - models: [all]
+    severity: info
+    text: >
+      Simple IP control has no command for picture settings, power saving, apps or information beyond the
+      addresses; those are in the REST API (sony-bravia), which can be opened beside this for the same display.
+      A display that is off with its network suspended does not answer at all.
+
+state:
+  power: { type: bool, description: "Whether the display is on" }
+  volume: { type: int, description: "Volume level" }
+  mute: { type: bool, description: "Whether the sound is muted" }
+  input.kind: { type: string, description: "Input kind: hdmi, composite, component or screen_mirroring" }
+  input.number: { type: int, description: "The input's number within its kind" }
+  picture_mute: { type: bool, description: "Whether the picture is muted (black)" }
+  scene: { type: string, description: "Scene setting: auto, auto24pSync or general" }
+  network.*.broadcast: { type: string, description: "IPv4 broadcast address, keyed by interface (eth0, wlan0)" }
+  network.*.mac: { type: string, description: "MAC address as twelve hex digits, keyed by interface" }
+
+telemetry:
+  poll:
+    every_ms: 60000
+    send:
+      - "*SEPOWR################"
+      - "*SEVOLU################"
+      - "*SEAMUT################"
+      - "*SEINPT################"
+      - "*SEPMUT################"
+      - { models: [bz], message: "*SESCEN################" }
+      - "*SEBADReth0############"
+      - "*SEBADRwlan0###########"
+      - "*SEMADReth0############"
+      - "*SEMADRwlan0###########"
+  updates:
+    - match: '^\*SAPOWR0{15}([01])$'
+      request_match: '^\*SEPOWR'
+      state: { power: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\*SNPOWR0{15}([01])$'
+      state: { power: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\*SAVOLU(\d{16})$'
+      request_match: '^\*SEVOLU'
+      state: { volume: "{1}" }
+    - match: '^\*SNVOLU(\d{16})$'
+      state: { volume: "{1}" }
+    - match: '^\*SAAMUT0{15}([01])$'
+      request_match: '^\*SEAMUT'
+      state: { mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\*SNAMUT0{15}([01])$'
+      state: { mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\*SAINPT0{7}([1345])0{4}(\d{4})$'
+      request_match: '^\*SEINPT'
+      state:
+        input.kind: { value: "{1}", map: { "1": hdmi, "3": composite, "4": component, "5": screen_mirroring } }
+        input.number: "{2}"
+    - match: '^\*SNINPT0{7}([1345])0{4}(\d{4})$'
+      state:
+        input.kind: { value: "{1}", map: { "1": hdmi, "3": composite, "4": component, "5": screen_mirroring } }
+        input.number: "{2}"
+    - match: '^\*SAPMUT0{15}([01])$'
+      request_match: '^\*SEPMUT'
+      state: { picture_mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\*SNPMUT0{15}([01])$'
+      state: { picture_mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\*SASCEN(auto|auto24pSync|general)#*$'
+      request_match: '^\*SESCEN'
+      state: { scene: "{1}" }
+    - match: '^\*SABADR([0-9.]+)#*$'
+      request_match: '^\*SEBADR([a-z0-9]+)#'
+      state: { "network.{2}.broadcast": "{1}" }
+    - match: '^\*SAMADR([0-9A-Fa-f]{12})#*$'
+      request_match: '^\*SEMADR([a-z0-9]+)#'
+      state: { "network.{2}.mac": "{1}" }
