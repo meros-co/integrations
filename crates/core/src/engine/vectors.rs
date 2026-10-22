@@ -624,7 +624,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 15] = [
+    const SUCCESS: &[&str] = &[
         "200 ok",
         "~01@ok",
         "ACK;",
