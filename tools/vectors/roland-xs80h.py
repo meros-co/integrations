@@ -52,8 +52,16 @@ r80("get_key_lock", {}, "KLS;\r", device_reply="KLS:1,1,0,0,0,0,0,0,0,0,0;",
 r80("get_version", {}, "VER;\r", device_reply="VER:XS-84H,3.15;",
     expect_result={"ok": {"kind": "value", "value": "XS-84H,3.15"}})
 r80("active_sense", {}, "ACS;\r", device_reply="ACK;", expect_result=R80_OK)
+# The same on the RS-232C connector (link serial): no CR after the ";" (p.21).
+r80("route_av", {"output": 2, "input": 5}, "OAV:1,4;", device_reply="ACK;", expect_result=R80_OK,
+    settings={"link": "serial"}, file="route_av-serial")
+r80("get_crosspoint", {"output": 1}, "CTS:0;", device_reply="CTS:0,3,3,0;",
+    expect_result={"ok": {"kind": "value", "value": "0,3,3,0"}},
+    settings={"link": "serial"}, file="get_crosspoint-serial")
 
 telemetry(R80, "crosspoint", inbound="CTS:0,3,4,1;",
+          expect_state={"outputs": {"1": {"video": 4, "audio": 5, "off": True}}})
+telemetry(R80, "crosspoint-serial", inbound="CTS:0,3,4,1;", settings={"link": "serial"},
           expect_state={"outputs": {"1": {"video": 4, "audio": 5, "off": True}}})
 telemetry(R80, "input-status", inbound="ITS:7,4,2,0,1;",
           expect_state={"inputs": {"8": {"type": 4, "color_space": 2, "hdcp": False, "aspect": 1}}})

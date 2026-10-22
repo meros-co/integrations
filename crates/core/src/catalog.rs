@@ -319,6 +319,30 @@ impl DeviceSpec {
         })
     }
 
+    /// The transport keys that differ on the serial port for `model`: every
+    /// entry of the block's `overrides` that is for the model (one naming no
+    /// `models` is for all), laid over one another in order. Empty for a
+    /// spec with no `serial` block or no `overrides`.
+    pub(crate) fn serial_overrides(&self, model: &str) -> Map<String, Value> {
+        let mut out = Map::new();
+        let entries = match self.serial_block().and_then(|b| b.get("overrides")) {
+            Some(Value::Array(list)) => list.clone(),
+            Some(one) => vec![one.clone()],
+            None => return out,
+        };
+        for entry in entries.iter().filter_map(Value::as_object) {
+            if entry.contains_key("models") && !names_model(entry.get("models"), model) {
+                continue;
+            }
+            for (k, v) in entry {
+                if k != "models" {
+                    out.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        out
+    }
+
     /// Add the `link` setting and the six serial settings a `serial` block
     /// stands for. A spec declaring any of them itself is refused, as is a
     /// block that is not one the core can open a port with.
@@ -349,6 +373,7 @@ impl DeviceSpec {
                 "parity",
                 "stop_bits",
                 "flow_control",
+                "overrides",
             ]
             .contains(&key.as_str())
             {
@@ -365,6 +390,44 @@ impl DeviceSpec {
                     let id = id.as_str().unwrap_or_default();
                     if self.model(id).is_none() {
                         return Err(format!("transport.serial.{key}: no model '{id}'"));
+                    }
+                }
+            }
+        }
+        if let Some(overrides) = block.get("overrides") {
+            let entries = match overrides {
+                Value::Array(list) if !list.is_empty() => list.clone(),
+                Value::Object(_) => vec![overrides.clone()],
+                _ => {
+                    return Err(
+                        "transport.serial.overrides must be a mapping or a list of them".into(),
+                    )
+                }
+            };
+            for entry in &entries {
+                let entry = entry
+                    .as_object()
+                    .ok_or("transport.serial.overrides: each entry is a mapping")?;
+                for key in entry.keys() {
+                    if !SERIAL_OVERRIDES.contains(&key.as_str()) && key != "models" {
+                        return Err(format!(
+                            "transport.serial.overrides.{key}: not a framing or reply key a serial \
+                             port can change"
+                        ));
+                    }
+                }
+                if let Some(list) = entry.get("models") {
+                    let ids = list
+                        .as_array()
+                        .filter(|a| !a.is_empty())
+                        .ok_or("transport.serial.overrides.models must list model ids")?;
+                    for id in ids {
+                        let id = id.as_str().unwrap_or_default();
+                        if self.model(id).is_none() {
+                            return Err(format!(
+                                "transport.serial.overrides.models: no model '{id}'"
+                            ));
+                        }
                     }
                 }
             }
@@ -564,6 +627,21 @@ impl DeviceSpec {
 }
 
 /// Whether a list of model ids holds `model`.
+/// The transport keys a `serial` block's `overrides` may change: how a
+/// message is framed and how replies are told apart (SPEC.md §2, "The same
+/// protocol on a serial port").
+pub(crate) const SERIAL_OVERRIDES: &[&str] = &[
+    "framing",
+    "open",
+    "close",
+    "terminator",
+    "reply_framing",
+    "reply_terminators",
+    "reply_fence",
+    "reply_match",
+    "error_match",
+];
+
 fn names_model(list: Option<&Value>, model: &str) -> bool {
     list.and_then(Value::as_array)
         .is_some_and(|ids| ids.iter().any(|id| id.as_str() == Some(model)))

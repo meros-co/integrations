@@ -6,8 +6,8 @@ category: display
 
 # LG documents one ASCII protocol for its signage and commercial TVs: "[Command1][Command2] [Set ID] [Data]"
 # ended by CR, acknowledged "[Command2] [Set ID] OK|NG[Data]x". The same messages are carried on TCP 9761 by
-# the network models. A display reached by RS-232C through a serial-to-Ethernet bridge speaks the same
-# protocol at the bridge's TCP port (see the quirks).
+# the network models, and on the RS-232C port (link serial). A display reached through a serial-to-Ethernet
+# bridge speaks the same protocol at the bridge's TCP port (see the quirks).
 source:
   - title: "USER GUIDE, LG Digital Signage (MONITOR SIGNAGE), webOS 6.0 (2021-12)"
     author: LG Electronics
@@ -15,7 +15,7 @@ source:
     note: >
       The current generation's command reference: IR codes (pp.82-83), controlling several products and Set
       ID 1-1000 (p.84), communication parameters 9600 bps, 8 data bits, no parity, 1 stop bit, ASCII
-      (p.85), the command list (pp.86-90) and the transmission / reception protocol with each command's data
+      and no flow control (p.85), the command list (pp.86-90) and the transmission / reception protocol with each command's data
       (pp.91-115): power ka (00 off, 01 on, 02 restart), input xb, aspect kc, energy saving jq, picture mode
       dx, contrast kg, brightness kh, sharpness kk, color ki, tint kj, color temperature xu (70-D2 = 3200-13000
       K), balance kt, sound mode dy, mute ke (00 mutes), volume kf, date fa, time fx, no-signal power off fg,
@@ -101,13 +101,23 @@ transport:
   timeout_ms: 3000
   reply: expected
   probe: "ka {settings.set_id:02x} ff"
+  # The protocol is LG's RS-232C protocol, the same messages on the RS-232C
+  # port: 9600 bps, 8 data bits, no parity, 1 stop bit, no flow control
+  # (webOS 6.0 guide p.85). No login either way.
+  serial:
+    baud_rate: 9600
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
 
 settings:
   # Set in the menu (General > Set ID). 00 broadcasts and is never acknowledged, so it is not offered.
   set_id: { type: int, min: 1, max: 1000, default: 1, label: Set ID, description: "The display's Set ID from its menu, 1 to 1000 (1 to 99 on a commercial TV); sent in hex, three digits above 255." }
 
 ports:
-  - { port: 9761, protocol: tcp, role: control, note: "the network models' control port; an RS-232C display is reached through a serial-to-Ethernet bridge at the bridge's port, given when the device is opened" }
+  - { port: 9761, protocol: tcp, role: control, when: "link tcp", note: "the network models' control port; an RS-232C display behind a serial-to-Ethernet bridge is reached at the bridge's port, given when the device is opened" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232C IN connector (D-Sub 9, or a 3.5 mm jack with LG's adapter): a crossed cable" }
 
 models:
   - id: webos6
@@ -3246,8 +3256,10 @@ quirks:
     text: >
       TCP 9761 comes from integrators' material, not from an LG document: LG's public guides describe the
       protocol over RS-232C only, and say nothing of a login, which none is sent. A display wired by RS-232C
-      (9600 bps, 8 data bits, no parity, 1 stop bit, crossed cable) is reached through a serial-to-Ethernet
-      bridge, opened at the bridge's TCP port; the messages are the same.
+      (9600 bps, 8 data bits, no parity, 1 stop bit, no flow control, crossed cable; webOS 6.0 guide p.85)
+      is driven on a serial port of the host with link serial, or through a serial-to-Ethernet bridge
+      opened with link tcp at the bridge's TCP port; the messages are the same. Displays daisy-chained from
+      RS-232C OUT to the next one's IN share one port and are told apart by Set ID (p.84).
   - models: [all]
     severity: warning
     text: >

@@ -751,3 +751,13 @@ telemetry(SH, 'serial_number', request='SRNO????', inbound='4012345X\r\n', expec
 # ERR: the command fails.
 _sh("set_volume", {"value": 50}, "VOLM0050\r", ["ERR\r\n"], {"error": {"error": "device_error"}},
     file="set_volume-err")
+
+# The same commands and replies on the RS-232C terminal (link serial), where no login comes first
+# (PN-LA p.1, PN-HB p.38).
+text(SH, 'set_power', {'on': True}, 'POWR0001\r', device_reply='WAIT\r\nOK\r\n', expect_result=_ACK,
+     settings={'link': 'serial'}, file='set_power-serial')
+text(SH, 'get_input', {}, 'INPS????\r', device_reply='10\r\n', expect_result=_v('10'),
+     settings={'link': 'serial'}, file='get_input-serial', model='pn-hb')
+telemetry(SH, 'power-serial', request='POWR????', inbound='1 001\r\n', expect_state={'power': 'on'},
+          settings={'link': 'serial', 'baud_rate': '38400'}, model='pn-r903a',
+          expect_connect_wire=['POWR????\r'])  # the probe at once: no login prompt is awaited

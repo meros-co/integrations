@@ -440,3 +440,11 @@ _lg('change_password', {'old_password': '000000', 'new_password': '123456'}, 'sn
 # NG ("illegal code"): the command fails.
 text(LG, "set_volume", {"level": 50}, "kf 01 32\r", device_reply="f 01 NG00x",
      expect_result={"error": {"error": "device_error"}}, file="set_volume-ng")
+
+# The same messages on the RS-232C port (link serial; webOS 6.0 guide p.85).
+text(LG, 'set_power', {'on': True}, 'ka 01 01\r', device_reply='a 01 OK01x', expect_result=_ACK,
+     settings={'link': 'serial'}, file='set_power-serial')
+text(LG, 'get_input', {}, 'xb 01 ff\r', device_reply='b 01 OK90x', expect_result=_v('90'),
+     settings={'link': 'serial'}, file='get_input-serial')
+telemetry(LG, 'power-serial', request='ka 01 ff', inbound='a 01 OK00x', expect_state={'power': False},
+          settings={'link': 'serial'})

@@ -626,6 +626,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
 - [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
+## blackmagic-videohub-leitch — Blackmagic Videohub (RS-422, Leitch protocol)
+
+- [ ] Confirm the ">" prompt is the only answer to every command, comes after the S: or V: lines a query returns, and that an unrecognized or out-of-range command gets no other answer (Blackmagic documents none). ([specs/blackmagic-videohub-leitch.yaml:58](specs/blackmagic-videohub-leitch.yaml#L58))
+- [ ] Confirm the bare CR on connecting is answered by ">" and that nothing else (a banner) is sent. ([specs/blackmagic-videohub-leitch.yaml:66](specs/blackmagic-videohub-leitch.yaml#L66))
+- [ ] Record the S: and V: notifications as sent: the hex digits' case, any zero padding, and whether a route change made by this connection is notified with status reporting off. ([specs/blackmagic-videohub-leitch.yaml:284](specs/blackmagic-videohub-leitch.yaml#L284))
+- [ ] Confirm the RS-422 port needs no flow control, which Blackmagic leaves unstated. ([specs/blackmagic-videohub-leitch.yaml:107](specs/blackmagic-videohub-leitch.yaml#L107))
+- [ ] Confirm which models have an RS-422 router control port that answers in Leitch server mode (Smart Videohub 12x12/20x20/40x40, CleanSwitch 12x12, Universal Videohub 72/288 from the manuals; older Smart Videohub, Broadcast and Studio Videohub not checked) and the connector each uses. ([specs/blackmagic-videohub-leitch.yaml:112](specs/blackmagic-videohub-leitch.yaml#L112))
+- [ ] Confirm a read-back right after a route (`@ X?`) reports the new source, and that @ B:R behaves as @ B:C. ([specs/blackmagic-videohub-leitch.yaml:160](specs/blackmagic-videohub-leitch.yaml#L160))
+
 ## boinx-mimolive — Boinx mimoLive
 
 - [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:2091](specs/boinx-mimolive.yaml#L2091))
@@ -1287,24 +1296,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## lg-display — LG signage displays and commercial TVs
 
-- [ ] Confirm the display takes the protocol on TCP 9761 with no greeting or login, and answers as over RS-232C; no LG document read names the port. ([specs/lg-display.yaml:3247](specs/lg-display.yaml#L3247))
+- [ ] Confirm the display takes the protocol on TCP 9761 with no greeting or login, and answers as over RS-232C; no LG document read names the port. ([specs/lg-display.yaml:3257](specs/lg-display.yaml#L3257))
 - [ ] Confirm an acknowledgement ends with the literal `x` and nothing after it (no CR or LF), and that its Set ID echo is two hex digits (three above 255). ([specs/lg-display.yaml:99](specs/lg-display.yaml#L99))
-- [ ] Record what a display in standby answers to `ka 01 ff` in each PM mode (Network Ready, Screen Off Always), and whether `ka 01 01` turns it on over TCP and is acknowledged. ([specs/lg-display.yaml:3254](specs/lg-display.yaml#L3254))
+- [ ] Record what a display in standby answers to `ka 01 ff` in each PM mode (Network Ready, Screen Off Always), and whether `ka 01 01` turns it on over TCP and is acknowledged. ([specs/lg-display.yaml:3266](specs/lg-display.yaml#L3266))
 - [ ] Check whether lowercase hex (`kf 01 3c`), as LG's examples write it, and uppercase are both taken. ([specs/lg-display.yaml:103](specs/lg-display.yaml#L103))
-- [ ] Check the OSD lock polarity (`kl 00` locks in the webOS 6.0 and 3.2 guides, unlocks in the L19 guide). ([specs/lg-display.yaml:1243](specs/lg-display.yaml#L1243))
-- [ ] Check the tile mode byte order (columns then rows in the webOS guides, rows then columns in the SE3B manual). ([specs/lg-display.yaml:3290](specs/lg-display.yaml#L3290))
-- [ ] Confirm the color temperature data on webOS 3.2 and L19 displays (70-D2 for 3200-13000 K, as webOS 6.0, or 00-64 as older generations). ([specs/lg-display.yaml:351](specs/lg-display.yaml#L351))
-- [ ] Record whether `xb ff` answers the PC or the DTV code of a port in each input label setting. ([specs/lg-display.yaml:154](specs/lg-display.yaml#L154))
-- [ ] Record the `sv` replies (is there a space between the sub-code and the data?) and the bit order of the temperature sensor health (`sv 07`). ([specs/lg-display.yaml:1975](specs/lg-display.yaml#L1975))
-- [ ] Record the fan speed data of `sv 09` for one and for several fans. ([specs/lg-display.yaml:1980](specs/lg-display.yaml#L1980))
-- [ ] Record the `xc ff` reply and whether `xc` takes 00 for an unused window (PIP with two inputs). ([specs/lg-display.yaml:1761](specs/lg-display.yaml#L1761))
-- [ ] Record the `mj ff` reply and how many port codes each model expects. ([specs/lg-display.yaml:1845](specs/lg-display.yaml#L1845))
-- [ ] Record what a timer, holiday and brightness schedule entry read answers (whether the entry code is echoed before the data) and an empty entry. ([specs/lg-display.yaml:1618](specs/lg-display.yaml#L1618))
-- [ ] Confirm the units of `dn` (degrees Celsius assumed) and `dl` (hours assumed), and the 3-byte `dn` form of the SE3B. ([specs/lg-display.yaml:1935](specs/lg-display.yaml#L1935))
-- [ ] Record the format of the serial number (`fy`) and software version (`fz`) data: plain text, or ASCII in hex digits as `jx` answers. ([specs/lg-display.yaml:1950](specs/lg-display.yaml#L1950))
-- [ ] Confirm the IR codes LG prints only as icons: 7E, and the media keys B0, B1, BA, 8F, 8E, AA on signage. ([specs/lg-display.yaml:2010](specs/lg-display.yaml#L2010))
-- [ ] Confirm the daylight saving read `sd 01 01 ff ff ff ff` answers the start entry with its 01 echoed first. ([specs/lg-display.yaml:866](specs/lg-display.yaml#L866))
-- [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:804](specs/lg-display.yaml#L804))
+- [ ] Check the OSD lock polarity (`kl 00` locks in the webOS 6.0 and 3.2 guides, unlocks in the L19 guide). ([specs/lg-display.yaml:1253](specs/lg-display.yaml#L1253))
+- [ ] Check the tile mode byte order (columns then rows in the webOS guides, rows then columns in the SE3B manual). ([specs/lg-display.yaml:3302](specs/lg-display.yaml#L3302))
+- [ ] Confirm the color temperature data on webOS 3.2 and L19 displays (70-D2 for 3200-13000 K, as webOS 6.0, or 00-64 as older generations). ([specs/lg-display.yaml:361](specs/lg-display.yaml#L361))
+- [ ] Record whether `xb ff` answers the PC or the DTV code of a port in each input label setting. ([specs/lg-display.yaml:164](specs/lg-display.yaml#L164))
+- [ ] Record the `sv` replies (is there a space between the sub-code and the data?) and the bit order of the temperature sensor health (`sv 07`). ([specs/lg-display.yaml:1985](specs/lg-display.yaml#L1985))
+- [ ] Record the fan speed data of `sv 09` for one and for several fans. ([specs/lg-display.yaml:1990](specs/lg-display.yaml#L1990))
+- [ ] Record the `xc ff` reply and whether `xc` takes 00 for an unused window (PIP with two inputs). ([specs/lg-display.yaml:1771](specs/lg-display.yaml#L1771))
+- [ ] Record the `mj ff` reply and how many port codes each model expects. ([specs/lg-display.yaml:1855](specs/lg-display.yaml#L1855))
+- [ ] Record what a timer, holiday and brightness schedule entry read answers (whether the entry code is echoed before the data) and an empty entry. ([specs/lg-display.yaml:1628](specs/lg-display.yaml#L1628))
+- [ ] Confirm the units of `dn` (degrees Celsius assumed) and `dl` (hours assumed), and the 3-byte `dn` form of the SE3B. ([specs/lg-display.yaml:1945](specs/lg-display.yaml#L1945))
+- [ ] Record the format of the serial number (`fy`) and software version (`fz`) data: plain text, or ASCII in hex digits as `jx` answers. ([specs/lg-display.yaml:1960](specs/lg-display.yaml#L1960))
+- [ ] Confirm the IR codes LG prints only as icons: 7E, and the media keys B0, B1, BA, 8F, 8E, AA on signage. ([specs/lg-display.yaml:2020](specs/lg-display.yaml#L2020))
+- [ ] Confirm the daylight saving read `sd 01 01 ff ff ff ff` answers the start entry with its 01 echoed first. ([specs/lg-display.yaml:876](specs/lg-display.yaml#L876))
+- [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:814](specs/lg-display.yaml#L814))
+- [ ] Drive an LG display on its RS-232C port (link serial) and confirm the acknowledgements are those of TCP 9761; confirm a commercial TV (UV340C, UL3E) runs at 9600 bps, 8N1, no flow control as the signage guides state. ([specs/lg-display.yaml:107](specs/lg-display.yaml#L107))
 
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
@@ -1916,21 +1926,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-v160hd — Roland V-160HD, V-80HD, VR-120HD, VR-6HD, V-1-4K
 
-- [ ] Confirm commands ended with CR LF are accepted (Roland documents only Telnet). ([specs/roland-v160hd.yaml:84](specs/roland-v160hd.yaml#L84))
-- [ ] Confirm the password prompt and reply texts ("Enter password:", "Welcome to ...", "Authentication error", "Wait a moment"), which are community-sourced. ([specs/roland-v160hd.yaml:2811](specs/roland-v160hd.yaml#L2811))
-- [ ] Check whether a query's value frame and its ACK; arrive on one line or two. ([specs/roland-v160hd.yaml:2827](specs/roland-v160hd.yaml#L2827))
-- [ ] Check whether GRCH, AMCH, SPCH, AUXCH, QSRTIST and QBSY are followed by ACK;. ([specs/roland-v160hd.yaml:2829](specs/roland-v160hd.yaml#L2829))
-- [ ] Confirm a poll of five queries a second does not lock the panel. ([specs/roland-v160hd.yaml:2850](specs/roland-v160hd.yaml#L2850))
-- [ ] Confirm the wire spellings chosen: test tone levels OFF, -20, -10, 0 and frequencies 500, 1k, 2k, and values without the space before the comma. ([specs/roland-v160hd.yaml:2874](specs/roland-v160hd.yaml#L2874))
-- [ ] Confirm the AUXLV and AUXCH replies are QAUXLV and QAUXCH, and QTIM names DSK on V-1-4K. ([specs/roland-v160hd.yaml:2880](specs/roland-v160hd.yaml#L2880))
-- [ ] Confirm the minimum firmware version per model for the Basic commands. ([specs/roland-v160hd.yaml:2886](specs/roland-v160hd.yaml#L2886))
-- [ ] Check whether a second control session receives tally frames after TALLY AUTO SEND. ([specs/roland-v160hd.yaml:2900](specs/roland-v160hd.yaml#L2900))
-- [ ] Check whether RQH sizes other than 000001 are answered. ([specs/roland-v160hd.yaml:2898](specs/roland-v160hd.yaml#L2898))
+- [ ] Confirm commands ended with CR LF are accepted (Roland documents only Telnet). ([specs/roland-v160hd.yaml:103](specs/roland-v160hd.yaml#L103))
+- [ ] Confirm the password prompt and reply texts ("Enter password:", "Welcome to ...", "Authentication error", "Wait a moment"), which are community-sourced. ([specs/roland-v160hd.yaml:2855](specs/roland-v160hd.yaml#L2855))
+- [ ] Check whether a query's value frame and its ACK; arrive on one line or two. ([specs/roland-v160hd.yaml:2871](specs/roland-v160hd.yaml#L2871))
+- [ ] Check whether GRCH, AMCH, SPCH, AUXCH, QSRTIST and QBSY are followed by ACK;. ([specs/roland-v160hd.yaml:2873](specs/roland-v160hd.yaml#L2873))
+- [ ] Confirm a poll of five queries a second does not lock the panel. ([specs/roland-v160hd.yaml:2894](specs/roland-v160hd.yaml#L2894))
+- [ ] Confirm the wire spellings chosen: test tone levels OFF, -20, -10, 0 and frequencies 500, 1k, 2k, and values without the space before the comma. ([specs/roland-v160hd.yaml:2905](specs/roland-v160hd.yaml#L2905))
+- [ ] Confirm the AUXLV and AUXCH replies are QAUXLV and QAUXCH, and QTIM names DSK on V-1-4K. ([specs/roland-v160hd.yaml:2875](specs/roland-v160hd.yaml#L2875))
+- [ ] Confirm the minimum firmware version per model for the Basic commands. ([specs/roland-v160hd.yaml:2932](specs/roland-v160hd.yaml#L2932))
+- [ ] Check whether a second control session receives tally frames after TALLY AUTO SEND. ([specs/roland-v160hd.yaml:2946](specs/roland-v160hd.yaml#L2946))
+- [ ] Check whether RQH sizes other than 000001 are answered. ([specs/roland-v160hd.yaml:2944](specs/roland-v160hd.yaml#L2944))
+- [ ] Drive a V-160HD, VR-120HD or VR-6HD on RS-232 (link serial): confirm commands with stx and nothing after the ";" are accepted, and whether replies end in LF there. ([specs/roland-v160hd.yaml:3281](specs/roland-v160hd.yaml#L3281))
+- [ ] Drive a V-80HD on RS-232 and confirm commands without stx and line ending are accepted. ([specs/roland-v160hd.yaml:3281](specs/roland-v160hd.yaml#L3281))
+- [ ] Check whether DTH is answered by the ack byte 06H or by ACK; on V-160HD, VR-120HD and VR-6HD, on RS-232 and over LAN. ([specs/roland-v160hd.yaml:3288](specs/roland-v160hd.yaml#L3288))
+- [ ] Find the V-80HD's default RS-232 BAUDRATE (115200 assumed, as on the others). ([specs/roland-v160hd.yaml:3291](specs/roland-v160hd.yaml#L3291))
+- [ ] Confirm XON/XOFF flow control on RS-232, which the communication standards leave out. ([specs/roland-v160hd.yaml:3294](specs/roland-v160hd.yaml#L3294))
 
 ## roland-v600uhd — Roland V-600UHD
 
-- [ ] Confirm the password prompt "Enter password:" and greeting "Welcome to Roland V-600UHD.", and record what a wrong password produces. ([specs/roland-v600uhd.yaml:260](specs/roland-v600uhd.yaml#L260))
-- [ ] Find which input audio numbers lie between HDMI IN1 (0) and TEST TONE (7). ([specs/roland-v600uhd.yaml:280](specs/roland-v600uhd.yaml#L280))
+- [ ] Confirm the password prompt "Enter password:" and greeting "Welcome to Roland V-600UHD.", and record what a wrong password produces. ([specs/roland-v600uhd.yaml:281](specs/roland-v600uhd.yaml#L281))
+- [ ] Find which input audio numbers lie between HDMI IN1 (0) and TEST TONE (7). ([specs/roland-v600uhd.yaml:301](specs/roland-v600uhd.yaml#L301))
+- [ ] Drive the V-600UHD on RS-232 (link serial): confirm commands with stx and no line ending are accepted, ACK arrives as the bare byte 06H, and whether any line ending follows a reply. ([specs/roland-v600uhd.yaml:50](specs/roland-v600uhd.yaml#L50))
 
 ## roland-v60hd — Roland V-60HD
 
@@ -1969,10 +1985,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-xs80h — Roland XS-82H/83H/84H
 
-- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:551](specs/roland-xs80h.yaml#L551))
-- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:553](specs/roland-xs80h.yaml#L553))
-- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:567](specs/roland-xs80h.yaml#L567))
-- [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:497](specs/roland-xs80h.yaml#L497))
+- [ ] Check whether any line ending follows ";" over LAN. ([specs/roland-xs80h.yaml:564](specs/roland-xs80h.yaml#L564))
+- [ ] Check whether ITS, OTS, CTS, KLS and VER are followed by ACK;. ([specs/roland-xs80h.yaml:566](specs/roland-xs80h.yaml#L566))
+- [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:584](specs/roland-xs80h.yaml#L584))
+- [ ] Drive an XS-8xH on RS-232C (link serial, FUNCTION RECEIVER) with no CR after the ";" and confirm the same replies as over LAN, with XON/XOFF. ([specs/roland-xs80h.yaml:48](specs/roland-xs80h.yaml#L48))
+- [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:510](specs/roland-xs80h.yaml#L510))
 
 ## ross-xpression — Ross XPression (TCP)
 
@@ -2120,18 +2137,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sharp-display — Sharp professional displays (S-Format)
 
-- [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:77](specs/sharp-display.yaml#L77))
-- [ ] Confirm the login is asked for with no user name or password set, and that CR alone is taken then. ([specs/sharp-display.yaml:80](specs/sharp-display.yaml#L80))
-- [ ] Confirm zero padding (`VOLM0030`) is taken on the PN-HB and PN-R903A, whose manuals show space padding (`VOLM  30`). ([specs/sharp-display.yaml:1230](specs/sharp-display.yaml#L1230))
-- [ ] Confirm a negative value as a minus and three digits (`OFSR-005`) and a positive one zero-padded (`OFSR0005`). ([specs/sharp-display.yaml:344](specs/sharp-display.yaml#L344))
-- [ ] Note whether sending the next command right after a reply, without Sharp's 100 ms gap, is ever refused, and how long WAIT lasts for power, input and size changes against the 15 s timeout. ([specs/sharp-display.yaml:67](specs/sharp-display.yaml#L67))
-- [ ] Confirm query replies carry no leading zeros (`30`, not `0030`) for the enum codes read into names (inputs and others). ([specs/sharp-display.yaml:132](specs/sharp-display.yaml#L132))
-- [ ] Record the `INF1` and `SRNO` replies (padding, quotes) on each family. ([specs/sharp-display.yaml:3466](specs/sharp-display.yaml#L3466))
-- [ ] Confirm `ERRT` is in degrees Celsius and record the PN-R903A's six-value reply. ([specs/sharp-display.yaml:3451](specs/sharp-display.yaml#L3451))
-- [ ] Record the `TSAD????` and `INnE????` replies (with or without quotes). ([specs/sharp-display.yaml:2047](specs/sharp-display.yaml#L2047))
-- [ ] Record what `SCnn????` answers and the meaning of its two weekday digits. ([specs/sharp-display.yaml:2228](specs/sharp-display.yaml#L2228))
-- [ ] Confirm the exact `LOCKED` and `UNSELECTED` texts on the PN-HB and PN-R903A (read from garbled Japanese PDFs). ([specs/sharp-display.yaml:5698](specs/sharp-display.yaml#L5698))
-- [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5671](specs/sharp-display.yaml#L5671))
+- [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:94](specs/sharp-display.yaml#L94))
+- [ ] Confirm the login is asked for with no user name or password set, and that CR alone is taken then. ([specs/sharp-display.yaml:98](specs/sharp-display.yaml#L98))
+- [ ] Confirm zero padding (`VOLM0030`) is taken on the PN-HB and PN-R903A, whose manuals show space padding (`VOLM  30`). ([specs/sharp-display.yaml:1250](specs/sharp-display.yaml#L1250))
+- [ ] Confirm a negative value as a minus and three digits (`OFSR-005`) and a positive one zero-padded (`OFSR0005`). ([specs/sharp-display.yaml:364](specs/sharp-display.yaml#L364))
+- [ ] Note whether sending the next command right after a reply, without Sharp's 100 ms gap, is ever refused, and how long WAIT lasts for power, input and size changes against the 15 s timeout. ([specs/sharp-display.yaml:71](specs/sharp-display.yaml#L71))
+- [ ] Confirm query replies carry no leading zeros (`30`, not `0030`) for the enum codes read into names (inputs and others). ([specs/sharp-display.yaml:152](specs/sharp-display.yaml#L152))
+- [ ] Record the `INF1` and `SRNO` replies (padding, quotes) on each family. ([specs/sharp-display.yaml:3486](specs/sharp-display.yaml#L3486))
+- [ ] Confirm `ERRT` is in degrees Celsius and record the PN-R903A's six-value reply. ([specs/sharp-display.yaml:3471](specs/sharp-display.yaml#L3471))
+- [ ] Record the `TSAD????` and `INnE????` replies (with or without quotes). ([specs/sharp-display.yaml:2067](specs/sharp-display.yaml#L2067))
+- [ ] Record what `SCnn????` answers and the meaning of its two weekday digits. ([specs/sharp-display.yaml:2248](specs/sharp-display.yaml#L2248))
+- [ ] Confirm the exact `LOCKED` and `UNSELECTED` texts on the PN-HB and PN-R903A (read from garbled Japanese PDFs). ([specs/sharp-display.yaml:5718](specs/sharp-display.yaml#L5718))
+- [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5691](specs/sharp-display.yaml#L5691))
+- [ ] Drive a Sharp display on its RS-232C terminal (link serial): confirm no login is asked for and the replies are those of the LAN, each ended CR LF. ([specs/sharp-display.yaml:5727](specs/sharp-display.yaml#L5727))
 
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 

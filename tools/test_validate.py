@@ -195,6 +195,21 @@ class SerialBlock(unittest.TestCase):
         doc = {"transport": {"type": "line-tcp", "port": 1}, "on_connect": [{"send": "x", "link": "tcp"}]}
         self.assertEqual(validate.expand_serial(doc), ["on_connect[0]: link needs transport.serial"])
 
+    def test_overrides_change_framing_and_replies_for_the_models_named(self):
+        doc = self.doc(overrides=[{"framing": "delimited", "close": "", "reply_framing": "terminated",
+                                   "reply_terminators": [";"]},
+                                  {"models": ["a"], "open": "\u0002"}])
+        self.assertEqual(validate.expand_serial(doc), [])
+        self.assertEqual(validate.expand_serial(self.doc(overrides={"terminator": "cr"})), [])
+        errors = validate.expand_serial(self.doc(overrides=[{"models": ["c"], "port": 24}]))
+        self.assertIn("transport.serial.overrides[0].models: no model 'c'", errors)
+        self.assertTrue(any("overrides[0].port" in e for e in errors))
+        errors = validate.expand_serial(self.doc(overrides={"framing": "delimited", "close": ""}))
+        self.assertTrue(any("needs reply_framing" in e for e in errors))
+        errors = validate.expand_serial(self.doc(overrides={"reply_match": "("}))
+        self.assertTrue(any("reply_match" in e for e in errors))
+        self.assertTrue(validate.expand_serial(self.doc(overrides=5)))
+
 
 if __name__ == "__main__":
     unittest.main()
