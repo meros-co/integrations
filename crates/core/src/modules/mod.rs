@@ -261,7 +261,7 @@ pub(crate) fn construct(
         // OCP.1 has no assigned port, so the host must give the device's.
         #[cfg(feature = "aes70")]
         "aes70" => match context.port {
-            Some(port) => Ok(Box::new(aes70::Aes70::new(context, port))),
+            Some(port) => Ok(Box::new(aes70::Aes70::checked(context, port)?)),
             None => Err("AES70 (OCP.1) has no standard port: give the device's OCP.1 port".into()),
         },
         // d&b's integrations use 30013 or 50014 by model; the DS10 and DS100

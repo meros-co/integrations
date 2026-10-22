@@ -76,6 +76,15 @@ source:
       _ocasec._tcp, and DTLS over UDP as _ocasec._udp), and OCC/ControlDataTypes/NetworkApplicationDataTypes.swift
       (the DNS-SD service types _oca._tcp, _oca._udp, _ocaws._tcp, _ocasec._tcp and _ocasec._udp). No code was
       copied.
+  - title: "IETF RFCs for secure OCP.1: RFC 5246 (TLS 1.2), RFC 4279 (PSK cipher suites, DHE_PSK), RFC 6347 (DTLS 1.2), RFC 5746 (renegotiation indication), RFC 7366 (encrypt-then-MAC), RFC 7627 (extended master secret), RFC 7919 (FFDHE groups, used in tests)"
+    author: IETF
+    url: "https://www.rfc-editor.org/rfc/rfc5246"
+    note: >
+      The TLS 1.2 and DTLS 1.2 client for secure OCP.1 follows these: the record layer, handshake and PRF
+      (RFC 5246), the DHE_PSK key exchange and pre-master secret (RFC 4279 section 3), DTLS records, epochs,
+      the cookie exchange, retransmission and replay window (RFC 6347), renegotiation_info (RFC 5746),
+      encrypt-then-MAC (RFC 7366) and the extended master secret (RFC 7627). Checked against OpenSSL's
+      s_server on loopback (TLS and DTLS, OpenSSL 1.1.1 and 3.6).
   - title: "OCA Alliance: AES70 Control Model"
     author: OCA Alliance
     url: "https://ocaalliance.com/aes70-control-model/"
@@ -94,9 +103,21 @@ settings:
   # How OCP.1 reaches the device (AES70-3): a TCP stream, UDP datagrams, or
   # WebSocket binary messages, plain (ws) or over TLS (wss). The port given on
   # opening is that transport's.
-  transport: { type: enum, values: [tcp, udp, ws, wss], default: tcp,
+  transport: { type: enum, values: [tcp, udp, ws, wss, tls, dtls], default: tcp,
                label: Transport,
-               description: "How OCP.1 reaches the device: TCP, UDP, a WebSocket (ws) or a WebSocket over TLS (wss), on the port given when opening." }
+               description: "How OCP.1 reaches the device: TCP, UDP, a WebSocket (ws or wss), or secure OCP.1 with a pre-shared key over TLS (tls) or DTLS (dtls), on the port given when opening." }
+  # Secure OCP.1 (tls, dtls): the pre-shared key, in hex (spaces and colons
+  # between bytes allowed), and the identity sent with it. AES70 has devices
+  # send the identity hint OCA-PSK; SwiftOCA uses that as the identity too.
+  psk: { type: string, secret: true, default: "", max_length: 131070, pattern: "^[0-9A-Fa-f :]*$",
+         label: Pre-shared key,
+         description: "The device's pre-shared key in hex, for the tls and dtls transports; never logged." }
+  psk_identity: { type: string, default: "OCA-PSK", max_length: 65535,
+                  label: PSK identity,
+                  description: "The identity sent with the pre-shared key, for the tls and dtls transports; it travels unencrypted." }
+  handshake_timeout_ms: { type: int, min: 1000, max: 600000, default: 10000,
+                          label: Handshake timeout,
+                          description: "Milliseconds the TLS or DTLS handshake may take before the connection is dropped and tried again." }
   # The WebSocket's path, for ws and wss.
   ws_path: { type: string, default: "/", max_length: 1024,
              label: WebSocket path,
@@ -154,18 +175,20 @@ ports:
   - { port: null, protocol: udp, role: control, when: "transport udp", note: "OCP.1 over UDP: the device's port, given when the device is opened" }
   - { port: null, protocol: ws, role: control, when: "transport ws", note: "OCP.1 over a WebSocket: the device's port, given when the device is opened" }
   - { port: null, protocol: wss, role: control, when: "transport wss", note: "OCP.1 over a WebSocket over TLS: the device's port, given when the device is opened" }
+  - { port: null, protocol: tls, role: control, when: "transport tls", note: "Secure OCP.1, TLS 1.2 with a pre-shared key over TCP (_ocasec._tcp): the device's port, given when the device is opened" }
+  - { port: null, protocol: udp, role: control, when: "transport dtls", note: "Secure OCP.1, DTLS 1.2 with a pre-shared key over UDP (_ocasec._udp): the device's port, given when the device is opened" }
 
 models:
   - id: aes70-device
-    name: "Any AES70 device over OCP.1 (TCP, UDP or WebSocket; give the device's OCP.1 port)"
+    name: "Any AES70 device over OCP.1 (TCP, UDP, WebSocket, or secure over TLS or DTLS; give the device's OCP.1 port)"
     supports: &all
       [set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, identify,
       get_property, set_property, call_method, refresh_objects, get_device_info]
     verification: none
     notes: >
       One model for every device: what a device offers is discovered from its object tree, not declared here.
-      AES70 assigns no port; the device's documentation, or its DNS-SD record (_oca._tcp, _oca._udp, _ocaws._tcp),
-      gives it. Remote preamps on AES67 and ST 2110 stageboxes, amplifiers and processors, and other devices that
+      AES70 assigns no port; the device's documentation, or its DNS-SD record (_oca._tcp, _oca._udp, _ocaws._tcp,
+      _ocasec._tcp, _ocasec._udp), gives it. Remote preamps on AES67 and ST 2110 stageboxes, amplifiers and processors, and other devices that
       speak OCP.1. d&b audiotechnik amplifiers have their own integration (dbaudio) with their controls named.
 
 commands:
@@ -379,10 +402,9 @@ quirks:
     severity: warning
     text: >
       AES70 assigns no port to OCP.1, so the device's port must be given when it is opened (the open fails
-      without it), on the transport the transport setting names: TCP (the default), UDP, or a WebSocket, plain or
-      over TLS. Devices advertise them over DNS-SD. Secure OCP.1 (_ocasec._tcp, and DTLS as _ocasec._udp) is not
-      implemented: AES70 has it use TLS 1.2 with a pre-shared key (TLS_DHE_PSK_WITH_AES_128_CBC_SHA, identity
-      hint OCA-PSK), which the core's TLS library does not offer.
+      without it), on the transport the transport setting names: TCP (the default), UDP, a WebSocket, plain or
+      over TLS, or secure OCP.1 over TLS or DTLS. Devices advertise them over DNS-SD (_oca._tcp, _oca._udp,
+      _ocaws._tcp, _ocasec._tcp, _ocasec._udp).
   - models: [all]
     severity: info
     text: >
@@ -402,6 +424,33 @@ quirks:
       WebSocket handshake; turn ws_subprotocol off for it. Text messages are ignored. Keep-alives are sent as
       on TCP, and a ping or pong from the device also counts as hearing from it. Over wss a self-signed
       certificate is refused unless accept_invalid_certs is on.
+  - models: [all]
+    severity: warning
+    text: >
+      Secure OCP.1 (transport tls, _ocasec._tcp, or dtls, _ocasec._udp) is TLS 1.2 or DTLS 1.2 with a pre-shared
+      key and the one cipher suite AES70 names, TLS_DHE_PSK_WITH_AES_128_CBC_SHA; the device sends the identity
+      hint OCA-PSK. Those facts come from SwiftOCA's documentation, which cites AES70-2024 11.2.4; the standard
+      itself was not available. The open fails without a psk (hex). The identity sent is psk_identity, OCA-PSK
+      unless set, as SwiftOCA sends; a device that sends another hint, or none, is still tried and the hint is
+      logged. The module's own TLS client offers nothing else: no other suite or version, no certificates,
+      no resumption or tickets, no compression, no renegotiation (a HelloRequest after the handshake is
+      answered with no_renegotiation). It offers the extended master secret and encrypt-then-MAC and uses each
+      when the device agrees. It refuses a Diffie-Hellman group under 2048 bits or over 8192 (OpenSSL 1.1.1
+      offers 1024 bits for this suite unless configured otherwise), an even modulus, a generator or public
+      value outside 2 to p-2, and a degenerate shared secret. A wrong key or identity fails the handshake
+      (the device's alert, or its Finished not verifying), reported as the disconnect reason; the module tries
+      again with the usual backoff. The handshake must finish within handshake_timeout_ms. The keep-alive is
+      the first PDU once the handshake is done.
+  - models: [all]
+    severity: info
+    text: >
+      Over DTLS each OCP.1 PDU is one record in one datagram, kept within 1452 bytes with the record around it,
+      as over plain UDP; a single PDU larger than a record (16 KiB) cannot be sent. The handshake follows RFC
+      6347: the cookie exchange if the device asks, flights sent again on a timer from 1 s doubling to 60 s,
+      fragments reassembled. A record that does not authenticate, or is replayed (a 64-record window), is
+      discarded without ending the session, as DTLS asks; nothing unprotected is read after the handshake.
+      Alerts and close_notify end the session as over TLS. Datagrams from any address other than the device's
+      are not heard.
   - models: [all]
     severity: info
     text: >
