@@ -1,6 +1,6 @@
 spec: 1
 id: sennheiser-ew-g3-g4
-name: Sennheiser evolution wireless G3 / G4 (Media Control Protocol)
+name: Sennheiser evolution wireless G3 / G4 and 2000 series (Media Control Protocol)
 vendor: Sennheiser
 category: wireless
 implementation: native
@@ -16,6 +16,19 @@ source:
     note: >
       Manufacturer document, retrieved from a reseller's mirror. Command syntax,
       replies, error codes, cyclic attribute layouts and the Push lifecycle.
+  - title: Media control protocol description — stationary devices of the ew 300 G3, ew 500 G3 and 2000 series (revision 120122, 01/2012)
+    author: Sennheiser
+    url: https://www.sennheiser.com/globalassets/digizuite/40900-en-ewg3_2000_mediacontrolprotocoldescription_120122.pdf
+    note: >
+      Manufacturer document, retrieved from sennheiser.com on 2026-10-22. The same protocol as
+      TI 1254 for the EM 300 G3, EM 500 G3, SR 300 IEM G3, EM 2000, EM 2050, SR 2000 IEM and
+      SR 2050 IEM from firmware 1.7.0 (not the EM 100 G3): UDP port 53212 both ways, commands
+      of at most 1500 characters ending in CR, echo or numbered error replies (1000-1050),
+      relative changes with #, Push (timeout 0-300 s, cycle 0-60000 ms in 100 ms steps, the
+      third parameter 0-7), BankList, Frequency, RfConfig, Name, Mute, FirmwareRevision, the Msg
+      and Config cyclic attributes, the EM's Squelch, AfOut (3 dB steps on G3, 1 dB on the 2000
+      series), Equalizer and RF1, RF2, States, RF, AF and Bat, and the SR's Sensitivity,
+      Equalizer, Mode, AF and States.
   - title: Meros internal G3/G4 client (not public)
     note: >
       Meros. Tested against real G3/G4 racks: the need for Push, resubscribing
@@ -53,8 +66,53 @@ models:
                get_bank_list, set_bank_channel, step_frequency, step_squelch, step_af_out]
     verification: none
     notes: >
-      A consumer runs against ew 500 G3 receivers over this protocol. TI 1254 covers
-      G4 only; G3 behaviour is taken from that use.
+      Requires firmware 1.7.0 or later. The EM 100 G3 does not support the
+      protocol. AF out moves in 3 dB steps.
+  - id: sr-300-iem-g3
+    name: Sennheiser SR 300 IEM G3 transmitter
+    channels: 1
+    supports: [rf_mute, set_frequency, set_name, set_sensitivity, set_mode, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_sensitivity, set_iem_equalizer]
+    verification: none
+    notes: >
+      Requires firmware 1.7.0 or later. An in-ear monitor transmitter; its
+      Mute stops the RF carrier, so it is exposed as rf_mute.
+  - id: em-2000
+    name: Sennheiser EM 2000 receiver
+    channels: 1
+    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_squelch, step_af_out]
+    verification: none
+    notes: >
+      Requires firmware 1.7.0 or later. AF out moves in 1 dB steps.
+  - id: em-2050
+    name: Sennheiser EM 2050 twin receiver
+    channels: 1
+    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_squelch, step_af_out]
+    verification: none
+    notes: >
+      Requires firmware 1.7.0 or later. AF out moves in 1 dB steps. Each of
+      its two receivers is opened as a device of its own, at its own address.
+  - id: sr-2000-iem
+    name: Sennheiser SR 2000 IEM transmitter
+    channels: 1
+    supports: [rf_mute, set_frequency, set_name, set_sensitivity, set_mode, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_sensitivity, set_iem_equalizer]
+    verification: none
+    notes: >
+      Requires firmware 1.7.0 or later. Its Mute stops the RF carrier, so it
+      is exposed as rf_mute.
+  - id: sr-2050-iem
+    name: Sennheiser SR 2050 IEM twin transmitter
+    channels: 1
+    supports: [rf_mute, set_frequency, set_name, set_sensitivity, set_mode, get_rf_config, get_firmware,
+               get_bank_list, set_bank_channel, step_frequency, step_sensitivity, set_iem_equalizer]
+    verification: none
+    notes: >
+      Requires firmware 1.7.0 or later. Each of its two transmitters is
+      opened as a device of its own, at its own address; Mute stops that
+      transmitter's RF carrier, so it is exposed as rf_mute.
 
 commands:
   mute:
@@ -102,7 +160,7 @@ commands:
     params:
       level_db: { type: int, min: -24, max: 24, required: true,
                   label: AF out,
-                  description: "Receiver audio output level in dB, -24 to +24 in 3 dB steps; values between steps are rejected." }
+                  description: "Receiver audio output level in dB, -24 to +24: in 3 dB steps on G3 and G4, 1 dB steps on the 2000 series; values between steps are rejected." }
     returns: ack
 
   set_equalizer:
@@ -180,11 +238,11 @@ commands:
     returns: ack
 
   step_af_out:
-    summary: Raise or lower the AF out by 3 dB steps (relative changes stop at +18 dB)
+    summary: Raise or lower the AF out by whole steps (relative changes stop at +18 dB)
     params:
-      steps: { type: int, min: -16, max: 16, required: true,
+      steps: { type: int, min: -48, max: 48, required: true,
                label: Steps,
-               description: "3 dB steps to move, positive up and negative down, not 0." }
+               description: "Steps to move, 3 dB each on G3 and G4 and 1 dB on the 2000 series, positive up and negative down, not 0." }
     returns: ack
 
   step_sensitivity:
@@ -277,42 +335,44 @@ quirks:
       Network control must be enabled on the device. Until it is, the device
       ignores the protocol entirely, which presents as an unreachable address.
 
-  - models: [sr-iem-g4]
+  - models: [sr-iem-g4, sr-300-iem-g3, sr-2000-iem, sr-2050-iem]
     severity: critical
     text: >
       rf_mute switches off the transmitter's carrier. Every receiver on that
       frequency loses its signal, so a performer's in-ear mix stops.
 
-  - models: [em-300-500-g4, em-300-500-g3]
+  - models: [em-300-500-g4, em-300-500-g3, em-2000, em-2050]
     severity: info
     text: >
       Set commands are acknowledged by the device echoing the instruction, and
       rejected with a numbered error such as "1020: Value out of range". A
       command with no reply within 1 s reports unverified rather than failure.
 
-  - models: [em-300-500-g4, em-300-500-g3]
+  - models: [em-300-500-g4, em-300-500-g3, em-2000, em-2050]
     severity: info
     text: >
-      TI 1254's bit table for States gives bit 1 as TX mute, but two of its own
-      examples disagree with the table. tx_mute uses bit 1 only, which the table
+      The bit table for States (TI 1254, and the G3 and 2000 series document)
+      gives bit 1 as TX mute, but two examples in each disagree with the table. tx_mute uses bit 1 only, which the table
       and the "States 9" example agree on; mute_flags carries all four bits for
       review against hardware.
 
-  - models: [em-300-500-g4, em-300-500-g3]
+  - models: [em-300-500-g4, em-300-500-g3, em-2000, em-2050]
     severity: info
     text: >
       Squelch accepts 0 or 5-25 dB in 2 dB steps, and AF out -24 to +24 dB in
-      3 dB steps. Values between steps are rejected by the device with error
-      1020 rather than rounded.
+      3 dB steps (G3 and G4) or 1 dB steps (2000 series). Values between steps
+      are rejected by the device with error 1020 rather than rounded.
 
-  - models: [em-300-500-g3]
-    severity: warning
+  - models: [em-300-500-g3, sr-300-iem-g3, em-2000, em-2050, sr-2000-iem, sr-2050-iem]
+    severity: info
     text: >
-      No manufacturer document covering G3 has been found. A consumer runs against
-      ew 500 G3 receivers, but no conformance vector has been recorded from one,
-      and commands a consumer does not use (squelch, AF out, equalizer, RfConfig,
-      FirmwareRevision, BankList, relative changes) are assumed to behave as on
-      G4.
+      Sennheiser's G3 and 2000 series document describes the same commands,
+      replies and cyclic attributes as TI 1254, which this module follows; no
+      exchange has been recorded from a G3 or 2000 series unit. The document
+      lists the EM 2050 and SR 2050 IEM without saying how their two receivers
+      or transmitters are addressed; each is taken to be a device of its own.
+      On the 2000 series AF out moves in 1 dB steps, and whether it accepts
+      +19 to +23 dB (the document gives "-24..+18(+24)") is not stated.
 
   - models: [all]
     severity: info

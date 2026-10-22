@@ -1936,16 +1936,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On an EM 4 Dante, confirm subscriptions and every channel command work on channels 3 and 4 (only channels 1 and 2 have been tested on hardware). ([specs/sennheiser-ew-dx.yaml:508](specs/sennheiser-ew-dx.yaml#L508))
 - [ ] Confirm a 3 s silence check against /api/ssc/version does not lose a healthy connection. ([specs/sennheiser-ew-dx.yaml:480](specs/sennheiser-ew-dx.yaml#L480))
 
-## sennheiser-ew-g3-g4 — Sennheiser ew G3 / G4
+## sennheiser-ew-g3-g4 — Sennheiser ew G3 / G4 and 2000 series
 
-- [ ] Check which bit of States is TX mute against a real receiver, using mute_flags, since the document's examples disagree with its table. ([specs/sennheiser-ew-g3-g4.yaml:293](specs/sennheiser-ew-g3-g4.yaml#L293))
-- [ ] On a G3 receiver, confirm squelch, AF out, equalizer, RfConfig, FirmwareRevision, BankList and the relative changes behave as on G4 (no G3 document has been found). ([specs/sennheiser-ew-g3-g4.yaml:308](specs/sennheiser-ew-g3-g4.yaml#L308))
+- [ ] Check which bit of States is TX mute against a real receiver, using mute_flags, since the document's examples disagree with its table. ([specs/sennheiser-ew-g3-g4.yaml:351](specs/sennheiser-ew-g3-g4.yaml#L351))
+- [ ] On a G3 (EM 300/500 G3, SR 300 IEM G3) and a 2000 series unit, record the replies and cyclic attributes the G3 and 2000 series document describes and check them against the G4 behavior this module follows. ([specs/sennheiser-ew-g3-g4.yaml:366](specs/sennheiser-ew-g3-g4.yaml#L366))
+- [ ] Find out how the EM 2050's two receivers and the SR 2050 IEM's two transmitters are addressed over the protocol (taken as one address each; the document does not say). ([specs/sennheiser-ew-g3-g4.yaml:88](specs/sennheiser-ew-g3-g4.yaml#L88))
+- [ ] On an EM 2000 or 2050, confirm AF out takes every whole dB from -24 to +18, and whether +19 to +23 dB are accepted (the document gives "-24..+18(+24)" with 1 dB steps). ([specs/sennheiser-ew-g3-g4.yaml:366](specs/sennheiser-ew-g3-g4.yaml#L366))
+- [ ] Record an SR's Af cyclic attribute: the document's example has five values ("Af 15 25 40 38 5") where its table gives four (two levels, two peak holds), and af.levels keeps them raw. ([specs/sennheiser-ew-g3-g4.yaml:289](specs/sennheiser-ew-g3-g4.yaml#L289))
 - [ ] Opened for commands only, confirm a receiver with no Push subscription answers a bare `Name`, the liveness check. ([crates/core/src/modules/sennheiser_mcp.rs:37](crates/core/src/modules/sennheiser_mcp.rs#L37))
-- [ ] Confirm a BankList reply carries no bank number (as the document's example shows), so it can only be tied to its request, and how many channels a preset bank lists. ([specs/sennheiser-ew-g3-g4.yaml:140](specs/sennheiser-ew-g3-g4.yaml#L140))
-- [ ] Confirm `Frequency f bank channel` with the channel's own frequency is answered with that bank and channel, and with 0 0 when they do not match. ([specs/sennheiser-ew-g3-g4.yaml:151](specs/sennheiser-ew-g3-g4.yaml#L151))
-- [ ] Check the reply to a relative change: the document's frequency example shows `821025 0 0` without the Frequency keyword, which the core would not match. ([specs/sennheiser-ew-g3-g4.yaml:166](specs/sennheiser-ew-g3-g4.yaml#L166))
-- [ ] Confirm the SR answers `Equalizer 1` with all six values, and the EM's AF third value carries the current mute bits as the AF table gives them. ([specs/sennheiser-ew-g3-g4.yaml:198](specs/sennheiser-ew-g3-g4.yaml#L198))
-- [ ] Confirm a Push with mode 3 sends every configuration attribute at once, so renewing it every 8 s keeps the configuration current without other reads. ([specs/sennheiser-ew-g3-g4.yaml:317](specs/sennheiser-ew-g3-g4.yaml#L317))
+- [ ] Confirm a BankList reply carries no bank number (as the document's example shows), so it can only be tied to its request, and how many channels a preset bank lists. ([specs/sennheiser-ew-g3-g4.yaml:198](specs/sennheiser-ew-g3-g4.yaml#L198))
+- [ ] Confirm `Frequency f bank channel` with the channel's own frequency is answered with that bank and channel, and with 0 0 when they do not match. ([specs/sennheiser-ew-g3-g4.yaml:209](specs/sennheiser-ew-g3-g4.yaml#L209))
+- [ ] Check the reply to a relative change: the document's frequency example shows `821025 0 0` without the Frequency keyword, which the core would not match. ([specs/sennheiser-ew-g3-g4.yaml:224](specs/sennheiser-ew-g3-g4.yaml#L224))
+- [ ] Confirm the SR answers `Equalizer 1` with all six values, and the EM's AF third value carries the current mute bits as the AF table gives them. ([specs/sennheiser-ew-g3-g4.yaml:256](specs/sennheiser-ew-g3-g4.yaml#L256))
+- [ ] Confirm a Push with mode 3 sends every configuration attribute at once, so renewing it every 8 s keeps the configuration current without other reads. ([specs/sennheiser-ew-g3-g4.yaml:377](specs/sennheiser-ew-g3-g4.yaml#L377))
 
 ## sennheiser-l-6000 — Sennheiser L 6000
 
