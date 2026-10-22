@@ -554,6 +554,167 @@ async fn link_tcp_uses_the_network_and_a_serial_only_model_defaults_to_its_port(
         .any(|p| p.path == "COM6"));
 }
 
+/// DUAL with framing the vendor documents differently on the serial port:
+/// STX before each message and no CR, replies ended by ";" or an ACK byte,
+/// and one model with no STX.
+const OVERRIDES: &str = r#"    overrides:
+      - { framing: delimited, open: "\u0002", close: "", reply_framing: terminated,
+          reply_terminators: [";", "\u0006"], reply_match: '^\x06|^Ver' }
+      - { models: [rs232-only], open: "" }
+"#;
+
+fn overridden() -> String {
+    DUAL.replace(
+        "    flow_control: none\n",
+        &format!("    flow_control: none\n{OVERRIDES}"),
+    )
+    .replace(r#"send: "CUT""#, r#"send: "CUT;""#)
+    .replace(
+        r#"expect: { contains: "Ok" }"#,
+        r#"expect: { matches: "Ok|\u0006" }"#,
+    )
+}
+
+/// Bytes the core sent the device, up to and including the next ";".
+async fn upto_semicolon(device: &mut (impl tokio::io::AsyncRead + Unpin)) -> String {
+    let mut out = Vec::new();
+    let mut byte = [0u8; 1];
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            device.read_exact(&mut byte).await.unwrap();
+            out.push(byte[0]);
+            if byte[0] == b';' {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("a message within 5 s");
+    String::from_utf8(out).unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn overrides_change_the_framing_on_the_serial_port_only() {
+    let spec = DeviceSpec::from_yaml(&overridden()).unwrap();
+    assert_eq!(spec.serial_overrides("networked")["open"], json!("\u{2}"));
+    assert_eq!(spec.serial_overrides("rs232-only")["open"], json!(""));
+    assert_eq!(
+        spec.serial_overrides("rs232-only")["reply_framing"],
+        json!("terminated")
+    );
+    let catalog = Catalog {
+        devices: [(spec.id.clone(), spec)].into(),
+    };
+    let ports = Arc::new(MemoryPorts::default());
+    let mut stx = ports.plug("COM8");
+    let mut plain = ports.plug("COM9");
+    let core = Core::with_catalog(
+        catalog,
+        CoreOptions::new().bind_address([127, 0, 0, 1].into()),
+    )
+    .unwrap()
+    .with_serial_ports(ports.clone());
+
+    // On the serial port: STX before each message, nothing after it, and an
+    // ACK byte with no line ending is the reply.
+    let id = dual_open(
+        &core,
+        "networked",
+        "",
+        json!({"link": "serial", "serial_port": "COM8"}),
+    )
+    .unwrap();
+    wait_connection(&core, id, |c| *c == Connection::Connected).await;
+    let command = core.execute(id, "cut", Params::new());
+    let answer = async {
+        assert_eq!(
+            upto_semicolon(&mut stx).await,
+            "\u{2}SERIAL\u{2}HELLO\u{2}CUT;"
+        );
+        stx.write_all(b"\x06").await.unwrap();
+    };
+    let (result, ()) = tokio::join!(command, answer);
+    assert_eq!(result, Ok(Outcome::Ack));
+
+    // A model whose entry drops the STX.
+    let only = dual_open(&core, "rs232-only", "", json!({"serial_port": "COM9"})).unwrap();
+    wait_connection(&core, only, |c| *c == Connection::Connected).await;
+    let command = core.execute(only, "cut", Params::new());
+    let answer = async {
+        assert_eq!(upto_semicolon(&mut plain).await, "SERIALHELLOCUT;");
+        plain.write_all(b"\x06").await.unwrap();
+    };
+    let (result, ()) = tokio::join!(command, answer);
+    assert_eq!(result, Ok(Outcome::Ack));
+
+    // Over TCP the transport's own framing stays: CR after each line.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let tcp = core
+        .open(OpenRequest {
+            device: "dual-test".into(),
+            model: "networked".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: Params::new(),
+            monitor: true,
+        })
+        .unwrap();
+    let (mut socket, _) = tokio::time::timeout(Duration::from_secs(5), listener.accept())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(line(&mut socket).await, "HELLO");
+    wait_connection(&core, tcp, |c| *c == Connection::Connected).await;
+    let command = core.execute(tcp, "cut", Params::new());
+    let answer = async {
+        assert_eq!(line(&mut socket).await, "CUT;");
+        socket.write_all(b"Ok\r\n").await.unwrap();
+    };
+    let (result, ()) = tokio::join!(command, answer);
+    assert_eq!(result, Ok(Outcome::Ack));
+}
+
+#[test]
+fn overrides_name_only_framing_and_reply_keys_and_known_models() {
+    let good = overridden();
+    for (from, to, says) in [
+        (
+            r#"{ models: [rs232-only], open: "" }"#,
+            "{ port: 24 }",
+            "port",
+        ),
+        ("models: [rs232-only], open", "models: [nope], open", "nope"),
+        (OVERRIDES, "    overrides: 5\n", "overrides"),
+    ] {
+        assert!(good.contains(from), "{from}");
+        let e = DeviceSpec::from_yaml(&good.replace(from, to)).unwrap_err();
+        assert!(e.contains(says), "{from}: {e}");
+    }
+    // Delimited with an empty close needs replies framed some other way.
+    let bare = good.replace(
+        "reply_framing: terminated,\n          reply_terminators: [\";\", \"\\u0006\"], ",
+        "",
+    );
+    assert_ne!(bare, good);
+    let spec = DeviceSpec::from_yaml(&bare).unwrap();
+    let core = Core::with_catalog(
+        Catalog {
+            devices: [(spec.id.clone(), spec)].into(),
+        },
+        CoreOptions::new().bind_address([127, 0, 0, 1].into()),
+    )
+    .unwrap()
+    .with_serial_ports(Arc::new(MemoryPorts::default()));
+    assert!(dual_open(
+        &core,
+        "networked",
+        "",
+        json!({"link": "serial", "serial_port": "COM1"})
+    )
+    .is_err());
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_link_without_what_it_needs_is_refused_on_opening() {
     let core = dual_core(Arc::new(MemoryPorts::default()));

@@ -987,7 +987,7 @@ def port_checks(doc: dict) -> list[str]:
         # A delimited reply ends at `close`, compared without surrounding
         # whitespace: an empty one would never end a message.
         if (t.get("type") in ("line-tcp", "line-serial") and t.get("framing") == "delimited"
-                and not str(t.get("close", "")).strip()):
+                and not str(t.get("close", "")).strip() and "reply_framing" not in t):
             errors.append("transport.close: framing delimited needs a close that is not only whitespace")
         if t.get("type") == "line-serial":
             if not any(e["protocol"] == "serial" for e in control):
@@ -1076,6 +1076,12 @@ def serial_checks(doc: dict) -> list[str]:
 LINK_SETTINGS = ("link",) + SERIAL_SETTINGS
 
 
+# The transport keys a `serial` block's `overrides` may change (SPEC.md §2,
+# "The same protocol on a serial port"), as in the core's SERIAL_OVERRIDES.
+SERIAL_OVERRIDES = ("framing", "open", "close", "terminator", "reply_framing",
+                    "reply_terminators", "reply_fence", "reply_match", "error_match")
+
+
 def expand_serial(doc: dict) -> list[str]:
     """A line-tcp transport's `serial` block stands for the `link` setting and
     the six serial settings (SPEC.md §2, "The same protocol on a serial
@@ -1099,6 +1105,36 @@ def expand_serial(doc: dict) -> list[str]:
         for m in block.get(key) or []:
             if m not in model_ids:
                 errors.append(f"transport.serial.{key}: no model '{m}'")
+    # `overrides`: the framing and reply keys that differ on the serial
+    # port, for every model or the models an entry names; with a delimited
+    # framing and an empty close, replies need a framing of their own.
+    overrides = block.get("overrides")
+    entries = overrides if isinstance(overrides, list) else [overrides] if overrides is not None else []
+    if overrides is not None and (not entries or not all(isinstance(e, dict) for e in entries)):
+        errors.append("transport.serial.overrides: a mapping or a list of them")
+        entries = []
+    for i, entry in enumerate(entries):
+        for key in entry:
+            if key != "models" and key not in SERIAL_OVERRIDES:
+                errors.append(f"transport.serial.overrides[{i}].{key}: not a framing or reply key a serial port can change")
+        for m in entry.get("models") or []:
+            if m not in model_ids:
+                errors.append(f"transport.serial.overrides[{i}].models: no model '{m}'")
+    for m in sorted(model_ids):
+        merged = dict(t)
+        for entry in entries:
+            if "models" not in entry or m in entry["models"]:
+                merged.update({k: v for k, v in entry.items() if k != "models"})
+        if (merged.get("framing") == "delimited" and not str(merged.get("close", "")).strip()
+                and "reply_framing" not in merged):
+            errors.append(f"transport.serial.overrides: on the serial port of {m}, framing delimited "
+                          "with an empty close needs reply_framing")
+        for key in ("reply_match", "error_match", "reply_fence"):
+            if isinstance(merged.get(key), str):
+                try:
+                    re.compile(merged[key])
+                except re.error as e:
+                    errors.append(f"transport.serial.overrides: {key} for {m}: {e}")
     only = "serial_only" in block
     link = block.get("link", "tcp")
     if only and link == "serial":

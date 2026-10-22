@@ -184,10 +184,10 @@ no number and reaches no HTTP server.
 transport:
   type: line-serial
   framing: delimited
-  open: ""
+  open: "\u0002"
   close: ";"
   reply_framing: terminated
-  reply_terminators: [";", ""]
+  reply_terminators: [";", "\u0006"]
 settings:
   serial_port:  { type: string, required: true, max_length: 256, label: Serial port,
                   description: "The host's serial port: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
@@ -297,6 +297,44 @@ network only:
 on_connect:
   - { when_set: password, link: tcp, after_prompt: "Password:", send: "{settings.password}" }
 ```
+
+Some vendors frame the same commands differently on the serial port: Roland
+wants STX (02H) before each command on RS-232 and no line ending after its
+`;`, and answers with an ACK byte (06H) where the network gets `ACK` and a
+line feed. The block's `overrides` give the transport keys that differ
+there: `framing`, `open`, `close`, `terminator`, `reply_framing`,
+`reply_terminators`, `reply_fence`, `reply_match` and `error_match`. It is a
+mapping for every model, or a list of mappings each for the `models` it
+names (every model when it names none); every entry for the device's model
+is laid over the transport, in order, when the link is serial, and the TCP
+link keeps the transport as it is. Templates, `expect` and the telemetry
+rules are shared, so a reply that differs (`ACK` or the ACK byte) is matched
+by a regex accepting both.
+
+```yaml
+transport:
+  type: line-tcp
+  port: 8023
+  framing: terminated
+  terminator: crlf
+  reply_match: 'ACK;|ERR:[0-9]+;'
+  serial:
+    models: [v-160hd, v-80hd]
+    baud_rate: { default: 115200, values: [9600, 38400, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
+    overrides:
+      - { framing: delimited, close: "", reply_framing: terminated,
+          reply_terminators: [";", "\u0006"] }
+      - { models: [v-160hd], open: "\u0002" }
+```
+
+`framing: delimited` with an empty `close` sends the payload with only `open`
+before it (or as it is, with no `open`); it needs a `reply_framing`, since
+no marker would end a reply. This holds for any line transport, not only in
+`overrides`.
 
 A vector plays a command or a telemetry message on the serial port by giving
 `link: serial` in its `settings` (and on TCP otherwise, unless `serial_only`
