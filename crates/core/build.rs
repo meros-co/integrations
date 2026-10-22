@@ -68,6 +68,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "blackmagic-teranex",
             "blackmagic-ultimatte",
             "blackmagic-videohub",
+            "blackmagic-videohub-leitch",
         ],
     ),
     ("vendor-bluenviron", &["mediamtx"]),

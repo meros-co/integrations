@@ -622,6 +622,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
 - [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
+## blackmagic-videohub-leitch — Blackmagic Videohub (RS-422, Leitch protocol)
+
+- [ ] Confirm the ">" prompt is the only answer to every command, comes after the S: or V: lines a query returns, and that an unrecognized or out-of-range command gets no other answer (Blackmagic documents none). ([specs/blackmagic-videohub-leitch.yaml:58](specs/blackmagic-videohub-leitch.yaml#L58))
+- [ ] Confirm the bare CR on connecting is answered by ">" and that nothing else (a banner) is sent. ([specs/blackmagic-videohub-leitch.yaml:66](specs/blackmagic-videohub-leitch.yaml#L66))
+- [ ] Record the S: and V: notifications as sent: the hex digits' case, any zero padding, and whether a route change made by this connection is notified with status reporting off. ([specs/blackmagic-videohub-leitch.yaml:284](specs/blackmagic-videohub-leitch.yaml#L284))
+- [ ] Confirm the RS-422 port needs no flow control, which Blackmagic leaves unstated. ([specs/blackmagic-videohub-leitch.yaml:107](specs/blackmagic-videohub-leitch.yaml#L107))
+- [ ] Confirm which models have an RS-422 router control port that answers in Leitch server mode (Smart Videohub 12x12/20x20/40x40, CleanSwitch 12x12, Universal Videohub 72/288 from the manuals; older Smart Videohub, Broadcast and Studio Videohub not checked) and the connector each uses. ([specs/blackmagic-videohub-leitch.yaml:112](specs/blackmagic-videohub-leitch.yaml#L112))
+- [ ] Confirm a read-back right after a route (`@ X?`) reports the new source, and that @ B:R behaves as @ B:C. ([specs/blackmagic-videohub-leitch.yaml:160](specs/blackmagic-videohub-leitch.yaml#L160))
+
 ## boinx-mimolive — Boinx mimoLive
 
 - [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:2091](specs/boinx-mimolive.yaml#L2091))

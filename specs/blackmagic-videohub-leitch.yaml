@@ -1,0 +1,350 @@
+spec: 1
+id: blackmagic-videohub-leitch
+name: Blackmagic Videohub (RS-422 router control, Leitch protocol)
+vendor: Blackmagic Design
+category: router
+
+# The RS-422 router control port of Videohubs that have one speaks the router
+# (server) side of the Leitch Serial Pass-Through Protocol, not the Ethernet
+# protocol of blackmagic-videohub: one line per command ended by CR, replies
+# ended by CR LF, and a ">" prompt with no line ending after each command.
+# Destinations, sources and levels are hexadecimal from 0 on the wire; here
+# they are numbered from 1, as on the router. Only level 0 exists.
+source:
+  - title: Videohub Developer Information (May 2018), Videohub RS-422 Protocol
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/DeveloperManuals/VideohubDeveloperInformation.pdf
+    note: >
+      Manufacturer-documented, and the source of every command and rule here.
+      Leitch Server and Leitch Client modes, the Leitch Serial Pass-Through
+      Protocol (section 4 of Leitch SPR-MAN revision D), DB9 or RJ11 port (p.8);
+      pinouts, 9600 N81, line format (250 characters at most, CR to the router,
+      CR LF from it), base-16 numbering from zero, level 0 only, the CR sent on
+      connecting and the ">" prompt after each command (p.9); S: and V:
+      notifications, the global commands (@ !, @ ?, @ Z:), the immediate
+      commands (@ X:, @ X?, @ S?) and the salvo commands (@ P:, @ P?, @ V?,
+      @ B:C, @ B:R, @ B:E) (p.10). Other Leitch commands are accepted and
+      ignored.
+  - title: Blackmagic Videohub Installation and Operation Manual (May 2025)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/Videohub12GInstallation.pdf
+    note: >
+      Manufacturer-documented. Serial Control Settings in Videohub Setup: the
+      Leitch protocol switch, Leitch server to be controlled from an automation
+      or router control system (p.37). Its Developer Information repeats the
+      RS-422 protocol above.
+  - title: Videohub Installation and Operation Manual (February 2020)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/VideohubInstallation.pdf
+    note: >
+      Manufacturer-documented. Models with an RS-422 router control port: Smart
+      Videohub 12x12, 20x20 and 40x40 and Smart Videohub CleanSwitch 12x12 (rear
+      panels, p.5-12), Universal Videohub 288 and 72 ("Third party router
+      controllers can control ... as an RS-422 slave device", p.26-33).
+
+transport:
+  type: line-serial
+  # One command per line, ended by CR (p.9).
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Replies end with CR LF; the ">" prompt that follows each command has no
+  # line ending, so it ends a message of its own and is the command's reply.
+  # S: and V: notifications go to the telemetry rules.
+  reply_framing: terminated
+  reply_terminators: ["\n", ">"]
+  reply_match: '^>$'
+  # Liveness: an empty line, which the router answers with its prompt.
+  probe: ""
+
+# "On connecting to the serial port, the client should send a carriage-return"
+# and the router answers with the prompt, which shows the connection is
+# established (p.9).
+on_connect:
+  - { send: "", await_reply: true }
+
+settings:
+  serial_port:
+    type: string
+    required: true
+    max_length: 256
+    label: Serial port
+    description: "The host's serial port wired to the Videohub's RS-422 router control port, through an RS-422 adapter: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS."
+  baud_rate:
+    type: int
+    min: 9600
+    max: 9600
+    default: 9600
+    label: Baud rate
+    description: "Bits per second; the RS-422 port runs at 9600 only."
+  data_bits:
+    type: int
+    min: 8
+    max: 8
+    default: 8
+    label: Data bits
+    description: "Bits per character; the port uses 8."
+  parity:
+    type: enum
+    values: [none]
+    default: none
+    label: Parity
+    description: "The port uses no parity."
+  stop_bits:
+    type: int
+    min: 1
+    max: 1
+    default: 1
+    label: Stop bits
+    description: "The port uses 1 stop bit."
+  flow_control:
+    type: enum
+    values: [none]
+    default: none
+    label: Flow control
+    description: "Flow control; Blackmagic documents none for the port."
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, note: "The RS-422 router control port (DB9 or RJ11 by model), set to Leitch server in Videohub Setup: an RS-422 adapter on the host" }
+
+models:
+  - id: smart-videohub-12x12
+    name: Smart Videohub 12x12 (6G-SDI)
+    supports: &leitch
+      [route, route_many, get_route, get_all_routes, enable_status_reporting,
+       disable_status_reporting, reset_routing, queue_route, queue_routes,
+       get_salvo_route, get_salvo, clear_salvo, reset_salvo, execute_salvo]
+    verification: none
+    notes: "12 inputs and 12 outputs: destinations and sources 1-12."
+  - id: smart-videohub-cleanswitch-12x12
+    name: Smart Videohub CleanSwitch 12x12
+    supports: *leitch
+    verification: none
+    notes: "12 inputs and 12 outputs: destinations and sources 1-12."
+  - id: smart-videohub-20x20
+    name: Smart Videohub 20x20 (6G-SDI)
+    supports: *leitch
+    verification: none
+    notes: "20 inputs and 20 outputs: destinations and sources 1-20."
+  - id: smart-videohub-40x40
+    name: Smart Videohub 40x40 (6G-SDI)
+    supports: *leitch
+    verification: none
+    notes: "40 inputs and 40 outputs: destinations and sources 1-40."
+  - id: universal-videohub-72
+    name: Universal Videohub 72
+    supports: *leitch
+    verification: none
+    notes: "Up to 72 SDI inputs and outputs, by the cards fitted: destinations and sources 1-72. The RS-422 router control port is on its crosspoint card."
+  - id: universal-videohub-288
+    name: Universal Videohub 288
+    supports: *leitch
+    verification: none
+    notes: "Up to 288 SDI inputs and outputs, by the cards fitted: destinations and sources 1-288. The RS-422 router control port is on its crosspoint card."
+
+commands:
+  # ── Immediate commands (p.10)
+  route:
+    summary: "Route a source to a destination at once (@ X:), and read the route back"
+    params:
+      destination: { type: int, min: 1, max: 288, required: true,
+                     label: Destination,
+                     description: "The output to route to, numbered from 1 as on the router." }
+      source: { type: int, min: 1, max: 288, required: true,
+                label: Source,
+                description: "The input to route, numbered from 1 as on the router." }
+    send:
+      - "@ X:0/{destination:-1:x},{source:-1:x}"
+      - "@ X?0{destination:-1:x}"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  route_many:
+    summary: "Route several sources to destinations at once in one command (@ X: with several pairs), then read every route back"
+    params:
+      routes: { type: string, required: true, max_length: 240,
+                pattern: '^[0-9a-fA-F]{1,3},[0-9a-fA-F]{1,3}(/[0-9a-fA-F]{1,3},[0-9a-fA-F]{1,3})*$',
+                label: Routes,
+                description: "Destination,source pairs as the router numbers them on the wire, in hexadecimal from 0 and separated by /, such as 6,2/7,2 for outputs 7 and 8 from input 3." }
+    send:
+      - "@ X:0/{routes}"
+      - "@ S?0"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  get_route:
+    summary: "Read the source routed to one destination (@ X?); it arrives as an S: notification"
+    params:
+      destination: { type: int, min: 1, max: 288, required: true,
+                     label: Destination,
+                     description: "The output to read, numbered from 1 as on the router." }
+    send: "@ X?0{destination:-1:x}"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  get_all_routes:
+    summary: "Read every route (@ S?); each arrives as an S: notification"
+    send: "@ S?0"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  # ── Global commands (p.10)
+  enable_status_reporting:
+    summary: "Enable status reporting (@ ?): route changes are then notified as they happen"
+    send: "@ ?"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  disable_status_reporting:
+    summary: "Disable status reporting (@ !), the router's default: route changes made elsewhere are then not notified"
+    send: "@ !"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  reset_routing:
+    summary: "Reset the routing table (@ Z:): the first source to every destination; then read every route"
+    send:
+      - "@ Z:"
+      - "@ S?0"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  # ── Salvo commands (p.10)
+  queue_route:
+    summary: "Add a route to the salvo, for later execution (@ P:), and read it back"
+    params:
+      destination: { type: int, min: 1, max: 288, required: true,
+                     label: Destination,
+                     description: "The output the queued route is for, numbered from 1 as on the router." }
+      source: { type: int, min: 1, max: 288, required: true,
+                label: Source,
+                description: "The input the queued route takes, numbered from 1 as on the router." }
+    send:
+      - "@ P:0/{destination:-1:x},{source:-1:x}"
+      - "@ P?0{destination:-1:x}"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  queue_routes:
+    summary: "Add several routes to the salvo in one command (@ P: with several pairs), then read the salvo back"
+    params:
+      routes: { type: string, required: true, max_length: 240,
+                pattern: '^[0-9a-fA-F]{1,3},[0-9a-fA-F]{1,3}(/[0-9a-fA-F]{1,3},[0-9a-fA-F]{1,3})*$',
+                label: Routes,
+                description: "Destination,source pairs as the router numbers them on the wire, in hexadecimal from 0 and separated by /, such as 6,2/7,2 for outputs 7 and 8 from input 3." }
+    send:
+      - "@ P:0/{routes}"
+      - "@ V?0"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  get_salvo_route:
+    summary: "Read the route queued in the salvo for one destination (@ P?); it arrives as a V: notification, or nothing when none is queued"
+    params:
+      destination: { type: int, min: 1, max: 288, required: true,
+                     label: Destination,
+                     description: "The output to read, numbered from 1 as on the router." }
+    send: "@ P?0{destination:-1:x}"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  get_salvo:
+    summary: "Read every route queued in the salvo (@ V?); each arrives as a V: notification"
+    send: "@ V?0"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  clear_salvo:
+    summary: "Clear the salvo (@ B:C): queued routes are discarded"
+    send: "@ B:C"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  reset_salvo:
+    summary: "Clear the salvo (@ B:R), which Blackmagic documents alike to @ B:C"
+    send: "@ B:R"
+    expect: { matches: '^>$' }
+    returns: ack
+
+  execute_salvo:
+    summary: "Execute the salvo (@ B:E): every queued route is taken, and each change is notified"
+    send: "@ B:E"
+    expect: { matches: '^>$' }
+    returns: ack
+
+telemetry:
+  # Status reporting is off until asked for (p.10); with it on, a route change
+  # made anywhere is notified. Every route is read once on connecting.
+  subscribe:
+    send: ["@ ?", "@ S?0"]
+  updates:
+    # S:0<destination>,<source>, hex from 0: a route, as changed or asked for.
+    - match: '^S:0([0-9A-Fa-f]+),([0-9A-Fa-f]+)$'
+      state: { "outputs.{1:hex:+1}.input": "{2:hex:+1}" }
+    # V:0<destination>,<source>: a route queued in the salvo.
+    - match: '^V:0([0-9A-Fa-f]+),([0-9A-Fa-f]+)$'
+      state: { "salvo.{1:hex:+1}.input": "{2:hex:+1}" }
+    # A cleared or executed salvo holds nothing.
+    - match: '^>$'
+      request_match: '^@ B:[CRE]$'
+      state: { "salvo": { delete: true } }
+    - match: '^>$'
+      request_match: '^@ \?$'
+      state: { "status_reporting": "true" }
+    - match: '^>$'
+      request_match: '^@ !$'
+      state: { "status_reporting": "false" }
+
+state:
+  outputs.*.input:  { type: int, description: "Source routed to the destination, both numbered from 1 (S: notifications)" }
+  salvo.*.input:    { type: int, description: "Source queued in the salvo for the destination, both numbered from 1 (V: notifications)" }
+  status_reporting: { type: bool, description: "Whether status reporting is on, as last set on this connection (@ ? or @ !); the router cannot be asked" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The RS-422 router control port speaks this protocol only with Videohub
+      Setup's Serial Control Settings set to Leitch server (May 2025 manual,
+      p.37); in Leitch client mode the Videohub is itself the controller. The
+      port runs at 9600 bps, no parity, 8 data bits, 1 stop bit (p.9), and
+      needs an RS-422 adapter on the host; DB9 or RJ11 by model, with the
+      pinouts of p.9. Blackmagic documents no flow control, so none is used.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the protocol switches routes on level 0 and reads them back,
+      and drives a salvo; nothing else of the router (labels, locks, take mode,
+      hardware status, the RS-422 deck control level of a Universal Videohub)
+      is reached on this port, which the Ethernet protocol (blackmagic-videohub)
+      covers. Other Leitch commands are accepted and ignored (p.9). Status
+      reporting cannot be read, so its state is what this connection last set;
+      it is turned on when the device is opened with monitoring.
+
+  - models: [all]
+    severity: info
+    text: >
+      Numbers are hexadecimal from 0 on the wire and from 1 here; route_many and
+      queue_routes take the wire's own "destination,source/..." text, so their
+      pairs are hexadecimal from 0. A command is at most 250 characters (p.9).
+      Destinations and sources run to 288; a model answers only for the ports it
+      has. The prompt ">" after each command is its reply: a command the router
+      does not recognize is not told apart, as Blackmagic documents no error
+      answer.
+
+  - models: [all]
+    severity: critical
+    text: >
+      reset_routing routes the first source to every destination at once, on
+      air; it cannot be undone except by routing each destination again.
+
+  - models: [all]
+    severity: info
+    text: >
+      The salvo in state lists what V: notifications reported; clearing or
+      executing the salvo empties it. A route queued from elsewhere is seen only
+      when the salvo is read (get_salvo); Blackmagic documents no notification
+      of a salvo change. @ B:C and @ B:R are documented alike.
