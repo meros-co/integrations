@@ -1479,6 +1479,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the where[title] query on songs matches part of a title or only the whole of it. ([specs/planningcenter-services.yaml:686](specs/planningcenter-services.yaml#L686))
 - [ ] Confirm Attachment open works under an item's attachments path as under media's, and how long the attachment_url lasts. ([specs/planningcenter-services.yaml:823](specs/planningcenter-services.yaml#L823))
 
+## probel-swp02 — Probel / Grass Valley SW-P-02 routers
+
+- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:131](specs/probel-swp02.yaml#L131))
+- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:106](specs/probel-swp02.yaml#L106))
+- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:127](specs/probel-swp02.yaml#L127))
+
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
 - [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:463](specs/probel-swp08.yaml#L463))

@@ -122,6 +122,8 @@ mod sony_camera_props;
 mod sony_camera_ptpip;
 #[cfg(any(feature = "sennheiser-ew-dx", feature = "sennheiser-spectera"))]
 mod sscv2;
+#[cfg(feature = "probel-swp02")]
+mod swp02;
 #[cfg(feature = "probel-swp08")]
 mod swp08;
 #[cfg(feature = "tally-arbiter")]
@@ -277,6 +279,8 @@ pub(crate) fn construct(
             None => Err("EasyWorship has no fixed port: give the port it advertises over Bonjour (_ezwremote._tcp)"
                 .into()),
         },
+        #[cfg(feature = "probel-swp02")]
+        "probel-swp02" => Ok(Box::new(swp02::Swp02::new(context)?)),
         #[cfg(feature = "probel-swp08")]
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]
