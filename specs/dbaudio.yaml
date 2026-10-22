@@ -1,0 +1,726 @@
+spec: 1
+id: dbaudio
+name: d&b audiotechnik amplifiers (AES70)
+vendor: d&b audiotechnik
+category: other
+implementation: native
+reason: >
+  AES70 over OCP.1: a binary object protocol of objects addressed by number and class, followed through
+  subscriptions, with a negotiated keep-alive (see aes70). This integration is the AES70 module with d&b's
+  amplifier objects named and their controls as commands.
+
+source:
+  - title: "d&b Q-SYS Plug-in 1.16.0 (dbaudio-plugins-q-sys-1.16.0.zip: dbaudio-q-sys plugin.qplug, 20.04.2026)"
+    author: d&b audiotechnik GmbH & Co. KG
+    url: "https://www.dbaudio.com/assets/products/downloads/software/plugins/dbaudio-plugins-q-sys-1.16.0.zip"
+    note: >
+      d&b's own plug-in for its D90, D80, D40, D25, D20, 40D, 30D, 25D, 10D, 5D and 5DM amplifiers, a Lua script
+      under a BSD-style licence from d&b (redistribution with the notice; read 2026-10-22). Facts only were used:
+      the object number tables of the three families (each with d&b's object names, Settings_PwrOn, Config_Mute,
+      Config_PotiLevel, ChStatus_MsDelay and the rest), the object number layout (type, record, channel and
+      object fields), each object's class (OcaSwitch, OcaMute, OcaGain, OcaDelay, OcaBooleanSensor,
+      OcaInt32Sensor, OcaStringSensor, OcaStringActuator, OcaInt32Actuator, OcaLevelSensor, the CdbOcaWinkActuator
+      and the CdbOcaAmpPreset agent at object 10003 with methods 3.1 backup-and-load and 3.3 load), the wink's
+      method 5.2 and values, the switch positions of the fallback and override modes, the D80 and D20 input modes,
+      the AmpPreset range (1 to 15, backups 13 to 15), the level and delay ranges, the time manager's object and
+      NTP time, the model codes in the model GUID, the subscription on object 4, and the TCP ports (30013 for the
+      D80, D20, 30D and 10D, 50014 for the others). No code was copied.
+  - title: "TI 316 1.7 en: QSC Q-SYS Plug-in for d&b 5D, 10D, 30D, 40D, D20, D40 and D80 amplifiers (D5316.EN.01, 10/2022)"
+    author: d&b audiotechnik
+    url: "https://www.dbaudio.com/assets/products/downloads/ti/dbaudio-technical-information-ti316-1.7-en.pdf"
+    note: >
+      What the plug-in controls (power, power and error status, wink, input routing, input gains, channel level,
+      mute, name and metering of ISP, GR and OVL, AmpPresets with backup, input and load monitoring, fallback and
+      override, the device clock) and the firmware it needs (10D, 30D, D20, D80 2.02.00 or later).
+  - title: "TI 321 1.3 en: Crestron Module for d&b four channel amplifiers (D5321.EN.01, 02/2023)"
+    author: d&b audiotechnik
+    url: "https://www.dbaudio.com/assets/products/downloads/ti/dbaudio-technical-information-ti-321-1.3-en.pdf"
+    note: Firmware needed (40D and D40 1.00.00, 5D 5.0.1 or later) and the controls, which agree with TI 316.
+  - title: "d&b AMX plug-in 2.0.1: Duet Module Interface Specification for D20 / D80 / 10D / 30D Amplifiers (v2.0.0, 09/2016)"
+    author: d&b audiotechnik
+    url: "https://www.dbaudio.com/assets/products/downloads/integration/amx/db_AMX_PlugIn_2.0.1.ZIP"
+    note: >
+      The OCP.1 TCP port 30013 on up-to-date firmware (another port for legacy firmware), an example PDU muting
+      channel A (SetState 4.2 on object 0x10008205), AmpPresets 1 to 15, the channel level range -57.5 to +6 dB,
+      that a switched-off amplifier stops answering keep-alives, and that state is followed by OCA subscriptions.
+  - title: "TI 320 1.1 en: Beckhoff Module for d&b 10D, 30D, D20 and D80 amplifiers (D5320.EN.01, 01/2017)"
+    author: d&b audiotechnik
+    url: "https://www.dbaudio.com/assets/products/downloads/integration/beckhoff/TI320_1.1EN.PDF"
+    note: Corroborates the controls (power, name, levels, mutes, AmpPresets, input and load monitoring, fallback and override).
+  - title: "d&b audiotechnik: OCA/AES70"
+    author: d&b audiotechnik
+    url: "https://www.dbaudio.com/global/en/solutions/signal-distribution-and-networking/ocaaes70/"
+    note: d&b's AES70 page; it publishes no object documentation of its own beyond the plug-ins above.
+  - title: "aes70 integration (this repository)"
+    url: "specs/aes70.yaml"
+    note: The OCP.1 transports, session, walk, subscriptions, meters and generic commands, with their own sources.
+
+settings:
+  # How OCP.1 reaches the device (AES70-3): a TCP stream, UDP datagrams, or
+  # WebSocket binary messages, plain (ws) or over TLS (wss). The port given on
+  # opening is that transport's.
+  transport: { type: enum, values: [tcp, udp, ws, wss], default: tcp,
+               label: Transport,
+               description: "How OCP.1 reaches the device: TCP, UDP, a WebSocket (ws) or a WebSocket over TLS (wss), on the port given when opening." }
+  # The WebSocket's path, for ws and wss.
+  ws_path: { type: string, default: "/", max_length: 1024,
+             label: WebSocket path,
+             description: "Path of the device's OCP.1 WebSocket, for the ws and wss transports." }
+  # Offer the AES70-OCP.1 subprotocol when opening the WebSocket, as AES70-3
+  # has controllers do; off for a device that predates it.
+  ws_subprotocol: { type: bool, default: true,
+                    label: Offer OCP.1 subprotocol,
+                    description: "Whether to offer the AES70-OCP.1 WebSocket subprotocol; turn off for a device that answers without one." }
+  # Over wss, accept a certificate that is not trusted, such as a device's
+  # self-signed one: still encrypted, but the device is not authenticated.
+  accept_invalid_certs: { type: bool, default: false,
+                          label: Accept untrusted certificate,
+                          description: "Over wss, accept a certificate that does not chain to a trusted root or name the device, such as a self-signed one." }
+  # The heartbeat time sent to the device in the keep-alive on connecting: the
+  # device sends a keep-alive when it has sent nothing for this long, and
+  # nothing heard for three of them drops the connection. Whole seconds are
+  # sent in seconds; anything else in milliseconds (AES70-2018's second form).
+  keepalive_interval_ms: { type: int, min: 100, max: 600000, default: 1000,
+                           label: Keep-alive interval,
+                           description: "Heartbeat time in milliseconds asked of the device; three intervals with nothing heard drop the connection." }
+  # How long a request waits for its response.
+  request_timeout_ms: { type: int, min: 100, max: 600000, default: 5000,
+                        label: Request timeout,
+                        description: "Milliseconds a request waits for its response before it fails." }
+  # Walk the root block on connecting (when the device is monitored). An
+  # amplifier's named objects are known without it; the DS10 and DS100 need it.
+  walk: { type: bool, default: true,
+          label: Walk object tree,
+          description: "Whether to walk the root block on connecting to learn the device's objects, when the device is monitored." }
+  # Block levels walked: 1 is the root block's members only, 2 also their
+  # members, and so on. Every level when not given.
+  walk_depth: { type: int, min: 1, max: 255,
+                label: Walk depth,
+                description: "Block levels walked: 1 is the root block's members only, 2 also their members, and so on; every level when not given." }
+  # Subscribe to the property changes of every known object found.
+  subscribe: { type: bool, default: true,
+               label: Subscribe,
+               description: "Whether to subscribe to property changes of every known object found." }
+  # Level sensors (meters): off (not read), read (once, on connecting), poll
+  # (read every level_poll_ms), or subscribe (follow their changes, which may
+  # be many per second).
+  level_sensors: { type: enum, values: ["off", read, poll, subscribe], default: poll,
+                   label: Level sensors,
+                   description: "How meters are read: off, read once on connecting, poll every level poll interval, or subscribe to their changes (may be many per second)." }
+  level_poll_ms: { type: int, min: 50, max: 600000, default: 1000,
+                   label: Level poll interval,
+                   description: "Milliseconds between level sensor reads when level sensors are polled." }
+  # Requests waiting for a response at once; more are queued.
+  max_in_flight: { type: int, min: 1, max: 1024, default: 32,
+                   label: Requests in flight,
+                   description: "Requests waiting for a response at once; more are queued." }
+
+
+ports:
+  - { port: 30013, protocol: tcp, role: control, when: "model d80, d20, 30d, 10d", note: "OCP.1 as d&b's integrations use it on these models; older firmware may use another, given when opening" }
+  - { port: 50014, protocol: tcp, role: control, when: "model d90, d40, d25, 40d, 25d, 5d, 5dm" }
+  - { port: null, protocol: tcp, role: control, when: "model ds10, ds100", note: "d&b documents no OCP.1 port for these: give it when opening" }
+  - { port: null, protocol: udp, role: control, when: "transport udp", note: "OCP.1 over UDP, if the device speaks it: the port given when opening" }
+  - { port: null, protocol: ws, role: control, when: "transport ws", note: "OCP.1 over a WebSocket, if the device speaks it: the port given when opening" }
+  - { port: null, protocol: wss, role: control, when: "transport wss", note: "OCP.1 over a WebSocket over TLS, if the device speaks it: the port given when opening" }
+
+models:
+  - id: d90
+    name: d&b D90
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_gain, set_mute, set_switch,
+      set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property, set_property,
+      call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel touring amplifier; objects numbered as on the D40 (port 50014).
+  - id: d80
+    name: d&b D80
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_input_mode, set_gain, set_mute,
+      set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property,
+      set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel touring amplifier; objects numbered as on the D20, 30D and 10D (port 30013), with the input-mode switch.
+  - id: d40
+    name: d&b D40
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_gain, set_mute, set_switch,
+      set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property, set_property,
+      call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel touring amplifier (port 50014).
+  - id: d25
+    name: d&b D25
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_gain, set_mute, set_switch,
+      set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property, set_property,
+      call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel amplifier in d&b's Q-SYS plug-in; numbered as the D40 (port 50014).
+  - id: d20
+    name: d&b D20
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_input_mode, set_gain, set_mute,
+      set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property,
+      set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel touring amplifier; numbered as the D80 (port 30013), with the input-mode switch.
+  - id: 40d
+    name: d&b 40D
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_gain, set_mute, set_switch,
+      set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property, set_property,
+      call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel installation amplifier; numbered as the D40 (port 50014).
+  - id: 30d
+    name: d&b 30D
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_gain, set_mute, set_switch,
+      set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property, set_property,
+      call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel installation amplifier; numbered as the D80 (port 30013).
+  - id: 25d
+    name: d&b 25D
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_gain, set_mute, set_switch,
+      set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property, set_property,
+      call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel installation amplifier in d&b's Q-SYS plug-in; numbered as the D40 (port 50014).
+  - id: 10d
+    name: d&b 10D
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time,
+      load_amp_preset, backup_and_load_amp_preset, set_amp_preset_name, set_gain, set_mute, set_switch,
+      set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property, set_property,
+      call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel installation amplifier; numbered as the D80 (port 30013).
+  - id: 5d
+    name: d&b 5D
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time, set_gain,
+      set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property,
+      set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Four-channel installation amplifier with Dante inputs (D1-D4 here); no AmpPresets (port 50014).
+  - id: 5dm
+    name: d&b 5DM
+    channels: 4
+    supports: [set_power, set_channel_mute, set_channel_level, set_channel_delay, set_channel_delay_enabled,
+      set_channel_name, set_load_monitoring, set_channel_filter, set_input_routing, set_input_gain,
+      set_input_gain_enabled, set_input_monitoring, set_input_fallback, set_input_fallback_active,
+      set_input_override, set_input_override_active, set_device_name, identify, set_device_time, set_gain,
+      set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property,
+      set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      The 5D with Milan inputs (D1-D4 here); numbered as the 5D, no AmpPresets (port 50014).
+  - id: ds10
+    name: d&b DS10 Audio network bridge
+    supports: [identify, set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float,
+      set_string, get_property, set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      d&b publishes no AES70 object list for it: its objects are found by walking its tree and reached with the generic AES70 commands. Give its OCP.1 port.
+  - id: ds100
+    name: d&b DS100 Signal Engine
+    supports: [identify, set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float,
+      set_string, get_property, set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      d&b publishes no AES70 object list for it (its OSC interface is documented separately): its objects are found by walking its tree and reached with the generic AES70 commands. Give its OCP.1 port.
+
+commands:
+  set_gain:
+    summary: "OcaGain SetGain (4.2): the gain in dB, on an object addressed by role path (object) or object number (ono)"
+    params:
+      object: &object { type: string, max_length: 4096,
+                        label: Object,
+                        description: "Object by role path, the roles from the root block down joined by '/', e.g. Input 1/Gain; give this or an object number." }
+      ono: &ono { type: int, min: 1, max: 4294967295,
+                  label: Object number,
+                  description: "Object number (ono), stable for a device's configuration; give this or a role path." }
+      gain_db: { type: float, required: true,
+                 label: Gain,
+                 description: "Gain in dB; the object's own minimum and maximum apply." }
+    returns: ack
+  set_mute:
+    summary: "OcaMute SetState (4.2): muted (state 1) or unmuted (2)"
+    params:
+      object: *object
+      ono: *ono
+      muted: { type: bool, default: true,
+               label: Mute,
+               description: "True mutes the object, false unmutes it." }
+    returns: ack
+  set_switch:
+    summary: >
+      OcaSwitch SetPosition (4.2): a position number from 0, or a position by its name (position_name, from the
+      switch's position names read on connecting)
+    params:
+      object: *object
+      ono: *ono
+      position: { type: int, min: 0, max: 65535,
+                  label: Position,
+                  description: "Switch position, numbered from 0; give this or a position name." }
+      position_name: { type: string, max_length: 1024,
+                       label: Position name,
+                       description: "Switch position by its name, as the switch reported on connecting; give this or a position number." }
+    returns: ack
+  set_polarity:
+    summary: "OcaPolarity SetState (4.2): inverted (state 2) or non-inverted (1)"
+    params:
+      object: *object
+      ono: *ono
+      inverted: { type: bool, default: true,
+                  label: Invert,
+                  description: "True inverts the polarity, false sets it back to normal." }
+    returns: ack
+  set_delay:
+    summary: "OcaDelay SetDelayTime (4.2): the delay in seconds"
+    params:
+      object: *object
+      ono: *ono
+      delay_s: { type: float, min: 0, required: true,
+                 label: Delay,
+                 description: "Delay time in seconds, e.g. 0.005 for 5 ms." }
+    returns: ack
+  set_bool:
+    summary: "OcaBooleanActuator SetSetting (5.2)"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: bool, required: true,
+               label: Value,
+               description: "New setting of the boolean actuator." }
+    returns: ack
+  set_int:
+    summary: "OcaInt8/16/32/64Actuator or OcaUint8/16/32/64Actuator SetSetting (5.2); the value must fit the actuator's type"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: int, required: true,
+               label: Value,
+               description: "New setting of the integer actuator; it must fit the actuator's type, e.g. 0 to 255 for an 8-bit unsigned one." }
+    returns: ack
+  set_float:
+    summary: "OcaFloat32Actuator or OcaFloat64Actuator SetSetting (5.2)"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: float, required: true,
+               label: Value,
+               description: "New setting of the floating-point actuator, in the actuator's own unit." }
+    returns: ack
+  set_string:
+    summary: "OcaStringActuator SetSetting (5.2)"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: string, required: true, max_length: 65535,
+               label: Value,
+               description: "New text for the string actuator." }
+    returns: ack
+  identify:
+    summary: >
+      Start or stop the device's identification. On an amplifier, d&b's wink (the Wink object's method 5.2 with
+      0x0200 to start and 0 to stop: the display flashes and the buzzer sounds); on a DS10 or DS100, OcaIdentificationActuator
+      SetActive (4.2) on the object given, or the first identification actuator found in the tree
+    params:
+      object: *object
+      ono: *ono
+      enabled: { type: bool, default: true,
+                 label: Identify,
+                 description: "True starts the device's identification (a flashing LED or display), false stops it." }
+    returns: ack
+  get_property:
+    summary: >
+      Read one property ("level.index", e.g. "4.1") of an object, with the getter of its class. Returns the
+      decoded value, or {value, min, max} for a bounded property, or {hex} when the reply cannot be decoded. Only
+      the properties listed under state are known; call_method reaches any other
+    params:
+      object: *object
+      ono: *ono
+      property: &property { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$",
+                            label: Property,
+                            description: "Property ID as level.index, e.g. 4.1 for the fourth class level's first property." }
+    returns: value
+  set_property:
+    summary: >
+      Write one property ("level.index") of an object with the setter of its class; value is JSON of the
+      property's type (a number, boolean, string, or list of strings or booleans; muted and inverted states as
+      booleans, delays in seconds)
+    params:
+      object: *object
+      ono: *ono
+      property: *property
+      value: { type: json, required: true,
+               label: Value,
+               description: "New value as JSON of the property's type: a number, boolean, string or list; mute and polarity states as booleans, delays in seconds." }
+    returns: ack
+  call_method:
+    summary: >
+      Escape hatch: call any method ("level.index") on an object with parameters already marshalled as OCP.1
+      bytes (params_hex) and their count (param_count; 1 when params_hex is not empty, else 0). Returns the
+      response as {status, status_name, param_count, params_hex}, whatever the status
+    params:
+      object: *object
+      ono: *ono
+      method: { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$",
+                label: Method,
+                description: "Method ID as level.index, e.g. 4.2." }
+      params_hex: { type: string, default: "", max_length: 131070, pattern: "^[0-9A-Fa-f ]*$",
+                    label: Parameters,
+                    description: "Method parameters already marshalled as OCP.1 bytes, in hex; empty for none." }
+      param_count: { type: int, min: 0, max: 255,
+                     label: Parameter count,
+                     description: "Number of parameters in the hex; when not given, 1 if parameters are given and 0 if not." }
+    returns: value
+  refresh_objects:
+    summary: >
+      Forget the object tree and walk the root block again; acknowledged when the walk is done. When monitored,
+      known objects are then read again and any new ones subscribed to
+    returns: ack
+  get_device_info:
+    summary: >
+      Read the device manager (object 1): model GUID, serial number, model description, name, AES70 version,
+      role, user inventory code, enabled, state, message and revision id. A property the device does not
+      implement is null
+    returns: value
+  set_power:
+    summary: "Switch the amplifier on or to standby (Settings_PwrOn, an OcaSwitch: 1 on, 0 standby)"
+    params:
+      powered: { type: bool, default: true, label: Power, description: "True switches the amplifier on, false to standby." }
+    returns: ack
+  set_channel_mute:
+    summary: "Mute an output channel (Config_Mute, an OcaMute)"
+    params:
+      channel: &channel { type: enum, values: [A, B, C, D], required: true, label: Channel,
+                          description: "Output channel, A to D as on the amplifier." }
+      muted: { type: bool, default: true, label: Mute, description: "True mutes the channel, false unmutes it." }
+    returns: ack
+  set_channel_level:
+    summary: "Set an output channel's level (Config_PotiLevel, an OcaGain), in dB"
+    params:
+      channel: *channel
+      gain_db: { type: float, min: -57.5, max: 6, required: true, label: Level,
+                 description: "Channel level in dB, -57.5 to +6 as d&b's integrations give it; the object's own range applies." }
+    returns: ack
+  set_channel_delay:
+    summary: "Set an output channel's delay (ChStatus_MsDelay, an OcaDelay set in seconds), in milliseconds"
+    params:
+      channel: *channel
+      delay_ms: { type: float, min: 0.3, max: 9999, required: true, label: Delay,
+                  description: "Delay in milliseconds, 0.3 to 9999 as d&b's Q-SYS plug-in offers; the object's own range applies." }
+    returns: ack
+  set_channel_delay_enabled:
+    summary: "Switch an output channel's delay in or out (Config_DelayOn, an OcaSwitch: 1 on, 0 off)"
+    params:
+      channel: *channel
+      enabled: { type: bool, default: true, label: Delay on, description: "True switches the delay in, false out." }
+    returns: ack
+  set_channel_name:
+    summary: "Name an output channel (Config_ChannelName, an OcaStringActuator)"
+    params:
+      channel: *channel
+      name: { type: string, required: true, max_length: 65535, label: Name, description: "The channel's new name." }
+    returns: ack
+  set_load_monitoring:
+    summary: "Switch an output channel's load monitoring (En_En_Enabled, an OcaSwitch: 1 on, 0 off)"
+    params:
+      channel: *channel
+      enabled: { type: bool, default: true, label: Load monitoring,
+                 description: "True enables load monitoring on the channel, false disables it, which also clears its errors." }
+    returns: ack
+  set_channel_filter:
+    summary: >
+      Set one of an output channel's three filter switches (Config_Filter1 and 2, OcaSwitch; Config_Filter3, an
+      OcaInt32Actuator), whose meaning depends on the loudspeaker setup selected on the channel
+    params:
+      channel: *channel
+      filter: { type: int, min: 1, max: 3, required: true, label: Filter,
+                description: "Filter 1 (CUT, INFRA, 100Hz, LFC or HFC: 0 off, 1 on), 2 (HFA, CSA: 0 to 2) or 3 (CPL or HF trim: -9 to 5)." }
+      value: { type: int, min: -9, max: 5, required: true, label: Value,
+               description: "Position for filters 1 and 2, the setting for filter 3, as the loudspeaker setup defines them." }
+    returns: ack
+  set_input_routing:
+    summary: "Route an input to an output channel or take it off (Config_InputEnable1 to 8, OcaSwitch per channel: 1 on, 0 off)"
+    params:
+      channel: *channel
+      input: &input { type: enum, values: [A1, A2, A3, A4, D1, D2, D3, D4], required: true, label: Input,
+                      description: "Analog input A1 to A4 or digital input D1 to D4 (Dante on a 5D, Milan on a 5DM)." }
+      enabled: { type: bool, default: true, label: Routed, description: "True routes the input to the channel, false removes it." }
+    returns: ack
+  set_input_gain:
+    summary: "Set an input's gain (Input_Analog_Gain or Input_Digital_Gain, an OcaGain per input), in dB"
+    params:
+      input: *input
+      gain_db: { type: float, min: -57.5, max: 6, required: true, label: Gain,
+                 description: "Input gain in dB, -57.5 to +6 as d&b's Q-SYS plug-in offers; the object's own range applies." }
+    returns: ack
+  set_input_gain_enabled:
+    summary: "Switch the input gains in or out (Settings_InputGainEnable, an OcaSwitch: 1 on, 0 off)"
+    params:
+      enabled: { type: bool, default: true, label: Input gain, description: "True applies the input gains, false bypasses them." }
+    returns: ack
+  set_input_monitoring:
+    summary: "Switch an input's monitoring (InputMonitoring_Analog_Enable or _Digital_Enable, an OcaSwitch per input: 1 on, 0 off)"
+    params:
+      input: *input
+      enabled: { type: bool, default: true, label: Input monitoring,
+                 description: "True enables monitoring of the input, false disables it, which also clears its errors." }
+    returns: ack
+  set_input_fallback:
+    summary: "Set the input fallback mode (Settings_InputFallbackMode, an OcaSwitch: 0 off, 1 manual, 2 auto)"
+    params:
+      mode: &fallback_mode { type: enum, values: ["off", manual, auto], required: true, label: Mode,
+                             description: "Off, manual (switched with the active command) or auto (switched by the amplifier)." }
+    returns: ack
+  set_input_fallback_active:
+    summary: "Switch to or from the fallback inputs by hand (Status_InputFallbackActive, an OcaSwitch: 1 active, 0 not)"
+    params:
+      active: { type: bool, default: true, label: Fallback active, description: "True switches to the fallback inputs, false back." }
+    returns: ack
+  set_input_override:
+    summary: "Set the input override mode (Settings_InputOverrideMode, an OcaSwitch: 0 off, 1 manual, 2 auto)"
+    params:
+      mode: *fallback_mode
+    returns: ack
+  set_input_override_active:
+    summary: "Switch to or from the override inputs by hand (Status_InputOverrideActive, an OcaSwitch: 1 active, 0 not)"
+    params:
+      active: { type: bool, default: true, label: Override active, description: "True switches to the override inputs, false back." }
+    returns: ack
+  set_input_mode:
+    summary: >
+      Set the D80 or D20's input mode (Settings_InputModes, an OcaSwitch): which input pairs are analog and which
+      digital
+    params:
+      mode: { type: int, min: 1, max: 5, required: true, label: Input mode,
+              description: "1 inputs 1-2 and 3-4 analog, 2 inputs 1-2 digital and 3-4 analog, 3 inputs 1-2 analog and 3-4 digital, 4 and 5 all digital." }
+    returns: ack
+  set_device_name:
+    summary: "Name the amplifier (Settings_DeviceName, an OcaStringActuator)"
+    params:
+      name: { type: string, required: true, max_length: 65535, label: Name, description: "The amplifier's new name." }
+    returns: ack
+  load_amp_preset:
+    summary: "Load an AmpPreset (the AmpPreset agent, object 10003, method 3.3 with the preset number)"
+    params:
+      preset: &preset { type: int, min: 1, max: 15, required: true, label: AmpPreset,
+                        description: "AmpPreset number, 1 to 15." }
+    returns: ack
+  backup_and_load_amp_preset:
+    summary: >
+      Store the current settings in a backup AmpPreset (13 to 15), then load an AmpPreset (the AmpPreset agent,
+      object 10003, method 3.1)
+    params:
+      preset: *preset
+      backup: { type: int, min: 13, max: 15, required: true, label: Backup slot,
+                description: "The AmpPreset, 13 to 15, the current settings are stored in first." }
+    returns: ack
+  set_amp_preset_name:
+    summary: "Name an AmpPreset (Preset_PresetName of that preset, an OcaStringActuator)"
+    params:
+      preset: *preset
+      name: { type: string, required: true, max_length: 65535, label: Name, description: "The AmpPreset's new name." }
+    returns: ack
+  set_device_time:
+    summary: >
+      Set the amplifier's clock (OcaDeviceTimeManager SetDeviceTimeNTP, 3.2, with seconds since 1900): to the given
+      time, or to the host's clock now
+    params:
+      unix_seconds: { type: int, min: 0, max: 2085978495, label: Time,
+                      description: "Time to set as seconds since 1970 (UTC); the host's clock when not given." }
+    returns: ack
+
+state:
+  discovery.complete:              { type: bool, description: "The walk of the root block has been answered or has timed out throughout" }
+  discovery.objects:               { type: int, description: "Objects found under the root block, at every level walked" }
+  objects.*.ono:                   { type: int, description: "Object number. An amplifier's documented objects are keyed by name (Power, PowerOk, GeneralError, DeviceError, DeviceErrorText, DeviceName, Wink, AmpPreset/Selected, AmpPreset/Modified, AmpPreset <n>/Name and /Stored, InputFallback/Mode and /Active, InputOverride/Mode and /Active, InputGain/Enabled, InputMode, <channel>/Name, /Mute, /Level, /Delay, /DelayOn, /LoadMonitoring, /Filter1 to 3, /Error, /ErrorText, /ISP, /GR, /OVL, /Headroom and /Input <A1-D4>, Input <A1-D4>/Gain, /Monitoring and /MonitoringError); others found by a walk by role path" }
+  objects.*.class:                 { type: string, description: "Class name (OcaGain, OcaBlock, ...) when the class is one the module knows by name, else the class id" }
+  objects.*.class_id:              { type: string, description: "Class id, its fields joined by '.' (\"1.1.1.5\"); proprietary classes include 65535 and the vendor's fields" }
+  objects.*.class_version:         { type: int, description: "Class version the device reports" }
+  objects.*.kind:                  { type: string, description: "The nearest standard class the object is or derives from, e.g. OcaGain for a vendor's subclass of it" }
+  objects.*.gain_db:               { type: float, unit: dB, description: "OcaGain 4.1 Gain; with gain_db_min and gain_db_max" }
+  objects.*.gain_db_min:           { type: float, unit: dB, description: "OcaGain minimum gain" }
+  objects.*.gain_db_max:           { type: float, unit: dB, description: "OcaGain maximum gain" }
+  objects.*.muted:                 { type: bool, description: "OcaMute 4.1 State: true for Muted (1), false for Unmuted (2)" }
+  objects.*.inverted:              { type: bool, description: "OcaPolarity 4.1 State: true for Inverted (2)" }
+  objects.*.position:              { type: int, description: "OcaSwitch 4.1 Position, from 0; with position_min and position_max" }
+  objects.*.position_min:          { type: int, description: "OcaSwitch lowest position" }
+  objects.*.position_max:          { type: int, description: "OcaSwitch highest position" }
+  objects.*.position_names:        { type: array, description: "OcaSwitch 4.2 PositionNames, indexed by position" }
+  objects.*.position_enabled:      { type: array, description: "OcaSwitch 4.3 PositionEnableds, when a change is reported" }
+  objects.*.delay_s:               { type: float, unit: s, description: "OcaDelay 4.1 DelayTime in seconds; with delay_s_min and delay_s_max" }
+  objects.*.delay_s_min:           { type: float, unit: s, description: "OcaDelay minimum delay" }
+  objects.*.delay_s_max:           { type: float, unit: s, description: "OcaDelay maximum delay" }
+  objects.*.active:                { type: bool, description: "OcaIdentificationActuator 4.1 Active: the device is identifying itself" }
+  objects.*.setting:               { type: float, description: "Basic actuator 5.1 Setting: a boolean, integer, float or string by the actuator's class; numeric ones with setting_min and setting_max" }
+  objects.*.setting_min:           { type: float, description: "Numeric basic actuator minimum" }
+  objects.*.setting_max:           { type: float, description: "Numeric basic actuator maximum" }
+  objects.*.reading:               { type: float, description: "Basic sensor 5.1 Reading (OcaBooleanSensor to OcaStringSensor): a boolean, integer, float or string by the sensor's class; numeric ones with reading_min and reading_max" }
+  objects.*.reading_min:           { type: float, description: "Numeric basic sensor lowest reading" }
+  objects.*.reading_max:           { type: float, description: "Numeric basic sensor highest reading" }
+  objects.*.reading_db:            { type: float, unit: dB, description: "OcaLevelSensor 4.1 Reading, as the level_sensors setting asks; with reading_db_min and reading_db_max. Infinite or NaN readings are \"inf\", \"-inf\" or \"nan\"" }
+  objects.*.reading_db_min:        { type: float, unit: dB, description: "OcaLevelSensor lowest reading" }
+  objects.*.reading_db_max:        { type: float, unit: dB, description: "OcaLevelSensor highest reading" }
+  objects.*.reading_state:         { type: string, description: "OcaSensor 3.1 ReadingState when a change is reported: unknown, valid, underrange, overrange or error" }
+  objects.*.enabled:               { type: bool, description: "OcaWorker 2.1 Enabled, when a change is reported or set" }
+  objects.*.label:                 { type: string, description: "OcaWorker 2.3 Label, when a change is reported or set" }
+  objects.*.raw.*:                 { type: string, description: "A reported change of a property the module does not know, keyed by property id (\"4.9\"): its new value as OCP.1 bytes in hex" }
+  device.model_guid:               { type: string, description: "OcaDeviceManager ModelGUID as 16 hex digits: a reserved byte, the manufacturer's IEEE OUI (3 bytes) and the model code (4)" }
+  device.serial_number:            { type: string, description: "OcaDeviceManager SerialNumber" }
+  device.model.manufacturer:       { type: string, description: "OcaDeviceManager ModelDescription manufacturer" }
+  device.model.name:               { type: string, description: "OcaDeviceManager ModelDescription name" }
+  device.model.version:            { type: string, description: "OcaDeviceManager ModelDescription version" }
+  device.name:                     { type: string, description: "OcaDeviceManager DeviceName" }
+  device.oca_version:              { type: int, description: "OcaDeviceManager OcaVersion: the AES70 version the device implements" }
+  device.role:                     { type: string, description: "OcaDeviceManager Role, from get_device_info" }
+  device.user_inventory_code:      { type: string, description: "OcaDeviceManager UserInventoryCode, from get_device_info" }
+  device.enabled:                  { type: bool, description: "OcaDeviceManager Enabled" }
+  device.state:                    { type: array, description: "OcaDeviceManager State: the names of the bits set, of operational, disabled, error, initializing and updating" }
+  device.message:                  { type: string, description: "OcaDeviceManager Message, from get_device_info" }
+  device.revision_id:              { type: string, description: "OcaDeviceManager DeviceRevisionID, where implemented" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      d&b documents its amplifiers' AES70 objects in its own integration plug-ins rather than in a protocol
+      document: the object numbers, their classes and the methods here are those of d&b's Q-SYS plug-in (1.16.0),
+      with the port and an example command from its AMX module's interface specification. Each object number is
+      type << 28 | record << 20 | channel << 15 | object, with type 1, the output channel (A to D as 1 to 4), and
+      the record an input or AmpPreset number. The D80, D20, 30D and 10D number objects one way, the D90, D40,
+      40D, D25 and 25D another, the 5D and 5DM a third, so the model opened must be the amplifier's.
+  - models: [all]
+    severity: warning
+    text: >
+      d&b's integrations connect to TCP port 30013 on the D80, D20, 30D and 10D and 50014 on the others, which is
+      the default here; the AMX module notes older firmware may use another port, which can be given. Its
+      integrations need 10D, 30D, D20 or D80 firmware 2.02.00 or later, 40D or D40 1.00.00 or later, and 5D
+      5.0.1 or later. Only OCP.1 over TCP is documented for the amplifiers. Switched off (not in standby), an
+      amplifier stops answering, and is reported lost after three keep-alive intervals.
+  - models: [all]
+    severity: info
+    text: >
+      The amplifier's model is in device.model_guid: d&b's integrations check its manufacturer code (3CC0C6, then
+      a DB byte) and its last byte, the model (D90 10, D80 07, D40 12, D25 16, D20 09, 40D 13, 30D 0B, 25D 15, 10D
+      0A, 5D E0, 5DM E1). A model mismatch means the named objects are the wrong ones; open it with the right
+      model.
+  - models: [all]
+    severity: info
+    text: >
+      The named objects are known without a walk: on connecting, their classes are asked for and, when the
+      amplifier is monitored, each is read and followed by subscription under objects.<name>; with walk on (the
+      default), the root block is walked as well and anything else found is keyed by role path. Opened for
+      commands only, a named command asks for its object's class once, then sends the setter. Every setter's
+      value is read back by notification.
+  - models: [d90, d80, d40, d25, d20, 40d, 30d, 25d, 10d]
+    severity: critical
+    text: >
+      load_amp_preset and backup_and_load_amp_preset replace the amplifier's settings at once (outputs, routing,
+      levels) and cannot be undone except by loading another AmpPreset; backup_and_load_amp_preset first stores
+      the current settings in AmpPreset 13, 14 or 15. AmpPreset/Selected is the active AmpPreset and
+      AmpPreset/Modified non-zero once its settings have been changed since it was loaded; AmpPreset <n>/Stored
+      false means the slot is empty. The 5D and 5DM have no AmpPresets.
+  - models: [all]
+    severity: info
+    text: >
+      identify on an amplifier sends d&b's wink as its plug-ins do: method 5.2 of the Wink object (a d&b subclass
+      of OcaIdentificationActuator) with the 16-bit value 0x0200 to start and 0 to stop. Its state is read as the
+      identification actuator's Active.
+  - models: [all]
+    severity: info
+    text: >
+      In the 2-way active and mix top/sub output modes a channel pair works as one, and d&b's Q-SYS plug-in leaves
+      the second channel of an active pair (B or D) out; its controls follow the first. The output mode itself is
+      set in R1 or on the amplifier, not through these objects.
+  - models: [all]
+    severity: info
+    text: >
+      Delay is an OcaDelay set in seconds (delay_ms / 1000); d&b's plug-in never sends less than 0.3 ms, and the
+      delay applies only with the channel's DelayOn switched in. The filter switches are in d&b's plug-in but
+      switched off there; what each position does depends on the loudspeaker setup on the channel.
+  - models: [d80, d20]
+    severity: info
+    text: >
+      On the D80 and D20 the input mode decides which inputs exist: d&b's plug-in follows the analog inputs A1-A2
+      for modes 1 and 3, the digital D1-D2 for 2, 4 and 5, the analog A3-A4 for modes 1 and 2, and the digital
+      D3-D4 for 3, 4 and 5. The routing switches of inputs that do not exist in the current mode may refuse a
+      change. The other amplifiers have every input at once.
+  - models: [all]
+    severity: info
+    text: >
+      Errors: GeneralError is the sum of the device and channel errors, with DeviceErrorText and each channel's
+      ErrorText saying what is wrong; PowerOk is false in standby. d&b documents no method that clears load or
+      input monitoring errors: its plug-in switches the monitoring off and, a second later, on again, which
+      set_load_monitoring and set_input_monitoring do here.
+  - models: [all]
+    severity: info
+    text: >
+      Meters: each channel's Headroom (ChStatus_GrHead) is an OcaLevelSensor, read as the level_sensors setting
+      says, every second by default; the ISP (input signal present), GR (gain reduction) and OVL (overload)
+      indicators are boolean sensors followed by subscription, which may change many times a second.
+  - models: [ds10, ds100]
+    severity: warning
+    text: >
+      d&b publishes no AES70 object list or port for the DS10 or DS100: its Q-SYS plug-in for the DS100 is
+      distributed through Q-SYS Designer's Asset Manager only. Their objects are found by walking their tree (walk
+      on) and reached by role path or object number with the generic commands; the port must be given.
+  - models: [all]
+    severity: info
+    text: >
+      Everything else (the transports, keep-alives, the walk, subscriptions, status codes and commands-only
+      opening) is the aes70 integration's; see its quirks.

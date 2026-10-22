@@ -34,21 +34,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aes70 — AES70 / OCA devices
 
-- [ ] Check the device's OCP.1 TCP port (AES70 assigns none) and that it accepts OCP.1 on plain TCP, not only over TLS, UDP or WebSocket. ([specs/aes70.yaml:279](specs/aes70.yaml#L279))
-- [ ] Check whether the device sends OcaDelay's delay time (OcaTimeInterval) as a 32-bit or a 64-bit float, and that set_delay written at that width is accepted. ([specs/aes70.yaml:291](specs/aes70.yaml#L291))
-- [ ] Confirm the device answers the controller's keep-alive with keep-alives of its own at that interval, so a device opened for commands only is reported connected within one interval, and whether it accepts the millisecond form for an interval that is not whole seconds. ([specs/aes70.yaml:297](specs/aes70.yaml#L297))
-- [ ] Confirm the device sends keep-alives while idle, so it is not dropped after three intervals of quiet, and that it closes the connection itself after three intervals without the controller's. ([specs/aes70.yaml:305](specs/aes70.yaml#L305))
-- [ ] Confirm AddSubscription (3.1 on object 4) for an object's PropertyChanged event, with subscriber method 1.1 of object 4096, an empty context, delivery mode 1 and an empty destination, is accepted, and that changes then arrive as notifications carrying the property id, value and change type (record which PDU type, 2 or 5). ([specs/aes70.yaml:312](specs/aes70.yaml#L312))
-- [ ] Check that GetMembers (3.5) answers on every block, how long a full walk takes on a large device (a DS100 or an amplifier with many channels), and whether 32 requests in flight at once is too many for it. ([specs/aes70.yaml:321](specs/aes70.yaml#L321))
-- [ ] Check that roles are unique within each block and contain no '/', so role paths are unambiguous. ([specs/aes70.yaml:329](specs/aes70.yaml#L329))
-- [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:335](specs/aes70.yaml#L335))
-- [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:343](specs/aes70.yaml#L343))
-- [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:238](specs/aes70.yaml#L238))
-- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:310](specs/aes70.yaml#L310))
-- [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:352](specs/aes70.yaml#L352))
-- [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:262](specs/aes70.yaml#L262))
+- [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:378](specs/aes70.yaml#L378))
+- [ ] Check whether the device sends OcaDelay's delay time (OcaTimeInterval) as a 32-bit or a 64-bit float, and that set_delay written at that width is accepted. ([specs/aes70.yaml:411](specs/aes70.yaml#L411))
+- [ ] Confirm the device answers the controller's keep-alive with keep-alives of its own at that interval, so a device opened for commands only is reported connected within one interval, and whether it accepts the millisecond form for an interval that is not whole seconds. ([specs/aes70.yaml:417](specs/aes70.yaml#L417))
+- [ ] Confirm the device sends keep-alives while idle, so it is not dropped after three intervals of quiet, and that it closes the connection itself after three intervals without the controller's. ([specs/aes70.yaml:425](specs/aes70.yaml#L425))
+- [ ] Confirm AddSubscription (3.1 on object 4) for an object's PropertyChanged event, with subscriber method 1.1 of object 4096, an empty context, delivery mode 1 and an empty destination, is accepted, and that changes then arrive as notifications carrying the property id, value and change type (record which PDU type, 2 or 5). ([specs/aes70.yaml:432](specs/aes70.yaml#L432))
+- [ ] Check that GetMembers (3.5) answers on every block, how long a full walk takes on a large device (a DS100 or an amplifier with many channels), and whether 32 requests in flight at once is too many for it. ([specs/aes70.yaml:441](specs/aes70.yaml#L441))
+- [ ] Check that roles are unique within each block and contain no '/', so role paths are unambiguous. ([specs/aes70.yaml:449](specs/aes70.yaml#L449))
+- [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:455](specs/aes70.yaml#L455))
+- [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:463](specs/aes70.yaml#L463))
+- [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:336](specs/aes70.yaml#L336))
+- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:353](specs/aes70.yaml#L353))
+- [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:472](specs/aes70.yaml#L472))
+- [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:363](specs/aes70.yaml#L363))
 - [ ] Check a role or label with non-ASCII characters: OCP.1 string lengths are taken to count Unicode characters, not bytes. ([crates/core/src/modules/aes70_codec.rs:244](crates/core/src/modules/aes70_codec.rs#L244))
-- [ ] Record the class ids of a vendor's proprietary objects (d&b, Powersoft, stagebox preamps) and whether they derive from the standard classes, so they are read and followed. ([specs/aes70.yaml:319](specs/aes70.yaml#L319))
+- [ ] Record the class ids of a vendor's proprietary objects (d&b, Powersoft, stagebox preamps) and whether they derive from the standard classes, so they are read and followed. ([specs/aes70.yaml:335](specs/aes70.yaml#L335))
+- [ ] On a device that speaks OCP.1 over UDP, confirm it ignores nothing after the controller's first keep-alive, answers in one PDU per datagram to the controller's address and port, sends its notifications there too, and accepts PDUs of up to 1452 bytes. ([specs/aes70.yaml:386](specs/aes70.yaml#L386))
+- [ ] On a device that speaks OCP.1 over a WebSocket, note its path and port, confirm it accepts the AES70-OCP.1 subprotocol (or needs ws_subprotocol off), answers keep-alives sent over the WebSocket, and, over wss, what certificate it presents. ([specs/aes70.yaml:396](specs/aes70.yaml#L396))
 
 ## aja-kipro — AJA Ki Pro
 
@@ -223,6 +225,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
+## barco-encore — Barco Encore Presentation System
+
+- [ ] Confirm the original Encore controller takes ASCII control on TCP port 3000, with commands ended by a line feed, and record whatever it answers. ([specs/barco-encore.yaml:88](specs/barco-encore.yaml#L88))
+- [ ] Check the unit of the ATRN argument (frames or tenths of a second), whether ATRN alone is accepted, and the range of PRESET R preset numbers. ([specs/barco-encore.yaml:99](specs/barco-encore.yaml#L99))
+- [ ] Find the syntax of the functions third-party software exposes beyond ATRN and PRESET R (manual transition, preset save and delete, preset names, current preset), and whether a Barco protocol document exists. ([specs/barco-encore.yaml:88](specs/barco-encore.yaml#L88))
+- [ ] Check whether the controller accepts more than one TCP session at a time. ([specs/barco-encore.yaml:107](specs/barco-encore.yaml#L107))
+
 ## barco-eventmaster — Barco Event Master
 
 - [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1396](specs/barco-eventmaster.yaml#L1396))
@@ -237,6 +246,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1295](specs/barco-eventmaster.yaml#L1295))
 - [ ] Confirm reading listContent for every screen destination every 10 seconds (after listDestinations) is acceptable on a processor with many screens, and that listContent's Layers, BGLyr and Transition arrays match the Doc 8.2 example on E2, S3, EX and Encore3. ([specs/barco-eventmaster.yaml:1175](specs/barco-eventmaster.yaml#L1175))
 - [ ] Record a listCues reply: the documents give no cue object, and the cue's id and Name are read as the other lists hold them. ([specs/barco-eventmaster.yaml:1248](specs/barco-eventmaster.yaml#L1248))
+
+## barco-eventmaster-telnet — Barco Event Master (ASCII over Telnet)
+
+- [ ] Record what the processor sends on port 9878 (the prompt, any answer to ATRN and PRESET, any error text), which Barco does not document. ([specs/barco-eventmaster-telnet.yaml:130](specs/barco-eventmaster-telnet.yaml#L130))
+- [ ] Confirm commands ended with CR LF are accepted (and whether CR or LF alone is too). ([specs/barco-eventmaster-telnet.yaml:140](specs/barco-eventmaster-telnet.yaml#L140))
+- [ ] Check how PRESET numbers 1-1000 map to the JSON API's preset ids and serial numbers, and whether PRESET -s overwrites an existing preset. ([specs/barco-eventmaster-telnet.yaml:148](specs/barco-eventmaster-telnet.yaml#L148))
+- [ ] Check which software versions accept PRESET -a. ([specs/barco-eventmaster-telnet.yaml:156](specs/barco-eventmaster-telnet.yaml#L156))
+- [ ] Confirm the Encore3 opens port 9878 and accepts ATRN and PRESET. ([specs/barco-eventmaster-telnet.yaml:165](specs/barco-eventmaster-telnet.yaml#L165))
 
 ## behringer-wing — Behringer WING
 
@@ -824,6 +841,52 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the shape of GET /v0/state ({clockTime, timelines: [{id, playbackStatus}]} bare, or under value as in the event stream, are both read) and confirm it lists every timeline of the show, stopped ones included: each read replaces the timelines state. ([specs/dataton-watchout7.yaml:364](specs/dataton-watchout7.yaml#L364))
 - [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:407](specs/dataton-watchout7.yaml#L407))
 - [ ] Confirm POST /v0/showfile takes the .watch file as the raw request body with Content-Type application/octet-stream, answers 200, and that showName names the loaded show; and record whether WATCHOUT 7 before 7.8 has it. ([specs/dataton-watchout7.yaml:318](specs/dataton-watchout7.yaml#L318))
+
+## dbaudio — d&b audiotechnik amplifiers
+
+- [ ] On each model (especially the D25, 25D, D90 and 5DM, which d&b's Q-SYS plug-in added last), confirm the named objects answer at the numbers built from the plug-in's tables, and record the class GetClassIdentification reports for each. ([specs/dbaudio.yaml:638](specs/dbaudio.yaml#L638))
+- [ ] Confirm the OCP.1 port on each family (30013 on the D80, D20, 30D and 10D, 50014 on the others) and on older firmware, and whether any amplifier also speaks OCP.1 over UDP or a WebSocket. ([specs/dbaudio.yaml:647](specs/dbaudio.yaml#L647))
+- [ ] Read device.model_guid on each model and check the manufacturer code and model byte against the list in the quirk. ([specs/dbaudio.yaml:655](specs/dbaudio.yaml#L655))
+- [ ] Check that subscriptions to the named objects are accepted and changes made in R1 or on the front panel arrive by notification, and whether a walk of the root block finds the same objects, and under which roles. ([specs/dbaudio.yaml:662](specs/dbaudio.yaml#L662))
+- [ ] Load an AmpPreset with load_amp_preset and backup_and_load_amp_preset and confirm the backup lands in 13 to 15; check what AmpPreset/Selected, AmpPreset/Modified and AmpPreset <n>/Stored report, and that the preset names can be written. ([specs/dbaudio.yaml:670](specs/dbaudio.yaml#L670))
+- [ ] Confirm identify (method 5.2 with 0x0200, then 0) makes the amplifier wink and stop, and that the Wink object's Active (4.1) follows it. ([specs/dbaudio.yaml:678](specs/dbaudio.yaml#L678))
+- [ ] In each 2-way active and mix top/sub output mode, check which channel's objects the pair answers to and what writing the second channel's does. ([specs/dbaudio.yaml:684](specs/dbaudio.yaml#L684))
+- [ ] Check the delay's reported minimum and maximum, and what Filter1, Filter2 and Filter3 do and accept with a few loudspeaker setups. ([specs/dbaudio.yaml:690](specs/dbaudio.yaml#L690))
+- [ ] On a D80 and D20, confirm the input mode positions 1 to 5 and which routing switches answer in each. ([specs/dbaudio.yaml:696](specs/dbaudio.yaml#L696))
+- [ ] Confirm switching load or input monitoring off and on again clears its errors, and what DeviceErrorText and ErrorText hold. ([specs/dbaudio.yaml:703](specs/dbaudio.yaml#L703))
+- [ ] Check the Headroom meter's unit and range, and how often the ISP, GR and OVL sensors notify under programme. ([specs/dbaudio.yaml:710](specs/dbaudio.yaml#L710))
+- [ ] On a DS10 and DS100, find the OCP.1 port and walk the tree: record its roles and classes so they can be named here. ([specs/dbaudio.yaml:716](specs/dbaudio.yaml#L716))
+- [ ] Confirm set_device_time (SetDeviceTimeNTP, 3.2, on object 9 or 10 by family) sets the amplifier's clock. ([specs/dbaudio.yaml:579](specs/dbaudio.yaml#L579))
+
+## dhd-aes67 — DHD audio AES67 / RAVENNA interfaces (Control API)
+
+- [ ] Check the module path /modules/1/api/ws on an AES67 interface itself, and the module ID Toolbox gives an XC3 52-7010 AES67 module. ([specs/dhd-aes67.yaml:40](specs/dhd-aes67.yaml#L40))
+- [ ] Check that the PTP, stream and route values whose names do not begin with _ can be set: DHD's AES67 OpenAPI document gives none of them a set parameter. ([specs/dhd-aes67.yaml:138](specs/dhd-aes67.yaml#L138))
+- [ ] Check that the current value sent after a subscribe arrives as an update rooted at the tree's root, as on cores. ([specs/dhd-aes67.yaml:770](specs/dhd-aes67.yaml#L770))
+- [ ] Check the auth answer and error codes 1280 and 1281 on an AES67 module, as on cores. ([specs/dhd-aes67.yaml:52](specs/dhd-aes67.yaml#L52))
+
+## dhd-control-api — DHD audio XC3 / XD3 / XS3 / RM1 cores (Control API)
+
+- [ ] Check that the current value sent after a subscribe arrives as an update message rooted at the tree's root (`{"method":"update","payload":{"audio":...}}`), as later changes do, and not only inside the subscribe answer. ([specs/dhd-control-api.yaml:3808](specs/dhd-control-api.yaml#L3808))
+- [ ] Check that every answer, including RPC answers and errors, returns the msgID the request carried as a string, which is how the core ties each command to its answer. ([specs/dhd-control-api.yaml:319](specs/dhd-control-api.yaml#L319))
+- [ ] Check the auth answer: success given as the string "true" (as DHD's example shows) or a boolean, error code 1281 for a wrong token and 1280 for none; and that the subscriptions sent once auth is answered are accepted. ([specs/dhd-control-api.yaml:70](specs/dhd-control-api.yaml#L70))
+- [ ] Check that an access group's access, brightnessconsole, brightnessdisplay and colorscheme can be set: their names do not begin with _, but DHD's OpenAPI document gives them no set parameter. ([specs/dhd-control-api.yaml:2736](specs/dhd-control-api.yaml#L2736))
+- [ ] Check the path of the "channel on key sets fader" option: DHD's document gives /control/mixers/<mixer>/faderoptionschonkeysetsfader, which looks like faderoptions/chonkeysetsfader with a slash missing. ([specs/dhd-control-api.yaml:2872](specs/dhd-control-api.yaml#L2872))
+- [ ] Check that fadetovalue takes its fade time as time (as DHD's example request and answer do) rather than fadetime (as its parameter list says). ([specs/dhd-control-api.yaml:485](specs/dhd-control-api.yaml#L485))
+- [ ] Check that a reverb's decay/min is read only like its _max and _step (it is named without the underscore) and that eq q is a whole number in flex processings and a decimal on faders, as the document's types say. ([specs/dhd-control-api.yaml:2963](specs/dhd-control-api.yaml#L2963))
+- [ ] Check that a level detect's _name and _mode are text, as their descriptions say, though DHD's document types them as numbers. ([specs/dhd-control-api.yaml:2971](specs/dhd-control-api.yaml#L2971))
+- [ ] Check that decimals sent with three places (fader -6.500) are accepted, and the nearest-value clamping answer of a set out of range. ([specs/dhd-control-api.yaml:3818](specs/dhd-control-api.yaml#L3818))
+
+## dhd-ecp — DHD audio ECP (RM4200D, Series 52 cores)
+
+- [ ] Check that an answer to a request addressed by fader channel (FaderHi 0x10) repeats 0x10 and the channel, for get_fader_level and get_pfl, rather than naming the logic fader the channel sits on; the core matches the answer by those bytes. ([specs/dhd-ecp.yaml:567](specs/dhd-ecp.yaml#L567))
+- [ ] Check that a set followed at once by its request is answered with the new value (set_route, set_logic, set_fader_level, set_label, set_io_gain), not the value before the set was applied. ([specs/dhd-ecp.yaml:521](specs/dhd-ecp.yaml#L521))
+- [ ] Check whether the device sends 0x1102 on/off blocks unasked when a fader or channel is switched on or off on the console; the protocol documents no request for it, and the on state is read only from such blocks. ([specs/dhd-ecp.yaml:488](specs/dhd-ecp.yaml#L488))
+- [ ] Check whether the device answers a fader level request for a logic fader whose virtual mixer or fader is not configured, or stays silent (the core times out after 2 s). ([specs/dhd-ecp.yaml:521](specs/dhd-ecp.yaml#L521))
+- [ ] Check the firmware 05 access status answer (0x1104, length 7): which access group D6 numbers (0-5 assumed, reported 1-6), and whether one answer comes per group. ([specs/dhd-ecp.yaml:508](specs/dhd-ecp.yaml#L508))
+- [ ] Check that the meter correlation byte is signed (-100 to 100 as a two's complement byte) as read. ([specs/dhd-ecp.yaml:515](specs/dhd-ecp.yaml#L515))
+- [ ] Check that Load Save Setups (0x111C) loads and saves snapshots on firmware 06 and later, which DHD documents only under firmware 05 but lists for every firmware line. ([specs/dhd-ecp.yaml:538](specs/dhd-ecp.yaml#L538))
+- [ ] Check that the channel label request (0x1114, length 3) is answered with length 8 for the display asked, and how a central operating panel module (0x8001-0x800C) answers it. ([specs/dhd-ecp.yaml:363](specs/dhd-ecp.yaml#L363))
 
 ## digico-sd — DiGiCo SD and Quantum consoles
 
@@ -1583,19 +1646,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the where[title] query on songs matches part of a title or only the whole of it. ([specs/planningcenter-services.yaml:686](specs/planningcenter-services.yaml#L686))
 - [ ] Confirm Attachment open works under an item's attachments path as under media's, and how long the attachment_url lasts. ([specs/planningcenter-services.yaml:823](specs/planningcenter-services.yaml#L823))
 
+## probel-swp02 — Probel / Grass Valley SW-P-02 routers
+
+- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:131](specs/probel-swp02.yaml#L131))
+- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:106](specs/probel-swp02.yaml#L106))
+- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:127](specs/probel-swp02.yaml#L127))
+
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
-- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:442](specs/probel-swp08.yaml#L442))
-- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:391](specs/probel-swp08.yaml#L391))
-- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:398](specs/probel-swp08.yaml#L398))
-- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:414](specs/probel-swp08.yaml#L414))
-- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:425](specs/probel-swp08.yaml#L425))
-- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:455](specs/probel-swp08.yaml#L455))
-- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:503](specs/probel-swp08.yaml#L503))
-- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:503](specs/probel-swp08.yaml#L503))
-- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:476](specs/probel-swp08.yaml#L476))
-- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:448](specs/probel-swp08.yaml#L448))
-- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:494](specs/probel-swp08.yaml#L494))
+- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:463](specs/probel-swp08.yaml#L463))
+- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:404](specs/probel-swp08.yaml#L404))
+- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:419](specs/probel-swp08.yaml#L419))
+- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:435](specs/probel-swp08.yaml#L435))
+- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:446](specs/probel-swp08.yaml#L446))
+- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:476](specs/probel-swp08.yaml#L476))
+- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
+- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
+- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:497](specs/probel-swp08.yaml#L497))
+- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:469](specs/probel-swp08.yaml#L469))
+- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:515](specs/probel-swp08.yaml#L515))
 
 ## propresenter — ProPresenter
 
@@ -1728,6 +1797,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:572](specs/roland-p20hd.yaml#L572))
 - [ ] Confirm the session closes after five minutes without commands and that ACS every ten seconds of silence keeps it open. ([specs/roland-p20hd.yaml:583](specs/roland-p20hd.yaml#L583))
 
+## roland-v1200hd — Roland V-1200HD
+
+- [ ] Confirm ACS (verification of unit status) is answered by a bare ACK, as the liveness check assumes; the guide lists no reply for it. ([specs/roland-v1200hd.yaml:44](specs/roland-v1200hd.yaml#L44))
+- [ ] Check whether ACK is the single byte 06H or "ACK;" as the guide's overview writes it, and that a trailing ";" is harmless. ([specs/roland-v1200hd.yaml:41](specs/roland-v1200hd.yaml#L41))
+- [ ] Confirm the STS frames carry their values comma-separated without spaces, group 5 answering 8 for no memory, and the order of each group as listed. ([specs/roland-v1200hd.yaml:298](specs/roland-v1200hd.yaml#L298))
+
 ## roland-v160hd — Roland V-160HD, V-80HD, VR-120HD, VR-6HD, V-1-4K
 
 - [ ] Confirm commands ended with CR LF are accepted (Roland documents only Telnet). ([specs/roland-v160hd.yaml:84](specs/roland-v160hd.yaml#L84))
@@ -1757,6 +1832,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:567](specs/roland-vr400uhd.yaml#L567))
 - [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:580](specs/roland-vr400uhd.yaml#L580))
 - [ ] Confirm get answers every parameter of the command list (OUTPUT FADE, DSK, LOGO, transition, MIC and LINE channels, outputs, auto mixing, audio follow video, reverb) with its current value, in the ranges set takes. ([specs/roland-vr400uhd.yaml:419](specs/roland-vr400uhd.yaml#L419))
+
+## roland-vr4hd — Roland VR-4HD
+
+- [ ] Confirm VER, used as the liveness check (the VR-4HD lists no ACS), is answered with REMOTE RS-232 on, and nothing when it is off. ([specs/roland-vr4hd.yaml:44](specs/roland-vr4hd.yaml#L44))
+- [ ] Check that a status frame pushed on a change (QPI, QDK, QPG, QUB) comes besides, not in place of, the ACK of the command that caused it. ([specs/roland-vr4hd.yaml:268](specs/roland-vr4hd.yaml#L268))
+
+## roland-xs1hd — Roland XS-1HD
+
+- [ ] Confirm ACS (obtain the status) is answered by a bare ACK and nothing else, as the liveness check assumes; the manual lists no ACS reply. ([specs/roland-xs1hd.yaml:39](specs/roland-xs1hd.yaml#L39))
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 
@@ -2154,15 +2238,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## visca — VISCA over IP
 
-- [ ] On Sony VISCA over IP, confirm the sequence number the camera expects after RESET (the core sends 1). ([specs/visca.yaml:912](specs/visca.yaml#L912))
-- [ ] On PTZOptics, check whether UDP 1259 expects Sony's 8-byte header. ([specs/visca.yaml:959](specs/visca.yaml#L959))
-- [ ] On PTZOptics, confirm the shutter, gain, bright, focus mode and focus position codes the core uses (0A/4A, 4C, 4D, 04 38, 04 48) against the 2026 list's conflicting codes. ([specs/visca.yaml:966](specs/visca.yaml#L966))
-- [ ] On SRG-X400, check which pan direction is positive. ([specs/visca.yaml:953](specs/visca.yaml#L953))
-- [ ] On BirdDog, confirm 32-bit sequence numbers are accepted, and the P400 white balance codes (04 ATW, 05/06 manual). ([specs/visca.yaml:979](specs/visca.yaml#L979))
-- [ ] On Lumens and Marshall, confirm preset 1 is wire 00. ([specs/visca.yaml:985](specs/visca.yaml#L985))
-- [ ] On AVer, confirm presets are numbered from 0 on the wire (preset n is wire n-1). ([specs/visca.yaml:992](specs/visca.yaml#L992))
-- [ ] On Canon, confirm replies go to UDP 52381 with the default response port setting. ([specs/visca.yaml:1004](specs/visca.yaml#L1004))
-- [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1012](specs/visca.yaml#L1012))
+- [ ] On Sony VISCA over IP, confirm the sequence number the camera expects after RESET (the core sends 1). ([specs/visca.yaml:940](specs/visca.yaml#L940))
+- [ ] On PTZOptics, check whether UDP 1259 expects Sony's 8-byte header. ([specs/visca.yaml:987](specs/visca.yaml#L987))
+- [ ] On PTZOptics, confirm the shutter, gain, bright, focus mode and focus position codes the core uses (0A/4A, 4C, 4D, 04 38, 04 48) against the 2026 list's conflicting codes. ([specs/visca.yaml:994](specs/visca.yaml#L994))
+- [ ] On SRG-X400, check which pan direction is positive. ([specs/visca.yaml:981](specs/visca.yaml#L981))
+- [ ] On BirdDog, confirm 32-bit sequence numbers are accepted, and the P400 white balance codes (04 ATW, 05/06 manual). ([specs/visca.yaml:1007](specs/visca.yaml#L1007))
+- [ ] On Lumens and Marshall, confirm preset 1 is wire 00. ([specs/visca.yaml:1013](specs/visca.yaml#L1013))
+- [ ] On AVer, confirm presets are numbered from 0 on the wire (preset n is wire n-1). ([specs/visca.yaml:1020](specs/visca.yaml#L1020))
+- [ ] On Canon, confirm replies go to UDP 52381 with the default response port setting. ([specs/visca.yaml:1032](specs/visca.yaml#L1032))
+- [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1040](specs/visca.yaml#L1040))
+- [ ] On a serial camera (Sony, Datavideo, Lumens, Marshall), confirm replies come from y0 with y = address + 8 and that only Address Set and IF_Clear broadcasts answer from 88. ([specs/visca.yaml:1126](specs/visca.yaml#L1126))
+- [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
 
 ## vmix — vMix
 

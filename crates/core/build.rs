@@ -42,7 +42,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-anomes", &["millumin"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
-    ("vendor-barco", &["barco-eventmaster"]),
+    (
+        "vendor-barco",
+        &[
+            "barco-encore",
+            "barco-eventmaster",
+            "barco-eventmaster-telnet",
+        ],
+    ),
     (
         "vendor-behringer",
         &["behringer-wing", "behringer-x32", "behringer-xair"],
@@ -78,6 +85,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-dataton",
         &["dataton-watchout6", "dataton-watchout7"],
     ),
+    ("vendor-dbaudio", &["dbaudio"]),
+    ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
     ("vendor-disguise", &["disguise"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
@@ -129,7 +138,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-panasonic", &["panasonic-ptz"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
-    ("vendor-probel", &["probel-swp08"]),
+    ("vendor-probel", &["probel-swp02", "probel-swp08"]),
     ("vendor-ptzoptics", &["ptzoptics"]),
     ("vendor-qsc", &["qsys", "qsys-ecp"]),
     (
@@ -142,10 +151,13 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-roland",
         &[
             "roland-p20hd",
+            "roland-v1200hd",
             "roland-v160hd",
             "roland-v600uhd",
             "roland-v60hd",
             "roland-vr400uhd",
+            "roland-vr4hd",
+            "roland-xs1hd",
             "roland-xs42h",
             "roland-xs62s",
             "roland-xs80h",

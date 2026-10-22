@@ -246,6 +246,11 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
+    // A serial port has no default; a vector need not name one.
+    let mut settings = settings;
+    for (name, value) in serial_port(spec) {
+        settings.entry(name).or_insert(value);
+    }
     let settings = validate(&spec.settings, &settings).map_err(|e| format!("settings: {e}"))?;
     let ctx = OpenContext {
         host: HOST,
@@ -262,7 +267,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     let mut connected = cx.take();
     if connected
         .iter()
-        .any(|a| matches!(a, Action::TcpOpen { .. }))
+        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::SerialOpen { .. }))
     {
         let mut cx = Cx::new(1);
         engine.tcp(&mut cx, "device", TcpInput::Connected);
@@ -539,6 +544,11 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         .cloned()
         .unwrap_or_default();
     let params = validate(&command_spec.params, &input).map_err(|e| format!("input: {e}"))?;
+    // A serial port has no default; a vector need not name one.
+    let mut settings = settings;
+    for (name, value) in serial_port(spec) {
+        settings.entry(name).or_insert(value);
+    }
     let settings = validate(&spec.settings, &settings).map_err(|e| format!("settings: {e}"))?;
 
     let ctx = OpenContext {
@@ -558,7 +568,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     engine.start(&mut cx);
     let started = cx.take();
     let mut cx = Cx::new(1);
-    if started.iter().any(|a| matches!(a, Action::TcpOpen { .. })) {
+    if started
+        .iter()
+        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::SerialOpen { .. }))
+    {
         engine.tcp(&mut cx, "device", TcpInput::Connected);
         // A login that waits for the device's prompt is given it.
         if let Some((_, prompt, _)) = engine.prompt_wait.clone() {
@@ -703,7 +716,13 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let mut reply_actions = None;
     if let Some(reply) = v.get("device_reply").and_then(Value::as_str) {
         let mut cx = Cx::new(3);
-        engine.tcp(&mut cx, "device", TcpInput::Data(reply.as_bytes().to_vec()));
+        // A websocket device's reply is one message; any other is bytes on
+        // the stream.
+        if matches!(engine.transport, super::Transport::Ws { .. }) {
+            engine.ws(&mut cx, "device", WsInput::Text(reply.to_string()));
+        } else {
+            engine.tcp(&mut cx, "device", TcpInput::Data(reply.as_bytes().to_vec()));
+        }
         let after = cx.take();
         let stated = expected_wire(&v, main_port(&engine)).map_or(0, |w| w.len());
         if stated > sent.len() {
@@ -872,6 +891,15 @@ fn every_spec_driven_command_has_a_vector() {
     );
 }
 
+/// A serial port for a spec that declares one, which has no default.
+fn serial_port(spec: &crate::catalog::DeviceSpec) -> crate::catalog::Params {
+    let mut given = crate::catalog::Params::new();
+    if spec.settings.contains_key("serial_port") {
+        given.insert("serial_port".into(), "COM1".into());
+    }
+    given
+}
+
 #[test]
 fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
     let catalog = Catalog::source_tree();
@@ -902,7 +930,14 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             port: None,
             model: model.id.clone(),
             channels: model.channels,
-            settings: validate(&spec.settings, &Default::default()).unwrap_or_default(),
+            // With no value for a required setting (a token), the defaults
+            // of the others, as a host opening it would have them.
+            settings: validate(&spec.settings, &serial_port(spec)).unwrap_or_else(|_| {
+                spec.settings
+                    .iter()
+                    .filter_map(|(k, p)| p.default.clone().map(|d| (k.clone(), d)))
+                    .collect()
+            }),
             monitor: true,
         };
         if let Err(e) = SpecEngine::new(Arc::new(spec.clone()), ctx) {

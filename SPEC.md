@@ -171,6 +171,60 @@ as the transport's `error_match`, a regex: such a message is taken as the
 reply of a command waiting with `reply_contains`, which then fails on its
 `expect`.
 
+### `line-serial`
+
+Text over a serial port of the host running the core: RS-232, RS-422, or
+a USB serial adapter (Roland's V-1200HD, which has no network control).
+Everything of `line-tcp` applies (its framings, `reply_framing`,
+`reply_match`, `error_match`, `probe`, `on_connect` with `after_prompt`,
+and the telemetry rules), except `port` and `endpoints`: a serial port has
+no number and reaches no HTTP server.
+
+```yaml
+transport:
+  type: line-serial
+  framing: delimited
+  open: ""
+  close: ";"
+  reply_framing: terminated
+  reply_terminators: [";", ""]
+settings:
+  serial_port:  { type: string, required: true, max_length: 256, label: Serial port,
+                  description: "The host's serial port: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate:    { type: enum, values: ["9600", "38400"], default: "38400", label: Baud rate, description: "…" }
+  data_bits:    { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "…" }
+  parity:       { type: enum, values: [none], default: none, label: Parity, description: "…" }
+  stop_bits:    { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "…" }
+  flow_control: { type: enum, values: [none, xon-xoff], default: none, label: Flow control, description: "…" }
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, note: "RS-232, D-sub 9-pin" }
+```
+
+The port and its line settings are settings with these names, so every
+serial device is configured alike: `serial_port` (required, no default),
+`baud_rate` (an `int`, or an `enum` of digits for a device that offers a
+few rates), `data_bits` (5 to 8), `parity` (`none`, `odd`, `even`),
+`stop_bits` (1 or 2) and `flow_control` (`none`, `xon-xoff`, `rts-cts`).
+Each line setting is declared with the device's documented default, and
+narrowed to the values the device allows; `tools/validate.py` checks them.
+Changing any of them with `update_settings` opens the port again.
+
+The port is opened when the device is, and is the device's connection: a
+port that cannot be opened (absent, or held by another program) or that
+fails while open (a USB adapter unplugged) is reported `disconnected`,
+commands in flight fail with `transport`, and it is opened again after 1 s,
+doubling to 30 s, as a TCP connection is reconnected. A serial line gives no
+sign of the device itself, so `connected` means the port is open; the
+device's own presence is what `probe` and its replies show. A device on a
+serial port needs no host: `host` may be left empty when it is opened (a
+`serial` entry in `ports` allows it). Commands-only opening and latency are
+as for any spec-driven device.
+
+Serial ports are opened on Windows, macOS and Linux (and the other Unix
+systems the `serial2` crate supports). Phones have no serial port an app can
+open, so on Android and iOS the port fails to open with a reason saying so,
+and the device stays `disconnected` (docs/MOBILE.md).
+
 ### `line-udp`
 
 Text messages over UDP, one message per datagram (ChamSys MagicQ's remote
@@ -601,6 +655,10 @@ transport:
 
 Templates are text messages, rendered as for `line-tcp` with nothing added; a
 JSON message is a template such as `'{"action":"get","path":{name:json}}'`.
+The `path` may name settings as `{settings.name}`, each value
+percent-encoded as one path segment; a setting with no value is an error, so
+the path never loses a segment. A DHD AES67 module serves its API under its
+module ID: `path: /modules/{settings.module}/api/ws`.
 With `auth: basic` or `bearer`, the credential goes on the opening request as
 for `http`, and a 401 or 403 answer to it is the same terminal refusal.
 
@@ -625,7 +683,10 @@ commands:
 Every message, reply or not, is also offered to the telemetry rules (§8).
 `on_connect` steps are sent when the websocket opens; telemetry `subscribe` and
 `poll` messages are sent straight away rather than queued, because a websocket
-device pushes and what it sends back goes to the rules. Pings are answered by
+device pushes and what it sends back goes to the rules. While a step with
+`await_reply` (a login) still waits for its answer, they queue behind it
+instead, each taking the next message as its reply, since such a device
+accepts nothing before the login is answered (DHD's Control API). Pings are answered by
 the core. `wss` uses TLS 1.2 or later and checks the device's certificate
 against the same public roots as `https`; a device with a self-signed
 certificate declares `accept_invalid_certs: true`, as for `http`: the
@@ -648,7 +709,7 @@ ports:
 | Field | Meaning |
 |---|---|
 | `port` | The default. `null` when there is none and one must be given; a `note` then says so |
-| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls` or `ssh` |
+| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, or `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`) |
 | `role` | `control` (where commands go; the port given when opening a device overrides the transport's, not an HTTP endpoint's), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
 | `listener` | Who listens: `device` (the default) or `core` |
 | `setting` | The setting that changes this port, if any |
@@ -782,8 +843,9 @@ settings, or corrects them with `update_settings`. This is still not a handshake
 whatever the device says.
 
 `refused` does not need `after_prompt`: on any line transport (`line-tcp` and
-`line-udp`), a login step can declare the text a device answers a failed login
-with, even when it answers in free text. A device whose console echoes free
+`line-udp`), and on `ws`, where it is read against each message, a login
+step can declare the text a device answers a failed login with, even when it
+answers in free text. A device whose console echoes free
 text afterwards can declare `accepted` too, a regex over reply lines: once a
 line matches it, the login is accepted and `refused` stops applying, so later
 output that happens to match is not taken for a refusal. Both are only ever
@@ -2140,6 +2202,13 @@ commands:
 A native spec's commands have no `send`, `expect` or `transport`; the module
 defines those. `reason` says why the protocol cannot be expressed as data.
 Vectors apply to native modules exactly as to spec-driven ones.
+
+A native module can drive a device on a serial port of the host as well
+(`Cx::serial_open`, reported like a TCP connection). Its spec then lists a
+`serial` entry in `ports`, usually with a `when` naming the setting that
+chooses it, and declares the six serial settings of `line-serial` (§2) with
+the device's defaults; `serial_port` is then optional, required only when
+the serial port is chosen.
 
 Every spec, spec-driven or native, is one integration, and each integration
 is a Cargo feature of the core named after its spec id (`sennheiser-ew-dx`,

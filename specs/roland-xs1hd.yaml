@@ -1,0 +1,210 @@
+spec: 1
+id: roland-xs1hd
+name: Roland XS-1HD (RS-232 control)
+vendor: Roland
+category: switcher
+
+# The XS-1HD's REMOTE connector (RS-232) takes the "stx" + three letters +
+# optional ":" and comma-separated numbers + ";" grammar of the other Roland
+# switchers (roland-v60hd), acknowledged by the single byte ACK (06H). It has
+# no network control. The command set is small: four cross-points, the
+# transition time, AUTO, five audio levels and memory recall, with no status
+# read-back beyond the version.
+source:
+  - title: "XS-1HD Reference Manual, edition 02 (© 2017)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/XS-1HD_reference_eng02_W.pdf
+    note: >
+      Manufacturer document. System menu: Remote Baudrate 9600 (default, in
+      bold) or 38400 bps, p.7; REMOTE connector (RS-232) specifications
+      (9600/38400 bps, no parity, 8 data bits, 1 stop bit, ASCII, XON/XOFF),
+      command format (stx, ACK 06H, Xon 11H/Xoff 13H, wait for ACK) p.9;
+      received and sent commands (XP1-XP4, TIM, ATO, MVL, CV1-CV4, MEM, VER,
+      ACS, ACK, ERR:0/5, VER:XS-1HD,a) p.10.
+
+transport:
+  type: line-serial
+  # Sent as STX, the command, then ";" (p.9), with no line ending.
+  framing: delimited
+  open: "\u0002"
+  close: ";"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Replies are delimited by ";" or are the bare ACK byte.
+  reply_framing: terminated
+  reply_terminators: [";", "\u0006"]
+  # A command is answered ACK or ERR:a; VER by its data frame (p.10).
+  reply_match: '^[\x02\x11\x13]*(\x06|ERR:[0-9]+;|VER:)'
+  probe: "ACS"
+
+settings:
+  serial_port:
+    type: string
+    required: true
+    max_length: 256
+    label: Serial port
+    description: "The host's serial port wired to the REMOTE connector: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS."
+  baud_rate:
+    type: enum
+    values: ["9600", "38400"]
+    default: "9600"
+    label: Baud rate
+    description: "The REMOTE connector's speed in bits per second, as set in the unit's SYSTEM menu (Remote Baudrate); 9600 by default."
+  data_bits:
+    type: int
+    min: 8
+    max: 8
+    default: 8
+    label: Data bits
+    description: "Bits per character; the XS-1HD uses 8."
+  parity:
+    type: enum
+    values: [none]
+    default: none
+    label: Parity
+    description: "The XS-1HD uses no parity."
+  stop_bits:
+    type: int
+    min: 1
+    max: 1
+    default: 1
+    label: Stop bits
+    description: "The XS-1HD uses 1 stop bit."
+  flow_control:
+    type: enum
+    values: [xon-xoff, none]
+    default: xon-xoff
+    label: Flow control
+    description: "XON/XOFF, as the XS-1HD documents; none ignores its XOFF."
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, note: "REMOTE connector, RS-232, D-sub 9-pin (male); a crossover cable to the host" }
+
+models:
+  - id: xs-1hd
+    name: Roland XS-1HD Multi-Format Matrix Switcher
+    supports:
+      - select_xpt
+      - set_transition_time
+      - auto
+      - set_output_level
+      - set_channel_level
+      - recall_memory
+      - get_version
+      - active_sense
+    verification: none
+    notes: >
+      Four inputs plus Color, four cross-points (XPT1-XPT4), four audio
+      channels and an output level, 16 memories.
+
+commands:
+  select_xpt:
+    summary: "Select a cross-point's input: Input 1-4 or Color (XP1-XP4); its effect depends on the screen mode"
+    params:
+      xpt: { type: int, min: 1, max: 4, required: true, label: Cross-point, description: "The cross-point, XPT1 to XPT4." }
+      input: { type: int, min: 1, max: 5, required: true, label: Input, description: "1-4 Input 1 to Input 4, 5 Color." }
+    send: "XP{xpt}:{input:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_transition_time:
+    summary: "Set the video transition time, 0-20 tenths of a second (TIM)"
+    params:
+      time: { type: int, min: 0, max: 20, required: true, label: Transition time, description: "Video transition time in tenths of a second, 0 to 20 (0.0 to 2.0 s)." }
+    send: "TIM:{time}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  auto:
+    summary: "Press the [AUTO] button; valid only in switcher mode (ATO)"
+    send: "ATO"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_output_level:
+    summary: "Set the output audio level, 0-127 (MVL)"
+    params:
+      level: { type: int, min: 0, max: 127, required: true, label: Output level, description: "The output audio level, 0 to 127." }
+    send: "MVL:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_channel_level:
+    summary: "Set the level of audio channel 1-4, 0-127 (CV1-CV4)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true, label: Audio channel, description: "The audio channel, 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "The channel's level, 0 to 127." }
+    send: "CV{channel}:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  recall_memory:
+    summary: "Recall memory 1-16 (MEM)"
+    params:
+      memory: { type: int, min: 1, max: 16, required: true, label: Memory, description: "The memory to recall, 1 to 16." }
+    send: "MEM:{memory:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_version:
+    summary: "Model name and version; answered by the VER frame (VER)"
+    send: "VER"
+    expect: { matches: '^[\x02\x11\x13]*VER:[^,;]*,([^;]+);' }
+    returns: value
+
+  active_sense:
+    summary: "Check the switcher is responding (ACS)"
+    send: "ACS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+telemetry:
+  # The version is the only thing the XS-1HD reports (p.10).
+  subscribe:
+    send: ["VER"]
+  updates:
+    - match: '^[\x02\x11\x13]*VER:([^,;]*),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  device.model:   { type: string, description: "Model name from VER (XS-1HD)" }
+  device.version: { type: string, description: "System program version from VER" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_memory loads a whole saved setting at once and cannot be undone
+      from here.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Wait for ACK after each command before sending the next (p.9); the
+      queue does this. ACK is the single byte 06H with no line ending and
+      data replies end in ";", both handled by the reply terminators. ERR:0
+      is a syntax error and ERR:5 an argument out of range (p.10). XON (11H)
+      and XOFF (13H) may appear before a frame.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire numbers are 0-based; inputs 1-5 and memories 1-16 here are
+      converted. The cross-point commands act according to the screen mode
+      (matrix, split or switcher), and AUTO only in switcher mode (p.10).
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the RS-232 commands read back nothing but the version
+      (VER), so state holds the model and version only. The cross-points,
+      the transition time, the audio levels and the memory last recalled
+      cannot be read, nor the screen mode set; the connection is the only
+      sign the unit is there, checked with ACS when idle.
+
+  - models: [all]
+    severity: info
+    text: >
+      The speed is set on the unit (SYSTEM menu, Remote Baudrate) and must
+      match the baud_rate setting; a mismatch shows as no reply at all.

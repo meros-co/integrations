@@ -3,7 +3,7 @@
 //! One task per connection, like TCP: it connects, reports the result,
 //! forwards every received message and writes whatever the session hands it.
 //! Pings are answered by the library; the module sees text and binary messages
-//! and the close. `wss` uses the same TLS as TCP streams (see `crate::tls`).
+//! and the close, and sends either. `wss` uses the same TLS as TCP streams (see `crate::tls`).
 
 use std::time::Duration;
 
@@ -23,6 +23,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) enum Outgoing {
     Text(String),
+    Binary(Vec<u8>),
     Close,
 }
 
@@ -147,6 +148,11 @@ pub(crate) fn spawn(
                             break closed(e.to_string());
                         }
                     }
+                    Some(Outgoing::Binary(data)) => {
+                        if let Err(e) = write.send(Message::binary(data)).await {
+                            break closed(e.to_string());
+                        }
+                    }
                     Some(Outgoing::Close) | None => {
                         let _ = write
                             .send(Message::Close(Some(CloseFrame {
@@ -180,7 +186,8 @@ mod tests {
 
     use super::*;
 
-    /// A wss server with a self-signed certificate that echoes text.
+    /// A wss server with a self-signed certificate that echoes text and
+    /// binary messages.
     async fn wss_echo() -> u16 {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -197,7 +204,9 @@ mod tests {
                         return;
                     };
                     while let Some(Ok(message)) = ws.next().await {
-                        if message.is_text() && ws.send(message).await.is_err() {
+                        if (message.is_text() || message.is_binary())
+                            && ws.send(message).await.is_err()
+                        {
                             break;
                         }
                     }
@@ -230,6 +239,8 @@ mod tests {
         assert_eq!(next(&mut rx).await, WsInput::Opened);
         c.writer.send(Outgoing::Text("hello".into())).unwrap();
         assert_eq!(next(&mut rx).await, WsInput::Text("hello".into()));
+        c.writer.send(Outgoing::Binary(vec![0x3B, 0, 1])).unwrap();
+        assert_eq!(next(&mut rx).await, WsInput::Binary(vec![0x3B, 0, 1]));
     }
 
     #[tokio::test(flavor = "multi_thread")]

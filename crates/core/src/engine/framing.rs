@@ -96,6 +96,12 @@ impl Framer {
         if let ReplyFraming::Delimited { open, close } = &self.framing {
             self.text.push_str(&String::from_utf8_lossy(bytes));
             let (open, close) = (open.trim(), close.trim());
+            if close.is_empty() {
+                // No marker ends a message, so none can be read (the engine
+                // refuses such a spec); nothing is kept, so nothing grows.
+                self.text.clear();
+                return out;
+            }
             while let Some(end) = self.text.find(close) {
                 let segment: String = self.text.drain(..end + close.len()).collect();
                 if open.is_empty() {
@@ -293,6 +299,18 @@ impl PacketReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_empty_close_reads_nothing_and_keeps_nothing() {
+        for close in ["", "  ", "\r\n"] {
+            let mut f = Framer::new(ReplyFraming::Delimited {
+                open: "<".into(),
+                close: close.into(),
+            });
+            assert!(f.feed(b"< REP 1 >\r\n").is_empty());
+            assert!(f.text.is_empty());
+        }
+    }
 
     #[test]
     fn any_line_ending_ends_a_line() {

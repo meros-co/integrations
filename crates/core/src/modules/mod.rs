@@ -6,7 +6,7 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
-#[cfg(any(feature = "aes70", feature = "focusrite-rednet"))]
+#[cfg(any(feature = "aes70", feature = "focusrite-rednet", feature = "dbaudio"))]
 mod aes70;
 #[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
 mod aja_config_events;
@@ -44,6 +44,10 @@ mod analogway;
 mod atem;
 #[cfg(feature = "bss-london")]
 mod bss_london;
+#[cfg(feature = "dbaudio")]
+mod dbaudio;
+#[cfg(feature = "dhd-ecp")]
+mod dhd_ecp;
 #[cfg(feature = "softouch-easyworship")]
 mod easyworship;
 #[cfg(feature = "emberplus")]
@@ -125,6 +129,8 @@ mod sony_camera_props;
 mod sony_camera_ptpip;
 #[cfg(any(feature = "sennheiser-ew-dx", feature = "sennheiser-spectera"))]
 mod sscv2;
+#[cfg(feature = "probel-swp02")]
+mod swp02;
 #[cfg(feature = "probel-swp08")]
 mod swp08;
 #[cfg(feature = "tally-arbiter")]
@@ -240,7 +246,7 @@ pub(crate) fn construct(
         #[cfg(feature = "vmix")]
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         #[cfg(feature = "visca")]
-        "visca" => Ok(Box::new(visca::Visca::new(context))),
+        "visca" => Ok(Box::new(visca::Visca::new(context)?)),
         #[cfg(feature = "qsys")]
         "qsys" => Ok(Box::new(qsys::Qsys::new(context))),
         #[cfg(any(
@@ -257,6 +263,13 @@ pub(crate) fn construct(
         "aes70" => match context.port {
             Some(port) => Ok(Box::new(aes70::Aes70::new(context, port))),
             None => Err("AES70 (OCP.1) has no standard port: give the device's OCP.1 port".into()),
+        },
+        // d&b's integrations use 30013 or 50014 by model; the DS10 and DS100
+        // need theirs given.
+        #[cfg(feature = "dbaudio")]
+        "dbaudio" => match context.port.or_else(|| dbaudio::default_port(&context.model)) {
+            Some(port) => Ok(Box::new(dbaudio::DbAudio::new(context, port))),
+            None => Err("give the device's OCP.1 port: d&b documents none for this model".into()),
         },
         // RedNet's OCP.1 port is advertised, not fixed, so the host must give it.
         #[cfg(feature = "focusrite-rednet")]
@@ -280,6 +293,10 @@ pub(crate) fn construct(
             None => Err("EasyWorship has no fixed port: give the port it advertises over Bonjour (_ezwremote._tcp)"
                 .into()),
         },
+        #[cfg(feature = "dhd-ecp")]
+        "dhd-ecp" => Ok(Box::new(dhd_ecp::DhdEcp::new(spec, context)?)),
+        #[cfg(feature = "probel-swp02")]
+        "probel-swp02" => Ok(Box::new(swp02::Swp02::new(context)?)),
         #[cfg(feature = "probel-swp08")]
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]

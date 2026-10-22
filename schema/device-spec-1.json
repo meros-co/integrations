@@ -1084,7 +1084,8 @@
               "ws",
               "wss",
               "tls",
-              "ssh"
+              "ssh",
+              "serial"
             ]
           },
           "role": {
@@ -1215,6 +1216,92 @@
           },
           "required": [
             "port",
+            "framing"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "line-serial",
+              "description": "Text over a serial port of the host (RS-232, RS-422, a USB serial adapter): line-tcp's framings and replies, the port and its line settings coming from the settings serial_port, baud_rate, data_bits, parity, stop_bits and flow_control (SPEC.md §2, line-serial)."
+            },
+            "framing": {
+              "enum": [
+                "delimited",
+                "terminated",
+                "block",
+                "length-prefixed"
+              ]
+            },
+            "open": {
+              "type": "string"
+            },
+            "close": {
+              "type": "string"
+            },
+            "terminator": {
+              "enum": [
+                "cr",
+                "crlf",
+                "lf"
+              ]
+            },
+            "encoding": {
+              "enum": [
+                "ascii",
+                "utf-8"
+              ],
+              "default": "ascii"
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reply": {
+              "enum": [
+                "expected",
+                "none"
+              ],
+              "default": "expected"
+            },
+            "reply_framing": {
+              "enum": [
+                "line",
+                "block",
+                "headed-block",
+                "terminated",
+                "fenced"
+              ],
+              "description": "How a reply is delimited. Defaults to 'block' for framing: block, otherwise 'line'. 'terminated' ends a message at any of reply_terminators, with no line ending needed. 'fenced' takes each line as a message, except the lines between two lines matching reply_fence, which are one."
+            },
+            "reply_fence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With reply_framing: fenced. A regex over a line: such a line opens a block, the next one after its first other line closes it, and the lines between are one message (Turtle AV's status between lines of = signs)."
+            },
+            "reply_terminators": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "With reply_framing: terminated. A message runs up to and including the first of these; surrounding spaces and line endings are dropped."
+            },
+            "reply_match": {
+              "type": "string",
+              "description": "RE2-safe regex. A message matching it is a command reply; any other message is unsolicited."
+            },
+            "error_match": {
+              "type": "string",
+              "description": "RE2-safe regex for the device's error answer, which names nothing it answers (Shure's < REP ERR >): it is taken as the reply of a command waiting with expect.reply_contains."
+            },
+            "probe": {
+              "type": "string"
+            }
+          },
+          "required": [
             "framing"
           ],
           "additionalProperties": false

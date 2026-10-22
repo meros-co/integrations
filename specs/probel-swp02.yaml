@@ -1,0 +1,132 @@
+spec: 1
+id: probel-swp02
+name: Probel / Grass Valley SW-P-02 routers (General Switcher Communication Protocol)
+vendor: Probel / Snell / Grass Valley (SW-P-02, also implemented by Ross, Evertz and others)
+category: router
+implementation: native
+reason: >
+  SW-P-02 is binary: each message is FFh, a command byte, that command's fixed number of 7-bit data bytes and
+  a 7-bit two's complement checksum, and destination and source numbers are split across a multiplier byte
+  and two MOD 128 bytes. Replies are matched to requests by command byte and destination, while CONNECTED is
+  broadcast on every port at any time, and the protocol has no NAK: a request is failed only by its reply not
+  coming, so the router's presence is judged from timeouts.
+
+source:
+  - title: "Router Control Protocols, SW-P-88 Issue 1 (20 March 2001), Annex D-6 to a European Parliament tender"
+    author: "Pro-Bel Limited"
+    url: "https://www.europarl.europa.eu/tenders/2012/20120822/11.annex_d-6_switcher_protocol_en.pdf"
+    note: >
+      Published by the European Parliament as a tender annex; it carries a confidentiality notice, so nothing
+      here is quoted from it and only wire layouts are restated. Its first part is the General Switcher
+      Communication Protocol (SW-P-02): electrical parameters, RS-485/RS-422 with 8 data bits, 1 stop bit,
+      even parity, 38.4k baud normally, and any common RS-485/RS-422 or RS-232 parameters (§2); message
+      format FFh, command, message, 7-bit two's complement checksum (§3.1); INTERROGATE 01, CONNECT 02, TALLY
+      03 (source 1023 for a destination out of range), CONNECTED 04 (issued on all ports), CONNECT ON GO 05,
+      GO 06 (00 set, 01 clear; no CONNECTED for what it sets), CONNECT ON GO ACKNOWLEDGE 12, GO DONE
+      ACKNOWLEDGE 13 (00 set, 01 cleared, 02 nothing to set or clear), the multiplier byte (destination DIV
+      128 in bits 4-6, bad source or update-disabled flag in bit 3, source DIV 128 in bits 0-2; destinations
+      896-1023 monitoring rows) (§3.2); background interrogation and link failure judged by TALLY timeouts,
+      no other acknowledgement (§3.3); which commands each standard Pro-Bel controller implements (§4).
+  - title: "Ross NK-3RD User Manual, SW-P-02 support"
+    author: "Ross Video"
+    url: "https://www.manualslib.com/manual/1251021/Ross-Nk-3rd.html"
+    note: "Corroboration from a third-party implementation: INTERROGATE, TALLY, CONNECT and CONNECTED only."
+
+settings:
+  # serial: an RS-422/RS-485 or RS-232 port of the host, the protocol's own link (§2). tcp: SW-P-02 carried
+  # over TCP by a router or gateway that offers it, at the port given when the device is opened.
+  link: { type: enum, values: [serial, tcp], default: serial, label: Link, description: "serial uses an RS-422, RS-485 or RS-232 port of the host; tcp reaches a router or gateway that carries SW-P-02 over TCP at the device's host and port." }
+  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the router: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate: { type: int, min: 1200, max: 115200, default: 38400, label: Baud rate, description: "With link serial, bits per second as set on the router's port; 38400 normally." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, bits per character; SW-P-02 uses 8." }
+  parity: { type: enum, values: [even, none, odd], default: even, label: Parity, description: "With link serial, the parity set on the router's port; even normally." }
+  stop_bits: { type: int, min: 1, max: 2, default: 1, label: Stop bits, description: "With link serial, stop bits as set on the router's port; 1 normally." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control: SW-P-02 has none." }
+  # Destinations 1..destinations are interrogated every poll_ms to keep state current.
+  destinations: { type: int, min: 1, max: 1024, default: 16, label: Destinations read, description: "How many destinations, from destination 1, are interrogated to keep state current." }
+  poll_ms: { type: int, min: 100, max: 3600000, default: 1000, label: Read interval, description: "Milliseconds between rounds of interrogating those destinations." }
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-422/RS-485 or RS-232 port of the host, wired to the router's SW-P-02 port" }
+  - { port: null, protocol: tcp, role: control, when: "link tcp", note: "SW-P-02 over TCP has no standard port: the port is given when the device is opened" }
+
+models:
+  - id: generic
+    name: "SW-P-02 router or controller (any maker)"
+    supports: [connect, interrogate, salvo_add, salvo_fire, salvo_clear, refresh]
+    verification: none
+    notes: >
+      For Pro-Bel controllers and third-party implementations. Every standard Pro-Bel controller implements
+      INTERROGATE, CONNECT, TALLY and CONNECTED; only some implement the connect-on-go salvo (§4), and a
+      router without it does not answer salvo_add, salvo_fire or salvo_clear (a timeout).
+
+commands:
+  connect:
+    summary: "Route a source to a destination (CONNECT 02); succeeds when the router reports the route made (CONNECTED 04)"
+    params:
+      destination: { type: int, min: 1, max: 1024, required: true, label: Destination, description: "Destination number, numbered from 1 (wire 0 is destination 1); 897-1024 are monitoring rows on some routers." }
+      source: { type: int, min: 1, max: 1024, required: true, label: Source, description: "Source number, numbered from 1 (wire 0 is source 1)." }
+    returns: ack
+  interrogate:
+    summary: "Read which source is routed to a destination (INTERROGATE 01, answered by TALLY 03); returns the source number, and fails for a destination out of range"
+    params:
+      destination: { type: int, min: 1, max: 1024, required: true, label: Destination, description: "Destination number, numbered from 1 (wire 0 is destination 1)." }
+    returns: value
+  salvo_add:
+    summary: "Store a route to be made on salvo_fire (CONNECT ON GO 05, acknowledged by 12)"
+    params:
+      destination: { type: int, min: 1, max: 1024, required: true, label: Destination, description: "Destination number, numbered from 1 (wire 0 is destination 1)." }
+      source: { type: int, min: 1, max: 1024, required: true, label: Source, description: "Source number, numbered from 1 (wire 0 is source 1)." }
+    returns: ack
+  salvo_fire:
+    summary: "Make every stored route at once (GO 06 with 00); returns set, or none when nothing was stored (GO DONE ACKNOWLEDGE 13)"
+    returns: value
+  salvo_clear:
+    summary: "Discard the stored routes (GO 06 with 01); returns cleared, or none when nothing was stored (GO DONE ACKNOWLEDGE 13)"
+    returns: value
+  refresh:
+    summary: "Interrogate the read destinations again now"
+    returns: ack
+
+state:
+  destinations.*.source: { type: int, description: "Source routed to the destination, numbered from 1; keyed by destination, numbered from 1" }
+  destinations.*.flag: { type: bool, description: "Multiplier bit 3 of the last TALLY or CONNECTED: a bad source, or crosspoint updates disabled, depending on the router" }
+  salvo.last_go: { type: string, description: "The last GO DONE ACKNOWLEDGE heard: set, cleared or none" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      salvo_fire makes every stored route at once, including routes another controller stored on the same
+      port, and cannot be undone from here.
+  - models: [all]
+    severity: warning
+    text: >
+      The protocol has no negative acknowledgement (§3.3.1): a router that does not implement a command, or a
+      route it refuses, simply sends nothing, and the command fails with a timeout after 1 s. Three requests
+      in a row unanswered report the router disconnected until it is heard again; the serial port being open
+      says nothing of the router.
+  - models: [all]
+    severity: info
+    text: >
+      Numbers are 1-based here and 0-based on the wire. Only destinations and sources up to 1024 can be
+      addressed (10 bits); there are no matrices or levels. A TALLY with wire source 1023 means the
+      destination is out of range, so source 1024 cannot be read back.
+  - models: [all]
+    severity: info
+    text: >
+      State is kept current by interrogating destinations 1 to destinations every poll_ms, as Pro-Bel
+      controllers do in the background (§3.3.1), and by the CONNECTED messages the router broadcasts on its
+      ports; a GO that sets crosspoints sends no CONNECTED, so the destinations are interrogated again at
+      once. Opened for commands only, only destination 1 is interrogated, once and after 10 s without
+      traffic, as the liveness check.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: SW-P-02 has no names, protects, tally dumps or levels; for those a router's SW-P-08 port
+      (probel-swp08) is needed. The meaning of multiplier bit 3 differs between routers (§3.2.1).
+  - models: [all]
+    severity: info
+    text: >
+      SW-P-02 over TCP is offered for routers and gateways that carry it, with the messages as on the serial
+      line; the document read describes only the serial link, so the TCP form is unconfirmed.
