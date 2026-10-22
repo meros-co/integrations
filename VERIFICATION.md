@@ -1808,8 +1808,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-p20hd — Roland P-20HD
 
-- [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:572](specs/roland-p20hd.yaml#L572))
-- [ ] Confirm the session closes after five minutes without commands and that ACS every ten seconds of silence keeps it open. ([specs/roland-p20hd.yaml:583](specs/roland-p20hd.yaml#L583))
+- [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:588](specs/roland-p20hd.yaml#L588))
+- [ ] Confirm the session closes after five minutes without commands and that ACS every ten seconds of silence keeps it open. ([specs/roland-p20hd.yaml:609](specs/roland-p20hd.yaml#L609))
+- [ ] Confirm XON/XOFF flow control on the RS-232 port (only the XON and XOFF commands are documented, p.78) and that no login is asked for there. ([specs/roland-p20hd.yaml:50](specs/roland-p20hd.yaml#L50))
 
 ## roland-v1200hd — Roland V-1200HD
 
