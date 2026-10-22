@@ -232,6 +232,22 @@ async fn another_serial_port_in_the_settings_is_opened_at_once() {
         .unwrap()
         .clone();
     core.update_settings(id, change).await.unwrap();
+    // The device is built afresh on the new port; commands go once it is open.
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while ports
+            .opened
+            .lock()
+            .unwrap()
+            .last()
+            .is_none_or(|p| p.path != "/dev/ttyUSB1")
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    wait_connection(&core, id, |c| *c == Connection::Connected).await;
     let command = core.execute(id, "cut", Params::new());
     let answer = async {
         assert_eq!(received(&mut second).await, "\u{2}CUT;");
