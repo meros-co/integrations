@@ -22,6 +22,7 @@ TRANSPORT = {
     "osc-udp": "OSC/UDP",
     "osc-tcp": "OSC/TCP",
     "http": "HTTP",
+    "ws": "WebSocket",
 }
 
 # Native modules choose their own transport, so it is described here.
@@ -39,6 +40,7 @@ NATIVE = {
     "blackmagic-atem": "Proprietary UDP 9910",
     "bss-london": "London Direct Inject over TCP 1023",
     "dbaudio": "OCP.1 over TCP 30013 or 50014 by model",
+    "dhd-ecp": "ECP 16-byte blocks over TCP 2008",
     "emberplus": "Ember+ (S101) over TCP",
     "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",

@@ -1,0 +1,785 @@
+spec: 1
+id: dhd-aes67
+name: DHD audio AES67 / RAVENNA interfaces (Control API)
+vendor: DHD audio
+category: other
+
+source:
+  - title: "DHD Developer Documentation, version 10.4: Control API (overview, AES67 Ravenna Interfaces)"
+    author: DHD audio
+    url: "https://developer.dhd.audio/docs/API/control-api/"
+    note: >
+      Read 2026-10-21. From DeviceOS 10.4 the AES67 RAVENNA interfaces support Control API as an alternative to
+      NMOS and Ember+: RX and TX streams (passing and reading SDP), multicast GPIOs, PTP, and routing between
+      streams and the mixer's TDM bus. RPCs are for core devices only.
+  - title: "DHD Developer Documentation, version 10.4: Control API WebSocket Usage and REST API Usage"
+    author: DHD audio
+    url: "https://developer.dhd.audio/docs/API/control-api/socket-usage"
+    note: >
+      The endpoint ws://[device]/modules/[ID]/api/ws (and wss://), the module ID (1 for in-band control on the
+      AES67 device itself; assigned by Toolbox for out-of-band control and on XC3 52-7010 controllers with the
+      16x16 AES67 licence, usually 2), the auth, get, set, subscribe and unsubscribe messages, msgID, the
+      error codes (rest-usage page), nearest-value clamping and the 60 s inactivity timeout.
+  - title: "DHD control api - AES67 Modules, OpenAPI 3.0.3 document, version 0.9.1 (firmware 10.4)"
+    author: DHD audio
+    url: "https://developer.dhd.audio/redocusaurus/controlapi-aes67.yaml"
+    note: >
+      Fetched 2026-10-21; the "OpenAPI documentation (AES67)" page links it
+      (https://developer.dhd.audio/docs/API/control-api/oapi-aes67). Every path of the module's tree, its type
+      and description: the set commands below are one per writable leaf (a name not beginning with _), and the
+      state one key per leaf, both generated from this document.
+  - title: "DHD Developer Documentation, version 10.4: Ember+ (connection limits)"
+    author: DHD audio
+    url: "https://developer.dhd.audio/docs/API/Ember/"
+    note: >
+      Names the AES67 interfaces 52-7067A and 52-7567A.
+
+transport:
+  type: ws
+  port: 80
+  path: /modules/{settings.module}/api/ws
+  scheme: { setting: scheme }
+  timeout_ms: 3000
+  reply: expected
+  # Answered by the module; keeps the socket inside its 60 s inactivity timeout.
+  probe: '{"msgID":"probe","method":"get","path":"/general/_uptime"}'
+
+settings:
+  token: { type: string, secret: true, required: true, label: API token, description: "A DHD token created in the device's WebApps user management, sent with the auth message on every connection." }
+  scheme: { type: enum, values: [ws, wss], default: ws, label: Scheme, description: "ws for an unencrypted connection, wss for TLS, which needs a certificate on the device that this computer trusts; give port 443 with wss." }
+  module: { type: int, min: 1, max: 255, default: 1, label: Module ID, description: "The AES67 module's ID in the path /modules/<ID>/api/ws: 1 for in-band control of the AES67 device itself, otherwise the ID Toolbox assigned (shown in the System App; usually 2 on an XC3 52-7010 controller)." }
+
+on_connect:
+  - send: '{"msgID":"auth","method":"auth","token":{settings.token:json}}'
+    await_reply: true
+    refused: '"code":\s*128[01]\b'
+    accepted: '"success":\s*"?true'
+
+ports:
+  - { port: 80, protocol: ws, role: control, when: "scheme ws" }
+  - { port: 443, protocol: wss, role: control, when: "scheme wss", note: "give the port when opening the device" }
+
+models:
+  - id: aes67
+    name: "DHD AES67 RAVENNA interface (52-7067A, 52-7567A) or AES67 module of an XC3 controller, firmware 10.4 and later"
+    supports:
+      [get, subscribe, unsubscribe, set_route, set_ptp_announce, set_ptp_delaymechanism, set_ptp_domain,
+      set_ptp_fs, set_ptp_ip_dscp, set_ptp_prio1, set_ptp_prio2, set_ptp_slaveonly, set_ptp_syncinterval,
+      set_rx_stream_channels, set_rx_stream_codec, set_rx_stream_delay, set_rx_stream_enabled, set_rx_stream_name,
+      set_rx_stream_sdp, set_rx_stream_source, set_rx_stream_source2, set_rx_stream_syntonized,
+      set_rx_stream_usesecondary, set_tx_stream_address, set_tx_stream_address2, set_tx_stream_address2enable,
+      set_tx_stream_addressenable, set_tx_stream_channels, set_tx_stream_codec, set_tx_stream_dscp,
+      set_tx_stream_enabled, set_tx_stream_info, set_tx_stream_name, set_tx_stream_payload, set_tx_stream_port,
+      set_tx_stream_samples_per_packet, set_tx_stream_sap, set_tx_stream_ttl]
+    verification: none
+    notes: >
+      One model for every AES67 module with Control API; the module ID setting chooses which module of a device is addressed.
+
+commands:
+  get:
+    summary: "Read any node or value of the tree once (method get); returns its payload: an object for a node, a value for a leaf. State is kept by subscription, not by this"
+    params:
+      path: { type: string, pattern: "^/[A-Za-z0-9_./-]*$", max_length: 512, required: true, label: Path, description: "Path in the Control API tree, such as /streams/rx-streams/0/name or /general/ptp." }
+    send: '{"msgID":"get {path}","method":"get","path":"{path}"}'
+    expect:
+      reply_json: { "$.msgID": "get {path}" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  subscribe:
+    summary: "Subscribe to a node or value (method subscribe); the device sends its current value, then every change, into state. The whole tree except /range is subscribed when monitoring"
+    params:
+      path: { type: string, pattern: "^/[A-Za-z0-9_./-]*$", max_length: 512, required: true, label: Path, description: "Path in the Control API tree, such as /general/ptp/state." }
+    send: '{"msgID":"subscribe {path}","method":"subscribe","path":"{path}"}'
+    expect:
+      reply_json: { "$.msgID": "subscribe {path}" }
+      json_equals: { "$.success": true }
+    returns: ack
+  unsubscribe:
+    summary: "Stop the updates of a node or value on this connection (method unsubscribe), for example /general/ptp/state, until it reconnects"
+    params:
+      path: { type: string, pattern: "^/[A-Za-z0-9_./-]*$", max_length: 512, required: true, label: Path, description: "Path that was subscribed, such as /general/ptp/state." }
+    send: '{"msgID":"unsubscribe {path}","method":"unsubscribe","path":"{path}"}'
+    expect:
+      reply_json: { "$.msgID": "unsubscribe {path}" }
+      json_equals: { "$.success": true }
+    returns: ack
+  set_route:
+    summary: "Set /audio/routing/routes/{output} (string): A defined route. The ID of the route is the ID of the output. Use \"off\" to disable a route. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      output: { type: int, min: 0, required: true, label: "Output", description: "Output ID the route goes to, as /audio/routing/outputs lists it." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Input (source) ID as /audio/routing/inputs lists it, or off to remove the route." }
+    send: "{\"msgID\":\"set /audio/routing/routes/{output}\",\"method\":\"set\",\"path\":\"/audio/routing/routes/{output}\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /audio/routing/routes/{output}" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_announce:
+    summary: "Set /general/ptp/announce (integer): Current PTP announce interval. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /general/ptp/announce\",\"method\":\"set\",\"path\":\"/general/ptp/announce\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/announce" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_delaymechanism:
+    summary: "Set /general/ptp/delaymechanism (string): Current delay mechanism (E2E or P2P). Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /general/ptp/delaymechanism\",\"method\":\"set\",\"path\":\"/general/ptp/delaymechanism\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/delaymechanism" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_domain:
+    summary: "Set /general/ptp/domain (integer): Current PTP domain. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /general/ptp/domain\",\"method\":\"set\",\"path\":\"/general/ptp/domain\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/domain" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_fs:
+    summary: "Set /general/ptp/fs (integer): Current sample rate (Hz). Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /general/ptp/fs\",\"method\":\"set\",\"path\":\"/general/ptp/fs\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/fs" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_ip_dscp:
+    summary: "Set /general/ptp/ip_dscp (integer): Current IP DSCP value. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /general/ptp/ip_dscp\",\"method\":\"set\",\"path\":\"/general/ptp/ip_dscp\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/ip_dscp" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_prio1:
+    summary: "Set /general/ptp/prio1 (integer): Current PTP priority 1 value. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /general/ptp/prio1\",\"method\":\"set\",\"path\":\"/general/ptp/prio1\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/prio1" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_prio2:
+    summary: "Set /general/ptp/prio2 (integer): Current PTP priority 2 value. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /general/ptp/prio2\",\"method\":\"set\",\"path\":\"/general/ptp/prio2\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/prio2" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_slaveonly:
+    summary: "Set /general/ptp/slaveonly (boolean): Forces the module to be only PTP slave / follower. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /general/ptp/slaveonly\",\"method\":\"set\",\"path\":\"/general/ptp/slaveonly\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/slaveonly" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_ptp_syncinterval:
+    summary: "Set /general/ptp/syncinterval (integer): Current PTP sync interval. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /general/ptp/syncinterval\",\"method\":\"set\",\"path\":\"/general/ptp/syncinterval\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /general/ptp/syncinterval" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_channels:
+    summary: "Set /streams/rx-streams/{stream}/channels (integer): Number of channels contained within the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/channels\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/channels\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/channels" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_codec:
+    summary: "Set /streams/rx-streams/{stream}/codec (string): Codec used for the stream (L16/L24/AM824). Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/codec\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/codec\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/codec" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_delay:
+    summary: "Set /streams/rx-streams/{stream}/delay (integer): Stream delay in milliseconds. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/delay\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/delay\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/delay" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_enabled:
+    summary: "Set /streams/rx-streams/{stream}/enabled (boolean): Enable the stream to actually receive data. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/enabled\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/enabled\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/enabled" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_name:
+    summary: "Set /streams/rx-streams/{stream}/name (string): Name of the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/name\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/name\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/name" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_sdp:
+    summary: "Set /streams/rx-streams/{stream}/sdp (string): Session Description Protocol (SDP) for the stream, can be placed here. Will be cleared after application. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/sdp\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/sdp\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/sdp" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_source:
+    summary: "Set /streams/rx-streams/{stream}/source (string): Source of the stream (name). Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/source\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/source\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/source" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_source2:
+    summary: "Set /streams/rx-streams/{stream}/source2 (string): Source2 of the stream (name) for redundancy. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/source2\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/source2\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/source2" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_syntonized:
+    summary: "Set /streams/rx-streams/{stream}/syntonized (boolean): Run stream in syntonized mode. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/syntonized\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/syntonized\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/syntonized" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_rx_stream_usesecondary:
+    summary: "Set /streams/rx-streams/{stream}/usesecondary (boolean): Use secondary source of the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /streams/rx-streams/{stream}/usesecondary\",\"method\":\"set\",\"path\":\"/streams/rx-streams/{stream}/usesecondary\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/rx-streams/{stream}/usesecondary" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_address:
+    summary: "Set /streams/tx-streams/{stream}/address (string): Primary stream address. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/address\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/address\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/address" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_address2:
+    summary: "Set /streams/tx-streams/{stream}/address2 (string): Secondary stream address for redundancy. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/address2\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/address2\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/address2" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_address2enable:
+    summary: "Set /streams/tx-streams/{stream}/address2enable (boolean): Enable or disable the secondary stream address. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/address2enable\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/address2enable\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/address2enable" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_addressenable:
+    summary: "Set /streams/tx-streams/{stream}/addressenable (boolean): Enable or disable the primary stream address. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/addressenable\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/addressenable\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/addressenable" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_channels:
+    summary: "Set /streams/tx-streams/{stream}/channels (integer): Number of channels contained within the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/channels\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/channels\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/channels" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_codec:
+    summary: "Set /streams/tx-streams/{stream}/codec (string): Codec used for the stream (L16/L24). Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/codec\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/codec\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/codec" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_dscp:
+    summary: "Set /streams/tx-streams/{stream}/dscp (integer): Differentiated Services Code Point (DSCP) for the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/dscp\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/dscp\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/dscp" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_enabled:
+    summary: "Set /streams/tx-streams/{stream}/enabled (boolean): Enable the stream to actually receive data. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/enabled\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/enabled\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/enabled" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_info:
+    summary: "Set /streams/tx-streams/{stream}/info (string): Optional information about the stream, will be announced as well. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/info\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/info\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/info" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_name:
+    summary: "Set /streams/tx-streams/{stream}/name (string): Name of the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "Text value." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/name\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/name\",\"payload\":{value:json}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/name" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_payload:
+    summary: "Set /streams/tx-streams/{stream}/payload (integer): Payload of the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/payload\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/payload\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/payload" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_port:
+    summary: "Set /streams/tx-streams/{stream}/port (integer): Outbound port of the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/port\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/port\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/port" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_samples_per_packet:
+    summary: "Set /streams/tx-streams/{stream}/samples-per-packet (integer): Samples per packet of the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/samples-per-packet\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/samples-per-packet\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/samples-per-packet" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_sap:
+    summary: "Set /streams/tx-streams/{stream}/sap (boolean): Enable / disable SAP announcement of the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: bool, required: true, label: Value, description: "True or false." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/sap\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/sap\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/sap" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+  set_tx_stream_ttl:
+    summary: "Set /streams/tx-streams/{stream}/ttl (integer): Time to live (TTL) for the stream. Returns the value the device reports, which it moves to its nearest allowed value"
+    params:
+      stream: { type: int, min: 0, required: true, label: "Stream", description: "Stream ID as the device lists it under /streams." }
+      value: { type: int, required: true, label: Value, description: "Whole number in the parameter's own unit; the device's /range node gives its range." }
+    send: "{\"msgID\":\"set /streams/tx-streams/{stream}/ttl\",\"method\":\"set\",\"path\":\"/streams/tx-streams/{stream}/ttl\",\"payload\":{value}}"
+    expect:
+      reply_json: { "$.msgID": "set /streams/tx-streams/{stream}/ttl" }
+      json_equals: { "$.success": true }
+      json_path: "$.payload"
+    returns: value
+
+state:
+  audio.routing.inputs.*._channels: { type: int, description: "Number of channels the input contains." }
+  audio.routing.inputs.*._device: { type: string, description: "The device/module where the input is located." }
+  audio.routing.inputs.*._hasagain: { type: bool, description: "If the input has an analog gain / preamp." }
+  audio.routing.inputs.*._hasp48: { type: bool, description: "If the input has P48V phantom power." }
+  audio.routing.inputs.*._inputerror: { type: bool, description: "If the input channel has an error." }
+  audio.routing.inputs.*._name: { type: string, description: "Input label." }
+  audio.routing.outputs.*._channels: { type: int, description: "Number of channels the output contains." }
+  audio.routing.outputs.*._device: { type: string, description: "The device/module where the output is located." }
+  audio.routing.outputs.*._name: { type: string, description: "Output label." }
+  audio.routing.routes.*: { type: string, description: "A defined route. The ID of the route is the ID of the output. Use \"off\" to disable a route." }
+  general.capabilities._extendedfeature: { type: bool, description: "Extended feature license available." }
+  general.capabilities._limited16x16: { type: bool, description: "Limited 16x16 channel mode (on XC3 core 52-7010 modules)." }
+  general.capabilities._maxrxstreams: { type: int, description: "Maximum number of receive streams." }
+  general.capabilities._maxtxstreams: { type: int, description: "Maximum number of transmit streams." }
+  general.capabilities._rxload: { type: int, description: "Current RX load." }
+  general.capabilities._txload: { type: int, description: "Current TX load." }
+  general.ptp.announce: { type: int, description: "Current PTP announce interval." }
+  general.ptp.delaymechanism: { type: string, description: "Current delay mechanism (E2E or P2P)." }
+  general.ptp.domain: { type: int, description: "Current PTP domain." }
+  general.ptp.fs: { type: int, description: "Current sample rate (Hz)." }
+  general.ptp.ip_dscp: { type: int, description: "Current IP DSCP value." }
+  general.ptp.prio1: { type: int, description: "Current PTP priority 1 value." }
+  general.ptp.prio2: { type: int, description: "Current PTP priority 2 value." }
+  general.ptp.slaveonly: { type: bool, description: "Forces the module to be only PTP slave / follower." }
+  general.ptp.state._clockoffset: { type: string, description: "PTP clock offset / jitter (40 data points at 1/sec).; kept as JSON text" }
+  general.ptp.state._clockstate: { type: string, description: "PTP clock state (FREERUN / LOCKED)." }
+  general.ptp.state._clockstateid: { type: int, description: "PTP clock state ID." }
+  general.ptp.state._grandmasterid: { type: string, description: "PTP grandmaster ID." }
+  general.ptp.state._state: { type: string, description: "PTP state (Leader/Follower)." }
+  general.ptp.state._state1: { type: int, description: "PTP state1." }
+  general.ptp.state._state2: { type: int, description: "PTP state2." }
+  general.ptp.state._syncmaster: { type: string, description: "Current PTP clock leader." }
+  general.ptp.syncinterval: { type: int, description: "Current PTP sync interval." }
+  general._activewebsockets: { type: int, description: "Number of active WebSocket connections." }
+  general._api_version: { type: string, description: "API version." }
+  general._firmware_version: { type: string, description: "Firmware version." }
+  general._hardwareserial: { type: string, description: "Hardware serial." }
+  general._hourmeter: { type: int, description: "Device hour meter." }
+  general._maxwebsockets: { type: int, description: "Maximum number of active WebSocket connections." }
+  general._systemtime: { type: int, description: "Current system time." }
+  general._uptime: { type: int, description: "System uptime." }
+  general._temperature: { type: int, description: "Current module temperature." }
+  streams._available: { type: string, description: "A list of discovered streams. Contains JSON objects with address information, channels, codec, name, samples-per-packet and info.; kept as JSON text" }
+  streams._rx-errors: { type: int, description: "RX packet error counter over all RX streams." }
+  streams.rx-streams.*._id: { type: string, description: "UUID of the stream as used in NMOS." }
+  streams.rx-streams.*._running: { type: bool, description: "Information if the stream is running." }
+  streams.rx-streams.*._rxerrors: { type: int, description: "Information if the stream has rx errors." }
+  streams.rx-streams.*._status: { type: int, description: "Stream status information. 1=ok (green), 2=warning (yellow), 3=error (red)." }
+  streams.rx-streams.*._statustext: { type: string, description: "Stream status description." }
+  streams.rx-streams.*.channels: { type: int, description: "Number of channels contained within the stream." }
+  streams.rx-streams.*.codec: { type: string, description: "Codec used for the stream (L16/L24/AM824)." }
+  streams.rx-streams.*.delay: { type: int, description: "Stream delay in milliseconds." }
+  streams.rx-streams.*.enabled: { type: bool, description: "Enable the stream to actually receive data." }
+  streams.rx-streams.*.name: { type: string, description: "Name of the stream." }
+  streams.rx-streams.*.sdp: { type: string, description: "Session Description Protocol (SDP) for the stream, can be placed here. Will be cleared after application." }
+  streams.rx-streams.*.source: { type: string, description: "Source of the stream (name)." }
+  streams.rx-streams.*.source2: { type: string, description: "Source2 of the stream (name) for redundancy." }
+  streams.rx-streams.*.syntonized: { type: bool, description: "Run stream in syntonized mode." }
+  streams.rx-streams.*.usesecondary: { type: bool, description: "Use secondary source of the stream." }
+  streams.tx-streams.*._id: { type: string, description: "UUID of the stream as used in NMOS." }
+  streams.tx-streams.*._rtsp-uri: { type: string, description: "RTSP URI of the stream." }
+  streams.tx-streams.*._running: { type: bool, description: "Information if the stream is running." }
+  streams.tx-streams.*._sdp: { type: string, description: "Session Description Protocol (SDP) of the stream, based on configured parameters." }
+  streams.tx-streams.*._status: { type: int, description: "Stream status information. 1=ok (green), 2=warning (yellow), 3=error (red)." }
+  streams.tx-streams.*._statustext: { type: string, description: "Stream status description." }
+  streams.tx-streams.*.address: { type: string, description: "Primary stream address." }
+  streams.tx-streams.*.address2: { type: string, description: "Secondary stream address for redundancy." }
+  streams.tx-streams.*.address2enable: { type: bool, description: "Enable or disable the secondary stream address." }
+  streams.tx-streams.*.addressenable: { type: bool, description: "Enable or disable the primary stream address." }
+  streams.tx-streams.*.channels: { type: int, description: "Number of channels contained within the stream." }
+  streams.tx-streams.*.codec: { type: string, description: "Codec used for the stream (L16/L24)." }
+  streams.tx-streams.*.dscp: { type: int, description: "Differentiated Services Code Point (DSCP) for the stream." }
+  streams.tx-streams.*.enabled: { type: bool, description: "Enable the stream to actually receive data." }
+  streams.tx-streams.*.info: { type: string, description: "Optional information about the stream, will be announced as well." }
+  streams.tx-streams.*.name: { type: string, description: "Name of the stream." }
+  streams.tx-streams.*.payload: { type: int, description: "Payload of the stream." }
+  streams.tx-streams.*.port: { type: int, description: "Outbound port of the stream." }
+  streams.tx-streams.*.samples-per-packet: { type: int, description: "Samples per packet of the stream." }
+  streams.tx-streams.*.sap: { type: bool, description: "Enable / disable SAP announcement of the stream." }
+  streams.tx-streams.*.ttl: { type: int, description: "Time to live (TTL) for the stream." }
+
+telemetry:
+  # The whole tree but /range: the module sends each node's current value at
+  # once, then every change.
+  subscribe:
+    send:
+      - '{"msgID":"subscribe /audio","method":"subscribe","path":"/audio"}'
+      - '{"msgID":"subscribe /general","method":"subscribe","path":"/general"}'
+      - '{"msgID":"subscribe /streams","method":"subscribe","path":"/streams"}'
+  updates:
+    - json_match: { "$.method": "^update$" }
+      json_each: "$.payload.audio.routing.inputs.*"
+      json:
+        "_channels": "$._channels"
+        "_device": "$._device"
+        "_hasagain": "$._hasagain"
+        "_hasp48": "$._hasp48"
+        "_inputerror": "$._inputerror"
+        "_name": "$._name"
+      state:
+        "audio.routing.inputs.{key}._channels": "{_channels}"
+        "audio.routing.inputs.{key}._device": "{_device}"
+        "audio.routing.inputs.{key}._hasagain": "{_hasagain}"
+        "audio.routing.inputs.{key}._hasp48": "{_hasp48}"
+        "audio.routing.inputs.{key}._inputerror": "{_inputerror}"
+        "audio.routing.inputs.{key}._name": "{_name}"
+    - json_match: { "$.method": "^update$" }
+      json_each: "$.payload.audio.routing.outputs.*"
+      json:
+        "_channels": "$._channels"
+        "_device": "$._device"
+        "_name": "$._name"
+      state:
+        "audio.routing.outputs.{key}._channels": "{_channels}"
+        "audio.routing.outputs.{key}._device": "{_device}"
+        "audio.routing.outputs.{key}._name": "{_name}"
+    - json_match: { "$.method": "^update$" }
+      json_each: "$.payload.audio.routing.routes.*"
+      json:
+        "value": "$"
+      state:
+        "audio.routing.routes.{key}": "{value}"
+    - json_match: { "$.method": "^update$" }
+      json:
+        "general_capabilities__extendedfeature": "$.payload.general.capabilities._extendedfeature"
+        "general_capabilities__limited16x16": "$.payload.general.capabilities._limited16x16"
+        "general_capabilities__maxrxstreams": "$.payload.general.capabilities._maxrxstreams"
+        "general_capabilities__maxtxstreams": "$.payload.general.capabilities._maxtxstreams"
+        "general_capabilities__rxload": "$.payload.general.capabilities._rxload"
+        "general_capabilities__txload": "$.payload.general.capabilities._txload"
+        "general_ptp_announce": "$.payload.general.ptp.announce"
+        "general_ptp_delaymechanism": "$.payload.general.ptp.delaymechanism"
+        "general_ptp_domain": "$.payload.general.ptp.domain"
+        "general_ptp_fs": "$.payload.general.ptp.fs"
+        "general_ptp_ip_dscp": "$.payload.general.ptp.ip_dscp"
+        "general_ptp_prio1": "$.payload.general.ptp.prio1"
+        "general_ptp_prio2": "$.payload.general.ptp.prio2"
+        "general_ptp_slaveonly": "$.payload.general.ptp.slaveonly"
+        "general_ptp_state__clockoffset": "$.payload.general.ptp.state._clockoffset"
+        "general_ptp_state__clockstate": "$.payload.general.ptp.state._clockstate"
+        "general_ptp_state__clockstateid": "$.payload.general.ptp.state._clockstateid"
+        "general_ptp_state__grandmasterid": "$.payload.general.ptp.state._grandmasterid"
+        "general_ptp_state__state": "$.payload.general.ptp.state._state"
+        "general_ptp_state__state1": "$.payload.general.ptp.state._state1"
+        "general_ptp_state__state2": "$.payload.general.ptp.state._state2"
+        "general_ptp_state__syncmaster": "$.payload.general.ptp.state._syncmaster"
+        "general_ptp_syncinterval": "$.payload.general.ptp.syncinterval"
+        "general__activewebsockets": "$.payload.general._activewebsockets"
+        "general__api_version": "$.payload.general._api_version"
+        "general__firmware_version": "$.payload.general._firmware_version"
+        "general__hardwareserial": "$.payload.general._hardwareserial"
+        "general__hourmeter": "$.payload.general._hourmeter"
+        "general__maxwebsockets": "$.payload.general._maxwebsockets"
+        "general__systemtime": "$.payload.general._systemtime"
+        "general__uptime": "$.payload.general._uptime"
+        "general__temperature": "$.payload.general._temperature"
+        "streams__available": "$.payload.streams._available"
+        "streams__rx_errors": "$.payload.streams._rx-errors"
+      state:
+        "general.capabilities._extendedfeature": "{general_capabilities__extendedfeature}"
+        "general.capabilities._limited16x16": "{general_capabilities__limited16x16}"
+        "general.capabilities._maxrxstreams": "{general_capabilities__maxrxstreams}"
+        "general.capabilities._maxtxstreams": "{general_capabilities__maxtxstreams}"
+        "general.capabilities._rxload": "{general_capabilities__rxload}"
+        "general.capabilities._txload": "{general_capabilities__txload}"
+        "general.ptp.announce": "{general_ptp_announce}"
+        "general.ptp.delaymechanism": "{general_ptp_delaymechanism}"
+        "general.ptp.domain": "{general_ptp_domain}"
+        "general.ptp.fs": "{general_ptp_fs}"
+        "general.ptp.ip_dscp": "{general_ptp_ip_dscp}"
+        "general.ptp.prio1": "{general_ptp_prio1}"
+        "general.ptp.prio2": "{general_ptp_prio2}"
+        "general.ptp.slaveonly": "{general_ptp_slaveonly}"
+        "general.ptp.state._clockoffset": "{general_ptp_state__clockoffset}"
+        "general.ptp.state._clockstate": "{general_ptp_state__clockstate}"
+        "general.ptp.state._clockstateid": "{general_ptp_state__clockstateid}"
+        "general.ptp.state._grandmasterid": "{general_ptp_state__grandmasterid}"
+        "general.ptp.state._state": "{general_ptp_state__state}"
+        "general.ptp.state._state1": "{general_ptp_state__state1}"
+        "general.ptp.state._state2": "{general_ptp_state__state2}"
+        "general.ptp.state._syncmaster": "{general_ptp_state__syncmaster}"
+        "general.ptp.syncinterval": "{general_ptp_syncinterval}"
+        "general._activewebsockets": "{general__activewebsockets}"
+        "general._api_version": "{general__api_version}"
+        "general._firmware_version": "{general__firmware_version}"
+        "general._hardwareserial": "{general__hardwareserial}"
+        "general._hourmeter": "{general__hourmeter}"
+        "general._maxwebsockets": "{general__maxwebsockets}"
+        "general._systemtime": "{general__systemtime}"
+        "general._uptime": "{general__uptime}"
+        "general._temperature": "{general__temperature}"
+        "streams._available": "{streams__available}"
+        "streams._rx-errors": "{streams__rx_errors}"
+    - json_match: { "$.method": "^update$" }
+      json_each: "$.payload.streams.rx-streams.*"
+      json:
+        "_id": "$._id"
+        "_running": "$._running"
+        "_rxerrors": "$._rxerrors"
+        "_status": "$._status"
+        "_statustext": "$._statustext"
+        "channels": "$.channels"
+        "codec": "$.codec"
+        "delay": "$.delay"
+        "enabled": "$.enabled"
+        "name": "$.name"
+        "sdp": "$.sdp"
+        "source": "$.source"
+        "source2": "$.source2"
+        "syntonized": "$.syntonized"
+        "usesecondary": "$.usesecondary"
+      state:
+        "streams.rx-streams.{key}._id": "{_id}"
+        "streams.rx-streams.{key}._running": "{_running}"
+        "streams.rx-streams.{key}._rxerrors": "{_rxerrors}"
+        "streams.rx-streams.{key}._status": "{_status}"
+        "streams.rx-streams.{key}._statustext": "{_statustext}"
+        "streams.rx-streams.{key}.channels": "{channels}"
+        "streams.rx-streams.{key}.codec": "{codec}"
+        "streams.rx-streams.{key}.delay": "{delay}"
+        "streams.rx-streams.{key}.enabled": "{enabled}"
+        "streams.rx-streams.{key}.name": "{name}"
+        "streams.rx-streams.{key}.sdp": "{sdp}"
+        "streams.rx-streams.{key}.source": "{source}"
+        "streams.rx-streams.{key}.source2": "{source2}"
+        "streams.rx-streams.{key}.syntonized": "{syntonized}"
+        "streams.rx-streams.{key}.usesecondary": "{usesecondary}"
+    - json_match: { "$.method": "^update$" }
+      json_each: "$.payload.streams.tx-streams.*"
+      json:
+        "_id": "$._id"
+        "_rtsp_uri": "$._rtsp-uri"
+        "_running": "$._running"
+        "_sdp": "$._sdp"
+        "_status": "$._status"
+        "_statustext": "$._statustext"
+        "address": "$.address"
+        "address2": "$.address2"
+        "address2enable": "$.address2enable"
+        "addressenable": "$.addressenable"
+        "channels": "$.channels"
+        "codec": "$.codec"
+        "dscp": "$.dscp"
+        "enabled": "$.enabled"
+        "info": "$.info"
+        "name": "$.name"
+        "payload": "$.payload"
+        "port": "$.port"
+        "samples_per_packet": "$.samples-per-packet"
+        "sap": "$.sap"
+        "ttl": "$.ttl"
+      state:
+        "streams.tx-streams.{key}._id": "{_id}"
+        "streams.tx-streams.{key}._rtsp-uri": "{_rtsp_uri}"
+        "streams.tx-streams.{key}._running": "{_running}"
+        "streams.tx-streams.{key}._sdp": "{_sdp}"
+        "streams.tx-streams.{key}._status": "{_status}"
+        "streams.tx-streams.{key}._statustext": "{_statustext}"
+        "streams.tx-streams.{key}.address": "{address}"
+        "streams.tx-streams.{key}.address2": "{address2}"
+        "streams.tx-streams.{key}.address2enable": "{address2enable}"
+        "streams.tx-streams.{key}.addressenable": "{addressenable}"
+        "streams.tx-streams.{key}.channels": "{channels}"
+        "streams.tx-streams.{key}.codec": "{codec}"
+        "streams.tx-streams.{key}.dscp": "{dscp}"
+        "streams.tx-streams.{key}.enabled": "{enabled}"
+        "streams.tx-streams.{key}.info": "{info}"
+        "streams.tx-streams.{key}.name": "{name}"
+        "streams.tx-streams.{key}.payload": "{payload}"
+        "streams.tx-streams.{key}.port": "{port}"
+        "streams.tx-streams.{key}.samples-per-packet": "{samples_per_packet}"
+        "streams.tx-streams.{key}.sap": "{sap}"
+        "streams.tx-streams.{key}.ttl": "{ttl}"
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The module's API is at /modules/<module>/api/ws on the device's address: module 1 for in-band control of
+      an AES67 interface, or the ID Toolbox assigned. After opening, the core sends the auth message with the
+      token before anything else; error code 1280 or 1281 is a terminal refusal until the settings are corrected.
+      The REST API is limited to one request a second, so the websocket is used.
+  - models: [all]
+    severity: info
+    text: >
+      When monitoring, the core subscribes to /audio, /general and /streams; the module sends each node's current
+      value at once and then every change as an update rooted at the tree's root. Opened for commands only,
+      nothing is subscribed; the liveness probe (a get of /general/_uptime after 10 s of quiet) keeps the socket
+      inside the 60 s inactivity timeout. /range is read with get.
+  - models: [all]
+    severity: warning
+    text: >
+      A value outside its range is not refused: the module sets the nearest value it allows and answers with
+      it, which each set command returns. Ranges are not in DHD's documents; the module's /range node gives them.
+      Changing PTP settings, a stream's addresses or its enabled state interrupts the audio it carries.
+  - models: [all]
+    severity: info
+    text: >
+      An RX stream's sdp takes a session description to apply and is cleared once applied; a TX stream's _sdp is
+      the description the module builds. Arrays (_available, _clockoffset) are kept in state as JSON text. RPCs
+      (snapshots and the rest) exist only on core devices.

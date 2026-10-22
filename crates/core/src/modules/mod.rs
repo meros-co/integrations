@@ -46,6 +46,8 @@ mod atem;
 mod bss_london;
 #[cfg(feature = "dbaudio")]
 mod dbaudio;
+#[cfg(feature = "dhd-ecp")]
+mod dhd_ecp;
 #[cfg(feature = "softouch-easyworship")]
 mod easyworship;
 #[cfg(feature = "emberplus")]
@@ -286,6 +288,8 @@ pub(crate) fn construct(
             None => Err("EasyWorship has no fixed port: give the port it advertises over Bonjour (_ezwremote._tcp)"
                 .into()),
         },
+        #[cfg(feature = "dhd-ecp")]
+        "dhd-ecp" => Ok(Box::new(dhd_ecp::DhdEcp::new(spec, context)?)),
         #[cfg(feature = "probel-swp08")]
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]

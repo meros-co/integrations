@@ -601,6 +601,10 @@ transport:
 
 Templates are text messages, rendered as for `line-tcp` with nothing added; a
 JSON message is a template such as `'{"action":"get","path":{name:json}}'`.
+The `path` may name settings as `{settings.name}`, each value
+percent-encoded as one path segment; a setting with no value is an error, so
+the path never loses a segment. A DHD AES67 module serves its API under its
+module ID: `path: /modules/{settings.module}/api/ws`.
 With `auth: basic` or `bearer`, the credential goes on the opening request as
 for `http`, and a 401 or 403 answer to it is the same terminal refusal.
 
@@ -625,7 +629,10 @@ commands:
 Every message, reply or not, is also offered to the telemetry rules (§8).
 `on_connect` steps are sent when the websocket opens; telemetry `subscribe` and
 `poll` messages are sent straight away rather than queued, because a websocket
-device pushes and what it sends back goes to the rules. Pings are answered by
+device pushes and what it sends back goes to the rules. While a step with
+`await_reply` (a login) still waits for its answer, they queue behind it
+instead, each taking the next message as its reply, since such a device
+accepts nothing before the login is answered (DHD's Control API). Pings are answered by
 the core. `wss` uses TLS 1.2 or later and checks the device's certificate
 against the same public roots as `https`; a device with a self-signed
 certificate declares `accept_invalid_certs: true`, as for `http`: the
@@ -782,8 +789,9 @@ settings, or corrects them with `update_settings`. This is still not a handshake
 whatever the device says.
 
 `refused` does not need `after_prompt`: on any line transport (`line-tcp` and
-`line-udp`), a login step can declare the text a device answers a failed login
-with, even when it answers in free text. A device whose console echoes free
+`line-udp`), and on `ws`, where it is read against each message, a login
+step can declare the text a device answers a failed login with, even when it
+answers in free text. A device whose console echoes free
 text afterwards can declare `accepted` too, a regex over reply lines: once a
 line matches it, the login is accepted and `refused` stops applying, so later
 output that happens to match is not taken for a refusal. Both are only ever
