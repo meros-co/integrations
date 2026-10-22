@@ -181,6 +181,41 @@ as the transport's `error_match`, a regex: such a message is taken as the
 reply of a command waiting with `reply_contains`, which then fails on its
 `expect`.
 
+#### TLS
+
+A device that serves its line protocol over TLS (Barco Pulse's JSON-RPC on
+9091, its plain port 9090 being turned off on current firmware) sets
+`scheme: tls`, or names an enum setting of `tcp` and `tls` for a device
+the operator can switch, with `tls_port` the default port when it chooses
+`tls`, as `https_port` is for HTTP:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 9090
+  scheme: { setting: scheme }
+  tls_port: 9091
+  accept_invalid_certs: true      # a self-signed certificate
+settings:
+  scheme: { type: enum, values: [tcp, tls], default: tls, label: Connection, description: "…" }
+ports:
+  - { port: 9091, protocol: tls, role: control, when: "scheme tls" }
+  - { port: 9090, protocol: tcp, role: control, when: "scheme tcp" }
+```
+
+The stream is TLS 1.2 or later, its certificate checked against the same
+public roots as `https`, and against the host name the device was opened
+with, or its address; `accept_invalid_certs: true` takes a device's
+self-signed certificate (the link is encrypted, the device not
+authenticated). Everything above the stream (framing, replies, telemetry)
+is as over plain TCP. A handshake that fails is a connection that fails,
+retried with backoff; its reason in the log starts `tls:`. Changing the
+setting with `update_settings` opens the new link at once. TLS is the
+network link's: with a `serial` block (below), link serial opens the
+serial port as it is. `tools/validate.py` checks that the setting is an enum
+of `tcp` and `tls`, that `tls_port` has a `tls` control entry in `ports`,
+and that `accept_invalid_certs` goes with a TLS scheme.
+
 ### `line-serial`
 
 Text over a serial port of the host running the core: RS-232, RS-422, or
