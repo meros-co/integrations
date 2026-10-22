@@ -2,6 +2,9 @@
 MXN5) and their vector modules from one table, since they share the protocol.
 
     python tools/generate_shure.py
+
+Edit this file, not its output: tools/test_generate_shure.py fails when the
+committed specs or vector modules differ from what it writes.
 """
 import json, sys
 from pathlib import Path
@@ -38,6 +41,7 @@ class Spec:
         self.rules = []         # yaml text
         self.vectors = []       # python lines
         self.conversions = set()
+        self.metering = None    # SAMPLE metering: (state, rules, quirk, vectors)
 
     # ── helpers ──
     def ch(self, var="channel"):
@@ -466,6 +470,8 @@ transport:
         out.append(s.commands[n])
     out.append("")
     out.append("state:")
+    if s.metering:
+        out.extend(s.metering[0])
     for path, (typ, unit, desc) in s.state.items():
         u = f", unit: {q(unit)}" if unit else ""
         out.append(f"  {path}: {{ type: {typ}{u}, description: {q(desc)} }}")
@@ -476,10 +482,15 @@ transport:
     out.append("  poll:")
     out.append(f"    send: [{q(s.all_cmd)}]")
     out.append("  updates:")
+    if s.metering:
+        out.extend(s.metering[1])
     out.extend(s.rules)
     out.append("")
     out.append("quirks:")
-    for sev, text in COMMON_QUIRKS + s.extra_quirks:
+    quirks = list(COMMON_QUIRKS)
+    if s.metering:
+        quirks[quirks.index(METERING_QUIRK)] = ("info", s.metering[2])
+    for sev, text in quirks + s.extra_quirks:
         out.append("  - models: [all]")
         out.append(f"    severity: {sev}")
         out.append("    text: >")
@@ -492,6 +503,10 @@ def wrap(text, indent):
     return [" " * indent + l for l in textwrap.wrap(" ".join(text.split()), 100 - indent)]
 
 
+METERING_QUIRK = ("info", """Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval
+     until set to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not
+     kept in state. Values 1-99 ms are refused by the device.""")
+
 COMMON_QUIRKS = [
     ("info", """Commands are matched to their REP by the parameter name, not by the channel: a change to
      the same parameter on another channel arriving in the same moment could be taken for the answer.
@@ -502,9 +517,7 @@ COMMON_QUIRKS = [
     ("info", """Gains are sent and reported in tenths of a dB offset by 1100 (0000-1400 = -110.0 to
      +30.0 dB); set commands take tenths of a dB (-1100 to 300), and state holds dB. Increase and
      decrease steps are in tenths of a dB."""),
-    ("info", """Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval
-     until set to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not
-     kept in state. Values 1-99 ms are refused by the device."""),
+    METERING_QUIRK,
     ("info", """On connecting the session sends one GET ALL; the device answers with a REP for every
      parameter, and thereafter reports every change unasked, so state stays current without polling.
      Opened for commands only, the GET ALL is not sent."""),
@@ -516,6 +529,188 @@ COMMON_QUIRKS = [
     ("critical", """restore_defaults erases the device's configuration (presets aside) and cannot be
      undone; reboot restarts the device, interrupting its audio, and is not acknowledged."""),
 ]
+
+# ── SAMPLE metering ───────────────────────────────────────────────────────
+# Specs whose SAMPLE messages are kept in state while a consumer runs metering.
+# Each has its state entries (put first under state), update rules (put first
+# under telemetry updates), a quirk (in place of the common metering quirk)
+# and telemetry vectors (put last in the vector module).
+
+
+def sample_metering(s, state, rules, quirk, vectors):
+    lines = lambda text: text[1:-1].split("\n")
+    s.metering = (lines(state), lines(rules), quirk, lines(vectors))
+
+
+P300_METER_STATE = r'''
+  meters.inputs.*: { type: int, unit: dBFS, description: "Input level, -60 to 0, by channel in SAMPLE_IN order from 1: 1-8 Dante inputs with mic processing, 9-10 Dante inputs, 11-12 analog, 13 USB, 14 mobile" }
+  meters.outputs.*: { type: int, unit: dBFS, description: "Output level, -60 to 0, by channel in SAMPLE_OUT order from 1: 1-2 Dante, 3-4 analog, 5 USB, 6 mobile, 7-12 Dante outputs 3-8" }
+  meters.processing.*: { type: int, unit: dBFS, description: "Processing level, -60 to 0, by channel in SAMPLE_PROC order from 1: 1-8 pre-AGC on the Dante inputs, 9 automixer output, 10 pre-compressor, 11 AEC reference" }
+  meters.erle.*: { type: int, unit: dB, description: "Echo return loss enhancement, 0 to 40, by channel from 1 (SAMPLE_ERLE)" }
+  meters.agc.*: { type: int, unit: dB, description: "AGC gain, by channel from 1 (SAMPLE_AGC)" }
+'''
+P300_METER_RULES = r'''
+    # Metering (p.12-16, p.24-25): each SAMPLE_* message lists one level per
+    # channel in the document's order, 000-060 for -60 to 0 dBFS (ERLE and
+    # AGC in dB). Sent only while a consumer has set its meter rate.
+    - match: "^< SAMPLE_IN "
+      match_each: "(\\d{3})"
+      state: { "meters.inputs.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_OUT "
+      match_each: "(\\d{3})"
+      state: { "meters.outputs.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_PROC "
+      match_each: "(\\d{3})"
+      state: { "meters.processing.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_ERLE "
+      match_each: "(\\d{2,3})"
+      state: { "meters.erle.{index:+1}": "{1}" }
+    - match: "^< SAMPLE_AGC "
+      match_each: "(\\d{2,3})"
+      state: { "meters.agc.{index:+1}": "{1}" }
+'''
+P300_METER_VECTORS = r'''
+
+# Metering (p.12-16, p.24-25): one level per channel, 000-060 for -60 to 0
+# dBFS, kept in dBFS; ERLE and AGC in dB as sent.
+telemetry(S, "meters-in", inbound="< SAMPLE_IN 060 045 000 030 001 002 003 004 005 006 007 008 009 010 >",
+          expect_state={"meters": {"inputs": {"1": 0, "2": -15, "3": -60, "4": -30, "5": -59, "6": -58, "7": -57,
+                                              "8": -56, "9": -55, "10": -54, "11": -53, "12": -52, "13": -51,
+                                              "14": -50}}})
+telemetry(S, "meters-out", inbound="< SAMPLE_OUT 060 050 040 030 020 010 >",
+          expect_state={"meters": {"outputs": {"1": 0, "2": -10, "3": -20, "4": -30, "5": -40, "6": -50}}})
+telemetry(S, "meters-proc", inbound="< SAMPLE_PROC 060 000 >",
+          expect_state={"meters": {"processing": {"1": 0, "2": -60}}})
+telemetry(S, "meters-erle", inbound="< SAMPLE_ERLE 20 40 00 >",
+          expect_state={"meters": {"erle": {"1": 20, "2": 40, "3": 0}}})
+telemetry(S, "meters-agc", inbound="< SAMPLE_AGC 003 012 >",
+          expect_state={"meters": {"agc": {"1": 3, "2": 12}}})
+'''
+P300_METER_QUIRK = """Metering (METER_RATE_IN and its siblings) sends SAMPLE_* messages at the chosen interval until
+     set to 0. It is never started here: a consumer that wants meters sets a rate (100 ms or more;
+     1-99 are refused), and each sample then updates meters.* (a state event per sample). Levels
+     are kept in dBFS (000-060 on the wire is -60 to 0); the meters keep their last value once
+     metering stops."""
+
+ANI_METER_STATE = r'''
+  meters.levels.*: { type: int, unit: dBFS, description: "Level, -60 to 0, by channel from 1 in SAMPLE order: ANI4IN and ANI4OUT channels 1-4, ANI22 inputs 1-2 then outputs 1-2 (3-4), ANIUSB-MATRIX channels 1-10 as its document numbers them" }
+'''
+ANI_METER_RULES = r'''
+    # Metering (Turn Metering On): SAMPLE lists one level per channel, 000-060
+    # for -60 to 0 dBFS, four values (ten on the ANIUSB-MATRIX). Sent only
+    # while a consumer has set the meter rate.
+    - match: "^< SAMPLE((?: \\d{3})+) *>$"
+      match_each: "(\\d{3})"
+      match_each_in: 1
+      state: { "meters.levels.{index:+1}": "{2:-60}" }
+'''
+ANI_METER_VECTORS = r'''
+
+# Metering (Turn Metering On): one level per channel, 000-060 for -60 to 0
+# dBFS, kept in dBFS; four values, ten on the ANIUSB-MATRIX. The document
+# writes the four-channel sample with two spaces before the closing >.
+telemetry(S, "meters", inbound="< SAMPLE 060 045 000 030  >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -15, "3": -60, "4": -30}}})
+telemetry(S, "meters-usb-matrix", inbound="< SAMPLE 060 050 040 030 020 010 000 001 002 003 >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -10, "3": -20, "4": -30, "5": -40, "6": -50,
+                                              "7": -60, "8": -59, "9": -58, "10": -57}}})
+'''
+ANI_METER_QUIRK = """Metering (METER_RATE) sends SAMPLE messages at the chosen interval until set to 0. It is
+     never started here: a consumer that wants meters sets a rate (100 ms or more; 1-99 are
+     refused), and each sample then updates meters.levels (a state event per sample). Levels are
+     kept in dBFS (000-060 on the wire is -60 to 0); the meters keep their last value once
+     metering stops."""
+
+MXA_METER_STATE = r'''
+  meters.levels.*: { type: int, unit: dBFS, description: "Level, -60 to 0, by channel from 1 as Channel Number Assignments gives them (automatic coverage on: 1-8 coverage areas, 9 automixer, 10 AEC reference; off: 1-8 channels, 9 automixer), from the SAMPLE meter last started (RMS, post-gate, automixer gain or AEC reference)" }
+  meters.precomp.*: { type: int, unit: dBFS, description: "Pre-compressor level, -60 to 0, by channel from 1 (SAMPLE_PRECOMP)" }
+  meters.coverage_areas.*: { type: int, unit: dBFS, description: "Post-gate level of each coverage area, -60 to 0, from 1 (SAMPLE_CA)" }
+  talkers.*.lobe: { type: int, description: "Lobe the talker is heard on, 1-8, by talker from 1 in the last report" }
+  talkers.*.coverage_area: { type: int, description: "Coverage area the talker is in, 1-8, or 0 with automatic coverage off" }
+  talkers.*.x_cm: { type: int, unit: cm, description: "Talker X position from the array's centre (along the LED bar on square arrays)" }
+  talkers.*.y_cm: { type: int, unit: cm, description: "Talker Y position from the array's centre" }
+  talkers.*.z_cm: { type: int, unit: cm, description: "Talker distance down from the array" }
+'''
+MXA_METER_RULES = r'''
+    # Metering (Meter Rate Commands): one level per channel, 000-060 for -60
+    # to 0 dBFS, in the order of Channel Number Assignments. METER_RATE,
+    # METER_RATE_POSTGATE, METER_RATE_MXR_GAIN and METER_RATE_AECREF all send
+    # SAMPLE, so it holds whichever of them a consumer started last.
+    - match: "^< SAMPLE((?: \\d{3})+) >$"
+      match_each: "(\\d{3})"
+      match_each_in: 1
+      state: { "meters.levels.{index:+1}": "{2:-60}" }
+    - match: "^< SAMPLE_PRECOMP "
+      match_each: "(\\d{3})"
+      state: { "meters.precomp.{index:+1}": "{1:-60}" }
+    - match: "^< SAMPLE_CA "
+      match_each: "(\\d{3})"
+      state: { "meters.coverage_areas.{index:+1}": "{1:-60}" }
+    # Talker positions (MXA920 Talker Position): sets of lobe, coverage area,
+    # X, Y, Z in cm and a reserved 0, all in one message per period; a period
+    # with no talker sends nothing, so the last positions stay.
+    - match: "^< SAMPLE TALKER_POSITIONS "
+      replace: talkers
+    - match: "^< SAMPLE TALKER_POSITIONS "
+      match_each: "(\\d+) (\\d+) (-?\\d+) (-?\\d+) (-?\\d+) -?\\d+"
+      state:
+        "talkers.{index:+1}.lobe": "{1}"
+        "talkers.{index:+1}.coverage_area": "{2}"
+        "talkers.{index:+1}.x_cm": "{3}"
+        "talkers.{index:+1}.y_cm": "{4}"
+        "talkers.{index:+1}.z_cm": "{5}"
+'''
+MXA_METER_VECTORS = r'''
+
+# Metering (Meter Rate Commands): one level per channel, 000-060 for -60 to 0
+# dBFS, kept in dBFS.
+telemetry(S, "meters", inbound="< SAMPLE 060 045 000 030 >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -15, "3": -60, "4": -30}}})
+telemetry(S, "meters-precomp", inbound="< SAMPLE_PRECOMP 050 >",
+          expect_state={"meters": {"precomp": {"1": -10}}})
+telemetry(S, "meters-coverage", inbound="< SAMPLE_CA 060 030 >",
+          expect_state={"meters": {"coverage_areas": {"1": 0, "2": -30}}})
+# Talker positions (MXA920 Talker Position): the document's example of two
+# talkers, which replace the last report.
+telemetry(S, "talkers", inbound="< SAMPLE TALKER_POSITIONS 1 2 -1524 321 914 0 2 3 123 -321 914 0 >",
+          state_before={"talkers": {"3": {"lobe": 4}}},
+          expect_state={"talkers": {"1": {"lobe": 1, "coverage_area": 2, "x_cm": -1524, "y_cm": 321, "z_cm": 914},
+                                    "2": {"lobe": 2, "coverage_area": 3, "x_cm": 123, "y_cm": -321, "z_cm": 914}}})
+'''
+MXA_METER_QUIRK = """Metering (METER_RATE and its siblings) and talker positions (TALKER_POSITION_RATE) are sent at
+     the chosen interval until set to 0. They are never started here: a consumer that wants them
+     sets a rate (100 ms or more; 1-99 are refused), and each sample then updates meters.* or
+     talkers.* (a state event per sample). Levels are kept in dBFS (000-060 on the wire is -60 to
+     0). METER_RATE, METER_RATE_POSTGATE, METER_RATE_MXR_GAIN and METER_RATE_AECREF all report as
+     SAMPLE, which does not say which it is: run one of them at a time. Talker positions are
+     replaced by each report; a period with no talker sends no report, so the last positions
+     stay."""
+
+MXN5_METER_STATE = r'''
+  meters.levels.*: { type: int, unit: dBFS, description: "Level, -60 to 0, by channel from 1 in SAMPLE order (Channel Number Assignments): 1-2 Dante inputs, 3 summed input, 4 Dante output" }
+'''
+MXN5_METER_RULES = r'''
+    # Metering (Metering Rate): SAMPLE lists one level per channel, 000-060
+    # for -60 to 0 dBFS, the four channels in Channel Number Assignments
+    # order. Sent only while a consumer has set the meter rate.
+    - match: "^< SAMPLE((?: \\d{3})+) *>$"
+      match_each: "(\\d{3})"
+      match_each_in: 1
+      state: { "meters.levels.{index:+1}": "{2:-60}" }
+'''
+MXN5_METER_VECTORS = r'''
+
+# Metering (Metering Rate): one level per channel in Channel Number
+# Assignments order, 000-060 for -60 to 0 dBFS, kept in dBFS.
+telemetry(S, "meters", inbound="< SAMPLE 060 045 000 030 >",
+          expect_state={"meters": {"levels": {"1": 0, "2": -15, "3": -60, "4": -30}}})
+'''
+MXN5_METER_QUIRK = """Metering (METER_RATE) sends SAMPLE messages at the chosen interval until set to 0. It is
+     never started here: a consumer that wants meters sets a rate (100 ms or more; 1-99 are
+     refused), and each sample then updates meters.levels (a state event per sample). Levels are
+     kept in dBFS (000-060 on the wire is -60 to 0); the meters keep their last value once
+     metering stops."""
+
 
 # ── P300 ──────────────────────────────────────────────────────────────────
 PUBS = "https://pubs.shure.com/command-strings/{p}/en-US"
@@ -581,6 +776,7 @@ def p300():
     add_param(s, dict(key="call_state", P="ONHOOK_STATE", scope="dev", kind="ro_text", desc="the call status (ONHOOK or OFFHOOK)", example="OFFHOOK"))
     matrix(s)
     peq(s)
+    sample_metering(s, P300_METER_STATE, P300_METER_RULES, P300_METER_QUIRK, P300_METER_VECTORS)
     return s
 
 
@@ -663,6 +859,7 @@ def ani():
     meter(s, "METER_RATE", "meter_rate", "the")
     matrix(s)
     peq(s)
+    sample_metering(s, ANI_METER_STATE, ANI_METER_RULES, ANI_METER_QUIRK, ANI_METER_VECTORS)
     return s
 
 
@@ -740,6 +937,7 @@ def mxa():
     add_param(s, dict(key="polar_pattern", P="POLAR_PATTERN", scope="ch", kind="enum", values=["TOROID", "OMNI", "CARDIOID", "SUPER", "HYPER", "BIDIRECTION"], desc="a lobe's polar pattern (MXA310)", example="CARDIOID"))
     add_param(s, dict(key="mute_button", P="MUTE_BUTTON_STATUS", scope="dev", kind="ro_onoff", desc="the mute button pressed (MXA310)"))
     peq(s)
+    sample_metering(s, MXA_METER_STATE, MXA_METER_RULES, MXA_METER_QUIRK, MXA_METER_VECTORS)
     return s
 
 
@@ -770,6 +968,7 @@ def mxn5():
           "SET {channel:02d} SIG_GEN {state}", set_expect("SIG_GEN"), "ack")
     s.vec("set_signal_generator", {"channel": 3, "state": "STOP"}, "< SET 03 SIG_GEN STOP >", "< REP 03 SIG_GEN STOP >", ACK)
     peq(s)
+    sample_metering(s, MXN5_METER_STATE, MXN5_METER_RULES, MXN5_METER_QUIRK, MXN5_METER_VECTORS)
     return s
 
 
@@ -780,5 +979,7 @@ for spec in (p300(), imx(), ani(), mxa(), mxn5()):
     name_rep = f"< REP {spec.chv(1)} CHAN_NAME {{Podium     }} >" if "get_name" in spec.commands else ""
     name_state = ", 'name': 'Podium'" if "get_name" in spec.commands else ""
     vec.append(f"telemetry(S, \"mute-gain-name\", inbound=\"< REP {spec.chv(1)} AUDIO_MUTE ON >< REP {spec.chv(1)} AUDIO_GAIN_HI_RES 1040 >{name_rep}< REP PRESET 03 >\", expect_state={{'channels': {{'1': {{'mute': True, 'gain': -6.0{name_state}}}}}, 'device': {{'preset': 3}}}})")
+    if spec.metering:
+        vec.extend(spec.metering[3])
     (ROOT / "tools" / "vectors" / f"{spec.sid}.py").write_bytes(("\n".join(vec) + "\n").encode())
     print(spec.sid, len(spec.commands), "commands")
