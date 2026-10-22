@@ -1637,6 +1637,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8765](specs/panasonic-ptz.yaml#L8765))
 - [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:124](specs/panasonic-ptz.yaml#L124))
 
+## philips-sicp — Philips professional displays (SICP)
+
+- [ ] Confirm the command set of current models (Q, D, C, E and T Line, 55BDL4107X video walls) against SICP V2.03, the newest public version; record get_platform and get_sicp_version on each. ([specs/philips-sicp.yaml:947](specs/philips-sicp.yaml#L947))
+- [ ] Record whether a display answers over TCP in standby in each power save mode, and whether set_power on is acknowledged from standby. ([specs/philips-sicp.yaml:941](specs/philips-sicp.yaml#L941))
+- [ ] Confirm replies carry the group byte (and none with group_byte off on pre-1.86 firmware). ([specs/philips-sicp.yaml:52](specs/philips-sicp.yaml#L52))
+- [ ] Record the input report (AD): whether a source type byte (FD) comes first, and the playlist byte; check 0x00 is taken for no playlist where Philips's examples send 0x09. ([specs/philips-sicp.yaml:438](specs/philips-sicp.yaml#L438))
+- [ ] Confirm sending one video parameter with the others as last read leaves them unchanged, and the Phoenix 2.0 ranges (sharpness 0-10, signed tint). ([specs/philips-sicp.yaml:485](specs/philips-sicp.yaml#L485))
+- [ ] Confirm the volume message takes two bytes on current models and one on Eagle and Himalaya 1. ([specs/philips-sicp.yaml:566](specs/philips-sicp.yaml#L566))
+- [ ] Record the failover list's length per model. ([specs/philips-sicp.yaml:454](specs/philips-sicp.yaml#L454))
+- [ ] Record a tiling report on a zero-bezel and a 5x5 model, and check the position and size encoding (the document's formula fails when the columns equal the row width). ([specs/philips-sicp.yaml:676](specs/philips-sicp.yaml#L676))
+- [ ] Record whether the schedule report echoes its page, and whether a page set with D1 0x10 is page 1 disabled (the document's example). ([specs/philips-sicp.yaml:759](specs/philips-sicp.yaml#L759))
+- [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
+- [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
+
 ## pjlink — PJLink
 
 - [ ] With authentication auto, check how a projector that predates 2.10 answers "PJLINK 2", and whether it counts it as a failed login. ([specs/pjlink.yaml:213](specs/pjlink.yaml#L213))

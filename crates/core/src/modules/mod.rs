@@ -95,6 +95,8 @@ mod onyx;
 mod osc_listener;
 #[cfg(feature = "panasonic-ptz")]
 mod panasonic_notify;
+#[cfg(feature = "philips-sicp")]
+mod philips_sicp;
 #[cfg(feature = "pjlink")]
 mod pjlink;
 #[cfg(feature = "qsys")]
@@ -295,6 +297,8 @@ pub(crate) fn construct(
         },
         #[cfg(feature = "dhd-ecp")]
         "dhd-ecp" => Ok(Box::new(dhd_ecp::DhdEcp::new(spec, context)?)),
+        #[cfg(feature = "philips-sicp")]
+        "philips-sicp" => Ok(Box::new(philips_sicp::PhilipsSicp::new(context)?)),
         #[cfg(feature = "probel-swp02")]
         "probel-swp02" => Ok(Box::new(swp02::Swp02::new(context)?)),
         #[cfg(feature = "probel-swp08")]
