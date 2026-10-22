@@ -62,6 +62,7 @@ NATIVE = {
     "probel-swp02": "SW-P-02 binary messages on a serial port, or over TCP",
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default) or a serial port",
     "qsys": "QRC JSON-RPC over TCP 1710",
+    "samsung-mdc": "MDC binary frames over TCP 1515 (TLS with a PIN in secured mode) or RS-232C",
     "sennheiser-digital-6000": "SSC over UDP 45",
     "sennheiser-ew-dx": "HTTPS + SSE (SSCv2); UDP (SSCv1 legacy mode)",
     "sennheiser-ew-g3-g4": "MCP over UDP 53212",

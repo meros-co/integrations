@@ -1886,6 +1886,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
 - [ ] Capture, on a Carbonite-family and an Acuity-family switcher with Cmd Response on and off, the bytes each documented query answers (XPT, MS, MNEM, TRANSRATE, TRANSTYPE, TRANSINCL, MVBOX, USERVAR and KEYSHAPED with ?, KEYSTATE, ACTIVEID, VERSION, HELP, MEM ?), the answer to an unknown source or ME, the answer to a set, the order of answers to queries sent together, and any unasked messages, so state can be kept. ([specs/rosstalk.yaml:1469](specs/rosstalk.yaml#L1469))
 
+## samsung-mdc — Samsung displays (MDC)
+
+- [ ] Check the secured mode handshake on a display with the secured protocol on: the plain-text MDCSTART<<TLS>> greeting, a TLS handshake on the same connection, the 4-digit PIN sent bare, and MDCAUTH<<PASS>> or MDCAUTH<<FAIL:xxxx>> (taken from a third-party library, not Ver. 15.0). ([specs/samsung-mdc.yaml:2884](specs/samsung-mdc.yaml#L2884))
+- [ ] Check which TLS versions the secured mode offers; the core speaks only TLS 1.2 and 1.3. ([specs/samsung-mdc.yaml:2890](specs/samsung-mdc.yaml#L2890))
+- [ ] Check power on over RJ45: whether a display in standby (Network Standby on and off) still answers MDC, whether Wake-on-LAN to the subnet broadcast wakes it, and whether reconnecting 10 s after an acknowledged power on is needed. ([specs/samsung-mdc.yaml:2875](specs/samsung-mdc.yaml#L2875))
+- [ ] Check the factory display ID (0 assumed) and that a display reached over RJ45 stays silent for any other ID, and that chained displays answer through its RS-232C loop-out. ([specs/samsung-mdc.yaml:40](specs/samsung-mdc.yaml#L40))
+- [ ] Check that a command a model lacks is answered NAK rather than left unanswered, and what error bytes NAKs carry. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
+- [ ] Check which timer layout (13 or 15 values) and which Maintenance Control, Sound Control and multi-screen layouts each model family replies with, and that a display refuses the set layout it does not take. ([specs/samsung-mdc.yaml:2919](specs/samsung-mdc.yaml#L2919))
+- [ ] Check the display status temperature encoding: signed (two's complement) is assumed, with 0xFF taken as invalid. ([specs/samsung-mdc.yaml:251](specs/samsung-mdc.yaml#L251))
+- [ ] Check the panel on time's unit: a counter rising every 10 minutes is assumed (count of 10-minute periods, or minutes). ([specs/samsung-mdc.yaml:1354](specs/samsung-mdc.yaml#L1354))
+- [ ] Check the older color temperature codes 0x00-0x0A (5000 K to 15000 K, steps not given) and whether a display answers a read with the extended (kelvin / 100) code. ([specs/samsung-mdc.yaml:872](specs/samsung-mdc.yaml#L872))
+- [ ] Check whether holiday indexes count from 0 or 1. ([specs/samsung-mdc.yaml:1921](specs/samsung-mdc.yaml#L1921))
+- [ ] Check the byte order of two-byte values whose sections do not state it (custom fit size, screen position, final duty, custom PIP, light sensor and brightness output ranges); high byte first is assumed. ([specs/samsung-mdc.yaml:2929](specs/samsung-mdc.yaml#L2929))
+- [ ] Check the light sensor effective range and brightness output range data width (two bytes per value assumed). ([specs/samsung-mdc.yaml:2288](specs/samsung-mdc.yaml#L2288))
+- [ ] Check the ticker frame: data length 17 plus the message, the message's encoding (UTF-8 sent), and the foreground opacity codes (0-2 opacities, 3-5 flashing and off assumed). ([specs/samsung-mdc.yaml:1194](specs/samsung-mdc.yaml#L1194))
+- [ ] Check the Wi-Fi access point frame: a type byte, a one-byte length and the text for the SSID then the password, and what the display echoes. ([specs/samsung-mdc.yaml:413](specs/samsung-mdc.yaml#L413))
+- [ ] Check what a display answers to set_osd_types (the shown-kinds bit mask, as for a read, is assumed). ([specs/samsung-mdc.yaml:1569](specs/samsung-mdc.yaml#L1569))
+- [ ] Check the latitude and longitude text format a display expects. ([specs/samsung-mdc.yaml:2313](specs/samsung-mdc.yaml#L2313))
+- [ ] Check that the serial number is 15 bytes padded with NULs or spaces. ([specs/samsung-mdc.yaml:246](specs/samsung-mdc.yaml#L246))
+- [ ] Check the LED white balance, color correction, seam correction and gradation bit layouts (sub-commands 0x92, 0x93, 0x97, 0x9B, 0x9C, 0x9F, 0xA2), sent and read as hex. ([specs/samsung-mdc.yaml:2938](specs/samsung-mdc.yaml#L2938))
+- [ ] Check the menu size reply's sub-command echo (the document prints 0x83 for 0x85); any echo is taken as the reply. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
+
 ## sennheiser-chg-70n — Sennheiser CHG 70N
 
 - [ ] Confirm the charger answers a command datagram with the method's new value (or an /osc/error entry) to the sender's port, so each command is acknowledged by its reply. ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))

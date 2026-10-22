@@ -167,6 +167,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-ross",
         &["ross-xpression", "ross-xpression-udp", "rosstalk"],
     ),
+    ("vendor-samsung", &["samsung-mdc"]),
     (
         "vendor-sennheiser",
         &[
