@@ -804,6 +804,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:407](specs/dataton-watchout7.yaml#L407))
 - [ ] Confirm POST /v0/showfile takes the .watch file as the raw request body with Content-Type application/octet-stream, answers 200, and that showName names the loaded show; and record whether WATCHOUT 7 before 7.8 has it. ([specs/dataton-watchout7.yaml:318](specs/dataton-watchout7.yaml#L318))
 
+## dbaudio — d&b audiotechnik amplifiers
+
+- [ ] On each model (especially the D25, 25D, D90 and 5DM, which d&b's Q-SYS plug-in added last), confirm the named objects answer at the numbers built from the plug-in's tables, and record the class GetClassIdentification reports for each. ([specs/dbaudio.yaml:638](specs/dbaudio.yaml#L638))
+- [ ] Confirm the OCP.1 port on each family (30013 on the D80, D20, 30D and 10D, 50014 on the others) and on older firmware, and whether any amplifier also speaks OCP.1 over UDP or a WebSocket. ([specs/dbaudio.yaml:647](specs/dbaudio.yaml#L647))
+- [ ] Read device.model_guid on each model and check the manufacturer code and model byte against the list in the quirk. ([specs/dbaudio.yaml:655](specs/dbaudio.yaml#L655))
+- [ ] Check that subscriptions to the named objects are accepted and changes made in R1 or on the front panel arrive by notification, and whether a walk of the root block finds the same objects, and under which roles. ([specs/dbaudio.yaml:662](specs/dbaudio.yaml#L662))
+- [ ] Load an AmpPreset with load_amp_preset and backup_and_load_amp_preset and confirm the backup lands in 13 to 15; check what AmpPreset/Selected, AmpPreset/Modified and AmpPreset <n>/Stored report, and that the preset names can be written. ([specs/dbaudio.yaml:670](specs/dbaudio.yaml#L670))
+- [ ] Confirm identify (method 5.2 with 0x0200, then 0) makes the amplifier wink and stop, and that the Wink object's Active (4.1) follows it. ([specs/dbaudio.yaml:678](specs/dbaudio.yaml#L678))
+- [ ] In each 2-way active and mix top/sub output mode, check which channel's objects the pair answers to and what writing the second channel's does. ([specs/dbaudio.yaml:684](specs/dbaudio.yaml#L684))
+- [ ] Check the delay's reported minimum and maximum, and what Filter1, Filter2 and Filter3 do and accept with a few loudspeaker setups. ([specs/dbaudio.yaml:690](specs/dbaudio.yaml#L690))
+- [ ] On a D80 and D20, confirm the input mode positions 1 to 5 and which routing switches answer in each. ([specs/dbaudio.yaml:696](specs/dbaudio.yaml#L696))
+- [ ] Confirm switching load or input monitoring off and on again clears its errors, and what DeviceErrorText and ErrorText hold. ([specs/dbaudio.yaml:703](specs/dbaudio.yaml#L703))
+- [ ] Check the Headroom meter's unit and range, and how often the ISP, GR and OVL sensors notify under programme. ([specs/dbaudio.yaml:710](specs/dbaudio.yaml#L710))
+- [ ] On a DS10 and DS100, find the OCP.1 port and walk the tree: record its roles and classes so they can be named here. ([specs/dbaudio.yaml:716](specs/dbaudio.yaml#L716))
+- [ ] Confirm set_device_time (SetDeviceTimeNTP, 3.2, on object 9 or 10 by family) sets the amplifier's clock. ([specs/dbaudio.yaml:579](specs/dbaudio.yaml#L579))
+
 ## digico-sd — DiGiCo SD and Quantum consoles
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
