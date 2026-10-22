@@ -154,8 +154,8 @@ HELP = {
     "solo": ("Automix solo", "ENABLE or DISABLE the channel's automix solo."),
     "speech_gating": ("Speech gating", "Off, Low, Medium or High on the MXA920; ON or OFF on the MXA902 and MXA901."),
     "noise_filter": ("Noise filter", "Enhanced noise filtering: Off, Low, Medium or High on the MXA920; ON or OFF on the MXA902 and MXA901."),
-    "led_color_unmuted": ("Unmuted LED colour", "The LED colour while unmuted, by Shure's colour name."),
-    "led_color_muted": ("Muted LED colour", "The LED colour while muted, by Shure's colour name."),
+    "led_color_unmuted": ("Unmuted LED color", "The LED color while unmuted, by Shure's color name."),
+    "led_color_muted": ("Muted LED color", "The LED color while muted, by Shure's color name."),
     "led_state_muted": ("Muted LED state", "The LED while muted: ON, FLASHING or OFF."),
     "led_state_unmuted": ("Unmuted LED state", "The LED while unmuted: ON, FLASHING or OFF."),
     "led_in": ("LED in", "On sets the LED-in state to unmuted, off to muted."),
@@ -163,15 +163,15 @@ HELP = {
     "bypass_intellimix": ("Bypass IntelliMix", "On bypasses the IntelliMix DSP, off restores it."),
     "eq_contour": ("EQ contour", "On turns the EQ contour on, off turns it off."),
     "lobe_width": ("Lobe width", "NARROW, MEDIUM or WIDE."),
-    "lobe_x": ("Lobe X", "Lobe X position in cm from the array's centre, -1524 to 1524."),
-    "lobe_y": ("Lobe Y", "Lobe Y position in cm from the array's centre, -1524 to 1524."),
+    "lobe_x": ("Lobe X", "Lobe X position in cm from the array's center, -1524 to 1524."),
+    "lobe_y": ("Lobe Y", "Lobe Y position in cm from the array's center, -1524 to 1524."),
     "lobe_z": ("Lobe height", "Lobe height below the array in cm, 0 to 914."),
     "autofocus": ("Autofocus", "On turns autofocus on, off turns it off."),
     "array_height": ("Array height", "Height of the array above the floor in cm, 122 to 914."),
     "automatic_coverage": ("Automatic coverage", "On turns automatic coverage on (MXA920), making channels 1-8 coverage areas; off turns it off."),
     "acoustic_boundary": ("Acoustic boundary", "Virtual acoustic boundary strength, 0 (off) to 20 (MXA920)."),
     "talker_position_rate": ("Talker position interval", "Interval in ms at which talker positions are reported, or 0 for off."),
-    "talker_sensitivity": ("Talker sensitivity", "The talker position sensitivity setting: 0-2 localisation, 4-7 voice detection, 8, 9 or 11 reflection and height correction."),
+    "talker_sensitivity": ("Talker sensitivity", "The talker position sensitivity setting: 0-2 localization, 4-7 voice detection, 8, 9 or 11 reflection and height correction."),
     "installation": ("Installation", "How the array is mounted: CEILING, WALL_HORIZONTAL, WALL_VERTICAL or TABLE (MXA710)."),
     "lobe_angle": ("Lobe angle", "Lobe angle in degrees, -90 to 90 (MXA710)."),
     "speaker": ("Loudspeaker", "On turns the loudspeaker on (MXA902), off turns it off."),
@@ -627,8 +627,8 @@ MXA_METER_STATE = r'''
   meters.coverage_areas.*: { type: int, unit: dBFS, description: "Post-gate level of each coverage area, -60 to 0, from 1 (SAMPLE_CA)" }
   talkers.*.lobe: { type: int, description: "Lobe the talker is heard on, 1-8, by talker from 1 in the last report" }
   talkers.*.coverage_area: { type: int, description: "Coverage area the talker is in, 1-8, or 0 with automatic coverage off" }
-  talkers.*.x_cm: { type: int, unit: cm, description: "Talker X position from the array's centre (along the LED bar on square arrays)" }
-  talkers.*.y_cm: { type: int, unit: cm, description: "Talker Y position from the array's centre" }
+  talkers.*.x_cm: { type: int, unit: cm, description: "Talker X position from the array's center (along the LED bar on square arrays)" }
+  talkers.*.y_cm: { type: int, unit: cm, description: "Talker Y position from the array's center" }
   talkers.*.z_cm: { type: int, unit: cm, description: "Talker distance down from the array" }
 '''
 MXA_METER_RULES = r'''
@@ -784,10 +784,10 @@ def imx():
     s = Spec("shure-imx-room", "Shure IntelliMix Room (software DSP)",
              "# Written from Shure's IntelliMix Room command strings. Channels: 01-16\n# Dante mic inputs (8 or 16 licensed), 17-24 Dante line inputs, 25 virtual\n# audio in, 26 PC in, 27-34 Dante outputs, 35 virtual audio out, 36 PC out,\n# 37 automix output, 55 VAD input right; 00 is all.",
              [src("IntelliMix Room Command Strings, Version 7.5 (2024-G)", "IntelliMixRoom", 7549,
-                  "TCP 2202 on the computer running IntelliMix Room; channel table p.3; device information (GET ALL, MODEL, FW_VER, DEVICE_ID, NA_DEVICE_NAME, PRESET, call status), AUDIO_GAIN_HI_RES with inc/dec, DEVICE_AUDIO_MUTE, AUDIO_MUTE, matrix routing and gain, AUTOMXR_MUTE, AUDIO_GAIN_POSTGATE, AUTOMXR_GATE, licence commands (CHAN_CONFIG, CHAN_COUNT, LIC_EXP_DATE, LIC_TYPE, LIC_VALID) and DENOISER_ENABLE / DENOISER_LEVEL.")],
+                  "TCP 2202 on the computer running IntelliMix Room; channel table p.3; device information (GET ALL, MODEL, FW_VER, DEVICE_ID, NA_DEVICE_NAME, PRESET, call status), AUDIO_GAIN_HI_RES with inc/dec, DEVICE_AUDIO_MUTE, AUDIO_MUTE, matrix routing and gain, AUTOMXR_MUTE, AUDIO_GAIN_POSTGATE, AUTOMXR_GATE, license commands (CHAN_CONFIG, CHAN_COUNT, LIC_EXP_DATE, LIC_TYPE, LIC_VALID) and DENOISER_ENABLE / DENOISER_LEVEL.")],
              [dict(id="intellimix-room", name="Shure IntelliMix Room (8 or 16 channels)")],
              ("inc", "dec"), "02d", "GET 00 ALL", [
-                 ("info", "Commands for channels beyond the licensed count (8-channel licences) fail with REP ERR."),
+                 ("info", "Commands for channels beyond the licensed count (8-channel licenses) fail with REP ERR."),
              ])
     for key, P, desc, ex in [("model", "MODEL", "the model", "{IntelliMix Room                 }"), ("firmware", "FW_VER", "the software version", "{7.5.0             }"),
                              ("device_id", "DEVICE_ID", "the device ID", "{Room 101                       }"), ("na_device_name", "NA_DEVICE_NAME", "the Dante device name", "{IMXR-ab12                      }")]:
@@ -808,9 +808,9 @@ def imx():
     add_param(s, dict(key="automixer_gate", P="AUTOMXR_GATE", scope="ch", kind="ro_onoff", desc="a channel's automixer gate (open)"))
     add_param(s, dict(key="channels_configured", P="CHAN_CONFIG", scope="dev", kind="ro_text", desc="whether the channels are configured (TRUE/FALSE)", example="TRUE"))
     add_param(s, dict(key="licensed_channels", P="CHAN_COUNT", scope="dev", kind="ro_int", desc="the licensed channel count (8 or 16)", example="16", example_value="16"))
-    add_param(s, dict(key="licence_expiry", P="LIC_EXP_DATE", scope="dev", kind="ro_text", desc="the licence expiry date (yyyy-mm-dd)", example="2026-12-31"))
-    add_param(s, dict(key="licence_type", P="LIC_TYPE", scope="dev", kind="ro_text", desc="the licence type (DEMO, PAID, TRIAL)", example="PAID"))
-    add_param(s, dict(key="licence_valid", P="LIC_VALID", scope="dev", kind="ro_text", desc="whether the licence is valid (TRUE/FALSE)", example="TRUE"))
+    add_param(s, dict(key="licence_expiry", P="LIC_EXP_DATE", scope="dev", kind="ro_text", desc="the license expiry date (yyyy-mm-dd)", example="2026-12-31"))
+    add_param(s, dict(key="licence_type", P="LIC_TYPE", scope="dev", kind="ro_text", desc="the license type (DEMO, PAID, TRIAL)", example="PAID"))
+    add_param(s, dict(key="licence_valid", P="LIC_VALID", scope="dev", kind="ro_text", desc="whether the license is valid (TRUE/FALSE)", example="TRUE"))
     add_param(s, dict(key="denoiser", P="DENOISER_ENABLE", scope="ch", kind="onoff", desc="the denoiser (channel 00 or 37)", example_channel=37))
     add_param(s, dict(key="denoiser_level", P="DENOISER_LEVEL", scope="ch", kind="enum", values=["LOW", "MEDIUM", "HIGH"], desc="the denoiser level (channel 00 or 37)", example="LOW", example_channel=37))
     add_param(s, dict(key="call_status_enabled", P="ONHOOK_ENABLE", scope="dev", kind="onoff", desc="the call status feature"))
@@ -848,7 +848,7 @@ def ani():
     s.vec("set_led_in", {"channel": 1, "enabled": True}, "< SET 01 CHAN_LED_IN_STATE ON >", None, "{'ok': {'kind': 'unverified'}}")
     add_param(s, dict(key="clip_indicator", P="AUDIO_OUT_CLIP_INDICATOR", scope="ch", kind="ro_onoff", desc="a channel's clip indicator"))
     add_param(s, dict(key="limiter_engaged", P="LIMITER_ENGAGED", scope="ch", kind="ro_onoff", desc="a channel's limiter engaged"))
-    add_param(s, dict(key="sig_clip_led", P="LED_COLOR_SIG_CLIP", scope="ch", kind="ro_text", desc="a channel's sig/clip LED colour (OFF, GREEN, AMBER, RED)", example="GREEN"))
+    add_param(s, dict(key="sig_clip_led", P="LED_COLOR_SIG_CLIP", scope="ch", kind="ro_text", desc="a channel's sig/clip LED color (OFF, GREEN, AMBER, RED)", example="GREEN"))
     add_param(s, dict(key="led_brightness", P="LED_BRIGHTNESS", scope="dev", kind="int", min=0, max=2, desc="the LED brightness (0 off, 1 dim, 2 default)", example="2", example_value="2"))
     add_param(s, dict(key="summing_mode", P="AUDIO_SUMMING_MODE", scope="dev", kind="enum", values=["OFF", "1+2", "3+4", "1+2/3+4", "1+2+3+4"], desc="the audio summing mode", example="OFF"))
     add_param(s, dict(key="input_meter_mode", P="INPUT_METER_MODE", scope="dev", kind="enum", values=["PRE_FADER", "POST_FADER"], desc="the input meter tap", example="PRE_FADER"))
@@ -866,8 +866,8 @@ def ani():
 def mxa():
     s = Spec("shure-mxa", "Shure Microflex Advance array microphones (MXA910, MXA920, MXA710, MXA310, MXA902, MXA901)",
              "# Written from Shure's command strings for each microphone. Channel numbers\n# differ by model (each document's Channel Number Assignments): typically the\n# lobes or Dante outputs first, then the automixer output (MXA910 and MXA920:\n# 09; MXA310: 05) and the AEC reference; 0 is all.",
-             [src("MXA910 Command Strings, Version 6.2 (2021-J)", "MXA910", 6999, "TCP 2202; channels 0-9; device information, CHAN_NAME, gains incl. post-gate and echo reduction, mutes, clip indicator, FLASH, metering rates, levels, presets, gate outputs, LED colours, states and brightness, lobe steering BEAM_X/Y/Z/W and autofocus positions, REBOOT, LAST_ERROR_EVENT, filters, IntelliMix bypass, NA names, NUM_ACTIVE_MICS, PEQ, solo, ENCRYPTION."),
-              src("MXA920 Command Strings, Version 1.4 (2025-J)", "MXA920", 8372, "TCP 2202; Telnet negotiation not supported; channel table and automatic coverage on/off p.3-5; device information, presets incl. PRESET_NAME, gains, mutes incl. post-gate and coverage areas, speech gating, noise filter, metering, LEDs (brightness 0-5, 17 colours, ON/FLASHING/OFF), PEQ, EQ contour, lobe width, ARRAY_HEIGHT, AUTO_COVERAGE, VAB, talker positions, array groups, gate outputs, lobe steering, AUTOFOCUS, coverage areas."),
+             [src("MXA910 Command Strings, Version 6.2 (2021-J)", "MXA910", 6999, "TCP 2202; channels 0-9; device information, CHAN_NAME, gains incl. post-gate and echo reduction, mutes, clip indicator, FLASH, metering rates, levels, presets, gate outputs, LED colors, states and brightness, lobe steering BEAM_X/Y/Z/W and autofocus positions, REBOOT, LAST_ERROR_EVENT, filters, IntelliMix bypass, NA names, NUM_ACTIVE_MICS, PEQ, solo, ENCRYPTION."),
+              src("MXA920 Command Strings, Version 1.4 (2025-J)", "MXA920", 8372, "TCP 2202; Telnet negotiation not supported; channel table and automatic coverage on/off p.3-5; device information, presets incl. PRESET_NAME, gains, mutes incl. post-gate and coverage areas, speech gating, noise filter, metering, LEDs (brightness 0-5, 17 colors, ON/FLASHING/OFF), PEQ, EQ contour, lobe width, ARRAY_HEIGHT, AUTO_COVERAGE, VAB, talker positions, array groups, gate outputs, lobe steering, AUTOFOCUS, coverage areas."),
               src("MXA710 Command Strings, Version 3.8 (2025-G)", "MXA710", 7643, "TCP 2202; 2 ft and 4 ft channel tables; DEVICE_INSTALLATION; BEAM_ANGLE (-90 to +90) and BEAM_W per lobe; as the MXA920 otherwise."),
               src("MXA310 Command Strings, Version 3.2 (2023-C)", "MXA310", 7094, "TCP 2202; channels 0-5; polar pattern, lobe angle, mute button and LED states, external switch, low-cut filter, mute control function, as the MXA910 otherwise."),
               src("MXA902 Command Strings, Version 0.5 (2025-G)", "MXA902", 9932, "TCP 2202; automixer output 09, speaker output 10, Dante inputs 11-12; SPEAKER, DELAY (1-160 ms on 10), COMPRESSOR, signal generator."),
@@ -881,7 +881,7 @@ def mxa():
              ("inc", "dec"), "02d", "GET 00 ALL", [
                  ("warning", "The MXA910 and MXA310 documents write the gain step keywords as INC and DEC, the newer documents as inc and dec; the session sends the lower-case form to every model."),
                  ("info", "Which parameters a microphone answers depends on its model and, on the MXA920, on whether automatic coverage is on; others are answered REP ERR."),
-                 ("info", "Lobe X/Y positions are sent and reported offset by 1524 cm (0-3048 = -1524 to +1524 cm); set commands take cm relative to the centre."),
+                 ("info", "Lobe X/Y positions are sent and reported offset by 1524 cm (0-3048 = -1524 to +1524 cm); set commands take cm relative to the center."),
              ])
     common_device(s, [("na_device_name", "NA_DEVICE_NAME", "the Dante device name", "{MXA920-ab12                    }"),
                       ("mac_address", "CONTROL_MAC_ADDR", "the control MAC address", "00:0E:DD:FF:F1:63")])
@@ -906,18 +906,18 @@ def mxa():
         meter(s, P, key, d)
     add_param(s, dict(key="mute_led", P="DEV_MUTE_STATUS_LED_STATE", scope="dev", kind="ro_onoff", desc="the mute LED (on = muted)"))
     add_param(s, dict(key="led_brightness", P="LED_BRIGHTNESS", scope="dev", kind="int", min=0, max=5, desc="the LED brightness (0 off, 1-5 = 20-100%; older firmware 0-2)", example="5", example_value="5"))
-    add_param(s, dict(key="led_color_unmuted", P="LED_COLOR_UNMUTED", scope="dev", kind="enum", values=COLORS, desc="the LED colour when unmuted", example="GREEN"))
-    add_param(s, dict(key="led_color_muted", P="LED_COLOR_MUTED", scope="dev", kind="enum", values=COLORS, desc="the LED colour when muted", example="RED"))
-    add_param(s, dict(key="led_state_muted", P="LED_STATE_MUTED", scope="dev", kind="enum", values=["ON", "FLASHING", "OFF"], desc="the LED behaviour when muted", example="ON"))
-    add_param(s, dict(key="led_state_unmuted", P="LED_STATE_UNMUTED", scope="dev", kind="enum", values=["ON", "FLASHING", "OFF"], desc="the LED behaviour when unmuted", example="ON"))
+    add_param(s, dict(key="led_color_unmuted", P="LED_COLOR_UNMUTED", scope="dev", kind="enum", values=COLORS, desc="the LED color when unmuted", example="GREEN"))
+    add_param(s, dict(key="led_color_muted", P="LED_COLOR_MUTED", scope="dev", kind="enum", values=COLORS, desc="the LED color when muted", example="RED"))
+    add_param(s, dict(key="led_state_muted", P="LED_STATE_MUTED", scope="dev", kind="enum", values=["ON", "FLASHING", "OFF"], desc="the LED behavior when muted", example="ON"))
+    add_param(s, dict(key="led_state_unmuted", P="LED_STATE_UNMUTED", scope="dev", kind="enum", values=["ON", "FLASHING", "OFF"], desc="the LED behavior when unmuted", example="ON"))
     add_param(s, dict(key="led_in", P="DEV_LED_IN_STATE", scope="dev", kind="onoff", desc="the LED-in state (on = unmuted)"))
     add_param(s, dict(key="bypass_eq", P="BYPASS_ALL_EQ", scope="dev", kind="onoff_toggle", desc="bypass of all EQ"))
     add_param(s, dict(key="bypass_intellimix", P="BYPASS_IMX", scope="dev", kind="onoff_toggle", desc="bypass of the IntelliMix DSP"))
     add_param(s, dict(key="eq_contour", P="EQ_CONTOUR", scope="dev", kind="onoff", desc="the EQ contour"))
     add_param(s, dict(key="lobe_width", P="BEAM_W", scope="ch", kind="enum", values=["NARROW", "MEDIUM", "WIDE"], desc="a lobe's width", example="MEDIUM"))
     for axis in ("X", "Y"):
-        add_param(s, dict(key=f"lobe_{axis.lower()}", P=f"BEAM_{axis}", scope="ch", kind="int", conv="shure_xy", unit="cm", min=-1524, max=1524, offset=1524, width=4, set_param="position_cm", set_example=-457, desc=f"a lobe's {axis} position, cm from the centre", example="1067", example_value="1067"))
-        add_param(s, dict(key=f"autofocus_{axis.lower()}", P=f"BEAM_{axis}_AF", scope="ch", kind="ro_int", conv="shure_xy", unit="cm", desc=f"a lobe's autofocus {axis} position, cm from the centre", example="1524", example_value="1524"))
+        add_param(s, dict(key=f"lobe_{axis.lower()}", P=f"BEAM_{axis}", scope="ch", kind="int", conv="shure_xy", unit="cm", min=-1524, max=1524, offset=1524, width=4, set_param="position_cm", set_example=-457, desc=f"a lobe's {axis} position, cm from the center", example="1067", example_value="1067"))
+        add_param(s, dict(key=f"autofocus_{axis.lower()}", P=f"BEAM_{axis}_AF", scope="ch", kind="ro_int", conv="shure_xy", unit="cm", desc=f"a lobe's autofocus {axis} position, cm from the center", example="1524", example_value="1524"))
     add_param(s, dict(key="lobe_z", P="BEAM_Z", scope="ch", kind="int", min=0, max=914, width=4, unit="cm", set_param="height_cm", set_example=152, desc="a lobe's height below the array, cm", example="0152", example_value="0152"))
     add_param(s, dict(key="autofocus_z", P="BEAM_Z_AF", scope="ch", kind="ro_int", unit="cm", desc="a lobe's autofocus height below the array, cm", example="0152", example_value="0152"))
     add_param(s, dict(key="autofocus", P="AUTOFOCUS", scope="dev", kind="onoff", desc="autofocus"))
@@ -925,7 +925,7 @@ def mxa():
     add_param(s, dict(key="automatic_coverage", P="AUTO_COVERAGE", scope="dev", kind="onoff", desc="automatic coverage (MXA920)"))
     add_param(s, dict(key="acoustic_boundary", P="VAB", scope="dev", kind="int", min=0, max=20, desc="the virtual acoustic boundary strength (0 off, MXA920)", example="5", example_value="5"))
     add_param(s, dict(key="talker_position_rate", P="TALKER_POSITION_RATE", scope="dev", kind="int", min=0, max=99999, width=5, unit="ms", set_param="rate_ms", set_example=1000, desc="the talker position reporting interval, ms (0 off)", example="01000", example_value="01000"))
-    add_param(s, dict(key="talker_sensitivity", P="TALKER_POSITION_SENSITIVITY", scope="dev", kind="int", min=0, max=11, desc="the talker position sensitivity setting (0-2 localisation, 4-7 voice detection, 8/9/11 reflection and height correction)", example="0", example_value="0"))
+    add_param(s, dict(key="talker_sensitivity", P="TALKER_POSITION_SENSITIVITY", scope="dev", kind="int", min=0, max=11, desc="the talker position sensitivity setting (0-2 localization, 4-7 voice detection, 8/9/11 reflection and height correction)", example="0", example_value="0"))
     add_param(s, dict(key="installation", P="DEVICE_INSTALLATION", scope="dev", kind="enum", values=["CEILING", "WALL_HORIZONTAL", "WALL_VERTICAL", "TABLE"], desc="the installation position (MXA710)", example="TABLE"))
     add_param(s, dict(key="lobe_angle", P="BEAM_ANGLE", scope="ch", kind="int", min=-90, max=90, unit="degrees", set_param="angle", set_example=-30, desc="a lobe's angle (MXA710)", example="-30", example_value="-30"))
     add_param(s, dict(key="speaker", P="SPEAKER", scope="dev", kind="onoff", desc="the loudspeaker (MXA902)"))
