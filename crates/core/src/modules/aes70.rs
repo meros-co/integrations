@@ -1,6 +1,14 @@
-//! AES70 (OCA) devices over OCP.1 on TCP, as a controller: remote preamps on
-//! AES67 and ST 2110 stageboxes, d&b audiotechnik amplifiers and DS
-//! processors, and any other device that speaks OCP.1.
+//! AES70 (OCA) devices over OCP.1, as a controller: remote preamps on AES67
+//! and ST 2110 stageboxes, d&b audiotechnik amplifiers (see `dbaudio`), and
+//! any other device that speaks OCP.1.
+//!
+//! OCP.1 runs over a TCP stream, UDP datagrams or WebSocket binary messages,
+//! plain or over TLS (the `transport` setting). TCP and WebSocket carry a
+//! byte stream of PDUs; over UDP each datagram is one PDU, kept within one
+//! Ethernet frame, and the device is counted connected when it first answers
+//! the keep-alive the module sends before anything else. Secure OCP.1
+//! (TLS 1.2 with a pre-shared key) is not implemented: the core's TLS does
+//! not offer pre-shared keys.
 //!
 //! The AES70 standard itself (AES70-1/2/3) is sold by the AES and was not
 //! used. The module was written from what open implementations and the OCA
@@ -46,8 +54,8 @@ use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput,
+    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
+    Outcome, TcpInput, WsInput, WsRequest,
 };
 
 #[path = "aes70_classes.rs"]
@@ -83,6 +91,16 @@ pub(crate) const SUBSCRIBER: (u32, Id) = (4096, Id(1, 1));
 
 /// Messages per PDU the module sends at most.
 const PDU_MESSAGES: usize = 64;
+
+/// The largest PDU sent in one UDP datagram: one Ethernet frame's payload
+/// (1500 bytes) less 48 for the IPv6 and UDP headers, so that a PDU of
+/// several messages is not fragmented. A single message too large for it
+/// goes alone in a larger datagram.
+const UDP_PDU_MAX: usize = 1500 - 48;
+
+/// The WebSocket subprotocol a controller offers for OCP.1 (AES70-3
+/// 8.4.3.4.2).
+const WS_SUBPROTOCOL: &str = "AES70-OCP.1";
 
 /// OcaStatus: its name and meaning.
 pub(crate) fn status_name(status: u8) -> (&'static str, &'static str) {
@@ -148,8 +166,24 @@ enum Levels {
     Subscribe,
 }
 
+/// How OCP.1 reaches the device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Transport {
+    /// A TCP stream.
+    Tcp,
+    /// UDP datagrams, each one PDU.
+    Udp,
+    /// WebSocket binary messages, plain or over TLS: a byte stream across
+    /// messages.
+    Ws { secure: bool },
+}
+
 #[derive(Debug, Clone)]
 struct Settings {
+    transport: Transport,
+    ws_path: String,
+    ws_subprotocol: bool,
+    accept_invalid_certs: bool,
     keepalive: Millis,
     request_timeout: Millis,
     walk: bool,
@@ -164,7 +198,24 @@ impl Settings {
     fn from(p: &Params) -> Settings {
         let int = |k: &str, d: i64| p.get(k).and_then(Value::as_i64).unwrap_or(d);
         let flag = |k: &str, d: bool| p.get(k).and_then(Value::as_bool).unwrap_or(d);
+        let mut ws_path = p
+            .get("ws_path")
+            .and_then(Value::as_str)
+            .unwrap_or("/")
+            .to_string();
+        if !ws_path.starts_with('/') {
+            ws_path.insert(0, '/');
+        }
         Settings {
+            transport: match p.get("transport").and_then(Value::as_str) {
+                Some("udp") => Transport::Udp,
+                Some("ws") => Transport::Ws { secure: false },
+                Some("wss") => Transport::Ws { secure: true },
+                _ => Transport::Tcp,
+            },
+            ws_path,
+            ws_subprotocol: flag("ws_subprotocol", true),
+            accept_invalid_certs: flag("accept_invalid_certs", false),
             keepalive: int("keepalive_interval_ms", 1000).max(100) as Millis,
             request_timeout: int("request_timeout_ms", 5000).max(100) as Millis,
             walk: flag("walk", true),
@@ -287,6 +338,8 @@ enum Found {
 
 pub(crate) struct Aes70 {
     device: SocketAddr,
+    /// The name the device was opened by, for a wss URL and certificate.
+    host_name: Option<String>,
     monitor: bool,
     settings: Settings,
     deframer: codec::Deframer,
@@ -320,12 +373,20 @@ pub(crate) struct Aes70 {
     subscribe_warned: bool,
     /// Objects found by a command's lookup, whose records go into state.
     to_emit: Vec<u32>,
+    /// Objects a vendor's documentation names by number, with the names they
+    /// are keyed by: known without a walk, read and followed when monitored.
+    named: Vec<(String, u32)>,
+    /// Objects whose properties have been read and changes subscribed to.
+    followed: BTreeSet<u32>,
+    /// The level sensor poll is running.
+    poll_armed: bool,
 }
 
 impl Aes70 {
     pub(crate) fn new(ctx: OpenContext, port: u16) -> Aes70 {
         Aes70 {
             device: SocketAddr::new(ctx.host, port),
+            host_name: ctx.host_name.clone(),
             monitor: ctx.monitor,
             settings: Settings::from(&ctx.settings),
             deframer: codec::Deframer::default(),
@@ -357,12 +418,96 @@ impl Aes70 {
             device_values: Map::new(),
             subscribe_warned: false,
             to_emit: Vec::new(),
+            named: Vec::new(),
+            followed: BTreeSet::new(),
+            poll_armed: false,
+        }
+    }
+
+    /// The module with objects a vendor documents by number, each keyed in
+    /// state and addressed in commands by the name given (in place of a
+    /// role path). Their classes are asked for on connecting; monitored,
+    /// they are then read and followed like the objects a walk finds.
+    pub(crate) fn with_named(ctx: OpenContext, port: u16, named: Vec<(String, u32)>) -> Aes70 {
+        let mut a = Aes70::new(ctx, port);
+        a.named = named;
+        a
+    }
+
+    fn is_named(&self, ono: u32) -> bool {
+        self.named.iter().any(|(_, o)| *o == ono)
+    }
+
+    /// Put the named objects in the tree under their names; any whose class
+    /// is known goes (back) into state.
+    fn seed_named(&mut self) {
+        for (name, ono) in self.named.clone() {
+            let o = self.objects.entry(ono).or_default();
+            o.path = Some(name.clone());
+            o.emitted = false;
+            if o.class.is_some() {
+                self.to_emit.push(ono);
+            }
+            self.paths.insert(name, ono);
         }
     }
 
     fn open(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
-        cx.tcp_open(SOCKET, self.device);
+        match self.settings.transport {
+            Transport::Tcp => cx.tcp_open(SOCKET, self.device),
+            Transport::Udp => {
+                // UDP has no connection: the socket is ready at once, and the
+                // device counts as connected when it first answers.
+                cx.udp_open(SOCKET, Bind::Ephemeral);
+                self.connected_socket(cx);
+            }
+            Transport::Ws { secure } => {
+                let host = match (&self.host_name, self.device.ip()) {
+                    (Some(name), _) => name.clone(),
+                    (None, std::net::IpAddr::V6(ip)) => format!("[{ip}]"),
+                    (None, ip) => ip.to_string(),
+                };
+                let scheme = if secure { "wss" } else { "ws" };
+                let headers = if self.settings.ws_subprotocol {
+                    vec![(
+                        "Sec-WebSocket-Protocol".to_string(),
+                        WS_SUBPROTOCOL.to_string(),
+                    )]
+                } else {
+                    Vec::new()
+                };
+                cx.ws_open(
+                    SOCKET,
+                    WsRequest {
+                        url: format!(
+                            "{scheme}://{host}:{}{}",
+                            self.device.port(),
+                            self.settings.ws_path
+                        ),
+                        headers,
+                        accept_invalid_certs: self.settings.accept_invalid_certs,
+                    },
+                );
+            }
+        }
+    }
+
+    /// Send one PDU on whichever transport is in use.
+    fn send_pdu(&self, cx: &mut Cx, pdu: Vec<u8>) {
+        match self.settings.transport {
+            Transport::Tcp => cx.tcp_send(SOCKET, pdu),
+            Transport::Udp => cx.udp_send(SOCKET, self.device, pdu),
+            Transport::Ws { .. } => cx.ws_send_binary(SOCKET, pdu),
+        }
+    }
+
+    fn close_socket(&self, cx: &mut Cx) {
+        match self.settings.transport {
+            Transport::Tcp => cx.tcp_close(SOCKET),
+            Transport::Udp => cx.udp_close(SOCKET),
+            Transport::Ws { .. } => cx.ws_close(SOCKET),
+        }
     }
 
     // --- Sending -----------------------------------------------------------
@@ -440,8 +585,29 @@ impl Aes70 {
             self.outbox.clear();
             return;
         }
-        for chunk in std::mem::take(&mut self.outbox).chunks(PDU_MESSAGES) {
-            cx.tcp_send(SOCKET, codec::pdu(codec::TYPE_COMMAND_RRQ, chunk));
+        let outbox = std::mem::take(&mut self.outbox);
+        if self.settings.transport == Transport::Udp {
+            // Each datagram is one PDU, kept within one Ethernet frame.
+            let mut chunk: Vec<Vec<u8>> = Vec::new();
+            let mut size = codec::PDU_HEADER;
+            for m in outbox {
+                if !chunk.is_empty()
+                    && (size + m.len() > UDP_PDU_MAX || chunk.len() == PDU_MESSAGES)
+                {
+                    self.send_pdu(cx, codec::pdu(codec::TYPE_COMMAND_RRQ, &chunk));
+                    chunk.clear();
+                    size = codec::PDU_HEADER;
+                }
+                size += m.len();
+                chunk.push(m);
+            }
+            if !chunk.is_empty() {
+                self.send_pdu(cx, codec::pdu(codec::TYPE_COMMAND_RRQ, &chunk));
+            }
+        } else {
+            for chunk in outbox.chunks(PDU_MESSAGES) {
+                self.send_pdu(cx, codec::pdu(codec::TYPE_COMMAND_RRQ, chunk));
+            }
         }
         self.last_sent = cx.now();
     }
@@ -460,10 +626,7 @@ impl Aes70 {
     }
 
     fn send_keepalive(&mut self, cx: &mut Cx) {
-        cx.tcp_send(
-            SOCKET,
-            KeepAlive::for_interval(self.settings.keepalive).pdu(),
-        );
+        self.send_pdu(cx, KeepAlive::for_interval(self.settings.keepalive).pdu());
         self.last_sent = cx.now();
     }
 
@@ -486,6 +649,8 @@ impl Aes70 {
         self.subscribed.clear();
         self.polling.clear();
         self.to_emit.clear();
+        self.followed.clear();
+        self.poll_armed = false;
         self.walking = false;
         self.walked = false;
         self.walk_pending = 0;
@@ -522,7 +687,7 @@ impl Aes70 {
             },
         );
         if self.socket_open {
-            cx.tcp_close(SOCKET);
+            self.close_socket(cx);
         }
         self.socket_open = false;
         self.connected = false;
@@ -537,6 +702,7 @@ impl Aes70 {
 
     fn connected_socket(&mut self, cx: &mut Cx) {
         self.reset();
+        self.seed_named();
         self.socket_open = true;
         self.last_heard = cx.now();
         // The keep-alive tells the device the heartbeat time it should keep
@@ -547,6 +713,9 @@ impl Aes70 {
             self.read_device_manager();
             if self.settings.subscribe {
                 self.subscribe(DEVICE_MANAGER_ONO);
+            }
+            for ono in self.named.iter().map(|(_, o)| *o).collect::<Vec<_>>() {
+                self.ask_class(ono);
             }
             if self.settings.walk {
                 self.start_walk(cx, true);
@@ -562,14 +731,17 @@ impl Aes70 {
         self.walking = true;
         self.walk_reads = reads;
         self.walk_pending = 0;
-        self.objects.retain(|ono, _| *ono == DEVICE_MANAGER_ONO);
+        let named: BTreeSet<u32> = self.named.iter().map(|(_, o)| *o).collect();
+        self.objects
+            .retain(|ono, _| *ono == DEVICE_MANAGER_ONO || named.contains(ono));
         self.members.clear();
         self.paths.clear();
         self.failed.clear();
         self.asked_members.clear();
         self.asked_role.clear();
-        self.asked_class.clear();
+        self.asked_class.retain(|ono| named.contains(ono));
         cx.state(json!({"objects": null, "discovery": {"complete": false}}));
+        self.seed_named();
         self.ask_members(ROOT_BLOCK, 0, true);
     }
 
@@ -687,52 +859,56 @@ impl Aes70 {
 
     /// Read every known object's properties and subscribe to its changes.
     fn read_and_follow(&mut self, cx: &mut Cx) {
-        let known: Vec<(u32, Vec<u16>)> = self
+        let known: Vec<u32> = self
             .objects
             .iter()
             .filter(|(_, o)| o.path.is_some())
-            .filter_map(|(ono, o)| o.class.clone().map(|c| (*ono, c)))
-            .filter(|(_, c)| classes::is_known(c))
+            .map(|(ono, _)| *ono)
             .collect();
-        for (ono, class) in known {
-            let level = classes::is_a(&class, classes::LEVEL_SENSOR);
-            if level && self.settings.levels == Levels::Off {
-                continue;
-            }
-            for prop in classes::props_of(&class) {
-                if prop.read {
-                    if let Some(get) = prop.get {
-                        self.request(
-                            ono,
-                            get,
-                            0,
-                            vec![],
-                            Purpose::Read {
-                                ono,
-                                prop,
-                                poll: false,
-                            },
-                        );
-                    }
-                }
-            }
-            let follow = !level || self.settings.levels == Levels::Subscribe;
-            if follow && self.settings.subscribe {
-                self.subscribe(ono);
-            }
-        }
-        if self.settings.levels == Levels::Poll && self.has_level_sensors() {
-            cx.set_timer(POLL, self.settings.level_poll);
+        for ono in known {
+            self.follow(cx, ono);
         }
     }
 
-    fn has_level_sensors(&self) -> bool {
-        self.objects.values().any(|o| {
-            o.path.is_some()
-                && o.class
-                    .as_deref()
-                    .is_some_and(|c| classes::is_a(c, classes::LEVEL_SENSOR))
-        })
+    /// Read one object's properties and subscribe to its changes, once, if
+    /// its class is one the module knows.
+    fn follow(&mut self, cx: &mut Cx, ono: u32) {
+        let Some(class) = self.objects.get(&ono).and_then(|o| o.class.clone()) else {
+            return;
+        };
+        if !classes::is_known(&class) || self.followed.contains(&ono) {
+            return;
+        }
+        let level = classes::is_a(&class, classes::LEVEL_SENSOR);
+        if level && self.settings.levels == Levels::Off {
+            return;
+        }
+        self.followed.insert(ono);
+        for prop in classes::props_of(&class) {
+            if prop.read {
+                if let Some(get) = prop.get {
+                    self.request(
+                        ono,
+                        get,
+                        0,
+                        vec![],
+                        Purpose::Read {
+                            ono,
+                            prop,
+                            poll: false,
+                        },
+                    );
+                }
+            }
+        }
+        let follow = !level || self.settings.levels == Levels::Subscribe;
+        if follow && self.settings.subscribe {
+            self.subscribe(ono);
+        }
+        if level && self.settings.levels == Levels::Poll && !self.poll_armed {
+            self.poll_armed = true;
+            cx.set_timer(POLL, self.settings.level_poll);
+        }
     }
 
     fn read_device_manager(&mut self) {
@@ -785,30 +961,38 @@ impl Aes70 {
     fn target(&mut self, p: &Params, need_class: bool) -> Result<Found, CommandError> {
         let path = p.get("object").and_then(Value::as_str);
         let ono = p.get("ono").and_then(Value::as_u64);
-        match (path, ono) {
-            (Some(_), Some(_)) => Err(invalid("give either 'object' or 'ono', not both")),
-            (None, None) => Err(invalid("give 'object' (a role path) or 'ono'")),
+        let ono = match (path, ono) {
+            (Some(_), Some(_)) => return Err(invalid("give either 'object' or 'ono', not both")),
+            (None, None) => return Err(invalid("give 'object' (a role path) or 'ono'")),
             (None, Some(ono)) => {
-                let ono = u32::try_from(ono).map_err(|_| invalid("'ono' is out of range"))?;
-                if !need_class || self.class_of(ono).is_some() {
-                    Ok(Found::Ono(ono))
-                } else if self.failed.contains(&ono) {
-                    self.asked_class.remove(&ono);
-                    self.failed.remove(&ono);
-                    Err(invalid(format!(
-                        "the device did not say what object {ono} is (no such object?)"
-                    )))
-                } else if self.walked && !self.walking && self.monitor && self.settings.walk {
-                    // The walk found every object in the tree.
-                    Err(invalid(format!(
-                        "no object {ono} was found in the device's tree"
-                    )))
-                } else {
-                    self.ask_class(ono);
-                    Ok(Found::Wait)
-                }
+                u32::try_from(ono).map_err(|_| invalid("'ono' is out of range"))?
             }
-            (Some(path), None) => self.resolve_path(path),
+            (Some(path), None) => match self.resolve_path(path)? {
+                Found::Wait => return Ok(Found::Wait),
+                Found::Ono(ono) => ono,
+            },
+        };
+        if !need_class || self.class_of(ono).is_some() {
+            Ok(Found::Ono(ono))
+        } else if self.failed.contains(&ono) {
+            self.asked_class.remove(&ono);
+            self.failed.remove(&ono);
+            Err(invalid(format!(
+                "the device did not say what object {ono} is (no such object?)"
+            )))
+        } else if self.walked
+            && !self.walking
+            && self.monitor
+            && self.settings.walk
+            && !self.is_named(ono)
+        {
+            // The walk found every object in the tree.
+            Err(invalid(format!(
+                "no object {ono} was found in the device's tree"
+            )))
+        } else {
+            self.ask_class(ono);
+            Ok(Found::Wait)
         }
     }
 
@@ -1249,7 +1433,10 @@ impl Aes70 {
 
     // --- Receiving ---------------------------------------------------------
 
-    fn data(&mut self, cx: &mut Cx, bytes: &[u8]) {
+    /// Bytes from the device: part of a stream (TCP, or WebSocket messages,
+    /// which carry a byte stream across them, AES70-3 8.4.3.4.4), or a whole
+    /// datagram of complete PDUs.
+    fn data(&mut self, cx: &mut Cx, bytes: &[u8], datagram: bool) {
         self.last_heard = cx.now();
         cx.alive();
         if !self.connected {
@@ -1257,7 +1444,17 @@ impl Aes70 {
             self.retry_after = RETRY_MIN;
             cx.connection(Connection::Connected);
         }
-        let (pdus, discarded) = self.deframer.feed(bytes);
+        let (pdus, discarded) = if datagram {
+            let mut d = codec::Deframer::default();
+            let (pdus, mut discarded) = d.feed(bytes);
+            let rest = d.pending();
+            if rest > 0 {
+                discarded.push(format!("{rest} bytes of a PDU cut short by the datagram"));
+            }
+            (pdus, discarded)
+        } else {
+            self.deframer.feed(bytes)
+        };
         for why in discarded {
             cx.log(Level::Warning, format!("discarded bytes: {why}"));
         }
@@ -1457,6 +1654,12 @@ impl Aes70 {
                         let o = self.objects.entry(ono).or_default();
                         o.class = Some(class);
                         o.version = version;
+                        if self.is_named(ono) {
+                            self.to_emit.push(ono);
+                            if self.monitor {
+                                self.follow(cx, ono);
+                            }
+                        }
                     }
                     Err(_) => {
                         self.failed.insert(ono);
@@ -1696,6 +1899,8 @@ fn object_record(ono: u32, o: &Obj) -> Value {
 impl Module for Aes70 {
     fn start(&mut self, cx: &mut Cx) {
         self.open(cx);
+        // Over UDP the socket is ready at once and the first requests go out.
+        self.settle(cx);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
@@ -1721,11 +1926,61 @@ impl Module for Aes70 {
             TcpInput::Connected => self.connected_socket(cx),
             TcpInput::Data(data) => {
                 if self.socket_open {
-                    self.data(cx, &data);
+                    self.data(cx, &data, false);
                 }
             }
             TcpInput::Closed { reason } => {
                 self.socket_open = false;
+                self.lost(cx, reason);
+            }
+        }
+        self.settle(cx);
+    }
+
+    fn datagram(&mut self, cx: &mut Cx, _socket: Key, from: SocketAddr, data: &[u8]) {
+        // Only the device's own address and port are heard.
+        if self.socket_open && from == self.device {
+            self.data(cx, data, true);
+        }
+        self.settle(cx);
+    }
+
+    fn socket_error(&mut self, cx: &mut Cx, _socket: Key, message: &str) {
+        self.socket_open = false;
+        self.lost(cx, format!("UDP socket: {message}"));
+        self.settle(cx);
+    }
+
+    fn ws(&mut self, cx: &mut Cx, _socket: Key, input: WsInput) {
+        match input {
+            WsInput::Opened => self.connected_socket(cx),
+            WsInput::Binary(data) => {
+                if self.socket_open {
+                    self.data(cx, &data, false);
+                }
+            }
+            WsInput::Text(text) => {
+                // OCP.1 travels in binary messages only (AES70-3 8.4.3.4.4).
+                cx.log(
+                    Level::Warning,
+                    format!(
+                        "ignored a text message, which OCP.1 does not use ({} bytes)",
+                        text.len()
+                    ),
+                );
+            }
+            WsInput::Activity => {
+                // A ping or pong: the device is there.
+                if self.socket_open {
+                    self.last_heard = cx.now();
+                }
+            }
+            WsInput::Closed { code, reason } => {
+                self.socket_open = false;
+                let reason = match code {
+                    Some(code) => format!("WebSocket closed ({code}): {reason}"),
+                    None => reason,
+                };
                 self.lost(cx, reason);
             }
         }
@@ -1774,7 +2029,7 @@ impl Module for Aes70 {
 
     fn stop(&mut self, cx: &mut Cx) {
         if self.socket_open {
-            cx.tcp_close(SOCKET);
+            self.close_socket(cx);
             self.socket_open = false;
         }
     }
@@ -1807,11 +2062,21 @@ mod tests {
         )
     }
 
+    /// What an action sends to the device, on any transport.
+    fn payload(a: &Action) -> Option<&Vec<u8>> {
+        match a {
+            Action::TcpSend { data, .. }
+            | Action::UdpSend { data, .. }
+            | Action::WsSendBinary { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+
     /// The commands the module sent, from every PDU in the actions.
     fn sent(actions: &[Action]) -> Vec<Command> {
         let mut out = Vec::new();
         for a in actions {
-            if let Action::TcpSend { data, .. } = a {
+            if let Some(data) = payload(a) {
                 let mut d = codec::Deframer::default();
                 for p in d.feed(data).0 {
                     for m in codec::parse_pdu(&p).unwrap().1 {
@@ -1828,7 +2093,7 @@ mod tests {
     fn keepalives(actions: &[Action]) -> Vec<KeepAlive> {
         let mut out = Vec::new();
         for a in actions {
-            if let Action::TcpSend { data, .. } = a {
+            if let Some(data) = payload(a) {
                 for p in codec::Deframer::default().feed(data).0 {
                     for m in codec::parse_pdu(&p).unwrap().1 {
                         if let Message::KeepAlive(k) = m {
@@ -2616,5 +2881,327 @@ mod tests {
             json!({"object": "Out", "gain_db": 0.0}),
         );
         assert_eq!(completed(&a, 2), Some(Err(CommandError::NotConnected)));
+    }
+
+    // --- Transports --------------------------------------------------------
+
+    fn device_addr() -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 70)), 50000)
+    }
+
+    #[test]
+    fn udp_sends_a_keepalive_first_and_is_connected_when_the_device_answers() {
+        let mut m = module(json!({"transport": "udp", "walk": false}), true);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let a = cx.take();
+        assert!(a.contains(&Action::UdpOpen {
+            socket: SOCKET,
+            bind: Bind::Ephemeral
+        }));
+        // The keep-alive goes first, to the device, before any request.
+        let first = a.iter().find_map(|x| match x {
+            Action::UdpSend { to, data, .. } => Some((*to, data.clone())),
+            _ => None,
+        });
+        let (to, data) = first.expect("a datagram");
+        assert_eq!(to, device_addr());
+        assert_eq!(data[7], codec::TYPE_KEEPALIVE);
+        assert!(!a.contains(&Action::Connection(Connection::Connected)));
+        // Requests are already on their way, as the socket is ready.
+        assert!(!sent(&a).is_empty());
+
+        // A datagram from elsewhere is not the device.
+        let ka = KeepAlive::for_interval(1000).pdu();
+        let mut cx = Cx::new(5);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 99)), 50000),
+            &ka,
+        );
+        assert!(!cx
+            .take()
+            .contains(&Action::Connection(Connection::Connected)));
+        let mut cx = Cx::new(6);
+        m.datagram(&mut cx, SOCKET, device_addr(), &ka);
+        assert!(cx
+            .take()
+            .contains(&Action::Connection(Connection::Connected)));
+    }
+
+    #[test]
+    fn udp_answers_arrive_one_pdu_per_datagram() {
+        let mut m = module(json!({"transport": "udp"}), true);
+        let mut fake = Fake {
+            gain: -6.0,
+            muted: false,
+        };
+        let mut st = json!({});
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let mut actions = cx.take();
+        for round in 0..20 {
+            state(&mut st, &actions);
+            // Every datagram is one whole PDU within the frame size.
+            for a in &actions {
+                if let Action::UdpSend { data, .. } = a {
+                    assert!(data.len() <= UDP_PDU_MAX, "{} bytes", data.len());
+                    let (pdus, _) = codec::Deframer::default().feed(data);
+                    assert_eq!(pdus.len(), 1);
+                }
+            }
+            let reply = fake.respond(&actions);
+            if reply.is_empty() {
+                break;
+            }
+            let mut cx = Cx::new(10 + round);
+            m.datagram(&mut cx, SOCKET, device_addr(), &reply);
+            actions = cx.take();
+        }
+        assert_eq!(st["discovery"]["complete"], true);
+        assert_eq!(st["objects"]["In1/Gain"]["gain_db"], -6.0);
+        // A datagram holding part of a PDU is discarded, not kept for the next.
+        let reply = Response {
+            handle: 999,
+            status: 0,
+            param_count: 0,
+            params: vec![],
+        }
+        .encode();
+        let whole = pdu(TYPE_RESPONSE, &[reply]);
+        let mut cx = Cx::new(100);
+        m.datagram(&mut cx, SOCKET, device_addr(), &whole[..whole.len() - 2]);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::Log { message, .. } if message.contains("cut short"))));
+        assert_eq!(m.deframer.pending(), 0);
+    }
+
+    #[test]
+    fn udp_packs_many_requests_into_datagrams_within_the_frame() {
+        let mut m = module(json!({"transport": "udp", "walk": false}), false);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        cx.take();
+        for id in 0..40u64 {
+            m.request(
+                300,
+                Id(5, 2),
+                1,
+                vec![0; 100],
+                Purpose::Command {
+                    id,
+                    then: Then::Raw,
+                },
+            );
+        }
+        let mut cx = Cx::new(1);
+        m.settle(&mut cx);
+        let datagrams: Vec<Vec<u8>> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::UdpSend { data, .. } => Some(data),
+                _ => None,
+            })
+            .collect();
+        assert!(datagrams.len() > 1);
+        assert!(datagrams.iter().all(|d| d.len() <= UDP_PDU_MAX));
+        assert_eq!(
+            sent(
+                &datagrams
+                    .iter()
+                    .map(|d| Action::UdpSend {
+                        socket: SOCKET,
+                        to: device_addr(),
+                        data: d.clone()
+                    })
+                    .collect::<Vec<_>>()
+            )
+            .len(),
+            32,
+            "max_in_flight requests went out"
+        );
+    }
+
+    #[test]
+    fn websocket_offers_the_subprotocol_and_carries_pdus_in_binary_messages() {
+        let mut m = module(json!({"transport": "ws"}), true);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let a = cx.take();
+        assert!(a.contains(&Action::WsOpen {
+            socket: SOCKET,
+            request: WsRequest {
+                url: "ws://10.0.0.70:50000/".into(),
+                headers: vec![("Sec-WebSocket-Protocol".into(), "AES70-OCP.1".into())],
+                accept_invalid_certs: false,
+            }
+        }));
+        let mut cx = Cx::new(1);
+        m.ws(&mut cx, SOCKET, WsInput::Opened);
+        let a = cx.take();
+        assert_eq!(
+            keepalives(&a),
+            vec![KeepAlive::Seconds(1)],
+            "the keep-alive goes first"
+        );
+        assert!(a.iter().all(|x| !matches!(x, Action::TcpSend { .. })));
+        // A PDU split across two binary messages is put back together.
+        let mut fake = Fake {
+            gain: -6.0,
+            muted: false,
+        };
+        let reply = fake.respond(&a);
+        let (one, two) = reply.split_at(7);
+        let mut cx = Cx::new(2);
+        m.ws(&mut cx, SOCKET, WsInput::Binary(one.to_vec()));
+        let a1 = cx.take();
+        assert!(a1.contains(&Action::Connection(Connection::Connected)));
+        let mut cx = Cx::new(3);
+        m.ws(&mut cx, SOCKET, WsInput::Binary(two.to_vec()));
+        let a2 = cx.take();
+        assert!(!sent(&a2).is_empty(), "the walk went on");
+
+        // Closed: lost, and tried again.
+        let mut cx = Cx::new(4);
+        m.ws(
+            &mut cx,
+            SOCKET,
+            WsInput::Closed {
+                code: Some(1011),
+                reason: "Unexpected".into(),
+            },
+        );
+        let a = cx.take();
+        assert!(a.iter().any(|x| matches!(
+            x,
+            Action::Connection(Connection::Disconnected { reason }) if reason.contains("1011")
+        )));
+        assert!(a.contains(&Action::SetTimer {
+            key: RETRY,
+            after: RETRY_MIN
+        }));
+    }
+
+    #[test]
+    fn wss_by_host_name_with_a_path_and_without_the_subprotocol() {
+        let mut m = Aes70::new(
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 70)),
+                host_name: Some("amp.local".into()),
+                port: Some(443),
+                model: "aes70-device".into(),
+                channels: None,
+                settings: params(json!({
+                    "transport": "wss",
+                    "ws_path": "oca",
+                    "ws_subprotocol": false,
+                    "accept_invalid_certs": true
+                })),
+                monitor: false,
+            },
+            443,
+        );
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert!(cx.take().contains(&Action::WsOpen {
+            socket: SOCKET,
+            request: WsRequest {
+                url: "wss://amp.local:443/oca".into(),
+                headers: vec![],
+                accept_invalid_certs: true,
+            }
+        }));
+        let mut cx = Cx::new(1);
+        m.stop(&mut cx);
+        assert!(cx.take().is_empty(), "nothing open yet");
+        let mut cx = Cx::new(2);
+        m.ws(&mut cx, SOCKET, WsInput::Opened);
+        cx.take();
+        let mut cx = Cx::new(3);
+        m.stop(&mut cx);
+        assert!(cx.take().contains(&Action::WsClose { socket: SOCKET }));
+    }
+
+    #[test]
+    fn named_objects_are_followed_without_a_walk() {
+        let named = |monitor: bool| {
+            Aes70::with_named(
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 70)),
+                    host_name: None,
+                    port: Some(50000),
+                    model: "aes70-device".into(),
+                    channels: None,
+                    settings: params(json!({"walk": false})),
+                    monitor,
+                },
+                50000,
+                vec![("A/Mute".into(), 202), ("A/Level".into(), 201)],
+            )
+        };
+        let mut fake = Fake {
+            gain: -6.0,
+            muted: false,
+        };
+        // Monitored: the classes are asked for, then each object is read and
+        // followed and put in state under its name.
+        let mut m = named(true);
+        let a = connect(&mut m, 0);
+        let asked: Vec<(u32, Id)> = sent(&a).iter().map(|c| (c.target, c.method)).collect();
+        assert!(asked.contains(&(202, GET_CLASS_IDENTIFICATION)));
+        assert!(asked.contains(&(201, GET_CLASS_IDENTIFICATION)));
+        assert!(!asked.iter().any(|(_, m)| *m == GET_MEMBERS), "no walk");
+        let mut st = json!({});
+        let a = feed(&mut m, 1, fake.respond(&a));
+        state(&mut st, &a);
+        let asked: Vec<(u32, Id)> = sent(&a).iter().map(|c| (c.target, c.method)).collect();
+        assert!(asked.contains(&(202, Id(4, 1))));
+        assert!(asked.contains(&(201, Id(4, 1))));
+        assert_eq!(
+            asked
+                .iter()
+                .filter(|a| **a == (SUBSCRIPTION_MANAGER_ONO, ADD_SUBSCRIPTION))
+                .count(),
+            2
+        );
+        let a = feed(&mut m, 2, fake.respond(&a));
+        state(&mut st, &a);
+        assert_eq!(st["objects"]["A/Mute"]["muted"], false);
+        assert_eq!(st["objects"]["A/Mute"]["ono"], 202);
+        assert_eq!(st["objects"]["A/Level"]["gain_db"], -6.0);
+        // Addressed by name.
+        let a = run(
+            &mut m,
+            3,
+            7,
+            "set_mute",
+            json!({"object": "A/Mute", "muted": true}),
+        );
+        assert_eq!(sent(&a)[0].target, 202);
+
+        // Commands only: nothing is asked until a command names an object,
+        // then its class, then the setter.
+        let mut m = named(false);
+        let a = connect(&mut m, 0);
+        assert!(sent(&a).is_empty());
+        let a = run(
+            &mut m,
+            1,
+            8,
+            "set_mute",
+            json!({"object": "A/Mute", "muted": true}),
+        );
+        let c = sent(&a);
+        assert_eq!((c[0].target, c[0].method), (202, GET_CLASS_IDENTIFICATION));
+        let a = feed(&mut m, 2, fake.respond(&a));
+        let c = sent(&a);
+        assert_eq!((c[0].target, c[0].method), (202, Id(4, 2)));
+        let a = feed(&mut m, 3, fake.respond(&a));
+        assert_eq!(completed(&a, 8), Some(Ok(Outcome::Ack)));
+        assert!(fake.muted);
     }
 }

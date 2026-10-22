@@ -1,4 +1,6 @@
-//! An AES70 device simulated on real TCP, driven through the public API.
+//! An AES70 device simulated on real loopback sockets, driven through the
+//! public API, over each OCP.1 transport: TCP, UDP (one PDU per datagram)
+//! and WebSocket binary messages, plain and over TLS.
 //!
 //! The simulator speaks OCP.1 as the open implementations describe it (see
 //! specs/aes70.yaml): PDUs of a sync byte, a 9-byte header and several
@@ -21,12 +23,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use futures_util::{SinkExt, StreamExt};
 use meros_integrations::{
     CommandError, Connection, Core, DeviceId, Event, OpenError, OpenRequest, Outcome,
 };
 use serde_json::{json, Value};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::{TcpListener, UdpSocket};
+use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+use tokio_tungstenite::tungstenite::http::HeaderValue;
+use tokio_tungstenite::tungstenite::Message;
 
 const GAIN: &[u16] = &[1, 1, 1, 5];
 const MUTE: &[u16] = &[1, 1, 1, 2];
@@ -193,20 +199,81 @@ impl Device {
     }
 }
 
-/// Accept one connection and serve it until `silent` is set, after which
-/// the device reads but says nothing.
-async fn simulate(silent: Arc<AtomicBool>) -> (u16, Log) {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let port = listener.local_addr().unwrap().port();
-    let log: Log = Arc::default();
-    let record = log.clone();
-    tokio::spawn(async move {
-        let (mut stream, _) = listener.accept().await.unwrap();
-        let mut device = Device {
-            gains: [(201, -6.0), (300, 0.0)],
-            muted: false,
-            subscribed: BTreeSet::new(),
+/// The device behind every transport: answers each complete PDU with the
+/// PDUs it sends back, until `silent` is set, after which it says nothing.
+struct Sim {
+    device: Device,
+    log: Log,
+    silent: Arc<AtomicBool>,
+}
+
+impl Sim {
+    fn new(silent: Arc<AtomicBool>) -> (Sim, Log) {
+        let log: Log = Arc::default();
+        let sim = Sim {
+            device: Device {
+                gains: [(201, -6.0), (300, 0.0)],
+                muted: false,
+                subscribed: BTreeSet::new(),
+            },
+            log: log.clone(),
+            silent,
         };
+        (sim, log)
+    }
+
+    fn answer(&mut self, p: &[u8]) -> Vec<Vec<u8>> {
+        assert_eq!(p[0], 0x3B, "sync byte");
+        if self.silent.load(Ordering::SeqCst) {
+            return vec![];
+        }
+        let kind = p[7];
+        let count = u16::from_be_bytes([p[8], p[9]]);
+        if kind == 4 {
+            // Echo the controller's keep-alive.
+            return vec![p.to_vec()];
+        }
+        assert_eq!(kind, 1, "commands want a response");
+        let mut at = 10;
+        let mut replies = Vec::new();
+        let mut notes = Vec::new();
+        for _ in 0..count {
+            let m = &p[at..];
+            let msize = u32::from_be_bytes(m[..4].try_into().unwrap()) as usize;
+            let handle = u32::from_be_bytes(m[4..8].try_into().unwrap());
+            let target = u32::from_be_bytes(m[8..12].try_into().unwrap());
+            let level = u16::from_be_bytes([m[12], m[13]]);
+            let index = u16::from_be_bytes([m[14], m[15]]);
+            let params = &m[17..msize];
+            self.log.lock().unwrap().push((target, level, index));
+            let ((status, pc, rp), note) = self.device.handle(target, (level, index), params);
+            replies.push(response(handle, status, pc, &rp));
+            notes.extend(note);
+            at += msize;
+        }
+        let mut out = vec![pdu(3, &replies)];
+        if !notes.is_empty() {
+            out.push(pdu(2, &notes));
+        }
+        out
+    }
+
+    /// Complete PDUs taken from the front of a byte stream.
+    fn take_pdus(pending: &mut Vec<u8>) -> Vec<Vec<u8>> {
+        let mut out = Vec::new();
+        while pending.len() >= 10 {
+            assert_eq!(pending[0], 0x3B, "sync byte");
+            let size = u32::from_be_bytes(pending[3..7].try_into().unwrap()) as usize;
+            if pending.len() < size + 1 {
+                break;
+            }
+            out.push(pending.drain(..size + 1).collect());
+        }
+        out
+    }
+
+    /// Serve a byte stream until it closes.
+    async fn stream(mut self, mut stream: impl AsyncRead + AsyncWrite + Unpin) {
         let mut buf = vec![0u8; 65536];
         let mut pending: Vec<u8> = Vec::new();
         loop {
@@ -215,53 +282,137 @@ async fn simulate(silent: Arc<AtomicBool>) -> (u16, Log) {
                 return;
             }
             pending.extend_from_slice(&buf[..n]);
-            let mut out = Vec::new();
-            while pending.len() >= 10 {
-                assert_eq!(pending[0], 0x3B, "sync byte");
-                let size = u32::from_be_bytes(pending[3..7].try_into().unwrap()) as usize;
-                if pending.len() < size + 1 {
-                    break;
-                }
-                let p: Vec<u8> = pending.drain(..size + 1).collect();
-                if silent.load(Ordering::SeqCst) {
-                    continue;
-                }
-                let kind = p[7];
-                let count = u16::from_be_bytes([p[8], p[9]]);
-                if kind == 4 {
-                    // Echo the controller's keep-alive.
-                    out.push(p.clone());
-                    continue;
-                }
-                assert_eq!(kind, 1, "commands want a response");
-                let mut at = 10;
-                let mut replies = Vec::new();
-                let mut notes = Vec::new();
-                for _ in 0..count {
-                    let m = &p[at..];
-                    let msize = u32::from_be_bytes(m[..4].try_into().unwrap()) as usize;
-                    let handle = u32::from_be_bytes(m[4..8].try_into().unwrap());
-                    let target = u32::from_be_bytes(m[8..12].try_into().unwrap());
-                    let level = u16::from_be_bytes([m[12], m[13]]);
-                    let index = u16::from_be_bytes([m[14], m[15]]);
-                    let params = &m[17..msize];
-                    record.lock().unwrap().push((target, level, index));
-                    let ((status, pc, rp), note) = device.handle(target, (level, index), params);
-                    replies.push(response(handle, status, pc, &rp));
-                    notes.extend(note);
-                    at += msize;
-                }
-                out.push(pdu(3, &replies));
-                if !notes.is_empty() {
-                    out.push(pdu(2, &notes));
+            for p in Sim::take_pdus(&mut pending) {
+                for out in self.answer(&p) {
+                    stream.write_all(&out).await.unwrap();
                 }
             }
-            for p in out {
-                stream.write_all(&p).await.unwrap();
+        }
+    }
+
+    /// Serve WebSocket binary messages, a byte stream across messages
+    /// (AES70-3 8.4.3.4.4); the controller must offer AES70-OCP.1.
+    async fn websocket(mut self, stream: impl AsyncRead + AsyncWrite + Unpin) {
+        let Ok(mut ws) = tokio_tungstenite::accept_hdr_async(stream, offers_ocp1).await else {
+            return;
+        };
+        let mut pending: Vec<u8> = Vec::new();
+        while let Some(Ok(message)) = ws.next().await {
+            let Message::Binary(data) = message else {
+                assert!(!message.is_text(), "OCP.1 is never sent as text");
+                continue;
+            };
+            pending.extend_from_slice(&data);
+            for p in Sim::take_pdus(&mut pending) {
+                for out in self.answer(&p) {
+                    if ws.send(Message::binary(out)).await.is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The WebSocket handshake: the controller must offer AES70-OCP.1, which is
+/// accepted.
+#[allow(clippy::result_large_err)]
+fn offers_ocp1(request: &Request, mut response: Response) -> Result<Response, ErrorResponse> {
+    let offered = request
+        .headers()
+        .get("Sec-WebSocket-Protocol")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert_eq!(offered, "AES70-OCP.1", "the OCP.1 subprotocol is offered");
+    response.headers_mut().insert(
+        "Sec-WebSocket-Protocol",
+        HeaderValue::from_static("AES70-OCP.1"),
+    );
+    Ok(response)
+}
+
+/// Accept one TCP connection and serve it until `silent` is set, after
+/// which the device reads but says nothing.
+async fn simulate(silent: Arc<AtomicBool>) -> (u16, Log) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let (sim, log) = Sim::new(silent);
+    tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        sim.stream(stream).await;
+    });
+    (port, log)
+}
+
+/// Serve OCP.1 over UDP: every datagram must be one whole PDU, and the
+/// answers go back to its sender, one PDU per datagram.
+async fn simulate_udp(silent: Arc<AtomicBool>) -> (u16, Log, Arc<Mutex<usize>>) {
+    let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let port = socket.local_addr().unwrap().port();
+    let (mut sim, log) = Sim::new(silent);
+    let largest: Arc<Mutex<usize>> = Arc::default();
+    let seen = largest.clone();
+    tokio::spawn(async move {
+        let mut buf = vec![0u8; 65536];
+        let mut opened = false;
+        loop {
+            let Ok((n, from)) = socket.recv_from(&mut buf).await else {
+                return;
+            };
+            let datagram = buf[..n].to_vec();
+            {
+                let mut l = seen.lock().unwrap();
+                *l = (*l).max(n);
+            }
+            let size = u32::from_be_bytes(datagram[3..7].try_into().unwrap()) as usize;
+            assert_eq!(size + 1, n, "one whole PDU per datagram");
+            // A UDP device ignores everything before the controller's
+            // keep-alive.
+            if datagram[7] == 4 {
+                opened = true;
+            }
+            assert!(opened, "the keep-alive comes first");
+            for out in sim.answer(&datagram) {
+                socket.send_to(&out, from).await.unwrap();
             }
         }
     });
+    (port, log, largest)
+}
+
+/// Serve OCP.1 over a WebSocket, over TLS with a self-signed certificate
+/// when `secure`.
+async fn simulate_ws(silent: Arc<AtomicBool>, secure: bool) -> (u16, Log) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let (sim, log) = Sim::new(silent);
+    tokio::spawn(async move {
+        let (tcp, _) = listener.accept().await.unwrap();
+        if secure {
+            let Ok(tls) = tls_acceptor().accept(tcp).await else {
+                return;
+            };
+            sim.websocket(tls).await;
+        } else {
+            sim.websocket(tcp).await;
+        }
+    });
     (port, log)
+}
+
+fn tls_acceptor() -> tokio_rustls::TlsAcceptor {
+    let rcgen::CertifiedKey { cert, key_pair } =
+        rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    let key = rustls::pki_types::PrivateKeyDer::Pkcs8(key_pair.serialize_der().into());
+    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .with_no_client_auth()
+    .with_single_cert(vec![cert.der().clone()], key)
+    .unwrap();
+    tokio_rustls::TlsAcceptor::from(Arc::new(config))
 }
 
 fn params(v: Value) -> meros_integrations::Params {
@@ -451,4 +602,81 @@ async fn the_port_is_required() {
         }
         other => panic!("{other:?}"),
     }
+}
+
+/// Open over `transport`, walk, set a gain and see the notification, then
+/// lose the device when it goes quiet.
+async fn end_to_end_over(transport: &str, port: u16, log: &Log, silent: &AtomicBool) {
+    let core = common::core().unwrap();
+    let mut settings = json!({"keepalive_interval_ms": 200, "transport": transport});
+    if transport == "wss" {
+        settings["accept_invalid_certs"] = json!(true);
+    }
+    let id = core
+        .open(OpenRequest {
+            device: "aes70".into(),
+            model: "aes70-device".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: params(settings),
+            monitor: true,
+        })
+        .unwrap();
+    wait_for_connection(&core, id, |c| *c == Connection::Connected).await;
+    wait_for_state(&core, id, |s| {
+        s["discovery"]["complete"] == true
+            && s["objects"]["In1/Gain"]["gain_db"] == -6.0
+            && s["objects"]["In1/Mute"]["muted"] == false
+            && s["device"]["serial_number"] == "SIM-0001"
+    })
+    .await;
+    assert_eq!(
+        core.execute(
+            id,
+            "set_gain",
+            params(json!({"object": "In1/Gain", "gain_db": 20.0}))
+        )
+        .await,
+        Ok(Outcome::Ack)
+    );
+    wait_for_state(&core, id, |s| s["objects"]["In1/Gain"]["gain_db"] == 12.0).await;
+    assert_eq!(
+        core.execute(id, "set_mute", params(json!({"ono": 202, "muted": true})))
+            .await,
+        Ok(Outcome::Ack)
+    );
+    wait_for_state(&core, id, |s| s["objects"]["In1/Mute"]["muted"] == true).await;
+    assert!(core.snapshot(id).unwrap().latency_ms.is_some());
+    let subs = log
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|a| **a == (4, 3, 1))
+        .count();
+    assert_eq!(subs, 4);
+    silent.store(true, Ordering::SeqCst);
+    wait_for_connection(&core, id, |c| matches!(c, Connection::Disconnected { .. })).await;
+    core.close(id).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ocp1_over_udp() {
+    let silent = Arc::new(AtomicBool::new(false));
+    let (port, log, largest) = simulate_udp(silent.clone()).await;
+    end_to_end_over("udp", port, &log, &silent).await;
+    assert!(*largest.lock().unwrap() <= 1452, "datagrams fit one frame");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ocp1_over_websocket() {
+    let silent = Arc::new(AtomicBool::new(false));
+    let (port, log) = simulate_ws(silent.clone(), false).await;
+    end_to_end_over("ws", port, &log, &silent).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ocp1_over_secure_websocket() {
+    let silent = Arc::new(AtomicBool::new(false));
+    let (port, log) = simulate_ws(silent.clone(), true).await;
+    end_to_end_over("wss", port, &log, &silent).await;
 }
