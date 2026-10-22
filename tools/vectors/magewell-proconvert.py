@@ -396,7 +396,7 @@ _mwt("video-config-ip", "/api/video/config/get", {
                "ident_text": "2K HDMI 85", "input_color_auto": False, "input_color_format": "bt.709",
                "output_quant_range": "limited", "safe_area": "none", "screen_debug": True, "view_mode": "single",
                "overlay": {"center_cross": False, "tally": True, "title": True, "vu_meter": True},
-               "switch_mode": "no-signal-image", "v_flip": False, "vu_meter_mode": "post-dbvu"}})
+               "switch_mode": "no-signal-image", "v_flip": False, "vu_meter_mode": "post-dbvu"}}, model="ip-to-hdmi")
 _mwt("video-format", "/mwapi?method=get-video-format", {"status": 0, "color-format": "rgb", "quant-range": "full"},
      {"video": {"output_color_format": "rgb", "output_quant_range": "full"}})
 _mwt("hdmi-output", "/mwapi?method=get-hdmi-output", {"status": 0, "enabled": True}, {"output": {"enabled": True}})
@@ -532,7 +532,8 @@ _mwt("system-info-ip", "/api/system/info", {
     "datetime": {"cur-time": "2021-12-20 13:25:57", "zonename": "Asia/Shanghai", "ntp-enable": True,
                  "ntp-server1": "0.pool.ntp.org", "ntp-server2": "1.pool.ntp.org"},
     "auto-reboot": {"enable": True, "hour": 23, "min": 59, "week": [1, 2]}},
-    {"device": {"name": "USB Fusion", "uptime": 8410}, "network": {"ntp_server": "0.pool.ntp.org"},
+    {"device": {"name": "USB Fusion", "uptime": 8410, "time": "2021-12-20 13:25:57", "timezone": "Asia/Shanghai"},
+     "network": {"ntp_server": "0.pool.ntp.org", "ntp_enabled": True, "ntp_server2": "1.pool.ntp.org"},
      "auto_reboot": {"enabled": True, "hour": 23, "minute": 59, "week": "[1,2]"}})
 
 # Re-reads after a change.
@@ -559,12 +560,709 @@ for _name, _path, _target in [
     ("reread-video-config-ip", "/api/video/config/set", "/api/video/config/get"),
     ("reread-video-mode-ip", "/api/video/mode/set", "/api/video/mode/get"),
     ("reread-audio-ip", "/api/audio/config/set", "/api/audio/config/get"),
-    ("reread-sources-ip", "/api/source/del", "/api/source/list?type=all"),
     ("reread-profiles-ip", "/api/profile/screen/select", "/api/profile/list"),
     ("reread-settings-ip", "/api/settings/ndi/set", "/api/settings/get"),
     ("reread-zen-master-ip", "/api/settings/zixi/master/set", "/api/settings/zixi/master/get"),
 ]:
     _mwt(_name, _path, _OKB, {}, expect_then_send=[{"method": "GET", "target": _target}])
+_mwt("reread-sources-ip", "/api/source/del", _OKB, {}, model="ip-to-hdmi",
+     expect_then_send=[{"method": "GET", "target": "/api/source/list?type=all"}])
 _mwt("reread-system-ip", "/api/system/auto-reboot", '{"status":0,"code":"Success"}', {},
      expect_then_send=[{"method": "POST", "target": "/api/system/info"}])
 _mwt("reread-refused", "/mwapi?method=set-video-config&brightness=-20", '{"status":7}', {})
+
+
+# AES67, Audio DX and IP to USB: JSON under /api, as the AES67 API V2.0, the
+# Audio DX API and the IP to USB API give the requests. Bodies are the
+# documents' fields in the order the spec writes them.
+def _api(model, command, input, method, target, body=None, file=None, **extra):
+    request = {"method": method, "target": target}
+    if body is not None:
+        request["body"] = body
+    v = {"spec": MW, "command": command, "input": input, "model": model, "expect_request": request, **extra}
+    if file:
+        v["file"] = file
+    V.append(v)
+
+
+def _aes(command, input, method, target, body=None, file=None, **extra):
+    _api("aes67", command, input, method, target, body, file, **extra)
+
+
+def _dx(command, input, method, target, body=None, file=None, **extra):
+    _api("audio-dx", command, input, method, target, body, file, **extra)
+
+
+def _usb(command, input, method, target, body=None, file=None, **extra):
+    _api("ip-to-usb", command, input, method, target, body, file, **extra)
+
+
+# Existing commands, the new models' messages.
+_aes("ping", {}, "GET", "/api/ping", file="ping-aes67")
+_dx("ping", {}, "GET", "/api/ping", file="ping-dx")
+_usb("ping", {}, "GET", "/api/ping", file="ping-usb", http_reply={"status": 200, "body": '{"status":0,"code":"Success"}'},
+     expect_result={"ok": {"kind": "ack"}})
+_aes("reboot", {}, "POST", "/api/reboot", file="reboot-aes67")
+_dx("reboot", {}, "POST", "/api/reboot", file="reboot-dx")
+_usb("reboot", {}, "POST", "/api/reboot", file="reboot-usb")
+_aes("get_summary", {}, "POST", "/api/aes67/summary-info", file="get_summary-aes67")
+_dx("get_summary", {}, "POST", "/api/aoip/summary-info", file="get_summary-dx")
+_usb("get_summary", {}, "POST", "/api/system/summary/get", file="get_summary-usb")
+_aes("get_system_info", {}, "POST", "/api/system/info", file="get_system_info-aes67")
+_dx("get_system_info", {}, "POST", "/api/system/info", file="get_system_info-dx")
+_usb("get_system_info", {}, "POST", "/api/system/info", file="get_system_info-usb")
+_aes("set_device_name", {"name": "Stage AES67"}, "POST", "/api/system/set-device-name", '{"name":"Stage AES67"}',
+     file="set_device_name-aes67")
+_dx("set_device_name", {"name": "Booth DX"}, "POST", "/api/system/set-device-name", '{"name":"Booth DX"}',
+    file="set_device_name-dx")
+_usb("set_device_name", {"name": "Magewell-1"}, "POST", "/api/system/set-device-name", '{"name":"Magewell-1"}',
+     file="set_device_name-usb")
+_aes("set_network_dhcp", {}, "POST", "/api/network/if-set", '{"iface":"eth0","use-dhcp":true}',
+     file="set_network_dhcp-aes67")
+_dx("set_network_dhcp", {}, "POST", "/api/network/if-set", '{"iface":"eth0","use-dhcp":true}',
+    file="set_network_dhcp-dx")
+_usb("set_network_dhcp", {}, "POST", "/api/network/if-set", '{"iface":"eth0","use-dhcp":true}',
+     file="set_network_dhcp-usb")
+_usb("set_network_static", {"address": "10.10.10.88", "netmask": "255.255.240.0", "gateway": "10.10.0.1",
+                            "dns": "10.10.0.3"}, "POST", "/api/network/if-set",
+     '{"iface":"eth0","use-dhcp":false,"ipaddr":"10.10.10.88","netmask":"255.255.240.0","gateway":"10.10.0.1",'
+     '"dns1":"10.10.0.3","dns2":""}', file="set_network_static-usb")
+_usb("set_auto_reboot_days", {"enabled": True, "hour": 23, "minute": 59, "days": "1,2"}, "POST",
+     "/api/system/auto-reboot", '{"enable":true,"hour":23,"min":59,"week":[1,2]}', file="set_auto_reboot_days-usb")
+_usb("get_video_config", {}, "GET", "/api/video/config/get", file="get_video_config-usb")
+_usb("set_decoder_flip", {"horizontal": True}, "POST", "/api/video/config/update",
+     '{"data":{"h_flip":true,"v_flip":false}}', file="set_decoder_flip-usb")
+_usb("set_aspect_conversion", {"mode": "zoom"}, "POST", "/api/video/config/update",
+     '{"data":{"ar_convert_mode":"Crop"}}', file="set_aspect_conversion-usb")
+_usb("select_source", {"id": 1}, "POST", "/api/source/select", '{"id":1}', file="select_source-usb")
+_usb("add_source", {"config": {"name": "name1", "protocol": "rtsp", "type": "url",
+                               "data": {"url": "rtsp://10.0.0.5:554/live", "buffer_ms": 60, "ptz_en": False}}},
+     "POST", "/api/source/add",
+     '{"name":"name1","protocol":"rtsp","type":"url","data":{"url":"rtsp://10.0.0.5:554/live","buffer_ms":60,'
+     '"ptz_en":false}}', file="add_source-usb")
+_usb("modify_source", {"id": 1, "config": {"name": "name1"}}, "POST", "/api/source/update",
+     '{"id":1,"config":{"name":"name1"}}', file="modify_source-usb")
+_usb("delete_source", {"id": 1}, "POST", "/api/source/delete", '{"id":[1]}', file="delete_source-usb")
+
+# Shared by the three (AES67 API sections 16-17, Audio DX API 8-9, IP to USB
+# API 3 and 9).
+_aes("get_device_info", {}, "POST", "/api/system/device-info")
+_dx("get_device_info", {}, "POST", "/api/system/device-info", file="get_device_info-dx")
+_usb("get_device_info", {}, "POST", "/api/system/device-info", file="get_device_info-usb")
+_aes("set_ntp", {"server1": "0.pool.ntp.org", "server2": "1.pool.ntp.org"}, "POST", "/api/system/set-date-time",
+     '{"ntp-enable":true,"ntp-server1":"0.pool.ntp.org","ntp-server2":"1.pool.ntp.org"}')
+_usb("set_clock", {"time": "2024-04-11 09:50:18", "server1": "0.pool.ntp.org", "server2": "1.pool.ntp.org"},
+     "POST", "/api/system/set-date-time",
+     '{"ntp-enable":false,"ntp-server1":"0.pool.ntp.org","ntp-server2":"1.pool.ntp.org","time":"2024-04-11 09:50:18"}')
+_dx("set_timezone", {"zone": "Asia/Shanghai"}, "POST", "/api/system/timezone-set", '{"zonename":"Asia/Shanghai"}')
+_aes("get_network_interfaces", {}, "POST", "/api/network/if-info")
+_dx("set_network_address", {"address": "10.10.10.88", "netmask": "255.255.240.0", "gateway": "10.10.0.1"},
+    "POST", "/api/network/if-set",
+    '{"iface":"eth0","use-dhcp":false,"ipaddr":"10.10.10.88","netmask":"255.255.240.0","gateway":"10.10.0.1"}')
+_aes("get_default_route", {}, "POST", "/api/network/if-route")
+_aes("get_dns", {}, "POST", "/api/network/get-dns")
+_aes("set_dns_manual", {"dns1": "10.0.1.3"}, "POST", "/api/network/set-dns",
+     '{"is-manual":true,"dns1":"10.0.1.3","dns2":""}')
+_dx("set_dns_auto", {}, "POST", "/api/network/set-dns", '{"is-manual":false}')
+
+# General settings: numbers on the AES67, text on the Audio DX.
+_aes("get_general_settings", {}, "POST", "/api/aes67/general-info")
+_dx("get_general_settings", {}, "POST", "/api/aoip/general-info", file="get_general_settings-dx")
+_dx("get_general_range", {}, "POST", "/api/aoip/general-range")
+_aes("set_aes67_sample_rate", {"rate": "96000"}, "POST", "/api/aes67/general-settings", '{"tx-sample-rate":96000}')
+_aes("set_aes67_packet_time", {"ptime": "0.125ms"}, "POST", "/api/aes67/general-settings", '{"tx-ptime":"0.125ms"}')
+_aes("set_stream_aac_bitrate", {"kbps": "192"}, "POST", "/api/aes67/general-settings", '{"aac-bitrate-kbps":192}')
+_dx("set_dx_sample_rate", {"rate": "48000"}, "POST", "/api/aoip/general-apply", '{"tx-sample-rate":"48000"}')
+_aes("set_unbalanced_input_level", {"level": "-10dBV"}, "POST", "/api/aes67/general-settings", '{"unbld-in":5}')
+_dx("set_unbalanced_input_level", {"level": "+4dBu"}, "POST", "/api/aoip/general-apply", '{"unbld-in":"+4dBu"}',
+    file="set_unbalanced_input_level-dx")
+_aes("set_unbalanced_output_level", {"level": "-2dBu"}, "POST", "/api/aes67/general-settings", '{"unbld-out":3}')
+_dx("set_unbalanced_output_level", {"level": "0dBu"}, "POST", "/api/aoip/general-apply", '{"unbld-out":"0dBu"}',
+    file="set_unbalanced_output_level-dx")
+_aes("set_balanced_input_level", {"level": "+24dBu"}, "POST", "/api/aes67/general-settings", '{"bld-in":0}')
+_dx("set_balanced_input_level", {"level": "-2dBu"}, "POST", "/api/aoip/general-apply", '{"bld-in":"-2dBV"}',
+    file="set_balanced_input_level-dx")
+_aes("set_balanced_output_level", {"level": "+4dBu"}, "POST", "/api/aes67/general-settings", '{"bld-out":1}')
+_dx("set_balanced_output_level", {"level": "+18dBu"}, "POST", "/api/aoip/general-apply", '{"bld-out":"+18dBu"}',
+    file="set_balanced_output_level-dx")
+_aes("set_mic_bias", {"enabled": True}, "POST", "/api/aes67/general-settings", '{"micbias":true}')
+_dx("set_mic_bias", {"enabled": False}, "POST", "/api/aoip/general-apply", '{"micbias":false}', file="set_mic_bias-dx")
+_aes("set_igmp_version", {"version": "v3"}, "POST", "/api/aes67/general-settings", '{"igmp":3}')
+_dx("set_igmp_version", {"version": "auto"}, "POST", "/api/aoip/general-apply", '{"igmp":"Auto"}',
+    file="set_igmp_version-dx")
+_aes("set_test_tone", {"mode": "analog-output"}, "POST", "/api/aes67/general-settings", '{"audio-pattern":2}')
+_dx("set_test_tone", {"mode": "analog-input"}, "POST", "/api/aoip/general-apply", '{"audio-pattern":"input"}',
+    file="set_test_tone-dx")
+
+# PTP (AES67 API section 5).
+_aes("get_ptp_settings", {}, "POST", "/api/aes67/ptp-info")
+_aes("get_ptp_state", {}, "POST", "/api/aes67/ptp-state")
+_aes("set_ptp_version", {"version": "PTPV2"}, "POST", "/api/aes67/ptp-settings", '{"version":"PTPV2"}')
+_aes("set_ptp_priority", {"priority1": 128, "priority2": 255}, "POST", "/api/aes67/ptp-settings",
+     '{"priority1":128,"priority2":255}')
+_aes("set_ptp_domain", {"domain": 0}, "POST", "/api/aes67/ptp-settings", '{"domain":0}')
+_aes("set_ptp_role", {"role": "follower"}, "POST", "/api/aes67/ptp-settings", '{"role":"Slaver"}')
+_aes("set_ptp_delay_mechanism", {"mechanism": "P2P"}, "POST", "/api/aes67/ptp-settings", '{"delay-mech":"P2P"}')
+_aes("set_ptp_intervals", {"announce": -2, "sync": -3}, "POST", "/api/aes67/ptp-settings",
+     '{"announce":-2,"sync":-3}')
+_aes("reset_ptp", {}, "POST", "/api/aes67/ptp-default")
+
+# AES67 sources and sinks (sections 6-7).
+_SRC = {"uid": 1, "name": "unicast-111", "enable": True, "dst-ip": "239.10.10.100", "dst-port": 5004, "payload": 96,
+        "depth": "L24", "channel-num": 2, "ttl": 254, "dscp": "BE"}
+_SRC_BODY = ('{"uid":1,"name":"unicast-111","enable":true,"dst-ip":"239.10.10.100","dst-port":5004,"payload":96,'
+             '"depth":"L24","channel-num":2,"ttl":254,"dscp":"BE"}')
+_aes("get_aes67_sources", {}, "POST", "/api/aes67/source-info")
+_aes("apply_aes67_source", {"config": _SRC}, "POST", "/api/aes67/source-apply", _SRC_BODY)
+_aes("update_aes67_source", {"config": _SRC}, "POST", "/api/aes67/source-update", _SRC_BODY)
+_aes("set_aes67_source_enabled", {"uid": 1, "enabled": False}, "POST", "/api/aes67/source-update",
+     '{"uid":1,"enable":false}')
+_aes("delete_aes67_source", {"uid": 1}, "POST", "/api/aes67/source-del", '{"uid":1}')
+_SINK = {"sink-idx": 0, "name": "Pro_Convert_AES67_1015_0_01", "is-manual": False,
+         "source-name": "Pro_Convert_AES67_1015_0_01", "source-dst-ip": "239.178.203.32", "source-dst-port": 5004}
+_SINK_BODY = ('{"sinks":[{"sink-idx":0,"name":"Pro_Convert_AES67_1015_0_01","is-manual":false,'
+              '"source-name":"Pro_Convert_AES67_1015_0_01","source-dst-ip":"239.178.203.32","source-dst-port":5004}]}')
+_aes("get_aes67_sinks", {}, "POST", "/api/aes67/sink-info")
+_aes("apply_aes67_sink", {"sink": _SINK}, "POST", "/api/aes67/sink-apply", _SINK_BODY)
+_aes("update_aes67_sink", {"sink": _SINK}, "POST", "/api/aes67/sink-update", _SINK_BODY)
+_aes("delete_aes67_sink", {"sink": 3}, "POST", "/api/aes67/sink-del", '{"sinks":[{"sink-idx":3}]}')
+_aes("get_sink_statistics", {"sink": 0}, "POST", "/api/aes67/sink-statistics", '{"sink-idx":0}')
+_aes("clear_sink_statistics", {"sink": 1}, "POST", "/api/aes67/sink-statistics-clear", '{"sink-idx":1}')
+_aes("parse_sdp", {"sdp": "v=0\r\ns=unicast-111\r\nm=audio 5004 RTP/AVP 96\r\n"}, "POST", "/api/aes67/sdp-parse",
+     '{"sdp":"v=0\\r\\ns=unicast-111\\r\\nm=audio 5004 RTP/AVP 96\\r\\n"}')
+
+# Streams (sections 8-14).
+_aes("select_stream_receiver", {"type": "icecast"}, "POST", "/api/ices/receiver-select", '{"type":2}')
+_NDI_TX = {"uid": 1, "enable": True, "ndi-name": "D424211217005_0_01", "group": "public", "mode": 3}
+_NDI_TX_BODY = '{"uid":1,"enable":true,"ndi-name":"D424211217005_0_01","group":"public","mode":3}'
+_aes("get_ndi_senders", {}, "POST", "/api/ndi/sender-info")
+_aes("apply_ndi_sender", {"config": _NDI_TX}, "POST", "/api/ndi/sender-apply", _NDI_TX_BODY)
+_aes("update_ndi_sender", {"config": _NDI_TX}, "POST", "/api/ndi/sender-update", _NDI_TX_BODY)
+_aes("set_ndi_sender_enabled", {"uid": 1, "enabled": True}, "POST", "/api/ndi/sender-update", '{"uid":1,"enable":true}')
+_aes("delete_ndi_sender", {"uid": 1}, "POST", "/api/ndi/sender-del", '{"uid":1}')
+_aes("find_ndi_failover_sources", {}, "POST", "/api/ndi/sender-find")
+_aes("set_ndi_sender_discovery", {"servers": "10.0.0.5,10.0.0.6"}, "POST", "/api/ndi/sender-options",
+     '{"discovery-server":"10.0.0.5,10.0.0.6"}')
+_NDI_RX = {"uid": 1, "enable": True, "ndi-name": "DESKTOP (Audio)", "url": "10.10.14.202:5961", "buffer-duration": 60}
+_NDI_RX_BODY = '{"uid":1,"enable":true,"ndi-name":"DESKTOP (Audio)","url":"10.10.14.202:5961","buffer-duration":60}'
+_aes("get_ndi_receivers", {}, "POST", "/api/ndi/receiver-info")
+_aes("apply_ndi_receiver", {"config": _NDI_RX}, "POST", "/api/ndi/receiver-apply", _NDI_RX_BODY)
+_aes("update_ndi_receiver", {"config": _NDI_RX}, "POST", "/api/ndi/receiver-update", _NDI_RX_BODY)
+_aes("set_ndi_receiver_enabled", {"uid": 2, "enabled": False}, "POST", "/api/ndi/receiver-update",
+     '{"uid":2,"enable":false}')
+_aes("delete_ndi_receiver", {"uid": 2}, "POST", "/api/ndi/receiver-del", '{"uid":2}')
+_aes("find_ndi_sources", {}, "POST", "/api/ndi/receiver-find")
+_aes("set_ndi_receiver_options", {"servers": "10.0.0.5", "group": "public"}, "POST", "/api/ndi/receiver-options",
+     '{"discovery-server":"10.0.0.5","group":"public","extra-ips":""}')
+_SRT = {"uid": 1, "enable": True, "name": "srt_01", "mode": 1, "bind-port": 8000, "latency": 120}
+_SRT_BODY = '{"uid":1,"enable":true,"name":"srt_01","mode":1,"bind-port":8000,"latency":120}'
+_aes("get_srt_senders", {}, "POST", "/api/srt/sender-info")
+_aes("apply_srt_sender", {"config": _SRT}, "POST", "/api/srt/sender-apply", _SRT_BODY)
+_aes("update_srt_sender", {"config": _SRT}, "POST", "/api/srt/sender-update", _SRT_BODY)
+_aes("set_srt_sender_enabled", {"uid": 1, "enabled": False}, "POST", "/api/srt/sender-update", '{"uid":1,"enable":false}')
+_aes("delete_srt_sender", {"uid": 1}, "POST", "/api/srt/sender-del", '{"uid":1}')
+_aes("get_srt_receivers", {}, "POST", "/api/srt/receiver-info")
+_aes("apply_srt_receiver", {"config": _SRT}, "POST", "/api/srt/receiver-apply", _SRT_BODY)
+_aes("update_srt_receiver", {"config": _SRT}, "POST", "/api/srt/receiver-update", _SRT_BODY)
+_aes("set_srt_receiver_enabled", {"uid": 1, "enabled": True}, "POST", "/api/srt/receiver-update",
+     '{"uid":1,"enable":true}')
+_aes("delete_srt_receiver", {"uid": 1}, "POST", "/api/srt/receiver-del", '{"uid":1}')
+_ICE_TX = {"uid": 1, "enable": True, "name": "test1", "service-url": "http://10.0.0.9:8000", "username": "source",
+           "password": "hackme"}
+_ICE_TX_BODY = ('{"uid":1,"enable":true,"name":"test1","service-url":"http://10.0.0.9:8000","username":"source",'
+                '"password":"hackme"}')
+_aes("get_icecast_senders", {}, "POST", "/api/ices/sender-info")
+_aes("apply_icecast_sender", {"config": _ICE_TX}, "POST", "/api/ices/sender-apply", _ICE_TX_BODY)
+_aes("update_icecast_sender", {"config": _ICE_TX}, "POST", "/api/ices/sender-update", _ICE_TX_BODY)
+_aes("set_icecast_sender_enabled", {"uid": 1, "enabled": False}, "POST", "/api/ices/sender-update",
+     '{"uid":1,"enable":false}')
+_aes("delete_icecast_sender", {"uid": 1}, "POST", "/api/ices/sender-del", '{"uid":1}')
+_ICE_RX = {"uid": 1, "enable": True, "name": "icecast_01", "service-url": "http://10.0.0.9:8000", "room": "stream",
+           "buffer-duration": 500, "headroom": 0}
+_ICE_RX_BODY = ('{"uid":1,"enable":true,"name":"icecast_01","service-url":"http://10.0.0.9:8000","room":"stream",'
+                '"buffer-duration":500,"headroom":0}')
+_aes("get_icecast_receivers", {}, "POST", "/api/ices/receiver-info")
+_aes("apply_icecast_receiver", {"config": _ICE_RX}, "POST", "/api/ices/receiver-apply", _ICE_RX_BODY)
+_aes("update_icecast_receiver", {"config": _ICE_RX}, "POST", "/api/ices/receiver-update", _ICE_RX_BODY)
+_aes("set_icecast_receiver_enabled", {"uid": 1, "enabled": True}, "POST", "/api/ices/receiver-update",
+     '{"uid":1,"enable":true}')
+_aes("delete_icecast_receiver", {"uid": 1}, "POST", "/api/ices/receiver-del", '{"uid":1}')
+_aes("list_icecast_streams", {}, "POST", "/api/ices/list-streams")
+
+# Audio DX streams and Dante (sections 5 and 7).
+_TX = {"uid": 11, "enable": True, "name": "NDI", "type": "ndi",
+       "ndi": {"source-name": "test11", "group-name": "public", "transport-mode": "tcp-unicast"},
+       "aac-bitrate-kbps": "128"}
+_dx("get_tx_streams", {}, "POST", "/api/tx/live-info")
+_dx("apply_tx_stream", {"config": _TX}, "POST", "/api/tx/live-apply",
+    '{"uid":11,"enable":true,"name":"NDI","type":"ndi","ndi":{"source-name":"test11","group-name":"public",'
+    '"transport-mode":"tcp-unicast"},"aac-bitrate-kbps":"128"}')
+_dx("delete_tx_stream", {"uid": 11}, "POST", "/api/tx/live-del", '{"uid":11}')
+_dx("get_rx_streams", {}, "POST", "/api/rx/live-info")
+_dx("apply_rx_stream", {"uid": 9, "enabled": True, "name": "TS over SRT", "stream": "Stream1",
+                        "url": "srt://10.10.11.54:10000?mode=caller&latency=100&mw-buffer-duration=100"},
+    "POST", "/api/rx/live-apply",
+    '{"uid":9,"enable":true,"name":"TS over SRT","stream-no":"Stream1",'
+    '"url":"srt://10.10.11.54:10000?mode=caller&latency=100&mw-buffer-duration=100"}')
+_dx("delete_rx_stream", {"uid": 9}, "POST", "/api/rx/live-del", '{"uid":9}')
+_dx("set_rx_ndi_options", {"enabled": True, "servers": "10.0.0.5"}, "POST", "/api/rx/ndi-options-apply",
+    '{"enable-discovery":true,"discovery-server":"10.0.0.5","group-name":"public","extra-ips":""}')
+_dx("get_dante_state", {}, "POST", "/api/dante/state")
+
+# The matrix (AES67 API section 15, Audio DX API section 6).
+_aes("get_matrix", {}, "POST", "/api/aes67/matrix-info")
+_dx("get_matrix", {}, "POST", "/api/aoip/matrix-info", file="get_matrix-dx")
+_dx("get_matrix_layout", {}, "POST", "/api/aoip/matrix-desc")
+_aes("get_audio_meters", {}, "POST", "/api/aes67/audio-meter")
+_dx("get_audio_meters", {}, "POST", "/api/aoip/audio-meter", file="get_audio_meters-dx")
+_aes("get_channel_meters", {"tx": 1, "rx": [1, 2, 3, 4]}, "POST", "/api/aes67/audio-meter-limit",
+     '{"tx-no":1,"rx-no":[1,2,3,4]}')
+_dx("get_channel_meters", {"tx": 0, "rx": [8]}, "POST", "/api/aoip/audio-meter-limit", '{"tx-no":0,"rx-no":[8]}',
+    file="get_channel_meters-dx")
+_aes("get_crosspoint_meter", {"tx": 2, "rx": 8}, "POST", "/api/aes67/matrix-meter", '{"tx-no":2,"rx-no":8}')
+_aes("set_crosspoint", {"tx": 0, "rx": 8, "connected": True}, "POST", "/api/aes67/matrix-settings",
+     '{"matrix":[{"tx-no":0,"rx-no":8,"mix":1}]}')
+_dx("set_crosspoint", {"tx": 8, "rx": 0, "connected": False}, "POST", "/api/aoip/matrix-settings",
+    '{"matrix":[{"tx-no":8,"rx-no":0,"mix":0}]}', file="set_crosspoint-dx")
+_aes("set_crosspoints", {"matrix": [{"tx-no": 0, "rx-no": 0, "mix": 1}, {"tx-no": 1, "rx-no": 1, "mix": 1}]},
+     "POST", "/api/aes67/matrix-settings", '{"matrix":[{"tx-no":0,"rx-no":0,"mix":1},{"tx-no":1,"rx-no":1,"mix":1}]}')
+_dx("set_crosspoints", {"matrix": [{"tx-no": 0, "rx-no": 4, "mix": 0}]}, "POST", "/api/aoip/matrix-settings",
+    '{"matrix":[{"tx-no":0,"rx-no":4,"mix":0}]}', file="set_crosspoints-dx")
+_aes("clear_matrix", {}, "POST", "/api/aes67/matrix-clear")
+_dx("clear_matrix", {}, "POST", "/api/aoip/matrix-clear", file="clear_matrix-dx")
+_aes("set_tx_volume", {"tx": 3, "muted": False, "db": -6}, "POST", "/api/aes67/volume-tx",
+     '{"volumes":[{"tx-no":3,"tx-mute":false,"db":-6}]}')
+_dx("set_tx_volume", {"tx": 0, "muted": True, "db": 0}, "POST", "/api/aoip/volume-tx",
+    '{"volumes":[{"tx-no":0,"tx-mute":true,"db":0}]}', file="set_tx_volume-dx")
+_aes("set_crosspoint_volume", {"tx": 3, "rx": 8, "muted": False, "db": 12}, "POST", "/api/aes67/volume-mix",
+     '{"volumes":[{"tx-no":3,"rx-no":8,"rx-mute":false,"db":12}]}')
+_dx("set_crosspoint_volume", {"tx": 0, "rx": 1, "muted": True, "db": -36}, "POST", "/api/aoip/volume-mix",
+    '{"volumes":[{"tx-no":0,"rx-no":1,"rx-mute":true,"db":-36}]}', file="set_crosspoint_volume-dx")
+
+# IP to USB (sections 3-8).
+_usb("get_usb_mode", {}, "GET", "/api/system/usb-mode/get")
+_usb("set_usb_mode", {"mode": "content-sharing"}, "POST", "/api/system/usb-mode/update", '{"mode":"Content mode"}')
+_usb("get_ndi_discovery", {}, "GET", "/api/ndi/config/get")
+_usb("set_usb_ndi_discovery", {"enabled": True, "servers": "192.168.66.1,192.168.66.2"}, "POST",
+     "/api/ndi/config/update",
+     '{"data":{"enable":true,"discovery_server":"192.168.66.1,192.168.66.2","groups":"public"}}')
+_usb("get_no_signal_image", {}, "POST", "/api/resource/image/get", '{"id":"no_signal_1","type":"simple"}')
+_usb("delete_no_signal_image", {"id": "no_signal_1"}, "POST", "/api/resource/image/delete", '{"id":"no_signal_1"}')
+_usb("get_usb_sources", {"list": "discovered"}, "GET", "/api/source/list?type=dynamic")
+_usb("add_usb_ndi_source", {"name": "name1", "ndi_name": "ULTRA ENCODE (C315230423002-2)", "url": "100.100.33.21:5000",
+                            "transport": "tcp"}, "POST", "/api/source/add",
+     '{"name":"name1","protocol":"ndi","type":"ndi","data":{"name":"ULTRA ENCODE (C315230423002-2)",'
+     '"url":"100.100.33.21:5000","low_bw":false,"transport":"tcp","pts_mode":"auto","buffer_ms":60}}')
+_usb("get_stream_status", {}, "GET", "/api/stream/status/get")
+
+
+# The no-signal image upload (IP to USB API section 6.1): multipart/form-data
+# with the id and type fields and the PNG; the boundary is the core's, derived
+# from the parts (SPEC.md §4, "Binary request bodies"). The image is a
+# made-up four bytes.
+def _mw_form(parts):
+    import hashlib
+    digest = hashlib.sha256(b"".join(n.encode() + b"\0" + d + b"\0" for n, d, _ in parts)).hexdigest()
+    boundary = "----form-" + digest[:16]
+    body = b""
+    for name, data, filename in parts:
+        body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"".encode()
+        if filename:
+            body += f"; filename=\"{filename}\"\r\nContent-Type: application/octet-stream".encode()
+        body += b"\r\n\r\n" + data + b"\r\n"
+    body += f"--{boundary}--\r\n".encode()
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+_IMG_BODY, _IMG_TYPE = _mw_form([("id", b"no_signal_1", None), ("type", b"simple", None),
+                                 ("file", b"\x89PNG", "no_signal.png")])
+V.append({"spec": MW, "command": "upload_no_signal_image", "input": {"image": "iVBORw=="}, "model": "ip-to-usb",
+          "expect_request": {"method": "POST", "target": "/api/resource/image/upload", "body_hex": _IMG_BODY.hex(),
+                             "content_type": _IMG_TYPE}})
+
+
+# Telemetry for the new models: the documents' example replies.
+def _mwm(name, model, path, body, state, **extra):
+    _mwt(name, path, body, state, model=model, **extra)
+
+
+_mwm("summary-aes67", "aes67", "/api/aes67/summary-info", {
+    "status": 0, "temperature": "79.61°C", "card-address": 0,
+    "unbalance": {"in": {"linked": True, "depth": "L24", "channel-num": 2},
+                  "out": {"linked": False, "depth": "L24", "channel-num": 2}},
+    "balance": {"in": {"linked": False, "depth": "L24", "channel-num": 2},
+                "out": {"linked": False, "depth": "L24", "channel-num": 2}},
+    "uac": {"usb-connected": True, "in": {"linked": False, "sample-rate": 48000, "depth": "L24", "channel-num": 4},
+            "out": {"linked": False, "sample-rate": 48000, "depth": "L24", "channel-num": 4}},
+    "sources": [{"name": "Pro_Convert_AES67_7005_0_01", "depth": "L24", "channel-num": 2, "sample-rate": 48000,
+                 "ptime": "1ms"}],
+    "sinks": [{"name": "Pro_Convert_AES67_1015_0_01", "depth": "L24", "channel-num": 2, "sample-rate": "48000",
+               "ptime": "1ms", "qos": 2}]},
+    {"device": {"temperature": 79.61, "board_id": 0},
+     "io": {"unbalanced": {"in": {"linked": True, "depth": "L24", "channels": 2},
+                           "out": {"linked": False, "depth": "L24", "channels": 2}},
+            "balanced": {"in": {"linked": False, "depth": "L24", "channels": 2},
+                         "out": {"linked": False, "depth": "L24", "channels": 2}},
+            "usb": {"connected": True,
+                    "in": {"linked": False, "sample_rate": 48000, "depth": "L24", "channels": 4},
+                    "out": {"linked": False, "sample_rate": 48000, "depth": "L24", "channels": 4}}},
+     "aes67": {"active_sources": {"0": {"name": "Pro_Convert_AES67_7005_0_01", "depth": "L24", "channels": 2,
+                                        "sample_rate": 48000, "ptime": "1ms"}},
+               "active_sinks": {"0": {"name": "Pro_Convert_AES67_1015_0_01", "depth": "L24", "channels": 2,
+                                      "sample_rate": 48000, "ptime": "1ms", "qos": 2}}}})
+_mwm("summary-dx", "audio-dx", "/api/aoip/summary-info", {
+    "status": 0, "temperature": "52.5°C", "card-address": 3,
+    "uac": {"usb-connected": False, "in": {"linked": False, "sample-rate": 48000, "depth": "L24", "channel-num": 2}}},
+    {"device": {"temperature": 52.5, "board_id": 3},
+     "io": {"usb": {"connected": False, "in": {"linked": False, "sample_rate": 48000, "depth": "L24", "channels": 2}}}})
+_mwm("summary-usb", "ip-to-usb", "/api/system/summary/get", {"status": 0, "code": "Success", "data": {"cpu_temp": 54}},
+     {"device": {"temperature": 54.0}})
+_mwm("general-aes67", "aes67", "/api/aes67/general-info", {
+    "status": 0, "tx-sample-rate": 48000, "tx-ptime": "1ms", "unbld-in": 2, "unbld-out": 2, "bld-in": 1, "bld-out": 0,
+    "micbias": True, "st2110": False, "igmp": 0, "aac-bitrate-kbps": 128, "audio-pattern": 0, "uac-num-channels": 4},
+    {"aoip": {"sample_rate": 48000, "packet_time": "1ms", "st2110": False},
+     "analog": {"unbalanced_in_level": "0dBu", "unbalanced_out_level": "0dBu", "balanced_in_level": "+18dBu",
+                "balanced_out_level": "+18dBu", "mic_bias": True, "test_tone": "off"},
+     "network": {"igmp": "auto"}, "stream": {"aac_bitrate_kbps": 128}, "io": {"usb": {"channel_setting": 4}}})
+_mwm("general-dx", "audio-dx", "/api/aoip/general-info", {
+    "status": 0, "device-lock": False, "tx-sample-rate": "48000", "unbld-in": "+12dBu", "unbld-out": "+12dBu",
+    "bld-in": "-2dBV", "bld-out": "+18dBu", "igmp": "Auto", "micbias": True, "audio-pattern": "off",
+    "uac-num-channels": 2},
+    {"dante": {"device_lock": False}, "aoip": {"sample_rate": 48000},
+     "analog": {"unbalanced_in_level": "+12dBu", "unbalanced_out_level": "+12dBu", "balanced_in_level": "-2dBu",
+                "balanced_out_level": "+18dBu", "mic_bias": True, "test_tone": "off"},
+     "network": {"igmp": "auto"}, "io": {"usb": {"channel_setting": 2}}})
+_mwm("ptp-info", "aes67", "/api/aes67/ptp-info", {
+    "status": 0, "version": "PTPV2", "priority1": 255, "priority2": 255, "domain": 0, "gmid": "D0-C8-57-FF-FE-80-BD-5A",
+    "role": "Slaver", "delay-mech": "E2E", "announce": -2, "sync": -1},
+    {"ptp": {"version": "PTPV2", "priority1": 255, "priority2": 255, "domain": 0,
+             "grandmaster": "D0-C8-57-FF-FE-80-BD-5A", "role": "follower", "delay_mechanism": "E2E",
+             "announce_interval": -2, "sync_interval": -1}})
+_mwm("ptp-default", "aes67", "/api/aes67/ptp-default", {
+    "status": 0, "version": "PTPV2", "priority1": 255, "priority2": 255, "domain": 0, "role": "Auto",
+    "delay-mech": "E2E", "announce": -2, "sync": -1},
+    {"ptp": {"version": "PTPV2", "priority1": 255, "priority2": 255, "domain": 0, "role": "auto",
+             "delay_mechanism": "E2E", "announce_interval": -2, "sync_interval": -1}})
+_mwm("ptp-state", "aes67", "/api/aes67/ptp-state", {
+    "status": 0, "is-sync": True, "is-master": False, "lock-to": "D0-C8-57-FF-FE-80-DF-9D",
+    "statistics": {"datetime": "2022-10-14 14:26:03", "interval": 2000, "delay": [-81, 286, -182]}},
+    {"ptp": {"synced": True, "leader": False, "locked_to": "D0-C8-57-FF-FE-80-DF-9D", "datetime": "2022-10-14 14:26:03",
+             "statistics_interval_ms": 2000, "delay_ns": "[-81,286,-182]"}})
+_mwm("aes67-sources", "aes67", "/api/aes67/source-info", {"status": 0, "sources": [{
+    "uid": 1, "name": "unicast-111", "enable": True, "state": 1, "dst-ip": "239.10.10.100", "dst-port": 5004,
+    "payload": 96, "depth": "L24", "channel-num": 2, "ttl": 254, "dscp": "BE", "sdp": "v=0\r\ns=unicast-111\r\n"}]},
+    {"aes67": {"sources": {"1": {"name": "unicast-111", "enabled": True, "state": "sending", "address": "239.10.10.100",
+                                 "port": 5004, "payload": 96, "depth": "L24", "channels": 2, "ttl": 254, "dscp": "BE",
+                                 "sdp": "v=0\r\ns=unicast-111\r\n"}}}},
+    state_before={"aes67": {"sources": {"4": {"name": "Gone"}}}})
+_mwm("aes67-sinks", "aes67", "/api/aes67/sink-info", {"status": 0, "sinks": [{
+    "sink-idx": 0, "state": 2, "name": "Pro_Convert_AES67_1015_0_01", "is-manual": False,
+    "source-name": "Pro_Convert_AES67_1015_0_01", "source-src-ip": "10.10.4.195", "source-src-mac": "d0:c8:57:80:df:9d",
+    "source-dst-ip": "239.178.203.32", "source-dst-port": 5004, "ssrc": 425112524, "depth": "L24", "channel-num": 2,
+    "sample-rate": "48000", "ptime": "1ms", "mediaclk-offset": 0, "max-delay": 0, "max-buffer": 6, "ttl": 15, "sdp": ""}],
+    "sources": [{"source-name": "Pro_Convert_AES67_1015_0_01", "source-src-ip": "10.10.4.195",
+                 "source-src-mac": "d0:c8:57:80:df:9d", "source-dst-ip": "239.178.203.32", "source-dst-port": 5004,
+                 "ssrc": 425112524, "depth": "L24", "channel-num": 2, "sample-rate": "48000", "ptime": "1ms",
+                 "mediaclk-offset": 0, "ttl": 15, "sdp": ""}]},
+    {"aes67": {"sinks": {"0": {"state": "connecting", "name": "Pro_Convert_AES67_1015_0_01", "manual": False,
+                               "source_name": "Pro_Convert_AES67_1015_0_01", "source_ip": "10.10.4.195",
+                               "source_mac": "d0:c8:57:80:df:9d", "address": "239.178.203.32", "port": 5004,
+                               "ssrc": 425112524, "depth": "L24", "channels": 2, "sample_rate": 48000, "ptime": "1ms",
+                               "mediaclk_offset": 0, "max_delay_ms": 0, "max_buffer": 6, "ttl": 15, "sdp": ""}},
+               "discovered": {"0": {"name": "Pro_Convert_AES67_1015_0_01", "source_ip": "10.10.4.195",
+                                    "source_mac": "d0:c8:57:80:df:9d", "address": "239.178.203.32", "port": 5004,
+                                    "ssrc": 425112524, "depth": "L24", "channels": 2, "sample_rate": 48000,
+                                    "ptime": "1ms", "mediaclk_offset": 0, "ttl": 15, "sdp": ""}}}})
+V.append({"spec": MW, "telemetry": "sink-statistics", "model": "aes67",
+          "inbound_http": {"path": "/api/aes67/sink-statistics", "request": json.loads('{"sink-idx":2}'), "body": json.dumps({
+              "status": 0, "qos": 2, "duration": 4690, "peak": 0, "average": 0, "late": 0, "lost": 0, "buff-count": 0,
+              "buff-underflow": 0, "buff-overflow": 0, "statistics": [{"x-us": 5000, "y-count": 0}]})},
+          "expect_state": {"aes67": {"sink_stats": {"2": {
+              "qos": 2, "duration_s": 4690, "peak_us": 0, "average_us": 0, "late": 0, "lost": 0, "buffer_count": 0,
+              "underflows": 0, "overflows": 0, "histogram": '[{"x-us":5000,"y-count":0}]'}}}}})
+_mwm("ndi-senders", "aes67", "/api/ndi/sender-info", {"status": 0, "discovery-server": "", "ndi": [{
+    "uid": 1, "enable": True, "ndi-name": "D424211217005_0_01", "group": "public", "enable-full": True,
+    "discovery-server-enable": True, "audio-standard": 0, "mode": 3, "multicast-ttl": 0, "multicast-net-prefix": "",
+    "multicast-netmask": "", "failover-enable": False, "failover-ndi-name": "", "failover-url": "", "web-control": True,
+    "report": {"module-name": "mws_ndi_sink_0", "module-type": 34, "ndi-name": "PRO-CONVERT-AES67 (D424211217005_0_01)",
+               "num-clients": 0}}]},
+    {"stream": {"ndi_tx_discovery_servers": ""},
+     "streams": {"ndi_tx": {"1": {"enabled": True, "name": "D424211217005_0_01", "group": "public",
+                                  "full_bandwidth": True, "discovery_enabled": True, "audio_standard": "smpte",
+                                  "transport": "tcp", "multicast_ttl": 0, "multicast_address": "",
+                                  "multicast_netmask": "", "failover_enabled": False, "failover_name": "",
+                                  "failover_url": "", "web_control": True,
+                                  "published_name": "PRO-CONVERT-AES67 (D424211217005_0_01)", "clients": 0}}}})
+_mwm("ndi-receivers", "aes67", "/api/ndi/receiver-info", {
+    "status": 0, "discovery-server": "", "group": "", "extra-ips": "", "ndi": [{
+        "uid": 1, "enable": True, "is-find": True, "alias": "DESKTOP (Intel UHD Graphics 630 1)",
+        "ndi-name": "DESKTOP (Intel UHD Graphics 630 1)", "url": "10.10.14.202:5961", "audio-standard": 0,
+        "buffer-duration": 60, "headroom-db": -20, "format": {"sample-rate": 48000, "channel-num": 2, "bit-depth": 32},
+        "report": {"audio-jitter": 22222, "audio-kbps": 3000, "is-connected": True, "living-time-ms": 6442306,
+                   "module-name": "mws_ndi_src_0", "module-type": 33, "video-jitter": 0, "video-kbps": 0}}]},
+    {"ndi": {"discovery": {"servers": ""}, "groups": "", "extra_ips": ""},
+     "streams": {"ndi_rx": {"1": {"enabled": True, "found": True, "alias": "DESKTOP (Intel UHD Graphics 630 1)",
+                                  "ndi_name": "DESKTOP (Intel UHD Graphics 630 1)", "url": "10.10.14.202:5961",
+                                  "audio_standard": "smpte", "buffer_ms": 60, "headroom_db": -20, "sample_rate": 48000,
+                                  "channels": 2, "bit_depth": 32, "connected": True, "audio_kbps": 3000,
+                                  "audio_jitter": 22222, "uptime_ms": 6442306}}}})
+_mwm("ndi-find", "aes67", "/api/ndi/receiver-find", {"status": 0, "sources": [
+    {"ndi-name": "DESKTOP-KN2V7CQ (Intel UHD Graphics 630 1)", "url": "10.10.14.202:5961"}]},
+    {"ndi": {"sources": {"0": {"name": "DESKTOP-KN2V7CQ (Intel UHD Graphics 630 1)", "address": "10.10.14.202:5961"}}}})
+_mwm("srt-senders", "aes67", "/api/srt/sender-info", {"status": 0, "srt": [{
+    "uid": 1, "enable": True, "name": "srt_01", "mode": 1, "remote-ip": "", "remote-port": 8000, "bind-port": 10000,
+    "stream-id": "1", "connect-timeout": 3000, "retry-duration": 3000, "latency": 120, "bandwidth": 25, "mtu": 1500,
+    "enc": 0, "passphrase": "", "report": {"living-time-ms": 8970, "mode": "listener", "module-name": "mws_srt_sink_0",
+                                           "module-type": 114, "num-clients": 0}}]},
+    {"streams": {"srt_tx": {"1": {"enabled": True, "name": "srt_01", "mode": "listener", "remote_ip": "",
+                                  "remote_port": 8000, "bind_port": 10000, "stream_id": "1", "connect_timeout_ms": 3000,
+                                  "retry_ms": 3000, "latency_ms": 120, "bandwidth_percent": 25, "mtu": 1500,
+                                  "encryption": "none", "clients": 0, "uptime_ms": 8970}}}})
+_mwm("srt-receivers", "aes67", "/api/srt/receiver-info", {"status": 0, "srt": [{
+    "uid": 1, "enable": True, "name": "srt_01", "mode": 1, "remote-ip": "", "remote-port": 8000, "bind-port": 8000,
+    "stream-id": "1", "latency": 120, "is-encrypted": False, "passphrase": "", "buffer-duration": 120,
+    "headroom-db": 0, "format": {"sample-rate": 0, "channel-num": 0, "bit-depth": 0}, "report": {}}]},
+    {"streams": {"srt_rx": {"1": {"enabled": True, "name": "srt_01", "mode": "listener", "remote_ip": "",
+                                  "remote_port": 8000, "bind_port": 8000, "stream_id": "1", "latency_ms": 120,
+                                  "encrypted": False, "buffer_ms": 120, "headroom_db": 0, "sample_rate": 0,
+                                  "channels": 0, "bit_depth": 0}}}})
+_mwm("icecast-senders", "aes67", "/api/ices/sender-info", {"status": 0, "ices": [{
+    "uid": 1, "enable": True, "name": "test1", "service-url": "http://10.0.0.9:8000", "username": "source",
+    "password": "hackme", "state": "success"}]},
+    {"streams": {"icecast_tx": {"1": {"enabled": True, "name": "test1", "url": "http://10.0.0.9:8000",
+                                      "user": "source", "state": "success"}}}})
+_mwm("icecast-receivers", "aes67", "/api/ices/receiver-info", {"status": 0, "ices": [{
+    "uid": 1, "enable": True, "name": "icecast_01", "service-url": "http://10.0.0.9:1930", "room": "stream",
+    "buffer-duration": 500, "headroom-db": 0, "state": "fail",
+    "format": {"sample-rate": 0, "channel-num": 0, "bit-depth": 0, "coding-format": "NONE"}}]},
+    {"streams": {"icecast_rx": {"1": {"enabled": True, "name": "icecast_01", "url": "http://10.0.0.9:1930",
+                                      "room": "stream", "buffer_ms": 500, "headroom_db": 0, "state": "fail",
+                                      "sample_rate": 0, "channels": 0, "bit_depth": 0, "codec": "NONE"}}}})
+_mwm("icecast-streams", "aes67", "/api/ices/list-streams", {"streams": [
+    {"room": "icecast_02", "content-type": "audio/aac", "is-magewell": True}], "status": 0},
+    {"icecast": {"streams": {"0": {"room": "icecast_02", "content_type": "audio/aac", "magewell": True}}}})
+_mwm("matrix-aes67", "aes67", "/api/aes67/matrix-info", {
+    "status": 0, "max-tx-channels": 22, "max-rx-channels": 46,
+    "matrix": [{"tx-no": 0, "tx-mute": False, "tx-volume": 0, "mix-state": [1, 0], "rx-mute": [False, True],
+                "rx-volume": [0, -6]},
+               {"tx-no": 1, "tx-mute": True, "tx-volume": -3, "mix-state": [], "rx-mute": [], "rx-volume": []}],
+    "uac-rx": {"channel-num": 4},
+    "live-rx": {"type": 0, "lives": [{"type": 0, "name": "DESKTOP (Intel UHD Graphics 630 1)", "channel-num": 2}]},
+    "aes67-rx": [{"sink-idx": 0, "name": "Pro_Convert_AES67_1015_0_01", "channel-num": 2}],
+    "uac-tx": {"channel-num": 4}, "live-tx": {"ndi": ["D424211217005_0_01"], "srt": [], "ices": []},
+    "aes67-tx": [{"name": "Pro_Convert_AES67_7005_0_01", "channel-num": 2}]},
+    {"matrix": {"max_tx": 22, "max_rx": 46, "usb_rx_channels": 4, "usb_tx_channels": 4,
+                "tx": {"0": {"mute": False, "volume_db": 0,
+                             "rx": {"0": {"state": "connected", "mute": False, "volume_db": 0},
+                                    "1": {"state": "disconnected", "mute": True, "volume_db": -6}}},
+                       "1": {"mute": True, "volume_db": -3}},
+                "stream_rx": {"0": {"type": "ndi", "name": "DESKTOP (Intel UHD Graphics 630 1)", "channels": 2}},
+                "aes67_rx": {"0": {"sink": 0, "name": "Pro_Convert_AES67_1015_0_01", "channels": 2}},
+                "aes67_tx": {"0": {"name": "Pro_Convert_AES67_7005_0_01", "channels": 2}},
+                "live_tx": {"ndi": '["D424211217005_0_01"]', "srt": "[]", "icecast": "[]"}},
+     "stream": {"receiver_type": "ndi"}},
+    state_before={"matrix": {"tx": {"5": {"mute": True}}}})
+_mwm("matrix-dx", "audio-dx", "/api/aoip/matrix-info", {
+    "status": 0, "max-tx-channels": 32, "max-rx-channels": 32,
+    "matrix": [{"tx-no": 0, "tx-mute": False, "tx-volume": 0, "mix-state": [3], "rx-mute": [False], "rx-volume": [0]}],
+    "uac-rx": {"channel-num": 4},
+    "stream-rx": [{"stream-no": "Stream1", "stream-index": 4, "name": "NDI", "type": "ndi", "channel-num": 4}],
+    "uac-tx": {"channel-num": 4},
+    "stream-tx": [{"stream-no": "Stream1", "stream-index": 4, "name": "ndi-01", "type": "ndi", "channel-num": 4}]},
+    {"matrix": {"max_tx": 32, "max_rx": 32, "usb_rx_channels": 4, "usb_tx_channels": 4,
+                "tx": {"0": {"mute": False, "volume_db": 0,
+                             "rx": {"0": {"state": "failed", "mute": False, "volume_db": 0}}}},
+                "stream_rx": {"0": {"slot": "Stream1", "name": "NDI", "type": "ndi", "channels": 4}},
+                "stream_tx": {"0": {"slot": "Stream1", "name": "ndi-01", "type": "ndi", "channels": 4}}}})
+_mwm("matrix-desc", "audio-dx", "/api/aoip/matrix-desc", {
+    "status": 0, "max-tx-channels": 32, "max-rx-channels": 32,
+    "tx": [{"name": "Unbalance", "channel-count": 2, "channel-start": 0, "channel-end": 1, "show": True},
+           {"name": "Dante", "channel-count": 8, "channel-start": 8, "channel-end": 15, "show": True}],
+    "rx": [{"name": "Unused", "channel-count": 4, "channel-start": 28, "channel-end": 31, "show": False}]},
+    {"matrix": {"groups": {"tx": {"0": {"name": "Unbalance", "channels": 2, "first": 0, "last": 1, "shown": True},
+                                  "1": {"name": "Dante", "channels": 8, "first": 8, "last": 15, "shown": True}},
+                           "rx": {"0": {"name": "Unused", "channels": 4, "first": 28, "last": 31, "shown": False}}}}})
+_mwm("audio-meter", "aes67", "/api/aes67/audio-meter", {"tx-db": [-100, -81], "rx-db": [-88, -26.5], "status": 0},
+     {"meters": {"tx": {"0": -100.0, "1": -81.0}, "rx": {"0": -88.0, "1": -26.5}}})
+_mwm("dante-state", "audio-dx", "/api/dante/state", {
+    "device": {"deivce-lock": False},
+    "clock-basic": {"uuid": "FE:30:38:71:E3:C7", "master-uuid": "00:1D:C1:50:B6:D8",
+                    "grandmaster-uuid": "00:1D:C1:50:B6:D8", "is-mute": False, "is-locked": True, "freq-ppm": 2},
+    "clock-params": {"priority1": 254, "priority2": 116, "domain": 0, "sync-interval": 0, "announce-interval": 0,
+                     "ttl": 16},
+    "audio-format": {"sample-rate": 48000, "encoding": "PCM24"}, "status": 0},
+    {"dante": {"device_lock": False, "sample_rate": 48000, "encoding": "PCM24",
+               "clock": {"uuid": "FE:30:38:71:E3:C7", "leader": "00:1D:C1:50:B6:D8",
+                         "grandmaster": "00:1D:C1:50:B6:D8", "muted": False, "locked": True, "freq_ppm": 2,
+                         "priority1": 254, "priority2": 116, "domain": 0, "sync_interval": 0,
+                         "announce_interval": 0, "ttl": 16}}})
+_mwm("tx-streams", "audio-dx", "/api/tx/live-info", {
+    "stream-no-max": 2, "streaming-count-max": 16, "streaming-count": 2, "status": 0,
+    "streaming": [
+        {"uid": 3, "enable": True, "name": "RTSP Server", "stream-no": "Stream1", "type": "rtsp",
+         "rtsp": {"bind-port": 554, "max-client-num": 8, "key": "aud", "enable-auth": False, "username": "",
+                  "password": ""},
+         "aac-bitrate-kbps": "128", "report": {"num-clients": 1}},
+        {"uid": 9, "enable": False, "name": "TS over SRT", "stream-no": "Stream2", "type": "srt",
+         "srt": {"mode": "listener", "dst-ip": "", "dst-port": 8000, "bind-port": 10000, "stream-id": "12/12",
+                 "connect-timeout": 3000, "retry-duration": 3000, "latency": 120, "bandwidth": 25, "mtu": 1500,
+                 "enc": "disable", "passphrase": "", "enable-logo": False},
+         "aac-bitrate-kbps": "128", "report": {"mode": "listener"}}],
+    "discovery": [{"is-ndi": True, "ndi-name": "DESKTOP (Intel UHD Graphics 630 1)", "ndi-url": "192.168.65.2:5961"}]},
+    {"stream": {"tx_slots": 2, "tx_max_streams": 16, "tx_count": 2},
+     "streams": {"tx": {"3": {"enabled": True, "name": "RTSP Server", "slot": "Stream1", "type": "rtsp",
+                              "aac_kbps": 128, "rtsp_port": 554, "rtsp_max_clients": 8, "rtsp_key": "aud",
+                              "rtsp_auth": False, "rtsp_user": "", "clients": 1},
+                        "9": {"enabled": False, "name": "TS over SRT", "slot": "Stream2", "type": "srt",
+                              "aac_kbps": 128, "srt_mode": "listener", "srt_address": "", "srt_port": 8000,
+                              "srt_bind_port": 10000, "srt_stream_id": "12/12", "srt_connect_timeout_ms": 3000,
+                              "srt_retry_ms": 3000, "srt_latency_ms": 120, "srt_bandwidth_percent": 25,
+                              "srt_mtu": 1500, "srt_encryption": "disable"}}},
+     "ndi": {"failover_sources": {"0": {"name": "DESKTOP (Intel UHD Graphics 630 1)", "address": "192.168.65.2:5961"}}}})
+_mwm("rx-streams", "audio-dx", "/api/rx/live-info", {
+    "stream-no-max": 2, "mw-buffer-duration-min": 1, "mw-buffer-duration-max": 3000, "mw-buffer-duration-def": 100,
+    "gst-count-max": 16, "gst-count": 1, "status": 0,
+    "gst": [{"uid": 11, "enable": False, "name": "NDI", "stream-no": "Stream1",
+             "url": "ntkndi://ndi?ndi-name=DESKTOP (1)&ndi-url=&mw-buffer-duration=100"}],
+    "ndi-options": {"enable-discovery": False, "discovery-server": "", "group-name": "", "extra-ips": ""},
+    "discovery": []},
+    {"stream": {"rx_slots": 2, "rx_max_streams": 16, "rx_count": 1, "rx_buffer_min_ms": 1, "rx_buffer_max_ms": 3000,
+                "rx_buffer_default_ms": 100},
+     "streams": {"rx": {"11": {"enabled": False, "name": "NDI", "slot": "Stream1",
+                               "url": "ntkndi://ndi?ndi-name=DESKTOP (1)&ndi-url=&mw-buffer-duration=100"}}},
+     "ndi": {"discovery": {"enabled": False, "servers": ""}, "groups": "", "extra_ips": ""}},
+    state_before={"ndi": {"sources": {"0": {"name": "Gone"}}}})
+_mwm("device-info", "ip-to-usb", "/api/system/device-info", {
+    "device-name": "Pro Router ONE", "product-id": "0x601", "product-name": "Pro Router ONE", "hardware-rev": "B",
+    "serial-number": "0123456789", "firmware-ver": "0.9.210", "firmware-name": "Development",
+    "build-time": "2023-04-14 06:48:13", "capability": {"support-ntp": True, "support-ipv6": True}, "status": 0,
+    "code": "Success"},
+    {"device": {"name": "Pro Router ONE", "product_id": "0x601", "model": "Pro Router ONE", "hardware_revision": "B",
+                "serial": "0123456789", "firmware": "0.9.210", "firmware_name": "Development",
+                "build_time": "2023-04-14 06:48:13", "capabilities": '{"support-ntp":true,"support-ipv6":true}'}})
+_mwm("system-info-cpu", "aes67", "/api/system/info", {
+    "device-name": "USB Fusion", "uptime": 8410, "cpu": {"total": 1624896, "idle": 1281701, "usage": 2110},
+    "mem": {"total": 8069612, "avail": 7171768}, "status": 0},
+    {"device": {"name": "USB Fusion", "uptime": 8410, "cpu_usage": 21.1, "memory_total_kb": 8069612,
+                "memory_available_kb": 7171768}})
+_mwm("set-device-name-usb", "ip-to-usb", "/api/system/set-device-name",
+     {"status": 0, "code": "SUCCESS", "ext-need-reboot": True}, {"device": {"reboot_required": True}},
+     expect_then_send=[{"method": "POST", "target": "/api/system/info"}])
+_mwm("interfaces-aes67", "aes67", "/api/network/if-info", {"device-name": "AES67", "status": 0, "net": [
+    {"enable": True, "iface": "eth0", "type": 0, "use-dhcp": True, "ipaddr": "10.10.12.166", "netmask": "255.255.240.0",
+     "gateway": "10.10.0.1", "mac": "84:85:86:87:88:2e", "link-speed": 1000, "link-state": 2, "tx-speed-kbps": 0,
+     "rx-speed-kbps": 107},
+    {"enable": True, "iface": "usb0", "type": 3, "use-dhcp": True, "ipaddr": "192.168.66.1", "netmask": "255.255.255.0",
+     "gateway": "192.168.66.1", "mac": "8e:40:df:be:7c:fa", "link-speed": 480, "link-state": 2, "tx-speed-kbps": 0,
+     "rx-speed-kbps": 0}]},
+    {"network": {"interfaces": {
+        "eth0": {"enabled": True, "type": "ethernet", "dhcp": True, "ip_address": "10.10.12.166",
+                 "netmask": "255.255.240.0", "gateway": "10.10.0.1", "mac": "84:85:86:87:88:2e", "link_speed": 1000,
+                 "link_state": "connected", "tx_kbps": 0, "rx_kbps": 107},
+        "usb0": {"enabled": True, "type": "usb", "dhcp": True, "ip_address": "192.168.66.1",
+                 "netmask": "255.255.255.0", "gateway": "192.168.66.1", "mac": "8e:40:df:be:7c:fa", "link_speed": 480,
+                 "link_state": "connected", "tx_kbps": 0, "rx_kbps": 0}}}},
+    state_before={"network": {"interfaces": {"wlan0": {"enabled": True}}}})
+_mwm("interfaces-usb", "ip-to-usb", "/api/network/if-info", {"device-name": "00A601230913015", "status": 0, "net": [
+    {"support-enable": False, "enable": True, "prio": 34, "iface": "eth0", "type": 0, "use-dhcp": True,
+     "ipaddr": "10.10.6.222", "netmask": "255.255.240.0", "gateway": "10.10.0.1", "dns1": "10.10.1.3", "dns2": "",
+     "mac": "d0:c8:57:81:c7:5e", "link-speed": 1000, "link-state": 2, "tx-speed-kbps": 0, "rx-speed-kbps": 35},
+    {"enable": True, "iface": "usb0", "type": 3, "use-dhcp": True, "ipaddr": "192.168.66.1", "link-state": 1}]},
+    {"network": {"interfaces": {
+        "eth0": {"enabled": True, "type": "ethernet", "dhcp": True, "ip_address": "10.10.6.222",
+                 "netmask": "255.255.240.0", "gateway": "10.10.0.1", "dns1": "10.10.1.3", "dns2": "",
+                 "mac": "d0:c8:57:81:c7:5e", "link_speed": 1000, "link_state": "connected", "tx_kbps": 0,
+                 "rx_kbps": 35},
+        "usb0": {"enabled": True, "type": "usb", "dhcp": True, "ip_address": "192.168.66.1",
+                 "link_state": "disconnected"}}}})
+_mwm("default-route", "audio-dx", "/api/network/if-route", {"iface": "eth0", "status": 0},
+     {"network": {"default_route": "eth0"}})
+_mwm("dns", "aes67", "/api/network/get-dns", {"is-manual": False, "dns1": "10.0.1.3", "dns2": "", "status": 0},
+     {"network": {"dns": {"manual": False, "primary": "10.0.1.3", "secondary": ""}}})
+_mwm("usb-mode", "ip-to-usb", "/api/system/usb-mode/get",
+     {"data": {"mode": "Normal mode"}, "status": 0, "code": "Success"}, {"usb": {"mode": "video-conferencing"}})
+_mwm("video-config-usb", "ip-to-usb", "/api/video/config/get",
+     {"status": 0, "code": "Success", "data": {"h_flip": True, "v_flip": False, "ar_convert_mode": "Windowbox"}},
+     {"video": {"h_flip": True, "v_flip": False, "aspect_conversion": "windowbox"}})
+_mwm("ndi-discovery-usb", "ip-to-usb", "/api/ndi/config/get", {"status": 0, "code": "Success", "data": {
+    "enable": True, "discovery_server": "192.168.66.1,192.168.66.2", "groups": "public"}},
+    {"ndi": {"discovery": {"enabled": True, "servers": "192.168.66.1,192.168.66.2"}, "groups": "public"}})
+_mwm("no-signal-image", "ip-to-usb", "/api/resource/image/get", {"status": 0, "code": "Success", "data": {
+    "id": "no_signal_1", "type": "simple", "path": "/static/img/no_signal.png", "is_default": True}},
+    {"video": {"no_signal_images": {"no_signal_1": {"path": "/static/img/no_signal.png", "default": True}}}})
+_mwm("sources-usb", "ip-to-usb", "/api/source/list?type=static", {
+    "status": 0, "code": "Success", "page": 1, "page_size": 25, "total": 2, "selected": 1, "data": [
+        {"id": 1, "config": {"name": "name1", "protocol": "ndi", "type": "ndi", "data": {
+            "name": "ULTRA ENCODE (C315230423002-2)", "url": "100.100.33.21:5000", "low_bw": False, "transport": "tcp",
+            "pts_mode": "auto", "buffer_ms": 60}}},
+        {"id": 2, "config": {"name": "name2", "protocol": "rtsp", "type": "url", "data": {
+            "url": "100.100.33.21:5000", "buffer_ms": 60, "ptz_en": True, "ptz": {
+                "protocol": "VISCA over UDP", "ip": "192.168.1.1", "port": 3000, "device_id": 1,
+                "message_header": True, "invert_pan": False, "invert_tilt": False}}}}]},
+    {"source": {"selected_id": 1},
+     "sources": {"1": {"name": "name1", "protocol": "ndi", "source_type": "ndi", "buffer_ms": 60, "kind": "static",
+                       "ndi_name": "ULTRA ENCODE (C315230423002-2)", "ndi_url": "100.100.33.21:5000",
+                       "low_bandwidth": False, "transport": "tcp", "pts_mode": "auto"},
+                 "2": {"name": "name2", "protocol": "rtsp", "source_type": "url", "buffer_ms": 60, "kind": "static",
+                       "url": "100.100.33.21:5000", "ptz_enabled": True,
+                       "ptz": {"protocol": "VISCA over UDP", "address": "192.168.1.1", "port": 3000, "camera": 1,
+                               "header": True, "invert_pan": False, "invert_tilt": False}}}},
+    state_before={"sources": {"7": {"name": "Gone"}}})
+_mwm("discovered-usb", "ip-to-usb", "/api/source/list?type=dynamic", {
+    "status": 0, "code": "Success", "selected": 0, "data": [
+        {"id": 5, "config": {"name": "CAM (1)", "protocol": "ndi", "type": "d_ndi",
+                             "data": {"name": "CAM (1)", "url": "10.0.0.5:5961"}}}]},
+    {"source": {"selected_id": 0}, "ndi": {"discovered": {"5": {"name": "CAM (1)", "address": "10.0.0.5:5961"}}}})
+_mwm("stream-status-usb", "ip-to-usb", "/api/stream/status/get", {"status": 0, "code": "Success", "data": {
+    "audio": {"codec": "ADTS", "jitter": 118856, "kbps": 123, "sample_rate": 48000, "bit_count": 16, "channels": 2,
+              "drops": 0},
+    "video": {"codec": "H264", "jitter": 210575, "kbps": 8029, "width": 1920, "height": 1080, "field_rate": 60.0,
+              "drops": 0},
+    "extra": {"tally_preview": False, "tally_program": True}, "state": 2, "uptime": 2028, "name": "NDI Server",
+    "protocol": "ndi"}},
+    {"stream": {"name": "NDI Server", "protocol": "ndi", "state": 2, "uptime_ms": 2028,
+                "video": {"codec": "H264", "jitter": 210575, "kbps": 8029, "width": 1920, "height": 1080,
+                          "field_rate": 60.0, "drops": 0},
+                "audio": {"codec": "ADTS", "jitter": 118856, "kbps": 123, "sample_rate": 48000, "bit_depth": 16,
+                          "channels": 2, "drops": 0}},
+     "tally": {"preview": False, "program": True}})
+
+# Re-reads after a change on the new models.
+for _name, _model, _path, _sends in [
+    ("reread-ntp", "aes67", "/api/system/set-date-time", [("POST", "/api/system/info")]),
+    ("reread-if-set", "audio-dx", "/api/network/if-set", [("POST", "/api/network/if-info")]),
+    ("reread-dns", "aes67", "/api/network/set-dns", [("POST", "/api/network/get-dns")]),
+    ("reread-general-aes67", "aes67", "/api/aes67/general-settings", [("POST", "/api/aes67/general-info")]),
+    ("reread-general-dx", "audio-dx", "/api/aoip/general-apply", [("POST", "/api/aoip/general-info")]),
+    ("reread-ptp", "aes67", "/api/aes67/ptp-settings", [("POST", "/api/aes67/ptp-info")]),
+    ("reread-aes67-sources", "aes67", "/api/aes67/source-del",
+     [("POST", "/api/aes67/source-info"), ("POST", "/api/aes67/matrix-info")]),
+    ("reread-aes67-sinks", "aes67", "/api/aes67/sink-apply",
+     [("POST", "/api/aes67/sink-info"), ("POST", "/api/aes67/matrix-info")]),
+    ("reread-ndi-receivers", "aes67", "/api/ndi/receiver-options",
+     [("POST", "/api/ndi/receiver-info"), ("POST", "/api/aes67/matrix-info")]),
+    ("reread-icecast-senders", "aes67", "/api/ices/sender-update",
+     [("POST", "/api/ices/sender-info"), ("POST", "/api/aes67/matrix-info")]),
+    ("reread-receiver-select", "aes67", "/api/ices/receiver-select", [("POST", "/api/aes67/matrix-info")]),
+    ("reread-matrix-dx", "audio-dx", "/api/aoip/volume-mix", [("POST", "/api/aoip/matrix-info")]),
+    ("reread-rx-streams", "audio-dx", "/api/rx/ndi-options-apply",
+     [("POST", "/api/rx/live-info"), ("POST", "/api/aoip/matrix-info")]),
+    ("reread-usb-mode", "ip-to-usb", "/api/system/usb-mode/update", [("GET", "/api/system/usb-mode/get")]),
+    ("reread-video-config-usb", "ip-to-usb", "/api/video/config/update", [("GET", "/api/video/config/get")]),
+    ("reread-ndi-usb", "ip-to-usb", "/api/ndi/config/update", [("GET", "/api/ndi/config/get")]),
+    ("reread-sources-usb", "ip-to-usb", "/api/source/select",
+     [("GET", "/api/source/list?type=static"), ("GET", "/api/source/list?type=dynamic")]),
+]:
+    _mwm(_name, _model, _path, '{"status":0}', {},
+         expect_then_send=[{"method": m, "target": t} for m, t in _sends])
+_mwm("reread-image-upload", "ip-to-usb", "/api/resource/image/upload", '{"status":0,"code":"Success"}', {},
+     expect_then_send=[{"method": "POST", "target": "/api/resource/image/get",
+                        "body": '{"id":"no_signal_1","type":"simple"}'}])
+V.append({"spec": MW, "telemetry": "reread-image-delete", "model": "ip-to-usb",
+          "inbound_http": {"path": "/api/resource/image/delete", "request": json.loads('{"id":"no_signal_2"}'), "body": '{"status":0,"code":"success"}'},
+          "expect_state": {}, "expect_then_send": [{"method": "POST", "target": "/api/resource/image/get",
+                                                     "body": '{"id":"no_signal_2","type":"simple"}'}]})
+V.append({"spec": MW, "telemetry": "reread-sink-statistics", "model": "aes67",
+          "inbound_http": {"path": "/api/aes67/sink-statistics-clear", "request": json.loads('{"sink-idx":1}'), "body": '{"status":0}'},
+          "expect_state": {}, "expect_then_send": [{"method": "POST", "target": "/api/aes67/sink-statistics",
+                                                     "body": '{"sink-idx":1}'}]})

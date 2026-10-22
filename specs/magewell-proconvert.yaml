@@ -25,7 +25,7 @@ source:
       reference-level 20 (SMPTE) or 14 (EBU) (sections 9.1-9.2);
       get-ndi-sources; get-tally and set-tally ext-tally (9.4-9.5). Retrieved
       again 2026-10-09 for the rest of the video configuration (the input and
-      output auto switches, colour space, quantization and saturation range,
+      output auto switches, color space, quantization and saturation range,
       aspect ratios, frame-rate conversion, ar-convertion, low-res-full-fr,
       reset-video-config), the NDI vendor fields, get-ptz-config,
       set-ptz-config and arrange-ptz-cameras, get-edid-config,
@@ -84,6 +84,57 @@ source:
       ZEN Master get and set; and the base pages Get basic info
       (POST /api/system/info, with the reboot schedule and NTP), Schedule
       automatic reboots and Set device name.
+  - title: "Magewell Pro Convert AES67 API V2.0 (firmware V1.2.433 and later), and V1.0 (firmware up through V1.2.402)"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/pro-convert-aes67-api/lastest/"
+    note: >
+      Manufacturer-documented, public (the PDF of V2.0 at
+      /api-docs/pro-convert-aes67-api/lastest/pro-convert-aes67-api-en_US.pdf,
+      dated 2024-07-05; V1.0 at /api-docs/pro-convert-aes67-api/v1.0/,
+      2023-03-01). Retrieved 2026-10-22. JSON over HTTP POST, a status in every
+      reply and the same status codes (1.2-1.3); login with the SHA-256 of the
+      password and the sid cookie (18.1); ping, reboot (2.1-2.2); summary-info
+      with the analog, USB audio, AES67 source and sink state (3.1);
+      general-info and general-settings: AES67 sample rate and packet time,
+      analog levels, MIC bias, IGMP, AAC bitrate, test tone (4.1-4.2);
+      ptp-info, ptp-settings, ptp-default, ptp-state (5.1-5.4); AES67 TX
+      source-info, -apply, -update, -del (6); AES67 RX sink-info, -apply,
+      -update, -del, sink-statistics, sink-statistics-clear, sdp-parse (7);
+      receiver-select (8.1); NDI, SRT and Icecast senders and receivers with
+      info, apply, update, del, find and options (9-14); the audio matrix
+      matrix-info, audio-meter, audio-meter-limit, matrix-meter,
+      matrix-settings, matrix-clear, volume-tx, volume-mix (15); device-info,
+      info, set-device-name, set-date-time, timezone-set (16); if-info,
+      if-set, if-route, get-dns, set-dns (17). V1.0 has no update methods,
+      and gives the Icecast receiver's apply as POST /api/ices/receiver-apply,
+      which V2.0's section 14.2 misprints as /api/live/receiver-select.
+  - title: "Magewell Pro Convert Audio DX API (unversioned)"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/pro-convert-audio-dx-api/"
+    note: >
+      Manufacturer-documented, public (PDF dated 2024-07-04). Retrieved
+      2026-10-22. The same agreement, status codes and login as the AES67 API
+      (1.2-1.3, 11.1); summary-info (3.1); general-range, general-info and
+      general-apply with the levels as text (4.1-4.3); tx-live-info, -apply,
+      -del for RTSP, TS over SRT and NDI streams, rx-live-info, -apply, -del
+      with SRT and NDI URLs, rx-ndi-options-apply (5); matrix-desc and the
+      audio matrix under /api/aoip (6); dante-state (7.1); the same system and
+      network methods (8-9). Its auto-reboot (8.6) and Certificate (10) pages
+      are listed but have no content.
+  - title: "Magewell Pro Convert IP to USB API (unversioned)"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/pro-convert-ip-to-usb-api/"
+    note: >
+      Manufacturer-documented, public (PDF dated 2025-08-22). Retrieved
+      2026-10-22. Each method's administrator and login requirements, a
+      status and code in every reply; ping, reboot (2); auto-reboot,
+      device-info, info, set-device-name, set-date-time, timezone-set,
+      summary/get, usb-mode/get and /update (3); video/config/get and
+      /update (4); ndi/config/get and /update (5); the no-signal image
+      upload, delete and get (6); source list, add, update, delete and
+      select with NDI, discovered NDI and URL sources (7); stream/status/get
+      (8); if-info and if-set (9); login with the sid-<serial number> cookie
+      (10.1).
   - title: "Pro Convert Decoder User Manual, and the Pro Convert knowledge base"
     author: Magewell
     url: "https://www.magewell.com/files/documents/User_Manual/ProConvert_Decoder-UserManual_en_US.pdf"
@@ -95,7 +146,7 @@ source:
     author: Bitfocus
     url: "https://github.com/bitfocus/companion-module-magewell-proconvert-decoder"
     note: >
-      Community source (MIT licence), read as corroboration only: it logs in
+      Community source (MIT license), read as corroboration only: it logs in
       with GET login and the MD5 of the password, sends the session cookie it
       received on every request, logs in again on status 37, and polls; there
       is no push.
@@ -113,7 +164,7 @@ settings:
     default: Admin
     max_length: 64
     label: Password
-    description: "That user's password; the core sends only its MD5 (encoders, NDI decoders) or SHA-256 (IP decoders) hash."
+    description: "That user's password; the core sends only its MD5 (encoders, NDI decoders) or SHA-256 (IP decoders, AES67, Audio DX, IP to USB) hash."
   scheme:
     type: enum
     values: [http, https]
@@ -127,8 +178,9 @@ ports:
 
 # Two APIs: the encoders and first-generation NDI decoders take
 # GET /mwapi?method=<name> (Encoder API, Decoder API V1.3), the IP decoders
-# JSON under /api (IP Decoder API V1.2). Each message names the models it is
-# for. Every reply carries an integer status, 0 for success.
+# JSON under /api (IP Decoder API V1.2, and the AES67, Audio DX and IP to USB
+# APIs, which share its login and system methods). Each message names the
+# models it is for. Every reply carries an integer status, 0 for success.
 transport:
   type: http
   port: 80
@@ -143,15 +195,20 @@ transport:
                      ndi-to-hdmi, ndi-to-sdi, ndi-to-aio, ndi-to-hdmi-4k],
         method: GET, path: /mwapi, query: { method: ping } }
     - { models: &ip [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k], method: GET, path: /api/ping }
+    # AES67 API 2.1, Audio DX API 2.1, IP to USB API 2.1.
+    - { models: &newapi [aes67, audio-dx, ip-to-usb], method: GET, path: /api/ping }
   # The session ID comes back only in Set-Cookie (sid, or sid-<serial number>
-  # on the IP decoders) and goes back as a cookie on every later request.
+  # on the IP decoders and IP to USB) and goes back as a cookie on every later
+  # request.
   session:
     login:
       # Encoder API section 4: id and the MD5 of the password.
       - { models: *mw, method: GET, path: /mwapi,
           query: { method: login, id: "{settings.username}", pass: "{settings.password:md5}" } }
-      # IP Decoder API section 15: the SHA-256 of the password, as JSON.
-      - { models: *ip, method: POST, path: /api/user/login, content_type: application/json,
+      # IP Decoder API section 15, AES67 API 18.1, Audio DX API 11.1, IP to
+      # USB API 10.1: the SHA-256 of the password, as JSON.
+      - { models: &base [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k, aes67, audio-dx, ip-to-usb],
+          method: POST, path: /api/user/login, content_type: application/json,
           body: '{"username":{settings.username:json},"password":"{settings.password:sha256}"}' }
     capture: { cookie: "*" }
     # 37 "not logged in": the session ended (a restart, or idle).
@@ -248,6 +305,29 @@ maps:
   hdr_output_ip: { auto: "0", disable: "1", hdr-pq: "2", hlg: "3" }
   signal_loss_ip: { no-signal-image: "0", black: "1", last-frame: "2", output-off: "3" }
   config_mode_ip: { simple: "1", profile: "2" }
+  # AES67 API section 4.2: the analog levels, IGMP and test tone as numbers.
+  unbld_level_aes67: { "+12dBu": "0", "+4dBu": "1", "0dBu": "2", "-2dBu": "3", "0dBV": "4", "-10dBV": "5" }
+  bld_in_level_aes67: { "+24dBu": "0", "+18dBu": "1", "+4dBu": "2", "0dBu": "3", "-2dBu": "4", "0dBV": "5", "-10dBV": "6" }
+  bld_out_level_aes67: { "+18dBu": "0", "+4dBu": "1", "0dBu": "2", "-2dBu": "3", "0dBV": "4", "-10dBV": "5" }
+  igmp_aes67: { auto: "0", v2: "2", v3: "3" }
+  test_tone_aes67: { "off": "0", analog-input: "1", analog-output: "2" }
+  # Audio DX API sections 4.1-4.3: the same as text, -2 dB on the balanced
+  # connectors written -2dBV in general-range.
+  bld_level_dx: { "+24dBu": "+24dBu", "+18dBu": "+18dBu", "+4dBu": "+4dBu", "0dBu": "0dBu", "-2dBu": "-2dBV", "0dBV": "0dBV", "-10dBV": "-10dBV" }
+  igmp_dx: { auto: Auto, v2: IGMPv2, v3: IGMPv3 }
+  test_tone_dx: { "off": "off", analog-input: input, analog-output: output }
+  # AES67 API sections 5 and 8-14.
+  ptp_role: { auto: Auto, follower: Slaver }
+  stream_receiver: { ndi: "0", srt: "1", icecast: "2" }
+  # IP to USB API sections 3.9, 4.2 and 7.1.
+  usb_mode: { video-conferencing: Normal mode, content-sharing: Content mode }
+  ar_convert_usb: { windowbox: Windowbox, zoom: Crop, full: Stretch }
+  usb_source_list: { static: static, discovered: dynamic }
+
+conversions:
+  # /api/system/info's cpu.usage is the CPU load in percent times 100.
+  percent_x100:
+    points: [[0, 0.0], [10000, 100.0]]
 
 models:
   - id: hdmi-4k-plus
@@ -354,13 +434,67 @@ models:
     name: "Magewell Pro Convert IP to AIO 4K"
     supports: *ipdecoder
     verification: none
+  - id: aes67
+    name: "Magewell Pro Convert AES67"
+    supports:
+      [ping, reboot, get_summary, get_device_info, get_system_info, set_device_name, set_ntp, set_clock,
+       set_timezone, get_network_interfaces, set_network_dhcp, set_network_address, get_default_route, get_dns,
+       set_dns_manual, set_dns_auto, get_general_settings, set_aes67_sample_rate, set_aes67_packet_time,
+       set_stream_aac_bitrate, set_unbalanced_input_level, set_unbalanced_output_level, set_balanced_input_level,
+       set_balanced_output_level, set_mic_bias, set_igmp_version, set_test_tone, get_ptp_settings, get_ptp_state,
+       set_ptp_version, set_ptp_priority, set_ptp_domain, set_ptp_role, set_ptp_delay_mechanism, set_ptp_intervals,
+       reset_ptp, get_aes67_sources, apply_aes67_source, update_aes67_source, set_aes67_source_enabled,
+       delete_aes67_source, get_aes67_sinks, apply_aes67_sink, update_aes67_sink, delete_aes67_sink,
+       get_sink_statistics, clear_sink_statistics, parse_sdp, select_stream_receiver, get_ndi_senders,
+       apply_ndi_sender, update_ndi_sender, set_ndi_sender_enabled, delete_ndi_sender, find_ndi_failover_sources,
+       set_ndi_sender_discovery, get_ndi_receivers, apply_ndi_receiver, update_ndi_receiver,
+       set_ndi_receiver_enabled, delete_ndi_receiver, find_ndi_sources, set_ndi_receiver_options, get_srt_senders,
+       apply_srt_sender, update_srt_sender, set_srt_sender_enabled, delete_srt_sender, get_srt_receivers,
+       apply_srt_receiver, update_srt_receiver, set_srt_receiver_enabled, delete_srt_receiver,
+       get_icecast_senders, apply_icecast_sender, update_icecast_sender, set_icecast_sender_enabled,
+       delete_icecast_sender, get_icecast_receivers, apply_icecast_receiver, update_icecast_receiver,
+       set_icecast_receiver_enabled, delete_icecast_receiver, list_icecast_streams, get_matrix, get_audio_meters,
+       get_channel_meters, get_crosspoint_meter, set_crosspoint, set_crosspoints, clear_matrix, set_tx_volume,
+       set_crosspoint_volume]
+    verification: none
+    notes: >
+      AES67 audio gateway with analog, USB audio, NDI, SRT and Icecast
+      streams and an audio matrix (AES67 API V2.0; V1.0 firmware lacks the
+      update methods).
+  - id: audio-dx
+    name: "Magewell Pro Convert Audio DX"
+    supports:
+      [ping, reboot, get_summary, get_device_info, get_system_info, set_device_name, set_ntp, set_clock,
+       set_timezone, get_network_interfaces, set_network_dhcp, set_network_address, get_default_route, get_dns,
+       set_dns_manual, set_dns_auto, get_general_settings, get_general_range, set_dx_sample_rate,
+       set_unbalanced_input_level, set_unbalanced_output_level, set_balanced_input_level,
+       set_balanced_output_level, set_mic_bias, set_igmp_version, set_test_tone, get_tx_streams, apply_tx_stream,
+       delete_tx_stream, get_rx_streams, apply_rx_stream, delete_rx_stream, set_rx_ndi_options, get_matrix,
+       get_matrix_layout, get_audio_meters, get_channel_meters, set_crosspoint, set_crosspoints, clear_matrix,
+       set_tx_volume, set_crosspoint_volume, get_dante_state]
+    verification: none
+    notes: >
+      Dante audio gateway with analog, USB audio, RTSP, SRT and NDI streams
+      and an audio matrix (Audio DX API).
+  - id: ip-to-usb
+    name: "Magewell Pro Convert IP to USB"
+    supports:
+      [ping, reboot, get_summary, get_device_info, get_system_info, set_device_name, set_ntp, set_clock,
+       set_timezone, set_auto_reboot_days, get_network_interfaces, set_network_dhcp, set_network_static,
+       get_usb_mode, set_usb_mode, get_video_config, set_decoder_flip, set_aspect_conversion, get_ndi_discovery,
+       set_usb_ndi_discovery, get_no_signal_image, upload_no_signal_image, delete_no_signal_image, get_usb_sources,
+       add_source, add_usb_ndi_source, modify_source, delete_source, select_source, get_stream_status]
+    verification: none
+    notes: >
+      Decodes an NDI, NDI|HX, SRT, RTMP, RTSP, HTTP, UDP or RTP stream to a
+      USB video (UVC) and audio device (IP to USB API).
 
 commands:
   ping:
     summary: "Check the device is ready; needs no login (ping)"
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: ping }, session: false }
-      - { models: *ip, method: GET, path: /api/ping, session: false }
+      - { models: *base, method: GET, path: /api/ping, session: false }
     # Every reply: HTTP 200 and status 0; any other status fails with its code.
     expect: &ok { status: 200, code_path: "$.status", code_range: [0, 0] }
     returns: ack
@@ -368,14 +502,17 @@ commands:
     summary: "Restart the device; its output stops until it is back (reboot)"
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: reboot } }
-      - { models: *ip, method: POST, path: /api/reboot }
+      - { models: *base, method: POST, path: /api/reboot }
     expect: *ok
     returns: ack
   get_summary:
-    summary: "Device, network and NDI status: model, firmware, input or output state, temperature, NDI stream and tally (get-summary-info, or /api/system/summary)"
+    summary: "Device, network and stream status: model, firmware, input or output state, temperature, NDI stream and tally; on the audio models the connectors and AES67 streams; on IP to USB the temperature (get-summary-info, /api/system/summary, summary-info or /api/system/summary/get)"
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: get-summary-info } }
       - { models: *ip, method: GET, path: /api/system/summary }
+      - { models: [aes67], method: POST, path: /api/aes67/summary-info }
+      - { models: [audio-dx], method: POST, path: /api/aoip/summary-info }
+      - { models: [ip-to-usb], method: POST, path: /api/system/summary/get }
     expect: &value { status: 200, code_path: "$.status", code_range: [0, 0], json_path: "$" }
     returns: value
   get_caps:
@@ -384,7 +521,7 @@ commands:
     expect: *value
     returns: value
   get_signal_info:
-    summary: "The input signal (encoders) or decoded source (decoders): format, colour, audio (get-signal-info, or /api/signal/info)"
+    summary: "The input signal (encoders) or decoded source (decoders): format, color, audio (get-signal-info, or /api/signal/info)"
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: get-signal-info } }
       - { models: *ip, method: GET, path: /api/signal/info }
@@ -394,7 +531,7 @@ commands:
     summary: "Video settings (get-video-config, or GET /api/video/config/get)"
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: get-video-config } }
-      - { models: *ip, method: GET, path: /api/video/config/get }
+      - { models: [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k, ip-to-usb], method: GET, path: /api/video/config/get }
     expect: *value
     returns: value
   get_ndi_config:
@@ -580,15 +717,15 @@ commands:
     summary: "Detect an input or output property automatically, or use the value set (set-video-config in-auto-* and out-auto-*)"
     params:
       setting: { type: enum, values: [input-aspect, input-color-format, input-quant-range, output-aspect, output-color-format, output-sat-range, output-quant-range],
-        required: true, label: Setting, description: "The property: input or output aspect ratio, colour space, saturation range or quantization range." }
+        required: true, label: Setting, description: "The property: input or output aspect ratio, color space, saturation range or quantization range." }
       enabled: { type: bool, required: true, label: Automatic, description: "On detects the property from the signal; off uses the value set with its own command." }
     send: { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-video-config&{setting:map.video_auto_field}={enabled}" }
     expect: *ok
     returns: ack
   set_input_color_format:
-    summary: "Fixed input colour space (set-video-config in-auto-color-fmt=false, in-color-fmt)"
+    summary: "Fixed input color space (set-video-config in-auto-color-fmt=false, in-color-fmt)"
     params:
-      format: { type: enum, values: [rgb, bt.601, bt.709, bt.2020], required: true, label: Input colour space, description: "The input's colour space, used instead of the one detected." }
+      format: { type: enum, values: [rgb, bt.601, bt.709, bt.2020], required: true, label: Input color space, description: "The input's color space, used instead of the one detected." }
     send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-color-fmt: "false", in-color-fmt: "{format}" } }
     expect: *ok
     returns: ack
@@ -616,9 +753,9 @@ commands:
     expect: *ok
     returns: ack
   set_output_color_format:
-    summary: "Fixed NDI output colour space (set-video-config out-auto-color-fmt=false, out-color-fmt)"
+    summary: "Fixed NDI output color space (set-video-config out-auto-color-fmt=false, out-color-fmt)"
     params:
-      format: { type: enum, values: [bt.601, bt.709, bt.2020], required: true, label: Output colour space, description: "The colour space the stream is sent in, used instead of the automatic choice." }
+      format: { type: enum, values: [bt.601, bt.709, bt.2020], required: true, label: Output color space, description: "The color space the stream is sent in, used instead of the automatic choice." }
     send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-auto-color-fmt: "false", out-color-fmt: "{format}" } }
     expect: *ok
     returns: ack
@@ -704,13 +841,13 @@ commands:
     expect: *ok
     returns: ack
   set_ptz_limits:
-    summary: "PTZ travel limits and centre (set-ptz-config pan-*, tilt-*, zoom-out-limit, focus-near-limit, focus-far-limit)"
+    summary: "PTZ travel limits and center (set-ptz-config pan-*, tilt-*, zoom-out-limit, focus-near-limit, focus-far-limit)"
     params:
       pan_left: { type: int, min: -32768, max: 32767, required: true, label: Pan left, description: "Pan left limit in camera units." }
-      pan_center: { type: int, min: -32768, max: 32767, required: true, label: Pan centre, description: "Pan centre in camera units." }
+      pan_center: { type: int, min: -32768, max: 32767, required: true, label: Pan center, description: "Pan center in camera units." }
       pan_right: { type: int, min: -32768, max: 32767, required: true, label: Pan right, description: "Pan right limit in camera units." }
       tilt_top: { type: int, min: -32768, max: 32767, required: true, label: Tilt top, description: "Tilt top limit in camera units." }
-      tilt_center: { type: int, min: -32768, max: 32767, required: true, label: Tilt centre, description: "Tilt centre in camera units." }
+      tilt_center: { type: int, min: -32768, max: 32767, required: true, label: Tilt center, description: "Tilt center in camera units." }
       tilt_bottom: { type: int, min: -32768, max: 32767, required: true, label: Tilt bottom, description: "Tilt bottom limit in camera units." }
       zoom_out: { type: int, min: 0, max: 32767, required: true, label: Zoom out limit, description: "Widest zoom position in camera units." }
       focus_near: { type: int, min: 0, max: 65535, required: true, label: Focus near limit, description: "Nearest focus position in camera units." }
@@ -825,9 +962,9 @@ commands:
     expect: *ok
     returns: ack
   set_overlay:
-    summary: "Show or hide an overlay on the decoded output: title, tally, VU meter or centre cross (set-video-config, or /api/video/config/set)"
+    summary: "Show or hide an overlay on the decoded output: title, tally, VU meter or center cross (set-video-config, or /api/video/config/set)"
     params:
-      overlay: { type: enum, values: [title, tally, vu-meter, center-cross], required: true, label: Overlay, description: "The source title, a tally border, audio meters, or a centre cross." }
+      overlay: { type: enum, values: [title, tally, vu-meter, center-cross], required: true, label: Overlay, description: "The source title, a tally border, audio meters, or a center cross." }
       visible: { type: bool, required: true, label: Visible, description: "On shows the overlay." }
     send:
       - { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-video-config&{overlay:map.overlay_field}={visible}" }
@@ -843,17 +980,19 @@ commands:
     expect: *ok
     returns: ack
   set_aspect_conversion:
-    summary: "How a source of another aspect ratio is fitted (set-video-config ar-convert-mode, or /api/video/config/set ar-convert)"
+    summary: "How a source of another aspect ratio is fitted (set-video-config ar-convert-mode, /api/video/config/set ar-convert, or /api/video/config/update ar_convert_mode)"
     params:
       mode: { type: enum, values: [windowbox, full, zoom], required: true, label: Aspect conversion, description: "Letterbox or pillarbox (windowbox), stretch (full), or crop (zoom)." }
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, ar-convert-mode: "{mode}" } }
       - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json,
           body: '{"ar-convert":{mode:map.ar_convert_ip}}' }
+      - { models: [ip-to-usb], method: POST, path: /api/video/config/update, content_type: application/json,
+          body: '{"data":{"ar_convert_mode":"{mode:map.ar_convert_usb}"}}' }
     expect: *ok
     returns: ack
   set_decoder_flip:
-    summary: "Flip the decoded output horizontally or vertically (set-video-config h-flip, v-flip, or /api/video/config/set)"
+    summary: "Flip the decoded output horizontally or vertically (set-video-config h-flip, v-flip, /api/video/config/set, or /api/video/config/update h_flip, v_flip)"
     params:
       horizontal: { type: bool, default: false, label: Horizontal flip, description: "On mirrors left to right." }
       vertical: { type: bool, default: false, label: Vertical flip, description: "On flips upside down." }
@@ -861,6 +1000,8 @@ commands:
       - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, h-flip: "{horizontal}", v-flip: "{vertical}" } }
       - { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json,
           body: '{"h-flip":{horizontal},"v-flip":{vertical}}' }
+      - { models: [ip-to-usb], method: POST, path: /api/video/config/update, content_type: application/json,
+          body: '{"data":{"h_flip":{horizontal},"v_flip":{vertical}}}' }
     expect: *ok
     returns: ack
   set_buffer_duration:
@@ -911,14 +1052,14 @@ commands:
     expect: *value
     returns: value
   get_video_format:
-    summary: "Output colour format and quantization range (get-video-format)"
+    summary: "Output color format and quantization range (get-video-format)"
     send: { models: *mw, method: GET, path: /mwapi, query: { method: get-video-format } }
     expect: *value
     returns: value
   set_output_format:
-    summary: "Output colour format and quantization range (set-video-format, or /api/video/config/set color-format, quant-range)"
+    summary: "Output color format and quantization range (set-video-format, or /api/video/config/set color-format, quant-range)"
     params:
-      color_format: { type: enum, values: [rgb, yuv444, yuv422], required: true, label: Colour format, description: "RGB, or YUV 4:4:4 or 4:2:2 on the output." }
+      color_format: { type: enum, values: [rgb, yuv444, yuv422], required: true, label: Color format, description: "RGB, or YUV 4:4:4 or 4:2:2 on the output." }
       quant_range: { type: enum, values: [limited, full], default: limited, label: Range, description: "Limited or full levels; applies to RGB only." }
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: set-video-format, color-format: "{color_format}", quant-range: "{quant_range}" } }
@@ -1010,16 +1151,16 @@ commands:
     expect: *ok
     returns: ack
   set_decoder_input_color_format:
-    summary: "Fixed source colour space (set-video-config in-auto-color-fmt=false, in-color-fmt)"
+    summary: "Fixed source color space (set-video-config in-auto-color-fmt=false, in-color-fmt)"
     params:
-      format: { type: enum, values: [rgb, bt.601, bt.709, bt.2020, bt.2020c], required: true, label: Source colour space, description: "The source's colour space, used instead of BT.601 for SD and BT.709 for HD." }
+      format: { type: enum, values: [rgb, bt.601, bt.709, bt.2020, bt.2020c], required: true, label: Source color space, description: "The source's color space, used instead of BT.601 for SD and BT.709 for HD." }
     send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-color-fmt: "false", in-color-fmt: "{format}" } }
     expect: *ok
     returns: ack
   set_decoder_input_color_auto:
-    summary: "Choose the source colour space automatically (set-video-config in-auto-color-fmt)"
+    summary: "Choose the source color space automatically (set-video-config in-auto-color-fmt)"
     params:
-      enabled: { type: bool, required: true, label: Automatic, description: "On uses BT.601 for SD and BT.709 for HD sources; off uses the colour space set." }
+      enabled: { type: bool, required: true, label: Automatic, description: "On uses BT.601 for SD and BT.709 for HD sources; off uses the color space set." }
     send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, in-auto-color-fmt: "{enabled}" } }
     expect: *ok
     returns: ack
@@ -1130,22 +1271,28 @@ commands:
       name: { type: string, required: true, max_length: 63, label: Device name, description: "The name the device shows and announces." }
     send:
       - { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, name: "{name}" } }
-      - { models: *ip, method: POST, path: /api/system/set-device-name, content_type: application/json, body: '{"name":{name:json}}' }
+      - { models: *base, method: POST, path: /api/system/set-device-name, content_type: application/json, body: '{"name":{name:json}}' }
     expect: *ok
     returns: ack
   set_network_dhcp:
-    summary: "Take the Ethernet address from DHCP; the device may move to a new address (set-eth-config dhcp=true)"
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, dhcp: "true" } }
+    summary: "Take the Ethernet address from DHCP; the device may move to a new address (set-eth-config dhcp=true, or /api/network/if-set use-dhcp=true)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, dhcp: "true" } }
+      - { models: *newapi, method: POST, path: /api/network/if-set, content_type: application/json,
+          body: '{"iface":"eth0","use-dhcp":true}' }
     expect: *ok
     returns: ack
   set_network_static:
-    summary: "Fixed Ethernet address; the device moves to it (set-eth-config dhcp=false, addr, mask, gw-addr, dns-addr)"
+    summary: "Fixed Ethernet address; the device moves to it (set-eth-config dhcp=false, addr, mask, gw-addr, dns-addr, or /api/network/if-set use-dhcp=false on IP to USB)"
     params:
       address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: IP address, description: "The device's new IPv4 address." }
       netmask: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Subnet mask, description: "Subnet mask, e.g. 255.255.255.0." }
       gateway: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Gateway, description: "Default gateway address." }
       dns: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: DNS server, description: "DNS server address." }
-    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, dhcp: "false", addr: "{address}", mask: "{netmask}", gw-addr: "{gateway}", dns-addr: "{dns}" } }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-eth-config, dhcp: "false", addr: "{address}", mask: "{netmask}", gw-addr: "{gateway}", dns-addr: "{dns}" } }
+      - { models: [ip-to-usb], method: POST, path: /api/network/if-set, content_type: application/json,
+          body: '{"iface":"eth0","use-dhcp":false,"ipaddr":"{address}","netmask":"{netmask}","gateway":"{gateway}","dns1":"{dns}","dns2":""}' }
     expect: *ok
     returns: ack
 
@@ -1155,10 +1302,10 @@ commands:
     expect: *value
     returns: value
   select_source:
-    summary: "Decode a source by id, in simple mode; the output switches at once (POST /api/source/select)"
+    summary: "Decode a source by id (IP decoders: in simple mode); the output switches at once (POST /api/source/select)"
     params:
-      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
-    send: { models: *ip, method: POST, path: /api/source/select, content_type: application/json, body: '{"id":{id}}' }
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources or get_usb_sources; on IP to USB, 0 deselects every source." }
+    send: { models: [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k, ip-to-usb], method: POST, path: /api/source/select, content_type: application/json, body: '{"id":{id}}' }
     expect: *ok
     returns: ack
   restart_source:
@@ -1238,25 +1385,29 @@ commands:
     expect: *ok
     returns: ack
   add_source:
-    summary: "Add a source in the IP Decoder API's Source Configuration shape: a URL source (type 1) or a custom NDI source (type 3) (POST /api/source/add)"
+    summary: "Add a source in the IP Decoder API's Source Configuration shape (a URL source, type 1, or a custom NDI source, type 3), or on IP to USB in its Source Settings shape (name, protocol, type url or ndi, data) (POST /api/source/add)"
     params:
-      config: { type: json, required: true, label: Configuration, description: "The source configuration object as IP Decoder API section 3 gives it." }
-    send: { models: *ip, method: POST, path: /api/source/add, content_type: application/json, body: '{config}' }
+      config: { type: json, required: true, label: Configuration, description: "The source configuration object as IP Decoder API section 3, or IP to USB API section 7.2, gives it." }
+    send: { models: [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k, ip-to-usb], method: POST, path: /api/source/add, content_type: application/json, body: '{config}' }
     expect: *ok
     returns: ack
   modify_source:
-    summary: "Change a source's configuration (POST /api/source/set)"
+    summary: "Change a source's configuration (POST /api/source/set, or /api/source/update on IP to USB)"
     params:
-      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
-      config: { type: json, required: true, label: Configuration, description: "The Source Configuration fields to change, as IP Decoder API section 3 gives them." }
-    send: { models: *ip, method: POST, path: /api/source/set, content_type: application/json, body: '{"id":{id},"config":{config}}' }
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources or get_usb_sources." }
+      config: { type: json, required: true, label: Configuration, description: "The Source Configuration fields to change, as IP Decoder API section 3, or IP to USB API section 7.2, gives them." }
+    send:
+      - { models: *ip, method: POST, path: /api/source/set, content_type: application/json, body: '{"id":{id},"config":{config}}' }
+      - { models: [ip-to-usb], method: POST, path: /api/source/update, content_type: application/json, body: '{"id":{id},"config":{config}}' }
     expect: *ok
     returns: ack
   delete_source:
-    summary: "Delete a source (POST /api/source/del)"
+    summary: "Delete a source (POST /api/source/del, or /api/source/delete on IP to USB)"
     params:
-      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
-    send: { models: *ip, method: POST, path: /api/source/del, content_type: application/json, body: '{"id":[{id}]}' }
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources or get_usb_sources." }
+    send:
+      - { models: *ip, method: POST, path: /api/source/del, content_type: application/json, body: '{"id":[{id}]}' }
+      - { models: [ip-to-usb], method: POST, path: /api/source/delete, content_type: application/json, body: '{"id":[{id}]}' }
     expect: *ok
     returns: ack
   add_profile:
@@ -1305,9 +1456,9 @@ commands:
     expect: *ok
     returns: ack
   set_ip_input_color_space:
-    summary: "Source colour space, or automatic (POST /api/video/config/set in-color-fmt)"
+    summary: "Source color space, or automatic (POST /api/video/config/set in-color-fmt)"
     params:
-      space: { type: enum, values: [auto, bt.601, bt.709, bt.2020], required: true, label: Source colour space, description: "The source's colour space, or auto." }
+      space: { type: enum, values: [auto, bt.601, bt.709, bt.2020], required: true, label: Source color space, description: "The source's color space, or auto." }
     send: { models: *ip, method: POST, path: /api/video/config/set, content_type: application/json, body: '{"in-color-fmt":{space:map.in_color_ip}}' }
     expect: *ok
     returns: ack
@@ -1431,7 +1582,7 @@ commands:
     returns: ack
   get_system_info:
     summary: "Device name, uptime, CPU, memory, date and time, NTP and the reboot schedule (POST /api/system/info)"
-    send: { models: *ip, method: POST, path: /api/system/info }
+    send: { models: *base, method: POST, path: /api/system/info }
     expect: *value
     returns: value
   set_auto_reboot_days:
@@ -1442,10 +1593,821 @@ commands:
       minute: { type: int, min: 0, max: 59, default: 0, label: Minute, description: "Minute of the reboot, 0 to 59." }
       days: { type: string, default: "", pattern: "^([1-7](,[1-7]){0,6})?$", label: Days,
         description: "Days separated by commas, 1 Monday to 7 Sunday, e.g. 1,2,3,4,5." }
-    send: { models: *ip, method: POST, path: /api/system/auto-reboot, content_type: application/json,
+    send: { models: [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k, ip-to-usb], method: POST, path: /api/system/auto-reboot, content_type: application/json,
             body: '{"enable":{enabled},"hour":{hour},"min":{minute},"week":[{days}]}' }
     expect: *ok
     returns: ack
+
+  # AES67, Audio DX and IP to USB: the system and network methods they share
+  # (AES67 API sections 16-17, Audio DX API 8-9, IP to USB API 3 and 9).
+  get_device_info:
+    summary: "Model, serial number, hardware revision, firmware version and build, and capabilities (POST /api/system/device-info)"
+    send: { models: *newapi, method: POST, path: /api/system/device-info }
+    expect: *value
+    returns: value
+  set_ntp:
+    summary: "Keep the clock with NTP from the servers given (POST /api/system/set-date-time ntp-enable=true)"
+    params:
+      server1: { type: string, required: true, max_length: 255, label: NTP server 1, description: "Host name or address of the first NTP server." }
+      server2: { type: string, default: "", max_length: 255, label: NTP server 2, description: "Host name or address of the second NTP server; empty for none." }
+    send: { models: *newapi, method: POST, path: /api/system/set-date-time, content_type: application/json,
+            body: '{"ntp-enable":true,"ntp-server1":{server1:json},"ntp-server2":{server2:json}}' }
+    expect: *ok
+    returns: ack
+  set_clock:
+    summary: "Turn NTP off and set the clock by hand (POST /api/system/set-date-time ntp-enable=false, time)"
+    params:
+      time: { type: string, required: true, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", label: Date and time,
+        description: "The device's local date and time as yyyy-MM-dd HH:mm:ss." }
+      server1: { type: string, required: true, max_length: 255, label: NTP server 1, description: "First NTP server kept for when NTP is turned on again." }
+      server2: { type: string, default: "", max_length: 255, label: NTP server 2, description: "Second NTP server kept for when NTP is turned on again; empty for none." }
+    send: { models: *newapi, method: POST, path: /api/system/set-date-time, content_type: application/json,
+            body: '{"ntp-enable":false,"ntp-server1":{server1:json},"ntp-server2":{server2:json},"time":"{time}"}' }
+    expect: *ok
+    returns: ack
+  set_timezone:
+    summary: "Time zone, by name (POST /api/system/timezone-set)"
+    params:
+      zone: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_+/-]+$", label: Time zone, description: "A time zone name such as Europe/London or Asia/Shanghai." }
+    send: { models: *newapi, method: POST, path: /api/system/timezone-set, content_type: application/json, body: '{"zonename":"{zone}"}' }
+    expect: *ok
+    returns: ack
+  get_network_interfaces:
+    summary: "Network interfaces: Ethernet and USB, each with DHCP, addresses, link and traffic (POST /api/network/if-info)"
+    send: { models: *newapi, method: POST, path: /api/network/if-info }
+    expect: *value
+    returns: value
+  set_network_address:
+    summary: "Fixed Ethernet address; the device moves to it (POST /api/network/if-set use-dhcp=false); DNS is set with set_dns_manual"
+    params:
+      address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: IP address, description: "The device's new IPv4 address." }
+      netmask: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Subnet mask, description: "Subnet mask, e.g. 255.255.255.0." }
+      gateway: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Gateway, description: "Default gateway address." }
+    send: { models: &aoip [aes67, audio-dx], method: POST, path: /api/network/if-set, content_type: application/json,
+            body: '{"iface":"eth0","use-dhcp":false,"ipaddr":"{address}","netmask":"{netmask}","gateway":"{gateway}"}' }
+    expect: *ok
+    returns: ack
+  get_default_route:
+    summary: "The interface the default route goes through, empty for none (POST /api/network/if-route)"
+    send: { models: *aoip, method: POST, path: /api/network/if-route }
+    expect: *value
+    returns: value
+  get_dns:
+    summary: "DNS servers and whether they are set by hand (POST /api/network/get-dns)"
+    send: { models: *aoip, method: POST, path: /api/network/get-dns }
+    expect: *value
+    returns: value
+  set_dns_manual:
+    summary: "Use the DNS servers given (POST /api/network/set-dns is-manual=true)"
+    params:
+      dns1: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: DNS server 1, description: "Primary DNS server address." }
+      dns2: { type: string, default: "", pattern: "^([0-9]{1,3}(\\.[0-9]{1,3}){3})?$", label: DNS server 2, description: "Secondary DNS server address; empty for none." }
+    send: { models: *aoip, method: POST, path: /api/network/set-dns, content_type: application/json,
+            body: '{"is-manual":true,"dns1":"{dns1}","dns2":"{dns2}"}' }
+    expect: *ok
+    returns: ack
+  set_dns_auto:
+    summary: "Take the DNS servers from DHCP (POST /api/network/set-dns is-manual=false)"
+    send: { models: *aoip, method: POST, path: /api/network/set-dns, content_type: application/json, body: '{"is-manual":false}' }
+    expect: *ok
+    returns: ack
+
+  # AES67 and Audio DX: general settings (AES67 API section 4, Audio DX API
+  # section 4). The AES67 takes numbers, the Audio DX text.
+  get_general_settings:
+    summary: "Audio general settings: network sample rate, analog levels, MIC bias, IGMP, test tone (POST /api/aes67/general-info or /api/aoip/general-info)"
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-info }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-info }
+    expect: *value
+    returns: value
+  get_general_range:
+    summary: "The values each general setting takes (POST /api/aoip/general-range)"
+    send: { models: [audio-dx], method: POST, path: /api/aoip/general-range }
+    expect: *value
+    returns: value
+  set_aes67_sample_rate:
+    summary: "Sample rate of the AES67 sources sent (POST /api/aes67/general-settings tx-sample-rate)"
+    params:
+      rate: { type: enum, values: ["44100", "48000", "96000"], required: true, label: Sample rate, description: "Sample rate of every AES67 source, in Hz." }
+    send: { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"tx-sample-rate":{rate}}' }
+    expect: *ok
+    returns: ack
+  set_aes67_packet_time:
+    summary: "Packet time of the AES67 sources sent (POST /api/aes67/general-settings tx-ptime)"
+    params:
+      ptime: { type: enum, values: [0.125ms, 0.250ms, 0.333ms, 1ms, 4ms], required: true, label: Packet time, description: "Audio carried in each AES67 packet; 1ms is the AES67 default." }
+    send: { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"tx-ptime":"{ptime}"}' }
+    expect: *ok
+    returns: ack
+  set_stream_aac_bitrate:
+    summary: "AAC bitrate of the streams sent (POST /api/aes67/general-settings aac-bitrate-kbps)"
+    params:
+      kbps: { type: enum, values: ["128", "192", "256"], required: true, label: AAC bitrate, description: "AAC bitrate of the NDI, SRT and Icecast streams sent, in kbit/s." }
+    send: { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"aac-bitrate-kbps":{kbps}}' }
+    expect: *ok
+    returns: ack
+  set_dx_sample_rate:
+    summary: "The device's sample rate (POST /api/aoip/general-apply tx-sample-rate)"
+    params:
+      rate: { type: enum, values: ["44100", "48000", "88200", "96000"], required: true, label: Sample rate, description: "Sample rate of the device, in Hz." }
+    send: { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"tx-sample-rate":"{rate}"}' }
+    expect: *ok
+    returns: ack
+  set_unbalanced_input_level:
+    summary: "Reference level of the unbalanced analog input (general-settings or general-apply unbld-in)"
+    params:
+      level: { type: enum, values: ["+12dBu", "+4dBu", "0dBu", "-2dBu", "0dBV", "-10dBV"], required: true, label: Input level, description: "The analog level that reaches full scale; +12dBu is the default." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"unbld-in":{level:map.unbld_level_aes67}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"unbld-in":"{level}"}' }
+    expect: *ok
+    returns: ack
+  set_unbalanced_output_level:
+    summary: "Reference level of the unbalanced analog output (general-settings or general-apply unbld-out)"
+    params:
+      level: { type: enum, values: ["+12dBu", "+4dBu", "0dBu", "-2dBu", "0dBV", "-10dBV"], required: true, label: Output level, description: "The analog level full scale gives; +12dBu is the default." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"unbld-out":{level:map.unbld_level_aes67}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"unbld-out":"{level}"}' }
+    expect: *ok
+    returns: ack
+  set_balanced_input_level:
+    summary: "Reference level of the balanced analog input (general-settings or general-apply bld-in)"
+    params:
+      level: { type: enum, values: ["+24dBu", "+18dBu", "+4dBu", "0dBu", "-2dBu", "0dBV", "-10dBV"], required: true, label: Input level, description: "The analog level that reaches full scale; +18dBu is the default." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"bld-in":{level:map.bld_in_level_aes67}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"bld-in":"{level:map.bld_level_dx}"}' }
+    expect: *ok
+    returns: ack
+  set_balanced_output_level:
+    summary: "Reference level of the balanced analog output (general-settings or general-apply bld-out)"
+    params:
+      level: { type: enum, values: ["+18dBu", "+4dBu", "0dBu", "-2dBu", "0dBV", "-10dBV"], required: true, label: Output level, description: "The analog level full scale gives; +18dBu is the default." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"bld-out":{level:map.bld_out_level_aes67}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"bld-out":"{level:map.bld_level_dx}"}' }
+    expect: *ok
+    returns: ack
+  set_mic_bias:
+    summary: "Phantom (MIC bias) power on the analog input (general-settings or general-apply micbias)"
+    params:
+      enabled: { type: bool, required: true, label: MIC bias, description: "On powers a microphone that needs bias on the analog input." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"micbias":{enabled}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"micbias":{enabled}}' }
+    expect: *ok
+    returns: ack
+  set_igmp_version:
+    summary: "IGMP version for multicast streams (general-settings or general-apply igmp)"
+    params:
+      version: { type: enum, values: [auto, v2, v3], required: true, label: IGMP version, description: "Choose automatically, or use IGMPv2 or IGMPv3." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"igmp":{version:map.igmp_aes67}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"igmp":"{version:map.igmp_dx}"}' }
+    expect: *ok
+    returns: ack
+  set_test_tone:
+    summary: "Test tone on the analog input or output, or off (general-settings or general-apply audio-pattern)"
+    params:
+      mode: { type: enum, values: ["off", analog-input, analog-output], required: true, label: Test tone, description: "Replace the analog input, or feed the analog output, with a test tone, or neither." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/general-settings, content_type: application/json, body: '{"audio-pattern":{mode:map.test_tone_aes67}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/general-apply, content_type: application/json, body: '{"audio-pattern":"{mode:map.test_tone_dx}"}' }
+    expect: *ok
+    returns: ack
+
+  # AES67: PTP (AES67 API section 5).
+  get_ptp_settings:
+    summary: "PTP settings and the grandmaster in use (POST /api/aes67/ptp-info)"
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-info }
+    expect: *value
+    returns: value
+  get_ptp_state:
+    summary: "PTP lock: synchronized, leader or follower, the clock locked to, and recent delays (POST /api/aes67/ptp-state)"
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-state }
+    expect: *value
+    returns: value
+  set_ptp_version:
+    summary: "PTP version (POST /api/aes67/ptp-settings version)"
+    params:
+      version: { type: enum, values: [PTPV1, PTPV2], required: true, label: PTP version, description: "IEEE 1588-2002 (PTPV1) or 1588-2008 (PTPV2), which AES67 uses." }
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-settings, content_type: application/json, body: '{"version":"{version}"}' }
+    expect: *ok
+    returns: ack
+  set_ptp_priority:
+    summary: "PTP priorities, which decide the grandmaster (POST /api/aes67/ptp-settings priority1, priority2)"
+    params:
+      priority1: { type: int, min: 0, max: 255, required: true, label: Priority 1, description: "PTP priority 1; lower wins the grandmaster election, 255 never leads." }
+      priority2: { type: int, min: 0, max: 255, required: true, label: Priority 2, description: "PTP priority 2, the tie-break after clock quality." }
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-settings, content_type: application/json, body: '{"priority1":{priority1},"priority2":{priority2}}' }
+    expect: *ok
+    returns: ack
+  set_ptp_domain:
+    summary: "PTP domain (POST /api/aes67/ptp-settings domain)"
+    params:
+      domain: { type: int, min: 0, max: 127, required: true, label: Domain, description: "PTP domain number, 0 to 127; every device on one clock uses the same." }
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-settings, content_type: application/json, body: '{"domain":{domain}}' }
+    expect: *ok
+    returns: ack
+  set_ptp_role:
+    summary: "Whether the device may become the PTP leader (POST /api/aes67/ptp-settings role)"
+    params:
+      role: { type: enum, values: [auto, follower], required: true, label: PTP role, description: "auto takes part in the leader election; follower only follows another clock." }
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-settings, content_type: application/json, body: '{"role":"{role:map.ptp_role}"}' }
+    expect: *ok
+    returns: ack
+  set_ptp_delay_mechanism:
+    summary: "PTP delay mechanism (POST /api/aes67/ptp-settings delay-mech)"
+    params:
+      mechanism: { type: enum, values: [E2E, P2P], required: true, label: Delay mechanism, description: "End-to-end or peer-to-peer delay measurement." }
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-settings, content_type: application/json, body: '{"delay-mech":"{mechanism}"}' }
+    expect: *ok
+    returns: ack
+  set_ptp_intervals:
+    summary: "PTP announce and sync intervals (POST /api/aes67/ptp-settings announce, sync)"
+    params:
+      announce: { type: int, min: -3, max: 1, required: true, label: Announce interval, description: "Announce interval as a power of two in seconds, -3 (1/8 s) to 1 (2 s)." }
+      sync: { type: int, min: -3, max: 1, required: true, label: Sync interval, description: "Sync interval as a power of two in seconds, -3 (1/8 s) to 1 (2 s)." }
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-settings, content_type: application/json, body: '{"announce":{announce},"sync":{sync}}' }
+    expect: *ok
+    returns: ack
+  reset_ptp:
+    summary: "Put the PTP settings back to their defaults; the clock may re-lock (POST /api/aes67/ptp-default)"
+    send: { models: [aes67], method: POST, path: /api/aes67/ptp-default }
+    expect: *ok
+    returns: ack
+
+  # AES67: sources sent and sinks received (AES67 API sections 6-7).
+  get_aes67_sources:
+    summary: "AES67 sources (streams sent), each with its uid, destination, format and SDP (POST /api/aes67/source-info)"
+    send: { models: [aes67], method: POST, path: /api/aes67/source-info }
+    expect: *value
+    returns: value
+  apply_aes67_source:
+    summary: "Set up an AES67 source from an object in source-apply's shape: uid, name, enable, dst-ip, dst-port, payload, depth, channel-num, ttl, dscp (POST /api/aes67/source-apply)"
+    params:
+      config: { type: json, required: true, label: Source, description: "The AES67 source object as AES67 API section 6.2 gives it." }
+    send: { models: [aes67], method: POST, path: /api/aes67/source-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  update_aes67_source:
+    summary: "Change an AES67 source, by uid, from an object in source-update's shape (POST /api/aes67/source-update, API V2.0)"
+    params:
+      config: { type: json, required: true, label: Source, description: "The AES67 source object with its uid, as AES67 API section 6.3 gives it." }
+    send: { models: [aes67], method: POST, path: /api/aes67/source-update, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  set_aes67_source_enabled:
+    summary: "Start or stop sending an AES67 source (POST /api/aes67/source-update uid, enable; API V2.0)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Source, description: "The source's uid from get_aes67_sources." }
+      enabled: { type: bool, required: true, label: Sending, description: "On sends the source; off stops it." }
+    send: { models: [aes67], method: POST, path: /api/aes67/source-update, content_type: application/json, body: '{"uid":{uid},"enable":{enabled}}' }
+    expect: *ok
+    returns: ack
+  delete_aes67_source:
+    summary: "Delete an AES67 source (POST /api/aes67/source-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Source, description: "The source's uid from get_aes67_sources." }
+    send: { models: [aes67], method: POST, path: /api/aes67/source-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  get_aes67_sinks:
+    summary: "AES67 sinks (streams received, 0 to 3) with their state and source, and the AES67 sources found on the network (POST /api/aes67/sink-info)"
+    send: { models: [aes67], method: POST, path: /api/aes67/sink-info }
+    expect: *value
+    returns: value
+  apply_aes67_sink:
+    summary: "Set up an AES67 sink from one object of sink-apply's sinks array: sink-idx, name, is-manual, source-name, source-src-ip, source-src-mac, source-dst-ip, source-dst-port, ssrc, sample-rate, depth, channel-num, ptime, mediaclk-offset, max-delay, max-buffer (POST /api/aes67/sink-apply)"
+    params:
+      sink: { type: json, required: true, label: Sink, description: "One sink object as AES67 API section 7.2 gives it; it is sent as the only element of sinks." }
+    send: { models: [aes67], method: POST, path: /api/aes67/sink-apply, content_type: application/json, body: '{"sinks":[{sink}]}' }
+    expect: *ok
+    returns: ack
+  update_aes67_sink:
+    summary: "Change an AES67 sink from one object of sink-update's sinks array (POST /api/aes67/sink-update, API V2.0)"
+    params:
+      sink: { type: json, required: true, label: Sink, description: "One sink object with its sink-idx, as AES67 API section 7.3 gives it; it is sent as the only element of sinks." }
+    send: { models: [aes67], method: POST, path: /api/aes67/sink-update, content_type: application/json, body: '{"sinks":[{sink}]}' }
+    expect: *ok
+    returns: ack
+  delete_aes67_sink:
+    summary: "Delete an AES67 sink; its audio stops (POST /api/aes67/sink-del)"
+    params:
+      sink: { type: int, min: 0, max: 3, required: true, label: Sink, description: "The sink's index, 0 to 3." }
+    send: { models: [aes67], method: POST, path: /api/aes67/sink-del, content_type: application/json, body: '{"sinks":[{"sink-idx":{sink}}]}' }
+    expect: *ok
+    returns: ack
+  get_sink_statistics:
+    summary: "An AES67 sink's reception statistics: QoS, delay, late and lost packets, buffer counts (POST /api/aes67/sink-statistics)"
+    params:
+      sink: { type: int, min: 0, max: 3, required: true, label: Sink, description: "The sink's index, 0 to 3." }
+    send: { models: [aes67], method: POST, path: /api/aes67/sink-statistics, content_type: application/json, body: '{"sink-idx":{sink}}' }
+    expect: *value
+    returns: value
+  clear_sink_statistics:
+    summary: "Clear an AES67 sink's statistics (POST /api/aes67/sink-statistics-clear)"
+    params:
+      sink: { type: int, min: 0, max: 3, required: true, label: Sink, description: "The sink's index, 0 to 3." }
+    send: { models: [aes67], method: POST, path: /api/aes67/sink-statistics-clear, content_type: application/json, body: '{"sink-idx":{sink}}' }
+    expect: *ok
+    returns: ack
+  parse_sdp:
+    summary: "Read an SDP description into the fields a sink takes: addresses, port, SSRC, format, packet time, offset, TTL (POST /api/aes67/sdp-parse)"
+    params:
+      sdp: { type: string, multiline: true, required: true, max_length: 4096, label: SDP, description: "The session description of an AES67 stream, lines separated by CR LF." }
+    send: { models: [aes67], method: POST, path: /api/aes67/sdp-parse, content_type: application/json, body: '{"sdp":{sdp:json}}' }
+    expect: *value
+    returns: value
+
+  # AES67: streams (AES67 API sections 8-14).
+  select_stream_receiver:
+    summary: "Which kind of received stream feeds the matrix: NDI, SRT or Icecast; the matrix inputs change at once (POST /api/ices/receiver-select)"
+    params:
+      type: { type: enum, values: [ndi, srt, icecast], required: true, label: Stream type, description: "The receivers whose audio reaches the matrix." }
+    send: { models: [aes67], method: POST, path: /api/ices/receiver-select, content_type: application/json, body: '{"type":{type:map.stream_receiver}}' }
+    expect: *ok
+    returns: ack
+  get_ndi_senders:
+    summary: "NDI senders with their settings, published name and receivers connected (POST /api/ndi/sender-info)"
+    send: { models: [aes67], method: POST, path: /api/ndi/sender-info }
+    expect: *value
+    returns: value
+  apply_ndi_sender:
+    summary: "Set up an NDI sender from an object in sender-apply's shape: uid, enable, ndi-name, group, enable-full, discovery-server-enable, mode, audio-standard, multicast fields, failover fields, web-control (POST /api/ndi/sender-apply)"
+    params:
+      config: { type: json, required: true, label: NDI sender, description: "The NDI sender object as AES67 API section 9.2 gives it." }
+    send: { models: [aes67], method: POST, path: /api/ndi/sender-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  update_ndi_sender:
+    summary: "Change an NDI sender, by uid, from an object in sender-update's shape (POST /api/ndi/sender-update, API V2.0)"
+    params:
+      config: { type: json, required: true, label: NDI sender, description: "The NDI sender object with its uid, as AES67 API section 9.3 gives it." }
+    send: { models: [aes67], method: POST, path: /api/ndi/sender-update, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  set_ndi_sender_enabled:
+    summary: "Start or stop an NDI sender (POST /api/ndi/sender-update uid, enable; API V2.0)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: NDI sender, description: "The sender's uid from get_ndi_senders." }
+      enabled: { type: bool, required: true, label: Sending, description: "On publishes the NDI source; off stops it." }
+    send: { models: [aes67], method: POST, path: /api/ndi/sender-update, content_type: application/json, body: '{"uid":{uid},"enable":{enabled}}' }
+    expect: *ok
+    returns: ack
+  delete_ndi_sender:
+    summary: "Delete an NDI sender (POST /api/ndi/sender-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: NDI sender, description: "The sender's uid from get_ndi_senders." }
+    send: { models: [aes67], method: POST, path: /api/ndi/sender-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  find_ndi_failover_sources:
+    summary: "NDI sources on the network a sender can fail over to (POST /api/ndi/sender-find)"
+    send: { models: [aes67], method: POST, path: /api/ndi/sender-find }
+    expect: *value
+    returns: value
+  set_ndi_sender_discovery:
+    summary: "Discovery servers the NDI senders register with (POST /api/ndi/sender-options discovery-server)"
+    params:
+      servers: { type: string, default: "", max_length: 255, label: Discovery servers, description: "Discovery server addresses separated by commas; empty for none." }
+    send: { models: [aes67], method: POST, path: /api/ndi/sender-options, content_type: application/json, body: '{"discovery-server":{servers:json}}' }
+    expect: *ok
+    returns: ack
+  get_ndi_receivers:
+    summary: "NDI receivers with their source, format, buffer and connection, and the receive options (POST /api/ndi/receiver-info)"
+    send: { models: [aes67], method: POST, path: /api/ndi/receiver-info }
+    expect: *value
+    returns: value
+  apply_ndi_receiver:
+    summary: "Set up an NDI receiver from an object in receiver-apply's shape: uid, enable, is-find, alias, ndi-name, url, audio-standard, buffer-duration, headroom-db (POST /api/ndi/receiver-apply)"
+    params:
+      config: { type: json, required: true, label: NDI receiver, description: "The NDI receiver object as AES67 API section 10.2 gives it." }
+    send: { models: [aes67], method: POST, path: /api/ndi/receiver-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  update_ndi_receiver:
+    summary: "Change an NDI receiver, by uid, from an object in receiver-update's shape (POST /api/ndi/receiver-update, API V2.0)"
+    params:
+      config: { type: json, required: true, label: NDI receiver, description: "The NDI receiver object with its uid, as AES67 API section 10.3 gives it." }
+    send: { models: [aes67], method: POST, path: /api/ndi/receiver-update, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  set_ndi_receiver_enabled:
+    summary: "Start or stop an NDI receiver (POST /api/ndi/receiver-update uid, enable; API V2.0)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: NDI receiver, description: "The receiver's uid from get_ndi_receivers." }
+      enabled: { type: bool, required: true, label: Receiving, description: "On receives the NDI source; off stops it." }
+    send: { models: [aes67], method: POST, path: /api/ndi/receiver-update, content_type: application/json, body: '{"uid":{uid},"enable":{enabled}}' }
+    expect: *ok
+    returns: ack
+  delete_ndi_receiver:
+    summary: "Delete an NDI receiver (POST /api/ndi/receiver-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: NDI receiver, description: "The receiver's uid from get_ndi_receivers." }
+    send: { models: [aes67], method: POST, path: /api/ndi/receiver-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  find_ndi_sources:
+    summary: "NDI sources on the network a receiver can take (POST /api/ndi/receiver-find)"
+    send: { models: [aes67], method: POST, path: /api/ndi/receiver-find }
+    expect: *value
+    returns: value
+  set_ndi_receiver_options:
+    summary: "Where the NDI receivers look for sources: discovery servers, group and extra addresses (POST /api/ndi/receiver-options)"
+    params:
+      servers: { type: string, default: "", max_length: 255, label: Discovery servers, description: "Discovery server addresses separated by commas; empty for none." }
+      group: { type: string, default: "", max_length: 255, label: NDI group, description: "NDI groups to look in, separated by commas; empty for public." }
+      extra_ips: { type: string, default: "", max_length: 255, label: Extra IPs, description: "Further addresses to look for sources at, separated by commas." }
+    send: { models: [aes67], method: POST, path: /api/ndi/receiver-options, content_type: application/json,
+            body: '{"discovery-server":{servers:json},"group":{group:json},"extra-ips":{extra_ips:json}}' }
+    expect: *ok
+    returns: ack
+  get_srt_senders:
+    summary: "SRT senders with their mode, addresses, latency and encryption (POST /api/srt/sender-info)"
+    send: { models: [aes67], method: POST, path: /api/srt/sender-info }
+    expect: *value
+    returns: value
+  apply_srt_sender:
+    summary: "Set up an SRT sender from an object in sender-apply's shape: uid, enable, name, mode, remote-ip, remote-port, bind-port, stream-id, connect-timeout, retry-duration, latency, bandwidth, mtu, enc, passphrase, enable-logo (POST /api/srt/sender-apply)"
+    params:
+      config: { type: json, required: true, label: SRT sender, description: "The SRT sender object as AES67 API section 11.2 gives it." }
+    send: { models: [aes67], method: POST, path: /api/srt/sender-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  update_srt_sender:
+    summary: "Change an SRT sender, by uid, from an object in sender-update's shape (POST /api/srt/sender-update, API V2.0)"
+    params:
+      config: { type: json, required: true, label: SRT sender, description: "The SRT sender object with its uid, as AES67 API section 11.3 gives it." }
+    send: { models: [aes67], method: POST, path: /api/srt/sender-update, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  set_srt_sender_enabled:
+    summary: "Start or stop an SRT sender (POST /api/srt/sender-update uid, enable; API V2.0)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: SRT sender, description: "The sender's uid from get_srt_senders." }
+      enabled: { type: bool, required: true, label: Sending, description: "On sends the stream; off stops it." }
+    send: { models: [aes67], method: POST, path: /api/srt/sender-update, content_type: application/json, body: '{"uid":{uid},"enable":{enabled}}' }
+    expect: *ok
+    returns: ack
+  delete_srt_sender:
+    summary: "Delete an SRT sender (POST /api/srt/sender-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: SRT sender, description: "The sender's uid from get_srt_senders." }
+    send: { models: [aes67], method: POST, path: /api/srt/sender-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  get_srt_receivers:
+    summary: "SRT receivers with their mode, addresses, latency, buffer and format (POST /api/srt/receiver-info)"
+    send: { models: [aes67], method: POST, path: /api/srt/receiver-info }
+    expect: *value
+    returns: value
+  apply_srt_receiver:
+    summary: "Set up an SRT receiver from an object in receiver-apply's shape: uid, enable, name, mode, remote-ip, remote-port, bind-port, stream-id, latency, mtu, is-encrypted, passphrase, buffer-duration, headroom-db (POST /api/srt/receiver-apply)"
+    params:
+      config: { type: json, required: true, label: SRT receiver, description: "The SRT receiver object as AES67 API section 12.2 gives it." }
+    send: { models: [aes67], method: POST, path: /api/srt/receiver-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  update_srt_receiver:
+    summary: "Change an SRT receiver, by uid, from an object in receiver-update's shape (POST /api/srt/receiver-update, API V2.0)"
+    params:
+      config: { type: json, required: true, label: SRT receiver, description: "The SRT receiver object with its uid, as AES67 API section 12.3 gives it." }
+    send: { models: [aes67], method: POST, path: /api/srt/receiver-update, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  set_srt_receiver_enabled:
+    summary: "Start or stop an SRT receiver (POST /api/srt/receiver-update uid, enable; API V2.0)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: SRT receiver, description: "The receiver's uid from get_srt_receivers." }
+      enabled: { type: bool, required: true, label: Receiving, description: "On receives the stream; off stops it." }
+    send: { models: [aes67], method: POST, path: /api/srt/receiver-update, content_type: application/json, body: '{"uid":{uid},"enable":{enabled}}' }
+    expect: *ok
+    returns: ack
+  delete_srt_receiver:
+    summary: "Delete an SRT receiver (POST /api/srt/receiver-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: SRT receiver, description: "The receiver's uid from get_srt_receivers." }
+    send: { models: [aes67], method: POST, path: /api/srt/receiver-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  get_icecast_senders:
+    summary: "Icecast senders with their server, user and state (POST /api/ices/sender-info)"
+    send: { models: [aes67], method: POST, path: /api/ices/sender-info }
+    expect: *value
+    returns: value
+  apply_icecast_sender:
+    summary: "Set up an Icecast sender from an object in sender-apply's shape: uid, enable, name, service-url, username, password (POST /api/ices/sender-apply)"
+    params:
+      config: { type: json, required: true, label: Icecast sender, description: "The Icecast sender object as AES67 API section 13.2 gives it." }
+    send: { models: [aes67], method: POST, path: /api/ices/sender-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  update_icecast_sender:
+    summary: "Change an Icecast sender, by uid, from an object in sender-update's shape (POST /api/ices/sender-update, API V2.0)"
+    params:
+      config: { type: json, required: true, label: Icecast sender, description: "The Icecast sender object with its uid, as AES67 API section 13.3 gives it." }
+    send: { models: [aes67], method: POST, path: /api/ices/sender-update, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  set_icecast_sender_enabled:
+    summary: "Start or stop an Icecast sender (POST /api/ices/sender-update uid, enable; API V2.0)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Icecast sender, description: "The sender's uid from get_icecast_senders." }
+      enabled: { type: bool, required: true, label: Sending, description: "On sends the stream to the server; off stops it." }
+    send: { models: [aes67], method: POST, path: /api/ices/sender-update, content_type: application/json, body: '{"uid":{uid},"enable":{enabled}}' }
+    expect: *ok
+    returns: ack
+  delete_icecast_sender:
+    summary: "Delete an Icecast sender (POST /api/ices/sender-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Icecast sender, description: "The sender's uid from get_icecast_senders." }
+    send: { models: [aes67], method: POST, path: /api/ices/sender-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  get_icecast_receivers:
+    summary: "Icecast receivers with their server, stream, buffer, state and format (POST /api/ices/receiver-info)"
+    send: { models: [aes67], method: POST, path: /api/ices/receiver-info }
+    expect: *value
+    returns: value
+  apply_icecast_receiver:
+    summary: "Set up an Icecast receiver from an object in receiver-apply's shape: uid, enable, name, service-url, room, buffer-duration, headroom (POST /api/ices/receiver-apply)"
+    params:
+      config: { type: json, required: true, label: Icecast receiver, description: "The Icecast receiver object as AES67 API section 14.2 (V1.0 section 14.2) gives it." }
+    send: { models: [aes67], method: POST, path: /api/ices/receiver-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  update_icecast_receiver:
+    summary: "Change an Icecast receiver, by uid, from an object in receiver-update's shape (POST /api/ices/receiver-update, API V2.0)"
+    params:
+      config: { type: json, required: true, label: Icecast receiver, description: "The Icecast receiver object with its uid, as AES67 API section 14.3 gives it." }
+    send: { models: [aes67], method: POST, path: /api/ices/receiver-update, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  set_icecast_receiver_enabled:
+    summary: "Start or stop an Icecast receiver (POST /api/ices/receiver-update uid, enable; API V2.0)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Icecast receiver, description: "The receiver's uid from get_icecast_receivers." }
+      enabled: { type: bool, required: true, label: Receiving, description: "On receives the stream; off stops it." }
+    send: { models: [aes67], method: POST, path: /api/ices/receiver-update, content_type: application/json, body: '{"uid":{uid},"enable":{enabled}}' }
+    expect: *ok
+    returns: ack
+  delete_icecast_receiver:
+    summary: "Delete an Icecast receiver (POST /api/ices/receiver-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Icecast receiver, description: "The receiver's uid from get_icecast_receivers." }
+    send: { models: [aes67], method: POST, path: /api/ices/receiver-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  list_icecast_streams:
+    summary: "Streams (mount points) on the Icecast server, each with its type and whether a Magewell device sends it (POST /api/ices/list-streams)"
+    send: { models: [aes67], method: POST, path: /api/ices/list-streams }
+    expect: *value
+    returns: value
+
+  # Audio DX: streams (Audio DX API section 5).
+  get_tx_streams:
+    summary: "Streams sent (RTSP, TS over SRT, NDI) with their settings and clients, and NDI sources found for failover (POST /api/tx/live-info)"
+    send: { models: [audio-dx], method: POST, path: /api/tx/live-info }
+    expect: *value
+    returns: value
+  apply_tx_stream:
+    summary: "Add or change a stream sent, by uid, from an object in tx-live-apply's shape: uid, enable, name, stream-no, type (rtsp, srt or ndi), the rtsp, srt or ndi object, aac-bitrate-kbps (POST /api/tx/live-apply)"
+    params:
+      config: { type: json, required: true, label: Stream, description: "The stream object as Audio DX API section 5.2 gives it." }
+    send: { models: [audio-dx], method: POST, path: /api/tx/live-apply, content_type: application/json, body: '{config}' }
+    expect: *ok
+    returns: ack
+  delete_tx_stream:
+    summary: "Delete a stream sent (POST /api/tx/live-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Stream, description: "The stream's uid from get_tx_streams." }
+    send: { models: [audio-dx], method: POST, path: /api/tx/live-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  get_rx_streams:
+    summary: "Streams received (SRT, NDI) with their URLs, the buffer limits, the NDI options and NDI sources found (POST /api/rx/live-info)"
+    send: { models: [audio-dx], method: POST, path: /api/rx/live-info }
+    expect: *value
+    returns: value
+  apply_rx_stream:
+    summary: "Add or change a stream received, by uid: an srt:// or ntkndi:// URL on Stream1 or Stream2 (POST /api/rx/live-apply)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Stream, description: "The stream's uid; a new uid adds a stream." }
+      enabled: { type: bool, required: true, label: Receiving, description: "On receives the stream; off stops it." }
+      name: { type: string, required: true, max_length: 63, label: Name, description: "The stream's name, 1 to 63 characters." }
+      stream: { type: enum, values: [Stream1, Stream2], required: true, label: Stream slot, description: "Which of the two received streams this is." }
+      url: { type: string, required: true, max_length: 1024, label: URL,
+        description: "An srt:// URL with mode, streamid, passphrase, latency, mw-audio-track, mw-buffer-duration and mw-headroom-db, or an ntkndi://ndi?ndi-name=... URL, as Audio DX API section 5.5 gives them." }
+    send: { models: [audio-dx], method: POST, path: /api/rx/live-apply, content_type: application/json,
+            body: '{"uid":{uid},"enable":{enabled},"name":{name:json},"stream-no":"{stream}","url":{url:json}}' }
+    expect: *ok
+    returns: ack
+  delete_rx_stream:
+    summary: "Delete a stream received (POST /api/rx/live-del)"
+    params:
+      uid: { type: int, min: 1, max: 2147483647, required: true, label: Stream, description: "The stream's uid from get_rx_streams." }
+    send: { models: [audio-dx], method: POST, path: /api/rx/live-del, content_type: application/json, body: '{"uid":{uid}}' }
+    expect: *ok
+    returns: ack
+  set_rx_ndi_options:
+    summary: "Where NDI streams are looked for: discovery server, group and extra addresses (POST /api/rx/ndi-options-apply)"
+    params:
+      enabled: { type: bool, required: true, label: Discovery server, description: "On finds sources through the discovery server given." }
+      servers: { type: string, default: "", max_length: 255, label: Servers, description: "Discovery server addresses separated by commas; needed when on." }
+      group: { type: string, default: public, max_length: 255, label: NDI group, description: "NDI group to look in; public is the default." }
+      extra_ips: { type: string, default: "", max_length: 255, label: Extra IPs, description: "Further addresses to look for sources at, separated by commas." }
+    send: { models: [audio-dx], method: POST, path: /api/rx/ndi-options-apply, content_type: application/json,
+            body: '{"enable-discovery":{enabled},"discovery-server":{servers:json},"group-name":{group:json},"extra-ips":{extra_ips:json}}' }
+    expect: *ok
+    returns: ack
+  get_dante_state:
+    summary: "Dante clock and format: lock, leader and grandmaster, PTP parameters, sample rate and encoding, and the Dante device lock (POST /api/dante/state)"
+    send: { models: [audio-dx], method: POST, path: /api/dante/state }
+    expect: *value
+    returns: value
+
+  # AES67 and Audio DX: the audio matrix (AES67 API section 15, Audio DX API
+  # section 6). Channels are numbered from 0, as the device numbers them.
+  get_matrix:
+    summary: "Audio matrix: each TX channel's mute and volume, each crosspoint's connection, mute and volume, and the channels of each input and output (matrix-info)"
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/matrix-info }
+      - { models: [audio-dx], method: POST, path: /api/aoip/matrix-info }
+    expect: *value
+    returns: value
+  get_matrix_layout:
+    summary: "The matrix's channel groups (analog, USB, Dante, streams) and the channels each covers (POST /api/aoip/matrix-desc)"
+    send: { models: [audio-dx], method: POST, path: /api/aoip/matrix-desc }
+    expect: *value
+    returns: value
+  get_audio_meters:
+    summary: "Level of every TX and RX channel of the matrix, in dBFS (audio-meter)"
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/audio-meter }
+      - { models: [audio-dx], method: POST, path: /api/aoip/audio-meter }
+    expect: *value
+    returns: value
+  get_channel_meters:
+    summary: "Level of one TX channel and the RX channels given, with their minimum and maximum (audio-meter-limit)"
+    params:
+      tx: { type: int, min: 0, max: 31, required: true, label: TX channel, description: "TX (output) channel, numbered from 0." }
+      rx: { type: json, required: true, label: RX channels, description: "Array of RX (input) channel numbers from 0, as audio-meter-limit's rx-no takes it, e.g. [1, 2, 3, 4]." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/audio-meter-limit, content_type: application/json, body: '{"tx-no":{tx},"rx-no":{rx}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/audio-meter-limit, content_type: application/json, body: '{"tx-no":{tx},"rx-no":{rx}}' }
+    expect: *value
+    returns: value
+  get_crosspoint_meter:
+    summary: "Level at one crosspoint, with its minimum and maximum (POST /api/aes67/matrix-meter)"
+    params:
+      tx: { type: int, min: 0, max: 31, required: true, label: TX channel, description: "TX (output) channel, numbered from 0." }
+      rx: { type: int, min: 0, max: 63, required: true, label: RX channel, description: "RX (input) channel, numbered from 0." }
+    send: { models: [aes67], method: POST, path: /api/aes67/matrix-meter, content_type: application/json, body: '{"tx-no":{tx},"rx-no":{rx}}' }
+    expect: *value
+    returns: value
+  set_crosspoint:
+    summary: "Connect or disconnect an RX channel to a TX channel; the audio changes at once (matrix-settings)"
+    params:
+      tx: { type: int, min: 0, max: 31, required: true, label: TX channel, description: "TX (output) channel, numbered from 0." }
+      rx: { type: int, min: 0, max: 63, required: true, label: RX channel, description: "RX (input) channel, numbered from 0." }
+      connected: { type: bool, required: true, label: Connected, description: "On mixes the RX channel into the TX channel; off removes it." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/matrix-settings, content_type: application/json,
+          body: '{"matrix":[{"tx-no":{tx},"rx-no":{rx},"mix":{connected:bool01}}]}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/matrix-settings, content_type: application/json,
+          body: '{"matrix":[{"tx-no":{tx},"rx-no":{rx},"mix":{connected:bool01}}]}' }
+    expect: *ok
+    returns: ack
+  set_crosspoints:
+    summary: "Connect or disconnect many crosspoints at once from matrix-settings' matrix array of tx-no, rx-no and mix (0 or 1)"
+    params:
+      matrix: { type: json, required: true, label: Crosspoints, description: "The matrix array as AES67 API section 15.5 and Audio DX API section 6.5 give it." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/matrix-settings, content_type: application/json, body: '{"matrix":{matrix}}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/matrix-settings, content_type: application/json, body: '{"matrix":{matrix}}' }
+    expect: *ok
+    returns: ack
+  clear_matrix:
+    summary: "Disconnect every crosspoint of the matrix; all routed audio stops (matrix-clear)"
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/matrix-clear }
+      - { models: [audio-dx], method: POST, path: /api/aoip/matrix-clear }
+    expect: *ok
+    returns: ack
+  set_tx_volume:
+    summary: "Mute and volume of a TX channel of the matrix (volume-tx)"
+    params:
+      tx: { type: int, min: 0, max: 31, required: true, label: TX channel, description: "TX (output) channel, numbered from 0." }
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the TX channel." }
+      db: { type: int, min: -36, max: 36, required: true, label: Volume, description: "TX channel volume in dB, -36 to +36." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/volume-tx, content_type: application/json,
+          body: '{"volumes":[{"tx-no":{tx},"tx-mute":{muted},"db":{db}}]}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/volume-tx, content_type: application/json,
+          body: '{"volumes":[{"tx-no":{tx},"tx-mute":{muted},"db":{db}}]}' }
+    expect: *ok
+    returns: ack
+  set_crosspoint_volume:
+    summary: "Mute and volume of one crosspoint of the matrix (volume-mix)"
+    params:
+      tx: { type: int, min: 0, max: 31, required: true, label: TX channel, description: "TX (output) channel, numbered from 0." }
+      rx: { type: int, min: 0, max: 63, required: true, label: RX channel, description: "RX (input) channel, numbered from 0." }
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the RX channel at this crosspoint." }
+      db: { type: int, min: -36, max: 36, required: true, label: Volume, description: "Crosspoint volume in dB, -36 to +36." }
+    send:
+      - { models: [aes67], method: POST, path: /api/aes67/volume-mix, content_type: application/json,
+          body: '{"volumes":[{"tx-no":{tx},"rx-no":{rx},"rx-mute":{muted},"db":{db}}]}' }
+      - { models: [audio-dx], method: POST, path: /api/aoip/volume-mix, content_type: application/json,
+          body: '{"volumes":[{"tx-no":{tx},"rx-no":{rx},"rx-mute":{muted},"db":{db}}]}' }
+    expect: *ok
+    returns: ack
+
+  # IP to USB (IP to USB API sections 3-8).
+  get_usb_mode:
+    summary: "USB mode: video conferencing or content sharing (GET /api/system/usb-mode/get)"
+    send: { models: [ip-to-usb], method: GET, path: /api/system/usb-mode/get }
+    expect: *value
+    returns: value
+  set_usb_mode:
+    summary: "USB mode: video conferencing or content sharing (POST /api/system/usb-mode/update)"
+    params:
+      mode: { type: enum, values: [video-conferencing, content-sharing], required: true, label: USB mode, description: "How the computer is offered the picture: as a conferencing camera (Normal mode) or for content sharing (Content mode)." }
+    send: { models: [ip-to-usb], method: POST, path: /api/system/usb-mode/update, content_type: application/json, body: '{"mode":"{mode:map.usb_mode}"}' }
+    expect: *ok
+    returns: ack
+  get_ndi_discovery:
+    summary: "NDI discovery settings: discovery servers on or off, the servers and the groups (GET /api/ndi/config/get)"
+    send: { models: [ip-to-usb], method: GET, path: /api/ndi/config/get }
+    expect: *value
+    returns: value
+  set_usb_ndi_discovery:
+    summary: "NDI discovery: discovery servers on or off, the servers and the groups (POST /api/ndi/config/update)"
+    params:
+      enabled: { type: bool, required: true, label: Discovery server, description: "On finds sources through the discovery servers given." }
+      servers: { type: string, default: "", max_length: 255, label: Servers, description: "Discovery server addresses separated by commas; needed when on." }
+      groups: { type: string, default: public, max_length: 255, label: NDI groups, description: "NDI groups to look in, separated by commas; public is the default." }
+    send: { models: [ip-to-usb], method: POST, path: /api/ndi/config/update, content_type: application/json,
+            body: '{"data":{"enable":{enabled},"discovery_server":{servers:json},"groups":{groups:json}}}' }
+    expect: *ok
+    returns: ack
+  get_no_signal_image:
+    summary: "A no-signal image: its path and whether it is the default (POST /api/resource/image/get)"
+    params:
+      id: { type: string, default: no_signal_1, max_length: 63, pattern: "^[A-Za-z0-9_-]+$", label: Image, description: "The image's preset id, e.g. no_signal_1." }
+    send: { models: [ip-to-usb], method: POST, path: /api/resource/image/get, content_type: application/json, body: '{"id":"{id}","type":"simple"}' }
+    expect: *value
+    returns: value
+  upload_no_signal_image:
+    summary: "Upload a PNG shown while there is no signal, replacing the one there (POST /api/resource/image/upload, multipart/form-data)"
+    params:
+      image: { type: binary, required: true, label: Image, description: "The PNG image's contents, given as base64 or as a host file." }
+      id: { type: string, default: no_signal_1, max_length: 63, pattern: "^[A-Za-z0-9_-]+$", label: Image, description: "The image's preset id, e.g. no_signal_1." }
+    send:
+      method: POST
+      path: /api/resource/image/upload
+      models: [ip-to-usb]
+      multipart:
+        - { name: id, value: "{id}" }
+        - { name: type, value: simple }
+        - { name: file, binary: image, filename: no_signal.png, content_type: application/octet-stream }
+    expect: *ok
+    returns: ack
+  delete_no_signal_image:
+    summary: "Delete an uploaded no-signal image; the default one comes back (POST /api/resource/image/delete)"
+    params:
+      id: { type: string, default: no_signal_1, max_length: 63, pattern: "^[A-Za-z0-9_-]+$", label: Image, description: "The image's preset id, e.g. no_signal_1." }
+    send: { models: [ip-to-usb], method: POST, path: /api/resource/image/delete, content_type: application/json, body: '{"id":"{id}"}' }
+    expect: *ok
+    returns: ack
+  get_usb_sources:
+    summary: "Sources added by hand, or NDI sources discovered, with their ids and the source selected (GET /api/source/list?type=static or dynamic)"
+    params:
+      list: { type: enum, values: [static, discovered], default: static, label: List, description: "Sources added by hand (static), or NDI sources found by discovery." }
+    send: { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: "{list:map.usb_source_list}" } }
+    expect: *value
+    returns: value
+  add_usb_ndi_source:
+    summary: "Add an NDI source by name and address (POST /api/source/add protocol ndi, type ndi)"
+    params:
+      name: { type: string, required: true, max_length: 255, label: Name, description: "The source's name in the list." }
+      ndi_name: { type: string, required: true, max_length: 255, label: NDI name, description: "The NDI stream's full name, e.g. ENCODER (Camera 1)." }
+      url: { type: string, required: true, max_length: 255, label: NDI address, description: "The NDI source's address and port, e.g. 10.0.0.5:5961." }
+      transport: { type: enum, values: [auto, multicast, udp, rudp, tcp, multi-tcp], default: auto, label: Transport, description: "How the source is asked to send, or auto." }
+      pts_mode: { type: enum, values: [auto, timecode, timestamp], default: auto, label: Timing, description: "Time the video by the NDI timecode, the timestamp, or auto." }
+      low_bandwidth: { type: bool, default: false, label: Low bandwidth, description: "On asks the source for its low-bandwidth stream." }
+      buffer_ms: { type: int, min: 0, max: 10000, default: 60, label: Buffer, description: "Buffer in milliseconds; shorter is lower latency and less tolerant of jitter." }
+    send: { models: [ip-to-usb], method: POST, path: /api/source/add, content_type: application/json,
+            body: '{"name":{name:json},"protocol":"ndi","type":"ndi","data":{"name":{ndi_name:json},"url":{url:json},"low_bw":{low_bandwidth},"transport":"{transport}","pts_mode":"{pts_mode}","buffer_ms":{buffer_ms}}}' }
+    expect: *ok
+    returns: ack
+  get_stream_status:
+    summary: "The stream being decoded: name, protocol, connection, uptime, tally, and its video and audio format, bitrate, jitter and drops (GET /api/stream/status/get)"
+    send: { models: [ip-to-usb], method: GET, path: /api/stream/status/get }
+    expect: *value
+    returns: value
 
 state:
   device.model:          { type: string, description: "Model, e.g. HDMI 4K Plus, NDI to HDMI or Pro Convert IP to HDMI" }
@@ -1456,10 +2418,10 @@ state:
   device.hardware_revision: { type: string, description: "Hardware revision, A to Z" }
   device.temperature:    { type: float, description: "Core temperature, degrees Celsius" }
   device.uptime:         { type: int, description: "Seconds since start" }
-  device.cpu_usage:      { type: float, description: "Encoders and NDI decoders: CPU load, percent" }
+  device.cpu_usage:      { type: float, description: "CPU load, percent (encoders, NDI decoders, and models answering /api/system/info)" }
   device.memory_usage:   { type: float, description: "Encoders and NDI decoders: memory in use, percent" }
   device.fan_rpm:        { type: int, description: "Fan speed in RPM, on models with a fan" }
-  device.board_id:       { type: int, description: "Encoders and NDI decoders: the rotary switch, 0 to 15" }
+  device.board_id:       { type: int, description: "Encoders, NDI decoders, AES67 and Audio DX: the rotary switch, 0 to 15" }
   device.input_state:    { type: string, description: "Encoder input: no-signal, locking, unsupported, or the format, e.g. 1920x1080p60" }
   device.output_state:   { type: string, description: "Output connection: e.g. connected, unconnected, active, or the IP decoder's HDMI state 0 disconnected, 1 working, 10 not supported" }
   network.ethernet.state: { type: string, description: "Ethernet link: down, disconnected, or the speed such as 1000m" }
@@ -1475,7 +2437,7 @@ state:
   network.ssdp:          { type: bool, description: "Encoders and NDI decoders: SSDP discovery answered (administrators only)" }
   auto_reboot.enabled:   { type: bool, description: "Scheduled reboot on" }
   auto_reboot.days:      { type: int, description: "Encoders and NDI decoders: sum of day masks, Monday 1 to Saturday 32 (week-flags)" }
-  auto_reboot.week:      { type: string, description: "IP decoders: reboot days as a JSON array, 1 Monday to 7 Sunday" }
+  auto_reboot.week:      { type: string, description: "IP decoders and IP to USB: reboot days as a JSON array, 1 Monday to 7 Sunday" }
   auto_reboot.hour:      { type: int, description: "Reboot hour (UTC on the encoders and NDI decoders)" }
   auto_reboot.minute:    { type: int, description: "Reboot minute" }
   ndi.name:              { type: string, description: "Encoder: the NDI source name sent; decoder: the NDI source decoded" }
@@ -1515,7 +2477,7 @@ state:
   ndi.timecode_first:    { type: bool, description: "NDI decoders: NDI timecode preferred for timing" }
   ndi.pts_mode:          { type: string, description: "IP decoders: auto, timecode or timestamp" }
   ndi.default_buffer_ms: { type: int, description: "IP decoders: buffer for discovered NDI sources, ms" }
-  ndi.extra_ips:         { type: string, description: "IP decoders: extra addresses NDI sources are looked for at" }
+  ndi.extra_ips:         { type: string, description: "IP decoders, AES67 and Audio DX: extra addresses NDI sources are looked for at" }
   ndi.sources.*.name:    { type: string, description: "NDI source discovered on the network, by position in the list" }
   ndi.sources.*.address: { type: string, description: "Its address and port; holding amc_id means multicast" }
   tally.preview:         { type: bool, description: "NDI tally: on preview at some receiver (encoder) or at the source (decoder)" }
@@ -1537,16 +2499,16 @@ state:
   video.bitrate_ratio:   { type: int, description: "Encoder: NDI bitrate, percent of the standard rate" }
   video.input_aspect_auto: { type: bool, description: "Encoder: input aspect ratio detected" }
   video.input_aspect:    { type: string, description: "Encoder: input aspect ratio set, e.g. 16:9" }
-  video.input_color_auto: { type: bool, description: "Input or source colour space chosen automatically" }
-  video.input_color_format: { type: string, description: "Input or source colour space set: rgb, bt.601, bt.709, bt.2020 or bt.2020c" }
+  video.input_color_auto: { type: bool, description: "Input or source color space chosen automatically" }
+  video.input_color_format: { type: string, description: "Input or source color space set: rgb, bt.601, bt.709, bt.2020 or bt.2020c" }
   video.input_quant_auto: { type: bool, description: "Encoder: input quantization range detected" }
   video.input_quant_range: { type: string, description: "Encoder: input quantization range set, full or limited" }
   video.aspect_conversion: { type: string, description: "Encoder ignore, cropping or padding; decoders windowbox, full or zoom" }
   video.output_aspect_auto: { type: bool, description: "Encoder: output aspect ratio automatic" }
   video.output_aspect:   { type: string, description: "Encoder: output aspect ratio set, e.g. 16:9" }
   video.frame_rate_conversion: { type: string, description: "Encoder: raw, half, one-third or quarter of the input rate" }
-  video.output_color_auto: { type: bool, description: "Encoder: output colour space automatic" }
-  video.output_color_format: { type: string, description: "Output colour space or format: encoder bt.601, bt.709 or bt.2020; decoders rgb, yuv444 or yuv422" }
+  video.output_color_auto: { type: bool, description: "Encoder: output color space automatic" }
+  video.output_color_format: { type: string, description: "Output color space or format: encoder bt.601, bt.709 or bt.2020; decoders rgb, yuv444 or yuv422" }
   video.output_sat_auto: { type: bool, description: "Encoder: output saturation range automatic" }
   video.output_sat_range: { type: string, description: "Encoder: output saturation range, full, limited or extended" }
   video.output_quant_auto: { type: bool, description: "Encoder: output quantization range automatic" }
@@ -1555,7 +2517,7 @@ state:
   video.overlay.title:   { type: bool, description: "Decoders: source name and resolution shown" }
   video.overlay.tally:   { type: bool, description: "Decoders: NDI tally shown" }
   video.overlay.vu_meter: { type: bool, description: "Decoders: audio meters shown" }
-  video.overlay.center_cross: { type: bool, description: "Decoders: centre cross shown" }
+  video.overlay.center_cross: { type: bool, description: "Decoders: center cross shown" }
   video.vu_meter_mode:   { type: string, description: "Decoders: meter scale, as set_vu_meter_mode or set_vu_meter_scale names it" }
   video.safe_area:       { type: string, description: "Decoders: safe area marker, none, 4:3, 80% or square" }
   video.ident_mode:      { type: string, description: "Decoders: ident overlay, none, ident-text or device-name (IP decoders: none, text or source-name)" }
@@ -1585,17 +2547,17 @@ state:
   audio.channel_map:     { type: string, description: "IP decoders: the channel map as a JSON array of source indexes from 0" }
   source.name:           { type: string, description: "NDI decoders: the source being decoded" }
   source.ndi:            { type: bool, description: "NDI decoders: the source is a discovered NDI source (false: a preset)" }
-  source.selected_id:    { type: int, description: "IP decoders: the source selected, in simple mode" }
+  source.selected_id:    { type: int, description: "IP decoders (in simple mode) and IP to USB: the source selected" }
   decoder.buffer_ms:     { type: int, description: "NDI decoders: decoder buffer, ms" }
   presets.*.name:        { type: string, description: "NDI decoders: preset source by position in the list; its name" }
   presets.*.url:         { type: string, description: "Its URL" }
   presets.*.hotkey:      { type: string, description: "Its shortcut, when one is set" }
   config.mode:           { type: string, description: "IP decoders: simple or profile mode" }
   config.language:       { type: string, description: "IP decoders: web interface language" }
-  sources.*.name:        { type: string, description: "IP decoders: a source by id; its name" }
+  sources.*.name:        { type: string, description: "IP decoders and IP to USB: a source by id; its name" }
   sources.*.kind:        { type: string, description: "static (added) or ndi (discovered)" }
   sources.*.type:        { type: int, description: "Configuration type: 1 URL, 2 discovered NDI, 3 custom NDI" }
-  sources.*.protocol:    { type: string, description: "rtmp, srt, udp, rtp, rtsp, http, ndi, zixi or rist" }
+  sources.*.protocol:    { type: string, description: "rtmp, srt, udp, rtp, rtsp, http, ndi, zixi or rist (IP to USB: ndi, rtmp, ts-srt, ts-udp, ts-rtp, rtsp or http)" }
   sources.*.url:         { type: string, description: "Its URL (URL sources)" }
   sources.*.ndi_name:    { type: string, description: "Its NDI name (NDI sources)" }
   sources.*.ndi_url:     { type: string, description: "Its NDI address (NDI sources)" }
@@ -1623,10 +2585,10 @@ state:
   ptz.port:              { type: int, description: "Encoder: VISCA over IP port" }
   ptz.visca_header:      { type: bool, description: "Encoder: VISCA over IP message header used" }
   ptz.limits.pan_left:   { type: int, description: "Encoder: pan left limit, camera units" }
-  ptz.limits.pan_center: { type: int, description: "Encoder: pan centre, camera units" }
+  ptz.limits.pan_center: { type: int, description: "Encoder: pan center, camera units" }
   ptz.limits.pan_right:  { type: int, description: "Encoder: pan right limit, camera units" }
   ptz.limits.tilt_top:   { type: int, description: "Encoder: tilt top limit, camera units" }
-  ptz.limits.tilt_center: { type: int, description: "Encoder: tilt centre, camera units" }
+  ptz.limits.tilt_center: { type: int, description: "Encoder: tilt center, camera units" }
   ptz.limits.tilt_bottom: { type: int, description: "Encoder: tilt bottom limit, camera units" }
   ptz.limits.zoom_out:   { type: int, description: "Encoder: zoom out limit, camera units" }
   ptz.limits.focus_near: { type: int, description: "Encoder: focus near limit, camera units" }
@@ -1636,6 +2598,345 @@ state:
   edid.keep_last:        { type: bool, description: "Encoder: last loop-through EDID kept" }
   edid.add_audio:        { type: bool, description: "Encoder: source asked for audio" }
   edid.limit_pixel_clock: { type: bool, description: "Encoder: pixel clock kept within the device's limit" }
+  device.product_id:     { type: string, description: "AES67, Audio DX, IP to USB: product id, e.g. 0x506" }
+  device.firmware_name:  { type: string, description: "AES67, Audio DX, IP to USB: firmware name" }
+  device.build_time:     { type: string, description: "AES67, Audio DX, IP to USB: firmware build time" }
+  device.capabilities:   { type: string, description: "AES67, Audio DX, IP to USB: capability flags as a JSON object (time zone, NTP, online upgrade, IPv6, ...)" }
+  device.memory_total_kb: { type: int, description: "Base API: memory, KB" }
+  device.memory_available_kb: { type: int, description: "Base API: memory free, KB" }
+  device.time:           { type: string, description: "Base API: the device's local time, yyyy-MM-dd HH:mm:ss" }
+  device.timezone:       { type: string, description: "Base API: time zone name" }
+  device.reboot_required: { type: bool, description: "IP to USB: the last name change takes effect after a restart" }
+  network.ntp_enabled:   { type: bool, description: "Base API: NTP keeps the clock" }
+  network.ntp_server2:   { type: string, description: "Base API: second NTP server" }
+  network.default_route: { type: string, description: "AES67, Audio DX: interface of the default route, empty for none" }
+  network.dns.manual:    { type: bool, description: "AES67, Audio DX: DNS servers set by hand" }
+  network.dns.primary:   { type: string, description: "AES67, Audio DX: first DNS server, empty when unset" }
+  network.dns.secondary: { type: string, description: "AES67, Audio DX: second DNS server, empty when unset" }
+  network.interfaces.*.enabled: { type: bool, description: "AES67, Audio DX, IP to USB: an interface by name (eth0, usb0); its service on" }
+  network.interfaces.*.type: { type: string, description: "ethernet, wifi, usb-sharing, usb, cellular or bridge" }
+  network.interfaces.*.dhcp: { type: bool, description: "Its address comes from DHCP" }
+  network.interfaces.*.ip_address: { type: string, description: "Its IPv4 address" }
+  network.interfaces.*.netmask: { type: string, description: "Its subnet mask" }
+  network.interfaces.*.gateway: { type: string, description: "Its gateway" }
+  network.interfaces.*.dns1: { type: string, description: "IP to USB: its first DNS server" }
+  network.interfaces.*.dns2: { type: string, description: "IP to USB: its second DNS server" }
+  network.interfaces.*.mac: { type: string, description: "Its MAC address" }
+  network.interfaces.*.link_speed: { type: int, description: "Link speed, Mbit/s (USB: 12, 480, 5000 or 10000)" }
+  network.interfaces.*.link_state: { type: string, description: "down, disconnected or connected" }
+  network.interfaces.*.tx_kbps: { type: int, description: "Send rate, kbit/s" }
+  network.interfaces.*.rx_kbps: { type: int, description: "Receive rate, kbit/s" }
+  io.*.*.linked:         { type: bool, description: "AES67, Audio DX: a connector (unbalanced, balanced, usb) and direction (in, out) is connected or working" }
+  io.*.*.depth:          { type: string, description: "Its sample depth, L16 or L24" }
+  io.*.*.channels:       { type: int, description: "Its channel count" }
+  io.usb.*.sample_rate:  { type: int, description: "USB audio in or out sample rate, Hz" }
+  io.usb.connected:      { type: bool, description: "AES67, Audio DX: a computer is connected to the USB audio port" }
+  io.usb.channel_setting: { type: int, description: "AES67, Audio DX: USB audio channels set (uac-num-channels), 2 or 4" }
+  aoip.sample_rate:      { type: int, description: "AES67: sample rate of the AES67 sources; Audio DX: the device's sample rate; Hz" }
+  aoip.packet_time:      { type: string, description: "AES67: packet time of the AES67 sources, e.g. 1ms" }
+  aoip.st2110:           { type: bool, description: "AES67: SMPTE ST 2110 mode reported (st2110)" }
+  analog.unbalanced_in_level: { type: string, description: "AES67, Audio DX: unbalanced input reference level, e.g. +12dBu" }
+  analog.unbalanced_out_level: { type: string, description: "AES67, Audio DX: unbalanced output reference level" }
+  analog.balanced_in_level: { type: string, description: "AES67, Audio DX: balanced input reference level, e.g. +18dBu" }
+  analog.balanced_out_level: { type: string, description: "AES67, Audio DX: balanced output reference level" }
+  analog.mic_bias:       { type: bool, description: "AES67, Audio DX: MIC bias on" }
+  analog.test_tone:      { type: string, description: "AES67, Audio DX: test tone off, analog-input or analog-output" }
+  network.igmp:          { type: string, description: "AES67, Audio DX: IGMP version, auto, v2 or v3" }
+  stream.aac_bitrate_kbps: { type: int, description: "AES67: AAC bitrate of the streams sent, kbit/s" }
+  aes67.active_sources.*.name: { type: string, description: "AES67: an AES67 source being sent, by position in the summary; its name" }
+  aes67.active_sources.*.sample_rate: { type: int, description: "Its sample rate, Hz" }
+  aes67.active_sources.*.depth: { type: string, description: "Its sample depth, L16 or L24" }
+  aes67.active_sources.*.channels: { type: int, description: "Its channel count" }
+  aes67.active_sources.*.ptime: { type: string, description: "Its packet time" }
+  aes67.active_sinks.*.name: { type: string, description: "AES67: an AES67 sink receiving, by position in the summary; the source's name" }
+  aes67.active_sinks.*.sample_rate: { type: int, description: "Its sample rate, Hz" }
+  aes67.active_sinks.*.depth: { type: string, description: "Its sample depth" }
+  aes67.active_sinks.*.channels: { type: int, description: "Its channel count" }
+  aes67.active_sinks.*.ptime: { type: string, description: "Its packet time" }
+  aes67.active_sinks.*.qos: { type: int, description: "Its QoS flags: 1 sync, 2 not sync, 4 underflow, 8 overflow, 16 late, 32 unmute, 64 mute" }
+  ptp.version:           { type: string, description: "AES67: PTPV1 or PTPV2" }
+  ptp.priority1:         { type: int, description: "AES67: PTP priority 1" }
+  ptp.priority2:         { type: int, description: "AES67: PTP priority 2" }
+  ptp.domain:            { type: int, description: "AES67: PTP domain, 0 to 127" }
+  ptp.grandmaster:       { type: string, description: "AES67: the grandmaster's clock id" }
+  ptp.role:              { type: string, description: "AES67: auto or follower" }
+  ptp.delay_mechanism:   { type: string, description: "AES67: E2E or P2P" }
+  ptp.announce_interval: { type: int, description: "AES67: announce interval, power of two in seconds" }
+  ptp.sync_interval:     { type: int, description: "AES67: sync interval, power of two in seconds" }
+  ptp.synced:            { type: bool, description: "AES67: synchronized with the leader" }
+  ptp.leader:            { type: bool, description: "AES67: this device is the PTP leader" }
+  ptp.locked_to:         { type: string, description: "AES67: clock id of the leader in use" }
+  ptp.datetime:          { type: string, description: "AES67: the device's time at the last statistics" }
+  ptp.statistics_interval_ms: { type: int, description: "AES67: interval between delay samples, ms" }
+  ptp.delay_ns:          { type: string, description: "AES67: recent delay samples as a JSON array, ns" }
+  aes67.sources.*.name:  { type: string, description: "AES67: an AES67 source by uid; its name" }
+  aes67.sources.*.enabled: { type: bool, description: "Sending on" }
+  aes67.sources.*.state: { type: string, description: "pending, sending, fail or unicast-unavailable" }
+  aes67.sources.*.address: { type: string, description: "Destination address" }
+  aes67.sources.*.port:  { type: int, description: "Destination port" }
+  aes67.sources.*.payload: { type: int, description: "RTP payload type" }
+  aes67.sources.*.depth: { type: string, description: "Sample depth, L16 or L24" }
+  aes67.sources.*.channels: { type: int, description: "Channel count" }
+  aes67.sources.*.ttl:   { type: int, description: "Multicast TTL" }
+  aes67.sources.*.dscp:  { type: string, description: "DSCP class: BE, AF31, AF41 or EF" }
+  aes67.sources.*.sdp:   { type: string, description: "Its session description" }
+  aes67.sinks.*.state:   { type: string, description: "AES67: an AES67 sink by index, 0 to 3; idle, receiving, connecting, lost or format-error" }
+  aes67.sinks.*.name:    { type: string, description: "The sink's name" }
+  aes67.sinks.*.manual:  { type: bool, description: "Set up by hand rather than from a discovered source" }
+  aes67.sinks.*.source_name: { type: string, description: "The source's name" }
+  aes67.sinks.*.source_ip: { type: string, description: "The source's address" }
+  aes67.sinks.*.source_mac: { type: string, description: "The source's MAC address" }
+  aes67.sinks.*.address: { type: string, description: "Stream destination address" }
+  aes67.sinks.*.port:    { type: int, description: "Stream destination port" }
+  aes67.sinks.*.ssrc:    { type: int, description: "RTP SSRC" }
+  aes67.sinks.*.sample_rate: { type: int, description: "Sample rate, Hz" }
+  aes67.sinks.*.depth:   { type: string, description: "Sample depth" }
+  aes67.sinks.*.channels: { type: int, description: "Channel count" }
+  aes67.sinks.*.ptime:   { type: string, description: "Packet time" }
+  aes67.sinks.*.mediaclk_offset: { type: int, description: "RTP media clock offset" }
+  aes67.sinks.*.max_delay_ms: { type: int, description: "Maximum delay, ms; 0 ignores delay" }
+  aes67.sinks.*.max_buffer: { type: int, description: "Buffer in packet times, 1 to 16" }
+  aes67.sinks.*.ttl:     { type: int, description: "TTL" }
+  aes67.sinks.*.sdp:     { type: string, description: "Session description" }
+  aes67.discovered.*.name: { type: string, description: "AES67: an AES67 source found on the network, by position; its name" }
+  aes67.discovered.*.source_ip: { type: string, description: "Its address" }
+  aes67.discovered.*.source_mac: { type: string, description: "Its MAC address" }
+  aes67.discovered.*.address: { type: string, description: "Its destination address" }
+  aes67.discovered.*.port: { type: int, description: "Its destination port" }
+  aes67.discovered.*.ssrc: { type: int, description: "Its RTP SSRC" }
+  aes67.discovered.*.sample_rate: { type: int, description: "Its sample rate, Hz" }
+  aes67.discovered.*.depth: { type: string, description: "Its sample depth" }
+  aes67.discovered.*.channels: { type: int, description: "Its channel count" }
+  aes67.discovered.*.ptime: { type: string, description: "Its packet time" }
+  aes67.discovered.*.mediaclk_offset: { type: int, description: "Its RTP offset" }
+  aes67.discovered.*.ttl: { type: int, description: "Its TTL" }
+  aes67.discovered.*.sdp: { type: string, description: "Its session description" }
+  aes67.sink_stats.*.qos: { type: int, description: "AES67: a sink's statistics by index, as last read; QoS flags as aes67.active_sinks" }
+  aes67.sink_stats.*.duration_s: { type: int, description: "Time the sink has run, seconds" }
+  aes67.sink_stats.*.peak_us: { type: int, description: "Maximum delay, microseconds" }
+  aes67.sink_stats.*.average_us: { type: int, description: "Average delay, microseconds" }
+  aes67.sink_stats.*.late: { type: int, description: "Packets later than the maximum delay" }
+  aes67.sink_stats.*.lost: { type: int, description: "Packets lost" }
+  aes67.sink_stats.*.buffer_count: { type: int, description: "Buffer count" }
+  aes67.sink_stats.*.underflows: { type: int, description: "Buffer underflows" }
+  aes67.sink_stats.*.overflows: { type: int, description: "Buffer overflows" }
+  aes67.sink_stats.*.histogram: { type: string, description: "Delay histogram as a JSON array of x-us and y-count" }
+  stream.receiver_type:  { type: string, description: "AES67: the received streams feeding the matrix, ndi, srt or icecast" }
+  stream.ndi_tx_discovery_servers: { type: string, description: "AES67: discovery servers the NDI senders register with" }
+  streams.ndi_tx.*.enabled: { type: bool, description: "AES67: an NDI sender by uid; sending on" }
+  streams.ndi_tx.*.name: { type: string, description: "Its NDI name" }
+  streams.ndi_tx.*.group: { type: string, description: "Its NDI group" }
+  streams.ndi_tx.*.full_bandwidth: { type: bool, description: "Full-bandwidth NDI (enable-full)" }
+  streams.ndi_tx.*.discovery_enabled: { type: bool, description: "Registers with the discovery servers" }
+  streams.ndi_tx.*.audio_standard: { type: string, description: "smpte or ebu" }
+  streams.ndi_tx.*.transport: { type: string, description: "udp, multicast, rudp, tcp or multi-tcp" }
+  streams.ndi_tx.*.multicast_ttl: { type: int, description: "Multicast TTL" }
+  streams.ndi_tx.*.multicast_address: { type: string, description: "Multicast address" }
+  streams.ndi_tx.*.multicast_netmask: { type: string, description: "Multicast netmask" }
+  streams.ndi_tx.*.failover_enabled: { type: bool, description: "Failover source named" }
+  streams.ndi_tx.*.failover_name: { type: string, description: "Failover NDI name" }
+  streams.ndi_tx.*.failover_url: { type: string, description: "Failover NDI address" }
+  streams.ndi_tx.*.web_control: { type: bool, description: "Web control allowed" }
+  streams.ndi_tx.*.published_name: { type: string, description: "The full NDI name receivers see" }
+  streams.ndi_tx.*.clients: { type: int, description: "Receivers connected" }
+  streams.ndi_rx.*.enabled: { type: bool, description: "AES67: an NDI receiver by uid; receiving on" }
+  streams.ndi_rx.*.found: { type: bool, description: "Its source was found through discovery" }
+  streams.ndi_rx.*.alias: { type: string, description: "Its alias" }
+  streams.ndi_rx.*.ndi_name: { type: string, description: "Its source's NDI name" }
+  streams.ndi_rx.*.url:  { type: string, description: "Its source's address" }
+  streams.ndi_rx.*.audio_standard: { type: string, description: "smpte or ebu" }
+  streams.ndi_rx.*.buffer_ms: { type: int, description: "Buffer, ms" }
+  streams.ndi_rx.*.headroom_db: { type: int, description: "Headroom, dB" }
+  streams.ndi_rx.*.sample_rate: { type: int, description: "Received sample rate, Hz" }
+  streams.ndi_rx.*.channels: { type: int, description: "Received channels" }
+  streams.ndi_rx.*.bit_depth: { type: int, description: "Received bit depth" }
+  streams.ndi_rx.*.connected: { type: bool, description: "Connected to its source" }
+  streams.ndi_rx.*.audio_kbps: { type: int, description: "Audio bitrate, kbit/s" }
+  streams.ndi_rx.*.audio_jitter: { type: int, description: "Audio jitter" }
+  streams.ndi_rx.*.uptime_ms: { type: int, description: "Time connected, ms" }
+  streams.srt_tx.*.enabled: { type: bool, description: "AES67: an SRT sender by uid; sending on" }
+  streams.srt_tx.*.name: { type: string, description: "Its name" }
+  streams.srt_tx.*.mode: { type: string, description: "caller or listener" }
+  streams.srt_tx.*.remote_ip: { type: string, description: "Address called" }
+  streams.srt_tx.*.remote_port: { type: int, description: "Port called" }
+  streams.srt_tx.*.bind_port: { type: int, description: "Port listened on" }
+  streams.srt_tx.*.stream_id: { type: string, description: "Stream ID" }
+  streams.srt_tx.*.connect_timeout_ms: { type: int, description: "Connection timeout, ms" }
+  streams.srt_tx.*.retry_ms: { type: int, description: "Retry interval, ms" }
+  streams.srt_tx.*.latency_ms: { type: int, description: "Latency, ms" }
+  streams.srt_tx.*.bandwidth_percent: { type: int, description: "Overhead bandwidth, percent" }
+  streams.srt_tx.*.mtu:  { type: int, description: "MTU, bytes" }
+  streams.srt_tx.*.encryption: { type: string, description: "none, aes-128, aes-192 or aes-256" }
+  streams.srt_tx.*.clients: { type: int, description: "Callers connected (listener)" }
+  streams.srt_tx.*.uptime_ms: { type: int, description: "Time running, ms" }
+  streams.srt_rx.*.enabled: { type: bool, description: "AES67: an SRT receiver by uid; receiving on" }
+  streams.srt_rx.*.name: { type: string, description: "Its name" }
+  streams.srt_rx.*.mode: { type: string, description: "caller or listener" }
+  streams.srt_rx.*.remote_ip: { type: string, description: "Address called" }
+  streams.srt_rx.*.remote_port: { type: int, description: "Port called" }
+  streams.srt_rx.*.bind_port: { type: int, description: "Port listened on" }
+  streams.srt_rx.*.stream_id: { type: string, description: "Stream ID" }
+  streams.srt_rx.*.latency_ms: { type: int, description: "Latency, ms" }
+  streams.srt_rx.*.encrypted: { type: bool, description: "Encrypted" }
+  streams.srt_rx.*.buffer_ms: { type: int, description: "Buffer, ms" }
+  streams.srt_rx.*.headroom_db: { type: int, description: "Headroom, dB" }
+  streams.srt_rx.*.sample_rate: { type: int, description: "Received sample rate, Hz" }
+  streams.srt_rx.*.channels: { type: int, description: "Received channels" }
+  streams.srt_rx.*.bit_depth: { type: int, description: "Received bit depth" }
+  streams.icecast_tx.*.enabled: { type: bool, description: "AES67: an Icecast sender by uid; sending on" }
+  streams.icecast_tx.*.name: { type: string, description: "Its stream (mount) name" }
+  streams.icecast_tx.*.url: { type: string, description: "The Icecast server" }
+  streams.icecast_tx.*.user: { type: string, description: "The server user name" }
+  streams.icecast_tx.*.state: { type: string, description: "Connection state, e.g. success" }
+  streams.icecast_rx.*.enabled: { type: bool, description: "AES67: an Icecast receiver by uid; receiving on" }
+  streams.icecast_rx.*.name: { type: string, description: "Its name" }
+  streams.icecast_rx.*.url: { type: string, description: "The Icecast server" }
+  streams.icecast_rx.*.room: { type: string, description: "The stream (mount) received" }
+  streams.icecast_rx.*.buffer_ms: { type: int, description: "Buffer, ms" }
+  streams.icecast_rx.*.headroom_db: { type: int, description: "Headroom, dB" }
+  streams.icecast_rx.*.state: { type: string, description: "idle, connecting, success, connect-fail, auth-fail, recv-fail or fail" }
+  streams.icecast_rx.*.sample_rate: { type: int, description: "Received sample rate, Hz" }
+  streams.icecast_rx.*.channels: { type: int, description: "Received channels" }
+  streams.icecast_rx.*.bit_depth: { type: int, description: "Received bit depth" }
+  streams.icecast_rx.*.codec: { type: string, description: "NONE, PCM, AAC or MP3" }
+  icecast.streams.*.room: { type: string, description: "AES67: a stream on the Icecast server, by position, as last listed; its name" }
+  icecast.streams.*.content_type: { type: string, description: "Its type, e.g. audio/aac" }
+  icecast.streams.*.magewell: { type: bool, description: "Sent by a Magewell device" }
+  streams.tx.*.enabled:  { type: bool, description: "Audio DX: a stream sent by uid; sending on" }
+  streams.tx.*.name:     { type: string, description: "Its name" }
+  streams.tx.*.slot:     { type: string, description: "Stream1 or Stream2" }
+  streams.tx.*.type:     { type: string, description: "rtsp, srt or ndi" }
+  streams.tx.*.aac_kbps: { type: int, description: "AAC bitrate, kbit/s" }
+  streams.tx.*.rtsp_port: { type: int, description: "RTSP port" }
+  streams.tx.*.rtsp_max_clients: { type: int, description: "RTSP connections allowed" }
+  streams.tx.*.rtsp_key: { type: string, description: "RTSP stream key" }
+  streams.tx.*.rtsp_auth: { type: bool, description: "RTSP authentication on" }
+  streams.tx.*.rtsp_user: { type: string, description: "RTSP user name" }
+  streams.tx.*.srt_mode: { type: string, description: "caller or listener" }
+  streams.tx.*.srt_address: { type: string, description: "SRT caller destination address" }
+  streams.tx.*.srt_port: { type: int, description: "SRT caller destination port" }
+  streams.tx.*.srt_bind_port: { type: int, description: "SRT listener port" }
+  streams.tx.*.srt_stream_id: { type: string, description: "SRT stream ID" }
+  streams.tx.*.srt_connect_timeout_ms: { type: int, description: "SRT connection timeout, ms" }
+  streams.tx.*.srt_retry_ms: { type: int, description: "SRT retry interval, ms" }
+  streams.tx.*.srt_latency_ms: { type: int, description: "SRT latency, ms" }
+  streams.tx.*.srt_bandwidth_percent: { type: int, description: "SRT overhead bandwidth, percent" }
+  streams.tx.*.srt_mtu:  { type: int, description: "SRT MTU, bytes" }
+  streams.tx.*.srt_encryption: { type: string, description: "SRT encryption as reported, e.g. disable or aes-128" }
+  streams.tx.*.ndi_source_name: { type: string, description: "NDI source name" }
+  streams.tx.*.ndi_group: { type: string, description: "NDI group" }
+  streams.tx.*.ndi_full_bandwidth: { type: bool, description: "Full-bandwidth NDI" }
+  streams.tx.*.ndi_audio_standard: { type: string, description: "SMPTE or EBU" }
+  streams.tx.*.ndi_discovery_enabled: { type: bool, description: "Registers with a discovery server" }
+  streams.tx.*.ndi_discovery_server: { type: string, description: "Discovery server" }
+  streams.tx.*.ndi_transport: { type: string, description: "udp-unicast, udp-multicast, rudp-unicast, tcp-unicast or tcp-multi" }
+  streams.tx.*.ndi_multicast_address: { type: string, description: "Multicast address" }
+  streams.tx.*.ndi_multicast_netmask: { type: string, description: "Multicast netmask" }
+  streams.tx.*.ndi_multicast_ttl: { type: int, description: "Multicast TTL" }
+  streams.tx.*.ndi_failover_enabled: { type: bool, description: "Failover source named" }
+  streams.tx.*.ndi_failover_name: { type: string, description: "Failover NDI name" }
+  streams.tx.*.ndi_failover_address: { type: string, description: "Failover NDI address" }
+  streams.tx.*.ndi_web_control: { type: bool, description: "Web control allowed" }
+  streams.tx.*.published_name: { type: string, description: "The full NDI name receivers see" }
+  streams.tx.*.clients:  { type: int, description: "Clients connected" }
+  stream.tx_slots:       { type: int, description: "Audio DX: streams that can be sent at once" }
+  stream.tx_max_streams: { type: int, description: "Audio DX: streams sent that can be set up" }
+  stream.tx_count:       { type: int, description: "Audio DX: streams sent set up" }
+  streams.rx.*.enabled:  { type: bool, description: "Audio DX: a stream received by uid; receiving on" }
+  streams.rx.*.name:     { type: string, description: "Its name" }
+  streams.rx.*.slot:     { type: string, description: "Stream1 or Stream2" }
+  streams.rx.*.url:      { type: string, description: "Its srt:// or ntkndi:// URL" }
+  stream.rx_slots:       { type: int, description: "Audio DX: streams that can be received at once" }
+  stream.rx_max_streams: { type: int, description: "Audio DX: streams received that can be set up" }
+  stream.rx_count:       { type: int, description: "Audio DX: streams received set up" }
+  stream.rx_buffer_min_ms: { type: int, description: "Audio DX: shortest receive buffer, ms" }
+  stream.rx_buffer_max_ms: { type: int, description: "Audio DX: longest receive buffer, ms" }
+  stream.rx_buffer_default_ms: { type: int, description: "Audio DX: default receive buffer, ms" }
+  ndi.failover_sources.*.name: { type: string, description: "Audio DX: NDI source found for failover, by position" }
+  ndi.failover_sources.*.address: { type: string, description: "Its address" }
+  matrix.max_tx:         { type: int, description: "AES67, Audio DX: TX (output) channels of the matrix" }
+  matrix.max_rx:         { type: int, description: "AES67, Audio DX: RX (input) channels of the matrix" }
+  matrix.tx.*.mute:      { type: bool, description: "A TX channel by number from 0; muted" }
+  matrix.tx.*.volume_db: { type: int, description: "Its volume, dB" }
+  matrix.tx.*.rx.*.state: { type: string, description: "A crosspoint, by RX channel from 0: disconnected, connected, connecting or failed" }
+  matrix.tx.*.rx.*.mute: { type: bool, description: "The crosspoint muted" }
+  matrix.tx.*.rx.*.volume_db: { type: int, description: "The crosspoint volume, dB" }
+  matrix.usb_rx_channels: { type: int, description: "USB audio channels into the matrix" }
+  matrix.usb_tx_channels: { type: int, description: "USB audio channels out of the matrix" }
+  matrix.stream_rx.*.name: { type: string, description: "A received stream feeding the matrix, by position; its name" }
+  matrix.stream_rx.*.type: { type: string, description: "ndi, srt or icecast" }
+  matrix.stream_rx.*.channels: { type: int, description: "Its channels" }
+  matrix.stream_rx.*.slot: { type: string, description: "Audio DX: Stream1 or Stream2" }
+  matrix.stream_tx.*.name: { type: string, description: "Audio DX: a stream sent from the matrix, by position; its name" }
+  matrix.stream_tx.*.type: { type: string, description: "rtsp, srt or ndi" }
+  matrix.stream_tx.*.channels: { type: int, description: "Its channels" }
+  matrix.stream_tx.*.slot: { type: string, description: "Stream1 or Stream2" }
+  matrix.aes67_rx.*.sink: { type: int, description: "AES67: an AES67 sink feeding the matrix, by position; its index" }
+  matrix.aes67_rx.*.name: { type: string, description: "Its name" }
+  matrix.aes67_rx.*.channels: { type: int, description: "Its channels" }
+  matrix.aes67_tx.*.name: { type: string, description: "AES67: an AES67 source fed by the matrix, by position; its name" }
+  matrix.aes67_tx.*.channels: { type: int, description: "Its channels" }
+  matrix.live_tx.ndi:    { type: string, description: "AES67: NDI senders fed by the matrix, a JSON array of names" }
+  matrix.live_tx.srt:    { type: string, description: "AES67: SRT senders fed by the matrix, a JSON array of names" }
+  matrix.live_tx.icecast: { type: string, description: "AES67: Icecast senders fed by the matrix, a JSON array of names" }
+  matrix.groups.*.*.name: { type: string, description: "Audio DX: a channel group by side (tx, rx) and position; its name, e.g. Dante" }
+  matrix.groups.*.*.channels: { type: int, description: "Its channel count" }
+  matrix.groups.*.*.first: { type: int, description: "Its first channel, from 0" }
+  matrix.groups.*.*.last: { type: int, description: "Its last channel" }
+  matrix.groups.*.*.shown: { type: bool, description: "Shown in the matrix (false: unused)" }
+  meters.tx.*:           { type: float, description: "AES67, Audio DX: a TX channel's level by number from 0, dBFS" }
+  meters.rx.*:           { type: float, description: "AES67, Audio DX: an RX channel's level by number from 0, dBFS" }
+  dante.device_lock:     { type: bool, description: "Audio DX: Dante settings locked" }
+  dante.clock.uuid:      { type: string, description: "Audio DX: the device's clock id" }
+  dante.clock.leader:    { type: string, description: "Audio DX: the leader clock's id" }
+  dante.clock.grandmaster: { type: string, description: "Audio DX: the grandmaster clock's id" }
+  dante.clock.muted:     { type: bool, description: "Audio DX: audio muted by the clock" }
+  dante.clock.locked:    { type: bool, description: "Audio DX: clock locked" }
+  dante.clock.freq_ppm:  { type: int, description: "Audio DX: clock frequency offset, ppm" }
+  dante.clock.priority1: { type: int, description: "Audio DX: PTP priority 1" }
+  dante.clock.priority2: { type: int, description: "Audio DX: PTP priority 2" }
+  dante.clock.domain:    { type: int, description: "Audio DX: PTP domain" }
+  dante.clock.sync_interval: { type: int, description: "Audio DX: PTP sync interval" }
+  dante.clock.announce_interval: { type: int, description: "Audio DX: PTP announce interval" }
+  dante.clock.ttl:       { type: int, description: "Audio DX: PTP TTL" }
+  dante.sample_rate:     { type: int, description: "Audio DX: Dante sample rate, Hz" }
+  dante.encoding:        { type: string, description: "Audio DX: Dante encoding, e.g. PCM24" }
+  usb.mode:              { type: string, description: "IP to USB: video-conferencing or content-sharing" }
+  video.no_signal_images.*.path: { type: string, description: "IP to USB: a no-signal image by id; its path on the device" }
+  video.no_signal_images.*.default: { type: bool, description: "The device's default image (none uploaded)" }
+  ndi.discovered.*.name: { type: string, description: "IP to USB: an NDI source found by discovery, by source id; its name" }
+  ndi.discovered.*.address: { type: string, description: "Its address" }
+  sources.*.source_type: { type: string, description: "IP to USB: url or ndi" }
+  sources.*.buffer_ms:   { type: int, description: "IP to USB: buffer, ms" }
+  sources.*.low_bandwidth: { type: bool, description: "IP to USB: NDI low-bandwidth stream asked for" }
+  sources.*.transport:   { type: string, description: "IP to USB: NDI transport" }
+  sources.*.pts_mode:    { type: string, description: "IP to USB: NDI timing, auto, timecode or timestamp" }
+  sources.*.ptz_enabled: { type: bool, description: "IP to USB: PTZ settings shown for this source" }
+  sources.*.ptz.protocol: { type: string, description: "IP to USB: PTZ protocol, VISCA over UDP" }
+  sources.*.ptz.address: { type: string, description: "IP to USB: PTZ camera address" }
+  sources.*.ptz.port:    { type: int, description: "IP to USB: PTZ camera port" }
+  sources.*.ptz.camera:  { type: int, description: "IP to USB: PTZ camera id" }
+  sources.*.ptz.header:  { type: bool, description: "IP to USB: VISCA over IP message header used" }
+  sources.*.ptz.invert_pan: { type: bool, description: "IP to USB: pan reversed" }
+  sources.*.ptz.invert_tilt: { type: bool, description: "IP to USB: tilt reversed" }
+  stream.name:           { type: string, description: "IP to USB: the stream being decoded" }
+  stream.protocol:       { type: string, description: "IP to USB: its protocol, e.g. ndi" }
+  stream.state:          { type: int, description: "IP to USB: connection state, 2 connected" }
+  stream.uptime_ms:      { type: int, description: "IP to USB: time connected, ms" }
+  stream.video.codec:    { type: string, description: "IP to USB: video format, e.g. H264" }
+  stream.video.jitter:   { type: int, description: "IP to USB: video jitter" }
+  stream.video.kbps:     { type: int, description: "IP to USB: video bitrate, kbit/s" }
+  stream.video.width:    { type: int, description: "IP to USB: video width, pixels" }
+  stream.video.height:   { type: int, description: "IP to USB: video height, lines" }
+  stream.video.field_rate: { type: float, description: "IP to USB: video field rate" }
+  stream.video.drops:    { type: int, description: "IP to USB: video packets dropped" }
+  stream.audio.codec:    { type: string, description: "IP to USB: audio format, e.g. ADTS" }
+  stream.audio.jitter:   { type: int, description: "IP to USB: audio jitter" }
+  stream.audio.kbps:     { type: int, description: "IP to USB: audio bitrate, kbit/s" }
+  stream.audio.sample_rate: { type: int, description: "IP to USB: audio sample rate, Hz" }
+  stream.audio.bit_depth: { type: int, description: "IP to USB: audio bit depth" }
+  stream.audio.channels: { type: int, description: "IP to USB: audio channels" }
+  stream.audio.drops:    { type: int, description: "IP to USB: audio packets dropped" }
 
 # Nothing is pushed. Status is polled every 2 seconds; settings are read on
 # connecting, every 30 seconds, and again after each command that changes
@@ -1646,6 +2947,14 @@ telemetry:
         - { models: *mw, method: GET, path: /mwapi, query: { method: get-summary-info } }
         - { models: &dec [ndi-to-hdmi, ndi-to-sdi, ndi-to-aio, ndi-to-hdmi-4k], method: GET, path: /mwapi, query: { method: get-channel } }
         - { models: *ip, method: GET, path: /api/system/summary }
+        - { models: [aes67], method: POST, path: /api/aes67/summary-info }
+        - { models: [aes67], method: POST, path: /api/aes67/ptp-state }
+        - { models: [aes67], method: POST, path: /api/aes67/audio-meter }
+        - { models: [audio-dx], method: POST, path: /api/aoip/summary-info }
+        - { models: [audio-dx], method: POST, path: /api/dante/state }
+        - { models: [audio-dx], method: POST, path: /api/aoip/audio-meter }
+        - { models: [ip-to-usb], method: POST, path: /api/system/summary/get }
+        - { models: [ip-to-usb], method: GET, path: /api/stream/status/get }
       every_ms: 2000
     - send:
         - { models: *mw, method: GET, path: /mwapi, query: { method: get-video-config } }
@@ -1671,7 +2980,35 @@ telemetry:
         - { models: *ip, method: GET, path: /api/profile/list }
         - { models: *ip, method: GET, path: /api/settings/get }
         - { models: *ip, method: GET, path: /api/settings/zixi/master/get }
-        - { models: *ip, method: POST, path: /api/system/info }
+        - { models: *base, method: POST, path: /api/system/info }
+        - { models: *newapi, method: POST, path: /api/system/device-info }
+        - { models: *newapi, method: POST, path: /api/network/if-info }
+        - { models: *aoip, method: POST, path: /api/network/if-route }
+        - { models: *aoip, method: POST, path: /api/network/get-dns }
+        - { models: [aes67], method: POST, path: /api/aes67/general-info }
+        - { models: [aes67], method: POST, path: /api/aes67/ptp-info }
+        - { models: [aes67], method: POST, path: /api/aes67/source-info }
+        - { models: [aes67], method: POST, path: /api/aes67/sink-info }
+        - { models: [aes67], method: POST, path: /api/aes67/matrix-info }
+        - { models: [aes67], method: POST, path: /api/ndi/sender-info }
+        - { models: [aes67], method: POST, path: /api/ndi/receiver-info }
+        - { models: [aes67], method: POST, path: /api/ndi/receiver-find }
+        - { models: [aes67], method: POST, path: /api/srt/sender-info }
+        - { models: [aes67], method: POST, path: /api/srt/receiver-info }
+        - { models: [aes67], method: POST, path: /api/ices/sender-info }
+        - { models: [aes67], method: POST, path: /api/ices/receiver-info }
+        - { models: [audio-dx], method: POST, path: /api/aoip/general-info }
+        - { models: [audio-dx], method: POST, path: /api/aoip/matrix-desc }
+        - { models: [audio-dx], method: POST, path: /api/aoip/matrix-info }
+        - { models: [audio-dx], method: POST, path: /api/tx/live-info }
+        - { models: [audio-dx], method: POST, path: /api/rx/live-info }
+        - { models: [ip-to-usb], method: GET, path: /api/system/usb-mode/get }
+        - { models: [ip-to-usb], method: GET, path: /api/video/config/get }
+        - { models: [ip-to-usb], method: GET, path: /api/ndi/config/get }
+        - { models: [ip-to-usb], method: POST, path: /api/resource/image/get, content_type: application/json,
+            body: '{"id":"no_signal_1","type":"simple"}' }
+        - { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: static } }
+        - { models: [ip-to-usb], method: GET, path: /api/source/list, query: { type: dynamic } }
       every_ms: 30000
   updates:
     # Encoder API section 5.1, Decoder API V1.3 section 5.1.
@@ -1914,7 +3251,8 @@ telemetry:
         video.aspect_conversion: "{ar}"
         video.output_follows_input: "{follow}"
     # IP Decoder API section 4.1: numbered values in the NDI decoders' words.
-    - path: "^/api/video/config/get$"
+    - models: *ip
+      path: "^/api/video/config/get$"
       json_match: { "$.status": "^0$" }
       json:
         title: "$.show-title"
@@ -2341,19 +3679,849 @@ telemetry:
         zen_master.tunnel_port: "{tunnel}"
         zen_master.user: "{user}"
         zen_master.state: "{state}"
-    # Base API, Get basic info.
+    # Base API, Get basic info (AES67 API section 16.2, Audio DX API 8.2, IP
+    # to USB API 3.3).
     - path: "^/api/system/info$"
       json_match: { "$.status": "^0$" }
       json: { name: "$.device-name", uptime: "$.uptime", ntp: "$.datetime.ntp-server1", enabled: "$.auto-reboot.enable",
-              hour: "$.auto-reboot.hour", minute: "$.auto-reboot.min", week: "$.auto-reboot.week" }
+              hour: "$.auto-reboot.hour", minute: "$.auto-reboot.min", week: "$.auto-reboot.week", cpu: "$.cpu.usage",
+              mem: "$.mem.total", avail: "$.mem.avail", time: "$.datetime.cur-time", zone: "$.datetime.zonename",
+              ntp_on: "$.datetime.ntp-enable", ntp2: "$.datetime.ntp-server2" }
       state:
         device.name: "{name}"
         device.uptime: "{uptime}"
+        device.cpu_usage: "{cpu:from.percent_x100}"
+        device.memory_total_kb: "{mem}"
+        device.memory_available_kb: "{avail}"
+        device.time: "{time}"
+        device.timezone: "{zone}"
+        network.ntp_enabled: "{ntp_on}"
         network.ntp_server: "{ntp}"
+        network.ntp_server2: "{ntp2}"
         auto_reboot.enabled: "{enabled}"
         auto_reboot.hour: "{hour}"
         auto_reboot.minute: "{minute}"
         auto_reboot.week: "{week}"
+
+    # AES67 API section 3.1, Audio DX API section 3.1. The temperature is
+    # text with its unit ("79.61°C"), so it is read from the body's text.
+    - path: "^/api/(?:aes67|aoip)/summary-info$"
+      json_match: { "$.status": "^0$" }
+      json:
+        board: "$.card-address"
+        ui_l: "$.unbalance.in.linked"
+        ui_d: "$.unbalance.in.depth"
+        ui_c: "$.unbalance.in.channel-num"
+        uo_l: "$.unbalance.out.linked"
+        uo_d: "$.unbalance.out.depth"
+        uo_c: "$.unbalance.out.channel-num"
+        bi_l: "$.balance.in.linked"
+        bi_d: "$.balance.in.depth"
+        bi_c: "$.balance.in.channel-num"
+        bo_l: "$.balance.out.linked"
+        bo_d: "$.balance.out.depth"
+        bo_c: "$.balance.out.channel-num"
+        usb: "$.uac.usb-connected"
+        ai_l: "$.uac.in.linked"
+        ai_r: "$.uac.in.sample-rate"
+        ai_d: "$.uac.in.depth"
+        ai_c: "$.uac.in.channel-num"
+        ao_l: "$.uac.out.linked"
+        ao_r: "$.uac.out.sample-rate"
+        ao_d: "$.uac.out.depth"
+        ao_c: "$.uac.out.channel-num"
+      state:
+        device.board_id: "{board}"
+        io.unbalanced.in.linked: "{ui_l}"
+        io.unbalanced.in.depth: "{ui_d}"
+        io.unbalanced.in.channels: "{ui_c}"
+        io.unbalanced.out.linked: "{uo_l}"
+        io.unbalanced.out.depth: "{uo_d}"
+        io.unbalanced.out.channels: "{uo_c}"
+        io.balanced.in.linked: "{bi_l}"
+        io.balanced.in.depth: "{bi_d}"
+        io.balanced.in.channels: "{bi_c}"
+        io.balanced.out.linked: "{bo_l}"
+        io.balanced.out.depth: "{bo_d}"
+        io.balanced.out.channels: "{bo_c}"
+        io.usb.connected: "{usb}"
+        io.usb.in.linked: "{ai_l}"
+        io.usb.in.sample_rate: "{ai_r}"
+        io.usb.in.depth: "{ai_d}"
+        io.usb.in.channels: "{ai_c}"
+        io.usb.out.linked: "{ao_l}"
+        io.usb.out.sample_rate: "{ao_r}"
+        io.usb.out.depth: "{ao_d}"
+        io.usb.out.channels: "{ao_c}"
+    - path: "^/api/(?:aes67|aoip)/summary-info$"
+      match: '"temperature"\s*:\s*"(-?[0-9]+(?:\.[0-9]+)?)'
+      state: { device.temperature: "{1}" }
+    - path: "^/api/aes67/summary-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.sources"
+      json: { name: "$.name", rate: "$.sample-rate", depth: "$.depth", channels: "$.channel-num", ptime: "$.ptime" }
+      replace: aes67.active_sources
+      state:
+        aes67.active_sources.{index}.name: "{name}"
+        aes67.active_sources.{index}.sample_rate: "{rate}"
+        aes67.active_sources.{index}.depth: "{depth}"
+        aes67.active_sources.{index}.channels: "{channels}"
+        aes67.active_sources.{index}.ptime: "{ptime}"
+    - path: "^/api/aes67/summary-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.sinks"
+      json: { name: "$.name", rate: "$.sample-rate", depth: "$.depth", channels: "$.channel-num", ptime: "$.ptime", qos: "$.qos" }
+      replace: aes67.active_sinks
+      state:
+        aes67.active_sinks.{index}.name: "{name}"
+        aes67.active_sinks.{index}.sample_rate: "{rate}"
+        aes67.active_sinks.{index}.depth: "{depth}"
+        aes67.active_sinks.{index}.channels: "{channels}"
+        aes67.active_sinks.{index}.ptime: "{ptime}"
+        aes67.active_sinks.{index}.qos: "{qos}"
+    # AES67 API section 4.1: numbered values.
+    - path: "^/api/aes67/general-info$"
+      json_match: { "$.status": "^0$" }
+      json: { rate: "$.tx-sample-rate", ptime: "$.tx-ptime", ui: "$.unbld-in", uo: "$.unbld-out", bi: "$.bld-in", bo: "$.bld-out",
+              bias: "$.micbias", st2110: "$.st2110", igmp: "$.igmp", aac: "$.aac-bitrate-kbps", tone: "$.audio-pattern",
+              uac: "$.uac-num-channels" }
+      state:
+        aoip.sample_rate: "{rate}"
+        aoip.packet_time: "{ptime}"
+        analog.unbalanced_in_level: { value: "{ui}", map: { "0": "+12dBu", "1": "+4dBu", "2": "0dBu", "3": "-2dBu", "4": "0dBV", "5": "-10dBV" } }
+        analog.unbalanced_out_level: { value: "{uo}", map: { "0": "+12dBu", "1": "+4dBu", "2": "0dBu", "3": "-2dBu", "4": "0dBV", "5": "-10dBV" } }
+        analog.balanced_in_level: { value: "{bi}", map: { "0": "+24dBu", "1": "+18dBu", "2": "+4dBu", "3": "0dBu", "4": "-2dBu", "5": "0dBV", "6": "-10dBV" } }
+        analog.balanced_out_level: { value: "{bo}", map: { "0": "+18dBu", "1": "+4dBu", "2": "0dBu", "3": "-2dBu", "4": "0dBV", "5": "-10dBV" } }
+        analog.mic_bias: "{bias}"
+        aoip.st2110: "{st2110}"
+        network.igmp: { value: "{igmp}", map: { "0": auto, "2": v2, "3": v3 } }
+        stream.aac_bitrate_kbps: "{aac}"
+        analog.test_tone: { value: "{tone}", map: { "0": "off", "1": analog-input, "2": analog-output } }
+        io.usb.channel_setting: "{uac}"
+    # Audio DX API section 4.2: the same as text.
+    - path: "^/api/aoip/general-info$"
+      json_match: { "$.status": "^0$" }
+      json: { lock: "$.device-lock", rate: "$.tx-sample-rate", ui: "$.unbld-in", uo: "$.unbld-out", bi: "$.bld-in", bo: "$.bld-out",
+              bias: "$.micbias", igmp: "$.igmp", tone: "$.audio-pattern", uac: "$.uac-num-channels" }
+      state:
+        dante.device_lock: "{lock}"
+        aoip.sample_rate: "{rate}"
+        analog.unbalanced_in_level: { value: "{ui}", map: &dx_unbld { "+12dBu": "+12dBu", "+4dBu": "+4dBu", "0dBu": "0dBu", "+0dBu": "0dBu", "-2dBu": "-2dBu", "0dBV": "0dBV", "-10dBV": "-10dBV" } }
+        analog.unbalanced_out_level: { value: "{uo}", map: *dx_unbld }
+        analog.balanced_in_level: { value: "{bi}", map: &dx_bld { "+24dBu": "+24dBu", "+18dBu": "+18dBu", "+4dBu": "+4dBu", "0dBu": "0dBu", "+0dBu": "0dBu", "-2dBu": "-2dBu", "-2dBV": "-2dBu", "0dBV": "0dBV", "-10dBV": "-10dBV" } }
+        analog.balanced_out_level: { value: "{bo}", map: *dx_bld }
+        analog.mic_bias: "{bias}"
+        network.igmp: { value: "{igmp}", map: { Auto: auto, IGMPv2: v2, IGMPv3: v3 } }
+        analog.test_tone: { value: "{tone}", map: { "off": "off", input: analog-input, output: analog-output } }
+        io.usb.channel_setting: "{uac}"
+    # AES67 API sections 5.1, 5.3 (ptp-default answers the defaults it set)
+    # and 5.4.
+    - path: "^/api/aes67/ptp-(info|default)$"
+      json_match: { "$.status": "^0$" }
+      json: { version: "$.version", p1: "$.priority1", p2: "$.priority2", domain: "$.domain", gm: "$.gmid", role: "$.role",
+              delay: "$.delay-mech", announce: "$.announce", sync: "$.sync" }
+      state:
+        ptp.version: "{version}"
+        ptp.priority1: "{p1}"
+        ptp.priority2: "{p2}"
+        ptp.domain: "{domain}"
+        ptp.grandmaster: "{gm}"
+        ptp.role: { value: "{role}", map: { Auto: auto, Slaver: follower } }
+        ptp.delay_mechanism: "{delay}"
+        ptp.announce_interval: "{announce}"
+        ptp.sync_interval: "{sync}"
+    - path: "^/api/aes67/ptp-state$"
+      json_match: { "$.status": "^0$" }
+      json: { sync: "$.is-sync", leader: "$.is-master", lock: "$.lock-to", time: "$.statistics.datetime",
+              interval: "$.statistics.interval", delay: "$.statistics.delay" }
+      state:
+        ptp.synced: "{sync}"
+        ptp.leader: "{leader}"
+        ptp.locked_to: "{lock}"
+        ptp.datetime: "{time}"
+        ptp.statistics_interval_ms: "{interval}"
+        ptp.delay_ns: "{delay}"
+    # AES67 API sections 6.1 and 7.1: the lists whole, keyed by uid and sink
+    # index; the sources found on the network by position.
+    - path: "^/api/aes67/source-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.sources"
+      json: { uid: "$.uid", name: "$.name", enabled: "$.enable", state: "$.state", ip: "$.dst-ip", port: "$.dst-port",
+              payload: "$.payload", depth: "$.depth", channels: "$.channel-num", ttl: "$.ttl", dscp: "$.dscp", sdp: "$.sdp" }
+      replace: aes67.sources
+      state:
+        aes67.sources.{uid}.name: "{name}"
+        aes67.sources.{uid}.enabled: "{enabled}"
+        aes67.sources.{uid}.state: { value: "{state}", map: { "0": pending, "1": sending, "2": fail, "3": unicast-unavailable } }
+        aes67.sources.{uid}.address: "{ip}"
+        aes67.sources.{uid}.port: "{port}"
+        aes67.sources.{uid}.payload: "{payload}"
+        aes67.sources.{uid}.depth: "{depth}"
+        aes67.sources.{uid}.channels: "{channels}"
+        aes67.sources.{uid}.ttl: "{ttl}"
+        aes67.sources.{uid}.dscp: "{dscp}"
+        aes67.sources.{uid}.sdp: "{sdp}"
+    - path: "^/api/aes67/sink-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.sinks"
+      json: { idx: "$.sink-idx", state: "$.state", name: "$.name", manual: "$.is-manual", src: "$.source-name",
+              src_ip: "$.source-src-ip", src_mac: "$.source-src-mac", ip: "$.source-dst-ip", port: "$.source-dst-port",
+              ssrc: "$.ssrc", rate: "$.sample-rate", depth: "$.depth", channels: "$.channel-num", ptime: "$.ptime",
+              offset: "$.mediaclk-offset", delay: "$.max-delay", buffer: "$.max-buffer", ttl: "$.ttl", sdp: "$.sdp" }
+      replace: aes67.sinks
+      state:
+        aes67.sinks.{idx}.state: { value: "{state}", map: { "0": idle, "1": receiving, "2": connecting, "3": lost, "4": format-error } }
+        aes67.sinks.{idx}.name: "{name}"
+        aes67.sinks.{idx}.manual: "{manual}"
+        aes67.sinks.{idx}.source_name: "{src}"
+        aes67.sinks.{idx}.source_ip: "{src_ip}"
+        aes67.sinks.{idx}.source_mac: "{src_mac}"
+        aes67.sinks.{idx}.address: "{ip}"
+        aes67.sinks.{idx}.port: "{port}"
+        aes67.sinks.{idx}.ssrc: "{ssrc}"
+        aes67.sinks.{idx}.sample_rate: "{rate}"
+        aes67.sinks.{idx}.depth: "{depth}"
+        aes67.sinks.{idx}.channels: "{channels}"
+        aes67.sinks.{idx}.ptime: "{ptime}"
+        aes67.sinks.{idx}.mediaclk_offset: "{offset}"
+        aes67.sinks.{idx}.max_delay_ms: "{delay}"
+        aes67.sinks.{idx}.max_buffer: "{buffer}"
+        aes67.sinks.{idx}.ttl: "{ttl}"
+        aes67.sinks.{idx}.sdp: "{sdp}"
+    - path: "^/api/aes67/sink-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.sources"
+      json: { name: "$.source-name", src_ip: "$.source-src-ip", src_mac: "$.source-src-mac", ip: "$.source-dst-ip",
+              port: "$.source-dst-port", ssrc: "$.ssrc", rate: "$.sample-rate", depth: "$.depth", channels: "$.channel-num",
+              ptime: "$.ptime", offset: "$.mediaclk-offset", ttl: "$.ttl", sdp: "$.sdp" }
+      replace: aes67.discovered
+      state:
+        aes67.discovered.{index}.name: "{name}"
+        aes67.discovered.{index}.source_ip: "{src_ip}"
+        aes67.discovered.{index}.source_mac: "{src_mac}"
+        aes67.discovered.{index}.address: "{ip}"
+        aes67.discovered.{index}.port: "{port}"
+        aes67.discovered.{index}.ssrc: "{ssrc}"
+        aes67.discovered.{index}.sample_rate: "{rate}"
+        aes67.discovered.{index}.depth: "{depth}"
+        aes67.discovered.{index}.channels: "{channels}"
+        aes67.discovered.{index}.ptime: "{ptime}"
+        aes67.discovered.{index}.mediaclk_offset: "{offset}"
+        aes67.discovered.{index}.ttl: "{ttl}"
+        aes67.discovered.{index}.sdp: "{sdp}"
+    # AES67 API section 7.5: the reply names no sink; the request does.
+    - path: "^/api/aes67/sink-statistics$"
+      request_match: { "$.sink-idx": "^([0-3])$" }
+      json_match: { "$.status": "^0$" }
+      json: { qos: "$.qos", duration: "$.duration", peak: "$.peak", average: "$.average", late: "$.late", lost: "$.lost",
+              count: "$.buff-count", under: "$.buff-underflow", over: "$.buff-overflow", hist: "$.statistics" }
+      state:
+        aes67.sink_stats.{1}.qos: "{qos}"
+        aes67.sink_stats.{1}.duration_s: "{duration}"
+        aes67.sink_stats.{1}.peak_us: "{peak}"
+        aes67.sink_stats.{1}.average_us: "{average}"
+        aes67.sink_stats.{1}.late: "{late}"
+        aes67.sink_stats.{1}.lost: "{lost}"
+        aes67.sink_stats.{1}.buffer_count: "{count}"
+        aes67.sink_stats.{1}.underflows: "{under}"
+        aes67.sink_stats.{1}.overflows: "{over}"
+        aes67.sink_stats.{1}.histogram: "{hist}"
+    # AES67 API sections 9.1 and 10.1.
+    - path: "^/api/ndi/sender-info$"
+      json_match: { "$.status": "^0$" }
+      json: { servers: "$.discovery-server" }
+      state: { stream.ndi_tx_discovery_servers: "{servers}" }
+    - path: "^/api/ndi/sender-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.ndi"
+      json: { uid: "$.uid", enabled: "$.enable", name: "$.ndi-name", group: "$.group", full: "$.enable-full",
+              disc: "$.discovery-server-enable", audio: "$.audio-standard", mode: "$.mode", ttl: "$.multicast-ttl",
+              prefix: "$.multicast-net-prefix", mask: "$.multicast-netmask", fo: "$.failover-enable",
+              fo_name: "$.failover-ndi-name", fo_url: "$.failover-url", web: "$.web-control",
+              published: "$.report.ndi-name", clients: "$.report.num-clients" }
+      replace: streams.ndi_tx
+      state:
+        streams.ndi_tx.{uid}.enabled: "{enabled}"
+        streams.ndi_tx.{uid}.name: "{name}"
+        streams.ndi_tx.{uid}.group: "{group}"
+        streams.ndi_tx.{uid}.full_bandwidth: "{full}"
+        streams.ndi_tx.{uid}.discovery_enabled: "{disc}"
+        streams.ndi_tx.{uid}.audio_standard: { value: "{audio}", map: { "0": smpte, "1": ebu } }
+        streams.ndi_tx.{uid}.transport: { value: "{mode}", map: { "0": udp, "1": multicast, "2": rudp, "3": tcp, "4": multi-tcp } }
+        streams.ndi_tx.{uid}.multicast_ttl: "{ttl}"
+        streams.ndi_tx.{uid}.multicast_address: "{prefix}"
+        streams.ndi_tx.{uid}.multicast_netmask: "{mask}"
+        streams.ndi_tx.{uid}.failover_enabled: "{fo}"
+        streams.ndi_tx.{uid}.failover_name: "{fo_name}"
+        streams.ndi_tx.{uid}.failover_url: "{fo_url}"
+        streams.ndi_tx.{uid}.web_control: "{web}"
+        streams.ndi_tx.{uid}.published_name: "{published}"
+        streams.ndi_tx.{uid}.clients: "{clients}"
+    - path: "^/api/ndi/receiver-info$"
+      json_match: { "$.status": "^0$" }
+      json: { servers: "$.discovery-server", group: "$.group", extra: "$.extra-ips" }
+      state:
+        ndi.discovery.servers: "{servers}"
+        ndi.groups: "{group}"
+        ndi.extra_ips: "{extra}"
+    - path: "^/api/ndi/receiver-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.ndi"
+      json: { uid: "$.uid", enabled: "$.enable", found: "$.is-find", alias: "$.alias", name: "$.ndi-name", url: "$.url",
+              audio: "$.audio-standard", buffer: "$.buffer-duration", headroom: "$.headroom-db",
+              rate: "$.format.sample-rate", channels: "$.format.channel-num", depth: "$.format.bit-depth",
+              connected: "$.report.is-connected", kbps: "$.report.audio-kbps", jitter: "$.report.audio-jitter",
+              uptime: "$.report.living-time-ms" }
+      replace: streams.ndi_rx
+      state:
+        streams.ndi_rx.{uid}.enabled: "{enabled}"
+        streams.ndi_rx.{uid}.found: "{found}"
+        streams.ndi_rx.{uid}.alias: "{alias}"
+        streams.ndi_rx.{uid}.ndi_name: "{name}"
+        streams.ndi_rx.{uid}.url: "{url}"
+        streams.ndi_rx.{uid}.audio_standard: { value: "{audio}", map: { "0": smpte, "1": ebu } }
+        streams.ndi_rx.{uid}.buffer_ms: "{buffer}"
+        streams.ndi_rx.{uid}.headroom_db: "{headroom}"
+        streams.ndi_rx.{uid}.sample_rate: "{rate}"
+        streams.ndi_rx.{uid}.channels: "{channels}"
+        streams.ndi_rx.{uid}.bit_depth: "{depth}"
+        streams.ndi_rx.{uid}.connected: "{connected}"
+        streams.ndi_rx.{uid}.audio_kbps: "{kbps}"
+        streams.ndi_rx.{uid}.audio_jitter: "{jitter}"
+        streams.ndi_rx.{uid}.uptime_ms: "{uptime}"
+    - path: "^/api/ndi/receiver-find$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.sources"
+      json: { name: "$.ndi-name", address: "$.url" }
+      replace: ndi.sources
+      state:
+        ndi.sources.{index}.name: "{name}"
+        ndi.sources.{index}.address: "{address}"
+    # AES67 API sections 11.1 and 12.1.
+    - path: "^/api/srt/sender-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.srt"
+      json: { uid: "$.uid", enabled: "$.enable", name: "$.name", mode: "$.mode", ip: "$.remote-ip", port: "$.remote-port",
+              bind: "$.bind-port", id: "$.stream-id", timeout: "$.connect-timeout", retry: "$.retry-duration",
+              latency: "$.latency", bandwidth: "$.bandwidth", mtu: "$.mtu", enc: "$.enc", clients: "$.report.num-clients",
+              uptime: "$.report.living-time-ms" }
+      replace: streams.srt_tx
+      state:
+        streams.srt_tx.{uid}.enabled: "{enabled}"
+        streams.srt_tx.{uid}.name: "{name}"
+        streams.srt_tx.{uid}.mode: { value: "{mode}", map: { "0": caller, "1": listener } }
+        streams.srt_tx.{uid}.remote_ip: "{ip}"
+        streams.srt_tx.{uid}.remote_port: "{port}"
+        streams.srt_tx.{uid}.bind_port: "{bind}"
+        streams.srt_tx.{uid}.stream_id: "{id}"
+        streams.srt_tx.{uid}.connect_timeout_ms: "{timeout}"
+        streams.srt_tx.{uid}.retry_ms: "{retry}"
+        streams.srt_tx.{uid}.latency_ms: "{latency}"
+        streams.srt_tx.{uid}.bandwidth_percent: "{bandwidth}"
+        streams.srt_tx.{uid}.mtu: "{mtu}"
+        streams.srt_tx.{uid}.encryption: { value: "{enc}", map: { "0": none, "16": aes-128, "24": aes-192, "32": aes-256 } }
+        streams.srt_tx.{uid}.clients: "{clients}"
+        streams.srt_tx.{uid}.uptime_ms: "{uptime}"
+    - path: "^/api/srt/receiver-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.srt"
+      json: { uid: "$.uid", enabled: "$.enable", name: "$.name", mode: "$.mode", ip: "$.remote-ip", port: "$.remote-port",
+              bind: "$.bind-port", id: "$.stream-id", latency: "$.latency", enc: "$.is-encrypted",
+              buffer: "$.buffer-duration", headroom: "$.headroom-db", rate: "$.format.sample-rate",
+              channels: "$.format.channel-num", depth: "$.format.bit-depth" }
+      replace: streams.srt_rx
+      state:
+        streams.srt_rx.{uid}.enabled: "{enabled}"
+        streams.srt_rx.{uid}.name: "{name}"
+        streams.srt_rx.{uid}.mode: { value: "{mode}", map: { "0": caller, "1": listener } }
+        streams.srt_rx.{uid}.remote_ip: "{ip}"
+        streams.srt_rx.{uid}.remote_port: "{port}"
+        streams.srt_rx.{uid}.bind_port: "{bind}"
+        streams.srt_rx.{uid}.stream_id: "{id}"
+        streams.srt_rx.{uid}.latency_ms: "{latency}"
+        streams.srt_rx.{uid}.encrypted: "{enc}"
+        streams.srt_rx.{uid}.buffer_ms: "{buffer}"
+        streams.srt_rx.{uid}.headroom_db: "{headroom}"
+        streams.srt_rx.{uid}.sample_rate: "{rate}"
+        streams.srt_rx.{uid}.channels: "{channels}"
+        streams.srt_rx.{uid}.bit_depth: "{depth}"
+    # AES67 API sections 13.1, 14.1 and 14.5.
+    - path: "^/api/ices/sender-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.ices"
+      json: { uid: "$.uid", enabled: "$.enable", name: "$.name", url: "$.service-url", user: "$.username", state: "$.state" }
+      replace: streams.icecast_tx
+      state:
+        streams.icecast_tx.{uid}.enabled: "{enabled}"
+        streams.icecast_tx.{uid}.name: "{name}"
+        streams.icecast_tx.{uid}.url: "{url}"
+        streams.icecast_tx.{uid}.user: "{user}"
+        streams.icecast_tx.{uid}.state: "{state}"
+    - path: "^/api/ices/receiver-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.ices"
+      json: { uid: "$.uid", enabled: "$.enable", name: "$.name", url: "$.service-url", room: "$.room",
+              buffer: "$.buffer-duration", headroom: "$.headroom-db", state: "$.state", rate: "$.format.sample-rate",
+              channels: "$.format.channel-num", depth: "$.format.bit-depth", codec: "$.format.coding-format" }
+      replace: streams.icecast_rx
+      state:
+        streams.icecast_rx.{uid}.enabled: "{enabled}"
+        streams.icecast_rx.{uid}.name: "{name}"
+        streams.icecast_rx.{uid}.url: "{url}"
+        streams.icecast_rx.{uid}.room: "{room}"
+        streams.icecast_rx.{uid}.buffer_ms: "{buffer}"
+        streams.icecast_rx.{uid}.headroom_db: "{headroom}"
+        streams.icecast_rx.{uid}.state: "{state}"
+        streams.icecast_rx.{uid}.sample_rate: "{rate}"
+        streams.icecast_rx.{uid}.channels: "{channels}"
+        streams.icecast_rx.{uid}.bit_depth: "{depth}"
+        streams.icecast_rx.{uid}.codec: "{codec}"
+    - path: "^/api/ices/list-streams$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.streams"
+      json: { room: "$.room", type: "$.content-type", magewell: "$.is-magewell" }
+      replace: icecast.streams
+      state:
+        icecast.streams.{index}.room: "{room}"
+        icecast.streams.{index}.content_type: "{type}"
+        icecast.streams.{index}.magewell: "{magewell}"
+    # AES67 API section 15.1, Audio DX API section 6.2: the matrix whole,
+    # each TX channel with its crosspoints by RX channel.
+    - path: "^/api/(?:aes67|aoip)/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json: { tx: "$.max-tx-channels", rx: "$.max-rx-channels", usb_rx: "$.uac-rx.channel-num", usb_tx: "$.uac-tx.channel-num" }
+      state:
+        matrix.max_tx: "{tx}"
+        matrix.max_rx: "{rx}"
+        matrix.usb_rx_channels: "{usb_rx}"
+        matrix.usb_tx_channels: "{usb_tx}"
+    - path: "^/api/(?:aes67|aoip)/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.matrix"
+      json: { tx: "$.tx-no", mute: "$.tx-mute", volume: "$.tx-volume" }
+      replace: matrix.tx
+      state:
+        matrix.tx.{tx}.mute: "{mute}"
+        matrix.tx.{tx}.volume_db: "{volume}"
+    - path: "^/api/(?:aes67|aoip)/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.matrix[*].mix-state"
+      json: { tx: "$^.tx-no", state: "$" }
+      state: { "matrix.tx.{tx}.rx.{index}.state": { value: "{state}", map: { "0": disconnected, "1": connected, "2": connecting, "3": failed } } }
+    - path: "^/api/(?:aes67|aoip)/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.matrix[*].rx-mute"
+      json: { tx: "$^.tx-no", mute: "$" }
+      state: { "matrix.tx.{tx}.rx.{index}.mute": "{mute}" }
+    - path: "^/api/(?:aes67|aoip)/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.matrix[*].rx-volume"
+      json: { tx: "$^.tx-no", volume: "$" }
+      state: { "matrix.tx.{tx}.rx.{index}.volume_db": "{volume}" }
+    - path: "^/api/aes67/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json: { type: "$.live-rx.type", ndi: "$.live-tx.ndi", srt: "$.live-tx.srt", ices: "$.live-tx.ices" }
+      state:
+        stream.receiver_type: { value: "{type}", map: { "0": ndi, "1": srt, "2": icecast } }
+        matrix.live_tx.ndi: "{ndi}"
+        matrix.live_tx.srt: "{srt}"
+        matrix.live_tx.icecast: "{ices}"
+    - path: "^/api/aes67/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.live-rx.lives"
+      json: { type: "$.type", name: "$.name", channels: "$.channel-num" }
+      replace: matrix.stream_rx
+      state:
+        matrix.stream_rx.{index}.type: { value: "{type}", map: { "0": ndi, "1": srt, "2": icecast } }
+        matrix.stream_rx.{index}.name: "{name}"
+        matrix.stream_rx.{index}.channels: "{channels}"
+    - path: "^/api/aes67/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.aes67-rx"
+      json: { sink: "$.sink-idx", name: "$.name", channels: "$.channel-num" }
+      replace: matrix.aes67_rx
+      state:
+        matrix.aes67_rx.{index}.sink: "{sink}"
+        matrix.aes67_rx.{index}.name: "{name}"
+        matrix.aes67_rx.{index}.channels: "{channels}"
+    - path: "^/api/aes67/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.aes67-tx"
+      json: { name: "$.name", channels: "$.channel-num" }
+      replace: matrix.aes67_tx
+      state:
+        matrix.aes67_tx.{index}.name: "{name}"
+        matrix.aes67_tx.{index}.channels: "{channels}"
+    - path: "^/api/aoip/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.stream-rx"
+      json: { slot: "$.stream-no", name: "$.name", type: "$.type", channels: "$.channel-num" }
+      replace: matrix.stream_rx
+      state:
+        matrix.stream_rx.{index}.slot: "{slot}"
+        matrix.stream_rx.{index}.name: "{name}"
+        matrix.stream_rx.{index}.type: "{type}"
+        matrix.stream_rx.{index}.channels: "{channels}"
+    - path: "^/api/aoip/matrix-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.stream-tx"
+      json: { slot: "$.stream-no", name: "$.name", type: "$.type", channels: "$.channel-num" }
+      replace: matrix.stream_tx
+      state:
+        matrix.stream_tx.{index}.slot: "{slot}"
+        matrix.stream_tx.{index}.name: "{name}"
+        matrix.stream_tx.{index}.type: "{type}"
+        matrix.stream_tx.{index}.channels: "{channels}"
+    # Audio DX API section 6.1: the channel groups on each side.
+    - path: "^/api/aoip/matrix-desc$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.tx"
+      json: { name: "$.name", count: "$.channel-count", first: "$.channel-start", last: "$.channel-end", shown: "$.show" }
+      replace: matrix.groups.tx
+      state:
+        matrix.groups.tx.{index}.name: "{name}"
+        matrix.groups.tx.{index}.channels: "{count}"
+        matrix.groups.tx.{index}.first: "{first}"
+        matrix.groups.tx.{index}.last: "{last}"
+        matrix.groups.tx.{index}.shown: "{shown}"
+    - path: "^/api/aoip/matrix-desc$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.rx"
+      json: { name: "$.name", count: "$.channel-count", first: "$.channel-start", last: "$.channel-end", shown: "$.show" }
+      replace: matrix.groups.rx
+      state:
+        matrix.groups.rx.{index}.name: "{name}"
+        matrix.groups.rx.{index}.channels: "{count}"
+        matrix.groups.rx.{index}.first: "{first}"
+        matrix.groups.rx.{index}.last: "{last}"
+        matrix.groups.rx.{index}.shown: "{shown}"
+    # AES67 API section 15.2, Audio DX API section 6.3.
+    - path: "^/api/(?:aes67|aoip)/audio-meter$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.tx-db"
+      json: { db: "$" }
+      state: { "meters.tx.{index}": "{db}" }
+    - path: "^/api/(?:aes67|aoip)/audio-meter$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.rx-db"
+      json: { db: "$" }
+      state: { "meters.rx.{index}": "{db}" }
+    # Audio DX API section 7.1 (its example spells device.deivce-lock).
+    - path: "^/api/dante/state$"
+      json_match: { "$.status": "^0$" }
+      json: { lock: "$.device.deivce-lock", uuid: "$.clock-basic.uuid", leader: "$.clock-basic.master-uuid",
+              gm: "$.clock-basic.grandmaster-uuid", mute: "$.clock-basic.is-mute", locked: "$.clock-basic.is-locked",
+              ppm: "$.clock-basic.freq-ppm", p1: "$.clock-params.priority1", p2: "$.clock-params.priority2",
+              domain: "$.clock-params.domain", sync: "$.clock-params.sync-interval",
+              announce: "$.clock-params.announce-interval", ttl: "$.clock-params.ttl",
+              rate: "$.audio-format.sample-rate", encoding: "$.audio-format.encoding" }
+      state:
+        dante.device_lock: "{lock}"
+        dante.clock.uuid: "{uuid}"
+        dante.clock.leader: "{leader}"
+        dante.clock.grandmaster: "{gm}"
+        dante.clock.muted: "{mute}"
+        dante.clock.locked: "{locked}"
+        dante.clock.freq_ppm: "{ppm}"
+        dante.clock.priority1: "{p1}"
+        dante.clock.priority2: "{p2}"
+        dante.clock.domain: "{domain}"
+        dante.clock.sync_interval: "{sync}"
+        dante.clock.announce_interval: "{announce}"
+        dante.clock.ttl: "{ttl}"
+        dante.sample_rate: "{rate}"
+        dante.encoding: "{encoding}"
+    # Audio DX API section 5.1: streams sent, keyed by uid.
+    - path: "^/api/tx/live-info$"
+      json_match: { "$.status": "^0$" }
+      json: { slots: "$.stream-no-max", max: "$.streaming-count-max", count: "$.streaming-count" }
+      state:
+        stream.tx_slots: "{slots}"
+        stream.tx_max_streams: "{max}"
+        stream.tx_count: "{count}"
+    - path: "^/api/tx/live-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.streaming"
+      json: { uid: "$.uid", enabled: "$.enable", name: "$.name", slot: "$.stream-no", type: "$.type", aac: "$.aac-bitrate-kbps",
+              rtsp_port: "$.rtsp.bind-port", rtsp_max: "$.rtsp.max-client-num", rtsp_key: "$.rtsp.key",
+              rtsp_auth: "$.rtsp.enable-auth", rtsp_user: "$.rtsp.username", srt_mode: "$.srt.mode", srt_ip: "$.srt.dst-ip",
+              srt_port: "$.srt.dst-port", srt_bind: "$.srt.bind-port", srt_id: "$.srt.stream-id",
+              srt_timeout: "$.srt.connect-timeout", srt_retry: "$.srt.retry-duration", srt_latency: "$.srt.latency",
+              srt_bw: "$.srt.bandwidth", srt_mtu: "$.srt.mtu", srt_enc: "$.srt.enc", ndi_name: "$.ndi.source-name",
+              ndi_group: "$.ndi.group-name", ndi_full: "$.ndi.enable-full", ndi_audio: "$.ndi.audio-standard",
+              ndi_disc: "$.ndi.enable-discovery", ndi_server: "$.ndi.discovery-server", ndi_mode: "$.ndi.transport-mode",
+              ndi_addr: "$.ndi.mcast-addr", ndi_mask: "$.ndi.mcast-mask", ndi_ttl: "$.ndi.mcast-ttl",
+              ndi_fo: "$.ndi.enable-fail-over", ndi_fo_name: "$.ndi.fail-over-ndi-name", ndi_fo_ip: "$.ndi.fail-over-ip-addr",
+              ndi_web: "$.ndi.enable-web-control", published: "$.report.ndi-name", clients: "$.report.num-clients" }
+      replace: streams.tx
+      state:
+        streams.tx.{uid}.enabled: "{enabled}"
+        streams.tx.{uid}.name: "{name}"
+        streams.tx.{uid}.slot: "{slot}"
+        streams.tx.{uid}.type: "{type}"
+        streams.tx.{uid}.aac_kbps: "{aac}"
+        streams.tx.{uid}.rtsp_port: "{rtsp_port}"
+        streams.tx.{uid}.rtsp_max_clients: "{rtsp_max}"
+        streams.tx.{uid}.rtsp_key: "{rtsp_key}"
+        streams.tx.{uid}.rtsp_auth: "{rtsp_auth}"
+        streams.tx.{uid}.rtsp_user: "{rtsp_user}"
+        streams.tx.{uid}.srt_mode: "{srt_mode}"
+        streams.tx.{uid}.srt_address: "{srt_ip}"
+        streams.tx.{uid}.srt_port: "{srt_port}"
+        streams.tx.{uid}.srt_bind_port: "{srt_bind}"
+        streams.tx.{uid}.srt_stream_id: "{srt_id}"
+        streams.tx.{uid}.srt_connect_timeout_ms: "{srt_timeout}"
+        streams.tx.{uid}.srt_retry_ms: "{srt_retry}"
+        streams.tx.{uid}.srt_latency_ms: "{srt_latency}"
+        streams.tx.{uid}.srt_bandwidth_percent: "{srt_bw}"
+        streams.tx.{uid}.srt_mtu: "{srt_mtu}"
+        streams.tx.{uid}.srt_encryption: "{srt_enc}"
+        streams.tx.{uid}.ndi_source_name: "{ndi_name}"
+        streams.tx.{uid}.ndi_group: "{ndi_group}"
+        streams.tx.{uid}.ndi_full_bandwidth: "{ndi_full}"
+        streams.tx.{uid}.ndi_audio_standard: "{ndi_audio}"
+        streams.tx.{uid}.ndi_discovery_enabled: "{ndi_disc}"
+        streams.tx.{uid}.ndi_discovery_server: "{ndi_server}"
+        streams.tx.{uid}.ndi_transport: "{ndi_mode}"
+        streams.tx.{uid}.ndi_multicast_address: "{ndi_addr}"
+        streams.tx.{uid}.ndi_multicast_netmask: "{ndi_mask}"
+        streams.tx.{uid}.ndi_multicast_ttl: "{ndi_ttl}"
+        streams.tx.{uid}.ndi_failover_enabled: "{ndi_fo}"
+        streams.tx.{uid}.ndi_failover_name: "{ndi_fo_name}"
+        streams.tx.{uid}.ndi_failover_address: "{ndi_fo_ip}"
+        streams.tx.{uid}.ndi_web_control: "{ndi_web}"
+        streams.tx.{uid}.published_name: "{published}"
+        streams.tx.{uid}.clients: "{clients}"
+    - path: "^/api/tx/live-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.discovery"
+      json: { name: "$.ndi-name", address: "$.ndi-url" }
+      replace: ndi.failover_sources
+      state:
+        ndi.failover_sources.{index}.name: "{name}"
+        ndi.failover_sources.{index}.address: "{address}"
+    # Audio DX API section 5.4: streams received, keyed by uid.
+    - path: "^/api/rx/live-info$"
+      json_match: { "$.status": "^0$" }
+      json: { slots: "$.stream-no-max", max: "$.gst-count-max", count: "$.gst-count", min_ms: "$.mw-buffer-duration-min",
+              max_ms: "$.mw-buffer-duration-max", def_ms: "$.mw-buffer-duration-def",
+              disc: "$.ndi-options.enable-discovery", servers: "$.ndi-options.discovery-server",
+              group: "$.ndi-options.group-name", extra: "$.ndi-options.extra-ips" }
+      state:
+        stream.rx_slots: "{slots}"
+        stream.rx_max_streams: "{max}"
+        stream.rx_count: "{count}"
+        stream.rx_buffer_min_ms: "{min_ms}"
+        stream.rx_buffer_max_ms: "{max_ms}"
+        stream.rx_buffer_default_ms: "{def_ms}"
+        ndi.discovery.enabled: "{disc}"
+        ndi.discovery.servers: "{servers}"
+        ndi.groups: "{group}"
+        ndi.extra_ips: "{extra}"
+    - path: "^/api/rx/live-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.gst"
+      json: { uid: "$.uid", enabled: "$.enable", name: "$.name", slot: "$.stream-no", url: "$.url" }
+      replace: streams.rx
+      state:
+        streams.rx.{uid}.enabled: "{enabled}"
+        streams.rx.{uid}.name: "{name}"
+        streams.rx.{uid}.slot: "{slot}"
+        streams.rx.{uid}.url: "{url}"
+    - path: "^/api/rx/live-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.discovery"
+      json: { name: "$.ndi-name", address: "$.ndi-url" }
+      replace: ndi.sources
+      state:
+        ndi.sources.{index}.name: "{name}"
+        ndi.sources.{index}.address: "{address}"
+    # AES67 API section 16.1, Audio DX API section 8.1, IP to USB API 3.2.
+    - path: "^/api/system/device-info$"
+      json_match: { "$.status": "^0$" }
+      json: { name: "$.device-name", id: "$.product-id", model: "$.product-name", hw: "$.hardware-rev", serial: "$.serial-number",
+              firmware: "$.firmware-ver", fw_name: "$.firmware-name", build: "$.build-time", caps: "$.capability" }
+      state:
+        device.name: "{name}"
+        device.product_id: "{id}"
+        device.model: "{model}"
+        device.hardware_revision: "{hw}"
+        device.serial: "{serial}"
+        device.firmware: "{firmware}"
+        device.firmware_name: "{fw_name}"
+        device.build_time: "{build}"
+        device.capabilities: "{caps}"
+    - path: "^/api/system/set-device-name$"
+      json_match: { "$.status": "^0$" }
+      json: { reboot: "$.ext-need-reboot" }
+      state: { device.reboot_required: "{reboot}" }
+    # Network: AES67 API section 17, Audio DX API section 9, IP to USB API
+    # section 9. The interface types are numbered differently.
+    - models: *aoip
+      path: "^/api/network/if-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.net"
+      json: { iface: "$.iface", type: "$.type" }
+      state: { "network.interfaces.{iface}.type": { value: "{type}", map: { "0": ethernet, "1": wifi, "2": cellular, "3": usb } } }
+    - models: [ip-to-usb]
+      path: "^/api/network/if-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.net"
+      json: { iface: "$.iface", type: "$.type" }
+      state: { "network.interfaces.{iface}.type": { value: "{type}", map: { "0": ethernet, "1": wifi, "2": usb-sharing, "3": usb, "4": cellular, "5": bridge } } }
+    - path: "^/api/network/if-info$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.net"
+      json: { iface: "$.iface", enabled: "$.enable", dhcp: "$.use-dhcp", ip: "$.ipaddr", mask: "$.netmask", gw: "$.gateway",
+              dns1: "$.dns1", dns2: "$.dns2", mac: "$.mac", speed: "$.link-speed", link: "$.link-state",
+              tx: "$.tx-speed-kbps", rx: "$.rx-speed-kbps" }
+      replace: network.interfaces
+      state:
+        network.interfaces.{iface}.enabled: "{enabled}"
+        network.interfaces.{iface}.dhcp: "{dhcp}"
+        network.interfaces.{iface}.ip_address: "{ip}"
+        network.interfaces.{iface}.netmask: "{mask}"
+        network.interfaces.{iface}.gateway: "{gw}"
+        network.interfaces.{iface}.dns1: "{dns1}"
+        network.interfaces.{iface}.dns2: "{dns2}"
+        network.interfaces.{iface}.mac: "{mac}"
+        network.interfaces.{iface}.link_speed: "{speed}"
+        network.interfaces.{iface}.link_state: { value: "{link}", map: { "0": down, "1": disconnected, "2": connected } }
+        network.interfaces.{iface}.tx_kbps: "{tx}"
+        network.interfaces.{iface}.rx_kbps: "{rx}"
+    - path: "^/api/network/if-route$"
+      json_match: { "$.status": "^0$" }
+      json: { iface: "$.iface" }
+      state: { network.default_route: "{iface}" }
+    - path: "^/api/network/get-dns$"
+      json_match: { "$.status": "^0$" }
+      json: { manual: "$.is-manual", dns1: "$.dns1", dns2: "$.dns2" }
+      state:
+        network.dns.manual: "{manual}"
+        network.dns.primary: "{dns1}"
+        network.dns.secondary: "{dns2}"
+    # IP to USB API sections 3.7-3.8 (the summary's example names the
+    # temperature cpu_temp, its table cpu-temp).
+    - path: "^/api/system/summary/get$"
+      json_match: { "$.status": "^0$" }
+      json: { temp: "$.data.cpu_temp" }
+      state: { device.temperature: "{temp}" }
+    - path: "^/api/system/summary/get$"
+      json_match: { "$.status": "^0$" }
+      json: { temp: "$.data.cpu-temp" }
+      state: { device.temperature: "{temp}" }
+    - path: "^/api/system/usb-mode/get$"
+      json_match: { "$.status": "^0$" }
+      json: { mode: "$.data.mode" }
+      state: { usb.mode: { value: "{mode}", map: { "Normal mode": video-conferencing, "Content mode": content-sharing } } }
+    # IP to USB API sections 4.1, 5.1 and 6.3.
+    - models: [ip-to-usb]
+      path: "^/api/video/config/get$"
+      json_match: { "$.status": "^0$" }
+      json: { h: "$.data.h_flip", v: "$.data.v_flip", ar: "$.data.ar_convert_mode" }
+      state:
+        video.h_flip: "{h}"
+        video.v_flip: "{v}"
+        video.aspect_conversion: { value: "{ar}", map: { Windowbox: windowbox, Crop: zoom, Stretch: full } }
+    - path: "^/api/ndi/config/get$"
+      json_match: { "$.status": "^0$" }
+      json: { enabled: "$.data.enable", servers: "$.data.discovery_server", groups: "$.data.groups" }
+      state:
+        ndi.discovery.enabled: "{enabled}"
+        ndi.discovery.servers: "{servers}"
+        ndi.groups: "{groups}"
+    - path: "^/api/resource/image/get$"
+      json_match: { "$.status": "^0$", "$.data.id": "^([A-Za-z0-9_-]+)$" }
+      json: { path: "$.data.path", default: "$.data.is_default" }
+      state:
+        video.no_signal_images.{1}.path: "{path}"
+        video.no_signal_images.{1}.default: "{default}"
+    # IP to USB API section 7.1: each list whole, keyed by source id.
+    - path: "^/api/source/list\\?type=static$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.config.name", protocol: "$.config.protocol", type: "$.config.type", buffer: "$.config.data.buffer_ms" }
+      replace: sources
+      state:
+        sources.{id}.name: "{name}"
+        sources.{id}.protocol: "{protocol}"
+        sources.{id}.source_type: "{type}"
+        sources.{id}.buffer_ms: "{buffer}"
+        sources.{id}.kind: static
+    - path: "^/api/source/list\\?type=static$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.data"
+      each_match: { "$.config.type": "^url$" }
+      json: { id: "$.id", url: "$.config.data.url", ptz: "$.config.data.ptz_en", proto: "$.config.data.ptz.protocol",
+              ip: "$.config.data.ptz.ip", port: "$.config.data.ptz.port", camera: "$.config.data.ptz.device_id",
+              header: "$.config.data.ptz.message_header", pan: "$.config.data.ptz.invert_pan",
+              tilt: "$.config.data.ptz.invert_tilt" }
+      state:
+        sources.{id}.url: "{url}"
+        sources.{id}.ptz_enabled: "{ptz}"
+        sources.{id}.ptz.protocol: "{proto}"
+        sources.{id}.ptz.address: "{ip}"
+        sources.{id}.ptz.port: "{port}"
+        sources.{id}.ptz.camera: "{camera}"
+        sources.{id}.ptz.header: "{header}"
+        sources.{id}.ptz.invert_pan: "{pan}"
+        sources.{id}.ptz.invert_tilt: "{tilt}"
+    - path: "^/api/source/list\\?type=static$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.data"
+      each_match: { "$.config.type": "^(ndi|d_ndi)$" }
+      json: { id: "$.id", name: "$.config.data.name", url: "$.config.data.url", low: "$.config.data.low_bw",
+              transport: "$.config.data.transport", pts: "$.config.data.pts_mode" }
+      state:
+        sources.{id}.ndi_name: "{name}"
+        sources.{id}.ndi_url: "{url}"
+        sources.{id}.low_bandwidth: "{low}"
+        sources.{id}.transport: "{transport}"
+        sources.{id}.pts_mode: "{pts}"
+    - path: "^/api/source/list\\?type=dynamic$"
+      json_match: { "$.status": "^0$" }
+      json_each: "$.data"
+      json: { id: "$.id", name: "$.config.data.name", url: "$.config.data.url" }
+      replace: ndi.discovered
+      state:
+        ndi.discovered.{id}.name: "{name}"
+        ndi.discovered.{id}.address: "{url}"
+    - path: "^/api/source/list\\?type=(static|dynamic)$"
+      json_match: { "$.status": "^0$" }
+      json: { selected: "$.selected" }
+      state: { source.selected_id: "{selected}" }
+    # IP to USB API section 8.1 (its example names the tally
+    # extra.tally_preview, its table tally-prview).
+    - path: "^/api/stream/status/get$"
+      json_match: { "$.status": "^0$" }
+      json: { name: "$.data.name", protocol: "$.data.protocol", state: "$.data.state", uptime: "$.data.uptime",
+              preview: "$.data.extra.tally_preview", program: "$.data.extra.tally_program",
+              vcodec: "$.data.video.codec", vjitter: "$.data.video.jitter", vkbps: "$.data.video.kbps",
+              width: "$.data.video.width", height: "$.data.video.height", rate: "$.data.video.field_rate",
+              vdrops: "$.data.video.drops", acodec: "$.data.audio.codec", ajitter: "$.data.audio.jitter",
+              akbps: "$.data.audio.kbps", arate: "$.data.audio.sample_rate", bits: "$.data.audio.bit_count",
+              channels: "$.data.audio.channels", adrops: "$.data.audio.drops" }
+      state:
+        stream.name: "{name}"
+        stream.protocol: "{protocol}"
+        stream.state: "{state}"
+        stream.uptime_ms: "{uptime}"
+        tally.preview: "{preview}"
+        tally.program: "{program}"
+        stream.video.codec: "{vcodec}"
+        stream.video.jitter: "{vjitter}"
+        stream.video.kbps: "{vkbps}"
+        stream.video.width: "{width}"
+        stream.video.height: "{height}"
+        stream.video.field_rate: "{rate}"
+        stream.video.drops: "{vdrops}"
+        stream.audio.codec: "{acodec}"
+        stream.audio.jitter: "{ajitter}"
+        stream.audio.kbps: "{akbps}"
+        stream.audio.sample_rate: "{arate}"
+        stream.audio.bit_depth: "{bits}"
+        stream.audio.channels: "{channels}"
+        stream.audio.drops: "{adrops}"
 
     # Re-reads after a change: the settings a command changed are read again
     # as soon as the device accepts it.
@@ -2429,7 +4597,8 @@ telemetry:
       json_match: { "$.status": "^0$" }
       json: {}
       then_send: [{ method: GET, path: /api/audio/config/get }]
-    - path: "^/api/source/(add|del|set|select)$"
+    - models: *ip
+      path: "^/api/source/(add|del|set|select)$"
       json_match: { "$.status": "^0$" }
       json: {}
       then_send: [{ method: GET, path: /api/source/list, query: { type: all } }]
@@ -2445,10 +4614,86 @@ telemetry:
       json_match: { "$.status": "^0$" }
       json: {}
       then_send: [{ method: GET, path: /api/settings/zixi/master/get }]
-    - path: "^/api/system/(auto-reboot|set-device-name)$"
+    - path: "^/api/system/(auto-reboot|set-device-name|set-date-time|timezone-set)$"
       json_match: { "$.status": "^0$" }
       json: {}
       then_send: [{ method: POST, path: /api/system/info }]
+    # AES67, Audio DX and IP to USB.
+    - path: "^/api/network/if-set$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/network/if-info }]
+    - path: "^/api/network/set-dns$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/network/get-dns }]
+    - path: "^/api/aes67/general-settings$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/aes67/general-info }]
+    - path: "^/api/aoip/general-apply$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/aoip/general-info }]
+    - path: "^/api/aes67/ptp-settings$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/aes67/ptp-info }]
+    - path: "^/api/aes67/source-(apply|update|del)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/aes67/source-info }, { method: POST, path: /api/aes67/matrix-info }]
+    - path: "^/api/aes67/sink-(apply|update|del)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/aes67/sink-info }, { method: POST, path: /api/aes67/matrix-info }]
+    - path: "^/api/aes67/sink-statistics-clear$"
+      request_match: { "$.sink-idx": "^([0-3])$" }
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/aes67/sink-statistics, content_type: application/json, body: '{"sink-idx":{1}}' }]
+    - path: "^/api/(ndi|srt|ices)/(sender|receiver)-(apply|update|del|options)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: "/api/{1}/{2}-info" }, { method: POST, path: /api/aes67/matrix-info }]
+    - path: "^/api/ices/receiver-select$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/aes67/matrix-info }]
+    - path: "^/api/(aes67|aoip)/(matrix-settings|matrix-clear|volume-tx|volume-mix)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: "/api/{1}/matrix-info" }]
+    - path: "^/api/(tx|rx)/(live-apply|live-del|ndi-options-apply)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: "/api/{1}/live-info" }, { method: POST, path: /api/aoip/matrix-info }]
+    - path: "^/api/system/usb-mode/update$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/system/usb-mode/get }]
+    - path: "^/api/video/config/update$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/video/config/get }]
+    - path: "^/api/ndi/config/update$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/ndi/config/get }]
+    - path: "^/api/resource/image/delete$"
+      request_match: { "$.id": "^([A-Za-z0-9_-]+)$" }
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/resource/image/get, content_type: application/json, body: '{"id":"{1}","type":"simple"}' }]
+    - path: "^/api/resource/image/upload$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: POST, path: /api/resource/image/get, content_type: application/json, body: '{"id":"no_signal_1","type":"simple"}' }]
+    - models: [ip-to-usb]
+      path: "^/api/source/(add|update|delete|select)$"
+      json_match: { "$.status": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/source/list, query: { type: static } }, { method: GET, path: /api/source/list, query: { type: dynamic } }]
 
 quirks:
   - models: [all]
@@ -2536,8 +4781,69 @@ quirks:
       the API reads back neither the camera's position nor its presets. The
       document does not give the IP decoders' default credentials; Admin /
       Admin is assumed as on the other Pro Convert models. Numbered values
-      (safe area, ident, deinterlace, aspect conversion, signal loss, colour
+      (safe area, ident, deinterlace, aspect conversion, signal loss, color
       space, HDR mode, view mode, configuration mode) are reported in the
       words the commands take. The NDI settings are changed one field at a
       time through /api/settings/ndi/set, whose document example sends every
       field; the reboot schedule is read through /api/system/info, a POST.
+
+  - models: [aes67, audio-dx, ip-to-usb]
+    severity: critical
+    text: >
+      These change the audio or picture at once and none asks for
+      confirmation: set_crosspoint, set_crosspoints, clear_matrix (which
+      disconnects every crosspoint), set_tx_volume, set_crosspoint_volume,
+      select_stream_receiver, set_test_tone (which replaces the analog audio
+      with a tone), the analog level and sample rate commands, the PTP
+      commands and reset_ptp (the clock may re-lock and the audio drop),
+      apply, update and delete of AES67 sources and sinks and of NDI, SRT and
+      Icecast senders and receivers, apply_tx_stream, apply_rx_stream,
+      delete_tx_stream, delete_rx_stream, select_source, set_usb_mode (the
+      computer sees the USB device change) and upload_no_signal_image (which
+      overwrites the image there). The delete commands cannot be undone, and
+      set_network_address, set_network_dhcp and set_network_static move the
+      device to another address, where the core no longer reaches it.
+
+  - models: [aes67, audio-dx, ip-to-usb]
+    severity: warning
+    text: >
+      Nothing is pushed. The summary (and the AES67's PTP state, the Audio
+      DX's Dante state, the matrix meters, and IP to USB's stream status) is
+      polled every 2 seconds; every setting and list the API can read is read
+      on connecting and every 30 seconds (about 20 requests on the AES67), and
+      what a command changes is read again as soon as the device accepts it.
+      The matrix meters are a 2-second sample, not a level meter.
+      AES67 sink statistics are read only by get_sink_statistics (and again
+      after clear_sink_statistics). Firmware before V1.2.433 (AES67 API V1.0)
+      has no update methods, so update_* and set_*_enabled fail there; apply_*
+      works on both.
+
+  - models: [aes67, audio-dx]
+    severity: info
+    text: >
+      The audio matrix numbers its TX (output) and RX (input) channels from
+      0, as the device does, in commands and in state (matrix.tx.<tx>.rx.<rx>,
+      meters.tx.<n>); the Audio DX's matrix layout (matrix.groups) says which
+      channels are analog, USB, Dante and stream. The AES67 takes the analog
+      levels, IGMP version and test tone as numbers and the Audio DX as text;
+      both are reported in the words the commands take. The USB audio channel
+      count (io.usb.channel_setting) is set through a uac-format method the
+      documents name but do not describe, so it is read only here. The
+      senders' and receivers' objects for apply and update are passed through
+      in the documents' own shapes, with a uid the caller chooses; the
+      passwords and passphrases they report (Icecast, SRT, RTSP) are kept out
+      of state. The Audio DX's Dante routing and Dante device lock have no API
+      (Dante Controller sets them), and its documents list an auto-reboot
+      method and a Certificate section whose pages are empty, so neither is
+      built.
+
+  - models: [ip-to-usb]
+    severity: info
+    text: >
+      The source list is read one page at a time and the document gives no
+      default page size; the core reads the first page of each list
+      (static and discovered). select_source with id 0 deselects every source.
+      A new device name may take effect only after a restart
+      (device.reboot_required). After an upload the core reads back the
+      no-signal image no_signal_1, the only id the document names. The USB
+      network (usb-config) is administration and is not covered.

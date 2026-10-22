@@ -176,6 +176,9 @@ fn a_vendor_group_selects_its_integrations() {
     if cfg!(feature = "sennheiser-chg-70n") {
         expected.push("sennheiser-chg-70n");
     }
+    if cfg!(feature = "sennheiser-l-6000") {
+        expected.push("sennheiser-l-6000");
+    }
     expected.sort();
     assert_eq!(ids, expected);
     let options = api::core_options(&json!({"devices": ["vendor-shure"]})).unwrap();

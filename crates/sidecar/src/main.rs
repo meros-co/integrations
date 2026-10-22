@@ -145,7 +145,8 @@
 //! limit either, since a command's `binary` params may carry a file's bytes
 //! (base64) in it. The folder (`--transfer-dir`,
 //! default `<temp>/meros-integrations-transfer-<port>`) is cleared of its
-//! ids at startup and on a clean stop; give each service on a host its own.
+//! ids at startup and on a clean stop, and the default folder is removed on a
+//! clean stop when nothing else is left in it; give each service on a host its own.
 //! These routes take the token in the header only.
 //!
 //! Events are one queue: run one event consumer per service. Their kinds and
@@ -801,7 +802,7 @@ fn main() {
         // Then every device is closed cleanly: subscriptions and metering
         // ended, last messages written.
         app.core.close_all(CLOSE_GRACE).await;
-        app.transfers.clear();
+        app.transfers.stop();
         eprintln!("stopped");
     });
 }

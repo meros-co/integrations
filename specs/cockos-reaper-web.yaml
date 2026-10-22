@@ -1,0 +1,890 @@
+spec: 1
+id: cockos-reaper-web
+name: Cockos REAPER (web interface)
+vendor: Cockos
+category: recorder
+
+# REAPER's built-in web browser interface (Preferences > Control/OSC/web, Add,
+# Control surface mode "Web browser interface"): an HTTP server in REAPER that
+# takes the requests REAPER's own web pages send, GET /_/ followed by commands
+# separated by semicolons, and answers lines of tab-separated fields.
+#
+# Why a spec of its own beside cockos-reaper (OSC) rather than an endpoint of
+# that spec: the web interface's configuration offers an optional
+# "Username:password", which REAPER checks as HTTP Basic authentication
+# (realm "reaper_www"), and an endpoint beside a non-HTTP transport carries no
+# credential (SPEC.md §2, Endpoints). It is also a control surface of its own
+# in REAPER, on its own port, added and enabled apart from an OSC one, so a
+# consumer may open either or both.
+#
+# Every command that changes something is sent with the request that reads it
+# back chained after it in the same request (as REAPER's own pages do,
+# "SET/TRACK/n/VOL/v;TRACK/n"), so its reply updates the state at once; the
+# polls below keep the state current for changes made in REAPER itself.
+
+source:
+  - title: main.js (helper script and command reference of REAPER's web interface)
+    author: Cockos Incorporated
+    url: https://www.reaper.fm/
+    note: >
+      Manufacturer document shipped with REAPER in Plugins/reaper_www_root/main.js (dated
+      2026-03-18 in the REAPER 7.78 install read, 410 lines); its opening comment is Cockos's
+      reference for the web interface and the page REAPER's own interfaces build on. Read for:
+      requests sent as GET /_/command;command;... executed in order; replies as lines separated by
+      \n with fields separated by tabs; numeric command IDs 0-65535 and _named registered command
+      IDs; TRANSPORT (playstate 0 stopped, 1 playing, 2 paused, 5 recording, 6 record paused;
+      position in seconds; repeat nonzero when on; position in the project's time format and in
+      measures.beats.hundredths); BEATPOS (playstate, position, full beat position, measure count,
+      beats in measure, time signature numerator and denominator); NTRACK (tracks excluding the
+      master); TRACK, TRACK/index, TRACK/start-end (number with 0 the master, name or MASTER,
+      flags 1 folder, 2 selected, 4 has FX, 8 muted, 16 soloed, 32 solo in place, 64 record armed,
+      128 record monitoring on, 256 record monitoring auto, volume 0 -inf and 1 +0 dB, pan -1..1,
+      last meter peak and position in tenths of a dB, width/pan2, pan mode, send, receive and
+      hardware output counts, color 0xaarrggbb or 0); GET/TRACK/x/SEND/y (SEND line, y=-1 first
+      receive, other track -1 for a hardware output, flags & 8 muted); GET/TRACK/x/<param> and
+      SET/TRACK/x/<param>/<value> through GetSetMediaTrackInfo with the GET line echoed and strings
+      escaped as \\n, \\t and \\\\; SET/TRACK/x/VOL, PAN and WIDTH through the control surface API
+      (absolute, or relative with a leading + or -; a trailing g ignores ganging; an e near the
+      end ends the touch state; touch states expire after 8 s); SET/TRACK/x/MUTE, SOLO, FX,
+      RECARM, SEL (a value < 0 toggles) and RECMON (< 0 cycles, 1 on, 2 auto); SET/UNDO/message,
+      SET/UNDO_BEGIN, SET/UNDO_END/message; SET/REPEAT (-1 toggles, 0, 1) and GET/REPEAT;
+      SET/TRACK/x/SEND/y/MUTE, VOL (1.0 = +0 dB, e for end, E for an instant edit) and PAN (0
+      center, -1 left); SET/POS (seconds) and SET/POS_STR (format auto-detected; r1 region ID 1,
+      m1 marker 1, R1 first timeline region, M1 first timeline marker); LYRICS/track (beat and
+      lyric pairs); SET/PROJEXTSTATE and GET/PROJEXTSTATE; GET/EXTSTATE, SET/EXTSTATE and
+      SET/EXTSTATEPERSIST (section, key and value URL-encoded); GET/command_id (CMDSTATE, state > 0
+      on, 0 off, -1 no state); OSC/oscstring[:floatValue|:sStringValue] (URL-decoded, through the
+      Default.ReaperOSC processing and action mappings); MARKER and REGION lists between
+      MARKER_LIST/MARKER_LIST_END and REGION_LIST/REGION_LIST_END with optional color; a request
+      abandoned after 3 seconds.
+  - title: REAPER's built-in web pages (index.html, basic.html, fancier.html, more_me.html, click.html)
+    author: Cockos Incorporated
+    url: https://www.reaper.fm/
+    note: >
+      Manufacturer pages shipped with REAPER in Plugins/reaper_www_root (REAPER 7.78), read as
+      Cockos's own usage of the reference: the action IDs their buttons send (1007 play, 1008
+      pause, 1013 record, 1016 stop, 40667 the stop button, 40668 after "abort recording?
+      contents will be lost!", 1068 repeat, 40364 metronome, 1157 snap, 40172 and 40173 previous
+      and next marker, 40157 add marker, 40029 and 40030 undo and redo); GET/40364 and GET/1157
+      polled for the metronome and snap buttons; the polls they set (TRANSPORT every 10 ms or
+      TRANSPORT;BEATPOS, NTRACK;TRACK every 1 s or more often, MARKER;REGION every 500 ms);
+      SET/TRACK/x/VOL/v;TRACK/x and SET/TRACK/x/SEND/y/MUTE/-1;GET/TRACK/x/SEND/y to read back a
+      change; P_NAME set with encodeURIComponent; sends numbered from 0, receives from -1; the
+      playstate read as bits (1 playing, 2 paused, 4 recording).
+  - title: Up and Running, A REAPER User Guide v7.81 (September 2026), §15.31 Controlling REAPER with a Web Browser Interface
+    author: Geoffrey Francis (distributed by Cockos)
+    url: https://www.reaper.fm/userguide.php
+    note: >
+      PDF https://dlx.reaper.fm/userguide/ReaperUserGuide781c.pdf, pp. 322-323: adding the web
+      browser interface in Preferences > Control/OSC/web, the Default interface choice, Apply
+      Settings and the Access URL, port 8080 as the example, the firewall note, and the
+      rc.reaper.fm redirect option.
+  - title: ReaScript API documentation (generated by REAPER v7.82)
+    author: Cockos Incorporated
+    url: https://www.reaper.fm/sdk/reascript/reascripthelp.html
+    note: >
+      Manufacturer document, retrieved 2026-10-22: GetMediaTrackInfo_Value and
+      GetSetMediaTrackInfo parameter names (B_MUTE, I_SOLO, I_FXEN, I_RECARM, I_RECINPUT,
+      I_RECMODE, I_RECMON, I_AUTOMODE, I_SELECTED, D_VOL, D_PAN, D_WIDTH, I_PANMODE, P_NAME, ...)
+      that GET/TRACK and SET/TRACK take; GetExtState, SetExtState (persist) and SetProjExtState
+      (an empty value deletes the key).
+  - title: REAPER 7.78 release notes (whatsnew.txt)
+    author: Cockos Incorporated
+    url: https://www.reaper.fm/whatsnew.txt
+    note: >
+      Read for: extra HTTP headers configurable in reaper.ini [csurf_www]; the configuration
+      window's connection statistics; keepalive connections; the 16 kB lyrics and PROJEXTSTATE
+      limits removed.
+
+transport:
+  type: http
+  port: 8080
+  scheme: http
+  # The web interface's "Username:password" is optional: none while it is
+  # empty, basic once set.
+  auth: { setting: auth }
+  refusal_status: [401]
+  # main.js abandons a request after 3 seconds.
+  timeout_ms: 3000
+  probe: { method: GET, path: "/_/NTRACK" }
+
+maps:
+  volume_touch: { hold: "", release: "e" }
+  send_touch: { hold: "", release: "e", instant: "E" }
+  ignore_gang: { "false": "", "true": "g" }
+
+settings:
+  auth: { type: enum, values: [none, basic], default: none,
+          label: Credential type,
+          description: "none while the web interface's Username:password field is empty; basic once one is set there." }
+  username: { type: string, default: "",
+              label: User,
+              description: "The user name before the colon in the web interface's Username:password field, sent when the credential type is basic." }
+  password: { type: string, secret: true, default: "",
+              label: Password,
+              description: "The password after the colon in the web interface's Username:password field, sent when the credential type is basic." }
+
+ports:
+  - { port: 8080, protocol: http, role: control, note: "The web browser interface's port, set in its configuration in REAPER" }
+
+models:
+  - id: reaper
+    name: REAPER 7 (web browser interface)
+    supports: [play, pause, record, stop, stop_save_media, stop_delete_media, toggle_metronome,
+               toggle_snap, next_marker, previous_marker, insert_marker, undo, redo, set_repeat,
+               toggle_repeat, read_repeat, set_position, set_position_text, go_to_marker,
+               go_to_region, go_to_timeline_marker, go_to_timeline_region, read_transport,
+               read_tracks, read_markers, read_regions, set_track_volume, set_track_pan,
+               set_track_width, set_track_mute, toggle_track_mute, set_track_solo,
+               toggle_track_solo, set_track_fx_enabled, toggle_track_fx_enabled, set_track_arm,
+               toggle_track_arm, set_track_monitor, cycle_track_monitor, set_track_selected,
+               toggle_track_selected, get_track_info, set_track_info, set_track_name,
+               get_track_send, set_track_send_mute, toggle_track_send_mute, set_track_send_volume,
+               set_track_send_pan, add_undo_point, begin_undo_block, end_undo_block, get_lyrics,
+               get_ext_state, set_ext_state, set_ext_state_persist, get_project_ext_state,
+               set_project_ext_state, run_action, run_named_action, get_action_state,
+               get_named_action_state, send_osc, send_osc_float, send_osc_string]
+    verification: none
+
+commands:
+  # ── Transport (action IDs REAPER's own pages send) ────────────────────────
+  play:
+    summary: "Start playback (action 1007), then read the transport back"
+    send: { method: GET, path: "/_/1007;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  pause:
+    summary: "Pause, or resume when paused (action 1008), then read the transport back"
+    send: { method: GET, path: "/_/1008;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  record:
+    summary: "Record (action 1013), then read the transport back"
+    send: { method: GET, path: "/_/1013;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop:
+    summary: "Stop (action 1016), then read the transport back"
+    send: { method: GET, path: "/_/1016;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_save_media:
+    summary: "Stop, keeping all recorded media (action 40667, the pages' stop button), then read the transport back"
+    send: { method: GET, path: "/_/40667;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_delete_media:
+    summary: "Stop and delete all media recorded in this take (action 40668, the pages' abort), then read the transport back"
+    send: { method: GET, path: "/_/40668;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_metronome:
+    summary: "Toggle the metronome (action 40364), then read its state back"
+    send: { method: GET, path: "/_/40364;GET/40364" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_snap:
+    summary: "Toggle snapping (action 1157), then read its state back"
+    send: { method: GET, path: "/_/1157;GET/1157" }
+    expect: { status: 200 }
+    returns: ack
+
+  next_marker:
+    summary: "Move the cursor to the next marker or project end (action 40173), then read the transport back"
+    send: { method: GET, path: "/_/40173;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  previous_marker:
+    summary: "Move the cursor to the previous marker or project start (action 40172), then read the transport back"
+    send: { method: GET, path: "/_/40172;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  insert_marker:
+    summary: "Add a marker at the play or edit cursor (action 40157), then read the markers back"
+    send: { method: GET, path: "/_/40157;MARKER" }
+    expect: { status: 200 }
+    returns: ack
+
+  undo:
+    summary: "Undo the last change (action 40029), then read the tracks, markers and regions back"
+    send: { method: GET, path: "/_/40029;NTRACK;TRACK;MARKER;REGION" }
+    expect: { status: 200 }
+    returns: ack
+
+  redo:
+    summary: "Redo the last undone change (action 40030), then read the tracks, markers and regions back"
+    send: { method: GET, path: "/_/40030;NTRACK;TRACK;MARKER;REGION" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_repeat:
+    summary: "Turn repeat on or off (SET/REPEAT), then read the transport back"
+    params:
+      enabled: { type: bool, required: true, label: Repeat, description: "On turns repeat on, off turns it off." }
+    send: { method: GET, path: "/_/SET/REPEAT/{enabled:bool01};TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_repeat:
+    summary: "Toggle repeat (SET/REPEAT/-1), then read the transport back"
+    send: { method: GET, path: "/_/SET/REPEAT/-1;TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  read_repeat:
+    summary: "Read whether repeat is on (GET/REPEAT)"
+    send: { method: GET, path: "/_/GET/REPEAT" }
+    expect: { status: 200, matches: "(?m)^GET/REPEAT\\t(-?\\d+)$" }
+    returns: value
+
+  set_position:
+    summary: "Move the edit cursor, seeking playback, to a time in seconds (SET/POS), then read the transport back"
+    params:
+      seconds: { type: float, min: 0.0, required: true, label: Position, description: "Project time in seconds from the project start." }
+    send: { method: GET, path: "/_/SET/POS/{seconds:.6f};TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_position_text:
+    summary: "Move the edit cursor, seeking playback, to a position written as text (SET/POS_STR), then read the transport back"
+    params:
+      position: { type: string, max_length: 64, required: true, label: Position, description: "A position in any format REAPER recognizes (time, measures.beats, timecode), or r1, m1, R1, M1 for a region or marker by ID or by place on the timeline." }
+    send: { method: GET, path: "/_/SET/POS_STR/{position};TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  go_to_marker:
+    summary: "Move the edit cursor to a marker by its ID (SET/POS_STR/m<id>), then read the transport back"
+    params:
+      id: { type: int, min: 0, required: true, label: Marker ID, description: "The marker's ID, the number REAPER shows on it." }
+    send: { method: GET, path: "/_/SET/POS_STR/m{id};TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  go_to_region:
+    summary: "Move the edit cursor to a region by its ID (SET/POS_STR/r<id>), then read the transport back"
+    params:
+      id: { type: int, min: 0, required: true, label: Region ID, description: "The region's ID, the number REAPER shows on it." }
+    send: { method: GET, path: "/_/SET/POS_STR/r{id};TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  go_to_timeline_marker:
+    summary: "Move the edit cursor to a marker by its place on the timeline (SET/POS_STR/M<n>), then read the transport back"
+    params:
+      place: { type: int, min: 1, required: true, label: Marker, description: "The marker's place on the timeline, 1 for the first." }
+    send: { method: GET, path: "/_/SET/POS_STR/M{place};TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  go_to_timeline_region:
+    summary: "Move the edit cursor to a region by its place on the timeline (SET/POS_STR/R<n>), then read the transport back"
+    params:
+      place: { type: int, min: 1, required: true, label: Region, description: "The region's place on the timeline, 1 for the first." }
+    send: { method: GET, path: "/_/SET/POS_STR/R{place};TRANSPORT" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Reads on demand (the polls read the same) ─────────────────────────────
+  read_transport:
+    summary: "Read the transport and the beat position now (TRANSPORT;BEATPOS)"
+    send: { method: GET, path: "/_/TRANSPORT;BEATPOS" }
+    expect: { status: 200 }
+    returns: ack
+
+  read_tracks:
+    summary: "Read the track count and every track now (NTRACK;TRACK)"
+    send: { method: GET, path: "/_/NTRACK;TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  read_markers:
+    summary: "Read every marker now (MARKER)"
+    send: { method: GET, path: "/_/MARKER" }
+    expect: { status: 200 }
+    returns: ack
+
+  read_regions:
+    summary: "Read every region now (REGION)"
+    send: { method: GET, path: "/_/REGION" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Tracks ────────────────────────────────────────────────────────────────
+  set_track_volume:
+    summary: "Set a track's volume through the control surface API, respecting automation modes (SET/TRACK/n/VOL), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      volume: { type: float, min: 0.0, required: true, label: Volume, description: "Linear gain: 0 is -inf, 0.5 about -6 dB, 1 is +0 dB, 2 about +6 dB." }
+      touch: { type: enum, values: [release, hold], default: release, label: Touch, description: "release ends the touch state with this value (for a single change); hold keeps touching, as while a fader is dragged, until a release or 8 seconds pass." }
+      ignore_gang: { type: bool, default: false, label: Ignore grouping, description: "On changes only this track, ignoring its grouping." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/VOL/{volume:.6f}{touch:map.volume_touch}{ignore_gang:map.ignore_gang};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_pan:
+    summary: "Set a track's pan through the control surface API (SET/TRACK/n/PAN), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: Pan, description: "Pan from -1 (full left) through 0 (center) to 1 (full right)." }
+      touch: { type: enum, values: [release, hold], default: release, label: Touch, description: "release ends the touch state with this value (for a single change); hold keeps touching, as while a knob is turned, until a release or 8 seconds pass." }
+      ignore_gang: { type: bool, default: false, label: Ignore grouping, description: "On changes only this track, ignoring its grouping." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/PAN/{pan:.6f}{touch:map.volume_touch}{ignore_gang:map.ignore_gang};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_width:
+    summary: "Set a track's width (or second pan, by pan mode) through the control surface API (SET/TRACK/n/WIDTH), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      width: { type: float, min: -1.0, max: 1.0, required: true, label: Width, description: "Width from -1 (reversed) through 0 (mono) to 1 (full), or the second pan position in dual-pan mode." }
+      touch: { type: enum, values: [release, hold], default: release, label: Touch, description: "release ends the touch state with this value (for a single change); hold keeps touching until a release or 8 seconds pass." }
+      ignore_gang: { type: bool, default: false, label: Ignore grouping, description: "On changes only this track, ignoring its grouping." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/WIDTH/{width:.6f}{touch:map.volume_touch}{ignore_gang:map.ignore_gang};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_mute:
+    summary: "Mute or unmute a track (SET/TRACK/n/MUTE), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the track, off unmutes it." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/MUTE/{muted:bool01};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_track_mute:
+    summary: "Toggle a track's mute (SET/TRACK/n/MUTE/-1), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/MUTE/-1;TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_solo:
+    summary: "Solo or unsolo a track (SET/TRACK/n/SOLO), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      soloed: { type: bool, required: true, label: Soloed, description: "On solos the track, off unsolos it." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SOLO/{soloed:bool01};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_track_solo:
+    summary: "Toggle a track's solo (SET/TRACK/n/SOLO/-1), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SOLO/-1;TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_fx_enabled:
+    summary: "Enable or bypass a track's whole FX chain (SET/TRACK/n/FX), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      enabled: { type: bool, required: true, label: FX enabled, description: "On makes the track's effects active, off bypasses them." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/FX/{enabled:bool01};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_track_fx_enabled:
+    summary: "Toggle a track's FX chain between active and bypassed (SET/TRACK/n/FX/-1), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/FX/-1;TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_arm:
+    summary: "Record-arm a track or disarm it (SET/TRACK/n/RECARM), then read the tracks back"
+    params:
+      track: { type: int, min: 1, required: true, label: Track, description: "Track number, 1 for the first track." }
+      armed: { type: bool, required: true, label: Armed, description: "On arms the track for recording, off disarms it." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/RECARM/{armed:bool01};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_track_arm:
+    summary: "Toggle a track's record-arm (SET/TRACK/n/RECARM/-1), then read the tracks back"
+    params:
+      track: { type: int, min: 1, required: true, label: Track, description: "Track number, 1 for the first track." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/RECARM/-1;TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_monitor:
+    summary: "Set a track's record monitoring (SET/TRACK/n/RECMON), then read the tracks back"
+    params:
+      track: { type: int, min: 1, required: true, label: Track, description: "Track number, 1 for the first track." }
+      mode: { type: int, min: 0, max: 2, required: true, label: Monitoring, description: "Record monitoring: 0 off, 1 on, 2 auto (not when playing, tape style)." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/RECMON/{mode};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  cycle_track_monitor:
+    summary: "Cycle a track's record monitoring through off, on and auto (SET/TRACK/n/RECMON/-1), then read the tracks back"
+    params:
+      track: { type: int, min: 1, required: true, label: Track, description: "Track number, 1 for the first track." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/RECMON/-1;TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_selected:
+    summary: "Select or deselect a track (SET/TRACK/n/SEL), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      selected: { type: bool, required: true, label: Selected, description: "On selects the track, off deselects it." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SEL/{selected:bool01};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_track_selected:
+    summary: "Toggle a track's selection (SET/TRACK/n/SEL/-1), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SEL/-1;TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_track_info:
+    summary: "Read any track attribute GetSetMediaTrackInfo knows (GET/TRACK/n/<attribute>), into track_info"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      attribute: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_:]+$", required: true, label: Attribute, description: "A GetSetMediaTrackInfo attribute name from REAPER's API documentation, such as I_RECINPUT, I_AUTOMODE, D_VOL or P_NAME." }
+    send: { method: GET, path: "/_/GET/TRACK/{track}/{attribute}" }
+    expect: { status: 200, matches: "(?m)^GET/TRACK/\\d+/[^\\t\\n]+\\t([^\\n]*)$" }
+    returns: value
+
+  set_track_info:
+    summary: "Set any track attribute GetSetMediaTrackInfo knows (SET/TRACK/n/<attribute>/<value>), then read it back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      attribute: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_:]+$", required: true, label: Attribute, description: "A GetSetMediaTrackInfo attribute name from REAPER's API documentation, such as I_RECINPUT, I_AUTOMODE, B_PHASE or P_NAME." }
+      value: { type: string, max_length: 4096, required: true, label: Value, description: "The new value as text, a number for numeric attributes; sent URL-encoded." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/{attribute}/{value};GET/TRACK/{track}/{attribute}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_name:
+    summary: "Rename a track (SET/TRACK/n/P_NAME, as REAPER's pages do), then read the tracks back"
+    params:
+      track: { type: int, min: 1, required: true, label: Track, description: "Track number, 1 for the first track." }
+      name: { type: string, max_length: 4096, required: true, label: Name, description: "The track's new name; sent URL-encoded." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/P_NAME/{name};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Sends, receives and hardware outputs ──────────────────────────────────
+  get_track_send:
+    summary: "Read a send, hardware output or receive of a track (GET/TRACK/n/SEND/i), into track_sends"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      send: { type: int, required: true, label: Send, description: "From 0 for the track's hardware outputs and sends, or -1 for its first receive, -2 the second, and so on." }
+    send: { method: GET, path: "/_/GET/TRACK/{track}/SEND/{send}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_send_mute:
+    summary: "Mute or unmute a send, hardware output or receive (SET/TRACK/n/SEND/i/MUTE), then read it back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      send: { type: int, required: true, label: Send, description: "From 0 for the track's hardware outputs and sends, or -1 for its first receive, -2 the second, and so on." }
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the send, off unmutes it." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SEND/{send}/MUTE/{muted:bool01};GET/TRACK/{track}/SEND/{send}" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_track_send_mute:
+    summary: "Toggle the mute of a send, hardware output or receive (SET/TRACK/n/SEND/i/MUTE/-1), then read it back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      send: { type: int, required: true, label: Send, description: "From 0 for the track's hardware outputs and sends, or -1 for its first receive, -2 the second, and so on." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SEND/{send}/MUTE/-1;GET/TRACK/{track}/SEND/{send}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_send_volume:
+    summary: "Set the level of a send, hardware output or receive (SET/TRACK/n/SEND/i/VOL), then read it back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      send: { type: int, required: true, label: Send, description: "From 0 for the track's hardware outputs and sends, or -1 for its first receive, -2 the second, and so on." }
+      volume: { type: float, min: 0.0, required: true, label: Volume, description: "Linear gain: 0 is -inf, 1.0 is +0 dB." }
+      touch: { type: enum, values: [release, hold, instant], default: instant, label: Edit, description: "instant applies the value as a single edit; release ends a drag at this value; hold continues a drag." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SEND/{send}/VOL/{volume:.6f}{touch:map.send_touch};GET/TRACK/{track}/SEND/{send}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_track_send_pan:
+    summary: "Set the pan of a send, hardware output or receive (SET/TRACK/n/SEND/i/PAN), then read it back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      send: { type: int, required: true, label: Send, description: "From 0 for the track's hardware outputs and sends, or -1 for its first receive, -2 the second, and so on." }
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: Pan, description: "Pan from -1 (left) through 0 (center) to 1 (right)." }
+      touch: { type: enum, values: [release, hold, instant], default: instant, label: Edit, description: "instant applies the value as a single edit; release ends a drag at this value; hold continues a drag." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/SEND/{send}/PAN/{pan:.6f}{touch:map.send_touch};GET/TRACK/{track}/SEND/{send}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Undo ──────────────────────────────────────────────────────────────────
+  add_undo_point:
+    summary: "Add an undo point for changes made with set_track_info (SET/UNDO/message)"
+    params:
+      message: { type: string, max_length: 256, required: true, label: Description, description: "What the undo point is called in REAPER's undo history; sent URL-encoded." }
+    send: { method: GET, path: "/_/SET/UNDO/{message}" }
+    expect: { status: 200 }
+    returns: ack
+
+  begin_undo_block:
+    summary: "Begin an undo block, to be ended with end_undo_block (SET/UNDO_BEGIN)"
+    send: { method: GET, path: "/_/SET/UNDO_BEGIN" }
+    expect: { status: 200 }
+    returns: ack
+
+  end_undo_block:
+    summary: "End the undo block begun with begin_undo_block (SET/UNDO_END/message)"
+    params:
+      message: { type: string, max_length: 256, required: true, label: Description, description: "What the undo block is called in REAPER's undo history; sent URL-encoded." }
+    send: { method: GET, path: "/_/SET/UNDO_END/{message}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Lyrics ────────────────────────────────────────────────────────────────
+  get_lyrics:
+    summary: "Read a track's MIDI lyrics (LYRICS/n), into track_lyrics"
+    params:
+      track: { type: int, min: 1, required: true, label: Track, description: "Track number, 1 for the first track." }
+    send: { method: GET, path: "/_/LYRICS/{track}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Extended state ────────────────────────────────────────────────────────
+  get_ext_state:
+    summary: "Read an extended state value (GET/EXTSTATE), into ext_state"
+    params:
+      section: { type: string, max_length: 256, required: true, label: Section, description: "The extended state section, usually a script's or extension's name; sent URL-encoded." }
+      key: { type: string, max_length: 256, required: true, label: Key, description: "The key within the section; sent URL-encoded." }
+    send: { method: GET, path: "/_/GET/EXTSTATE/{section}/{key}" }
+    expect: { status: 200, matches: "(?m)^EXTSTATE\\t[^\\t\\n]*\\t[^\\t\\n]*\\t([^\\n]*)$" }
+    returns: value
+
+  set_ext_state:
+    summary: "Set an extended state value until REAPER quits (SET/EXTSTATE), then read it back"
+    params:
+      section: { type: string, max_length: 256, required: true, label: Section, description: "The extended state section, usually a script's or extension's name; sent URL-encoded." }
+      key: { type: string, max_length: 256, required: true, label: Key, description: "The key within the section; sent URL-encoded." }
+      value: { type: string, max_length: 65536, required: true, label: Value, description: "The value to store; sent URL-encoded." }
+    send: { method: GET, path: "/_/SET/EXTSTATE/{section}/{key}/{value};GET/EXTSTATE/{section}/{key}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_ext_state_persist:
+    summary: "Set an extended state value REAPER keeps across restarts (SET/EXTSTATEPERSIST), then read it back"
+    params:
+      section: { type: string, max_length: 256, required: true, label: Section, description: "The extended state section, usually a script's or extension's name; sent URL-encoded." }
+      key: { type: string, max_length: 256, required: true, label: Key, description: "The key within the section; sent URL-encoded." }
+      value: { type: string, max_length: 65536, required: true, label: Value, description: "The value to store in REAPER's ini file; sent URL-encoded." }
+    send: { method: GET, path: "/_/SET/EXTSTATEPERSIST/{section}/{key}/{value};GET/EXTSTATE/{section}/{key}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_project_ext_state:
+    summary: "Read a value stored in the current project (GET/PROJEXTSTATE), into project_ext_state"
+    params:
+      section: { type: string, max_length: 256, required: true, label: Section, description: "The extension name the value is stored under; sent URL-encoded." }
+      key: { type: string, max_length: 256, required: true, label: Key, description: "The key within the section; sent URL-encoded." }
+    send: { method: GET, path: "/_/GET/PROJEXTSTATE/{section}/{key}" }
+    expect: { status: 200, matches: "(?m)^PROJEXTSTATE\\t[^\\t\\n]*\\t[^\\t\\n]*\\t([^\\n]*)$" }
+    returns: value
+
+  set_project_ext_state:
+    summary: "Store a value in the current project (SET/PROJEXTSTATE), then read it back"
+    params:
+      section: { type: string, max_length: 256, required: true, label: Section, description: "The extension name the value is stored under; sent URL-encoded." }
+      key: { type: string, max_length: 256, required: true, label: Key, description: "The key within the section; sent URL-encoded." }
+      value: { type: string, max_length: 65536, required: true, label: Value, description: "The value to store with the project; an empty value deletes the key." }
+    send: { method: GET, path: "/_/SET/PROJEXTSTATE/{section}/{key}/{value};GET/PROJEXTSTATE/{section}/{key}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Actions ───────────────────────────────────────────────────────────────
+  run_action:
+    summary: "Run a REAPER action by its command ID, then read its on/off state back"
+    params:
+      command: { type: int, min: 0, max: 65535, required: true, label: Command ID, description: "The action's command ID from REAPER's Actions list, such as 40364 (toggle metronome)." }
+    send: { method: GET, path: "/_/{command};GET/{command}" }
+    expect: { status: 200 }
+    returns: ack
+
+  run_named_action:
+    summary: "Run an action by its named command ID, for scripts, custom actions and extensions, then read its state back"
+    params:
+      command: { type: string, max_length: 256, pattern: "^_[A-Za-z0-9_]+$", required: true, label: Command ID, description: "The named command ID REAPER's Actions list shows for a script, custom action or extension action, starting with an underscore." }
+    send: { method: GET, path: "/_/{command};GET/{command}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_action_state:
+    summary: "Read whether an action's toggle is on (GET/<command ID>)"
+    params:
+      command: { type: int, min: 0, max: 65535, required: true, label: Command ID, description: "The action's command ID from REAPER's Actions list." }
+    send: { method: GET, path: "/_/GET/{command}" }
+    expect: { status: 200, matches: "(?m)^CMDSTATE\\t[^\\t\\n]+\\t(-?\\d+)$" }
+    returns: value
+
+  get_named_action_state:
+    summary: "Read whether a named action's toggle is on (GET/<named command ID>)"
+    params:
+      command: { type: string, max_length: 256, pattern: "^_[A-Za-z0-9_]+$", required: true, label: Command ID, description: "The named command ID REAPER's Actions list shows, starting with an underscore." }
+    send: { method: GET, path: "/_/GET/{command}" }
+    expect: { status: 200, matches: "(?m)^CMDSTATE\\t[^\\t\\n]+\\t(-?\\d+)$" }
+    returns: value
+
+  # ── OSC through REAPER's default processing ───────────────────────────────
+  send_osc:
+    summary: "Send an OSC message without a value through REAPER's Default.ReaperOSC processing and action mappings (OSC/...)"
+    params:
+      address: { type: string, max_length: 256, pattern: "^/[^:;]*$", required: true, label: OSC address, description: "An OSC address from REAPER's Default.ReaperOSC, such as /play or /track/3/mute/toggle; sent URL-encoded." }
+    send: { method: GET, path: "/_/OSC/{address}" }
+    expect: { status: 200 }
+    returns: ack
+
+  send_osc_float:
+    summary: "Send an OSC message with a number through REAPER's Default.ReaperOSC processing (OSC/address:value)"
+    params:
+      address: { type: string, max_length: 256, pattern: "^/[^:;]*$", required: true, label: OSC address, description: "An OSC address from REAPER's Default.ReaperOSC, such as /track/3/volume; sent URL-encoded." }
+      value: { type: float, required: true, label: Value, description: "The message's float argument, in the pattern's own scale." }
+    send: { method: GET, path: "/_/OSC/{address}:{value:.6f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  send_osc_string:
+    summary: "Send an OSC message with a string through REAPER's Default.ReaperOSC processing (OSC/address:s<text>)"
+    params:
+      address: { type: string, max_length: 256, pattern: "^/[^:;]*$", required: true, label: OSC address, description: "An OSC address from REAPER's Default.ReaperOSC, such as /track/3/name; sent URL-encoded." }
+      text: { type: string, max_length: 4096, required: true, label: Text, description: "The message's string argument; sent URL-encoded." }
+    send: { method: GET, path: "/_/OSC/{address}:s{text}" }
+    expect: { status: 200 }
+    returns: ack
+
+state:
+  transport.play_state: { type: string, description: "stopped, playing, paused, recording or record_paused (TRANSPORT playstate 0, 1, 2, 5, 6)" }
+  transport.playing: { type: bool, description: "Playing or recording" }
+  transport.paused: { type: bool, description: "Paused, in playback or recording" }
+  transport.recording: { type: bool, description: "Recording, or recording paused" }
+  transport.position: { type: float, unit: s, description: "Play or edit cursor position" }
+  transport.repeat: { type: bool, description: "Repeat on" }
+  transport.position_text: { type: string, description: "Position in the project's time format, as REAPER formats it" }
+  transport.position_beats: { type: string, description: "Position as measures.beats.hundredths" }
+  transport.beat_position: { type: float, description: "Position in beats from the project start (BEATPOS full beat position)" }
+  transport.measure: { type: int, description: "Measure count of the position (BEATPOS measure_cnt)" }
+  transport.beat_in_measure: { type: float, description: "Beats into the current measure (BEATPOS beats_in_measure)" }
+  transport.time_signature_numerator: { type: int, description: "Time signature numerator at the position" }
+  transport.time_signature_denominator: { type: int, description: "Time signature denominator at the position" }
+  transport.metronome: { type: bool, description: "Metronome on (state of action 40364)" }
+  options.snap: { type: bool, description: "Snapping on (state of action 1157)" }
+  track_count: { type: int, description: "Number of tracks, not counting the master" }
+  tracks.*.name: { type: string, description: "Track name, MASTER for track 0" }
+  tracks.*.flags: { type: int, description: "Track flags as REAPER sends them, a sum of 1 folder, 2 selected, 4 has FX, 8 muted, 16 soloed, 32 solo in place, 64 record armed, 128 record monitoring on, 256 record monitoring auto" }
+  tracks.*.volume: { type: float, description: "Track volume as linear gain, 0 for -inf and 1 for +0 dB" }
+  tracks.*.pan: { type: float, description: "Pan, -1 (full left) to 1 (full right)" }
+  tracks.*.peak_db10: { type: int, description: "Last meter peak in tenths of a dB (-100 is -10 dB)" }
+  tracks.*.meter_db10: { type: int, description: "Last meter position in tenths of a dB" }
+  tracks.*.width: { type: float, description: "Width, or second pan position by pan mode, -1 to 1" }
+  tracks.*.pan_mode: { type: int, description: "Pan mode (I_PANMODE: 0 classic 3.x, 3 balance, 5 stereo pan, 6 dual pan)" }
+  tracks.*.send_count: { type: int, description: "Number of sends" }
+  tracks.*.receive_count: { type: int, description: "Number of receives" }
+  tracks.*.hw_out_count: { type: int, description: "Number of hardware outputs" }
+  tracks.*.color: { type: string, description: "Custom color as 0xaarrggbb, 0 when none is set" }
+  markers.*.name: { type: string, description: "Marker name, by its place on the timeline from 1" }
+  markers.*.id: { type: int, description: "Marker ID, the number REAPER shows on it" }
+  markers.*.position: { type: float, unit: s, description: "Marker position" }
+  markers.*.color: { type: string, description: "Marker color as 0xaarrggbb, 0 when none is set" }
+  regions.*.name: { type: string, description: "Region name, by its place on the timeline from 1" }
+  regions.*.id: { type: int, description: "Region ID, the number REAPER shows on it" }
+  regions.*.start: { type: float, unit: s, description: "Region start" }
+  regions.*.end: { type: float, unit: s, description: "Region end" }
+  regions.*.color: { type: string, description: "Region color as 0xaarrggbb, 0 when none is set" }
+  track_info.*.*: { type: string, description: "A track attribute read with get_track_info or set_track_info, by track number and attribute name, as REAPER sends it (strings escaped as \\n, \\t, \\\\)" }
+  track_sends.*.*.flags: { type: int, description: "Send flags, by track and send index (receives negative); 8 is set while muted" }
+  track_sends.*.*.volume: { type: float, description: "Send level as linear gain, 1.0 for +0 dB" }
+  track_sends.*.*.pan: { type: float, description: "Send pan, -1 (left) to 1 (right)" }
+  track_sends.*.*.other_track: { type: int, description: "The track at the other end of the send or receive, -1 for a hardware output" }
+  track_lyrics.*.*.beat: { type: float, description: "Beat position of a MIDI lyric, by track and place from 1" }
+  track_lyrics.*.*.text: { type: string, description: "The lyric, as REAPER sends it (escaped as \\n, \\t, \\\\)" }
+  ext_state.*.*: { type: string, description: "An extended state value read or written, by section and key, as REAPER sends it (escaped as \\n, \\t, \\\\)" }
+  project_ext_state.*.*: { type: string, description: "A project extended state value read or written, by section and key, as REAPER sends it" }
+  actions.*.state: { type: int, description: "An action's toggle state by command ID: above 0 on, 0 off, -1 no state" }
+
+telemetry:
+  # REAPER pushes nothing over HTTP; its own pages poll. Polled more slowly
+  # than they do: the transport every second, tracks and the metronome and
+  # snap states every two, markers and regions every five. Every command reads
+  # back what it changes in the same request.
+  poll:
+    - every_ms: 1000
+      send: [{ method: GET, path: "/_/TRANSPORT;BEATPOS" }]
+    - every_ms: 2000
+      send: [{ method: GET, path: "/_/NTRACK;TRACK;GET/40364;GET/1157" }]
+    - every_ms: 5000
+      send: [{ method: GET, path: "/_/MARKER;REGION" }]
+  # Each reply is lines of tab-separated fields, each line naming what it
+  # holds, so the plain text rules read the body whatever the request; a
+  # body holding several commands' answers is read by each rule in turn.
+  updates:
+    - match: '(?m)^TRANSPORT\t(\d+)\t([^\t\n]*)\t(-?\d+)\t([^\t\n]*)\t([^\t\n]*)$'
+      state:
+        transport.play_state: { value: "{1}", map: { "0": stopped, "1": playing, "2": paused, "5": recording, "6": record_paused } }
+        transport.playing: { value: "{1}", map: { "0": false, "1": true, "2": false, "5": true, "6": false } }
+        transport.paused: { value: "{1}", map: { "0": false, "1": false, "2": true, "5": false, "6": true } }
+        transport.recording: { value: "{1}", map: { "0": false, "1": false, "2": false, "5": true, "6": true } }
+        transport.position: "{2}"
+        transport.repeat: { value: "{3}", map: { "0": false, "1": true } }
+        transport.position_text: "{4}"
+        transport.position_beats: "{5}"
+    - match: '(?m)^GET/REPEAT\t(-?\d+)$'
+      state:
+        transport.repeat: { value: "{1}", map: { "0": false, "1": true } }
+    - match: '(?m)^BEATPOS\t(\d+)\t([^\t\n]*)\t([^\t\n]*)\t([^\t\n]*)\t([^\t\n]*)\t([^\t\n]*)\t([^\t\n]*)$'
+      state:
+        transport.beat_position: "{3}"
+        transport.measure: "{4}"
+        transport.beat_in_measure: "{5}"
+        transport.time_signature_numerator: "{6}"
+        transport.time_signature_denominator: "{7}"
+    - match: '(?m)^NTRACK\t(\d+)$'
+      state: { track_count: "{1}" }
+    # Every track line of the reply, the whole list each time.
+    - match: '(?m)((?:^TRACK\t[^\n]*(?:\n|$))+)'
+      match_each: '(?m)^TRACK\t(\d+)\t([^\t\n]*)\t(-?\d+)\t([^\t\n]*)\t([^\t\n]*)\t(-?\d+)\t(-?\d+)\t([^\t\n]*)\t(-?\d+)\t(\d+)\t(\d+)\t(\d+)\t([^\t\n]*)$'
+      match_each_in: 1
+      replace: tracks
+      state:
+        "tracks.{2}.name": "{3}"
+        "tracks.{2}.flags": "{4}"
+        "tracks.{2}.volume": "{5}"
+        "tracks.{2}.pan": "{6}"
+        "tracks.{2}.peak_db10": "{7}"
+        "tracks.{2}.meter_db10": "{8}"
+        "tracks.{2}.width": "{9}"
+        "tracks.{2}.pan_mode": "{10}"
+        "tracks.{2}.send_count": "{11}"
+        "tracks.{2}.receive_count": "{12}"
+        "tracks.{2}.hw_out_count": "{13}"
+        "tracks.{2}.color": "{14}"
+    - match: '(?m)^MARKER_LIST\n((?:MARKER\t[^\n]*\n)*)MARKER_LIST_END$'
+      match_each: '(?m)^MARKER\t([^\t\n]*)\t(-?\d+)\t([^\t\n]*)(?:\t([^\t\n]*))?$'
+      match_each_in: 1
+      replace: markers
+      state:
+        "markers.{index:+1}.name": "{2}"
+        "markers.{index:+1}.id": "{3}"
+        "markers.{index:+1}.position": "{4}"
+        "markers.{index:+1}.color": "{5}"
+    - match: '(?m)^REGION_LIST\n((?:REGION\t[^\n]*\n)*)REGION_LIST_END$'
+      match_each: '(?m)^REGION\t([^\t\n]*)\t(-?\d+)\t([^\t\n]*)\t([^\t\n]*)(?:\t([^\t\n]*))?$'
+      match_each_in: 1
+      replace: regions
+      state:
+        "regions.{index:+1}.name": "{2}"
+        "regions.{index:+1}.id": "{3}"
+        "regions.{index:+1}.start": "{4}"
+        "regions.{index:+1}.end": "{5}"
+        "regions.{index:+1}.color": "{6}"
+    # Every CMDSTATE line of the reply (the poll asks for two).
+    - match: '(?s)^(.*CMDSTATE\t.*)$'
+      match_each: '(?m)^CMDSTATE\t([^\t\n]+)\t(-?\d+)$'
+      match_each_in: 1
+      state: { "actions.{2}.state": "{3}" }
+    - match: '(?m)^CMDSTATE\t40364\t(-?\d+)$'
+      state: { transport.metronome: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?m)^CMDSTATE\t1157\t(-?\d+)$'
+      state: { options.snap: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?m)^GET/TRACK/(\d+)/([A-Za-z0-9_:]+)\t([^\n]*)$'
+      state: { "track_info.{1}.{2:key}": "{3}" }
+    - match: '(?m)^SEND\t(\d+)\t(-?\d+)\t(-?\d+)\t([^\t\n]*)\t([^\t\n]*)\t(-?\d+)$'
+      state:
+        "track_sends.{1}.{2}.flags": "{3}"
+        "track_sends.{1}.{2}.volume": "{4}"
+        "track_sends.{1}.{2}.pan": "{5}"
+        "track_sends.{1}.{2}.other_track": "{6}"
+    - match: '(?m)^LYRICS\t(\d+)((?:\t[^\t\n]*\t[^\t\n]*)*)$'
+      match_each: '\t([^\t\n]*)\t([^\t\n]*)'
+      match_each_in: 2
+      replace: "track_lyrics.{1}"
+      state:
+        "track_lyrics.{1}.{index:+1}.beat": "{3}"
+        "track_lyrics.{1}.{index:+1}.text": "{4}"
+    - match: '(?m)^EXTSTATE\t([^\t\n]*)\t([^\t\n]*)\t([^\n]*)$'
+      state: { "ext_state.{1:key}.{2:key}": "{3}" }
+    - match: '(?m)^PROJEXTSTATE\t([^\t\n]*)\t([^\t\n]*)\t([^\n]*)$'
+      state: { "project_ext_state.{1:key}.{2:key}": "{3}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      stop_delete_media stops and deletes everything recorded in the take, which REAPER's own pages
+      ask to confirm ("contents will be lost"). record starts or stops recording. run_action,
+      run_named_action, send_osc and set_track_info reach any action, OSC pattern or track
+      attribute, including ones that delete items, close the project or quit REAPER, with no
+      confirmation; set_ext_state_persist writes REAPER's ini file and set_project_ext_state the
+      project.
+
+  - models: [all]
+    severity: warning
+    text: >
+      REAPER must have a "Web browser interface" control surface added in Preferences >
+      Control/OSC/web, on the port the device is opened with (8080 by default here, the User
+      Guide's example). Its optional Username:password is HTTP Basic over plain HTTP: set the
+      credential type to basic with the same user and password, and keep the interface on a
+      trusted network; REAPER serves no HTTPS. A refused credential (401) stops the device until
+      its settings are corrected.
+
+  - models: [all]
+    severity: warning
+    text: >
+      REAPER pushes nothing over HTTP, so the state comes from polling: the transport and beat
+      position every second, the track list, metronome and snap every two seconds, markers and
+      regions every five; each command reads back what it changed in the same request. Changes
+      made in REAPER between polls show at the next poll. Track sends, receives, lyrics, track
+      attributes, extended state and action states are read only by the commands that ask for
+      them, since what to read (which send, key or action) is the caller's choice.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A track's mute, solo, record-arm, record monitoring, selection, folder and has-FX states
+      arrive only as the bits of tracks.*.flags, which the spec format cannot split into separate
+      values; read the bit (8 muted, 16 soloed, 32 solo in place, 64 armed, 128 monitoring on, 256
+      monitoring auto, 2 selected, 1 folder, 4 has FX), or read B_MUTE, I_SOLO, I_RECARM, I_RECMON
+      or I_SELECTED with get_track_info.
+
+  - models: [all]
+    severity: info
+    text: >
+      Tracks are numbered as REAPER numbers them, 0 for the master; the whole list replaces
+      tracks.* at each read, so a removed track leaves it, while track_info, track_sends and
+      track_lyrics are kept by track number until read again. Markers and regions are numbered by
+      their place on the timeline from 1, with their own IDs in id. Volumes are linear gain (1 is
+      +0 dB) and pans -1 to 1, unlike the OSC interface's normalized fader positions. Text values
+      come as REAPER sends them, newlines, tabs and backslashes escaped.
+
+  - models: [all]
+    severity: info
+    text: >
+      Track volume, pan and width go through REAPER's control surface API and so respect
+      automation modes and grouping: touch release (the default) ends the touch state at once,
+      hold keeps it, as a dragged fader does, until a release or 8 seconds; ignore_gang changes
+      only the track named. Relative changes (a value starting with + or -, in dB for volume) are
+      not offered: the spec format renders no sign before a positive decimal, and whether REAPER
+      decodes a percent-encoded + there is undocumented; each command reads the value back, so an
+      absolute value reaches the same result.

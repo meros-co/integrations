@@ -373,3 +373,68 @@ telemetry(K, "signal-dvi", inbound="Frq00 3 0 3 3\r\n",
           expect_state={"inputs": {"1": {"signal": True}, "2": {"signal": False}, "3": {"signal": True},
                                    "4": {"signal": True}}})
 telemetry(K, "part-number-dvi", inbound="Pno43-265-01\r\n", expect_state={"device": {"part_number": "43-265-01"}})
+
+# ── MMX 42/62 (68-778-01 Rev. C, p.4-5 to 4-6): bare replies, no verbose mode ──
+_seen_mmx = {}
+
+
+def _tm(command, *args, **extra):
+    # A second file per command, so the other models' vectors are kept.
+    n = _seen_mmx.get(command, 0) + 1
+    _seen_mmx[command] = n
+    text(K, command, *args, file=f"{command}.mmx" if n == 1 else f"{command}.mmx-{n}", **extra)
+
+
+MM = {"model": "mmx-42-62"}
+_tm("tie", {"input": 5, "output": 2}, "5*2!\r", device_reply="Out02 In05 All\r\n", expect_result=ACK, **MM)
+_tm("tie_video", {"input": 3, "output": 1}, "3*1%\r", device_reply="Out01 In03 Vid\r\n", expect_result=ACK, **MM)
+_tm("tie_audio", {"input": 6, "output": 1}, "6*1$\r", device_reply="Out01 In06 Aud\r\n", expect_result=ACK, **MM)
+_tm("tie", {"input": 7, "output": 1}, "7*1!\r", device_reply="E01\r\n", expect_result=ERR, **MM)
+_tm("get_video_tie", {"output": 2}, "2%\r", device_reply="In05\r\n", expect_result=val("05"), **MM)
+_tm("get_audio_tie", {"output": 1}, "1$\r", device_reply="In00\r\n", expect_result=val("00"), **MM)
+_tm("set_video_mute", {"output": 1, "muted": True}, "1*1B\r", device_reply="Vmt1*1\r\n", expect_result=ACK, **MM)
+_tm("get_video_mute", {"output": 1}, "1B\r", device_reply="1\r\n", expect_result=val("1"), **MM)
+_tm("set_video_mute_all", {"muted": True}, "1*B\r", device_reply="Vmt1\r\n", expect_result=ACK, **MM)
+_tm("set_audio_mute", {"output": 2, "muted": False}, "2*0Z\r", device_reply="Amt2*0\r\n", expect_result=ACK, **MM)
+_tm("get_audio_mute", {"output": 2}, "2Z\r", device_reply="0\r\n", expect_result=val("0"), **MM)
+_tm("set_audio_mute_all", {"muted": False}, "0*Z\r", device_reply="Amt0\r\n", expect_result=ACK, **MM)
+_tm("set_input_gain", {"input": 4, "gain": 3}, "4*3G\r", device_reply="In04 Aud+03\r\n", expect_result=ACK, **MM)
+_tm("set_input_attenuation", {"input": 2, "attenuation": 6}, "2*6g\r", device_reply="In02 Aud-06\r\n",
+     expect_result=ACK, **MM)
+_tm("increase_input_level", {"input": 4}, "4+G\r", device_reply="In04 Aud+04\r\n", expect_result=ACK, **MM)
+_tm("decrease_input_level", {"input": 4}, "4-G\r", device_reply="In04 Aud+02\r\n", expect_result=ACK, **MM)
+_tm("get_input_level", {"input": 4}, "4G\r", device_reply="+03\r\n", expect_result=val("+03"), **MM)
+_tm("set_front_panel_lock", {"mode": 1}, "1X\r", device_reply="Exe1\r\n", expect_result=ACK, **MM)
+_tm("get_front_panel_lock", {}, "X\r", device_reply="0\r\n", expect_result=val("0"), **MM)
+_tm("get_info", {}, "I\r", device_reply="V1*03 A1*03 V2*05 A2*06 Vmt1*0 Amt1*0 Vmt2*1 Amt2*0\r\n",
+     expect_result=val("V1*03 A1*03 V2*05 A2*06 Vmt1*0 Amt1*0 Vmt2*1 Amt2*0"), **MM)
+_tm("get_part_number", {}, "N\r", device_reply="60-655-01\r\n", expect_result=val("60-655-01"), **MM)
+_tm("get_firmware", {}, "Q\r", device_reply="1.02\r\n", expect_result=val("1.02"), **MM)
+_tm("mmx_reset_audio_levels", {}, E + "ZA\r", device_reply="Zpa\r\n", expect_result=ACK, **MM)
+_tm("mmx_unmute_all_video", {}, E + "ZB\r", device_reply="Zpb\r\n", expect_result=ACK, **MM)
+_tm("mmx_unmute_all_audio", {}, E + "ZZ\r", device_reply="Zpz\r\n", expect_result=ACK, **MM)
+
+telemetry(K, "mmx-info", inbound="V1*03 A1*03 V2*05 A2*06 Vmt1*0 Amt1*0 Vmt2*1 Amt2*0\r\n", model="mmx-42-62",
+          expect_state={"outputs": {"1": {"video_input": 3, "audio_input": 3, "video_mute": False, "audio_mute": False},
+                                    "2": {"video_input": 5, "audio_input": 6, "video_mute": True,
+                                          "audio_mute": False}}})
+telemetry(K, "mmx-front-panel-tie", inbound="Out02 In04 All\r\n", model="mmx-42-62",
+          expect_state={"outputs": {"2": {"video_input": 4, "audio_input": 4}}})
+telemetry(K, "mmx-bare-video-tie", inbound="In05\r\n", request="2%", model="mmx-42-62",
+          expect_state={"outputs": {"2": {"video_input": 5}}})
+telemetry(K, "mmx-bare-audio-tie", inbound="In01\r\n", request="1$", model="mmx-42-62",
+          expect_state={"outputs": {"1": {"audio_input": 1}}})
+telemetry(K, "mmx-bare-video-mute", inbound="1\r\n", request="2B", model="mmx-42-62",
+          expect_state={"outputs": {"2": {"video_mute": True}}})
+telemetry(K, "mmx-bare-audio-mute", inbound="0\r\n", request="1Z", model="mmx-42-62",
+          expect_state={"outputs": {"1": {"audio_mute": False}}})
+telemetry(K, "mmx-bare-level", inbound="-06\r\n", request="2G", model="mmx-42-62",
+          expect_state={"inputs": {"2": {"audio_level": -6}}})
+telemetry(K, "mmx-bare-lock", inbound="1\r\n", request="X", model="mmx-42-62", expect_state={"front_panel_lock": 1})
+telemetry(K, "mmx-global-mute", inbound="Vmt1\r\n", model="mmx-42-62", expect_state={}, expect_then_send=["I\r"])
+telemetry(K, "mmx-reset-video-mutes", inbound="Zpb\r\n", model="mmx-42-62",
+          expect_state={"outputs": {"1": {"video_mute": False}, "2": {"video_mute": False}}})
+telemetry(K, "mmx-reset-audio-mutes", inbound="Zpz\r\n", model="mmx-42-62",
+          expect_state={"outputs": {"1": {"audio_mute": False}, "2": {"audio_mute": False}}})
+telemetry(K, "mmx-reset-levels", inbound="Zpa\r\n", model="mmx-42-62",
+          expect_state={"inputs": {str(n): {"audio_level": 0} for n in range(1, 7)}})

@@ -52,6 +52,10 @@ pub(crate) enum Outgoing {
         generation: u64,
         path: PathBuf,
     },
+    /// Shut the sending side down once what was handed over before it is
+    /// sent, so the peer reads to the end; what is handed over after it is
+    /// not sent. The receiving side stays open until the peer closes.
+    Shutdown,
 }
 
 /// The chunk a host file is read and sent in.
@@ -343,6 +347,12 @@ pub(crate) async fn pump<S>(
                 Some(Outgoing::Data(data)) => {
                     if let Err(e) = write_out(&mut write, &data).await {
                         break e.to_string();
+                    }
+                }
+                Some(Outgoing::Shutdown) => {
+                    if !shut {
+                        let _ = write.shutdown().await;
+                        shut = true;
                     }
                 }
                 Some(Outgoing::File { file, generation, .. }) if shut => {

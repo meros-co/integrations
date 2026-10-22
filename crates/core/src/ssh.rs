@@ -213,6 +213,9 @@ pub(crate) fn spawn(
                             break e.to_string();
                         }
                     }
+                    Some(crate::tcp::Outgoing::Shutdown) => {
+                        let _ = write.shutdown().await;
+                    }
                     Some(crate::tcp::Outgoing::File { file, generation, .. }) => {
                         let message = "a host file is not sent through an SSH tunnel".to_string();
                         let input = crate::module::FileInput::Failed { message };
