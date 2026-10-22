@@ -40,7 +40,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
@@ -280,20 +280,19 @@ fn flag(value: &str) -> Option<bool> {
     }
 }
 
-/// The sony-camera models in the embedded catalogue, as (id, name). Read once.
-fn sony_models() -> &'static [(String, String)] {
-    static MODELS: OnceLock<Vec<(String, String)>> = OnceLock::new();
-    MODELS.get_or_init(|| {
-        crate::catalog::Catalog::embedded()
-            .device(SONY_SPEC)
-            .map(|s| {
-                s.models
-                    .iter()
-                    .map(|m| (m.id.clone(), m.name.clone()))
-                    .collect()
-            })
-            .unwrap_or_default()
-    })
+/// The sony-camera models in the core's catalogue, as (id, name), taken
+/// when the core is built: parsing a catalogue again at the first discovery
+/// would hold up an async worker for seconds.
+fn sony_models(catalog: &crate::catalog::Catalog) -> Arc<[(String, String)]> {
+    catalog
+        .device(SONY_SPEC)
+        .map(|s| {
+            s.models
+                .iter()
+                .map(|m| (m.id.clone(), m.name.clone()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The catalogue model a camera's `X_ModelName` names: the model whose id is
@@ -358,6 +357,8 @@ enum Known {
 /// scans and description fetches.
 struct Shared {
     events: Arc<EventQueue>,
+    /// The catalogue's sony-camera models, as (id, name).
+    models: Arc<[(String, String)]>,
     client: reqwest::Client,
     known: Mutex<HashMap<String, Known>>,
     fetches: Semaphore,
@@ -366,7 +367,7 @@ struct Shared {
 }
 
 impl Shared {
-    fn new(events: Arc<EventQueue>) -> Result<Shared, String> {
+    fn new(events: Arc<EventQueue>, models: Arc<[(String, String)]>) -> Result<Shared, String> {
         let client = reqwest::Client::builder()
             .connect_timeout(FETCH_CONNECT_TIMEOUT)
             .timeout(FETCH_TIMEOUT)
@@ -377,6 +378,7 @@ impl Shared {
             .map_err(|e| format!("cannot build the SSDP HTTP client: {e}"))?;
         Ok(Shared {
             events,
+            models,
             client,
             known: Mutex::default(),
             fetches: Semaphore::new(FETCHES_IN_FLIGHT),
@@ -479,6 +481,7 @@ impl Shared {
                 );
                 drop(known);
                 self.events.push(discovered(
+                    &self.models,
                     from,
                     &advert,
                     &location,
@@ -557,6 +560,7 @@ impl Shared {
 }
 
 fn discovered(
+    models: &[(String, String)],
     address: IpAddr,
     advert: &Advert,
     location: &str,
@@ -565,9 +569,7 @@ fn discovered(
     imaging_error: Option<String>,
 ) -> Event {
     let model_name = imaging.model_name.clone().or(device.model_name.clone());
-    let model = model_name
-        .as_deref()
-        .and_then(|n| match_model(n, sony_models()));
+    let model = model_name.as_deref().and_then(|n| match_model(n, models));
     let ptp3 = imaging.ptp3();
     let suggested = if imaging.ssh == Some(true) {
         "ssh"
@@ -708,17 +710,24 @@ struct State {
     scan: Option<JoinHandle<()>>,
 }
 
-#[derive(Default)]
 pub(crate) struct Ssdp {
     state: Mutex<State>,
+    models: Arc<[(String, String)]>,
 }
 
 impl Ssdp {
-    fn shared(state: &mut State, services: &Services) -> Result<Arc<Shared>, String> {
+    pub(crate) fn new(catalog: &crate::catalog::Catalog) -> Ssdp {
+        Ssdp {
+            state: Mutex::default(),
+            models: sony_models(catalog),
+        }
+    }
+
+    fn shared(&self, state: &mut State, services: &Services) -> Result<Arc<Shared>, String> {
         if let Some(s) = &state.shared {
             return Ok(s.clone());
         }
-        let shared = Arc::new(Shared::new(services.events.clone())?);
+        let shared = Arc::new(Shared::new(services.events.clone(), self.models.clone())?);
         state.shared = Some(shared.clone());
         Ok(shared)
     }
@@ -728,7 +737,7 @@ impl Ssdp {
     /// joined on every call, so a scan picks up a newly connected network.
     pub(crate) fn listen(&self, services: &Arc<Services>) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
-        let shared = Self::shared(&mut state, services)?;
+        let shared = self.shared(&mut state, services)?;
         if state.listener.is_none() {
             let socket = match bind_listener(services.bind_address) {
                 Ok(s) => Arc::new(s),
@@ -779,7 +788,7 @@ impl Ssdp {
         if state.scan.as_ref().is_some_and(|t| !t.is_finished()) {
             return Ok(());
         }
-        let shared = Self::shared(&mut state, services)?;
+        let shared = self.shared(&mut state, services)?;
         let interfaces: Vec<Ipv4Addr> = crate::discovery::interfaces(services.bind_address)
             .into_iter()
             .map(|(ip, _)| ip)
@@ -830,6 +839,7 @@ impl Ssdp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::Catalog;
     use std::sync::atomic::AtomicUsize;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
@@ -984,7 +994,7 @@ mod tests {
         assert_eq!(m(""), None);
         // And against the embedded catalogue.
         assert_eq!(
-            match_model("ILCE-7M4", sony_models()).as_deref(),
+            match_model("ILCE-7M4", &sony_models(&Catalog::embedded())).as_deref(),
             Some("ilce-7m4")
         );
     }
@@ -1050,7 +1060,8 @@ mod tests {
     async fn a_notify_is_described_once_and_reported() {
         let (port, requests) = camera_http(imaging_xml("3.00", "Enable", "Disable")).await;
         let events = Arc::new(EventQueue::new(64));
-        let shared = Arc::new(Shared::new(events.clone()).unwrap());
+        let shared =
+            Arc::new(Shared::new(events.clone(), sony_models(&Catalog::embedded())).unwrap());
         let location = format!("http://127.0.0.1:{port}/dd.xml");
         let alive = notify("ssdp:alive", &location);
         shared.handle(LOCAL, alive.as_bytes());
@@ -1108,7 +1119,8 @@ mod tests {
     async fn a_ptp2_body_with_ssh_is_still_reported() {
         let (port, _) = camera_http(imaging_xml("2.00", "Disable", "Enable")).await;
         let events = Arc::new(EventQueue::new(64));
-        let shared = Arc::new(Shared::new(events.clone()).unwrap());
+        let shared =
+            Arc::new(Shared::new(events.clone(), sony_models(&Catalog::embedded())).unwrap());
         let answer = format!(
             "HTTP/1.1 200 OK\r\nLOCATION: http://127.0.0.1:{port}/dd.xml\r\nST: {SONY_URN}\r\n\
              USN: uuid:ptp2::{SONY_URN}\r\n\r\n"

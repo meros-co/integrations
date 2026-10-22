@@ -122,7 +122,7 @@ impl Discovery {
             #[cfg(feature = "sennheiser-ew-g3-g4")]
             mcp: Default::default(),
             #[cfg(feature = "sony-camera")]
-            ssdp: Default::default(),
+            ssdp: crate::ssdp::Ssdp::new(catalog),
             #[cfg(feature = "pjlink")]
             pjlink: Default::default(),
             #[cfg(any(
