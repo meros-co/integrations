@@ -1861,8 +1861,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 
-- [ ] Check whether the unit prompts before taking the password, and record the login exchange and what a wrong password produces. ([specs/roland-xs42h.yaml:341](specs/roland-xs42h.yaml#L341))
-- [ ] Check the dB scale of levels 0-127. ([specs/roland-xs42h.yaml:361](specs/roland-xs42h.yaml#L361))
+- [ ] Check whether the unit prompts before taking the password, and record the login exchange and what a wrong password produces. ([specs/roland-xs42h.yaml:354](specs/roland-xs42h.yaml#L354))
+- [ ] Check the dB scale of levels 0-127. ([specs/roland-xs42h.yaml:381](specs/roland-xs42h.yaml#L381))
+- [ ] Confirm the RS-232 port uses no flow control (not documented) and asks for no password. ([specs/roland-xs42h.yaml:39](specs/roland-xs42h.yaml#L39))
 
 ## roland-xs62s — Roland XS-62S
 
