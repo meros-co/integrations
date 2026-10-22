@@ -65,9 +65,19 @@ transport:
   # it is the asynchronous status message (ERR00000 "System Warning: ..."), so it is left out.
   error_match: '^\(\d+ \d+ ERR0*[1-9]\d* '
   probe: "PWR?"
+  # The same commands on the RS232 IN port: 115200 by default, BDR+PRTA offering 2400 to 115200, Xon/Xoff
+  # flow control in both directions. Data bits, parity and stop bits are not stated in these references:
+  # 8N1 is assumed (see the quirks).
+  serial:
+    baud_rate: { default: 115200, values: [2400, 9600, 19200, 38400, 57600, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: xon-xoff
 
 ports:
-  - { port: 3002, protocol: tcp, role: control }
+  - { port: 3002, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS232 IN, on the Video Input panel (TruLife+) or the IMXB faceplate (4K40-RGB, Mirage SST, Boxer)" }
 
 models:
   - id: eclipse
@@ -2718,8 +2728,10 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Serial: every reference documents the same command set and message format for the RS232 IN port and for TCP
-      3002 ("Christie serial protocol over Ethernet"). Baud rate BDR+PRTA 1 to 6 = 2400, 9600, 19200, 38400,
+      Serial (link serial): every reference documents the same command set and message format for the RS232 IN
+      port and for TCP 3002 ("Christie serial protocol over Ethernet"), so link serial sends the same messages;
+      8 data bits, no parity and 1 stop bit are assumed. After set_baud_rate over the serial port, change the
+      link's baud_rate to match. Baud rate BDR+PRTA 1 to 6 = 2400, 9600, 19200, 38400,
       57600, 115200, default 115200 ("on each port" on 4K40-RGB, Mirage SST and Boxer), set with service access.
       Flow control is Xon/Xoff in both directions (the projector sends 13h when its buffer fills and 11h when it
       can take more, and accepts up to 10 more bytes after 13h). Data bits, parity, stop bits and the connector
