@@ -189,6 +189,11 @@ pub struct TlsTarget {
     /// name the device, such as a device's self-signed one. The stream is
     /// still encrypted; the device is not authenticated.
     pub accept_invalid_certs: bool,
+    /// Plain text the device sends on connecting, before the handshake
+    /// starts (Samsung MDC's secured mode greets with `MDCSTART<<TLS>>`). It
+    /// is read and checked first; anything else fails the handshake with a
+    /// reason starting `tls:`. `None` starts the handshake at once.
+    pub preamble: Option<Vec<u8>>,
 }
 
 /// A serial port a module asks the session to open: RS-232, RS-422 or a USB

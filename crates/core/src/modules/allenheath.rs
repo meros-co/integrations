@@ -610,6 +610,7 @@ impl AllenHeath {
                     to: self.device,
                     server_name: self.device.ip().to_string(),
                     accept_invalid_certs: true,
+                    preamble: None,
                 },
             );
         } else {
@@ -1108,6 +1109,7 @@ mod tests {
                 to: "10.0.0.20:51327".parse().unwrap(),
                 server_name: "10.0.0.20".into(),
                 accept_invalid_certs: true,
+                preamble: None,
             },
         }));
         let mut cx = Cx::new(10);
