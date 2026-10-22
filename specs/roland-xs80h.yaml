@@ -1,6 +1,6 @@
 spec: 1
 id: roland-xs80h
-name: Roland XS-82H / XS-83H / XS-84H (LAN control)
+name: Roland XS-82H / XS-83H / XS-84H (LAN or RS-232C control)
 vendor: Roland
 category: router
 
@@ -14,8 +14,9 @@ source:
     url: https://static.roland.com/assets/media/zip/XS-82H_83H_84H_reference_v30_eng03_W.pdf
     note: >
       Manufacturer document (the PDF itself states "Version 3.15 and later").
-      Command overview, ";" CR terminator, RS-232C settings and LAN control
-      (TCP 8023) p.21; received commands p.22-23; sent commands (ACK, ERR,
+      RS-232C menu (BAUD RATE 9600 or 38400, 9600 by default; FUNCTION
+      RECEIVER by default) p.11; command overview, ";" CR terminator (no CR
+      needed on RS-232C), RS-232C settings and LAN control (TCP 8023) p.21; received commands p.22-23; sent commands (ACK, ERR,
       ITS, OTS, CTS, KLS, VER) p.24.
 
 transport:
@@ -34,9 +35,21 @@ transport:
   # status frame of ITS, OTS, CTS, KLS or VER.
   reply_match: '^[\x02\x11\x13]*(ACK;|ERR:[0-9]+;|ITS:|OTS:|CTS:|KLS:|VER:)'
   probe: "ACS;"
+  # The RS-232C connector takes the same commands (p.21): 9600 bps (the
+  # default, p.11) or 38400, no parity, 8 data bits, 1 stop bit, XON/XOFF
+  # flow control. "When using RS-232C, no CR is required" after the ";", so
+  # on the serial port each command is sent as it is.
+  serial:
+    baud_rate: { default: 9600, values: [9600, 38400] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
+    overrides: { framing: delimited }
 
 ports:
-  - { port: 8023, protocol: tcp, role: control }
+  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232C connector, D-sub 9-pin male: a crossover (null-modem) cable" }
 
 models:
   - id: xs-82h
@@ -564,8 +577,11 @@ quirks:
       PGM-PST (p.23). Resolution code 14 is not listed (p.22). PLS:1 does
       nothing when every KEY LOCK MODE is off (p.23). Status queries return
       the reply's comma list as one value; the parts are in state. Over
-      RS-232C the menu RS-232C FUNCTION must be RECEIVER; no setting is
-      documented for LAN control, and no password.
+      RS-232C (link serial) the menu RS-232C FUNCTION must be RECEIVER, its
+      default (p.11); set to an HDBaseT connector, the port passes commands
+      through and the unit is not under remote control. Commands go out on
+      RS-232C with no CR, which the manual says is not required there
+      (p.21). No setting is documented for LAN control, and no password.
 
   - models: [all]
     severity: info
