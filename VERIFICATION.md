@@ -1262,6 +1262,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what `Subnet.VDN<n> ?` answers for a named slot (name and serial separated by one space assumed) and an empty one (* assumed). ([specs/labgruppen-nlb60e.yaml:246](specs/labgruppen-nlb60e.yaml#L246))
 - [ ] Record an amplifier's `Status ?` answer for 2-, 4- and 8-channel models: three values, then nine per channel from A. ([specs/labgruppen-nlb60e.yaml:275](specs/labgruppen-nlb60e.yaml#L275))
 
+## lg-display — LG signage displays and commercial TVs
+
+- [ ] Confirm the display takes the protocol on TCP 9761 with no greeting or login, and answers as over RS-232C; no LG document read names the port. ([specs/lg-display.yaml:3247](specs/lg-display.yaml#L3247))
+- [ ] Confirm an acknowledgement ends with the literal `x` and nothing after it (no CR or LF), and that its Set ID echo is two hex digits (three above 255). ([specs/lg-display.yaml:99](specs/lg-display.yaml#L99))
+- [ ] Record what a display in standby answers to `ka 01 ff` in each PM mode (Network Ready, Screen Off Always), and whether `ka 01 01` turns it on over TCP and is acknowledged. ([specs/lg-display.yaml:3254](specs/lg-display.yaml#L3254))
+- [ ] Check whether lowercase hex (`kf 01 3c`), as LG's examples write it, and uppercase are both taken. ([specs/lg-display.yaml:103](specs/lg-display.yaml#L103))
+- [ ] Check the OSD lock polarity (`kl 00` locks in the webOS 6.0 and 3.2 guides, unlocks in the L19 guide). ([specs/lg-display.yaml:1243](specs/lg-display.yaml#L1243))
+- [ ] Check the tile mode byte order (columns then rows in the webOS guides, rows then columns in the SE3B manual). ([specs/lg-display.yaml:3290](specs/lg-display.yaml#L3290))
+- [ ] Confirm the color temperature data on webOS 3.2 and L19 displays (70-D2 for 3200-13000 K, as webOS 6.0, or 00-64 as older generations). ([specs/lg-display.yaml:351](specs/lg-display.yaml#L351))
+- [ ] Record whether `xb ff` answers the PC or the DTV code of a port in each input label setting. ([specs/lg-display.yaml:154](specs/lg-display.yaml#L154))
+- [ ] Record the `sv` replies (is there a space between the sub-code and the data?) and the bit order of the temperature sensor health (`sv 07`). ([specs/lg-display.yaml:1975](specs/lg-display.yaml#L1975))
+- [ ] Record the fan speed data of `sv 09` for one and for several fans. ([specs/lg-display.yaml:1980](specs/lg-display.yaml#L1980))
+- [ ] Record the `xc ff` reply and whether `xc` takes 00 for an unused window (PIP with two inputs). ([specs/lg-display.yaml:1761](specs/lg-display.yaml#L1761))
+- [ ] Record the `mj ff` reply and how many port codes each model expects. ([specs/lg-display.yaml:1845](specs/lg-display.yaml#L1845))
+- [ ] Record what a timer, holiday and brightness schedule entry read answers (whether the entry code is echoed before the data) and an empty entry. ([specs/lg-display.yaml:1618](specs/lg-display.yaml#L1618))
+- [ ] Confirm the units of `dn` (degrees Celsius assumed) and `dl` (hours assumed), and the 3-byte `dn` form of the SE3B. ([specs/lg-display.yaml:1935](specs/lg-display.yaml#L1935))
+- [ ] Record the format of the serial number (`fy`) and software version (`fz`) data: plain text, or ASCII in hex digits as `jx` answers. ([specs/lg-display.yaml:1950](specs/lg-display.yaml#L1950))
+- [ ] Confirm the IR codes LG prints only as icons: 7E, and the media keys B0, B1, BA, 8F, 8E, AA on signage. ([specs/lg-display.yaml:2010](specs/lg-display.yaml#L2010))
+- [ ] Confirm the daylight saving read `sd 01 01 ff ff ff ff` answers the start entry with its 01 echoed first. ([specs/lg-display.yaml:866](specs/lg-display.yaml#L866))
+- [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:804](specs/lg-display.yaml#L804))
+
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
 - [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
