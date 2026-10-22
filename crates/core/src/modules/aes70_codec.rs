@@ -550,6 +550,11 @@ pub(crate) struct Deframer {
 }
 
 impl Deframer {
+    /// Bytes held for a PDU not yet complete.
+    pub(crate) fn pending(&self) -> usize {
+        self.buf.len()
+    }
+
     /// Complete PDUs, and why any bytes were discarded. Bytes before a sync
     /// byte are dropped, and a header that cannot be one makes the deframer
     /// look for the next sync byte.
