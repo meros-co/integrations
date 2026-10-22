@@ -1272,19 +1272,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
-- [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
-- [ ] Record the error answers ("(ERR04)" and others) and whether a failed command is answered at all. ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
-- [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:678](specs/lightware-lw2.yaml#L678))
-- [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:722](specs/lightware-lw2.yaml#L722))
-- [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:678](specs/lightware-lw2.yaml#L678))
-- [ ] On an MX-CPU1 frame and an MX8x8, check which of edid_route, RS232BAUD, GETTIME/SETTIME and PS/(PSC) exist (documented for MX-CPU2 only), and on an MX-CPU2 frame whether HDMIIGET/HDMIOGET/HDMISET still work. ([specs/lightware-lw2.yaml:713](specs/lightware-lw2.yaml#L713))
-- [ ] Record the ISD and OSD digits for each board type on a live frame, and check the MX8x8's digits against its bit table. ([specs/lightware-lw2.yaml:706](specs/lightware-lw2.yaml#L706))
-- [ ] Check that polling {VC}, {VM}, {:ISD}, {:OSD}, {VEDID}, {IP_CONFIG=?} and {RS232BAUD=?} every 5 seconds does not slow an MX matrix, and that an MX8x8 or MX-CPU1 answers {RS232BAUD=?} with an error that changes nothing. ([specs/lightware-lw2.yaml:773](specs/lightware-lw2.yaml#L773))
-- [ ] Confirm set_ip_dhcp and reset_ip_config answer "(Changing IP configuration...)" before the connection drops. ([specs/lightware-lw2.yaml:664](specs/lightware-lw2.yaml#L664))
-- [ ] Confirm a switch to a locked output answers (1LO<out>) on the MX8x8 too. ([specs/lightware-lw2.yaml:674](specs/lightware-lw2.yaml#L674))
-- [ ] Check the UMX GPIO pin range (the manual prints 0 ...8 and pin 1 to 8; the hardware has 7) and the RS232_LOCAL_FORMAT reply. ([specs/lightware-lw2.yaml:643](specs/lightware-lw2.yaml#L643))
-- [ ] Confirm set_hdmi_output's answer is the output's STO line. ([specs/lightware-lw2.yaml:515](specs/lightware-lw2.yaml#L515))
-- [ ] Capture the {VM} answer on an MX matrix and confirm it lists one 1 or 0 per output in order after MUT, so the mutes poll keys them by position; and confirm {VC V} and {VC A} answer on the UMX as get_connection_layer's replies do. ([specs/lightware-lw2.yaml:815](specs/lightware-lw2.yaml#L815))
+- [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:696](specs/lightware-lw2.yaml#L696))
+- [ ] Record the error answers ("(ERR04)" and others) and whether a failed command is answered at all. ([specs/lightware-lw2.yaml:696](specs/lightware-lw2.yaml#L696))
+- [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:705](specs/lightware-lw2.yaml#L705))
+- [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:749](specs/lightware-lw2.yaml#L749))
+- [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:705](specs/lightware-lw2.yaml#L705))
+- [ ] On an MX-CPU1 frame and an MX8x8, check which of edid_route, RS232BAUD, GETTIME/SETTIME and PS/(PSC) exist (documented for MX-CPU2 only), and on an MX-CPU2 frame whether HDMIIGET/HDMIOGET/HDMISET still work. ([specs/lightware-lw2.yaml:740](specs/lightware-lw2.yaml#L740))
+- [ ] Record the ISD and OSD digits for each board type on a live frame, and check the MX8x8's digits against its bit table. ([specs/lightware-lw2.yaml:733](specs/lightware-lw2.yaml#L733))
+- [ ] Check that polling {VC}, {VM}, {:ISD}, {:OSD}, {VEDID}, {IP_CONFIG=?} and {RS232BAUD=?} every 5 seconds does not slow an MX matrix, and that an MX8x8 or MX-CPU1 answers {RS232BAUD=?} with an error that changes nothing. ([specs/lightware-lw2.yaml:800](specs/lightware-lw2.yaml#L800))
+- [ ] Confirm set_ip_dhcp and reset_ip_config answer "(Changing IP configuration...)" before the connection drops. ([specs/lightware-lw2.yaml:691](specs/lightware-lw2.yaml#L691))
+- [ ] Confirm a switch to a locked output answers (1LO<out>) on the MX8x8 too. ([specs/lightware-lw2.yaml:701](specs/lightware-lw2.yaml#L701))
+- [ ] Check the UMX GPIO pin range (the manual prints 0 ...8 and pin 1 to 8; the hardware has 7) and the RS232_LOCAL_FORMAT reply. ([specs/lightware-lw2.yaml:656](specs/lightware-lw2.yaml#L656))
+- [ ] Confirm set_hdmi_output's answer is the output's STO line. ([specs/lightware-lw2.yaml:528](specs/lightware-lw2.yaml#L528))
+- [ ] Capture the {VM} answer on an MX matrix and confirm it lists one 1 or 0 per output in order after MUT, so the mutes poll keys them by position; and confirm {VC V} and {VC A} answer on the UMX as get_connection_layer's replies do. ([specs/lightware-lw2.yaml:842](specs/lightware-lw2.yaml#L842))
+- [ ] Drive an MX8x8 Pro, an MX-CPU2 frame and a UMX-HDMI-140 on RS-232 (link serial) and confirm the same answers as over TCP 10001, and that no flow control is used. ([specs/lightware-lw2.yaml:81](specs/lightware-lw2.yaml#L81))
+- [ ] On a UMX-HDMI-140-Plus with the Cleartext login on, confirm LW2 on RS-232 is refused (no LW2 login command). ([specs/lightware-lw2.yaml:674](specs/lightware-lw2.yaml#L674))
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 
