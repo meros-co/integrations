@@ -249,15 +249,24 @@ fn log(services: &Services, message: String) {
 fn discovered(address: IpAddr, name: &Option<String>, family: Option<Family>) -> Event {
     let (models, family_evidence) = match family {
         Some(Family::Receiver) => (
-            vec!["em-300-500-g4", "em-300-500-g3"],
-            "receiver: it reports RF, RF1/RF2 or Bat telegrams. G3 and G4 cannot be told apart over MCP",
+            vec!["em-300-500-g4", "em-300-500-g3", "em-2000", "em-2050"],
+            "receiver: it reports RF, RF1/RF2 or Bat telegrams. G3, G4 and the 2000 series cannot be told apart over MCP",
         ),
         Some(Family::IemTransmitter) => (
-            vec!["sr-iem-g4"],
+            vec!["sr-iem-g4", "sr-300-iem-g3", "sr-2000-iem", "sr-2050-iem"],
             "IEM transmitter: it reports Af telegrams and no RF or battery",
         ),
         None => (
-            vec!["em-300-500-g4", "em-300-500-g3", "sr-iem-g4"],
+            vec![
+                "em-300-500-g4",
+                "em-300-500-g3",
+                "em-2000",
+                "em-2050",
+                "sr-iem-g4",
+                "sr-300-iem-g3",
+                "sr-2000-iem",
+                "sr-2050-iem",
+            ],
             "not yet known: no cycle telegram identifying a receiver or transmitter has arrived",
         ),
     };

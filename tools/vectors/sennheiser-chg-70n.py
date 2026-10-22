@@ -23,7 +23,8 @@ ERR = {"error": {"error": "device_error"}}
 t(C70, "identify_bay", {"bay": 1}, '{"bays":{"identify":[true,null]}}',
      device_reply='{"bays":{"identify":[true,false]}}', expect_result=OK)
 t(C70, "identify_bay", {"bay": 2, "enabled": False}, '{"bays":{"identify":[null,false]}}',
-     device_reply='{"osc":{"error":[{"bays":{"identify":[423]}}]}}', expect_result=ERR)
+     device_reply='{"osc":{"error":[{"bays":{"identify":[423]}}]}}', expect_result=ERR,
+     file="identify_bay-error")
 t(C70, "identify_device", {}, '{"device":{"identification":{"visual":true}}}',
      device_reply='{"device":{"identification":{"visual":true}}}', expect_result=OK)
 t(C70, "set_storage_mode", {"enabled": True}, '{"device":{"storage_mode":true}}',

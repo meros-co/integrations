@@ -135,7 +135,8 @@ models:
                toggle_repeat, read_repeat, set_position, set_position_text, go_to_marker,
                go_to_region, go_to_timeline_marker, go_to_timeline_region, read_transport,
                read_tracks, read_markers, read_regions, set_track_volume, set_track_pan,
-               set_track_width, set_track_mute, toggle_track_mute, set_track_solo,
+               set_track_width, adjust_track_volume, adjust_track_pan, adjust_track_width,
+               set_track_mute, toggle_track_mute, set_track_solo,
                toggle_track_solo, set_track_fx_enabled, toggle_track_fx_enabled, set_track_arm,
                toggle_track_arm, set_track_monitor, cycle_track_monitor, set_track_selected,
                toggle_track_selected, get_track_info, set_track_info, set_track_name,
@@ -350,6 +351,39 @@ commands:
       touch: { type: enum, values: [release, hold], default: release, label: Touch, description: "release ends the touch state with this value (for a single change); hold keeps touching until a release or 8 seconds pass." }
       ignore_gang: { type: bool, default: false, label: Ignore grouping, description: "On changes only this track, ignoring its grouping." }
     send: { method: GET, path: "/_/SET/TRACK/{track}/WIDTH/{width:.6f}{touch:map.volume_touch}{ignore_gang:map.ignore_gang};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  adjust_track_volume:
+    summary: "Raise or lower a track's volume by a number of dB through the control surface API (SET/TRACK/n/VOL/+x or -x), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      change_db: { type: float, required: true, label: Change, description: "Change in dB from the current volume, positive to raise it and negative to lower it." }
+      touch: { type: enum, values: [release, hold], default: release, label: Touch, description: "release ends the touch state after this change; hold keeps touching, as while a fader is dragged, until a release or 8 seconds pass." }
+      ignore_gang: { type: bool, default: false, label: Ignore grouping, description: "On changes only this track, ignoring its grouping." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/VOL/{change_db:signed:.6f}{touch:map.volume_touch}{ignore_gang:map.ignore_gang};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  adjust_track_pan:
+    summary: "Move a track's pan by an amount through the control surface API (SET/TRACK/n/PAN/+x or -x), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      change: { type: float, min: -2.0, max: 2.0, required: true, label: Change, description: "Change on the pan's -1 (full left) to 1 (full right) scale, positive toward the right." }
+      touch: { type: enum, values: [release, hold], default: release, label: Touch, description: "release ends the touch state after this change; hold keeps touching, as while a knob is turned, until a release or 8 seconds pass." }
+      ignore_gang: { type: bool, default: false, label: Ignore grouping, description: "On changes only this track, ignoring its grouping." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/PAN/{change:signed:.6f}{touch:map.volume_touch}{ignore_gang:map.ignore_gang};TRACK" }
+    expect: { status: 200 }
+    returns: ack
+
+  adjust_track_width:
+    summary: "Change a track's width (or second pan, by pan mode) by an amount through the control surface API (SET/TRACK/n/WIDTH/+x or -x), then read the tracks back"
+    params:
+      track: { type: int, min: 0, required: true, label: Track, description: "Track number, 0 for the master and 1 for the first track." }
+      change: { type: float, min: -2.0, max: 2.0, required: true, label: Change, description: "Change on the width's -1 (reversed) to 1 (full) scale, or the second pan's in dual-pan mode, positive to widen or move right." }
+      touch: { type: enum, values: [release, hold], default: release, label: Touch, description: "release ends the touch state after this change; hold keeps touching until a release or 8 seconds pass." }
+      ignore_gang: { type: bool, default: false, label: Ignore grouping, description: "On changes only this track, ignoring its grouping." }
+    send: { method: GET, path: "/_/SET/TRACK/{track}/WIDTH/{change:signed:.6f}{touch:map.volume_touch}{ignore_gang:map.ignore_gang};TRACK" }
     expect: { status: 200 }
     returns: ack
 
@@ -694,6 +728,15 @@ state:
   track_count: { type: int, description: "Number of tracks, not counting the master" }
   tracks.*.name: { type: string, description: "Track name, MASTER for track 0" }
   tracks.*.flags: { type: int, description: "Track flags as REAPER sends them, a sum of 1 folder, 2 selected, 4 has FX, 8 muted, 16 soloed, 32 solo in place, 64 record armed, 128 record monitoring on, 256 record monitoring auto" }
+  tracks.*.folder: { type: bool, description: "The track is a folder (flags bit 1)" }
+  tracks.*.selected: { type: bool, description: "The track is selected (flags bit 2)" }
+  tracks.*.has_fx: { type: bool, description: "The track has FX (flags bit 4)" }
+  tracks.*.muted: { type: bool, description: "The track is muted (flags bit 8)" }
+  tracks.*.soloed: { type: bool, description: "The track is soloed (flags bit 16)" }
+  tracks.*.solo_in_place: { type: bool, description: "The track is soloed in place (flags bit 32)" }
+  tracks.*.record_armed: { type: bool, description: "The track is armed for recording (flags bit 64)" }
+  tracks.*.record_monitoring_on: { type: bool, description: "Record monitoring is on (flags bit 128)" }
+  tracks.*.record_monitoring_auto: { type: bool, description: "Record monitoring is auto, on while recording or armed and stopped (flags bit 256)" }
   tracks.*.volume: { type: float, description: "Track volume as linear gain, 0 for -inf and 1 for +0 dB" }
   tracks.*.pan: { type: float, description: "Pan, -1 (full left) to 1 (full right)" }
   tracks.*.peak_db10: { type: int, description: "Last meter peak in tenths of a dB (-100 is -10 dB)" }
@@ -770,6 +813,15 @@ telemetry:
       state:
         "tracks.{2}.name": "{3}"
         "tracks.{2}.flags": "{4}"
+        "tracks.{2}.folder": "{4:bit.0}"
+        "tracks.{2}.selected": "{4:bit.1}"
+        "tracks.{2}.has_fx": "{4:bit.2}"
+        "tracks.{2}.muted": "{4:bit.3}"
+        "tracks.{2}.soloed": "{4:bit.4}"
+        "tracks.{2}.solo_in_place": "{4:bit.5}"
+        "tracks.{2}.record_armed": "{4:bit.6}"
+        "tracks.{2}.record_monitoring_on": "{4:bit.7}"
+        "tracks.{2}.record_monitoring_auto": "{4:bit.8}"
         "tracks.{2}.volume": "{5}"
         "tracks.{2}.pan": "{6}"
         "tracks.{2}.peak_db10": "{7}"
@@ -860,13 +912,13 @@ quirks:
       them, since what to read (which send, key or action) is the caller's choice.
 
   - models: [all]
-    severity: warning
+    severity: info
     text: >
-      A track's mute, solo, record-arm, record monitoring, selection, folder and has-FX states
-      arrive only as the bits of tracks.*.flags, which the spec format cannot split into separate
-      values; read the bit (8 muted, 16 soloed, 32 solo in place, 64 armed, 128 monitoring on, 256
-      monitoring auto, 2 selected, 1 folder, 4 has FX), or read B_MUTE, I_SOLO, I_RECARM, I_RECMON
-      or I_SELECTED with get_track_info.
+      A track's folder, selected, has-FX, mute, solo, solo-in-place, record-arm and record
+      monitoring states arrive as the bits of one flags field, kept whole in tracks.*.flags and
+      split into one boolean each (muted, soloed, record_armed, ...). Record monitoring off is both
+      record_monitoring_on and record_monitoring_auto false. Whether the FX chain is bypassed is not
+      among the flags: read I_FXEN with get_track_info.
 
   - models: [all]
     severity: info
@@ -884,7 +936,7 @@ quirks:
       Track volume, pan and width go through REAPER's control surface API and so respect
       automation modes and grouping: touch release (the default) ends the touch state at once,
       hold keeps it, as a dragged fader does, until a release or 8 seconds; ignore_gang changes
-      only the track named. Relative changes (a value starting with + or -, in dB for volume) are
-      not offered: the spec format renders no sign before a positive decimal, and whether REAPER
-      decodes a percent-encoded + there is undocumented; each command reads the value back, so an
-      absolute value reaches the same result.
+      only the track named. The adjust_track_* commands send main.js's relative form, a value
+      starting with + or - (in dB for volume, on the -1 to 1 scale for pan and width), with the +
+      unencoded as REAPER's own pages send it; main.js gives pan and width a range of -1 to 1
+      whatever the change.

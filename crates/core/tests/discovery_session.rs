@@ -60,7 +60,10 @@ async fn a_g3_g4_is_discovered_and_identified_as_a_receiver() {
     .expect("discovered within 10 s");
     assert_eq!(found.0, "127.0.0.2");
     assert_eq!(found.3, "sennheiser-ew-g3-g4");
-    assert_eq!(found.1, ["em-300-500-g4", "em-300-500-g3"]);
+    assert_eq!(
+        found.1,
+        ["em-300-500-g4", "em-300-500-g3", "em-2000", "em-2050"]
+    );
     assert_eq!(found.2.as_deref(), Some("Vocal 1"));
 
     // Unknown protocols are refused rather than ignored.
