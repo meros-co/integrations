@@ -63,7 +63,8 @@ text(L2, "set_autoselect_priority", {"layer": "A", "priorities": "1;0;2;3;4;5"},
 # Presets and names (MX 7.3.9-7.3.20)
 text(L2, "save_preset", {"preset": 1}, "{$1}\r\n", device_reply="(SPR01)\r\n", expect_result=OK2, **MXP)
 text(L2, "load_preset", {"preset": 1}, "{%1}\r\n", device_reply="(LPR01)\r\n", expect_result=OK2, **MXP)
-text(L2, "load_preset", {"preset": 9}, "{%9}\r\n", device_reply="(ERR04)\r\n", expect_result=ER2, **MXP)
+text(L2, "load_preset", {"preset": 9}, "{%9}\r\n", device_reply="(ERR04)\r\n", expect_result=ER2, **MXP,
+     file="load_preset-error")
 text(L2, "view_preset", {"preset": 1}, "{VP#1=?}\r\n", device_reply="(VP#1= M01 02 M03 04 05 06 07 08)\r\n",
      expect_result=v2("M01 02 M03 04 05 06 07 08"), **MXP)
 text(L2, "set_preset_name", {"preset": 1, "name": "first preset"}, "{PNAME#1=first preset}\r\n",
