@@ -253,7 +253,16 @@ fn render_unescaped(
         let name = caps.get(1).unwrap().as_str();
         let directives: Vec<&str> = caps[2].split(':').filter(|d| !d.is_empty()).collect();
         let text = render_one(name, &directives, values)?;
-        out.push_str(&escape(&text));
+        // A signed number's `+` is part of the number: an HTTP path takes
+        // it as it is (RFC 3986 allows it in a segment), as REAPER's own
+        // pages send `VOL/+1.5`. Only the digits go through the escaping.
+        match text.strip_prefix('+') {
+            Some(digits) if directives.contains(&"signed") => {
+                out.push('+');
+                out.push_str(&escape(digits));
+            }
+            _ => out.push_str(&escape(&text)),
+        }
         last = whole.end();
     }
     out.push_str(&template[last..]);
@@ -343,15 +352,17 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
         for d in &directives[..converted] {
             x = apply_conversion(x, d, values)?;
         }
-        let places = match &directives[converted..] {
-            [d] => d.strip_prefix('.').and_then(|r| r.strip_suffix('f')),
+        let rest = &directives[converted..];
+        let signed = rest.contains(&"signed");
+        let places = match rest.iter().filter(|d| **d != "signed").collect::<Vec<_>>()[..] {
+            [d] if rest.len() <= 2 => d.strip_prefix('.').and_then(|r| r.strip_suffix('f')),
             _ => None,
         }
         .ok_or_else(|| format!("converted '{name}' rendered as text needs one ':.Nf'"))?;
         let places: u32 = places
             .parse()
             .map_err(|_| format!("bad directive on '{name}'"))?;
-        return Ok(fixed(x, places));
+        return Ok(with_sign(fixed(x, places), signed));
     }
 
     match kind {
@@ -368,6 +379,15 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                     width = Some(w.parse().map_err(|_| format!("bad directive ':{d}'"))?);
                 } else if *d == "signed" {
                     signed = true;
+                } else if let Some(bit) = d.strip_prefix("bit.") {
+                    // One bit of a flags word, numbered from 0 for the
+                    // value 1: `true` while it is set.
+                    let bit: u32 = bit
+                        .parse()
+                        .ok()
+                        .filter(|b| *b < 64)
+                        .ok_or_else(|| format!("bad directive ':{d}'"))?;
+                    return Ok(((n >> bit) & 1 == 1).to_string());
                 } else if *d == "url_decode" {
                     // A name that is all digits arrives as a number: there
                     // is nothing to decode.
@@ -400,14 +420,23 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
             let x = value
                 .as_f64()
                 .ok_or_else(|| format!("'{name}' is not a number"))?;
-            let places = directives
-                .iter()
-                .find_map(|d| d.strip_prefix('.').and_then(|r| r.strip_suffix('f')))
-                .ok_or_else(|| format!("float '{name}' rendered as text needs ':.Nf'"))?;
-            let places: u32 = places
-                .parse()
-                .map_err(|_| format!("bad directive on '{name}'"))?;
-            Ok(fixed(x, places))
+            let mut places = None;
+            let mut signed = false;
+            for d in directives {
+                if *d == "signed" {
+                    signed = true;
+                } else if let Some(p) = d.strip_prefix('.').and_then(|r| r.strip_suffix('f')) {
+                    places = Some(
+                        p.parse::<u32>()
+                            .map_err(|_| format!("bad directive ':{d}'"))?,
+                    );
+                } else {
+                    return Err(format!("directive ':{d}' does not apply to a float"));
+                }
+            }
+            let places =
+                places.ok_or_else(|| format!("float '{name}' rendered as text needs ':.Nf'"))?;
+            Ok(with_sign(fixed(x, places), signed))
         }
         ParamType::Bool => {
             let b = value
@@ -485,6 +514,16 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
             }
             Ok(s)
         }
+    }
+}
+
+/// A fixed-decimal text with an explicit `+` before a value that is not
+/// negative, when `signed` asks for it.
+fn with_sign(text: String, signed: bool) -> String {
+    if signed && !text.starts_with('-') {
+        format!("+{text}")
+    } else {
+        text
     }
 }
 
@@ -694,6 +733,74 @@ mod tests {
         assert_eq!(go("{n:signed}", json!({"n": -7}), s).unwrap(), "-7");
         assert_eq!(go("{n:03d}", json!({"n": -7}), s).unwrap(), "-007");
         assert_eq!(go("#R{n:-1:02d}", json!({"n": 100}), s).unwrap(), "#R99");
+    }
+
+    #[test]
+    fn bits_of_an_integer() {
+        let s = "n: { type: int }";
+        // 8 + 64 + 256: bits 3, 6 and 8.
+        assert_eq!(go("{n:bit.3}", json!({"n": 328}), s).unwrap(), "true");
+        assert_eq!(go("{n:bit.4}", json!({"n": 328}), s).unwrap(), "false");
+        assert_eq!(go("{n:bit.0}", json!({"n": 1}), s).unwrap(), "true");
+        assert_eq!(go("{n:bit.8}", json!({"n": 328}), s).unwrap(), "true");
+        // Two's complement for a negative value; offsets apply first.
+        assert_eq!(go("{n:bit.63}", json!({"n": -1}), s).unwrap(), "true");
+        assert_eq!(go("{n:+1:bit.0}", json!({"n": 1}), s).unwrap(), "false");
+        assert!(go("{n:bit.64}", json!({"n": 1}), s).is_err());
+        assert!(go("{n:bit.x}", json!({"n": 1}), s).is_err());
+        assert!(go("{b:bit.0}", json!({"b": "1x"}), "b: { type: string }").is_err());
+    }
+
+    #[test]
+    fn a_signed_numbers_plus_is_not_escaped() {
+        let (p, s) = values(
+            json!({"x": 1.5, "n": 2}),
+            "x: { type: float }
+n: { type: int }",
+        );
+        let empty = Params::new();
+        let empty_specs = BTreeMap::new();
+        let conversions = Conversions::new();
+        let maps = Maps::new();
+        let v = Values {
+            params: &p,
+            param_specs: &s,
+            settings: &empty,
+            setting_specs: &empty_specs,
+            conversions: &conversions,
+            maps: &maps,
+        };
+        assert_eq!(
+            render("/VOL/{x:signed:.2f}/{n:signed}", &v, percent_encode).unwrap(),
+            "/VOL/+1.50/+2"
+        );
+    }
+
+    #[test]
+    fn signed_floats() {
+        let s = "x: { type: float }";
+        assert_eq!(go("{x:signed:.2f}", json!({"x": 1.5}), s).unwrap(), "+1.50");
+        assert_eq!(
+            go("{x:.2f:signed}", json!({"x": -1.5}), s).unwrap(),
+            "-1.50"
+        );
+        assert_eq!(go("{x:signed:.1f}", json!({"x": 0.0}), s).unwrap(), "+0.0");
+        // A value rounding to zero from below has no minus sign to keep.
+        assert_eq!(
+            go("{x:signed:.1f}", json!({"x": -0.01}), s).unwrap(),
+            "+0.0"
+        );
+        assert!(go("{x:signed}", json!({"x": 1.0}), s).is_err());
+        assert!(go("{x:upper:.1f}", json!({"x": 1.0}), s).is_err());
+        assert_eq!(
+            go(
+                "{db:to.fader:signed:.4f}",
+                json!({"db": -20.0}),
+                "db: { type: float }"
+            )
+            .unwrap(),
+            "+0.3750"
+        );
     }
 
     #[test]

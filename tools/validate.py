@@ -32,7 +32,8 @@ PLACEHOLDER = re.compile(r"""(?<!\\)\{(\^*[A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"
 DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
     (re.compile(r"^0\d+d$"), {"int"}),                  # zero-padded integer
     (re.compile(r"^[+-]\d+$"), {"int"}),                # integer offset
-    (re.compile(r"^signed$"), {"int"}),                 # explicit sign
+    (re.compile(r"^signed$"), {"int", "float"}),        # explicit sign
+    (re.compile(r"^bit\.([0-9]|[1-5][0-9]|6[0-3])$"), {"int"}),  # one bit, true or false
     (re.compile(r"^\.\d+f$"), {"float"}),               # fixed decimals
     (re.compile(r"^(on_off|bool01|bool10)$"), {"bool"}),
     (re.compile(r"^(upper|lower|json|url)$"), {"string", "enum"}),
@@ -923,6 +924,8 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                         errors.append(f"{where}: ':{d}' names undeclared conversion '{c.group(2)}'")
                     if d == "key":
                         errors.append(f"{where}: ':key' marks a state path segment, not a value")
+                    elif not any(pat.match(d) for pat, _ in DIRECTIVES):
+                        errors.append(f"{where}: unknown directive ':{d}' in '{m.group(0)}'")
         # `:key` keeps a path segment whole, dots included (SPEC.md §8, Keys
         # holding dots): only in a state or replace path, and last.
         replace_ = rule.get("replace") or []

@@ -1754,6 +1754,35 @@ mod tests {
     }
 
     #[test]
+    fn bits_of_a_flags_word_become_booleans() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [{
+                "match": r"^TRACK (\d+) (-?\w*)$",
+                "state": {
+                    "tracks.{1}.flags": "{2}",
+                    "tracks.{1}.muted": "{2:bit.3}",
+                    "tracks.{1}.soloed": "{2:bit.4}",
+                    "tracks.{1}.armed": {"value": "{2:bit.6}", "map": {"true": "armed", "false": "safe"}},
+                },
+            }]})),
+            &state(json!({
+                "tracks.*.flags": {"type": "int", "description": "x"},
+                "tracks.*.muted": {"type": "bool", "description": "x"},
+                "tracks.*.soloed": {"type": "bool", "description": "x"},
+                "tracks.*.armed": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            t.apply(&Inbound::Text("TRACK 2 72")).unwrap(),
+            json!({"tracks": {"2": {"flags": 72, "muted": true, "soloed": false, "armed": "armed"}}})
+        );
+        // A word that is not a decimal integer assigns no bit.
+        assert_eq!(t.apply(&Inbound::Text("TRACK 2 x8")), None);
+    }
+
+    #[test]
     fn a_quiet_rule_stands_alone_and_matches_no_message() {
         let declared = || state(json!({"complete": {"type": "bool", "description": "x"}}));
         for (rule, ok) in [
