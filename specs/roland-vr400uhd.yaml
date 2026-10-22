@@ -1,6 +1,6 @@
 spec: 1
 id: roland-vr400uhd
-name: Roland VR-400UHD (LAN control)
+name: Roland VR-400UHD (LAN or RS-232 control)
 vendor: Roland
 category: switcher
 
@@ -42,6 +42,16 @@ transport:
   # "set,..." line carrying a value is not the reply.
   reply_match: "^(ack|err),"
   probe: "ver"
+  # The same commands on the RS-232 connector ("Commands are common to the
+  # LAN and the RS-232 interface", guide p.2): 9600 or 38400 bps, no parity,
+  # 8 data bits, 1 stop bit; RS-232 Baudrate 9600 by default on the Setup
+  # screen (Reference p.34). Flow control is not documented.
+  serial:
+    baud_rate: { default: 9600, values: [9600, 38400] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
 
 settings:
   password:
@@ -53,13 +63,17 @@ settings:
     label: Password
     description: The eight-character password set on the mixer under Setup, System, Password; empty sends none.
 
+# The password is asked for over the network only (guide p.3, Reference
+# p.29 and p.38).
 on_connect:
   - when_set: password
+    link: tcp
     after_prompt: "Enter"
     send: "{settings.password}"
 
 ports:
-  - { port: 8023, protocol: tcp, role: control }
+  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 connector, DB-9 male" }
 
 models:
   - id: vr-400uhd
@@ -550,6 +564,13 @@ state:
   device.version:           { type: string, description: "Version from ver" }
 
 quirks:
+  - models: [all]
+    severity: info
+    text: >
+      With link serial the mixer is driven on its RS-232 connector with the same commands and replies as
+      over LAN (guide p.2). The link's baud rate must match RS-232 Baudrate on the Setup screen (9600 by
+      default, Reference p.34). The password is asked for over the network only, so it is sent over TCP
+      only. Flow control is not documented; none is used.
   - models: [all]
     severity: critical
     text: >
