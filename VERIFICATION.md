@@ -954,6 +954,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm StreamCollection and StreamEntry tags and the templateReference tag match the provider. ([specs/emberplus.yaml:224](specs/emberplus.yaml#L224))
 - [ ] Opened for commands only, check that an Unsubscribe on a looked-up node (or as a bare command at the root) ends the value subscription its GetDirectory created. ([crates/core/src/modules/emberplus.rs:35](crates/core/src/modules/emberplus.rs#L35))
 
+## epson-projector — Epson projectors (ESC/VP21)
+
+- [ ] Confirm the projector's answer to the ESC/VP.net connect header (its first ten bytes "ESC/VP.net" are all the module checks), and how a projector set to Protected or with a Monitor Password answers it. ([specs/epson-projector.yaml:4075](specs/epson-projector.yaml#L4075))
+- [ ] Check whether TCP 3629 keeps an idle connection open, and how the projector answers a second connection. ([specs/epson-projector.yaml:4075](specs/epson-projector.yaml#L4075))
+- [ ] Confirm the reply's colon comes at the start of a line, after CR, for every query, including QC? (four lines) and SOURCELIST?. ([specs/epson-projector.yaml:2554](specs/epson-projector.yaml#L2554))
+- [ ] Find which serial speeds each model offers (SPEED lists 9600-57600 on the models that have it). ([specs/epson-projector.yaml:56](specs/epson-projector.yaml#L56))
+- [ ] Measure power on and power off answer times on laser models (110 s is allowed). ([specs/epson-projector.yaml:2490](specs/epson-projector.yaml#L2490))
+- [ ] Check how LAMP? answers on two-lamp models (one number per lamp is assumed). ([specs/epson-projector.yaml:3835](specs/epson-projector.yaml#L3835))
+- [ ] Check whether the sheets spelling PLUG-IN take PLUGIN, and that TRACKING and GAING are the keywords the workbook prints as TRACKIOK and GAIOK. ([specs/epson-projector.yaml:3162](specs/epson-projector.yaml#L3162))
+- [ ] Confirm each family's SOURCE codes against its sheet, and which commands answer ERR in standby with the network on. ([specs/epson-projector.yaml:2726](specs/epson-projector.yaml#L2726))
+
 ## etc-echo — ETC Echo
 
 - [ ] Check whether set commands (pst act, off, seq act, zone int, chan int, ras, low, lok, ulok) get any reply over UDP (they report unverified here). ([spec](specs/etc-echo.yaml#L380))
@@ -1498,6 +1509,30 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether a display answers messages addressed to ALL or a group, and whether more than one TCP connection is taken at once. ([specs/nec-display.yaml:849](specs/nec-display.yaml#L849))
 - [ ] Confirm out-of-range sets are ignored with result 00 (PN-ME §8.2) on the other series too. ([specs/nec-display.yaml:831](specs/nec-display.yaml#L831))
 
+## nec-projector — NEC and Sharp NEC projectors
+
+- [ ] Find the serial speed a projector ships with: the manual lists the speeds each model offers but no default, and 38400 bit/s is assumed. ([specs/nec-projector.yaml:59](specs/nec-projector.yaml#L59))
+- [ ] Check whether any model needs RTS/CTS flow control on its PC CONTROL port, which the pinout wires but the communication conditions do not mention. ([specs/nec-projector.yaml:64](specs/nec-projector.yaml#L64))
+- [ ] Confirm commands sent with ID1 and ID2 as 00h are answered when a control ID is set on the projector, and whether TCP 7142 keeps an idle connection open or closes it. ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
+- [ ] Measure how long POWER ON and POWER OFF take to answer (15 s is allowed). ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
+- [ ] Confirm each model's input terminal codes, which differ by family (HDMI is 1Ah on the older models and A1h on the newer). ([specs/nec-projector.yaml:845](specs/nec-projector.yaml#L845))
+- [ ] Find what the two names the aspect table gives one code mean (02h WIDE SCREEN and 16:9, CINEMA and 16:9; 06h ZOOM and FULL), and which of 06h and 0Ch, 05h and 0Fh an NP-PX651X takes for 16:10 and AUTO. ([specs/nec-projector.yaml:1197](specs/nec-projector.yaml#L1197))
+- [ ] Check that 037-6 sends kilograms little-endian: the manual's example for 2460.06375 kg prints 9Ch 90h where 2460 is 9Ch 09h. ([specs/nec-projector.yaml:919](specs/nec-projector.yaml#L919))
+- [ ] Check that 053-1 and 060-1 values are signed 16-bit (negative lens shift positions, picture minimums). ([specs/nec-projector.yaml:948](specs/nec-projector.yaml#L948))
+- [ ] Check how a one-lamp or laser model answers 037-4 for lamp 2 and for the remaining life on 2024 models. ([specs/nec-projector.yaml:913](specs/nec-projector.yaml#L913))
+- [ ] Confirm the 098-198 reply for sub inputs 2 and 3 names them 03h and 04h, as the manual prints, or 09h and 0Ah as in the request. ([specs/nec-projector.yaml:1067](specs/nec-projector.yaml#L1067))
+- [ ] Confirm the NP-U321H's eco modes (OFF 00h, ECO 01h; the appendix's cells are shared with the next columns). ([specs/nec-projector.yaml:571](specs/nec-projector.yaml#L571))
+- [ ] Check the 2024 keys on 2020 models and the 2020 keys (AUTO, PICTURE, COMPUTER1-2, VIDEO1, S-VIDEO1, FREEZE, ASPECT, SOURCE) on 2024 models. ([specs/nec-projector.yaml:924](specs/nec-projector.yaml#L924))
+- [ ] Check which characters 098-45 accepts in a projector name beyond letters and digits. ([specs/nec-projector.yaml:1044](specs/nec-projector.yaml#L1044))
+## nec-projector-ascii — Sharp NEC projectors and monitors (Common ASCII Control Command)
+
+- [ ] Confirm current-value responses repeat the command's words before the value (">volume 5", ">lens zoom 1000", ">usage light hours 120", ">avmute video on", ">tilematrix position 2"); the manual shows only the power, volume, input and status forms. ([specs/nec-projector-ascii.yaml:421](specs/nec-projector-ascii.yaml#L421))
+- [ ] Confirm TCP 7142 takes ASCII and binary commands on the same connection, and whether the projector keeps an idle connection open. ([specs/nec-projector-ascii.yaml:52](specs/nec-projector-ascii.yaml#L52))
+- [ ] Find the serial defaults of models other than the NP-P627UL family (38400 bit/s, 8N1, no flow control there), and of monitors. ([specs/nec-projector-ascii.yaml:47](specs/nec-projector-ascii.yaml#L47))
+- [ ] Confirm a display without a polled function answers error:command-try'help' or error:parameter promptly, so the poll is not held up. ([specs/nec-projector-ascii.yaml:427](specs/nec-projector-ascii.yaml#L427))
+- [ ] Check how negative lens travel times and half-second values are written ("lens focus time -1.5"). ([specs/nec-projector-ascii.yaml:246](specs/nec-projector-ascii.yaml#L246))
+- [ ] Confirm the NORMAL standby mode refuses ASCII commands on the network on other models. ([specs/nec-projector-ascii.yaml:435](specs/nec-projector-ascii.yaml#L435))
+
 ## newtek-tricaster — NewTek TriCaster
 
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:572](specs/newtek-tricaster.yaml#L572))
@@ -1666,6 +1701,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8765](specs/panasonic-ptz.yaml#L8765))
 - [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:124](specs/panasonic-ptz.yaml#L124))
 
+## panasonic-projector — Panasonic projectors
+
+- [ ] Confirm the NTCONTROL hash against a projector in protect mode: MD5 of "user:password:random" as 32 lowercase hex digits (the manual's example gives no random number to check against). ([specs/panasonic-projector.yaml:54](specs/panasonic-projector.yaml#L54))
+- [ ] Confirm the projector closes the connection after every answer on all series, and how quickly it accepts the next connection. ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
+- [ ] Confirm a set command's network reply echoes the command after "00" (as "00PON"), and the serial reply is the bare data without "00". ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
+- [ ] Check which serial speeds the older series offer (the PT-RZ120's menu gives 9600, 19200 and 38400). ([specs/panasonic-projector.yaml:57](specs/panasonic-projector.yaml#L57))
+- [ ] Check that commands addressed to ZZ are answered with RESPONSE (ID ALL) off on a single projector. ([specs/panasonic-projector.yaml:16368](specs/panasonic-projector.yaml#L16368))
+- [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
+- [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 ## philips-sicp — Philips professional displays (SICP)
 
 - [ ] Confirm the command set of current models (Q, D, C, E and T Line, 55BDL4107X video walls) against SICP V2.03, the newest public version; record get_platform and get_sicp_version on each. ([specs/philips-sicp.yaml:947](specs/philips-sicp.yaml#L947))

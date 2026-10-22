@@ -1,0 +1,442 @@
+spec: 1
+id: nec-projector-ascii
+name: Sharp NEC projectors and monitors (Common ASCII Control Command)
+vendor: Sharp NEC Display Solutions (NEC Display Solutions)
+category: display
+source:
+  - title: "Projector/Monitor Common ASCII Control Command Reference Manual, VDT24007 Revision 1.0 (2024-09-05)"
+    author: "Sharp NEC Display Solutions, Ltd."
+    url: "https://sharp-displays.jp.sharp/support/webdl/dl_service/data/projector/manual/common_ascii/common_ascii_e.pdf"
+    note: >
+      Manufacturer document (also at
+      https://www.sharp-nec-displays.com/support/webdl/dl_service/data/projector/manual/common_ascii/common_ascii_e.pdf;
+      the 2016 edition is BDT160006). Command list (§1); a command is the command name, a space, parameters
+      and a line end (CR, LF or CRLF), characters A-Z, a-z, 0-9, "_", "." and space, not case-sensitive, at
+      most 5 s between characters, the answer within 2 s (§1.1); setting, current value, information ("?")
+      and help forms; a response starts with ">" and ends with the line end the command used; ">ok" for a
+      setting; "cur=,def=,min=,max=,step=,sel=" for information, step=na when the step varies; ++ and -- to
+      step; errors error:command-try'help', error:parameter, error:busy, error:unavailable (§1.2); the
+      commands power, input, avmute (video, audio), product (serial, model, firmware1), usage (lighthours,
+      lightremains, filterhours), status (power, error and warning lists), volume, brightness, contrast,
+      color, hue, sharpness, backlight, light adjust, tilematrix (h_monitor, v_monitor, position, tilecomp),
+      lens (zoom, focus, pfocus, h_shift, v_shift by position, time in 0.5 s steps, start + or -, stop, and
+      home), shutter, autoadj, freeze and help (§2); an execution example (§3).
+  - title: "NP-P627UL / NP-P547UL User's Manual, 9-7 About the ASCII Control Command"
+    author: "Sharp NEC Display Solutions, Ltd."
+    url: "https://sharp-displays.jp.sharp/support/webdl/dl_service/data/projector/manual/P627UL_manual_EN.pdf"
+    note: >
+      Manufacturer document (pages 137-140, 64): TCP port 7142 for commands; the serial port at 38400, 19200,
+      9600 or 4800 bit/s (38400 by default, set in the menu), 8 data bits, no parity, 1 stop bit, no flow
+      control, full duplex; the model's input parameters (hdmi1, hdmi2, computer, hdbaset, usb-a, lan and their
+      aliases) and status errors; ASCII commands not accepted in the NORMAL standby mode (use NETWORK STANDBY
+      or SLEEP).
+
+transport:
+  type: line-tcp
+  port: 7142
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  # §1.1: the answer comes within 2 s.
+  timeout_ms: 3000
+  reply: expected
+  # Every response starts with ">" (§1.2).
+  reply_match: "^>"
+  # The same commands on the PC CONTROL port (NP-P627UL manual p.139).
+  serial:
+    baud_rate: { default: 38400, values: [4800, 9600, 19200, 38400] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+  probe: "power"
+
+ports:
+  - { port: 7142, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "PC CONTROL, D-Sub 9-pin, cross cable" }
+
+models:
+  - id: ascii
+    name: "Sharp NEC projector or monitor with the Common ASCII Control Command"
+    supports:
+      [set_power, get_power, get_power_info, set_input, get_input, get_input_info, set_av_mute, get_av_mute,
+      get_av_mute_info, get_serial_number, get_model_name, get_firmware_version, get_product, get_light_hours,
+      get_light_remaining, get_filter_hours, get_status, get_status_info, set_adjustment, step_adjustment,
+      get_adjustment, get_adjustment_info, set_tile_matrix, set_tile_matrix_value, get_tile_matrix,
+      get_tile_matrix_info, set_lens_position, move_lens_for, start_lens, stop_lens, lens_home,
+      get_lens_position, get_lens_info, set_shutter, get_shutter, get_shutter_info, auto_adjust, set_freeze,
+      get_freeze, get_freeze_info, help, get_command_help]
+    verification: none
+    notes: >
+      Which commands and parameters a display takes depends on the model: help lists them, and a command the
+      display lacks is answered error:command-try'help'.
+
+commands:
+  set_power:
+    summary: "Power on or off (power on / power off)"
+    params:
+      "on": { type: bool, required: true, label: Power, description: "On powers the display on; off puts it in standby." }
+    send: "power {on:map.onoff}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_power:
+    summary: "Read the power status (power): off, warming, on or cooling"
+    send: "power"
+    expect: { matches: "^>power (\\S+)$" }
+    returns: value
+  get_power_info:
+    summary: "Read the power status and its choices (power ?)"
+    send: "power ?"
+    expect: { matches: "^>power (.+)$" }
+    returns: value
+  set_input:
+    summary: "Switch the input (input VAL); the model's manual names its terminals (hdmi1, hdmi2, displayport, computer, hdbaset, usb-a, lan ...)"
+    params:
+      input: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: Input, description: "The input terminal's name as the model takes it, such as hdmi1; input ? lists the choices." }
+    send: "input {input}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_input:
+    summary: "Read the current input (input)"
+    send: "input"
+    expect: { matches: "^>input (\\S+)$" }
+    returns: value
+  get_input_info:
+    summary: "Read the current input and the choices (input ?)"
+    send: "input ?"
+    expect: { matches: "^>input (.+)$" }
+    returns: value
+  set_av_mute:
+    summary: "AV mute on or off, for picture and sound, the picture only or the sound only (avmute [video|audio] on/off)"
+    params:
+      target: { type: enum, values: [both, video, audio], default: both, label: Target, description: "both mutes picture and sound, video the picture, audio the sound." }
+      muted: { type: bool, default: true, label: Mute, description: "On mutes, off unmutes." }
+    send: "avmute{target:map.avmute_target} {muted:map.onoff}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_av_mute:
+    summary: "Read an AV mute status (avmute, avmute video, avmute audio)"
+    params:
+      target: { type: enum, values: [both, video, audio], default: both, label: Target, description: "both reads picture and sound, video the picture, audio the sound." }
+    send: "avmute{target:map.avmute_target}"
+    expect: { matches: "^>avmute (?:video |audio )?(\\S+)$" }
+    returns: value
+  get_av_mute_info:
+    summary: "Read an AV mute status and its choices (avmute ?)"
+    params:
+      target: { type: enum, values: [both, video, audio], default: both, label: Target, description: "both reads picture and sound, video the picture, audio the sound." }
+    send: "avmute{target:map.avmute_target} ?"
+    expect: { matches: "^>avmute (.+)$" }
+    returns: value
+  get_serial_number:
+    summary: "Read the serial number (product serial)"
+    send: "product serial"
+    expect: { matches: "^>product serial (.+)$" }
+    returns: value
+  get_model_name:
+    summary: "Read the model name (product model)"
+    send: "product model"
+    expect: { matches: "^>product model (.+)$" }
+    returns: value
+  get_firmware_version:
+    summary: "Read the version number (product firmware1)"
+    send: "product firmware1"
+    expect: { matches: "^>product firmware1 (.+)$" }
+    returns: value
+  get_product:
+    summary: "Read another product item (product VAL); product help lists the model's items"
+    params:
+      item: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_.]+$", required: true, label: Item, description: "The product information item, such as serial, model or firmware1; product help lists them." }
+    send: "product {item}"
+    expect: { matches: "^>product (.+)$" }
+    returns: value
+  get_light_hours:
+    summary: "Read the light source usage in hours (usage light hours)"
+    send: "usage light hours"
+    expect: { matches: "^>usage light hours (\\S+)$" }
+    returns: value
+  get_light_remaining:
+    summary: "Read the light source remaining life in % (usage light remains)"
+    send: "usage light remains"
+    expect: { matches: "^>usage light remains (\\S+)$" }
+    returns: value
+  get_filter_hours:
+    summary: "Read the filter usage in hours (usage filter hours)"
+    send: "usage filter hours"
+    expect: { matches: "^>usage filter hours (\\S+)$" }
+    returns: value
+  get_status:
+    summary: "Read the operation status with its errors and warnings (status), such as standby;error:cover&filter;warning:light"
+    send: "status"
+    expect: { matches: "^>status (.+)$" }
+    returns: value
+  get_status_info:
+    summary: "Read the operation status and the errors the display can report (status ?)"
+    send: "status ?"
+    expect: { matches: "^>status (.+)$" }
+    returns: value
+  set_adjustment:
+    summary: "Set volume, brightness, contrast, color, hue, sharpness, backlight or light adjust to a value (volume 10, light adjust 10)"
+    params:
+      item: { type: enum, values: [volume, brightness, contrast, color, hue, sharpness, backlight, light_adjust], required: true, label: Item, description: "The adjustment to set; light_adjust is the light source brightness." }
+      value: { type: int, min: -9999, max: 9999, required: true, label: Value, description: "The value within the range the information form (get_adjustment_info) reports; negative where the range allows." }
+    send: "{item:map.adjustment} {value}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  step_adjustment:
+    summary: "Step an adjustment by a number of its steps (volume ++2, brightness --1)"
+    params:
+      item: { type: enum, values: [volume, brightness, contrast, color, hue, sharpness, backlight, light_adjust], required: true, label: Item, description: "The adjustment to step; light_adjust is the light source brightness." }
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up raises the value, down lowers it." }
+      steps: { type: int, min: 1, max: 999, default: 1, label: Steps, description: "How many of the adjustment's steps to move." }
+    send: "{item:map.adjustment} {direction:map.step_sign}{steps}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_adjustment:
+    summary: "Read an adjustment's current value (volume, brightness ...)"
+    params:
+      item: { type: enum, values: [volume, brightness, contrast, color, hue, sharpness, backlight, light_adjust], required: true, label: Item, description: "The adjustment to read." }
+    send: "{item:map.adjustment}"
+    expect: { matches: "^>(?:volume|brightness|contrast|color|hue|sharpness|backlight|light adjust) (\\S+)$" }
+    returns: value
+  get_adjustment_info:
+    summary: "Read an adjustment's current, default, minimum and maximum values and step (volume ?)"
+    params:
+      item: { type: enum, values: [volume, brightness, contrast, color, hue, sharpness, backlight, light_adjust], required: true, label: Item, description: "The adjustment to read." }
+    send: "{item:map.adjustment} ?"
+    expect: { matches: "^>(?:volume|brightness|contrast|color|hue|sharpness|backlight|light adjust) (cur=.+)$" }
+    returns: value
+  set_tile_matrix:
+    summary: "Enable or disable the tile matrix (tilematrix enable / disable)"
+    params:
+      enabled: { type: bool, required: true, label: Tile matrix, description: "On enables the tile matrix, off disables it." }
+    send: "tilematrix {enabled:map.enable}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  set_tile_matrix_value:
+    summary: "Set a tile matrix item: monitors across, monitors down, position, or TILECOMP (tilematrix h_monitor 2)"
+    params:
+      item: { type: enum, values: [h_monitor, v_monitor, position, tilecomp], required: true, label: Item, description: "h_monitor and v_monitor are the monitors across and down, position this display's place, tilecomp the frame compensation." }
+      value: { type: string, max_length: 8, pattern: "^([0-9]{1,3}|on|off)$", required: true, label: Value, description: "A number for the counts and position, on or off for tilecomp." }
+    send: "tilematrix {item} {value}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_tile_matrix:
+    summary: "Read the tile matrix or one of its items (tilematrix, tilematrix h_monitor ...)"
+    params:
+      item: { type: enum, values: [enabled, h_monitor, v_monitor, position, tilecomp], default: enabled, label: Item, description: "enabled reads whether the tile matrix is on; the others read that item." }
+    send: "tilematrix{item:map.tile_item}"
+    expect: { matches: "^>tilematrix (?:\\S+ )?(\\S+)$" }
+    returns: value
+  get_tile_matrix_info:
+    summary: "Read a tile matrix item with its range (tilematrix ?)"
+    params:
+      item: { type: enum, values: [enabled, h_monitor, v_monitor, position, tilecomp], default: enabled, label: Item, description: "enabled reads the tile matrix itself; the others that item." }
+    send: "tilematrix{item:map.tile_item} ?"
+    expect: { matches: "^>tilematrix (.+)$" }
+    returns: value
+  set_lens_position:
+    summary: "Move zoom, focus, periphery focus or lens shift to a position (lens zoom 1000); some lenses refuse positions"
+    params:
+      target: { type: enum, values: [zoom, focus, pfocus, h_shift, v_shift], required: true, label: Target, description: "zoom, focus, pfocus (periphery focus), h_shift or v_shift." }
+      position: { type: int, min: -99999, max: 99999, required: true, label: Position, description: "The position within the range get_lens_info reports." }
+    send: "lens {target} {position}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  move_lens_for:
+    summary: "Drive a lens adjustment for a time, in 0.5 s steps, negative for the - direction (lens zoom time 1.5)"
+    params:
+      target: { type: enum, values: [zoom, focus, pfocus, h_shift, v_shift], required: true, label: Target, description: "zoom, focus, pfocus (periphery focus), h_shift or v_shift." }
+      seconds: { type: float, min: -60.0, max: 60.0, required: true, label: Time, description: "Seconds to drive, a multiple of 0.5; negative drives in the - direction." }
+    send: "lens {target} time {seconds:.1f}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  start_lens:
+    summary: "Start driving a lens adjustment in the + or - direction until stopped (lens zoom start+)"
+    params:
+      target: { type: enum, values: [zoom, focus, pfocus, h_shift, v_shift], required: true, label: Target, description: "zoom, focus, pfocus (periphery focus), h_shift or v_shift." }
+      direction: { type: enum, values: ["+", "-"], required: true, label: Direction, description: "+ or - direction." }
+    send: "lens {target} start{direction}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  stop_lens:
+    summary: "Stop driving a lens adjustment (lens zoom stop)"
+    params:
+      target: { type: enum, values: [zoom, focus, pfocus, h_shift, v_shift], required: true, label: Target, description: "zoom, focus, pfocus (periphery focus), h_shift or v_shift." }
+    send: "lens {target} stop"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  lens_home:
+    summary: "Move the lens to its home position (lens home)"
+    send: "lens home"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_lens_position:
+    summary: "Read a lens adjustment's position (lens zoom)"
+    params:
+      target: { type: enum, values: [zoom, focus, pfocus, h_shift, v_shift], required: true, label: Target, description: "zoom, focus, pfocus (periphery focus), h_shift or v_shift." }
+    send: "lens {target}"
+    expect: { matches: "^>lens \\S+ (\\S+)$" }
+    returns: value
+  get_lens_info:
+    summary: "Read a lens adjustment's position and range (lens zoom ?)"
+    params:
+      target: { type: enum, values: [zoom, focus, pfocus, h_shift, v_shift], required: true, label: Target, description: "zoom, focus, pfocus (periphery focus), h_shift or v_shift." }
+    send: "lens {target} ?"
+    expect: { matches: "^>lens \\S+ (cur=.+)$" }
+    returns: value
+  set_shutter:
+    summary: "Open or close the shutter (shutter open / close)"
+    params:
+      closed: { type: bool, required: true, label: Closed, description: "On closes the shutter, off opens it." }
+    send: "shutter {closed:map.shutter}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_shutter:
+    summary: "Read the shutter (shutter): open or close"
+    send: "shutter"
+    expect: { matches: "^>shutter (\\S+)$" }
+    returns: value
+  get_shutter_info:
+    summary: "Read the shutter and its choices (shutter ?)"
+    send: "shutter ?"
+    expect: { matches: "^>shutter (.+)$" }
+    returns: value
+  auto_adjust:
+    summary: "Adjust the picture to the signal automatically (autoadj exec)"
+    send: "autoadj exec"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  set_freeze:
+    summary: "Freeze or unfreeze the picture (freeze on / off)"
+    params:
+      frozen: { type: bool, required: true, label: Freeze, description: "On freezes the picture, off lets it run again." }
+    send: "freeze {frozen:map.onoff}"
+    expect: { matches: "^>ok$" }
+    returns: ack
+  get_freeze:
+    summary: "Read whether the picture is frozen (freeze)"
+    send: "freeze"
+    expect: { matches: "^>freeze (\\S+)$" }
+    returns: value
+  get_freeze_info:
+    summary: "Read the freeze and its choices (freeze ?)"
+    send: "freeze ?"
+    expect: { matches: "^>freeze (.+)$" }
+    returns: value
+  help:
+    summary: "List the commands the display takes (help)"
+    send: "help"
+    expect: { matches: "^>(.+)$" }
+    returns: value
+  get_command_help:
+    summary: "List one command's parameters (power help, avmute video help)"
+    params:
+      command: { type: string, max_length: 32, pattern: "^[A-Za-z0-9_]+( [A-Za-z0-9_]+)*$", required: true, label: Command, description: "A command name, with a sub-item where it has them, such as power or avmute video." }
+    send: "{command} help"
+    expect: { matches: "^>(.+)$" }
+    returns: value
+
+maps:
+  avmute_target: { both: "", video: " video", audio: " audio" }
+  adjustment: { volume: volume, brightness: brightness, contrast: contrast, color: color, hue: hue, sharpness: sharpness, backlight: backlight, light_adjust: "light adjust" }
+  step_sign: { up: "++", down: "--" }
+  enable: { "true": enable, "false": disable }
+  tile_item: { enabled: "", h_monitor: " h_monitor", v_monitor: " v_monitor", position: " position", tilecomp: " tilecomp" }
+  shutter: { "true": close, "false": open }
+  onoff: { "true": "on", "false": "off" }
+
+state:
+  power: { type: string, description: "'off' (standby), 'warming', 'on' or 'cooling' (power)" }
+  status.power: { type: string, description: "'standby', 'warming', 'running' or 'cooling' (status)" }
+  status.errors: { type: string, description: "The errors the status reports, joined by '&' (cover, temp, fan, light, system, filter); empty when none" }
+  status.warnings: { type: string, description: "The warnings the status reports, joined by '&' (filter, light); empty when none" }
+  input: { type: string, description: "The current input as the display names it (input)" }
+  av_mute: { type: string, description: "AV mute of picture and sound, 'on' or 'off' (avmute)" }
+  av_mute_video: { type: string, description: "Picture mute, 'on' or 'off' (avmute video)" }
+  av_mute_audio: { type: string, description: "Sound mute, 'on' or 'off' (avmute audio)" }
+  freeze: { type: string, description: "Freeze, 'on' or 'off' (freeze)" }
+  shutter: { type: string, description: "Shutter, 'open' or 'close' (shutter)" }
+  adjustments.*: { type: int, description: "Current value of volume, brightness, contrast, color, hue, sharpness, backlight or light_adjust" }
+  lens.*: { type: int, description: "Current position of zoom, focus, pfocus, h_shift or v_shift (lens)" }
+  info.serial_number: { type: string, description: "Serial number (product serial)" }
+  info.model_name: { type: string, description: "Model name (product model)" }
+  info.firmware_version: { type: string, description: "Version number (product firmware1)" }
+  usage.light_hours: { type: int, unit: h, description: "Light source usage time (usage light hours)" }
+  usage.light_remaining: { type: int, unit: "%", description: "Light source remaining life (usage light remains)" }
+  usage.filter_hours: { type: int, unit: h, description: "Filter usage time (usage filter hours)" }
+  tile_matrix.enabled: { type: string, description: "'enable' or 'disable' (tilematrix)" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send: ["status", "power", "input", "avmute", "freeze", "shutter"]
+    - every_ms: 60000
+      send: ["product serial", "product model", "product firmware1", "usage light hours", "usage light remains",
+        "usage filter hours", "volume", "brightness", "contrast", "color", "hue", "sharpness", "backlight",
+        "light adjust", "lens zoom", "lens focus", "lens pfocus", "lens h_shift", "lens v_shift", "tilematrix",
+        "avmute video", "avmute audio"]
+  updates:
+    - match: "^>power (off|warming|on|cooling)$"
+      state: { power: "{1}" }
+    - match: "^>status (standby|warming|running|cooling)(?:;error:([a-z&]+))?(?:;warning:([a-z&]+))?$"
+      state: { status.power: "{1}", status.errors: "{2}", status.warnings: "{3}" }
+    - match: "^>input (\\S+)$"
+      state: { input: "{1}" }
+    - match: "^>avmute (on|off)$"
+      state: { av_mute: "{1}" }
+    - match: "^>avmute video (on|off)$"
+      state: { av_mute_video: "{1}" }
+    - match: "^>avmute audio (on|off)$"
+      state: { av_mute_audio: "{1}" }
+    - match: "^>freeze (on|off)$"
+      state: { freeze: "{1}" }
+    - match: "^>shutter (open|close)$"
+      state: { shutter: "{1}" }
+    - match: "^>(volume|brightness|contrast|color|hue|sharpness|backlight) (-?\\d+)$"
+      state: { "adjustments.{1}": "{2}" }
+    - match: "^>light adjust (-?\\d+)$"
+      state: { adjustments.light_adjust: "{1}" }
+    - match: "^>lens (zoom|focus|pfocus|h_shift|v_shift) (-?\\d+)$"
+      state: { "lens.{1}": "{2}" }
+    - match: "^>product serial (.+)$"
+      state: { info.serial_number: "{1}" }
+    - match: "^>product model (.+)$"
+      state: { info.model_name: "{1}" }
+    - match: "^>product firmware1 (.+)$"
+      state: { info.firmware_version: "{1}" }
+    - match: "^>usage light hours (\\d+)$"
+      state: { usage.light_hours: "{1}" }
+    - match: "^>usage light remains (-?\\d+)$"
+      state: { usage.light_remaining: "{1}" }
+    - match: "^>usage filter hours (\\d+)$"
+      state: { usage.filter_hours: "{1}" }
+    - match: "^>tilematrix (enable|disable)$"
+      state: { tile_matrix.enabled: "{1}" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The manual prints commands and responses with a space glyph between the command name and each
+      parameter ("power on", ">power on"); the responses to current-value forms are taken to repeat the
+      command's words before the value (">volume 5", ">lens zoom 1000", ">usage light hours 120").
+  - models: [all]
+    severity: info
+    text: >
+      Which commands, parameters and input names a display takes differs by model; help lists them, and the
+      poll asks for everything the manual describes, so a display without a function answers
+      error:command-try'help' or error:parameter for it and that state stays empty. error:busy answers
+      commands during power processing, input switching or auto adjustment; error:unavailable a function not
+      available now.
+  - models: [all]
+    severity: warning
+    text: >
+      A projector in the NORMAL standby mode does not take ASCII commands (NP-P627UL manual p.64): set its
+      standby mode to NETWORK STANDBY or SLEEP. Projectors also accept NEC's binary commands on the same port
+      (see nec-projector).
+  - models: [all]
+    severity: info
+    text: >
+      ">ok" says the setting was taken, not that it was applied (§1.2); the poll reads the value back. The
+      lens travel time is in 0.5 s steps, and a position may be refused for some lenses (§2.16).
