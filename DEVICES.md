@@ -459,7 +459,8 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | Panasonic projectors | NTCONTROL, TCP 1024 | Public |
-| Christie / Barco / Epson / NEC / Digital Projection projectors | Vendor TCP command sets | Public |
+| Epson / NEC projectors | Vendor TCP command sets | Public |
+| Digital Projection INSIGHT 4K Laser, HIGHlite 660 / Titan / Lightning, dVision (the other DP series are built) | Binary on TCP 43728 and TCP 30000 (External Control Protocol), ASCII on TCP 1025 | Public |
 | Samsung commercial displays | MDC, TCP 1515 | Public |
 | Sony BRAVIA Professional | Simple IP Control, TCP 20060, and REST | Public |
 | LG, Philips (SICP), Sharp displays | Vendor TCP | Public |
