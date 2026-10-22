@@ -235,6 +235,84 @@ systems the `serial2` crate supports). Phones have no serial port an app can
 open, so on Android and iOS the port fails to open with a reason saying so,
 and the device stays `disconnected` (docs/MOBILE.md).
 
+Every delivery lists the host's serial ports, for a consumer offering a
+choice of `serial_port`: `Core::serial_ports` in Rust, `mi_serial_ports` in
+C, `serialPorts()` in Node, `serial_ports()` in Python and
+`GET /v1/serial_ports` in the HTTP service. Each port has its `name`, the
+value `serial_port` takes; the port library gives no description or USB
+ids. The list is empty on Android and iOS.
+
+#### The same protocol on a serial port
+
+Many devices speak their network protocol unchanged on an RS-232 or RS-422
+port as well (Extron SIS, Kramer Protocol 3000, Lightware LW2 and LW3, most
+Roland switchers), and some models of a family have only the serial port. A
+`line-tcp` transport then adds a `serial` block, and one spec serves the
+device either way: the framing, replies, probe, `on_connect`, telemetry,
+polls and commands are shared, and only what is opened differs.
+
+```yaml
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  serial:
+    serial_only: [in1604-dtp, in1604-hd]   # optional
+    models: [in1806-1808, in1604-dtp, in1604-hd]   # optional
+    baud_rate: { default: 9600, values: [9600, 19200, 38400, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial",
+      note: "Remote RS-232 port, 3-pole captive screw" }
+```
+
+The block stands for settings the spec does not declare itself (the core
+and `tools/validate.py` add them, and the catalogue lists them like any
+other):
+
+- `link`, `tcp` or `serial`: the consumer's choice for each device. `tcp`
+  reaches the device at its host and port, `serial` opens `serial_port` and
+  needs no host. Its default is the block's `link`, `tcp` unless given.
+  With `serial_only`, a list of the models reached only on a serial port
+  (RS-232-only units), `link` has no default: left out, those models use
+  `serial` and the others `tcp`.
+- `serial_port`, optional, and required by opening with link serial.
+- `baud_rate`, `data_bits`, `parity`, `stop_bits` and `flow_control`, as
+  for `line-serial`, each from the block: the vendor's one documented value
+  (a fixed setting), or `{ default, values }` when the device's port can be
+  set to others (`baud_rate` is then an enum of digits, `data_bits` and
+  `stop_bits` an int range without gaps). All five are given, as the vendor
+  documents them; a value the vendor leaves undocumented (flow control,
+  often) is `none` and a quirk with a VERIFICATION.md item.
+
+`models`, when given, lists the models that have the serial port; opening
+another model with link serial fails with `invalid_settings`, as does link
+serial without `serial_port`. Link tcp without a host fails as for any
+network device. Changing `link` or a line setting with `update_settings`
+opens the new link at once, as for `line-serial`; on Android and iOS link
+serial fails to open as `line-serial` does.
+
+The ports list both links, the transport's port with `when: "link tcp"` and
+a `serial` control entry with `when: "link serial"`. A step of `on_connect`
+can name the link it is for, `link: tcp` or `link: serial`, when the vendor
+documents a difference between them, such as a login asked for on the
+network only:
+
+```yaml
+on_connect:
+  - { when_set: password, link: tcp, after_prompt: "Password:", send: "{settings.password}" }
+```
+
+A vector plays a command or a telemetry message on the serial port by giving
+`link: serial` in its `settings` (and on TCP otherwise, unless `serial_only`
+names its model); the vector runner checks that the link opened is the one
+chosen.
+
 ### `line-udp`
 
 Text messages over UDP, one message per datagram (ChamSys MagicQ's remote
@@ -1041,6 +1119,8 @@ The directive set is closed.
 | `json` | String as a JSON string literal, quotes and escapes included: `{text:json}` → `"Say \"hi\""`. For JSON request bodies |
 | `url` | String percent-encoded, RFC 3986 unreserved characters kept: `{name:url}` → `Cam%201`. For free text in a `raw_query` |
 | `url_decode` | String percent-decoded, each `%XX` the byte it stands for: `{2:url_decode}` → `Camera 1` for `Camera%201`. For a telemetry value a device sends encoded (Spyder's names); a `%` not followed by two hex digits is kept, and a name that is all digits, which arrives as a number, is left as it is |
+| `x`, `02x`, `03x`, … | Integer as lowercase hexadecimal digits, zero-padded to the width given: `{volume:02x}` → `64` for 100, `{id:x}` → `3e8` for 1000. For a protocol that writes numbers in hex as text (LG's `kf 01 64`) |
+| `hex` | Hexadecimal digits a device sends, read as a number: `{1:hex}` → `100` for `64`, `{1:hex}` → `1000` for `3E8`. First among a placeholder's directives, which then apply to the number; text that is not hex digits only (or a negative number) assigns nothing. For a telemetry capture, which arrives as an integer when it holds digits only and is read the same way |
 | `-1`, `+1`, … | Integer offset applied before formatting; combines as `{preset:-1:02d}` |
 | `signed` | Number with an explicit leading sign: `7` → `+7`, `-7` → `-7`; with a float's `.Nf`, `{gain:signed:.1f}` → `+1.5`. For a protocol that reads a leading sign as a relative change (REAPER's `+1.5` for 1.5 dB up). A float that rounds to zero is `+0.0` |
 | `bit.0` … `bit.63` | Integer → `true` / `false`, whether that bit is set, numbered from 0 for the value 1 (two's complement for a negative value): `{flags:bit.3}` → `true` for `328`. For a flags word a device sends whole, read into one boolean per bit (§8); offsets apply first, and it is the last directive |

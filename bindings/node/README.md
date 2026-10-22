@@ -41,6 +41,20 @@ only those devices, opening any other throws `not_selected`, and discovery
 runs only the protocols that find them. Opening a device whose integration
 was not built in throws `not_built`, naming the feature to build with.
 
+## Serial ports
+
+A device can be reached on a serial port of this machine (RS-232, RS-422, a
+USB serial adapter): a serial-only device, or one whose spec offers both
+links, chosen with the `link` setting (`'tcp'` or `'serial'`). The
+`serial_port` setting names the port, and `core.serialPorts()` lists this
+machine's ports to choose from (names only; empty on Android and iOS):
+
+```js
+const [port] = core.serialPorts(); // { name: 'COM3' }
+const id = core.open({ device: 'extron-matrix', model: 'mmx-42-62',
+  settings: { link: 'serial', serial_port: port.name } }); // no host needed
+```
+
 ## Files sent to devices
 
 A command's `binary` parameter (a show file, a media file, an image) takes

@@ -34,23 +34,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## aes70 — AES70 / OCA devices
 
-- [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:378](specs/aes70.yaml#L378))
-- [ ] Check whether the device sends OcaDelay's delay time (OcaTimeInterval) as a 32-bit or a 64-bit float, and that set_delay written at that width is accepted. ([specs/aes70.yaml:411](specs/aes70.yaml#L411))
-- [ ] Confirm the device answers the controller's keep-alive with keep-alives of its own at that interval, so a device opened for commands only is reported connected within one interval, and whether it accepts the millisecond form for an interval that is not whole seconds. ([specs/aes70.yaml:417](specs/aes70.yaml#L417))
-- [ ] Confirm the device sends keep-alives while idle, so it is not dropped after three intervals of quiet, and that it closes the connection itself after three intervals without the controller's. ([specs/aes70.yaml:425](specs/aes70.yaml#L425))
-- [ ] Confirm AddSubscription (3.1 on object 4) for an object's PropertyChanged event, with subscriber method 1.1 of object 4096, an empty context, delivery mode 1 and an empty destination, is accepted, and that changes then arrive as notifications carrying the property id, value and change type (record which PDU type, 2 or 5). ([specs/aes70.yaml:432](specs/aes70.yaml#L432))
-- [ ] Check that GetMembers (3.5) answers on every block, how long a full walk takes on a large device (a DS100 or an amplifier with many channels), and whether 32 requests in flight at once is too many for it. ([specs/aes70.yaml:441](specs/aes70.yaml#L441))
-- [ ] Check that roles are unique within each block and contain no '/', so role paths are unambiguous. ([specs/aes70.yaml:449](specs/aes70.yaml#L449))
-- [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:455](specs/aes70.yaml#L455))
-- [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:463](specs/aes70.yaml#L463))
-- [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:336](specs/aes70.yaml#L336))
-- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:353](specs/aes70.yaml#L353))
-- [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:472](specs/aes70.yaml#L472))
-- [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:363](specs/aes70.yaml#L363))
+- [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))
+- [ ] Check whether the device sends OcaDelay's delay time (OcaTimeInterval) as a 32-bit or a 64-bit float, and that set_delay written at that width is accepted. ([specs/aes70.yaml:460](specs/aes70.yaml#L460))
+- [ ] Confirm the device answers the controller's keep-alive with keep-alives of its own at that interval, so a device opened for commands only is reported connected within one interval, and whether it accepts the millisecond form for an interval that is not whole seconds. ([specs/aes70.yaml:466](specs/aes70.yaml#L466))
+- [ ] Confirm the device sends keep-alives while idle, so it is not dropped after three intervals of quiet, and that it closes the connection itself after three intervals without the controller's. ([specs/aes70.yaml:474](specs/aes70.yaml#L474))
+- [ ] Confirm AddSubscription (3.1 on object 4) for an object's PropertyChanged event, with subscriber method 1.1 of object 4096, an empty context, delivery mode 1 and an empty destination, is accepted, and that changes then arrive as notifications carrying the property id, value and change type (record which PDU type, 2 or 5). ([specs/aes70.yaml:481](specs/aes70.yaml#L481))
+- [ ] Check that GetMembers (3.5) answers on every block, how long a full walk takes on a large device (a DS100 or an amplifier with many channels), and whether 32 requests in flight at once is too many for it. ([specs/aes70.yaml:490](specs/aes70.yaml#L490))
+- [ ] Check that roles are unique within each block and contain no '/', so role paths are unambiguous. ([specs/aes70.yaml:498](specs/aes70.yaml#L498))
+- [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:504](specs/aes70.yaml#L504))
+- [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:512](specs/aes70.yaml#L512))
+- [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:359](specs/aes70.yaml#L359))
+- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:376](specs/aes70.yaml#L376))
+- [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:521](specs/aes70.yaml#L521))
+- [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:386](specs/aes70.yaml#L386))
 - [ ] Check a role or label with non-ASCII characters: OCP.1 string lengths are taken to count Unicode characters, not bytes. ([crates/core/src/modules/aes70_codec.rs:244](crates/core/src/modules/aes70_codec.rs#L244))
-- [ ] Record the class ids of a vendor's proprietary objects (d&b, Powersoft, stagebox preamps) and whether they derive from the standard classes, so they are read and followed. ([specs/aes70.yaml:335](specs/aes70.yaml#L335))
-- [ ] On a device that speaks OCP.1 over UDP, confirm it ignores nothing after the controller's first keep-alive, answers in one PDU per datagram to the controller's address and port, sends its notifications there too, and accepts PDUs of up to 1452 bytes. ([specs/aes70.yaml:386](specs/aes70.yaml#L386))
-- [ ] On a device that speaks OCP.1 over a WebSocket, note its path and port, confirm it accepts the AES70-OCP.1 subprotocol (or needs ws_subprotocol off), answers keep-alives sent over the WebSocket, and, over wss, what certificate it presents. ([specs/aes70.yaml:396](specs/aes70.yaml#L396))
+- [ ] Record the class ids of a vendor's proprietary objects (d&b, Powersoft, stagebox preamps) and whether they derive from the standard classes, so they are read and followed. ([specs/aes70.yaml:358](specs/aes70.yaml#L358))
+- [ ] On a device that speaks OCP.1 over UDP, confirm it ignores nothing after the controller's first keep-alive, answers in one PDU per datagram to the controller's address and port, sends its notifications there too, and accepts PDUs of up to 1452 bytes. ([specs/aes70.yaml:408](specs/aes70.yaml#L408))
+- [ ] On a device that speaks OCP.1 over a WebSocket, note its path and port, confirm it accepts the AES70-OCP.1 subprotocol (or needs ws_subprotocol off), answers keep-alives sent over the WebSocket, and, over wss, what certificate it presents. ([specs/aes70.yaml:418](specs/aes70.yaml#L418))
+- [ ] On a device that offers secure OCP.1, note its port and transport (_ocasec._tcp or _ocasec._udp), confirm it negotiates TLS_DHE_PSK_WITH_AES_128_CBC_SHA over TLS 1.2 (or DTLS 1.2) and sends the identity hint OCA-PSK, which identity it expects (OCA-PSK or its own), and how its pre-shared key is set and shown (hex, and its length). ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
+- [ ] Record the Diffie-Hellman group size a secure device offers (at least 2048 bits is required; a 1024-bit group is refused) and whether it agrees to the extended master secret and encrypt-then-MAC. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
+- [ ] Confirm that a wrong key or identity shows as a refused handshake (and which alert the device sends), and that the device answers the keep-alive sent first inside the secure session as it does over TCP. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
+- [ ] On a device that speaks secure OCP.1 over DTLS, confirm it takes one OCP.1 PDU per record and datagram and answers the same way, whether it asks for a cookie, and that it sends its flight again when the controller's is lost. ([specs/aes70.yaml:444](specs/aes70.yaml#L444))
 
 ## aja-kipro — AJA Ki Pro
 
@@ -1157,56 +1161,62 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## extron-matrix — Extron SIS matrix switchers
 
-- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([spec](specs/extron-matrix.yaml#L1925))
-- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([spec](specs/extron-matrix.yaml#L1935))
-- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([spec](specs/extron-matrix.yaml#L1910))
-- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([spec](specs/extron-matrix.yaml#L486))
-- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([spec](specs/extron-matrix.yaml#L1965))
-- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([spec](specs/extron-matrix.yaml#L1979))
-- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([spec](specs/extron-matrix.yaml#L1973))
-- [ ] On DXP HD 4K PLUS, record the EDID view replies (EdidR hex, EdidN native resolution) and the EDID import and export tags, which the guide prints as EIX5@ and EEX5@. ([spec](specs/extron-matrix.yaml#L1211))
-- [ ] On XTP II, record the remote power (POEC) replies and pushes, and the all-ports forms. ([spec](specs/extron-matrix.yaml#L1315))
-- [ ] On XTP II, check ETIE: which type value (1 or 2) selects video only, and the receiver form (Rev. Q). ([spec](specs/extron-matrix.yaml#L1384))
-- [ ] Check which IP, DHCP and password changes end the Telnet session on each family (only DXP DVI documents it). ([spec](specs/extron-matrix.yaml#L1987))
-- [ ] Check the unit name length limit on each family (63 on DXP HD 4K PLUS, 24 elsewhere) and the CT read format (SMX MM/DD/YY, others Ddd, DD Mmm YYYY). ([spec](specs/extron-matrix.yaml#L1633))
-- [ ] On SMX, check the serial port (CP) syntax, which the guide prints as Esc *port,...CP, and which port numbers are the rear ports on each family. ([spec](specs/extron-matrix.yaml#L1683))
-- [ ] On SMX, record a virtual plane definition and its read-back (Mpv), and whether Esc ZXXX clears virtual planes. ([spec](specs/extron-matrix.yaml#L1743))
-- [ ] Check what a DXP HD 4K PLUS answers for global presets 17-32, and how DXP DVI and SMX treat names longer than 12 characters. ([spec](specs/extron-matrix.yaml#L2016))
-- [ ] Check that the 2-minute poll's extra queries (network, EDID, HDCP authorization, formats, transmitter inputs, slot and virtual planes) are answered with E-codes, not silence, on the models that lack them. ([spec](specs/extron-matrix.yaml#L2016))
-- [ ] On an MMX 42/62 behind a serial-to-Ethernet interface's raw TCP port (an IPL T S at 2001), confirm the CR sent after every command is ignored and the replies come back one per line, ending CR LF. ([spec](specs/extron-matrix.yaml#L2035))
-- [ ] On an MMX, confirm the poll's queries that are not MMX commands are answered E10 rather than ignored (a silent unit would hold each for the 3-second timeout every 2 minutes). ([spec](specs/extron-matrix.yaml#L2047))
-- [ ] On an MMX, record the part number reply (the guide prints Nnn-nnn-nn: with or without a leading N) and the bare tie views (In05). ([spec](specs/extron-matrix.yaml#L912))
-- [ ] On an MMX, record the I reply's exact spacing (V1*03 A1*03 V2*05 A2*06 Vmt1*0 Amt1*0 Vmt2*1 Amt2*0 assumed) and whether input numbers are padded. ([spec](specs/extron-matrix.yaml#L2763))
-- [ ] On an MMX, check whether front panel mutes or level changes send any message (only front panel ties are documented), and whether set_input_attenuation takes 0 (g with 00). ([spec](specs/extron-matrix.yaml#L282))
+- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([spec](specs/extron-matrix.yaml#L1949))
+- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([spec](specs/extron-matrix.yaml#L1959))
+- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([spec](specs/extron-matrix.yaml#L1934))
+- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([spec](specs/extron-matrix.yaml#L510))
+- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([spec](specs/extron-matrix.yaml#L1989))
+- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([spec](specs/extron-matrix.yaml#L2003))
+- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([spec](specs/extron-matrix.yaml#L1997))
+- [ ] On DXP HD 4K PLUS, record the EDID view replies (EdidR hex, EdidN native resolution) and the EDID import and export tags, which the guide prints as EIX5@ and EEX5@. ([spec](specs/extron-matrix.yaml#L1235))
+- [ ] On XTP II, record the remote power (POEC) replies and pushes, and the all-ports forms. ([spec](specs/extron-matrix.yaml#L1339))
+- [ ] On XTP II, check ETIE: which type value (1 or 2) selects video only, and the receiver form (Rev. Q). ([spec](specs/extron-matrix.yaml#L1408))
+- [ ] Check which IP, DHCP and password changes end the Telnet session on each family (only DXP DVI documents it). ([spec](specs/extron-matrix.yaml#L2011))
+- [ ] Check the unit name length limit on each family (63 on DXP HD 4K PLUS, 24 elsewhere) and the CT read format (SMX MM/DD/YY, others Ddd, DD Mmm YYYY). ([spec](specs/extron-matrix.yaml#L1657))
+- [ ] On SMX, check the serial port (CP) syntax, which the guide prints as Esc *port,...CP, and which port numbers are the rear ports on each family. ([spec](specs/extron-matrix.yaml#L1707))
+- [ ] On SMX, record a virtual plane definition and its read-back (Mpv), and whether Esc ZXXX clears virtual planes. ([spec](specs/extron-matrix.yaml#L1767))
+- [ ] Check what a DXP HD 4K PLUS answers for global presets 17-32, and how DXP DVI and SMX treat names longer than 12 characters. ([spec](specs/extron-matrix.yaml#L2040))
+- [ ] Check that the 2-minute poll's extra queries (network, EDID, HDCP authorization, formats, transmitter inputs, slot and virtual planes) are answered with E-codes, not silence, on the models that lack them. ([spec](specs/extron-matrix.yaml#L2040))
+- [ ] On an MMX 42/62 behind a serial-to-Ethernet interface's raw TCP port (an IPL T S at 2001), confirm the CR sent after every command is ignored and the replies come back one per line, ending CR LF. ([spec](specs/extron-matrix.yaml#L2078))
+- [ ] On an MMX, confirm the poll's queries that are not MMX commands are answered E10 rather than ignored (a silent unit would hold each for the 3-second timeout every 2 minutes). ([spec](specs/extron-matrix.yaml#L2092))
+- [ ] On an MMX, record the part number reply (the guide prints Nnn-nnn-nn: with or without a leading N) and the bare tie views (In05). ([spec](specs/extron-matrix.yaml#L936))
+- [ ] On an MMX, record the I reply's exact spacing (V1*03 A1*03 V2*05 A2*06 Vmt1*0 Amt1*0 Vmt2*1 Amt2*0 assumed) and whether input numbers are padded. ([spec](specs/extron-matrix.yaml#L2808))
+- [ ] On an MMX, check whether front panel mutes or level changes send any message (only front panel ties are documented), and whether set_input_attenuation takes 0 (g with 00). ([spec](specs/extron-matrix.yaml#L306))
+- [ ] On each family, drive the matrix on its rear Remote port (link serial) and confirm replies, change reports and the verbose-mode step behave as over Telnet, with the banner only at power-up. ([spec](specs/extron-matrix.yaml#L157))
+- [ ] On DXP HD 4K PLUS, confirm the Remote RS-232 and USB ports ask for no password when one is set (documented for DXP DVI/HDMI, XTP II and SMX only). ([spec](specs/extron-matrix.yaml#L181))
+- [ ] On DXP HD 4K PLUS, confirm the Remote port uses no flow control (not documented). ([spec](specs/extron-matrix.yaml#L2059))
 
 ## extron-switcher — Extron IN-series scaling presentation switchers
 
-- [ ] Record the tagged reply forms in verbose mode 3 (In X!*1 All, VnamI, Inf00, GrpmD padding). ([spec](specs/extron-switcher.yaml#L2404))
-- [ ] Confirm that a CR after a simple command (1*3!, 2B, 1X) is ignored. ([spec](specs/extron-switcher.yaml#L2398))
-- [ ] Check how often a change report arrives while a command waits. ([spec](specs/extron-switcher.yaml#L2382))
-- [ ] On IN1606/IN1608, check whether the unsolicited signal message (IN00 ...) is sent, as on IN1808. ([spec](specs/extron-switcher.yaml#L2437))
-- [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([spec](specs/extron-switcher.yaml#L2462))
-- [ ] Record what a wrong password produces (the prompt again assumed). ([spec](specs/extron-switcher.yaml#L135))
-- [ ] Confirm both families answer N with the part number, the IN1808 tagged (Pno60-1615-02) and the IN1606/IN1608 bare, so the reads on connecting are queued. ([spec](specs/extron-switcher.yaml#L2597))
-- [ ] On an IN1606/IN1608, record whether the current-input picture queries (Esc CONT, BRIT, HDET, COLR, TINT) answer tagged with the input (Cont3*060) in verbose mode 3; a bare value is not kept. ([spec](specs/extron-switcher.yaml#L2454))
-- [ ] Confirm an IN1806 or IN1606 answers queries about inputs 7 and 8 with an error rather than ignoring them (which would hold the reads for the timeout). ([spec](specs/extron-switcher.yaml#L2444))
-- [ ] Record the screen saver reply forms on both families (SsavM1*2, SsavT1*501, SsavS1*0 on IN1808; SsavM0, SsavCFF0000, SsavT030 on IN1608), and confirm the IN1608 custom color has no query. ([spec](specs/extron-switcher.yaml#L1025))
-- [ ] Confirm the IN1808 B query answers one digit per output separated by spaces (Vmt0 1 0). ([spec](specs/extron-switcher.yaml#L2737))
-- [ ] Record the change reports for the IN1608 settings added here: automatic Auto-Image (Img4*1), video format (Typ1*2), overscan (Oscn2*1) and the Auto-Image threshold (Alvl025); and the IN1808 detected format (Vtyp3*2) and audio names (AnamI10*name). ([spec](specs/extron-switcher.yaml#L2804))
-- [ ] Check whether an input or user preset recall and an Auto-Image report each picture and image setting they change; if they do, the re-reads after them can go. ([spec](specs/extron-switcher.yaml#L2696))
-- [ ] Confirm the auto-switch priority order is sent and answered with spaces between the inputs (Esc P8 7 1 2 3 4 5 6AUSW). ([spec](specs/extron-switcher.yaml#L630))
-- [ ] Confirm the image position and size replies carry signed, zero-padded positions (Ximg1,-0010*+0020*01920*01080; IN1608 without 1,) and the shift replies HctrI1*-0002 and Hctr+0012. ([spec](specs/extron-switcher.yaml#L2849))
-- [ ] Confirm the embedded-audio OIDs 30012-30015 with H: which of each pair is the left channel (the guide's example takes 30012 as the right). ([spec](specs/extron-switcher.yaml#L1311))
-- [ ] On an IN1604 behind a serial-to-Ethernet interface's raw TCP port (an IPL T S at 2001), confirm the CR sent after every command is ignored, Esc 3CV is accepted on RS-232, and no password is asked. ([spec](specs/extron-switcher.yaml#L2470))
-- [ ] On an IN1604, record which queries answer tagged in verbose mode 3 where the guide prints only a bare value: the analog timing and picture views with the input (Hsrt2*128, Cont2*064), Esc A EDID (EdidA2*41), Esc I AFMT, Esc OSCN, Esc MUTM, Esc CN (Ipn), 2i, and the preset names (Pnam1*01,name); bare names and descriptions cannot be read. ([spec](specs/extron-switcher.yaml#L2478))
-- [ ] On an IN1604, check whether automatic Auto-Image (n*1A) works for inputs 2-4 (the guide shows input 1 only). ([spec](specs/extron-switcher.yaml#L2478))
-- [ ] On an IN1604, record the unsolicited signal message (In00 with spaces between digits assumed, as in the tagged 0LS reply) and whether one is sent at all. ([spec](specs/extron-switcher.yaml#L3116))
-- [ ] On an IN1604, check whether an output format change from the front panel or menu is reported (Vtpo3), and that Esc 1*VTPO's reply has the same text, which is why the format is read only from the replies to its own set and view. ([spec](specs/extron-switcher.yaml#L3027))
-- [ ] On an IN1604, record the preset delete reply (printed PrstX1*X2)), and whether it also clears the preset's name. ([spec](specs/extron-switcher.yaml#L2022))
-- [ ] On an IN1604, record the zero padding and sign of the gain and volume replies (Aud-06, Vol-20) and the separator of the audio mute view (0 1). ([spec](specs/extron-switcher.yaml#L2153))
-- [ ] On an IN1604, check the EDID and output rate codes against the guide's table (no 27 or 28) and what Esc A n*0EDID (automatic) answers. ([spec](specs/extron-switcher.yaml#L1649))
-- [ ] On an IN1604, record the internal temperature reply (the guide prints xxx.x degrees Celsius) and its tagged form (20Stat). ([spec](specs/extron-switcher.yaml#L2366))
-- [ ] On an IN1604, record the ranges the unit accepts for total pixels, active pixels and active lines (the guide gives only +/-512 or 256 of the signal's default). ([spec](specs/extron-switcher.yaml#L1766))
+- [ ] Record the tagged reply forms in verbose mode 3 (In X!*1 All, VnamI, Inf00, GrpmD padding). ([spec](specs/extron-switcher.yaml#L2424))
+- [ ] Confirm that a CR after a simple command (1*3!, 2B, 1X) is ignored. ([spec](specs/extron-switcher.yaml#L2418))
+- [ ] Check how often a change report arrives while a command waits. ([spec](specs/extron-switcher.yaml#L2402))
+- [ ] On IN1606/IN1608, check whether the unsolicited signal message (IN00 ...) is sent, as on IN1808. ([spec](specs/extron-switcher.yaml#L2457))
+- [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([spec](specs/extron-switcher.yaml#L2482))
+- [ ] Record what a wrong password produces (the prompt again assumed). ([spec](specs/extron-switcher.yaml#L153))
+- [ ] Confirm both families answer N with the part number, the IN1808 tagged (Pno60-1615-02) and the IN1606/IN1608 bare, so the reads on connecting are queued. ([spec](specs/extron-switcher.yaml#L2630))
+- [ ] On an IN1606/IN1608, record whether the current-input picture queries (Esc CONT, BRIT, HDET, COLR, TINT) answer tagged with the input (Cont3*060) in verbose mode 3; a bare value is not kept. ([spec](specs/extron-switcher.yaml#L2474))
+- [ ] Confirm an IN1806 or IN1606 answers queries about inputs 7 and 8 with an error rather than ignoring them (which would hold the reads for the timeout). ([spec](specs/extron-switcher.yaml#L2464))
+- [ ] Record the screen saver reply forms on both families (SsavM1*2, SsavT1*501, SsavS1*0 on IN1808; SsavM0, SsavCFF0000, SsavT030 on IN1608), and confirm the IN1608 custom color has no query. ([spec](specs/extron-switcher.yaml#L1045))
+- [ ] Confirm the IN1808 B query answers one digit per output separated by spaces (Vmt0 1 0). ([spec](specs/extron-switcher.yaml#L2770))
+- [ ] Record the change reports for the IN1608 settings added here: automatic Auto-Image (Img4*1), video format (Typ1*2), overscan (Oscn2*1) and the Auto-Image threshold (Alvl025); and the IN1808 detected format (Vtyp3*2) and audio names (AnamI10*name). ([spec](specs/extron-switcher.yaml#L2837))
+- [ ] Check whether an input or user preset recall and an Auto-Image report each picture and image setting they change; if they do, the re-reads after them can go. ([spec](specs/extron-switcher.yaml#L2729))
+- [ ] Confirm the auto-switch priority order is sent and answered with spaces between the inputs (Esc P8 7 1 2 3 4 5 6AUSW). ([spec](specs/extron-switcher.yaml#L650))
+- [ ] Confirm the image position and size replies carry signed, zero-padded positions (Ximg1,-0010*+0020*01920*01080; IN1608 without 1,) and the shift replies HctrI1*-0002 and Hctr+0012. ([spec](specs/extron-switcher.yaml#L2882))
+- [ ] Confirm the embedded-audio OIDs 30012-30015 with H: which of each pair is the left channel (the guide's example takes 30012 as the right). ([spec](specs/extron-switcher.yaml#L1331))
+- [ ] On an IN1604 behind a serial-to-Ethernet interface's raw TCP port (an IPL T S at 2001), confirm the CR sent after every command is ignored, Esc 3CV is accepted on RS-232, and no password is asked. ([spec](specs/extron-switcher.yaml#L2490))
+- [ ] On an IN1604, record which queries answer tagged in verbose mode 3 where the guide prints only a bare value: the analog timing and picture views with the input (Hsrt2*128, Cont2*064), Esc A EDID (EdidA2*41), Esc I AFMT, Esc OSCN, Esc MUTM, Esc CN (Ipn), 2i, and the preset names (Pnam1*01,name); bare names and descriptions cannot be read. ([spec](specs/extron-switcher.yaml#L2511))
+- [ ] On an IN1604, check whether automatic Auto-Image (n*1A) works for inputs 2-4 (the guide shows input 1 only). ([spec](specs/extron-switcher.yaml#L2511))
+- [ ] On an IN1604, record the unsolicited signal message (In00 with spaces between digits assumed, as in the tagged 0LS reply) and whether one is sent at all. ([spec](specs/extron-switcher.yaml#L3149))
+- [ ] On an IN1604, check whether an output format change from the front panel or menu is reported (Vtpo3), and that Esc 1*VTPO's reply has the same text, which is why the format is read only from the replies to its own set and view. ([spec](specs/extron-switcher.yaml#L3060))
+- [ ] On an IN1604, record the preset delete reply (printed PrstX1*X2)), and whether it also clears the preset's name. ([spec](specs/extron-switcher.yaml#L2042))
+- [ ] On an IN1604, record the zero padding and sign of the gain and volume replies (Aud-06, Vol-20) and the separator of the audio mute view (0 1). ([spec](specs/extron-switcher.yaml#L2173))
+- [ ] On an IN1604, check the EDID and output rate codes against the guide's table (no 27 or 28) and what Esc A n*0EDID (automatic) answers. ([spec](specs/extron-switcher.yaml#L1669))
+- [ ] On an IN1604, record the internal temperature reply (the guide prints xxx.x degrees Celsius) and its tagged form (20Stat). ([spec](specs/extron-switcher.yaml#L2386))
+- [ ] On an IN1604, record the ranges the unit accepts for total pixels, active pixels and active lines (the guide gives only +/-512 or 256 of the signal's default). ([spec](specs/extron-switcher.yaml#L1786))
+- [ ] On IN1806/IN1808 and IN1606/IN1608, confirm the Remote RS-232 port asks for no password when one is set (not documented either way). ([spec](specs/extron-switcher.yaml#L150))
+- [ ] Confirm 8 data bits on the IN1606/IN1608 and IN1604 Remote port (not stated) and which stop bits the IN1806/IN1808 Esc...CP command accepts (1 assumed). ([spec](specs/extron-switcher.yaml#L126))
+- [ ] Drive a unit on its rear Remote port (link serial) and confirm the same replies and change reports as over Telnet; check whether the front USB port appears as a serial port. ([spec](specs/extron-switcher.yaml#L2499))
 
 ## facebook-account — Facebook account (a user's Pages and Page access tokens)
 
@@ -1346,32 +1356,34 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## kramer-p3000 — Kramer Protocol 3000
 
-- [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4077](specs/kramer-p3000.yaml#L4077))
-- [ ] Record the MV-4X ROTATE? reply (written "~nn@#ROTATE" in the manual) and confirm the rotation needs aspect ratio Full and the border off. ([specs/kramer-p3000.yaml:2742](specs/kramer-p3000.yaml#L2742))
-- [ ] Record the KDS-DEC7's KDS-CHANNEL-SELECT replies to a set (the signal list in brackets) and to a get (signal,channel), and whether signal names come back in lower case. ([specs/kramer-p3000.yaml:3891](specs/kramer-p3000.yaml#L3891))
-- [ ] Find the largest grid VIEW-MOD 15 takes (16 by 16 is assumed; the manual gives none) and the TTL range of KDS-MULTICAST (1-255 assumed). ([specs/kramer-p3000.yaml:2975](specs/kramer-p3000.yaml#L2975))
-- [ ] Check NET-SRV-DSCP's service numbering (0 stream, 1 control), which the manual gives the other way round from NET-SRV-802-1Q. ([specs/kramer-p3000.yaml:2958](specs/kramer-p3000.yaml#L2958))
-- [ ] Confirm the DSP-62's DSP field ids are the lower-case words of its examples (attack, low-freq, band-bypass, tone-freq) and which values take decimals. ([specs/kramer-p3000.yaml:3170](specs/kramer-p3000.yaml#L3170))
-- [ ] Confirm the DSP-62's signal generator command is DSP-SIGGEN (its syntax and example) rather than DSP-SIG-GEN (its table). ([specs/kramer-p3000.yaml:3322](specs/kramer-p3000.yaml#L3322))
-- [ ] Confirm DSP-METER is sent with "?" (the manual's syntax leaves it out) and record its reply. ([specs/kramer-p3000.yaml:3339](specs/kramer-p3000.yaml#L3339))
-- [ ] Check that X-MIX-LVL accepts one decimal place (-25.0) and replies with the level the same way. ([specs/kramer-p3000.yaml:3348](specs/kramer-p3000.yaml#L3348))
-- [ ] Confirm KDS-MULTICAST takes any group address, which the KDS-7 ignores and reports as 0.0.0.0. ([specs/kramer-p3000.yaml:2877](specs/kramer-p3000.yaml#L2877))
+- [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))
+- [ ] Record the MV-4X ROTATE? reply (written "~nn@#ROTATE" in the manual) and confirm the rotation needs aspect ratio Full and the border off. ([specs/kramer-p3000.yaml:2755](specs/kramer-p3000.yaml#L2755))
+- [ ] Record the KDS-DEC7's KDS-CHANNEL-SELECT replies to a set (the signal list in brackets) and to a get (signal,channel), and whether signal names come back in lower case. ([specs/kramer-p3000.yaml:3904](specs/kramer-p3000.yaml#L3904))
+- [ ] Find the largest grid VIEW-MOD 15 takes (16 by 16 is assumed; the manual gives none) and the TTL range of KDS-MULTICAST (1-255 assumed). ([specs/kramer-p3000.yaml:2988](specs/kramer-p3000.yaml#L2988))
+- [ ] Check NET-SRV-DSCP's service numbering (0 stream, 1 control), which the manual gives the other way round from NET-SRV-802-1Q. ([specs/kramer-p3000.yaml:2971](specs/kramer-p3000.yaml#L2971))
+- [ ] Confirm the DSP-62's DSP field ids are the lower-case words of its examples (attack, low-freq, band-bypass, tone-freq) and which values take decimals. ([specs/kramer-p3000.yaml:3183](specs/kramer-p3000.yaml#L3183))
+- [ ] Confirm the DSP-62's signal generator command is DSP-SIGGEN (its syntax and example) rather than DSP-SIG-GEN (its table). ([specs/kramer-p3000.yaml:3335](specs/kramer-p3000.yaml#L3335))
+- [ ] Confirm DSP-METER is sent with "?" (the manual's syntax leaves it out) and record its reply. ([specs/kramer-p3000.yaml:3352](specs/kramer-p3000.yaml#L3352))
+- [ ] Check that X-MIX-LVL accepts one decimal place (-25.0) and replies with the level the same way. ([specs/kramer-p3000.yaml:3361](specs/kramer-p3000.yaml#L3361))
+- [ ] Confirm KDS-MULTICAST takes any group address, which the KDS-7 ignores and reports as 0.0.0.0. ([specs/kramer-p3000.yaml:2890](specs/kramer-p3000.yaml#L2890))
 
-- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:3492](specs/kramer-p3000.yaml#L3492))
-- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:3609](specs/kramer-p3000.yaml#L3609))
-- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:3508](specs/kramer-p3000.yaml#L3508))
-- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:3644](specs/kramer-p3000.yaml#L3644))
-- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:3655](specs/kramer-p3000.yaml#L3655))
-- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:3607](specs/kramer-p3000.yaml#L3607))
-- [ ] On a presentation switcher (VP-440X, VP-551X or VP-427X2), a multiviewer (MV-4X) and a streamer (KDS-EN7), record the values VID-RES, IMAGE-PROP, SCLR-AS, VIEW-MOD and W-COLOR take and answer, and which channels count from 0. ([specs/kramer-p3000.yaml:4041](specs/kramer-p3000.yaml#L4041))
-- [ ] Check whether EDID-AUDIO takes the guide's single mode or the per-input form (input,format) on each product. ([specs/kramer-p3000.yaml:1584](specs/kramer-p3000.yaml#L1584))
-- [ ] Confirm GPIO-CFG answers type,direction without the pull-up, and that GPIO-STATE is pushed on a change. ([specs/kramer-p3000.yaml:2014](specs/kramer-p3000.yaml#L2014))
-- [ ] Confirm the KDS-ACTION values (0 stop, 1 play, 2 save), since the guide's table is a copy of another. ([specs/kramer-p3000.yaml:2181](specs/kramer-p3000.yaml#L2181))
-- [ ] Record how ETH-PORT names the protocol in its reply (TCP/UDP or 0/1) and whether a TCP port change ends the connection before the answer. ([specs/kramer-p3000.yaml:2404](specs/kramer-p3000.yaml#L2404))
-- [ ] Record the TIME? reply's date form (the guide's DD-MM-YYYY or SWT3's YYYY/MM/DD). ([specs/kramer-p3000.yaml:2431](specs/kramer-p3000.yaml#L2431))
-- [ ] Check which network changes end the connection at once, and that NET-IP answers before the address changes. ([specs/kramer-p3000.yaml:4030](specs/kramer-p3000.yaml#L4030))
-- [ ] On the VP-551X, check MIC-GAIN's three-parameter form (0,mic,level) against the two-parameter command offered. ([specs/kramer-p3000.yaml:2586](specs/kramer-p3000.yaml#L2586))
-- [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:4058](specs/kramer-p3000.yaml#L4058))
+- [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:3505](specs/kramer-p3000.yaml#L3505))
+- [ ] Check whether AUD-LVL's channel means the Audio Channel table or an input/output number on the product in use. ([specs/kramer-p3000.yaml:3622](specs/kramer-p3000.yaml#L3622))
+- [ ] Confirm the documentation inconsistencies taken as written: the LABEL query with only a port number, NAME? echoed with the question mark, the #INFO-PRST? query form, and PRST-STO/PRST-RCL replies without "nn@". ([specs/kramer-p3000.yaml:3521](specs/kramer-p3000.yaml#L3521))
+- [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:3657](specs/kramer-p3000.yaml#L3657))
+- [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:3668](specs/kramer-p3000.yaml#L3668))
+- [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:3620](specs/kramer-p3000.yaml#L3620))
+- [ ] On a presentation switcher (VP-440X, VP-551X or VP-427X2), a multiviewer (MV-4X) and a streamer (KDS-EN7), record the values VID-RES, IMAGE-PROP, SCLR-AS, VIEW-MOD and W-COLOR take and answer, and which channels count from 0. ([specs/kramer-p3000.yaml:4067](specs/kramer-p3000.yaml#L4067))
+- [ ] Check whether EDID-AUDIO takes the guide's single mode or the per-input form (input,format) on each product. ([specs/kramer-p3000.yaml:1597](specs/kramer-p3000.yaml#L1597))
+- [ ] Confirm GPIO-CFG answers type,direction without the pull-up, and that GPIO-STATE is pushed on a change. ([specs/kramer-p3000.yaml:2027](specs/kramer-p3000.yaml#L2027))
+- [ ] Confirm the KDS-ACTION values (0 stop, 1 play, 2 save), since the guide's table is a copy of another. ([specs/kramer-p3000.yaml:2194](specs/kramer-p3000.yaml#L2194))
+- [ ] Record how ETH-PORT names the protocol in its reply (TCP/UDP or 0/1) and whether a TCP port change ends the connection before the answer. ([specs/kramer-p3000.yaml:2417](specs/kramer-p3000.yaml#L2417))
+- [ ] Record the TIME? reply's date form (the guide's DD-MM-YYYY or SWT3's YYYY/MM/DD). ([specs/kramer-p3000.yaml:2444](specs/kramer-p3000.yaml#L2444))
+- [ ] Check which network changes end the connection at once, and that NET-IP answers before the address changes. ([specs/kramer-p3000.yaml:4056](specs/kramer-p3000.yaml#L4056))
+- [ ] On the VP-551X, check MIC-GAIN's three-parameter form (0,mic,level) against the two-parameter command offered. ([specs/kramer-p3000.yaml:2599](specs/kramer-p3000.yaml#L2599))
+- [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:4084](specs/kramer-p3000.yaml#L4084))
+- [ ] On each product, confirm the RS-232 control port runs 115200 8N1 with no flow control and takes the same commands and handshake as TCP 5000, and that #BAUD? 0 lists the rates link serial offers. ([specs/kramer-p3000.yaml:110](specs/kramer-p3000.yaml#L110))
+- [ ] Check whether the RS-232 port needs LOGIN when security is on (product-specific, guide p.49). ([specs/kramer-p3000.yaml:3931](specs/kramer-p3000.yaml#L3931))
 
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 
@@ -1402,40 +1414,65 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what `Subnet.VDN<n> ?` answers for a named slot (name and serial separated by one space assumed) and an empty one (* assumed). ([specs/labgruppen-nlb60e.yaml:246](specs/labgruppen-nlb60e.yaml#L246))
 - [ ] Record an amplifier's `Status ?` answer for 2-, 4- and 8-channel models: three values, then nine per channel from A. ([specs/labgruppen-nlb60e.yaml:275](specs/labgruppen-nlb60e.yaml#L275))
 
+## lg-display — LG signage displays and commercial TVs
+
+- [ ] Confirm the display takes the protocol on TCP 9761 with no greeting or login, and answers as over RS-232C; no LG document read names the port. ([specs/lg-display.yaml:3247](specs/lg-display.yaml#L3247))
+- [ ] Confirm an acknowledgement ends with the literal `x` and nothing after it (no CR or LF), and that its Set ID echo is two hex digits (three above 255). ([specs/lg-display.yaml:99](specs/lg-display.yaml#L99))
+- [ ] Record what a display in standby answers to `ka 01 ff` in each PM mode (Network Ready, Screen Off Always), and whether `ka 01 01` turns it on over TCP and is acknowledged. ([specs/lg-display.yaml:3254](specs/lg-display.yaml#L3254))
+- [ ] Check whether lowercase hex (`kf 01 3c`), as LG's examples write it, and uppercase are both taken. ([specs/lg-display.yaml:103](specs/lg-display.yaml#L103))
+- [ ] Check the OSD lock polarity (`kl 00` locks in the webOS 6.0 and 3.2 guides, unlocks in the L19 guide). ([specs/lg-display.yaml:1243](specs/lg-display.yaml#L1243))
+- [ ] Check the tile mode byte order (columns then rows in the webOS guides, rows then columns in the SE3B manual). ([specs/lg-display.yaml:3290](specs/lg-display.yaml#L3290))
+- [ ] Confirm the color temperature data on webOS 3.2 and L19 displays (70-D2 for 3200-13000 K, as webOS 6.0, or 00-64 as older generations). ([specs/lg-display.yaml:351](specs/lg-display.yaml#L351))
+- [ ] Record whether `xb ff` answers the PC or the DTV code of a port in each input label setting. ([specs/lg-display.yaml:154](specs/lg-display.yaml#L154))
+- [ ] Record the `sv` replies (is there a space between the sub-code and the data?) and the bit order of the temperature sensor health (`sv 07`). ([specs/lg-display.yaml:1975](specs/lg-display.yaml#L1975))
+- [ ] Record the fan speed data of `sv 09` for one and for several fans. ([specs/lg-display.yaml:1980](specs/lg-display.yaml#L1980))
+- [ ] Record the `xc ff` reply and whether `xc` takes 00 for an unused window (PIP with two inputs). ([specs/lg-display.yaml:1761](specs/lg-display.yaml#L1761))
+- [ ] Record the `mj ff` reply and how many port codes each model expects. ([specs/lg-display.yaml:1845](specs/lg-display.yaml#L1845))
+- [ ] Record what a timer, holiday and brightness schedule entry read answers (whether the entry code is echoed before the data) and an empty entry. ([specs/lg-display.yaml:1618](specs/lg-display.yaml#L1618))
+- [ ] Confirm the units of `dn` (degrees Celsius assumed) and `dl` (hours assumed), and the 3-byte `dn` form of the SE3B. ([specs/lg-display.yaml:1935](specs/lg-display.yaml#L1935))
+- [ ] Record the format of the serial number (`fy`) and software version (`fz`) data: plain text, or ASCII in hex digits as `jx` answers. ([specs/lg-display.yaml:1950](specs/lg-display.yaml#L1950))
+- [ ] Confirm the IR codes LG prints only as icons: 7E, and the media keys B0, B1, BA, 8F, 8E, AA on signage. ([specs/lg-display.yaml:2010](specs/lg-display.yaml#L2010))
+- [ ] Confirm the daylight saving read `sd 01 01 ff ff ff ff` answers the start entry with its 01 echoed first. ([specs/lg-display.yaml:866](specs/lg-display.yaml#L866))
+- [ ] Confirm the equalizer byte (band in bits 7-5, step in bits 4-0) on a commercial TV. ([specs/lg-display.yaml:804](specs/lg-display.yaml#L804))
+
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
-- [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
-- [ ] Record the error answers ("(ERR04)" and others) and whether a failed command is answered at all. ([specs/lightware-lw2.yaml:669](specs/lightware-lw2.yaml#L669))
-- [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:678](specs/lightware-lw2.yaml#L678))
-- [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:722](specs/lightware-lw2.yaml#L722))
-- [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:678](specs/lightware-lw2.yaml#L678))
-- [ ] On an MX-CPU1 frame and an MX8x8, check which of edid_route, RS232BAUD, GETTIME/SETTIME and PS/(PSC) exist (documented for MX-CPU2 only), and on an MX-CPU2 frame whether HDMIIGET/HDMIOGET/HDMISET still work. ([specs/lightware-lw2.yaml:713](specs/lightware-lw2.yaml#L713))
-- [ ] Record the ISD and OSD digits for each board type on a live frame, and check the MX8x8's digits against its bit table. ([specs/lightware-lw2.yaml:706](specs/lightware-lw2.yaml#L706))
-- [ ] Check that polling {VC}, {VM}, {:ISD}, {:OSD}, {VEDID}, {IP_CONFIG=?} and {RS232BAUD=?} every 5 seconds does not slow an MX matrix, and that an MX8x8 or MX-CPU1 answers {RS232BAUD=?} with an error that changes nothing. ([specs/lightware-lw2.yaml:773](specs/lightware-lw2.yaml#L773))
-- [ ] Confirm set_ip_dhcp and reset_ip_config answer "(Changing IP configuration...)" before the connection drops. ([specs/lightware-lw2.yaml:664](specs/lightware-lw2.yaml#L664))
-- [ ] Confirm a switch to a locked output answers (1LO<out>) on the MX8x8 too. ([specs/lightware-lw2.yaml:674](specs/lightware-lw2.yaml#L674))
-- [ ] Check the UMX GPIO pin range (the manual prints 0 ...8 and pin 1 to 8; the hardware has 7) and the RS232_LOCAL_FORMAT reply. ([specs/lightware-lw2.yaml:643](specs/lightware-lw2.yaml#L643))
-- [ ] Confirm set_hdmi_output's answer is the output's STO line. ([specs/lightware-lw2.yaml:515](specs/lightware-lw2.yaml#L515))
-- [ ] Capture the {VM} answer on an MX matrix and confirm it lists one 1 or 0 per output in order after MUT, so the mutes poll keys them by position; and confirm {VC V} and {VC A} answer on the UMX as get_connection_layer's replies do. ([specs/lightware-lw2.yaml:815](specs/lightware-lw2.yaml#L815))
+- [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:696](specs/lightware-lw2.yaml#L696))
+- [ ] Record the error answers ("(ERR04)" and others) and whether a failed command is answered at all. ([specs/lightware-lw2.yaml:696](specs/lightware-lw2.yaml#L696))
+- [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:705](specs/lightware-lw2.yaml#L705))
+- [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:749](specs/lightware-lw2.yaml#L749))
+- [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:705](specs/lightware-lw2.yaml#L705))
+- [ ] On an MX-CPU1 frame and an MX8x8, check which of edid_route, RS232BAUD, GETTIME/SETTIME and PS/(PSC) exist (documented for MX-CPU2 only), and on an MX-CPU2 frame whether HDMIIGET/HDMIOGET/HDMISET still work. ([specs/lightware-lw2.yaml:740](specs/lightware-lw2.yaml#L740))
+- [ ] Record the ISD and OSD digits for each board type on a live frame, and check the MX8x8's digits against its bit table. ([specs/lightware-lw2.yaml:733](specs/lightware-lw2.yaml#L733))
+- [ ] Check that polling {VC}, {VM}, {:ISD}, {:OSD}, {VEDID}, {IP_CONFIG=?} and {RS232BAUD=?} every 5 seconds does not slow an MX matrix, and that an MX8x8 or MX-CPU1 answers {RS232BAUD=?} with an error that changes nothing. ([specs/lightware-lw2.yaml:800](specs/lightware-lw2.yaml#L800))
+- [ ] Confirm set_ip_dhcp and reset_ip_config answer "(Changing IP configuration...)" before the connection drops. ([specs/lightware-lw2.yaml:691](specs/lightware-lw2.yaml#L691))
+- [ ] Confirm a switch to a locked output answers (1LO<out>) on the MX8x8 too. ([specs/lightware-lw2.yaml:701](specs/lightware-lw2.yaml#L701))
+- [ ] Check the UMX GPIO pin range (the manual prints 0 ...8 and pin 1 to 8; the hardware has 7) and the RS232_LOCAL_FORMAT reply. ([specs/lightware-lw2.yaml:656](specs/lightware-lw2.yaml#L656))
+- [ ] Confirm set_hdmi_output's answer is the output's STO line. ([specs/lightware-lw2.yaml:528](specs/lightware-lw2.yaml#L528))
+- [ ] Capture the {VM} answer on an MX matrix and confirm it lists one 1 or 0 per output in order after MUT, so the mutes poll keys them by position; and confirm {VC V} and {VC A} answer on the UMX as get_connection_layer's replies do. ([specs/lightware-lw2.yaml:842](specs/lightware-lw2.yaml#L842))
+- [ ] Drive an MX8x8 Pro, an MX-CPU2 frame and a UMX-HDMI-140 on RS-232 (link serial) and confirm the same answers as over TCP 10001, and that no flow control is used. ([specs/lightware-lw2.yaml:81](specs/lightware-lw2.yaml#L81))
+- [ ] On a UMX-HDMI-140-Plus with the Cleartext login on, confirm LW2 on RS-232 is refused (no LW2 login command). ([specs/lightware-lw2.yaml:674](specs/lightware-lw2.yaml#L674))
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 
-- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:4375](specs/lightware-lw3.yaml#L4375))
-- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:4357](specs/lightware-lw3.yaml#L4357))
-- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:4409](specs/lightware-lw3.yaml#L4409))
-- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:4427](specs/lightware-lw3.yaml#L4427))
-- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:4447](specs/lightware-lw3.yaml#L4447))
-- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:4391](specs/lightware-lw3.yaml#L4391))
-- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:4453](specs/lightware-lw3.yaml#L4453))
-- [ ] On MX2, record the answer to applySettings (the manual prints m0 where other methods answer mO). ([specs/lightware-lw3.yaml:1970](specs/lightware-lw3.yaml#L1970))
-- [ ] Check the /V1 GPIO pin range (P1-P6 assumed from the 8-pole connector; the manuals give no range) and that Direction and Output answer pw with = as in the examples. ([specs/lightware-lw3.yaml:1612](specs/lightware-lw3.yaml#L1612))
-- [ ] On UMX, check the GPIO pins P1-P7, and that the UART's numbered ControlProtocol, Rs232Mode, Baudrate, StopBits and Parity codes are as translated. ([specs/lightware-lw3.yaml:4510](specs/lightware-lw3.yaml#L4510))
-- [ ] On UMX-HDMI-140-Plus, record an Event Manager condition and action as GET answers them, and the RS-232 recognizer's Rx after a received message. ([specs/lightware-lw3.yaml:4510](specs/lightware-lw3.yaml#L4510))
-- [ ] Check whether the /V1 LW3 service can be disabled over LW3 (SERVICES/LW3.Enabled is not documented) and whether set_web_service_enabled answers before the service stops. ([specs/lightware-lw3.yaml:1738](specs/lightware-lw3.yaml#L1738))
-- [ ] On UCX and MMX2, check which remote syslog format property exists (UCX LogFormat, MMX2 SyslogFormat); it is left out. ([specs/lightware-lw3.yaml:1781](specs/lightware-lw3.yaml#L1781))
-- [ ] Check that the reads on connecting (about 390 single GETs across the three trees, most answered with errors on the other trees) complete without the device dropping the connection. ([specs/lightware-lw3.yaml:2760](specs/lightware-lw3.yaml#L2760))
-- [ ] On MX2, record the answers to PRESET:create and PRESET:rename, and whether GET /MEDIA/PRESET lists the presets as child nodes. ([specs/lightware-lw3.yaml:3392](specs/lightware-lw3.yaml#L3392))
-- [ ] On MX2, confirm that port names cannot be set over LW3 (no property in the manual's LW3 chapter). ([specs/lightware-lw3.yaml:4496](specs/lightware-lw3.yaml#L4496))
+- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:4402](specs/lightware-lw3.yaml#L4402))
+- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:4384](specs/lightware-lw3.yaml#L4384))
+- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:4436](specs/lightware-lw3.yaml#L4436))
+- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:4454](specs/lightware-lw3.yaml#L4454))
+- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:4474](specs/lightware-lw3.yaml#L4474))
+- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:4418](specs/lightware-lw3.yaml#L4418))
+- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:4480](specs/lightware-lw3.yaml#L4480))
+- [ ] On MX2, record the answer to applySettings (the manual prints m0 where other methods answer mO). ([specs/lightware-lw3.yaml:1984](specs/lightware-lw3.yaml#L1984))
+- [ ] Check the /V1 GPIO pin range (P1-P6 assumed from the 8-pole connector; the manuals give no range) and that Direction and Output answer pw with = as in the examples. ([specs/lightware-lw3.yaml:1626](specs/lightware-lw3.yaml#L1626))
+- [ ] On UMX, check the GPIO pins P1-P7, and that the UART's numbered ControlProtocol, Rs232Mode, Baudrate, StopBits and Parity codes are as translated. ([specs/lightware-lw3.yaml:4537](specs/lightware-lw3.yaml#L4537))
+- [ ] On UMX-HDMI-140-Plus, record an Event Manager condition and action as GET answers them, and the RS-232 recognizer's Rx after a received message. ([specs/lightware-lw3.yaml:4537](specs/lightware-lw3.yaml#L4537))
+- [ ] Check whether the /V1 LW3 service can be disabled over LW3 (SERVICES/LW3.Enabled is not documented) and whether set_web_service_enabled answers before the service stops. ([specs/lightware-lw3.yaml:1752](specs/lightware-lw3.yaml#L1752))
+- [ ] On UCX and MMX2, check which remote syslog format property exists (UCX LogFormat, MMX2 SyslogFormat); it is left out. ([specs/lightware-lw3.yaml:1795](specs/lightware-lw3.yaml#L1795))
+- [ ] Check that the reads on connecting (about 390 single GETs across the three trees, most answered with errors on the other trees) complete without the device dropping the connection. ([specs/lightware-lw3.yaml:2774](specs/lightware-lw3.yaml#L2774))
+- [ ] On MX2, record the answers to PRESET:create and PRESET:rename, and whether GET /MEDIA/PRESET lists the presets as child nodes. ([specs/lightware-lw3.yaml:3406](specs/lightware-lw3.yaml#L3406))
+- [ ] On MX2, confirm that port names cannot be set over LW3 (no property in the manual's LW3 chapter). ([specs/lightware-lw3.yaml:4523](specs/lightware-lw3.yaml#L4523))
+- [ ] Drive an MX2 and a UMX-HDMI-140 (Control mode, LW3) on RS-232 (link serial) and confirm the same answers and CHG notifications as over TCP 6107, with no flow control. ([specs/lightware-lw3.yaml:161](specs/lightware-lw3.yaml#L161))
+- [ ] Check when a Cleartext login on the RS-232 port ends (not documented) and that the login step works there. ([specs/lightware-lw3.yaml:4333](specs/lightware-lw3.yaml#L4333))
 
 ## magewell-proconvert — Magewell Pro Convert
 
@@ -1587,6 +1624,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that a property's /? query sent right after an OSC change is answered with the new value, and which address the position, mapping corner and effect queries answer on. ([specs/millumin.yaml:841](specs/millumin.yaml#L841))
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
+
+## nec-display — NEC (Sharp NEC) large-format displays
+
+- [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
+- [ ] Confirm the 15 s wait after power and 10 s after an input change are enough, and whether a message sent sooner is answered with the NULL message (BE). ([specs/nec-display.yaml:825](specs/nec-display.yaml#L825))
+- [ ] Confirm 600 ms between messages is needed on the 2011-2013 generation only. ([specs/nec-display.yaml:49](specs/nec-display.yaml#L49))
+- [ ] Check the green and blue gain codes (00-18, 00-1A) on a P404 or P403 generation display, whose tables swap them. ([specs/nec-display.yaml:233](specs/nec-display.yaml#L233))
+- [ ] Confirm the mute code (00-8D) is not taken by the M series, as its table leaves it out. ([specs/nec-display.yaml:334](specs/nec-display.yaml#L334))
+- [ ] Record the firmware version reply (CA02) on each generation: raw characters on the M series, two hex digits per character before. ([specs/nec-display.yaml:683](specs/nec-display.yaml#L683))
+- [ ] Confirm the date year (C211/C212) is counted from 2000 on the M series, and what its last byte (daylight saving, reserved there) is answered. ([specs/nec-display.yaml:685](specs/nec-display.yaml#L685))
+- [ ] Confirm the temperature readout's 0.5 °C two's complement and how many sensors each model has. ([specs/nec-display.yaml:698](specs/nec-display.yaml#L698))
+- [ ] Record whether a display answers messages addressed to ALL or a group, and whether more than one TCP connection is taken at once. ([specs/nec-display.yaml:849](specs/nec-display.yaml#L849))
+- [ ] Confirm out-of-range sets are ignored with result 00 (PN-ME §8.2) on the other series too. ([specs/nec-display.yaml:831](specs/nec-display.yaml#L831))
 
 ## newtek-tricaster — NewTek TriCaster
 
@@ -1755,6 +1805,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the Web CGIs of the AW-HE145 and AW-UE155 match the AW-UE150 supplement (only the AW-UE150 is documented). ([specs/panasonic-ptz.yaml:88](specs/panasonic-ptz.yaml#L88))
 - [ ] Record the SRT latency and TTL ranges (the document gives no limits) and whether get_srt_info answers encryption or encrtyption. ([specs/panasonic-ptz.yaml:8765](specs/panasonic-ptz.yaml#L8765))
 - [ ] Confirm the Admin CGIs answer a Digest challenge with the current firmware, and Basic with older firmware. ([specs/panasonic-ptz.yaml:124](specs/panasonic-ptz.yaml#L124))
+
+## philips-sicp — Philips professional displays (SICP)
+
+- [ ] Confirm the command set of current models (Q, D, C, E and T Line, 55BDL4107X video walls) against SICP V2.03, the newest public version; record get_platform and get_sicp_version on each. ([specs/philips-sicp.yaml:947](specs/philips-sicp.yaml#L947))
+- [ ] Record whether a display answers over TCP in standby in each power save mode, and whether set_power on is acknowledged from standby. ([specs/philips-sicp.yaml:941](specs/philips-sicp.yaml#L941))
+- [ ] Confirm replies carry the group byte (and none with group_byte off on pre-1.86 firmware). ([specs/philips-sicp.yaml:52](specs/philips-sicp.yaml#L52))
+- [ ] Record the input report (AD): whether a source type byte (FD) comes first, and the playlist byte; check 0x00 is taken for no playlist where Philips's examples send 0x09. ([specs/philips-sicp.yaml:438](specs/philips-sicp.yaml#L438))
+- [ ] Confirm sending one video parameter with the others as last read leaves them unchanged, and the Phoenix 2.0 ranges (sharpness 0-10, signed tint). ([specs/philips-sicp.yaml:485](specs/philips-sicp.yaml#L485))
+- [ ] Confirm the volume message takes two bytes on current models and one on Eagle and Himalaya 1. ([specs/philips-sicp.yaml:566](specs/philips-sicp.yaml#L566))
+- [ ] Record the failover list's length per model. ([specs/philips-sicp.yaml:454](specs/philips-sicp.yaml#L454))
+- [ ] Record a tiling report on a zero-bezel and a 5x5 model, and check the position and size encoding (the document's formula fails when the columns equal the row width). ([specs/philips-sicp.yaml:676](specs/philips-sicp.yaml#L676))
+- [ ] Record whether the schedule report echoes its page, and whether a page set with D1 0x10 is page 1 disabled (the document's example). ([specs/philips-sicp.yaml:759](specs/philips-sicp.yaml#L759))
+- [ ] Record whether the multi-window report (FD) starts with the window number. ([specs/philips-sicp.yaml:792](specs/philips-sicp.yaml#L792))
+- [ ] Confirm the operating hours report is a big-endian 16-bit count of hours. ([specs/philips-sicp.yaml:724](specs/philips-sicp.yaml#L724))
 
 ## pjlink — PJLink
 
@@ -1936,8 +2000,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-p20hd — Roland P-20HD
 
-- [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:572](specs/roland-p20hd.yaml#L572))
-- [ ] Confirm the session closes after five minutes without commands and that ACS every ten seconds of silence keeps it open. ([specs/roland-p20hd.yaml:583](specs/roland-p20hd.yaml#L583))
+- [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:588](specs/roland-p20hd.yaml#L588))
+- [ ] Confirm the session closes after five minutes without commands and that ACS every ten seconds of silence keeps it open. ([specs/roland-p20hd.yaml:609](specs/roland-p20hd.yaml#L609))
+- [ ] Confirm XON/XOFF flow control on the RS-232 port (only the XON and XOFF commands are documented, p.78) and that no login is asked for there. ([specs/roland-p20hd.yaml:50](specs/roland-p20hd.yaml#L50))
 
 ## roland-v1200hd — Roland V-1200HD
 
@@ -1965,15 +2030,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-v60hd — Roland V-60HD
 
-- [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all) and the order of the QAL:13 frame (inputs 0-10, AUX, MASTER OUT assumed). ([specs/roland-v60hd.yaml:430](specs/roland-v60hd.yaml#L430))
-- [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:498](specs/roland-v60hd.yaml#L498))
+- [ ] Confirm the QAL numbering (which of 11, 12 and 13 is MASTER OUT, AUX and all) and the order of the QAL:13 frame (inputs 0-10, AUX, MASTER OUT assumed). ([specs/roland-v60hd.yaml:441](specs/roland-v60hd.yaml#L441))
+- [ ] Check whether the QPL frame for PANEL INFORMATION is also sent over LAN. ([specs/roland-v60hd.yaml:516](specs/roland-v60hd.yaml#L516))
+- [ ] Drive the V-60HD on RS-232 (link serial) and confirm the same frames as over LAN, with XON/XOFF. ([specs/roland-v60hd.yaml:50](specs/roland-v60hd.yaml#L50))
 
 ## roland-vr400uhd — Roland VR-400UHD
 
-- [ ] Confirm the password prompt (a line containing "Enter") and greeting, and record what a wrong password produces. ([specs/roland-vr400uhd.yaml:556](specs/roland-vr400uhd.yaml#L556))
-- [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:567](specs/roland-vr400uhd.yaml#L567))
-- [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:580](specs/roland-vr400uhd.yaml#L580))
-- [ ] Confirm get answers every parameter of the command list (OUTPUT FADE, DSK, LOGO, transition, MIC and LINE channels, outputs, auto mixing, audio follow video, reverb) with its current value, in the ranges set takes. ([specs/roland-vr400uhd.yaml:419](specs/roland-vr400uhd.yaml#L419))
+- [ ] Confirm the password prompt (a line containing "Enter") and greeting, and record what a wrong password produces. ([specs/roland-vr400uhd.yaml:577](specs/roland-vr400uhd.yaml#L577))
+- [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:588](specs/roland-vr400uhd.yaml#L588))
+- [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:601](specs/roland-vr400uhd.yaml#L601))
+- [ ] Confirm get answers every parameter of the command list (OUTPUT FADE, DSK, LOGO, transition, MIC and LINE channels, outputs, auto mixing, audio follow video, reverb) with its current value, in the ranges set takes. ([specs/roland-vr400uhd.yaml:433](specs/roland-vr400uhd.yaml#L433))
+- [ ] Confirm the RS-232 port uses no flow control (not documented) and asks for no password. ([specs/roland-vr400uhd.yaml:49](specs/roland-vr400uhd.yaml#L49))
 
 ## roland-vr4hd — Roland VR-4HD
 
@@ -1986,13 +2053,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 
-- [ ] Check whether the unit prompts before taking the password, and record the login exchange and what a wrong password produces. ([specs/roland-xs42h.yaml:341](specs/roland-xs42h.yaml#L341))
-- [ ] Check the dB scale of levels 0-127. ([specs/roland-xs42h.yaml:361](specs/roland-xs42h.yaml#L361))
+- [ ] Check whether the unit prompts before taking the password, and record the login exchange and what a wrong password produces. ([specs/roland-xs42h.yaml:354](specs/roland-xs42h.yaml#L354))
+- [ ] Check the dB scale of levels 0-127. ([specs/roland-xs42h.yaml:381](specs/roland-xs42h.yaml#L381))
+- [ ] Confirm the RS-232 port uses no flow control (not documented) and asks for no password. ([specs/roland-xs42h.yaml:39](specs/roland-xs42h.yaml#L39))
 
 ## roland-xs62s — Roland XS-62S
 
-- [ ] Confirm the forms the manual leaves open: VOS with only the bus, IL2 with both a and b, the two TRS values, and VER's empty model field. ([specs/roland-xs62s.yaml:634](specs/roland-xs62s.yaml#L634))
-- [ ] Confirm QAL:14 answers fourteen levels (the manual's example shows thirteen), in the order inputs 0-10, MASTER OUT, PVW/2, AUX/3, and whether the input levels are the PGM/1 (IL1) or PVW/2 (IL2) bus levels. ([specs/roland-xs62s.yaml:569](specs/roland-xs62s.yaml#L569))
+- [ ] Confirm the forms the manual leaves open: VOS with only the bus, IL2 with both a and b, the two TRS values, and VER's empty model field. ([specs/roland-xs62s.yaml:653](specs/roland-xs62s.yaml#L653))
+- [ ] Confirm QAL:14 answers fourteen levels (the manual's example shows thirteen), in the order inputs 0-10, MASTER OUT, PVW/2, AUX/3, and whether the input levels are the PGM/1 (IL1) or PVW/2 (IL2) bus levels. ([specs/roland-xs62s.yaml:580](specs/roland-xs62s.yaml#L580))
+- [ ] Drive the XS-62S on RS-232 (link serial) and confirm the same frames as over LAN, with XON/XOFF. ([specs/roland-xs62s.yaml:40](specs/roland-xs62s.yaml#L40))
 
 ## roland-xs80h — Roland XS-82H/83H/84H
 
@@ -2025,6 +2094,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Vision, check whether command words such as MECUT and MEAUTO must use MLE instead of ME. ([specs/rosstalk.yaml:1202](specs/rosstalk.yaml#L1202))
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
 - [ ] Capture, on a Carbonite-family and an Acuity-family switcher with Cmd Response on and off, the bytes each documented query answers (XPT, MS, MNEM, TRANSRATE, TRANSTYPE, TRANSINCL, MVBOX, USERVAR and KEYSHAPED with ?, KEYSTATE, ACTIVEID, VERSION, HELP, MEM ?), the answer to an unknown source or ME, the answer to a set, the order of answers to queries sent together, and any unasked messages, so state can be kept. ([specs/rosstalk.yaml:1469](specs/rosstalk.yaml#L1469))
+
+## samsung-mdc — Samsung displays (MDC)
+
+- [ ] Check the secured mode handshake on a display with the secured protocol on: the plain-text MDCSTART<<TLS>> greeting, a TLS handshake on the same connection, the 4-digit PIN sent bare, and MDCAUTH<<PASS>> or MDCAUTH<<FAIL:xxxx>> (taken from a third-party library, not Ver. 15.0). ([specs/samsung-mdc.yaml:2884](specs/samsung-mdc.yaml#L2884))
+- [ ] Check which TLS versions the secured mode offers; the core speaks only TLS 1.2 and 1.3. ([specs/samsung-mdc.yaml:2890](specs/samsung-mdc.yaml#L2890))
+- [ ] Check power on over RJ45: whether a display in standby (Network Standby on and off) still answers MDC, whether Wake-on-LAN to the subnet broadcast wakes it, and whether reconnecting 10 s after an acknowledged power on is needed. ([specs/samsung-mdc.yaml:2875](specs/samsung-mdc.yaml#L2875))
+- [ ] Check the factory display ID (0 assumed) and that a display reached over RJ45 stays silent for any other ID, and that chained displays answer through its RS-232C loop-out. ([specs/samsung-mdc.yaml:40](specs/samsung-mdc.yaml#L40))
+- [ ] Check that a command a model lacks is answered NAK rather than left unanswered, and what error bytes NAKs carry. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
+- [ ] Check which timer layout (13 or 15 values) and which Maintenance Control, Sound Control and multi-screen layouts each model family replies with, and that a display refuses the set layout it does not take. ([specs/samsung-mdc.yaml:2919](specs/samsung-mdc.yaml#L2919))
+- [ ] Check the display status temperature encoding: signed (two's complement) is assumed, with 0xFF taken as invalid. ([specs/samsung-mdc.yaml:251](specs/samsung-mdc.yaml#L251))
+- [ ] Check the panel on time's unit: a counter rising every 10 minutes is assumed (count of 10-minute periods, or minutes). ([specs/samsung-mdc.yaml:1354](specs/samsung-mdc.yaml#L1354))
+- [ ] Check the older color temperature codes 0x00-0x0A (5000 K to 15000 K, steps not given) and whether a display answers a read with the extended (kelvin / 100) code. ([specs/samsung-mdc.yaml:872](specs/samsung-mdc.yaml#L872))
+- [ ] Check whether holiday indexes count from 0 or 1. ([specs/samsung-mdc.yaml:1921](specs/samsung-mdc.yaml#L1921))
+- [ ] Check the byte order of two-byte values whose sections do not state it (custom fit size, screen position, final duty, custom PIP, light sensor and brightness output ranges); high byte first is assumed. ([specs/samsung-mdc.yaml:2929](specs/samsung-mdc.yaml#L2929))
+- [ ] Check the light sensor effective range and brightness output range data width (two bytes per value assumed). ([specs/samsung-mdc.yaml:2288](specs/samsung-mdc.yaml#L2288))
+- [ ] Check the ticker frame: data length 17 plus the message, the message's encoding (UTF-8 sent), and the foreground opacity codes (0-2 opacities, 3-5 flashing and off assumed). ([specs/samsung-mdc.yaml:1194](specs/samsung-mdc.yaml#L1194))
+- [ ] Check the Wi-Fi access point frame: a type byte, a one-byte length and the text for the SSID then the password, and what the display echoes. ([specs/samsung-mdc.yaml:413](specs/samsung-mdc.yaml#L413))
+- [ ] Check what a display answers to set_osd_types (the shown-kinds bit mask, as for a read, is assumed). ([specs/samsung-mdc.yaml:1569](specs/samsung-mdc.yaml#L1569))
+- [ ] Check the latitude and longitude text format a display expects. ([specs/samsung-mdc.yaml:2313](specs/samsung-mdc.yaml#L2313))
+- [ ] Check that the serial number is 15 bytes padded with NULs or spaces. ([specs/samsung-mdc.yaml:246](specs/samsung-mdc.yaml#L246))
+- [ ] Check the LED white balance, color correction, seam correction and gradation bit layouts (sub-commands 0x92, 0x93, 0x97, 0x9B, 0x9C, 0x9F, 0xA2), sent and read as hex. ([specs/samsung-mdc.yaml:2938](specs/samsung-mdc.yaml#L2938))
+- [ ] Check the menu size reply's sub-command echo (the document prints 0x83 for 0x85); any echo is taken as the reply. ([specs/samsung-mdc.yaml:2903](specs/samsung-mdc.yaml#L2903))
 
 ## sennheiser-chg-70n — Sennheiser CHG 70N
 
@@ -2123,6 +2214,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
 - [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
 
+## sharp-display — Sharp professional displays (S-Format)
+
+- [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:77](specs/sharp-display.yaml#L77))
+- [ ] Confirm the login is asked for with no user name or password set, and that CR alone is taken then. ([specs/sharp-display.yaml:80](specs/sharp-display.yaml#L80))
+- [ ] Confirm zero padding (`VOLM0030`) is taken on the PN-HB and PN-R903A, whose manuals show space padding (`VOLM  30`). ([specs/sharp-display.yaml:1230](specs/sharp-display.yaml#L1230))
+- [ ] Confirm a negative value as a minus and three digits (`OFSR-005`) and a positive one zero-padded (`OFSR0005`). ([specs/sharp-display.yaml:344](specs/sharp-display.yaml#L344))
+- [ ] Note whether sending the next command right after a reply, without Sharp's 100 ms gap, is ever refused, and how long WAIT lasts for power, input and size changes against the 15 s timeout. ([specs/sharp-display.yaml:67](specs/sharp-display.yaml#L67))
+- [ ] Confirm query replies carry no leading zeros (`30`, not `0030`) for the enum codes read into names (inputs and others). ([specs/sharp-display.yaml:132](specs/sharp-display.yaml#L132))
+- [ ] Record the `INF1` and `SRNO` replies (padding, quotes) on each family. ([specs/sharp-display.yaml:3466](specs/sharp-display.yaml#L3466))
+- [ ] Confirm `ERRT` is in degrees Celsius and record the PN-R903A's six-value reply. ([specs/sharp-display.yaml:3451](specs/sharp-display.yaml#L3451))
+- [ ] Record the `TSAD????` and `INnE????` replies (with or without quotes). ([specs/sharp-display.yaml:2047](specs/sharp-display.yaml#L2047))
+- [ ] Record what `SCnn????` answers and the meaning of its two weekday digits. ([specs/sharp-display.yaml:2228](specs/sharp-display.yaml#L2228))
+- [ ] Confirm the exact `LOCKED` and `UNSELECTED` texts on the PN-HB and PN-R903A (read from garbled Japanese PDFs). ([specs/sharp-display.yaml:5698](specs/sharp-display.yaml#L5698))
+- [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5671](specs/sharp-display.yaml#L5671))
+
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 
 - [ ] Check that the ANI4IN and ANI4OUT accept two-digit channel numbers (01), which the session sends, though their documents write one digit. ([specs/shure-ani.yaml:443](specs/shure-ani.yaml#L443))
@@ -2201,6 +2307,32 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what a status sent with only the logo, black and clear flags (before EasyWorship's first status) does. ([specs/softouch-easyworship.yaml:101](specs/softouch-easyworship.yaml#L101))
 - [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
 - [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
+
+## sony-bravia — Sony BRAVIA Professional Displays (REST API and IRCC-IP)
+
+- [ ] Check what a wrong or missing pre-shared key is answered with (HTTP 403 or 401, or a 200 carrying error 403), since that decides whether the core reports unauthorized. ([specs/sony-bravia.yaml:460](specs/sony-bravia.yaml#L460))
+- [ ] Check that getCurrentExternalInputsStatus v1.1 answers on /sony/avContent (the reference lists it under /sony/system). ([specs/sony-bravia.yaml:499](specs/sony-bravia.yaml#L499))
+- [ ] Check which getSystemInformation and getPictureQualitySettings versions each generation answers (v1.7 and v1.1 assumed on the P series). ([specs/sony-bravia.yaml:496](specs/sony-bravia.yaml#L496))
+- [ ] Check the IRCC-IP SOAP envelope of the 2019 page is still accepted, with SOAPACTION and X-Auth-PSK. ([specs/sony-bravia.yaml:438](specs/sony-bravia.yaml#L438))
+- [ ] Check whether getPowerStatus is answered in standby, and setPowerStatus on from standby with remote start on and off. ([specs/sony-bravia.yaml:484](specs/sony-bravia.yaml#L484))
+- [ ] Check the volume range (maxVolume) on each model; 0-100 is assumed. ([specs/sony-bravia.yaml:510](specs/sony-bravia.yaml#L510))
+- [ ] Check set_text (setTextForm v1.0, unencrypted) on P series displays outside Japan and on other models outside Japan and the EU. ([specs/sony-bravia.yaml:393](specs/sony-bravia.yaml#L393))
+
+## sony-bravia-ip — Sony BRAVIA Professional Displays (Simple IP Control)
+
+- [ ] Check the picture mute notification's polarity: the document's notification table gives 0 for muted, its answer table 1. ([specs/sony-bravia-ip.yaml:261](specs/sony-bravia-ip.yaml#L261))
+- [ ] Check the volume range Simple IP control takes (0-100 assumed). ([specs/sony-bravia-ip.yaml:266](specs/sony-bravia-ip.yaml#L266))
+- [ ] Check what the input notification of sixteen 0 means and when it is sent. ([specs/sony-bravia-ip.yaml:256](specs/sony-bravia-ip.yaml#L256))
+- [ ] Check which commands EU models with each RED-DA specification refuse. ([specs/sony-bravia-ip.yaml:248](specs/sony-bravia-ip.yaml#L248))
+- [ ] Check that an enquiry the display cannot answer (scene on an unsupported input) is answered sixteen N. ([specs/sony-bravia-ip.yaml:255](specs/sony-bravia-ip.yaml#L255))
+
+## sony-bravia-serial — Sony BRAVIA Professional Displays (RS-232C serial control)
+
+- [ ] Capture the data each query returns (power, input, volume, muting, ID, product information 1-3); the core reads power and muting as one byte, the input as kind and number. ([specs/sony-bravia-serial.yaml:312](specs/sony-bravia-serial.yaml#L312))
+- [ ] Check which functions answer canceled (0x03) in standby. ([specs/sony-bravia-serial.yaml:301](specs/sony-bravia-serial.yaml#L301))
+- [ ] Check the V shift up and down bytes: the document prints function 0x42 for them, the core sends 0x43. ([specs/sony-bravia-serial.yaml:326](specs/sony-bravia-serial.yaml#L326))
+- [ ] Check the hue up/down layout (a color byte, then up or down). ([specs/sony-bravia-serial.yaml:179](specs/sony-bravia-serial.yaml#L179))
+- [ ] Check the answer timing at 9600 bit/s (3 s allowed) and whether the display sends anything unasked. ([specs/sony-bravia-serial.yaml:319](specs/sony-bravia-serial.yaml#L319))
 
 ## sony-camera — Sony cameras
 

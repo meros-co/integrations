@@ -1,6 +1,6 @@
 spec: 1
 id: roland-xs42h
-name: Roland XS-42H / VP-42H (LAN control)
+name: Roland XS-42H / VP-42H (LAN or RS-232 control)
 vendor: Roland
 category: switcher
 
@@ -32,6 +32,16 @@ transport:
   # get is answered "ack,..." and then the value as a "set,..." line (p.29).
   reply_match: "^(ack|err),"
   probe: "ver"
+  # The same commands on the RS-232 connector ("Commands are common to the
+  # LAN and the RS-232 interface", p.28): 9600 or 38400 bps, no parity, 8
+  # data bits, 1 stop bit (p.28); RS-232 Baudrate 9600 by default in the
+  # System menu (p.24). Flow control is not documented.
+  serial:
+    baud_rate: { default: 9600, values: [9600, 38400] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
 
 settings:
   password:
@@ -43,12 +53,15 @@ settings:
     label: Password
     description: "The eight-character password set on the unit for WebRCS and Telnet; empty when none is set."
 
+# The password is for the network (WebRCS and Telnet) only (p.15, p.26).
 on_connect:
   - when_set: password
+    link: tcp
     send: "{settings.password}"
 
 ports:
-  - { port: 8023, protocol: tcp, role: control }
+  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 connector" }
 
 models:
   - id: xs-42h
@@ -338,6 +351,13 @@ state:
   device.version:     { type: string, description: "Version from ver; ---- while the unit starts up (p.29)" }
 
 quirks:
+  - models: [all]
+    severity: info
+    text: >
+      With link serial the switcher is driven on its RS-232 connector with the same commands and replies
+      as over LAN (p.28). The link's baud rate must match RS-232 Baudrate in the System menu (9600 by
+      default, p.24). The password is for the network only (p.15, p.26), so it is sent over TCP only.
+      Flow control is not documented; none is used.
   - models: [all]
     severity: critical
     text: >

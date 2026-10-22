@@ -115,6 +115,8 @@ test('the catalogue lists every spec', () => {
     const { devices } = core.catalog();
     assert.ok(devices['sennheiser-ew-dx']);
     assert.ok(devices['shure-wireless']);
+    // Whatever serial ports this machine has, by name only.
+    for (const port of core.serialPorts()) assert.deepStrictEqual(Object.keys(port), ['name']);
   } finally {
     core.dispose();
   }

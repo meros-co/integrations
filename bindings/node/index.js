@@ -94,6 +94,17 @@ class Core extends EventEmitter {
     return this.#native.catalog();
   }
 
+  /**
+   * The host's serial ports, [{ name }], for the serial_port setting of a
+   * device wired to one: names only, empty on a phone. Throws an
+   * IntegrationsError if they cannot be listed.
+   */
+  serialPorts() {
+    const result = this.#native.serialPorts();
+    if (result.error) throw new IntegrationsError(result.error);
+    return result.ok;
+  }
+
   /** Open a device; returns its id. The connection is made in the background. */
   open(request) {
     const result = this.#native.open(request);

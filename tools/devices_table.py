@@ -28,7 +28,7 @@ TRANSPORT = {
 
 # Native modules choose their own transport, so it is described here.
 NATIVE = {
-    "aes70": "OCP.1 over TCP, UDP or WebSocket (the device's port)",
+    "aes70": "OCP.1 over TCP, UDP, WebSocket, TLS or DTLS (the device's port)",
     "allenheath-ahm": "MIDI over TCP 51325",
     "allenheath-cq": "MIDI over TCP 51325",
     "allenheath-dlive": "MIDI over TCP 51325 (MixRack) or 51328 (Surface)",
@@ -51,6 +51,7 @@ NATIVE = {
     "http-listener": "HTTP/1.1 requests from any sender (webhooks); receives",
     "http-snapshot": "HTTP JPEG snapshots",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
+    "nec-display": "External Control binary messages over TCP 7142, or an RS-232C port",
     "novastar-central-control": "Binary frames over TCP 5200",
     "novastar-h": "Signed JSON over HTTP 8000",
     "obs-studio": "obs-websocket 5 over WebSocket 4455",
@@ -58,16 +59,19 @@ NATIVE = {
     "omt": "OMT metadata frames over TCP (the source's port, 6400 first)",
     "omt-discovery": "OMT metadata frames over TCP 6399",
     "osc-listener": "OSC over UDP or TCP from any sender; receives",
+    "philips-sicp": "SICP binary messages over TCP 5000, or an RS-232 port",
     "pjlink": "PJLink over TCP 4352",
     "probel-swp02": "SW-P-02 binary messages on a serial port, or over TCP",
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default) or a serial port",
     "qsys": "QRC JSON-RPC over TCP 1710",
+    "samsung-mdc": "MDC binary frames over TCP 1515 (TLS with a PIN in secured mode) or RS-232C",
     "sennheiser-digital-6000": "SSC over UDP 45",
     "sennheiser-ew-dx": "HTTPS + SSE (SSCv2); UDP (SSCv1 legacy mode)",
     "sennheiser-ew-g3-g4": "MCP over UDP 53212",
     "sennheiser-spectera": "HTTPS + SSE (SSCv2)",
     "shure-wireless": "Command strings over TCP 2202",
     "softouch-easyworship": "JSON lines over TCP (the port EasyWorship advertises over Bonjour)",
+    "sony-bravia-serial": "Binary frames on an RS-232C port, or a serial-to-Ethernet converter",
     "sony-camera": "PTP-IP over TCP 15740, or through SSH",
     "tally-arbiter": "Socket.IO 4 over a WebSocket on 4455",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
@@ -118,6 +122,9 @@ def main():
                 kind = "HTTPS"
             # A serial port has no number.
             transport = f"{kind} {t['port']}" if "port" in t else kind
+            # The same protocol on a serial port of the host (transport.serial).
+            if "serial" in t:
+                transport += " or serial"
         rows.append(
             f"| `{sid}` | {doc['name']} | `{groups[sid]}` | {transport} | {'yes' if native else ''} "
             f"| {len(models)} | {commands} | {verification(models)} |"

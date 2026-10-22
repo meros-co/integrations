@@ -23,6 +23,7 @@
 //! | Method and path              | Body / query                          | Returns                    |
 //! |------------------------------|---------------------------------------|----------------------------|
 //! | GET  /v1/catalog             |                                       | the catalogue              |
+//! | GET  /v1/serial_ports        |                                       | {ok: [{name}]} or {error}  |
 //! | POST /v1/open                | an OpenRequest                        | {device} or {error}        |
 //! | POST /v1/discover            | {action, protocols?, hints?}          | {ok} or {error}            |
 //! | POST /v1/execute             | {device, command, params}             | {ok} or {error}            |
@@ -46,6 +47,10 @@
 //! Videohub, HyperDeck, SmartView and MultiView, and Meros Cameras); none
 //! means every protocol that finds a device in the service's catalogue.
 //! `hints` are addresses where devices were last seen.
+//!
+//! `/v1/serial_ports` lists the serial ports of the machine running the
+//! service, by the name a device's `serial_port` setting takes (`COM3`,
+//! `/dev/ttyUSB0`), for a device wired to one of them; names only.
 //!
 //! `/v1/settings` changes an open device's settings without closing it, as
 //! `update_settings` does in every delivery: `settings` are merged into the
@@ -229,6 +234,13 @@ async fn catalog(State(app): State<Shared>, headers: HeaderMap) -> Response {
         return unauthorized();
     }
     Json(api::catalog(&app.core)).into_response()
+}
+
+async fn serial_ports(State(app): State<Shared>, headers: HeaderMap) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    Json(api::serial_ports(&app.core)).into_response()
 }
 
 async fn open(State(app): State<Shared>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
@@ -650,6 +662,7 @@ async fn device_stream(
 fn router(app: Shared) -> Router {
     Router::new()
         .route("/v1/catalog", get(catalog))
+        .route("/v1/serial_ports", get(serial_ports))
         .route("/v1/open", post(open))
         .route("/v1/discover", post(discover))
         // A command's `binary` params may carry a file's bytes as base64 in

@@ -145,6 +145,16 @@ pub unsafe extern "C" fn mi_catalog(core: *const MiCore) -> *mut c_char {
     guard(|| to_c(api::catalog(&(*core).core)))
 }
 
+/// The host's serial ports: `{"ok":[{"name":"COM3"},...]}` or
+/// `{"error":{...}}`; empty on Android and iOS.
+///
+/// # Safety
+/// `core` must be a live core.
+#[no_mangle]
+pub unsafe extern "C" fn mi_serial_ports(core: *const MiCore) -> *mut c_char {
+    guard(|| to_c(api::serial_ports(&(*core).core)))
+}
+
 /// Open a device: `request` is an OpenRequest as JSON. Returns `{"device":id}`
 /// or `{"error":{...}}`.
 ///
