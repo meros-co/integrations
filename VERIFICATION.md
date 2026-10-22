@@ -1492,6 +1492,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
 
+## nec-display — NEC (Sharp NEC) large-format displays
+
+- [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
+- [ ] Confirm the 15 s wait after power and 10 s after an input change are enough, and whether a message sent sooner is answered with the NULL message (BE). ([specs/nec-display.yaml:825](specs/nec-display.yaml#L825))
+- [ ] Confirm 600 ms between messages is needed on the 2011-2013 generation only. ([specs/nec-display.yaml:49](specs/nec-display.yaml#L49))
+- [ ] Check the green and blue gain codes (00-18, 00-1A) on a P404 or P403 generation display, whose tables swap them. ([specs/nec-display.yaml:233](specs/nec-display.yaml#L233))
+- [ ] Confirm the mute code (00-8D) is not taken by the M series, as its table leaves it out. ([specs/nec-display.yaml:334](specs/nec-display.yaml#L334))
+- [ ] Record the firmware version reply (CA02) on each generation: raw characters on the M series, two hex digits per character before. ([specs/nec-display.yaml:683](specs/nec-display.yaml#L683))
+- [ ] Confirm the date year (C211/C212) is counted from 2000 on the M series, and what its last byte (daylight saving, reserved there) is answered. ([specs/nec-display.yaml:685](specs/nec-display.yaml#L685))
+- [ ] Confirm the temperature readout's 0.5 °C two's complement and how many sensors each model has. ([specs/nec-display.yaml:698](specs/nec-display.yaml#L698))
+- [ ] Record whether a display answers messages addressed to ALL or a group, and whether more than one TCP connection is taken at once. ([specs/nec-display.yaml:849](specs/nec-display.yaml#L849))
+- [ ] Confirm out-of-range sets are ignored with result 00 (PN-ME §8.2) on the other series too. ([specs/nec-display.yaml:831](specs/nec-display.yaml#L831))
+
 ## nec-projector — NEC and Sharp NEC projectors
 
 - [ ] Find the serial speed a projector ships with: the manual lists the speeds each model offers but no default, and 38400 bit/s is assumed. ([specs/nec-projector.yaml:59](specs/nec-projector.yaml#L59))
@@ -1507,18 +1520,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the NP-U321H's eco modes (OFF 00h, ECO 01h; the appendix's cells are shared with the next columns). ([specs/nec-projector.yaml:571](specs/nec-projector.yaml#L571))
 - [ ] Check the 2024 keys on 2020 models and the 2020 keys (AUTO, PICTURE, COMPUTER1-2, VIDEO1, S-VIDEO1, FREEZE, ASPECT, SOURCE) on 2024 models. ([specs/nec-projector.yaml:924](specs/nec-projector.yaml#L924))
 - [ ] Check which characters 098-45 accepts in a projector name beyond letters and digits. ([specs/nec-projector.yaml:1044](specs/nec-projector.yaml#L1044))
-## nec-display — NEC (Sharp NEC) large-format displays
+## nec-projector-ascii — Sharp NEC projectors and monitors (Common ASCII Control Command)
 
-- [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
-- [ ] Confirm the 15 s wait after power and 10 s after an input change are enough, and whether a message sent sooner is answered with the NULL message (BE). ([specs/nec-display.yaml:825](specs/nec-display.yaml#L825))
-- [ ] Confirm 600 ms between messages is needed on the 2011-2013 generation only. ([specs/nec-display.yaml:49](specs/nec-display.yaml#L49))
-- [ ] Check the green and blue gain codes (00-18, 00-1A) on a P404 or P403 generation display, whose tables swap them. ([specs/nec-display.yaml:233](specs/nec-display.yaml#L233))
-- [ ] Confirm the mute code (00-8D) is not taken by the M series, as its table leaves it out. ([specs/nec-display.yaml:334](specs/nec-display.yaml#L334))
-- [ ] Record the firmware version reply (CA02) on each generation: raw characters on the M series, two hex digits per character before. ([specs/nec-display.yaml:683](specs/nec-display.yaml#L683))
-- [ ] Confirm the date year (C211/C212) is counted from 2000 on the M series, and what its last byte (daylight saving, reserved there) is answered. ([specs/nec-display.yaml:685](specs/nec-display.yaml#L685))
-- [ ] Confirm the temperature readout's 0.5 °C two's complement and how many sensors each model has. ([specs/nec-display.yaml:698](specs/nec-display.yaml#L698))
-- [ ] Record whether a display answers messages addressed to ALL or a group, and whether more than one TCP connection is taken at once. ([specs/nec-display.yaml:849](specs/nec-display.yaml#L849))
-- [ ] Confirm out-of-range sets are ignored with result 00 (PN-ME §8.2) on the other series too. ([specs/nec-display.yaml:831](specs/nec-display.yaml#L831))
+- [ ] Confirm current-value responses repeat the command's words before the value (">volume 5", ">lens zoom 1000", ">usage light hours 120", ">avmute video on", ">tilematrix position 2"); the manual shows only the power, volume, input and status forms. ([specs/nec-projector-ascii.yaml:421](specs/nec-projector-ascii.yaml#L421))
+- [ ] Confirm TCP 7142 takes ASCII and binary commands on the same connection, and whether the projector keeps an idle connection open. ([specs/nec-projector-ascii.yaml:52](specs/nec-projector-ascii.yaml#L52))
+- [ ] Find the serial defaults of models other than the NP-P627UL family (38400 bit/s, 8N1, no flow control there), and of monitors. ([specs/nec-projector-ascii.yaml:47](specs/nec-projector-ascii.yaml#L47))
+- [ ] Confirm a display without a polled function answers error:command-try'help' or error:parameter promptly, so the poll is not held up. ([specs/nec-projector-ascii.yaml:427](specs/nec-projector-ascii.yaml#L427))
+- [ ] Check how negative lens travel times and half-second values are written ("lens focus time -1.5"). ([specs/nec-projector-ascii.yaml:246](specs/nec-projector-ascii.yaml#L246))
+- [ ] Confirm the NORMAL standby mode refuses ASCII commands on the network on other models. ([specs/nec-projector-ascii.yaml:435](specs/nec-projector-ascii.yaml#L435))
 
 ## newtek-tricaster — NewTek TriCaster
 
