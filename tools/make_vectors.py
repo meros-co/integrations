@@ -156,7 +156,8 @@ _pp_vectors()
 # Replies, from the document's own examples.
 http(PP, "version_get", {}, "GET", "/version",
      http_reply={"status": 200, "body": '{"name":"ProPresenter","major_version":7}'},
-     expect_result={"ok": {"kind": "value", "value": {"name": "ProPresenter", "major_version": 7}}})
+     expect_result={"ok": {"kind": "value", "value": {"name": "ProPresenter", "major_version": 7}}},
+     file="version_get-reply")
 telemetry(PP, "slide", inbound_http={"path": "/v1/status/slide", "body": json.dumps({
     "current": {"text": "Amazing Grace, how sweet the sound", "notes": "", "uuid": "1"},
     "next": {"text": "That saved a wretch like me", "notes": "Start quiet", "uuid": "2"}})},
