@@ -1039,13 +1039,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] TCP 23 accepts the op commands as a raw TCP connection, with no Telnet option negotiation or prompt that the core would have to answer. ([specs/digitalprojection-evision-op.yaml:50](specs/digitalprojection-evision-op.yaml#L50))
 - [ ] A get, a set and a step are each answered "OP <KEYWORD> = <value>" in capitals on one CR-ended line. ([specs/digitalprojection-evision-op.yaml:56](specs/digitalprojection-evision-op.yaml#L56))
-- [ ] An execute command (power_on, reset_all) is answered with a line starting "OP" (the documents' example is garbled). ([specs/digitalprojection-evision-op.yaml:1056](specs/digitalprojection-evision-op.yaml#L1056))
-- [ ] "OP <KEYWORD> = NA" and "*Illegal format#" are the only failure answers. ([specs/digitalprojection-evision-op.yaml:1892](specs/digitalprojection-evision-op.yaml#L1892))
-- [ ] Commands longer than 26 bytes (set_net_ipaddr with a long address) are accepted, and no delay between commands is needed on TCP 23. ([specs/digitalprojection-evision-op.yaml:994](specs/digitalprojection-evision-op.yaml#L994))
-- [ ] Keywords printed with capitals or a space ("Hsg.b. hue") are sent as hsg.b.hue and accepted. ([specs/digitalprojection-evision-op.yaml:567](specs/digitalprojection-evision-op.yaml#L567))
-- [ ] The E-Vision 7010 and 6110 accept the 5900 and 5100 values, and answer NA to inputs and modes they lack. ([specs/digitalprojection-evision-op.yaml:1918](specs/digitalprojection-evision-op.yaml#L1918))
-- [ ] Input numbering per model (input.sel starts at 1). ([specs/digitalprojection-evision-op.yaml:728](specs/digitalprojection-evision-op.yaml#L728))
-- [ ] Lens memories 1 to 8 on the E-Vision Laser 9000 and 9100. ([specs/digitalprojection-evision-op.yaml:815](specs/digitalprojection-evision-op.yaml#L815))
+- [ ] An execute command (power_on, reset_all) is answered with a line starting "OP" (the documents' example is garbled). ([specs/digitalprojection-evision-op.yaml:1064](specs/digitalprojection-evision-op.yaml#L1064))
+- [ ] "OP <KEYWORD> = NA" and "*Illegal format#" are the only failure answers. ([specs/digitalprojection-evision-op.yaml:1900](specs/digitalprojection-evision-op.yaml#L1900))
+- [ ] Commands longer than 26 bytes (set_net_ipaddr with a long address) are accepted, and no delay between commands is needed on TCP 23. ([specs/digitalprojection-evision-op.yaml:1002](specs/digitalprojection-evision-op.yaml#L1002))
+- [ ] Keywords printed with capitals or a space ("Hsg.b. hue") are sent as hsg.b.hue and accepted. ([specs/digitalprojection-evision-op.yaml:575](specs/digitalprojection-evision-op.yaml#L575))
+- [ ] The E-Vision 7010 and 6110 accept the 5900 and 5100 values, and answer NA to inputs and modes they lack. ([specs/digitalprojection-evision-op.yaml:1926](specs/digitalprojection-evision-op.yaml#L1926))
+- [ ] Input numbering per model (input.sel starts at 1). ([specs/digitalprojection-evision-op.yaml:736](specs/digitalprojection-evision-op.yaml#L736))
+- [ ] Lens memories 1 to 8 on the E-Vision Laser 9000 and 9100. ([specs/digitalprojection-evision-op.yaml:823](specs/digitalprojection-evision-op.yaml#L823))
 
 ## digitalprojection-projector — Digital Projection projectors (ASCII control protocol)
 
