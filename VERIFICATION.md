@@ -1481,17 +1481,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
-- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:442](specs/probel-swp08.yaml#L442))
-- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:391](specs/probel-swp08.yaml#L391))
-- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:398](specs/probel-swp08.yaml#L398))
-- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:414](specs/probel-swp08.yaml#L414))
-- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:425](specs/probel-swp08.yaml#L425))
-- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:455](specs/probel-swp08.yaml#L455))
-- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:503](specs/probel-swp08.yaml#L503))
-- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:503](specs/probel-swp08.yaml#L503))
-- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:476](specs/probel-swp08.yaml#L476))
-- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:448](specs/probel-swp08.yaml#L448))
-- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:494](specs/probel-swp08.yaml#L494))
+- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:463](specs/probel-swp08.yaml#L463))
+- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:404](specs/probel-swp08.yaml#L404))
+- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:419](specs/probel-swp08.yaml#L419))
+- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:435](specs/probel-swp08.yaml#L435))
+- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:446](specs/probel-swp08.yaml#L446))
+- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:476](specs/probel-swp08.yaml#L476))
+- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
+- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
+- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:497](specs/probel-swp08.yaml#L497))
+- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:469](specs/probel-swp08.yaml#L469))
+- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:515](specs/probel-swp08.yaml#L515))
 
 ## propresenter — ProPresenter
 
