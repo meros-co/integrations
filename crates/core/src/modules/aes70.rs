@@ -911,15 +911,6 @@ impl Aes70 {
         }
     }
 
-    fn has_level_sensors(&self) -> bool {
-        self.objects.values().any(|o| {
-            o.path.is_some()
-                && o.class
-                    .as_deref()
-                    .is_some_and(|c| classes::is_a(c, classes::LEVEL_SENSOR))
-        })
-    }
-
     fn read_device_manager(&mut self) {
         for prop in classes::props_of(classes::DEVICE_MANAGER) {
             if prop.read {
