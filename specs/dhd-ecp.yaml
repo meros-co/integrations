@@ -1,0 +1,592 @@
+spec: 1
+id: dhd-ecp
+name: DHD audio RM4200D and Series 52 cores (External Control Protocol, ECP)
+vendor: DHD audio
+category: mixer
+implementation: native
+reason: >
+  ECP over TCP is binary: every block is 16 bytes (a length byte, a 29-bit command ID, up to eight data bytes),
+  big-endian, with no acknowledgement and no request numbering. A request and its answer share the command ID
+  and differ only in the length byte, so an answer is tied to its request by the address bytes it repeats, and
+  the same block types also arrive unasked (crosspoint and fader-value notifications, motor-fader touches,
+  meters, clean feed changes). Levels are signed 16-bit hundredths of a dB and one clean feed output word packs
+  five fields. None of this is expressible as text templates.
+
+source:
+  - title: "DHD Developer Documentation, version 10.4: ECP - External Control Protocol (overview, device and firmware table, deprecation notice)"
+    author: DHD audio
+    url: "https://developer.dhd.audio/docs/API/ECP/"
+    note: >
+      Read 2026-10-21. Devices and controllers that speak ECP (RM4200D with RM420-850/852/853, 52/XR with
+      52-6850/6851, 52/XS, XC, XD with 52-7450, XS2, XC2, XD2 with 52-7456) and their firmware lines; ECP is
+      deprecated from firmware 10.2 for third-generation cores (XC3/XD3/XS3), kept as a legacy protocol with a
+      reduced feature set, and the commands planned for removal (16-bit routing, arbitration, display labels,
+      load/save setups, both I/O gain forms, both clean feed parameters).
+  - title: "DHD Developer Documentation, version 10.4: ECP Communication"
+    author: DHD audio
+    url: "https://developer.dhd.audio/docs/API/ECP/communication"
+    note: >
+      Interfaces per frame and controller (up to 10 TCP sockets; 5 before firmware 7.04.06; 4 on some 05.05.27 to
+      05.06.01 firmware); IP communication: TCP port 2008, the 16-byte block (length, unused byte, ID28..ID0 in
+      four bytes, data bytes 0-7, two unused bytes), unused bytes sent as zero and ignored on receipt, Motorola
+      byte order; sockets are non-blocking from firmware 06.xx.xx and closed when data is not fetched fast
+      enough. The serial framing (STX, DLE escaping, checksum, ACK/NAK) is described there too but is not used.
+  - title: "DHD Developer Documentation, version 10.4: ECP Commands"
+    author: DHD audio
+    url: "https://developer.dhd.audio/docs/API/ECP/commands"
+    note: >
+      The command overview by firmware line and its footnotes; Set Output Routing 0x01F5 16-bit (lengths 0, 2,
+      4; physical I/O numbers) and 32-bit (lengths 1, 5, 8; crosspoint notification; AudioID versions 1 and 2);
+      Set Arbitration 0x01F9; Set Monitor Channel 0x1100; Switch Fader/Channel On/Off 0x1102; Set Fader Level
+      0x1103 (lengths 1, 2, 4, 7; level and time encoding; fade types); Set Fader Access 0x1104; Set Channel
+      Input Number 0x110D; Set Internal Logic States 0x110E; Set Monitor Level 0x1110; Set Display or Channel
+      Label 0x1114; Set PFL 0x1116; Load Save Setups 0x111C; Set IO Gain 0x112D 16-bit and 32-bit; Motorfader
+      Touched 0x1182; Metering 0x111D; Get / Set Parameter 0x1181 for clean feed input (prefix 0x0024) and
+      clean feed output (prefix 0x0025), with their bit layouts.
+  - title: "companion-module-dhdaudio-ecp (README, companion/HELP.md, src/ecp.ts)"
+    author: "Daniel Lippens (MIT licence)"
+    url: "https://github.com/daniellippens/companion-module-dhdaudio-ecp"
+    note: >
+      Corroboration only (MIT, checked 2026-10-21; no code used): the 16-byte block layout and port 2008; logic
+      IDs are the low 16 bits of the 32-bit logic address a Toolbox Export.dpx file lists.
+
+settings:
+  read_mixers: { type: int, min: 0, max: 4, default: 1, label: Mixers read, description: "How many virtual mixers, from mixer 1, have their logic faders read on connecting (level, input and PFL); 0 reads none." }
+  read_faders: { type: int, min: 0, max: 48, default: 0, label: Faders read, description: "How many logic faders of each of those mixers, from fader 1, are read on connecting; 0 reads none." }
+  read_monitors: { type: int, min: 0, max: 200, default: 0, label: Monitors read, description: "How many monitor (selector) channels, from monitor 1, have their inputs read on connecting." }
+  read_pots: { type: int, min: 0, max: 120, default: 0, label: Pots read, description: "How many monitor potentiometers, from pot 1, have their levels read on connecting." }
+  meters: { type: int, min: 0, max: 48, default: 0, label: Meters, description: "How many level detects, from 1, have meter notifications switched on when monitoring (firmware 08.01.18 and later); each sends levels as they change." }
+
+ports:
+  - { port: 2008, protocol: tcp, role: control }
+
+models:
+  - id: rm4200d-fw5
+    name: "DHD RM4200D DSP frame with RM420-850 controller (firmware 05.xx.xx)"
+    supports:
+      [set_route_16, get_route_16, get_all_routes_16, set_monitor_channel, get_monitor_channel, set_fader_on,
+      set_fader_level, get_fader_level, set_fader_access, get_fader_access, set_fader_input, get_fader_input,
+      get_all_fader_inputs, set_logic, get_logic, set_pot_level, set_label, reset_label, get_label, set_pfl,
+      clear_pfl, load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot,
+      set_io_gain_16, get_io_gain_16, refresh]
+    verification: none
+    notes: >
+      Firmware 05: one mixer of up to 40 faders (mixer 1, faders 1-40; no fader channels), 16-bit routing with a
+      request for every crosspoint, the PFL request and the pot level request are missing, and 6 monitor
+      channels. get_fader_level needs 05.02.03 and the 16-bit I/O gain 05.02.04.
+  - id: rm4200d
+    name: "DHD RM4200D DSP frame with RM420-852 or RM420-853 controller (firmware 06 and later)"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xr
+    name: "DHD 52/XR router DSP frame with 52-6850 or 52-6851 controller"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xs
+    name: "DHD 52/XS core"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xc
+    name: "DHD 52/XC core"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xd
+    name: "DHD 52/XD core with 52-7450 controller"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xs2
+    name: "DHD 52/XS2 core (also behind SX2 and TX2 consoles)"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xc2
+    name: "DHD 52/XC2 core (also behind SX2 and TX2 consoles)"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xd2
+    name: "DHD 52/XD2 core with 52-7456 controller (also behind SX2 and TX2 consoles)"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Firmware 06 and later: four virtual mixers of up to 48 logic faders, fader channels 1-250, 200 monitor
+      channels. Several commands need a minimum firmware (see quirks); a command the firmware lacks is ignored
+      and its read-back times out.
+  - id: 52-xc3
+    name: "DHD XC3 / XD3 / XS3 core (ECP as a legacy protocol)"
+    supports:
+      [set_route, get_route, set_route_16, get_route_16, set_crosspoint_notification, set_arbitration,
+      get_arbitration, set_monitor_channel, get_monitor_channel, set_fader_on, set_fader_level, get_fader_level,
+      set_fader_notification, set_fader_access, set_fader_input, get_fader_input, set_logic, get_logic,
+      set_pot_level, get_pot_level, set_label, reset_label, get_label, set_pfl, get_pfl, clear_pfl,
+      load_channel_snapshot, save_channel_snapshot, load_mixer_snapshot, save_mixer_snapshot, set_io_gain_16,
+      get_io_gain_16, set_io_gain, get_io_gain, set_meter_notification, set_cleanfeed_input_gain,
+      get_cleanfeed_input_gain, set_cleanfeed_output, get_cleanfeed_output, refresh]
+    verification: none
+    notes: >
+      Third-generation cores keep ECP as a deprecated legacy protocol from firmware 10.2, with a reduced feature
+      set, and DHD plans to remove 16-bit routing, arbitration, display labels, load/save setups, I/O gain and
+      the clean feed parameters. DHD recommends its Control API (dhd-control-api) for these cores.
+
+commands:
+  set_route:
+    summary: "Route a source to an output by 32-bit AudioIDs (0x01F5, length 8; mono, one channel each), then read the crosspoint back (length 5); returns the input AudioID now routed"
+    params:
+      output: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: Output AudioID, description: "32-bit AudioID of the output as 8 hex digits, as the Toolbox configuration lists or exports it (for example 40080803)." }
+      input: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: Input AudioID, description: "32-bit AudioID of the source as 8 hex digits; 00000000 mutes the output." }
+    returns: value
+  get_route:
+    summary: "Read the source routed to an output by 32-bit AudioID (0x01F5, length 5); returns the input AudioID, 00000000 for mute"
+    params:
+      output: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: Output AudioID, description: "32-bit AudioID of the output as 8 hex digits, as the Toolbox configuration lists or exports it." }
+    returns: value
+  set_route_16:
+    summary: "Route a physical input or summation to a physical output by 16-bit numbers (0x01F5, length 4), then read the crosspoint back (length 2); returns the input number now routed"
+    params:
+      output: { type: string, pattern: "^[0-9A-Fa-f]{4}$", required: true, label: Output, description: "Physical output as 4 hex digits: the slot (01-1E) then the port with bit 7 set (80-FF), for example 0580 for slot 5, output 1." }
+      input: { type: string, pattern: "^[0-9A-Fa-f]{4}$", required: true, label: Input, description: "Physical input as 4 hex digits: the slot (01-1E) then the port (00-7F); 4000-7FFF for summations and special channels; FFFF mutes." }
+    returns: value
+  get_route_16:
+    summary: "Read the input routed to a physical output by 16-bit number (0x01F5, length 2); returns the input number"
+    params:
+      output: { type: string, pattern: "^[0-9A-Fa-f]{4}$", required: true, label: Output, description: "Physical output as 4 hex digits: the slot (01-1E) then the port with bit 7 set (80-FF)." }
+    returns: value
+  get_all_routes_16:
+    summary: "Ask for every crosspoint (0x01F5, length 0; firmware 05 only); each answer updates state"
+    returns: ack
+  set_crosspoint_notification:
+    summary: "Switch the device's crosspoint notification on this connection on or off (0x01F5, length 1); while on, every route made on the device is sent. Switched on automatically when monitoring"
+    params:
+      enabled: { type: bool, default: true, label: Notify, description: "On sends every crosspoint change made on the device to this connection." }
+    returns: none
+  set_arbitration:
+    summary: "Set the owning device of an input or output AudioID (0x01F9, length 5), an information store the device does not enforce, then read it back (length 4); returns the owner"
+    params:
+      audio_id: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: AudioID, description: "32-bit AudioID of the input or output as 8 hex digits." }
+      owner: { type: int, min: 0, max: 255, required: true, label: Owner device, description: "Device ID of the owning device from the Toolbox configuration (0x40-0x60 in DHD's documentation), or 0 for no owner." }
+    returns: value
+  get_arbitration:
+    summary: "Read the owning device of an input or output AudioID (0x01F9, length 4); returns the owner, 0 for none"
+    params:
+      audio_id: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: AudioID, description: "32-bit AudioID of the input or output as 8 hex digits." }
+    returns: value
+  set_monitor_channel:
+    summary: "Switch a monitor (selector) channel to a left and right input (0x1100, length 6), then read it back (length 3); returns {left, right}"
+    params:
+      monitor: { type: int, min: 1, max: 200, required: true, label: Monitor, description: "Monitor (selector) channel, numbered from 1 (wire 0 is monitor 1); 1-6 on firmware 05." }
+      left: { type: string, pattern: "^[0-9A-Fa-f]{4}$", required: true, label: Left input, description: "16-bit audio address of the left signal as 4 hex digits: 0000-0027 a pre-fader signal of the mixer, 0100-1E7F a mixer input, 4000-7FFF a summation or special channel." }
+      right: { type: string, pattern: "^[0-9A-Fa-f]{4}$", required: true, label: Right input, description: "16-bit audio address of the right signal as 4 hex digits, in the same numbering as the left." }
+    returns: value
+  get_monitor_channel:
+    summary: "Read a monitor (selector) channel's inputs (0x1100, length 3); returns {left, right}"
+    params:
+      monitor: { type: int, min: 1, max: 200, required: true, label: Monitor, description: "Monitor (selector) channel, numbered from 1 (wire 0 is monitor 1)." }
+    returns: value
+  set_fader_on:
+    summary: "Switch a logic fader or a fader channel on or off (0x1102, length 3). The protocol has no read-back for it"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+      enabled: { type: bool, required: true, label: "On", description: "On switches the fader or channel on, off switches it off." }
+    returns: none
+  set_fader_level:
+    summary: "Set a logic fader's or fader channel's level, at once (0x1103, length 4) or over a fade time (length 7), then read it back (length 2); returns the level in dB, mid-fade for a timed fade"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+      level: { type: float, min: -327.68, max: 327.67, required: true, label: Level, description: "Fader level in dB, sent in hundredths of a dB." }
+      fade_ms: { type: int, min: 0, max: 8192, default: 0, label: Fade time, description: "Milliseconds to reach the level; 0 sets it at once." }
+      curve: { type: enum, values: [level_linear, fader_linear], default: fader_linear, label: Fade curve, description: "level_linear fades linearly in dB, fader_linear linearly in fader travel; used only with a fade time." }
+    returns: value
+  get_fader_level:
+    summary: "Read a logic fader's or fader channel's level (0x1103, length 2; firmware 05.02.03 and later); returns the level in dB"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+    returns: value
+  set_fader_notification:
+    summary: "Switch fader value notification on this connection on or off (0x1103, length 1; firmware 07.02.09 and later); while on, every fader change is sent. Switched on automatically when monitoring"
+    params:
+      enabled: { type: bool, default: true, label: Notify, description: "On sends every fader value change to this connection." }
+    returns: none
+  set_fader_access:
+    summary: "Switch the access function of a logic fader or fader channel on or off (0x1104, length 7). The protocol's status request is firmware 05 only"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+      enabled: { type: bool, required: true, label: Access on, description: "On switches the access function on for the fader, off switches it off." }
+      function: { type: enum, values: [gain, pan_balance, input_select], required: true, label: Function, description: "The access function: gain, pan/balance or input select." }
+    returns: none
+  get_fader_access:
+    summary: "Ask for the access status (0x1104, length 0; firmware 05 only); returns the first answer {mixer, fader, enabled, function, channel, group}, and every answer updates state"
+    returns: value
+  set_fader_input:
+    summary: "Assign a fader channel to a logic fader (input select, 0x110D, length 4), then read it back (length 2); returns the fader channel"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1." }
+      fader: { type: int, min: 1, max: 48, required: true, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1)." }
+      input: { type: int, min: 1, max: 250, required: true, label: Fader channel, description: "Fader channel number from the Toolbox configuration to put on the logic fader." }
+    returns: value
+  get_fader_input:
+    summary: "Read which fader channel a logic fader carries (0x110D, length 2); returns the fader channel"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1." }
+      fader: { type: int, min: 1, max: 48, required: true, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1)." }
+    returns: value
+  get_all_fader_inputs:
+    summary: "Ask for every logic fader's input (0x110D, length 0; firmware 05 only); each answer updates state"
+    returns: ack
+  set_logic:
+    summary: "Set an internal logic true or false (0x110E, length 3), then read it back (length 2); returns the logic's state"
+    params:
+      logic: { type: int, min: 0, max: 65535, required: true, label: Logic ID, description: "Logic ID: the low 16 bits of the logic's 32-bit address in the Toolbox configuration (Export.dpx); on firmware 05 the fixed table of the protocol." }
+      value: { type: bool, required: true, label: Value, description: "True sets the logic on, false sets it off." }
+    returns: value
+  get_logic:
+    summary: "Read an internal logic's state (0x110E, length 2); returns true or false"
+    params:
+      logic: { type: int, min: 0, max: 65535, required: true, label: Logic ID, description: "Logic ID: the low 16 bits of the logic's 32-bit address in the Toolbox configuration (Export.dpx)." }
+    returns: value
+  set_pot_level:
+    summary: "Set a monitor potentiometer's level, at once (0x1110, length 4) or over a fade time (length 7); on firmware 07.04.11 and later reads it back (length 2) and returns the level in dB"
+    params:
+      pot: { type: int, min: 1, max: 120, required: true, label: Potentiometer, description: "Potentiometer, numbered from 1 (wire 0 is pot 1)." }
+      level: { type: float, min: -327.68, max: 327.67, required: true, label: Level, description: "Pot level in dB, sent in hundredths of a dB." }
+      fade_ms: { type: int, min: 0, max: 8192, default: 0, label: Fade time, description: "Milliseconds to reach the level; 0 sets it at once." }
+      curve: { type: enum, values: [level_linear, fader_linear], default: fader_linear, label: Fade curve, description: "level_linear fades linearly in dB, fader_linear linearly in fader travel; used only with a fade time." }
+    returns: value
+  get_pot_level:
+    summary: "Read a monitor potentiometer's level (0x1110, length 2; firmware 07.04.11 and later); returns the level in dB"
+    params:
+      pot: { type: int, min: 1, max: 120, required: true, label: Potentiometer, description: "Potentiometer, numbered from 1 (wire 0 is pot 1)." }
+    returns: value
+  set_label:
+    summary: "Write four characters to one display of a fader channel or of a central operating panel module (0x1114, length 8), then read the channel label back (length 3); returns the text"
+    params:
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel whose label is written; give either this or a panel." }
+      panel: { type: int, min: 1, max: 12, label: Panel module, description: "Central operating panel module ID whose display is written; give either this or a fader channel." }
+      display: { type: int, min: 0, max: 127, default: 0, label: Display, description: "Display number, each holding four characters; 0 is the first." }
+      text: { type: string, pattern: "^[ -~]{0,4}$", required: true, label: Text, description: "Up to four printable ASCII characters; shorter text is padded with spaces." }
+    returns: value
+  reset_label:
+    summary: "Put a display back to its original text (0x1114, length 2); on a central operating panel this clears every segment"
+    params:
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel whose label is reset; give either this or a panel." }
+      panel: { type: int, min: 1, max: 12, label: Panel module, description: "Central operating panel module ID whose displays are reset; give either this or a fader channel." }
+    returns: none
+  get_label:
+    summary: "Read one display of a fader channel's label (0x1114, length 3; firmware 07.02.10 and later); returns the four characters"
+    params:
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel whose label is read; give either this or a panel." }
+      panel: { type: int, min: 1, max: 12, label: Panel module, description: "Central operating panel module ID whose display is read; give either this or a fader channel." }
+      display: { type: int, min: 0, max: 127, default: 0, label: Display, description: "Display number, each holding four characters; 0 is the first." }
+    returns: value
+  set_pfl:
+    summary: "Switch PFL of a logic fader or fader channel on or off (0x1116, length 4), optionally switching every other PFL off; on firmware 07.04.11 and later reads it back (length 2) and returns {pfl, auto_mute}"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+      enabled: { type: bool, required: true, label: PFL on, description: "On switches PFL on, off switches it off." }
+      exclusive: { type: bool, default: false, label: Others off, description: "On also switches PFL off on every other channel (the protocol's auto mute)." }
+    returns: value
+  get_pfl:
+    summary: "Read the PFL state of a logic fader or fader channel (0x1116, length 2; firmware 07.04.11 and later); returns {pfl, auto_mute}"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+    returns: value
+  clear_pfl:
+    summary: "Switch PFL off on every channel of a virtual mixer (0x1116, length 1), or on firmware 05 everywhere (length 0)"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer whose PFLs are switched off, numbered from 1; firmware 05 switches off every PFL." }
+    returns: none
+  load_channel_snapshot:
+    summary: "Load a channel snapshot onto a logic fader or fader channel (0x111C, action 0x00)"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+      snapshot: { type: int, min: 0, max: 250, required: true, label: Snapshot, description: "Channel snapshot number, 0-250, as the device numbers them." }
+    returns: none
+  save_channel_snapshot:
+    summary: "Save a logic fader's or fader channel's settings as a channel snapshot (0x111C, action 0x01), overwriting that snapshot"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the logic fader belongs to, numbered from 1; ignored when a channel is given." }
+      fader: { type: int, min: 1, max: 48, label: Logic fader, description: "Logic fader of the virtual mixer, numbered from 1 (wire fader 0 is fader 1); give either this or a channel." }
+      channel: { type: int, min: 1, max: 250, label: Fader channel, description: "Fader channel number from the Toolbox configuration, wherever it is assigned; give either this or a logic fader." }
+      snapshot: { type: int, min: 0, max: 250, required: true, label: Snapshot, description: "Channel snapshot number, 0-250, as the device numbers them." }
+    returns: none
+  load_mixer_snapshot:
+    summary: "Load a mixer snapshot into a virtual mixer (0x111C, action 0x0A)"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer the snapshot is loaded into, numbered from 1." }
+      snapshot: { type: int, min: 0, max: 20, required: true, label: Snapshot, description: "Mixer snapshot number, 0-20, as the device numbers them." }
+    returns: none
+  save_mixer_snapshot:
+    summary: "Save a virtual mixer's settings as a mixer snapshot (0x111C, action 0x0B), overwriting that snapshot"
+    params:
+      mixer: { type: int, min: 1, max: 4, default: 1, label: Virtual mixer, description: "Virtual mixer whose settings are saved, numbered from 1." }
+      snapshot: { type: int, min: 0, max: 20, required: true, label: Snapshot, description: "Mixer snapshot number, 0-20, as the device numbers them." }
+    returns: none
+  set_io_gain_16:
+    summary: "Set a physical input's or output's gain by 16-bit number (0x112D, length 4), then read it back (length 2); returns the gain in dB"
+    params:
+      io: { type: string, pattern: "^[0-9A-Fa-f]{4}$", required: true, label: Input or output, description: "Physical input (slot then port, 0100-1E7F), output (slot then port with bit 7 set, 0180-1EFF) or summation (4000-7FFF) as 4 hex digits." }
+      gain: { type: float, min: -327.68, max: 327.67, required: true, label: Gain, description: "Gain in dB, sent in hundredths of a dB." }
+    returns: value
+  get_io_gain_16:
+    summary: "Read a physical input's or output's gain by 16-bit number (0x112D, length 2); returns the gain in dB"
+    params:
+      io: { type: string, pattern: "^[0-9A-Fa-f]{4}$", required: true, label: Input or output, description: "Physical input, output or summation as 4 hex digits." }
+    returns: value
+  set_io_gain:
+    summary: "Set an input's or output's gain by 32-bit AudioID (0x112D, length 6; firmware 06.07.15 or 07.01.16 and later), then read it back (length 4); returns the gain in dB"
+    params:
+      audio_id: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: AudioID, description: "32-bit AudioID of the input or output as 8 hex digits." }
+      gain: { type: float, min: -327.68, max: 327.67, required: true, label: Gain, description: "Gain in dB, sent in hundredths of a dB." }
+    returns: value
+  get_io_gain:
+    summary: "Read an input's or output's gain by 32-bit AudioID (0x112D, length 4); returns the gain in dB"
+    params:
+      audio_id: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: AudioID, description: "32-bit AudioID of the input or output as 8 hex digits." }
+    returns: value
+  set_meter_notification:
+    summary: "Switch the meter notification of one level detect, true peak or loudness meter on or off (0x111D, length 2; firmware 08.01.18 and later); while on, levels are sent as they change"
+    params:
+      meter: { type: int, min: 1, max: 48, required: true, label: Meter, description: "Position of the level detect, true peak or loudness meter in the Toolbox configuration, 1-48." }
+      enabled: { type: bool, default: true, label: Notify, description: "On sends the meter's levels as they change." }
+    returns: none
+  set_cleanfeed_input_gain:
+    summary: "Set a fader channel's clean feed input gain (0x1181, prefix 0x0024, length 8; firmware 09.00.05 and later), then read it back (length 4); returns the gain in dB"
+    params:
+      channel: { type: int, min: 1, max: 250, required: true, label: Fader channel, description: "Fader channel number from the Toolbox configuration." }
+      gain: { type: int, min: -40, max: 15, required: true, label: Gain, description: "Clean feed input gain or attenuation in whole dB." }
+    returns: value
+  get_cleanfeed_input_gain:
+    summary: "Read a fader channel's clean feed input gain (0x1181, prefix 0x0024, length 4); returns the gain in dB"
+    params:
+      channel: { type: int, min: 1, max: 250, required: true, label: Fader channel, description: "Fader channel number from the Toolbox configuration." }
+    returns: value
+  set_cleanfeed_output:
+    summary: >
+      Set a clean feed channel's output parameters (0x1181, prefix 0x0025, length 8; firmware 09.00.05 and later),
+      then read them back (length 4); returns {n_mix, alternative, muted, alternative_source, gain}. The fields
+      share one word: a field not given keeps the value last read for the channel, and the command is refused
+      when one is missing and nothing has been read yet
+    params:
+      channel: { type: int, min: 1, max: 250, required: true, label: Fader channel, description: "Fader channel defined as a clean feed (n-1) in the Toolbox configuration." }
+      n_mix: { type: bool, label: N-mix, description: "On sends the complete bus (n), off the n-1 signal." }
+      alternative: { type: bool, label: Alternative source, description: "On sends the alternative source from the selected list position instead of the clean feed." }
+      muted: { type: bool, label: Muted, description: "On mutes the clean feed output." }
+      alternative_source: { type: int, min: 0, max: 127, label: Alternative list position, description: "Position in the alternative source list used while the alternative source is on." }
+      gain: { type: int, min: -30, max: 10, label: Gain, description: "Clean feed output gain or attenuation in whole dB." }
+    returns: value
+  get_cleanfeed_output:
+    summary: "Read a clean feed channel's output parameters (0x1181, prefix 0x0025, length 4); returns {n_mix, alternative, muted, alternative_source, gain}"
+    params:
+      channel: { type: int, min: 1, max: 250, required: true, label: Fader channel, description: "Fader channel defined as a clean feed (n-1) in the Toolbox configuration." }
+    returns: value
+  refresh:
+    summary: "Read again what the settings say to read on connecting (fader levels, inputs and PFLs, monitor channels, pot levels), even when opened for commands only"
+    returns: ack
+
+state:
+  routes.*: { type: string, description: "Input AudioID (8 hex digits, 00000000 for mute) routed to the output, keyed by the output's 32-bit AudioID in 8 upper-case hex digits" }
+  routes_16.*: { type: string, description: "Input (4 hex digits, FFFF for mute) routed to the physical output, keyed by the output's 16-bit number in 4 upper-case hex digits" }
+  arbitration.*: { type: int, description: "Device ID owning the input or output, 0 for none, keyed by its AudioID in 8 upper-case hex digits; an information store the device does not enforce" }
+  monitors.*.left: { type: string, description: "16-bit audio address (4 hex digits) on the monitor channel's left side; keyed by monitor number from 1" }
+  monitors.*.right: { type: string, description: "16-bit audio address (4 hex digits) on the monitor channel's right side" }
+  mixers.*.faders.*.level: { type: float, unit: dB, description: "Logic fader level; keyed by virtual mixer and logic fader, each numbered from 1" }
+  mixers.*.faders.*.on: { type: bool, description: "Logic fader switched on, from a 0x1102 block the device sends; the protocol has no request for it" }
+  mixers.*.faders.*.input: { type: int, description: "Fader channel on the logic fader (input select)" }
+  mixers.*.faders.*.pfl: { type: bool, description: "PFL on for the logic fader" }
+  mixers.*.faders.*.pfl_auto_mute: { type: bool, description: "The auto mute flag the PFL answer carries for the logic fader" }
+  channels.*.level: { type: float, unit: dB, description: "Fader channel level, from answers addressed by channel; keyed by fader channel number" }
+  channels.*.on: { type: bool, description: "Fader channel switched on, from a 0x1102 block addressed by channel that the device sends" }
+  channels.*.pfl: { type: bool, description: "PFL on for the fader channel" }
+  channels.*.pfl_auto_mute: { type: bool, description: "The auto mute flag the PFL answer carries for the fader channel" }
+  channels.*.touched: { type: bool, description: "The motor fader carrying the channel is being touched (0x1182)" }
+  channels.*.labels.*: { type: string, description: "Four characters of the channel's label on one display, keyed by display number from 0" }
+  channels.*.cleanfeed.input_gain: { type: int, unit: dB, description: "Clean feed input gain" }
+  channels.*.cleanfeed.n_mix: { type: bool, description: "Clean feed sends the whole bus (n) rather than n-1" }
+  channels.*.cleanfeed.alternative: { type: bool, description: "Clean feed sends the alternative source" }
+  channels.*.cleanfeed.muted: { type: bool, description: "Clean feed output muted" }
+  channels.*.cleanfeed.alternative_source: { type: int, description: "Alternative source list position of the clean feed" }
+  channels.*.cleanfeed.gain: { type: int, unit: dB, description: "Clean feed output gain" }
+  panels.*.labels.*: { type: string, description: "Four characters on one display of a central operating panel module, keyed by module ID 1-12 and display number from 0" }
+  logics.*: { type: bool, description: "Internal logic state, keyed by logic ID" }
+  pots.*.level: { type: float, unit: dB, description: "Monitor potentiometer level, keyed by pot number from 1" }
+  io_gains.*: { type: float, unit: dB, description: "Input or output gain, keyed by the 16-bit number (4 hex digits) or the 32-bit AudioID (8 hex digits) it was read by" }
+  access.*.mixer: { type: int, description: "Virtual mixer of the fader in access, keyed by access group from 1 (firmware 05 status answers)" }
+  access.*.fader: { type: int, description: "Logic fader in access, numbered from 1" }
+  access.*.channel: { type: int, description: "Fader channel in access" }
+  access.*.enabled: { type: bool, description: "Access switched on" }
+  access.*.function: { type: string, description: "Access function: gain, pan_balance or input_select" }
+  meters.*.left: { type: float, unit: dB, description: "Left level of a level detect, true peak or loudness meter, keyed by its position 1-48" }
+  meters.*.right: { type: float, unit: dB, description: "Right level of the meter" }
+  meters.*.correlation: { type: float, description: "Correlation of the meter, -1.00 to 1.00" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Over TCP every block is 16 bytes and nothing is acknowledged: a set to an address the configuration does not
+      have, or a command the firmware lacks, is silently ignored. Commands with a request form therefore send the
+      set and then the request, and succeed with the value the device answers, matched by the command ID and the
+      address bytes the answer repeats; no answer within 2 s is a timeout. Switching a fader on or off, access,
+      reset_label, the notifications, clear_pfl and the snapshots have no read-back in the protocol and report
+      unverified.
+  - models: [all]
+    severity: warning
+    text: >
+      Most addresses come from the device's Toolbox configuration, not from the protocol: AudioIDs, logic IDs,
+      fader channel numbers, level detect positions, pots and monitor channels. The 32-bit AudioID has two
+      layouts (version 1 for RM4200D and 52/XR, version 2 for XS/XC/XD cores); its stereo and format bits are
+      indications only and routing is always mono, so a stereo route is two set_route commands. Logic IDs are the
+      low 16 bits of the logic's 32-bit address in a Toolbox Export.dpx file.
+  - models: [all]
+    severity: critical
+    text: >
+      load_channel_snapshot and load_mixer_snapshot replace the processing and routing of a fader or of a whole
+      virtual mixer at once, on air. save_channel_snapshot and save_mixer_snapshot overwrite the snapshot with
+      that number without asking. DHD documents the Load Save Setups block under firmware 05 and lists it for
+      every firmware line in its overview; it plans to remove it from third-generation cores.
+  - models: [all]
+    severity: warning
+    text: >
+      I/O gain changes last only until the system restarts and cannot be changed from the console. Arbitration
+      owners are reset to 0 by a reboot, are an information store the device does not enforce (routes are made
+      whatever the owner), and DHD's documentation sends no confirmation for a set, so set_arbitration reads the
+      owner back.
+  - models: [all]
+    severity: info
+    text: >
+      State is kept current by what the device sends: when monitoring, the core switches on the crosspoint
+      notification (length 1, TCP only) and the fader value notification on connecting, and the meter
+      notifications of the first `meters` level detects; motor fader touches, clean feed parameter changes and
+      every answer arrive on their own. What the protocol cannot report unasked (inputs on logic faders, PFL,
+      monitor channels, pots, logics, labels, I/O gains) is read on connecting for the counts the read_* settings
+      give, and otherwise as commands read it. A fader value notification names the logic fader (FaderHi 0-3), so
+      a level set by fader channel is reported under its logic fader. Opened for commands only, nothing is
+      switched on or read, and only what arrives is applied.
+  - models: [all]
+    severity: info
+    text: >
+      Levels are signed 16-bit hundredths of a dB (0x8000 is -327.68 dB, 0x7FFF +327.67 dB); fade times are
+      milliseconds up to 0x2000 (8192 ms). Fader, monitor, pot and access numbers are 1-based here and 0-based on
+      the wire; fader channels, logic IDs and display numbers are sent as given. A logic fader is addressed by
+      virtual mixer (FaderHi 0-3) and fader; a fader channel by FaderHi 0x10 and the channel number, which
+      DHD's tables give as 1-150 in the fader blocks and 1-250 elsewhere.
+  - models: [all]
+    severity: info
+    text: >
+      Only the TCP form (port 2008) is implemented; the serial form (38400 8N1, STX/EOT framing, DLE escaping,
+      checksum and ACK/NAK) is not. The device accepts up to 10 sockets (5 before firmware 7.04.06), and from
+      firmware 06 closes a socket whose data is not fetched fast enough.
+  - models: [rm4200d-fw5]
+    severity: info
+    text: >
+      Firmware 05 has one mixer of up to 40 faders and no fader channels: give mixer 1 and faders 1-40. Its logic
+      IDs are a fixed table in the protocol (pushbuttons, GPIs, fader start, PFL, logic functions, global logics
+      and so on) rather than Toolbox addresses.
+  - models: [rm4200d, 52-xr, 52-xs, 52-xc, 52-xd, 52-xs2, 52-xc2, 52-xd2, 52-xc3]
+    severity: info
+    text: >
+      Minimum firmware per command, from DHD's overview: 32-bit routing, crosspoint notification and 32-bit I/O
+      gain 06.07.15 or 07.01.16; arbitration 07.02.32; fader value notification 07.02.09; channel label request
+      07.02.10; PFL and pot level requests 07.04.11; metering 08.01.18; clean feed parameters 09.00.05. Older
+      firmware ignores them, so their read-back times out.
+  - models: [52-xc3]
+    severity: warning
+    text: >
+      ECP is deprecated from firmware 10.2 on third-generation cores and kept with a reduced feature set; DHD
+      plans to remove 16-bit routing, arbitration, display labels, load/save setups, both I/O gain forms and the
+      clean feed parameters. Use dhd-control-api for these cores.

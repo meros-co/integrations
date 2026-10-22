@@ -39,6 +39,7 @@ NATIVE = {
     "biamp-tesira": "Tesira Text Protocol over Telnet, TCP 23",
     "blackmagic-atem": "Proprietary UDP 9910",
     "bss-london": "London Direct Inject over TCP 1023",
+    "dhd-ecp": "ECP 16-byte blocks over TCP 2008",
     "emberplus": "Ember+ (S101) over TCP",
     "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",

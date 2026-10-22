@@ -802,6 +802,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:407](specs/dataton-watchout7.yaml#L407))
 - [ ] Confirm POST /v0/showfile takes the .watch file as the raw request body with Content-Type application/octet-stream, answers 200, and that showName names the loaded show; and record whether WATCHOUT 7 before 7.8 has it. ([specs/dataton-watchout7.yaml:318](specs/dataton-watchout7.yaml#L318))
 
+## dhd-ecp — DHD audio ECP (RM4200D, Series 52 cores)
+
+- [ ] Check that an answer to a request addressed by fader channel (FaderHi 0x10) repeats 0x10 and the channel, for get_fader_level and get_pfl, rather than naming the logic fader the channel sits on; the core matches the answer by those bytes. ([specs/dhd-ecp.yaml:567](specs/dhd-ecp.yaml#L567))
+- [ ] Check that a set followed at once by its request is answered with the new value (set_route, set_logic, set_fader_level, set_label, set_io_gain), not the value before the set was applied. ([specs/dhd-ecp.yaml:521](specs/dhd-ecp.yaml#L521))
+- [ ] Check whether the device sends 0x1102 on/off blocks unasked when a fader or channel is switched on or off on the console; the protocol documents no request for it, and the on state is read only from such blocks. ([specs/dhd-ecp.yaml:488](specs/dhd-ecp.yaml#L488))
+- [ ] Check whether the device answers a fader level request for a logic fader whose virtual mixer or fader is not configured, or stays silent (the core times out after 2 s). ([specs/dhd-ecp.yaml:521](specs/dhd-ecp.yaml#L521))
+- [ ] Check the firmware 05 access status answer (0x1104, length 7): which access group D6 numbers (0-5 assumed, reported 1-6), and whether one answer comes per group. ([specs/dhd-ecp.yaml:508](specs/dhd-ecp.yaml#L508))
+- [ ] Check that the meter correlation byte is signed (-100 to 100 as a two's complement byte) as read. ([specs/dhd-ecp.yaml:515](specs/dhd-ecp.yaml#L515))
+- [ ] Check that Load Save Setups (0x111C) loads and saves snapshots on firmware 06 and later, which DHD documents only under firmware 05 but lists for every firmware line. ([specs/dhd-ecp.yaml:538](specs/dhd-ecp.yaml#L538))
+- [ ] Check that the channel label request (0x1114, length 3) is answered with length 8 for the display asked, and how a central operating panel module (0x8001-0x800C) answers it. ([specs/dhd-ecp.yaml:363](specs/dhd-ecp.yaml#L363))
+
 ## digico-sd — DiGiCo SD and Quantum consoles
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
