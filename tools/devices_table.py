@@ -55,7 +55,7 @@ NATIVE = {
     "omt-discovery": "OMT metadata frames over TCP 6399",
     "osc-listener": "OSC over UDP or TCP from any sender; receives",
     "pjlink": "PJLink over TCP 4352",
-    "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default)",
+    "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default) or a serial port",
     "qsys": "QRC JSON-RPC over TCP 1710",
     "sennheiser-digital-6000": "SSC over UDP 45",
     "sennheiser-ew-dx": "HTTPS + SSE (SSCv2); UDP (SSCv1 legacy mode)",
