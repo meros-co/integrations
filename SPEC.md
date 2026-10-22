@@ -212,7 +212,8 @@ is as over plain TCP. A handshake that fails is a connection that fails,
 retried with backoff; its reason in the log starts `tls:`. Changing the
 setting with `update_settings` opens the new link at once. TLS is the
 network link's: with a `serial` block (below), link serial opens the
-serial port as it is. `tools/validate.py` checks that the setting is an enum
+serial port as it is, and the network entries in `ports` name both choices
+(`when: "link tcp, scheme tls"`). `tools/validate.py` checks that the setting is an enum
 of `tcp` and `tls`, that `tls_port` has a `tls` control entry in `ports`,
 and that `accept_invalid_certs` goes with a TLS scheme.
 

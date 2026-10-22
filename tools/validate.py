@@ -1157,7 +1157,9 @@ def expand_serial(doc: dict) -> list[str]:
     ports = doc.get("ports") or []
     if not any(e["protocol"] == "serial" and e.get("when") == "link serial" for e in ports):
         errors.append('ports: transport.serial needs a serial control entry with when: "link serial"')
-    if not any(e["protocol"] == "tcp" and e["port"] == t.get("port") and e.get("when") == "link tcp"
+    # "link tcp", or "link tcp, scheme tcp" beside a TLS scheme setting.
+    if not any(e["protocol"] == "tcp" and e["port"] == t.get("port")
+               and str(e.get("when", "")).split(",")[0].strip() == "link tcp"
                for e in ports):
         errors.append(f'ports: the transport port {t.get("port")} needs when: "link tcp" beside transport.serial')
     return errors
