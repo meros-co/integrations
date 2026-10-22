@@ -1867,8 +1867,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-xs62s — Roland XS-62S
 
-- [ ] Confirm the forms the manual leaves open: VOS with only the bus, IL2 with both a and b, the two TRS values, and VER's empty model field. ([specs/roland-xs62s.yaml:634](specs/roland-xs62s.yaml#L634))
-- [ ] Confirm QAL:14 answers fourteen levels (the manual's example shows thirteen), in the order inputs 0-10, MASTER OUT, PVW/2, AUX/3, and whether the input levels are the PGM/1 (IL1) or PVW/2 (IL2) bus levels. ([specs/roland-xs62s.yaml:569](specs/roland-xs62s.yaml#L569))
+- [ ] Confirm the forms the manual leaves open: VOS with only the bus, IL2 with both a and b, the two TRS values, and VER's empty model field. ([specs/roland-xs62s.yaml:653](specs/roland-xs62s.yaml#L653))
+- [ ] Confirm QAL:14 answers fourteen levels (the manual's example shows thirteen), in the order inputs 0-10, MASTER OUT, PVW/2, AUX/3, and whether the input levels are the PGM/1 (IL1) or PVW/2 (IL2) bus levels. ([specs/roland-xs62s.yaml:580](specs/roland-xs62s.yaml#L580))
+- [ ] Drive the XS-62S on RS-232 (link serial) and confirm the same frames as over LAN, with XON/XOFF. ([specs/roland-xs62s.yaml:40](specs/roland-xs62s.yaml#L40))
 
 ## roland-xs80h — Roland XS-82H/83H/84H
 
