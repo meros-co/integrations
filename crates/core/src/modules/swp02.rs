@@ -523,14 +523,12 @@ impl Module for Swp02 {
                     cx.set_timer(POLL_TIMER, self.poll_ms);
                 }
             }
-            PROBE_TIMER => {
-                if self.open {
-                    if self.in_flight.is_none() && self.queue.is_empty() {
-                        self.queue.push_back(Swp02::interrogate(0));
-                        self.pump(cx);
-                    }
-                    cx.set_timer(PROBE_TIMER, PROBE_EVERY);
+            PROBE_TIMER if self.open => {
+                if self.in_flight.is_none() && self.queue.is_empty() {
+                    self.queue.push_back(Swp02::interrogate(0));
+                    self.pump(cx);
                 }
+                cx.set_timer(PROBE_TIMER, PROBE_EVERY);
             }
             _ => {}
         }
