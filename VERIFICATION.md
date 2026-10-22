@@ -1861,6 +1861,26 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the SR answers `Equalizer 1` with all six values, and the EM's AF third value carries the current mute bits as the AF table gives them. ([specs/sennheiser-ew-g3-g4.yaml:198](specs/sennheiser-ew-g3-g4.yaml#L198))
 - [ ] Confirm a Push with mode 3 sends every configuration attribute at once, so renewing it every 8 s keeps the configuration current without other reads. ([specs/sennheiser-ew-g3-g4.yaml:317](specs/sennheiser-ew-g3-g4.yaml#L317))
 
+## sennheiser-l-6000 — Sennheiser L 6000
+
+- [ ] Confirm the charger answers a command datagram with the method's new value (or an /osc/error entry) to the sender's port, so each command is acknowledged by its reply. ([spec](specs/sennheiser-l-6000.yaml#L63))
+- [ ] Confirm the SSC port is 45 on the L 6000 (the guide gives 45 as the SSC default; its DNS-SD record names the port actually used). ([spec](specs/sennheiser-l-6000.yaml#L38))
+- [ ] Confirm the name query used as the liveness probe is answered while nothing else is happening. ([spec](specs/sennheiser-l-6000.yaml#L44))
+- [ ] Confirm that querying a bay's identify (and /device/identify) with null starts the identification and is answered true, how long it lasts, and whether anything stops it. ([spec](specs/sennheiser-l-6000.yaml#L423))
+- [ ] Check whether /device/storage_mode accepts a write (the guide marks it read-only but describes it as set and returned) and what the reply is. ([spec](specs/sennheiser-l-6000.yaml#L414))
+- [ ] Check the device name's length and character limits (none documented; the spec takes 32 characters without braces, brackets, backslash or quote, as for the EM 6000) and that the reply carries the MAC address appended. ([spec](specs/sennheiser-l-6000.yaml#L86))
+- [ ] Confirm auto false and the three static_* values are applied from one message, and what the charger answers. ([spec](specs/sennheiser-l-6000.yaml#L102))
+- [ ] Check what /device/network/ipv4/mdns true does to the addressing in practice, and whether it may be written while auto is true. ([spec](specs/sennheiser-l-6000.yaml#L112))
+- [ ] Find out what the asterisk on ipaddr, netmask and gateway ("Read/Write*") means, and whether they come as plain strings (as the guide shows) or arrays. ([spec](specs/sennheiser-l-6000.yaml#L436))
+- [ ] Confirm the three subscription address trees (slot LEDs, detection, types and device warnings and product; accu_parameter of slots 1-2; of slots 3-4) are each accepted in one subscription with a 60 s lifetime, and that the notifications fit a datagram. ([spec](specs/sennheiser-l-6000.yaml#L121))
+- [ ] Confirm the two multi-method poll queries (device basics; network) are answered in one reply each. ([spec](specs/sennheiser-l-6000.yaml#L127))
+- [ ] Record what /slotN/type reports for an LM 6062 and an LM 6070 module (the guide lists 0-3 only). ([spec](specs/sennheiser-l-6000.yaml#L397))
+- [ ] Check what accu_parameter holds for an empty bay, and whether its integer fields arrive as integers or as decimals (24.0 for temperature in the guide's example). ([spec](specs/sennheiser-l-6000.yaml#L153))
+- [ ] Confirm the operating time and time to full are hours plus minutes, and what time to full reads when the battery is full or not charging (the guide's example shows 340 h 30 min). ([spec](specs/sennheiser-l-6000.yaml#L405))
+- [ ] Confirm /device/warnings uses the numbers the guide lists (0-36) and reports an empty array when nothing is wrong. ([spec](specs/sennheiser-l-6000.yaml#L303))
+- [ ] Confirm /device/identity/product, version and vendor answer as the guide shows ("L6000"), and that /device/language is an array. ([spec](specs/sennheiser-l-6000.yaml#L313))
+- [ ] Confirm the charger accepts subscriptions from sixteen clients and refuses a seventeenth. ([spec](specs/sennheiser-l-6000.yaml#L388))
+
 ## sennheiser-spectera — Sennheiser Spectera
 
 - [ ] Confirm the API accepts controlSennheiser with the device password on firmware 1.4.x, and whether the user api works on any firmware yet. ([specs/sennheiser-spectera.yaml:539](specs/sennheiser-spectera.yaml#L539))

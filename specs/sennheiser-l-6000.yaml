@@ -1,0 +1,443 @@
+spec: 1
+id: sennheiser-l-6000
+name: Sennheiser L 6000 network charger (SSC)
+vendor: Sennheiser
+category: wireless
+
+source:
+  - title: Sennheiser Sound Control Protocol (SSC) — Developer's guide for Digital 6000 (TI 1109 v2.2)
+    author: Sennheiser
+    url: https://www.sennheiser.com/globalassets/digizuite/41931-en-ti_1109_v2.2_sennheiser_sound_control_protocol_digital_6000_en.pdf
+    note: >
+      Manufacturer document; the guide covers the EM 6000 and the L 6000.
+      §4.3 messages and addresses, §5 subscriptions (lifetime default 10 s,
+      count default 1000, renewal by re-requesting, 310 on expiry), §6.1 UDP
+      transport on default port 45, §10 L 6000 limitations (UDP only, sixteen
+      subscribing clients), §11 the L 6000 method list (/slot1-4/subslot1-2
+      led, identify, accu_parameter and accu_detection; /slot1-4/type;
+      /device identity, network, language, warnings, storage_mode, name and
+      identify; /osc methods), §12 error codes.
+  - title: L 6000 release notes, firmware 3.0.2 (with the previous releases)
+    author: Sennheiser
+    url: https://sennheiser.com/globalassets/digizuite/48121-en-l_6000_release_notes_v3.0.2_en-1.pdf
+    note: >
+      LM 6062 (BA 62) support from firmware 2.0.8, LM 6070 (BA 70) support
+      from 3.0.1. Neither release note says what /slotN/type reports for
+      these modules.
+  - title: L 6000 Architect's Specification, 10/2018
+    author: Sennheiser
+    url: https://www.sennheiser.com/globalassets/digizuite/41056-en-l_6000_architect_specifications_10_2018_en.docx
+    note: Storage mode (charge or discharge to 70 %) and the battery information are offered through network control.
+  - title: Bitfocus Companion, companion-module-sennheiser-digital6000 (src/actions.js, src/subscriptions.js, src/consts.js)
+    url: https://github.com/bitfocus/companion-module-sennheiser-digital6000
+    note: >
+      MIT-licensed; read as corroboration only, no code copied. Identifies a
+      bay by querying its identify method with null, subscribes the slot and
+      device methods in several address trees, and knows slot types 0-3 only.
+
+transport:
+  type: line-udp
+  port: 45
+  terminator: none
+  encoding: ascii
+  reply: to-source
+  probe: '{"device":{"name":null}}'
+
+ports:
+  - { port: 45, protocol: udp, role: control }
+
+models:
+  - id: l-6000
+    name: Sennheiser L 6000 charger
+    supports:
+      [identify_bay, identify_device, set_storage_mode, set_device_name,
+       set_network_dhcp, set_network_manual, set_mdns]
+    verification: none
+    notes: >
+      A rack charger with four slots, each taking a charging module with two
+      bays: LM 6060 (BA 60), LM 6061 (BA 61), LM 6062 (BA 62, firmware 2.0.8
+      and later) or LM 6070 (BA 70, firmware 3.0.1 and later), or a blank
+      panel.
+
+commands:
+  identify_bay:
+    summary: Flash one bay's LED to identify it (/slotN/subslotM/identify)
+    params:
+      slot: { type: int, min: 1, max: 4, required: true, label: Slot, description: "Charging module slot, 1 to 4 as the API numbers them." }
+      bay: { type: int, min: 1, max: 2, required: true, label: Bay, description: "Bay of the module, 1 or 2 (the API's subslot)." }
+    send: '{"slot{slot}":{"subslot{bay}":{"identify":null}}}'
+    expect: { reply_contains: '"identify"', not_contains: '"error"' }
+    returns: ack
+
+  identify_device:
+    summary: Identify the charger by changing the colors of its LEDs (/device/identify)
+    send: '{"device":{"identify":null}}'
+    expect: { reply_contains: '"identify"', not_contains: '"error"' }
+    returns: ack
+
+  set_storage_mode:
+    summary: Start or stop storage mode, which charges or discharges every battery to about 70 % (/device/storage_mode)
+    params:
+      enabled: { type: bool, required: true, label: Storage mode, description: "On brings the inserted batteries to their storage charge, off returns to normal charging." }
+    send: '{"device":{"storage_mode":{enabled}}}'
+    expect: { reply_contains: '"storage_mode"', not_contains: '"error"' }
+    returns: ack
+
+  set_device_name:
+    summary: >
+      Name the charger (/device/name); the charger appends its MAC address to
+      the name, and the name is also its discovery name
+    params:
+      name: { type: string, max_length: 32, pattern: '^[^{}\[\]\\"]+$', required: true, label: Name, description: "Device name; the charger adds its MAC address after it to keep names unique in discovery." }
+    send: '{"device":{"name":{name:json}}}'
+    expect: { reply_contains: '"name"', not_contains: '"error"' }
+    returns: ack
+
+  set_network_dhcp:
+    summary: Take the IP address automatically, by DHCP and Auto-IP (/device/network/ipv4/auto true)
+    send: '{"device":{"network":{"ipv4":{"auto":true}}}}'
+    expect: { reply_contains: '"auto"', not_contains: '"error"' }
+    returns: ack
+
+  set_network_manual:
+    summary: Set a static IP address, netmask and gateway (/device/network/ipv4 auto false and static_*)
+    params:
+      ip: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", required: true, label: IP address, description: "Static IPv4 address in dotted form, e.g. 192.168.1.203." }
+      netmask: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", required: true, label: Netmask, description: "IPv4 netmask in dotted form, e.g. 255.255.255.0." }
+      gateway: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", required: true, label: Gateway, description: "IPv4 gateway in dotted form, e.g. 192.168.1.1." }
+    send: '{"device":{"network":{"ipv4":{"auto":false,"static_ipaddr":{ip:json},"static_netmask":{netmask:json},"static_gateway":{gateway:json}}}}}'
+    expect: { reply_contains: '"static_ipaddr"', not_contains: '"error"' }
+    returns: ack
+
+  set_mdns:
+    summary: Turn mDNS-only addressing on or off (/device/network/ipv4/mdns)
+    params:
+      enabled: { type: bool, required: true, label: mDNS, description: "On announces the charger by mDNS with the manually set address and no DHCP or link-local addressing; off leaves manual addressing alone." }
+    send: '{"device":{"network":{"ipv4":{"mdns":{enabled}}}}}'
+    expect: { reply_contains: '"mdns"', not_contains: '"error"' }
+    returns: ack
+
+telemetry:
+  subscribe:
+    send:
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60},"slot1":{"type":null,"subslot1":{"led":null,"accu_detection":null},"subslot2":{"led":null,"accu_detection":null}},"slot2":{"type":null,"subslot1":{"led":null,"accu_detection":null},"subslot2":{"led":null,"accu_detection":null}},"slot3":{"type":null,"subslot1":{"led":null,"accu_detection":null},"subslot2":{"led":null,"accu_detection":null}},"slot4":{"type":null,"subslot1":{"led":null,"accu_detection":null},"subslot2":{"led":null,"accu_detection":null}},"device":{"warnings":null,"identity":{"product":null}}}]}}}'
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60},"slot1":{"subslot1":{"accu_parameter":null},"subslot2":{"accu_parameter":null}},"slot2":{"subslot1":{"accu_parameter":null},"subslot2":{"accu_parameter":null}}}]}}}'
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60},"slot3":{"subslot1":{"accu_parameter":null},"subslot2":{"accu_parameter":null}},"slot4":{"subslot1":{"accu_parameter":null},"subslot2":{"accu_parameter":null}}}]}}}'
+    every_ms: 20000
+  poll:
+    send:
+      - '{"device":{"name":null,"storage_mode":null,"language":null,"identity":{"version":null,"vendor":null}}}'
+      - '{"device":{"network":{"ether":{"macs":null,"interfaces":null},"ipv4":{"auto":null,"mdns":null,"interfaces":null,"static_ipaddr":null,"static_netmask":null,"static_gateway":null,"ipaddr":null,"netmask":null,"gateway":null}}}}'
+    every_ms: 30000
+  updates:
+    - json_match: { "$.slot1.type": "^([0-9]+)$" }
+      state:
+        slots.1.type_code: "{1}"
+        slots.1.type: { value: "{1}", map: &slot_type { "0": "none", "1": "lm6060", "2": "lm6061", "3": "unknown_fault" } }
+    - json_match: { "$.slot2.type": "^([0-9]+)$" }
+      state:
+        slots.2.type_code: "{1}"
+        slots.2.type: { value: "{1}", map: *slot_type }
+    - json_match: { "$.slot3.type": "^([0-9]+)$" }
+      state:
+        slots.3.type_code: "{1}"
+        slots.3.type: { value: "{1}", map: *slot_type }
+    - json_match: { "$.slot4.type": "^([0-9]+)$" }
+      state:
+        slots.4.type_code: "{1}"
+        slots.4.type: { value: "{1}", map: *slot_type }
+    - json_match: { "$.slot1.subslot1.led": "^([A-Z_]+)$" }
+      state: { slots.1.bays.1.led: { value: "{1}", map: &led { "OFF": "off", "GREEN": "green", "GREEN_FLASHING": "green_flashing", "YELLOW": "yellow", "YELLOW_FLASHING": "yellow_flashing", "RED": "red", "RED_FLASHING": "red_flashing", "GREEN_RED_FLASHING": "green_red_flashing", "YELLOW_RED_FLASHING": "yellow_red_flashing", "YELLOW_GREEN_FLASHING": "yellow_green_flashing", "DEV_IDENTIFY": "identify" } } }
+    - json_match: { "$.slot1.subslot1.accu_detection": "^(true|false)$" }
+      state: { slots.1.bays.1.battery_detected: "{1}" }
+    - json_match: { "$.slot1.subslot1.accu_parameter": "^\\[" }
+      json: { p0: "$.slot1.subslot1.accu_parameter[0]", p1: "$.slot1.subslot1.accu_parameter[1]", p2: "$.slot1.subslot1.accu_parameter[2]", p3: "$.slot1.subslot1.accu_parameter[3]", p4: "$.slot1.subslot1.accu_parameter[4]", p5: "$.slot1.subslot1.accu_parameter[5]", p6: "$.slot1.subslot1.accu_parameter[6]", p7: "$.slot1.subslot1.accu_parameter[7]", p8: "$.slot1.subslot1.accu_parameter[8]", p9: "$.slot1.subslot1.accu_parameter[9]", p10: "$.slot1.subslot1.accu_parameter[10]", p11: "$.slot1.subslot1.accu_parameter[11]" }
+      state:
+        slots.1.bays.1.temperature_c: "{p0}"
+        slots.1.bays.1.voltage_mv: "{p1}"
+        slots.1.bays.1.capacity_mah: "{p2}"
+        slots.1.bays.1.current_ma: "{p3}"
+        slots.1.bays.1.energy_mwh: "{p4}"
+        slots.1.bays.1.operating_time_h: "{p5}"
+        slots.1.bays.1.operating_time_min: "{p6}"
+        slots.1.bays.1.battery_percent: "{p7}"
+        slots.1.bays.1.cycles: "{p8}"
+        slots.1.bays.1.health_pct: "{p9}"
+        slots.1.bays.1.time_to_full_h: "{p10}"
+        slots.1.bays.1.time_to_full_min: "{p11}"
+    - json_match: { "$.slot1.subslot2.led": "^([A-Z_]+)$" }
+      state: { slots.1.bays.2.led: { value: "{1}", map: *led } }
+    - json_match: { "$.slot1.subslot2.accu_detection": "^(true|false)$" }
+      state: { slots.1.bays.2.battery_detected: "{1}" }
+    - json_match: { "$.slot1.subslot2.accu_parameter": "^\\[" }
+      json: { p0: "$.slot1.subslot2.accu_parameter[0]", p1: "$.slot1.subslot2.accu_parameter[1]", p2: "$.slot1.subslot2.accu_parameter[2]", p3: "$.slot1.subslot2.accu_parameter[3]", p4: "$.slot1.subslot2.accu_parameter[4]", p5: "$.slot1.subslot2.accu_parameter[5]", p6: "$.slot1.subslot2.accu_parameter[6]", p7: "$.slot1.subslot2.accu_parameter[7]", p8: "$.slot1.subslot2.accu_parameter[8]", p9: "$.slot1.subslot2.accu_parameter[9]", p10: "$.slot1.subslot2.accu_parameter[10]", p11: "$.slot1.subslot2.accu_parameter[11]" }
+      state:
+        slots.1.bays.2.temperature_c: "{p0}"
+        slots.1.bays.2.voltage_mv: "{p1}"
+        slots.1.bays.2.capacity_mah: "{p2}"
+        slots.1.bays.2.current_ma: "{p3}"
+        slots.1.bays.2.energy_mwh: "{p4}"
+        slots.1.bays.2.operating_time_h: "{p5}"
+        slots.1.bays.2.operating_time_min: "{p6}"
+        slots.1.bays.2.battery_percent: "{p7}"
+        slots.1.bays.2.cycles: "{p8}"
+        slots.1.bays.2.health_pct: "{p9}"
+        slots.1.bays.2.time_to_full_h: "{p10}"
+        slots.1.bays.2.time_to_full_min: "{p11}"
+    - json_match: { "$.slot2.subslot1.led": "^([A-Z_]+)$" }
+      state: { slots.2.bays.1.led: { value: "{1}", map: *led } }
+    - json_match: { "$.slot2.subslot1.accu_detection": "^(true|false)$" }
+      state: { slots.2.bays.1.battery_detected: "{1}" }
+    - json_match: { "$.slot2.subslot1.accu_parameter": "^\\[" }
+      json: { p0: "$.slot2.subslot1.accu_parameter[0]", p1: "$.slot2.subslot1.accu_parameter[1]", p2: "$.slot2.subslot1.accu_parameter[2]", p3: "$.slot2.subslot1.accu_parameter[3]", p4: "$.slot2.subslot1.accu_parameter[4]", p5: "$.slot2.subslot1.accu_parameter[5]", p6: "$.slot2.subslot1.accu_parameter[6]", p7: "$.slot2.subslot1.accu_parameter[7]", p8: "$.slot2.subslot1.accu_parameter[8]", p9: "$.slot2.subslot1.accu_parameter[9]", p10: "$.slot2.subslot1.accu_parameter[10]", p11: "$.slot2.subslot1.accu_parameter[11]" }
+      state:
+        slots.2.bays.1.temperature_c: "{p0}"
+        slots.2.bays.1.voltage_mv: "{p1}"
+        slots.2.bays.1.capacity_mah: "{p2}"
+        slots.2.bays.1.current_ma: "{p3}"
+        slots.2.bays.1.energy_mwh: "{p4}"
+        slots.2.bays.1.operating_time_h: "{p5}"
+        slots.2.bays.1.operating_time_min: "{p6}"
+        slots.2.bays.1.battery_percent: "{p7}"
+        slots.2.bays.1.cycles: "{p8}"
+        slots.2.bays.1.health_pct: "{p9}"
+        slots.2.bays.1.time_to_full_h: "{p10}"
+        slots.2.bays.1.time_to_full_min: "{p11}"
+    - json_match: { "$.slot2.subslot2.led": "^([A-Z_]+)$" }
+      state: { slots.2.bays.2.led: { value: "{1}", map: *led } }
+    - json_match: { "$.slot2.subslot2.accu_detection": "^(true|false)$" }
+      state: { slots.2.bays.2.battery_detected: "{1}" }
+    - json_match: { "$.slot2.subslot2.accu_parameter": "^\\[" }
+      json: { p0: "$.slot2.subslot2.accu_parameter[0]", p1: "$.slot2.subslot2.accu_parameter[1]", p2: "$.slot2.subslot2.accu_parameter[2]", p3: "$.slot2.subslot2.accu_parameter[3]", p4: "$.slot2.subslot2.accu_parameter[4]", p5: "$.slot2.subslot2.accu_parameter[5]", p6: "$.slot2.subslot2.accu_parameter[6]", p7: "$.slot2.subslot2.accu_parameter[7]", p8: "$.slot2.subslot2.accu_parameter[8]", p9: "$.slot2.subslot2.accu_parameter[9]", p10: "$.slot2.subslot2.accu_parameter[10]", p11: "$.slot2.subslot2.accu_parameter[11]" }
+      state:
+        slots.2.bays.2.temperature_c: "{p0}"
+        slots.2.bays.2.voltage_mv: "{p1}"
+        slots.2.bays.2.capacity_mah: "{p2}"
+        slots.2.bays.2.current_ma: "{p3}"
+        slots.2.bays.2.energy_mwh: "{p4}"
+        slots.2.bays.2.operating_time_h: "{p5}"
+        slots.2.bays.2.operating_time_min: "{p6}"
+        slots.2.bays.2.battery_percent: "{p7}"
+        slots.2.bays.2.cycles: "{p8}"
+        slots.2.bays.2.health_pct: "{p9}"
+        slots.2.bays.2.time_to_full_h: "{p10}"
+        slots.2.bays.2.time_to_full_min: "{p11}"
+    - json_match: { "$.slot3.subslot1.led": "^([A-Z_]+)$" }
+      state: { slots.3.bays.1.led: { value: "{1}", map: *led } }
+    - json_match: { "$.slot3.subslot1.accu_detection": "^(true|false)$" }
+      state: { slots.3.bays.1.battery_detected: "{1}" }
+    - json_match: { "$.slot3.subslot1.accu_parameter": "^\\[" }
+      json: { p0: "$.slot3.subslot1.accu_parameter[0]", p1: "$.slot3.subslot1.accu_parameter[1]", p2: "$.slot3.subslot1.accu_parameter[2]", p3: "$.slot3.subslot1.accu_parameter[3]", p4: "$.slot3.subslot1.accu_parameter[4]", p5: "$.slot3.subslot1.accu_parameter[5]", p6: "$.slot3.subslot1.accu_parameter[6]", p7: "$.slot3.subslot1.accu_parameter[7]", p8: "$.slot3.subslot1.accu_parameter[8]", p9: "$.slot3.subslot1.accu_parameter[9]", p10: "$.slot3.subslot1.accu_parameter[10]", p11: "$.slot3.subslot1.accu_parameter[11]" }
+      state:
+        slots.3.bays.1.temperature_c: "{p0}"
+        slots.3.bays.1.voltage_mv: "{p1}"
+        slots.3.bays.1.capacity_mah: "{p2}"
+        slots.3.bays.1.current_ma: "{p3}"
+        slots.3.bays.1.energy_mwh: "{p4}"
+        slots.3.bays.1.operating_time_h: "{p5}"
+        slots.3.bays.1.operating_time_min: "{p6}"
+        slots.3.bays.1.battery_percent: "{p7}"
+        slots.3.bays.1.cycles: "{p8}"
+        slots.3.bays.1.health_pct: "{p9}"
+        slots.3.bays.1.time_to_full_h: "{p10}"
+        slots.3.bays.1.time_to_full_min: "{p11}"
+    - json_match: { "$.slot3.subslot2.led": "^([A-Z_]+)$" }
+      state: { slots.3.bays.2.led: { value: "{1}", map: *led } }
+    - json_match: { "$.slot3.subslot2.accu_detection": "^(true|false)$" }
+      state: { slots.3.bays.2.battery_detected: "{1}" }
+    - json_match: { "$.slot3.subslot2.accu_parameter": "^\\[" }
+      json: { p0: "$.slot3.subslot2.accu_parameter[0]", p1: "$.slot3.subslot2.accu_parameter[1]", p2: "$.slot3.subslot2.accu_parameter[2]", p3: "$.slot3.subslot2.accu_parameter[3]", p4: "$.slot3.subslot2.accu_parameter[4]", p5: "$.slot3.subslot2.accu_parameter[5]", p6: "$.slot3.subslot2.accu_parameter[6]", p7: "$.slot3.subslot2.accu_parameter[7]", p8: "$.slot3.subslot2.accu_parameter[8]", p9: "$.slot3.subslot2.accu_parameter[9]", p10: "$.slot3.subslot2.accu_parameter[10]", p11: "$.slot3.subslot2.accu_parameter[11]" }
+      state:
+        slots.3.bays.2.temperature_c: "{p0}"
+        slots.3.bays.2.voltage_mv: "{p1}"
+        slots.3.bays.2.capacity_mah: "{p2}"
+        slots.3.bays.2.current_ma: "{p3}"
+        slots.3.bays.2.energy_mwh: "{p4}"
+        slots.3.bays.2.operating_time_h: "{p5}"
+        slots.3.bays.2.operating_time_min: "{p6}"
+        slots.3.bays.2.battery_percent: "{p7}"
+        slots.3.bays.2.cycles: "{p8}"
+        slots.3.bays.2.health_pct: "{p9}"
+        slots.3.bays.2.time_to_full_h: "{p10}"
+        slots.3.bays.2.time_to_full_min: "{p11}"
+    - json_match: { "$.slot4.subslot1.led": "^([A-Z_]+)$" }
+      state: { slots.4.bays.1.led: { value: "{1}", map: *led } }
+    - json_match: { "$.slot4.subslot1.accu_detection": "^(true|false)$" }
+      state: { slots.4.bays.1.battery_detected: "{1}" }
+    - json_match: { "$.slot4.subslot1.accu_parameter": "^\\[" }
+      json: { p0: "$.slot4.subslot1.accu_parameter[0]", p1: "$.slot4.subslot1.accu_parameter[1]", p2: "$.slot4.subslot1.accu_parameter[2]", p3: "$.slot4.subslot1.accu_parameter[3]", p4: "$.slot4.subslot1.accu_parameter[4]", p5: "$.slot4.subslot1.accu_parameter[5]", p6: "$.slot4.subslot1.accu_parameter[6]", p7: "$.slot4.subslot1.accu_parameter[7]", p8: "$.slot4.subslot1.accu_parameter[8]", p9: "$.slot4.subslot1.accu_parameter[9]", p10: "$.slot4.subslot1.accu_parameter[10]", p11: "$.slot4.subslot1.accu_parameter[11]" }
+      state:
+        slots.4.bays.1.temperature_c: "{p0}"
+        slots.4.bays.1.voltage_mv: "{p1}"
+        slots.4.bays.1.capacity_mah: "{p2}"
+        slots.4.bays.1.current_ma: "{p3}"
+        slots.4.bays.1.energy_mwh: "{p4}"
+        slots.4.bays.1.operating_time_h: "{p5}"
+        slots.4.bays.1.operating_time_min: "{p6}"
+        slots.4.bays.1.battery_percent: "{p7}"
+        slots.4.bays.1.cycles: "{p8}"
+        slots.4.bays.1.health_pct: "{p9}"
+        slots.4.bays.1.time_to_full_h: "{p10}"
+        slots.4.bays.1.time_to_full_min: "{p11}"
+    - json_match: { "$.slot4.subslot2.led": "^([A-Z_]+)$" }
+      state: { slots.4.bays.2.led: { value: "{1}", map: *led } }
+    - json_match: { "$.slot4.subslot2.accu_detection": "^(true|false)$" }
+      state: { slots.4.bays.2.battery_detected: "{1}" }
+    - json_match: { "$.slot4.subslot2.accu_parameter": "^\\[" }
+      json: { p0: "$.slot4.subslot2.accu_parameter[0]", p1: "$.slot4.subslot2.accu_parameter[1]", p2: "$.slot4.subslot2.accu_parameter[2]", p3: "$.slot4.subslot2.accu_parameter[3]", p4: "$.slot4.subslot2.accu_parameter[4]", p5: "$.slot4.subslot2.accu_parameter[5]", p6: "$.slot4.subslot2.accu_parameter[6]", p7: "$.slot4.subslot2.accu_parameter[7]", p8: "$.slot4.subslot2.accu_parameter[8]", p9: "$.slot4.subslot2.accu_parameter[9]", p10: "$.slot4.subslot2.accu_parameter[10]", p11: "$.slot4.subslot2.accu_parameter[11]" }
+      state:
+        slots.4.bays.2.temperature_c: "{p0}"
+        slots.4.bays.2.voltage_mv: "{p1}"
+        slots.4.bays.2.capacity_mah: "{p2}"
+        slots.4.bays.2.current_ma: "{p3}"
+        slots.4.bays.2.energy_mwh: "{p4}"
+        slots.4.bays.2.operating_time_h: "{p5}"
+        slots.4.bays.2.operating_time_min: "{p6}"
+        slots.4.bays.2.battery_percent: "{p7}"
+        slots.4.bays.2.cycles: "{p8}"
+        slots.4.bays.2.health_pct: "{p9}"
+        slots.4.bays.2.time_to_full_h: "{p10}"
+        slots.4.bays.2.time_to_full_min: "{p11}"
+    - json_match: { "$.device.warnings": "^(\\[.*\\])$" }
+      state: { device.warning_codes: "{1}" }
+    - json_match: { "$.device.warnings": "^\\[" }
+      json_each: "$.device.warnings"
+      json: { v: "$" }
+      replace: device.warnings
+      state:
+        "device.warnings.{index}": { value: "{v}", map: { "0": "slot1_bay1_too_hot", "1": "slot1_bay2_too_hot", "2": "slot2_bay1_too_hot", "3": "slot2_bay2_too_hot", "4": "slot3_bay1_too_hot", "5": "slot3_bay2_too_hot", "6": "slot4_bay1_too_hot", "7": "slot4_bay2_too_hot", "8": "slot1_bay1_regenerating", "9": "slot1_bay2_regenerating", "10": "slot2_bay1_regenerating", "11": "slot2_bay2_regenerating", "12": "slot3_bay1_regenerating", "13": "slot3_bay2_regenerating", "14": "slot4_bay1_regenerating", "15": "slot4_bay2_regenerating", "16": "slot1_bay1_defect", "17": "slot1_bay2_defect", "18": "slot2_bay1_defect", "19": "slot2_bay2_defect", "20": "slot3_bay1_defect", "21": "slot3_bay2_defect", "22": "slot4_bay1_defect", "23": "slot4_bay2_defect", "24": "fan1_defect", "25": "fan2_defect", "26": "fan3_defect", "27": "fan4_defect", "28": "device_too_hot", "29": "slot1_bay1_too_cold", "30": "slot1_bay2_too_cold", "31": "slot2_bay1_too_cold", "32": "slot2_bay2_too_cold", "33": "slot3_bay1_too_cold", "34": "slot3_bay2_too_cold", "35": "slot4_bay1_too_cold", "36": "slot4_bay2_too_cold" } }
+    - json_match: { "$.device.name": "^(.*)$" }
+      state: { device.name: "{1}" }
+    - json_match: { "$.device.storage_mode": "^(true|false)$" }
+      state: { device.storage_mode: "{1}" }
+    - json_match: { "$.device.language": "^(.*)$" }
+      state: { device.language: "{1}" }
+    - json_match: { "$.device.identity.product": "^(.*)$" }
+      state: { device.product: "{1}" }
+    - json_match: { "$.device.identity.version": "^(.*)$" }
+      state: { device.version: "{1}" }
+    - json_match: { "$.device.identity.vendor": "^(.*)$" }
+      state: { device.vendor: "{1}" }
+    - json_match: { "$.device.network.ether.macs": '^\["?([^"\]]*)"?' }
+      state: { device.network.mac: "{1}" }
+    - json_match: { "$.device.network.ether.interfaces": "^(\\[.*\\])$" }
+      state: { device.network.interfaces: "{1}" }
+    - json_match: { "$.device.network.ipv4.interfaces": "^(\\[.*\\])$" }
+      state: { device.network.ipv4_interfaces: "{1}" }
+    - json_match: { "$.device.network.ipv4.auto": "^(true|false)$" }
+      state: { device.network.auto: "{1}" }
+    - json_match: { "$.device.network.ipv4.mdns": "^(true|false)$" }
+      state: { device.network.mdns: "{1}" }
+    - json_match: { "$.device.network.ipv4.static_ipaddr": "^(.*)$" }
+      state: { device.network.manual_ip: "{1}" }
+    - json_match: { "$.device.network.ipv4.static_netmask": "^(.*)$" }
+      state: { device.network.manual_netmask: "{1}" }
+    - json_match: { "$.device.network.ipv4.static_gateway": "^(.*)$" }
+      state: { device.network.manual_gateway: "{1}" }
+    - json_match: { "$.device.network.ipv4.ipaddr": "^(.*)$" }
+      state: { device.network.ip: "{1}" }
+    - json_match: { "$.device.network.ipv4.netmask": "^(.*)$" }
+      state: { device.network.netmask: "{1}" }
+    - json_match: { "$.device.network.ipv4.gateway": "^(.*)$" }
+      state: { device.network.gateway: "{1}" }
+
+state:
+  slots.*.type:                   { type: string, description: "What is in the slot: none (blank panel), lm6060, lm6061 or unknown_fault; slots are 1-4 in the API's order" }
+  slots.*.type_code:              { type: int, description: "The slot type number as the charger sends it: 0 blank panel, 1 LM 6060, 2 LM 6061, 3 unknown or fault" }
+  slots.*.bays.*.led:             { type: string, description: "Bay LED: off, green, green_flashing, yellow, yellow_flashing, red, red_flashing, green_red_flashing, yellow_red_flashing, yellow_green_flashing or identify" }
+  slots.*.bays.*.battery_detected: { type: bool, description: "Whether a battery is in the bay" }
+  slots.*.bays.*.temperature_c:   { type: float, unit: "°C", description: "Battery temperature" }
+  slots.*.bays.*.voltage_mv:      { type: int, unit: mV, description: "Battery voltage" }
+  slots.*.bays.*.capacity_mah:    { type: int, unit: mAh, description: "Battery capacity" }
+  slots.*.bays.*.current_ma:      { type: int, unit: mA, description: "Charging current" }
+  slots.*.bays.*.energy_mwh:      { type: int, unit: mWh, description: "Energy held by the battery" }
+  slots.*.bays.*.operating_time_h:   { type: int, unit: h, description: "Operating time the battery holds, hours part" }
+  slots.*.bays.*.operating_time_min: { type: int, unit: min, description: "Operating time the battery holds, minutes part" }
+  slots.*.bays.*.battery_percent: { type: int, unit: "%", description: "State of charge, 0-100" }
+  slots.*.bays.*.cycles:          { type: int, description: "Charge cycle count of the battery" }
+  slots.*.bays.*.health_pct:      { type: int, unit: "%", description: "State of health of the battery, 0-100" }
+  slots.*.bays.*.time_to_full_h:  { type: int, unit: h, description: "Time until the battery is full, hours part" }
+  slots.*.bays.*.time_to_full_min: { type: int, unit: min, description: "Time until the battery is full, minutes part" }
+  device.warnings.*:              { type: string, description: "Active warnings by name, e.g. slot2_bay1_too_hot, slot1_bay2_regenerating, slot3_bay1_defect, slot4_bay2_too_cold, fan1_defect to fan4_defect or device_too_hot" }
+  device.warning_codes:           { type: string, description: "The active warning numbers as the JSON array the charger sends, e.g. [3,5]" }
+  device.name:                    { type: string, description: "Device name, with the MAC address the charger appends" }
+  device.storage_mode:            { type: bool, description: "Whether storage mode is on" }
+  device.language:                { type: string, description: "Language of the charger's description texts, as it sends it, e.g. [\"en_GB\"]" }
+  device.product:                 { type: string, description: "Product label, L6000" }
+  device.version:                 { type: string, description: "Firmware version" }
+  device.vendor:                  { type: string, description: "Vendor string" }
+  device.network.mac:             { type: string, description: "Ethernet MAC address" }
+  device.network.interfaces:      { type: string, description: "Ethernet interfaces as the JSON array the charger sends, e.g. [\"CONTROL\"]" }
+  device.network.ipv4_interfaces: { type: string, description: "IPv4 interface indices as the JSON array the charger sends" }
+  device.network.auto:            { type: bool, description: "Whether the address is taken automatically (DHCP and Auto-IP) rather than set manually" }
+  device.network.mdns:            { type: bool, description: "Whether mDNS-only addressing is on (manual address announced by mDNS)" }
+  device.network.manual_ip:       { type: string, description: "Static IPv4 address, used when auto is off" }
+  device.network.manual_netmask:  { type: string, description: "Static IPv4 netmask" }
+  device.network.manual_gateway:  { type: string, description: "Static IPv4 gateway" }
+  device.network.ip:              { type: string, description: "Current IPv4 address, in every mode" }
+  device.network.netmask:         { type: string, description: "Current IPv4 netmask" }
+  device.network.gateway:         { type: string, description: "Current IPv4 gateway" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      SSC on the L 6000 is unencrypted and has no password: anyone on the
+      network can control the charger. Keep it on a separate control network.
+
+  - models: [all]
+    severity: info
+    text: >
+      The slot and bay values and the warnings come from three subscriptions
+      with a 60 s lifetime, renewed every 20 s; the name, storage mode,
+      identity and network settings are not subscribable and are read every
+      30 s and after each change. The charger accepts subscriptions from at
+      most sixteen clients at a time.
+
+  - models: [all]
+    severity: warning
+    text: >
+      TI 1109 lists slot types 0-3 only (blank panel, LM 6060, LM 6061,
+      unknown or fault). What an LM 6062 or LM 6070 reports is not documented:
+      type_code keeps the number the charger sends, and type is left unset for
+      a number the guide does not list.
+
+  - models: [all]
+    severity: info
+    text: >
+      accu_parameter is valid only while a battery is in the bay
+      (battery_detected); with the bay empty its values are kept but mean
+      nothing. The guide's example gives a time to full of 340 h 30 min for a
+      battery at 69 % drawing no current, so the time to full is meaningful
+      only while the battery is charging.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The guide marks /device/storage_mode read-only while describing it as
+      set and returned; set_storage_mode follows the description and the
+      architect's specification, which offer storage mode through network
+      control. A charger that refuses it answers with an /osc/error entry and
+      the command fails.
+
+  - models: [all]
+    severity: info
+    text: >
+      Identification is a query: reading /device/identify or a bay's identify
+      starts it and is answered true. The guide documents no way to stop it
+      or how long it lasts.
+
+  - models: [all]
+    severity: critical
+    text: >
+      set_network_manual, set_network_dhcp and set_mdns can move the charger
+      to an address the core is not using; that cannot be undone from here.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the guide gives the L 6000 no restart, factory reset,
+      location or firmware update method (firmware updates go through
+      Wireless Systems Manager), and ipaddr, netmask and gateway are marked
+      "Read/Write*" without saying what the asterisk means, so they are read
+      only and the static_* methods are written instead.
