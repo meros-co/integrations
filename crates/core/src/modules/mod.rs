@@ -239,7 +239,7 @@ pub(crate) fn construct(
         #[cfg(feature = "vmix")]
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         #[cfg(feature = "visca")]
-        "visca" => Ok(Box::new(visca::Visca::new(context))),
+        "visca" => Ok(Box::new(visca::Visca::new(context)?)),
         #[cfg(feature = "qsys")]
         "qsys" => Ok(Box::new(qsys::Qsys::new(context))),
         #[cfg(any(

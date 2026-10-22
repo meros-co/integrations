@@ -1,5 +1,6 @@
-//! VISCA PTZ cameras: Sony's VISCA over IP (UDP 52381, 8-byte header), and
-//! VISCA without a header over TCP or UDP where vendors document that.
+//! VISCA PTZ cameras: Sony's VISCA over IP (UDP 52381, 8-byte header),
+//! VISCA without a header over TCP or UDP where vendors document that, and
+//! VISCA on an RS-232 or RS-422 serial port of the host.
 //!
 //! Written from Sony's own command lists (see the spec's sources): the
 //! "Color Video Camera VISCA Command List" for BRC-X400/SRG-X400/SRG-X120
@@ -28,6 +29,15 @@
 //! - Nothing is pushed: zoom, focus and pan/tilt positions are polled often,
 //!   settings rarely, and their replies become state.
 //!
+//! - On a serial port (transport `serial`) messages carry the camera's
+//!   address from the `camera_address` setting, `8x` with x = 1 to 7, and
+//!   replies come from `y0` with y = x + 8 (Lumens RS-232 command set
+//!   p.1-2). Only replies from that camera are taken. With `address_set` on,
+//!   opening the port sends Address Set (`88 30 01 FF`), which numbers the
+//!   cameras of the chain from 1, then IF_Clear broadcast (`88 01 00 01 FF`).
+//!   The port is a stream like TCP: one message waits for its reply, and a
+//!   port that fails is opened again.
+//!
 //! Opened for commands only (`monitor` false), nothing is polled and a
 //! command is not followed by an inquiry to refresh its state. Since VISCA
 //! pushes nothing, the version inquiry every 5 s (the settings poll's
@@ -41,7 +51,7 @@ use serde_json::{json, Map, Value};
 use crate::catalog::Params;
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, SerialPort, TcpInput,
 };
 
 const SONY_PORT: u16 = 52381;
@@ -96,6 +106,8 @@ pub(crate) enum Transport {
     RawTcp,
     /// VISCA messages with no header, one or more per UDP datagram.
     RawUdp,
+    /// VISCA messages with the camera's address, on a serial port.
+    Serial,
 }
 
 impl Transport {
@@ -104,6 +116,7 @@ impl Transport {
             "sony-ip" => Some(Transport::SonyIp),
             "raw-tcp" => Some(Transport::RawTcp),
             "raw-udp" => Some(Transport::RawUdp),
+            "serial" => Some(Transport::Serial),
             _ => None,
         }
     }
@@ -113,7 +126,13 @@ impl Transport {
             Transport::SonyIp => SONY_PORT,
             Transport::RawTcp => PTZOPTICS_TCP_PORT,
             Transport::RawUdp => PTZOPTICS_UDP_PORT,
+            Transport::Serial => 0,
         }
+    }
+
+    /// A byte stream: TCP or a serial port.
+    fn is_stream(self) -> bool {
+        matches!(self, Transport::RawTcp | Transport::Serial)
     }
 }
 
@@ -918,6 +937,9 @@ fn step(action: &str) -> u8 {
 
 pub(crate) struct Visca {
     device: SocketAddr,
+    /// Transport `serial`: the port, the camera's address 1-7, and whether
+    /// opening the port numbers the chain with Address Set.
+    serial: Option<SerialLink>,
     profile: Profile,
     transport: Transport,
     bind: Bind,
@@ -945,8 +967,16 @@ pub(crate) struct Visca {
     monitor: bool,
 }
 
+/// A camera on a serial port.
+#[derive(Debug, Clone, PartialEq)]
+struct SerialLink {
+    port: SerialPort,
+    address: u8,
+    address_set: bool,
+}
+
 impl Visca {
-    pub(crate) fn new(ctx: OpenContext) -> Visca {
+    pub(crate) fn new(ctx: OpenContext) -> Result<Visca, String> {
         let mut profile = Profile::of(&ctx.model);
         if let Some(t) = ctx
             .settings
@@ -970,20 +1000,50 @@ impl Visca {
                 .unwrap_or(default)
                 .max(0) as Millis
         };
+        let serial = match profile.transport {
+            Transport::Serial => Some(SerialLink {
+                port: SerialPort::from_settings(&ctx.settings)?,
+                address: ctx
+                    .settings
+                    .get("camera_address")
+                    .and_then(Value::as_u64)
+                    .filter(|a| (1..=7).contains(a))
+                    .unwrap_or(1) as u8,
+                address_set: ctx
+                    .settings
+                    .get("address_set")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true),
+            }),
+            _ if ctx.host.is_unspecified() => {
+                return Err("VISCA over IP needs the camera's host".into())
+            }
+            _ => None,
+        };
         let port = ctx.port.unwrap_or(profile.transport.default_port());
         let mut m = Visca::for_device(SocketAddr::new(ctx.host, port), profile);
+        m.serial = serial;
         m.fast_ms = ms("poll_position_ms", DEFAULT_FAST_MS);
         m.slow_ms = ms("poll_settings_ms", DEFAULT_SLOW_MS);
         m.monitor = ctx.monitor;
-        m
+        Ok(m)
+    }
+
+    /// Open the byte stream: TCP, or the serial port.
+    fn open_stream(&self, cx: &mut Cx) {
+        match &self.serial {
+            Some(link) => cx.serial_open(SOCKET, link.port.clone()),
+            None => cx.tcp_open(SOCKET, self.device),
+        }
     }
 
     pub(crate) fn for_device(device: SocketAddr, profile: Profile) -> Visca {
         Visca {
             device,
+            serial: None,
             profile,
             transport: profile.transport,
-            bind: if profile.fixed_reply_port && profile.transport != Transport::RawTcp {
+            bind: if profile.fixed_reply_port && !profile.transport.is_stream() {
                 Bind::Shared(SONY_PORT)
             } else {
                 Bind::Ephemeral
@@ -1584,7 +1644,7 @@ impl Visca {
     fn open(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         match self.transport {
-            Transport::RawTcp => cx.tcp_open(SOCKET, self.device),
+            Transport::RawTcp | Transport::Serial => self.open_stream(cx),
             _ => {
                 cx.udp_open(SOCKET, self.bind);
                 self.link = true;
@@ -1624,6 +1684,16 @@ impl Visca {
             }
             Transport::RawUdp => cx.udp_send(SOCKET, self.device, msg.payload.clone()),
             Transport::RawTcp => cx.tcp_send(SOCKET, msg.payload.clone()),
+            Transport::Serial => {
+                // The camera's address in place of the 1 VISCA over IP uses.
+                let mut payload = msg.payload.clone();
+                if let (Some(link), Some(first)) = (&self.serial, payload.first_mut()) {
+                    if *first == 0x81 {
+                        *first = 0x80 | link.address;
+                    }
+                }
+                cx.tcp_send(SOCKET, payload);
+            }
         }
     }
 
@@ -1805,7 +1875,7 @@ impl Visca {
         self.misses = 0;
         self.framer = Framer::default();
         cx.connection(Connection::Disconnected { reason });
-        if self.transport == Transport::RawTcp {
+        if self.transport.is_stream() {
             if self.link {
                 cx.tcp_close(SOCKET);
             }
@@ -2140,11 +2210,24 @@ impl Module for Visca {
             TcpInput::Connected => {
                 self.link = true;
                 self.framer = Framer::default();
+                if self.serial.as_ref().is_some_and(|l| l.address_set) {
+                    // Number the chain from 1, then clear every camera's
+                    // buffers; their broadcast answers are not replies.
+                    cx.tcp_send(SOCKET, vec![0x88, 0x30, 0x01, 0xFF]);
+                    cx.tcp_send(SOCKET, vec![0x88, 0x01, 0x00, 0x01, 0xFF]);
+                }
                 self.probe(cx);
             }
             TcpInput::Data(data) => {
                 for m in self.framer.feed(&data) {
-                    self.reply(cx, &m, None);
+                    // On a chain, only this camera's replies.
+                    let ours = self
+                        .serial
+                        .as_ref()
+                        .is_none_or(|l| m[0] >> 4 == l.address + 8);
+                    if ours {
+                        self.reply(cx, &m, None);
+                    }
                 }
             }
             TcpInput::Closed { reason } => {
@@ -2161,12 +2244,12 @@ impl Module for Visca {
                     return;
                 }
                 match self.transport {
-                    Transport::RawTcp if !self.link => {
+                    Transport::RawTcp | Transport::Serial if !self.link => {
                         cx.connection(Connection::Connecting);
-                        cx.tcp_open(SOCKET, self.device);
+                        self.open_stream(cx);
                         cx.set_timer(PROBE, self.retry_after.max(5_000));
                     }
-                    Transport::RawTcp => {
+                    Transport::RawTcp | Transport::Serial => {
                         // Connected but silent: ask again.
                         self.in_flight = None;
                         self.probe(cx);
@@ -2191,7 +2274,7 @@ impl Module for Visca {
                     && match self.transport {
                         Transport::SonyIp => true,
                         Transport::RawUdp => f.msg.kind == Kind::Inquiry,
-                        Transport::RawTcp => false,
+                        Transport::RawTcp | Transport::Serial => false,
                     };
                 if resend {
                     f.retransmitted = true;
@@ -2257,7 +2340,7 @@ impl Module for Visca {
     }
 
     fn stop(&mut self, cx: &mut Cx) {
-        if self.transport == Transport::RawTcp && self.link {
+        if self.transport.is_stream() && self.link {
             cx.tcp_close(SOCKET);
         }
     }
@@ -2314,6 +2397,75 @@ mod tests {
             }
         }
         merged
+    }
+
+    #[test]
+    fn a_camera_on_a_serial_port_is_addressed_and_only_its_replies_are_taken() {
+        use crate::module::{FlowControl, Parity};
+        let ctx = OpenContext {
+            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            host_name: None,
+            port: None,
+            model: "lumens".into(),
+            channels: None,
+            settings: params(json!({
+                "transport": "serial", "serial_port": "/dev/ttyUSB0",
+                "baud_rate": 38400, "camera_address": 2
+            })),
+            monitor: false,
+        };
+        let mut m = Visca::new(ctx.clone()).unwrap();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let a = drain(&mut cx);
+        assert!(a.contains(&Action::SerialOpen {
+            socket: SOCKET,
+            port: SerialPort {
+                path: "/dev/ttyUSB0".into(),
+                baud_rate: 38400,
+                data_bits: 8,
+                parity: Parity::None,
+                stop_bits: 1,
+                flow_control: FlowControl::None,
+            }
+        }));
+        // Address Set and IF_Clear broadcast, then the version inquiry to
+        // camera 2.
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        assert_eq!(
+            sent(&drain(&mut cx)),
+            [h("88 30 01 FF"), h("88 01 00 01 FF"), h("82 09 00 02 FF")]
+        );
+        // The chain's answers to the broadcasts, and camera 1's reply, are
+        // not camera 2's.
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(h(
+                "88 30 03 FF 88 01 00 01 FF 90 50 00 01 05 21 01 00 02 FF",
+            )),
+        );
+        let a = drain(&mut cx);
+        assert!(
+            !a.contains(&Action::Connection(Connection::Connected)),
+            "{a:?}"
+        );
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(h("A0 50 00 01 05 21 01 00 02 FF")),
+        );
+        let a = drain(&mut cx);
+        assert!(
+            a.contains(&Action::Connection(Connection::Connected)),
+            "{a:?}"
+        );
+        // A serial camera needs no host; one over IP does.
+        let ip = OpenContext {
+            settings: params(json!({})),
+            ..ctx
+        };
+        assert!(Visca::new(ip).is_err());
     }
 
     /// A Sony camera after RESET and with the connect-time polls drained.

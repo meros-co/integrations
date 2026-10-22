@@ -68,7 +68,7 @@ NATIVE = {
     "tally-arbiter": "Socket.IO 4 over a WebSocket on 4455",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
     "tsl-umd-listener": "TSL UMD over UDP, or TCP for V3.1 and V5.0; receives",
-    "visca": "VISCA over IP (UDP 52381), raw VISCA over TCP or UDP",
+    "visca": "VISCA over IP (UDP 52381), raw VISCA over TCP or UDP, or VISCA on a serial port",
     "vmix": "TCP API 8099",
 }
 

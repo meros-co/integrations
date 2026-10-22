@@ -2051,15 +2051,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## visca — VISCA over IP
 
-- [ ] On Sony VISCA over IP, confirm the sequence number the camera expects after RESET (the core sends 1). ([specs/visca.yaml:912](specs/visca.yaml#L912))
-- [ ] On PTZOptics, check whether UDP 1259 expects Sony's 8-byte header. ([specs/visca.yaml:959](specs/visca.yaml#L959))
-- [ ] On PTZOptics, confirm the shutter, gain, bright, focus mode and focus position codes the core uses (0A/4A, 4C, 4D, 04 38, 04 48) against the 2026 list's conflicting codes. ([specs/visca.yaml:966](specs/visca.yaml#L966))
-- [ ] On SRG-X400, check which pan direction is positive. ([specs/visca.yaml:953](specs/visca.yaml#L953))
-- [ ] On BirdDog, confirm 32-bit sequence numbers are accepted, and the P400 white balance codes (04 ATW, 05/06 manual). ([specs/visca.yaml:979](specs/visca.yaml#L979))
-- [ ] On Lumens and Marshall, confirm preset 1 is wire 00. ([specs/visca.yaml:985](specs/visca.yaml#L985))
-- [ ] On AVer, confirm presets are numbered from 0 on the wire (preset n is wire n-1). ([specs/visca.yaml:992](specs/visca.yaml#L992))
-- [ ] On Canon, confirm replies go to UDP 52381 with the default response port setting. ([specs/visca.yaml:1004](specs/visca.yaml#L1004))
-- [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1012](specs/visca.yaml#L1012))
+- [ ] On Sony VISCA over IP, confirm the sequence number the camera expects after RESET (the core sends 1). ([specs/visca.yaml:940](specs/visca.yaml#L940))
+- [ ] On PTZOptics, check whether UDP 1259 expects Sony's 8-byte header. ([specs/visca.yaml:987](specs/visca.yaml#L987))
+- [ ] On PTZOptics, confirm the shutter, gain, bright, focus mode and focus position codes the core uses (0A/4A, 4C, 4D, 04 38, 04 48) against the 2026 list's conflicting codes. ([specs/visca.yaml:994](specs/visca.yaml#L994))
+- [ ] On SRG-X400, check which pan direction is positive. ([specs/visca.yaml:981](specs/visca.yaml#L981))
+- [ ] On BirdDog, confirm 32-bit sequence numbers are accepted, and the P400 white balance codes (04 ATW, 05/06 manual). ([specs/visca.yaml:1007](specs/visca.yaml#L1007))
+- [ ] On Lumens and Marshall, confirm preset 1 is wire 00. ([specs/visca.yaml:1013](specs/visca.yaml#L1013))
+- [ ] On AVer, confirm presets are numbered from 0 on the wire (preset n is wire n-1). ([specs/visca.yaml:1020](specs/visca.yaml#L1020))
+- [ ] On Canon, confirm replies go to UDP 52381 with the default response port setting. ([specs/visca.yaml:1032](specs/visca.yaml#L1032))
+- [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1040](specs/visca.yaml#L1040))
+- [ ] On a serial camera (Sony, Datavideo, Lumens, Marshall), confirm replies come from y0 with y = address + 8 and that only Address Set and IF_Clear broadcasts answer from 88. ([specs/visca.yaml:1126](specs/visca.yaml#L1126))
+- [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
 
 ## vmix — vMix
 
