@@ -619,6 +619,11 @@ impl Session {
     }
 
     async fn apply(&mut self, actions: Vec<Action>) {
+        // Replies go last: a caller answered reads a snapshot that already
+        // holds the state and connection the same step reported, even when
+        // the module completed the command first (a refused login fails the
+        // command, then reports the device unauthorized).
+        let mut replies = Vec::new();
         for action in actions {
             match action {
                 Action::UdpOpen { socket, bind } => {
@@ -870,7 +875,7 @@ impl Session {
                 }
                 Action::Complete { id, result } => {
                     if let Some(p) = self.pending.remove(&id) {
-                        let _ = p.reply.send(result);
+                        replies.push((p.reply, result));
                     }
                 }
                 Action::State(patch) => {
@@ -951,6 +956,9 @@ impl Session {
                         .publish(self.device, stream, format, data);
                 }
             }
+        }
+        for (reply, result) in replies {
+            let _ = reply.send(result);
         }
     }
 
@@ -1435,6 +1443,115 @@ mod tests {
                 ("twice".to_string(), Ok(vec![2])),
             ]
         );
+
+        let (done, finished) = tokio::sync::oneshot::channel();
+        tx.send(SessionMsg::Close { done }).await.ok().unwrap();
+        finished.await.unwrap();
+        task.await.unwrap();
+    }
+
+    /// Fails every command, then reports the device unauthorized: the
+    /// order a refused login takes.
+    struct Refusing;
+
+    impl crate::module::Module for Refusing {
+        fn start(&mut self, _: &mut crate::module::Cx) {}
+
+        fn command(
+            &mut self,
+            cx: &mut crate::module::Cx,
+            id: crate::module::CommandId,
+            _: &str,
+            _: &crate::catalog::Params,
+        ) {
+            cx.complete(
+                id,
+                Err(crate::module::CommandError::Auth {
+                    message: "refused".into(),
+                }),
+            );
+            cx.connection(crate::module::Connection::Unauthorized {
+                reason: "refused".into(),
+            });
+        }
+
+        fn timer(&mut self, _: &mut crate::module::Cx, _: crate::module::Key) {}
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_reply_comes_after_the_snapshot_holds_what_the_same_step_reported() {
+        use crate::events::EventQueue;
+        use crate::module::Connection;
+        use crate::session::{DeviceSnapshot, Services, Session, SessionMsg};
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+
+        let events = Arc::new(EventQueue::new(16));
+        let services = Arc::new(Services {
+            events: events.clone(),
+            bind_address: "127.0.0.1".parse().unwrap(),
+            shared_udp: crate::udp::SharedUdp::new(events),
+            shared_tcp: Default::default(),
+            http: crate::http::HttpClients::new().unwrap(),
+            streams: Default::default(),
+            serial: Arc::new(crate::serial::HostPorts),
+        });
+        let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
+            connection: Connection::Connecting,
+            state: serde_json::Value::Null,
+            latency_ms: None,
+        }));
+        let session = Session::new(
+            9,
+            "127.0.0.1".parse().unwrap(),
+            Box::new(Refusing),
+            services,
+            snapshot.clone(),
+        );
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
+        let task = tokio::spawn(session.run(rx));
+
+        // Hold the snapshot, as a consumer reading it at that moment would:
+        // the session cannot record the connection meanwhile.
+        let (held_tx, held) = std::sync::mpsc::channel();
+        let (release, gate) = std::sync::mpsc::channel::<()>();
+        let holder = {
+            let snapshot = snapshot.clone();
+            std::thread::spawn(move || {
+                let _guard = snapshot.lock().unwrap();
+                held_tx.send(()).unwrap();
+                let _ = gate.recv();
+            })
+        };
+        held.recv().unwrap();
+
+        let (reply, mut answer) = tokio::sync::oneshot::channel();
+        tx.send(SessionMsg::Command {
+            name: "x".into(),
+            params: Default::default(),
+            reply,
+        })
+        .await
+        .ok()
+        .unwrap();
+        // No answer while the connection it goes with is unrecorded.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(answer.try_recv().is_err(), "answered before the snapshot");
+
+        release.send(()).unwrap();
+        holder.join().unwrap();
+        let answered = tokio::time::timeout(Duration::from_secs(5), answer)
+            .await
+            .expect("answered once the snapshot is free")
+            .unwrap();
+        assert!(matches!(
+            answered,
+            Err(crate::module::CommandError::Auth { .. })
+        ));
+        assert!(matches!(
+            snapshot.lock().unwrap().connection,
+            Connection::Unauthorized { .. }
+        ));
 
         let (done, finished) = tokio::sync::oneshot::channel();
         tx.send(SessionMsg::Close { done }).await.ok().unwrap();
