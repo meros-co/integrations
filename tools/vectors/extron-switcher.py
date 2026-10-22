@@ -472,3 +472,245 @@ telemetry(K, "bare-screen-saver-status", inbound="2\r\n", request=E + "S1SSAV",
           expect_state={"screen_saver": {"status": 2}})
 telemetry(K, "screen-saver-color", inbound="SsavCFF0000\r\n", expect_state={"screen_saver": {"color": "FF0000"}})
 telemetry(K, "bare-verbose", inbound="3\r\n", request=E + "CV", expect_state={"verbose_mode": 3})
+
+# ── IN1604 DTP and IN1604 HD (68-2631-01 Rev. B, p.35-48) ────────────────
+_seen_in1604 = {}
+
+
+def _t4(command, *args, **extra):
+    # A second file per command, so the other models' vectors are kept.
+    n = _seen_in1604.get(command, 0) + 1
+    _seen_in1604[command] = n
+    text(K, command, *args, file=f"{command}.in1604" if n == 1 else f"{command}.in1604-{n}", **extra)
+
+
+D4 = {"model": "in1604-dtp"}
+H4 = {"model": "in1604-hd"}
+_t4("select_input_in1600", {"input": 3}, "3!\r", device_reply="In3 All\r\n", expect_result=ACK, **H4)
+_t4("set_input_video_format_in1604", {"input": 1, "format": 3}, "1*3\\\r", device_reply="Typ1*3\r\n",
+     expect_result=ACK, **D4)
+_t4("get_input_video_format_in1604", {"input": 2}, "2\\\r", device_reply="5\r\n", expect_result=val("5"), **H4)
+_t4("set_input_edid", {"input": 2, "edid": 41}, E + "A2*41EDID\r", device_reply="EdidA2*41\r\n",
+     expect_result=ACK, **D4)
+_t4("get_input_edid", {"input": 2}, E + "A2EDID\r", device_reply="EdidA2*201\r\n", expect_result=val("201"), **H4)
+_t4("save_output_edid", {"slot": 203}, E + "S1*203EDID\r", device_reply="EdidS1*203\r\n", expect_result=ACK, **D4)
+# Analog timing of the current input (p.36-37): Esc n XXXX, Esc +XXXX, Esc -XXXX, Esc XXXX.
+_t4("set_horizontal_start", {"value": 130}, E + "130HSRT\r", device_reply="Hsrt1*130\r\n", expect_result=ACK, **D4)
+_t4("increase_horizontal_start", {}, E + "+HSRT\r", device_reply="Hsrt1*131\r\n", expect_result=ACK, **H4)
+_t4("decrease_horizontal_start", {}, E + "-HSRT\r", device_reply="Hsrt1*129\r\n", expect_result=ACK, **H4)
+_t4("get_horizontal_start", {}, E + "HSRT\r", device_reply="Hsrt1*128\r\n", expect_result=val("128"), **D4)
+_t4("set_vertical_start", {"value": 126}, E + "126VSRT\r", device_reply="Vsrt1*126\r\n", expect_result=ACK, **D4)
+_t4("increase_vertical_start", {}, E + "+VSRT\r", device_reply="Vsrt1*127\r\n", expect_result=ACK, **H4)
+_t4("decrease_vertical_start", {}, E + "-VSRT\r", device_reply="Vsrt1*125\r\n", expect_result=ACK, **H4)
+_t4("get_vertical_start", {}, E + "VSRT\r", device_reply="128\r\n", expect_result=val("128"), **D4)
+_t4("set_pixel_phase", {"value": 31}, E + "31PHAS\r", device_reply="Phas1*31\r\n", expect_result=ACK, **D4)
+_t4("increase_pixel_phase", {}, E + "+PHAS\r", device_reply="Phas1*32\r\n", expect_result=ACK, **H4)
+_t4("decrease_pixel_phase", {}, E + "-PHAS\r", device_reply="Phas1*30\r\n", expect_result=ACK, **H4)
+_t4("get_pixel_phase", {}, E + "PHAS\r", device_reply="Phas1*31\r\n", expect_result=val("31"), **D4)
+_t4("set_total_pixels", {"value": 1344}, E + "1344TPIX\r", device_reply="Tpix1*1344\r\n", expect_result=ACK, **D4)
+_t4("increase_total_pixels", {}, E + "+TPIX\r", device_reply="Tpix1*1345\r\n", expect_result=ACK, **H4)
+_t4("decrease_total_pixels", {}, E + "-TPIX\r", device_reply="Tpix1*1343\r\n", expect_result=ACK, **H4)
+_t4("get_total_pixels", {}, E + "TPIX\r", device_reply="Tpix1*1344\r\n", expect_result=val("1344"), **D4)
+_t4("set_active_pixels", {"value": 1024}, E + "1024APIX\r", device_reply="Apix1*1024\r\n", expect_result=ACK, **D4)
+_t4("increase_active_pixels", {}, E + "+APIX\r", device_reply="Apix1*1025\r\n", expect_result=ACK, **H4)
+_t4("decrease_active_pixels", {}, E + "-APIX\r", device_reply="Apix1*1023\r\n", expect_result=ACK, **H4)
+_t4("get_active_pixels", {}, E + "APIX\r", device_reply="Apix1*1024\r\n", expect_result=val("1024"), **D4)
+_t4("set_active_lines", {"value": 768}, E + "768ALIN\r", device_reply="Alin1*768\r\n", expect_result=ACK, **D4)
+_t4("increase_active_lines", {}, E + "+ALIN\r", device_reply="Alin1*769\r\n", expect_result=ACK, **H4)
+_t4("decrease_active_lines", {}, E + "-ALIN\r", device_reply="Alin1*767\r\n", expect_result=ACK, **H4)
+_t4("get_active_lines", {}, E + "ALIN\r", device_reply="Alin1*768\r\n", expect_result=val("768"), **D4)
+# Picture steps of the current input (p.38).
+_t4("increase_contrast_current_input", {}, E + "+CONT\r", device_reply="Cont2*065\r\n", expect_result=ACK, **D4)
+_t4("decrease_contrast_current_input", {}, E + "-CONT\r", device_reply="Cont2*063\r\n", expect_result=ACK, **H4)
+_t4("increase_brightness_current_input", {}, E + "+BRIT\r", device_reply="Brit2*065\r\n", expect_result=ACK, **D4)
+_t4("decrease_brightness_current_input", {}, E + "-BRIT\r", device_reply="Brit2*063\r\n", expect_result=ACK, **H4)
+_t4("increase_detail_current_input", {}, E + "+HDET\r", device_reply="Hdet2*065\r\n", expect_result=ACK, **D4)
+_t4("decrease_detail_current_input", {}, E + "-HDET\r", device_reply="Hdet2*063\r\n", expect_result=ACK, **H4)
+_t4("increase_color_current_input", {}, E + "+COLR\r", device_reply="Colr1*065\r\n", expect_result=ACK, **D4)
+_t4("decrease_color_current_input", {}, E + "-COLR\r", device_reply="Colr1*063\r\n", expect_result=ACK, **H4)
+_t4("increase_tint_current_input", {}, E + "+TINT\r", device_reply="Tint1*065\r\n", expect_result=ACK, **D4)
+_t4("decrease_tint_current_input", {}, E + "-TINT\r", device_reply="Tint1*063\r\n", expect_result=ACK, **H4)
+# Image shift and size (p.39).
+_t4("set_image_horizontal_position", {"value": -12}, E + "-12HCTR\r", device_reply="Hctr-0012\r\n",
+     expect_result=ACK, **D4)
+_t4("increase_image_horizontal_position", {}, E + "+HCTR\r", device_reply="Hctr-0011\r\n", expect_result=ACK, **H4)
+_t4("decrease_image_horizontal_position", {}, E + "-HCTR\r", device_reply="Hctr-0013\r\n", expect_result=ACK, **H4)
+_t4("get_image_horizontal_position", {}, E + "HCTR\r", device_reply="Hctr-0012\r\n", expect_result=val("-0012"),
+     **D4)
+_t4("set_image_vertical_position", {"value": 20}, E + "20VCTR\r", device_reply="Vctr+0020\r\n", expect_result=ACK,
+     **D4)
+_t4("increase_image_vertical_position", {}, E + "+VCTR\r", device_reply="Vctr+0021\r\n", expect_result=ACK, **H4)
+_t4("decrease_image_vertical_position", {}, E + "-VCTR\r", device_reply="Vctr+0019\r\n", expect_result=ACK, **H4)
+_t4("get_image_vertical_position", {}, E + "VCTR\r", device_reply="+0020\r\n", expect_result=val("+0020"), **D4)
+_t4("set_image_width", {"value": 1920}, E + "1920HSIZ\r", device_reply="Hsiz01920\r\n", expect_result=ACK, **D4)
+_t4("increase_image_width", {}, E + "+HSIZ\r", device_reply="Hsiz01921\r\n", expect_result=ACK, **H4)
+_t4("decrease_image_width", {}, E + "-HSIZ\r", device_reply="Hsiz01919\r\n", expect_result=ACK, **H4)
+_t4("get_image_width", {}, E + "HSIZ\r", device_reply="Hsiz01920\r\n", expect_result=val("01920"), **D4)
+_t4("set_image_height", {"value": 1080}, E + "1080VSIZ\r", device_reply="Vsiz01080\r\n", expect_result=ACK, **D4)
+_t4("increase_image_height", {}, E + "+VSIZ\r", device_reply="Vsiz01081\r\n", expect_result=ACK, **H4)
+_t4("decrease_image_height", {}, E + "-VSIZ\r", device_reply="Vsiz01079\r\n", expect_result=ACK, **H4)
+_t4("get_image_height", {}, E + "VSIZ\r", device_reply="Vsiz01080\r\n", expect_result=val("01080"), **D4)
+# Presets (p.40).
+_t4("delete_user_preset", {"preset": 4}, E + "1*4PRST\r", device_reply="Prst1*04\r\n", expect_result=ACK, **D4)
+_t4("delete_input_preset", {"preset": 12}, E + "2*12PRST\r", device_reply="Prst2*12\r\n", expect_result=ACK, **H4)
+_t4("set_user_preset_name", {"preset": 4, "name": "Lecture"}, E + "1*4,LecturePNAM\r",
+     device_reply="Pnam1*04,Lecture\r\n", expect_result=ACK, **D4)
+_t4("get_user_preset_name", {"preset": 4}, E + "1*4PNAM\r", device_reply="Pnam1*04,Lecture\r\n",
+     expect_result=val("Lecture"), **H4)
+_t4("set_input_preset_name", {"preset": 2, "name": "Laptop 1080p"}, E + "2*2,Laptop 1080pPNAM\r",
+     device_reply="Pnam2*02,Laptop 1080p\r\n", expect_result=ACK, **D4)
+_t4("get_input_preset_name", {"preset": 2}, E + "2*2PNAM\r", device_reply="Pnam2*02,[Input Preset 002]\r\n",
+     expect_result=val("[Input Preset 002]"), **H4)
+_t4("recall_user_preset", {"preset": 5}, "1*5.\r", device_reply="1Rpr05\r\n", expect_result=ACK, **D4)
+# Output (p.41-42).
+_t4("set_output_format_in1604", {"format": 3}, E + "3VTPO\r", device_reply="Vtpo3\r\n", expect_result=ACK, **D4)
+_t4("get_output_format_in1604", {}, E + "VTPO\r", device_reply="Vtpo0\r\n", expect_result=val("0"), **H4)
+_t4("get_auto_output_format_in1604", {}, E + "1*VTPO\r", device_reply="Vtpo2\r\n", expect_result=val("2"), **D4)
+_t4("set_screen_saver_mode_in1604", {"mode": 2}, E + "M2SSAV\r", device_reply="SsavM2\r\n", expect_result=ACK, **D4)
+_t4("get_screen_saver_mode_in1600", {}, E + "MSSAV\r", device_reply="SsavM1\r\n", expect_result=val("1"), **H4)
+_t4("set_output_rate_in1604", {"rate": 41}, E + "41RATE\r", device_reply="Rate41\r\n", expect_result=ACK, **D4)
+_t4("set_video_mute_all", {"mode": 2}, "2B\r", device_reply="Vmt2\r\n", expect_result=ACK, **H4)
+# Audio (p.43-44).
+_t4("set_audio_mute_all_in1604", {"muted": True}, "1Z\r", device_reply="Amt1\r\n", expect_result=ACK, **D4)
+_t4("set_audio_mute_in1604", {"output": 2, "muted": True}, "2*1Z\r", device_reply="Amt2*1\r\n",
+     expect_result=ACK, **H4)
+_t4("get_audio_mute_in1604", {}, "Z\r", device_reply="0 1\r\n", expect_result=val("0 1"), **D4)
+_t4("set_audio_input_format_in1604", {"input": 3, "format": 7}, E + "I3*7AFMT\r", device_reply="AfmtI3*7\r\n",
+     expect_result=ACK, **D4)
+_t4("set_audio_input_format_in1604", {"input": 1, "format": 3}, E + "I1*3AFMT\r", device_reply="E14\r\n",
+     expect_result=ERR, **H4)
+_t4("get_audio_input_format_in1604", {"input": 3}, E + "I3AFMT\r", device_reply="AfmtI3*8\r\n",
+     expect_result=val("8"), **H4)
+_t4("set_audio_gain_in1604", {"level": -6}, "-6G\r", device_reply="Aud-06\r\n", expect_result=ACK, **D4)
+_t4("increase_audio_gain_in1604", {}, "+G\r", device_reply="Aud-05\r\n", expect_result=ACK, **D4)
+_t4("decrease_audio_gain_in1604", {}, "-G\r", device_reply="Aud-07\r\n", expect_result=ACK, **H4)
+_t4("get_audio_gain_in1604", {}, "G\r", device_reply="Aud+03\r\n", expect_result=val("+03"), **H4)
+_t4("set_volume_in1604", {"level": -20}, "-20V\r", device_reply="Vol-20\r\n", expect_result=ACK, **D4)
+_t4("increase_volume_in1604", {}, "+V\r", device_reply="Vol-19\r\n", expect_result=ACK, **D4)
+_t4("decrease_volume_in1604", {}, "-V\r", device_reply="Vol-21\r\n", expect_result=ACK, **H4)
+_t4("get_volume_in1604", {}, "V\r", device_reply="Vol-10\r\n", expect_result=val("-10"), **H4)
+_t4("set_audio_output_format", {"format": 1}, E + "O1*1AFMT\r", device_reply="AfmtO1*1\r\n", expect_result=ACK,
+     **D4)
+_t4("get_audio_output_format", {}, E + "OAFMT\r", device_reply="AfmtO1*2\r\n", expect_result=val("2"), **H4)
+# Advanced (p.44-46).
+_t4("set_test_pattern_in1604", {"pattern": 7}, E + "7TEST\r", device_reply="Test07\r\n", expect_result=ACK, **D4)
+_t4("set_overscan_in1604", {"format": 2, "overscan": 1}, E + "2*1OSCN\r", device_reply="Oscn2*1\r\n",
+     expect_result=ACK, **D4)
+_t4("get_overscan_in1604", {"format": 4}, E + "4OSCN\r", device_reply="1\r\n", expect_result=val("1"), **H4)
+_t4("get_signal_status_in1604", {}, E + "0LS\r", device_reply="In00 1 0 1 1\r\n", expect_result=val("1 0 1 1"),
+     **D4)
+_t4("set_output_hdcp_mode_in1604", {"mode": 3}, E + "S3HDCP\r", device_reply="HdcpS3\r\n", expect_result=ACK,
+     **D4)
+_t4("set_contact_mute_mode", {"mute_mode": 1, "tally_mode": 2}, E + "1*2MUTM\r", device_reply="Mutm1*2\r\n",
+     expect_result=ACK, **D4)
+_t4("get_contact_mute_mode", {}, E + "MUTM\r", device_reply="Mutm0*0\r\n", expect_result=val("0*0"), **H4)
+# On-screen menu and device (p.47-48).
+_t4("osd_menu", {"key": "up"}, E + "UMENU\r", device_reply="Menu*U\r\n", expect_result=ACK, **D4)
+_t4("osd_menu", {"key": "toggle"}, E + "MMENU\r", device_reply="Menu*M\r\n", expect_result=ACK, **H4)
+_t4("get_osd_menu", {}, E + "MENU\r", device_reply="Menu1\r\n", expect_result=val("1"), **D4)
+_t4("set_unit_name", {"name": "Room-204"}, E + "Room-204CN\r", device_reply="Ipn Room-204\r\n", expect_result=ACK,
+     **D4)
+_t4("reset_unit_name", {}, E + " CN\r", device_reply="Ipn IN1604-DTP\r\n", expect_result=ACK, **D4)
+_t4("get_unit_name", {}, E + "CN\r", device_reply="Ipn IN1604-HD\r\n", expect_result=val("IN1604-HD"), **H4)
+_t4("get_description_in1604", {}, "2i\r", device_reply="SCALING PRESENTATION SWITCHER\r\n",
+     expect_result=val("SCALING PRESENTATION SWITCHER"), **H4)
+_t4("get_temperature_in1604", {}, E + "20STAT\r", device_reply="20Stat 041.5\r\n", expect_result=val("41.5"), **D4)
+_t4("get_tp_output_format", {}, E + "O1HDBT\r", device_reply="HdbtO1*1\r\n", expect_result=val("1"), **D4)
+
+_CURRENT_IN1604 = [E + w for w in ("CONT", "BRIT", "HDET", "COLR", "TINT", "HSRT", "VSRT", "PHAS", "TPIX", "APIX",
+                                   "ALIN", "XIMG")] + ["F", "G"]
+
+
+def _reads_in1604():
+    r = ["!"]
+    for n in range(1, 5):
+        r += [f"{n}\\", E + f"A{n}EDID", E + f"E{n}HDCP", E + f"{n}FILM", E + f"{n}AMEM", E + f"I{n}AFMT",
+              E + f"I{n}HDCP", E + f"{n}ASPR"]
+    r += ["1A"] + _CURRENT_IN1604
+    r += [E + "ALVL", E + "VTPO", E + "1*VTPO", E + "MSSAV", E + "TSSAV", E + "SSSAV", "B", E + "RATE", "Z", "V",
+          E + "OAFMT", E + "TEST", E + "AUSW", E + "SWEF", E + "SHDCP", E + "NHDCP", E + "MUTM", E + "MENU", E + "CV",
+          E + "CN", E + "O1HDCP"]
+    r += [E + f"{f}OSCN" for f in range(1, 6)]
+    r += [E + f"1*{p}PNAM" for p in range(1, 17)] + [E + f"2*{p}PNAM" for p in range(1, 17)]
+    return [m + "\r" for m in r]
+
+
+telemetry(K, "reads-in1604-hd", inbound="60-1281-02\r\n", request="N", model="in1604-hd",
+          expect_state={"device": {"part_number": "60-1281-02"}}, expect_then_send=_reads_in1604())
+telemetry(K, "reads-in1604-dtp", inbound="Pno60-1281-01\r\n", request="N", model="in1604-dtp",
+          expect_state={"device": {"part_number": "60-1281-01"}},
+          expect_then_send=_reads_in1604() + [E + "O1HDBT\r"])
+telemetry(K, "reread-input-in1604", inbound="In2 All\r\n", model="in1604-hd",
+          expect_state={"input": 2, "video_input": 2, "audio_input": 2},
+          expect_then_send=[m + "\r" for m in _CURRENT_IN1604])
+telemetry(K, "reread-preset-in1604", inbound="2Rpr03\r\n", model="in1604-dtp", expect_state={},
+          expect_then_send=[m + "\r" for m in _CURRENT_IN1604])
+telemetry(K, "timing-in1604", inbound="Hsrt2*130\r\n", model="in1604-dtp",
+          expect_state={"inputs": {"2": {"horizontal_start": 130}}})
+telemetry(K, "vertical-start-in1604", inbound="Vsrt2*126\r\n", model="in1604-hd",
+          expect_state={"inputs": {"2": {"vertical_start": 126}}})
+telemetry(K, "pixel-phase-in1604", inbound="Phas1*31\r\n", model="in1604-hd",
+          expect_state={"inputs": {"1": {"pixel_phase": 31}}})
+telemetry(K, "total-pixels-in1604", inbound="Tpix1*1344\r\n", model="in1604-hd",
+          expect_state={"inputs": {"1": {"total_pixels": 1344}}})
+telemetry(K, "active-pixels-in1604", inbound="Apix1*1024\r\n", model="in1604-hd",
+          expect_state={"inputs": {"1": {"active_pixels": 1024}}})
+telemetry(K, "active-lines-in1604", inbound="Alin1*768\r\n", model="in1604-hd",
+          expect_state={"inputs": {"1": {"active_lines": 768}}})
+telemetry(K, "edid-in1604", inbound="EdidA3*41\r\n", model="in1604-dtp", expect_state={"inputs": {"3": {"edid": 41}}})
+telemetry(K, "bare-edid-in1604", inbound="0\r\n", request=E + "A4EDID", model="in1604-hd",
+          expect_state={"inputs": {"4": {"edid": 0}}})
+telemetry(K, "output-format-in1604", inbound="Vtpo3\r\n", request=E + "3VTPO", model="in1604-dtp",
+          expect_state={"output_format": 3})
+telemetry(K, "auto-output-format-in1604", inbound="Vtpo2\r\n", request=E + "1*VTPO", model="in1604-dtp",
+          expect_state={"auto_output_format": 2})
+telemetry(K, "bare-video-mute-in1604", inbound="1\r\n", request="B", model="in1604-hd",
+          expect_state={"video_mute_all": 1})
+telemetry(K, "audio-mute-in1604", inbound="Amt2*1\r\n", model="in1604-dtp",
+          expect_state={"audio_outputs": {"2": {"muted": True}}})
+telemetry(K, "audio-mute-all-in1604", inbound="Amt1\r\n", model="in1604-dtp",
+          expect_state={"audio_outputs": {"1": {"muted": True}, "2": {"muted": True}}})
+telemetry(K, "audio-mutes-in1604", inbound="0 1\r\n", request="Z", model="in1604-hd",
+          expect_state={"audio_outputs": {"1": {"muted": False}, "2": {"muted": True}}})
+telemetry(K, "tagged-audio-mutes-in1604", inbound="Amt1 0\r\n", model="in1604-hd",
+          expect_state={"audio_outputs": {"1": {"muted": True}, "2": {"muted": False}}})
+telemetry(K, "audio-format-in1604", inbound="AfmtI4*8\r\n", model="in1604-hd",
+          expect_state={"inputs": {"4": {"audio_format": 8}}})
+telemetry(K, "bare-audio-format-in1604", inbound="6\r\n", request=E + "I2AFMT", model="in1604-hd",
+          expect_state={"inputs": {"2": {"audio_format": 6}}})
+telemetry(K, "audio-gain-in1604", inbound="Aud+03\r\n", model="in1604-dtp", expect_state={"audio_gain": 3})
+telemetry(K, "bare-audio-gain-in1604", inbound="-12\r\n", request="G", model="in1604-dtp",
+          expect_state={"audio_gain": -12})
+telemetry(K, "volume-in1604", inbound="Vol-10\r\n", model="in1604-hd", expect_state={"volume": -10})
+telemetry(K, "bare-volume-in1604", inbound="-35\r\n", request="V", model="in1604-hd", expect_state={"volume": -35})
+telemetry(K, "audio-output-format-in1604", inbound="AfmtO1*1\r\n", model="in1604-dtp",
+          expect_state={"audio_output_format": 1})
+telemetry(K, "bare-audio-output-format-in1604", inbound="2\r\n", request=E + "OAFMT", model="in1604-dtp",
+          expect_state={"audio_output_format": 2})
+telemetry(K, "contact-mute-in1604", inbound="Mutm1*2\r\n", model="in1604-dtp",
+          expect_state={"contact": {"av_mute_mode": 1, "tally_mode": 2}})
+telemetry(K, "bare-contact-mute-in1604", inbound="2*0\r\n", request=E + "MUTM", model="in1604-hd",
+          expect_state={"contact": {"av_mute_mode": 2, "tally_mode": 0}})
+telemetry(K, "osd-menu-in1604", inbound="Menu1\r\n", model="in1604-hd", expect_state={"osd_menu_open": True})
+telemetry(K, "bare-osd-menu-in1604", inbound="0\r\n", request=E + "MENU", model="in1604-hd",
+          expect_state={"osd_menu_open": False})
+telemetry(K, "unit-name-in1604", inbound="Ipn Room-204\r\n", model="in1604-dtp",
+          expect_state={"unit_name": "Room-204"})
+telemetry(K, "input-preset-name-in1604", inbound="Pnam2*07,Doc Cam\r\n", model="in1604-dtp",
+          expect_state={"input_presets": {"7": {"name": "Doc Cam"}}})
+telemetry(K, "user-preset-name-in1604", inbound="Pnam1*16,Lecture\r\n", model="in1604-hd",
+          expect_state={"user_presets": {"16": {"name": "Lecture"}}})
+telemetry(K, "tp-format-in1604", inbound="HdbtO1*1\r\n", model="in1604-dtp", expect_state={"tp_output_format": 1})
+telemetry(K, "bare-tp-format-in1604", inbound="0\r\n", request=E + "O1HDBT", model="in1604-dtp",
+          expect_state={"tp_output_format": 0})
+telemetry(K, "signal-in1604", inbound="In00 1 0 1 1\r\n", model="in1604-dtp",
+          expect_state={"inputs": {"1": {"signal": True}, "2": {"signal": False}, "3": {"signal": True},
+                                   "4": {"signal": True}}})
+telemetry(K, "bare-signal-in1604", inbound="0 1 1 0\r\n", request=E + "0LS", model="in1604-hd",
+          expect_state={"inputs": {"1": {"signal": False}, "2": {"signal": True}, "3": {"signal": True},
+                                   "4": {"signal": False}}})
+telemetry(K, "hdcp-mode-in1604", inbound="HdcpS3\r\n", model="in1604-dtp", expect_state={"hdcp_mode": 3})
+telemetry(K, "detail-in1604", inbound="Hdet2*070\r\n", model="in1604-hd",
+          expect_state={"inputs": {"2": {"detail": 70}}})
+telemetry(K, "auto-image-in1604", inbound="Img1*1\r\n", model="in1604-hd",
+          expect_state={"inputs": {"1": {"auto_image": True}}})

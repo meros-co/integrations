@@ -1,0 +1,1023 @@
+spec: 1
+id: extron-ipl
+name: Extron IP Link control interfaces (IPL 250, IPL T S Series)
+vendor: Extron
+category: other
+
+# Extron's Simple Instruction Set (SIS) as the IP Link control interfaces
+# speak it over Telnet (TCP 23): serial ports (send data, port settings,
+# receive timeouts, pass-through), and on the IPL 250 IR outputs, relays and
+# contact inputs, plus information requests, network, time, verbose mode,
+# passwords and port maps. Each model supports only what its own guide
+# documents; page numbers are the guides' printed page numbers.
+#
+# Not here, on either model: e-mail alerts and the mail server, the file
+# system and file streaming, event buffers (their replies carry binary data),
+# the UDP broadcast mode (IPL T S), resets (Esc ZXXX, ZFFF, ZY, ZQQQ), IR
+# learning and firmware. The IPL Pro and IPCP Pro control processors are not
+# models: their user guides document no SIS (they are programmed with Global
+# Configurator and Global Scripter; see the quirks).
+source:
+  - title: "IPL 250 IP Link Ethernet Controller Reference Manual, 68-1715-01 Rev. A (08 09)"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-1715-01_IPL_250_A_080509.pdf
+    note: >
+      Manufacturer document. SIS chapter p.4-1 to 4-22: no start or end
+      characters, CR LF after every response, copyright banner and date on a
+      Telnet connection, "Password:" prompt repeated on a wrong password and
+      Login Administrator / Login User replies p.4-2; error codes p.4-3;
+      Telnet port 23, Esc or W, CR or | p.4-3 and 4-4; symbol definitions
+      (ports 01-99 as two digits, COM1-3, relays 1-4, IR 1-4; timeouts in
+      tens of milliseconds; #L or #D; pulse time in 20 ms steps; verbose
+      modes 0-3, tagged replies in modes 2 and 3) p.4-5 to 4-7; send data
+      (RS, data up to 200 bytes) p.4-8; serial port parameters, mode, flow
+      control, receive timeout p.4-9; pass-through and Ethernet timeouts
+      p.4-10; IR output (IR, file 0-99, function 1-137, play once,
+      continuously or stop) p.4-11; contact inputs, relays (O: open, close,
+      toggle, pulse, view) and firmware queries p.4-12; part number, model
+      name and description p.4-13; memory, unit name, date and time p.4-14;
+      GMT offset, daylight saving, DHCP, IP, MAC, subnet p.4-15; gateway,
+      verbose mode, connections, security level, passwords p.4-16; port maps
+      (MT, MH, MD) p.4-17; directories and files p.4-18 to 4-20; e-mail and
+      events p.4-20 to 4-22. Direct port access on TCP 2001-2003 p.3-14.
+  - title: "IPL T S Series (IPL T S1, S2, S4) User Guide, 68-1218-01 Rev. G"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-1218-01_G_IPL_T_S_Series_UG.pdf
+    note: >
+      Manufacturer document. Models and ports (S1 one RS-232 port; S2 two
+      and S4 four RS-232, RS-422 or RS-485 ports) p.1-3 and p.7; Telnet
+      (port 23) and web commands p.25; symbols p.26; error codes (E12 invalid
+      port to E31 pass-through not set) p.27; send data (RS) p.28; port
+      parameters, port type 0-2, flow control and receive timeout p.29;
+      pass-through and Ethernet timeouts p.30; firmware queries p.31; part
+      number, model name and description, memory p.32; unit name, time,
+      DHCP, IP, MAC, subnet p.34; gateway, verbose mode (0 for Telnet
+      connections) p.35; passwords (factory password the serial number) and
+      session security level p.36; port maps p.37; connections p.39; direct
+      port access on TCP 2001-2006, no password, data passed unprocessed
+      p.47.
+  - title: "IPL Pro Series User Guide, 68-2437-01 Rev. H (2021), and IPCP Pro xi Series User Guide, 68-3496-01 Rev. B"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-2437-01_H_IPL_Pro_Series_UG.pdf
+    note: >
+      Manufacturer documents, read to establish their SIS coverage: both
+      describe configuration with Global Configurator and Global Scripter
+      only and list no SIS commands (the IPCP Pro xi guide was read from a
+      reseller's copy of Extron's PDF, online.videopro.com.au). The IPL EXP
+      I/O Series guide (68-3490-01 Rev. E) likewise documents no SIS.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  # Commands need no start or end characters; Esc commands end with CR or |
+  # (IPL 250 p.4-2 and 4-4). Every command is sent followed by CR.
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # Responses end with CR LF. Every response shape the commands here can get:
+  # tagged verbose-mode replies, bare numbers and E-codes. The copyright
+  # banner, its date line, "Password:" and "Login ..." never match, so they
+  # are never taken as a reply.
+  reply_match: '^(E\d\d$|Cpn|Irs|Ver|Pno|Inf|Ipn|Ipt|Ipz|Ipx|Idh|Ipi|Iph|Ips|Ipg|Ipa|Ipu|Icc|Pvl|Pti|Pmt|Pmh|Pmd|Vrb|[HSN],\d|\d|[-+]\d)'
+  # Q (firmware version) answers on every model and keeps the session open.
+  probe: "Q"
+
+settings:
+  password: { type: string, secret: true, default: "", max_length: 12, pattern: '^[A-Za-z0-9]*$',
+              label: Password,
+              description: "The unit's administrator or user password, 4 to 12 letters and digits; leave it empty for a unit without passwords (the factory password is the unit's serial number on current firmware)." }
+
+on_connect:
+  # A password-protected unit sends "Password:" after the copyright banner and
+  # date; a good password is answered "Login Administrator" or "Login User", a
+  # wrong one by the prompt again (IPL 250 p.4-2).
+  - when_set: password
+    after_prompt: "Password:"
+    send: "{settings.password}"
+    refused: '^Password:?$'
+    accepted: '^Login (Administrator|User)$'
+  # Verbose mode 3: tagged query replies and unsolicited messages. Telnet
+  # connections start in mode 0 (IPL 250 p.4-16, IPL T S p.35). Answered "Vrb3".
+  - send: "\x1b3CV"
+    await_reply: true
+
+maps:
+  relay_state: { open: "0", closed: "1", toggle: "2" }
+  ir_mode: { once: "0", continuous: "1", stop: "2" }
+  timeout_scope: { this: "0", global: "1" }
+
+ports:
+  - { port: 23, protocol: tcp, role: control }
+
+models:
+  - id: ipl-250
+    name: Extron IPL 250
+    supports:
+      [send_serial_data, send_serial_data_timed, set_serial_port, get_serial_port, set_serial_port_type,
+       get_serial_port_type, set_serial_flow_control, get_serial_flow_control, set_serial_receive_timeout,
+       get_serial_receive_timeout, set_serial_passthrough, end_serial_passthrough, get_serial_passthrough,
+       play_ir, set_relay, pulse_relay, get_relay, get_contact_input,
+       get_firmware, get_firmware_versions, get_part_number, get_model_name, get_model_description,
+       get_system_memory, get_user_memory, set_unit_name, reset_unit_name, get_unit_name, set_date_time,
+       get_date_time, set_gmt_offset, get_gmt_offset, set_daylight_saving, get_daylight_saving, set_dhcp,
+       get_dhcp, set_ip_address, get_ip_address, get_mac_address, set_subnet_mask, get_subnet_mask,
+       set_gateway, get_gateway, set_verbose_mode, get_verbose_mode, get_connection_count,
+       get_security_level, set_admin_password, set_user_password, set_port_timeout, get_port_timeout,
+       set_telnet_port, get_telnet_port, set_web_port, get_web_port, set_direct_port, get_direct_port]
+    verification: none
+    notes: >
+      Three RS-232 ports (COM1-3), four IR outputs, four relays and four
+      contact inputs (p.4-5 and 4-13). Serial ports are RS-232 only: the port
+      type answers 0 (p.4-9). Daylight saving 0 off, 1 USA, 2 Europe.
+  - id: ipl-t-s
+    name: Extron IPL T S1, IPL T S2, IPL T S4
+    supports:
+      [send_serial_data, send_serial_data_timed, set_serial_port, get_serial_port, set_serial_port_type,
+       get_serial_port_type, set_serial_flow_control, get_serial_flow_control, set_serial_receive_timeout,
+       get_serial_receive_timeout, set_serial_passthrough, end_serial_passthrough, get_serial_passthrough,
+       get_firmware, get_firmware_versions, get_part_number, get_model_name, get_model_description,
+       get_system_memory, get_user_memory, set_unit_name, reset_unit_name, get_unit_name, set_date_time,
+       get_date_time, set_gmt_offset, get_gmt_offset, set_daylight_saving, get_daylight_saving, set_dhcp,
+       get_dhcp, set_ip_address, get_ip_address, get_mac_address, set_subnet_mask, get_subnet_mask,
+       set_gateway, get_gateway, set_verbose_mode, get_verbose_mode, get_connection_count,
+       get_security_level, set_admin_password, set_user_password, set_port_timeout, get_port_timeout,
+       set_telnet_port, get_telnet_port, set_web_port, get_web_port, set_direct_port, get_direct_port]
+    verification: none
+    notes: >
+      Serial interfaces only: the S1 has one RS-232 port, the S2 two and the
+      S4 four RS-232, RS-422 or RS-485 ports (p.1). No relays, IR or contact
+      inputs.
+
+commands:
+  # ── Serial ports (IPL 250 p.4-8 to 4-10, IPL T S p.28-30) ───────────────
+  send_serial_data:
+    summary: >
+      Send a string out of a serial port with the port's default receive
+      settings (Esc X!RS, CR, then the data); the attached device's answer
+      comes back on this connection unmatched (see the quirks)
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1: 1-3 on the IPL 250, 1, 2 or 4 ports on the IPL T S1, S2 and S4." }
+      data: { type: string, max_length: 200, required: true,
+              label: Data,
+              description: "The text to send to the attached device, up to 200 bytes; it cannot hold a line break, and the CR that ends every command follows it." }
+    send: "\x1b{port:02d}RS\r{data}"
+    returns: none
+
+  send_serial_data_timed:
+    summary: >
+      Send a string out of a serial port with this message's own receive
+      settings (Esc X!*X1&*X2)*X2!RS, CR, then the data)
+    params:
+      port:         { type: int, min: 1, max: 4, required: true,
+                      label: Serial port,
+                      description: "The serial port, from 1 for COM1: 1-3 on the IPL 250, 1, 2 or 4 ports on the IPL T S1, S2 and S4." }
+      first_wait:   { type: int, min: 0, max: 32767, required: true,
+                      label: Wait for the first character,
+                      description: "Tens of milliseconds to wait for the first character of the answer; 0 only together with a between-character wait of 0." }
+      between_wait: { type: int, min: 0, max: 32767, required: true,
+                      label: Wait between characters,
+                      description: "Tens of milliseconds to wait between characters of the answer before ending it; 0 only together with a first-character wait of 0." }
+      end:          { type: string, pattern: '^\d{1,5}[LD]$', required: true,
+                      label: Answer length or delimiter,
+                      description: "How the answer ends: a byte count followed by L (3L), or a delimiter's decimal ASCII value followed by D (10D for line feed)." }
+      data:         { type: string, max_length: 200, required: true,
+                      label: Data,
+                      description: "The text to send to the attached device, up to 200 bytes; it cannot hold a line break, and the CR that ends every command follows it." }
+    send: "\x1b{port:02d}*{first_wait}*{between_wait}*{end}RS\r{data}"
+    returns: none
+
+  set_serial_port:
+    summary: Set a serial port's baud rate, parity, data bits and stop bits (Esc X!*baud,parity,data,stopCP)
+    params:
+      port:      { type: int, min: 1, max: 4, required: true,
+                   label: Serial port,
+                   description: "The serial port, from 1 for COM1." }
+      baud:      { type: enum, values: ['300', '600', '1200', '1800', '2400', '3600', '4800', '7200', '9600', '14400', '19200', '28800', '38400', '57600', '115200'], required: true,
+                   label: Baud rate,
+                   description: "The port's baud rate; 9600 is the default." }
+      parity:    { type: enum, values: [N, O, E, M, S], required: true,
+                   label: Parity,
+                   description: "N none (the default), O odd, E even, M mark, S space." }
+      data_bits: { type: enum, values: ['8', '7'], required: true,
+                   label: Data bits,
+                   description: "7 or 8 data bits; 8 is the default." }
+      stop_bits: { type: enum, values: ['1', '2'], required: true,
+                   label: Stop bits,
+                   description: "1 or 2 stop bits; 1 is the default." }
+    send: "\x1b{port:02d}*{baud},{parity},{data_bits},{stop_bits}CP"
+    expect: { matches: '^Cpn\s*0*\d+\s*Ccp' }
+    returns: ack
+
+  get_serial_port:
+    summary: A serial port's settings as baud,parity,data bits,stop bits
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1." }
+    send: "\x1b{port:02d}CP"
+    expect: { matches: '^(?:Cpn\s*0*\d+\s*Ccp)?(\d+,[NOEMS],[78],[12])$' }
+    returns: value
+
+  set_serial_port_type:
+    summary: Set a serial port to RS-232 (0), RS-422 (1) or RS-485 (2); the IPL 250 takes 0 only
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1." }
+      type: { type: int, min: 0, max: 2, required: true,
+              label: Port type,
+              description: "0 RS-232, 1 RS-422, 2 RS-485; the IPL 250 and the IPL T S1 are RS-232 only." }
+    send: "\x1b{port:02d}*{type}CY"
+    expect: { matches: '^Cpn\s*0*\d+\s*Cty[0-2]$' }
+    returns: ack
+
+  get_serial_port_type:
+    summary: A serial port's type (0 RS-232, 1 RS-422, 2 RS-485)
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1." }
+    send: "\x1b{port:02d}CY"
+    expect: { matches: '^(?:Cpn\s*0*\d+\s*Cty)?([0-2])$' }
+    returns: value
+
+  set_serial_flow_control:
+    summary: Set a serial port's flow control and data pacing (Esc X!*flow,pacingCF)
+    params:
+      port:   { type: int, min: 1, max: 4, required: true,
+                label: Serial port,
+                description: "The serial port, from 1 for COM1." }
+      flow:   { type: enum, values: [H, S, N], required: true,
+                label: Flow control,
+                description: "H hardware, S software, N none." }
+      pacing: { type: int, min: 0, max: 1000, required: true,
+                label: Data pacing,
+                description: "Milliseconds between bytes sent, 0 to 1000; 0 is the default." }
+    send: "\x1b{port:02d}*{flow},{pacing}CF"
+    expect: { matches: '^Cpn\s*0*\d+\s*Cfl[HSN],\d+$' }
+    returns: ack
+
+  get_serial_flow_control:
+    summary: A serial port's flow control and pacing as flow,pacing (H, S or N; milliseconds)
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1." }
+    send: "\x1b{port:02d}CF"
+    expect: { matches: '^(?:Cpn\s*0*\d+\s*Cfl)?([HSN],\d+)$' }
+    returns: value
+
+  set_serial_receive_timeout:
+    summary: >
+      Set a serial port's receive timeouts and whether they or each send
+      data message's own settings apply (Esc X!*X1&*X2)*X2#*X2!CE)
+    params:
+      port:         { type: int, min: 1, max: 4, required: true,
+                      label: Serial port,
+                      description: "The serial port, from 1 for COM1." }
+      first_wait:   { type: int, min: 0, max: 32767, required: true,
+                      label: Wait for the first character,
+                      description: "Tens of milliseconds to wait for the first character of an answer (default 10 on the IPL 250, 1 on the IPL T S); 0 only together with a between-character wait of 0." }
+      between_wait: { type: int, min: 0, max: 32767, required: true,
+                      label: Wait between characters,
+                      description: "Tens of milliseconds to wait between characters before ending an answer (default 2); 0 only together with a first-character wait of 0." }
+      priority:     { type: int, min: 0, max: 1, required: true,
+                      label: Priority,
+                      description: "0 lets each send data message's own settings apply, 1 makes these settings apply." }
+      end:          { type: string, pattern: '^\d{1,5}[LD]$', required: true,
+                      label: Answer length or delimiter,
+                      description: "How an answer ends: a byte count followed by L (3L), or a delimiter's decimal ASCII value followed by D (10D)." }
+    send: "\x1b{port:02d}*{first_wait}*{between_wait}*{priority}*{end}CE"
+    expect: { matches: '^Cpn\s*0*\d+\s*Cce' }
+    returns: ack
+
+  get_serial_receive_timeout:
+    summary: A serial port's receive settings as first wait,between wait,priority,length or delimiter
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1." }
+    send: "\x1b{port:02d}CE"
+    expect: { matches: '^(?:Cpn\s*0*\d+\s*Cce)?(\d+[,*]\d+,[01],\d+[LD])$' }
+    returns: value
+
+  set_serial_passthrough:
+    summary: >
+      Pass a serial port's data through to another serial port (redirect
+      mode), releasing it to other senders after a timeout (Esc X!*X5)*X5#*X2!CD)
+    params:
+      port:     { type: int, min: 1, max: 4, required: true,
+                  label: Serial port,
+                  description: "The serial port whose data is redirected, from 1 for COM1." }
+      redirect: { type: int, min: 1, max: 4, required: true,
+                  label: Redirect to,
+                  description: "The serial port the data passes to and from, from 1 for COM1." }
+      timeout:  { type: int, min: 1, max: 32767, required: true,
+                  label: Release timeout,
+                  description: "Tens of milliseconds without pass-through data after which other data can be sent on the port (default 10)." }
+      end:      { type: string, pattern: '^\d{1,5}[LD]$', required: true,
+                  label: Message length or delimiter,
+                  description: "How a passed-through message ends: a byte count followed by L, or a delimiter's decimal ASCII value followed by D." }
+    send: "\x1b{port:02d}*{redirect}*{timeout}*{end}CD"
+    expect: { matches: '^Cpn\s*0*\d+\s*Ccd' }
+    returns: ack
+
+  end_serial_passthrough:
+    summary: End a serial port's pass-through mode (Esc X!*0CD); E31 when none is set
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1." }
+    send: "\x1b{port:02d}*0CD"
+    expect: { matches: '^Cpn\s*0*\d+\s*Ccd0+,' }
+    returns: ack
+
+  get_serial_passthrough:
+    summary: A serial port's pass-through as redirect port,timeout,length or delimiter (redirect 0 when off)
+    params:
+      port: { type: int, min: 1, max: 4, required: true,
+              label: Serial port,
+              description: "The serial port, from 1 for COM1." }
+    send: "\x1b{port:02d}CD"
+    expect: { matches: '^(?:Cpn\s*0*\d+\s*Ccd)?(\d+,\d+,\d+[LD])$' }
+    returns: value
+
+  # ── IR, relays and contact inputs (IPL 250 p.4-11 to 4-12) ──────────────
+  play_ir:
+    summary: >
+      Play a function of a loaded IR driver file (n.eir) out of an IR port
+      once or continuously, or stop it (Esc X!,file,function,modeIR)
+    params:
+      port:     { type: int, min: 1, max: 4, required: true,
+                  label: IR port,
+                  description: "The IR output, from 1 as on the rear panel." }
+      file:     { type: int, min: 0, max: 99, required: true,
+                  label: IR file,
+                  description: "The IR driver file number, 0 to 99, as in 3.eir loaded on the unit." }
+      function: { type: int, min: 1, max: 127, required: true,
+                  label: Function,
+                  description: "The function within the file, from 1 (functions from 127 up only describe the file)." }
+      mode:     { type: enum, values: [once, continuous, stop], default: once,
+                  label: Mode,
+                  description: "once plays the function once, continuous repeats it until stopped, stop ends a continuous playback." }
+    send: "\x1b{port:02d},{file},{function},{mode:map.ir_mode}IR"
+    expect: { matches: '^Irs\s*0*\d+,\d+,\d+,\d+$' }
+    returns: ack
+
+  set_relay:
+    summary: Open, close or toggle a relay (X!*0O, X!*1O, X!*2O)
+    params:
+      relay: { type: int, min: 1, max: 4, required: true,
+               label: Relay,
+               description: "The relay, from 1 as on the rear panel." }
+      state: { type: enum, values: [open, closed, toggle], required: true,
+               label: State,
+               description: "open turns the relay off, closed turns it on, toggle changes it." }
+    send: "{relay:02d}*{state:map.relay_state}O"
+    expect: { matches: '^Cpn\s*0*\d+\s*Rly[01]$' }
+    returns: ack
+
+  pulse_relay:
+    summary: Close a relay for a time in 20 ms steps, then open it (X!*3*X6#O)
+    params:
+      relay: { type: int, min: 1, max: 4, required: true,
+               label: Relay,
+               description: "The relay, from 1 as on the rear panel." }
+      ticks: { type: int, min: 1, max: 65535, required: true,
+               label: Pulse length,
+               description: "The pulse length in 20 ms steps, 1 (20 ms) to 65535 (1310.7 s); 25 (500 ms) is the default." }
+    send: "{relay:02d}*3*{ticks}O"
+    expect: { matches: '^Cpn\s*0*\d+\s*Rly[01]$' }
+    returns: ack
+
+  get_relay:
+    summary: A relay's state (0 open, 1 closed)
+    params:
+      relay: { type: int, min: 1, max: 4, required: true,
+               label: Relay,
+               description: "The relay, from 1 as on the rear panel." }
+    send: "{relay:02d}O"
+    expect: { matches: '^(?:Cpn\s*0*\d+\s*Rly)?([01])$' }
+    returns: value
+
+  get_contact_input:
+    summary: A contact input's state (0 open, 1 closed) (X!])
+    params:
+      input: { type: int, min: 1, max: 4, required: true,
+               label: Contact input,
+               description: "The contact input, from 1 as on the rear panel." }
+    send: "{input:02d}]"
+    expect: { matches: '^(?:\S*\*)?([01])$' }
+    returns: value
+
+  # ── Information (IPL 250 p.4-12 to 4-14, IPL T S p.31-32) ───────────────
+  get_firmware:
+    summary: Firmware version (n.nn)
+    send: "Q"
+    expect: { matches: '^(?:Ver01\*)?(\d+\.\d+)' }
+    returns: value
+
+  get_firmware_versions:
+    summary: Bootstrap, factory and updated firmware versions with kernel versions and dates (0Q)
+    send: "0Q"
+    expect: { matches: '^(?:Ver00\*)?(\d.*)$' }
+    returns: value
+
+  get_part_number:
+    summary: Extron part number (60-nnnn-nn), which identifies the model
+    send: "N"
+    expect: { matches: '^(?:Pno)?(60-[0-9-]+)$' }
+    returns: value
+
+  get_model_name:
+    summary: Model name, such as IPL 250 (1I)
+    send: "1I"
+    expect: { matches: '^Inf01\*\s*(.+)$' }
+    returns: value
+
+  get_model_description:
+    summary: Model description, listing the unit's ports (2I)
+    send: "2I"
+    expect: { matches: '^Inf02\*\s*(.+)$' }
+    returns: value
+
+  get_system_memory:
+    summary: System memory used and available (3I)
+    send: "3I"
+    expect: { matches: '^(?:Inf03\*)?(\d+ Bytes Used out of \d+ KBytes)$' }
+    returns: value
+
+  get_user_memory:
+    summary: User memory used and available (4I)
+    send: "4I"
+    expect: { matches: '^(?:Inf04\*)?(\d+ Bytes Used out of \d+ KBytes)$' }
+    returns: value
+
+  # ── Network, time and verbose mode (IPL 250 p.4-14 to 4-16, IPL T S p.34-35)
+  set_unit_name:
+    summary: Set the unit (host) name
+    params:
+      name: { type: string, max_length: 24, pattern: '^[A-Za-z]([A-Za-z0-9-]{0,22}[A-Za-z0-9])?$', required: true,
+              label: Name,
+              description: "Up to 24 letters, digits and hyphens, starting with a letter and not ending with a hyphen." }
+    send: "\x1b{name}CN"
+    expect: { matches: '^Ipn\s*\S+$' }
+    returns: ack
+
+  reset_unit_name:
+    summary: Restore the factory unit name (model name and the last three MAC address pairs)
+    send: "\x1b CN"
+    expect: { matches: '^Ipn\s*\S+$' }
+    returns: ack
+
+  get_unit_name:
+    summary: The unit (host) name
+    send: "\x1bCN"
+    expect: { matches: '^Ipn\s*(\S+)$' }
+    returns: value
+
+  set_date_time:
+    summary: Set the date and time, MM/DD/YY-HH:MM:SS
+    params:
+      date_time: { type: string, pattern: '^\d\d/\d\d/\d\d-\d\d:\d\d:\d\d$', required: true,
+                   label: Date and time,
+                   description: "Date and 24-hour time as MM/DD/YY-HH:MM:SS, such as 07/17/09-10:54:00." }
+    send: "\x1b{date_time}CT"
+    expect: { matches: '^Ipt' }
+    returns: ack
+
+  get_date_time:
+    summary: The date and time as the unit gives it (Ddd, D Mmm YYYY HH:MM:SS)
+    send: "\x1bCT"
+    expect: { matches: '^Ipt\s*(.+)$' }
+    returns: value
+
+  set_gmt_offset:
+    summary: Set the offset from GMT as hours:minutes, -12:00 to +14:00, no + sign
+    params:
+      offset: { type: string, pattern: '^-?(1[0-4]|0?[0-9])[:.][0-5][0-9]$', required: true,
+                label: GMT offset,
+                description: "Hours and minutes from GMT, such as -05:00 or 5:30; a positive offset has no + sign." }
+    send: "\x1b{offset}CZ"
+    expect: { matches: '^Ipz' }
+    returns: ack
+
+  get_gmt_offset:
+    summary: The offset from GMT
+    send: "\x1bCZ"
+    expect: { matches: '^(?:Ipz\s*)?([+-]?\d+[:.]\d\d)$' }
+    returns: value
+
+  set_daylight_saving:
+    summary: Set daylight saving time, 0 off, 1 USA, 2 Europe
+    params:
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Daylight saving,
+              description: "0 off, 1 USA (second Sunday of March to first Sunday of November), 2 Europe (last Sunday of March to last Sunday of October)." }
+    send: "\x1b{mode}CX"
+    expect: { matches: '^Ipx[0-2]$' }
+    returns: ack
+
+  get_daylight_saving:
+    summary: Daylight saving time, 0 off, 1 USA, 2 Europe
+    send: "\x1bCX"
+    expect: { matches: '^(?:Ipx)?([0-2])$' }
+    returns: value
+
+  set_dhcp:
+    summary: Turn DHCP on or off; off resets the IP address to 192.168.254.254, and the session may drop
+    params:
+      enabled: { type: bool, required: true,
+                 label: DHCP,
+                 description: "True takes the address from DHCP, false uses the fixed address (reset to 192.168.254.254)." }
+    send: "\x1b{enabled:bool01}DH"
+    expect: { matches: '^Idh[01]$' }
+    returns: ack
+
+  get_dhcp:
+    summary: Whether DHCP is on (1) or off (0)
+    send: "\x1bDH"
+    expect: { matches: '^(?:Idh)?([01])$' }
+    returns: value
+
+  set_ip_address:
+    summary: Set the IP address; the session may drop
+    params:
+      address: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true,
+                 label: IP address,
+                 description: "IPv4 address, such as 192.168.254.254." }
+    send: "\x1b{address}CI"
+    expect: { matches: '^Ipi\s*' }
+    returns: ack
+
+  get_ip_address:
+    summary: The IP address
+    send: "\x1bCI"
+    expect: { matches: '^(?:Ipi\s*)?(\d{1,3}(?:\.\d{1,3}){3})$' }
+    returns: value
+
+  get_mac_address:
+    summary: The MAC address (00-05-A6-xx-xx-xx)
+    send: "\x1bCH"
+    expect: { matches: '^(?:Iph\s*)?([0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){5})$' }
+    returns: value
+
+  set_subnet_mask:
+    summary: Set the subnet mask; the session may drop
+    params:
+      netmask: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true,
+                 label: Subnet mask,
+                 description: "IPv4 subnet mask, such as 255.255.0.0." }
+    send: "\x1b{netmask}CS"
+    expect: { matches: '^Ips\s*' }
+    returns: ack
+
+  get_subnet_mask:
+    summary: The subnet mask
+    send: "\x1bCS"
+    expect: { matches: '^(?:Ips\s*)?(\d{1,3}(?:\.\d{1,3}){3})$' }
+    returns: value
+
+  set_gateway:
+    summary: Set the gateway address; the session may drop
+    params:
+      gateway: { type: string, pattern: '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$', required: true,
+                 label: Gateway,
+                 description: "IPv4 gateway address, such as 0.0.0.0." }
+    send: "\x1b{gateway}CG"
+    expect: { matches: '^Ipg\s*' }
+    returns: ack
+
+  get_gateway:
+    summary: The gateway address
+    send: "\x1bCG"
+    expect: { matches: '^(?:Ipg\s*)?(\d{1,3}(?:\.\d{1,3}){3})$' }
+    returns: value
+
+  set_verbose_mode:
+    summary: >
+      Verbose mode of this connection: 0 none, 1 unsolicited messages, 2
+      tagged replies, 3 both (set on connecting; lower modes stop the tagged
+      replies the state rules read)
+    params:
+      mode: { type: int, min: 0, max: 3, required: true,
+              label: Verbose mode,
+              description: "This connection's verbose mode: 0 none, 1 unsolicited messages, 2 tagged replies, 3 both, set on connecting." }
+    send: "\x1b{mode}CV"
+    expect: { matches: '^Vrb[0-3]$' }
+    returns: ack
+
+  get_verbose_mode:
+    summary: Verbose mode of this connection
+    send: "\x1bCV"
+    expect: { matches: '^(?:Vrb)?([0-3])$' }
+    returns: value
+
+  get_connection_count:
+    summary: The number of open IP client connections
+    send: "\x1bCC"
+    expect: { matches: '^(?:Icc\s*)?0*(\d+)$' }
+    returns: value
+
+  set_port_timeout:
+    summary: Set the IP connection timeout in 10-second steps (default 30), for this connection or globally
+    params:
+      scope: { type: enum, values: [this, global], required: true,
+               label: Scope,
+               description: "this sets it for this connection only, global for every new connection." }
+      steps: { type: int, min: 1, max: 65000, required: true,
+               label: Timeout,
+               description: "Timeout in 10-second steps, 1 to 65000; 30 (300 seconds) is the default." }
+    send: "\x1b{scope:map.timeout_scope}*{steps}TC"
+    expect: { matches: '^Pti[01]\*\d+$' }
+    returns: ack
+
+  get_port_timeout:
+    summary: The IP connection timeout in 10-second steps, of this connection or the global one
+    params:
+      scope: { type: enum, values: [this, global], required: true,
+               label: Scope,
+               description: "this reads this connection's timeout, global the default for new connections." }
+    send: "\x1b{scope:map.timeout_scope}TC"
+    expect: { matches: '^(?:Pti[01]\*)?0*(\d+)$' }
+    returns: value
+
+  # ── Security and port maps (IPL 250 p.4-16 to 4-17, IPL T S p.36-37) ───
+  get_security_level:
+    summary: This connection's login level (0 not logged in, 11 user, 12 administrator)
+    send: "\x1bCK"
+    expect: { matches: '^(?:Pvl)?(0|11|12)$' }
+    returns: value
+
+  set_admin_password:
+    summary: Set the administrator password; a single space clears every password
+    params:
+      password: { type: string, secret: true, pattern: '^([A-Za-z0-9]{4,12}| )$', required: true,
+                  label: Password,
+                  description: "4 to 12 letters and digits, case sensitive; a single space clears the administrator and user passwords." }
+    send: "\x1b{password}CA"
+    expect: { matches: '^Ipa' }
+    returns: ack
+
+  set_user_password:
+    summary: Set the user password (needs an administrator password, E14 otherwise); a single space clears it
+    params:
+      password: { type: string, secret: true, pattern: '^([A-Za-z0-9]{4,12}| )$', required: true,
+                  label: Password,
+                  description: "4 to 12 letters and digits, case sensitive; a single space clears the user password." }
+    send: "\x1b{password}CU"
+    expect: { matches: '^Ipu' }
+    returns: ack
+
+  set_telnet_port:
+    summary: Move the Telnet port (23 the default, 0 disables it); the session ends on the old port
+    params:
+      port: { type: int, min: 0, max: 65535, required: true,
+              label: Telnet port,
+              description: "23 to restore the default, 0 to disable Telnet, otherwise 1024 to 65535; it may not equal the web or direct access port." }
+    send: "\x1b{port}MT"
+    expect: { matches: '^Pmt\s*\d+$' }
+    returns: ack
+
+  get_telnet_port:
+    summary: The Telnet port (0 disabled)
+    send: "\x1bMT"
+    expect: { matches: '^(?:Pmt\s*)?0*(\d+)$' }
+    returns: value
+
+  set_web_port:
+    summary: Move the web (HTTP) port (80 the default, 0 disables it)
+    params:
+      port: { type: int, min: 0, max: 65535, required: true,
+              label: Web port,
+              description: "80 to restore the default, 0 to disable the web server, otherwise 1024 to 65535; it may not equal the Telnet or direct access port." }
+    send: "\x1b{port}MH"
+    expect: { matches: '^Pmh\s*\d+$' }
+    returns: ack
+
+  get_web_port:
+    summary: The web (HTTP) port (0 disabled)
+    send: "\x1bMH"
+    expect: { matches: '^(?:Pmh\s*)?0*(\d+)$' }
+    returns: value
+
+  set_direct_port:
+    summary: Move the first direct access port (2001 the default, 0 disables direct access)
+    params:
+      port: { type: int, min: 0, max: 65535, required: true,
+              label: Direct access port,
+              description: "2001 to restore the default, 0 to disable direct port access, otherwise 1024 to 65535; the serial ports take this and the following port numbers." }
+    send: "\x1b{port}MD"
+    expect: { matches: '^Pmd\s*\d+$' }
+    returns: ack
+
+  get_direct_port:
+    summary: The first direct access port (0 disabled)
+    send: "\x1bMD"
+    expect: { matches: '^(?:Pmd\s*)?0*(\d+)$' }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      API limits: Extron's IPL Pro (S1, S3, S6, CR88, IRS8) and IPCP Pro
+      control processors document no SIS commands; they are configured with
+      Global Configurator and programmed with Global Scripter, and a consumer
+      reaches what they control through their program. They are therefore not
+      models here. Flex I/O, power receptacles and eBUS belong to models whose
+      SIS guides are not published on Extron's site (IPL T SFI244, IPL T PCS4,
+      IPL T CR48) and are not covered. The IR function name query (Esc
+      file,functionIR) answers free text without a tag, which the transport's
+      reply allow-list cannot take as a reply (format limit), so it is not
+      offered.
+
+  - models: [all]
+    severity: warning
+    text: >
+      send_serial_data and send_serial_data_timed return unverified: the
+      attached device's answer comes back on this connection as plain text the
+      unit adds nothing to, so the core cannot tell it from other text and
+      does not wait for it (an answer that happens to look like a tagged reply
+      or a number can be taken as the next command's reply). The data is
+      followed by the CR that ends every command; whether the unit forwards
+      that CR to the device is not documented. A consumer that needs the
+      device's answers opens the serial port's direct access TCP port (2001
+      for COM1, no password) as a generic TCP device instead.
+
+  - models: [all]
+    severity: warning
+    text: >
+      SIS errors are E-codes on their own line: E10 invalid command, E12
+      invalid port, E13 invalid value, E14 not valid for this configuration
+      (a user password with no administrator password), E17 timed out, E22
+      busy, E24 privilege violation (a user-level login), E25 device not
+      present, E26 too many connections, E27 invalid event, E28 file not
+      found, E31 pass-through ended when not set (IPL 250 p.4-3, IPL T S
+      p.27). Every command's reply is matched against its documented success
+      text, so an E-code fails it as a device error.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A Telnet connection closes after 5 minutes without traffic by default
+      (30 x 10 s, IPL 250 p.4-10); the engine's liveness probe (Q) keeps it
+      open. Password login: the password is sent after "Password:"; a wrong
+      one is answered by the prompt again, which marks the device
+      unauthorized. The factory password is the unit's serial number (IPL T S
+      p.36); a unit with a password whose setting is empty answers only
+      "Password:". Telnet starts in verbose mode 0; the core sets mode 3 on
+      connecting so query replies are tagged.
+
+  - models: [ipl-250]
+    severity: critical
+    text: >
+      set_relay, pulse_relay and play_ir act at once on whatever is wired to
+      the relay or IR output (screens, lifts, lighting, power, a display), and
+      a continuous IR playback runs until stopped.
+
+  - models: [all]
+    severity: critical
+    text: >
+      set_ip_address, set_subnet_mask, set_gateway and set_dhcp can end the
+      Telnet session and the unit may come back at another address (DHCP off
+      resets the address to 192.168.254.254). set_telnet_port ends it on port
+      23, and 0 disables Telnet until it is set again another way.
+      set_admin_password with a single space clears every password; a new
+      password must be given to the core (update_settings) before it
+      reconnects. Changes take up to 100 seconds to be saved to flash (IPL
+      250 p.4-4).
+
+  - models: [all]
+    severity: info
+    text: >
+      State: relays and contact inputs (IPL 250) are read every 10 seconds,
+      since the guides document no message on their changes; relay changes
+      this connection makes are read from the replies. Serial port settings,
+      pass-through, network, time, port maps and the information requests are
+      read on connecting and every 2 minutes, and after each change from the
+      reply. Queries are answered tagged in verbose mode 3 (Cpn01 Ccp...),
+      and bare values are tied to the query they answer. A port the model
+      lacks answers E12, which is ignored.
+
+  - models: [all]
+    severity: info
+    text: >
+      Documentation gaps taken as written: the contact input query is printed
+      as X!] (the ] character after the input number, URL %5D); its tagged
+      form is not documented. The IPL T S guide's port key names ports of
+      another product (host, Config, MLS, display, IR/serial A-C); its own
+      ports are COM1 to COM4, taken here as 1 to 4. The IPL T S date format
+      and copyright banner are not printed and are taken as the IPL 250's.
+      The pass-through and receive timeout views are printed with commas or
+      asterisks between fields; both are accepted.
+
+state:
+  device.model:             { type: string, description: "Model name from the copyright banner sent on connecting" }
+  device.firmware:          { type: string, description: "Firmware version from the banner or the Q reply" }
+  device.part_number:       { type: string, description: "Extron part number (60-nnnn-nn)" }
+  device.login:             { type: string, description: "Administrator or User, from the Login reply to the password" }
+  device.model_name:        { type: string, description: "Model name from 1I, such as IPL 250" }
+  device.description:      { type: string, description: "Model description from 2I, listing the unit's ports" }
+  verbose_mode:             { type: int, description: "Verbose mode of this connection (3 after connecting)" }
+  security_level:           { type: int, description: "This connection's login level: 0 not logged in, 11 user, 12 administrator" }
+  serial.*.settings:        { type: string, description: "A serial port's baud,parity,data bits,stop bits, such as 9600,N,8,1" }
+  serial.*.type:            { type: int, description: "A serial port's type: 0 RS-232, 1 RS-422, 2 RS-485" }
+  serial.*.flow_control:    { type: string, description: "A serial port's flow control: H hardware, S software, N none" }
+  serial.*.pacing:          { type: int, unit: ms, description: "A serial port's data pacing between bytes" }
+  serial.*.receive_timeout: { type: string, description: "A serial port's receive settings as first wait,between wait,priority,length or delimiter (waits in tens of ms)" }
+  serial.*.passthrough:     { type: string, description: "A serial port's pass-through as redirect port,timeout,length or delimiter; redirect 0 when off" }
+  ir.*.file:                { type: int, description: "IPL 250: the IR file last played on an IR port" }
+  ir.*.function:            { type: int, description: "IPL 250: the IR function last played on an IR port" }
+  ir.*.mode:                { type: int, description: "IPL 250: the last playback mode on an IR port: 0 once, 1 continuous, 2 stopped" }
+  relays.*.closed:          { type: bool, description: "IPL 250: the relay is closed (on)" }
+  contacts.*.closed:        { type: bool, description: "IPL 250: the contact input is closed (on, shorted)" }
+  network.dhcp:             { type: bool, description: "DHCP is on" }
+  network.address:          { type: string, description: "IP address" }
+  network.netmask:          { type: string, description: "Subnet mask" }
+  network.gateway:          { type: string, description: "Gateway address" }
+  network.mac:              { type: string, description: "MAC address" }
+  network.unit_name:        { type: string, description: "Unit (host) name" }
+  network.connections:      { type: int, description: "Open IP client connections" }
+  network.telnet_port:      { type: int, description: "Telnet port, 0 disabled" }
+  network.web_port:         { type: int, description: "Web (HTTP) port, 0 disabled" }
+  network.direct_port:      { type: int, description: "First direct access port, 0 disabled" }
+  clock.date_time:          { type: string, description: "Date and time as the unit last gave it" }
+  clock.gmt_offset:         { type: string, description: "Offset from GMT" }
+  clock.daylight_saving:    { type: int, description: "Daylight saving: 0 off, 1 USA, 2 Europe" }
+  port_timeout.connection:  { type: int, description: "This connection's IP timeout, in 10-second steps" }
+  port_timeout.global:      { type: int, description: "The global IP timeout, in 10-second steps" }
+
+telemetry:
+  poll:
+    # Relays and contact inputs change without a documented message.
+    - every_ms: 10000
+      send:
+        - { models: [ipl-250], message: "01O" }
+        - { models: [ipl-250], message: "02O" }
+        - { models: [ipl-250], message: "03O" }
+        - { models: [ipl-250], message: "04O" }
+        - { models: [ipl-250], message: "01]" }
+        - { models: [ipl-250], message: "02]" }
+        - { models: [ipl-250], message: "03]" }
+        - { models: [ipl-250], message: "04]" }
+    - every_ms: 120000
+      send:
+        - "N"
+        - "1I"
+        - "2I"
+        - "\x1bCK"
+        - "\x1bCN"
+        - "\x1bDH"
+        - "\x1bCI"
+        - "\x1bCS"
+        - "\x1bCG"
+        - "\x1bCH"
+        - "\x1bCZ"
+        - "\x1bCX"
+        - "\x1bCC"
+        - "\x1b0TC"
+        - "\x1b1TC"
+        - "\x1bMT"
+        - "\x1bMH"
+        - "\x1bMD"
+        - "\x1b01CP"
+        - "\x1b01CY"
+        - "\x1b01CF"
+        - "\x1b01CE"
+        - "\x1b01CD"
+        - "\x1b02CP"
+        - "\x1b02CY"
+        - "\x1b02CF"
+        - "\x1b02CE"
+        - "\x1b02CD"
+        - "\x1b03CP"
+        - "\x1b03CY"
+        - "\x1b03CF"
+        - "\x1b03CE"
+        - "\x1b03CD"
+        - { models: [ipl-t-s], message: "\x1b04CP" }
+        - { models: [ipl-t-s], message: "\x1b04CY" }
+        - { models: [ipl-t-s], message: "\x1b04CF" }
+        - { models: [ipl-t-s], message: "\x1b04CE" }
+        - { models: [ipl-t-s], message: "\x1b04CD" }
+  updates:
+    # Copyright banner on connecting (IPL 250 p.4-2). Not anchored: Telnet
+    # option bytes may come first.
+    - match: '\(c\) Copyright \d{4}, Extron Electronics,?\s*([^,]+?),\s*V(\d+\.\d+),\s*(60-[0-9-]+)'
+      state: { device.model: "{1}", device.firmware: "{2}", device.part_number: "{3}" }
+    - match: '^Login (Administrator|User)$'
+      state: { device.login: "{1}" }
+    - match: '^Vrb([0-3])$'
+      state: { verbose_mode: "{1}" }
+    - match: '^(?:Vrb)?([0-3])$'
+      request_match: '^\x1bCV$'
+      state: { verbose_mode: "{1}" }
+    - match: '^(?:Ver01\*)?(\d+\.\d+)$'
+      request_match: '^1?Q$'
+      state: { device.firmware: "{1}" }
+    - match: '^(?:Pno)?(60-[0-9-]+)$'
+      state: { device.part_number: "{1}" }
+    - match: '^Inf01\*\s*(.+)$'
+      state: { device.model_name: "{1}" }
+    - match: '^Inf02\*\s*(.+)$'
+      state: { device.description: "{1}" }
+    - match: '^(?:Pvl)?(0|11|12)$'
+      request_match: '^\x1bCK$'
+      state: { security_level: "{1}" }
+    - match: '^Pvl(0|11|12)$'
+      state: { security_level: "{1}" }
+    # Serial ports: tagged replies to sets and queries, and bare query replies.
+    - match: '^Cpn\s*0*(\d+)\s*Ccp(\d+,[NOEMS],[78],[12])$'
+      state: { "serial.{1}.settings": "{2}" }
+    - match: '^(\d+,[NOEMS],[78],[12])$'
+      request_match: '^\x1b0*(\d+)CP$'
+      state: { "serial.{2}.settings": "{1}" }
+    - match: '^Cpn\s*0*(\d+)\s*Cty([0-2])$'
+      state: { "serial.{1}.type": "{2}" }
+    - match: '^([0-2])$'
+      request_match: '^\x1b0*(\d+)CY$'
+      state: { "serial.{2}.type": "{1}" }
+    - match: '^(?:Cpn\s*0*(\d+)\s*Cfl)([HSN]),0*(\d+)$'
+      state: { "serial.{1}.flow_control": "{2}", "serial.{1}.pacing": "{3}" }
+    - match: '^([HSN]),0*(\d+)$'
+      request_match: '^\x1b0*(\d+)CF$'
+      state: { "serial.{3}.flow_control": "{1}", "serial.{3}.pacing": "{2}" }
+    - match: '^Cpn\s*0*(\d+)\s*Cce(\d+[,*]\d+,[01],\d+[LD])$'
+      state: { "serial.{1}.receive_timeout": "{2}" }
+    - match: '^(\d+[,*]\d+,[01],\d+[LD])$'
+      request_match: '^\x1b0*(\d+)CE$'
+      state: { "serial.{2}.receive_timeout": "{1}" }
+    - match: '^Cpn\s*0*(\d+)\s*Ccd(\d+,\d+,\d+[LD])$'
+      state: { "serial.{1}.passthrough": "{2}" }
+    - match: '^(\d+,\d+,\d+[LD])$'
+      request_match: '^\x1b0*(\d+)CD$'
+      state: { "serial.{2}.passthrough": "{1}" }
+    # IR, relays and contact inputs (IPL 250 p.4-11 to 4-12).
+    - match: '^Irs\s*0*(\d+),0*(\d+),0*(\d+),0*([0-2])$'
+      state: { "ir.{1}.file": "{2}", "ir.{1}.function": "{3}", "ir.{1}.mode": "{4}" }
+    - match: '^Cpn\s*0*(\d+)\s*Rly([01])$'
+      state: { "relays.{1}.closed": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^0*(\d+)O$'
+      state: { "relays.{2}.closed": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:\S*\*)?([01])$'
+      request_match: '^0*(\d+)\]$'
+      state: { "contacts.{2}.closed": { value: "{1}", map: { "0": false, "1": true } } }
+    # Network and time (IPL 250 p.4-14 to 4-17).
+    - match: '^Ipn\s*(\S+)$'
+      state: { network.unit_name: "{1}" }
+    - match: '^Idh([01])$'
+      state: { network.dhcp: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^\x1bDH$'
+      state: { network.dhcp: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^(?:Ipi\s*)?(\d{1,3}(?:\.\d{1,3}){3})$'
+      request_match: '^\x1b(?:[\d.]+)?CI$'
+      state: { network.address: "{1}" }
+    - match: '^Ipi\s*(\d{1,3}(?:\.\d{1,3}){3})$'
+      state: { network.address: "{1}" }
+    - match: '^Ips\s*(\d{1,3}(?:\.\d{1,3}){3})$'
+      state: { network.netmask: "{1}" }
+    - match: '^(\d{1,3}(?:\.\d{1,3}){3})$'
+      request_match: '^\x1bCS$'
+      state: { network.netmask: "{1}" }
+    - match: '^Ipg\s*(\d{1,3}(?:\.\d{1,3}){3})$'
+      state: { network.gateway: "{1}" }
+    - match: '^(\d{1,3}(?:\.\d{1,3}){3})$'
+      request_match: '^\x1bCG$'
+      state: { network.gateway: "{1}" }
+    - match: '^(?:Iph\s*)?([0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){5})$'
+      state: { network.mac: "{1}" }
+    - match: '^(?:Icc\s*)?0*(\d+)$'
+      request_match: '^\x1bCC$'
+      state: { network.connections: "{1}" }
+    - match: '^Icc\s*0*(\d+)$'
+      state: { network.connections: "{1}" }
+    - match: '^(?:Pmt\s*)?0*(\d+)$'
+      request_match: '^\x1b\d*MT$'
+      state: { network.telnet_port: "{1}" }
+    - match: '^(?:Pmh\s*)?0*(\d+)$'
+      request_match: '^\x1b\d*MH$'
+      state: { network.web_port: "{1}" }
+    - match: '^(?:Pmd\s*)?0*(\d+)$'
+      request_match: '^\x1b\d*MD$'
+      state: { network.direct_port: "{1}" }
+    - match: '^Ipt\s*(.+)$'
+      state: { clock.date_time: "{1}" }
+    - match: '^(?:Ipz\s*)?([+-]?\d+[:.]\d\d)$'
+      request_match: '^\x1b.*CZ$'
+      state: { clock.gmt_offset: "{1}" }
+    - match: '^(?:Ipx)?([0-2])$'
+      request_match: '^\x1b\d?CX$'
+      state: { clock.daylight_saving: "{1}" }
+    - match: '^(?:Pti0\*)?0*(\d+)$'
+      request_match: '^\x1b0(?:\*\d+)?TC$'
+      state: { port_timeout.connection: "{1}" }
+    - match: '^(?:Pti1\*)?0*(\d+)$'
+      request_match: '^\x1b1(?:\*\d+)?TC$'
+      state: { port_timeout.global: "{1}" }

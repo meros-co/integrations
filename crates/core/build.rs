@@ -81,7 +81,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-disguise", &["disguise"]),
     ("vendor-etc", &["etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
-    ("vendor-extron", &["extron-matrix", "extron-switcher"]),
+    (
+        "vendor-extron",
+        &["extron-ipl", "extron-matrix", "extron-switcher"],
+    ),
     ("vendor-figure53", &["qlab"]),
     (
         "vendor-focusrite",

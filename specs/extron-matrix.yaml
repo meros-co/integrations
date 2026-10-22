@@ -1,6 +1,6 @@
 spec: 1
 id: extron-matrix
-name: Extron SIS matrix switchers (DXP, XTP II CrossPoint, SMX)
+name: Extron SIS matrix switchers (DXP, XTP II CrossPoint, SMX, MMX)
 vendor: Extron
 category: router
 
@@ -11,6 +11,8 @@ category: router
 # user guide documents its own subset and variants. Each model below supports
 # only what its own guide documents. Commands are written from the guides'
 # command and response tables; page numbers are the guides' printed numbers.
+# The MMX 42/62 compact matrices have an RS-232 port only: they are reached
+# through a serial-to-Ethernet interface's raw TCP port (see the quirks).
 #
 # Not here: e-mail alerts, the file system, firmware, matrix factory resets
 # (Z commands, which differ between families: Esc ZXXX resets the settings on
@@ -85,6 +87,30 @@ source:
       p.45-47; EDID by slot p.41 and p.48; slot signal p.49; audio and names
       per plane p.50-51; slot HDCP p.50-52; name, time, network, passwords
       and serial ports p.53-58.
+  - title: "MMX 42/62 Series Matrix Switchers User's Manual, 68-778-01 Rev. C (2009)"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/MMX_4262_C_OL.pdf
+    note: >
+      Manufacturer document covering the MMX 42 AV, 42 AV RCA, 42 SVA, 42 SVA
+      RCA, 62 AV, 62 AV RCA, 62 SVA and 62 SVA RCA. Remote control chapter
+      p.4-2 to 4-6: rear RS-232 port only, 9600 baud, 1 stop bit, no parity,
+      no flow control, no start or end characters, CR LF after every
+      response p.4-2; copyright message at power-on, Out.. In.. All/Vid/Aud
+      on a front panel tie, error codes (E01, E10, E12, E13), a 10-second
+      pause between characters aborts a command p.4-3; symbols (gain -18 to
+      +24 dB, 43 steps) p.4-4; ties, tie views (In..), video and audio mutes
+      and their views (bare 0 or 1), global mutes p.4-5; input gain (G) and
+      attenuation (g, case sensitive), level steps and view, front panel
+      lockout (0X, 1X, X), resets (Esc ZA, ZB, ZZ, ZXXX), information request
+      I (both outputs' ties and mutes), part number N and firmware Q p.4-6.
+  - title: "IPL T S Series User Guide, 68-1218-01 Rev. G"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-1218-01_G_IPL_T_S_Series_UG.pdf
+    note: >
+      Manufacturer document, for reaching an RS-232-only matrix over the
+      network: direct port access on TCP 2001 (COM1) to 2006, no password,
+      data passed both ways unprocessed, the serial port's settings made on
+      the interface first p.47.
   - title: Bitfocus Companion modules extron-dxp and extron-mmx-tcp (MIT)
     author: Bitfocus AS and contributors
     url: https://github.com/bitfocus/companion-module-extron-dxp
@@ -113,7 +139,7 @@ transport:
   # "Reconfig" and "HplgO" never match, so they are never taken as a reply.
   # Change reports from other controllers have the same text as replies and
   # cannot be told apart (see the quirks).
-  reply_match: '^(E\d\d$|Out|In|Vmt|Amt|Mut|Rpr|Spr|Rmm?\s*\d|Prst|Nm[gimopr]|Exec?\s*\d|Exe[TR]|Vrb|Ver|Pno|Inf|Vgp|Frq|Hdcp|Sts|Qik|Psav|Tst|Mpr|Edid|Idh|Ip[aghimnpstuxz]|Icc|Cpn|Pti|Boot|Poec|Rely|Etie|Afmt|Aud|Vol|Aadj|Frz|Zpx|Mpv|Stat|Vtpo|V\d|\d|-|\*{4})'
+  reply_match: '^(E\d\d$|Out|In|Vmt|Amt|Mut|Rpr|Spr|Rmm?\s*\d|Prst|Nm[gimopr]|Exec?\s*\d|Exe[TR]|Vrb|Ver|Pno|Inf|Vgp|Frq|Hdcp|Sts|Qik|Psav|Tst|Mpr|Edid|Idh|Ip[aghimnpstuxz]|Icc|Cpn|Pti|Boot|Poec|Rely|Etie|Afmt|Aud|Vol|Aadj|Frz|Zp[xabz]|Mpv|Stat|Vtpo|V\d|N\d|\d|-|\+\d|\*{4})'
   # Q (firmware version) is Extron's documented keep-alive query.
   probe: "Q"
 
@@ -137,8 +163,10 @@ on_connect:
     accepted: '^Login (Administrator|User)$'
   # Verbose mode 3: tagged query replies and change reports from the front
   # panel and other connections (DXP HD 4K PLUS p.38 and p.51, XTP II p.48 and
-  # p.66). Telnet connections start in mode 0. Answered "Vrb3".
-  - send: "\x1b3CV"
+  # p.66). Telnet connections start in mode 0. Answered "Vrb3". The MMX has no
+  # verbose mode.
+  - models: [dxp-hd-4k-plus, dxp-dvi-hdmi, xtp-ii-crosspoint, smx]
+    send: "\x1b3CV"
     await_reply: true
 
 maps:
@@ -148,6 +176,7 @@ maps:
 
 ports:
   - { port: 23, protocol: tcp, role: control }
+  - { port: null, protocol: tcp, role: control, when: "model mmx-42-62", note: "RS-232 only: the raw TCP port of the serial-to-Ethernet interface the matrix is wired to (an Extron IPL T S's direct port access, 2001 for COM1), given when the device is opened" }
 
 models:
   - id: dxp-hd-4k-plus
@@ -236,6 +265,21 @@ models:
       planes 90-99); every tie, mute and plane preset names its plane, and
       replies carry the plane number first (p.42-44). Global presets 1-32
       cover all planes; plane presets 1-10.
+  - id: mmx-42-62
+    name: Extron MMX 42/62 Series (MMX 42 AV, 42 AV RCA, 42 SVA, 42 SVA RCA, 62 AV, 62 AV RCA, 62 SVA, 62 SVA RCA)
+    supports:
+      [tie, tie_video, tie_audio, get_video_tie, get_audio_tie,
+       set_video_mute, get_video_mute, set_video_mute_all,
+       set_audio_mute, get_audio_mute, set_audio_mute_all,
+       set_input_gain, set_input_attenuation, increase_input_level, decrease_input_level, get_input_level,
+       set_front_panel_lock, get_front_panel_lock, get_info, get_part_number, get_firmware,
+       mmx_reset_audio_levels, mmx_unmute_all_video, mmx_unmute_all_audio]
+    verification: none
+    notes: >
+      Composite video (AV) or S-video (SVA) with stereo audio, 4x2 (MMX 42)
+      or 6x2 (MMX 62), RS-232 control only (p.4-2). Input gain 0 to +24 dB
+      and attenuation 0 to 18 dB (-18 to +24 in all, 43 steps); front panel
+      lockout 0 or 1 only. No presets, names, verbose mode or password.
 
 commands:
   # ── Ties (DXP HD 4K PLUS p.43, DXP DVI p.57, XTP II p.51) ───────────────
@@ -338,7 +382,7 @@ commands:
                 label: Output,
                 description: "The output number, from 1 as on the switcher." }
     send: "{output}%"
-    expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+(?:Vid|RGB))?$' }
+    expect: { matches: '^(?:Out\s*\d+\s+)?(?:In\s*)?(\d+)(?:\s+(?:Vid|RGB))?$' }
     returns: value
 
   get_audio_tie:
@@ -348,7 +392,7 @@ commands:
                 label: Output,
                 description: "The output number, from 1 as on the switcher." }
     send: "{output}$"
-    expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+Aud)?$' }
+    expect: { matches: '^(?:Out\s*\d+\s+)?(?:In\s*)?(\d+)(?:\s+Aud)?$' }
     returns: value
 
   # ── Mutes (DXP HD 4K PLUS p.46-47, DXP DVI p.58, XTP II p.52) ───────────
@@ -865,7 +909,7 @@ commands:
   get_part_number:
     summary: Extron part number (60-nnnn-nn), which identifies the model
     send: "N"
-    expect: { matches: '^(?:Pno\s*)?((?:60|43)-[0-9-]+)' }
+    expect: { matches: '^(?:Pno\s*|N)?((?:60|43)-[0-9-]+)' }
     returns: value
 
   get_info:
@@ -1807,6 +1851,25 @@ commands:
     expect: { matches: '^(?:\d+\s*FRQ00\*)?([0-3](?:\s+[0-3])*)$' }
     returns: value
 
+  # ── MMX 42/62 (MMX p.4-6) ───────────────────────────────────────────────
+  mmx_reset_audio_levels:
+    summary: Reset every input's audio level to 0 dB (Esc ZA)
+    send: "\x1bZA"
+    expect: { matches: '^Zpa$' }
+    returns: ack
+
+  mmx_unmute_all_video:
+    summary: Unmute every output's video (Esc ZB)
+    send: "\x1bZB"
+    expect: { matches: '^Zpb$' }
+    returns: ack
+
+  mmx_unmute_all_audio:
+    summary: Unmute every output's audio (Esc ZZ)
+    send: "\x1bZZ"
+    expect: { matches: '^Zpz$' }
+    returns: ack
+
 quirks:
   - models: [all]
     severity: critical
@@ -1965,6 +2028,32 @@ quirks:
       queries it lacks with E10 or E14, which are ignored. XTP II endpoint
       signal and HDCP status (LsT, HdcpT) and remote power changes (Poec) are
       pushed by the matrix.
+
+  - models: [mmx-42-62]
+    severity: warning
+    text: >
+      The MMX 42/62 has an RS-232 port only (9600 baud, 8 data bits, no
+      parity, 1 stop bit, p.4-2). It is opened at the address and raw TCP
+      port of a serial-to-Ethernet interface wired to that port, such as an
+      Extron IPL T S's direct port access (TCP 2001 for COM1, no password,
+      IPL T S guide p.47), with the interface's serial port set to the MMX's
+      settings; there is no Telnet login, banner or port timeout of the
+      MMX's own. Pausing 10 seconds or more between the characters of a
+      command aborts it (p.4-3); the core sends each command whole.
+
+  - models: [mmx-42-62]
+    severity: info
+    text: >
+      The MMX has no verbose mode: queries are answered bare (In05, 0, +03),
+      and the state rules tie each bare reply to the query it answers. It
+      reports only front panel ties on its own (Out02 In05 All); global mutes
+      and resets are followed by the I query, which reads both outputs' ties
+      and mutes, and the 2-minute poll reads I, the front panel lockout and
+      every input's level. The poll's other queries are not MMX commands and
+      are answered E10, which is ignored. No tie of both video and audio can
+      be read (no n! view); presets, names, quick ties and the input-to-all
+      ties are not MMX commands. Esc ZXXX (factory reset) is not offered, as
+      for the other families.
 
 state:
   device.model:            { type: string, description: "Model name from the copyright banner sent on connecting" }
@@ -2143,6 +2232,12 @@ telemetry:
       - "\x1b97MP"
       - "\x1b98MP"
       - "\x1b99MP"
+      - { models: [mmx-42-62], message: "1G" }
+      - { models: [mmx-42-62], message: "2G" }
+      - { models: [mmx-42-62], message: "3G" }
+      - { models: [mmx-42-62], message: "4G" }
+      - { models: [mmx-42-62], message: "5G" }
+      - { models: [mmx-42-62], message: "6G" }
     every_ms: 120000
   updates:
     # Copyright banner on connecting: model, firmware and part number (DXP HD
@@ -2156,7 +2251,7 @@ telemetry:
       state: { device.verbose_mode: "{1}" }
     - match: '^Ver0?1\*\s*(\d+\.\d+)$'
       state: { device.firmware: "{1}" }
-    - match: '^(?:Pno\s*)?((?:60|43)-\d+-\d+)$'
+    - match: '^(?:Pno\s*|N)?((?:60|43)-\d+-\d+)$'
       state: { device.part_number: "{1}" }
     - match: '^(?:Info?\d*\*\s*)?V(\d+)X(\d+)\s+A(\d+)X(\d+)\s*$'
       state: { device.video_inputs: "{1}", device.video_outputs: "{2}", device.audio_inputs: "{3}", device.audio_outputs: "{4}" }
@@ -2661,3 +2756,59 @@ telemetry:
     - match: '^Frq00[\s*]*'
       match_each: '([0-3])'
       state: { "inputs.{index:+1}.signal": { value: "{1}", map: { "0": false, "1": true, "2": true, "3": true } } }
+    # MMX 42/62 (p.4-5 to 4-6): bare replies tied to their query, the I
+    # reply with both outputs' ties and mutes, and re-reads after global
+    # mutes and resets.
+    - models: [mmx-42-62]
+      match: '^V1\*0*(\d+)\s*A1\*0*(\d+)\s*V2\*0*(\d+)\s*A2\*0*(\d+)\s*Vmt1\*([01])\s*Amt1\*([01])\s*Vmt2\*([01])\s*Amt2\*([01])$'
+      state:
+        outputs.1.video_input: "{1}"
+        outputs.1.audio_input: "{2}"
+        outputs.2.video_input: "{3}"
+        outputs.2.audio_input: "{4}"
+        outputs.1.video_mute: { value: "{5}", map: { "0": false, "1": true } }
+        outputs.1.audio_mute: { value: "{6}", map: { "0": false, "1": true } }
+        outputs.2.video_mute: { value: "{7}", map: { "0": false, "1": true } }
+        outputs.2.audio_mute: { value: "{8}", map: { "0": false, "1": true } }
+    - models: [mmx-42-62]
+      match: '^In\s*0*(\d+)$'
+      request_match: '^(\d+)%$'
+      state: { "outputs.{2}.video_input": "{1}" }
+    - models: [mmx-42-62]
+      match: '^In\s*0*(\d+)$'
+      request_match: '^(\d+)\$$'
+      state: { "outputs.{2}.audio_input": "{1}" }
+    - models: [mmx-42-62]
+      match: '^([01])$'
+      request_match: '^(\d+)B$'
+      state: { "outputs.{2}.video_mute": { value: "{1}", map: { "0": false, "1": true } } }
+    - models: [mmx-42-62]
+      match: '^([01])$'
+      request_match: '^(\d+)Z$'
+      state: { "outputs.{2}.audio_mute": { value: "{1}", map: { "0": false, "1": true } } }
+    - models: [mmx-42-62]
+      match: '^([+-]?\d+)$'
+      request_match: '^(\d+)G$'
+      state: { "inputs.{2}.audio_level": "{1}" }
+    - models: [mmx-42-62]
+      match: '^([01])$'
+      request_match: '^X$'
+      state: { front_panel_lock: "{1}" }
+    - models: [mmx-42-62]
+      match: '^(?:Vmt|Amt)[01]$'
+      then_send: ["I"]
+    - models: [mmx-42-62]
+      match: '^Zpb$'
+      state: { outputs.1.video_mute: "false", outputs.2.video_mute: "false" }
+    - models: [mmx-42-62]
+      match: '^Zpz$'
+      state: { outputs.1.audio_mute: "false", outputs.2.audio_mute: "false" }
+    - models: [mmx-42-62]
+      match: '^Zpa$'
+      state:
+        inputs.1.audio_level: "0"
+        inputs.2.audio_level: "0"
+        inputs.3.audio_level: "0"
+        inputs.4.audio_level: "0"
+        inputs.5.audio_level: "0"
+        inputs.6.audio_level: "0"
