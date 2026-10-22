@@ -1386,10 +1386,28 @@ impl SpecEngine {
         }
         let transport = match kind {
             "line-tcp" | "line-serial" => {
+                // `line-serial`, or a `line-tcp` transport's `serial` block
+                // with the device's link on its serial port (SPEC.md §2),
+                // where the block's `overrides` replace the framing and
+                // reply keys the vendor documents differently there.
+                let on_serial = kind == "line-serial"
+                    || spec.serial_link(&ctx.model, &ctx.settings) == Some(true);
+                let mut t = t.clone();
+                if on_serial && kind == "line-tcp" {
+                    if let Some(map) = t.as_object_mut() {
+                        map.extend(spec.serial_overrides(&ctx.model));
+                    }
+                }
                 let framing = str_field(&t, "framing").unwrap_or("terminated");
                 let open = str_field(&t, "open").unwrap_or("").to_string();
                 let close = str_field(&t, "close").unwrap_or("").to_string();
-                if framing == "delimited" && close.trim().is_empty() {
+                // A delimited reply ends at `close`; with replies framed
+                // otherwise, `close` may be empty (a prefix only, such as
+                // Roland's STX on RS-232, or the payload as it is).
+                if framing == "delimited"
+                    && close.trim().is_empty()
+                    && t.get("reply_framing").is_none()
+                {
                     return Err(
                         "framing delimited needs a close that is not only whitespace".into(),
                     );
@@ -1444,10 +1462,6 @@ impl SpecEngine {
                     Some(p) => Some(Regex::new(p).map_err(|e| format!("reply_match: {e}"))?),
                     None => None,
                 };
-                // `line-serial`, or a `line-tcp` transport's `serial` block
-                // with the device's link on its serial port (SPEC.md §2).
-                let on_serial = kind == "line-serial"
-                    || spec.serial_link(&ctx.model, &ctx.settings) == Some(true);
                 if on_serial && !spec.serial_model(&ctx.model) {
                     return Err(format!(
                         "model {} has no serial port for link serial: use link tcp",

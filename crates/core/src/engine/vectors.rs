@@ -654,6 +654,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "*SAPOWR0000000000000000",
         // LG displays: "[Command2] [Set ID] OK[Data]x", ended by the x.
         "a 01 OK01x",
+        // Sharp NEC's ASCII control commands: every response starts with ">".
+        ">ok",
+        // The Leitch pass-through prompt after each command (Videohub RS-422).
+        ">",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {

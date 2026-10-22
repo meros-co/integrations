@@ -56,6 +56,10 @@ mod dhd_ecp;
 mod easyworship;
 #[cfg(feature = "emberplus")]
 mod emberplus;
+#[cfg(feature = "epson-projector")]
+mod epson_projector;
+#[cfg(feature = "epson-projector")]
+mod epson_projector_commands;
 #[cfg(feature = "focusrite-rednet")]
 mod focusrite_rednet;
 #[cfg(feature = "blackmagic-hyperdeck")]
@@ -85,6 +89,10 @@ mod meros_camera;
 mod meros_camera_wire;
 #[cfg(feature = "nec-display")]
 mod nec_display;
+#[cfg(feature = "nec-projector")]
+mod nec_projector;
+#[cfg(feature = "nec-projector")]
+mod nec_projector_models;
 #[cfg(feature = "novastar-central-control")]
 mod novastar_ccp;
 #[cfg(feature = "novastar-h")]
@@ -101,6 +109,10 @@ mod onyx;
 mod osc_listener;
 #[cfg(feature = "panasonic-ptz")]
 mod panasonic_notify;
+#[cfg(feature = "panasonic-projector")]
+mod panasonic_projector;
+#[cfg(feature = "panasonic-projector")]
+mod panasonic_projector_commands;
 #[cfg(feature = "philips-sicp")]
 mod philips_sicp;
 #[cfg(feature = "pjlink")]
@@ -323,6 +335,14 @@ pub(crate) fn construct(
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
+        #[cfg(feature = "epson-projector")]
+        "epson-projector" => Ok(Box::new(epson_projector::EpsonProjector::new(spec, context)?)),
+        #[cfg(feature = "panasonic-projector")]
+        "panasonic-projector" => Ok(Box::new(panasonic_projector::PanasonicProjector::new(
+            spec, context,
+        )?)),
+        #[cfg(feature = "nec-projector")]
+        "nec-projector" => Ok(Box::new(nec_projector::NecProjector::new(context)?)),
         #[cfg(feature = "samsung-mdc")]
         "samsung-mdc" => Ok(Box::new(samsung_mdc::SamsungMdc::new(context)?)),
         #[cfg(feature = "sony-bravia-serial")]

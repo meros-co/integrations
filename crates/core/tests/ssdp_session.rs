@@ -124,17 +124,24 @@ async fn a_sony_camera_answers_a_search_and_is_described() {
     })
     .unwrap();
 
+    // What discovery reported besides, to say why when nothing is found.
+    let mut seen = Vec::new();
     let found = tokio::time::timeout(Duration::from_secs(10), async {
         loop {
             for e in core.next_events(64).await {
                 if let Event::Discovered { .. } = e {
-                    return e;
+                    return Some(e);
                 }
+                seen.push(format!("{e:?}"));
             }
         }
     })
     .await
-    .expect("discovered within 10 s");
+    .ok()
+    .flatten();
+    let Some(found) = found else {
+        panic!("not discovered within 10 s; events: {seen:#?}");
+    };
     let Event::Discovered {
         protocol,
         address,

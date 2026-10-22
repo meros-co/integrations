@@ -5,14 +5,15 @@ vendor: Sharp
 category: display
 
 # Sharp's S-Format protocol: a four-character command and a four-character parameter, ended by CR, over
-# RS-232C or TCP 10008 with a user name and password prompt. Newer models also offer the NEC-style binary
+# RS-232C (link serial) or TCP 10008, where a user name and password prompt comes first. Newer models also offer the NEC-style binary
 # protocol on TCP 7142 instead (their "command format" setting); that protocol is the nec-display spec's.
 source:
   - title: "INTERACTIVE DISPLAY OPERATION MANUAL for S-Format command, PN-LA862, PN-LA752, PN-LA652 (2023-08, revised 2024-03)"
     author: Sharp Corporation
     url: "https://business.sharpusa.com/portals/0/downloads/Manuals/PN-LA862-LA752-LA652_S-Format_command_manual_en_Rev1.pdf"
     note: >
-      The fullest current command table (pp.5-9): power, input, the picture, audio, multi/PIP, touch panel,
+      RS-232C conditions (p.1: 9600 bps, 8 bits, no parity, 1 stop bit, no flow control, straight cable,
+      COMMAND (RS-232C) on). The fullest current command table (pp.5-9): power, input, the picture, audio, multi/PIP, touch panel,
       administrator and function menus, model, serial number, temperature and standby cause; the
       communication procedure (p.2-3: command and parameter, CR, OK/ERR/WAIT, ???? to read, one command at a
       time, a 10 s timeout, 100 ms between commands, 1 minute after power on or off), LAN login with
@@ -20,37 +21,40 @@ source:
   - title: "LCD MONITOR OPERATION MANUAL for S-Format command, PN-LC862, PN-LC752, PN-LC652 (2023)"
     author: Sharp Corporation
     url: "https://business.sharpusa.com/portals/0/downloads/Manuals/PN-LC862-LC752-LC652_S-Format_command_manual.pdf"
-    note: "The PN-LC table (p.4): power, input, volume, mute, size, model, serial number, reset, brightness, resolution, backlight off; the LAN procedure (p.5)."
+    note: "RS-232C (p.1: 9600 bps, 8N1, no flow control, straight cable, command format S-Format). The PN-LC table (p.4): power, input, volume, mute, size, model, serial number, reset, brightness, resolution, backlight off; the LAN procedure (p.5)."
   - title: "S-Format command operation manual, PN-HW862/752/652/552/502/432/322 (JA105, 2026-09)"
     author: Sharp Corporation
     url: "https://smj.jp.sharp/bs/lcd-display/lineup/pnhw/download_files/sharp-lcd_display_pnhw2series_command-manual_jp.pdf"
     note: >
-      Japanese. The PN-HW2 table (pp.4-5): media player input, picture modes, color temperature, key and IR
+      Japanese. RS-232C (p.2: 9600 bps, 8 bits, no parity, 1 stop bit, no flow control, crossed cable).
+      The PN-HW2 table (pp.4-5): media player input, picture modes, color temperature, key and IR
       locks, pixel shift, refresh, tile matrix and bezel compensation; PC CONTROL can be allowed only once the
       factory user name and password are changed (p.6).
   - title: "Operation manual, PN-HB851/751/651, PN-HM851/751/651 (2018-10, revised 2019-06), RS-232C and LAN chapters"
     author: Sharp Corporation
     url: "https://jp.sharp/business/lcd-display/cms/images/PNHB851_HB751_HB651_HM851_HM751_HM651_Manual.pdf"
     note: >
-      Japanese. RS-232C 9600/19200/38400 bps (38400 by default) and daisy chaining (p.38), replies including
+      Japanese. RS-232C 9600/19200/38400 bps (38400 by default), 8N1, no flow control, straight cable,
+      display control select RS-232C (LAN and APPLICATION then not controlled) and daisy chaining (p.38), replies including
       LOCKED and UNSELECTED and the ID suffix (pp.38-39), the full command table with standby availability
       (pp.42-48), LAN control (p.49).
   - title: "Operation manual, PN-R903A (2017-02, revised 2019-07), RS-232C and LAN chapters"
     author: Sharp Corporation
     url: "https://jp.sharp/business/lcd-display/cms/images/R903A_Manual.pdf"
     note: >
-      Japanese. The PN-R generation's command table (pp.36-43) with PC and AV terminal settings, color
+      Japanese. RS-232C 9600/19200/38400 bps (38400 by default), 8N1, no flow control, straight cable, and
+      RS-232C/LAN switch (the two never at once) (p.32, p.44). The PN-R generation's command table (pp.36-43) with PC and AV terminal settings, color
       management brightness, settings copy and six temperature sensors; the LAN data port (configurable,
       10008 by default), login and auto logout (pp.44-52).
   - title: "S-Format command manual, PN-ME982/862/752/652/552/502/432 (2025-02)"
     author: Sharp Corporation
     url: "https://smj.jp.sharp/bs/lcd-display/lineup/pnme/download_files/me_s-format_command_manual_japanese.pdf"
-    note: "Japanese. The PN-ME2 table (p.4): HOME and APPLICATION 1-6 inputs, the zoom size; the LAN procedure (p.5)."
+    note: "Japanese. RS-232C (p.2: 9600 bps, 8N1, no flow control, crossed cable). The PN-ME2 table (p.4): HOME and APPLICATION 1-6 inputs, the zoom size; the LAN procedure (p.5)."
   - title: "S-Format command manual, PN-M432-M982 and PN-P436-P756 (PN-P6_M2 OM1 JP(3), 2025-07)"
     author: Sharp Corporation
     url: "https://smj.jp.sharp/bs/lcd-display/lineup/pnm/download_files/pn-pxx6-mxx2_s-format_command_manual_jp.pdf"
     note: >
-      Japanese. The PN-M2/P6 table (pp.6-9): compute module input, SVE picture modes, gamma, ambient light
+      Japanese. RS-232C (p.2: 9600 bps, 8N1, no flow control, crossed cable). The PN-M2/P6 table (pp.6-9): compute module input, SVE picture modes, gamma, ambient light
       and motion sensors, audio modes, time and daylight saving; S-FORMAT LOGIN AUTH on the web page (p.3);
       zero or space padding; replies with the ID over a LAN chain (p.5).
 
@@ -67,6 +71,18 @@ transport:
   timeout_ms: 15000
   reply: expected
   probe: "POWR????"
+  # The same commands and replies on the RS-232C input terminal, with no
+  # login: 8 data bits, no parity, 1 stop bit, no flow control on every
+  # family; 9600 bps fixed on PN-LA, PN-LC (p.1), PN-HW2 (p.2), PN-ME2 (p.2)
+  # and PN-M2/P6 (p.2); 9600, 19200 or 38400 bps, 38400 by default, on
+  # PN-HB/HM (p.38) and PN-R903A (p.32). One baud rate setting serves every
+  # family: 9600 by default, the families' common rate (see the quirks).
+  serial:
+    baud_rate: { default: 9600, values: [9600, 19200, 38400] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
 
 settings:
   username: { type: string, max_length: 32, pattern: "^[!-~]*$", default: "", label: User name, description: "The display's user name for LAN control; empty when none is set, in which case only CR is sent." }
@@ -74,15 +90,19 @@ settings:
 
 # The display asks for a user name and a password on every connection, set or not, and answers OK. Sharp
 # documents no answer to a wrong one.
+# The login is a LAN procedure only; RS-232C takes commands at once.
 on_connect:
-  - after_prompt: "Login:"
+  - link: tcp
+    after_prompt: "Login:"
     send: "{settings.username}"
-  - after_prompt: "Password:"
+  - link: tcp
+    after_prompt: "Password:"
     send: "{settings.password}"
     await_reply: true
 
 ports:
-  - { port: 10008, protocol: tcp, role: control, note: "the S-Format data port (configurable on the PN-R903A); an RS-232C display is reached through a serial-to-Ethernet bridge at the bridge's port" }
+  - { port: 10008, protocol: tcp, role: control, when: "link tcp", note: "the S-Format data port (configurable on the PN-R903A); an RS-232C display behind a serial-to-Ethernet bridge is reached at the bridge's port" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232C input terminal: a straight cable on PN-LA, PN-LC, PN-HB/HM and PN-R903A, a crossed cable on PN-HW2, PN-ME2 and PN-M2/P6" }
 
 models:
   - id: pn-la
@@ -5697,8 +5717,19 @@ quirks:
     text: >
       Daisy-chain addressing (IDSL, IDLK, the + repeater) is not offered: commands always go to the display
       this connection reaches. A display with an ID number set ends each reply with it, which is read past.
-      RS-232C and LAN control exclude each other (set_control_select); LOCKED and UNSELECTED say control is
-      prohibited or on the other path.
+      RS-232C and LAN control exclude each other (set_control_select, CTLS): the menu's display control
+      select (PN-HB/HM, p.38 and p.49; RS-232C/LAN on the PN-R903A, p.32 and p.44) must be RS-232C for link
+      serial and LAN for link tcp, and with one chosen the other path is not controlled (nor APPLICATION on
+      the PN-HB/HM). LOCKED and UNSELECTED say control is prohibited or on the other path.
+  - models: [all]
+    severity: warning
+    text: >
+      On the RS-232C terminal (link serial) the commands and replies are the LAN ones and there is no login.
+      The PN-LA, PN-LC, PN-HW2, PN-ME2 and PN-M2/P6 run at 9600 bps only; the PN-HB/HM and PN-R903A at
+      9600, 19200 or 38400 bps as set in their menu (communication speed, BAUD), 38400 from the factory, so
+      either set the baud rate setting to 38400 for them or set the display to 9600; every display on a
+      chain must match. The PN-LA takes commands on RS-232C only with COMMAND (RS-232C) on (ADMIN, CONTROL
+      FUNCTION; set_rs232_command), and the PN-LC only with its command format set to S-Format.
   - models: [pn-la]
     severity: critical
     text: >
