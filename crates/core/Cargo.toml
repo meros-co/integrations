@@ -193,7 +193,7 @@ vendor-zinc = ["oscpoint"]
 
 # One feature per integration (spec id).
 # AES70 / OCA devices (OCP.1) (native)
-aes70 = []
+aes70 = ["dep:aes", "dep:cbc", "dep:crypto-bigint", "dep:getrandom", "dep:hmac", "dep:sha1", "dep:sha2-tls", "dep:subtle", "dep:zeroize"] # also secure OCP.1 (TLS and DTLS with a pre-shared key)
 # AJA Ki Pro recorders (with a native extension)
 aja-kipro = []
 # AJA KUMO SDI routers and control panels (with a native extension)
@@ -287,7 +287,7 @@ dataton-watchout6 = []
 # Dataton WATCHOUT 7 (HTTP REST API)
 dataton-watchout7 = []
 # d&b audiotechnik amplifiers (AES70) (native)
-dbaudio = []
+dbaudio = ["dep:aes", "dep:cbc", "dep:crypto-bigint", "dep:getrandom", "dep:hmac", "dep:sha1", "dep:sha2-tls", "dep:subtle", "dep:zeroize"] # the AES70 module, with its secure OCP.1
 # disguise Designer (Session and Service APIs)
 dhd-aes67 = []
 dhd-control-api = []
@@ -316,7 +316,7 @@ facebook-account = []
 # Facebook Live (Meta Graph API Live Video API, cloud)
 facebook-live = []
 # Focusrite RedNet (AES70) (native)
-focusrite-rednet = []
+focusrite-rednet = ["dep:aes", "dep:cbc", "dep:crypto-bigint", "dep:getrandom", "dep:hmac", "dep:sha1", "dep:sha2-tls", "dep:subtle", "dep:zeroize"] # the AES70 module, with its secure OCP.1
 # Focusrite RedNet MP8R (Yamaha Remote Control Protocol, TCP 49280)
 focusrite-rednet-rcp = []
 # Generic HTTP device (native)
@@ -529,10 +529,18 @@ yamaha-tf = []
 youtube-live = []
 
 [dependencies]
+# Secure OCP.1 (aes70, and dbaudio and focusrite-rednet, which build on it):
+# TLS 1.2 and DTLS 1.2 with TLS_DHE_PSK_WITH_AES_128_CBC_SHA, which rustls does
+# not offer, from RustCrypto primitives (src/modules/aes70_tls.rs).
+aes = { version = "0.9.3", optional = true }
 base64 = "0.22"
+cbc = { version = "0.2.1", default-features = false, optional = true }
+crypto-bigint = { version = "0.7.5", default-features = false, features = ["alloc", "zeroize"], optional = true }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
+getrandom = { version = "0.4.3", optional = true }
 # Pure-Rust YAML parser for the specs and vectors; src/yaml.rs maps it onto serde.
 granit-parser = { version = "2.0.0", default-features = false, features = ["std", "error_messages"] }
+hmac = { version = "0.13.0", features = ["zeroize"], optional = true }
 if-addrs = "0.15.0"
 md-5 = "0.10"
 # DEFLATE: Meros Camera fleet links (meros-camera) and ATEM media pool PNG files
@@ -546,9 +554,12 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 russh = { version = "0.63", default-features = false, features = ["ring", "rsa"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+sha1 = { version = "0.11.0", default-features = false, features = ["zeroize"], optional = true }
 sha2 = "0.10.9"
+sha2-tls = { package = "sha2", version = "0.11.0", default-features = false, features = ["zeroize"], optional = true }
 # `all` for SO_REUSEPORT, which sharing UDP 5353 with mDNSResponder needs.
 socket2 = { version = "0.5", features = ["all"] }
+subtle = { version = "2.6.1", optional = true }
 # Glyph rasterizing for ATEM multiviewer labels drawn from text (blackmagic-atem).
 swash = { version = "0.2.10", optional = true }
 thiserror = "2"
@@ -556,6 +567,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["connect", "handshake", "__rustls-tls"] }
 webpki-roots = "1"
+zeroize = { version = "1.9.0", optional = true }
 
 # Serial ports (RS-232, RS-422, USB serial adapters) on desktop systems. Phones
 # have no serial port an app can open, so the transport is left out there
