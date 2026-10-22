@@ -32,6 +32,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Send> SerialStream for T {}
 /// Opens serial ports: the host's own ([`HostPorts`]), or a test's.
 pub(crate) trait SerialPorts: Send + Sync {
     fn open(&self, port: &SerialPort) -> std::io::Result<Box<dyn SerialStream>>;
+
+    /// The names of the ports there are now, sorted.
+    fn list(&self) -> std::io::Result<Vec<String>>;
 }
 
 /// The host's serial ports.
@@ -78,6 +81,24 @@ impl SerialPorts for HostPorts {
             std::io::ErrorKind::Unsupported,
             "serial ports are not available on this platform",
         ))
+    }
+    /// The ports `serial2` finds: names only, as it gives no description or
+    /// USB ids.
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    fn list(&self) -> std::io::Result<Vec<String>> {
+        let mut names: Vec<String> = serial2_tokio::SerialPort::available_ports()?
+            .into_iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names.dedup();
+        Ok(names)
+    }
+
+    /// A phone has no serial port an app can open: none to list.
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    fn list(&self) -> std::io::Result<Vec<String>> {
+        Ok(Vec::new())
     }
 }
 
@@ -152,5 +173,18 @@ impl SerialPorts for MemoryPorts {
                 "no such port",
             )),
         }
+    }
+    /// Every port a test has plugged in and not yet opened.
+    fn list(&self) -> std::io::Result<Vec<String>> {
+        let mut names: Vec<String> = self
+            .plugged
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, ends)| !ends.is_empty())
+            .map(|(name, _)| name.clone())
+            .collect();
+        names.sort();
+        Ok(names)
     }
 }

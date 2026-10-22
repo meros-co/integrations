@@ -103,6 +103,15 @@ pub fn catalog(core: &Core) -> Value {
     serde_json::to_value(core.catalog()).expect("catalog serialises")
 }
 
+/// The host's serial ports (`Core::serial_ports`): `{"ok": [{"name": ...}]}`
+/// or `{"error": {"error": "serial_ports", "message": ...}}`.
+pub fn serial_ports(core: &Core) -> Value {
+    match core.serial_ports() {
+        Ok(ports) => json!({ "ok": ports }),
+        Err(message) => json!({ "error": { "error": "serial_ports", "message": message } }),
+    }
+}
+
 /// The snapshot, or `null` for a device that is not open.
 pub fn snapshot(core: &Core, device: DeviceId) -> Value {
     core.snapshot(device)

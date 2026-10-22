@@ -101,9 +101,22 @@ transport:
   # Protocol handshaking, mandatory on every device (p.9): "#" CR, answered
   # "~nn@ OK".
   probe: "#"
+  # The same protocol on the device's RS-232 control port (guide p.1-3: the
+  # serial, Ethernet and USB ports alike; product manuals: "via serial or
+  # Ethernet ports"). 115200 baud, no parity, 8 data bits, 1 stop bit (guide
+  # p.1, and each product's default communication parameters: VS-88UT p.89,
+  # VP-440X p.51, MV-4X p.56, DSP-62 p.54); BAUD changes the rate (p.16), as
+  # set_baud does, among the rates set_baud offers.
+  serial:
+    baud_rate: { default: 115200, values: [9600, 19200, 38400, 57600, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
 
 ports:
-  - { port: 5000, protocol: tcp, role: control }
+  - { port: 5000, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The device's RS-232 control port, usually a 3-pin terminal block (G, Rx, Tx)" }
 
 models:
   - id: p3000-generic
@@ -3912,6 +3925,19 @@ telemetry:
       state: { "meters.{1:key}.{2}": "{3}" }
 
 quirks:
+  - models: [all]
+    severity: info
+    text: >
+      With link serial the device is driven on its RS-232 control port with the same commands, framing,
+      handshake and machine number as over TCP (guide p.1-3 and p.9). The port runs at 115200 8N1 unless
+      BAUD changed it (set_baud, kept across restarts); after a change over the serial port, change the
+      link's baud_rate to match. Products that answer BAUD with ERR 002 keep 115200. No flow control is
+      documented; none is used. Some products share the port with other uses and must have it set to
+      control the device: on the VP-440X "Use RS-232 Port for control of" must be Scaler (manual p.40-41), on
+      the SWT3-21-H/41-H the serial port's Tunneling must be Control (manual p.28-31), and the KDS-EN7/DEC7
+      manual documents only its RS-232 gateway on that port. The VS-88UT's other RS-232 and RS-485 ports
+      drive room devices, not the switcher. Which ports need LOGIN when security is on is product-specific
+      (guide p.49).
   - models: [all]
     severity: critical
     text: >

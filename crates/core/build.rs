@@ -121,13 +121,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["labgruppen-lake", "labgruppen-nlb60e"],
     ),
     ("vendor-lawo", &["emberplus"]),
+    ("vendor-lg", &["lg-display"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
     ("vendor-magewell", &["magewell-proconvert"]),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
-    ("vendor-nec", &["nec-projector"]),
+    ("vendor-nec", &["nec-display", "nec-projector"]),
     ("vendor-newtek", &["newtek-tricaster"]),
     (
         "vendor-novastar",
@@ -141,6 +142,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-panasonic",
         &["panasonic-projector", "panasonic-ptz"],
     ),
+    ("vendor-philips", &["philips-sicp"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
     ("vendor-probel", &["probel-swp02", "probel-swp08"]),
@@ -172,6 +174,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-ross",
         &["ross-xpression", "ross-xpression-udp", "rosstalk"],
     ),
+    ("vendor-samsung", &["samsung-mdc"]),
     (
         "vendor-sennheiser",
         &[
@@ -183,6 +186,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "sennheiser-spectera",
         ],
     ),
+    ("vendor-sharp", &["sharp-display"]),
     (
         "vendor-shure",
         &[
@@ -195,7 +199,16 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-softouch", &["softouch-easyworship"]),
-    ("vendor-sony", &["sony-camera", "visca"]),
+    (
+        "vendor-sony",
+        &[
+            "sony-bravia",
+            "sony-bravia-ip",
+            "sony-bravia-serial",
+            "sony-camera",
+            "visca",
+        ],
+    ),
     ("vendor-studiocoast", &["vmix"]),
     (
         "vendor-symetrix",

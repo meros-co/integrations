@@ -8,6 +8,10 @@ KX = {"model": "p3000-extended"}
 text(K, "handshake", {}, "#\r", device_reply="~01@ OK\r\n", expect_result={"ok": {"kind": "ack"}})
 text(K, "get_model", {}, "#MODEL?\r", device_reply="~01@MODEL VS-88UT\r\n",
      expect_result={"ok": {"kind": "value", "value": "VS-88UT"}})
+# The same on the RS-232 control port (link serial, guide p.1-3).
+text(K, "get_model", {}, "#MODEL?\r", device_reply="~01@MODEL VS-88UT\r\n",
+     expect_result={"ok": {"kind": "value", "value": "VS-88UT"}}, settings={"link": "serial"},
+     file="get_model-serial")
 text(K, "get_version", {}, "#VERSION?\r", device_reply="~01@VERSION 1.12.0034\r\n",
      expect_result={"ok": {"kind": "value", "value": "1.12.0034"}})
 text(K, "get_serial", {}, "#SN?\r", device_reply="~01@SN 00000123456789\r\n",

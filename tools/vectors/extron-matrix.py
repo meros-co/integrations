@@ -145,6 +145,14 @@ text(K, "smx_recall_plane_preset", {"plane": 1, "preset": 2}, "01*2*0.\r", devic
 # goes through the rules, replies and change reports alike.
 telemetry(K, "connect", expect_connect_wire=[E + "3CV\r"], inbound="Vrb3\r\n",
           expect_state={"device": {"verbose_mode": 3}})
+# The same on the rear Remote port (link serial): the password, asked for over
+# Ethernet only, is not sent there (DXP DVI/HDMI p.109, XTP II p.47); over
+# Telnet it answers the prompt first.
+telemetry(K, "connect-serial", settings={"link": "serial", "password": "extron"},
+          expect_connect_wire=[E + "3CV\r"], inbound="Vrb3\r\n", expect_state={"device": {"verbose_mode": 3}})
+telemetry(K, "connect-password", settings={"password": "extron"},
+          expect_connect_wire=["extron\r", E + "3CV\r"], inbound="Vrb3\r\n",
+          expect_state={"device": {"verbose_mode": 3}})
 telemetry(K, "banner",
           inbound="(c) Copyright 2018, Extron Electronics, DXP 88 HD 4K Plus, V1.00, 60-1495-03\r\n",
           expect_state={"device": {"model": "DXP 88 HD 4K Plus", "firmware": "1.00", "part_number": "60-1495-03"}})
@@ -391,6 +399,13 @@ def _tm(command, *args, **extra):
 
 
 MM = {"model": "mmx-42-62"}
+# The MMX is reached on its RS-232 port unless told otherwise (link serial by
+# default): these vectors play on the serial port, and one over a
+# serial-to-Ethernet interface's TCP port.
+text(K, "tie", {"input": 5, "output": 2}, "5*2!\r", device_reply="Out02 In05 All\r\n", expect_result=ACK,
+     settings={"link": "tcp"}, file="tie.mmx-tcp", **MM)
+text(K, "tie", {"input": 3, "output": 4}, "3*4!\r", device_reply="Out04 In03 All\r\n", expect_result=ACK,
+     settings={"link": "serial"}, file="tie-serial")
 _tm("tie", {"input": 5, "output": 2}, "5*2!\r", device_reply="Out02 In05 All\r\n", expect_result=ACK, **MM)
 _tm("tie_video", {"input": 3, "output": 1}, "3*1%\r", device_reply="Out01 In03 Vid\r\n", expect_result=ACK, **MM)
 _tm("tie_audio", {"input": 6, "output": 1}, "6*1$\r", device_reply="Out01 In06 Aud\r\n", expect_result=ACK, **MM)

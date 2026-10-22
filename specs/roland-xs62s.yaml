@@ -1,6 +1,6 @@
 spec: 1
 id: roland-xs62s
-name: Roland XS-62S (LAN control)
+name: Roland XS-62S (LAN or RS-232 control)
 vendor: Roland
 category: switcher
 
@@ -33,9 +33,20 @@ transport:
   # included, come before their ACK and go to the telemetry rules only.
   reply_match: '^[\x02\x11\x13]*(\x06|ERR:[0-9]+;)'
   probe: "ACS"
+  # The same commands and framing on the RS-232 connector (p.26): 9600 or
+  # 38400 bps, no parity, 8 data bits, 1 stop bit, XON/XOFF flow control;
+  # RS-232 ON and RS-232 BAUDRATE 38400 by default in the RS-232/GPIO menu
+  # (p.14).
+  serial:
+    baud_rate: { default: 38400, values: [9600, 38400] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
 
 ports:
-  - { port: 8023, protocol: tcp, role: control }
+  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 connector, DB-9 male: a crossover (null-modem) cable; the RS-422 port drives VISCA cameras and is not this one" }
 
 models:
   - id: xs-62s
@@ -609,6 +620,14 @@ state:
   device.version:      { type: string, description: "Version from VER" }
 
 quirks:
+  - models: [all]
+    severity: info
+    text: >
+      With link serial the mixer is driven on its RS-232 connector with the same commands, STX framing
+      and replies as over LAN (p.26). RS-232 must be ON in the RS-232/GPIO menu (the default) and the
+      link's baud rate must match RS-232 BAUDRATE there (38400 by default, p.14). With RS-232 PNL INFO
+      on, panel operations are reported on both ports. XON/XOFF flow control is documented and used by
+      default. The RS-422 port is for cameras (VISCA), not for control.
   - models: [all]
     severity: warning
     text: >

@@ -57,6 +57,11 @@ impl NativeCore {
         api::catalog(&self.core).to_string()
     }
 
+    /// `{"ok": [{"name": ...}]}` or `{"error": {...}}`.
+    fn serial_ports(&self) -> String {
+        api::serial_ports(&self.core).to_string()
+    }
+
     fn discover(&self, request: &str) -> String {
         match parse(request) {
             Ok(request) => api::discover(&self.core, &request).to_string(),

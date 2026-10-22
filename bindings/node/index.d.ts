@@ -191,9 +191,20 @@ export class Stream extends EventEmitter {
   on(event: 'end', listener: () => void): this;
 }
 
+export interface SerialPort {
+  /** What the `serial_port` setting takes: COM3, /dev/ttyUSB0... */
+  name: string;
+}
+
 export class Core extends EventEmitter {
   constructor(options?: CoreOptions);
   catalog(): { devices: Record<string, unknown> };
+  /**
+   * The host's serial ports, for the `serial_port` setting of a device wired
+   * to one (a spec with `link: serial`, or a serial-only device): names only,
+   * empty on Android and iOS.
+   */
+  serialPorts(): SerialPort[];
   open(request: OpenRequest): DeviceId;
   /** Found devices arrive as `discovered` events. */
   discover(request: DiscoverRequest): void;

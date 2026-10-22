@@ -13,8 +13,11 @@ category: switcher
 # each model supports only the forms its own guide documents. The IN1604 DTP
 # and IN1604 HD share most IN1606/IN1608 forms; where their syntax or values
 # differ, the IN1604 form ends in _in1604. Page numbers are the guides' printed
-# page numbers. The IN1604 has RS-232 and USB ports only: it is reached through
-# a serial-to-Ethernet interface's raw TCP port (see the quirks).
+# page numbers. Every model speaks the same SIS on its rear RS-232 Remote
+# port, so a unit is reached over Telnet or on a serial port of the host,
+# chosen by the link setting (transport.serial). The IN1604 has RS-232 and
+# USB ports only: link serial is its default, and link tcp reaches it
+# through a serial-to-Ethernet interface's raw TCP port (see the quirks).
 #
 # Every setting a command here writes is read back into state: on connecting
 # (the part number query N is answered, and each family's rule then queues
@@ -114,6 +117,19 @@ transport:
   encoding: ascii
   timeout_ms: 3000
   reply: expected
+  # The same SIS on the rear Remote RS-232 port (3-pole captive screw): IN1808
+  # guide p.13, p.52 and p.61 (9600 8N1 default, no flow control; Esc...CP sets
+  # 300 to 115200 baud, odd, even or no parity, 7 or 8 data bits); IN1608
+  # guide p.18 and p.42 (9600, 1 stop bit, no parity, no flow control; the
+  # rate is changed on the front panel, p.39); IN1604 guide p.10 and p.29
+  # (9600, 1 stop bit, no parity, no flow control, not adjustable).
+  serial:
+    serial_only: [in1604-dtp, in1604-hd]
+    baud_rate: { default: 9600, values: [300, 600, 1200, 1800, 2400, 3600, 4800, 7200, 9600, 14400, 19200, 28800, 38400, 57600, 115200] }
+    data_bits: { default: 8, values: [7, 8] }
+    parity: { default: none, values: [none, odd, even] }
+    stop_bits: 1
+    flow_control: none
   # Every response shape the commands here can get; the banner, its date line,
   # "Password:", "Login ...", "Reconfig" and "HplgO" never match.
   # A bare value (a query answered in verbose mode 0 or 1 form) starts with a digit or a sign.
@@ -129,13 +145,16 @@ settings:
               description: "Administrator or user password; empty for a unit without passwords (the factory password is the unit's serial number)." }
 
 on_connect:
+  # Over Telnet only: no guide documents a password prompt on the serial port.
   - when_set: password
+    link: tcp
     after_prompt: "Password:"
     send: "{settings.password}"
     refused: '^Password:?$'
     accepted: '^Login (Administrator|User)$'
   # Verbose mode 3: tagged replies and change reports from the front panel and other connections
-  # (IN1808 guide p.59 and p.84, IN1608 guide p.63). Telnet connections start in mode 0. Answered "Vrb3".
+  # (IN1808 guide p.59 and p.84, IN1608 guide p.63). Telnet connections start in mode 0, RS-232 and USB
+  # ones in mode 1 (IN1808 p.59, IN1608 p.63, IN1604 p.47), so it is sent on either link. Answered "Vrb3".
   - send: "\x1b3CV"
     await_reply: true
 
@@ -143,8 +162,9 @@ maps:
   osd_key: { toggle: M, open: A, exit: X, enter: E, up: U, down: D, left: L, right: R }
 
 ports:
-  - { port: 23, protocol: tcp, role: control }
-  - { port: null, protocol: tcp, role: control, when: "model in1604-dtp or in1604-hd", note: "RS-232 only: the raw TCP port of the serial-to-Ethernet interface the scaler's RS-232 port is wired to (an Extron IPL T S's direct port access, 2001 for COM1), given when the device is opened" }
+  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The rear Remote RS-232 port, 3-pole captive screw; the front USB configuration port carries SIS too" }
+  - { port: null, protocol: tcp, role: control, when: "model in1604-dtp or in1604-hd with link tcp", note: "RS-232 only: the raw TCP port of the serial-to-Ethernet interface the scaler's RS-232 port is wired to (an Extron IPL T S's direct port access, 2001 for COM1), given when the device is opened" }
 
 models:
   - id: in1808-series
@@ -2468,10 +2488,23 @@ quirks:
     severity: warning
     text: >
       The IN1604 has RS-232 (9600 baud, 8 data bits, no parity, 1 stop bit, not adjustable) and front USB
-      ports only (IN1604 guide p.29). It is opened at the address and raw TCP port of a serial-to-Ethernet
+      ports only (IN1604 guide p.29). Link serial, its default, opens it on a serial port of the host at 9600
+      8N1. With link tcp it is opened at the address and raw TCP port of a serial-to-Ethernet
       interface wired to its RS-232 port, such as an Extron IPL T S's direct port access (TCP 2001 for COM1,
       no password, IPL T S guide p.47); there is no Telnet login, banner or port timeout of its own, and it
       documents no password. RS-232 starts in verbose mode 1; the core sets mode 3 on connecting.
+  - models: [all]
+    severity: info
+    text: >
+      With link serial the unit is driven on its rear Remote RS-232 port with the same SIS, framing and
+      replies as over Telnet; the link's line settings must match the port's, set on the unit (IN1806/IN1808
+      Esc...CP, IN1606/IN1608 front panel, IN1604 fixed at 9600). The IN1808 guide also lists mark and space
+      parity, which the core's serial ports do not open, and the IN1608 and IN1604 guides do not state the
+      data bits (8 is assumed). A serial session gets the copyright banner only after the unit powers up,
+      and starts in verbose mode 1, which the connection step changes to 3; no guide documents a password
+      prompt on the serial port, so the password step is sent over Telnet only, and port timeouts apply to
+      network connections. The front USB port also speaks SIS; the guides do not say whether it is a
+      virtual serial port.
   - models: [in1604-dtp, in1604-hd]
     severity: info
     text: >

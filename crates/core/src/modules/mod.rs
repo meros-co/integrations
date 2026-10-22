@@ -83,6 +83,8 @@ mod lake_dlm;
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
 mod meros_camera_wire;
+#[cfg(feature = "nec-display")]
+mod nec_display;
 #[cfg(feature = "nec-projector")]
 mod nec_projector;
 #[cfg(feature = "nec-projector")]
@@ -107,12 +109,18 @@ mod panasonic_notify;
 mod panasonic_projector;
 #[cfg(feature = "panasonic-projector")]
 mod panasonic_projector_commands;
+#[cfg(feature = "philips-sicp")]
+mod philips_sicp;
 #[cfg(feature = "pjlink")]
 mod pjlink;
 #[cfg(feature = "qsys")]
 mod qsys;
 #[cfg(feature = "resolume")]
 mod resolume_push;
+#[cfg(feature = "samsung-mdc")]
+mod samsung_mdc;
+#[cfg(feature = "samsung-mdc")]
+mod samsung_mdc_table;
 #[cfg(feature = "sennheiser-digital-6000")]
 mod sennheiser_d6000;
 #[cfg(feature = "sennheiser-ew-dx")]
@@ -125,6 +133,8 @@ mod sennheiser_mcp;
 mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
+#[cfg(feature = "sony-bravia-serial")]
+mod sony_bravia_serial;
 #[cfg(feature = "sony-camera")]
 mod sony_camera;
 #[cfg(feature = "sony-camera")]
@@ -307,6 +317,10 @@ pub(crate) fn construct(
         },
         #[cfg(feature = "dhd-ecp")]
         "dhd-ecp" => Ok(Box::new(dhd_ecp::DhdEcp::new(spec, context)?)),
+        #[cfg(feature = "nec-display")]
+        "nec-display" => Ok(Box::new(nec_display::NecDisplay::new(context)?)),
+        #[cfg(feature = "philips-sicp")]
+        "philips-sicp" => Ok(Box::new(philips_sicp::PhilipsSicp::new(context)?)),
         #[cfg(feature = "probel-swp02")]
         "probel-swp02" => Ok(Box::new(swp02::Swp02::new(context)?)),
         #[cfg(feature = "probel-swp08")]
@@ -321,6 +335,10 @@ pub(crate) fn construct(
         )?)),
         #[cfg(feature = "nec-projector")]
         "nec-projector" => Ok(Box::new(nec_projector::NecProjector::new(context)?)),
+        #[cfg(feature = "samsung-mdc")]
+        "samsung-mdc" => Ok(Box::new(samsung_mdc::SamsungMdc::new(context)?)),
+        #[cfg(feature = "sony-bravia-serial")]
+        "sony-bravia-serial" => Ok(Box::new(sony_bravia_serial::SonyBraviaSerial::new(context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]

@@ -89,6 +89,9 @@ text(LW, "get_serial", {}, "GET /.SerialNumber\r\n", device_reply="pr /.SerialNu
      expect_result=_v("87654321"), **V1)
 text(LW, "get_product_name", {}, "GET /.ProductName\r\n", device_reply="pr /.ProductName=MX2-8x8-HDMI20\r\n",
      expect_result=_v("MX2-8x8-HDMI20"), **MX)
+# The same on the RS-232 port of an MX2 (link serial, MX2 9.19.1).
+text(LW, "get_product_name", {}, "GET /.ProductName\r\n", device_reply="pr /.ProductName=MX2-8x8-HDMI20\r\n",
+     expect_result=_v("MX2-8x8-HDMI20"), **MX, settings={"link": "serial"}, file="get_product_name-serial")
 
 # /V1 tree (MMX2 7.5-7.9, UCX 8.5-8.11)
 text(LW, "get_firmware_version", {}, "GET /V1/MANAGEMENT/UID/PACKAGE.Version\r\n",

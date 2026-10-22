@@ -16,6 +16,9 @@ def r20v(command, input, wire, reply, value):
 
 r20("quit", {}, "\x02QIT;", device_reply="\x06", expect_result=R20_OK)
 r20("record_start", {}, "\x02REC;", device_reply="\x06", expect_result=R20_OK)
+# The same on the RS-232 connector (link serial, p.77): no login is sent there.
+r20("record_start", {}, "\x02REC;", device_reply="\x06", expect_result=R20_OK,
+    settings={"link": "serial", "user_id": "admin", "password": "password1"}, file="record_start-serial")
 r20("record_stop", {}, "\x02RES;", device_reply="\x02ERR:4;", expect_result={"error": {"error": "device_error"}})
 r20("play", {}, "\x02PLY;")
 r20("pause", {}, "\x02PUS;")

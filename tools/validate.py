@@ -38,6 +38,8 @@ DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
     (re.compile(r"^(on_off|bool01|bool10)$"), {"bool"}),
     (re.compile(r"^(upper|lower|json|url)$"), {"string", "enum"}),
     (re.compile(r"^url_decode$"), {"string", "int"}),      # a percent-encoded name a device sends
+    (re.compile(r"^(x|0\d+x)$"), {"int"}),              # lowercase hexadecimal digits, zero-padded
+    (re.compile(r"^hex$"), {"string", "int"}),            # hexadecimal digits a device sends, as a number
     (re.compile(r"^(md5|sha256)$"), {"string"}),         # a hashed password, lowercase hex
     (re.compile(r"^(to|from)\.[a-z0-9_]+$"), {"int", "float"}),  # a named conversion
     (re.compile(r"^map\.[a-z0-9_]+$"), {"enum", "bool", "int", "string"}),  # a value table
@@ -1071,6 +1073,84 @@ def serial_checks(doc: dict) -> list[str]:
     return errors
 
 
+LINK_SETTINGS = ("link",) + SERIAL_SETTINGS
+
+
+def expand_serial(doc: dict) -> list[str]:
+    """A line-tcp transport's `serial` block stands for the `link` setting and
+    the six serial settings (SPEC.md §2, "The same protocol on a serial
+    port"); add them, as the core does, so the other checks see them. Returns
+    what is wrong with the block."""
+    t = doc.get("transport") or {}
+    block = t.get("serial")
+    errors: list[str] = []
+    steps_with_link = [i for i, s in enumerate(doc.get("on_connect") or [])
+                       if isinstance(s, dict) and "link" in s]
+    if block is None:
+        for i in steps_with_link:
+            errors.append(f"on_connect[{i}]: link needs transport.serial")
+        return errors
+    if t.get("type") != "line-tcp":
+        return ["transport.serial is for a line-tcp transport"]
+    if "endpoints" in t:
+        errors.append("transport.serial: a serial port reaches no endpoints")
+    model_ids = {m["id"] for m in doc.get("models") or []}
+    for key in ("serial_only", "models"):
+        for m in block.get(key) or []:
+            if m not in model_ids:
+                errors.append(f"transport.serial.{key}: no model '{m}'")
+    only = "serial_only" in block
+    link = block.get("link", "tcp")
+    if only and link == "serial":
+        errors.append("transport.serial: serial_only names the models that default to serial, so link stays tcp")
+    settings = doc.setdefault("settings", {}) or {}
+    doc["settings"] = settings
+    for name in LINK_SETTINGS:
+        if name in settings:
+            errors.append(f"settings.{name}: transport.serial declares it; leave it out")
+
+    def line(name):
+        v = block[name]
+        if isinstance(v, dict):
+            if v["default"] not in v["values"]:
+                errors.append(f"transport.serial.{name}: the default is not one of the values")
+            return v["default"], v["values"]
+        return v, [v]
+
+    settings["link"] = {"type": "enum", "values": ["tcp", "serial"], "label": "Link", "description": "generated"}
+    if not only:
+        settings["link"]["default"] = link
+    settings["serial_port"] = {"type": "string", "max_length": 256, "label": "Serial port", "description": "generated"}
+    default, values = line("baud_rate")
+    if any(not isinstance(v, int) or v <= 0 for v in values):
+        errors.append("transport.serial.baud_rate: bits per second, above 0")
+    if len(values) == 1:
+        settings["baud_rate"] = {"type": "int", "min": default, "max": default, "default": default,
+                                 "label": "Baud rate", "description": "generated"}
+    else:
+        settings["baud_rate"] = {"type": "enum", "values": [str(v) for v in values], "default": str(default),
+                                 "label": "Baud rate", "description": "generated"}
+    for name in ("data_bits", "stop_bits"):
+        default, values = line(name)
+        n = sorted(set(values))
+        if len(n) != len(values) or n[-1] - n[0] + 1 != len(n):
+            errors.append(f"transport.serial.{name}: whole numbers with no gaps")
+        settings[name] = {"type": "int", "min": n[0], "max": n[-1], "default": default,
+                          "label": name, "description": "generated"}
+    for name in ("parity", "flow_control"):
+        default, values = line(name)
+        settings[name] = {"type": "enum", "values": list(values), "default": default,
+                          "label": name, "description": "generated"}
+    # The ports say which link each entry is for.
+    ports = doc.get("ports") or []
+    if not any(e["protocol"] == "serial" and e.get("when") == "link serial" for e in ports):
+        errors.append('ports: transport.serial needs a serial control entry with when: "link serial"')
+    if not any(e["protocol"] == "tcp" and e["port"] == t.get("port") and e.get("when") == "link tcp"
+               for e in ports):
+        errors.append(f'ports: the transport port {t.get("port")} needs when: "link tcp" beside transport.serial')
+    return errors
+
+
 def label_checks(doc: dict) -> list[str]:
     """Every parameter and setting has a label and a description (SPEC.md §4)."""
     errors = []
@@ -1123,7 +1203,8 @@ def main() -> int:
             print(f"    {exc.message}")
             continue
 
-        errors = cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + label_checks(doc)
+        errors = expand_serial(doc)
+        errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + label_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]
