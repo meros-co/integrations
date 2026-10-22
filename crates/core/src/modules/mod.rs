@@ -79,6 +79,10 @@ mod lake_dlm;
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
 mod meros_camera_wire;
+#[cfg(feature = "nec-projector")]
+mod nec_projector;
+#[cfg(feature = "nec-projector")]
+mod nec_projector_models;
 #[cfg(feature = "novastar-central-control")]
 mod novastar_ccp;
 #[cfg(feature = "novastar-h")]
@@ -301,6 +305,8 @@ pub(crate) fn construct(
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
+        #[cfg(feature = "nec-projector")]
+        "nec-projector" => Ok(Box::new(nec_projector::NecProjector::new(context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]

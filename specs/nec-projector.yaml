@@ -1,0 +1,1228 @@
+spec: 1
+id: nec-projector
+name: NEC and Sharp NEC projectors (NEC Projector Control Command, binary)
+vendor: Sharp NEC Display Solutions (NEC Display Solutions)
+category: display
+implementation: native
+reason: >
+  Binary framing: every command and reply is a class byte, a command byte, two ID bytes, a length, data and a
+  checksum (the low byte of the sum of the preceding bytes), and a reply is matched to its command by class and
+  command byte, its class byte telling success (20h-23h) from failure (A0h-A3h, followed by an error code
+  pair). Values are 16- and 32-bit little-endian integers inside the data. The codes for inputs, aspects, eco
+  or light modes and picture-in-picture sources differ by model family and come from the manual's appendix
+  tables, and the projector pushes nothing, so state is a paced poll of only what the family supports.
+
+source:
+  - title: "Projector Control Command Reference Manual, BDT140013 Revision 7.1 (2020-04-16), with its Appendixes BDT140014 Revision 20.0 (2020-04-16)"
+    author: "NEC Display Solutions, Ltd."
+    url: "https://www.nec.com.au/download_file/3153/1322"
+    note: >
+      Manufacturer document; the same file is served by Sharp NEC Europe at
+      https://www.sharpdisplays.eu/p/download/cp/Products/Projectors/Shared/CommandLists/NEC-ExternalControlManual-english.pdf.
+      Serial cable pinout (PC CONTROL, D-SUB 9P, with RTS and CTS wired) and TCP 7142 (§1.1, §1.2: 115200, 38400,
+      19200, 9600 or 4800 bit/s by model, 8 data bits, no parity, 1 stop bit, full duplex); command and reply
+      notation, ID1, ID2, checksum with the example 20h 81h 01h 60h 01h 00h giving 03h, LEN (§2.1, §2.2);
+      success and failure replies (§2.3); the ERR1/ERR2 table (§2.4); every command with its bytes, data and
+      reply (§3.1-§3.53): 009, 015, 016, 018 with the example 02h 03h 00h 00h 02h 01h 06h 0Eh, 020-025, 030-1
+      with the examples for brightness 10 and -10, 030-2, 030-12, 030-15, 037, 037-3, 037-4 with the 18000 s
+      example, 037-6, 050 with the key code list, 051, 052, 053, 053-1 to 053-7, 053-10, 053-11, 060-1, 078-1 to
+      078-6, 079, 084, 097-8, 097-45, 097-155, 097-198, 097-243-1, 098-8, 098-45, 098-198, 098-243-1, 305-1 to
+      305-3, 319-10. The appendixes (pages 9-38 of the appendix part): models and their serial speeds and LAN
+      (page 10), the standby mode that accepts POWER ON (page 11), the supported command list per model
+      (pages 12-17), and the per-model values of the input terminals (pages 18-22), aspects (23-24), eco modes
+      (25), base model types (26-29), selection signal types (30-35), sub inputs (36-37) and audio select (38).
+  - title: "Projector Control Command Reference Manual, VDT24004 Revision 1.0 (2024-08-27)"
+    author: "Sharp NEC Display Solutions, Ltd."
+    url: "https://business.sharpusa.com/Portals/0/downloads/Manuals/sharp-pj-control-command-codes.pdf"
+    note: >
+      Manufacturer document for the XP models. Same framing and commands as BDT140013, with 037-3 and 078-6
+      removed, 037-4 renamed LIGHT INFORMATION REQUEST 3 (light usage time only), 097-8 and 098-8 renamed LIGHT
+      MODE, the error status bits redefined (cover, fan, light off or LD driver communication, phosphor wheel,
+      driver version, CPU communication, temperature sensor, TEC driver, color sensor, lens not installed), the
+      lens target 06h periphery focus added to 053, 053-1 and 053-2, selection signal types 21h HDMI, 27h
+      HDBaseT and 28h SDI, and keys added to 050 (TEST, digits, SHUTTER OPEN and CLOSE, HDBaseT, LIGHT MODE,
+      ID SET, HDMI, GEOMETRIC, AUX, HDMI2, OSD MUTE OFF and ON, USER1-3, SDI, DEFAULT).
+  - title: "Projector Control Command Reference Manual Appendixes, VDT24005 Revision 4.0 (2025)"
+    author: "Sharp NEC Display Solutions, Ltd."
+    url: "https://business.sharpusa.com/Portals/0/downloads/Manuals/sharp-pj-control-command-appendix.pdf"
+    note: >
+      The XP-A201U, XP-A175U/A155U, XP-A104U/A824U, XP-E501U-W, XP-M421W/M401H, XP-P701U-W/P621U-W/P601U-W,
+      XP-P721Q/P601Q, XP-V801U/V731U/V711U and XP-X171Q/X141Q: serial speeds and LAN (page 3), standby modes
+      (page 4), supported commands (page 5), input terminals (page 6), aspects (pages 7-8), light modes (page
+      9), base model types (page 10), selection signal types (pages 11-12) and sub inputs (page 13).
+
+settings:
+  # tcp: TCP 7142 (§1.2). serial: the PC CONTROL port, RS-232C (§1.1).
+  link: { type: enum, values: [tcp, serial], default: tcp, label: Link, description: "tcp reaches the projector over its LAN port (TCP 7142); serial uses an RS-232 port of the host wired to the projector's PC CONTROL port." }
+  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the projector's PC CONTROL port: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  # §1.2: 115200, 38400, 19200, 9600 or 4800 bit/s, by model (appendix page 10). The manual names no default.
+  baud_rate: { type: enum, values: ["4800", "9600", "19200", "38400", "115200"], default: "38400", label: Baud rate, description: "With link serial, bits per second as set on the projector; each model's notes list the speeds it offers." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, bits per character; the manual gives 8." }
+  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity, as the manual gives." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit, as the manual gives." }
+  # The pinout wires RTS and CTS (§1.1) but the conditions name no flow control (§1.2).
+  flow_control: { type: enum, values: [none, rts-cts], default: none, label: Flow control, description: "With link serial, none unless the projector's port needs RTS/CTS, which its pinout wires but the manual does not require." }
+
+ports:
+  - { port: 7142, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C PC CONTROL port (D-SUB 9P), cross cable" }
+
+models:
+  - id: np4100
+    name: "NEC NP4100 / NP4100W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, get_gain, set_freeze, get_eco_mode, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, computer3, video, s_video, component. Eco modes: normal, eco. Serial 4800,
+      9600, 19200, 38400 bit/s; wired LAN (TCP 7142). Firmware 1.02 or later.
+  - id: np-m420x
+    name: "NEC NP-M420X / NP-M350X / NP-M230X / NP-M300W / NP-M260W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, get_cover_status, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_projector_name,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi, viewer, network, usb_display. Eco modes: off,
+      auto_eco, eco1. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-m300x
+    name: "NEC NP-M300X / NP-M260X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, get_cover_status, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_projector_name,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi, viewer, network, usb_display. Eco modes: off,
+      auto_eco, eco1, eco2. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-m420xv
+    name: "NEC NP-M420XV"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, get_filter_usage,
+      get_lamp_usage, press_key, get_cover_status, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi, viewer, network, usb_display. Eco modes: off,
+      auto_eco, eco1. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-m403x
+    name: "NEC NP-M403X / NP-M363X / NP-M323X / NP-M283X / NP-M403W / NP-M363W / NP-M323W / NP-M333XS / NP-M353WS / NP-M303WS / NP-M403H / NP-M323H / NP-M353HS / NP-M323HS / NP-M303HS"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_lamp_usage, get_carbon_savings, press_key,
+      get_settings, get_running_status, get_input_status, get_mute_status, get_model_name, get_cover_status,
+      set_freeze, get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_eco_mode,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, usb_a, lan, usb_b. Eco modes: off, auto_eco, normal, eco. Aspects:
+      auto, wide_zoom, 16:9, native, 4:3, 15:9, 16:10, letterbox. Serial 4800, 9600, 19200, 38400 bit/s; wired
+      LAN (TCP 7142).
+  - id: np-m402w
+    name: "NEC NP-M402W / NP-M362W / NP-M402X / NP-M362X / NP-M322X / NP-M282X / NP-M322W / NP-M352WS / NP-M302WS / NP-M332XS"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_lamp_usage, get_carbon_savings, press_key,
+      get_settings, get_running_status, get_input_status, get_mute_status, get_model_name, get_cover_status,
+      set_freeze, get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_eco_mode,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, usb_a, lan, usb_b. Eco modes: off, auto_eco, normal, eco. Aspects:
+      auto, wide_zoom, 16:9, native, 4:3, 15:9, 16:10, letterbox. Serial 4800, 9600, 19200, 38400 bit/s; wired
+      LAN (TCP 7142).
+  - id: np-m361x
+    name: "NEC NP-M361X / NP-M311X / NP-M271X / NP-M311W / NP-M271W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, get_cover_status, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_projector_name,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi, viewer, network, usb_display. Eco modes: off,
+      auto_eco, normal, eco. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-m350xs
+    name: "NEC NP-M350XS / NP-M300XS / NP-M300WS / NP-M260WS"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi, viewer, network, usb_display. Eco modes: off,
+      auto_eco, eco1. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-m260xs
+    name: "NEC NP-M260XS"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi, viewer, network, usb_display. Eco modes: off,
+      auto_eco, eco1, eco2. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-me401w
+    name: "NEC NP-ME401W / NP-ME361W / NP-ME331W / NP-ME301W / NP-ME401X / NP-ME361X / NP-ME331X / NP-ME301X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_filter_usage, get_lamp_usage,
+      get_carbon_savings, press_key, get_gain, get_settings, get_running_status, get_input_status,
+      get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, set_eco_mode, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, usb_a, lan, usb_b. Eco modes: off, auto_eco, normal, eco. Aspects:
+      auto, wide_zoom, cinema, 16:9, native, 4:3, 15:9, 16:10, letterbox. Audio select terminals: hdmi1,
+      hdmi2, displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400 bit/s; wired
+      LAN (TCP 7142).
+  - id: np-me360x
+    name: "NEC NP-ME360X / NP-ME310X / NP-ME270X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, set_freeze, get_signal_frequency, get_eco_mode,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video. Eco modes: off, on. Serial 4800, 9600, 19200 bit/s; no LAN control.
+  - id: np-p554u
+    name: "NEC NP-P554U / NP-P474U / NP-P554W / NP-P474W / NP-P604X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_filter_usage, get_lamp_usage,
+      get_carbon_savings, press_key, get_gain, get_settings, get_running_status, get_input_status,
+      get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, set_eco_mode, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, usb_a, hdbaset. Eco modes: off, auto_eco, normal, eco. Aspects:
+      auto, wide_zoom, cinema, 16:9, native, 4:3, 15:9, 16:10, letterbox. Audio select terminals: hdmi1,
+      hdmi2, displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400 bit/s; wired
+      LAN (TCP 7142).
+  - id: np-p603x
+    name: "NEC NP-P603X / NP-P523X / NP-PE523X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_filter_usage, get_lamp_usage,
+      get_carbon_savings, press_key, get_gain, get_settings, get_running_status, get_input_status,
+      get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, set_eco_mode, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, usb_a. Eco modes: off, auto_eco, normal, eco. Aspects: auto,
+      wide_zoom, cinema, 16:9, native, 4:3, 15:9, 16:10, letterbox. Audio select terminals: hdmi1, hdmi2,
+      displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN
+      (TCP 7142).
+  - id: np-p605ul
+    name: "NEC NP-P605UL / NP-P525UL / NP-P525WL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, get_gain, get_settings, get_running_status, get_input_status,
+      get_mute_status, get_model_name, get_cover_status, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, set_eco_mode, set_projector_name, set_pip_mode,
+      set_pip_position, set_pip_sub_input, get_base_model_type, get_serial_number, get_basic_information,
+      set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, hdmi, hdmi2, usb_a, lan, hdbaset. Eco modes: off, eco, long_life. Aspects: auto, 16:9,
+      native, 4:3, 15:9, 16:10, letterbox. PIP sub inputs: off, hdmi1, hdmi2, computer, hdbaset. Audio select
+      terminals: hdmi1, hdmi2, displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200,
+      38400 bit/s; wired LAN (TCP 7142). Command 319-10: supported (Ver. 2.00 or later).
+  - id: np-p502hl
+    name: "NEC NP-P502HL / NP-P502WL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_lamp_usage, get_carbon_savings, press_key,
+      get_settings, get_running_status, get_input_status, get_mute_status, get_model_name, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_eco_mode,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, set_audio_select,
+      refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, hdbaset, apps. Eco modes: off, eco1, eco2. Aspects: auto, 16:9,
+      native, 4:3, 15:9, 16:10, letterbox. Audio select terminals: hdmi1, hdmi2, displayport, ethernet_or_lan,
+      usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-p502h
+    name: "NEC NP-P502H / NP-P502W / NP-P452H / NP-P452W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_lamp_usage, get_carbon_savings, press_key,
+      get_settings, get_running_status, get_input_status, get_mute_status, get_model_name, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_eco_mode,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, set_audio_select,
+      refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, hdbaset, apps. Eco modes: off, auto_eco, normal, eco. Aspects:
+      auto, 16:9, native, 4:3, 15:9, 16:10, letterbox. Audio select terminals: hdmi1, hdmi2, displayport,
+      ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-p501x
+    name: "NEC NP-P501X / NP-P451X / NP-P451W / NP-P401W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, get_cover_status, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_projector_name,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, s_video, hdmi, hdmi2, viewer, network, usb_display. Eco modes: off, auto_eco,
+      normal, eco. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-p420x
+    name: "NEC NP-P420X / NP-P350X / NP-P350W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, get_cover_status, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_projector_name,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi, viewer, network, usb_display. Eco modes: off,
+      auto_eco, eco1. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-pe501x
+    name: "NEC NP-PE501X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, get_cover_status, set_freeze,
+      get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_projector_name,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, s_video, hdmi, hdmi2, usb_display. Eco modes: off, auto_eco, normal, eco.
+      Serial 4800, 9600, 19200, 38400 bit/s; no LAN control.
+  - id: np-pe401h
+    name: "NEC NP-PE401H"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, set_freeze, get_eco_mode, get_projector_name,
+      get_mac_address, set_projector_name, get_base_model_type, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, s_video, hdmi, hdmi2. Eco modes: off, eco. Serial 38400 bit/s; wired LAN (TCP
+      7142).
+  - id: np-pa1004ul
+    name: "NEC NP-PA1004UL / NP-PA804UL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens,
+      stop_lens, lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option,
+      get_lens_status, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, hdmi, hdmi2, displayport, hdbaset. Eco modes: normal, eco1, eco2, boost. Aspects:
+      4:3_windows, letterbox, wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub
+      inputs: off, hdmi1, hdmi2, displayport, computer, hdbaset. Audio select terminals: hdmi1, hdmi2,
+      displayport, hdbaset, usb_a, usb_b. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-pa803ul
+    name: "NEC NP-PA803UL / NP-PA653UL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens,
+      stop_lens, lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option,
+      get_lens_status, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, hdmi, hdmi2, displayport, hdbaset. Eco modes: normal, eco1, eco2, long_life. Aspects:
+      4:3_windows, letterbox, wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub
+      inputs: off, hdmi1, hdmi2, displayport, computer, hdbaset. Audio select terminals: hdmi1, hdmi2,
+      displayport, hdbaset, usb_a, usb_b. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-pa803u
+    name: "NEC NP-PA803U / NP-PA723U / NP-PA653U / NP-PA853W / NP-PA703W / NP-PA903X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, drive_lens, get_lens_position, set_lens_position, move_lens, stop_lens,
+      lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option, get_lens_status,
+      set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status, get_input_status,
+      get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name, set_pip_mode,
+      set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type, get_serial_number,
+      get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, hdmi, hdmi2, displayport, hdbaset. Eco modes: off, on. Aspects: 4:3_windows,
+      letterbox, wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub inputs: off,
+      hdmi1, hdmi2, displayport, computer, hdbaset. Audio select terminals: hdmi1, hdmi2, displayport,
+      ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP
+      7142).
+  - id: np-pa622u
+    name: "NEC NP-PA622U / NP-PA522U / NP-PA672W / NP-PA572W / NP-PA722X / NP-PA622X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_filter_usage,
+      get_lamp_usage, get_carbon_savings, press_key, drive_lens, get_lens_position, set_lens_position,
+      move_lens, stop_lens, lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option,
+      get_lens_status, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, bnc, bnc_cv, bnc_yc, hdmi, hdmi2, displayport, hdbaset. Eco modes: off, on. Aspects:
+      4:3_windows, letterbox, wide_screen, 16:9, zoom, full, 5:4, 16:10, 15:9, native, auto. PIP sub inputs:
+      off, bnc_cv, bnc_yc, hdmi1, hdmi2, displayport, computer, bnc, hdbaset. Audio select terminals: hdmi1,
+      hdmi2, displayport, hdbaset, usb_a, usb_b. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP
+      7142).
+  - id: np-pa621u
+    name: "NEC NP-PA621U / NP-PA521U / NP-PA671W / NP-PA571W / NP-PA721X / NP-PA621X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_filter_usage,
+      get_lamp_usage, get_carbon_savings, press_key, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, bnc, bnc_cv, bnc_yc, hdmi, hdmi2, displayport, usb_a, ethernet. Eco modes: off, on.
+      Aspects: 4:3_windows, letterbox, wide_screen, 16:9, zoom, full, 5:4, 16:10, 15:9, native, auto. PIP sub
+      inputs: off, bnc_cv, bnc_yc, hdmi1, hdmi2, displayport, computer, bnc, ethernet, usb_a. Audio select
+      terminals: hdmi1, hdmi2, displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200,
+      38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-pa600x
+    name: "NEC NP-PA600X / NP-PA500X / NP-PA550W / NP-PA500U"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, get_gain, set_freeze, get_signal_frequency,
+      get_eco_mode, get_projector_name, get_mac_address, set_projector_name, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, computer3, video, s_video, hdmi, displayport, viewer, network. Eco modes:
+      off, on. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-ph3501ql
+    name: "NEC NP-PH3501QL / NP-PH2601QL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, set_aspect,
+      set_aspect_code, set_light_adjust, get_information, get_filter_usage, get_lamp_usage, press_key,
+      set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens, stop_lens, lens_memory,
+      reference_lens_memory, get_lens_memory_option, set_lens_memory_option, get_lens_status, set_lens_profile,
+      get_lens_profile, get_gain, get_settings, get_running_status, get_input_status, get_mute_status,
+      get_model_name, set_freeze, get_signal_frequency, get_projector_name, get_mac_address, get_pip,
+      get_edge_blending, set_projector_name, set_pip_mode, set_pip_position, set_pip_sub_input,
+      set_edge_blending, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, displayport, displayport2, slot, hdbaset, sdi, sdi2, sdi3, sdi4. Aspects: 4:3,
+      letterbox, wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub inputs: hdmi1,
+      hdmi2, displayport, hdbaset, displayport2, sdi1, sdi2, sdi3, sdi4, slot. Serial 4800, 9600, 19200,
+      38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-ph1400u
+    name: "NEC NP-PH1400U"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, get_filter_usage,
+      get_lamp_usage, press_key, set_shutter, get_gain, get_cover_status, set_freeze, get_signal_frequency,
+      get_eco_mode, get_projector_name, get_mac_address, set_projector_name, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, computer3, video, s_video, hdmi, displayport, slot, stereo_dvi, viewer,
+      network. Eco modes: off, on. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-ph1202hl
+    name: "NEC NP-PH1202HL / NP-PH1002HL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, set_aspect,
+      set_aspect_code, set_light_adjust, get_information, get_filter_usage, get_lamp_usage, get_carbon_savings,
+      press_key, set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens, stop_lens,
+      lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option, get_lens_status,
+      set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status, get_input_status,
+      get_mute_status, get_model_name, get_cover_status, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, bnc, bnc_cv, bnc_yc, hdmi, displayport, slot, hdbaset. Eco modes: normal, eco1, eco2,
+      long_life. Aspects: 4:3_windows, letterbox, wide_screen, 16:9, zoom, full, 5:4, 16:10, 15:9, native,
+      auto. PIP sub inputs: off, bnc_cv, bnc_yc, hdmi, slot, displayport, computer, bnc, hdbaset. Serial 4800,
+      9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-ph1000u
+    name: "NEC NP-PH1000U"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, get_filter_usage,
+      get_lamp_usage, press_key, set_shutter, get_gain, get_cover_status, set_freeze, get_signal_frequency,
+      get_eco_mode, get_projector_name, get_mac_address, set_projector_name, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, computer3, video, s_video, hdmi, displayport, slot, viewer, network. Eco
+      modes: off, on. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-px2000ul
+    name: "NEC NP-PX2000UL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, set_aspect,
+      set_aspect_code, set_light_adjust, get_information, get_lamp_usage, press_key, set_shutter, drive_lens,
+      lens_memory, reference_lens_memory, set_lens_profile, get_lens_profile, get_gain, get_settings,
+      get_running_status, get_input_status, get_mute_status, get_model_name, set_freeze, get_eco_mode,
+      get_projector_name, get_mac_address, get_edge_blending, set_eco_mode, set_projector_name,
+      set_edge_blending, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, bnc, hdmi, hdmi2, displayport, dvi_d, sdi. Eco modes: normal, eco, boost. Aspects:
+      16:9, 4:3, 16:10, letterbox, 5:4, native, auto, 1.88:1, 2.35:1. Serial 9600 bit/s; wired LAN (TCP 7142).
+  - id: np-px1005ql
+    name: "NEC NP-PX1005QL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, set_aspect,
+      set_aspect_code, set_light_adjust, get_information, get_lamp_usage, get_carbon_savings, press_key,
+      set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens, stop_lens, lens_memory,
+      reference_lens_memory, get_lens_memory_option, set_lens_memory_option, get_lens_status, set_lens_profile,
+      get_lens_profile, get_gain, get_settings, get_running_status, get_input_status, get_mute_status,
+      get_model_name, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address,
+      get_pip, get_edge_blending, set_eco_mode, set_projector_name, set_pip_mode, set_pip_position,
+      set_pip_sub_input, set_edge_blending, get_base_model_type, get_serial_number, get_basic_information,
+      refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, displayport, displayport2, slot, hdbaset, sdi, sdi2, sdi3, sdi4. Eco modes: normal,
+      eco1, eco2. Aspects: 4:3, wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub
+      inputs: hdmi1, hdmi2, displayport, hdbaset, displayport2, sdi1, sdi2, sdi3, sdi4, slot. Serial 4800,
+      9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-px1004ul
+    name: "NEC NP-PX1004UL / NP-PX803UL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, set_aspect,
+      set_aspect_code, set_light_adjust, get_information, get_lamp_usage, get_carbon_savings, press_key,
+      set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens, stop_lens, lens_memory,
+      reference_lens_memory, get_lens_memory_option, set_lens_memory_option, get_lens_status, set_lens_profile,
+      get_lens_profile, get_gain, get_settings, get_running_status, get_input_status, get_mute_status,
+      get_model_name, get_cover_status, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name, set_pip_mode,
+      set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, bnc, bnc_cv, bnc_yc, hdmi, displayport, slot, hdbaset. Eco modes: normal, eco1, eco2.
+      Aspects: 4:3_windows, letterbox, wide_screen, 16:9, zoom, full, 5:4, 16:10, 15:9, native, auto. PIP sub
+      inputs: off, bnc_cv, bnc_yc, hdmi, slot, displayport, computer, bnc, hdbaset. Serial 4800, 9600, 19200,
+      38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-px750u
+    name: "NEC NP-PX750U / NP-PX700W / NP-PX800X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, get_filter_usage,
+      get_lamp_usage, press_key, set_shutter, get_gain, get_cover_status, set_freeze, get_signal_frequency,
+      get_eco_mode, get_projector_name, get_mac_address, set_projector_name, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, computer3, video, s_video, hdmi, displayport, slot, viewer, network. Eco
+      modes: off, on. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-px651x
+    name: "NEC NP-PX651X / NP-PX581W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_picture, set_aspect, set_aspect_code,
+      get_information, get_filter_usage, get_lamp_usage, press_key, drive_lens, get_settings,
+      get_running_status, get_input_status, get_mute_status, get_model_name, set_freeze, get_eco_mode,
+      get_mac_address, set_eco_mode, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, computer3, video, s_video, component, hdmi, hdbaset. Eco modes: normal,
+      eco. Aspects: 4:3, 16:9, 1.85:1, 2.35:1, auto, 16:10, 5:4, native. Serial 9600, 19200, 38400 bit/s;
+      wired LAN (TCP 7142).
+  - id: np-px620x
+    name: "NEC NP-PX620X / NP-PX550W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, get_gain, set_freeze, get_eco_mode, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, computer3, video, s_video, component. Eco modes: normal, eco. Serial 4800,
+      9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-px602ul
+    name: "NEC NP-PX602UL / NP-PX602WL"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, set_aspect,
+      set_aspect_code, set_light_adjust, get_information, get_lamp_usage, get_carbon_savings, press_key,
+      set_shutter, drive_lens, get_gain, get_settings, get_running_status, get_input_status, get_mute_status,
+      get_model_name, get_cover_status, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name, set_pip_mode,
+      set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, bnc, bnc_cv, bnc_yc, hdmi, displayport, slot, hdbaset. Eco modes: normal, eco1, eco2.
+      Aspects: 4:3_windows, letterbox, wide_screen, 16:9, zoom, full, 5:4, 16:10, 15:9, native, auto. PIP sub
+      inputs: off, bnc_cv, bnc_yc, hdmi, slot, displayport, computer, bnc, hdbaset. Serial 4800, 9600, 19200,
+      38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: np-u321h
+    name: "NEC NP-U321H"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_picture, set_volume, set_aspect,
+      set_aspect_code, get_information, get_filter_usage, get_lamp_usage, press_key, get_settings,
+      get_running_status, get_input_status, get_mute_status, get_model_name, set_freeze, get_eco_mode,
+      get_projector_name, get_mac_address, set_eco_mode, set_projector_name, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2. Eco modes: off, eco. Aspects: auto, 16:9, native, 4:3, 15:9,
+      16:10, 5:4. Serial 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-u300x
+    name: "NEC NP-U300X / NP-U250X / NP-U310W / NP-U260W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, set_freeze, get_eco_mode, get_projector_name,
+      get_mac_address, set_projector_name, get_base_model_type, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi. Eco modes: off, on. Serial 38400 bit/s; wired LAN
+      (TCP 7142).
+  - id: np-um351w
+    name: "NEC NP-UM351W / NP-UM301W / NP-UM361X / NP-UM301X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_filter_usage, get_lamp_usage,
+      get_carbon_savings, press_key, get_settings, get_running_status, get_input_status, get_mute_status,
+      get_model_name, get_cover_status, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, set_eco_mode, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, usb_a, lan, usb_b. Eco modes: off, auto_eco, normal, eco. Aspects:
+      auto, wide_zoom, cinema, 16:9, native, 4:3, 15:9, 16:10, letterbox. Audio select terminals: hdmi1,
+      hdmi2, displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400 bit/s; wired
+      LAN (TCP 7142).
+  - id: np-um352w
+    name: "NEC NP-UM352W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, get_information, get_filter_usage, get_lamp_usage,
+      get_carbon_savings, press_key, get_settings, get_running_status, get_input_status, get_mute_status,
+      get_model_name, get_cover_status, set_freeze, get_signal_frequency, get_eco_mode, get_projector_name,
+      get_mac_address, set_eco_mode, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2, usb_b, apps. Eco modes: off, auto_eco, normal, eco. Aspects: auto,
+      wide_zoom, cinema, 16:9, native, 4:3, 15:9, 16:10, letterbox. Audio select terminals: hdmi1, hdmi2,
+      displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN
+      (TCP 7142).
+  - id: np-um330x
+    name: "NEC NP-UM330X / NP-UM280X / NP-UM330W / NP-UM280W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_filter_usage, get_lamp_usage, press_key, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, s_video, hdmi, hdmi2, viewer, network, usb_display. Eco modes: off, auto_eco,
+      normal, eco. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-v332x
+    name: "NEC NP-V332X / NP-V332W / NP-V302X / NP-V302W / NP-V302H"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_picture, set_volume, set_aspect,
+      set_aspect_code, get_information, get_lamp_usage, press_key, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_eco_mode, get_projector_name,
+      get_mac_address, set_eco_mode, set_projector_name, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi, hdmi2. Eco modes: off, eco. Aspects: auto, 16:9, native, 4:3, 15:9,
+      16:10, 5:4. Serial 38400 bit/s; wired LAN (TCP 7142).
+  - id: np-v311w
+    name: "NEC NP-V311W / NP-V281W / NP-V311X"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, press_key, set_freeze, get_eco_mode, get_projector_name, get_mac_address,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi. Eco modes: off, on. Serial 4800, 9600, 19200, 38400
+      bit/s; wired LAN (TCP 7142).
+  - id: np-v300x
+    name: "NEC NP-V300X / NP-V260X / NP-V300W / NP-V260W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, press_key, set_freeze, get_eco_mode, get_projector_name, get_mac_address,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, computer2, video, s_video, hdmi. Eco modes: off, on. Serial 4800, 9600, 19200, 38400
+      bit/s; wired LAN (TCP 7142).
+  - id: np-v230x
+    name: "NEC NP-V230X / NP-V260 / NP-V230"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, press_key, set_freeze, get_eco_mode, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, s_video. Eco modes: off, on. Serial 4800, 9600, 19200, 38400 bit/s; no LAN
+      control.
+  - id: np-v260r
+    name: "NEC NP-V260R"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, press_key, set_freeze, get_eco_mode, get_base_model_type, get_serial_number,
+      get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, s_video, hdmi. Eco modes: off, on. Serial 4800, 9600, 19200, 38400 bit/s; no
+      LAN control.
+  - id: np-ve303x
+    name: "NEC NP-VE303X / NP-VE303"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_picture, set_volume, set_aspect,
+      set_aspect_code, get_information, get_lamp_usage, press_key, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_eco_mode, get_projector_name,
+      set_eco_mode, set_projector_name, get_base_model_type, get_serial_number, get_basic_information,
+      set_audio_select, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi. Eco modes: off, eco. Aspects: auto, 16:9, native, 4:3, 15:9, 16:10, 5:4.
+      Audio select terminals: hdmi1, hdmi2, displayport, ethernet_or_lan, usb_a, usb_b, hdbaset. Serial 38400
+      bit/s; no LAN control.
+  - id: np-ve281x
+    name: "NEC NP-VE281X / NP-VE281"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, press_key, set_freeze, get_signal_frequency, get_eco_mode,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video, hdmi. Eco modes: off, on. Serial 4800, 9600, 19200, 38400 bit/s; no LAN
+      control.
+  - id: np-ve280x
+    name: "NEC NP-VE280X / NP-VE280"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, get_lamp_usage, press_key, set_freeze, get_signal_frequency, get_eco_mode,
+      get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: computer, video. Eco modes: off, on. Serial 4800, 9600, 19200, 38400 bit/s; no LAN control.
+  - id: xp-a201u
+    name: "Sharp NEC XP-A201U"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens,
+      stop_lens, lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option,
+      get_lens_status, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, hdbaset, sdi. Light modes: normal, long_life, silent. Aspects: 4:3_windows,
+      letterbox, wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub inputs: off,
+      hdmi1, hdmi2, hdbaset, sdi. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: xp-a175u
+    name: "Sharp NEC XP-A175U / XP-A155U"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens,
+      stop_lens, lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option,
+      get_lens_status, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, hdbaset, sdi. Light modes: normal, long_life, silent. Aspects: 4:3_windows,
+      letterbox, wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub inputs: off,
+      hdmi1, hdmi2, hdbaset, sdi. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: xp-a104u
+    name: "Sharp NEC XP-A104U / XP-A824U"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens,
+      stop_lens, lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option,
+      get_lens_status, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_pip, get_edge_blending, set_eco_mode, set_projector_name,
+      set_pip_mode, set_pip_position, set_pip_sub_input, set_edge_blending, get_base_model_type,
+      get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, hdbaset. Light modes: normal, long_life, silent. Aspects: 4:3_windows, letterbox,
+      wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. PIP sub inputs: off, hdmi1,
+      hdmi2, hdbaset. Serial 4800, 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: xp-e501u-w
+    name: "Sharp NEC XP-E501U-W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage, press_key,
+      get_gain, get_settings, get_running_status, get_input_status, get_mute_status, get_model_name,
+      set_freeze, get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_eco_mode,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, hdbaset, usb_a. Light modes: normal, long_life, silent1, silent2. Aspects: 16:9,
+      4:3, full, auto. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: xp-m421w
+    name: "Sharp NEC XP-M421W / XP-M401H"
+    supports:
+      [set_power, set_input, set_picture_mute, set_sound_mute, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2. Serial 38400 bit/s; no LAN control.
+  - id: xp-p701u-w
+    name: "Sharp NEC XP-P701U-W / XP-P621U-W / XP-P601U-W"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage, press_key,
+      get_gain, get_settings, get_running_status, get_input_status, get_mute_status, get_model_name,
+      set_freeze, get_signal_frequency, get_eco_mode, get_projector_name, get_mac_address, set_eco_mode,
+      set_projector_name, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, hdbaset, usb_a. Light modes: normal, long_life, silent. Aspects: 16:9, 4:3, full,
+      auto. Serial 4800, 9600, 19200, 38400 bit/s; wired LAN (TCP 7142).
+  - id: xp-p721q
+    name: "Sharp NEC XP-P721Q / XP-P601Q"
+    supports:
+      [get_errors, set_power, set_input, get_information, press_key, get_settings, get_running_status,
+      get_model_name, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, hdbaset. Serial 9600, 19200, 38400, 115200 bit/s; wired LAN (TCP 7142).
+  - id: xp-v801u
+    name: "Sharp NEC XP-V801U / XP-V731U / XP-V711U"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_sound_mute, set_onscreen_mute, set_picture,
+      set_volume, set_aspect, set_aspect_code, set_light_adjust, get_information, get_lamp_usage,
+      get_carbon_savings, press_key, set_shutter, drive_lens, get_lens_position, set_lens_position, move_lens,
+      stop_lens, lens_memory, reference_lens_memory, get_lens_memory_option, set_lens_memory_option,
+      get_lens_status, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_edge_blending, set_eco_mode, set_projector_name,
+      set_edge_blending, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, hdbaset. Light modes: normal, long_life, silent. Aspects: 4:3_windows, letterbox,
+      wide_screen, 16:9, full, zoom, 5:4, 16:10, 15:9, native, auto, normal. Serial 4800, 9600, 19200, 38400,
+      115200 bit/s; wired LAN (TCP 7142).
+  - id: xp-x171q
+    name: "Sharp NEC XP-X171Q / XP-X141Q"
+    supports:
+      [get_errors, set_power, set_input, set_picture_mute, set_onscreen_mute, set_picture, set_aspect,
+      set_aspect_code, set_light_adjust, get_information, get_lamp_usage, press_key, set_shutter, drive_lens,
+      reference_lens_memory, set_lens_profile, get_lens_profile, get_gain, get_settings, get_running_status,
+      get_input_status, get_mute_status, get_model_name, set_freeze, get_signal_frequency, get_eco_mode,
+      get_projector_name, get_mac_address, get_edge_blending, set_eco_mode, set_projector_name,
+      set_edge_blending, get_base_model_type, get_serial_number, get_basic_information, refresh]
+    verification: none
+    notes: >
+      Inputs: hdmi, hdmi2, displayport, displayport2, hdbaset, sdi. Light modes: normal, eco, full. Aspects:
+      16:9, 4:3, 16:10, letterbox, 5:4, native, normal, 2.35:1, 1.88:1. Serial 9600 bit/s; wired LAN (TCP
+      7142).
+
+commands:
+  set_power:
+    summary: "Power on (015 POWER ON) or off to standby (016 POWER OFF), then read the status. The projector accepts nothing else while it powers on or off, cooling included"
+    params:
+      "on": { type: bool, required: true, label: Power, description: "On powers the projector up; off puts it in standby after cooling." }
+    returns: ack
+  set_input:
+    summary: "Switch the input terminal (018 INPUT SW CHANGE), by the terminal's name; the model's notes list its terminals and the module sends that model's code. Then reads the status"
+    params:
+      input:
+        type: enum
+        values: [computer, computer2, computer3, bnc, video, bnc_cv, s_video, bnc_yc, component, hdmi, hdmi2, displayport,
+          displayport2, slot, stereo_dvi, dvi_d, viewer, usb_a, network, lan, ethernet, hdbaset, sdi, sdi2, sdi3, sdi4,
+          usb_display, usb_b, apps]
+        required: true
+        label: Input
+        description: "The input terminal as the manual's appendix names it (hdmi is HDMI or HDMI1, bnc_cv BNC(CV), bnc_yc BNC(Y/C)); one the model lacks is refused before sending."
+    returns: ack
+  set_picture_mute:
+    summary: "Picture mute on or off (020 PICTURE MUTE ON, 021 PICTURE MUTE OFF). Switching the input or the signal turns it off. Then reads the mute status"
+    params:
+      muted: { type: bool, default: true, label: Mute, description: "On blanks the picture, off shows it again." }
+    returns: ack
+  set_sound_mute:
+    summary: "Sound mute on or off (022 SOUND MUTE ON, 023 SOUND MUTE OFF). Switching the input or the signal, or changing the volume, turns it off. Then reads the mute status"
+    params:
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the sound, off restores it." }
+    returns: ack
+  set_onscreen_mute:
+    summary: "Onscreen (menu and message) mute on or off (024 ONSCREEN MUTE ON, 025 ONSCREEN MUTE OFF). Switching the input or the signal turns it off. Then reads the mute status"
+    params:
+      muted: { type: bool, default: true, label: Mute, description: "On hides the onscreen display, off shows it again." }
+    returns: ack
+  set_picture:
+    summary: "Adjust brightness, contrast, color, hue or sharpness (030-1 PICTURE ADJUST), to a value or by a step; the range is the model's, read with get_gain. Then reads the adjusted value"
+    params:
+      item: { type: enum, values: [brightness, contrast, color, hue, sharpness], required: true, label: Item, description: "The picture adjustment to change." }
+      value: { type: int, min: -32768, max: 32767, required: true, label: Value, description: "The new value, or with relative on the amount to add (negative to lower it), within the range get_gain reports." }
+      relative: { type: bool, default: false, label: Relative, description: "Off sets the value; on adds it to the current one." }
+    returns: ack
+  set_volume:
+    summary: "Adjust the sound volume (030-2 VOLUME ADJUST), to a value or by a step. Then reads the volume"
+    params:
+      value: { type: int, min: -32768, max: 32767, required: true, label: Volume, description: "The new volume, or with relative on the amount to add, within the range get_gain reports for volume." }
+      relative: { type: bool, default: false, label: Relative, description: "Off sets the volume; on adds the value to the current one." }
+    returns: ack
+  set_aspect:
+    summary: "Set the aspect (030-12 ASPECT ADJUST) by name; the model's notes list its aspects and the module sends that model's code. Write-only: the protocol has no aspect query"
+    params:
+      aspect:
+        type: enum
+        values: [auto, wide_zoom, cinema, "16:9", native, "4:3", "15:9", "16:10", letterbox, "4:3_windows", wide_screen, full,
+          zoom, "5:4", normal, "1.85:1", "1.88:1", "2.35:1"]
+        required: true
+        label: Aspect
+        description: "The aspect as the appendix names it (4:3_windows is 4:3 (WINDOWS)); one the model lacks is refused before sending."
+    returns: ack
+  set_aspect_code:
+    summary: "Set the aspect (030-12 ASPECT ADJUST) by its code from the model's appendix table, for codes the table gives two names (see the quirks)"
+    params:
+      code: { type: int, min: 0, max: 255, required: true, label: Aspect code, description: "DATA01 of 030-12 as the appendix's aspect table gives it for the model, such as 6 for 06h." }
+    returns: ack
+  set_light_adjust:
+    summary: "Adjust the lamp or light output (030-15 OTHER ADJUST, LAMP ADJUST / LIGHT ADJUST), to a value or by a step. Then reads it"
+    params:
+      value: { type: int, min: -32768, max: 32767, required: true, label: Light, description: "The new light level, or with relative on the amount to add, within the range get_gain reports for light_adjust." }
+      relative: { type: bool, default: false, label: Relative, description: "Off sets the level; on adds the value to the current one." }
+    returns: ack
+  get_information:
+    summary: "Read the projector name, lamp or light usage and filter usage (037 INFORMATION REQUEST); returns {projector_name, lamp_usage_seconds, filter_usage_seconds}"
+    returns: value
+  get_filter_usage:
+    summary: "Read the filter usage time and the time its alarm starts (037-3 FILTER USAGE INFORMATION REQUEST); returns {usage_seconds, alarm_start_seconds}, null where the projector defines none"
+    returns: value
+  get_lamp_usage:
+    summary: "Read a lamp's usage time or remaining life (037-4 LAMP INFORMATION REQUEST 3; LIGHT INFORMATION on 2024 models, usage only). Values reflect the eco mode"
+    params:
+      lamp: { type: int, min: 1, max: 2, default: 1, label: Lamp, description: "The lamp, 1 or 2; 2 only on two-lamp models, and 1 (the light) on laser models." }
+      content: { type: enum, values: [usage_seconds, remaining_percent], default: usage_seconds, label: Content, description: "usage_seconds reads the usage time; remaining_percent the remaining life, negative past the replacement time (not on 2024 models)." }
+    returns: value
+  get_carbon_savings:
+    summary: "Read the carbon savings in kilograms (037-6 CARBON SAVINGS INFORMATION REQUEST)"
+    params:
+      scope: { type: enum, values: [total, operation], default: total, label: Scope, description: "total is the total carbon savings; operation the savings during this operation." }
+    returns: value
+  press_key:
+    summary: "Send a remote control key (050 REMOTE KEY CODE), from the key code lists of both editions; a key the model lacks is ignored or refused by the projector"
+    params:
+      key:
+        type: enum
+        values: [power_on, power_off, auto, menu, up, down, right, left, enter, exit, help, magnify_up, magnify_down, mute,
+          picture, test, computer1, computer2, video1, s_video1, "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+          volume_up, volume_down, freeze, shutter_open, shutter_close, aspect, source, hdbaset, eco, id_set, hdmi,
+          geometric, aux, hdmi2, osd_mute_off, osd_mute_on, user1, user2, user3, sdi, default]
+        required: true
+        label: Key
+        description: "The remote key: help is HELP (STATUS on 2024 models), magnify_up and magnify_down are MAGNIFY or D-ZOOM, eco is LAMP MODE/ECO or LIGHT MODE."
+    returns: ack
+  set_shutter:
+    summary: "Close or open the lens shutter (051 SHUTTER CLOSE / LENS MUTE ON, 052 SHUTTER OPEN / LENS MUTE OFF). Write-only: the protocol has no shutter query"
+    params:
+      closed: { type: bool, default: true, label: Closed, description: "On closes the shutter (lens mute), off opens it." }
+    returns: ack
+  drive_lens:
+    summary: "Drive the zoom, focus, lens shift or periphery focus (053 LENS CONTROL) for 1, 0.5 or 0.25 s or until stopped. Then reads the position"
+    params:
+      target: { type: enum, values: [zoom, focus, shift_horizontal, shift_vertical, periphery_focus], required: true, label: Target, description: "What to drive; periphery_focus on 2024 models only." }
+      drive: { type: enum, values: [stop, plus_1s, plus_0_5s, plus_0_25s, plus, minus, minus_0_25s, minus_0_5s, minus_1s], required: true, label: Drive, description: "plus or minus drives until stop is sent; the timed values drive for that long; stop ends a drive." }
+    returns: ack
+  get_lens_position:
+    summary: "Read a lens position and its adjustment range (053-1 LENS CONTROL REQUEST); returns {max, min, position}"
+    params:
+      target: { type: enum, values: [zoom, focus, shift_horizontal, shift_vertical, periphery_focus], required: true, label: Target, description: "The lens adjustment to read; periphery_focus on 2024 models only." }
+    returns: value
+  set_lens_position:
+    summary: "Move a lens adjustment to an absolute position (053-2 LENS CONTROL 2) within the range get_lens_position reports. Then reads the position"
+    params:
+      target: { type: enum, values: [zoom, focus, shift_horizontal, shift_vertical, periphery_focus], required: true, label: Target, description: "The lens adjustment to move; periphery_focus on 2024 models only." }
+      position: { type: int, min: -32768, max: 32767, required: true, label: Position, description: "The position to move to, in the projector's units, within the range get_lens_position reports." }
+    returns: ack
+  move_lens:
+    summary: "Move a lens adjustment by a relative amount (053-2 LENS CONTROL 2). Then reads the position"
+    params:
+      target: { type: enum, values: [zoom, focus, shift_horizontal, shift_vertical, periphery_focus], required: true, label: Target, description: "The lens adjustment to move; periphery_focus on 2024 models only." }
+      offset: { type: int, min: -32768, max: 32767, required: true, label: Offset, description: "How far to move, in the projector's units; negative moves the other way." }
+    returns: ack
+  stop_lens:
+    summary: "Stop every lens movement (053-2 LENS CONTROL 2 with target FFh)"
+    returns: ack
+  lens_memory:
+    summary: "Move to, store or reset the lens memory (053-3 LENS MEMORY CONTROL). Storing or resetting replaces the stored lens position. Moving then reads the positions"
+    params:
+      operation: { type: enum, values: [move, store, reset], required: true, label: Operation, description: "move recalls the stored lens position, store saves the current one, reset clears it." }
+    returns: ack
+  reference_lens_memory:
+    summary: "Move to, store or reset the reference lens memory of the profile chosen with set_lens_profile (053-4 REFERENCE LENS MEMORY CONTROL). Moving then reads the positions"
+    params:
+      operation: { type: enum, values: [move, store, reset], required: true, label: Operation, description: "move recalls the profile's reference position, store saves the current one, reset clears it." }
+    returns: ack
+  get_lens_memory_option:
+    summary: "Read a lens memory option (053-5 LENS MEMORY OPTION REQUEST): load by signal or forced mute"
+    params:
+      option: { type: enum, values: [load_by_signal, forced_mute], required: true, label: Option, description: "load_by_signal recalls the lens memory when the signal changes; forced_mute mutes the picture while the lens moves." }
+    returns: value
+  set_lens_memory_option:
+    summary: "Turn a lens memory option on or off (053-6 LENS MEMORY OPTION SET). Then reads it"
+    params:
+      option: { type: enum, values: [load_by_signal, forced_mute], required: true, label: Option, description: "load_by_signal recalls the lens memory when the signal changes; forced_mute mutes the picture while the lens moves." }
+      "on": { type: bool, required: true, label: "On", description: "On enables the option, off disables it." }
+    returns: ack
+  get_lens_status:
+    summary: "Read which lens adjustments are moving (053-7 LENS INFORMATION REQUEST); returns {memory, zoom, focus, shift_horizontal, shift_vertical}"
+    returns: value
+  set_lens_profile:
+    summary: "Choose the reference lens memory profile (053-10 LENS PROFILE SET). Then reads it"
+    params:
+      profile: { type: int, min: 1, max: 2, required: true, label: Profile, description: "Reference lens memory profile 1 or 2." }
+    returns: ack
+  get_lens_profile:
+    summary: "Read the chosen reference lens memory profile, 1 or 2 (053-11 LENS PROFILE REQUEST)"
+    returns: value
+  get_gain:
+    summary: "Read a picture, volume or light adjustment with its range, default and steps (060-1 GAIN PARAMETER REQUEST 3); returns {status, max, min, default, value, wide_step, narrow_step}"
+    params:
+      item: { type: enum, values: [brightness, contrast, color, hue, sharpness, volume, light_adjust], required: true, label: Item, description: "The adjustment to read." }
+    returns: value
+  get_settings:
+    summary: "Read the base model type, whether the projector has sound, and its timer functions (078-1 SETTING REQUEST)"
+    returns: value
+  get_running_status:
+    summary: "Read the power, cooling and operation status (078-2 RUNNING STATUS REQUEST)"
+    returns: value
+  get_input_status:
+    summary: "Read the input signal status: switching, signal list number and type, selected signal type, test pattern, what is displayed (078-3 INPUT STATUS REQUEST)"
+    returns: value
+  get_mute_status:
+    summary: "Read the picture, sound, onscreen and forced onscreen mutes and whether the onscreen display is shown (078-4 MUTE STATUS REQUEST)"
+    returns: value
+  get_model_name:
+    summary: "Read the model name (078-5 MODEL NAME REQUEST)"
+    returns: value
+  get_cover_status:
+    summary: "Read whether the mirror or lens cover is closed (078-6 COVER STATUS REQUEST)"
+    returns: value
+  set_freeze:
+    summary: "Freeze or unfreeze the picture (079 FREEZE CONTROL). Then reads the status"
+    params:
+      frozen: { type: bool, default: true, label: Freeze, description: "On freezes the picture, off lets it run again." }
+    returns: ack
+  get_signal_frequency:
+    summary: "Read the input signal's horizontal or vertical frequency as the projector shows it (084 INFORMATION STRING REQUEST)"
+    params:
+      which: { type: enum, values: [horizontal, vertical], required: true, label: Frequency, description: "horizontal reads the horizontal synchronous frequency, vertical the vertical one." }
+    returns: value
+  get_eco_mode:
+    summary: "Read the eco, lamp or light mode (097-8 ECO MODE REQUEST / LIGHT MODE REQUEST), by the model's names"
+    returns: value
+  set_eco_mode:
+    summary: "Set the eco, lamp or light mode (098-8 ECO MODE SET / LIGHT MODE SET) by name; the model's notes list its modes. Then reads it"
+    params:
+      mode: { type: enum, values: [normal, eco, "off", "on", auto_eco, eco1, eco2, long_life, boost, silent, silent1, silent2, full], required: true, label: Mode, description: "The mode as the appendix names it for the model; one the model lacks is refused before sending." }
+    returns: ack
+  get_projector_name:
+    summary: "Read the projector name set for the LAN (097-45 LAN PROJECTOR NAME REQUEST)"
+    returns: value
+  set_projector_name:
+    summary: "Set the projector name used on the LAN (098-45 LAN PROJECTOR NAME SET), up to 16 characters. Then reads it"
+    params:
+      name: { type: string, max_length: 16, pattern: "^[ -~]*$", required: true, label: Name, description: "The new projector name, up to 16 printable ASCII characters." }
+    returns: ack
+  get_mac_address:
+    summary: "Read the projector's MAC address (097-155 LAN MAC ADDRESS STATUS REQUEST2)"
+    returns: value
+  get_pip:
+    summary: "Read a picture-in-picture or picture-by-picture setting (097-198 PIP/PICTURE BY PICTURE REQUEST)"
+    params:
+      target: { type: enum, values: [mode, start_position, sub_input, sub_input_2, sub_input_3], required: true, label: Setting, description: "mode, the start position, or sub input 1, 2 or 3." }
+    returns: value
+  set_pip_mode:
+    summary: "Choose picture in picture or picture by picture (098-198 PIP/PICTURE BY PICTURE SET, MODE). Then reads it"
+    params:
+      mode: { type: enum, values: [picture_in_picture, picture_by_picture], required: true, label: Mode, description: "picture_in_picture shows the sub picture inside the main one; picture_by_picture side by side." }
+    returns: ack
+  set_pip_position:
+    summary: "Set the picture-in-picture start position (098-198 PIP/PICTURE BY PICTURE SET, START POSITION). Then reads it"
+    params:
+      position: { type: enum, values: [top_left, top_right, bottom_left, bottom_right], required: true, label: Position, description: "The corner the sub picture starts in." }
+    returns: ack
+  set_pip_sub_input:
+    summary: "Set a sub picture's input (098-198 PIP/PICTURE BY PICTURE SET, SUB INPUT 1-3) by name; the model's notes list its sub inputs. Then reads it"
+    params:
+      sub: { type: int, min: 1, max: 3, default: 1, label: Sub picture, description: "Sub input 1, 2 or 3; 2 and 3 only on models with several sub pictures." }
+      input: { type: enum, values: ["off", hdmi1, hdmi2, hdmi, computer, hdbaset, displayport, displayport2, bnc, bnc_cv, bnc_yc, ethernet, usb_a, sdi, sdi1, sdi2, sdi3, sdi4, slot], required: true, label: Input, description: "The sub picture's input as the appendix names it for the model; one the model lacks is refused before sending." }
+    returns: ack
+  get_edge_blending:
+    summary: "Read whether edge blending is on (097-243-1 EDGE BLENDING MODE REQUEST)"
+    returns: value
+  set_edge_blending:
+    summary: "Turn edge blending on or off (098-243-1 EDGE BLENDING MODE SET). Then reads it"
+    params:
+      "on": { type: bool, required: true, label: Edge blending, description: "On turns edge blending on, off turns it off." }
+    returns: ack
+  get_base_model_type:
+    summary: "Read the base model type and model name (305-1 BASE MODEL TYPE REQUEST)"
+    returns: value
+  get_serial_number:
+    summary: "Read the serial number (305-2 SERIAL NUMBER REQUEST)"
+    returns: value
+  get_basic_information:
+    summary: "Read the operation status, what is displayed, the selected signal type, the video signal type, the mutes and the freeze (305-3 BASIC INFORMATION REQUEST)"
+    returns: value
+  set_audio_select:
+    summary: "Choose the sound for an input terminal (319-10 AUDIO SELECT SET): the terminal's own, BNC or COMPUTER. Write-only: the protocol has no query"
+    params:
+      input: { type: enum, values: [hdmi1, hdmi2, displayport, hdbaset, ethernet_or_lan, usb_a, usb_b], required: true, label: Input, description: "The input terminal whose sound to choose, as the appendix names them for the model." }
+      source: { type: enum, values: [input, bnc, computer], default: input, label: Sound from, description: "input plays the terminal's own sound; bnc or computer plays that audio input's." }
+    returns: ack
+  get_errors:
+    summary: "Read the error status (009 ERROR STATUS REQUEST); returns one boolean per error the model's edition defines"
+    returns: value
+  refresh:
+    summary: "Read the projector's identity and status again, everything the model supports, once"
+    returns: ack
+
+state:
+  power: { type: string, description: "Operation status: 'standby', 'on', 'cooling', 'standby_error', 'standby_power_saving' or 'network_standby' (305-3 DATA01, 078-2 DATA06)" }
+  powered: { type: bool, description: "Power status on (078-2 DATA03)" }
+  cooling: { type: bool, description: "Cooling in progress (078-2 DATA04)" }
+  power_changing: { type: bool, description: "Power on or off in progress (078-2 DATA05)" }
+  display: { type: string, description: "What is shown: 'video', 'no_signal', 'viewer', 'test_pattern', 'lan', 'user_test_pattern' or 'switching' (305-3 DATA02, 078-3 DATA09)" }
+  input.type: { type: string, description: "Selected signal type 2: 'computer', 'video', 's_video', 'component', 'viewer_1_5', 'dvi_d', 'hdmi', 'displayport', 'viewer_6_10', 'hdbaset', 'sdi', 'other' or 'none'" }
+  input.type_code: { type: int, description: "Selected signal type 2 as the projector sends it; the appendix maps it, with input.number, to the model's terminal" }
+  input.number: { type: int, description: "Selected signal type 1, 1-5: which terminal of that type, such as 2 for HDMI2" }
+  input.switching: { type: bool, description: "Signal switching in progress (078-3 DATA01)" }
+  input.list_number: { type: int, description: "Signal list (entry list) number, from 1 (078-3 DATA02)" }
+  input.list_type: { type: string, description: "'default' or 'user' signal list (078-3 DATA05)" }
+  input.test_pattern: { type: bool, description: "Test pattern displayed (078-3 DATA06)" }
+  video_signal: { type: string, description: "Video signal type of a video or S-video input, such as 'NTSC3.58' or 'PAL'; null otherwise (305-3 DATA05, 2020 models)" }
+  mute.picture: { type: bool, description: "Picture muted (305-3 DATA06, 078-4 DATA01)" }
+  mute.sound: { type: bool, description: "Sound muted (305-3 DATA07, 078-4 DATA02)" }
+  mute.onscreen: { type: bool, description: "Onscreen display muted (305-3 DATA08, 078-4 DATA03)" }
+  mute.forced_onscreen: { type: bool, description: "Forced onscreen mute (078-4 DATA04)" }
+  mute.onscreen_display: { type: bool, description: "An onscreen display is showing (078-4 DATA05)" }
+  freeze: { type: bool, description: "Picture frozen (305-3 DATA09)" }
+  errors: { type: object, description: "One boolean per error of 009 ERROR STATUS REQUEST: on 2020 models cover, temperature_bimetal, fan, power, lamp_off, lamp_replacement_moratorium, lamp_hours_exceeded, formatter, lamp2_off, fpga, temperature_sensor, lamp_missing, lamp_data, mirror_cover, lamp2_replacement_moratorium, lamp2_hours_exceeded, lamp2_missing, lamp2_data, dust_temperature, foreign_matter_sensor, ballast_communication, iris_calibration, lens_not_installed, portrait_cover_up, interlock_open, system_error_slave_cpu, system_error_formatter; on 2024 models cover, fan, light_off, phosphor_wheel, driver_version, cpu_communication, temperature_sensor, tec_driver, color_sensor, lens_not_installed" }
+  lamps.*.usage_seconds: { type: int, unit: s, description: "Lamp or light usage time, lamps numbered from 1 (037-4, 037); updated by the projector once a minute" }
+  lamps.*.usage_hours: { type: int, unit: h, description: "Lamp or light usage time in whole hours" }
+  lamps.*.remaining_percent: { type: int, unit: "%", description: "Lamp remaining life, negative past the replacement time (037-4, 2020 models)" }
+  filter.usage_seconds: { type: int, unit: s, description: "Filter usage time (037-3, 037); null when not defined" }
+  filter.alarm_start_seconds: { type: int, unit: s, description: "Filter usage time at which the filter alarm starts (037-3); null when not defined" }
+  picture.*.value: { type: int, description: "Current value of brightness, contrast, color, hue or sharpness (060-1)" }
+  picture.*.min: { type: int, description: "Lower end of the adjustment range" }
+  picture.*.max: { type: int, description: "Upper end of the adjustment range" }
+  picture.*.default: { type: int, description: "Default value; null when the projector says it is not valid" }
+  picture.*.status: { type: string, description: "'adjustable', 'not_adjustable', 'not_displayed' or 'absent' (060-1 DATA01)" }
+  picture.*.wide_step: { type: int, description: "Wide adjustment step" }
+  picture.*.narrow_step: { type: int, description: "Narrow adjustment step" }
+  volume: { type: object, description: "The volume as for picture.*: {status, max, min, default, value, wide_step, narrow_step} (060-1 05h)" }
+  light_adjust: { type: object, description: "The lamp or light adjustment as for picture.* (060-1 96h)" }
+  lens.*.position: { type: int, description: "Current position of zoom, focus, shift_horizontal, shift_vertical or periphery_focus (053-1)" }
+  lens.*.min: { type: int, description: "Lower end of its adjustment range" }
+  lens.*.max: { type: int, description: "Upper end of its adjustment range" }
+  lens.moving.memory: { type: bool, description: "Lens memory moving (053-7)" }
+  lens.moving.zoom: { type: bool, description: "Zoom moving" }
+  lens.moving.focus: { type: bool, description: "Focus moving" }
+  lens.moving.shift_horizontal: { type: bool, description: "Horizontal lens shift moving" }
+  lens.moving.shift_vertical: { type: bool, description: "Vertical lens shift moving" }
+  lens_memory.load_by_signal: { type: bool, description: "Lens memory load by signal on (053-5)" }
+  lens_memory.forced_mute: { type: bool, description: "Lens memory forced mute on (053-5)" }
+  lens_profile: { type: int, description: "Reference lens memory profile, 1 or 2 (053-11)" }
+  eco_mode: { type: string, description: "Eco, lamp or light mode by the model's names, or the code as 'NNh' when the model's table lacks it (097-8)" }
+  name: { type: string, description: "Projector name on the LAN (097-45)" }
+  info.projector_name: { type: string, description: "Projector name from 037 INFORMATION REQUEST" }
+  info.model_name: { type: string, description: "Model name (078-5)" }
+  info.serial_number: { type: string, description: "Serial number (305-2)" }
+  info.mac_address: { type: string, description: "MAC address, colon-separated lowercase hex (097-155)" }
+  info.base_model_type: { type: string, description: "Base model type bytes as hex (078-1 DATA01-03, or 305-1 DATA01-02 and DATA12-13)" }
+  info.sound: { type: bool, description: "The projector has a sound function (078-1 DATA04)" }
+  info.timer_functions: { type: string, description: "'none', 'clock', 'sleep_timer' or 'clock_and_sleep_timer' (078-1 DATA05)" }
+  pip.mode: { type: string, description: "'picture_in_picture' or 'picture_by_picture' (097-198)" }
+  pip.start_position: { type: string, description: "'top_left', 'top_right', 'bottom_left' or 'bottom_right'" }
+  pip.sub_input: { type: string, description: "Sub input 1 by the model's names" }
+  pip.sub_input_2: { type: string, description: "Sub input 2 by the model's names" }
+  pip.sub_input_3: { type: string, description: "Sub input 3 by the model's names" }
+  edge_blending: { type: bool, description: "Edge blending on (097-243-1)" }
+  cover_closed: { type: bool, description: "Mirror or lens cover closed (078-6)" }
+  signal.horizontal_frequency: { type: string, description: "Horizontal synchronous frequency as the projector displays it (084)" }
+  signal.vertical_frequency: { type: string, description: "Vertical synchronous frequency as the projector displays it (084)" }
+  carbon_savings.total_kg: { type: float, unit: kg, description: "Total carbon savings (037-6)" }
+  carbon_savings.operation_kg: { type: float, unit: kg, description: "Carbon savings during this operation (037-6)" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Opened for commands only (monitor false), nothing is polled and no set is followed by a read; one 305-3
+      BASIC INFORMATION REQUEST (078-2 RUNNING STATUS REQUEST on models without it) every 5 s shows the projector
+      is there, since it sends nothing unasked. The refresh command still reads everything once.
+  - models: [all]
+    severity: info
+    text: >
+      A failed command is a device error carrying the ERR1/ERR2 pair as its code (such as "0101") and the
+      meaning of §2.4: 0000 not recognized, 0001 not supported by the model, 0100 invalid value, 0101 invalid
+      input terminal, 0203 value cannot be set, 0204 forced onscreen mute on, 0207 no signal, 0208 test
+      pattern or filer displayed, 020D power is off, 020E execution failed, 020F no authority, and so on. A set
+      whose reply carries an execution result of FFh or 01h (018, 050, 053, 053-3 to 053-10, 079, 098-x,
+      319-10), or a 030-x result other than 0000h, fails too. A polled query answered "not supported" is not
+      asked again until the device is opened again.
+  - models: [all]
+    severity: warning
+    text: >
+      The aspect, the shutter and the audio select are write-only: the protocol has no query for them, so the
+      state does not show them. The picture mute, the sound mute and the onscreen mute turn themselves off
+      when the input or signal changes (and the sound mute when the volume changes), as §3.5-§3.9 say; the
+      next poll shows it.
+  - models: [all]
+    severity: info
+    text: >
+      The appendix's aspect table gives some models two names for one code (02h is both WIDE SCREEN and 16:9
+      on the NP-PA, NP-PH, NP-PX and XP-A/V models, CINEMA and 16:9 on the NP-ME, NP-P554U, NP-P603X and
+      NP-UM models; 06h both ZOOM and FULL on several), and the NP-PX651X family two codes for one name (16:10
+      at 06h and 0Ch, AUTO at 05h and 0Fh). set_aspect sends the code the table puts the name under (the first
+      of two); set_aspect_code sends any code. XP-X171Q/X141Q put NORMAL at 0Fh and 2.35/1.88 at 11h/12h where
+      the NP-PX2000UL has AUTO, 1.88 and 2.35.
+  - models: [all]
+    severity: info
+    text: >
+      The input in state is the selected signal type (078-3 and 305-3 DATA03-04), not the terminal name:
+      type 'hdmi' number 2 is HDMI2, and the appendix's "Selection signal type" tables map each model's
+      terminals onto these. Some models answer 305-3 with FFh as type 2 when there is no signal, and the
+      NP-U300X family always 00h (appendix page 30).
+  - models: [all]
+    severity: info
+    text: >
+      Models accept POWER ON in standby only in the standby modes the appendix lists for them (page 11 of the
+      2020 appendix, page 4 of the 2024 one), and some only over serial in a power-saving standby; in another
+      standby mode the projector does not answer on the LAN, and the device shows as disconnected until it is
+      powered from elsewhere.
+  - models: [all]
+    severity: info
+    text: >
+      With link serial the module opens the host's serial port and speaks the same frames as over TCP; the
+      port open is the connection, and a port that fails (a USB adapter unplugged) is reopened like a dropped
+      connection. The speed must match the projector's; each model's notes list the speeds it offers.
+  - models: [np-pa1004ul, np-pa803ul, np-pa803u, np-pa622u, np-pa621u, np-ph3501ql, np-ph1202hl, np-px1005ql, np-px1004ul, np-px602ul, np-p605ul]
+    severity: info
+    text: >
+      The appendix's sub input table marks HDBaseT and SLOT on the NP-PH3501QL and NP-PX1005QL families as not
+      available for sub inputs 2 and 3, and the 098-198 reply lists the sub inputs 2 and 3 as targets 03h and
+      04h where the request uses 09h and 0Ah; the reply's result byte is read either way.

@@ -1448,6 +1448,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
 
+## nec-projector — NEC and Sharp NEC projectors
+
+- [ ] Find the serial speed a projector ships with: the manual lists the speeds each model offers but no default, and 38400 bit/s is assumed. ([specs/nec-projector.yaml:59](specs/nec-projector.yaml#L59))
+- [ ] Check whether any model needs RTS/CTS flow control on its PC CONTROL port, which the pinout wires but the communication conditions do not mention. ([specs/nec-projector.yaml:64](specs/nec-projector.yaml#L64))
+- [ ] Confirm commands sent with ID1 and ID2 as 00h are answered when a control ID is set on the projector, and whether TCP 7142 keeps an idle connection open or closes it. ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
+- [ ] Measure how long POWER ON and POWER OFF take to answer (15 s is allowed). ([specs/nec-projector.yaml:840](specs/nec-projector.yaml#L840))
+- [ ] Confirm each model's input terminal codes, which differ by family (HDMI is 1Ah on the older models and A1h on the newer). ([specs/nec-projector.yaml:845](specs/nec-projector.yaml#L845))
+- [ ] Find what the two names the aspect table gives one code mean (02h WIDE SCREEN and 16:9, CINEMA and 16:9; 06h ZOOM and FULL), and which of 06h and 0Ch, 05h and 0Fh an NP-PX651X takes for 16:10 and AUTO. ([specs/nec-projector.yaml:1197](specs/nec-projector.yaml#L1197))
+- [ ] Check that 037-6 sends kilograms little-endian: the manual's example for 2460.06375 kg prints 9Ch 90h where 2460 is 9Ch 09h. ([specs/nec-projector.yaml:919](specs/nec-projector.yaml#L919))
+- [ ] Check that 053-1 and 060-1 values are signed 16-bit (negative lens shift positions, picture minimums). ([specs/nec-projector.yaml:948](specs/nec-projector.yaml#L948))
+- [ ] Check how a one-lamp or laser model answers 037-4 for lamp 2 and for the remaining life on 2024 models. ([specs/nec-projector.yaml:913](specs/nec-projector.yaml#L913))
+- [ ] Confirm the 098-198 reply for sub inputs 2 and 3 names them 03h and 04h, as the manual prints, or 09h and 0Ah as in the request. ([specs/nec-projector.yaml:1067](specs/nec-projector.yaml#L1067))
+- [ ] Confirm the NP-U321H's eco modes (OFF 00h, ECO 01h; the appendix's cells are shared with the next columns). ([specs/nec-projector.yaml:571](specs/nec-projector.yaml#L571))
+- [ ] Check the 2024 keys on 2020 models and the 2020 keys (AUTO, PICTURE, COMPUTER1-2, VIDEO1, S-VIDEO1, FREEZE, ASPECT, SOURCE) on 2024 models. ([specs/nec-projector.yaml:924](specs/nec-projector.yaml#L924))
+- [ ] Check which characters 098-45 accepts in a projector name beyond letters and digits. ([specs/nec-projector.yaml:1044](specs/nec-projector.yaml#L1044))
+
 ## newtek-tricaster — NewTek TriCaster
 
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:572](specs/newtek-tricaster.yaml#L572))
