@@ -620,3 +620,5 @@ telemetry(C1, "lamp-whisper-mode", inbound="(WSP 3)", expect_state={"lamp": {"wh
 telemetry(C1, "lamp-auto-switch", inbound="(LSF!1)", expect_state={"lamp": {"auto_switch": 1}})
 telemetry(C1, "lamp-auto-switch-hours", inbound="(LSF+TIME!120)", expect_state={"lamp": {"auto_switch_hours": 120}})
 telemetry(C1, "lamp-life-warning", inbound="(LPL 1500)", expect_state={"lamp": {"life_warning": 1500}})
+# The same on the RS232 IN port (link serial).
+_c("get_power", {}, "(PWR?)", settings={"link": "serial"}, file="get_power-serial")
