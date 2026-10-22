@@ -774,6 +774,29 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that REAPER feeds back /track/@/autotrim ... /autowrite as 1 for the mode in force and 0 for the others, and record what /track/auto sends for each mode. ([specs/cockos-reaper.yaml:870](specs/cockos-reaper.yaml#L870))
 - [ ] Record the command ID of "Control surface: Refresh all surfaces" in REAPER's Actions list, and whether it is the same across REAPER versions. ([specs/cockos-reaper.yaml:1105](specs/cockos-reaper.yaml#L1105))
 
+## cockos-reaper-web — Cockos REAPER (web interface)
+
+- [ ] Confirm that the web interface's Username:password field makes REAPER answer 401 with HTTP Basic (realm reaper_www) and accept the user and password as Basic credentials, and that requests carrying a Basic header are accepted while the field is empty. ([spec](specs/cockos-reaper-web.yaml#L105))
+- [ ] Confirm the default port REAPER proposes for a new Web browser interface (8080, the User Guide's example). ([spec](specs/cockos-reaper-web.yaml#L128))
+- [ ] Confirm what actions 40667 and 40668 do (taken as stop saving all recorded media and stop deleting it, from REAPER's pages' stop and abort buttons). ([spec](specs/cockos-reaper-web.yaml#L175))
+- [ ] Confirm the action IDs read from REAPER's pages for snap (1157), next and previous marker (40173, 40172), add marker (40157), and undo and redo (40029, 40030). ([spec](specs/cockos-reaper-web.yaml#L193))
+- [ ] Check that a command and the read-back chained after it in one request (`;TRANSPORT`, `;TRACK`, `;GET/...`) answer with the value after the change, including for actions that REAPER may run deferred. ([spec](specs/cockos-reaper-web.yaml#L151))
+- [ ] Check that SET/POS_STR decodes a percent-encoded position and takes m1, r1, M1 and R1 as main.js describes. ([spec](specs/cockos-reaper-web.yaml#L257))
+- [ ] Check the order of the volume, pan and width suffixes this spec sends (e for releasing the touch, then g for ignoring grouping, as "0.500000eg"), and that REAPER reads both. ([spec](specs/cockos-reaper-web.yaml#L330))
+- [ ] Record the RECMON value REAPER takes for monitoring off (0 assumed; main.js names only 1 on, 2 auto and < 0 to cycle). ([spec](specs/cockos-reaper-web.yaml#L424))
+- [ ] Check that a SET/TRACK/n/<attribute>/<value> value, a P_NAME, extended state sections, keys and values, and undo messages sent percent-encoded (/ as %2F, ; as %3B) are decoded by REAPER before use. ([spec](specs/cockos-reaper-web.yaml#L467))
+- [ ] Check the send index of GET/TRACK/n/SEND/i and SET/TRACK/n/SEND/i/...: hardware outputs first from 0, then sends (inferred from more_me.html), and receives from -1. ([spec](specs/cockos-reaper-web.yaml#L487))
+- [ ] Check the send volume and pan suffixes e (end of a drag) and E (instant edit), and what a value with neither does. ([spec](specs/cockos-reaper-web.yaml#L515))
+- [ ] Check that OSC/<address> takes a percent-encoded address (%2F for /), that :<float> and :s<text> carry the argument, and that the message reaches Default.ReaperOSC with no OSC control surface configured. ([spec](specs/cockos-reaper-web.yaml#L652))
+- [ ] Check that REAPER ends reply lines with LF alone (the rules do not expect CR), and that a request of several commands answers each command's lines in order in one body. ([spec](specs/cockos-reaper-web.yaml#L732))
+- [ ] Record a TRANSPORT reply: the repeat field as 0 and 1 (main.js says only nonzero when on), and the position formats. ([spec](specs/cockos-reaper-web.yaml#L743))
+- [ ] Record a BEATPOS reply: whether the measure count is a whole number and the beats-in-measure a decimal, as read. ([spec](specs/cockos-reaper-web.yaml#L756))
+- [ ] Record a TRACK reply: meter peak and position as integers, the width and pan mode fields, the color as 0xaarrggbb text or 0, and whether a track name holding a tab is escaped. ([spec](specs/cockos-reaper-web.yaml#L766))
+- [ ] Record MARKER and REGION replies with and without the color field, and check that markers and regions are listed in timeline order (state keys them by place from 1). ([spec](specs/cockos-reaper-web.yaml#L783))
+- [ ] Record a SEND reply's flags, volume and pan formats, and its first two fields for a receive (the track and the negative index asked for). ([spec](specs/cockos-reaper-web.yaml#L813))
+- [ ] Record a LYRICS reply: beat and lyric pairs after the track number. ([spec](specs/cockos-reaper-web.yaml#L819))
+- [ ] Check that the EXTSTATE and PROJEXTSTATE replies give the section and key decoded, as sent before encoding. ([spec](specs/cockos-reaper-web.yaml#L826))
+
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
 - [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))

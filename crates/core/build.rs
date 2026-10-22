@@ -72,7 +72,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     ("vendor-christie", &["christie-spyder"]),
     ("vendor-churchapps", &["freeshow"]),
-    ("vendor-cockos", &["cockos-reaper"]),
+    ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-digico", &["digico-sd"]),
     (
         "vendor-dataton",
