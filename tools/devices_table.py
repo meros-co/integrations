@@ -43,7 +43,7 @@ NATIVE = {
     "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",
     "generic-osc": "OSC over UDP or TCP",
-    "generic-tcp-udp": "Text or bytes over TCP or UDP",
+    "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
     "http-snapshot": "HTTP JPEG snapshots",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
