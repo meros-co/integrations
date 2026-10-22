@@ -271,8 +271,12 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     {
         let mut cx = Cx::new(1);
         engine.tcp(&mut cx, "device", TcpInput::Connected);
-        // A login that waits for the device's prompt is given it.
-        if let Some((_, prompt, _)) = engine.prompt_wait.clone() {
+        // A login that waits for the device's prompts is given each in turn
+        // (Sharp's user name, then password).
+        for _ in 0..8 {
+            let Some((_, prompt, _)) = engine.prompt_wait.clone() else {
+                break;
+            };
             engine.tcp(&mut cx, "device", TcpInput::Data(prompt.into_bytes()));
         }
         connected = cx.take();
@@ -573,8 +577,12 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         .any(|a| matches!(a, Action::TcpOpen { .. } | Action::SerialOpen { .. }))
     {
         engine.tcp(&mut cx, "device", TcpInput::Connected);
-        // A login that waits for the device's prompt is given it.
-        if let Some((_, prompt, _)) = engine.prompt_wait.clone() {
+        // A login that waits for the device's prompts is given each in turn
+        // (Sharp's user name, then password).
+        for _ in 0..8 {
+            let Some((_, prompt, _)) = engine.prompt_wait.clone() else {
+                break;
+            };
             engine.tcp(&mut cx, "device", TcpInput::Data(prompt.into_bytes()));
         }
     }

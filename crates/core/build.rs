@@ -179,6 +179,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "sennheiser-spectera",
         ],
     ),
+    ("vendor-sharp", &["sharp-display"]),
     (
         "vendor-shure",
         &[
