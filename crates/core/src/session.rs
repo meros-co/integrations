@@ -65,6 +65,9 @@ pub(crate) type Build = Box<dyn Fn(Params) -> Result<Box<dyn Module>, String> + 
 /// module afresh from new ones.
 pub(crate) struct Reconfigure {
     pub(crate) declared: std::collections::BTreeMap<String, ParamSpec>,
+    /// The model the device was opened as: a setting's default can be the
+    /// model's own.
+    pub(crate) model: String,
     pub(crate) settings: Params,
     pub(crate) build: Build,
 }
@@ -294,7 +297,9 @@ impl Session {
         };
         let mut merged = reconfigure.settings.clone();
         merged.extend(delta);
-        let settings = crate::catalog::validate(&reconfigure.declared, &merged).map_err(invalid)?;
+        let settings =
+            crate::catalog::validate_settings(&reconfigure.declared, &merged, &reconfigure.model)
+                .map_err(invalid)?;
         let mut cx = self.cx();
         let update = self.module.update_settings(&mut cx, &settings);
         if update == SettingsUpdate::Applied {

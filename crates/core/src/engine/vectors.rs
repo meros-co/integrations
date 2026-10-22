@@ -251,7 +251,8 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     for (name, value) in serial_port(spec) {
         settings.entry(name).or_insert(value);
     }
-    let settings = validate(&spec.settings, &settings).map_err(|e| format!("settings: {e}"))?;
+    let settings = crate::catalog::validate_settings(&spec.settings, &settings, &model.id)
+        .map_err(|e| format!("settings: {e}"))?;
     let ctx = OpenContext {
         host: HOST,
         host_name: None,
@@ -555,7 +556,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     for (name, value) in serial_port(spec) {
         settings.entry(name).or_insert(value);
     }
-    let settings = validate(&spec.settings, &settings).map_err(|e| format!("settings: {e}"))?;
+    let settings = crate::catalog::validate_settings(&spec.settings, &settings, &model.id)
+        .map_err(|e| format!("settings: {e}"))?;
 
     let ctx = OpenContext {
         host: HOST,
@@ -967,7 +969,12 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             channels: model.channels,
             // With no value for a required setting (a token), the defaults
             // of the others, as a host opening it would have them.
-            settings: validate(&spec.settings, &serial_port(spec)).unwrap_or_else(|_| {
+            settings: crate::catalog::validate_settings(
+                &spec.settings,
+                &serial_port(spec),
+                &model.id,
+            )
+            .unwrap_or_else(|_| {
                 spec.settings
                     .iter()
                     .filter_map(|(k, p)| p.default.clone().map(|d| (k.clone(), d)))

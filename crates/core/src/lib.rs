@@ -426,7 +426,7 @@ impl Core {
                 device: request.device.clone(),
                 model: request.model.clone(),
             })?;
-        let settings = catalog::validate(&spec.settings, &request.settings)
+        let settings = catalog::validate_settings(&spec.settings, &request.settings, &model.id)
             .map_err(|message| OpenError::InvalidSettings { message })?;
         // A spec reaching the device over TCP or a serial port (a `serial`
         // block): link serial needs the port and no host, link tcp a host.
@@ -482,6 +482,7 @@ impl Core {
         })?;
         let reconfigure = session::Reconfigure {
             declared: spec.settings.clone(),
+            model: model.id.clone(),
             settings: context.settings.clone(),
             build: {
                 let spec = spec.clone();

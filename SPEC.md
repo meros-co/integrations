@@ -280,6 +280,24 @@ other):
   documents them; a value the vendor leaves undocumented (flow control,
   often) is `none` and a quirk with a VERIFICATION.md item.
 
+A family whose models leave the factory with different line settings (Sharp's
+PN-HB and PN-R903A at 38400 bps, its other displays at 9600) gives those
+models' defaults in `by_model`, a list of `{ models, default }` beside the
+setting's `default` and `values`:
+
+```yaml
+  serial:
+    baud_rate: { default: 9600, values: [9600, 19200, 38400],
+                 by_model: [{ models: [pn-hb, pn-r903a], default: 38400 }] }
+```
+
+A device opened as one of those models takes its model's default for a
+setting it is not given, on opening and in `update_settings` alike; the
+others take `default`. The catalogue lists the setting's `default_by_model`
+(model id to default) and its description names them. Each model is named
+once and must have the serial port, and each default is one of the
+values; the core and `tools/validate.py` refuse a block that breaks this.
+
 `models`, when given, lists the models that have the serial port; opening
 another model with link serial fails with `invalid_settings`, as does link
 serial without `serial_port`. Link tcp without a host fails as for any

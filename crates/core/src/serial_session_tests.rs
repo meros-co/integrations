@@ -320,7 +320,8 @@ transport:
   serial:
     serial_only: [rs232-only]
     models: [networked, rs232-only]
-    baud_rate: { default: 9600, values: [9600, 19200, 115200] }
+    baud_rate: { default: 9600, values: [9600, 19200, 115200],
+                 by_model: [{ models: [rs232-only], default: 115200 }] }
     data_bits: 8
     parity: { default: none, values: [none, even] }
     stop_bits: 1
@@ -408,6 +409,31 @@ fn a_serial_block_adds_the_link_and_the_line_settings() {
         ["9600", "19200", "115200"]
     );
     assert_eq!(s["baud_rate"].default, Some(json!("9600")));
+    // A model whose port leaves the factory at another rate has its own
+    // default, which the catalogue lists and opening applies.
+    assert_eq!(
+        s["baud_rate"].default_by_model,
+        Some([("rs232-only".to_string(), json!("115200"))].into())
+    );
+    assert!(s["baud_rate"]
+        .description
+        .as_deref()
+        .unwrap()
+        .contains("9600 unless changed there, 115200 on rs232-only"));
+    let catalogued = serde_json::to_value(&s["baud_rate"]).unwrap();
+    assert_eq!(
+        catalogued["default_by_model"]["rs232-only"],
+        json!("115200")
+    );
+    let given = Params::new();
+    let rs232 = crate::catalog::validate_settings(s, &given, "rs232-only").unwrap();
+    assert_eq!(rs232["baud_rate"], json!("115200"));
+    let networked = crate::catalog::validate_settings(s, &given, "networked").unwrap();
+    assert_eq!(networked["baud_rate"], json!("9600"));
+    assert_eq!(
+        crate::catalog::validate(s, &given).unwrap()["baud_rate"],
+        json!("9600")
+    );
     assert_eq!(
         (s["data_bits"].min, s["data_bits"].max),
         (Some(8.0), Some(8.0))
@@ -442,6 +468,31 @@ fn a_serial_block_adds_the_link_and_the_line_settings() {
             "parity",
         ),
         ("default: 9600, values", "default: 4800, values", "default"),
+        (
+            "default: 115200 }",
+            "default: 4800 }",
+            "4800 is not one of the values",
+        ),
+        (
+            "models: [rs232-only], default",
+            "models: [nope], default",
+            "no model 'nope'",
+        ),
+        (
+            "models: [rs232-only], default",
+            "models: [no-serial], default",
+            "'no-serial' has no serial port",
+        ),
+        (
+            "models: [rs232-only], default",
+            "models: [rs232-only, rs232-only], default",
+            "named twice",
+        ),
+        (
+            "by_model: [{ models",
+            "by_model: [{ model",
+            "{models, default}",
+        ),
         ("serial_only: [rs232-only]", "serial_only: [nope]", "nope"),
         (
             "    flow_control: none\n",
@@ -542,16 +593,47 @@ async fn link_tcp_uses_the_network_and_a_serial_only_model_defaults_to_its_port(
     .unwrap();
     assert_eq!(line(&mut rs232).await, "SERIAL");
 
-    // A model reached only on its serial port uses it unless told otherwise.
+    // At the networked model's default rate.
+    let at = |path: &str| {
+        ports
+            .opened
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|p| p.path == path)
+            .map(|p| p.baud_rate)
+    };
+    assert_eq!(at("COM5"), Some(9600));
+
+    // A model reached only on its serial port uses it unless told otherwise,
+    // at its own default rate.
     let _second = ports.plug("COM6");
     let only = dual_open(&core, "rs232-only", "", json!({"serial_port": "COM6"})).unwrap();
     wait_connection(&core, only, |c| *c == Connection::Connected).await;
-    assert!(ports
-        .opened
-        .lock()
-        .unwrap()
-        .iter()
-        .any(|p| p.path == "COM6"));
+    assert_eq!(at("COM6"), Some(115200));
+    // Settings changed later keep the model's default where none is given.
+    let _third = ports.plug("COM6");
+    core.update_settings(only, json!({"parity": "even"}).as_object().unwrap().clone())
+        .await
+        .unwrap();
+    let reopened = || {
+        ports
+            .opened
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|p| p.path == "COM6")
+            .map(|p| (p.baud_rate, p.parity))
+            .collect::<Vec<_>>()
+    };
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while reopened().len() < 2 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the port opened again within 5 s");
+    assert_eq!(reopened()[1], (115200, Parity::Even));
 }
 
 /// DUAL with framing the vendor documents differently on the serial port:

@@ -1145,11 +1145,28 @@ def expand_serial(doc: dict) -> list[str]:
         if name in settings:
             errors.append(f"settings.{name}: transport.serial declares it; leave it out")
 
+    model_ids = {m["id"] for m in doc.get("models") or []}
+    serial_models = block.get("models")
+
     def line(name):
         v = block[name]
         if isinstance(v, dict):
             if v["default"] not in v["values"]:
                 errors.append(f"transport.serial.{name}: the default is not one of the values")
+            # A default that differs by model: each model named once, with
+            # the serial port, and a value the port allows.
+            seen = set()
+            for i, entry in enumerate(v.get("by_model") or []):
+                if entry["default"] not in v["values"]:
+                    errors.append(f"transport.serial.{name}.by_model[{i}]: the default is not one of the values")
+                for m in entry["models"]:
+                    if m not in model_ids:
+                        errors.append(f"transport.serial.{name}.by_model[{i}]: no model '{m}'")
+                    elif serial_models is not None and m not in serial_models:
+                        errors.append(f"transport.serial.{name}.by_model[{i}]: model '{m}' has no serial port")
+                    if m in seen:
+                        errors.append(f"transport.serial.{name}.by_model[{i}]: model '{m}' is named twice")
+                    seen.add(m)
             return v["default"], v["values"]
         return v, [v]
 
