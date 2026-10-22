@@ -959,7 +959,8 @@ impl SamsungMdc {
             None if !layouts.is_empty() => cx.log(
                 Level::Debug,
                 format!(
-                    "MDC: a reply to 0x{:02x} of {} bytes matches no documented layout: {}",
+                    "MDC: a reply to {} (0x{:02x}) of {} bytes matches no documented layout: {}",
+                    def.key,
                     job.cmd,
                     body.len(),
                     hex(body)
