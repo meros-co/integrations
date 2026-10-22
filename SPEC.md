@@ -332,6 +332,14 @@ network device. Changing `link` or a line setting with `update_settings`
 opens the new link at once, as for `line-serial`; on Android and iOS link
 serial fails to open as `line-serial` does.
 
+A device with HTTP `endpoints` (§2, Endpoints) beside its line protocol
+(Barco Pulse's file endpoints on its web server) keeps them on link serial
+too: they are reached at the host the device was opened with, over the
+network, while the line protocol goes over the serial port. Opened on link
+serial without a host, it reaches no HTTP server, and a command or poll
+naming an endpoint fails with `invalid_params` saying so. The same holds
+for TLS (§2, `line-tcp`, TLS): it is the network link's.
+
 The ports list both links, the transport's port with `when: "link tcp"` and
 a `serial` control entry with `when: "link serial"`. A step of `on_connect`
 can name the link it is for, `link: tcp` or `link: serial`, when the vendor

@@ -332,9 +332,6 @@ impl DeviceSpec {
         if t.get("type").and_then(Value::as_str) != Some("line-tcp") {
             return Err("transport.serial is for a line-tcp transport".into());
         }
-        if t.get("endpoints").is_some() {
-            return Err("transport.serial: a serial port reaches no endpoints".into());
-        }
         let block = block
             .as_object()
             .ok_or("transport.serial must be a mapping")?

@@ -1106,8 +1106,6 @@ def expand_serial(doc: dict) -> list[str]:
         return errors
     if t.get("type") != "line-tcp":
         return ["transport.serial is for a line-tcp transport"]
-    if "endpoints" in t:
-        errors.append("transport.serial: a serial port reaches no endpoints")
     model_ids = {m["id"] for m in doc.get("models") or []}
     for key in ("serial_only", "models"):
         for m in block.get(key) or []:

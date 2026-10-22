@@ -2046,6 +2046,13 @@ impl SpecEngine {
 
     /// A declared endpoint (`transport.endpoints`), by name.
     fn endpoint(&self, name: &str) -> Result<&Endpoint, String> {
+        // Beside a `serial` block, a device on its serial port may have been
+        // opened without a host: its HTTP servers cannot be reached then.
+        if self.host.is_unspecified() {
+            return Err(format!(
+                "endpoint '{name}' needs the device's host: open it with one to reach its HTTP server"
+            ));
+        }
         self.endpoints
             .get(name)
             .ok_or_else(|| format!("no endpoint '{name}' in transport.endpoints"))
@@ -7861,6 +7868,63 @@ state:
         assert_eq!(completed(&a), vec![(4, Err(CommandError::Timeout))]);
         assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
         assert_eq!(e.link, Connection::Connected);
+    }
+
+    #[test]
+    fn endpoints_beside_a_serial_link_need_the_host() {
+        let text = LINE_ENDPOINT.replace(
+            "  probe: ping\n",
+            "  probe: ping\n  serial: { baud_rate: 9600, data_bits: 8, parity: none, stop_bits: 1, flow_control: none }\n",
+        )
+        .replace(
+            "  - { port: 9993, protocol: tcp, role: control }\n",
+            "  - { port: 9993, protocol: tcp, role: control, when: \"link tcp\" }\n  - { port: null, protocol: serial, role: control, setting: serial_port, when: \"link serial\" }\n",
+        );
+        let spec = DeviceSpec::from_yaml(&text).unwrap();
+        let open = |host: IpAddr| {
+            let settings = crate::catalog::validate(
+                &spec.settings,
+                json!({"link": "serial", "serial_port": "COM9"})
+                    .as_object()
+                    .unwrap(),
+            )
+            .unwrap();
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host,
+                    host_name: None,
+                    port: None,
+                    model: "m".into(),
+                    channels: None,
+                    settings,
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            assert!(cx
+                .take()
+                .iter()
+                .any(|a| matches!(a, Action::SerialOpen { .. })));
+            let mut cx = Cx::new(1);
+            e.command(&mut cx, 1, "csr", &Params::new());
+            cx.take()
+        };
+        // With a host, the endpoint is reached over the network.
+        let a = open(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        assert_eq!(
+            requests(&a).remove(0).1.url,
+            "http://127.0.0.1:80/admin/api/v1/csr"
+        );
+        // Without one, there is no HTTP server to reach.
+        let a = open(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+        assert!(requests(&a).is_empty());
+        assert!(matches!(
+            completed(&a).as_slice(),
+            [(1, Err(CommandError::InvalidParams { message }))] if message.contains("needs the device's host")
+        ));
     }
 
     #[test]
