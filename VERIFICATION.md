@@ -934,6 +934,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the tieline source encoding (source in the lower 12 bits, level above) on a system with tielines. ([specs/evertz-quartz.yaml:499](specs/evertz-quartz.yaml#L499))
 - [ ] Confirm a name write (.WD, .WS, .WL) is answered with the .RA name update and then .A, in that order, that a space within a name is accepted, and record what an invalid number or a name over eight characters answers. ([specs/evertz-quartz.yaml:401](specs/evertz-quartz.yaml#L401))
 
+## extron-ipl — Extron IP Link control interfaces (IPL 250, IPL T S Series)
+
+- [ ] On an IPL T S, record the copyright banner, the date line and the password prompt on a Telnet connection (not printed in its guide; taken as the IPL 250's), and on both models what a wrong password produces. ([spec](specs/extron-ipl.yaml#L810))
+- [ ] Confirm the contact input query is the input number followed by the ] character (03]), and record its tagged reply in verbose mode 3. ([spec](specs/extron-ipl.yaml#L407))
+- [ ] Record the tagged forms of the relay, serial port, flow control, receive timeout and pass-through views in verbose mode 3 (Cpn02 Rly1, Cpn02 Ccp9600,N,8,1 assumed). ([spec](specs/extron-ipl.yaml#L798))
+- [ ] Check whether a relay or contact input change, from a program, a touchpanel or the input itself, sends any message on a verbose Telnet connection; if one does, the 10-second poll can be replaced by it. ([spec](specs/extron-ipl.yaml#L798))
+- [ ] Check whether the CR the core adds after send_serial_data's data is forwarded to the attached device, and how the device's answer arrives on the Telnet session (one line, ending CR LF assumed). ([spec](specs/extron-ipl.yaml#L155))
+- [ ] On an IPL T S, confirm its serial ports are numbered 1 to 4 in SIS commands (the guide's key names another product's ports). ([spec](specs/extron-ipl.yaml#L810))
+- [ ] On an IPL T S, record the date and time set format (the guide's key gives none; MM/DD/YY-HH:MM:SS assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L483))
+- [ ] Record the GMT offset as set and read (-05:00 or -05.00), and the daylight saving values on the IPL T S (0-2 assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L499))
+- [ ] Record the IR reply's padding (Irs01,03,001,00 assumed) and what playing a function missing from a loaded file answers (E13 or E28). ([spec](specs/extron-ipl.yaml#L350))
+- [ ] Record the receive timeout view's separator (the IPL 250 prints commas, the IPL T S an asterisk after the first field). ([spec](specs/extron-ipl.yaml#L298))
+- [ ] On an IPL 250, record what a port type other than 0 (Esc 01*1CY) answers. ([spec](specs/extron-ipl.yaml#L225))
+- [ ] Record the port map replies' padding (Pmt00023) and the bare views, and confirm a remapped Telnet port takes effect at once. ([spec](specs/extron-ipl.yaml#L676))
+- [ ] Record the Q reply's tagged form in verbose mode 3 (Ver01*1.15 assumed) and the 0Q reply's. ([spec](specs/extron-ipl.yaml#L418))
+
 ## extron-matrix — Extron SIS matrix switchers
 
 - [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([spec](specs/extron-matrix.yaml#L1925))
@@ -988,22 +1004,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On an IN1604, record the ranges the unit accepts for total pixels, active pixels and active lines (the guide gives only +/-512 or 256 of the signal's default). ([spec](specs/extron-switcher.yaml#L1766))
 
 ## facebook-account — Facebook account (a user's Pages and Page access tokens)
-
-## extron-ipl — Extron IP Link control interfaces (IPL 250, IPL T S Series)
-
-- [ ] On an IPL T S, record the copyright banner, the date line and the password prompt on a Telnet connection (not printed in its guide; taken as the IPL 250's), and on both models what a wrong password produces. ([spec](specs/extron-ipl.yaml#L810))
-- [ ] Confirm the contact input query is the input number followed by the ] character (03]), and record its tagged reply in verbose mode 3. ([spec](specs/extron-ipl.yaml#L407))
-- [ ] Record the tagged forms of the relay, serial port, flow control, receive timeout and pass-through views in verbose mode 3 (Cpn02 Rly1, Cpn02 Ccp9600,N,8,1 assumed). ([spec](specs/extron-ipl.yaml#L798))
-- [ ] Check whether a relay or contact input change, from a program, a touchpanel or the input itself, sends any message on a verbose Telnet connection; if one does, the 10-second poll can be replaced by it. ([spec](specs/extron-ipl.yaml#L798))
-- [ ] Check whether the CR the core adds after send_serial_data's data is forwarded to the attached device, and how the device's answer arrives on the Telnet session (one line, ending CR LF assumed). ([spec](specs/extron-ipl.yaml#L155))
-- [ ] On an IPL T S, confirm its serial ports are numbered 1 to 4 in SIS commands (the guide's key names another product's ports). ([spec](specs/extron-ipl.yaml#L810))
-- [ ] On an IPL T S, record the date and time set format (the guide's key gives none; MM/DD/YY-HH:MM:SS assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L483))
-- [ ] Record the GMT offset as set and read (-05:00 or -05.00), and the daylight saving values on the IPL T S (0-2 assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L499))
-- [ ] Record the IR reply's padding (Irs01,03,001,00 assumed) and what playing a function missing from a loaded file answers (E13 or E28). ([spec](specs/extron-ipl.yaml#L350))
-- [ ] Record the receive timeout view's separator (the IPL 250 prints commas, the IPL T S an asterisk after the first field). ([spec](specs/extron-ipl.yaml#L298))
-- [ ] On an IPL 250, record what a port type other than 0 (Esc 01*1CY) answers. ([spec](specs/extron-ipl.yaml#L225))
-- [ ] Record the port map replies' padding (Pmt00023) and the bare views, and confirm a remapped Telnet port takes effect at once. ([spec](specs/extron-ipl.yaml#L676))
-- [ ] Record the Q reply's tagged form in verbose mode 3 (Ver01*1.15 assumed) and the 0Q reply's. ([spec](specs/extron-ipl.yaml#L418))
 
 - [ ] Confirm an invalid or expired user token answers HTTP 400 with error code 190 on /me and /me/accounts, as for a Page token. ([specs/facebook-account.yaml:107](specs/facebook-account.yaml#L107))
 - [ ] Confirm GET /{api_version}/me?fields=id,name with a user token answers the app-scoped id and name, and record what the 10-second idle probe costs against the app's Platform rate limit. ([specs/facebook-account.yaml:110](specs/facebook-account.yaml#L110))
@@ -2304,4 +2304,4 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## Integrations with no open items
 
-Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio.
+Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-listener, http-snapshot, obs-studio.

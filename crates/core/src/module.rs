@@ -495,6 +495,14 @@ pub enum Action {
         peer: SocketAddr,
         data: Vec<u8>,
     },
+    /// Shut down the sending side of one connection accepted by `TcpServe`
+    /// once what was sent to it before is written, so the peer reads to the
+    /// end (an HTTP response marked `Connection: close`). The connection is
+    /// reported `Closed` when the peer closes it.
+    TcpClientShutdown {
+        socket: Key,
+        peer: SocketAddr,
+    },
     /// Close one connection accepted by `TcpServe`. Not reported back: the
     /// module knows.
     TcpClientClose {
@@ -740,6 +748,10 @@ impl Cx {
             peer,
             data: data.into(),
         });
+    }
+
+    pub fn tcp_client_shutdown(&mut self, socket: Key, peer: SocketAddr) {
+        self.push(Action::TcpClientShutdown { socket, peer });
     }
 
     pub fn tcp_client_close(&mut self, socket: Key, peer: SocketAddr) {

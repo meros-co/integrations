@@ -792,6 +792,11 @@ impl Session {
                         let _ = c.writer.send(crate::tcp::Outgoing::Data(data));
                     }
                 }
+                Action::TcpClientShutdown { socket, peer } => {
+                    if let Some(c) = self.servers.get(socket).and_then(|s| s.clients.get(&peer)) {
+                        let _ = c.writer.send(crate::tcp::Outgoing::Shutdown);
+                    }
+                }
                 Action::TcpClientClose { socket, peer } => {
                     if let Some(c) = self
                         .servers

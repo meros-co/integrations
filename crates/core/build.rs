@@ -96,6 +96,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "generic-http",
             "generic-osc",
             "generic-tcp-udp",
+            "http-listener",
             "http-snapshot",
             "osc-listener",
         ],
@@ -161,8 +162,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "sennheiser-digital-6000",
             "sennheiser-ew-dx",
             "sennheiser-ew-g3-g4",
-            "sennheiser-spectera",
             "sennheiser-l-6000",
+            "sennheiser-spectera",
         ],
     ),
     (

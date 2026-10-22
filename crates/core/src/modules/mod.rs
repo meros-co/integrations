@@ -59,9 +59,12 @@ mod generic_osc;
 #[cfg(any(
     feature = "generic-tcp-udp",
     feature = "generic-osc",
+    feature = "http-listener",
     feature = "osc-listener"
 ))]
 mod generic_tcp_udp;
+#[cfg(feature = "http-listener")]
+mod http_listener;
 #[cfg(feature = "http-snapshot")]
 mod http_snapshot;
 #[cfg(feature = "blackmagic-hyperdeck")]
@@ -287,6 +290,8 @@ pub(crate) fn construct(
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
+        #[cfg(feature = "http-listener")]
+        "http-listener" => Ok(Box::new(http_listener::HttpListener::new(context)?)),
         #[cfg(feature = "http-snapshot")]
         "http-snapshot" => Ok(Box::new(http_snapshot::HttpSnapshot::new(context)?)),
         #[cfg(feature = "sennheiser-ew-dx")]

@@ -1,0 +1,162 @@
+spec: 1
+id: http-listener
+name: HTTP requests received from any sender (webhooks)
+vendor: Generic (any device or service that sends HTTP requests, such as webhooks or HTTP notifications)
+category: other
+implementation: native
+reason: >
+  The core receives rather than sends: it serves HTTP on a port to whichever senders reach it, answers each
+  request with a configured response, and reports every request as it arrives, repeats included, which state
+  cannot carry. Paths, methods and bodies are the sender's choice, not declared in the spec. The companion of
+  generic-http, as osc-listener is of generic-osc.
+
+source:
+  - title: "RFC 9112: HTTP/1.1"
+    author: "R. Fielding, M. Nottingham, J. Reschke, Eds. (IETF, 2022)"
+    url: "https://www.rfc-editor.org/rfc/rfc9112"
+    note: >
+      Message format (§2): blank lines before a request line are ignored (§2.2); request line (§3) and
+      origin-form and absolute-form targets (§3.2); field lines, obsolete line folding refused (§5); message
+      body length by Transfer-Encoding chunked or Content-Length, conflicting lengths an error (§6.1-6.3);
+      chunked transfer coding with extensions and trailers (§7.1); persistent connections, the HTTP/1.1
+      default and close (§9.3); pipelined requests answered in order (§9.3.2).
+  - title: "RFC 9110: HTTP Semantics"
+    author: "R. Fielding, M. Nottingham, J. Reschke, Eds. (IETF, 2022)"
+    url: "https://www.rfc-editor.org/rfc/rfc9110"
+    note: >
+      Field names are case-insensitive tokens (§5.1); Expect: 100-continue (§10.1.1); 204 has no content
+      (§15.3.5); 401 with WWW-Authenticate (§11.6.1, §15.5.2); 404, 413, 505 (§15); HEAD answered without
+      content (§9.3.2).
+  - title: "RFC 6585: Additional HTTP Status Codes"
+    author: "M. Nottingham, R. Fielding (IETF, 2012)"
+    url: "https://www.rfc-editor.org/rfc/rfc6585"
+    note: "431 Request Header Fields Too Large (§5)."
+  - title: "RFC 7617: The 'Basic' HTTP Authentication Scheme"
+    author: "J. Reschke (IETF, 2015)"
+    url: "https://www.rfc-editor.org/rfc/rfc7617"
+    note: "Credentials are base64 of user-id ':' password (§2); the charset parameter (§2.1)."
+  - title: "RFC 6750: The OAuth 2.0 Authorization Framework: Bearer Token Usage"
+    author: "M. Jones, D. Hardt (IETF, 2012)"
+    url: "https://www.rfc-editor.org/rfc/rfc6750"
+    note: "Authorization: Bearer <token> (§2.1); the Bearer challenge (§3)."
+  - title: "URL Standard, application/x-www-form-urlencoded parsing"
+    author: "WHATWG"
+    url: "https://url.spec.whatwg.org/#urlencoded-parsing"
+    note: "Name-value pairs split at & and the first =, + as a space, then percent-decoded."
+
+settings:
+  bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "",
+    label: Bind address,
+    description: "The local IP address to listen on, such as one network interface's; empty listens where the core binds (every interface unless the core was started with a bind address)." }
+  path_prefix: { type: string, pattern: '^(/[!-~]*)?$', max_length: 1024, default: "",
+    label: Path prefix,
+    description: "Accept only requests whose path begins with this text, such as /hooks/; others are answered 404 and not reported; empty accepts every path." }
+  username: { type: string, max_length: 256, pattern: '^[^:]*$', default: "",
+    label: Username,
+    description: "With a password, requests must carry these HTTP Basic credentials (or the token); empty with an empty password asks for none." }
+  password: { type: string, secret: true, max_length: 256, default: "",
+    label: Password,
+    description: "The password senders must give with the username as HTTP Basic credentials." }
+  token: { type: string, secret: true, max_length: 1024, pattern: '^[!-~]*$', default: "",
+    label: Token,
+    description: "When set, requests may instead carry Authorization: Bearer with this token; empty accepts no bearer token." }
+  response_status: { type: int, min: 200, max: 299, default: 200,
+    label: Response status,
+    description: "The status every accepted request is answered with, such as 200 or 204 (No Content, sent without a body)." }
+  response_body: { type: string, max_length: 65536, default: "",
+    label: Response body,
+    description: "The body every accepted request is answered with, such as {\"ok\":true} for a sender that checks it; empty sends none." }
+  response_content_type: { type: string, max_length: 256, default: "text/plain; charset=utf-8",
+    label: Response content type,
+    description: "The Content-Type of the response body, such as application/json." }
+  max_body_bytes: { type: int, min: 0, max: 9007199254740991, default: 0,
+    label: Largest body,
+    description: "The largest request body accepted, in bytes; larger ones are answered 413 and not reported; 0 accepts any size." }
+
+ports:
+  - { port: null, protocol: http, role: control, listener: core, note: "Webhooks have no standard port: the port to listen on is given when the integration is opened" }
+
+models:
+  - id: generic
+    name: "Any sender of HTTP/1.0 or 1.1 requests (give the port to listen on; no host)"
+    supports: []
+    verification: none
+
+commands: {}
+
+state:
+  port: { type: int, description: "The port listened on" }
+  request_count: { type: int, description: "Requests reported since the integration was opened (accepted ones only)" }
+  connections: { type: int, description: "Senders connected now" }
+  senders.*.requests: { type: int, description: "Requests reported from a sender, keyed by its ip:port; the 256 most recently heard senders are kept" }
+  senders.*.last_path: { type: string, description: "Path of the sender's last request reported" }
+  senders.*.connected: { type: bool, description: "Whether the sender's connection is open" }
+  paths.*.method: { type: string, description: "Method of the last request to a path (keyed by the path as sent, without its query); the 256 most recently requested paths are kept" }
+  paths.*.query: { type: string, description: "Query string of the last request to the path, without the ?, as sent" }
+  paths.*.query_params: { type: object, description: "The query string as name to value, percent-decoded, the last of a repeated name kept" }
+  paths.*.content_type: { type: string, description: "Content-Type of the last request to the path; empty when it gave none" }
+  paths.*.body: { type: string, description: "Body of the last request to the path as text, when it is UTF-8; at most 64 KiB here (the message event carries it whole)" }
+  paths.*.body_hex: { type: string, description: "Body of the last request to the path in hex, when it is not UTF-8; at most 32 KiB of it here" }
+  paths.*.json: { type: object, description: "Body of the last request to the path parsed as JSON, when it is JSON (any JSON value); absent otherwise" }
+  paths.*.form: { type: object, description: "Body of the last request to the path as name to value, when it is application/x-www-form-urlencoded" }
+  paths.*.source: { type: string, description: "The ip:port of the sender of the last request to the path" }
+  paths.*.requests: { type: int, description: "Requests reported to the path" }
+  last.path: { type: string, description: "Path of the last request reported, whatever its path" }
+  last.method: { type: string, description: "Method of the last request reported" }
+  last.query: { type: string, description: "Query string of the last request reported" }
+  last.query_params: { type: object, description: "Query string of the last request reported, as name to value" }
+  last.content_type: { type: string, description: "Content-Type of the last request reported" }
+  last.body: { type: string, description: "Body of the last request reported as text, at most 64 KiB" }
+  last.body_hex: { type: string, description: "Body of the last request reported in hex, when it is not UTF-8, at most 32 KiB" }
+  last.json: { type: object, description: "Body of the last request reported, parsed as JSON" }
+  last.form: { type: object, description: "Body of the last request reported, as a form" }
+  last.source: { type: string, description: "The ip:port of the sender of the last request reported" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every accepted request is a message event, {event: message, device, address, args, source}, even when it
+      repeats the last exactly: two identical webhooks are two events. address is the request's path (without
+      its query); args holds one object with method, path, query, query_params, headers (names in lower case,
+      repeated ones joined with ", ", Authorization left out), content_type, body (as text, whole) or body_hex
+      (when it is not UTF-8), json (when the body parses as JSON, whatever its Content-Type) and form (for
+      application/x-www-form-urlencoded); source is the sender's ip:port. Message events are kept when the
+      consumer falls behind and state patches are dropped; only past 100,000 queued events are they dropped
+      too, counted in the dropped event's messages.
+  - models: [all]
+    severity: info
+    text: >
+      Opened with no host (empty or left out; 0.0.0.0 is the same), since it hears any sender. Connected means
+      listening; a port that cannot be bound (another program, or another integration of this core, holds it)
+      is reported disconnected and tried again after 1 s, doubling to 30 s. Opening for commands only (monitor
+      false) changes nothing: listening is the whole purpose. It has no commands: the response is the settings'.
+  - models: [all]
+    severity: info
+    text: >
+      Plain HTTP/1.0 and 1.1 only: no TLS (a sender that insists on https needs a TLS-terminating proxy in
+      front), no HTTP/2 (answered 505). Up to 64 senders are connected at once; more are closed as they
+      connect. Connections are kept open between requests unless the sender asks to close (HTTP/1.0 without
+      keep-alive, or Connection: close), in which case the response says so and the sending side is shut
+      down after it. Expect: 100-continue is answered at once.
+  - models: [all]
+    severity: info
+    text: >
+      Request bodies have no size limit unless max_body_bytes sets one: a body is held in memory until it is
+      whole, then reported whole in its message event, so the integrator sets a limit where senders are not
+      trusted. A request line and its headers are limited to 64 KiB (431 past that), as they describe the
+      request rather than carry content. A request that cannot be read (malformed, a transfer coding other
+      than chunked, conflicting lengths) is answered 400 and its connection closed.
+  - models: [all]
+    severity: warning
+    text: >
+      With a username and password, a token, or both set, every request must carry one of them (Authorization:
+      Basic or Bearer); one without is answered 401 with a challenge and not reported. Credentials travel in
+      clear text over plain HTTP, so use them only on a trusted network. Without credentials anyone who can
+      reach the port can make requests that appear as the device's.
+  - models: [all]
+    severity: info
+    text: >
+      The path prefix is compared as text: /hooks/ matches /hooks/tally but not /hooks2/tally. Requests to other
+      paths are answered 404. Paths are kept as sent, percent-encoding included; an absolute-form target
+      (http://host/path) gives its path.

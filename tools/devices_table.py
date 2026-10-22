@@ -44,6 +44,7 @@ NATIVE = {
     "generic-osc": "OSC over UDP or TCP",
     "generic-tcp-udp": "Text or bytes over TCP or UDP",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
+    "http-listener": "HTTP/1.1 requests from any sender (webhooks); receives",
     "http-snapshot": "HTTP JPEG snapshots",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
     "novastar-central-control": "Binary frames over TCP 5200",
