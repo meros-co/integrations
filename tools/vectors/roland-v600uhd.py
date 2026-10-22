@@ -35,3 +35,18 @@ rv6("get_version", {}, "VER;\r\n", device_reply="VER:V-600UHD,3.00;\n",
 
 telemetry(RV6, "version", inbound="VER:V-600UHD,3.00;\n",
           expect_state={"device": {"model": "V-600UHD", "version": "3.00"}})
+
+# The same on the RS-232 connector (link serial, p.58-59): stx before each
+# command and nothing after its ";"; ACK is the byte 06H, the other replies
+# keep their stx.
+SERIAL = {"link": "serial"}
+rv6("select_pgm", {"xpt": 1}, "\x02PGM:0;", device_reply="\x06", expect_result=RV6_OK,
+    settings=SERIAL, file="select_pgm-serial")
+rv6("select_pst", {"xpt": 8}, "\x02PST:7;", device_reply="\x02ERR:5;",
+    expect_result={"error": {"error": "device_error"}}, settings=SERIAL, file="select_pst-serial")
+rv6("recall_memory", {"memory": 64}, "\x02MEM:63;", device_reply="\x06", expect_result=RV6_OK,
+    settings=SERIAL, file="recall_memory-serial")
+rv6("get_version", {}, "\x02VER;", device_reply="\x02VER:V-600UHD,3.00;",
+    expect_result={"ok": {"kind": "value", "value": "3.00"}}, settings=SERIAL, file="get_version-serial")
+telemetry(RV6, "version-serial", inbound="\x02VER:V-600UHD,3.00;", settings=SERIAL,
+          expect_state={"device": {"model": "V-600UHD", "version": "3.00"}})

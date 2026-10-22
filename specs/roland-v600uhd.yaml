@@ -1,6 +1,6 @@
 spec: 1
 id: roland-v600uhd
-name: Roland V-600UHD (LAN control)
+name: Roland V-600UHD (LAN or RS-232 control)
 vendor: Roland
 category: switcher
 
@@ -15,9 +15,11 @@ source:
     url: https://static.roland.com/assets/media/pdf/V-600UHD_reference_eng07_W.pdf
     note: >
       Manufacturer document. LAN interface (Telnet, TCP 8023) and the
-      four-character network password p.57; command format p.58; list of
-      commands, LAN differences (no stx; ACK sent as "ACK" LF) and ERR codes
-      p.59; Remote Control menu, Password ("using four characters", Reset to
+      four-character network password p.57; RS-232 interface (DB-9, 9600 or
+      38400 bps, 8N1, XON/XOFF) and command format (stx, ";", ACK 06H)
+      p.58; list of commands, LAN differences (no stx; ACK sent as "ACK" LF)
+      and ERR codes p.59; Remote Control menu (RS-232 Off by default,
+      Baudrate 38400 by default), Password ("using four characters", Reset to
       unset) p.50-51; Ver.3.00 notes "Added Password for LAN command control
       and WebRCS function" p.3.
   - title: Bitfocus companion-module-roland-v600uhd (MIT), src/utils.js
@@ -41,6 +43,23 @@ transport:
   # greeting are not replies.
   reply_match: '^[\x02\x11\x13]*(ACK|ERR:[0-9]+;|VER:)'
   probe: "ACS;"
+  # The RS-232 connector takes the same commands with stx (02H) before each
+  # and nothing after its ";", and answers ACK as the byte 06H (p.58-59):
+  # 9600 or 38400 bps (38400 by default, p.50), no parity, 8 data bits, 1
+  # stop bit, XON/XOFF flow control (p.58).
+  serial:
+    baud_rate: { default: 38400, values: [9600, 38400] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: { default: xon-xoff, values: [xon-xoff, none] }
+    overrides:
+      framing: delimited
+      open: "\u0002"
+      close: ""
+      reply_framing: terminated
+      reply_terminators: [";", "\u0006"]
+      reply_match: '^[\x02\x11\x13]*(\x06|ERR:[0-9]+;|VER:)'
 
 settings:
   password:
@@ -56,11 +75,13 @@ settings:
 # the critical quirk: it is sent on connecting, not in answer to the prompt.
 on_connect:
   - when_set: password
+    link: tcp
     after_prompt: "Enter password:"
     send: "{settings.password}"
 
 ports:
-  - { port: 8023, protocol: tcp, role: control }
+  - { port: 8023, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The RS-232 connector, DB-9 male: a crossover (null-modem) cable" }
 
 models:
   - id: v-600uhd
@@ -99,7 +120,7 @@ commands:
              label: Cross-point,
              description: "The cross-point to put on PGM, numbered from 1 as XPT 1 to XPT 8 on the switcher." }
     send: "PGM:{xpt:-1};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   select_pst:
@@ -109,7 +130,7 @@ commands:
              label: Cross-point,
              description: "The cross-point to select on PST, numbered from 1 as XPT 1 to XPT 8 on the switcher." }
     send: "PST:{xpt:-1};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   select_aux:
@@ -119,7 +140,7 @@ commands:
              label: Cross-point,
              description: "The cross-point sent to the AUX bus, numbered from 1 as XPT 1 to XPT 8 on the switcher." }
     send: "AUX:{xpt:-1};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_transition_pattern:
@@ -129,7 +150,7 @@ commands:
                  label: Transition pattern,
                  description: "Numbered from 0, unlike the button names: 0 is WIPE 1, 1 WIPE 2, 2 WIPE 3 and 3 MIX." }
     send: "TRS:{pattern};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_transition_time:
@@ -139,19 +160,19 @@ commands:
               label: Transition time,
               description: "The video transition time in tenths of a second, from 0 to 40 (0.0 to 4.0 s)." }
     send: "TIM:{time};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   auto:
     summary: "Press the [AUTO] button (ATO)"
     send: "ATO;"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   cut:
     summary: "Press the [CUT] button (CUT)"
     send: "CUT;"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_composition_type:
@@ -161,7 +182,7 @@ commands:
               label: Composition type,
               description: "Numbered from 0: 0 None, 1 PinP1-1, 2 PinP1-2, 3 Key1, 4 PinP1-1+Key1 and 5 PinP1-2+Key1." }
     send: "CTY:{type};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_dsk_type:
@@ -171,19 +192,19 @@ commands:
               label: DSK type,
               description: "Numbered from 0: 0 None, 1 PinP2-1, 2 PinP2-2, 3 DSK, 4 PinP2-1+Key2 and 5 PinP2-2+Key2." }
     send: "DTY:{type};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   toggle_composition:
     summary: "Press the [COMPOSITION] button (CMP)"
     send: "CMP;"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   toggle_dsk:
     summary: "Press the [DSK] button (DSK)"
     send: "DSK;"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_output_fade:
@@ -193,7 +214,7 @@ commands:
                  label: Output fade,
                  description: "On fades the output out and off fades it back in, over the output fade time." }
     send: "FDE:{enabled:bool01};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_output_fade_time:
@@ -203,7 +224,7 @@ commands:
               label: Output fade time,
               description: "The output fade time in tenths of a second, from 0 to 100 (0.0 to 10.0 s)." }
     send: "FDT:{time};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   # ── Audio (p.59)
@@ -217,7 +238,7 @@ commands:
                label: Level,
                description: "Level in tenths of a dB, from -800 (-80.0 dB) to 100 (+10.0 dB), or -801 for -INF." }
     send: "IAL:{input},{level};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_master_level:
@@ -227,7 +248,7 @@ commands:
                label: Level,
                description: "The master out level in tenths of a dB, from -800 (-80.0 dB) to 100 (+10.0 dB), or -801 for -INF." }
     send: "OAL:{level};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   set_aux_level:
@@ -237,7 +258,7 @@ commands:
                label: Level,
                description: "The AUX bus level in tenths of a dB, from -800 (-80.0 dB) to 100 (+10.0 dB), or -801 for -INF." }
     send: "OAX:{level};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   # ── System (p.59)
@@ -248,7 +269,7 @@ commands:
                  label: HDCP,
                  description: "On turns the switcher's HDCP setting on and off turns it off." }
     send: "HCP:{enabled:bool01};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   recall_memory:
@@ -258,13 +279,13 @@ commands:
                 label: Scene memory,
                 description: "The scene memory numbered from 1, where bank b number n is (b-1)*8+n, so 1 is 1-1 and 64 is 8-8." }
     send: "MEM:{memory:-1};"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   active_sense:
     summary: "Check the switcher is responding (ACS)"
     send: "ACS;"
-    expect: { contains: "ACK" }
+    expect: { matches: 'ACK|\x06' }
     returns: ack
 
   get_version:
@@ -304,8 +325,19 @@ quirks:
     text: >
       Send one command at a time and wait for ACK before the next (p.59); the
       queue does this. Over LAN, ACK has no semicolon and no stx ("A C K LF"),
-      while ERR:n; and VER:V-600UHD,a; keep their semicolons. Error codes:
-      ERR:0 syntax error, ERR:5 out of range.
+      while ERR:n; and VER:V-600UHD,a; keep their semicolons. On RS-232 (link
+      serial) commands start with stx and ACK is the single byte 06H, so
+      every command accepts either form. Error codes: ERR:0 syntax error,
+      ERR:5 out of range.
+
+  - models: [all]
+    severity: warning
+    text: >
+      RS-232 control is off by default: set the menu Remote Control, RS-232
+      to On, and Baudrate to the rate chosen here (38400 by default), before
+      using link serial (p.50). The network password is a LAN setting and is
+      not sent on RS-232. The manual documents no line ending after a reply
+      on RS-232; replies there end at ";" or the ACK byte.
 
   - models: [all]
     severity: info

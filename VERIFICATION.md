@@ -1881,8 +1881,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-v600uhd — Roland V-600UHD
 
-- [ ] Confirm the password prompt "Enter password:" and greeting "Welcome to Roland V-600UHD.", and record what a wrong password produces. ([specs/roland-v600uhd.yaml:260](specs/roland-v600uhd.yaml#L260))
-- [ ] Find which input audio numbers lie between HDMI IN1 (0) and TEST TONE (7). ([specs/roland-v600uhd.yaml:280](specs/roland-v600uhd.yaml#L280))
+- [ ] Confirm the password prompt "Enter password:" and greeting "Welcome to Roland V-600UHD.", and record what a wrong password produces. ([specs/roland-v600uhd.yaml:281](specs/roland-v600uhd.yaml#L281))
+- [ ] Find which input audio numbers lie between HDMI IN1 (0) and TEST TONE (7). ([specs/roland-v600uhd.yaml:301](specs/roland-v600uhd.yaml#L301))
+- [ ] Drive the V-600UHD on RS-232 (link serial): confirm commands with stx and no line ending are accepted, ACK arrives as the bare byte 06H, and whether any line ending follows a reply. ([specs/roland-v600uhd.yaml:50](specs/roland-v600uhd.yaml#L50))
 
 ## roland-v60hd — Roland V-60HD
 
