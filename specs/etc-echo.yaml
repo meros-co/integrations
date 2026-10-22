@@ -1,0 +1,473 @@
+spec: 1
+id: etc-echo
+name: ETC Echo architectural control (UDP strings)
+vendor: ETC
+category: lighting
+
+source:
+  - title: ETC Installation Guide, Echo Integration Interface
+    author: Electronic Theatre Controls
+    url: https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737501307
+    note: >
+      7186M2111 Rev A, released 2019-12 (retrieved 2026-10-22), 8 pages. Overview (control and
+      status strings: preset activate, space off, sequence activate and deactivate, zone
+      intensity); default IP 10.101.19.201, Automatic (DHCP) or Manual IP; Interface Config:
+      UDP Port default 04703 (reboot after a change), up to two Subscribers (IP, port, End of
+      Message CR default, LF, CR+LF, LF+CR or null, Enabled/Disabled default Disabled) that
+      receive a full system sync at startup and updates as system state changes, Options
+      Subscribers Only (default) or All Incoming; page 8, Supported UDP String Commands:
+      commands start with E$ and responses with E>, levels 0-255, times 0-25.4 decimal seconds
+      (values outside it use the output products' default timings), parameters separated by
+      white space; set commands pst act, off, seq act, seq dact, zone int; get commands pst
+      get, off get, seq get, sync get (space 0 = all spaces), zone int get; help returns the
+      command list to the requesting address and port.
+  - title: EchoTouch Controller User Manual, Version 3.4.0
+    author: Electronic Theatre Controls
+    url: https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737521203
+    note: >
+      7186M1283-3.4.0 Rev B, released 2026-07 (retrieved 2026-10-22); the same section is in
+      the v3.3.0 manual (7186M1283-3.3.0 Rev A, 2023-08). Settings > Network > String Setup:
+      Enable UDP String Communication, UDP Receive Port default 4703, Message Receive Mode
+      Subscribers Only or All Incoming, up to two Subscribers (IP, Port, End of Msg CR default,
+      LF, CRLF, LFCR or null, Format Channel or Zone, Enabled, default disabled) receiving a full
+      sync at startup and updates as state changes. Supported UDP String Commands: chan int
+      (channels 1-80), zone int, ras and low (space raise and lower by 0-255), off, lok and
+      ulok (space lock and unlock), pst act, seq act and seq dact; get commands chan int get,
+      zone int get, lok get, off get, pst get, seq get, sync get (0 = all enabled spaces); help.
+  - title: ETC Release Notes, EchoTouch Controller v3.4.0 and v3.3.3
+    author: Electronic Theatre Controls
+    url: https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737521198
+    note: >
+      7186M1183-3.4.0 Rev A, 2026-04 (and 7186M1183-3.3.3 Rev A, 2025-10, id=10737519807).
+      UDP string input added in v3.3.0 (2023-08-17). Remaining UDP issues: off reported when
+      the off fade completes (CSCON-49519), UDP channel changes do not alter presets
+      (CSCON-49508), zone and channel levels sent out of order and duplicated (CSCON-49505),
+      space off and sequence indication unreliable with no station on the bus (CSCON-49503,
+      CSCON-49502), an altered state message sent for spaces other than 1 (CSCON-49497), all
+      subscribers sent a sync when String Setup changes (CSCON-49453), channel information
+      sent for all channels (CSCON-49439).
+  - title: ETC Release Note, Echo Expansion Bridge, BACnet and Integration Interfaces v3.3.6
+    author: Electronic Theatre Controls
+    url: https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737508757
+    note: >
+      7186M1141-3.3.6 Rev A, 2021-10 (v3.3.4 note id=10737507217, v3.3.1 note
+      id=10737501321). Integration Interface first released in v3.3.1. Known issues: get
+      responses carry no termination characters for non-subscribers (EEB-47106), subscribers
+      are not told when space off becomes false (EEB-47104), long-running relay panel or DMX
+      scene controller sequences occasionally reported stopping and restarting (EEB-47089),
+      space off reported true for spaces with no online output products (EEB-47088).
+  - title: How to Setup UDP Strings on an EchoTouch; SnapBack integrating with EchoTouch; QSC Q-SYS Unison Echo Plugin Help
+    author: Electronic Theatre Controls (support knowledge base)
+    url: https://support.etcconnect.com/ETC/Architectural/Echo/EchoTouch/How_to_Setup_UDP_Strings_on_an_EchoTouch
+    note: >
+      Retrieved 2026-10-22. Repeat the manual's setup and command list; the SnapBack article
+      says EchoTouch sends its status messages starting with E> to subscribers; the Q-SYS
+      plugin help (support.etcconnect.com, Echo Architectural Control Processor section)
+      says E$help verifies two-way communication, that the plugin polls status on boot, and
+      that EII status updates can take 1-5 seconds.
+  - title: Bitfocus Companion module companion-module-etc-echo (community, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-etc-echo
+    note: >
+      v1.0.1, read for corroboration only (MIT at the top level). ETC documents the commands but
+      not the text of the E> responses; this spec's reply and state formats for presets (E>pst
+      act: space, preset), space off (E>space off: space, 0|1), sequences (E>seq act: space,
+      sequence) and zone levels (E>zone int: space, zone, level, several to a datagram) follow
+      how this module parses them, and the E>lok: prefix is the only sign of the lock reply.
+
+# UDP strings to the Echo Integration Interface's UDP Port or the EchoTouch's UDP Receive Port
+# (both 4703 by default), each ended by CR (the default End of Message). Gets are answered to
+# the sending address and port; subscribers (up to two, configured on the device) also get a
+# full sync at startup and every change. Set feedback_port to the port given for this host's
+# subscriber entry: commands are then sent from it too, and every datagram arriving on it goes
+# to the device it came from. Set commands have no documented reply.
+transport:
+  type: line-udp
+  port: 4703
+  terminator: cr
+  reply: to-source
+  timeout_ms: 1000
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535,
+                   label: Subscriber port,
+                   description: "Local UDP port given for this host in the device's subscriber list, where it sends its sync and updates; not set, only replies to gets are received." }
+
+ports:
+  - { port: 4703, protocol: udp, role: control }
+  - { port: null, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "the port given for this host's subscriber entry on the device" }
+
+models:
+  - id: eii
+    name: Echo Integration Interface (EII)
+    supports: [
+      preset_activate, preset_activate_default_time, space_off, space_off_default_time,
+      sequence_activate, sequence_deactivate, zone_set, zone_set_default_time, preset_get,
+      space_off_get, sequence_get, zone_get, sync_get, help
+    ]
+    verification: none
+  - id: echotouch
+    name: EchoTouch Controller (software 3.3.0 and later)
+    supports: [
+      channel_set, channel_set_default_time, zone_set, zone_set_default_time, space_raise,
+      space_lower, space_off, space_off_default_time, space_lock, space_unlock, preset_activate,
+      preset_activate_default_time, sequence_activate, sequence_deactivate, channel_get,
+      zone_get, space_lock_get, space_off_get, preset_get, sequence_get, sync_get, help
+    ]
+    verification: none
+
+commands:
+  preset_activate:
+    summary: "Activate a preset in a space over a fade time (E$pst act)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      preset: { type: int, min: 1, max: 64, required: true,
+                label: Preset,
+                description: "Preset number within the space, 1 to 64." }
+      time: { type: float, min: 0, max: 25.4, required: true,
+              label: Fade time,
+              description: "Fade time in seconds, to a tenth of a second; 0 changes at once." }
+    send: "E$pst act: {space}, {preset}, {time:.1f}"
+    returns: none
+
+  preset_activate_default_time:
+    summary: "Activate a preset in a space at the output products' default timing (E$pst act with a time outside 0-25.4)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      preset: { type: int, min: 1, max: 64, required: true,
+                label: Preset,
+                description: "Preset number within the space, 1 to 64." }
+    send: "E$pst act: {space}, {preset}, 99.0"
+    returns: none
+
+  space_off:
+    summary: "Turn a space off over a fade time (E$off)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      time: { type: float, min: 0, max: 25.4, required: true,
+              label: Fade time,
+              description: "Fade time in seconds, to a tenth of a second; 0 changes at once." }
+    send: "E$off: {space}, {time:.1f}"
+    returns: none
+
+  space_off_default_time:
+    summary: "Turn a space off at the output products' default timing (E$off with a time outside 0-25.4)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$off: {space}, 99.0"
+    returns: none
+
+  sequence_activate:
+    summary: "Start a sequence in a space (E$seq act)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      sequence: { type: int, min: 1, max: 4, required: true,
+                  label: Sequence,
+                  description: "Sequence number within the space, 1 to 4." }
+    send: "E$seq act: {space}, {sequence}"
+    returns: none
+
+  sequence_deactivate:
+    summary: "Stop a sequence in a space (E$seq dact)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      sequence: { type: int, min: 1, max: 4, required: true,
+                  label: Sequence,
+                  description: "Sequence number within the space, 1 to 4." }
+    send: "E$seq dact: {space}, {sequence}"
+    returns: none
+
+  zone_set:
+    summary: "Set a zone's intensity 0-255 in a space over a fade time (E$zone int)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      zone: { type: int, min: 1, max: 16, required: true,
+              label: Zone,
+              description: "Zone number within the space, 1 to 16." }
+      level: { type: int, min: 0, max: 255, required: true,
+               label: Level,
+               description: "Intensity, 0 (off) to 255 (full)." }
+      time: { type: float, min: 0, max: 25.4, required: true,
+              label: Fade time,
+              description: "Fade time in seconds, to a tenth of a second; 0 changes at once." }
+    send: "E$zone int: {space}, {zone}, {level}, {time:.1f}"
+    returns: none
+
+  zone_set_default_time:
+    summary: "Set a zone's intensity 0-255 at the output products' default timing (E$zone int with a time outside 0-25.4)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      zone: { type: int, min: 1, max: 16, required: true,
+              label: Zone,
+              description: "Zone number within the space, 1 to 16." }
+      level: { type: int, min: 0, max: 255, required: true,
+               label: Level,
+               description: "Intensity, 0 (off) to 255 (full)." }
+    send: "E$zone int: {space}, {zone}, {level}, 99.0"
+    returns: none
+
+  channel_set:
+    summary: "Set an EchoTouch channel's intensity 0-255 over a fade time (E$chan int)"
+    params:
+      channel: { type: int, min: 1, max: 80, required: true,
+                 label: Channel,
+                 description: "EchoTouch channel number, 1 to 80, as in its patch." }
+      level: { type: int, min: 0, max: 255, required: true,
+               label: Level,
+               description: "Intensity, 0 (off) to 255 (full)." }
+      time: { type: float, min: 0, max: 25.4, required: true,
+              label: Fade time,
+              description: "Fade time in seconds, to a tenth of a second; 0 changes at once." }
+    send: "E$chan int: {channel}, {level}, {time:.1f}"
+    returns: none
+
+  channel_set_default_time:
+    summary: "Set an EchoTouch channel's intensity 0-255 at the default timing (E$chan int with a time outside 0-25.4)"
+    params:
+      channel: { type: int, min: 1, max: 80, required: true,
+                 label: Channel,
+                 description: "EchoTouch channel number, 1 to 80, as in its patch." }
+      level: { type: int, min: 0, max: 255, required: true,
+               label: Level,
+               description: "Intensity, 0 (off) to 255 (full)." }
+    send: "E$chan int: {channel}, {level}, 99.0"
+    returns: none
+
+  space_raise:
+    summary: "Raise every level in a space by 0-255 (E$ras)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      amount: { type: int, min: 0, max: 255, required: true,
+                label: Amount,
+                description: "Amount to raise the levels by, on the 0 to 255 scale." }
+    send: "E$ras: {space}, {amount}"
+    returns: none
+
+  space_lower:
+    summary: "Lower every level in a space by 0-255 (E$low)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+      amount: { type: int, min: 0, max: 255, required: true,
+                label: Amount,
+                description: "Amount to lower the levels by, on the 0 to 255 scale." }
+    send: "E$low: {space}, {amount}"
+    returns: none
+
+  space_lock:
+    summary: "Lock out a space's controls (E$lok)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$lok: {space}"
+    returns: none
+
+  space_unlock:
+    summary: "Unlock a space's controls (E$ulok)"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$ulok: {space}"
+    returns: none
+
+  preset_get:
+    summary: "Ask which preset is active in a space (E$pst get); 0 is none, and the reply also updates the state"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$pst get: {space}"
+    expect: { reply_contains: "E>pst act: {space}, ", matches: 'E>pst act: \d+, (\d+)' }
+    returns: value
+
+  space_off_get:
+    summary: "Ask whether a space is off (E$off get); 1 is off, and the reply also updates the state"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$off get: {space}"
+    expect: { reply_contains: "E>space off: {space}, ", matches: 'E>space off: \d+, ([01])' }
+    returns: value
+
+  sequence_get:
+    summary: "Ask which sequence is running in a space (E$seq get); 0 is none, and the reply also updates the state"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$seq get: {space}"
+    expect: { reply_contains: "E>seq act: {space}, ", matches: 'E>seq act: \d+, (\d+)' }
+    returns: value
+
+  zone_get:
+    summary: "Ask the zone levels of a space (E$zone int get); the reply's text is returned and updates the state"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$zone int get: {space}"
+    expect: { reply_contains: "E>zone int: {space}, " }
+    returns: text
+
+  space_lock_get:
+    summary: "Ask whether a space is locked out (E$lok get); the reply's text is returned"
+    params:
+      space: { type: int, min: 1, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16." }
+    send: "E$lok get: {space}"
+    expect: { reply_contains: "E>lok:" }
+    returns: text
+
+  channel_get:
+    summary: "Ask the EchoTouch's channel levels (E$chan int get); the first reply's text is returned"
+    send: "E$chan int get: "
+    returns: text
+
+  sync_get:
+    summary: "Ask a space's full status, or every enabled space's with 0 (E$sync get); every message updates the state, the first is returned"
+    params:
+      space: { type: int, min: 0, max: 16, required: true,
+               label: Space,
+               description: "Echo space number, 1 to 16, or 0 for every enabled space." }
+    send: "E$sync get: {space}"
+    returns: text
+
+  help:
+    summary: "List the string commands the device supports (E$help); the first reply's text is returned"
+    send: "E$help"
+    returns: text
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Strings are off until set up on the device. On the Echo Integration Interface, Setup >
+      Interface Config sets the UDP Port (04703 by default, reboot after a change); on an
+      EchoTouch (software 3.3.0 or later), Settings > Network > String Setup must have Enable
+      UDP String Communication checked (UDP Receive Port 4703 by default). The host's port
+      overrides the transport's 4703. Both ignore every sender but their subscribers by
+      default (Subscribers Only): add this host as one of the two subscribers, with
+      feedback_port as its port, End of Message CR, and Enabled, or switch the device to All
+      Incoming.
+
+  - models: [all]
+    severity: warning
+    text: >
+      ETC documents no reply to set commands, so they report unverified. State comes from
+      what the device sends its subscribers (a full sync at startup and each change) and
+      from an E$sync get: 0 poll every 10 seconds, which also catches what subscribers are
+      not told: the Integration Interface does not report a space off becoming false
+      (EEB-47104). Status can take 1-5 seconds to arrive from an Integration Interface; an
+      EchoTouch may send zone and channel levels out of order or twice (CSCON-49505) and
+      reports space off when the off fade ends, not when it starts (CSCON-49519).
+
+  - models: [all]
+    severity: warning
+    text: >
+      ETC's documents say only that responses start with E>. The forms read here (E>pst act:
+      space, preset; E>space off: space, 0 or 1; E>seq act: space, sequence; E>zone int:
+      space, zone, level, several to a datagram) follow a community integration, and the
+      lock (E>lok: space, 0 or 1) and channel (E>chan int: channel, level) forms are assumed
+      by analogy. A message in another form changes no state. EchoTouch also sends a preset
+      altered state message (CSCON-49497) whose form is not published.
+
+  - models: [all]
+    severity: critical
+    text: >
+      preset_activate replaces the levels of a whole space, and space_off turns every level in
+      a space off; neither can be undone from here, since the string protocol cannot deactivate
+      a preset or read back the levels that were there before. Both act at once on a live
+      room.
+
+  - models: [all]
+    severity: warning
+    text: >
+      sequence_activate starts a sequence that keeps changing the space's levels until
+      sequence_deactivate or another action stops it, and an activated sequence can stop
+      space_off from working on an EchoTouch with no station on the bus (CSCON-49503).
+      space_lock locks out the space's control stations until space_unlock.
+
+  - models: [all]
+    severity: info
+    text: >
+      Spaces are 1-16, zones 1-16 per space, presets 1-64 and sequences 1-4 per space, and
+      EchoTouch channels 1-80, as numbered in the Echo configuration; the protocol has no names.
+      Times are 0-25.4 seconds in tenths. ETC documents that any time outside that range uses
+      the output products' own default timing: the *_default_time commands send 99.0 for it.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the strings cannot deactivate, toggle or record a preset, raise or lower a
+      single zone, turn a space on, pause a sequence, or read names or configuration; space
+      raise, lower and lock and channel control exist only on EchoTouch. In state, a preset
+      or sequence of 0 means none is active. Only the UDP string interface is covered: Echo
+      Room Controllers, Relay Panels, stations and the EchoAccess Interface have no network
+      string interface of their own and are reached through an Integration Interface or an
+      EchoTouch on the same bus; the Echo BACnet Interface (BACnet/IP) and the EchoAccess app
+      (Bluetooth) are not covered.
+
+  - models: [echotouch]
+    severity: info
+    text: >
+      Each EchoTouch subscriber's Format chooses zone or channel status strings in its sync
+      and updates, not both: choose Zone for zone levels or Channel for channel levels. Changing
+      any String Setup setting sends every subscriber a sync (CSCON-49453).
+
+state:
+  "spaces.*.preset": { type: int, description: "Active preset number 1-64 in the space, 0 when none, from E>pst act messages" }
+  "spaces.*.off": { type: bool, description: "Space off, from E>space off messages (1 is off)" }
+  "spaces.*.sequence": { type: int, description: "Running sequence number 1-4 in the space, 0 when none, from E>seq act messages" }
+  "spaces.*.zones.*.level": { type: int, description: "Zone intensity 0-255, by space and zone number, from E>zone int messages" }
+  "spaces.*.locked": { type: bool, description: "Space locked out (EchoTouch), from E>lok messages (1 is locked); the form is assumed" }
+  "channels.*.level": { type: int, description: "EchoTouch channel intensity 0-255, by channel number, from E>chan int messages; the form is assumed" }
+
+# Each datagram may hold several E> messages (a sync, or a space's zone levels), with or
+# without line endings between them, so every rule reads each message of its kind along it.
+telemetry:
+  poll:
+    send: ["E$sync get: 0"]
+    every_ms: 10000
+  updates:
+    - match: '^E>'
+      match_each: '(?:^|E>)pst act:\s*(\d+),\s*(\d+)'
+      state: { "spaces.{1}.preset": "{2}" }
+    - match: '^E>'
+      match_each: '(?:^|E>)space off:\s*(\d+),\s*([01])'
+      state: { "spaces.{1}.off": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^E>'
+      match_each: '(?:^|E>)seq act:\s*(\d+),\s*(\d+)'
+      state: { "spaces.{1}.sequence": "{2}" }
+    - match: '^E>'
+      match_each: '(?:^|E>)zone int:\s*(\d+),\s*(\d+),\s*(\d+)'
+      state: { "spaces.{1}.zones.{2}.level": "{3}" }
+    - match: '^E>'
+      match_each: '(?:^|E>)lok:\s*(\d+),\s*([01])'
+      state: { "spaces.{1}.locked": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^E>'
+      match_each: '(?:^|E>)chan int:\s*(\d+),\s*(\d+)'
+      state: { "channels.{1}.level": "{2}" }

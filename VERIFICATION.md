@@ -885,6 +885,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm StreamCollection and StreamEntry tags and the templateReference tag match the provider. ([specs/emberplus.yaml:224](specs/emberplus.yaml#L224))
 - [ ] Opened for commands only, check that an Unsubscribe on a looked-up node (or as a bare command at the root) ends the value subscription its GetDirectory created. ([crates/core/src/modules/emberplus.rs:35](crates/core/src/modules/emberplus.rs#L35))
 
+## etc-echo — ETC Echo
+
+- [ ] Check whether set commands (pst act, off, seq act, zone int, chan int, ras, low, lok, ulok) get any reply over UDP (they report unverified here). ([spec](specs/etc-echo.yaml#L380))
+- [ ] Record the reply to E$pst get on an Integration Interface and an EchoTouch: E>pst act: space, preset assumed, with 0 for no active preset. ([spec](specs/etc-echo.yaml#L302))
+- [ ] Record the reply to E$off get: E>space off: space, 0 or 1 assumed. ([spec](specs/etc-echo.yaml#L312))
+- [ ] Record the reply to E$seq get: E>seq act: space, sequence assumed, with 0 for no running sequence, and what it says with two sequences running. ([spec](specs/etc-echo.yaml#L322))
+- [ ] Record the reply to E$zone int get: E>zone int: space, zone, level assumed, all of a space's zones in one datagram, with or without an EOM between them. ([spec](specs/etc-echo.yaml#L466))
+- [ ] On an EchoTouch, record the reply to E$lok get and the lock status a subscriber receives (E>lok: space, 0 or 1 assumed). ([spec](specs/etc-echo.yaml#L469))
+- [ ] On an EchoTouch with a Channel-format subscriber, record the reply to E$chan int get and the channel updates (E>chan int: channel, level assumed), and whether the reply is one datagram or many. ([spec](specs/etc-echo.yaml#L472))
+- [ ] Record the preset altered state message an EchoTouch sends subscribers (CSCON-49497), which no state rule reads yet. ([spec](specs/etc-echo.yaml#L391))
+- [ ] Record what E$sync get: 0 returns (which messages, how many datagrams), and whether gets from a non-subscriber are answered with the device in All Incoming mode. ([spec](specs/etc-echo.yaml#L350))
+- [ ] Confirm that this host must be a subscriber, with feedback_port as its port, for its commands to be accepted in Subscribers Only mode, and that subscriber updates arrive on that port. ([spec](specs/etc-echo.yaml#L373))
+- [ ] Confirm that a time of 99.0 makes the output products use their default timing, as ETC documents for any time outside 0-25.4. ([spec](specs/etc-echo.yaml#L145))
+- [ ] Confirm that times with one decimal (3.5, 0.0) are accepted. ([spec](specs/etc-echo.yaml#L133))
+- [ ] Confirm that E$chan int get: with nothing after the colon (as documented) is answered. ([spec](specs/etc-echo.yaml#L345))
+- [ ] Check whether a 10-second E$sync get: 0 poll is light enough on a full 16-space system, and that it catches a space off becoming false, which subscribers are not told (EEB-47104). ([spec](specs/etc-echo.yaml#L454))
+
 ## etc-eos — ETC Eos
 
 - [ ] Check whether /eos/param levels take 0-100 or the parameter's own units (pan 270). ([specs/etc-eos.yaml:4712](specs/etc-eos.yaml#L4712))
