@@ -18,6 +18,9 @@ def val(v):
 text(K, "select_input", {"input": 3}, "3*1!\r", device_reply="In03*1 All\r\n", expect_result=ACK, **N8)
 text(K, "select_input", {"input": 8}, "8*1!\r", device_reply="E01\r\n", expect_result=ERR, **N8,
      file="select_input-error")
+# The same on the rear Remote RS-232 port (link serial).
+text(K, "select_input", {"input": 3}, "3*1!\r", device_reply="In03*1 All\r\n", expect_result=ACK, **N8,
+     settings={"link": "serial"}, file="select_input-serial")
 text(K, "select_video_input", {"input": 2}, "2*1%\r", device_reply="In02*1 Vid\r\n", expect_result=ACK, **N8)
 text(K, "select_audio_input", {"input": 9}, "9*1$\r", device_reply="In09*1 Aud\r\n", expect_result=ACK, **N8)
 text(K, "get_input", {}, "1!\r", device_reply="In04*1 All\r\n", expect_result=val("4"), **N8)
@@ -489,7 +492,11 @@ def _t4(command, *args, **extra):
 
 D4 = {"model": "in1604-dtp"}
 H4 = {"model": "in1604-hd"}
+# The IN1604 is reached on its RS-232 port unless told otherwise (link serial
+# by default); one vector goes through a serial-to-Ethernet interface instead.
 _t4("select_input_in1600", {"input": 3}, "3!\r", device_reply="In3 All\r\n", expect_result=ACK, **H4)
+text(K, "select_input_in1600", {"input": 2}, "2!\r", device_reply="In2 All\r\n", expect_result=ACK, **D4,
+     settings={"link": "tcp"}, file="select_input_in1600.in1604-tcp")
 _t4("set_input_video_format_in1604", {"input": 1, "format": 3}, "1*3\\\r", device_reply="Typ1*3\r\n",
      expect_result=ACK, **D4)
 _t4("get_input_video_format_in1604", {"input": 2}, "2\\\r", device_reply="5\r\n", expect_result=val("5"), **H4)

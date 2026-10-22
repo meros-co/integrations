@@ -57,6 +57,17 @@ to build with.
 `cargo test -p meros-integrations-c` plays the shared script, which needs a
 build with every integration (the default).
 
+## Serial ports
+
+A device can be reached on a serial port of this machine (RS-232, RS-422, a
+USB serial adapter): a serial-only device, or one whose spec offers both
+links, chosen with the `link` setting (`"tcp"` or `"serial"`). The
+`serial_port` setting names the port. `mi_serial_ports(core)` lists this
+machine's ports to choose from, as `{"ok":[{"name":"COM3"},...]}` (names
+only; empty on Android and iOS):
+`mi_open(core, "{\"device\":\"extron-matrix\",\"model\":\"mmx-42-62\",\"settings\":{\"link\":\"serial\",\"serial_port\":\"COM3\"}}")`
+needs no host.
+
 ## Files sent to devices
 
 A command's `binary` parameter (a show file, a media file, an image) takes

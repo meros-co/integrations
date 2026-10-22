@@ -53,6 +53,20 @@ only those devices, opening any other raises `IntegrationsError`
 a device whose integration was not built in raises `not_built`, naming the
 feature to build with.
 
+## Serial ports
+
+A device can be reached on a serial port of this machine (RS-232, RS-422, a
+USB serial adapter): a serial-only device, or one whose spec offers both
+links, chosen with the `link` setting (`"tcp"` or `"serial"`). The
+`serial_port` setting names the port, and `core.serial_ports()` lists this
+machine's ports to choose from (names only; empty on Android and iOS):
+
+```python
+port = core.serial_ports()[0]  # {"name": "COM3"}
+device = core.open({"device": "extron-matrix", "model": "mmx-42-62",
+                    "settings": {"link": "serial", "serial_port": port["name"]}})  # no host needed
+```
+
 ## Files sent to devices
 
 A command's `binary` parameter (a show file, a media file, an image) takes

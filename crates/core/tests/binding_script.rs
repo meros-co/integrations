@@ -93,6 +93,14 @@ async fn the_shared_binding_script() {
                 &step["expect"],
                 "{label}"
             ),
+            "serial_ports" => {
+                // Whatever ports this machine has: names only.
+                let result = api::serial_ports(&core);
+                for port in result["ok"].as_array().expect(&label) {
+                    let port = port.as_object().expect(&label);
+                    assert!(port.len() == 1 && port["name"].is_string(), "{label}");
+                }
+            }
             "open" => {
                 let result = api::open(&core, &step["request"]);
                 if let Some(expect) = step.get("expect") {

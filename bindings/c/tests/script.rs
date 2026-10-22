@@ -109,6 +109,14 @@ fn the_shared_binding_script() {
                         "{label}"
                     );
                 }
+                "serial_ports" => {
+                    // Whatever ports this machine has: names only.
+                    let result = take(mi_serial_ports(core));
+                    for port in result["ok"].as_array().expect(&label) {
+                        let port = port.as_object().expect(&label);
+                        assert!(port.len() == 1 && port["name"].is_string(), "{label}");
+                    }
+                }
                 "open" => {
                     let request = cs(&step["request"].to_string());
                     let result = take(mi_open(core, request.as_ptr()));

@@ -25,7 +25,8 @@ spec: shure-wireless
 model: slxd                  # optional; the first model supporting the command otherwise
 command: get_channel_name
 input: { channel: 1 }        # command parameters; defaults apply as usual
-settings: {}                 # optional device settings
+settings: {}                 # optional device settings; { link: serial } plays a spec
+                             # with transport.serial on its serial port (SPEC.md §2)
 
 # What goes on the wire — exactly one of:
 expect_wire: "< GET 1 CHAN_NAME >"            # text, framing included

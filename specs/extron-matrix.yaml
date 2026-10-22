@@ -11,8 +11,12 @@ category: router
 # user guide documents its own subset and variants. Each model below supports
 # only what its own guide documents. Commands are written from the guides'
 # command and response tables; page numbers are the guides' printed numbers.
-# The MMX 42/62 compact matrices have an RS-232 port only: they are reached
-# through a serial-to-Ethernet interface's raw TCP port (see the quirks).
+# Every family speaks the same SIS on its rear RS-232 (or RS-422) Remote
+# port, so a device is reached over Telnet or on a serial port of the host,
+# chosen by the link setting (transport.serial). The MMX 42/62 compact
+# matrices have an RS-232 port only: link serial is their default, and link
+# tcp reaches them through a serial-to-Ethernet interface's raw TCP port
+# (see the quirks).
 #
 # Not here: e-mail alerts, the file system, firmware, matrix factory resets
 # (Z commands, which differ between families: Esc ZXXX resets the settings on
@@ -142,6 +146,21 @@ transport:
   reply_match: '^(E\d\d$|Out|In|Vmt|Amt|Mut|Rpr|Spr|Rmm?\s*\d|Prst|Nm[gimopr]|Exec?\s*\d|Exe[TR]|Vrb|Ver|Pno|Inf|Vgp|Frq|Hdcp|Sts|Qik|Psav|Tst|Mpr|Edid|Idh|Ip[aghimnpstuxz]|Icc|Cpn|Pti|Boot|Poec|Rely|Etie|Afmt|Aud|Vol|Aadj|Frz|Zp[xabz]|Mpv|Stat|Vtpo|V\d|N\d|\d|-|\+\d|\*{4})'
   # Q (firmware version) is Extron's documented keep-alive query.
   probe: "Q"
+  # The same SIS on the rear Remote port: DXP HD 4K PLUS p.10, p.35 and p.56
+  # (RS-232, 9600 default, Esc...CP 9600/19200/38400/115200, parity, 7 or 8
+  # data bits, 1 or 2 stop bits); DXP DVI/HDMI p.11, p.49-50 and p.71 (RS-232
+  # or RS-422, 9600 8N1, no flow control, "identical" SIS on Ethernet and
+  # serial); XTP II p.12, p.45 and p.66; SMX p.8, p.34 and p.58; MMX 42/62
+  # p.2-10, p.4-2 and p.A-4 (RS-232 only, 9600 8N1, not adjustable). Mark and
+  # space parity, which the guides also list, are not offered (see the
+  # quirks).
+  serial:
+    serial_only: [mmx-42-62]
+    baud_rate: { default: 9600, values: [9600, 19200, 38400, 115200] }
+    data_bits: { default: 8, values: [7, 8] }
+    parity: { default: none, values: [none, odd, even] }
+    stop_bits: { default: 1, values: [1, 2] }
+    flow_control: none
 
 settings:
   # Administrator or user password. Left empty for a unit without passwords;
@@ -155,16 +174,20 @@ on_connect:
   # a good password is answered "Login Administrator" or "Login User", a
   # wrong one by the prompt again (DXP HD 4K PLUS p.36, XTP II p.47, SMX
   # p.35-36). The repeated prompt becomes a whole line once the next text
-  # arrives, which is the verbose-mode step below.
+  # arrives, which is the verbose-mode step below. Passwords apply to
+  # Ethernet only: the serial port asks for none (DXP DVI/HDMI p.109, XTP II
+  # p.47, SMX p.36), so the step is sent over TCP only.
   - when_set: password
+    link: tcp
     after_prompt: "Password:"
     send: "{settings.password}"
     refused: '^Password:?$'
     accepted: '^Login (Administrator|User)$'
   # Verbose mode 3: tagged query replies and change reports from the front
   # panel and other connections (DXP HD 4K PLUS p.38 and p.51, XTP II p.48 and
-  # p.66). Telnet connections start in mode 0. Answered "Vrb3". The MMX has no
-  # verbose mode.
+  # p.66). Telnet connections start in mode 0, serial ones in mode 1
+  # (untagged replies), so it is sent on either link. Answered "Vrb3". The MMX
+  # has no verbose mode.
   - models: [dxp-hd-4k-plus, dxp-dvi-hdmi, xtp-ii-crosspoint, smx]
     send: "\x1b3CV"
     await_reply: true
@@ -175,8 +198,9 @@ maps:
   timeout_scope: { this: "0", global: "1" }
 
 ports:
-  - { port: 23, protocol: tcp, role: control }
-  - { port: null, protocol: tcp, role: control, when: "model mmx-42-62", note: "RS-232 only: the raw TCP port of the serial-to-Ethernet interface the matrix is wired to (an Extron IPL T S's direct port access, 2001 for COM1), given when the device is opened" }
+  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The rear Remote port: RS-232 (RS-422 on DXP DVI/HDMI, XTP II and SMX, set on the matrix), 9-pin D or 3-pole captive screw by model; DXP and XTP II front USB configuration ports carry SIS too" }
+  - { port: null, protocol: tcp, role: control, when: "model mmx-42-62 with link tcp", note: "RS-232 only: the raw TCP port of the serial-to-Ethernet interface the matrix is wired to (an Extron IPL T S's direct port access, 2001 for COM1), given when the device is opened" }
 
 models:
   - id: dxp-hd-4k-plus
@@ -2029,11 +2053,32 @@ quirks:
       signal and HDCP status (LsT, HdcpT) and remote power changes (Poec) are
       pushed by the matrix.
 
+  - models: [all]
+    severity: info
+    text: >
+      With link serial the matrix is driven on its rear Remote port with the
+      same SIS, framing and replies as over Telnet. The port's settings are
+      set on the matrix (Esc...CP, or the front panel, which offers 9600,
+      19200 and 115200 only on the DXP HD 4K PLUS, p.30) and the link's line
+      settings must match them; changing the Remote port's own settings with
+      set_serial_port over that port cuts the link until the host's settings
+      follow. The guides also list mark and space parity, which the core's
+      serial ports do not open. A serial session gets the copyright banner
+      only when the matrix powers up, without the date line, asks for no
+      password, has no port timeout, and starts in verbose mode 1, which the
+      connection step changes to 3 as over Telnet. RS-422 (DXP DVI/HDMI, XTP II
+      and SMX) is chosen on the matrix (set_serial_port_type or the front
+      panel) and needs an RS-422 adapter on the host. Flow control is none:
+      the DXP DVI/HDMI and SMX guides fix it, the XTP II defaults to it, and
+      the DXP HD 4K PLUS guide does not say.
+
   - models: [mmx-42-62]
     severity: warning
     text: >
       The MMX 42/62 has an RS-232 port only (9600 baud, 8 data bits, no
-      parity, 1 stop bit, p.4-2). It is opened at the address and raw TCP
+      parity, 1 stop bit, not adjustable, p.4-2 and p.A-4). Link serial, its
+      default, opens it on a serial port of the host at 9600 8N1. With link
+      tcp it is opened at the address and raw TCP
       port of a serial-to-Ethernet interface wired to that port, such as an
       Extron IPL T S's direct port access (TCP 2001 for COM1, no password,
       IPL T S guide p.47), with the interface's serial port set to the MMX's

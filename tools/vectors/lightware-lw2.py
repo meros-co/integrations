@@ -20,6 +20,9 @@ text(L2, "get_compile_time", {}, "{ct}\r\n", device_reply="(Compiled: Nov 25 201
      expect_result=v2("Nov 25 2013 12:40:07, build: 1737"), **MXP)
 text(L2, "get_health", {}, "{st}\r\n", device_reply="(STAT 3.3V 5.0V 29V)\r\n", expect_result=v2("3.3V 5.0V 29V"), **MXP)
 text(L2, "get_protocol", {}, "{P_?}\r\n", device_reply="(CONTROL PROTOCOL = #1)\r\n", expect_result=v2("1"), **MXP)
+# The same on the RS-232 control port (link serial, MX-FR 4.10.1).
+text(L2, "get_protocol", {}, "{P_?}\r\n", device_reply="(CONTROL PROTOCOL = #1)\r\n", expect_result=v2("1"), **MXP,
+     settings={"link": "serial"}, file="get_protocol-serial")
 text(L2, "ping", {}, "{ping}\r\n", device_reply="(PONG!)\r\n", expect_result=OK2, **UMX2)
 text(L2, "get_label", {}, "{label}\r\n", device_reply="(LABEL=UMX-HDMI-140_ConferenceRoom)\r\n",
      expect_result=v2("UMX-HDMI-140_ConferenceRoom"), **UMX2)
