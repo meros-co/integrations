@@ -1,0 +1,118 @@
+spec: 1
+id: barco-encore
+name: Barco Encore Presentation System (legacy Encore controller)
+vendor: Barco
+category: switcher
+
+# The original Encore presentation switcher (Encore Controller SC/LC with
+# Encore video processors, formerly Folsom Research), not the Encore3. Barco's
+# Encore user's guide documents no third-party control protocol, and none was
+# found published elsewhere by Barco. What is here comes from the MIT-licensed
+# Bitfocus Companion module: ASCII lines on TCP port 3000, with the two
+# commands it sends. Third-party control software documentation corroborates
+# the port and lists further functions (manual transition, preset save and
+# delete, preset names) without their syntax, so they are not here.
+
+source:
+  - title: companion-module-barco-encore (encore.js, HELP.md)
+    author: Bitfocus AS, William Viker, Håkon Nessjøen
+    url: https://github.com/bitfocus/companion-module-barco-encore
+    note: >
+      MIT license (top-level LICENSE). Read, not copied, as the only public
+      source of the wire syntax: it connects to the Encore Presentation
+      Switcher on TCP port 3000 (its default), sends "ATRN " plus a number
+      (its option is labelled transition frames) and "PRESET R " plus a
+      preset number, each ended with a line feed, and reads nothing back.
+  - title: Encore Presentation System User's Guide (26-0313000-00, revision B, 2006-10-24)
+    author: Barco
+    url: https://www.manualslib.com/manual/355133/Barco-Encore.html
+    note: >
+      Manufacturer document, read on ManualsLib. Its Ethernet and RS-232
+      sections (Comm Setup menus p.175-177, Communications Specifications
+      p.345) cover the controller's control of routers and projectors and the
+      system's ports; it documents no remote control protocol for the Encore
+      itself. Cited for that absence.
+  - title: Modulo Player user manual, "Barco Encore"
+    author: Modulo Pi
+    url: https://support.modulo-pi.com/modulo-player-manual/1/en/topic/encore
+    note: >
+      Third-party documentation (not code). Corroborates TCP/IP control on
+      port 3000 by default, with the actions Take, Take Time (in tenths of a
+      second) and Recall Preset; gives no wire syntax.
+  - title: Medialon MxM help, "Barco Folsom Encore"
+    author: 7thSense (Medialon)
+    url: https://portal.7thsense.one/medialon-help/mxmBarcoFolsomEncore.html
+    note: >
+      Third-party documentation (not code). Corroborates port 3000 and lists
+      Recall Preset, Auto Transition (with an optional duration), Manual
+      Transition (T-bar value), Save Preset (with overwrite), Delete Preset,
+      Get Preset Name, and a current preset and preset list as feedback; gives
+      no wire syntax, so none of these beyond the two commands above is built.
+
+transport:
+  type: line-tcp
+  port: 3000
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: none
+
+ports:
+  - { port: 3000, protocol: tcp, role: control }
+
+models:
+  - id: encore
+    name: Barco Encore Presentation System (Encore Controller SC/LC, Encore VPx)
+    supports: [auto_transition_time, recall_preset]
+    verification: none
+
+commands:
+  auto_transition_time:
+    summary: "Auto transition preview to program with this duration (ATRN, Bitfocus module)"
+    params:
+      duration: { type: int, min: 0, required: true, label: Transition duration, description: "Transition duration sent as the ATRN argument; one source calls it frames and another tenths of a second, see the quirks." }
+    send: "ATRN {duration}"
+    returns: ack
+
+  recall_preset:
+    summary: "Recall a preset by number (PRESET R, Bitfocus module)"
+    params:
+      preset: { type: int, min: 0, required: true, label: Preset, description: "Preset number as shown on the Encore controller." }
+    send: "PRESET R {preset}"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Barco publishes no remote control protocol for the original Encore; the
+      wire syntax here comes from one third-party module (see source), which
+      reads no reply. Writes are therefore reported unverified, nothing is
+      read back, and the transport keeps no state. Other functions third-party
+      software exposes (manual transition, preset save and delete, preset
+      names, the current preset) are left out because their syntax is not
+      public.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The unit of the ATRN argument is not settled: the Companion module
+      labels it transition frames, while Modulo Player's Take Time is in
+      tenths of a second. Whether ATRN alone (the controller's own time) is
+      accepted, and the preset number range, are not documented.
+
+  - models: [all]
+    severity: info
+    text: >
+      Commands end with a line feed, as the Companion module sends them.
+      Whether the controller takes more than one TCP session at a time is not
+      documented.
+
+  - models: [all]
+    severity: info
+    text: >
+      This is the original Encore system, not the Encore3, which is an Event
+      Master processor controlled with barco-eventmaster (JSON-RPC, port 9999)
+      or barco-eventmaster-telnet. The Event Master ASCII interface's PRESET
+      command takes -r where this one takes R.

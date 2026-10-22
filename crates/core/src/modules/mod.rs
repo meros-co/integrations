@@ -6,7 +6,7 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
-#[cfg(any(feature = "aes70", feature = "focusrite-rednet"))]
+#[cfg(any(feature = "aes70", feature = "focusrite-rednet", feature = "dbaudio"))]
 mod aes70;
 #[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
 mod aja_config_events;
@@ -44,6 +44,8 @@ mod analogway;
 mod atem;
 #[cfg(feature = "bss-london")]
 mod bss_london;
+#[cfg(feature = "dbaudio")]
+mod dbaudio;
 #[cfg(feature = "softouch-easyworship")]
 mod easyworship;
 #[cfg(feature = "emberplus")]
@@ -256,6 +258,13 @@ pub(crate) fn construct(
         "aes70" => match context.port {
             Some(port) => Ok(Box::new(aes70::Aes70::new(context, port))),
             None => Err("AES70 (OCP.1) has no standard port: give the device's OCP.1 port".into()),
+        },
+        // d&b's integrations use 30013 or 50014 by model; the DS10 and DS100
+        // need theirs given.
+        #[cfg(feature = "dbaudio")]
+        "dbaudio" => match context.port.or_else(|| dbaudio::default_port(&context.model)) {
+            Some(port) => Ok(Box::new(dbaudio::DbAudio::new(context, port))),
+            None => Err("give the device's OCP.1 port: d&b documents none for this model".into()),
         },
         // RedNet's OCP.1 port is advertised, not fixed, so the host must give it.
         #[cfg(feature = "focusrite-rednet")]

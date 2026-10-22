@@ -675,6 +675,12 @@ pub enum Action {
         socket: Key,
         text: String,
     },
+    /// Send a binary message, for protocols that frame bytes in WebSocket
+    /// binary messages (AES70's OCP.1).
+    WsSendBinary {
+        socket: Key,
+        data: Vec<u8>,
+    },
     WsClose {
         socket: Key,
     },
@@ -924,6 +930,13 @@ impl Cx {
         self.push(Action::WsSend {
             socket,
             text: text.into(),
+        });
+    }
+
+    pub fn ws_send_binary(&mut self, socket: Key, data: impl Into<Vec<u8>>) {
+        self.push(Action::WsSendBinary {
+            socket,
+            data: data.into(),
         });
     }
 

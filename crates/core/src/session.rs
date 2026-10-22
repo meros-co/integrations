@@ -829,6 +829,11 @@ impl Session {
                         let _ = c.writer.send(crate::ws::Outgoing::Text(text));
                     }
                 }
+                Action::WsSendBinary { socket, data } => {
+                    if let Some(c) = self.ws.get(socket) {
+                        let _ = c.writer.send(crate::ws::Outgoing::Binary(data));
+                    }
+                }
                 Action::WsClose { socket } => self.close_ws(socket),
                 Action::Http { id, request } => {
                     self.services.http.spawn_request(
@@ -1101,6 +1106,11 @@ impl Session {
                 Action::WsSend { socket, text } => {
                     if let Some(c) = self.ws.get(socket) {
                         let _ = c.writer.send(crate::ws::Outgoing::Text(text));
+                    }
+                }
+                Action::WsSendBinary { socket, data } => {
+                    if let Some(c) = self.ws.get(socket) {
+                        let _ = c.writer.send(crate::ws::Outgoing::Binary(data));
                     }
                 }
                 // Sent; the reply only says it arrived.

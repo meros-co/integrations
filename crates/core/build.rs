@@ -42,7 +42,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-anomes", &["millumin"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
-    ("vendor-barco", &["barco-eventmaster"]),
+    (
+        "vendor-barco",
+        &[
+            "barco-encore",
+            "barco-eventmaster",
+            "barco-eventmaster-telnet",
+        ],
+    ),
     (
         "vendor-behringer",
         &["behringer-wing", "behringer-x32", "behringer-xair"],
@@ -78,6 +85,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-dataton",
         &["dataton-watchout6", "dataton-watchout7"],
     ),
+    ("vendor-dbaudio", &["dbaudio"]),
     ("vendor-disguise", &["disguise"]),
     ("vendor-etc", &["etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
