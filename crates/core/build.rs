@@ -88,6 +88,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-dbaudio", &["dbaudio"]),
     ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
     ("vendor-disguise", &["disguise"]),
+    ("vendor-epson", &["epson-projector"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
     (
@@ -127,7 +128,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
-    ("vendor-nec", &["nec-display"]),
+    (
+        "vendor-nec",
+        &["nec-display", "nec-projector", "nec-projector-ascii"],
+    ),
     ("vendor-newtek", &["newtek-tricaster"]),
     (
         "vendor-novastar",
@@ -137,7 +141,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
     ("vendor-openlp", &["openlp"]),
     ("vendor-omt", &["omt", "omt-discovery"]),
-    ("vendor-panasonic", &["panasonic-ptz"]),
+    (
+        "vendor-panasonic",
+        &["panasonic-projector", "panasonic-ptz"],
+    ),
     ("vendor-philips", &["philips-sicp"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
