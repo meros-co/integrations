@@ -55,12 +55,15 @@ fn at<'a>(v: &'a Value, path: &str) -> &'a Value {
 
 /// Kills the child when dropped, so a failed assertion does not leave a
 /// sidecar running and holding the binary open.
-struct KillOnDrop(Child);
+/// Also removes the transfer folder the sidecar was given, so a killed
+/// sidecar leaves nothing in the temp folder.
+struct KillOnDrop(Child, PathBuf);
 
 impl Drop for KillOnDrop {
     fn drop(&mut self) {
         let _ = self.0.kill();
         let _ = self.0.wait();
+        let _ = std::fs::remove_dir_all(&self.1);
     }
 }
 
@@ -177,6 +180,7 @@ async fn the_shared_binding_script() {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&token_file);
+    let transfer_dir = token_file.with_extension("transfer");
     let mut sidecar = KillOnDrop(
         Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
             .args([
@@ -188,9 +192,12 @@ async fn the_shared_binding_script() {
             ])
             .arg("--token-file")
             .arg(&token_file)
+            .arg("--transfer-dir")
+            .arg(&transfer_dir)
             .stdout(Stdio::piped())
             .spawn()
             .unwrap(),
+        transfer_dir,
     );
     let listening = first_line(&mut sidecar.0)["listening"]
         .as_str()
@@ -351,6 +358,7 @@ async fn a_sidecar_started_for_some_devices() {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&token_file);
+    let transfer_dir = token_file.with_extension("transfer");
     let mut sidecar = KillOnDrop(
         Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
             .args([
@@ -362,10 +370,13 @@ async fn a_sidecar_started_for_some_devices() {
             ])
             .arg("--token-file")
             .arg(&token_file)
+            .arg("--transfer-dir")
+            .arg(&transfer_dir)
             .args(["--devices", "sennheiser-ew-g3-g4,shure-wireless"])
             .stdout(Stdio::piped())
             .spawn()
             .unwrap(),
+        transfer_dir,
     );
     let listening = first_line(&mut sidecar.0)["listening"]
         .as_str()
@@ -461,6 +472,7 @@ async fn sigterm_closes_every_device_before_exiting() {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&token_file);
+    let transfer_dir = token_file.with_extension("transfer");
     let mut sidecar = KillOnDrop(
         Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
             .args([
@@ -472,10 +484,13 @@ async fn sigterm_closes_every_device_before_exiting() {
             ])
             .arg("--token-file")
             .arg(&token_file)
+            .arg("--transfer-dir")
+            .arg(&transfer_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
             .unwrap(),
+        transfer_dir,
     );
     let listening = first_line(&mut sidecar.0)["listening"]
         .as_str()

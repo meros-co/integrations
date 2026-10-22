@@ -2281,7 +2281,8 @@ parameters (§4, "Binary request bodies") may carry a file's bytes in it as
 base64; `{"file": "transfer:<file>"}` keeps them out of it.
 The folder (`--transfer-dir`, default
 `<temp>/meros-integrations-transfer-<port>`) is cleared of its ids at startup
-and on a clean stop.
+and on a clean stop, when the default folder is also removed if nothing else
+is left in it.
 
 The core likewise sets no limit of its own on a host file a command reads or
 writes: a device's own limits (an ATEM's media pool, a Sony camera's largest

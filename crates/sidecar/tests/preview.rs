@@ -23,12 +23,15 @@ const PAYLOAD: usize = 128 * 1024;
 const GOP: i64 = 10;
 const FRAME_US: i64 = 10_000;
 
-struct KillOnDrop(Child);
+/// Also removes the transfer folder the sidecar was given, so a killed
+/// sidecar leaves nothing in the temp folder.
+struct KillOnDrop(Child, PathBuf);
 
 impl Drop for KillOnDrop {
     fn drop(&mut self) {
         let _ = self.0.kill();
         let _ = self.0.wait();
+        let _ = std::fs::remove_dir_all(&self.1);
     }
 }
 
@@ -203,6 +206,7 @@ async fn the_preview_is_served_as_frames_from_a_keyframe() {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&token_file);
+    let transfer_dir = token_file.with_extension("transfer");
     let mut sidecar = KillOnDrop(
         Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
             .args([
@@ -214,9 +218,12 @@ async fn the_preview_is_served_as_frames_from_a_keyframe() {
             ])
             .arg("--token-file")
             .arg(&token_file)
+            .arg("--transfer-dir")
+            .arg(&transfer_dir)
             .stdout(Stdio::piped())
             .spawn()
             .unwrap(),
+        transfer_dir,
     );
     let mut line = String::new();
     BufReader::new(sidecar.0.stdout.take().unwrap())

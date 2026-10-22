@@ -86,6 +86,9 @@ pub struct Transfers {
     root: PathBuf,
     /// `root` as given to the core, to find it again in results.
     root_text: String,
+    /// The folder is the default one, which the service removes on a clean
+    /// stop once it is empty.
+    default_dir: bool,
     index: Mutex<Index>,
 }
 
@@ -147,18 +150,23 @@ pub fn safe_name(given: Option<&str>) -> String {
     }
 }
 
+/// `<temp>/meros-integrations-transfer-<port>`: the folder when none is given.
+fn default_folder(port: u16) -> PathBuf {
+    std::env::temp_dir().join(format!("meros-integrations-transfer-{port}"))
+}
+
 impl Transfers {
     /// Set up the folder (created if absent) and clear what an earlier run
     /// left in it.
     pub fn start(options: Options, port: u16) -> std::io::Result<Arc<Self>> {
-        let dir = options.dir.unwrap_or_else(|| {
-            std::env::temp_dir().join(format!("meros-integrations-transfer-{port}"))
-        });
+        let default_dir = options.dir.is_none();
+        let dir = options.dir.unwrap_or_else(|| default_folder(port));
         std::fs::create_dir_all(&dir)?;
         let root = std::path::absolute(&dir)?;
         let transfers = Arc::new(Self {
             root_text: root.to_string_lossy().into_owned(),
             root,
+            default_dir,
             index: Mutex::default(),
         });
         transfers.clear();
@@ -168,6 +176,16 @@ impl Transfers {
     #[cfg(test)]
     fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// On a clean stop: remove every id's file, then the default folder
+    /// itself if nothing else is left in it (a folder given with
+    /// `--transfer-dir` stays, as does anything the service did not put there).
+    pub fn stop(&self) {
+        self.clear();
+        if self.default_dir {
+            let _ = std::fs::remove_dir(&self.root);
+        }
     }
 
     /// Remove every id's file from the folder, and nothing else there.
@@ -790,5 +808,31 @@ mod tests {
         assert_eq!(left, ["keep.txt"]);
         drop(t);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_clean_stop_removes_the_default_folder_only_when_empty() {
+        // A port no other test or service of this run uses for its folder.
+        let port = 40_000 + (std::process::id() % 20_000) as u16;
+        let t = Transfers::start(Options::default(), port).unwrap();
+        let dir = t.root().to_path_buf();
+        assert_eq!(dir, std::path::absolute(default_folder(port)).unwrap());
+        std::fs::create_dir_all(dir.join("0123456789abcdef0123456789abcdef")).unwrap();
+        t.stop();
+        assert!(!dir.exists(), "the default folder is removed");
+
+        // Something the service did not put there keeps it.
+        let t = Transfers::start(Options::default(), port).unwrap();
+        std::fs::write(dir.join("keep.txt"), b"not ours").unwrap();
+        t.stop();
+        assert!(dir.join("keep.txt").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+
+        // A folder given is never removed.
+        let given = folder("given");
+        let t = transfers(&given);
+        t.stop();
+        assert!(given.exists());
+        let _ = std::fs::remove_dir_all(&given);
     }
 }
