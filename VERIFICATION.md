@@ -1029,11 +1029,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## digitalprojection-evision-6500 — Digital Projection E-Vision Laser 6500 II (VXX command set)
 
 - [ ] TCP 23 accepts the V commands as a raw TCP connection, with no Telnet negotiation or prompt. ([specs/digitalprojection-evision-6500.yaml:22](specs/digitalprojection-evision-6500.yaml#L22))
-- [ ] A read is answered "P" followed directly by the value ("P50"), a set by "P", a failure by "F", each ended by CR. ([specs/digitalprojection-evision-6500.yaml:540](specs/digitalprojection-evision-6500.yaml#L540))
-- [ ] "op power.on" powers the projector on and what it answers. ([specs/digitalprojection-evision-6500.yaml:53](specs/digitalprojection-evision-6500.yaml#L53))
+- [ ] A read is answered "P" followed directly by the value ("P50"), a set by "P", a failure by "F", each ended by CR. ([specs/digitalprojection-evision-6500.yaml:548](specs/digitalprojection-evision-6500.yaml#L548))
+- [ ] "op power.on" powers the projector on and what it answers. ([specs/digitalprojection-evision-6500.yaml:61](specs/digitalprojection-evision-6500.yaml#L61))
 - [ ] Projector ID 99 is answered by a projector set to another ID. ([specs/digitalprojection-evision-6500.yaml:18](specs/digitalprojection-evision-6500.yaml#L18))
-- [ ] VXXS0317 and VXXG0319/VXXS0319 are the codes for 3D format and light mode (the hexadecimal column shows 0316 and 0318). ([specs/digitalprojection-evision-6500.yaml:573](specs/digitalprojection-evision-6500.yaml#L573))
-- [ ] get_firmware_version's answer format. ([specs/digitalprojection-evision-6500.yaml:371](specs/digitalprojection-evision-6500.yaml#L371))
+- [ ] VXXS0317 and VXXG0319/VXXS0319 are the codes for 3D format and light mode (the hexadecimal column shows 0316 and 0318). ([specs/digitalprojection-evision-6500.yaml:581](specs/digitalprojection-evision-6500.yaml#L581))
+- [ ] get_firmware_version's answer format. ([specs/digitalprojection-evision-6500.yaml:379](specs/digitalprojection-evision-6500.yaml#L379))
 
 ## digitalprojection-evision-op — Digital Projection E-Vision projectors (op command set)
 
