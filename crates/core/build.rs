@@ -191,7 +191,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-softouch", &["softouch-easyworship"]),
-    ("vendor-sony", &["sony-camera", "visca"]),
+    (
+        "vendor-sony",
+        &["sony-bravia", "sony-bravia-ip", "sony-camera", "visca"],
+    ),
     ("vendor-studiocoast", &["vmix"]),
     (
         "vendor-symetrix",

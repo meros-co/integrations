@@ -2084,6 +2084,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
 - [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
 
+## sony-bravia — Sony BRAVIA Professional Displays (REST API and IRCC-IP)
+
+- [ ] Check what a wrong or missing pre-shared key is answered with (HTTP 403 or 401, or a 200 carrying error 403), since that decides whether the core reports unauthorized. ([specs/sony-bravia.yaml:460](specs/sony-bravia.yaml#L460))
+- [ ] Check that getCurrentExternalInputsStatus v1.1 answers on /sony/avContent (the reference lists it under /sony/system). ([specs/sony-bravia.yaml:499](specs/sony-bravia.yaml#L499))
+- [ ] Check which getSystemInformation and getPictureQualitySettings versions each generation answers (v1.7 and v1.1 assumed on the P series). ([specs/sony-bravia.yaml:496](specs/sony-bravia.yaml#L496))
+- [ ] Check the IRCC-IP SOAP envelope of the 2019 page is still accepted, with SOAPACTION and X-Auth-PSK. ([specs/sony-bravia.yaml:438](specs/sony-bravia.yaml#L438))
+- [ ] Check whether getPowerStatus is answered in standby, and setPowerStatus on from standby with remote start on and off. ([specs/sony-bravia.yaml:484](specs/sony-bravia.yaml#L484))
+- [ ] Check the volume range (maxVolume) on each model; 0-100 is assumed. ([specs/sony-bravia.yaml:510](specs/sony-bravia.yaml#L510))
+- [ ] Check set_text (setTextForm v1.0, unencrypted) on P series displays outside Japan and on other models outside Japan and the EU. ([specs/sony-bravia.yaml:393](specs/sony-bravia.yaml#L393))
+
+## sony-bravia-ip — Sony BRAVIA Professional Displays (Simple IP Control)
+
+- [ ] Check the picture mute notification's polarity: the document's notification table gives 0 for muted, its answer table 1. ([specs/sony-bravia-ip.yaml:261](specs/sony-bravia-ip.yaml#L261))
+- [ ] Check the volume range Simple IP control takes (0-100 assumed). ([specs/sony-bravia-ip.yaml:266](specs/sony-bravia-ip.yaml#L266))
+- [ ] Check what the input notification of sixteen 0 means and when it is sent. ([specs/sony-bravia-ip.yaml:256](specs/sony-bravia-ip.yaml#L256))
+- [ ] Check which commands EU models with each RED-DA specification refuse. ([specs/sony-bravia-ip.yaml:248](specs/sony-bravia-ip.yaml#L248))
+- [ ] Check that an enquiry the display cannot answer (scene on an unsupported input) is answered sixteen N. ([specs/sony-bravia-ip.yaml:255](specs/sony-bravia-ip.yaml#L255))
+
 ## sony-camera — Sony cameras
 
 - [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:3187](specs/sony-camera.yaml#L3187))
