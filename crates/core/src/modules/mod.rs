@@ -52,6 +52,10 @@ mod dhd_ecp;
 mod easyworship;
 #[cfg(feature = "emberplus")]
 mod emberplus;
+#[cfg(feature = "epson-projector")]
+mod epson_projector;
+#[cfg(feature = "epson-projector")]
+mod epson_projector_commands;
 #[cfg(feature = "focusrite-rednet")]
 mod focusrite_rednet;
 #[cfg(feature = "blackmagic-hyperdeck")]
@@ -305,6 +309,8 @@ pub(crate) fn construct(
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
+        #[cfg(feature = "epson-projector")]
+        "epson-projector" => Ok(Box::new(epson_projector::EpsonProjector::new(spec, context)?)),
         #[cfg(feature = "nec-projector")]
         "nec-projector" => Ok(Box::new(nec_projector::NecProjector::new(context)?)),
         #[cfg(feature = "generic-osc")]

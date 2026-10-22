@@ -88,6 +88,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-dbaudio", &["dbaudio"]),
     ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
     ("vendor-disguise", &["disguise"]),
+    ("vendor-epson", &["epson-projector"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
     (

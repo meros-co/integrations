@@ -47,6 +47,7 @@ NATIVE = {
     "generic-http": "HTTP or HTTPS",
     "generic-osc": "OSC over UDP or TCP",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
+    "epson-projector": "ESC/VP21 over ESC/VP.net (TCP 3629) or a serial port",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
     "http-listener": "HTTP/1.1 requests from any sender (webhooks); receives",
     "http-snapshot": "HTTP JPEG snapshots",

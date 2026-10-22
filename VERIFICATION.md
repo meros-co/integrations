@@ -950,6 +950,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm StreamCollection and StreamEntry tags and the templateReference tag match the provider. ([specs/emberplus.yaml:224](specs/emberplus.yaml#L224))
 - [ ] Opened for commands only, check that an Unsubscribe on a looked-up node (or as a bare command at the root) ends the value subscription its GetDirectory created. ([crates/core/src/modules/emberplus.rs:35](crates/core/src/modules/emberplus.rs#L35))
 
+## epson-projector — Epson projectors (ESC/VP21)
+
+- [ ] Confirm the projector's answer to the ESC/VP.net connect header (its first ten bytes "ESC/VP.net" are all the module checks), and how a projector set to Protected or with a Monitor Password answers it. ([specs/epson-projector.yaml:4075](specs/epson-projector.yaml#L4075))
+- [ ] Check whether TCP 3629 keeps an idle connection open, and how the projector answers a second connection. ([specs/epson-projector.yaml:4075](specs/epson-projector.yaml#L4075))
+- [ ] Confirm the reply's colon comes at the start of a line, after CR, for every query, including QC? (four lines) and SOURCELIST?. ([specs/epson-projector.yaml:2554](specs/epson-projector.yaml#L2554))
+- [ ] Find which serial speeds each model offers (SPEED lists 9600-57600 on the models that have it). ([specs/epson-projector.yaml:56](specs/epson-projector.yaml#L56))
+- [ ] Measure power on and power off answer times on laser models (110 s is allowed). ([specs/epson-projector.yaml:2490](specs/epson-projector.yaml#L2490))
+- [ ] Check how LAMP? answers on two-lamp models (one number per lamp is assumed). ([specs/epson-projector.yaml:3835](specs/epson-projector.yaml#L3835))
+- [ ] Check whether the sheets spelling PLUG-IN take PLUGIN, and that TRACKING and GAING are the keywords the workbook prints as TRACKIOK and GAIOK. ([specs/epson-projector.yaml:3162](specs/epson-projector.yaml#L3162))
+- [ ] Confirm each family's SOURCE codes against its sheet, and which commands answer ERR in standby with the network on. ([specs/epson-projector.yaml:2726](specs/epson-projector.yaml#L2726))
+
 ## etc-echo — ETC Echo
 
 - [ ] Check whether set commands (pst act, off, seq act, zone int, chan int, ras, low, lok, ulok) get any reply over UDP (they report unverified here). ([spec](specs/etc-echo.yaml#L380))
