@@ -321,6 +321,26 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] activate_profile and activate_preset apply the stored settings live, and their result is true on success. ([specs/barco-pulse.yaml:4460](specs/barco-pulse.yaml#L4460))
 - [ ] reset_all answers the list of domains it resets, and whether it resets the network and user domains, which can cut the connection. ([specs/barco-pulse.yaml:3511](specs/barco-pulse.yaml#L3511))
 
+## barco-rlm-w14 — Barco RLM-W14
+
+- [ ] The echo is lower case and ends at CR, and answers come as "OP <COMMAND> = <value>" lines (line ending unknown). ([specs/barco-rlm-w14.yaml:29](specs/barco-rlm-w14.yaml#L29))
+- [ ] Commands the table capitalizes (Bright, Tint, Lens.center, Osdlite, CS_cust_*, DarkTm.sel) are accepted in lower case. ([specs/barco-rlm-w14.yaml:1087](specs/barco-rlm-w14.yaml#L1087))
+- [ ] A step (+/-) answers with the new value. ([specs/barco-rlm-w14.yaml:1810](specs/barco-rlm-w14.yaml#L1810))
+- [ ] Execute functions answer "OP <COMMAND>". ([specs/barco-rlm-w14.yaml:154](specs/barco-rlm-w14.yaml#L154))
+- [ ] What motor commands answer (OP ZOOMIO, OP FOCUS, OP VERT.OFFSET ...). ([specs/barco-rlm-w14.yaml:138](specs/barco-rlm-w14.yaml#L138))
+- [ ] What lens memory commands answer. ([specs/barco-rlm-w14.yaml:852](specs/barco-rlm-w14.yaml#L852))
+- [ ] P7 custom coordinates must be sent as three digits. ([specs/barco-rlm-w14.yaml:1382](specs/barco-rlm-w14.yaml#L1382))
+- [ ] Blend top/bottom 0-500 and left/right 0-800 (ranges reconstructed from the table layout). ([specs/barco-rlm-w14.yaml:1059](specs/barco-rlm-w14.yaml#L1059))
+- [ ] Black level width top/bottom in steps of 8 and left/right in steps of 4 (reconstructed from the table layout). ([specs/barco-rlm-w14.yaml:1003](specs/barco-rlm-w14.yaml#L1003))
+- [ ] The scen.blue range (0-32) is assumed, and scen.all reads NA when red, green and blue differ. ([specs/barco-rlm-w14.yaml:954](specs/barco-rlm-w14.yaml#L954))
+- [ ] pip.sel uses 1-based source numbers, unlike input.sel. ([specs/barco-rlm-w14.yaml:1452](specs/barco-rlm-w14.yaml#L1452))
+- [ ] The text format of lamp hours, pixel clock, refresh rates and run time. ([specs/barco-rlm-w14.yaml:458](specs/barco-rlm-w14.yaml#L458))
+- [ ] Error codes 39 and 41-50 (the catalog elides them). ([specs/barco-rlm-w14.yaml:378](specs/barco-rlm-w14.yaml#L378))
+- [ ] What scen.adl and w2.recover do. ([specs/barco-rlm-w14.yaml:1515](specs/barco-rlm-w14.yaml#L1515))
+- [ ] Unit of warp rotation -20 to +20. ([specs/barco-rlm-w14.yaml:1642](specs/barco-rlm-w14.yaml#L1642))
+- [ ] The effect of control_port network (marked obsolete) and eco_network_power on RS-232 control. ([specs/barco-rlm-w14.yaml:1130](specs/barco-rlm-w14.yaml#L1130))
+- [ ] Whether the projector has a network (TCP) form of these commands. ([specs/barco-rlm-w14.yaml:2563](specs/barco-rlm-w14.yaml#L2563))
+
 ## behringer-wing — Behringer WING
 
 - [ ] Confirm that solo, talkback on, monitor level, solo dim and mono, input gain and phantom ($-prefixed parameters) can be set over OSC. ([specs/behringer-wing.yaml:8484](specs/behringer-wing.yaml#L8484))

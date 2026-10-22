@@ -50,6 +50,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "barco-eventmaster-telnet",
             "barco-projection-protocol",
             "barco-pulse",
+            "barco-rlm-w14",
         ],
     ),
     (
