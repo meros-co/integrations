@@ -47,6 +47,15 @@ rw("set_track_volume", {"track": 3, "volume": 1.0, "touch": "hold", "ignore_gang
    "/_/SET/TRACK/3/VOL/1.000000g;TRACK", file="set_track_volume.hold-ungrouped")
 rw("set_track_pan", {"track": 2, "pan": -0.25}, "/_/SET/TRACK/2/PAN/-0.250000e;TRACK")
 rw("set_track_width", {"track": 2, "width": 1.0, "ignore_gang": True}, "/_/SET/TRACK/2/WIDTH/1.000000eg;TRACK")
+# Relative changes: a leading + or - (main.js), the + sent unencoded as
+# REAPER's own pages send it (index.html's fader, "+" + dy).
+rw("adjust_track_volume", {"track": 3, "change_db": 1.5}, "/_/SET/TRACK/3/VOL/+1.500000e;TRACK")
+rw("adjust_track_volume", {"track": 0, "change_db": -3.0, "touch": "hold", "ignore_gang": True},
+   "/_/SET/TRACK/0/VOL/-3.000000g;TRACK", file="adjust_track_volume.down-hold-ungrouped")
+rw("adjust_track_pan", {"track": 2, "change": -0.1}, "/_/SET/TRACK/2/PAN/-0.100000e;TRACK")
+rw("adjust_track_pan", {"track": 2, "change": 0.25, "ignore_gang": True},
+   "/_/SET/TRACK/2/PAN/+0.250000eg;TRACK", file="adjust_track_pan.right")
+rw("adjust_track_width", {"track": 1, "change": 0.5}, "/_/SET/TRACK/1/WIDTH/+0.500000e;TRACK")
 rw("set_track_mute", {"track": 3, "muted": True}, "/_/SET/TRACK/3/MUTE/1;TRACK")
 rw("toggle_track_mute", {"track": 0}, "/_/SET/TRACK/0/MUTE/-1;TRACK")
 rw("set_track_solo", {"track": 4, "soloed": False}, "/_/SET/TRACK/4/SOLO/0;TRACK")
@@ -125,6 +134,15 @@ telemetry(RW, "transport-paused", inbound_http={
                                 "position_text": "0:03.000", "position_beats": "2.3.00"}})
 telemetry(RW, "repeat", inbound_http={"path": "/_/GET/REPEAT", "body": "GET/REPEAT\t0\n"},
           expect_state={"transport": {"repeat": False}})
+
+
+def bits(flags):
+    """The booleans main.js gives for a TRACK line's flags field."""
+    names = ["folder", "selected", "has_fx", "muted", "soloed", "solo_in_place", "record_armed",
+             "record_monitoring_on", "record_monitoring_auto"]
+    return {"flags": flags, **{n: bool(flags & (1 << i)) for i, n in enumerate(names)}}
+
+
 # The track poll: count, every track (0 the master), metronome and snap.
 telemetry(RW, "tracks", inbound_http={
     "path": "/_/NTRACK;TRACK;GET/40364;GET/1157",
@@ -137,13 +155,13 @@ telemetry(RW, "tracks", inbound_http={
     state_before={"tracks": {"3": {"name": "Gone"}}},
     expect_state={"track_count": 2,
                   "tracks": {
-                      "0": {"name": "MASTER", "flags": 4, "volume": 1.0, "pan": 0.0, "peak_db10": -60,
+                      "0": {"name": "MASTER", **bits(4), "volume": 1.0, "pan": 0.0, "peak_db10": -60,
                             "meter_db10": -120, "width": 1.0, "pan_mode": 3, "send_count": 0,
                             "receive_count": 0, "hw_out_count": 1, "color": "0"},
-                      "1": {"name": "Kick", "flags": 72, "volume": 0.5, "pan": -0.25, "peak_db10": -100,
+                      "1": {"name": "Kick", **bits(72), "volume": 0.5, "pan": -0.25, "peak_db10": -100,
                             "meter_db10": -150, "width": 1.0, "pan_mode": 3, "send_count": 1,
                             "receive_count": 0, "hw_out_count": 0, "color": "0x01FF0000"},
-                      "2": {"name": "Vox", "flags": 26, "volume": 1.0, "pan": 0.0, "peak_db10": -1500,
+                      "2": {"name": "Vox", **bits(26), "volume": 1.0, "pan": 0.0, "peak_db10": -1500,
                             "meter_db10": -1500, "width": 0.5, "pan_mode": 5, "send_count": 0,
                             "receive_count": 1, "hw_out_count": 0, "color": "0"}},
                   "actions": {"40364": {"state": 1}, "1157": {"state": 0}},
@@ -155,11 +173,26 @@ telemetry(RW, "track-readback", inbound_http={
     "body": "TRACK\t0\tMASTER\t0\t1.000000\t0.000000\t-1500\t-1500\t1.000000\t3\t0\t0\t1\t0\n"
             "TRACK\t1\tKick\t8\t1.000000\t0.000000\t-1500\t-1500\t1.000000\t3\t0\t0\t0\t0\n"},
     expect_state={"tracks": {
-        "0": {"name": "MASTER", "flags": 0, "volume": 1.0, "pan": 0.0, "peak_db10": -1500,
+        "0": {"name": "MASTER", **bits(0), "volume": 1.0, "pan": 0.0, "peak_db10": -1500,
               "meter_db10": -1500, "width": 1.0, "pan_mode": 3, "send_count": 0,
               "receive_count": 0, "hw_out_count": 1, "color": "0"},
-        "1": {"name": "Kick", "flags": 8, "volume": 1.0, "pan": 0.0, "peak_db10": -1500,
+        "1": {"name": "Kick", **bits(8), "volume": 1.0, "pan": 0.0, "peak_db10": -1500,
               "meter_db10": -1500, "width": 1.0, "pan_mode": 3, "send_count": 0,
+              "receive_count": 0, "hw_out_count": 0, "color": "0"}}})
+# Every flag at once but has-FX and muted (1+2+16+32+64+128+256), and record
+# monitoring auto alone.
+telemetry(RW, "track-flags", inbound_http={
+    "path": "/_/TRACK/5-6",
+    "body": "TRACK\t5\tBus\t499\t1.000000\t0.000000\t-1500\t-1500\t1.000000\t3\t0\t0\t0\t0\n"
+            "TRACK\t6\tGtr\t256\t1.000000\t0.000000\t-1500\t-1500\t1.000000\t3\t0\t0\t0\t0\n"},
+    expect_state={"tracks": {
+        "5": {"name": "Bus", "folder": True, "selected": True, "has_fx": False, "muted": False,
+              "soloed": True, "solo_in_place": True, "record_armed": True, "record_monitoring_on": True,
+              "record_monitoring_auto": True, "flags": 499, "volume": 1.0, "pan": 0.0,
+              "peak_db10": -1500, "meter_db10": -1500, "width": 1.0, "pan_mode": 3, "send_count": 0,
+              "receive_count": 0, "hw_out_count": 0, "color": "0"},
+        "6": {"name": "Gtr", **bits(256), "volume": 1.0, "pan": 0.0,
+              "peak_db10": -1500, "meter_db10": -1500, "width": 1.0, "pan_mode": 3, "send_count": 0,
               "receive_count": 0, "hw_out_count": 0, "color": "0"}}})
 # The marker and region poll; the color field is optional.
 telemetry(RW, "markers-regions", inbound_http={
