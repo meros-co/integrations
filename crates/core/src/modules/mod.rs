@@ -101,6 +101,10 @@ mod pjlink;
 mod qsys;
 #[cfg(feature = "resolume")]
 mod resolume_push;
+#[cfg(feature = "samsung-mdc")]
+mod samsung_mdc;
+#[cfg(feature = "samsung-mdc")]
+mod samsung_mdc_table;
 #[cfg(feature = "sennheiser-digital-6000")]
 mod sennheiser_d6000;
 #[cfg(feature = "sennheiser-ew-dx")]
@@ -113,6 +117,8 @@ mod sennheiser_mcp;
 mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
+#[cfg(feature = "sony-bravia-serial")]
+mod sony_bravia_serial;
 #[cfg(feature = "sony-camera")]
 mod sony_camera;
 #[cfg(feature = "sony-camera")]
@@ -301,6 +307,10 @@ pub(crate) fn construct(
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
+        #[cfg(feature = "samsung-mdc")]
+        "samsung-mdc" => Ok(Box::new(samsung_mdc::SamsungMdc::new(context)?)),
+        #[cfg(feature = "sony-bravia-serial")]
+        "sony-bravia-serial" => Ok(Box::new(sony_bravia_serial::SonyBraviaSerial::new(context)?)),
         #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]

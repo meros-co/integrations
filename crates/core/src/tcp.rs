@@ -127,13 +127,42 @@ async fn handshake(
     target: &TlsTarget,
 ) -> Result<tokio_rustls::client::TlsStream<TcpStream>, String> {
     let name = crate::tls::server_name(&target.server_name)?;
-    let tcp = connect(target.to).await?;
+    let mut tcp = connect(target.to).await?;
+    if let Some(preamble) = &target.preamble {
+        read_preamble(&mut tcp, preamble).await?;
+    }
     let connector =
         tokio_rustls::TlsConnector::from(crate::tls::client_config(target.accept_invalid_certs));
     match tokio::time::timeout(HANDSHAKE_TIMEOUT, connector.connect(name, tcp)).await {
         Ok(Ok(s)) => Ok(s),
         Ok(Err(e)) => Err(crate::tls::describe(&e)),
         Err(_) => Err(format!("{} handshake timed out", crate::tls::PREFIX)),
+    }
+}
+
+/// Read the plain text a device sends before its TLS handshake, exactly as
+/// long as `expected`, so nothing of the handshake is consumed with it.
+async fn read_preamble(tcp: &mut TcpStream, expected: &[u8]) -> Result<(), String> {
+    let mut got = vec![0u8; expected.len()];
+    match tokio::time::timeout(HANDSHAKE_TIMEOUT, tcp.read_exact(&mut got)).await {
+        Ok(Ok(_)) if got == expected => Ok(()),
+        Ok(Ok(_)) => Err(format!(
+            "{} expected {:?} before the handshake, got {:?}",
+            crate::tls::PREFIX,
+            String::from_utf8_lossy(expected),
+            String::from_utf8_lossy(&got)
+        )),
+        Ok(Err(e)) => Err(format!(
+            "{} no {:?} before the handshake: {e}",
+            crate::tls::PREFIX,
+            String::from_utf8_lossy(expected)
+        )),
+        Err(_) => Err(format!(
+            "{} no {:?} before the handshake within {} s",
+            crate::tls::PREFIX,
+            String::from_utf8_lossy(expected),
+            HANDSHAKE_TIMEOUT.as_secs()
+        )),
     }
 }
 
@@ -433,6 +462,7 @@ mod tests {
             to,
             server_name: "127.0.0.1".into(),
             accept_invalid_certs,
+            preamble: None,
         }
     }
 
@@ -455,6 +485,46 @@ mod tests {
             TcpInput::Closed { reason } => {
                 assert!(reason.starts_with("tls:"), "{reason}");
                 assert!(reason.contains("accept_invalid_certs"), "{reason}");
+            }
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+    }
+
+    /// A device that greets in plain text before its handshake (Samsung
+    /// MDC's secured mode) is reached when the greeting is expected, and
+    /// refused when another greeting arrives.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_plain_text_preamble_is_read_before_the_handshake() {
+        let echo = tls_echo().await;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut s, _) = listener.accept().await.unwrap();
+                tokio::spawn(async move {
+                    // Greet, then relay to the TLS echo server.
+                    s.write_all(b"MDCSTART<<TLS>>").await.unwrap();
+                    let mut up = TcpStream::connect(echo).await.unwrap();
+                    let _ = tokio::io::copy_bidirectional(&mut s, &mut up).await;
+                });
+            }
+        });
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut t = target(addr, true);
+        t.preamble = Some(b"MDCSTART<<TLS>>".to_vec());
+        let c = spawn_tls("a", 1, t, tx);
+        assert_eq!(next(&mut rx).await, TcpInput::Connected);
+        c.writer.send(Outgoing::Data(b"1234".to_vec())).unwrap();
+        assert_eq!(next(&mut rx).await, TcpInput::Data(b"1234".to_vec()));
+
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut t = target(addr, true);
+        t.preamble = Some(b"HELLO<<TLS>>xyz".to_vec());
+        let _c = spawn_tls("b", 1, t, tx);
+        match next(&mut rx).await {
+            TcpInput::Closed { reason } => {
+                assert!(reason.starts_with("tls:"), "{reason}");
+                assert!(reason.contains("MDCSTART"), "{reason}");
             }
             other => panic!("expected a refusal, got {other:?}"),
         }
