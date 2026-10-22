@@ -1733,6 +1733,18 @@ impl SonyCamera {
                     jobs_changed |= info.code == 0xD02A;
                 }
             }
+            // State carried in the range rather than the current value
+            // (reported even where the camera marks the property disabled,
+            // as the capture area always is).
+            if let Form::Range { min, max, .. } = &info.form {
+                if let Some((path, value)) = props::from_form(info.code, &info.current, min, max) {
+                    if self.reported_named.get(path) != Some(&value) {
+                        put(&mut patch, path, value.clone());
+                        self.reported_named.insert(path, value);
+                        changed = true;
+                    }
+                }
+            }
             self.capabilities(cx, &info);
             if self.props.get(&info.code).map(|p| &p.current) != Some(&info.current) {
                 self.info_property(cx, info.code, &info.current);
@@ -2713,9 +2725,27 @@ impl SonyCamera {
         Ok(Op::with_data(OP_CONTROL_PTZF, vec![kind], data))
     }
 
-    fn preset_ptzf(&self, set: bool, params: &Params) -> Result<Op, CommandError> {
-        let mut data = self.ptzf_header(0xE0CC)?;
+    /// A preset PTZF number, checked against the numbers the camera reports
+    /// (pan_tilt.preset_numbers: its slot property's range, ending at the
+    /// number of slots).
+    fn preset_number(&self, params: &Params) -> Result<i128, CommandError> {
         let preset = param_int(params, "preset")?;
+        if let Some(numbers) = self.reported_named.get("pan_tilt.preset_numbers") {
+            if let (Some(first), Some(last)) = (numbers["first"].as_i64(), numbers["last"].as_i64())
+            {
+                if preset < first as i128 || preset > last as i128 {
+                    return Err(invalid(format!(
+                        "the camera numbers its presets {first} to {last}"
+                    )));
+                }
+            }
+        }
+        Ok(preset)
+    }
+
+    fn preset_ptzf(&self, set: bool, params: &Params) -> Result<Op, CommandError> {
+        let preset = self.preset_number(params)?;
+        let mut data = self.ptzf_header(0xE0CC)?;
         let preset = u16::try_from(preset).map_err(|_| invalid("'preset' is out of range"))?;
         data.extend_from_slice(&preset.to_le_bytes());
         if set {
@@ -3115,13 +3145,64 @@ impl SonyCamera {
                 let (x, y) = (param_int(params, "x")?, param_int(params, "y")?);
                 ops(self.control(0xD2DC, (x << 16) | y))
             }
+            "set_af_c_area_position" => {
+                let (x, y) = (param_int(params, "x")?, param_int(params, "y")?);
+                let value = props::pack16(&[x, y]).map_err(invalid)?;
+                ops(self.set_prop(0xE079, PtpValue::Int(value)))
+            }
+            "set_af_free_size" => {
+                let names = ["height", "width", "x", "y"];
+                let fields = names
+                    .iter()
+                    .map(|n| param_int(params, n))
+                    .collect::<Result<Vec<_>, _>>()?;
+                // Each field has its own bounds in the range's minimum and
+                // maximum.
+                if let Ok(PropInfo {
+                    form: Form::Range { min, max, .. },
+                    ..
+                }) = self.prop(0xD138)
+                {
+                    if let (Some(lo), Some(hi)) = (min.as_int(), max.as_int()) {
+                        for (i, (name, v)) in names.iter().zip(&fields).enumerate() {
+                            let (a, b) = (props::field16(lo, i, 4), props::field16(hi, i, 4));
+                            if *v < a || *v > b {
+                                return Err(invalid(format!(
+                                    "'{name}' must be {a} to {b} on this camera"
+                                )));
+                            }
+                        }
+                    }
+                }
+                let value = props::pack16(&fields).map_err(invalid)?;
+                ops(self.set_prop(0xD138, PtpValue::Int(value)))
+            }
             "color_temperature_step" => ops(self.control(0xD2EC, param_int(params, "step")?)),
             "tint_step" => ops(self.control(0xD2ED, param_int(params, "step")?)),
             "custom_wb_capture_standby" => Ok(Plan::Ops(self.button(0xD2DF, None)?)),
             "custom_wb_capture_cancel" => Ok(Plan::Ops(self.button(0xD2E0, None)?)),
             "custom_wb_capture" => {
                 let (x, y) = (param_int(params, "x")?, param_int(params, "y")?);
-                ops(self.control(0xD2E1, (x << 16) | y))
+                // The point must be inside the capturable area the camera
+                // reports.
+                if let Some(Value::Object(area)) =
+                    self.reported_named.get("white_balance.custom_capture_area")
+                {
+                    let bound = |end: &str, axis: &str| {
+                        area.get(end).and_then(|p| p[axis].as_i64()).map(i128::from)
+                    };
+                    for (axis, v) in [("x", x), ("y", y)] {
+                        if let (Some(a), Some(b)) = (bound("min", axis), bound("max", axis)) {
+                            if v < a || v > b {
+                                return Err(invalid(format!(
+                                    "'{axis}' must be {a} to {b}, inside the camera's capturable area"
+                                )));
+                            }
+                        }
+                    }
+                }
+                let value = props::pack16(&[x, y]).map_err(invalid)?;
+                ops(self.control(0xD2E1, value))
             }
             "flicker_scan" => Ok(Plan::Ops(self.button(0xD2F1, None)?)),
             "format_media" => {
@@ -3163,21 +3244,7 @@ impl SonyCamera {
             "pan_tilt_stop" => ops(self.ptzf(PTZF_CANCEL, params)),
             "pan_tilt_home" => ops(self.ptzf(PTZF_HOME, params)),
             "pan_tilt_reset" => ops(self.ptzf(PTZF_RESET, params)),
-            "preset_recall" => {
-                let preset = param_int(params, "preset")?;
-                if let Ok(PropInfo {
-                    form: Form::Range { min, max, .. },
-                    ..
-                }) = self.prop(0xE0CB)
-                {
-                    if let (Some(lo), Some(hi)) = (min.as_int(), max.as_int()) {
-                        if preset < lo || preset > hi {
-                            return Err(invalid(format!("the camera has presets {lo} to {hi}")));
-                        }
-                    }
-                }
-                ops(self.control(0xF015, preset))
-            }
+            "preset_recall" => ops(self.control(0xF015, self.preset_number(params)?)),
             "preset_set" => ops(self.preset_ptzf(true, params)),
             "preset_clear" => ops(self.preset_ptzf(false, params)),
             // Live view
@@ -4598,6 +4665,103 @@ mod tests {
     }
 
     #[test]
+    fn af_frames_custom_white_balance_points_and_presets_follow_the_camera_ranges() {
+        let mut m = camera(json!({}));
+        connected(&mut m, 300);
+        m.controls.extend([0xF015, 0xD2E1]);
+        let list = build::prop_array(&[
+            build::enum_prop(0xE0CC, dt::UINT16, false, 1, 100, &[]),
+            // 100 preset slots, numbered from 1.
+            build::range_prop(0xE0CB, dt::UINT16, false, 100, (1, 256, 1)),
+            // Capturable area x 16 to 624, y 32 to 464.
+            build::range_prop(0xD26B, dt::UINT32, false, 0, (0x0010_0020, 0x0270_01D0, 1)),
+            build::range_prop(0xE079, dt::UINT32, true, 0x0096_0064, (0, 0xFFFF_FFFF, 1)),
+            // Height and width 16 to 256, x 0 to 639, y 0 to 479.
+            build::range_prop(
+                0xD138,
+                dt::UINT64,
+                true,
+                0x0032_0032_0096_0064,
+                (0x0010_0010_0000_0000, 0x0100_0100_027F_01DF, 1),
+            ),
+        ]);
+        let mut cx = Cx::new(0);
+        m.apply(&mut cx, parse_prop_info_array(&list).unwrap());
+        let named = |m: &SonyCamera, path: &str| m.reported_named.get(path).cloned();
+        assert_eq!(
+            named(&m, "pan_tilt.preset_numbers"),
+            Some(json!({"first": 1, "last": 100}))
+        );
+        assert_eq!(
+            named(&m, "white_balance.custom_capture_area"),
+            Some(json!({"min": {"x": 16, "y": 32}, "max": {"x": 624, "y": 464}}))
+        );
+        assert_eq!(
+            named(&m, "focus.af_c_area_position"),
+            Some(json!({"x": 150, "y": 100}))
+        );
+        assert_eq!(
+            named(&m, "focus.af_free_size"),
+            Some(json!({"height": 50, "width": 50, "x": 150, "y": 100}))
+        );
+        let plan = |m: &SonyCamera, name: &str, p: Value| m.plan(name, &settings(p), 1);
+        let first_op = |plan: Result<Plan, CommandError>| match plan {
+            Ok(Plan::Ops(ops)) => ops.into_iter().next().unwrap(),
+            Ok(_) => panic!("expected operations"),
+            Err(e) => panic!("{e:?}"),
+        };
+        // Presets outside 1 to 100 are refused before anything is sent.
+        for name in ["preset_recall", "preset_set", "preset_clear"] {
+            for preset in [0, 101] {
+                assert!(
+                    matches!(
+                        plan(&m, name, json!({"preset": preset})),
+                        Err(CommandError::InvalidParams { .. })
+                    ),
+                    "{name} {preset}"
+                );
+            }
+        }
+        let recall = first_op(plan(&m, "preset_recall", json!({"preset": 1})));
+        assert_eq!(recall.data.unwrap(), vec![1, 0]);
+        let set = first_op(plan(&m, "preset_set", json!({"preset": 100})));
+        assert_eq!(set.data.unwrap(), vec![100, 0, 0, 0, 100, 0, 1, 1]);
+        // Custom white balance points inside the capturable area only.
+        assert!(matches!(
+            plan(&m, "custom_wb_capture", json!({"x": 8, "y": 100})),
+            Err(CommandError::InvalidParams { .. })
+        ));
+        let capture = first_op(plan(&m, "custom_wb_capture", json!({"x": 320, "y": 240})));
+        assert_eq!(capture.data.unwrap(), 0x0140_00F0u32.to_le_bytes().to_vec());
+        // The AF-C area position and the free-size frame, packed as
+        // documented.
+        let af = first_op(plan(
+            &m,
+            "set_af_c_area_position",
+            json!({"x": 639, "y": 479}),
+        ));
+        assert_eq!(af.params, vec![0xE079, 0]);
+        assert_eq!(af.data.unwrap(), 0x027F_01DFu32.to_le_bytes().to_vec());
+        let frame = first_op(plan(
+            &m,
+            "set_af_free_size",
+            json!({"height": 64, "width": 48, "x": 320, "y": 240}),
+        ));
+        assert_eq!(
+            frame.data.unwrap(),
+            0x0040_0030_0140_00F0u64.to_le_bytes().to_vec()
+        );
+        assert!(matches!(
+            plan(
+                &m,
+                "set_af_free_size",
+                json!({"height": 8, "width": 48, "x": 320, "y": 240})
+            ),
+            Err(CommandError::InvalidParams { .. })
+        ));
+    }
+
+    #[test]
     fn the_spec_and_the_module_agree() {
         let catalog = crate::catalog::Catalog::embedded();
         let spec = catalog.device("sony-camera").expect("the sony-camera spec");
@@ -4624,6 +4788,12 @@ mod tests {
                 spec.state.contains_key(prop.path),
                 "{} is not in the spec's state",
                 prop.path
+            );
+        }
+        for path in props::FORM_PATHS {
+            assert!(
+                spec.state.contains_key(*path),
+                "{path} is not in the spec's state"
             );
         }
         for model in &spec.models {

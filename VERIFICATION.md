@@ -1851,16 +1851,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sony-camera — Sony cameras
 
-- [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:2515](specs/sony-camera.yaml#L2515))
-- [ ] Check zoom and focus preset slot numbering: that slot 0 is the first preset, matching save_zoom_focus_position, before relying on set_preset_zoom_only. ([specs/sony-camera.yaml:2509](specs/sony-camera.yaml#L2509))
-- [ ] On ILME-FR7 and BRC-AM7, check whether pan/tilt preset numbers for preset_recall, preset_set and preset_clear start at 0 or 1 within pan_tilt.preset_slots. ([specs/sony-camera.yaml:1960](specs/sony-camera.yaml#L1960))
-- [ ] Check the display-list mapping: that base look, AE level offset, scene file, creative look and stream destination names come from the list types the module uses and match what the camera shows. ([crates/core/src/modules/sony_camera_info.rs:92](crates/core/src/modules/sony_camera_info.rs#L92))
-- [ ] Check shutter speed encoding: that 1/x values and long exposures (sent as tenths of a second, such as 2.5") round-trip through the 16/16 and 32/32 numerator-over-denominator properties and match the camera's listed values. ([crates/core/src/modules/sony_camera_props.rs:28](crates/core/src/modules/sony_camera_props.rs#L28))
-- [ ] On a Camera Control PTP 2 body (ILCE-7M3), check which way a positive exposure_step moves for iris, shutter speed, ISO and exposure and flash compensation. ([specs/sony-camera.yaml:1984](specs/sony-camera.yaml#L1984))
-- [ ] On ILME-FR7 and BRC-AM7, confirm pan is positive anticlockwise from above and tilt positive upward, both desk- and ceiling-mounted. ([specs/sony-camera.yaml:2360](specs/sony-camera.yaml#L2360))
-- [ ] On ILCE-7CM2, ILCE-7CR and ILX-LR1 firmware 1.00, check focus indication from AF status events and whether focal distance reads sensibly. ([specs/sony-camera.yaml:2371](specs/sony-camera.yaml#L2371))
+- [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:3187](specs/sony-camera.yaml#L3187))
+- [ ] Check zoom and focus preset slot numbering: that slot 0 is the first preset, matching save_zoom_focus_position, before relying on set_preset_zoom_only. ([specs/sony-camera.yaml:2609](specs/sony-camera.yaml#L2609))
+- [ ] Check the display-list mapping: that base look, AE level offset, scene file, creative look and stream destination names come from the list types the module uses and match what the camera shows. ([crates/core/src/modules/sony_camera_info.rs:94](crates/core/src/modules/sony_camera_info.rs#L94))
+- [ ] Check long shutter speeds in the 32/32 numerator-over-denominator properties (Shutter Speed Setting and Current Value): the reference fixes the denominator at 10 for long exposures only in the 16/16 property, so check that a value such as 2.5" sent as tenths of a second matches the camera's listed values. ([crates/core/src/modules/sony_camera_props.rs:31](crates/core/src/modules/sony_camera_props.rs#L31))
+- [ ] On a Camera Control PTP 2 body (ILCE-7M3), check which way a positive exposure_step moves for iris, shutter speed, ISO and exposure and flash compensation. ([specs/sony-camera.yaml:2084](specs/sony-camera.yaml#L2084))
+- [ ] On ILCE-7CM2, ILCE-7CR and ILX-LR1 firmware 1.00, check that focus.indication follows the AF status events. ([specs/sony-camera.yaml:3040](specs/sony-camera.yaml#L3040))
 - [ ] Opened for commands only, confirm the camera tolerates GetDeviceInfo once a second as the liveness check. ([crates/core/src/modules/sony_camera.rs:48](crates/core/src/modules/sony_camera.rs#L48))
-- [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it. ([specs/sony-camera.yaml:2607](specs/sony-camera.yaml#L2607))
+- [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2717](specs/sony-camera.yaml#L2717))
+- [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2685](specs/sony-camera.yaml#L2685))
 
 ## symetrix-composer — Symetrix Composer DSPs
 

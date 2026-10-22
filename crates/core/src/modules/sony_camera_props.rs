@@ -49,6 +49,11 @@ pub(crate) enum Decode {
     Progress,
     /// Movie frame rate code.
     FrameRate,
+    /// A point: x in the upper 16 bits, y in the lower 16.
+    Point,
+    /// An AF frame: height and width in the upper 32 bits, its centre x and
+    /// y in the lower 32, 16 bits each.
+    Frame,
 }
 
 /// One operator-facing property.
@@ -609,6 +614,13 @@ const FTP_PROXY_TARGET: &[(i128, &str)] = &[
     (3, "proxy_and_original"),
 ];
 const FTP_STILL_SIZE: &[(i128, &str)] = &[(1, "small"), (2, "large")];
+const CUSTOM_WB_SIZE: &[(i128, &str)] = &[(1, "small"), (2, "medium"), (3, "large")];
+const CUSTOM_WB_STATE: &[(i128, &str)] = &[
+    (0, "invalid"),
+    (1, "standby"),
+    (2, "capturing"),
+    (3, "operating_camera"),
+];
 
 use Decode::*;
 
@@ -781,6 +793,31 @@ pub(crate) const PROPS: &[Prop] = &[
         Some("set_white_balance_b_gain"),
     ),
     p(0xD24E, "white_balance.awb_locked", OnOff, None),
+    p(
+        0xD135,
+        "white_balance.custom_capture_size",
+        Labels(CUSTOM_WB_SIZE),
+        Some("set_custom_wb_size"),
+    ),
+    p(
+        0xD26D,
+        "white_balance.custom_capture_standby_available",
+        Flag,
+        None,
+    ),
+    p(
+        0xD26E,
+        "white_balance.custom_capture_cancel_available",
+        Flag,
+        None,
+    ),
+    p(0xD26F, "white_balance.custom_capture_available", Flag, None),
+    p(
+        0xD270,
+        "white_balance.custom_capture_state",
+        Labels(CUSTOM_WB_STATE),
+        None,
+    ),
     // Focus
     p(
         0x500A,
@@ -825,6 +862,11 @@ pub(crate) const PROPS: &[Prop] = &[
         Raw,
         Some("set_af_subject_shift_sensitivity"),
     ),
+    // Written by set_af_c_area_position and set_af_free_size, which take
+    // the coordinates as separate parameters.
+    p(0xE079, "focus.af_c_area_position", Point, None),
+    p(0xD138, "focus.af_free_size", Frame, None),
+    p(0xD19E, "focus.af_free_size_default", Frame, None),
     // Zoom
     p(0xD25C, "zoom.scale", Scaled(1000.0), None),
     p(0xD00A, "zoom.digital_scale", Scaled(1000.0), None),
@@ -1107,13 +1149,49 @@ pub(crate) const PROPS: &[Prop] = &[
     p(0xE0B8, "pan_tilt.tilt", Microdegrees, None),
     p(0xE0B7, "pan_tilt.pan_status", Labels(PT_STATUS), None),
     p(0xE0B9, "pan_tilt.tilt_status", Labels(PT_STATUS), None),
-    p(0xE0BA, "pan_tilt.pan_limit.min", Microdegrees, None),
-    p(0xE0BB, "pan_tilt.pan_limit.max", Microdegrees, None),
-    p(0xE0BC, "pan_tilt.tilt_limit.min", Microdegrees, None),
-    p(0xE0BD, "pan_tilt.tilt_limit.max", Microdegrees, None),
-    p(0xE0BE, "pan_tilt.pan_limit.enabled", OnOff, None),
-    p(0xE0BF, "pan_tilt.tilt_limit.enabled", OnOff, None),
+    p(
+        0xE0BA,
+        "pan_tilt.pan_limit.min",
+        Microdegrees,
+        Some("set_pan_limit_min"),
+    ),
+    p(
+        0xE0BB,
+        "pan_tilt.pan_limit.max",
+        Microdegrees,
+        Some("set_pan_limit_max"),
+    ),
+    p(
+        0xE0BC,
+        "pan_tilt.tilt_limit.min",
+        Microdegrees,
+        Some("set_tilt_limit_min"),
+    ),
+    p(
+        0xE0BD,
+        "pan_tilt.tilt_limit.max",
+        Microdegrees,
+        Some("set_tilt_limit_max"),
+    ),
+    p(
+        0xE0BE,
+        "pan_tilt.pan_limit.enabled",
+        OnOff,
+        Some("set_pan_limit_enabled"),
+    ),
+    p(
+        0xE0BF,
+        "pan_tilt.tilt_limit.enabled",
+        OnOff,
+        Some("set_tilt_limit_enabled"),
+    ),
     p(0xE0CB, "pan_tilt.preset_slots", Raw, None),
+    p(
+        0xE05C,
+        "pan_tilt.ramp_curve",
+        Raw,
+        Some("set_pan_tilt_ramp_curve"),
+    ),
     // Live view
     p(0xD221, "live_view.available", Flag, None),
     p(0xD278, "live_view.url", Raw, None),
@@ -1472,6 +1550,76 @@ pub(crate) fn decode(decode: Decode, value: &PtpValue) -> Value {
             }
         }
         FrameRate => frame_rate_label(v),
+        Point => point(v),
+        Frame => json!({
+            "height": field16(v, 0, 4),
+            "width": field16(v, 1, 4),
+            "x": field16(v, 2, 4),
+            "y": field16(v, 3, 4),
+        }),
+    }
+}
+
+fn point(v: i128) -> Value {
+    json!({"x": field16(v, 0, 2), "y": field16(v, 1, 2)})
+}
+
+/// Packs 16-bit fields, the first in the highest bits.
+pub(crate) fn pack16(fields: &[i128]) -> Result<i128, String> {
+    fields.iter().try_fold(0, |acc, f| {
+        if (0..=0xFFFF).contains(f) {
+            Ok((acc << 16) | f)
+        } else {
+            Err(format!("{f} does not fit in 16 bits"))
+        }
+    })
+}
+
+/// The 16-bit field `index` (0 the highest) of a value packed from `count`.
+pub(crate) fn field16(v: i128, index: usize, count: usize) -> i128 {
+    (v >> (16 * (count - 1 - index))) & 0xFFFF
+}
+
+/// State the module reads from a property's form rather than its current
+/// value: the paths, for the spec check.
+#[cfg(test)]
+pub(crate) const FORM_PATHS: &[&str] = &[
+    "white_balance.custom_capture_area",
+    "white_balance.custom_capture_frame_size",
+    "pan_tilt.preset_numbers",
+];
+
+/// State a property carries in its range form. The custom white balance
+/// capture area and frame size have no current value and give their x and y
+/// bounds as the range's minimum and maximum; preset PTZF numbers run over
+/// the slot property's range, ending at the number of slots.
+pub(crate) fn from_form(
+    code: u16,
+    current: &PtpValue,
+    min: &PtpValue,
+    max: &PtpValue,
+) -> Option<(&'static str, Value)> {
+    let (lo, hi) = (min.as_int()?, max.as_int()?);
+    match code {
+        0xD26B => Some((
+            "white_balance.custom_capture_area",
+            json!({"min": point(lo), "max": point(hi)}),
+        )),
+        0xD26C => Some((
+            "white_balance.custom_capture_frame_size",
+            json!({"min": point(lo), "max": point(hi)}),
+        )),
+        0xE0CB => {
+            let last = match current.as_int() {
+                Some(slots) if slots > 0 => hi.min(slots),
+                _ => hi,
+            };
+            Some((
+                "pan_tilt.preset_numbers",
+                json!({"first": lo, "last": last}),
+            ))
+        }
+        _ => None,
     }
 }
 
@@ -1534,6 +1682,14 @@ fn number(value: &Value) -> Result<f64, String> {
     value
         .as_f64()
         .ok_or_else(|| format!("{value} is not a number"))
+}
+
+fn object_int(value: &Value, name: &str) -> Result<i128, String> {
+    value
+        .get(name)
+        .and_then(Value::as_i64)
+        .map(i128::from)
+        .ok_or_else(|| format!("'{name}' must be an integer"))
 }
 
 /// The wire value for an operator value, the inverse of `decode`.
@@ -1627,6 +1783,13 @@ pub(crate) fn encode(decode: Decode, value: &Value) -> Result<PtpValue, String> 
                 .map(PtpValue::Int)
                 .ok_or_else(|| format!("'{text}' is not a known frame rate"))
         }
+        Point => int(pack16(&[object_int(value, "x")?, object_int(value, "y")?])?),
+        Frame => int(pack16(&[
+            object_int(value, "height")?,
+            object_int(value, "width")?,
+            object_int(value, "x")?,
+            object_int(value, "y")?,
+        ])?),
         Percent | Count32 | Millivolts | Ratio64 | Progress => {
             Err("this property is read-only here; use set_property".into())
         }
@@ -1894,6 +2057,13 @@ mod tests {
             (FrameRate, json!("59.94p"), 0x0A),
             (FrameRate, json!("50i"), 0x44),
             (Microdegrees, json!(-12.5), -12_500_000),
+            (Point, json!({"x": 150, "y": 100}), 0x0096_0064),
+            (
+                Frame,
+                json!({"height": 50, "width": 40, "x": 150, "y": 100}),
+                0x0032_0028_0096_0064,
+            ),
+            (Labels(CUSTOM_WB_SIZE), json!("medium"), 2),
         ];
         for (d, operator, wire) in cases {
             assert_eq!(encode(d, &operator).unwrap(), int(wire), "{operator}");
@@ -1913,6 +2083,27 @@ mod tests {
         assert!(encode(Timecode, &json!("25:00:00:00")).is_err());
         assert!(encode(UserBits, &json!("12")).is_err());
         assert!(encode(Percent, &json!(5)).is_err());
+        assert!(encode(Point, &json!({"x": 70000, "y": 1})).is_err());
+        assert!(encode(Frame, &json!({"x": 1, "y": 1})).is_err());
+    }
+
+    #[test]
+    fn form_state_reads_the_range() {
+        // The capturable area's x and y bounds come from the range.
+        assert_eq!(
+            from_form(0xD26B, &int(0), &int(0x0010_0020), &int(0x0270_01D0)),
+            Some((
+                "white_balance.custom_capture_area",
+                json!({"min": {"x": 16, "y": 32}, "max": {"x": 624, "y": 464}})
+            ))
+        );
+        // Preset numbers end at the number of slots.
+        assert_eq!(
+            from_form(0xE0CB, &int(100), &int(1), &int(256)),
+            Some(("pan_tilt.preset_numbers", json!({"first": 1, "last": 100})))
+        );
+        assert_eq!(from_form(0x5005, &int(0), &int(0), &int(1)), None);
+        assert_eq!(field16(0x0032_0033_0096_0064, 1, 4), 0x33);
     }
 
     #[test]
