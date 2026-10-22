@@ -1,0 +1,2824 @@
+spec: 1
+id: christie-trulife
+name: Christie TruLife and TruLife+ projectors (serial commands over TCP)
+vendor: Christie
+category: display
+
+# Christie's 3DLP laser and lamp projectors built on the TruLife and TruLife+ electronics (Eclipse, M RGB,
+# Griffyn, Sapphire 4K40-RGBH, 4K40-RGB, Mirage SST, Boxer) share one ASCII command set: "(" + three-letter
+# code [+ four-character subcode] [value | ?] + ")", on the RS232 IN port and on TCP 3002. A set is sent with
+# the "#" prefix, which makes the projector echo the message once it has processed it; requests carry no "#"
+# and are answered "(CODE!value ...)". Each family's reference is a model with its own supports list; a
+# parameter takes the union of the documented ranges, with each family's values in its description.
+source:
+  - title: "Christie TruLife+ Technical Reference: Serial Commands, 020-103316-13 Rev. 1 (10-2025)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-103316-13-Christie-LIT-TECH-REF-TruLifePlus-API.pdf
+    note: "Models (Eclipse, M RGB Series, Griffyn Series, Sapphire 4K40-RGBH), RS232 IN and Ethernet (TCP 3002), message format with the # full acknowledgment, $ and & prefixes, error code table, Xon/Xoff flow control, typical automation commands (pp. 6-18); every command and its 'Only applies to' notes (pp. 19-76); asynchronous messages (p. 77)."
+  - title: "Christie TruLife+ Technical Reference: Status System, 020-103327-17 Rev. 1 (11-2025)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-103327-17-Christie-LIT-TECH-REF-TruLifePlus-STATSYS.pdf
+    note: "Status states and the items of the CONF, SYST, SIGN, VERS, TEMP, COOL, SERI and LGHT groups per family, read into status.items and the typed status keys."
+  - title: "Christie Technical Bulletin: TruLife+ LAS serial command notification, 020-200567-01 Rev. 1 (01-2024)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-200567-01-christie-bul-tech-trulife-las-cmd.pdf
+    note: "LAS+EBLU, LAS+EGRN and LAS+ERED are removed and must not be used (damage to the diffuser); PWR 1 turns the laser on."
+  - title: "Christie 4K40-RGB Technical Reference: Serial Commands, 020-102972-07 Rev. 1 (09-2020)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-102972-07-Christie-LIT-TECH-4K40-RGB-API.pdf
+    note: "Commands of the d4k40-rgb model; TCP 3002; RS232 port on the IMXB faceplate."
+  - title: "Christie D4K40-RGB Technical Reference: Status System, 020-102975-02 Rev. 1 (01-2020)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-102975-02-christie-lit-tech-ref-d4k40-rgb-statsys.pdf
+    note: "Status groups and items of the d4k40-rgb model (CONF, SYST, SIGN, LGHT, VERS, TEMP, COOL, SERI)."
+  - title: "Christie Mirage SST Technical Reference: Serial Commands, 020-103005-04 (the cover reads 020-103005-03 Rev. 1 (01-2021))"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-103005-04-Christie-LIT-TECH-REF-Mirage-SST-API.pdf
+    note: "Commands of the mirage-sst model; TCP 3002."
+  - title: "Christie Boxer 4K Technical Reference: Serial API Commands, 020-101697-12 Rev. 1 (11-2020)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-101697-12-Christie-LIT-TECH-REF-Boxer-4K-API.pdf
+    note: "Commands of the boxer-4k model, lamp commands (LOP, LPL, LPP, HIS) and the Boxer status groups; TCP 3002."
+  - title: "Christie Boxer 2K Technical Reference: Serial API Commands, 020-102417-08 Rev. 1 (11-2020)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-102417-08-Christie-LIT-TECH-REF-Boxer-2K-API.pdf
+    note: "Commands of the boxer-2k model; TCP 3002."
+  - title: "Christie Boxer 30 Technical Reference: Serial API Commands, 020-102096-10 Rev. 1 (11-2020)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/globalassets/resources/public/020-102096-10-Christie-LIT-TECH-REF-Boxer-30-API.pdf
+    note: "Commands of the boxer-30 model; TCP 3002."
+  - title: "Christie product pages (model names)"
+    author: Christie Digital Systems USA, Inc.
+    url: https://www.christiedigital.com/products/projectors/all-projectors/
+    note: "M 4K RGB Series: M 4K15 RGB, M 4K+15 RGB, M 4K25 RGB, M 4K+25 RGB; Griffyn Series: 4K35-RGB, 4K50-RGB (4K32-RGB under end of production); Eclipse G3; Sapphire 4K40-RGBH; Boxer 2K30 and Boxer 30 under end of support."
+
+transport:
+  type: line-tcp
+  port: 3002
+  framing: delimited
+  open: "("
+  close: ")"
+  encoding: ascii
+  timeout_ms: 30000
+  reply: expected
+  # Errors are answered as (65535 00000 ERR00005 "ITP: Too Few Parameters"). Code 0 is not an error reply:
+  # it is the asynchronous status message (ERR00000 "System Warning: ..."), so it is left out.
+  error_match: '^\(\d+ \d+ ERR0*[1-9]\d* '
+  probe: "PWR?"
+
+ports:
+  - { port: 3002, protocol: tcp, role: control }
+
+models:
+  - id: eclipse
+    name: "Christie Eclipse and Eclipse G3"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_channel, get_channel, get_channel_list, set_input, get_input,
+      get_input_list, set_port_configuration, get_port_configuration, set_video_input_configuration,
+      get_video_input_configuration, set_sdi_payload_override, set_sdi_custom_payload, set_edid_frame_rate,
+      set_edid_mode, set_film_mode_detect, set_frame_delay, get_frame_delay, get_frame_delay_time, set_thumbnails,
+      set_shutter, get_shutter, set_shutter_inhibit, get_shutter_inhibit, set_freeze, get_freeze, set_test_pattern,
+      get_test_pattern, get_test_pattern_list, set_test_pattern_frequency, set_test_pattern_grid_pitch,
+      set_test_pattern_gray, set_test_pattern_ramp_level, set_test_pattern_ramp_speed, set_test_pattern_ramp_slope,
+      set_test_pattern_grid_color, set_test_pattern_grid_motion, set_engine_test_pattern, set_3d_test_pattern,
+      set_color_enable, set_gamma_function, set_gamma, set_gamma_max_luminance, set_gamma_min_luminance,
+      set_gamma_pq_white_level, set_gamma_slope, set_color_space, set_sharpness, set_resize_preset, set_orientation,
+      set_black_level_offset_enabled, set_black_level_offset, set_black_level_offset_max,
+      save_black_level_offset_defaults, get_output_resolution, get_output_columns, get_output_rows, set_color_table,
+      copy_color_table, set_color_temperature, set_custom_color_coordinate, set_native_primary,
+      set_custom_color_saturation, reset_native_primaries, save_native_primaries, set_color_uniformity,
+      set_color_uniformity_point, set_laser_power, get_laser_power, set_laser_drive, set_thermal_profile,
+      get_thermal_profile, set_pressurized_filter, calibrate_lens, lens_home, calibrate_zoom, set_lens_lock,
+      set_lens_has_zoom_motor, set_lens_focus, get_lens_focus_range, set_lens_horizontal, get_lens_horizontal_range,
+      set_lens_vertical, get_lens_vertical_range, set_lens_zoom, get_lens_zoom_range, move_lens, run_lens_motor,
+      step_lens_motor, set_warp, get_warp_list, set_keystone_gain_compensation, get_keystone_gain_compensation,
+      set_warp_optimization_disabled, set_edge_blend, get_edge_blend_list, set_black_level_blend,
+      get_black_level_blend_list, set_3d_mode, set_3d_sync_delay, get_3d_sync_delay, set_3d_invert, get_3d_invert,
+      set_3d_sync_out, get_3d_sync_out, set_3d_dark_interval, toggle_high_frame_rate, recall_profile,
+      get_profile_list, clear_profile, set_artnet, set_artnet_base_channel, set_artnet_net, set_artnet_subnet,
+      set_artnet_universe, set_static_ip, set_static_ip_without_gateway, enable_dhcp, get_ip_address, get_netmask,
+      get_gateway, get_mac_address, set_device_group, set_hostname, set_control_port, get_control_port, set_snmp_trap,
+      set_snmp_read_community, set_snmp_trap_destination, set_ethernet_access_level, set_serial_access_level,
+      set_address, get_address, set_baud_rate, get_baud_rate, set_async_messages, set_language, get_language,
+      set_temperature_unit, get_temperature_unit, set_menu_position, get_menu_position, set_osd, get_osd,
+      set_splash_color, set_stealth_mode, get_stealth_mode, set_keypad, get_wired_keypad, set_gpio_direction,
+      get_gpio_direction, set_gpio_outputs, get_gpio_states, set_gpio_trigger, set_date, get_date, set_time, get_time,
+      login, logout, get_user, factory_defaults, ping, get_status, get_status_group, get_status_item, get_events,
+      get_recent_events, get_events_since, get_events_between, request
+    ]
+    verification: none
+    notes: "Commands from TruLife+ Serial Commands 020-103316-13 and Status System 020-103327-17."
+  - id: m-rgb
+    name: "Christie M 4K RGB Series (M 4K15 RGB, M 4K+15 RGB, M 4K25 RGB, M 4K+25 RGB)"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_channel, get_channel, get_channel_list,
+      set_input, get_input, get_input_list, set_port_configuration, get_port_configuration, set_christie_link_input,
+      set_video_input_configuration, get_video_input_configuration, set_sdi_payload_override, set_sdi_custom_payload,
+      set_edid_frame_rate, set_edid_mode, set_film_mode_detect, set_frame_delay, get_frame_delay,
+      get_frame_delay_time, set_thumbnails, set_shutter, get_shutter, set_freeze, get_freeze, set_test_pattern,
+      get_test_pattern, get_test_pattern_list, set_test_pattern_frequency, set_test_pattern_grid_pitch,
+      set_test_pattern_gray, set_test_pattern_ramp_level, set_test_pattern_ramp_speed, set_test_pattern_ramp_slope,
+      set_test_pattern_grid_color, set_test_pattern_grid_motion, set_engine_test_pattern, set_3d_test_pattern,
+      set_color_enable, set_gamma_function, set_gamma, set_gamma_max_luminance, set_gamma_min_luminance,
+      set_gamma_pq_white_level, set_gamma_slope, set_color_space, set_sharpness, set_resize_preset, set_orientation,
+      set_black_level_offset_enabled, set_black_level_offset, set_black_level_offset_max,
+      save_black_level_offset_defaults, get_output_resolution, get_output_columns, get_output_rows, set_color_table,
+      copy_color_table, set_color_temperature, set_custom_color_coordinate, set_native_primary,
+      set_custom_color_saturation, reset_native_primaries, save_native_primaries, set_color_uniformity,
+      set_color_uniformity_point, set_laser_power, get_laser_power, set_laser_drive, set_liteloc_mode,
+      set_white_target, set_camera_friendly_color, set_camera_friendly_white, get_color_sensor,
+      set_low_brightness_mode, set_realblack, set_realblack_threshold, set_realblack_time, set_thermal_profile,
+      get_thermal_profile, set_shifted_superposition, get_shifted_superposition, set_actuator_multiplication,
+      calibrate_lens, lens_home, calibrate_zoom, set_lens_lock, set_lens_has_zoom_motor, set_lens_focus,
+      get_lens_focus_range, set_lens_horizontal, get_lens_horizontal_range, set_lens_vertical,
+      get_lens_vertical_range, set_lens_zoom, get_lens_zoom_range, move_lens, run_lens_motor, step_lens_motor,
+      set_warp, get_warp_list, set_keystone_gain_compensation, get_keystone_gain_compensation,
+      set_warp_optimization_disabled, set_edge_blend, get_edge_blend_list, set_black_level_blend,
+      get_black_level_blend_list, set_3d_mode, set_3d_sync_delay, get_3d_sync_delay, set_3d_invert, get_3d_invert,
+      set_3d_sync_out, get_3d_sync_out, set_3d_dark_interval, toggle_high_frame_rate, recall_profile,
+      get_profile_list, clear_profile, set_artnet, set_artnet_base_channel, set_artnet_net, set_artnet_subnet,
+      set_artnet_universe, set_static_ip, set_static_ip_without_gateway, enable_dhcp, get_ip_address, get_netmask,
+      get_gateway, get_mac_address, set_device_group, set_hostname, set_control_port, get_control_port, set_snmp_trap,
+      set_snmp_read_community, set_snmp_trap_destination, set_ethernet_access_level, set_serial_access_level,
+      set_address, get_address, set_baud_rate, get_baud_rate, set_async_messages, set_language, get_language,
+      set_temperature_unit, get_temperature_unit, set_menu_position, get_menu_position, set_osd, get_osd,
+      set_splash_color, set_stealth_mode, get_stealth_mode, set_keypad, get_wired_keypad, set_gpio_direction,
+      get_gpio_direction, set_gpio_outputs, get_gpio_states, set_gpio_trigger, set_date, get_date, set_time, get_time,
+      login, logout, get_user, factory_defaults, ping, get_status, get_status_group, get_status_item, get_events,
+      get_recent_events, get_events_since, get_events_between, request
+    ]
+    verification: none
+    notes: "Commands from TruLife+ Serial Commands 020-103316-13 and Status System 020-103327-17."
+  - id: griffyn
+    name: "Christie Griffyn Series (Griffyn 4K32-RGB, 4K35-RGB, 4K50-RGB)"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_channel, get_channel, get_channel_list,
+      set_input, get_input, get_input_list, set_port_configuration, get_port_configuration, set_christie_link_input,
+      set_video_input_configuration, get_video_input_configuration, set_sdi_payload_override, set_sdi_custom_payload,
+      set_edid_frame_rate, set_edid_mode, set_film_mode_detect, set_frame_delay, get_frame_delay,
+      get_frame_delay_time, set_thumbnails, set_shutter, get_shutter, set_freeze, get_freeze, set_test_pattern,
+      get_test_pattern, get_test_pattern_list, set_test_pattern_frequency, set_test_pattern_grid_pitch,
+      set_test_pattern_gray, set_test_pattern_ramp_level, set_test_pattern_ramp_speed, set_test_pattern_ramp_slope,
+      set_test_pattern_grid_color, set_test_pattern_grid_motion, set_engine_test_pattern, set_3d_test_pattern,
+      set_color_enable, set_gamma_function, set_gamma, set_gamma_max_luminance, set_gamma_min_luminance,
+      set_gamma_pq_white_level, set_gamma_slope, set_color_space, set_sharpness, set_resize_preset, set_orientation,
+      set_black_level_offset_enabled, set_black_level_offset, set_black_level_offset_max,
+      save_black_level_offset_defaults, get_output_resolution, get_output_columns, get_output_rows, set_color_table,
+      copy_color_table, set_color_temperature, set_custom_color_coordinate, set_native_primary,
+      set_custom_color_saturation, reset_native_primaries, save_native_primaries, set_color_uniformity,
+      set_color_uniformity_point, set_laser_power, get_laser_power, set_laser_drive, set_liteloc_mode,
+      set_white_target, set_camera_friendly_color, set_camera_friendly_white, get_color_sensor,
+      set_max_ambient_temperature, set_max_humidity, set_environment_manual, set_realblack, set_realblack_threshold,
+      set_realblack_time, set_enhanced_healing, set_thermal_profile, get_thermal_profile, calibrate_lens, lens_home,
+      calibrate_zoom, set_lens_lock, set_lens_has_zoom_motor, set_lens_focus, get_lens_focus_range,
+      set_lens_horizontal, get_lens_horizontal_range, set_lens_vertical, get_lens_vertical_range, set_lens_zoom,
+      get_lens_zoom_range, move_lens, run_lens_motor, step_lens_motor, set_warp, get_warp_list,
+      set_keystone_gain_compensation, get_keystone_gain_compensation, set_warp_optimization_disabled, set_edge_blend,
+      get_edge_blend_list, set_black_level_blend, get_black_level_blend_list, set_3d_mode, set_3d_sync_delay,
+      get_3d_sync_delay, set_3d_invert, get_3d_invert, set_3d_sync_out, get_3d_sync_out, set_3d_dark_interval,
+      toggle_high_frame_rate, recall_profile, get_profile_list, clear_profile, set_artnet, set_artnet_base_channel,
+      set_artnet_net, set_artnet_subnet, set_artnet_universe, set_static_ip, set_static_ip_without_gateway,
+      enable_dhcp, get_ip_address, get_netmask, get_gateway, get_mac_address, set_device_group, set_hostname,
+      set_control_port, get_control_port, set_snmp_trap, set_snmp_read_community, set_snmp_trap_destination,
+      set_ethernet_access_level, set_serial_access_level, set_address, get_address, set_baud_rate, get_baud_rate,
+      set_async_messages, set_language, get_language, set_temperature_unit, get_temperature_unit, set_menu_position,
+      get_menu_position, set_osd, get_osd, set_splash_color, set_stealth_mode, get_stealth_mode, set_keypad,
+      get_wired_keypad, set_gpio_direction, get_gpio_direction, set_gpio_outputs, get_gpio_states, set_gpio_trigger,
+      set_date, get_date, set_time, get_time, login, logout, get_user, factory_defaults, ping, get_status,
+      get_status_group, get_status_item, get_events, get_recent_events, get_events_since, get_events_between, request
+    ]
+    verification: none
+    notes: "Commands from TruLife+ Serial Commands 020-103316-13 and Status System 020-103327-17."
+  - id: sapphire-4k40-rgbh
+    name: "Christie Sapphire 4K40-RGBH"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_channel, get_channel, get_channel_list,
+      set_input, get_input, get_input_list, set_port_configuration, get_port_configuration,
+      set_video_input_configuration, get_video_input_configuration, set_sdi_payload_override, set_sdi_custom_payload,
+      set_edid_frame_rate, set_edid_mode, set_film_mode_detect, set_frame_delay, get_frame_delay,
+      get_frame_delay_time, set_phase_locking_disabled, get_phase_locking_disabled, set_thumbnails, set_shutter,
+      get_shutter, set_freeze, get_freeze, set_test_pattern, get_test_pattern, get_test_pattern_list,
+      set_test_pattern_frequency, set_test_pattern_grid_pitch, set_test_pattern_gray, set_test_pattern_ramp_level,
+      set_test_pattern_ramp_speed, set_test_pattern_ramp_slope, set_test_pattern_grid_color,
+      set_test_pattern_grid_motion, set_engine_test_pattern, set_3d_test_pattern, set_color_enable,
+      set_gamma_function, set_gamma, set_gamma_max_luminance, set_gamma_min_luminance, set_gamma_pq_white_level,
+      set_gamma_slope, set_color_space, set_sharpness, set_resize_preset, set_orientation,
+      set_black_level_offset_enabled, set_black_level_offset, set_black_level_offset_max,
+      save_black_level_offset_defaults, get_output_resolution, get_output_columns, get_output_rows, set_color_table,
+      copy_color_table, set_color_temperature, set_custom_color_coordinate, set_native_primary,
+      set_custom_color_saturation, reset_native_primaries, save_native_primaries, set_color_uniformity,
+      set_color_uniformity_point, set_laser_power, get_laser_power, set_laser_drive, set_phosphor_drive,
+      set_liteloc_mode, set_thermal_profile, get_thermal_profile, calibrate_lens, lens_home, calibrate_zoom,
+      set_lens_lock, set_lens_has_zoom_motor, set_lens_focus, get_lens_focus_range, set_lens_horizontal,
+      get_lens_horizontal_range, set_lens_vertical, get_lens_vertical_range, set_lens_zoom, get_lens_zoom_range,
+      move_lens, run_lens_motor, step_lens_motor, set_warp, get_warp_list, set_keystone_gain_compensation,
+      get_keystone_gain_compensation, set_warp_optimization_disabled, set_edge_blend, get_edge_blend_list,
+      set_black_level_blend, get_black_level_blend_list, set_3d_mode, set_3d_sync_delay, get_3d_sync_delay,
+      set_3d_invert, get_3d_invert, set_3d_sync_out, get_3d_sync_out, set_3d_dark_interval, toggle_high_frame_rate,
+      recall_profile, get_profile_list, clear_profile, set_artnet, set_artnet_base_channel, set_artnet_net,
+      set_artnet_subnet, set_artnet_universe, set_static_ip, set_static_ip_without_gateway, enable_dhcp,
+      get_ip_address, get_netmask, get_gateway, get_mac_address, set_device_group, set_hostname, set_control_port,
+      get_control_port, set_snmp_trap, set_snmp_read_community, set_snmp_trap_destination, set_ethernet_access_level,
+      set_serial_access_level, set_address, get_address, set_baud_rate, get_baud_rate, set_async_messages,
+      set_language, get_language, set_temperature_unit, get_temperature_unit, set_menu_position, get_menu_position,
+      set_osd, get_osd, set_splash_color, set_stealth_mode, get_stealth_mode, set_keypad, get_wired_keypad,
+      set_gpio_direction, get_gpio_direction, set_gpio_outputs, get_gpio_states, set_gpio_trigger, set_date, get_date,
+      set_time, get_time, login, logout, get_user, factory_defaults, ping, get_status, get_status_group,
+      get_status_item, get_events, get_recent_events, get_events_since, get_events_between, request
+    ]
+    verification: none
+    notes: "Commands from TruLife+ Serial Commands 020-103316-13 and Status System 020-103327-17."
+  - id: d4k40-rgb
+    name: "Christie 4K40-RGB (D4K40-RGB)"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_input, get_input, get_input_list,
+      set_port_configuration, get_port_configuration, set_christie_link_video, set_dual_link_dvi_disabled,
+      set_loop_out, set_edid_frame_rate, set_film_mode_detect, set_frame_delay, get_frame_delay, get_frame_delay_time,
+      auto_setup, set_shutter, get_shutter, set_shutter_keep_blend, get_shutter_keep_blend,
+      set_shutter_monitoring_disabled, set_freeze, get_freeze, set_test_pattern, get_test_pattern,
+      get_test_pattern_list, set_test_pattern_frequency, set_test_pattern_grid_pitch, set_test_pattern_gray,
+      set_test_pattern_ramp_level, set_test_pattern_ramp_speed, set_test_pattern_ramp_slope,
+      set_test_pattern_grid_color, set_test_pattern_grid_motion, set_engine_test_pattern, set_color_enable,
+      set_gamma_function, set_gamma, set_gamma_max_luminance, set_gamma_min_luminance, set_gamma_slope,
+      set_color_space, set_sharpness, set_resize_preset, set_orientation, set_ambient_light_correction, set_blanking,
+      get_blanking, reset_blanking, set_output_resolution, get_output_resolution, get_output_columns, get_output_rows,
+      set_color_table, copy_color_table, set_color_temperature, set_custom_color_coordinate, set_native_primary,
+      set_custom_color_saturation, reset_native_primaries, save_native_primaries, set_color_uniformity,
+      set_color_uniformity_point, set_laser_power, get_laser_power, set_laser_drive, set_liteloc_mode,
+      set_white_target, get_color_sensor, set_max_ambient_temperature, calibrate_lens, lens_home, calibrate_zoom,
+      set_lens_lock, set_lens_has_zoom_motor, set_lens_focus, get_lens_focus_range, set_lens_horizontal,
+      get_lens_horizontal_range, set_lens_vertical, get_lens_vertical_range, set_lens_zoom, get_lens_zoom_range,
+      move_lens, run_lens_motor, step_lens_motor, set_ust_lens_area, get_ust_lens_area, set_warp, get_warp_list,
+      set_keystone_gain_compensation, get_keystone_gain_compensation, set_edge_blend, get_edge_blend_list,
+      set_black_level_blend, get_black_level_blend_list, set_keep_blend_on_input_switch,
+      get_keep_blend_on_input_switch, toggle_high_frame_rate, recall_profile, get_profile_list, set_artnet,
+      set_artnet_base_channel, set_artnet_net, set_artnet_subnet, set_artnet_universe, set_static_ip,
+      set_static_ip_without_gateway, enable_dhcp, get_ip_address, get_netmask, get_gateway, get_mac_address,
+      set_device_group, set_hostname, set_control_port, get_control_port, set_network_switching, set_snmp_trap,
+      set_snmp_read_community, set_snmp_trap_destination, set_ethernet_access_level, set_serial_access_level,
+      set_address, get_address, set_baud_rate, get_baud_rate, set_async_messages, set_language, get_language,
+      set_temperature_unit, get_temperature_unit, set_menu_position, get_menu_position, set_osd, get_osd,
+      set_splash_color, set_stealth_mode, get_stealth_mode, set_keypad, get_wired_keypad, set_gpio_direction,
+      get_gpio_direction, set_gpio_outputs, get_gpio_states, set_date, get_date, set_time, get_time, login, logout,
+      get_user, factory_defaults, reboot, ping, get_status, get_status_group, get_status_item, get_events,
+      get_recent_events, get_events_since, get_events_between, run_self_test_suite, run_self_test,
+      get_self_test_suite_list, get_self_test_list, request
+    ]
+    verification: none
+    notes: "Commands from 4K40-RGB Serial Commands 020-102972-07 and Status System 020-102975-02."
+  - id: mirage-sst
+    name: "Christie Mirage SST"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_input, get_input, get_input_list,
+      set_port_configuration, get_port_configuration, set_christie_link_video, set_dual_link_dvi_disabled,
+      set_loop_out, set_sdi_payload_override, set_sdi_custom_payload, set_edid_frame_rate, set_film_mode_detect,
+      set_frame_delay, get_frame_delay, get_frame_delay_time, auto_setup, set_thumbnails, set_shutter, get_shutter,
+      set_freeze, get_freeze, set_test_pattern, get_test_pattern, get_test_pattern_list, set_test_pattern_frequency,
+      set_test_pattern_grid_pitch, set_test_pattern_gray, set_test_pattern_ramp_level, set_test_pattern_ramp_speed,
+      set_test_pattern_ramp_slope, set_test_pattern_grid_color, set_test_pattern_grid_motion, set_engine_test_pattern,
+      set_3d_test_pattern, set_color_enable, set_gamma_function, set_gamma, set_gamma_max_luminance,
+      set_gamma_min_luminance, set_gamma_slope, set_color_space, set_sharpness, set_resize_preset, set_orientation,
+      set_ambient_light_correction, set_output_resolution, get_output_resolution, get_output_columns, get_output_rows,
+      set_color_table, copy_color_table, set_color_temperature, set_custom_color_coordinate, set_native_primary,
+      set_custom_color_saturation, reset_native_primaries, save_native_primaries, set_color_uniformity,
+      set_color_uniformity_point, set_laser_power, get_laser_power, set_laser_drive, set_max_ambient_temperature,
+      calibrate_lens, lens_home, calibrate_zoom, set_lens_lock, set_lens_has_zoom_motor, set_lens_focus,
+      get_lens_focus_range, set_lens_horizontal, get_lens_horizontal_range, set_lens_vertical,
+      get_lens_vertical_range, set_lens_zoom, get_lens_zoom_range, move_lens, run_lens_motor, step_lens_motor,
+      set_ust_lens_area, get_ust_lens_area, set_warp, get_warp_list, set_keystone_gain_compensation,
+      get_keystone_gain_compensation, set_edge_blend, get_edge_blend_list, set_black_level_blend,
+      get_black_level_blend_list, set_3d_mode, set_3d_sync_delay, get_3d_sync_delay, set_3d_invert, get_3d_invert,
+      set_3d_sync_out, get_3d_sync_out, set_3d_dark_interval, toggle_high_frame_rate, recall_profile,
+      get_profile_list, set_artnet, set_artnet_base_channel, set_artnet_net, set_artnet_subnet, set_artnet_universe,
+      set_static_ip, set_static_ip_without_gateway, enable_dhcp, get_ip_address, get_netmask, get_gateway,
+      get_mac_address, set_device_group, set_hostname, set_control_port, get_control_port, set_network_switching,
+      set_snmp_trap, set_snmp_read_community, set_snmp_trap_destination, set_ethernet_access_level,
+      set_serial_access_level, set_address, get_address, set_baud_rate, get_baud_rate, set_async_messages,
+      set_language, get_language, set_temperature_unit, get_temperature_unit, set_menu_position, get_menu_position,
+      set_osd, get_osd, set_splash_color, set_keypad, get_wired_keypad, set_gpio_direction, get_gpio_direction,
+      set_gpio_outputs, get_gpio_states, set_date, get_date, set_time, get_time, login, logout, get_user,
+      factory_defaults, reboot, ping, get_status, get_status_group, get_status_item, get_events, get_recent_events,
+      get_events_since, get_events_between, run_self_test_suite, run_self_test, get_self_test_suite_list,
+      get_self_test_list, request
+    ]
+    verification: none
+    notes: "Commands from Mirage SST Serial Commands 020-103005."
+  - id: boxer-4k
+    name: "Christie Boxer 4K series (Boxer 4K30 and its siblings)"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_input, get_input, get_input_list,
+      set_port_configuration, get_port_configuration, set_christie_link_video, set_dual_link_dvi_disabled,
+      set_loop_out, set_sdi_payload_override, set_sdi_custom_payload, set_edid_frame_rate, set_edid_window,
+      set_film_mode_detect, set_frame_delay, get_frame_delay, get_frame_delay_time, auto_setup, set_thumbnails,
+      set_shutter, get_shutter, set_freeze, get_freeze, set_test_pattern, get_test_pattern, get_test_pattern_list,
+      set_test_pattern_frequency, set_test_pattern_grid_pitch, set_test_pattern_gray, set_test_pattern_ramp_level,
+      set_test_pattern_ramp_speed, set_test_pattern_ramp_slope, set_test_pattern_grid_color,
+      set_test_pattern_grid_motion, set_engine_test_pattern, set_color_enable, set_gamma_function, set_gamma,
+      set_gamma_max_luminance, set_gamma_min_luminance, set_gamma_slope, set_color_space, set_sharpness,
+      set_resize_preset, set_orientation, set_ambient_light_correction, set_blanking, get_blanking, reset_blanking,
+      set_output_resolution, get_output_resolution, get_output_columns, get_output_rows, set_color_table,
+      copy_color_table, set_color_temperature, set_custom_color_coordinate, set_native_primary,
+      set_custom_color_saturation, reset_native_primaries, save_native_primaries, select_lamp, set_active_lamps,
+      set_lamp_life, set_lamp_power, get_lamp_power_range, get_lamp_history, get_lamp_module_history, calibrate_lens,
+      lens_home, calibrate_zoom, set_lens_focus, get_lens_focus_range, set_lens_horizontal, get_lens_horizontal_range,
+      set_lens_vertical, get_lens_vertical_range, set_lens_zoom, get_lens_zoom_range, move_lens, run_lens_motor,
+      step_lens_motor, set_ust_lens_area, get_ust_lens_area, set_warp, get_warp_list, set_keystone_gain_compensation,
+      get_keystone_gain_compensation, set_edge_blend, get_edge_blend_list, set_black_level_blend,
+      get_black_level_blend_list, toggle_high_frame_rate, recall_profile, get_profile_list, set_artnet,
+      set_artnet_base_channel, set_artnet_net, set_artnet_subnet, set_artnet_universe, set_static_ip,
+      set_static_ip_without_gateway, enable_dhcp, get_ip_address, get_netmask, get_gateway, get_mac_address,
+      set_device_group, set_hostname, set_control_port, get_control_port, set_network_switching, set_snmp_trap,
+      set_snmp_read_community, set_snmp_trap_destination, set_ethernet_access_level, set_serial_access_level,
+      set_address, get_address, set_baud_rate, get_baud_rate, set_async_messages, set_language, get_language,
+      set_temperature_unit, get_temperature_unit, set_menu_position, get_menu_position, set_osd, get_osd,
+      set_splash_color, set_stealth_mode, get_stealth_mode, set_keypad, get_wired_keypad, set_gpio_direction,
+      get_gpio_direction, set_gpio_outputs, get_gpio_states, set_date, get_date, set_time, get_time, login, logout,
+      get_user, factory_defaults, reboot, ping, get_status, get_status_group, get_status_item, get_events,
+      get_recent_events, get_events_since, get_events_between, run_self_test_suite, run_self_test,
+      get_self_test_suite_list, get_self_test_list, request
+    ]
+    verification: none
+    notes: "Commands from Boxer 4K Serial API Commands 020-101697-12."
+  - id: boxer-2k
+    name: "Christie Boxer 2K series (Boxer 2K20, 2K25, 2K30)"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_input, get_input, get_input_list,
+      set_port_configuration, get_port_configuration, set_christie_link_video, set_dual_link_dvi_disabled,
+      set_loop_out, set_sdi_payload_override, set_sdi_custom_payload, set_edid_frame_rate, set_film_mode_detect,
+      set_frame_delay, get_frame_delay, get_frame_delay_time, auto_setup, set_thumbnails, set_shutter, get_shutter,
+      set_freeze, get_freeze, set_test_pattern, get_test_pattern, get_test_pattern_list, set_test_pattern_frequency,
+      set_test_pattern_grid_pitch, set_test_pattern_gray, set_test_pattern_ramp_level, set_test_pattern_ramp_speed,
+      set_test_pattern_ramp_slope, set_test_pattern_grid_color, set_test_pattern_grid_motion, set_engine_test_pattern,
+      set_color_enable, set_gamma_function, set_gamma, set_gamma_max_luminance, set_gamma_min_luminance,
+      set_gamma_slope, set_color_space, set_sharpness, set_resize_preset, set_orientation,
+      set_ambient_light_correction, set_blanking, get_blanking, reset_blanking, get_output_resolution,
+      get_output_columns, get_output_rows, set_color_table, copy_color_table, set_color_temperature,
+      set_custom_color_coordinate, set_native_primary, set_custom_color_saturation, reset_native_primaries,
+      save_native_primaries, select_lamp, set_active_lamps, set_lamp_life, set_lamp_power, get_lamp_power_range,
+      get_lamp_history, get_lamp_module_history, calibrate_lens, lens_home, set_lens_focus, get_lens_focus_range,
+      set_lens_horizontal, get_lens_horizontal_range, set_lens_vertical, get_lens_vertical_range, set_lens_zoom,
+      get_lens_zoom_range, move_lens, run_lens_motor, step_lens_motor, set_ust_lens_area, get_ust_lens_area, set_warp,
+      get_warp_list, set_keystone_gain_compensation, get_keystone_gain_compensation, set_edge_blend,
+      get_edge_blend_list, set_black_level_blend, get_black_level_blend_list, recall_profile, get_profile_list,
+      set_artnet, set_artnet_base_channel, set_artnet_net, set_artnet_subnet, set_artnet_universe, set_static_ip,
+      set_static_ip_without_gateway, enable_dhcp, get_ip_address, get_netmask, get_gateway, get_mac_address,
+      set_device_group, set_hostname, set_control_port, get_control_port, set_network_switching, set_snmp_trap,
+      set_snmp_read_community, set_snmp_trap_destination, set_ethernet_access_level, set_serial_access_level,
+      set_address, get_address, set_baud_rate, get_baud_rate, set_async_messages, set_language, get_language,
+      set_temperature_unit, get_temperature_unit, set_menu_position, get_menu_position, set_osd, get_osd,
+      set_splash_color, set_stealth_mode, get_stealth_mode, set_keypad, get_wired_keypad, set_gpio_direction,
+      get_gpio_direction, set_gpio_outputs, get_gpio_states, set_date, get_date, set_time, get_time, login, logout,
+      get_user, factory_defaults, reboot, ping, get_status, get_status_group, get_status_item, get_events,
+      get_recent_events, get_events_since, get_events_between, run_self_test_suite, run_self_test,
+      get_self_test_suite_list, get_self_test_list, request
+    ]
+    verification: none
+    notes: "Commands from Boxer 2K Serial API Commands 020-102417-08."
+  - id: boxer-30
+    name: "Christie Boxer 30"
+    supports: [
+      set_power, get_power, set_keep_electronics_on, set_auto_power_on, set_input, get_input, get_input_list,
+      set_port_configuration, get_port_configuration, set_christie_link_video, set_dual_link_dvi_disabled,
+      set_loop_out, set_sdi_payload_override, set_sdi_custom_payload, set_edid_frame_rate, set_film_mode_detect,
+      set_frame_delay, get_frame_delay, get_frame_delay_time, auto_setup, set_thumbnails, set_shutter, get_shutter,
+      set_freeze, get_freeze, set_test_pattern, get_test_pattern, get_test_pattern_list, set_test_pattern_frequency,
+      set_test_pattern_grid_pitch, set_test_pattern_gray, set_test_pattern_ramp_level, set_test_pattern_ramp_speed,
+      set_test_pattern_ramp_slope, set_test_pattern_grid_color, set_test_pattern_grid_motion, set_engine_test_pattern,
+      set_color_enable, set_gamma_function, set_gamma, set_gamma_max_luminance, set_gamma_min_luminance,
+      set_gamma_slope, set_color_space, set_sharpness, set_resize_preset, set_orientation,
+      set_ambient_light_correction, set_blanking, get_blanking, reset_blanking, get_output_resolution,
+      get_output_columns, get_output_rows, set_color_table, copy_color_table, set_color_temperature,
+      set_custom_color_coordinate, set_native_primary, set_custom_color_saturation, reset_native_primaries,
+      save_native_primaries, select_lamp, set_active_lamps, set_lamp_life, set_lamp_power, get_lamp_power_range,
+      get_lamp_history, get_lamp_module_history, calibrate_lens, lens_home, calibrate_zoom, set_lens_focus,
+      get_lens_focus_range, set_lens_horizontal, get_lens_horizontal_range, set_lens_vertical,
+      get_lens_vertical_range, set_lens_zoom, get_lens_zoom_range, move_lens, run_lens_motor, step_lens_motor,
+      set_ust_lens_area, get_ust_lens_area, set_warp, get_warp_list, set_keystone_gain_compensation,
+      get_keystone_gain_compensation, set_edge_blend, get_edge_blend_list, set_black_level_blend,
+      get_black_level_blend_list, recall_profile, get_profile_list, set_artnet, set_artnet_base_channel,
+      set_artnet_net, set_artnet_subnet, set_artnet_universe, set_static_ip, set_static_ip_without_gateway,
+      enable_dhcp, get_ip_address, get_netmask, get_gateway, get_mac_address, set_device_group, set_hostname,
+      set_control_port, get_control_port, set_network_switching, set_snmp_trap, set_snmp_read_community,
+      set_snmp_trap_destination, set_ethernet_access_level, set_serial_access_level, set_address, get_address,
+      set_baud_rate, get_baud_rate, set_async_messages, set_language, get_language, set_temperature_unit,
+      get_temperature_unit, set_menu_position, get_menu_position, set_osd, get_osd, set_splash_color,
+      set_stealth_mode, get_stealth_mode, set_keypad, get_wired_keypad, set_gpio_direction, get_gpio_direction,
+      set_gpio_outputs, get_gpio_states, set_date, get_date, set_time, get_time, login, logout, get_user,
+      factory_defaults, reboot, ping, get_status, get_status_group, get_status_item, get_events, get_recent_events,
+      get_events_since, get_events_between, run_self_test_suite, run_self_test, get_self_test_suite_list,
+      get_self_test_list, request
+    ]
+    verification: none
+    notes: "Commands from Boxer 30 Serial API Commands 020-102096-10."
+
+maps:
+  link_slot: { A: "SLTA", B: "SLTB" }
+  blank_edge: { top: "TOPP", bottom: "BOTP", left: "LFTP", right: "RGTP" }
+  blo_color: { red: "REDO", green: "GRNO", blue: "BLUO" }
+  cca_point: { red: "RD", green: "GN", blue: "BL", white: "WH" }
+  cca_axis: { x: "X", y: "Y" }
+  cca_rgb: { red: "R", green: "G", blue: "B" }
+  cca_of: { red: "R", green: "G", blue: "B", white: "W" }
+  cuc_measure: { luminance: "L", x: "X", y: "Y" }
+  laser_color: { red: "REDP", green: "GRNP", blue: "BLUP" }
+  xy: { x: "X", y: "Y" }
+  xyz: { x: "X", y: "Y", z: "Z" }
+  lens_axis: { horizontal: "H", vertical: "V", zoom: "Z", focus: "F" }
+  snmp_trap: { light_source_faults: "LAMP", light_source_life: "LIFE", power: "POWR", signal: "SIGN", cooling: "STAL", temperature: "THRM" }
+  keypad: { front_ir: "FRNT", rear_ir: "REAR", wired: "WIRE", hdbaset_ir: "HDBT" }
+
+commands:
+  set_power:
+    summary: "Turn the projector on or off (PWR)"
+    params:
+      value: { type: "bool", required: true, label: "On", description: "True turns the projector on, false turns it off (it cools down, then goes to standby)." }
+    send: "#PWR {value:bool01}"
+    expect: { reply_contains: "PWR {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_power:
+    summary: "Read the power state (PWR?): 0 standby, 1 on, 10 cooling down, 11 warming up"
+    send: "PWR?"
+    expect: { reply_contains: "PWR!", matches: 'PWR!\s*(-?\d+)' }
+    returns: value
+  set_keep_electronics_on:
+    summary: "Keep the video electronics on in standby (PWR+ELEC)"
+    params:
+      value: { type: "bool", required: true, label: "Keep electronics on", description: "True keeps the video electronics on in standby whatever the light source does (electronics override)." }
+    send: "#PWR+ELEC {value:bool01}"
+    expect: { reply_contains: "PWR+ELEC {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_auto_power_on:
+    summary: "Turn auto power on after AC loss on or off (APW)"
+    params:
+      value: { type: "bool", required: true, label: "Auto power on", description: "True powers the projector up again if it was on when AC power was lost." }
+    send: "#APW {value:bool01}"
+    expect: { reply_contains: "APW {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_channel:
+    summary: "Select the source channel, port configuration and input in one step (CHA)"
+    params:
+      value: { type: "int", min: 600, max: 699, required: true, label: "Channel", description: "Channel number as listed by CHA?L: 600 HDMI0, 601 HDMI1, 603 DP0, 604 DP1, 606 to 609 SDI0 to SDI3, 611 SDVoE, 612 Christie Link A, 614 VOM-HDMI, 615 VOM-DP0, 616 VOM-DP1, 620 two-port HDMI, 621 two-port DP, 622 four-port SDI, 623 two-port VOM-DP, 630 to 635 dual-input 3D pairs, 636 four-port DP." }
+    send: "#CHA {value}"
+    expect: { reply_contains: "CHA {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_channel:
+    summary: "Read the selected channel (CHA?)"
+    send: "CHA?"
+    expect: { reply_contains: "CHA!", matches: 'CHA!\s*(-?\d+)' }
+    returns: value
+  get_channel_list:
+    summary: "Read the list of available channels (CHA?L)"
+    send: "CHA?L"
+    expect: { reply_contains: "CHA!L", matches: '!L(.*)\)$' }
+    returns: value
+  set_input:
+    summary: "Select the active input of the current port configuration (SIN)"
+    params:
+      value: { type: "int", min: 0, max: 99, required: true, label: "Input", description: "Input number as listed by SIN?L for the selected port configuration (0 = None); the list depends on the configuration and the option cards or VOM fitted." }
+    send: "#SIN {value}"
+    expect: { reply_contains: "SIN {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_input:
+    summary: "Read the selected input (SIN?, general request form)"
+    send: "SIN?"
+    expect: { reply_contains: "SIN!", matches: 'SIN!\s*(-?\d+)' }
+    returns: value
+  get_input_list:
+    summary: "Read the list of inputs of the current port configuration (SIN?L)"
+    send: "SIN?L"
+    expect: { reply_contains: "SIN!L", matches: '!L(.*)\)$' }
+    returns: value
+  set_port_configuration:
+    summary: "Select the input port configuration (SIN+PORT)"
+    params:
+      value: { type: "int", min: 1, max: 10, required: true, label: "Port configuration", description: "1 = one-port, 2 = two-port, 3 = four-port columns (4K40-RGB, Mirage SST, Boxer), 4 = four-port quadrants, 5 = one-port dual-input 3D, 6 = two-port dual-input 3D, 7 = four-port columns dual-input 3D, 8 = four-port quadrants dual-input 3D (Mirage SST), 9 = four-port 4 viewer 2D, 10 = four-port 2 viewer 3D (TruLife+ with the Mirage license; 5 too)." }
+    send: "#SIN+PORT {value}"
+    expect: { reply_contains: "SIN+PORT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_port_configuration:
+    summary: "Read the input port configuration (SIN+PORT?)"
+    send: "SIN+PORT?"
+    expect: { reply_contains: "SIN+PORT!", matches: 'SIN\+PORT!\s*(-?\d+)' }
+    returns: value
+  set_christie_link_input:
+    summary: "Choose which Christie Link port feeds the video mux (CHL+INPT)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Christie Link input", description: "0 = Christie Link input and loop-out (the default behavior), 1 = Christie Link port 1, 2 = Christie Link port 2." }
+    send: "#CHL+INPT {value}"
+    expect: { reply_contains: "CHL+INPT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_christie_link_video:
+    summary: "Turn Christie Link video on the option card in slot A or B on or off (FIB+SLTA, FIB+SLTB)"
+    params:
+      slot: { type: "enum", values: ["A", "B"], required: true, label: "Slot", description: "Option card slot: A (FIB+SLTA, the only one on the 4K40-RGB and Boxer 4K) or B (FIB+SLTB)." }
+      value: { type: "bool", required: true, label: "Enabled", description: "True takes video from the Christie Link card; the other inputs of the HBMIC are then inactive." }
+    send: "#FIB+{slot:map.link_slot} {value:bool01}"
+    expect: { reply_contains: "FIB+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_video_input_configuration:
+    summary: "Select the CAVE board scaler FPGA image, DisplayPort or SDVoE (CAV+MODE)"
+    params:
+      value: { type: "int", min: 0, max: 1, required: true, label: "Input FPGA mode", description: "0 = DisplayPort mode, 1 = SDVoE mode; the scaler FPGA reloads, which takes 15 to 20 seconds." }
+    send: "#CAV+MODE {value}"
+    expect: { reply_contains: "CAV+MODE {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_video_input_configuration:
+    summary: "Read the CAVE scaler FPGA image (CAV+MODE?)"
+    send: "CAV+MODE?"
+    expect: { reply_contains: "CAV+MODE!", matches: 'CAV\+MODE!\s*(-?\d+)' }
+    returns: value
+  set_dual_link_dvi_disabled:
+    summary: "Disable or enable dual-link DVI inputs (DDD)"
+    params:
+      value: { type: "bool", required: true, label: "Dual-link off", description: "True disables the secondary DVI receiver on dual-link DVI cards (DDD 1); false enables dual-link support." }
+    send: "#DDD {value:bool01}"
+    expect: { reply_contains: "DDD {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_loop_out:
+    summary: "Turn video loop-out on or off (LOE)"
+    params:
+      value: { type: "bool", required: true, label: "Loop out", description: "True enables video loop-out on option cards that have it (THIC, 3GIC, TDPIC)." }
+    send: "#LOE {value:bool01}"
+    expect: { reply_contains: "LOE {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_sdi_payload_override:
+    summary: "Override the SMPTE 352M payload of the HBMIC-SDI inputs (SDI)"
+    params:
+      value: { type: "int", min: 0, max: 7, required: true, label: "SDI payload", description: "0 = auto detect, 1 = custom (set_sdi_custom_payload), 2 = 3G-A 1080p60, 3 = 3G-A 1080p59.94, 4 = 3G-A 1080p50, 5 = 3G-A 2K60, 6 = 3G-A 2K59.94, 7 = 3G-A 2K50." }
+    send: "#SDI {value}"
+    expect: { reply_contains: "SDI {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_sdi_custom_payload:
+    summary: "Set the custom SMPTE 352M payload used when the override is custom (SDI+PAYL)"
+    params:
+      value: { type: "string", max_length: 8, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: "Payload", description: "The custom SMPTE 352M payload as four bytes in hexadecimal, big-endian, such as 04C20500." }
+    send: "#SDI+PAYL \"{value}\""
+    expect: { reply_contains: "SDI+PAYL \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_edid_frame_rate:
+    summary: "Set the frame rate the EDID advertises (EDO)"
+    params:
+      value: { type: "enum", values: ["24", "25", "30", "48", "50", "60", "120", "240", "360", "480"], required: true, label: "Frame rate", description: "Frame rate the EDID advertises: 24, 25, 30, 48 (4K40-RGB, Mirage SST, Boxer), 50, 60, 120 (TruLife+ with the 3D license, Mirage SST), 240, 360, 480 (Mirage SST with the Mirage license and HFR mode)." }
+    send: "#EDO {value}"
+    expect: { reply_contains: "EDO {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_edid_mode:
+    summary: "Select the default or legacy EDID mode (EDO+ADVN)"
+    params:
+      value: { type: "bool", required: true, label: "Default EDID", description: "True selects the default EDID mode, false the legacy EDID mode." }
+    send: "#EDO+ADVN {value:bool01}"
+    expect: { reply_contains: "EDO+ADVN {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_edid_window:
+    summary: "Set the expected active window size of the incoming signal (EDO+COLM)"
+    params:
+      value: { type: "int", min: 0, max: 3, required: true, label: "Active window", description: "Expected active window of the incoming signal: 0 = auto detect, 1 = 4K columns 2x1, 2 = 4K columns 4x1, 3 = 4K quadrants 2x2." }
+    send: "#EDO+COLM {value}"
+    expect: { reply_contains: "EDO+COLM {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_film_mode_detect:
+    summary: "Turn film mode (cadence) detection on or off (FMD)"
+    params:
+      value: { type: "bool", required: true, label: "Film mode detect", description: "True detects film cadence automatically on interlaced signals; false forces de-interlacing." }
+    send: "#FMD {value:bool01}"
+    expect: { reply_contains: "FMD {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_frame_delay:
+    summary: "Set the frame delay (FRD)"
+    params:
+      value: { type: "int", min: 1000, max: 3000, required: true, label: "Frame delay", description: "Delay between input and output sync in thousandths of a frame, 1000 to 3000 (2000 = 2 frames)." }
+    send: "#FRD {value}"
+    expect: { reply_contains: "FRD {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_frame_delay:
+    summary: "Read the actual frame delay, in thousandths of a frame (FRD+STAT?)"
+    send: "FRD+STAT?"
+    expect: { reply_contains: "FRD+STAT!", matches: 'FRD\+STAT!\s*(-?\d+)' }
+    returns: value
+  get_frame_delay_time:
+    summary: "Read the actual frame delay in milliseconds, per eye for dual-input 3D (FRD+TIME?)"
+    send: "FRD+TIME?"
+    expect: { reply_contains: "FRD+TIME!", matches: 'FRD\+TIME!\s*"?([^")]*)' }
+    returns: value
+  set_phase_locking_disabled:
+    summary: "Disable or enable phase locking (PHL)"
+    params:
+      value: { type: "bool", required: true, label: "Phase locking off", description: "True disables phase locking (PHL 1); false enables it (the default)." }
+    send: "#PHL {value:bool01}"
+    expect: { reply_contains: "PHL {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_phase_locking_disabled:
+    summary: "Read whether phase locking is disabled (PHL?)"
+    send: "PHL?"
+    expect: { reply_contains: "PHL!", matches: 'PHL!\s*(\d+)' }
+    returns: value
+  auto_setup:
+    summary: "Readjust the video controls for the active source automatically (ASU)"
+    send: "#ASU"
+    expect: { reply_contains: "ASU", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_thumbnails:
+    summary: "Turn the video thumbnails on or off (THM)"
+    params:
+      value: { type: "bool", required: true, label: "Thumbnails", description: "True turns the video thumbnails on." }
+    send: "#THM {value:bool01}"
+    expect: { reply_contains: "THM {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_shutter:
+    summary: "Close or open the shutter (SHU)"
+    params:
+      value: { type: "bool", required: true, label: "Closed", description: "True closes the shutter, false opens it; it opens only while the projector is on." }
+    send: "#SHU {value:bool01}"
+    expect: { reply_contains: "SHU {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_shutter:
+    summary: "Read the shutter state (SHU?): 1 closed, 0 open"
+    send: "SHU?"
+    expect: { reply_contains: "SHU!", matches: 'SHU!\s*(\d+)' }
+    returns: value
+  set_shutter_inhibit:
+    summary: "Keep the shutter closed during power on, or not (SHU+INHB)"
+    params:
+      value: { type: "bool", required: true, label: "Inhibit", description: "True keeps the shutter closed when the laser powers on, so it must be opened by hand; false opens it during power on." }
+    send: "#SHU+INHB {value:bool01}"
+    expect: { reply_contains: "SHU+INHB {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_shutter_inhibit:
+    summary: "Read the shutter inhibit setting (SHU+INHB?)"
+    send: "SHU+INHB?"
+    expect: { reply_contains: "SHU+INHB!", matches: 'SHU\+INHB!\s*(\d+)' }
+    returns: value
+  set_shutter_keep_blend:
+    summary: "Keep the black level blend during shutter operation, or not (SHU+BLND)"
+    params:
+      value: { type: "bool", required: true, label: "Keep blend", description: "True keeps the black level blend while the shutter opens and closes." }
+    send: "#SHU+BLND {value:bool01}"
+    expect: { reply_contains: "SHU+BLND {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_shutter_keep_blend:
+    summary: "Read whether the black level blend is kept during shutter operation (SHU+BLND?)"
+    send: "SHU+BLND?"
+    expect: { reply_contains: "SHU+BLND!", matches: 'SHU\+BLND!\s*(\d+)' }
+    returns: value
+  set_shutter_monitoring_disabled:
+    summary: "Disable or enable shutter monitoring (SHU+SERV)"
+    params:
+      value: { type: "bool", required: true, label: "Monitoring off", description: "True disables shutter monitoring (SHU+SERV 1); false enables it (the default)." }
+    send: "#SHU+SERV {value:bool01}"
+    expect: { reply_contains: "SHU+SERV {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_freeze:
+    summary: "Freeze or unfreeze the image (FRZ)"
+    params:
+      value: { type: "bool", required: true, label: "Frozen", description: "True freezes the current video or test pattern." }
+    send: "#FRZ {value:bool01}"
+    expect: { reply_contains: "FRZ {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_freeze:
+    summary: "Read the freeze state (FRZ?, general request form)"
+    send: "FRZ?"
+    expect: { reply_contains: "FRZ!", matches: 'FRZ!\s*(\d+)' }
+    returns: value
+  set_test_pattern:
+    summary: "Show an internal test pattern, or 0 for none (ITP)"
+    params:
+      value: { type: "int", min: 0, max: 109, required: true, label: "Test pattern", description: "0 = off, 1 = grid, 2 = gray scale 16, 3 = flat white, 4 = flat gray, 5 = flat black, 6 = checker, 7 = 17 point, 8 = edge blend, 9 = color bars, 10 = multi color, 11 = RGBW ramp, 12 = horizontal ramp, 13 = vertical ramp, 14 = diagonal ramp, 15 = square grid, 16 = diagonal grid, 17 = maximum activity, 18 = prism/convergence, 19 = FLIR, 20 = focus fidelity, 21 = boresight, 22 = convergence, 23 = integrator rod, 24 = flare, 25 = resolution demo (Boxer), 26 and 27 = CTF horizontal and vertical, 28 and 29 = electronic convergence, 30 = 15 point, 31 = grid 16:9, 100 to 109 = user patterns (TruLife+); ITP?L lists what the projector has." }
+    send: "#ITP {value}"
+    expect: { reply_contains: "ITP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_test_pattern:
+    summary: "Read the test pattern shown (ITP?, general request form)"
+    send: "ITP?"
+    expect: { reply_contains: "ITP!", matches: 'ITP!\s*(-?\d+)' }
+    returns: value
+  get_test_pattern_list:
+    summary: "Read the list of test patterns (ITP?L)"
+    send: "ITP?L"
+    expect: { reply_contains: "ITP!L", matches: '!L(.*)\)$' }
+    returns: value
+  set_test_pattern_frequency:
+    summary: "Set the frequency of the test patterns (ITP+FREQ)"
+    params:
+      value: { type: "int", min: 24, max: 50000, required: true, label: "Frequency", description: "Rate at which internal test patterns are shown: 2300 to 50000 (default 6000) on TruLife+ and 4K40-RGB, 24 to 500 (default 60) on Mirage SST and Boxer." }
+    send: "#ITP+FREQ {value}"
+    expect: { reply_contains: "ITP+FREQ {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_test_pattern_grid_pitch:
+    summary: "Set the grid pitch of the test patterns (ITP+GRDP)"
+    params:
+      value: { type: "int", min: 2, max: 127, required: true, label: "Grid pitch", description: "Spacing between the lines of the square and diagonal grid patterns, 32 by default." }
+    send: "#ITP+GRDP {value}"
+    expect: { reply_contains: "ITP+GRDP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_test_pattern_gray:
+    summary: "Set the gray level of the test patterns (ITP+GREY)"
+    params:
+      value: { type: "int", min: 0, max: 4095, required: true, label: "Gray level", description: "Shade of the flat gray pattern, 0 to 4095 (2048 by default)." }
+    send: "#ITP+GREY {value}"
+    expect: { reply_contains: "ITP+GREY {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_test_pattern_ramp_level:
+    summary: "Set the start level of the test patterns (ITP+RMPL)"
+    params:
+      value: { type: "int", min: 0, max: 4095, required: true, label: "Start level", description: "Starting (top or left) gray level of the ramp patterns, 0 to 4095; no effect while the ramp moves." }
+    send: "#ITP+RMPL {value}"
+    expect: { reply_contains: "ITP+RMPL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_test_pattern_ramp_speed:
+    summary: "Set the ramp speed of the test patterns (ITP+RMPM)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Ramp speed", description: "Motion speed of the ramp patterns, 0 (static) to 100." }
+    send: "#ITP+RMPM {value}"
+    expect: { reply_contains: "ITP+RMPM {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_test_pattern_ramp_slope:
+    summary: "Set the ramp slope of the test patterns (ITP+RMPS)"
+    params:
+      value: { type: "int", min: -10, max: 10, required: true, label: "Ramp slope", description: "Slope of the ramp patterns: -10 to 10 on TruLife+, 1 to 5 on the other families (1 by default)." }
+    send: "#ITP+RMPS {value}"
+    expect: { reply_contains: "ITP+RMPS {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_test_pattern_grid_color:
+    summary: "Draw the grid patterns in multiple colors or white on black (ITP+GRDC)"
+    params:
+      value: { type: "bool", required: true, label: "Multi-color", description: "True draws the square and diagonal grids in multiple colors (the default), false white on black." }
+    send: "#ITP+GRDC {value:bool01}"
+    expect: { reply_contains: "ITP+GRDC {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_test_pattern_grid_motion:
+    summary: "Move or hold the grid patterns (ITP+GRDM)"
+    params:
+      value: { type: "bool", required: true, label: "Moving", description: "True moves the square and diagonal grids, false keeps them static." }
+    send: "#ITP+GRDM {value:bool01}"
+    expect: { reply_contains: "ITP+GRDM {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_engine_test_pattern:
+    summary: "Show an engine (formatter) diagnostic test pattern, or 255 for none (ETP)"
+    params:
+      value: { type: "int", min: 0, max: 255, required: true, label: "Engine pattern", description: "0 = flat black, 1 = green, 2 = red, 3 = blue, 4 = white, 5 to 8 = 8x8 checkers (green, red, blue, white), 9 to 13 = convergence border and cross (green, red, blue, white, multi-color), 14 to 16 = convergence border and square (green, red, blue), 17 to 22 = half-screen blue, green and red patterns, 29 and 45 = convergence border and cross multi-color 2 and 3, 235 to 237 = moving circles (green, red, blue), 238 = color bars, 239 to 242 = edge blend grid (green, red, blue, white), 243 = 17 point, 244 = magenta, 245 = cyan, 246 = yellow, 247 = diagonal lines, 248 and 249 = dark and bright segmented ramps, 255 = off." }
+    send: "#ETP {value}"
+    expect: { reply_contains: "ETP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_3d_test_pattern:
+    summary: "Show or hide the 3D test pattern (TDT)"
+    params:
+      value: { type: "bool", required: true, label: "3D pattern", description: "True shows the 3D test pattern." }
+    send: "#TDT {value:bool01}"
+    expect: { reply_contains: "TDT {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_color_enable:
+    summary: "Show only some primary colors of the image (CLE)"
+    params:
+      value: { type: "int", min: 0, max: 6, required: true, label: "Colors", description: "Colors shown: 0 = white (all), 1 = red, 2 = green, 3 = blue, 4 = yellow, 5 = cyan, 6 = magenta." }
+    send: "#CLE {value}"
+    expect: { reply_contains: "CLE {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_gamma_function:
+    summary: "Apply a predefined gamma transfer function (BGC)"
+    params:
+      value: { type: "int", min: 0, max: 999, required: true, label: "Gamma function", description: "TruLife+ and 4K40-RGB: 0 = auto detect, 1 = sRGB, 2 = power law, 3 = classic, 4 = ITU-R BT.1886, 6 = HDR/PQ (SMPTE ST 2084), 7 = raw PQ clipped at the PQ white level (TruLife+), 100 and up = custom tables (TruLife+); Mirage SST and Boxer: 0 = sRGB, 2 = power law, 3 = M-Series (standard), 4 = ITU-R BT.1886." }
+    send: "#BGC {value}"
+    expect: { reply_contains: "BGC {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_gamma:
+    summary: "Set the exponent of the gamma curve (GAM)"
+    params:
+      value: { type: "int", min: 1000, max: 3000, required: true, label: "Exponent", description: "Power law exponent times 1000, 1000 to 3000 (2200 = 2.2, the default); used when the gamma function is power law." }
+    send: "#GAM {value}"
+    expect: { reply_contains: "GAM {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_gamma_max_luminance:
+    summary: "Set the maximum luminance of the gamma curve (GAM+MAXL)"
+    params:
+      value: { type: "int", min: 100, max: 2000, required: true, label: "Maximum luminance", description: "Maximum screen luminance used by ITU-R BT.1886 and HDR/PQ, 100 to 2000 (1000 by default)." }
+    send: "#GAM+MAXL {value}"
+    expect: { reply_contains: "GAM+MAXL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_gamma_min_luminance:
+    summary: "Set the minimum luminance of the gamma curve (GAM+MINL)"
+    params:
+      value: { type: "int", min: 0, max: 1000, required: true, label: "Minimum luminance", description: "Minimum screen luminance used by ITU-R BT.1886 and HDR/PQ, 0 to 1000 (10 by default)." }
+    send: "#GAM+MINL {value}"
+    expect: { reply_contains: "GAM+MINL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_gamma_pq_white_level:
+    summary: "Set the pq white level of the gamma curve (GAM+PQWL)"
+    params:
+      value: { type: "int", min: 50, max: 2000, required: true, label: "PQ white level", description: "PQ curve white level used by gamma function 7, 50 to 2000 (1000 by default)." }
+    send: "#GAM+PQWL {value}"
+    expect: { reply_contains: "GAM+PQWL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_gamma_slope:
+    summary: "Set the slope of the gamma curve (GAM+SLOP)"
+    params:
+      value: { type: "int", min: 1, max: 100, required: true, label: "Slope", description: "Slope of the linear section at the bottom of the curve, 1 to 100 (1 by default)." }
+    send: "#GAM+SLOP {value}"
+    expect: { reply_contains: "GAM+SLOP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_color_space:
+    summary: "Set the color space of the active signal (CSP)"
+    params:
+      value: { type: "int", min: 0, max: 8, required: true, label: "Color space", description: "0 = auto detect, 1 = RGB full range, 2 = YCbCr HDTV (BT.709), 3 = RGB limited range, 4 = YCbCr HDTV expanded range, 5 = YCbCr JPEG full range, 6 = YCbCr UHDTV (BT.2020), 7 = YCbCr UHDTV (BT.2020) full range (5 to 7 on TruLife+ and Mirage SST), 8 = XYZ (TruLife+)." }
+    send: "#CSP {value}"
+    expect: { reply_contains: "CSP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_sharpness:
+    summary: "Set the sharpness of scaled video (DTL)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Sharpness", description: "Sharpness of scaled video: 0 to 49 soften, 50 = moderate filtering (the default), 51 to 100 sharpen." }
+    send: "#DTL {value}"
+    expect: { reply_contains: "DTL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_resize_preset:
+    summary: "Set how video is scaled to the display (SZP)"
+    params:
+      value: { type: "int", min: 0, max: 4, required: true, label: "Resize", description: "0 = automatic, 1 = no resizing, 2 = full size (stretch both ways), 3 = full width, 4 = full height." }
+    send: "#SZP {value}"
+    expect: { reply_contains: "SZP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_orientation:
+    summary: "Set the image orientation (SOR)"
+    params:
+      value: { type: "int", min: 0, max: 3, required: true, label: "Orientation", description: "0 = front projection, 1 = rear projection, 2 = front projection inverted, 3 = rear projection inverted." }
+    send: "#SOR {value}"
+    expect: { reply_contains: "SOR {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_ambient_light_correction:
+    summary: "Compensate the image for ambient light (ALC)"
+    params:
+      value: { type: "int", min: -100, max: 100, required: true, label: "Correction", description: "0 = none, 1 to 100 adjust the image for darker surroundings, -1 to -100 for brighter ones." }
+    send: "#ALC {value}"
+    expect: { reply_contains: "ALC {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_blanking:
+    summary: "Blank a share of the pixels at one edge of the output (BLK+TOPP, BOTP, LFTP, RGTP)"
+    params:
+      edge: { type: "enum", values: ["top", "bottom", "left", "right"], required: true, label: "Edge", description: "The edge of the projector output to blank." }
+      value: { type: "int", min: 0, max: 250, required: true, label: "Blanking", description: "Share of pixels to blank in tenths of a percent, 0 to 250 (250 = 25 %)." }
+    send: "#BLK+{edge:map.blank_edge} {value}"
+    expect: { reply_contains: "BLK+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_blanking:
+    summary: "Read the blanking of one edge (BLK+<edge>?)"
+    params:
+      edge: { type: "enum", values: ["top", "bottom", "left", "right"], required: true, label: "Edge", description: "The edge of the projector output." }
+    send: "BLK+{edge:map.blank_edge}?"
+    expect: { reply_contains: "BLK+", matches: '!\s*(-?\d+)' }
+    returns: value
+  reset_blanking:
+    summary: "Reset the blanking of every edge to zero (BLK+RSTP)"
+    send: "#BLK+RSTP"
+    expect: { reply_contains: "BLK+RSTP", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_black_level_offset_enabled:
+    summary: "Turn the black level offsets on or off (BLO+SLCT)"
+    params:
+      value: { type: "bool", required: true, label: "Enabled", description: "True enables the black level offset adjustments (the default)." }
+    send: "#BLO+SLCT {value:bool01}"
+    expect: { reply_contains: "BLO+SLCT {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_black_level_offset:
+    summary: "Set the black level offset of one DMD (BLO+REDO, GRNO, BLUO)"
+    params:
+      color: { type: "enum", values: ["red", "green", "blue"], required: true, label: "DMD", description: "The DMD whose black level is offset." }
+      value: { type: "int", min: 0, max: 100, required: true, label: "Offset", description: "Black offset, 0 to 100 where 100 is 0.001 (0 by default)." }
+    send: "#BLO+{color:map.blo_color} {value}"
+    expect: { reply_contains: "BLO+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_black_level_offset_max:
+    summary: "Set the maximum black level offset (BLO+MAXO)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Maximum", description: "Largest black level offset allowed; larger offsets are clipped to it (no range is documented; 0 to 100 as the offsets)." }
+    send: "#BLO+MAXO {value}"
+    expect: { reply_contains: "BLO+MAXO {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  save_black_level_offset_defaults:
+    summary: "Save the black level offsets as factory defaults (BLO+CALI 1, service access)"
+    send: "#BLO+CALI 1"
+    expect: { reply_contains: "BLO+CALI 1", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_output_resolution:
+    summary: "Change the output resolution of a 4K projector with the HFR license (OTR)"
+    params:
+      value: { type: "int", min: 0, max: 1, required: true, label: "Output resolution", description: "0 = 4096x2160 (4K), 1 = 2048x1080 (2K); needs the HFR or Mirage license, and a restart afterwards." }
+    send: "#OTR {value}"
+    expect: { reply_contains: "OTR {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_output_resolution:
+    summary: "Read the output resolution (OTR?)"
+    send: "OTR?"
+    expect: { reply_contains: "OTR!", matches: 'OTR!\s*"?([^")]*)' }
+    returns: value
+  get_output_columns:
+    summary: "Read the number of output columns (OTR+HRES?)"
+    send: "OTR+HRES?"
+    expect: { reply_contains: "OTR+HRES!", matches: 'OTR\+HRES!\s*(\d+)' }
+    returns: value
+  get_output_rows:
+    summary: "Read the number of output rows (OTR+VRES?)"
+    send: "OTR+VRES?"
+    expect: { reply_contains: "OTR+VRES!", matches: 'OTR\+VRES!\s*(\d+)' }
+    returns: value
+  set_color_table:
+    summary: "Select the color table (CCA+SLCT)"
+    params:
+      value: { type: "int", min: 0, max: 7, required: true, label: "Color table", description: "0 = max drives (no color adjustment), 1 = color temperature, 2 = HD video (BT.709), 3 = custom, 4 = auto detect, 5 = DCI P3, 6 = DCI P3 (D65), 7 = ITU-R BT.2020." }
+    send: "#CCA+SLCT {value}"
+    expect: { reply_contains: "CCA+SLCT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  copy_color_table:
+    summary: "Copy one of the predefined color tables into the custom table (CCA+COPY)"
+    params:
+      value: { type: "int", min: 0, max: 7, required: true, label: "Source table", description: "0 = max drives, 1 = color temperature, 2 = HD video (BT.709), 5 = DCI P3, 6 = DCI P3 (D65), 7 = ITU-R BT.2020." }
+    send: "#CCA+COPY {value}"
+    expect: { reply_contains: "CCA+COPY {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_color_temperature:
+    summary: "Set the color temperature (CCA+CTMP)"
+    params:
+      value: { type: "int", min: 3200, max: 9300, required: true, label: "Color temperature", description: "Color temperature in kelvin, 3200 to 9300 (6500 by default); used when the color table is color temperature." }
+    send: "#CCA+CTMP {value}"
+    expect: { reply_contains: "CCA+CTMP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_custom_color_coordinate:
+    summary: "Set a point of the custom color table as CIE 1931 x,y (CCA+RDCX ... WHCY)"
+    params:
+      point: { type: "enum", values: ["red", "green", "blue", "white"], required: true, label: "Point", description: "The primary or white point to set." }
+      axis: { type: "enum", values: ["x", "y"], required: true, label: "Axis", description: "The CIE 1931 x or y coordinate." }
+      value: { type: "int", min: 0, max: 10000, required: true, label: "Coordinate", description: "Coordinate times 10000 (3350 = 0.3350); the valid range depends on the point." }
+    send: "#CCA+{point:map.cca_point}C{axis:map.cca_axis} {value}"
+    expect: { reply_contains: "CCA+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_native_primary:
+    summary: "Set a native color primary of the projector as CIE 1931 x,y (CCA+RDPX ... WHPY, service access)"
+    params:
+      point: { type: "enum", values: ["red", "green", "blue", "white"], required: true, label: "Point", description: "The native primary or white point." }
+      axis: { type: "enum", values: ["x", "y"], required: true, label: "Axis", description: "The CIE 1931 x or y coordinate." }
+      value: { type: "int", min: 0, max: 10000, required: true, label: "Coordinate", description: "Measured coordinate times 10000; the valid range depends on the point." }
+    send: "#CCA+{point:map.cca_point}P{axis:map.cca_axis} {value}"
+    expect: { reply_contains: "CCA+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_custom_color_saturation:
+    summary: "Set how much of a native component a target color takes in the custom table (CCA+ROFG ... BOFW)"
+    params:
+      component: { type: "enum", values: ["red", "green", "blue"], required: true, label: "Component", description: "The native red, green or blue component." }
+      target: { type: "enum", values: ["red", "green", "blue", "white"], required: true, label: "Of", description: "The target color the component contributes to." }
+      value: { type: "int", min: -1000, max: 1000, required: true, label: "Amount", description: "Share in tenths of a percent (1000 = 100 %): -1000 to 1000 for a component of another primary, 0 to 1000 for a primary's own component and for white." }
+    send: "#CCA+{component:map.cca_rgb}OF{target:map.cca_of} {value}"
+    expect: { reply_contains: "CCA+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  reset_native_primaries:
+    summary: "Reset the native color primaries to their saved defaults (CCA+RSET, service access)"
+    send: "#CCA+RSET"
+    expect: { reply_contains: "CCA+RSET", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  save_native_primaries:
+    summary: "Save the native color primaries as the new defaults (CCA+SAVE, service access)"
+    send: "#CCA+SAVE"
+    expect: { reply_contains: "CCA+SAVE", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_color_uniformity:
+    summary: "Turn 1D color uniformity on or off (CUC+SLCT)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Mode", description: "0 = 1D color uniformity off, 1 = on (from the measured points), 2 = custom uniformity from a file (TruLife+)." }
+    send: "#CUC+SLCT {value}"
+    expect: { reply_contains: "CUC+SLCT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_color_uniformity_point:
+    summary: "Enter a measured luminance or x,y value of one primary at one point for 1D color uniformity (CUC+H<p><c><m>)"
+    params:
+      point: { type: "int", min: 1, max: 5, required: true, label: "Point", description: "Measurement point 1 to 5 (the screen positions 15, 2, 5, 8 and 16)." }
+      color: { type: "enum", values: ["red", "green", "blue"], required: true, label: "Color", description: "The primary measured." }
+      measure: { type: "enum", values: ["luminance", "x", "y"], required: true, label: "Measure", description: "Luminance, or the x or y coordinate." }
+      value: { type: "string", max_length: 12, pattern: "^[0-9]{1,5}(\\.[0-9]{1,4})?$", required: true, label: "Value", description: "The measured value as digits with an optional decimal part, as the family documents it (TruLife+ examples use whole numbers such as 5322; Mirage SST documents 0 to 99999.99 for luminance and 0 to 0.9999 for x and y)." }
+    send: "#CUC+H{point}{color:map.cca_rgb}{measure:map.cuc_measure} {value}"
+    expect: { reply_contains: "CUC+H{point}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_laser_power:
+    summary: "Set the overall laser power (LAS+POWR)"
+    params:
+      value: { type: "int", min: 0, max: 1000, required: true, label: "Laser power", description: "Overall laser output in tenths of a percent, 0 to 1000 (750 by default on TruLife+, 500 on Mirage SST), keeping the ratio between colors." }
+    send: "#LAS+POWR {value}"
+    expect: { reply_contains: "LAS+POWR {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_laser_power:
+    summary: "Read the overall laser power (LAS+POWR?)"
+    send: "LAS+POWR?"
+    expect: { reply_contains: "LAS+POWR!", matches: 'LAS\+POWR!\s*(-?\d+)' }
+    returns: value
+  set_laser_drive:
+    summary: "Set the drive level of the red, green or blue lasers (LAS+REDP, GRNP, BLUP)"
+    params:
+      color: { type: "enum", values: ["red", "green", "blue"], required: true, label: "Color", description: "The laser color." }
+      value: { type: "int", min: 0, max: 1000, required: true, label: "Drive", description: "Drive level in tenths of a percent, 0 to 1000; what reaches the lasers is reduced by the overall laser power. 4K40-RGB: only with LiteLOC off (LAS+MODE 1)." }
+    send: "#LAS+{color:map.laser_color} {value}"
+    expect: { reply_contains: "LAS+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_phosphor_drive:
+    summary: "Set the phosphor pump drive level (LAS+PHOP)"
+    params:
+      value: { type: "int", min: 0, max: 1000, required: true, label: "Phosphor drive", description: "Drive level of the phosphor pumps in tenths of a percent, 0 to 1000, used while LiteLOC is off." }
+    send: "#LAS+PHOP {value}"
+    expect: { reply_contains: "LAS+PHOP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_liteloc_mode:
+    summary: "Turn LiteLOC (constant brightness) on or off (LAS+MODE)"
+    params:
+      value: { type: "int", min: 0, max: 4, required: true, label: "LiteLOC", description: "TruLife+: 0 = LiteLOC 1 (deprecated), 1 = LiteLOC off, 2 = LiteLOC 2 (deprecated), 3 = LiteLOC on (default), 4 = LiteLOC on (default on the Sapphire 4K40-RGBH); 4K40-RGB: 0 = LiteLOC 1, 1 = off (default), 2 = LiteLOC 2." }
+    send: "#LAS+MODE {value}"
+    expect: { reply_contains: "LAS+MODE {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_white_target:
+    summary: "Set the white point target of the laser system (LAS+WHTX, WHTY)"
+    params:
+      axis: { type: "enum", values: ["x", "y"], required: true, label: "Axis", description: "The CIE x or y coordinate." }
+      value: { type: "int", min: 2500, max: 4500, required: true, label: "Target", description: "Coordinate times 10000, 2500 to 4500 (defaults 3127 and 3290)." }
+    send: "#LAS+WHT{axis:map.xy} {value}"
+    expect: { reply_contains: "LAS+WHT", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_camera_friendly_color:
+    summary: "Turn camera friendly color mode on or off (LAS+CFCM)"
+    params:
+      value: { type: "bool", required: true, label: "Camera friendly", description: "True targets a bluer white that reduces the red cast phone cameras show on RGB laser projection." }
+    send: "#LAS+CFCM {value:bool01}"
+    expect: { reply_contains: "LAS+CFCM {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_camera_friendly_white:
+    summary: "Set the white target of camera friendly color mode (LAS+CFWX, CFWY)"
+    params:
+      axis: { type: "enum", values: ["x", "y"], required: true, label: "Axis", description: "The CIE x or y coordinate." }
+      value: { type: "int", min: 2500, max: 4500, required: true, label: "Target", description: "Coordinate times 10000, 2500 to 4500 (defaults 2740 and 3250)." }
+    send: "#LAS+CFW{axis:map.xy} {value}"
+    expect: { reply_contains: "LAS+CFW", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_color_sensor:
+    summary: "Read the color sensor X, Y or Z reading (LAS+CSRX?, CSRY?, CSRZ?)"
+    params:
+      axis: { type: "enum", values: ["x", "y", "z"], required: true, label: "Axis", description: "The sensor reading to read." }
+    send: "LAS+CSR{axis:map.xyz}?"
+    expect: { reply_contains: "LAS+CSR", matches: '!\s*"?([^")]*)' }
+    returns: value
+  set_low_brightness_mode:
+    summary: "Turn low brightness mode on or off (LAS+ELBM)"
+    params:
+      value: { type: "bool", required: true, label: "Low brightness", description: "True turns laser strings off so lower brightness targets can be reached (M 4K25 RGB and M 4K+25 RGB)." }
+    send: "#LAS+ELBM {value:bool01}"
+    expect: { reply_contains: "LAS+ELBM {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_max_ambient_temperature:
+    summary: "Set the maximum ambient temperature (LAS+MAXA)"
+    params:
+      value: { type: "int", min: 0, max: 50, required: true, label: "Maximum ambient", description: "Highest ambient temperature in degrees Celsius the projector is set up for: 0 to 50 (35 by default; Mirage SST 0 to 40, 25 by default)." }
+    send: "#LAS+MAXA {value}"
+    expect: { reply_contains: "LAS+MAXA {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_max_humidity:
+    summary: "Set the expected relative humidity (LAS+MAXH)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Maximum humidity", description: "Expected relative humidity in percent, 0 to 100 (80 by default), used by LiteLOC in user mode." }
+    send: "#LAS+MAXH {value}"
+    expect: { reply_contains: "LAS+MAXH {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_environment_manual:
+    summary: "Choose manual or automatic LiteLOC environment settings (LAS+UDEC)"
+    params:
+      value: { type: "bool", required: true, label: "Manual", description: "True lets LAS+MAXA and LAS+MAXH set the LiteLOC environment by hand; false calculates them (the default)." }
+    send: "#LAS+UDEC {value:bool01}"
+    expect: { reply_contains: "LAS+UDEC {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_realblack:
+    summary: "Turn RealBlack on or off (RBK+SLCT)"
+    params:
+      value: { type: "bool", required: true, label: "RealBlack", description: "True turns the lasers off during runs of fully black frames." }
+    send: "#RBK+SLCT {value:bool01}"
+    expect: { reply_contains: "RBK+SLCT {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_realblack_threshold:
+    summary: "Set the RealBlack black threshold (RBK+LOSL)"
+    params:
+      value: { type: "int", min: 0, max: 255, required: true, label: "Threshold", description: "Pixel value at or below which a frame counts as black, 0 to 255." }
+    send: "#RBK+LOSL {value}"
+    expect: { reply_contains: "RBK+LOSL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_realblack_time:
+    summary: "Set how long black lasts before RealBlack turns the lasers off (RBK+TIME)"
+    params:
+      value: { type: "int", min: 0, max: 25, required: true, label: "Time", description: "Tenths of a second of black frames before the lasers go off, 0 to 25 (5 by default)." }
+    send: "#RBK+TIME {value}"
+    expect: { reply_contains: "RBK+TIME {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_enhanced_healing:
+    summary: "Turn enhanced DMD healing on or off (ENH+SLCT)"
+    params:
+      value: { type: "bool", required: true, label: "Enhanced healing", description: "True runs 20 minutes of gray pattern with the laser on at the start of cooling down, for sites with long black regions." }
+    send: "#ENH+SLCT {value:bool01}"
+    expect: { reply_contains: "ENH+SLCT {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_thermal_profile:
+    summary: "Select the fan control profile (TMC+MODE)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Fan profile", description: "0 = standard (balance noise and brightness), 1 = quiet, 2 = performance (M RGB Series, Griffyn 4K35-RGB and 4K50-RGB)." }
+    send: "#TMC+MODE {value}"
+    expect: { reply_contains: "TMC+MODE {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_thermal_profile:
+    summary: "Read the fan control profile (TMC+MODE ?)"
+    send: "TMC+MODE?"
+    expect: { reply_contains: "TMC+MODE!", matches: 'TMC\+MODE!\s*(-?\d+)' }
+    returns: value
+  set_pressurized_filter:
+    summary: "Say whether the pressurized filter is installed (COO+HEPA)"
+    params:
+      value: { type: "bool", required: true, label: "Filter installed", description: "True tells the projector the pressurized filter is installed, so its two fans (16 and 17) are monitored." }
+    send: "#COO+HEPA {value:bool01}"
+    expect: { reply_contains: "COO+HEPA {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_shifted_superposition:
+    summary: "Turn shifted superposition (the resolution actuator) on or off (SSP+SLCT)"
+    params:
+      value: { type: "bool", required: true, label: "Actuator", description: "True runs the actuator (shifted superposition, twice the DMD resolution each way); service access is required." }
+    send: "#SSP+SLCT {value:bool01}"
+    expect: { reply_contains: "SSP+SLCT {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_shifted_superposition:
+    summary: "Read the actuator state (SSP+SLCT?)"
+    send: "SSP+SLCT?"
+    expect: { reply_contains: "SSP+SLCT!", matches: 'SSP\+SLCT!\s*(\d+)' }
+    returns: value
+  set_actuator_multiplication:
+    summary: "Turn actuator multiplication mode on or off (SSP+TMUL)"
+    params:
+      value: { type: "bool", required: true, label: "Multiplication", description: "True runs the actuator at two or four times the input frame rate (the default), which helps fine detail." }
+    send: "#SSP+TMUL {value:bool01}"
+    expect: { reply_contains: "SSP+TMUL {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  select_lamp:
+    summary: "Select the lamp used in limited power mode (LOP)"
+    params:
+      value: { type: "int", min: 1, max: 6, required: true, label: "Lamp", description: "Lamp for limited power mode: 1 = A1, 2 = A2, 3 = A3, 4 = B1, 5 = B2, 6 = B3; not while the projector is on." }
+    send: "#LOP {value}"
+    expect: { reply_contains: "LOP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_active_lamps:
+    summary: "Choose which lamps are active in full power mode (LOP+MULT)"
+    params:
+      value: { type: "int", min: 1, max: 63, required: true, label: "Lamps", description: "Sum of the lamps to use: 1 = A1, 2 = A2, 4 = A3, 8 = B1, 16 = B2, 32 = B3 (63 = all, the default); at least one, installed lamps only." }
+    send: "#LOP+MULT {value}"
+    expect: { reply_contains: "LOP+MULT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_lamp_life:
+    summary: "Set the expected lamp life (LPL)"
+    params:
+      value: { type: "int", min: 0, max: 1000000, required: true, label: "Lamp life", description: "Hours of lamp run time before the status system warns that the lamp needs replacing; 0 disables the check." }
+    send: "#LPL {value}"
+    expect: { reply_contains: "LPL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_lamp_power:
+    summary: "Set the lamp power (LPP)"
+    params:
+      value: { type: "int", min: 0, max: 100000, required: true, label: "Lamp power", description: "Power to the lamp in watts, within the range LPP?m reports for the lamp fitted." }
+    send: "#LPP {value}"
+    expect: { reply_contains: "LPP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_lamp_power_range:
+    summary: "Read the lowest and highest lamp power for the lamp fitted (LPP?m)"
+    send: "LPP?m"
+    expect: { reply_contains: "LPP!", matches: 'LPP!M?\s*(-?\d+\s+-?\d+)' }
+    returns: value
+  get_lamp_history:
+    summary: "Read the history of lamps installed, newest first (HIS?)"
+    send: "HIS?"
+    expect: { reply_contains: "HIS!", matches: 'HIS!(.*)\)$' }
+    returns: value
+  get_lamp_module_history:
+    summary: "Read the lamp history kept in one lamp memory module (HIS+LMP1? ... LMP6?)"
+    params:
+      module: { type: "int", min: 1, max: 6, required: true, label: "Module", description: "Lamp memory module: 1 = A1, 2 = A2, 3 = A3, 4 = B1, 5 = B2, 6 = B3." }
+    send: "HIS+LMP{module}?"
+    expect: { reply_contains: "HIS+LMP{module}!", matches: '!(.*)\)$' }
+    returns: value
+  calibrate_lens:
+    summary: "Calibrate every lens motor (LCB 1)"
+    send: "#LCB 1"
+    expect: { reply_contains: "LCB 1", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  lens_home:
+    summary: "Move every lens motor to its center flag and set its position to 0 (LCB+HOME)"
+    send: "#LCB+HOME"
+    expect: { reply_contains: "LCB+HOME", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  calibrate_zoom:
+    summary: "Calibrate the zoom motor (LCB+ZOOM 1)"
+    send: "#LCB+ZOOM 1"
+    expect: { reply_contains: "LCB+ZOOM 1", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_lens_lock:
+    summary: "Lock or unlock the lens motors (LCB+LOCK)"
+    params:
+      value: { type: "bool", required: true, label: "Locked", description: "True locks every lens motor; it overrides every other lens function." }
+    send: "#LCB+LOCK {value:bool01}"
+    expect: { reply_contains: "LCB+LOCK {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_lens_has_zoom_motor:
+    summary: "Say whether the lens has a zoom motor (LCB+ZOMR)"
+    params:
+      value: { type: "bool", required: true, label: "Zoom motor", description: "True programs the lens connector board to report a motorized zoom; false a lens without one." }
+    send: "#LCB+ZOMR {value:bool01}"
+    expect: { reply_contains: "LCB+ZOMR {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_lens_focus:
+    summary: "Move the lens focus to an absolute position (FCS)"
+    params:
+      value: { type: "int", min: -65535, max: 65535, required: true, label: "Position", description: "Absolute focus position, within the range FCS?m reports after the last lens calibration." }
+    send: "#FCS {value}"
+    expect: { reply_contains: "FCS {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_lens_focus_range:
+    summary: "Read the focus range found by the last lens calibration (FCS?m)"
+    send: "FCS?m"
+    expect: { reply_contains: "FCS!", matches: 'FCS!M?\s*(-?\d+\s+-?\d+)' }
+    returns: value
+  set_lens_horizontal:
+    summary: "Move the lens horizontal shift to an absolute position (LHO)"
+    params:
+      value: { type: "int", min: -65535, max: 65535, required: true, label: "Position", description: "Absolute horizontal shift position, within the range LHO?m reports after the last lens calibration." }
+    send: "#LHO {value}"
+    expect: { reply_contains: "LHO {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_lens_horizontal_range:
+    summary: "Read the horizontal shift range found by the last lens calibration (LHO?m)"
+    send: "LHO?m"
+    expect: { reply_contains: "LHO!", matches: 'LHO!M?\s*(-?\d+\s+-?\d+)' }
+    returns: value
+  set_lens_vertical:
+    summary: "Move the lens vertical shift to an absolute position (LVO)"
+    params:
+      value: { type: "int", min: -65535, max: 65535, required: true, label: "Position", description: "Absolute vertical shift position, within the range LVO?m reports after the last lens calibration." }
+    send: "#LVO {value}"
+    expect: { reply_contains: "LVO {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_lens_vertical_range:
+    summary: "Read the vertical shift range found by the last lens calibration (LVO?m)"
+    send: "LVO?m"
+    expect: { reply_contains: "LVO!", matches: 'LVO!M?\s*(-?\d+\s+-?\d+)' }
+    returns: value
+  set_lens_zoom:
+    summary: "Move the lens zoom to an absolute position (ZOM)"
+    params:
+      value: { type: "int", min: -65535, max: 65535, required: true, label: "Position", description: "Absolute zoom position, within the range ZOM?m reports after the last lens calibration." }
+    send: "#ZOM {value}"
+    expect: { reply_contains: "ZOM {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_lens_zoom_range:
+    summary: "Read the zoom range found by the last lens calibration (ZOM?m)"
+    send: "ZOM?m"
+    expect: { reply_contains: "ZOM!", matches: 'ZOM!M?\s*(-?\d+\s+-?\d+)' }
+    returns: value
+  move_lens:
+    summary: "Move every lens axis to an absolute position at once (LMV)"
+    params:
+      horizontal: { type: "int", min: -65535, max: 65535, required: true, label: "Horizontal shift", description: "Absolute horizontal shift position, within the range the projector reports for the lens fitted." }
+      vertical: { type: "int", min: -65535, max: 65535, required: true, label: "Vertical shift", description: "Absolute vertical shift position, within the range the projector reports for the lens fitted." }
+      zoom: { type: "int", min: -65535, max: 65535, required: true, label: "Zoom", description: "Absolute zoom position, within the range the projector reports for the lens fitted." }
+      focus: { type: "int", min: -65535, max: 65535, required: true, label: "Focus", description: "Absolute focus position, within the range the projector reports for the lens fitted." }
+    send: "#LMV {horizontal} {vertical} {zoom} {focus}"
+    expect: { reply_contains: "LMV {horizontal} {vertical} {zoom} {focus}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  run_lens_motor:
+    summary: "Start or stop one lens motor (LMV+HRUN, VRUN, ZRUN, FRUN)"
+    params:
+      axis: { type: "enum", values: ["horizontal", "vertical", "zoom", "focus"], required: true, label: "Axis", description: "The lens motor." }
+      value: { type: "int", min: -1, max: 1, required: true, label: "Direction", description: "-1 runs toward the negative end (left, down, smaller, outward), 0 stops, 1 runs toward the positive end." }
+    send: "#LMV+{axis:map.lens_axis}RUN {value}"
+    expect: { reply_contains: "LMV+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  step_lens_motor:
+    summary: "Move one lens motor a number of steps (LMV+HSTP, VSTP, ZSTP, FSTP)"
+    params:
+      axis: { type: "enum", values: ["horizontal", "vertical", "zoom", "focus"], required: true, label: "Axis", description: "The lens motor." }
+      value: { type: "int", min: -65535, max: 65535, required: true, label: "Steps", description: "Relative steps: negative moves left, down, smaller or outward, positive the other way; the axis range limits it." }
+    send: "#LMV+{axis:map.lens_axis}STP {value}"
+    expect: { reply_contains: "LMV+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_ust_lens_area:
+    summary: "Use the UST lens keep-out area or the normal one (UST+ENBL)"
+    params:
+      value: { type: "bool", required: true, label: "UST keep-out", description: "True uses the 0.38:1 UST lens keep-out area; changing it moves the lens to its home position." }
+    send: "#UST+ENBL {value:bool01}"
+    expect: { reply_contains: "UST+ENBL {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_ust_lens_area:
+    summary: "Read whether the UST lens keep-out area is in use (UST+ENBL?)"
+    send: "UST+ENBL?"
+    expect: { reply_contains: "UST+ENBL!", matches: 'UST\+ENBL!\s*(\d+)' }
+    returns: value
+  set_warp:
+    summary: "Select the warp map (WRP+SLCT)"
+    params:
+      value: { type: "int", min: 0, max: 11, required: true, label: "Warp", description: "0 = warping off, 1 to 4 = one of the four warp maps loaded with Twist or Mystique, 11 = 2D keystone (on-board keystone on Boxer)." }
+    send: "#WRP+SLCT {value}"
+    expect: { reply_contains: "WRP+SLCT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_warp_list:
+    summary: "Read the list of warp maps (WRP+SLCT?L)"
+    send: "WRP+SLCT?L"
+    expect: { reply_contains: "WRP+SLCT!L", matches: '!L(.*)\)$' }
+    returns: value
+  set_keystone_gain_compensation:
+    summary: "Turn keystone gain compensation on or off (WRP+KGAN)"
+    params:
+      value: { type: "bool", required: true, label: "Gain compensation", description: "True compensates the gain when 2D keystone is applied." }
+    send: "#WRP+KGAN {value:bool01}"
+    expect: { reply_contains: "WRP+KGAN {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_keystone_gain_compensation:
+    summary: "Read keystone gain compensation (WRP+KGAN?)"
+    send: "WRP+KGAN?"
+    expect: { reply_contains: "WRP+KGAN!", matches: 'WRP\+KGAN!\s*(\d+)' }
+    returns: value
+  set_warp_optimization_disabled:
+    summary: "Disable or enable the warp calculation speed optimization (TWE)"
+    params:
+      value: { type: "bool", required: true, label: "Optimization off", description: "True disables the speed optimization of the warp calculation (TWE 1), which can remove rare artifacts; false enables it (the default)." }
+    send: "#TWE {value:bool01}"
+    expect: { reply_contains: "TWE {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_edge_blend:
+    summary: "Select the edge blend (EBL+SLCT)"
+    params:
+      value: { type: "int", min: 0, max: 11, required: true, label: "Edge blend", description: "0 = edge blending off, 1 to 4 = one of the four edge blends loaded with Twist or Mystique, 11 = basic built-in edge blending (TruLife+, Boxer)." }
+    send: "#EBL+SLCT {value}"
+    expect: { reply_contains: "EBL+SLCT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_edge_blend_list:
+    summary: "Read the list of edge blends (EBL+SLCT?L)"
+    send: "EBL+SLCT?L"
+    expect: { reply_contains: "EBL+SLCT!L", matches: '!L(.*)\)$' }
+    returns: value
+  set_black_level_blend:
+    summary: "Select the black level blend (EBB+SLCT)"
+    params:
+      value: { type: "int", min: 0, max: 11, required: true, label: "Black level blend", description: "0 = black level blending off, 1 to 4 = one of the four black level blends loaded with Twist or Mystique, 11 = basic built-in black level blending (TruLife+, Boxer)." }
+    send: "#EBB+SLCT {value}"
+    expect: { reply_contains: "EBB+SLCT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_black_level_blend_list:
+    summary: "Read the list of black level blends (EBB+SLCT?L)"
+    send: "EBB+SLCT?L"
+    expect: { reply_contains: "EBB+SLCT!L", matches: '!L(.*)\)$' }
+    returns: value
+  set_keep_blend_on_input_switch:
+    summary: "Keep the black level blend during input switching, or not (VID+BLND)"
+    params:
+      value: { type: "bool", required: true, label: "Keep blend", description: "True keeps the black level blend while the input switches." }
+    send: "#VID+BLND {value:bool01}"
+    expect: { reply_contains: "VID+BLND {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_keep_blend_on_input_switch:
+    summary: "Read whether the black level blend is kept during input switching (VID+BLND?)"
+    send: "VID+BLND?"
+    expect: { reply_contains: "VID+BLND!", matches: 'VID\+BLND!\s*(\d+)' }
+    returns: value
+  set_3d_mode:
+    summary: "Set when inputs are processed as 3D (TDM)"
+    params:
+      value: { type: "int", min: 0, max: 6, required: true, label: "3D mode", description: "0 = 3D off for direct inputs (for 2D 120 Hz), 1 = automatic (the default), 2 = 3D where possible (frame doubling or tripling), 3 = side-by-side, 5 = top-and-bottom, 6 = frame packing (3, 5 and 6 on TruLife+); needs the Mirage license." }
+    send: "#TDM {value}"
+    expect: { reply_contains: "TDM {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_3d_sync_delay:
+    summary: "Set the 3D emitter sync delay (TDD)"
+    params:
+      value: { type: "int", min: -65535, max: 65535, required: true, label: "Sync delay", description: "Where the 3D sync pulse falls relative to the DMD on/off transition: 0 = on it, negative before, positive after (TDD 2000 is documented as 20.00 ms); used with 3D sync out to an emitter." }
+    send: "#TDD {value}"
+    expect: { reply_contains: "TDD {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_3d_sync_delay:
+    summary: "Read the 3D emitter sync delay (TDD?)"
+    send: "TDD?"
+    expect: { reply_contains: "TDD!", matches: 'TDD!\s*(-?\d+)' }
+    returns: value
+  set_3d_invert:
+    summary: "Swap the left and right eye frames, or not (TDN)"
+    params:
+      value: { type: "bool", required: true, label: "Inverted", description: "True swaps the left and right eye frames." }
+    send: "#TDN {value:bool01}"
+    expect: { reply_contains: "TDN {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_3d_invert:
+    summary: "Read whether the 3D eye frames are swapped (TDN?)"
+    send: "TDN?"
+    expect: { reply_contains: "TDN!", matches: 'TDN!\s*(\d+)' }
+    returns: value
+  set_3d_sync_out:
+    summary: "Configure the 3D sync out port (TDO)"
+    params:
+      value: { type: "int", min: 0, max: 1, required: true, label: "Sync out", description: "0 = 3D sync out to an emitter (with delay and inversion), 1 = to another projector downstream (without them)." }
+    send: "#TDO {value}"
+    expect: { reply_contains: "TDO {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_3d_sync_out:
+    summary: "Read the 3D sync out configuration (TDO?)"
+    send: "TDO?"
+    expect: { reply_contains: "TDO!", matches: 'TDO!\s*(-?\d+)' }
+    returns: value
+  set_3d_dark_interval:
+    summary: "Set the 3D dark interval (DRK)"
+    params:
+      value: { type: "int", min: 200, max: 3000, required: true, label: "Dark time", description: "Microseconds the DMDs stay off between 3D frames: 250 to 3000 (690 by default) on TruLife+, 200 to 3000 (700 by default) on Mirage SST." }
+    send: "#DRK {value}"
+    expect: { reply_contains: "DRK {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  toggle_high_frame_rate:
+    summary: "Turn high frame rate mode on if it is off, off if it is on; the projector reboots (HFR+ENBL, standby only, HFR or Mirage license)"
+    send: "#HFR+ENBL"
+    expect: { reply_contains: "HFR+ENBL", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  recall_profile:
+    summary: "Apply a stored profile, recalling every setting it holds (PRO)"
+    params:
+      value: { type: "int", min: 0, max: 20, required: true, label: "Profile", description: "0 = the default profile, 1 to 20 = custom profiles (TruLife+; 1 to 10 on Mirage SST and Boxer, 1 to 4 on the 4K40-RGB); an empty profile does nothing." }
+    send: "#PRO {value}"
+    expect: { reply_contains: "PRO {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_profile_list:
+    summary: "Read the list of local profiles (PRO?L)"
+    send: "PRO?L"
+    expect: { reply_contains: "PRO!L", matches: '!L(.*)\)$' }
+    returns: value
+  clear_profile:
+    summary: "Clear a custom profile (PRO+RSET)"
+    params:
+      value: { type: "int", min: 1, max: 20, required: true, label: "Profile", description: "Custom profile to clear, 1 to 20." }
+    send: "#PRO+RSET {value}"
+    expect: { reply_contains: "PRO+RSET {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_artnet:
+    summary: "Turn the Art-Net interface on or off (DMX+ENBL)"
+    params:
+      value: { type: "bool", required: true, label: "Art-Net", description: "True enables the Art-Net interface." }
+    send: "#DMX+ENBL {value:bool01}"
+    expect: { reply_contains: "DMX+ENBL {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_artnet_base_channel:
+    summary: "Set the Art-Net base channel (DMX+CHAN)"
+    params:
+      value: { type: "int", min: 1, max: 488, required: true, label: "Base channel", description: "First DMX channel the projector uses, 1 to 488 (1 by default)." }
+    send: "#DMX+CHAN {value}"
+    expect: { reply_contains: "DMX+CHAN {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_artnet_net:
+    summary: "Set the Art-Net net (DMX+NETS)"
+    params:
+      value: { type: "int", min: 0, max: 127, required: true, label: "Net", description: "Art-Net network, 0 to 127." }
+    send: "#DMX+NETS {value}"
+    expect: { reply_contains: "DMX+NETS {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_artnet_subnet:
+    summary: "Set the Art-Net subnet (DMX+SUBN)"
+    params:
+      value: { type: "int", min: 0, max: 15, required: true, label: "Subnet", description: "Art-Net subnet, 0 to 15." }
+    send: "#DMX+SUBN {value}"
+    expect: { reply_contains: "DMX+SUBN {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_artnet_universe:
+    summary: "Set the Art-Net universe (DMX+UNVS)"
+    params:
+      value: { type: "int", min: 0, max: 15, required: true, label: "Universe", description: "Art-Net universe, 0 to 15." }
+    send: "#DMX+UNVS {value}"
+    expect: { reply_contains: "DMX+UNVS {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_static_ip:
+    summary: "Set a static IP address, netmask and gateway, turning DHCP off (NET)"
+    params:
+      ip: { type: "string", max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "IP address", description: "The projector's IPv4 address." }
+      netmask: { type: "string", max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "Netmask", description: "The IPv4 netmask." }
+      gateway: { type: "string", max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "Gateway", description: "The IPv4 default gateway." }
+    send: "#NET \"{ip}\" \"{netmask}\" \"{gateway}\""
+    expect: { reply_contains: "NET \"{ip}\" \"{netmask}\" \"{gateway}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_static_ip_without_gateway:
+    summary: "Set a static IP address and netmask with no gateway, turning DHCP off (NET)"
+    params:
+      ip: { type: "string", max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "IP address", description: "The projector's IPv4 address." }
+      netmask: { type: "string", max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "Netmask", description: "The IPv4 netmask." }
+    send: "#NET \"{ip}\" \"{netmask}\""
+    expect: { reply_contains: "NET \"{ip}\" \"{netmask}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  enable_dhcp:
+    summary: "Turn DHCP on (NET+DHCP 1); a static address turns it off"
+    send: "#NET+DHCP 1"
+    expect: { reply_contains: "NET+DHCP 1", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_ip_address:
+    summary: "Read the projector IP address (NET+ETH0?)"
+    send: "NET+ETH0?"
+    expect: { reply_contains: "NET+ETH0!", matches: 'NET\+ETH0!\s*"?([^")]*)' }
+    returns: value
+  get_netmask:
+    summary: "Read the projector netmask (NET+SUB0?)"
+    send: "NET+SUB0?"
+    expect: { reply_contains: "NET+SUB0!", matches: 'NET\+SUB0!\s*"?([^")]*)' }
+    returns: value
+  get_gateway:
+    summary: "Read the projector gateway (NET+GATE?)"
+    send: "NET+GATE?"
+    expect: { reply_contains: "NET+GATE!", matches: 'NET\+GATE!\s*"?([^")]*)' }
+    returns: value
+  get_mac_address:
+    summary: "Read the projector MAC address (NET+MAC0?)"
+    send: "NET+MAC0?"
+    expect: { reply_contains: "NET+MAC0!", matches: 'NET\+MAC0!\s*"?([^")]*)' }
+    returns: value
+  set_device_group:
+    summary: "Set the device group name (NET+DGRP)"
+    params:
+      value: { type: "string", max_length: 64, pattern: "^[^\"()\\\\]*$", required: true, label: "Group", description: "Device group name, which helps broadcast searches find projectors by group." }
+    send: "#NET+DGRP \"{value}\""
+    expect: { reply_contains: "NET+DGRP \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_hostname:
+    summary: "Set the projector name (NET+HOST)"
+    params:
+      value: { type: "string", max_length: 64, pattern: "^[^\"()\\\\ ]*$", required: true, label: "Name", description: "The projector's name; devices on its subnet reach it as <name>.local." }
+    send: "#NET+HOST \"{value}\""
+    expect: { reply_contains: "NET+HOST \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_control_port:
+    summary: "Change the TCP port of the serial protocol over Ethernet (NET+PORT)"
+    params:
+      value: { type: "int", min: 1024, max: 49151, required: true, label: "Port", description: "TCP port for the Christie serial protocol over Ethernet, 1024 to 49151 (3003 is reserved); the connection then moves to it." }
+    send: "#NET+PORT {value}"
+    expect: { reply_contains: "NET+PORT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_control_port:
+    summary: "Read the TCP port of the serial protocol over Ethernet (NET+PORT?)"
+    send: "NET+PORT?"
+    expect: { reply_contains: "NET+PORT!", matches: 'NET\+PORT!\s*(-?\d+)' }
+    returns: value
+  set_network_switching:
+    summary: "Set the internal network switching mode (NET+SWIT)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Switching", description: "Internal network switching: 0 = split (the default), 1 = all ports joined, 2 = HDBaseT joined with Ethernet (loop-through)." }
+    send: "#NET+SWIT {value}"
+    expect: { reply_contains: "NET+SWIT {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_snmp_trap:
+    summary: "Turn one kind of SNMP trap on or off (SNM+LAMP, LIFE, POWR, SIGN, STAL, THRM)"
+    params:
+      trap: { type: "enum", values: ["light_source_faults", "light_source_life", "power", "signal", "cooling", "temperature"], required: true, label: "Trap", description: "light_source_faults (not on Mirage SST), light_source_life (TruLife+ and Boxer), power state changes, video signal changes, cooling (fan) faults, temperature faults." }
+      value: { type: "bool", required: true, label: "Enabled", description: "True sends the trap (every trap is on by default)." }
+    send: "#SNM+{trap:map.snmp_trap} {value:bool01}"
+    expect: { reply_contains: "SNM+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_snmp_read_community:
+    summary: "Set the SNMP read community (SNM+READ)"
+    params:
+      value: { type: "string", max_length: 32, pattern: "^[^\"()\\\\]*$", required: true, label: "Community", description: "SNMP read community name (password on the older families), up to 32 characters; private by default." }
+    send: "#SNM+READ \"{value}\""
+    expect: { reply_contains: "SNM+READ \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_snmp_trap_destination:
+    summary: "Set one of the three addresses SNMP traps are sent to (SNM+TIP1, TIP2, TIP3)"
+    params:
+      slot: { type: "int", min: 1, max: 3, required: true, label: "Destination", description: "Trap destination 1, 2 or 3." }
+      ip: { type: "string", max_length: 15, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", required: true, label: "IP address", description: "IPv4 address to send traps to; 0.0.0.0 sends none (the default)." }
+    send: "#SNM+TIP{slot} \"{ip}\""
+    expect: { reply_contains: "SNM+TIP{slot} \"{ip}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_ethernet_access_level:
+    summary: "Set the serial protocol access level of the Ethernet ports (RAL)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Access level", description: "Serial protocol access on the Ethernet ports: 0 = no access (disables the port), 1 = login required (read-only until UID), 2 = free access at operator level (the default)." }
+    send: "#RAL {value}"
+    expect: { reply_contains: "RAL {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_serial_access_level:
+    summary: "Set the serial protocol access level of the RS232 port (RAL+PRTA)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Access level", description: "Serial protocol access on the RS232 port: 0 = no access, 1 = login required, 2 = free access (the default)." }
+    send: "#RAL+PRTA {value}"
+    expect: { reply_contains: "RAL+PRTA {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_address:
+    summary: "Set the projector address (ADR)"
+    params:
+      value: { type: "int", min: 0, max: 999, required: true, label: "Address", description: "Projector address for RS-232 daisy chains, 0 to 999 (65535 is the broadcast address)." }
+    send: "#ADR {value}"
+    expect: { reply_contains: "ADR {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_address:
+    summary: "Read the projector address (ADR?)"
+    send: "ADR?"
+    expect: { reply_contains: "ADR!", matches: 'ADR!\s*(-?\d+)' }
+    returns: value
+  set_baud_rate:
+    summary: "Set the baud rate of the RS232 IN port (BDR+PRTA)"
+    params:
+      value: { type: "int", min: 1, max: 6, required: true, label: "Baud rate", description: "RS232 IN baud rate: 1 = 2400, 2 = 9600, 3 = 19200, 4 = 38400, 5 = 57600, 6 = 115200 (the default); service access is required." }
+    send: "#BDR+PRTA {value}"
+    expect: { reply_contains: "BDR+PRTA {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_baud_rate:
+    summary: "Read the baud rate of the RS232 IN port (BDR+PRTA?)"
+    send: "BDR+PRTA?"
+    expect: { reply_contains: "BDR+PRTA!", matches: 'BDR\+PRTA!\s*(-?\d+)' }
+    returns: value
+  set_async_messages:
+    summary: "Turn the projector's asynchronous messages on or off (EME)"
+    params:
+      value: { type: "bool", required: true, label: "Messages", description: "True lets the projector send its FYI and ERR messages unasked (the default); this spec reads status changes from them." }
+    send: "#EME {value:bool01}"
+    expect: { reply_contains: "EME {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_language:
+    summary: "Set the interface language (LOC+LANG)"
+    params:
+      value: { type: "int", min: 0, max: 8, required: true, label: "Language", description: "0 = English, 1 = French, 2 = German, 3 = Spanish, 4 = Italian, 5 = Chinese (simplified), 6 = Japanese, 7 = Korean, 8 = Russian." }
+    send: "#LOC+LANG {value}"
+    expect: { reply_contains: "LOC+LANG {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_language:
+    summary: "Read the interface language (LOC+LANG?)"
+    send: "LOC+LANG?"
+    expect: { reply_contains: "LOC+LANG!", matches: 'LOC\+LANG!\s*(-?\d+)' }
+    returns: value
+  set_temperature_unit:
+    summary: "Set the temperature unit (LOC+TEMP)"
+    params:
+      value: { type: "int", min: 0, max: 1, required: true, label: "Unit", description: "0 = Celsius (the default), 1 = Fahrenheit; status temperatures follow it." }
+    send: "#LOC+TEMP {value}"
+    expect: { reply_contains: "LOC+TEMP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_temperature_unit:
+    summary: "Read the temperature unit (LOC+TEMP?)"
+    send: "LOC+TEMP?"
+    expect: { reply_contains: "LOC+TEMP!", matches: 'LOC\+TEMP!\s*(-?\d+)' }
+    returns: value
+  set_menu_position:
+    summary: "Set the on-screen menu position (MSP)"
+    params:
+      value: { type: "int", min: 0, max: 8, required: true, label: "Position", description: "0 = top left (the default), 1 = top center, 2 = top right, 3 = center left, 4 = center, 5 = center right, 6 = bottom left, 7 = bottom center, 8 = bottom right." }
+    send: "#MSP {value}"
+    expect: { reply_contains: "MSP {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_menu_position:
+    summary: "Read the on-screen menu position (MSP?)"
+    send: "MSP?"
+    expect: { reply_contains: "MSP!", matches: 'MSP!\s*(-?\d+)' }
+    returns: value
+  set_osd:
+    summary: "Show or hide the on-screen display (OSD)"
+    params:
+      value: { type: "bool", required: true, label: "Shown", description: "True shows the on-screen display, false hides it." }
+    send: "#OSD {value:bool01}"
+    expect: { reply_contains: "OSD {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_osd:
+    summary: "Read whether the on-screen display is shown (OSD?)"
+    send: "OSD?"
+    expect: { reply_contains: "OSD!", matches: 'OSD!\s*(\d+)' }
+    returns: value
+  set_splash_color:
+    summary: "Set the splash screen background color (SPS+COLR)"
+    params:
+      value: { type: "enum", values: ["1", "2", "3", "7"], required: true, label: "Color", description: "Splash screen background when no signal is present: 1 = red, 2 = green, 3 = blue, 7 = black (the default)." }
+    send: "#SPS+COLR {value}"
+    expect: { reply_contains: "SPS+COLR {value}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_stealth_mode:
+    summary: "Turn stealth mode on or off (STH+MODE)"
+    params:
+      value: { type: "bool", required: true, label: "Stealth", description: "True turns the status and shutter LEDs off and stops the display panel's heartbeat." }
+    send: "#STH+MODE {value:bool01}"
+    expect: { reply_contains: "STH+MODE {value:bool01}", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_stealth_mode:
+    summary: "Read whether stealth mode is on (STH+MODE?)"
+    send: "STH+MODE?"
+    expect: { reply_contains: "STH+MODE!", matches: 'STH\+MODE!\s*(\d+)' }
+    returns: value
+  set_keypad:
+    summary: "Turn a keypad sensor on or off (KEN+FRNT, REAR, WIRE, HDBT)"
+    params:
+      sensor: { type: "enum", values: ["front_ir", "rear_ir", "wired", "hdbaset_ir"], required: true, label: "Sensor", description: "front_ir, rear_ir, wired keypad jack, or IR over HDBaseT (not on TruLife+)." }
+      value: { type: "bool", required: true, label: "Enabled", description: "True enables the sensor (IR sensors and the wired jack are on by default, IR over HDBaseT off)." }
+    send: "#KEN+{sensor:map.keypad} {value:bool01}"
+    expect: { reply_contains: "KEN+", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_wired_keypad:
+    summary: "Read whether the wired keypad jack is enabled (KEN+WIRE?)"
+    send: "KEN+WIRE?"
+    expect: { reply_contains: "KEN+WIRE!", matches: 'KEN\+WIRE!\s*(\d+)' }
+    returns: value
+  set_gpio_direction:
+    summary: "Set each general purpose pin as input or output (GIO+CNFG)"
+    params:
+      value: { type: "string", max_length: 7, pattern: "^[IOXiox]{1,7}$", required: true, label: "Directions", description: "One letter per pin, pin 1 first: I = input, O = output, X = no change (seven pins; the 12 V and ground pins cannot be set)." }
+    send: "#GIO+CNFG \"{value}\""
+    expect: { reply_contains: "GIO+CNFG \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_gpio_direction:
+    summary: "Read the direction of each general purpose pin (GIO+CNFG?)"
+    send: "GIO+CNFG?"
+    expect: { reply_contains: "GIO+CNFG!", matches: 'GIO\+CNFG!\s*"?([^")]*)' }
+    returns: value
+  set_gpio_outputs:
+    summary: "Set the general purpose outputs (GIO+STAT)"
+    params:
+      value: { type: "string", max_length: 7, pattern: "^[HLXhlx]{1,7}$", required: true, label: "Outputs", description: "One letter per pin, pin 1 first: H = high, L = low, X = no change; only output pins change." }
+    send: "#GIO+STAT \"{value}\""
+    expect: { reply_contains: "GIO+STAT \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_gpio_states:
+    summary: "Read the state of the general purpose pins (GIO+STAT?)"
+    send: "GIO+STAT?"
+    expect: { reply_contains: "GIO+STAT!", matches: 'GIO\+STAT!\s*"?([^")]*)' }
+    returns: value
+  set_gpio_trigger:
+    summary: "Choose the general purpose pins used as camera trigger signals (GIO+TRIG)"
+    params:
+      value: { type: "string", max_length: 7, pattern: "^[NTXntx]{1,7}$", required: true, label: "Triggers", description: "One letter per pin, pin 1 first: N = normal, T = camera trigger, X = no change." }
+    send: "#GIO+TRIG \"{value}\""
+    expect: { reply_contains: "GIO+TRIG \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  set_date:
+    summary: "Set the date of the real-time clock (TMD+DATE)"
+    params:
+      value: { type: "string", max_length: 10, pattern: "^[0-9]{4}/[0-9]{2}/[0-9]{2}$", required: true, label: "Date", description: "Date for the real-time clock as YYYY/MM/DD." }
+    send: "#TMD+DATE \"{value}\""
+    expect: { reply_contains: "TMD+DATE \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_date:
+    summary: "Read the date of the real-time clock (TMD+DATE?, general request form)"
+    send: "TMD+DATE?"
+    expect: { reply_contains: "TMD+DATE!", matches: 'TMD\+DATE!\s*"?([^")]*)' }
+    returns: value
+  set_time:
+    summary: "Set the time of the real-time clock (TMD+TIME)"
+    params:
+      value: { type: "string", max_length: 8, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true, label: "Time", description: "Time for the real-time clock as hh:mm:ss (24 hours)." }
+    send: "#TMD+TIME \"{value}\""
+    expect: { reply_contains: "TMD+TIME \"{value}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_time:
+    summary: "Read the time of the real-time clock (TMD+TIME?)"
+    send: "TMD+TIME?"
+    expect: { reply_contains: "TMD+TIME!", matches: 'TMD\+TIME!\s*"?([^")]*)' }
+    returns: value
+  login:
+    summary: "Log in to raise the access level of this connection (UID)"
+    params:
+      username: { type: "string", max_length: 32, pattern: "^[^\"()\\\\]*$", required: true, label: "Username", description: "User name, such as service." }
+      password: { type: "string", max_length: 64, pattern: "^[^\"()\\\\]*$", secret: true, required: true, label: "Password", description: "The user's password, sent in clear text as the protocol does." }
+    send: "#UID \"{username}\" \"{password}\""
+    expect: { reply_contains: "UID \"{username}\"", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  logout:
+    summary: "Log the current user out of this connection (UID)"
+    send: "#UID"
+    expect: { reply_contains: "UID", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  get_user:
+    summary: "Read the user logged in on this connection and its access level (UID?)"
+    send: "UID?"
+    expect: { reply_contains: "UID!", matches: 'UID!(.*)\)$' }
+    returns: value
+  factory_defaults:
+    summary: "Restore every setting to factory defaults, delete profiles, warps and blends, and turn DHCP on (DEF 111)"
+    send: "#DEF 111"
+    expect: { reply_contains: "DEF 111", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  reboot:
+    summary: "Reboot the projector (RBT 111, standby only)"
+    send: "#RBT 111"
+    expect: { reply_contains: "RBT 111", matches: '^\(#?[A-Za-z]' }
+    returns: ack
+  ping:
+    summary: "Read the projector type and software version (PNG?)"
+    send: "PNG?"
+    expect: { reply_contains: "PNG!", matches: 'PNG!(.*)\)$' }
+    returns: value
+  get_status:
+    summary: "Read every status item, one message per item (SST?)"
+    send: "SST?"
+    expect: { reply_contains: "SST+", matches: '^\(SST\+(.*)\)$' }
+    returns: value
+  get_status_group:
+    summary: "Read every status item of one group (SST+<group>?)"
+    params:
+      group: { type: "enum", values: ["ALRM", "CONF", "SYST", "SIGN", "LAMP", "LGHT", "VERS", "TEMP", "COOL", "SERI"], required: true, label: "Group", description: "ALRM alarms (Boxer), CONF configuration, SYST system, SIGN signal, LAMP lamps (Boxer), LGHT illuminator (laser families), VERS versions, TEMP temperatures, COOL cooling, SERI serial numbers." }
+    send: "SST+{group}?"
+    expect: { reply_contains: "SST+{group}!", matches: '!(.*)\)$' }
+    returns: value
+  get_status_item:
+    summary: "Read one status item (SST+<group>?<index>)"
+    params:
+      group: { type: "enum", values: ["ALRM", "CONF", "SYST", "SIGN", "LAMP", "LGHT", "VERS", "TEMP", "COOL", "SERI"], required: true, label: "Group", description: "The status group, as for get_status_group." }
+      index: { type: "int", min: 0, max: 9999, required: true, label: "Item", description: "The item's index within its group, as the status system reference numbers it." }
+    send: "SST+{group}?{index}"
+    expect: { reply_contains: "SST+{group}!", matches: '!(.*)\)$' }
+    returns: value
+  get_events:
+    summary: "Read every logged event since AC power came on, newest first (EVT)"
+    send: "EVT"
+    expect: { reply_contains: "EVT!", matches: 'EVT!(.*)\)$' }
+    returns: value
+  get_recent_events:
+    summary: "Read the most recent logged events (EVT <max>)"
+    params:
+      count: { type: "int", min: 1, max: 9999, required: true, label: "Count", description: "How many events to return, newest first." }
+    send: "EVT {count}"
+    expect: { reply_contains: "EVT!", matches: 'EVT!(.*)\)$' }
+    returns: value
+  get_events_since:
+    summary: "Read the logged events from a time until now (EVT \"<start>\")"
+    params:
+      start: { type: "string", max_length: 19, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true, label: "From", description: "Start time as yyyy-mm-dd hh:mm:ss." }
+    send: "EVT \"{start}\""
+    expect: { reply_contains: "EVT!", matches: 'EVT!(.*)\)$' }
+    returns: value
+  get_events_between:
+    summary: "Read the logged events between two times (EVT \"<start>\" \"<end>\")"
+    params:
+      start: { type: "string", max_length: 19, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true, label: "From", description: "Start time as yyyy-mm-dd hh:mm:ss." }
+      end: { type: "string", max_length: 19, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true, label: "To", description: "End time as yyyy-mm-dd hh:mm:ss." }
+    send: "EVT \"{start}\" \"{end}\""
+    expect: { reply_contains: "EVT!", matches: 'EVT!(.*)\)$' }
+    returns: value
+  run_self_test_suite:
+    summary: "Run a built-in self test suite and read its results (BST)"
+    params:
+      suite: { type: "int", min: 0, max: 99, required: true, label: "Suite", description: "Suite as BST?L lists it: 0 = all tests, 1 = image processor board, 2 = formatter, 3 = active backplane, 4 = video path, 5 = IMXB (4K40-RGB)." }
+    send: "BST {suite}"
+    expect: { reply_contains: "BST!", matches: 'BST!(.*)\)$' }
+    returns: value
+  run_self_test:
+    summary: "Run one built-in self test and read its result (BST+TEST)"
+    params:
+      test: { type: "int", min: 0, max: 99, required: true, label: "Test", description: "Test as BST+TEST?L lists it." }
+    send: "BST+TEST {test}"
+    expect: { reply_contains: "BST+TEST!", matches: 'BST\+TEST!(.*)\)$' }
+    returns: value
+  get_self_test_suite_list:
+    summary: "Read the list of built-in self test suites (BST?L)"
+    send: "BST?L"
+    expect: { reply_contains: "BST!L", matches: '!L(.*)\)$' }
+    returns: value
+  get_self_test_list:
+    summary: "Read the list of built-in self tests (BST+TEST?L)"
+    send: "BST+TEST?L"
+    expect: { reply_contains: "BST+TEST!L", matches: '!L(.*)\)$' }
+    returns: value
+  request:
+    summary: "Send any request in the documented general form (<code>? or <code>+<subcode>?) and return the reply data"
+    params:
+      code: { type: "string", max_length: 8, pattern: "^[A-Za-z]{3}(\\+[A-Za-z0-9]{4})?$", required: true, label: "Code", description: "Function code with an optional subcode, such as LAS+POWR or SIN+PORT, without the question mark." }
+    send: "{code}?"
+    expect: { reply_contains: "{code}!", matches: '!(.*)\)$' }
+    returns: value
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send:
+        - "PWR?"
+        - "SHU?"
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh], message: "CHA?" }
+        - "SIN?"
+        - "SIN+PORT?"
+        - "FRZ?"
+        - "ITP?"
+    - every_ms: 30000
+      send:
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh, d4k40-rgb, mirage-sst], message: "LAS+POWR?" }
+        - "OSD?"
+        - "MSP?"
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh, d4k40-rgb, boxer-4k, boxer-2k, boxer-30], message: "STH+MODE?" }
+        - { models: [eclipse], message: "SHU+INHB?" }
+        - { models: [d4k40-rgb], message: "SHU+BLND?" }
+        - { models: [d4k40-rgb], message: "VID+BLND?" }
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh], message: "TMC+MODE?" }
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh, mirage-sst], message: "TDD?" }
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh, mirage-sst], message: "TDN?" }
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh, mirage-sst], message: "TDO?" }
+        - { models: [sapphire-4k40-rgbh], message: "PHL?" }
+        - { models: [m-rgb], message: "SSP+SLCT?" }
+        - { models: [d4k40-rgb, mirage-sst, boxer-4k, boxer-2k, boxer-30], message: "UST+ENBL?" }
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh], message: "CAV+MODE?" }
+        - "WRP+KGAN?"
+        - "KEN+WIRE?"
+        - "FRD+STAT?"
+        - "FRD+TIME?"
+        - "GIO+CNFG?"
+        - "GIO+STAT?"
+        - { models: [m-rgb, griffyn, d4k40-rgb], message: "LAS+CSRX?" }
+        - { models: [m-rgb, griffyn, d4k40-rgb], message: "LAS+CSRY?" }
+        - { models: [m-rgb, griffyn, d4k40-rgb], message: "LAS+CSRZ?" }
+    - every_ms: 300000
+      send:
+        - "SST?"
+    - every_ms: 3600000
+      send:
+        - "PNG?"
+        - "OTR?"
+        - "OTR+HRES?"
+        - "OTR+VRES?"
+        - "NET+ETH0?"
+        - "NET+SUB0?"
+        - "NET+GATE?"
+        - "NET+MAC0?"
+        - "NET+PORT?"
+        - "ADR?"
+        - "BDR+PRTA?"
+        - "LOC+LANG?"
+        - "LOC+TEMP?"
+        - "TMD+DATE?"
+        - "TMD+TIME?"
+        - "UID?"
+        - { models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh], message: "CHA?L" }
+        - "SIN?L"
+        - "ITP?L"
+        - "PRO?L"
+        - "WRP+SLCT?L"
+        - "EBL+SLCT?L"
+        - "EBB+SLCT?L"
+        - "FCS?m"
+        - "LHO?m"
+        - "LVO?m"
+        - "ZOM?m"
+        - { models: [boxer-4k, boxer-2k, boxer-30], message: "LPP?m" }
+        - { models: [boxer-4k, boxer-2k, boxer-30], message: "HIS?" }
+        - { models: [d4k40-rgb, mirage-sst, boxer-4k, boxer-2k, boxer-30], message: "BST?L" }
+        - { models: [d4k40-rgb, mirage-sst, boxer-4k, boxer-2k, boxer-30], message: "BST+TEST?L" }
+  updates:
+    - match: '^\(#?PWR\s*[01]\)$'
+      then_send: ["PWR?"]
+    - match: '^\(PWR!\s*(\d+)[\s)]'
+      state: { "power.state": "{1}" }
+    - match: '^\(PWR!\s*\d+\s+"([^"]*)"'
+      state: { "power.state_text": "{1}" }
+    - match: '^\(#?PWR\+ELEC(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "power.keep_electronics_on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?APW(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "power.auto_power_on": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?CHA(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "input.channel": "{1}" }
+    - match: '^\(#?CHA\s*[-\w"]'
+      then_send: ["CHA?"]
+    - match: '^\(CHA!\s*\d+\s+"([^"]*)"'
+      state: { "input.channel_name": "{1}" }
+    - match: '^\(CHA!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.channels.{2}.name": "{3}", "options.channels.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SIN(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "input.selected": "{1}" }
+    - match: '^\(#?SIN\s*[-\w"]'
+      then_send: ["SIN?"]
+    - match: '^\(SIN!\s*\d+\s+"([^"]*)"'
+      state: { "input.selected_name": "{1}" }
+    - match: '^\(SIN!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.inputs.{2}.name": "{3}", "options.inputs.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SIN\+PORT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "input.port_configuration": "{1}" }
+    - match: '^\(#?SIN\+PORT\s*[-\w"]'
+      then_send: ["SIN+PORT?", "SIN?L"]
+    - match: '^\(SIN\+PORT!\s*\d+\s+"([^"]*)"'
+      state: { "input.port_configuration_name": "{1}" }
+    - match: '^\(#?CHL\+INPT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "input.christie_link_input": "{1}" }
+    - match: '^\(#?FIB\+(SLT[AB])(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "input.christie_link_video.{1}": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^\(#?CAV\+MODE(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "video.input_fpga_mode": "{1}" }
+    - match: '^\(#?CAV\+MODE\s*[-\w"]'
+      then_send: ["CAV+MODE?"]
+    - match: '^\(#?DDD(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "video.dual_link_dvi_disabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?LOE(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "video.loop_out": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SDI(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "video.sdi_payload_override": "{1}" }
+    - match: '^\(#?SDI\+PAYL(?:!\s*|\s*)"([^"]*)"'
+      state: { "video.sdi_custom_payload": "{1}" }
+    - match: '^\(#?EDO(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "video.edid_frame_rate": "{1}" }
+    - match: '^\(#?EDO\+ADVN(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "video.edid_default_mode": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?EDO\+COLM(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "video.edid_window": "{1}" }
+    - match: '^\(#?FMD(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "video.film_mode_detect": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?FRD(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "video.frame_delay": "{1}" }
+    - match: '^\(#?FRD\s*[-\w"]'
+      then_send: ["FRD+STAT?", "FRD+TIME?"]
+    - match: '^\(FRD\+STAT!\s*(-?\d+)'
+      state: { "video.frame_delay_actual": "{1}" }
+    - match: '^\(FRD\+TIME!\s*"([^"]*)'
+      state: { "video.frame_delay_time": "{1}" }
+    - match: '^\(#?PHL(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "video.phase_locking_disabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?PHL\s*[-\w"]'
+      then_send: ["PHL?"]
+    - match: '^\(#?THM(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "video.thumbnails": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SHU(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "shutter.closed": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SHU\s*[-\w"]'
+      then_send: ["SHU?"]
+    - match: '^\(#?SHU\+INHB(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "shutter.inhibit": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SHU\+INHB\s*[-\w"]'
+      then_send: ["SHU+INHB?"]
+    - match: '^\(#?SHU\+BLND(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "shutter.keep_black_level_blend": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SHU\+BLND\s*[-\w"]'
+      then_send: ["SHU+BLND?"]
+    - match: '^\(#?SHU\+SERV(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "shutter.monitoring_disabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?FRZ(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "image.frozen": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?FRZ\s*[-\w"]'
+      then_send: ["FRZ?"]
+    - match: '^\(#?ITP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.index": "{1}" }
+    - match: '^\(#?ITP\s*[-\w"]'
+      then_send: ["ITP?"]
+    - match: '^\(ITP!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.test_patterns.{2}.name": "{3}", "options.test_patterns.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?ITP\+FREQ(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.frequency": "{1}" }
+    - match: '^\(#?ITP\+GRDP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.grid_pitch": "{1}" }
+    - match: '^\(#?ITP\+GREY(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.gray": "{1}" }
+    - match: '^\(#?ITP\+RMPL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.ramp_level": "{1}" }
+    - match: '^\(#?ITP\+RMPM(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.ramp_speed": "{1}" }
+    - match: '^\(#?ITP\+RMPS(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.ramp_slope": "{1}" }
+    - match: '^\(#?ITP\+GRDC(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "test_pattern.grid_multicolor": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?ITP\+GRDM(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "test_pattern.grid_moving": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?ETP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "test_pattern.engine": "{1}" }
+    - match: '^\(#?TDT(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "threed.test_pattern": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?CLE(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.color_enable": "{1}" }
+    - match: '^\(#?BGC(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.gamma_function": "{1}" }
+    - match: '^\(#?GAM(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.gamma": "{1}" }
+    - match: '^\(#?GAM\+MAXL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.gamma_max_luminance": "{1}" }
+    - match: '^\(#?GAM\+MINL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.gamma_min_luminance": "{1}" }
+    - match: '^\(#?GAM\+PQWL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.gamma_pq_white_level": "{1}" }
+    - match: '^\(#?GAM\+SLOP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.gamma_slope": "{1}" }
+    - match: '^\(#?CSP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.color_space": "{1}" }
+    - match: '^\(#?DTL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.sharpness": "{1}" }
+    - match: '^\(#?SZP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.resize_preset": "{1}" }
+    - match: '^\(#?SOR(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.orientation": "{1}" }
+    - match: '^\(#?ALC(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.ambient_light_correction": "{1}" }
+    - match: '^\(#?BLK\+(TOPP|BOTP|LFTP|RGTP)(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "image.blanking.{1}": "{2}" }
+    - match: '^\(#?BLK\+RSTP\s*\)$'
+      then_send: ["BLK+TOPP?", "BLK+BOTP?", "BLK+LFTP?", "BLK+RGTP?"]
+    - match: '^\(#?BLO\+SLCT(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "image.black_level_offset.enabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?BLO\+(REDO|GRNO|BLUO)(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "image.black_level_offset.{1}": "{2}" }
+    - match: '^\(#?BLO\+MAXO(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "image.black_level_offset.maximum": "{1}" }
+    - match: '^\(#?OTR(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "device.output_resolution_mode": "{1}" }
+    - match: '^\(OTR!\s*"([^"]*)"'
+      state: { "device.output_resolution": "{1}" }
+    - match: '^\(OTR\+HRES!\s*(\d+)'
+      state: { "device.output_columns": "{1}" }
+    - match: '^\(OTR\+VRES!\s*(\d+)'
+      state: { "device.output_rows": "{1}" }
+    - match: '^\(#?CCA\+SLCT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "color.table": "{1}" }
+    - match: '^\(#?CCA\+CTMP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "color.temperature": "{1}" }
+    - match: '^\(#?CCA\+((?:RD|GN|BL|WH)C[XY])(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "color.custom_coordinates.{1}": "{2}" }
+    - match: '^\(#?CCA\+((?:RD|GN|BL|WH)P[XY])(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "color.native_primaries.{1}": "{2}" }
+    - match: '^\(#?CCA\+([RGB]OF[RGBW])(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "color.saturation.{1}": "{2}" }
+    - match: '^\(#?CUC\+SLCT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "color.uniformity": "{1}" }
+    - match: '^\(#?CUC\+(H[1-5][RGB][LXY])(?:!\s*|\s*)"?([0-9.]+)'
+      state: { "color.uniformity_points.{1}": "{2}" }
+    - match: '^\(#?LAS\+POWR(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.power": "{1}" }
+    - match: '^\(#?LAS\+POWR\s*[-\w"]'
+      then_send: ["LAS+POWR?"]
+    - match: '^\(#?LAS\+(REDP|GRNP|BLUP)(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "light.drive.{1}": "{2}" }
+    - match: '^\(#?LAS\+PHOP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.phosphor_drive": "{1}" }
+    - match: '^\(#?LAS\+MODE(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.liteloc_mode": "{1}" }
+    - match: '^\(#?LAS\+WHT([XY])(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "light.white_target.{1}": "{2}" }
+    - match: '^\(#?LAS\+CFCM(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "light.camera_friendly_color": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?LAS\+CFW([XY])(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "light.camera_friendly_white.{1}": "{2}" }
+    - match: '^\(LAS\+CSR([XYZ])!\s*"?([^")]*)'
+      state: { "light.color_sensor.{1}": "{2}" }
+    - match: '^\(#?LAS\+ELBM(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "light.low_brightness_mode": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?LAS\+MAXA(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.max_ambient_temperature": "{1}" }
+    - match: '^\(#?LAS\+MAXH(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.max_humidity": "{1}" }
+    - match: '^\(#?LAS\+UDEC(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "light.environment_manual": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?RBK\+SLCT(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "light.realblack.enabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?RBK\+LOSL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.realblack.threshold": "{1}" }
+    - match: '^\(#?RBK\+TIME(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.realblack.time": "{1}" }
+    - match: '^\(#?ENH\+SLCT(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "light.enhanced_healing": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?TMC\+MODE(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "cooling.profile": "{1}" }
+    - match: '^\(#?TMC\+MODE\s*[-\w"]'
+      then_send: ["TMC+MODE?"]
+    - match: '^\(TMC\+MODE!\s*(?:\d+\s*)?"([^"]*)"'
+      state: { "cooling.profile_name": "{1}" }
+    - match: '^\(#?COO\+HEPA(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "cooling.pressurized_filter": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SSP\+SLCT(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "image.shifted_superposition": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SSP\+SLCT\s*[-\w"]'
+      then_send: ["SSP+SLCT?"]
+    - match: '^\(#?SSP\+TMUL(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "image.actuator_multiplication": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?LOP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.lamp_selected": "{1}" }
+    - match: '^\(#?LOP\+MULT(?:!\s*|\s*)(\d+)[\s)]'
+      state: { "light.active_lamps": "{1}", "light.lamps.A1.active": "{1:bit.0}", "light.lamps.A2.active": "{1:bit.1}", "light.lamps.A3.active": "{1:bit.2}", "light.lamps.B1.active": "{1:bit.3}", "light.lamps.B2.active": "{1:bit.4}", "light.lamps.B3.active": "{1:bit.5}" }
+    - match: '^\(#?LPL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.lamp_life": "{1}" }
+    - match: '^\(#?LPP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "light.lamp_power": "{1}" }
+    - match: '^\(LPP!M\s*(-?\d+)\s+(-?\d+)'
+      state: { "light.lamp_power_min": "{1}", "light.lamp_power_max": "{2}" }
+    - match: '^\(HIS!(\d+) "([^"]*)" "([^"]*)" "([^"]*)" ([\d ]*?)\s*(\d+)\)$'
+      state: { "light.lamp_history.{1}.install_date": "{2}", "light.lamp_history.{1}.serial": "{3}", "light.lamp_history.{1}.type": "{4}", "light.lamp_history.{1}.counters": "{5}", "light.lamp_history.{1}.total_hours": "{6}" }
+    - match: '^\(HIS\+LMP(\d)!(\d+) "([^"]*)" "([^"]*)" "([^"]*)" ([\d ]*?)\s*(\d+)\)$'
+      state: { "light.lamp_modules.{1}.history.{2}.install_date": "{3}", "light.lamp_modules.{1}.history.{2}.serial": "{4}", "light.lamp_modules.{1}.history.{2}.type": "{5}", "light.lamp_modules.{1}.history.{2}.counters": "{6}", "light.lamp_modules.{1}.history.{2}.total_hours": "{7}" }
+    - match: '^\(#?LCB\s*1\)$'
+      then_send: ["FCS?m", "LHO?m", "LVO?m", "ZOM?m"]
+    - match: '^\(#?LCB\+ZOOM\s*1\)$'
+      then_send: ["ZOM?m"]
+    - match: '^\(#?LCB\+LOCK(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "lens.locked": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?LCB\+ZOMR(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "lens.zoom_motor": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?FCS(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "lens.focus.position": "{1}" }
+    - match: '^\(FCS!M\s*(-?\d+)\s+(-?\d+)'
+      state: { "lens.focus.min": "{1}", "lens.focus.max": "{2}" }
+    - match: '^\(#?LHO(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "lens.horizontal.position": "{1}" }
+    - match: '^\(LHO!M\s*(-?\d+)\s+(-?\d+)'
+      state: { "lens.horizontal.min": "{1}", "lens.horizontal.max": "{2}" }
+    - match: '^\(#?LVO(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "lens.vertical.position": "{1}" }
+    - match: '^\(LVO!M\s*(-?\d+)\s+(-?\d+)'
+      state: { "lens.vertical.min": "{1}", "lens.vertical.max": "{2}" }
+    - match: '^\(#?ZOM(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "lens.zoom.position": "{1}" }
+    - match: '^\(ZOM!M\s*(-?\d+)\s+(-?\d+)'
+      state: { "lens.zoom.min": "{1}", "lens.zoom.max": "{2}" }
+    - match: '^\(#?LMV\s*(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)[\s)]'
+      state: { "lens.horizontal.position": "{1}", "lens.vertical.position": "{2}", "lens.zoom.position": "{3}", "lens.focus.position": "{4}" }
+    - match: '^\(#?UST\+ENBL(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "lens.ust_keep_out": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?UST\+ENBL\s*[-\w"]'
+      then_send: ["UST+ENBL?"]
+    - match: '^\(#?WRP\+SLCT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "geometry.warp": "{1}" }
+    - match: '^\(WRP\+SLCT!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.warps.{2}.name": "{3}", "options.warps.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?WRP\+KGAN(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "geometry.keystone_gain_compensation": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?WRP\+KGAN\s*[-\w"]'
+      then_send: ["WRP+KGAN?"]
+    - match: '^\(#?TWE(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "geometry.warp_optimization_disabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?EBL\+SLCT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "blend.edge": "{1}" }
+    - match: '^\(EBL\+SLCT!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.edge_blends.{2}.name": "{3}", "options.edge_blends.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?EBB\+SLCT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "blend.black_level": "{1}" }
+    - match: '^\(EBB\+SLCT!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.black_level_blends.{2}.name": "{3}", "options.black_level_blends.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?VID\+BLND(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "blend.keep_on_input_switch": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?VID\+BLND\s*[-\w"]'
+      then_send: ["VID+BLND?"]
+    - match: '^\(#?TDM(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "threed.mode": "{1}" }
+    - match: '^\(#?TDD(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "threed.sync_delay": "{1}" }
+    - match: '^\(#?TDD\s*[-\w"]'
+      then_send: ["TDD?"]
+    - match: '^\(#?TDN(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "threed.inverted": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?TDN\s*[-\w"]'
+      then_send: ["TDN?"]
+    - match: '^\(#?TDO(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "threed.sync_out": "{1}" }
+    - match: '^\(#?TDO\s*[-\w"]'
+      then_send: ["TDO?"]
+    - match: '^\(#?DRK(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "threed.dark_interval": "{1}" }
+    - match: '^\(#?PRO(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "profile.active": "{1}" }
+    - match: '^\(PRO!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.profiles.{2}.name": "{3}", "options.profiles.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?PRO\+RSET\s*\d+\)$'
+      then_send: ["PRO?L"]
+    - match: '^\(#?DMX\+ENBL(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "dmx.enabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?DMX\+CHAN(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "dmx.base_channel": "{1}" }
+    - match: '^\(#?DMX\+NETS(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "dmx.net": "{1}" }
+    - match: '^\(#?DMX\+SUBN(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "dmx.subnet": "{1}" }
+    - match: '^\(#?DMX\+UNVS(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "dmx.universe": "{1}" }
+    - match: '^\(#?NET\s*"([^"]*)"\s+"([^"]*)"'
+      state: { "network.ip_address": "{1}", "network.netmask": "{2}" }
+    - match: '^\(#?NET\s*"[^"]*"\s+"[^"]*"\s+"([^"]*)"'
+      state: { "network.gateway": "{1}" }
+    - match: '^\(NET\+ETH0!\s*"?([^")]*)'
+      state: { "network.ip_address": "{1}" }
+    - match: '^\(NET\+SUB0!\s*"?([^")]*)'
+      state: { "network.netmask": "{1}" }
+    - match: '^\(NET\+GATE!\s*"?([^")]*)'
+      state: { "network.gateway": "{1}" }
+    - match: '^\(NET\+MAC0!\s*"?([^")]*)'
+      state: { "network.mac_address": "{1}" }
+    - match: '^\(#?NET\+DGRP(?:!\s*|\s*)"([^"]*)"'
+      state: { "network.device_group": "{1}" }
+    - match: '^\(#?NET\+HOST(?:!\s*|\s*)"([^"]*)"'
+      state: { "network.hostname": "{1}" }
+    - match: '^\(#?NET\+PORT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "network.control_port": "{1}" }
+    - match: '^\(#?NET\+PORT\s*[-\w"]'
+      then_send: ["NET+PORT?"]
+    - match: '^\(#?NET\+SWIT(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "network.switching": "{1}" }
+    - match: '^\(\d+ \d+ FYI0*915 "Configured network:\s*IP:(\S+)\s+Mask:(\S+)\s+Gateway:([^"\s]*)'
+      state: { "network.ip_address": "{1}", "network.netmask": "{2}", "network.gateway": "{3}" }
+    - match: '^\(#?SNM\+(LAMP|LIFE|POWR|SIGN|STAL|THRM)(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "snmp.traps.{1}": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^\(#?SNM\+READ(?:!\s*|\s*)"([^"]*)"'
+      state: { "snmp.read_community": "{1}" }
+    - match: '^\(#?SNM\+TIP([1-3])(?:!\s*|\s*)"([^"]*)"'
+      state: { "snmp.trap_destinations.{1}": "{2}" }
+    - match: '^\(#?RAL(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "access.ethernet": "{1}" }
+    - match: '^\(#?RAL\+PRTA(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "access.serial": "{1}" }
+    - match: '^\(#?ADR(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "setup.address": "{1}" }
+    - match: '^\(#?ADR\s*[-\w"]'
+      then_send: ["ADR?"]
+    - match: '^\(#?BDR\+PRTA(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "setup.baud_rate": "{1}" }
+    - match: '^\(#?BDR\+PRTA\s*[-\w"]'
+      then_send: ["BDR+PRTA?"]
+    - match: '^\(#?EME(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "setup.async_messages": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?LOC\+LANG(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "setup.language": "{1}" }
+    - match: '^\(#?LOC\+LANG\s*[-\w"]'
+      then_send: ["LOC+LANG?"]
+    - match: '^\(#?LOC\+TEMP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "setup.temperature_unit": "{1}" }
+    - match: '^\(#?LOC\+TEMP\s*[-\w"]'
+      then_send: ["LOC+TEMP?"]
+    - match: '^\(#?MSP(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "osd.menu_position": "{1}" }
+    - match: '^\(#?MSP\s*[-\w"]'
+      then_send: ["MSP?"]
+    - match: '^\(#?OSD(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "osd.visible": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?OSD\s*[-\w"]'
+      then_send: ["OSD?"]
+    - match: '^\(#?SPS\+COLR(?:!\s*|\s*)(-?\d+)[\s)]'
+      state: { "osd.splash_color": "{1}" }
+    - match: '^\(#?STH\+MODE(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "setup.stealth_mode": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(#?STH\+MODE\s*[-\w"]'
+      then_send: ["STH+MODE?"]
+    - match: '^\(#?KEN\+(FRNT|REAR|WIRE|HDBT)(?:!\s*0*|\s*)([01])[\s)]'
+      state: { "setup.keypad.{1}": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^\(#?KEN\+WIRE\s*[01]\)$'
+      then_send: ["KEN+WIRE?"]
+    - match: '^\(#?GIO\+CNFG(?:!\s*|\s*)"([^"]*)"'
+      state: { "gpio.directions": "{1}" }
+    - match: '^\(#?GIO\+CNFG\s*[-\w"]'
+      then_send: ["GIO+CNFG?"]
+    - match: '^\(GIO\+CONF?G!\s*"([^"]*)"'
+      state: { "gpio.directions": "{1}" }
+    - match: '^\(#?GIO\+STAT(?:!\s*|\s*)"([^"]*)"'
+      state: { "gpio.states": "{1}" }
+    - match: '^\(#?GIO\+STAT\s*[-\w"]'
+      then_send: ["GIO+STAT?"]
+    - match: '^\(#?GIO\+TRIG(?:!\s*|\s*)"([^"]*)"'
+      state: { "gpio.triggers": "{1}" }
+    - match: '^\(#?TMD\+DATE(?:!\s*|\s*)"([^"]*)"'
+      state: { "clock.date": "{1}" }
+    - match: '^\(#?TMD\+DATE\s*[-\w"]'
+      then_send: ["TMD+DATE?"]
+    - match: '^\(#?TMD\+TIME(?:!\s*|\s*)"([^"]*)"'
+      state: { "clock.time": "{1}" }
+    - match: '^\(#?TMD\+TIME\s*[-\w"]'
+      then_send: ["TMD+TIME?"]
+    - match: '^\(UID!\s*"?([^")]*)'
+      state: { "session.user": "{1}" }
+    - match: '^\(PNG!(\d+) (\d+) (\d+) (\d+)'
+      state: { "device.type": "{1}", "device.software_version": "{2}.{3}.{4}" }
+    - match: '^\(SST\+([A-Z]{4})!(\d+) (\d+) "([^"]*)'
+      state: { "status.items.{1}.{2}.state": "{3}", "status.items.{1}.{2}.value": "{4}" }
+    - match: '^\(SST\+([A-Z]{4})!(\d+) \d+ "[^"]*" "([^"]*)'
+      state: { "status.items.{1}.{2}.name": "{3}" }
+    - match: '^\(SST\+([A-Z]{4})!(\d+) \d+ "\s*(-?\d+(?:\.\d+)?)'
+      state: { "status.items.{1}.{2}.number": "{3}" }
+    - match: '^\(SST\+[A-Z]{4}!\d+ \d+ "([^"]*)" "Projector\ Model"'
+      state: { "device.model": "{1}" }
+    - match: '^\(SST\+[A-Z]{4}!\d+ \d+ "([^"]*)" "Projector\ S/N"'
+      state: { "device.serial_number": "{1}" }
+    - match: '^\(SST\+[A-Z]{4}!\d+ \d+ "([^"]*)" "Output\ Resolution"'
+      state: { "device.native_resolution": "{1}" }
+    - match: '^\(SST\+[A-Z]{4}!\d+ \d+ "([^"]*)" "Projector\ Build\ Date"'
+      state: { "device.build_date": "{1}" }
+    - match: '^\(SST\+[A-Z]{4}!\d+ \d+ "([^"]*)" "Main\ Control\ Board\ SW\ Version"'
+      state: { "device.firmware_version": "{1}" }
+    - match: '^\(SST\+[A-Z]{4}!\d+ \d+ "(\d+):(\d+)[^"]*" "Projector Hours"'
+      state: { "status.projector_hours": "{1}", "status.projector_minutes": "{2}" }
+    - match: '^\(SST\+([A-Z]{4})!(\d+) \d+ "(\d+)(?::\d+)?[^"]*" "[^"]*(?:Laser On|Laser Standby|Lamp) Hours'
+      state: { "status.light_hours.{1}.{2}": "{3}" }
+    - match: '^\(SST\+TEMP!(\d+) (\d+) "\s*(-?\d+(?:\.\d+)?)'
+      state: { "status.temperatures.{1}.value": "{3}", "status.temperatures.{1}.state": "{2}" }
+    - match: '^\(SST\+TEMP!(\d+) \d+ "[^"]*" "([^"]*)'
+      state: { "status.temperatures.{1}.name": "{2}" }
+    - match: '^\(\d+ \d+ (FYI|ERR)(\d+) "([^"]*)'
+      state: { "status.last_message.type": "{1}", "status.last_message.code": "{2}", "status.last_message.text": "{3}" }
+    - match: '^\(\d+ \d+ (?:FYI|ERR)\d+ "(?:System (?:Warning|Error): )?\\?\(SST\+([A-Z]{4})\?(\d+)'
+      then_send: ["SST+{1}?{2}"]
+    - match: '^\(\d+ \d+ ERR0*([1-9]\d*) "([^"]*)'
+      state: { "status.last_error.code": "{1}", "status.last_error.text": "{2}" }
+    - match: '^\(EVT!(\d+) "([^"]*)" "([^"]*)" "([^"]*)'
+      state: { "events.{1}.time": "{2}", "events.{1}.severity": "{3}", "events.{1}.text": "{4}" }
+    - match: '^\(BST!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.self_test_suites.{2}.name": "{3}", "options.self_test_suites.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(BST\+TEST!L0*([01]) \d+ (-?\d+) "([^"]*)'
+      state: { "options.self_tests.{2}.name": "{3}", "options.self_tests.{2}.available": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(BST(?:\+TEST)?!(\d+) "([^"]*)"'
+      state: { "self_test.results.{1}.result": "{2}" }
+    - match: '^\(BST(?:\+TEST)?!(\d+) "[^"]*" "([^"]*)'
+      state: { "self_test.results.{1}.detail": "{2}" }
+
+state:
+  power.state: { type: "int", description: "Power state from PWR?: 0 = standby, 1 = on, 10 = cooling down, 11 = warming up" }
+  power.state_text: { type: "string", description: "The projector's text for its power state, such as \"Warming Up\"" }
+  power.keep_electronics_on: { type: "bool", description: "The video electronics stay on in standby (electronics override)" }
+  power.auto_power_on: { type: "bool", description: "The projector powers up again after AC loss if it was on" }
+  input.channel: { type: "int", description: "Channel number from CHA? or the last CHA echo, such as 600 for one-port HDMI0" }
+  input.channel_name: { type: "string", description: "The projector's name for the selected channel, such as \"One-Port HDMI0\"" }
+  options.channels.*.name: { type: "string", description: "Name of each channel, keyed by its number, from CHA?L" }
+  options.channels.*.available: { type: "bool", description: "Whether the projector lists the channel as available (L001) or not (L000)" }
+  input.selected: { type: "int", description: "Input number from SIN? or the last SIN echo, numbered as SIN?L lists them" }
+  input.selected_name: { type: "string", description: "The projector's name for the selected input" }
+  options.inputs.*.name: { type: "string", description: "Name of each input, keyed by its number, from SIN?L" }
+  options.inputs.*.available: { type: "bool", description: "Whether the projector lists the input as available (L001) or not (L000)" }
+  input.port_configuration: { type: "int", description: "Input port configuration: 1 one-port, 2 two-port, 3 four-port columns, 4 four-port quadrants, 5 and up dual-input 3D or multi-viewer" }
+  input.port_configuration_name: { type: "string", description: "The projector's name for the port configuration, such as \"One-Port\"" }
+  input.christie_link_input: { type: "int", description: "Christie Link video mux: 0 = default input/loop-out, 1 = port 1, 2 = port 2" }
+  input.christie_link_video.*: { type: "bool", description: "Christie Link video input enabled, keyed by slot subcode (SLTA, SLTB)" }
+  video.input_fpga_mode: { type: "int", description: "CAVE scaler FPGA image: 0 = DisplayPort, 1 = SDVoE" }
+  video.dual_link_dvi_disabled: { type: "bool", description: "Dual-link DVI support is disabled (DDD 1)" }
+  video.loop_out: { type: "bool", description: "Video loop-out on option cards is enabled" }
+  video.sdi_payload_override: { type: "int", description: "SMPTE 352M payload override for the HBMIC-SDI inputs: 0 = auto detect, 1 = custom, 2 to 7 = 3G-A formats" }
+  video.sdi_custom_payload: { type: "string", description: "Custom SMPTE 352M payload, eight hexadecimal digits" }
+  video.edid_frame_rate: { type: "int", description: "Frame rate the EDID advertises, in Hz" }
+  video.edid_default_mode: { type: "bool", description: "The default EDID mode is selected (false = legacy)" }
+  video.edid_window: { type: "int", description: "Expected active window: 0 = auto, 1 = 4K columns 2x1, 2 = 4K columns 4x1, 3 = 4K quadrants 2x2" }
+  video.film_mode_detect: { type: "bool", description: "Film mode (cadence) detection is on" }
+  video.frame_delay: { type: "int", description: "Requested frame delay, in thousandths of a frame" }
+  video.frame_delay_actual: { type: "int", description: "Actual frame delay in thousandths of a frame (FRD+STAT), at least the requested delay" }
+  video.frame_delay_time: { type: "string", description: "Actual frame delay in milliseconds as the projector words it, such as \"33.33 (L), 41.67 (R)\"" }
+  video.phase_locking_disabled: { type: "bool", description: "Phase locking is disabled (PHL 1)" }
+  video.thumbnails: { type: "bool", description: "Video thumbnails are on" }
+  shutter.closed: { type: "bool", description: "The shutter is closed (it reports closed in standby)" }
+  shutter.inhibit: { type: "bool", description: "The shutter stays closed when the laser powers on" }
+  shutter.keep_black_level_blend: { type: "bool", description: "The black level blend is kept while the shutter moves" }
+  shutter.monitoring_disabled: { type: "bool", description: "Shutter monitoring is disabled (SHU+SERV 1)" }
+  image.frozen: { type: "bool", description: "The image is frozen" }
+  test_pattern.index: { type: "int", description: "Internal test pattern shown, 0 = off" }
+  options.test_patterns.*.name: { type: "string", description: "Name of each test pattern, keyed by its number, from ITP?L" }
+  options.test_patterns.*.available: { type: "bool", description: "Whether the projector lists the test pattern as available (L001) or not (L000)" }
+  test_pattern.frequency: { type: "int", description: "Rate at which internal test patterns are shown, in the family's documented units" }
+  test_pattern.grid_pitch: { type: "int", description: "Line spacing of the square and diagonal grid patterns" }
+  test_pattern.gray: { type: "int", description: "Shade of the flat gray test pattern, 0 to 4095" }
+  test_pattern.ramp_level: { type: "int", description: "Starting gray level of the ramp test patterns" }
+  test_pattern.ramp_speed: { type: "int", description: "Motion speed of the ramp test patterns, 0 = static" }
+  test_pattern.ramp_slope: { type: "int", description: "Slope of the ramp test patterns" }
+  test_pattern.grid_multicolor: { type: "bool", description: "The grid test patterns are multi-colored (false = white on black)" }
+  test_pattern.grid_moving: { type: "bool", description: "The grid test patterns move" }
+  test_pattern.engine: { type: "int", description: "Engine diagnostic test pattern last set, 255 = off" }
+  threed.test_pattern: { type: "bool", description: "The 3D test pattern is shown" }
+  image.color_enable: { type: "int", description: "Colors enabled in the video path: 0 = all, 1 = red, 2 = green, 3 = blue, 4 = yellow, 5 = cyan, 6 = magenta" }
+  image.gamma_function: { type: "int", description: "Gamma transfer function, numbered as the family documents it" }
+  image.gamma: { type: "int", description: "Power law gamma exponent times 1000" }
+  image.gamma_max_luminance: { type: "int", description: "Maximum screen luminance for BT.1886 and HDR/PQ" }
+  image.gamma_min_luminance: { type: "int", description: "Minimum screen luminance for BT.1886 and HDR/PQ" }
+  image.gamma_pq_white_level: { type: "int", description: "PQ curve white level for the raw PQ gamma function" }
+  image.gamma_slope: { type: "int", description: "Slope of the linear section at the bottom of the gamma curve" }
+  image.color_space: { type: "int", description: "Color space of the active signal, 0 = auto detect" }
+  image.sharpness: { type: "int", description: "Sharpness of scaled video, 50 = moderate" }
+  image.resize_preset: { type: "int", description: "Resize preset: 0 = auto, 1 = none, 2 = full size, 3 = full width, 4 = full height" }
+  image.orientation: { type: "int", description: "Orientation: 0 = front, 1 = rear, 2 = front inverted, 3 = rear inverted" }
+  image.ambient_light_correction: { type: "int", description: "Ambient light correction, -100 (brighter room) to 100 (darker room)" }
+  image.blanking.*: { type: "int", description: "Blanking per edge in tenths of a percent, keyed by subcode (TOPP, BOTP, LFTP, RGTP)" }
+  image.black_level_offset.enabled: { type: "bool", description: "The black level offset adjustments are enabled" }
+  image.black_level_offset.*: { type: "int", description: "Black level offset per DMD, keyed by subcode (REDO, GRNO, BLUO), 100 = 0.001" }
+  image.black_level_offset.maximum: { type: "int", description: "Largest black level offset; larger ones are clipped" }
+  device.output_resolution_mode: { type: "int", description: "Output resolution last set: 0 = 4096x2160, 1 = 2048x1080" }
+  device.output_resolution: { type: "string", description: "Output resolution as OTR? reports it (format not documented)" }
+  device.output_columns: { type: "int", description: "Maximum number of output columns (OTR+HRES?)" }
+  device.output_rows: { type: "int", description: "Maximum number of output rows (OTR+VRES?)" }
+  color.table: { type: "int", description: "Color table: 0 = max drives, 1 = color temperature, 2 = BT.709, 3 = custom, 4 = auto, 5 = DCI P3, 6 = P3 D65, 7 = BT.2020" }
+  color.temperature: { type: "int", description: "Color temperature, in kelvin" }
+  color.custom_coordinates.*: { type: "int", description: "Custom color table x,y coordinates times 10000, keyed by subcode (RDCX ... WHCY)" }
+  color.native_primaries.*: { type: "int", description: "Native color primaries x,y times 10000, keyed by subcode (RDPX ... WHPY)" }
+  color.saturation.*: { type: "int", description: "Custom table component shares in tenths of a percent, keyed by subcode (GOFR ... BOFW)" }
+  color.uniformity: { type: "int", description: "1D color uniformity: 0 = off, 1 = on, 2 = from file" }
+  color.uniformity_points.*: { type: "string", description: "Measured 1D color uniformity values as sent, keyed by subcode (H1RL ... H5BY)" }
+  light.power: { type: "int", description: "Overall laser power in tenths of a percent" }
+  light.drive.*: { type: "int", description: "Laser drive levels in tenths of a percent, keyed by subcode (REDP, GRNP, BLUP)" }
+  light.phosphor_drive: { type: "int", description: "Phosphor pump drive level in tenths of a percent" }
+  light.liteloc_mode: { type: "int", description: "LiteLOC mode, numbered as the family documents it" }
+  light.white_target.*: { type: "int", description: "Laser white point target times 10000, keyed by axis (X, Y)" }
+  light.camera_friendly_color: { type: "bool", description: "Camera friendly color mode is on" }
+  light.camera_friendly_white.*: { type: "int", description: "Camera friendly white target times 10000, keyed by axis (X, Y)" }
+  light.color_sensor.*: { type: "string", description: "Color sensor reading as sent, keyed by axis (X, Y, Z); its format is not documented" }
+  light.low_brightness_mode: { type: "bool", description: "Low brightness mode is on" }
+  light.max_ambient_temperature: { type: "int", description: "Maximum ambient temperature the projector is set up for, in degrees Celsius" }
+  light.max_humidity: { type: "int", description: "Expected relative humidity, in percent" }
+  light.environment_manual: { type: "bool", description: "The LiteLOC ambient and humidity limits are set by hand" }
+  light.realblack.enabled: { type: "bool", description: "RealBlack is on" }
+  light.realblack.threshold: { type: "int", description: "RealBlack threshold pixel value, 0 to 255" }
+  light.realblack.time: { type: "int", description: "Black time before the lasers go off, in tenths of a second" }
+  light.enhanced_healing: { type: "bool", description: "Enhanced DMD healing is on" }
+  cooling.profile: { type: "int", description: "Fan control profile: 0 = standard, 1 = quiet, 2 = performance" }
+  cooling.profile_name: { type: "string", description: "The projector's name for the fan control profile, such as \"Standard\"" }
+  cooling.pressurized_filter: { type: "bool", description: "The pressurized filter is installed and its fans are monitored" }
+  image.shifted_superposition: { type: "bool", description: "The shifted superposition actuator is on" }
+  image.actuator_multiplication: { type: "bool", description: "Actuator multiplication mode is on" }
+  light.lamp_selected: { type: "int", description: "Lamp used in limited power mode: 1 = A1 ... 6 = B3" }
+  light.active_lamps: { type: "int", description: "Active lamps as a sum: 1 = A1, 2 = A2, 4 = A3, 8 = B1, 16 = B2, 32 = B3" }
+  light.lamps.A1.active: { type: "bool", description: "Lamp A1 is active (from LOP+MULT)" }
+  light.lamps.A2.active: { type: "bool", description: "Lamp A2 is active (from LOP+MULT)" }
+  light.lamps.A3.active: { type: "bool", description: "Lamp A3 is active (from LOP+MULT)" }
+  light.lamps.B1.active: { type: "bool", description: "Lamp B1 is active (from LOP+MULT)" }
+  light.lamps.B2.active: { type: "bool", description: "Lamp B2 is active (from LOP+MULT)" }
+  light.lamps.B3.active: { type: "bool", description: "Lamp B3 is active (from LOP+MULT)" }
+  light.lamp_life: { type: "int", description: "Expected lamp life in hours, 0 = no end-of-life check" }
+  light.lamp_power: { type: "int", description: "Lamp power in watts" }
+  light.lamp_power_min: { type: "int", description: "Lowest lamp power for the lamp fitted, in watts (LPP?m)" }
+  light.lamp_power_max: { type: "int", description: "Highest lamp power for the lamp fitted, in watts (LPP?m)" }
+  light.lamp_history.*.install_date: { type: "string", description: "Date the entry was made, per lamp history entry (HIS?), 0 = the lamp installed now" }
+  light.lamp_modules.*.history.*.install_date: { type: "string", description: "Date the entry was made, per entry of a lamp memory module (HIS+LMPn?)" }
+  light.lamp_history.*.serial: { type: "string", description: "Lamp serial number, per lamp history entry (HIS?), 0 = the lamp installed now" }
+  light.lamp_modules.*.history.*.serial: { type: "string", description: "Lamp serial number, per entry of a lamp memory module (HIS+LMPn?)" }
+  light.lamp_history.*.type: { type: "string", description: "Lamp type, per lamp history entry (HIS?), 0 = the lamp installed now" }
+  light.lamp_modules.*.history.*.type: { type: "string", description: "Lamp type, per entry of a lamp memory module (HIS+LMPn?)" }
+  light.lamp_history.*.counters: { type: "string", description: "Strike, failed strike, failed re-strike, unexpected off and pre-installation hour counts, as sent, per lamp history entry (HIS?), 0 = the lamp installed now" }
+  light.lamp_modules.*.history.*.counters: { type: "string", description: "Strike, failed strike, failed re-strike, unexpected off and pre-installation hour counts, as sent, per entry of a lamp memory module (HIS+LMPn?)" }
+  light.lamp_history.*.total_hours: { type: "int", description: "Total lamp hours, pre-installation hours included (the last number), per lamp history entry (HIS?), 0 = the lamp installed now" }
+  light.lamp_modules.*.history.*.total_hours: { type: "int", description: "Total lamp hours, pre-installation hours included (the last number), per entry of a lamp memory module (HIS+LMPn?)" }
+  lens.locked: { type: "bool", description: "The lens motors are locked" }
+  lens.zoom_motor: { type: "bool", description: "The lens is programmed as having a zoom motor" }
+  lens.focus.position: { type: "int", description: "Lens focus position last set or read" }
+  lens.focus.min: { type: "int", description: "Lowest focus position from the last lens calibration (FCS?m)" }
+  lens.focus.max: { type: "int", description: "Highest focus position from the last lens calibration (FCS?m)" }
+  lens.horizontal.position: { type: "int", description: "Lens horizontal shift position last set or read" }
+  lens.horizontal.min: { type: "int", description: "Lowest horizontal shift position from the last lens calibration (LHO?m)" }
+  lens.horizontal.max: { type: "int", description: "Highest horizontal shift position from the last lens calibration (LHO?m)" }
+  lens.vertical.position: { type: "int", description: "Lens vertical shift position last set or read" }
+  lens.vertical.min: { type: "int", description: "Lowest vertical shift position from the last lens calibration (LVO?m)" }
+  lens.vertical.max: { type: "int", description: "Highest vertical shift position from the last lens calibration (LVO?m)" }
+  lens.zoom.position: { type: "int", description: "Lens zoom position last set or read" }
+  lens.zoom.min: { type: "int", description: "Lowest zoom position from the last lens calibration (ZOM?m)" }
+  lens.zoom.max: { type: "int", description: "Highest zoom position from the last lens calibration (ZOM?m)" }
+  lens.ust_keep_out: { type: "bool", description: "The UST lens keep-out area is in use" }
+  geometry.warp: { type: "int", description: "Warp map: 0 = off, 1 to 4 = warp maps, 11 = 2D keystone" }
+  options.warps.*.name: { type: "string", description: "Name of each warp map, keyed by its number, from WRP+SLCT?L" }
+  options.warps.*.available: { type: "bool", description: "Whether the projector lists the warp map as available (L001) or not (L000)" }
+  geometry.keystone_gain_compensation: { type: "bool", description: "Gain compensation is applied with 2D keystone" }
+  geometry.warp_optimization_disabled: { type: "bool", description: "Warp calculation speed optimization is disabled (TWE 1)" }
+  blend.edge: { type: "int", description: "Edge blend: 0 = off, 1 to 4 = loaded blends, 11 = basic" }
+  options.edge_blends.*.name: { type: "string", description: "Name of each edge blend, keyed by its number, from EBL+SLCT?L" }
+  options.edge_blends.*.available: { type: "bool", description: "Whether the projector lists the edge blend as available (L001) or not (L000)" }
+  blend.black_level: { type: "int", description: "Black level blend: 0 = off, 1 to 4 = loaded blends, 11 = basic" }
+  options.black_level_blends.*.name: { type: "string", description: "Name of each black level blend, keyed by its number, from EBB+SLCT?L" }
+  options.black_level_blends.*.available: { type: "bool", description: "Whether the projector lists the black level blend as available (L001) or not (L000)" }
+  blend.keep_on_input_switch: { type: "bool", description: "The black level blend is kept while inputs switch" }
+  threed.mode: { type: "int", description: "3D processing mode, 1 = automatic" }
+  threed.sync_delay: { type: "int", description: "3D emitter sync delay, in the projector's units (2000 = 20.00 ms)" }
+  threed.inverted: { type: "bool", description: "Left and right eye frames are swapped" }
+  threed.sync_out: { type: "int", description: "3D sync out: 0 = to an emitter, 1 = to a downstream projector" }
+  threed.dark_interval: { type: "int", description: "3D dark interval between frames, in microseconds" }
+  profile.active: { type: "int", description: "Profile last applied through this connection: 0 = default, 1 to 20 = custom" }
+  options.profiles.*.name: { type: "string", description: "Name of each profile, keyed by its number, from PRO?L" }
+  options.profiles.*.available: { type: "bool", description: "Whether the projector lists the profile as available (L001) or not (L000)" }
+  dmx.enabled: { type: "bool", description: "The Art-Net interface is on" }
+  dmx.base_channel: { type: "int", description: "Art-Net base channel" }
+  dmx.net: { type: "int", description: "Art-Net net" }
+  dmx.subnet: { type: "int", description: "Art-Net subnet" }
+  dmx.universe: { type: "int", description: "Art-Net universe" }
+  network.ip_address: { type: "string", description: "The projector's IP address (NET+ETH0?, a NET echo or a network change message)" }
+  network.netmask: { type: "string", description: "The projector's netmask" }
+  network.gateway: { type: "string", description: "The projector's gateway" }
+  network.mac_address: { type: "string", description: "MAC address of the Ethernet port (NET+MAC0?)" }
+  network.device_group: { type: "string", description: "Device group name" }
+  network.hostname: { type: "string", description: "The projector's network name" }
+  network.control_port: { type: "int", description: "TCP port of the Christie serial protocol over Ethernet" }
+  network.switching: { type: "int", description: "Internal network switching: 0 = split, 1 = all joined, 2 = HDBaseT with Ethernet" }
+  snmp.traps.*: { type: "bool", description: "SNMP traps enabled, keyed by subcode (LAMP, LIFE, POWR, SIGN, STAL, THRM)" }
+  snmp.read_community: { type: "string", description: "SNMP read community name" }
+  snmp.trap_destinations.*: { type: "string", description: "SNMP trap destination addresses, keyed by 1 to 3" }
+  access.ethernet: { type: "int", description: "Ethernet serial protocol access: 0 = none, 1 = login required, 2 = free" }
+  access.serial: { type: "int", description: "RS232 serial protocol access: 0 = none, 1 = login required, 2 = free" }
+  setup.address: { type: "int", description: "Projector address, 0 to 999" }
+  setup.baud_rate: { type: "int", description: "RS232 IN baud rate code: 1 = 2400 ... 6 = 115200" }
+  setup.async_messages: { type: "bool", description: "Asynchronous FYI/ERR messages are on" }
+  setup.language: { type: "int", description: "Interface language: 0 = English ... 8 = Russian" }
+  setup.temperature_unit: { type: "int", description: "Temperature unit: 0 = Celsius, 1 = Fahrenheit" }
+  osd.menu_position: { type: "int", description: "On-screen menu position preset, 0 = top left ... 8 = bottom right" }
+  osd.visible: { type: "bool", description: "The on-screen display is shown" }
+  osd.splash_color: { type: "int", description: "Splash screen color: 1 = red, 2 = green, 3 = blue, 7 = black" }
+  setup.stealth_mode: { type: "bool", description: "Stealth mode is on" }
+  setup.keypad.*: { type: "bool", description: "Keypad sensors enabled, keyed by subcode (FRNT, REAR, WIRE, HDBT)" }
+  gpio.directions: { type: "string", description: "Pin directions, pin 1 first: I = input, O = output" }
+  gpio.states: { type: "string", description: "Pin states, pin 1 first: H = high, L = low" }
+  gpio.triggers: { type: "string", description: "Pins used as camera triggers, pin 1 first: N = normal, T = trigger" }
+  clock.date: { type: "string", description: "Date of the real-time clock, YYYY/MM/DD" }
+  clock.time: { type: "string", description: "Time of the real-time clock when last read or set, hh:mm:ss" }
+  session.user: { type: "string", description: "User and access level UID? reports for this connection, as sent" }
+  device.type: { type: "int", description: "Projector type from PNG?: 54 = D4K, 55 = Boxer, 64 = Crimson, 68 = Mirage SST, 70 = Core5 (TruLife+)" }
+  device.software_version: { type: "string", description: "Main software version from PNG?, major.minor.build" }
+  status.items.*.*.state: { type: "int", description: "Status item condition: 0 = OK, 1 = warning, 2 = error; keyed by group and item index" }
+  status.items.*.*.value: { type: "string", description: "Status item value as the projector words it, keyed by group and item index" }
+  status.items.*.*.name: { type: "string", description: "Status item name, keyed by group and item index" }
+  status.items.*.*.number: { type: "float", description: "The number a status item's value starts with (degrees, RPM, hours, volts), keyed by group and item index" }
+  device.model: { type: "string", description: "Projector model (status item Projector Model)" }
+  device.serial_number: { type: "string", description: "Projector serial number (status item Projector S/N)" }
+  device.native_resolution: { type: "string", description: "Native output resolution (status item Output Resolution)" }
+  device.build_date: { type: "string", description: "Build date of the projector (status item Projector Build Date)" }
+  device.firmware_version: { type: "string", description: "Main control board software version (status item Main Control Board SW Version)" }
+  status.projector_hours: { type: "int", description: "Projector hours, warm-up and cool-down included (status item Projector Hours)" }
+  status.projector_minutes: { type: "int", description: "Minutes past the projector hours (status item Projector Hours)" }
+  status.light_hours.*.*: { type: "int", description: "Light source hours (laser on, laser standby or lamp hours items), keyed by group and item index" }
+  status.temperatures.*.value: { type: "float", description: "Temperature in the unit set by LOC+TEMP, keyed by the TEMP item index" }
+  status.temperatures.*.name: { type: "string", description: "Name of the temperature sensor, keyed by the TEMP item index" }
+  status.temperatures.*.state: { type: "int", description: "Condition of the temperature: 0 = OK, 1 = warning, 2 = error" }
+  status.last_message.type: { type: "string", description: "Type of the last asynchronous message: FYI or ERR" }
+  status.last_message.code: { type: "int", description: "Code of the last asynchronous message, such as 916 for a date or time change" }
+  status.last_message.text: { type: "string", description: "Text of the last asynchronous message (cut at its first closing parenthesis)" }
+  status.last_error.code: { type: "int", description: "Code of the last error reply: 3 to 10 and 101 to 118, as the TruLife+ reference lists them" }
+  status.last_error.text: { type: "string", description: "Text of the last error reply, such as \"ITP: Too Few Parameters\"" }
+  events.*.time: { type: "string", description: "Time of a logged event, keyed by the event number" }
+  events.*.severity: { type: "string", description: "Severity of a logged event, such as OK or Error" }
+  events.*.text: { type: "string", description: "Text of a logged event (cut at its first closing parenthesis)" }
+  options.self_test_suites.*.name: { type: "string", description: "Name of each self test suite, keyed by its number, from BST?L" }
+  options.self_test_suites.*.available: { type: "bool", description: "Whether the projector lists the self test suite as available (L001) or not (L000)" }
+  options.self_tests.*.name: { type: "string", description: "Name of each self test, keyed by its number, from BST+TEST?L" }
+  options.self_tests.*.available: { type: "bool", description: "Whether the projector lists the self test as available (L001) or not (L000)" }
+  self_test.results.*.result: { type: "string", description: "Built-in self test result, keyed by the result number BST answers with" }
+  self_test.results.*.detail: { type: "string", description: "Detail of a failed built-in self test" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every message is in parentheses. A set is sent with the "#" prefix, which the references document as a
+      request for a full acknowledgment: the projector echoes the message once it has finished processing it, and
+      the command waits for that echo. Whether the echo keeps the "#" is not documented; the commands and rules
+      accept both. Requests carry no "#" and are answered "(CODE!value)", the value zero-padded to a fixed width
+      and often followed by a quoted text, as in "(PWR!001 "On")". Several queued replies may arrive in one
+      packet; each parenthesized message is read on its own.
+  - models: [all]
+    severity: warning
+    text: >
+      The references say that while powering up (20 seconds or more) the projector answers late but keeps every
+      request queued, and that the acknowledgment of a set comes only when it has been carried out. The reply
+      timeout is therefore 30 s. Power on and off, lens calibration, the CAV+MODE FPGA reload (15 to 20 s), BST
+      self tests and the rebooting commands (toggle_high_frame_rate, reboot) can still outlast it, so such a
+      command may report a timeout although the projector accepted it. The power state is read with PWR? every 5 s
+      and after each power echo.
+  - models: [all]
+    severity: info
+    text: >
+      The general message format documents "(Code ?)" and "(Code+Subcode ?)" for any code, but most codes only
+      document a set. The documented queries are offered as get_* commands and polled; SIN?, FRZ?, ITP? and
+      TMD+DATE? use the general form. Settings without a query are read back from the echo of each set, so state
+      shows what was last set through this connection, not changes made on the keypad, web page or another
+      connection. request sends any query in the general form; a code that does not answer it gets an error reply.
+  - models: [all]
+    severity: info
+    text: >
+      An error is answered as "(65535 00000 ERR00005 "ITP: Too Few Parameters")" and fails the waiting command;
+      its code and text are kept in status.last_error. The TruLife+ reference lists the codes: 3 invalid
+      parameter, 4 too many parameters, 5 too few parameters, 6 channel not found, 7 command not executed, 8
+      checksum error, 9 unknown request, 10 error receiving serial data, 101 control not found, 102 subcontrol not
+      found, 103 wrong control type, 104 invalid value, 105 disabled control, 106 invalid language, 107 exceeded
+      list size, 110 communication timeout, 111 communications failure, 112 failed to set hardware, 113 bad file,
+      114 memory failure, 115 not implemented, 116 invalid security, 117 invalid access group, 118 system busy
+      (try again later); the other references give only the example. The spec format's code table needs a leading
+      numeric code, which this reply does not have, so the table is kept here. ERR00000 is not an error reply but
+      the asynchronous status message below, and is not taken as one.
+  - models: [all]
+    severity: info
+    text: >
+      With EME 1 (the default) the projector sends messages unasked: FYI00916 when the date or time is set,
+      FYI00919 after factory defaults, FYI00915 with the new IP address, mask and gateway when the network changes
+      (read into network.*), FYI01901 when an option card is detected or removed (4K40-RGB), and FYI00000 or
+      ERR00000 naming a status item ("(SST+LAMP?001) ...") whenever one changes between OK, warning and error. The
+      last of these makes the spec read that item again at once, so status changes are pushed; every status item
+      is also polled every 5 minutes. Each message's type, code and text are kept in status.last_message. With EME
+      0 nothing is pushed and status follows the polls only.
+  - models: [all]
+    severity: warning
+    text: >
+      A message ends at the first ")". The references say text sends parentheses as \( and \), but their
+      asynchronous, event log and status examples hold bare ones ("Integrator Rod Temperature (Temp 1)",
+      "(SST+TEMP?002) Air Intake ..."); either way such a message is cut there. The rules read what comes before
+      the cut: a status item's description ending in a parenthesis is kept whole, while an event or message text
+      keeps only its first part, and the rest arrives as fragments no rule matches. Text parameters refuse quotes,
+      parentheses and backslashes for the same reason.
+  - models: [all]
+    severity: info
+    text: >
+      The "$" simple acknowledgment and the "&" checksum prefix are documented but not used: the "#" echo already
+      confirms each set, and TCP carries its own checksum. ADR addresses projectors on an RS-232 daisy chain; over
+      TCP each projector is its own connection, so no address prefix is sent.
+  - models: [all]
+    severity: info
+    text: >
+      List queries (CHA?L, SIN?L, ITP?L, PRO?L, WRP+SLCT?L, EBL+SLCT?L, EBB+SLCT?L, BST?L, BST+TEST?L) answer one
+      message per item, "(ITP!L001 001 00001 "Grid")", ending with "(ITP!L111 "--END--")". Items are kept under
+      options.* keyed by their number, with L001 read as available and L000 as not (the references call them
+      enabled and disabled); the second number's meaning is not documented. The list command returns the first
+      item only. Nothing marks the start of a list, so an item a later list no longer holds stays in state until
+      the device is opened again.
+  - models: [all]
+    severity: critical
+    text: >
+      These cannot be undone from the API: factory_defaults (DEF 111) deletes every profile, warp, blend and
+      custom test pattern and turns DHCP on; reboot (RBT 111) and toggle_high_frame_rate restart the projector;
+      clear_profile erases a profile; recall_profile replaces every setting the profile holds;
+      save_native_primaries, reset_native_primaries and save_black_level_offset_defaults overwrite calibration;
+      set_video_input_configuration reloads the scaler FPGA (no video for 15 to 20 s). set_static_ip,
+      set_static_ip_without_gateway, enable_dhcp, set_control_port and set_ethernet_access_level 0 can end this
+      connection; the device must then be opened at its new address or port. The lens commands move the image at
+      once.
+  - models: [all]
+    severity: warning
+    text: >
+      Technical bulletin 020-200567-01 removed LAS+EBLU, LAS+EGRN and LAS+ERED (switching the red, green and blue
+      lasers) from the TruLife+ reference because using them damages the diffuser, and says to use PWR 1 to turn
+      the laser on. The 4K40-RGB and Mirage SST references still list them, and the Mirage SST reference adds
+      LAS+EPOW (all three at once). None of them is offered: set_power and set_shutter turn the light on and off.
+  - models: [all]
+    severity: info
+    text: >
+      Serial: every reference documents the same command set and message format for the RS232 IN port and for TCP
+      3002 ("Christie serial protocol over Ethernet"). Baud rate BDR+PRTA 1 to 6 = 2400, 9600, 19200, 38400,
+      57600, 115200, default 115200 ("on each port" on 4K40-RGB, Mirage SST and Boxer), set with service access.
+      Flow control is Xon/Xoff in both directions (the projector sends 13h when its buffer fills and 11h when it
+      can take more, and accepts up to 10 more bytes after 13h). Data bits, parity, stop bits and the connector
+      are not stated in these references (they point to the user manuals; "a standard RS232 serial cable"); the
+      port is on the Video Input panel (TruLife+) or the IMXB faceplate (4K40-RGB, Mirage SST, Boxer). RAL+PRTA
+      sets the serial port's access level.
+  - models: [all]
+    severity: info
+    text: >
+      Ranges that differ between families take the union, each family's values given in the parameter description;
+      a value outside a family's range is sent and refused with an error reply. Gamma function numbers differ: 0
+      is auto detect on TruLife+ and the 4K40-RGB but sRGB on Mirage SST and Boxer, and 3 is classic or M-Series.
+      No upper bound is documented for the custom gamma tables (100 and up), the lens positions (the ?m ranges),
+      the 3D sync delay or the lamp power and life; the spec's bounds there are its own.
+  - models: [all]
+    severity: info
+    text: >
+      Status items arrive as "(SST+<group>!<index> <state> "<value>" "<description>")", the state 000 OK, 001
+      warning, 002 error. Every item is kept under status.items.<group>.<index> with its state, value, name and
+      the number its value starts with. Item numbers differ between families, so model, serial number, native
+      resolution, build date, main software version, projector hours, light source hours and temperatures are
+      recognized by the item's name in the description. Temperatures follow LOC+TEMP (Celsius or Fahrenheit); the
+      degree sign is not ASCII and is read as a replacement character.
+  - models: [all]
+    severity: info
+    text: >
+      Polling: power, shutter, channel (TruLife+), input, port configuration, freeze and test pattern every 5 s;
+      laser power, on-screen display, menu position, stealth mode, shutter options, fan profile, 3D sync settings,
+      phase locking, actuator, UST lens area, FPGA mode, keystone gain, wired keypad, frame delay, GPIO and the
+      color sensor every 30 s; every status item every 5 minutes; identity, network, address, baud rate, language,
+      temperature unit, clock, user, the option lists, lens ranges, lamp power range, lamp history and self test
+      lists every hour.
+  - models: [all]
+    severity: info
+    text: >
+      No credential is needed while RAL is 2 (free access, the default). With RAL 1 the connection is read-only
+      until login (UID "user" "password"); service-level commands (BDR+PRTA, the native primaries and their save
+      and reset, BLO+CALI, SSP+SLCT) need a service login. login sends the password in clear text, as the protocol
+      does.
+  - models: [all]
+    severity: warning
+    text: >
+      Where references disagree with themselves the spec follows the syntax line: GPIO+TRIG (a four-letter code in
+      the TruLife+ reference) is sent as GIO+TRIG with its pins in quotes like GIO+CNFG and GIO+STAT; GIO+CNFG
+      examples use 0 where the table says O for output, and only I, O and X are accepted; the reply to GIO+CNFG?
+      is printed as GIO+CONFG and both are read; BLO+BLUO and BLO+REDO describe each other's DMD and are taken by
+      their names; BLO+MAXO has no documented range (0 to 100 is assumed, as for the offsets); LCB+HOME is sent
+      with no value as the TruLife+ syntax shows. The 4K40-RGB reference shows the VID+BLND example as VID+BLDN.
+  - models: [all]
+    severity: info
+    text: >
+      Lens positions: FCS, LHO, LVO, ZOM and LMV move to absolute positions within the ranges FCS?m, LHO?m, LVO?m
+      and ZOM?m report ("(ZOM!M-2400 900)"), and the echo gives the position set. No query for the current
+      position is documented, so after run_lens_motor or step_lens_motor the position in state is the last
+      absolute one.
+  - models: [all]
+    severity: info
+    text: >
+      BST self tests are sent without "#": their results come as replies, "(BST!000 "--Passed--")" or one
+      "(BST!001 "Fail" "detail")" per failed test. EVT, HIS and the lists likewise answer with several messages;
+      the command returns the first and every message goes to state.
+  - models: [eclipse]
+    severity: info
+    text: >
+      COO+HEPA applies to the Eclipse G3 only; SHU+INHB to the Eclipse.
+  - models: [m-rgb]
+    severity: info
+    text: >
+      LAS+ELBM (low brightness mode) applies to the M 4K25 RGB and M 4K+25 RGB only; SSP+SLCT needs service access
+      and may cause video artifacts when changed.
+  - models: [griffyn]
+    severity: info
+    text: >
+      LAS+MAXA, LAS+MAXH and LAS+UDEC apply to the Griffyn 4K32-RGB only; fan profile 2 (performance) to the
+      4K35-RGB and 4K50-RGB.
+  - models: [m-rgb, griffyn]
+    severity: info
+    text: >
+      RealBlack (RBK) must be enabled and saved in each profile; switching profiles otherwise loses it.
+  - models: [eclipse, m-rgb, griffyn, sapphire-4k40-rgbh, mirage-sst]
+    severity: info
+    text: >
+      The 3D commands (TDM, TDD, TDN, TDO, TDT, DRK) need the Mirage license, and HFR+ENBL the Mirage (Pro) or HFR
+      license with the projector in standby; without it they get an error reply.
+  - models: [mirage-sst]
+    severity: warning
+    text: >
+      The Mirage SST status system reference (020-103007) was not available, so its status groups are not known;
+      every status item is read with SST? and kept generically.
+  - models: [boxer-4k, boxer-2k, boxer-30]
+    severity: info
+    text: >
+      The Boxer families use lamps: LOP, LOP+MULT, LPL, LPP and HIS replace the LAS laser commands. The LPP?m
+      reply is assumed to read like the lens ranges ("(LPP!M<min> <max>)"); the reference gives no example. PWR 0
+      fails while a housekeeping board failure keeps the projector on until AC power is removed.
+  - models: [boxer-4k, boxer-2k, boxer-30]
+    severity: info
+    text: >
+      HIS documents ten fields per lamp entry (number, install date, serial, type, strikes, failed strikes, failed
+      re-strikes, unexpected lamp offs, pre-installation hours, total hours) but its examples hold one number
+      fewer, so the counts between the type and the last number are kept as one text
+      (light.lamp_history.*.counters) and the last number is read as the total lamp hours.
