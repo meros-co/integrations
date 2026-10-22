@@ -1,0 +1,168 @@
+spec: 1
+id: barco-eventmaster-telnet
+name: Barco Event Master (ASCII over Telnet)
+vendor: Barco
+category: switcher
+
+# The ASCII interface of Barco's Event Master processors: plain text commands
+# typed into a telnet session on TCP 9878. Barco documents two commands, ATRN
+# (auto transition) and PRESET (save, recall, recall and transition), and no
+# replies, queries or pushed status. Everything else, and every read, is on
+# the JSON-RPC API on port 9999 (barco-eventmaster); this spec is for control
+# systems that drive the processor over the telnet port.
+
+source:
+  - title: Event Master series Remote control protocol, Reference guide (R5919184/00)
+    author: Barco
+    url: https://www.barco.com/en/support/docs/R5919184
+    note: >
+      Manufacturer document, revision 00, dated 2025-05-08 on its last page.
+      Chapter 1 "ASCII", pages 7-8: section 1.1 (telnet to the processor's
+      IP address on port 9878, then type commands) and section 1.2, the
+      command list: ATRN with an optional transition time of 0 to 1999 frames
+      (0 a cut, none the controller's time), and PRESET -s (save the selected
+      destinations), -r (recall) and -a (recall and auto transition), each
+      with a preset number 1 to 1000. Both commands are documented with
+      "Query Format: N/A" and "Query Response: N/A". Barco's support site
+      lists revision 02 (2026-02-12) as current; it sits behind a bot
+      challenge and could not be retrieved, so revision 00 was read from the
+      copy attached to bitfocus/companion-module-requests issue 1912
+      (https://github.com/user-attachments/files/21056211/R5919184_00_ReferenceGuide.pdf).
+      Cited as R5919184/00.
+  - title: E2 User's Guide (R5905948, 2014-12-12), annex B "Remote Control Protocol"
+    author: Barco
+    url: https://www.manualslib.com/manual/902953/Barco-E2.html?page=296
+    note: >
+      Manufacturer document, read on ManualsLib pages 295-297. B.1 (telnet to
+      port 9878; a command prompt appears; type a command and press Enter) and
+      B.2, ATRN and PRESET -s and -r with the same wording as R5919184/00;
+      PRESET -a is not in this edition. The annex says only a limited set of
+      commands is available and more would follow in a future release. Cited
+      as R5905948 B.
+  - title: Encore3 User guide (R5917615/01), section 6.5.1 "Use JSON"
+    author: Barco
+    url: https://www.manualslib.com/manual/4552519/Barco-Encore3.html?page=93
+    note: >
+      Manufacturer document (software Event Master Toolset 10.1). Used for the
+      statement that Event Master devices, the Encore3 among them, use the
+      Event Master command reference (R5919184), whose chapter 1 is this
+      interface. The Encore3 guide itself names only the JSON API.
+
+transport:
+  type: line-tcp
+  port: 9878
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: none
+
+ports:
+  - { port: 9878, protocol: tcp, role: control }
+
+models:
+  - id: e2
+    name: Barco Event Master E2 (E2, E2 Gen 2, E2 Jr)
+    supports: [auto_transition, auto_transition_time, cut, save_preset, recall_preset,
+               recall_preset_auto_transition]
+    verification: none
+  - id: s3-4k
+    name: Barco Event Master S3-4K (S3-4K, S3-4K Jr)
+    supports: [auto_transition, auto_transition_time, cut, save_preset, recall_preset,
+               recall_preset_auto_transition]
+    verification: none
+  - id: ex
+    name: Barco Event Master EX
+    supports: [auto_transition, auto_transition_time, cut, save_preset, recall_preset,
+               recall_preset_auto_transition]
+    verification: none
+  - id: encore3
+    name: Barco Encore3 (E3)
+    supports: [auto_transition, auto_transition_time, cut, save_preset, recall_preset,
+               recall_preset_auto_transition]
+    verification: none
+    notes: >
+      The Encore3 guide points to the Event Master command reference, whose
+      ASCII chapter this is, but names only the JSON API itself; see the quirks.
+
+commands:
+  auto_transition:
+    summary: "Auto transition preview to program on the active destinations at the controller's transition time (R5919184/00 ATRN)"
+    send: "ATRN"
+    returns: ack
+
+  auto_transition_time:
+    summary: "Auto transition preview to program on the active destinations in this many frames, 0 being a cut (R5919184/00 ATRN <transTime>)"
+    params:
+      frames: { type: int, min: 0, max: 1999, required: true, label: Transition time, description: "Transition time in frames, 0 to 1999; 0 is a cut, and any other value overrides the controller's transition time." }
+    send: "ATRN {frames}"
+    returns: ack
+
+  cut:
+    summary: "Cut preview to program on the active destinations (R5919184/00 ATRN 0)"
+    send: "ATRN 0"
+    returns: ack
+
+  save_preset:
+    summary: "Save the currently selected destinations to a preset, 1-1000 (R5919184/00 PRESET -s)"
+    params:
+      preset: { type: int, min: 1, max: 1000, required: true, label: Preset, description: "Preset number from 1 to 1000 to save the selected destinations to." }
+    send: "PRESET -s {preset}"
+    returns: ack
+
+  recall_preset:
+    summary: "Recall a preset, 1-1000 (R5919184/00 PRESET -r)"
+    params:
+      preset: { type: int, min: 1, max: 1000, required: true, label: Preset, description: "Preset number from 1 to 1000 to recall." }
+    send: "PRESET -r {preset}"
+    returns: ack
+
+  recall_preset_auto_transition:
+    summary: "Recall a preset, 1-1000, and auto transition it to program (R5919184/00 PRESET -a)"
+    params:
+      preset: { type: int, min: 1, max: 1000, required: true, label: Preset, description: "Preset number from 1 to 1000 to recall and take to program with an auto transition." }
+    send: "PRESET -a {preset}"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Barco documents no reply, query or pushed message on this port (every
+      command's query format and response are "N/A"), so the transport reads
+      none: writes are reported unverified, and the interface gives no state.
+      The processor's state is read over the JSON-RPC API on port 9999
+      (barco-eventmaster), which also has every command here (allTrans with
+      transTime, cut, savePreset, activatePreset).
+
+  - models: [all]
+    severity: info
+    text: >
+      The documents say to type the commands into a telnet session and press
+      Enter; they do not give the line ending. Commands are sent with CR LF,
+      as a telnet client sends Enter. The E2 guide says a command prompt
+      appears on connecting; its text is not given and it is ignored.
+
+  - models: [all]
+    severity: warning
+    text: >
+      PRESET numbers run from 1 to 1000. The documents do not say how they
+      relate to the JSON API's 0-based preset ids or to preset serial numbers
+      such as 3.00, nor whether PRESET -s overwrites an existing preset with
+      that number.
+
+  - models: [all]
+    severity: info
+    text: >
+      ATRN acts on the currently active (selected) destinations with the
+      selected effect type, rate and edge width; a non-zero time overrides
+      the controller's transition time, ATRN 0 is a cut, and ATRN alone uses
+      the controller's time. PRESET -a (recall and auto transition) is in
+      R5919184/00 but not in the 2014 E2 guide, so older software may lack it.
+
+  - models: [encore3]
+    severity: warning
+    text: >
+      The Encore3 user guide refers to the Event Master command reference for
+      remote commands but describes only the JSON API; that the Encore3 opens
+      the telnet port 9878 is not stated anywhere.

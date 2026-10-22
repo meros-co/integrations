@@ -225,6 +225,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
+## barco-encore — Barco Encore Presentation System
+
+- [ ] Confirm the original Encore controller takes ASCII control on TCP port 3000, with commands ended by a line feed, and record whatever it answers. ([specs/barco-encore.yaml:88](specs/barco-encore.yaml#L88))
+- [ ] Check the unit of the ATRN argument (frames or tenths of a second), whether ATRN alone is accepted, and the range of PRESET R preset numbers. ([specs/barco-encore.yaml:99](specs/barco-encore.yaml#L99))
+- [ ] Find the syntax of the functions third-party software exposes beyond ATRN and PRESET R (manual transition, preset save and delete, preset names, current preset), and whether a Barco protocol document exists. ([specs/barco-encore.yaml:88](specs/barco-encore.yaml#L88))
+- [ ] Check whether the controller accepts more than one TCP session at a time. ([specs/barco-encore.yaml:107](specs/barco-encore.yaml#L107))
+
 ## barco-eventmaster — Barco Event Master
 
 - [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1396](specs/barco-eventmaster.yaml#L1396))
@@ -239,6 +246,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1295](specs/barco-eventmaster.yaml#L1295))
 - [ ] Confirm reading listContent for every screen destination every 10 seconds (after listDestinations) is acceptable on a processor with many screens, and that listContent's Layers, BGLyr and Transition arrays match the Doc 8.2 example on E2, S3, EX and Encore3. ([specs/barco-eventmaster.yaml:1175](specs/barco-eventmaster.yaml#L1175))
 - [ ] Record a listCues reply: the documents give no cue object, and the cue's id and Name are read as the other lists hold them. ([specs/barco-eventmaster.yaml:1248](specs/barco-eventmaster.yaml#L1248))
+
+## barco-eventmaster-telnet — Barco Event Master (ASCII over Telnet)
+
+- [ ] Record what the processor sends on port 9878 (the prompt, any answer to ATRN and PRESET, any error text), which Barco does not document. ([specs/barco-eventmaster-telnet.yaml:130](specs/barco-eventmaster-telnet.yaml#L130))
+- [ ] Confirm commands ended with CR LF are accepted (and whether CR or LF alone is too). ([specs/barco-eventmaster-telnet.yaml:140](specs/barco-eventmaster-telnet.yaml#L140))
+- [ ] Check how PRESET numbers 1-1000 map to the JSON API's preset ids and serial numbers, and whether PRESET -s overwrites an existing preset. ([specs/barco-eventmaster-telnet.yaml:148](specs/barco-eventmaster-telnet.yaml#L148))
+- [ ] Check which software versions accept PRESET -a. ([specs/barco-eventmaster-telnet.yaml:156](specs/barco-eventmaster-telnet.yaml#L156))
+- [ ] Confirm the Encore3 opens port 9878 and accepts ATRN and PRESET. ([specs/barco-eventmaster-telnet.yaml:165](specs/barco-eventmaster-telnet.yaml#L165))
 
 ## behringer-wing — Behringer WING
 

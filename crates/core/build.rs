@@ -42,7 +42,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-anomes", &["millumin"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
-    ("vendor-barco", &["barco-eventmaster"]),
+    (
+        "vendor-barco",
+        &[
+            "barco-encore",
+            "barco-eventmaster",
+            "barco-eventmaster-telnet",
+        ],
+    ),
     (
         "vendor-behringer",
         &["behringer-wing", "behringer-x32", "behringer-xair"],
