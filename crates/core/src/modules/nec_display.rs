@@ -762,6 +762,10 @@ fn identity() -> Vec<Vec<Step>> {
     ]
 }
 
+/// A reply's state patch, the value a command returns, and for an
+/// operation code its raw maximum and value.
+type Answer = (Value, Value, Option<Value>);
+
 pub(crate) struct NecDisplay {
     link: Link,
     monitor: bool,
@@ -880,11 +884,7 @@ impl NecDisplay {
     }
 
     /// Whether `reply` answers `step`, and if so its result.
-    fn answer(
-        &self,
-        step: &Step,
-        reply: &Reply,
-    ) -> Option<Result<(Value, Value, Option<Value>), CommandError>> {
+    fn answer(&self, step: &Step, reply: &Reply) -> Option<Result<Answer, CommandError>> {
         if reply.body == "BE" {
             return Some(Err(CommandError::DeviceError {
                 code: Some("BE".into()),
