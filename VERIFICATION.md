@@ -1469,6 +1469,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
 
+## nec-display — NEC (Sharp NEC) large-format displays
+
+- [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
+- [ ] Confirm the 15 s wait after power and 10 s after an input change are enough, and whether a message sent sooner is answered with the NULL message (BE). ([specs/nec-display.yaml:825](specs/nec-display.yaml#L825))
+- [ ] Confirm 600 ms between messages is needed on the 2011-2013 generation only. ([specs/nec-display.yaml:49](specs/nec-display.yaml#L49))
+- [ ] Check the green and blue gain codes (00-18, 00-1A) on a P404 or P403 generation display, whose tables swap them. ([specs/nec-display.yaml:233](specs/nec-display.yaml#L233))
+- [ ] Confirm the mute code (00-8D) is not taken by the M series, as its table leaves it out. ([specs/nec-display.yaml:334](specs/nec-display.yaml#L334))
+- [ ] Record the firmware version reply (CA02) on each generation: raw characters on the M series, two hex digits per character before. ([specs/nec-display.yaml:683](specs/nec-display.yaml#L683))
+- [ ] Confirm the date year (C211/C212) is counted from 2000 on the M series, and what its last byte (daylight saving, reserved there) is answered. ([specs/nec-display.yaml:685](specs/nec-display.yaml#L685))
+- [ ] Confirm the temperature readout's 0.5 °C two's complement and how many sensors each model has. ([specs/nec-display.yaml:698](specs/nec-display.yaml#L698))
+- [ ] Record whether a display answers messages addressed to ALL or a group, and whether more than one TCP connection is taken at once. ([specs/nec-display.yaml:849](specs/nec-display.yaml#L849))
+- [ ] Confirm out-of-range sets are ignored with result 00 (PN-ME §8.2) on the other series too. ([specs/nec-display.yaml:831](specs/nec-display.yaml#L831))
+
 ## newtek-tricaster — NewTek TriCaster
 
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:572](specs/newtek-tricaster.yaml#L572))

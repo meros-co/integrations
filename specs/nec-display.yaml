@@ -1,0 +1,860 @@
+spec: 1
+id: nec-display
+name: NEC (Sharp NEC) large-format displays (External Control protocol)
+vendor: NEC Display Solutions / Sharp NEC Display Solutions
+category: display
+implementation: native
+reason: >
+  NEC's display protocol frames each message with SOH, the monitor ID as a byte, the message type, a length
+  in hex, the body between STX and ETX in hex digits, and an XOR check code; replies are matched by type and
+  operation code, a busy display answers a NULL message, and the controller must wait 15 s after power and
+  10 s after an input change before the next message. Temperatures and fans are read by selecting a sensor
+  with one message and reading it with the next.
+
+source:
+  - title: "External Control, M series M751/M861/M981, Rev.1.1 (2023-07)"
+    author: "Sharp NEC Display Solutions"
+    url: "https://sharp-displays.jp.sharp/support/webdl/dl_service/data/display/manual/External_Control_M751_M861_M981_EN_Rev1.1.pdf"
+    note: >
+      RS-232C 9600 bps, 8 data bits, no parity, 1 stop bit, crossed cable; LAN on TCP 7142, dropped after 15
+      minutes without a packet (§2-§3); waiting for each reply, then 15 s after power and 10 s after input,
+      auto setup or factory reset (§3); the header, destination addresses (monitor ID 40h + n, ALL, groups),
+      length, check code and its example, delimiter (§4); get, set and command message bodies, the NULL
+      message (§5); temperature readout in 0.5 °C (§6.2); power status 01D6 and control C203D6, save 0C,
+      timing 07, self-diagnosis B1, serial C216, model C217, firmware CA02, date and time C211/C212, and the
+      operation code tables (VCP and CTL chapters).
+  - title: "External Control, NEC LCD Monitor, Rev.1.0 (G4), P404/P484/P554/V404/V484/V554 (2016-11-16)"
+    author: "NEC Display Solutions"
+    url: "https://www.nec.com.au/download_file/1839/781"
+    note: "The same framing; the 2016 generation's operation codes (input codes with media player and compute module, picture inputs 11-0E to 11-11, IR and key locks, CEC)."
+  - title: "External Control, NEC LCD Monitor, Rev.2.4 (G2), P403 family and X464UN/X554UN video wall models (2015-06-19)"
+    author: "NEC Display Solutions"
+    url: "https://www.nec.com.au/download_file/view/1870/552"
+    note: "The 2015 generation's operation codes, frame compensation of the UN video wall models, schedules C221/C222."
+  - title: "EXTERNAL CONTROL, NEC LCD Monitor, Rev.3.8 (2013-06-28)"
+    author: "NEC Display Solutions"
+    url: "https://www.nec.com.au/download_file/1794/781"
+    note: "The 2011-2013 generation (P402, V422, X461S, X463UN ...): a packet interval longer than 600 ms (§3.3), the oldest input and picture mode codes."
+  - title: "External Control, ME series PN-ME432/PN-ME502/PN-ME552/PN-ME652, Rev.1.4"
+    author: "Sharp NEC Display Solutions"
+    url: "https://smj.jp.sharp/bs/lcd-display/lineup/pnme/download_files/pnme652_pnme552_pnme502_pnme432_external_control_manual_ver1_4.pdf"
+    note: "Japanese. The same protocol on Sharp's ME series; the commands taken in standby (§8.1); out-of-range values ignored with result 00 (§8.2); at most 100 ms between the bytes of one message."
+  - title: "NEC PD SDK (nec_pd_sdk), Sharp NEC Display Solutions (MIT)"
+    url: "https://github.com/SharpNECDisplaySolutions/necpdsdk"
+    note: "Corroboration only, licence checked, no code copied: the operation code list and the controller's reply timeout."
+
+settings:
+  monitor_id: { type: int, min: 1, max: 100, default: 1, label: Monitor ID, description: "The display's monitor ID from its menu, 1 to 100; on an RS-232C chain, the display this device addresses." }
+  poll_ms: { type: int, min: 1000, max: 3600000, default: 5000, label: Read interval, description: "Milliseconds between reads of power, input, volume and mute; other settings are read every minute." }
+  packet_interval_ms: { type: int, min: 0, max: 10000, default: 0, label: Packet interval, description: "Milliseconds to wait after each reply before the next message: 600 for the 2011-2013 generation, 0 for later ones." }
+  # tcp: LAN on TCP 7142. serial: the RS-232C port, the same messages.
+  link: { type: enum, values: [tcp, serial], default: tcp, label: Link, description: "tcp reaches the display on the network; serial uses an RS-232C port of the host wired to the display's RS-232C IN." }
+  serial_port: { type: string, max_length: 256, label: Serial port, description: "With link serial, the host's serial port wired to the display: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate: { type: int, min: 9600, max: 9600, default: 9600, label: Baud rate, description: "With link serial, 9600 bits per second." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, 8 bits per character." }
+  parity: { type: enum, values: [none], default: none, label: Parity, description: "With link serial, no parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control." }
+
+ports:
+  - { port: 7142, protocol: tcp, role: control, when: "link tcp", note: "fixed on the display" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C port of the host wired to the display's RS-232C IN (D-sub 9), crossed cable" }
+
+models:
+- id: m-series
+  name: NEC MultiSync M751, M861, M981 (M series, 2023)
+  supports: [get_input, set_input, get_backlight, set_backlight, get_contrast, set_contrast, get_black_level, set_black_level, get_sharpness,
+    set_sharpness, get_color, set_color, get_color_temperature, set_color_temperature, get_color_preset, set_color_preset, get_red_gain,
+    set_red_gain, get_green_gain, set_green_gain, get_blue_gain, set_blue_gain, get_picture_mode, set_picture_mode, get_gamma, set_gamma,
+    get_adaptive_contrast, set_adaptive_contrast, get_aspect, set_aspect, get_overscan, set_overscan, get_image_flip, set_image_flip,
+    get_auto_dimming, set_auto_dimming, get_ambient_light_sensing, set_ambient_light_sensing, get_video_range, set_video_range, get_volume,
+    set_volume, get_balance, set_balance, get_treble, set_treble, get_bass, set_bass, get_stereo, set_stereo, get_audio_input, set_audio_input,
+    get_line_out, set_line_out, get_pip_size, set_pip_size, get_pip_x, set_pip_x, get_pip_y, set_pip_y, get_multi_picture_mode, set_multi_picture_mode,
+    get_picture1_input, set_picture1_input, get_picture2_input, set_picture2_input, get_picture3_input, set_picture3_input, get_picture4_input,
+    set_picture4_input, get_tile_columns, set_tile_columns, get_tile_rows, set_tile_rows, get_tile_position, set_tile_position, get_tile_matrix,
+    set_tile_matrix, get_tile_compensation, set_tile_compensation, get_power_on_delay, set_power_on_delay, get_osd_language, set_osd_language,
+    get_osd_time, set_osd_time, get_information_osd, set_information_osd, get_osd_rotation, set_osd_rotation, get_power_led, set_power_led,
+    get_monitor_id, set_monitor_id, get_group_ids, set_group_ids, get_off_timer, set_off_timer, get_quick_start, set_quick_start, get_fan_control,
+    set_fan_control, get_fan_speed, set_fan_speed, get_input_detect, set_input_detect, get_screen_saver_motion, set_screen_saver_motion,
+    get_side_border_color, set_side_border_color, get_cec, set_cec, get_human_sensing, set_human_sensing, get_illuminance, get_power,
+    set_power, save_settings, get_timing, self_diagnosis, get_serial_number, get_model, get_firmware_version, get_date, set_date, get_temperature,
+    get_fan_status, reset, get_vcp, set_vcp]
+  verification: none
+- id: g4
+  name: NEC MultiSync P404, P484, P554, V404, V484, V554 (2016 generation)
+  supports: [get_input, set_input, get_backlight, set_backlight, get_contrast, set_contrast, get_black_level, set_black_level, get_sharpness,
+    set_sharpness, get_tint, set_tint, get_color, set_color, get_color_temperature, set_color_temperature, get_color_preset, set_color_preset,
+    get_red_gain, set_red_gain, get_green_gain, set_green_gain, get_blue_gain, set_blue_gain, get_picture_mode, set_picture_mode, get_gamma,
+    set_gamma, get_adaptive_contrast, set_adaptive_contrast, get_noise_reduction, set_noise_reduction, get_aspect, set_aspect, get_overscan,
+    set_overscan, get_image_flip, set_image_flip, get_auto_dimming, set_auto_dimming, get_ambient_light_sensing, set_ambient_light_sensing,
+    get_video_range, set_video_range, get_volume, set_volume, get_mute, set_mute, get_screen_mute, set_screen_mute, get_balance, set_balance,
+    get_treble, set_treble, get_bass, set_bass, get_stereo, set_stereo, get_audio_input, set_audio_input, get_line_out, set_line_out,
+    get_pip_mode, set_pip_mode, get_pip_size, set_pip_size, get_pip_x, set_pip_x, get_pip_y, set_pip_y, get_picture1_input, set_picture1_input,
+    get_picture2_input, set_picture2_input, get_picture3_input, set_picture3_input, get_picture4_input, set_picture4_input, get_tile_columns,
+    set_tile_columns, get_tile_rows, set_tile_rows, get_tile_position, set_tile_position, get_tile_matrix, set_tile_matrix, get_tile_compensation,
+    set_tile_compensation, get_power_on_delay, set_power_on_delay, get_osd_language, set_osd_language, get_osd_time, set_osd_time, get_information_osd,
+    set_information_osd, get_osd_rotation, set_osd_rotation, get_power_led, set_power_led, get_monitor_id, set_monitor_id, get_group_ids,
+    set_group_ids, get_off_timer, set_off_timer, get_fan_control, set_fan_control, get_fan_speed, set_fan_speed, get_input_detect, set_input_detect,
+    get_screen_saver_motion, set_screen_saver_motion, get_side_border_color, set_side_border_color, get_ir_lock, set_ir_lock, get_key_lock,
+    set_key_lock, get_cec, set_cec, get_human_sensing, set_human_sensing, get_illuminance, get_power, set_power, save_settings, get_timing,
+    self_diagnosis, get_serial_number, get_model, get_firmware_version, get_date, set_date, get_temperature, get_fan_status, auto_setup,
+    reset, get_vcp, set_vcp]
+  verification: none
+- id: g2
+  name: NEC MultiSync P403, P463, P553, P703, P801, X464UN, X554UN, X464UNV, X554UNS, X474HB, X464UNS, X554UNV, X555UNS, X555UNV (2015
+    generation)
+  supports: [get_input, set_input, get_backlight, set_backlight, get_contrast, set_contrast, get_black_level, set_black_level, get_sharpness,
+    set_sharpness, get_tint, set_tint, get_color, set_color, get_color_temperature, set_color_temperature, get_color_preset, set_color_preset,
+    get_red_gain, set_red_gain, get_green_gain, set_green_gain, get_blue_gain, set_blue_gain, get_picture_mode, set_picture_mode, get_gamma,
+    set_gamma, get_adaptive_contrast, set_adaptive_contrast, get_noise_reduction, set_noise_reduction, get_aspect, set_aspect, get_overscan,
+    set_overscan, get_image_flip, set_image_flip, get_auto_dimming, set_auto_dimming, get_ambient_light_sensing, set_ambient_light_sensing,
+    get_video_range, set_video_range, get_volume, set_volume, get_mute, set_mute, get_screen_mute, set_screen_mute, get_balance, set_balance,
+    get_treble, set_treble, get_bass, set_bass, get_stereo, set_stereo, get_audio_input, set_audio_input, get_line_out, set_line_out,
+    get_pip_mode, set_pip_mode, get_pip_input, set_pip_input, get_pip_size, set_pip_size, get_pip_x, set_pip_x, get_pip_y, set_pip_y,
+    get_tile_columns, set_tile_columns, get_tile_rows, set_tile_rows, get_tile_position, set_tile_position, get_tile_matrix, set_tile_matrix,
+    get_tile_compensation, set_tile_compensation, get_power_on_delay, set_power_on_delay, get_osd_language, set_osd_language, get_osd_time,
+    set_osd_time, get_information_osd, set_information_osd, get_osd_rotation, set_osd_rotation, get_power_led, set_power_led, get_monitor_id,
+    set_monitor_id, get_group_ids, set_group_ids, get_off_timer, set_off_timer, get_fan_control, set_fan_control, get_fan_speed, set_fan_speed,
+    get_input_detect, set_input_detect, get_screen_saver_motion, set_screen_saver_motion, get_side_border_color, set_side_border_color,
+    get_ir_lock, set_ir_lock, get_human_sensing, set_human_sensing, get_illuminance, get_power, set_power, save_settings, get_timing,
+    self_diagnosis, get_serial_number, get_model, get_firmware_version, get_date, set_date, get_temperature, get_fan_status, auto_setup,
+    reset, get_vcp, set_vcp]
+  verification: none
+- id: g1
+  name: NEC MultiSync P402, P462, P552, P702, V322, V422, V462, V551, V552, V651, V652, V801, X401S, X461S, X551S, X462S, X552S, X463UN,
+    X551UN, X462UNV, V423, V463 (2011-2013 generation)
+  supports: [get_input, set_input, get_backlight, set_backlight, get_contrast, set_contrast, get_black_level, set_black_level, get_sharpness,
+    set_sharpness, get_tint, set_tint, get_color, set_color, get_color_temperature, set_color_temperature, get_color_preset, set_color_preset,
+    get_red_gain, set_red_gain, get_green_gain, set_green_gain, get_blue_gain, set_blue_gain, get_picture_mode, set_picture_mode, get_gamma,
+    set_gamma, get_adaptive_contrast, set_adaptive_contrast, get_noise_reduction, set_noise_reduction, get_aspect, set_aspect, get_overscan,
+    set_overscan, get_auto_dimming, set_auto_dimming, get_video_range, set_video_range, get_volume, set_volume, get_mute, set_mute,
+    get_screen_mute, set_screen_mute, get_balance, set_balance, get_treble, set_treble, get_bass, set_bass, get_stereo, set_stereo,
+    get_audio_input, set_audio_input, get_line_out, set_line_out, get_pip_mode, set_pip_mode, get_pip_input, set_pip_input, get_pip_x,
+    set_pip_x, get_pip_y, set_pip_y, get_tile_columns, set_tile_columns, get_tile_rows, set_tile_rows, get_tile_position, set_tile_position,
+    get_tile_matrix, set_tile_matrix, get_tile_compensation, set_tile_compensation, get_power_on_delay, set_power_on_delay, get_osd_language,
+    set_osd_language, get_osd_time, set_osd_time, get_information_osd, set_information_osd, get_osd_rotation, set_osd_rotation, get_power_led,
+    set_power_led, get_monitor_id, set_monitor_id, get_group_ids, set_group_ids, get_off_timer, set_off_timer, get_fan_control, set_fan_control,
+    get_fan_speed, set_fan_speed, get_input_detect, set_input_detect, get_screen_saver_motion, set_screen_saver_motion, get_side_border_color,
+    set_side_border_color, get_illuminance, get_power, set_power, save_settings, get_timing, self_diagnosis, get_serial_number, get_model,
+    get_date, set_date, get_temperature, auto_setup, reset, get_vcp, set_vcp]
+  verification: none
+  notes: 'Set packet_interval_ms to 600: these models need 600 ms between messages.'
+- id: pn-me
+  name: Sharp PN-ME432, PN-ME502, PN-ME552, PN-ME652 (ME series, the NEC-style protocol)
+  supports: [get_input, set_input, get_backlight, set_backlight, get_contrast, set_contrast, get_black_level, set_black_level, get_sharpness,
+    set_sharpness, get_color, set_color, get_color_temperature, set_color_temperature, get_color_preset, set_color_preset, get_red_gain,
+    set_red_gain, get_green_gain, set_green_gain, get_blue_gain, set_blue_gain, get_picture_mode, set_picture_mode, get_gamma, set_gamma,
+    get_adaptive_contrast, set_adaptive_contrast, get_aspect, set_aspect, get_overscan, set_overscan, get_auto_dimming, set_auto_dimming,
+    get_ambient_light_sensing, set_ambient_light_sensing, get_video_range, set_video_range, get_volume, set_volume, get_mute, set_mute,
+    get_screen_mute, set_screen_mute, get_balance, set_balance, get_treble, set_treble, get_bass, set_bass, get_stereo, set_stereo,
+    get_audio_input, set_audio_input, get_line_out, set_line_out, get_pip_x, set_pip_x, get_pip_y, set_pip_y, get_tile_columns, set_tile_columns,
+    get_tile_rows, set_tile_rows, get_tile_position, set_tile_position, get_tile_matrix, set_tile_matrix, get_tile_compensation, set_tile_compensation,
+    get_power_on_delay, set_power_on_delay, get_osd_language, set_osd_language, get_osd_time, set_osd_time, get_information_osd, set_information_osd,
+    get_osd_rotation, set_osd_rotation, get_power_led, set_power_led, get_monitor_id, set_monitor_id, get_group_ids, set_group_ids,
+    get_off_timer, set_off_timer, get_quick_start, set_quick_start, get_fan_control, set_fan_control, get_fan_speed, set_fan_speed,
+    get_input_detect, set_input_detect, get_side_border_color, set_side_border_color, get_ir_lock, set_ir_lock, get_key_lock, set_key_lock,
+    get_cec, set_cec, get_human_sensing, set_human_sensing, get_illuminance, get_power, set_power, save_settings, get_timing, self_diagnosis,
+    get_serial_number, get_model, get_firmware_version, get_date, set_date, get_temperature, reset, get_vcp, set_vcp]
+  verification: none
+  notes: With the display's command format set to the NEC-style protocol rather than Sharp's S-Format (the sharp-display spec).
+commands:
+  get_input: {summary: Read the input (00-60), returns: value}
+  set_input:
+    summary: Set the input (00-60) and read it back
+    params:
+      value:
+        type: enum
+        values: &id001 [vga, rgbhv, dvi, hdmi_set_only, video1, video2, s_video, tv, ypbpr, option, ypbpr2, displayport1, displayport2,
+          hdmi1, hdmi2, displayport3, hdmi3, media_player, compute_module, usb_c]
+        required: true
+        label: Input
+        description: 'The input; a model has some of them: vga, rgbhv (BNC), dvi, video1, video2, s_video, ypbpr, ypbpr2 and displayport3
+          on the older generations, option (the slot), displayport1 and 2, hdmi1 to hdmi3, media_player (P404 generation; HOME on the
+          PN-ME), compute_module and usb_c (PN-ME); hdmi_set_only is the older generations'' set-only HDMI code.'
+    returns: ack
+  get_backlight: {summary: Read the backlight (00-10), returns: value}
+  set_backlight:
+    summary: Set the backlight (00-10) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Backlight, description: Backlight from 0 to 100.}
+    returns: ack
+  get_contrast: {summary: Read the contrast (00-12), returns: value}
+  set_contrast:
+    summary: Set the contrast (00-12) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Contrast, description: Contrast from 0 to 100.}
+    returns: ack
+  get_black_level: {summary: Read the black level (00-92), returns: value}
+  set_black_level:
+    summary: Set the black level (00-92) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Black level, description: Black level (brightness) from 0 to 100.}
+    returns: ack
+  get_sharpness: {summary: Read the sharpness (00-8C), returns: value}
+  set_sharpness:
+    summary: Set the sharpness (00-8C) and read it back
+    params:
+      value: {type: int, min: 0, max: 24, required: true, label: Sharpness, description: 'Sharpness: 0 to 24, or 0 to 10 on the M series
+          and PN-ME.'}
+    returns: ack
+  get_tint: {summary: Read the tint (00-90), returns: value}
+  set_tint:
+    summary: Set the tint (00-90) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Tint, description: Tint from 0 (purplish) to 100 (greenish).}
+    returns: ack
+  get_color: {summary: Read the color (02-1F), returns: value}
+  set_color:
+    summary: Set the color (02-1F) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Color, description: Color saturation from 0 to 100.}
+    returns: ack
+  get_color_temperature: {summary: Read the color temperature (00-54), returns: value}
+  set_color_temperature:
+    summary: Set the color temperature (00-54) and read it back
+    params:
+      value: {type: int, min: 0, max: 74, required: true, label: Color temperature, description: Color temperature from 0 (2600 K) to
+          74 (10000 K) in 100 K steps.}
+    returns: ack
+  get_color_preset: {summary: Read the color preset (00-14), returns: value}
+  set_color_preset:
+    summary: Set the color preset (00-14) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Color preset, description: 'Color preset code: 2 native, 9 10000 K,
+          11 custom (user), and others the operation code tables list per model.'}
+    returns: ack
+  get_red_gain: {summary: Read the red gain (00-16), returns: value}
+  set_red_gain:
+    summary: Set the red gain (00-16) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Red gain, description: 'Red gain: 0 to 255, or 0 to 100 on the M series.'}
+    returns: ack
+  get_green_gain: {summary: Read the green gain (00-18), returns: value}
+  set_green_gain:
+    summary: Set the green gain (00-18) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Green gain, description: 'Green gain: 0 to 255, or 0 to 100 on the
+          M series.'}
+    returns: ack
+  get_blue_gain: {summary: Read the blue gain (00-1A), returns: value}
+  set_blue_gain:
+    summary: Set the blue gain (00-1A) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Blue gain, description: 'Blue gain: 0 to 255, or 0 to 100 on the M
+          series.'}
+    returns: ack
+  get_picture_mode: {summary: Read the picture mode (02-1A), returns: value}
+  set_picture_mode:
+    summary: Set the picture mode (02-1A) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Picture mode, description: 'Picture mode code: 1 sRGB, 3 high bright,
+          4 standard, 5 cinema, 8 and 9 custom 1 and 2, 13-17 SpectraView Engine modes (P404 generation); on the M series 3 high bright,
+          8 custom, 28 retail, 29 conferencing, 30 transportation, 31 native.'}
+    returns: ack
+  get_gamma: {summary: Read the gamma (02-68), returns: value}
+  set_gamma:
+    summary: Set the gamma (02-68) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Gamma, description: 'Gamma code: 1 native, 4 2.2, 5 DICOM simulation,
+          6 programmable 1, 7 S gamma, 8 2.4, 9 custom, 15 BT.1886, 16 HLG, 17 PQ, as each model lists.'}
+    returns: ack
+  get_adaptive_contrast: {summary: Read the adaptive contrast (02-8D), returns: value}
+  set_adaptive_contrast:
+    summary: Set the adaptive contrast (02-8D) and read it back
+    params:
+      value: {type: int, min: 0, max: 4, required: true, label: Adaptive contrast, description: '1 off, 2 low, 3 middle (oldest generation),
+          4 high.'}
+    returns: ack
+  get_noise_reduction: {summary: Read the noise reduction (02-26), returns: value}
+  set_noise_reduction:
+    summary: Set the noise reduction (02-26) and read it back
+    params:
+      value: {type: int, min: 0, max: 7, required: true, label: Noise reduction, description: 'Noise reduction level: 0 to 3, 5 or 7
+          by generation.'}
+    returns: ack
+  get_aspect: {summary: Read the aspect (02-70), returns: value}
+  set_aspect:
+    summary: Set the aspect (02-70) and read it back
+    params:
+      value:
+        type: enum
+        values: [normal, full, wide, zoom, trim, dynamic, dot_by_dot, cinema, auto]
+        required: true
+        label: Aspect
+        description: 'The aspect: normal, full, wide, zoom, dynamic and dot_by_dot on most models; trim, cinema and auto on some.'
+    returns: ack
+  get_overscan: {summary: Read the overscan (02-E3), returns: value}
+  set_overscan:
+    summary: Set the overscan (02-E3) and read it back
+    params:
+      value: {type: int, min: 1, max: 3, required: true, label: Overscan, description: '1 off and 2 on; on the M series 1 underscan,
+          2 overscan, 3 auto.'}
+    returns: ack
+  get_image_flip: {summary: Read the image flip (02-D7), returns: value}
+  set_image_flip:
+    summary: Set the image flip (02-D7) and read it back
+    params:
+      value:
+        type: enum
+        values: [none, horizontal, vertical, rotate_180]
+        required: true
+        label: Image flip
+        description: Flip the picture horizontally, vertically or both (180 degrees).
+    returns: ack
+  get_auto_dimming: {summary: Read the auto dimming (02-2D), returns: value}
+  set_auto_dimming:
+    summary: Set the auto dimming (02-2D) and read it back
+    params:
+      value: {type: int, min: 0, max: 2, required: true, label: Auto dimming, description: '0 off, 1 on (mode 1), 2 mode 2.'}
+    returns: ack
+  get_ambient_light_sensing: {summary: Read the ambient light sensing (10-C8), returns: value}
+  set_ambient_light_sensing:
+    summary: Set the ambient light sensing (10-C8) and read it back
+    params:
+      value: {type: int, min: 1, max: 3, required: true, label: Ambient light sensing, description: '1 off, 2 mode 1 (on), 3 mode 2.'}
+    returns: ack
+  get_video_range: {summary: Read the video range (10-40), returns: value}
+  set_video_range:
+    summary: Set the video range (10-40) and read it back
+    params:
+      value:
+        type: enum
+        values: [expand, raw, auto]
+        required: true
+        label: Video range
+        description: 'The HDMI signal range: expand (limited), raw (full) or auto.'
+    returns: ack
+  get_volume: {summary: Read the volume (00-62), returns: value}
+  set_volume:
+    summary: Set the volume (00-62) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Volume, description: Volume from 0 to 100.}
+    returns: ack
+  get_mute: {summary: Read the mute (00-8D), returns: value}
+  set_mute:
+    summary: Set the mute (00-8D) and read it back
+    params:
+      value: {type: bool, required: true, label: Mute, description: On mutes the sound; off restores it.}
+    returns: ack
+  get_screen_mute: {summary: Read the screen mute (10-B6), returns: value}
+  set_screen_mute:
+    summary: Set the screen mute (10-B6) and read it back
+    params:
+      value: {type: bool, required: true, label: Screen mute, description: On blanks the picture; off shows it.}
+    returns: ack
+  get_balance: {summary: Read the balance (00-93), returns: value}
+  set_balance:
+    summary: Set the balance (00-93) and read it back
+    params:
+      value: {type: int, min: 0, max: 60, required: true, label: Balance, description: 'Balance: 0 to 60 with 30 centered, or 0 to 50
+          with 25 centered on the M series and PN-ME.'}
+    returns: ack
+  get_treble: {summary: Read the treble (00-8F), returns: value}
+  set_treble:
+    summary: Set the treble (00-8F) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Treble, description: 'Treble: 0 to 12 with 6 centered, 0 to 100 on
+          the M series, 0 to 10 on the PN-ME.'}
+    returns: ack
+  get_bass: {summary: Read the bass (00-91), returns: value}
+  set_bass:
+    summary: Set the bass (00-91) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Bass, description: 'Bass: 0 to 12 with 6 centered, 0 to 100 on the
+          M series, 0 to 10 on the PN-ME.'}
+    returns: ack
+  get_stereo: {summary: Read the stereo (00-94), returns: value}
+  set_stereo:
+    summary: Set the stereo (00-94) and read it back
+    params:
+      value:
+        type: enum
+        values: [mono, stereo]
+        required: true
+        label: Stereo
+        description: Mono or stereo sound.
+    returns: ack
+  get_audio_input: {summary: Read the audio input (02-2E), returns: value}
+  set_audio_input:
+    summary: Set the audio input (02-2E) and read it back
+    params:
+      value: {type: int, min: 0, max: 255, required: true, label: Audio input, description: 'Audio input code: 1 to 3 analog inputs,
+          4 HDMI 1, 6 option, 7 DisplayPort 1, 8 DisplayPort 2, 10 HDMI 2, 13 media player, 14 compute module, as each model lists.'}
+    returns: ack
+  get_line_out: {summary: Read the line out (10-81), returns: value}
+  set_line_out:
+    summary: Set the line out (10-81) and read it back
+    params:
+      value:
+        type: enum
+        values: [fixed, variable]
+        required: true
+        label: Line out
+        description: 'The line out level: fixed or variable.'
+    returns: ack
+  get_pip_mode: {summary: Read the pIP mode (02-72), returns: value}
+  set_pip_mode:
+    summary: Set the pIP mode (02-72) and read it back
+    params:
+      value: {type: int, min: 1, max: 6, required: true, label: PIP mode, description: '1 off, 2 PIP, 3 POP, 4 still, 5 PBP aspect,
+          6 PBP full (P404 generation: 1, 2, 5).'}
+    returns: ack
+  get_pip_input: {summary: Read the pIP input (02-73), returns: value}
+  set_pip_input:
+    summary: Set the pIP input (02-73) and read it back
+    params:
+      value:
+        type: enum
+        values: *id001
+        required: true
+        label: PIP input
+        description: The sub picture's input.
+    returns: ack
+  get_pip_size: {summary: Read the pIP size (10-B9), returns: value}
+  set_pip_size:
+    summary: Set the pIP size (10-B9) and read it back
+    params:
+      value: {type: int, min: 0, max: 80, required: true, label: PIP size, description: PIP size from 0 to 80.}
+    returns: ack
+  get_pip_x: {summary: Read the pIP horizontal position (02-74), returns: value}
+  set_pip_x:
+    summary: Set the pIP horizontal position (02-74) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: PIP horizontal position, description: PIP horizontal position from
+          0 to 100.}
+    returns: ack
+  get_pip_y: {summary: Read the pIP vertical position (02-75), returns: value}
+  set_pip_y:
+    summary: Set the pIP vertical position (02-75) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: PIP vertical position, description: PIP vertical position from 0 to
+          100.}
+    returns: ack
+  get_multi_picture_mode: {summary: Read the multi-picture mode (11-EB), returns: value}
+  set_multi_picture_mode:
+    summary: Set the multi-picture mode (11-EB) and read it back
+    params:
+      value:
+        type: enum
+        values: ['off', pip2, pbp2, pbp4]
+        required: true
+        label: Multi-picture mode
+        description: Off, two pictures as PIP, two side by side, or four.
+    returns: ack
+  get_picture1_input: {summary: Read the picture 1 input (11-0E), returns: value}
+  set_picture1_input:
+    summary: Set the picture 1 input (11-0E) and read it back
+    params:
+      value:
+        type: enum
+        values: *id001
+        required: true
+        label: Picture 1 input
+        description: Picture 1's input in multi-picture mode.
+    returns: ack
+  get_picture2_input: {summary: Read the picture 2 input (11-0F), returns: value}
+  set_picture2_input:
+    summary: Set the picture 2 input (11-0F) and read it back
+    params:
+      value:
+        type: enum
+        values: *id001
+        required: true
+        label: Picture 2 input
+        description: Picture 2's input in multi-picture mode.
+    returns: ack
+  get_picture3_input: {summary: Read the picture 3 input (11-10), returns: value}
+  set_picture3_input:
+    summary: Set the picture 3 input (11-10) and read it back
+    params:
+      value:
+        type: enum
+        values: *id001
+        required: true
+        label: Picture 3 input
+        description: Picture 3's input in multi-picture mode.
+    returns: ack
+  get_picture4_input: {summary: Read the picture 4 input (11-11), returns: value}
+  set_picture4_input:
+    summary: Set the picture 4 input (11-11) and read it back
+    params:
+      value:
+        type: enum
+        values: *id001
+        required: true
+        label: Picture 4 input
+        description: Picture 4's input in multi-picture mode.
+    returns: ack
+  get_tile_columns: {summary: Read the tile columns (02-D0), returns: value}
+  set_tile_columns:
+    summary: Set the tile columns (02-D0) and read it back
+    params:
+      value: {type: int, min: 1, max: 10, required: true, label: Tile columns, description: 'Displays across the wall, 1 to 10 (1 to
+          5 on the PN-ME).'}
+    returns: ack
+  get_tile_rows: {summary: Read the tile rows (02-D1), returns: value}
+  set_tile_rows:
+    summary: Set the tile rows (02-D1) and read it back
+    params:
+      value: {type: int, min: 1, max: 10, required: true, label: Tile rows, description: 'Displays down the wall, 1 to 10 (1 to 5 on
+          the PN-ME).'}
+    returns: ack
+  get_tile_position: {summary: Read the tile position (02-D2), returns: value}
+  set_tile_position:
+    summary: Set the tile position (02-D2) and read it back
+    params:
+      value: {type: int, min: 1, max: 100, required: true, label: Tile position, description: 'This display''s place in the wall from
+          1, left to right then top to bottom (1 to 25 on the PN-ME).'}
+    returns: ack
+  get_tile_matrix: {summary: Read the tile matrix (02-D3), returns: value}
+  set_tile_matrix:
+    summary: Set the tile matrix (02-D3) and read it back
+    params:
+      value:
+        type: enum
+        values: [disabled, enabled, disabled_erase_frame]
+        required: true
+        label: Tile matrix
+        description: enabled shows this display's part of the wall; disabled_erase_frame (set only, M series and oldest generation)
+          also erases the frame.
+    returns: ack
+  get_tile_compensation: {summary: Read the tile compensation (02-D5), returns: value}
+  set_tile_compensation:
+    summary: Set the tile compensation (02-D5) and read it back
+    params:
+      value: {type: bool, required: true, label: Tile compensation, description: On hides the picture behind the bezels.}
+    returns: ack
+  get_power_on_delay: {summary: Read the power on delay (02-D8), returns: value}
+  set_power_on_delay:
+    summary: Set the power on delay (02-D8) and read it back
+    params:
+      value: {type: int, min: 0, max: 50, required: true, label: Power on delay, description: Seconds from 0 (off) to 50 to wait before
+          turning on.}
+    returns: ack
+  get_osd_language: {summary: Read the oSD language (00-68), returns: value}
+  set_osd_language:
+    summary: Set the oSD language (00-68) and read it back
+    params:
+      value: {type: int, min: 1, max: 15, required: true, label: OSD language, description: 'Menu language: 1 English, 2 German, 3 French,
+          4 Spanish, 5 Japanese, 6 Italian, 7 Swedish, 9 Russian, 14 Chinese.'}
+    returns: ack
+  get_osd_time: {summary: Read the oSD time (00-FC), returns: value}
+  set_osd_time:
+    summary: Set the oSD time (00-FC) and read it back
+    params:
+      value: {type: int, min: 2, max: 48, required: true, label: OSD time, description: 'How long the menu stays, 2 to 48 in 5 s steps
+          (10 to 240 s).'}
+    returns: ack
+  get_information_osd: {summary: Read the information OSD (02-3D), returns: value}
+  set_information_osd:
+    summary: Set the information OSD (02-3D) and read it back
+    params:
+      value: {type: int, min: 0, max: 16, required: true, label: Information OSD, description: '0 off, or 3 to 10 seconds (on the M
+          series 1 to 16, on the PN-ME 1 on).'}
+    returns: ack
+  get_osd_rotation: {summary: Read the oSD rotation (02-41), returns: value}
+  set_osd_rotation:
+    summary: Set the oSD rotation (02-41) and read it back
+    params:
+      value: {type: int, min: 0, max: 3, required: true, label: OSD rotation, description: '0 landscape, 1 rotated, 2 auto (M series),
+          3 180 degrees (PN-ME).'}
+    returns: ack
+  get_power_led: {summary: Read the power LED (02-BE), returns: value}
+  set_power_led:
+    summary: Set the power LED (02-BE) and read it back
+    params:
+      value: {type: bool, required: true, label: Power LED, description: On lights the power indicator.}
+    returns: ack
+  get_monitor_id: {summary: Read the monitor ID (02-3E), returns: value}
+  set_monitor_id:
+    summary: Set the monitor ID (02-3E) and read it back
+    params:
+      value: {type: int, min: 1, max: 100, required: true, label: Monitor ID, description: 'The display''s monitor ID, 1 to 100 (1 to
+          25 on the PN-ME).'}
+    returns: ack
+  get_group_ids: {summary: Read the group IDs (10-7F), returns: value}
+  set_group_ids:
+    summary: Set the group IDs (10-7F) and read it back
+    params:
+      value: {type: int, min: 0, max: 1023, required: true, label: Group IDs, description: 'The groups the display is in, a bit each:
+          bit 0 group A to bit 9 group J.'}
+    returns: ack
+  get_off_timer: {summary: Read the off timer (02-2B), returns: value}
+  set_off_timer:
+    summary: Set the off timer (02-2B) and read it back
+    params:
+      value: {type: int, min: 0, max: 24, required: true, label: Off timer, description: Hours from 0 (off) to 24 before the display
+          turns off.}
+    returns: ack
+  get_quick_start: {summary: Read the quick start (11-EA), returns: value}
+  set_quick_start:
+    summary: Set the quick start (11-EA) and read it back
+    params:
+      value: {type: bool, required: true, label: Quick start, description: 'On keeps the display ready in standby, so every command
+          is taken there, using more standby power.'}
+    returns: ack
+  get_fan_control: {summary: Read the fan control (02-7D), returns: value}
+  set_fan_control:
+    summary: Set the fan control (02-7D) and read it back
+    params:
+      value: {type: int, min: 1, max: 7, required: true, label: Fan control, description: '1 auto, 2 forced on; 3 to 7 auto with an
+          offset of -2 to -10 on the oldest generation.'}
+    returns: ack
+  get_fan_speed: {summary: Read the fan speed (10-3F), returns: value}
+  set_fan_speed:
+    summary: Set the fan speed (10-3F) and read it back
+    params:
+      value:
+        type: enum
+        values: [high, low]
+        required: true
+        label: Fan speed
+        description: Fan speed high or low.
+    returns: ack
+  get_input_detect: {summary: Read the input detect (02-40), returns: value}
+  set_input_detect:
+    summary: Set the input detect (02-40) and read it back
+    params:
+      value:
+        type: enum
+        values: [first, last, none, video, custom]
+        required: true
+        label: Input detect
+        description: 'How the display switches input on its own: first or last detected, none, video, or custom priorities.'
+    returns: ack
+  get_screen_saver_motion: {summary: Read the screen saver motion (02-DD), returns: value}
+  set_screen_saver_motion:
+    summary: Set the screen saver motion (02-DD) and read it back
+    params:
+      value: {type: int, min: 0, max: 90, required: true, label: Screen saver motion, description: Pixel shift interval from 0 (off)
+          to 90 in 10 s steps.}
+    returns: ack
+  get_side_border_color: {summary: Read the side border color (02-DF), returns: value}
+  set_side_border_color:
+    summary: Set the side border color (02-DF) and read it back
+    params:
+      value: {type: int, min: 0, max: 100, required: true, label: Side border color, description: Side border color from 0 (black) to
+          100 (white).}
+    returns: ack
+  get_ir_lock: {summary: Read the iR lock (10-D4), returns: value}
+  set_ir_lock:
+    summary: Set the iR lock (10-D4) and read it back
+    params:
+      value:
+        type: enum
+        values: [unlocked, all, custom]
+        required: true
+        label: IR lock
+        description: 'The remote control: unlocked, all locked, or locked as the custom IR lock settings say.'
+    returns: ack
+  get_key_lock: {summary: Read the key lock (11-6A), returns: value}
+  set_key_lock:
+    summary: Set the key lock (11-6A) and read it back
+    params:
+      value: {type: int, min: 1, max: 3, required: true, label: Key lock, description: 'The display''s keys: 1 unlocked, 2 all locked,
+          3 custom.'}
+    returns: ack
+  get_cec: {summary: Read the cEC (11-76), returns: value}
+  set_cec:
+    summary: Set the cEC (11-76) and read it back
+    params:
+      value: {type: int, min: 1, max: 3, required: true, label: CEC, description: 'HDMI CEC: 1 off, 2 on (mode 1), 3 mode 2 (M series).'}
+    returns: ack
+  get_human_sensing: {summary: Read the human sensing (10-75), returns: value}
+  set_human_sensing:
+    summary: Set the human sensing (10-75) and read it back
+    params:
+      value: {type: int, min: 1, max: 4, required: true, label: Human sensing, description: '1 disabled, 2 auto off, 4 custom.'}
+    returns: ack
+  get_illuminance: {summary: Read the illuminance (02-B4), returns: value}
+  get_power: {summary: 'Read the power state (01D6): on, standby, suspend or off', returns: value}
+  set_power:
+    summary: Turn the display on or off (C203D6); the next message waits 15 s, then the power state is read
+    params:
+      'on': {type: bool, required: true, label: Power, description: On turns the display on; off turns it off as the remote's power
+          key does.}
+    returns: ack
+  save_settings: {summary: 'Save the current settings (0C), so they survive a power cycle', returns: ack}
+  get_timing: {summary: 'Read the input timing (07): signal state and horizontal and vertical frequencies', returns: value}
+  self_diagnosis: {summary: 'Run the self-diagnosis (B1): normal, or the faults found (power rails, fans, backlight, temperature, no
+      signal)', returns: value}
+  get_serial_number: {summary: Read the serial number (C216), returns: value}
+  get_model: {summary: Read the model name (C217), returns: value}
+  get_firmware_version: {summary: Read the firmware version (CA02 00), returns: value}
+  get_date: {summary: Read the display's date and time (C211), returns: value}
+  set_date:
+    summary: Set the display's date and time (C212) and read it back
+    params:
+      year: {type: int, min: 2000, max: 2099, required: true, label: Year, description: Year from 2000 to 2099 (2015 at the earliest
+          on the M series).}
+      month: {type: int, min: 1, max: 12, required: true, label: Month, description: Month from 1 to 12.}
+      day: {type: int, min: 1, max: 31, required: true, label: Day, description: Day of the month from 1 to 31.}
+      weekday: {type: int, min: 0, max: 6, required: true, label: Weekday, description: Day of the week from 0 (Sunday) to 6 (Saturday).}
+      hour: {type: int, min: 0, max: 23, required: true, label: Hour, description: Hour from 0 to 23.}
+      minute: {type: int, min: 0, max: 59, required: true, label: Minute, description: Minute from 0 to 59.}
+      daylight_saving: {type: bool, required: true, label: Daylight saving, description: 'On marks the time as daylight saving time
+          (reserved on the M series, which takes off).'}
+    returns: ack
+  get_temperature:
+    summary: Read one temperature sensor (select it with 02-78, read 02-79), in °C
+    params:
+      sensor: {type: int, min: 1, max: 3, required: true, label: Sensor, description: Temperature sensor from 1 to 3; models have one
+          to three.}
+    returns: value
+  get_fan_status:
+    summary: 'Read one fan''s status (select it with 02-7A, read 02-7B): off, on or error'
+    params:
+      fan: {type: int, min: 1, max: 3, required: true, label: Fan, description: Fan from 1 to 3; models have up to three.}
+    returns: value
+  auto_setup: {summary: Adjust the VGA picture automatically (00-1E); the next message waits 10 s, returns: ack}
+  reset:
+    summary: Reset all settings or a menu's (02-CB)
+    params:
+      target:
+        type: enum
+        values: [factory, picture, adjust, audio, schedule, pip, osd, multi_display, protection, advanced, advanced2, control, remote_control,
+          slot, network, protect, system, input]
+        required: true
+        label: Reset
+        description: factory resets everything; the others one menu's settings, as each model lists them.
+    returns: ack
+  get_vcp:
+    summary: 'Read any operation code (page, code): returns its value and maximum'
+    params:
+      page: {type: int, min: 0, max: 255, required: true, label: Page, description: 'Operation code page, 0 to 255 (00h, 02h, 10h, 11h
+          in NEC''s tables).'}
+      code: {type: int, min: 0, max: 255, required: true, label: Code, description: 'Operation code, 0 to 255.'}
+    returns: value
+  set_vcp:
+    summary: 'Set any operation code (page, code) to a value: returns the value set and the maximum'
+    params:
+      page: {type: int, min: 0, max: 255, required: true, label: Page, description: 'Operation code page, 0 to 255.'}
+      code: {type: int, min: 0, max: 255, required: true, label: Code, description: 'Operation code, 0 to 255.'}
+      value: {type: int, min: 0, max: 65535, required: true, label: Value, description: 'The value, 0 to 65535, as NEC''s operation
+          code table gives it.'}
+    returns: value
+state:
+  audio.balance: {type: int, description: Balance (00-93)}
+  audio.bass: {type: int, description: Bass (00-91)}
+  audio.input: {type: int, description: Audio input (02-2E)}
+  audio.line_out: {type: string, description: 'Line out (10-81): fixed, variable'}
+  audio.muted: {type: bool, description: Mute (00-8D)}
+  audio.stereo: {type: string, description: 'Stereo (00-94): mono, stereo'}
+  audio.treble: {type: int, description: Treble (00-8F)}
+  audio.volume: {type: int, description: Volume (00-62)}
+  cec: {type: int, description: CEC (11-76)}
+  clock.day: {type: int, description: 'The display''s clock: day'}
+  clock.hour: {type: int, description: 'The display''s clock: hour'}
+  clock.minute: {type: int, description: 'The display''s clock: minute'}
+  clock.month: {type: int, description: 'The display''s clock: month'}
+  clock.weekday: {type: int, description: 'The display''s clock: weekday'}
+  clock.year: {type: int, description: 'The display''s clock: year'}
+  fan.control: {type: int, description: Fan control (02-7D)}
+  fan.speed: {type: string, description: 'Fan speed (10-3F): high, low'}
+  human_sensing: {type: int, description: Human sensing (10-75)}
+  ids.groups: {type: int, description: Group IDs (10-7F)}
+  ids.monitor: {type: int, description: Monitor ID (02-3E)}
+  info.firmware_version: {type: string, description: Firmware version (CA02)}
+  info.model: {type: string, description: Model name (C217)}
+  info.serial_number: {type: string, description: Serial number (C216)}
+  input: {type: string, description: 'Input (00-60): vga, rgbhv, dvi, hdmi_set_only, video1, video2, s_video, tv, ypbpr, option, ypbpr2,
+      displayport1, displayport2, hdmi1, hdmi2, displayport3, hdmi3, media_player, compute_module, usb_c'}
+  input_detect: {type: string, description: 'Input detect (02-40): first, last, none, video, custom'}
+  locks.ir: {type: string, description: 'IR lock (10-D4): unlocked, all, custom'}
+  locks.keys: {type: int, description: Key lock (11-6A)}
+  off_timer: {type: int, description: Off timer (02-2B)}
+  osd.information: {type: int, description: Information OSD (02-3D)}
+  osd.language: {type: int, description: OSD language (00-68)}
+  osd.rotation: {type: int, description: OSD rotation (02-41)}
+  osd.time: {type: int, description: OSD time (00-FC)}
+  picture.adaptive_contrast: {type: int, description: Adaptive contrast (02-8D)}
+  picture.ambient_light_sensing: {type: int, description: Ambient light sensing (10-C8)}
+  picture.aspect: {type: string, description: 'Aspect (02-70): normal, full, wide, zoom, trim, dynamic, dot_by_dot, cinema, auto'}
+  picture.auto_dimming: {type: int, description: Auto dimming (02-2D)}
+  picture.backlight: {type: int, description: Backlight (00-10)}
+  picture.black_level: {type: int, description: Black level (00-92)}
+  picture.blue_gain: {type: int, description: Blue gain (00-1A)}
+  picture.color: {type: int, description: Color (02-1F)}
+  picture.color_preset: {type: int, description: Color preset (00-14)}
+  picture.color_temperature: {type: int, description: Color temperature (00-54)}
+  picture.contrast: {type: int, description: Contrast (00-12)}
+  picture.gamma: {type: int, description: Gamma (02-68)}
+  picture.green_gain: {type: int, description: Green gain (00-18)}
+  picture.image_flip: {type: string, description: 'Image flip (02-D7): none, horizontal, vertical, rotate_180'}
+  picture.mode: {type: int, description: Picture mode (02-1A)}
+  picture.noise_reduction: {type: int, description: Noise reduction (02-26)}
+  picture.overscan: {type: int, description: Overscan (02-E3)}
+  picture.red_gain: {type: int, description: Red gain (00-16)}
+  picture.screen_muted: {type: bool, description: Screen mute (10-B6)}
+  picture.sharpness: {type: int, description: Sharpness (00-8C)}
+  picture.tint: {type: int, description: Tint (00-90)}
+  picture.video_range: {type: string, description: 'Video range (10-40): expand, raw, auto'}
+  pip.input: {type: string, description: 'PIP input (02-73): vga, rgbhv, dvi, hdmi_set_only, video1, video2, s_video, tv, ypbpr, option,
+      ypbpr2, displayport1, displayport2, hdmi1, hdmi2, displayport3, hdmi3, media_player, compute_module, usb_c'}
+  pip.mode: {type: int, description: PIP mode (02-72)}
+  pip.multi_picture_mode: {type: string, description: 'Multi-picture mode (11-EB): off, pip2, pbp2, pbp4'}
+  pip.pictures.*: {type: string, description: 'Input of each picture in multi-picture mode (11-0E to 11-11), keyed 1 to 4'}
+  pip.size: {type: int, description: PIP size (10-B9)}
+  pip.x: {type: int, description: PIP horizontal position (02-74)}
+  pip.y: {type: int, description: PIP vertical position (02-75)}
+  power: {type: string, description: 'Power state (01D6): on, standby, suspend or off'}
+  power_led: {type: bool, description: Power LED (02-BE)}
+  power_on_delay: {type: int, description: Power on delay (02-D8)}
+  quick_start: {type: bool, description: Quick start (11-EA)}
+  screen_saver.motion: {type: int, description: Screen saver motion (02-DD)}
+  side_border_color: {type: int, description: Side border color (02-DF)}
+  status.diagnosis: {type: string, description: 'Self-diagnosis results (B1), separated by commas: normal, or faults such as fan1, led_backlight,
+      temperature_shutdown, no_signal'}
+  status.fans.*: {type: string, description: 'Status of each fan (02-7B), keyed 1 to 3: off, on or error'}
+  status.illuminance: {type: int, description: 'Current illuminance (02-B4), 0 to 65535, read-only', unit: lx}
+  status.temperatures.*: {type: float, unit: °C, description: 'Temperature of each sensor (02-79), keyed 1 to 3'}
+  tile.columns: {type: int, description: Tile columns (02-D0)}
+  tile.compensation: {type: bool, description: Tile compensation (02-D5)}
+  tile.matrix: {type: string, description: 'Tile matrix (02-D3): disabled, enabled, disabled_erase_frame'}
+  tile.position: {type: int, description: Tile position (02-D2)}
+  tile.rows: {type: int, description: Tile rows (02-D1)}
+  timing.h_frequency_khz: {type: float, unit: kHz, description: Horizontal frequency (07)}
+  timing.no_signal: {type: bool, description: 'No signal, or the signal is out of range (07)'}
+  timing.unstable: {type: bool, description: The signal is unstable (07)}
+  timing.v_frequency_hz: {type: float, unit: Hz, description: Vertical frequency (07)}
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      After power on or off the next message waits 15 s, and after an input change, auto setup or factory
+      reset 10 s, as NEC requires; commands queue meanwhile. A message the display cannot take now is answered
+      with the NULL message and fails; one it does not support (result 01) fails too.
+  - models: [all]
+    severity: warning
+    text: >
+      Some models ignore an out-of-range value and still answer it was set: every set is read back, so state
+      shows what the display holds. Settings are kept over a power cycle only after save_settings.
+  - models: [all]
+    severity: info
+    text: >
+      Value ranges and codes differ by generation; each parameter's description gives them, and get_vcp
+      returns the maximum a model takes. get_vcp and set_vcp reach any operation code of NEC's tables, for
+      the many settings (option slot, SpectraView Engine, network, proof of play) not named here.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed: power, input, volume and mute are read every poll_ms, the other settings, the
+      temperature sensors, the fans, the self-diagnosis and the clock every minute. In standby a display
+      answers only the power, identity and input commands unless quick start is on.
+  - models: [all]
+    severity: info
+    text: >
+      Schedules, the network settings, the security lock, asset data, proof of play and auto tile matrix are
+      command messages whose layouts differ by generation and are not named here. Broadcast and group
+      addressing are not offered: whether displays answer them is not documented.
+  - models: [all]
+    severity: critical
+    text: >
+      reset with factory restores every setting, and set_monitor_id changes the ID this device addresses:
+      set monitor_id to the new ID afterwards. Neither can be undone from here.
+  - models: [g4, g2]
+    severity: info
+    text: >
+      These generations' tables name 00-18 the blue gain and 00-1A the green gain, the M series, the PN-ME
+      and NEC's SDK the other way round; set_green_gain and set_blue_gain follow the latter.

@@ -51,6 +51,7 @@ NATIVE = {
     "http-listener": "HTTP/1.1 requests from any sender (webhooks); receives",
     "http-snapshot": "HTTP JPEG snapshots",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
+    "nec-display": "External Control binary messages over TCP 7142, or an RS-232C port",
     "novastar-central-control": "Binary frames over TCP 5200",
     "novastar-h": "Signed JSON over HTTP 8000",
     "obs-studio": "obs-websocket 5 over WebSocket 4455",
