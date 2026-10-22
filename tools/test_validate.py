@@ -140,6 +140,15 @@ class Serial(unittest.TestCase):
         self.assertIn("settings.stop_bits: needs the device's default", errors)
         self.assertIn("settings.stop_bits: an int within 1 to 2 (give min and max)", errors)
 
+    def test_a_delimited_framing_needs_a_close(self):
+        for close in (None, "", "  ", "\r\n"):
+            t = {"type": "line-tcp", "port": 1, "framing": "delimited", "open": "<"}
+            if close is not None:
+                t["close"] = close
+            doc = {"transport": t, "ports": [{"port": 1, "protocol": "tcp", "role": "control"}]}
+            self.assertIn("transport.close: framing delimited needs a close that is not only whitespace",
+                          validate.port_checks(doc))
+
     def test_a_line_serial_transport_needs_a_serial_control_entry(self):
         doc = self.doc(ports=[{"port": 23, "protocol": "tcp", "role": "control"}])
         self.assertIn("ports: a line-serial transport needs a serial control entry", validate.port_checks(doc))

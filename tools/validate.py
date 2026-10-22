@@ -979,6 +979,11 @@ def port_checks(doc: dict) -> list[str]:
             errors.append(f"ports[{i}]: a control port with no default needs a note saying so")
     t = doc.get("transport")
     if t is not None:
+        # A delimited reply ends at `close`, compared without surrounding
+        # whitespace: an empty one would never end a message.
+        if (t.get("type") in ("line-tcp", "line-serial") and t.get("framing") == "delimited"
+                and not str(t.get("close", "")).strip()):
+            errors.append("transport.close: framing delimited needs a close that is not only whitespace")
         if t.get("type") == "line-serial":
             if not any(e["protocol"] == "serial" for e in control):
                 errors.append("ports: a line-serial transport needs a serial control entry")

@@ -1350,6 +1350,11 @@ impl SpecEngine {
                 let framing = str_field(&t, "framing").unwrap_or("terminated");
                 let open = str_field(&t, "open").unwrap_or("").to_string();
                 let close = str_field(&t, "close").unwrap_or("").to_string();
+                if framing == "delimited" && close.trim().is_empty() {
+                    return Err(
+                        "framing delimited needs a close that is not only whitespace".into(),
+                    );
+                }
                 let send = match framing {
                     "delimited" => SendFraming::Delimited {
                         open: open.clone(),
