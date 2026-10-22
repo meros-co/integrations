@@ -7,7 +7,7 @@ ACK = {"ok": {"kind": "ack"}}
 text(SC, "set_controller", {"controller": 1, "position": 754}, "CS 1 754\r",
      device_reply="ACK\r", expect_result=ACK)
 text(SC, "set_controller", {"controller": 9999, "position": 0}, "CS 9999 0\r",
-     device_reply="NAK\r", expect_result={"error": {"error": "device_error"}})
+     device_reply="NAK\r", expect_result={"error": {"error": "device_error"}}, file="set_controller-error")
 text(SC, "set_controller_quick", {"controller": 140, "position": 65535}, "CSQ 140 65535\r",
      device_reply="ACK\r", expect_result=ACK)
 text(SC, "increment_controller", {"controller": 7, "amount": 780}, "CC 7 1 780\r",
@@ -22,7 +22,7 @@ text(SC, "read_controller_block", {"controller": 9, "count": 3}, "GSB2 9 3\r",
 # -8 dB: (-8 + 72) * 65535 / 84 = 49931.4 (p.5's example).
 text(SC, "set_fader_db", {"controller": 12, "level_db": -8.0}, "CS 12 49931\r",
      device_reply="ACK\r", expect_result=ACK)
-text(SC, "set_fader_db", {"controller": 12, "level_db": 12.0}, "CS 12 65535\r")
+text(SC, "set_fader_db", {"controller": 12, "level_db": 12.0}, "CS 12 65535\r", file="set_fader_db-max")
 text(SC, "get_fader_db", {"controller": 12}, "GS 12\r", device_reply="0\r",
      expect_result={"ok": {"kind": "value", "value": -72.0}})
 text(SC, "button_on", {"controller": 140}, "CS 140 65535\r", device_reply="ACK\r", expect_result=ACK)
@@ -73,11 +73,12 @@ text(SC, "matrix_set", {"feature": "CPGain", "enumerator": "I3O6", "value": 4.1}
      "CMV Set 0.1.CPGain.I3O6 4.10\r", device_reply="ACK\r", expect_result=ACK)
 text(SC, "matrix_set", {"feature": "CPConnect", "enumerator": "{I1O1:I3O20}", "value": 1},
      "CMV Set 0.1.CPConnect.{I1O1:I3O20} 1.00\r", device_reply="NAK Enumerator\r",
-     expect_result={"error": {"error": "device_error"}})
+     expect_result={"error": {"error": "device_error"}}, file="matrix_set-error")
 text(SC, "matrix_get", {"feature": "CPConnect", "enumerator": "I13O76"}, "CMV Get 0.1.CPConnect.I13O76\r",
      device_reply="1\r", expect_result={"ok": {"kind": "value", "value": "1"}})
 text(SC, "matrix_get", {"unit": 2, "module": 1, "feature": "OGain", "enumerator": "O1"},
-     "CMV Get 2.1.OGain.O1\r", device_reply="-4.50\r", expect_result={"ok": {"kind": "value", "value": "-4.50"}})
+     "CMV Get 2.1.OGain.O1\r", device_reply="-4.50\r", expect_result={"ok": {"kind": "value", "value": "-4.50"}},
+     file="matrix_get-unit")
 text(SC, "matrix_modify", {"feature": "CPDelay", "enumerator": "I1O1", "offset": -3.7},
      "CMV Modify 0.1.CPDelay.I1O1 -3.70\r")
 text(SC, "matrix_toggle", {"feature": "OMute", "enumerator": "O2"}, "CMV Toggle 0.1.OMute.O2 1\r")
