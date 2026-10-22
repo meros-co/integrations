@@ -16,7 +16,8 @@ def val(v):
 
 # Input selection (IN1808 p.63, IN1608 p.50)
 text(K, "select_input", {"input": 3}, "3*1!\r", device_reply="In03*1 All\r\n", expect_result=ACK, **N8)
-text(K, "select_input", {"input": 8}, "8*1!\r", device_reply="E01\r\n", expect_result=ERR, **N8)
+text(K, "select_input", {"input": 8}, "8*1!\r", device_reply="E01\r\n", expect_result=ERR, **N8,
+     file="select_input-error")
 text(K, "select_video_input", {"input": 2}, "2*1%\r", device_reply="In02*1 Vid\r\n", expect_result=ACK, **N8)
 text(K, "select_audio_input", {"input": 9}, "9*1$\r", device_reply="In09*1 Aud\r\n", expect_result=ACK, **N8)
 text(K, "get_input", {}, "1!\r", device_reply="In04*1 All\r\n", expect_result=val("4"), **N8)
@@ -47,7 +48,7 @@ text(K, "get_input_name_in1600", {"input": 3}, E + "3NI\r", device_reply="Nmi3,L
 
 # Input configuration (IN1808 p.64-66, IN1608 p.52-53, p.60)
 text(K, "auto_image", {"mode": "1"}, "1*1A\r", device_reply="Img1*1\r\n", expect_result=ACK, **N8)
-text(K, "auto_image", {}, "1*0A\r", **N8)
+text(K, "auto_image", {}, "1*0A\r", **N8, file="auto_image-off")
 text(K, "auto_image_in1600", {}, "A\r", device_reply="Img0\r\n", expect_result=ACK, **N6)
 text(K, "auto_image_fill_in1600", {}, "1*A\r", device_reply="Img1\r\n", expect_result=ACK, **N6)
 text(K, "auto_image_keep_aspect_in1600", {}, "2*A\r", device_reply="Img2\r\n", expect_result=ACK, **N6)
@@ -124,7 +125,8 @@ text(K, "get_osd_duration", {}, E + "MDUR\r", device_reply="Mdur060\r\n", expect
 
 # Presets (IN1808 p.74, IN1608 p.59)
 text(K, "recall_input_preset", {"preset": 4}, "2*4.\r", device_reply="2Rpr004\r\n", expect_result=ACK, **N8)
-text(K, "recall_input_preset", {"preset": 17}, "2*17.\r", device_reply="E11\r\n", expect_result=ERR, **N8)
+text(K, "recall_input_preset", {"preset": 17}, "2*17.\r", device_reply="E11\r\n", expect_result=ERR, **N8,
+     file="recall_input_preset-error")
 text(K, "save_input_preset", {"preset": 4}, "2*4,\r", device_reply="2Spr004\r\n", expect_result=ACK, **N8)
 text(K, "recall_user_preset", {"preset": 2}, "1*2.\r", device_reply="1Rpr02\r\n", expect_result=ACK, **N6)
 text(K, "save_user_preset", {"preset": 2}, "1*2,\r", device_reply="1Spr02\r\n", expect_result=ACK, **N6)
@@ -160,7 +162,8 @@ text(K, "set_phantom_power", {"oid": "40000", "enabled": True}, E + "Z40000*1AU\
 text(K, "set_volume_knob_group", {"group": "8"}, E + "1*8KNOB\r", device_reply="Knob1*8\r\n", expect_result=ACK, **N6)
 text(K, "get_volume_knob_group", {}, E + "1KNOB\r", device_reply="Knob1*1\r\n", expect_result=val("1"), **N6)
 text(K, "play_audio_file", {"slot": 2}, E + "2*1PLAY\r", device_reply="Play2*1\r\n", expect_result=ACK, **N8)
-text(K, "play_audio_file", {"slot": 9}, E + "9*1PLAY\r", device_reply="E22\r\n", expect_result=ERR, **N8)
+text(K, "play_audio_file", {"slot": 9}, E + "9*1PLAY\r", device_reply="E22\r\n", expect_result=ERR, **N8,
+     file="play_audio_file-error")
 text(K, "stop_audio_file", {"slot": 2}, E + "2*0PLAY\r", device_reply="Play2*0\r\n", expect_result=ACK, **N8)
 text(K, "get_playing_audio_file", {}, E + "PLAY\r", device_reply="Play2*1\r\n", expect_result=val("2"), **N8)
 

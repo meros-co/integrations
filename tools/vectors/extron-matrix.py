@@ -19,7 +19,8 @@ ERR = {"error": {"error": "device_error"}}
 
 # Ties (DXP HD 4K PLUS p.43, DXP DVI p.57, XTP II p.51)
 text(K, "tie", {"input": 3, "output": 4}, "3*4!\r", device_reply="Out04 In03 All\r\n", expect_result=ACK)
-text(K, "tie", {"input": 0, "output": 4}, "0*4!\r", device_reply="Out04 In00 All\r\n", expect_result=ACK, **DV)
+text(K, "tie", {"input": 0, "output": 4}, "0*4!\r", device_reply="Out04 In00 All\r\n", expect_result=ACK, **DV,
+     file="tie-dxp-dvi")
 text(K, "tie_video", {"input": 7, "output": 5}, "7*5%\r", device_reply="Out05 In07 Vid\r\n", expect_result=ACK)
 text(K, "tie_audio", {"input": 6, "output": 4}, "6*4$\r", device_reply="Out04 In06 Aud\r\n", expect_result=ACK)
 text(K, "tie_input_to_all", {"input": 5}, "5*!\r", device_reply="In05 All\r\n", expect_result=ACK)
@@ -37,7 +38,8 @@ text(K, "get_video_mute", {"output": 2}, "2B\r", device_reply="Vmt2*0\r\n", expe
 text(K, "set_video_mute_all", {"muted": False}, "0*B\r", device_reply="Vmt0\r\n", expect_result=ACK)
 text(K, "set_audio_mute", {"output": 1, "muted": True}, "1*1Z\r", device_reply="Amt1*1\r\n", expect_result=ACK)
 text(K, "set_audio_mute_mode", {"output": 1, "mode": 7}, "1*7Z\r", device_reply="Amt1*7\r\n", expect_result=ACK)
-text(K, "set_audio_mute_mode", {"output": 9, "mode": 3}, "9*3Z\r", device_reply="E12\r\n", expect_result=ERR, **XT)
+text(K, "set_audio_mute_mode", {"output": 9, "mode": 3}, "9*3Z\r", device_reply="E12\r\n", expect_result=ERR, **XT,
+     file="set_audio_mute_mode-error")
 text(K, "get_audio_mute", {"output": 1}, "1Z\r", device_reply="Amt1*2\r\n", expect_result=val("2"))
 text(K, "set_audio_mute_all", {"muted": True}, "1*Z\r", device_reply="Amt1\r\n", expect_result=ACK)
 text(K, "get_mutes", {}, E + "VM\r", device_reply="Mut01002300\r\n", expect_result=val("01002300"), **DV)
@@ -45,7 +47,8 @@ text(K, "get_mutes", {}, E + "VM\r", device_reply="Mut01002300\r\n", expect_resu
 # Presets and rooms (DXP HD 4K PLUS p.48-50, DXP DVI p.58-60, XTP II p.52)
 text(K, "save_global_preset", {"preset": 9}, "9,\r", device_reply="Spr09\r\n", expect_result=ACK)
 text(K, "recall_global_preset", {"preset": 5}, "5.\r", device_reply="Rpr05\r\n", expect_result=ACK)
-text(K, "recall_global_preset", {"preset": 6}, "6.\r", device_reply="E11\r\n", expect_result=ERR, **SM)
+text(K, "recall_global_preset", {"preset": 6}, "6.\r", device_reply="E11\r\n", expect_result=ERR, **SM,
+     file="recall_global_preset-error")
 text(K, "recall_global_preset_prst", {"preset": 3}, E + "R3PRST\r", device_reply="PrstR03\r\n", expect_result=ACK)
 text(K, "get_global_preset_video_ties", {"preset": 0}, E + "0*1*1VC\r",
      device_reply="Vgp00*Out01 8 8 2 8 8 7 7 0 -- -- -- -- -- -- -- -- Vid\r\n",
@@ -79,7 +82,8 @@ text(K, "increase_input_level", {"input": 4}, "4+G\r", device_reply="In04 Aud+08
 text(K, "decrease_input_level", {"input": 4}, "4-G\r", **XT)
 text(K, "get_input_level", {"input": 1}, "1G\r", device_reply="In01 Aud-03\r\n", expect_result=val("-03"))
 text(K, "set_output_volume", {"output": 1, "level": 64}, "1*64V\r", device_reply="Out1 Vol64\r\n", expect_result=ACK)
-text(K, "set_output_volume", {"output": 1, "level": 90}, "1*90V\r", device_reply="E13\r\n", expect_result=ERR, **XT)
+text(K, "set_output_volume", {"output": 1, "level": 90}, "1*90V\r", device_reply="E13\r\n", expect_result=ERR, **XT,
+     file="set_output_volume-error")
 text(K, "increase_output_volume", {"output": 2}, "2+V\r", device_reply="Out2 Vol65\r\n", expect_result=ACK)
 text(K, "decrease_output_volume", {"output": 2}, "2-V\r")
 text(K, "get_output_volume", {"output": 2}, "2V\r", device_reply="Out2 Vol100\r\n", expect_result=val("100"))
@@ -101,7 +105,8 @@ text(K, "get_test_pattern", {}, E + "TEST\r", device_reply="00\r\n", expect_resu
 text(K, "set_verbose_mode", {"mode": 3}, E + "3CV\r", device_reply="Vrb3\r\n", expect_result=ACK)
 text(K, "get_verbose_mode", {}, E + "CV\r", device_reply="Vrb3\r\n", expect_result=val("3"))
 text(K, "get_firmware", {}, "Q\r", device_reply="1.14\r\n", expect_result=val("1.14"))
-text(K, "get_firmware", {}, "Q\r", device_reply="Ver01*1.14\r\n", expect_result=val("1.14"), **SM)
+text(K, "get_firmware", {}, "Q\r", device_reply="Ver01*1.14\r\n", expect_result=val("1.14"), **SM,
+     file="get_firmware-smx")
 text(K, "get_firmware_full", {}, "*Q\r", device_reply="1.14.0002\r\n", expect_result=val("1.14.0002"))
 text(K, "get_part_number", {}, "N\r", device_reply="Pno60-1495-01\r\n", expect_result=val("60-1495-01"))
 text(K, "get_info", {}, "I\r", device_reply="V32X32 A32X32\r\n", expect_result=val("V32X32 A32X32"), **XT)

@@ -3,10 +3,11 @@ LW = "lightware-lw3"
 # v1.3.1 user manuals, LW3 Programmers' Reference chapters). Commands end with
 # CR LF; replies are "<prefix> <path>..." lines, changes "CHG <path>=<value>".
 #
-# Every command first gets a vector rendered here from example values with a
-# small renderer of its own (bool as true/false, .Nf floats, plain values),
-# as the ProPresenter vectors are; the hand-stated vectors after them, with
-# device replies from the manuals' examples, replace those of the same name.
+# Every command gets a vector rendered here from example values with a small
+# renderer of its own (bool as true/false, .Nf floats, plain values), as the
+# ProPresenter vectors are; it is written as <command>-rendered when a
+# hand-stated vector (device replies from the manuals' examples) already
+# carries the command's name.
 import re as _re
 
 _LW_DOC = yaml.safe_load((ROOT / "specs" / f"{LW}.yaml").read_text(encoding="utf-8"))
@@ -70,22 +71,6 @@ def _lw_render(template, values):
     return _re.sub(r"\{([A-Za-z0-9_.]+(?::[^{}]*)?)\}", sub, template) + "\r\n"
 
 
-for _name, _cmd in _LW_DOC["commands"].items():
-    _values = {k: _lw_example(p) for k, p in (_cmd.get("params") or {}).items()}
-    _send = _cmd["send"]
-    _model = next(m["id"] for m in _LW_DOC["models"] if _name in m["supports"])
-    _extra = {}
-    if "{settings.password}" in str(_send):
-        _values_s = {**_values, "settings.password": "Secret1"}
-        _extra["settings"] = {"password": "Secret1"}
-    else:
-        _values_s = _values
-    if isinstance(_send, list):
-        _wire = [_lw_render(s, _values_s) for s in _send]
-    else:
-        _wire = _lw_render(_send, _values_s)
-    text(LW, _name, _values, _wire, model=_model, **_extra)
-
 ACK = {"ok": {"kind": "ack"}}
 ERR = {"error": {"error": "device_error"}}
 
@@ -113,7 +98,8 @@ text(LW, "set_device_label", {"label": "Room 1"}, "SET /V1/MANAGEMENT/LABEL.Devi
 text(LW, "switch", {"layer": "VIDEO", "input": 2, "output": 1}, "CALL /V1/MEDIA/VIDEO/XP:switch(I2:O1)\r\n",
      device_reply="mO /V1/MEDIA/VIDEO/XP:switch=\r\n", expect_result=ACK, **V1)
 text(LW, "switch", {"layer": "VIDEO", "input": 5, "output": 1}, "CALL /V1/MEDIA/VIDEO/XP:switch(I5:O1)\r\n",
-     device_reply="mE /V1/MEDIA/VIDEO/XP:switch %E006:Illegal operation\r\n", expect_result=ERR, **UCX)
+     device_reply="mE /V1/MEDIA/VIDEO/XP:switch %E006:Illegal operation\r\n", expect_result=ERR, **UCX,
+     file="switch-error")
 text(LW, "disconnect", {"layer": "AUDIO", "output": 2}, "CALL /V1/MEDIA/AUDIO/XP:switch(0:O2)\r\n",
      device_reply="mO /V1/MEDIA/AUDIO/XP:switch=\r\n", expect_result=ACK, **V1)
 text(LW, "set_port_lock", {"layer": "VIDEO", "port": "O1", "locked": True},
@@ -302,3 +288,27 @@ def _lw_nodes():
 
 
 _lw_nodes()
+
+
+def _lw_rendered():
+    _taken = {v.get("file") or v.get("command") for v in V if v.get("spec") == LW}
+    for _name, _cmd in _LW_DOC["commands"].items():
+        _values = {k: _lw_example(p) for k, p in (_cmd.get("params") or {}).items()}
+        _send = _cmd["send"]
+        _model = next(m["id"] for m in _LW_DOC["models"] if _name in m["supports"])
+        _extra = {}
+        if "{settings.password}" in str(_send):
+            _values_s = {**_values, "settings.password": "Secret1"}
+            _extra["settings"] = {"password": "Secret1"}
+        else:
+            _values_s = _values
+        if isinstance(_send, list):
+            _wire = [_lw_render(s, _values_s) for s in _send]
+        else:
+            _wire = _lw_render(_send, _values_s)
+        if _name in _taken:
+            _extra["file"] = f"{_name}-rendered"
+        text(LW, _name, _values, _wire, model=_model, **_extra)
+
+
+_lw_rendered()

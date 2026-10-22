@@ -1229,7 +1229,7 @@ _mwm("stream-status-usb", "ip-to-usb", "/api/stream/status/get", {"status": 0, "
 
 # Re-reads after a change on the new models.
 for _name, _model, _path, _sends in [
-    ("reread-ntp", "aes67", "/api/system/set-date-time", [("POST", "/api/system/info")]),
+    ("reread-ntp-aes67", "aes67", "/api/system/set-date-time", [("POST", "/api/system/info")]),
     ("reread-if-set", "audio-dx", "/api/network/if-set", [("POST", "/api/network/if-info")]),
     ("reread-dns", "aes67", "/api/network/set-dns", [("POST", "/api/network/get-dns")]),
     ("reread-general-aes67", "aes67", "/api/aes67/general-settings", [("POST", "/api/aes67/general-info")]),

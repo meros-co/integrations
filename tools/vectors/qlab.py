@@ -92,7 +92,7 @@ q("set_current_cue_list_by_id", {"cue_list_id": UID}, f"/currentCueListID/{UID}"
 # A denied reply fails the query (the dictionary's status values).
 reply, _ = q_reply("/workspaces", None, status="denied")
 q("get_workspaces", {}, "/workspaces", device_reply_hex=hexs(reply),
-  expect_result={"error": {"error": "device_error"}})
+  expect_result={"error": {"error": "device_error"}}, file="get_workspaces-denied")
 reply, body = q_reply("/thump", "thump")
 q("thump", {}, "/thump", device_reply_hex=hexs(reply), expect_result={"ok": {"kind": "value", "value": body}})
 for stem, scope in [("cue_lists", "cueLists"), ("selected_cues", "selectedCues"),

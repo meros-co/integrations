@@ -10,7 +10,8 @@ text(Q, "control_get", {"name": "gain1"}, 'cg "gain1"\n',
      device_reply='cv "gain1" "-12.0dB" -12 0.75\r\n',
      expect_result={"ok": {"kind": "value", "value": 'cv "gain1" "-12.0dB" -12 0.75'}})
 text(Q, "control_get", {"name": "Room Mute"}, 'cg "Room Mute"\n',
-     device_reply='bad_id "Room Mute"\r\n', expect_result={"error": {"error": "device_error"}})
+     device_reply='bad_id "Room Mute"\r\n', expect_result={"error": {"error": "device_error"}},
+     file="control_get-error")
 text(Q, "control_get_metadata", {"name": "gain1"}, 'cgm "gain1"\n', expect_result=QNONE)
 text(Q, "control_set_value", {"name": "gain1", "value": -6.5}, 'csv "gain1" -6.500000\n',
      device_reply='cv "gain1" "-6.5dB" -6.5 0.8125\r\n', expect_result=QACK)
@@ -23,7 +24,8 @@ text(Q, "control_set_position_ramp", {"name": "gain1", "position": 1.0, "ramp": 
 text(Q, "control_set_string", {"name": "text1", "text": "Say \"hi\""}, 'css "text1" "Say \\"hi\\""\n',
      device_reply='cv "text1" "Say \\"hi\\"" 0 0\r\n', expect_result=QACK)
 text(Q, "control_set_string", {"name": "mute1", "text": "muted"}, 'css "mute1" "muted"\n',
-     device_reply='control_read_only "mute1"\r\n', expect_result={"error": {"error": "device_error"}})
+     device_reply='control_read_only "mute1"\r\n', expect_result={"error": {"error": "device_error"}},
+     file="control_set_string-error")
 text(Q, "control_set_value_vector", {"name": "eq1", "count": 3, "values": "1 -2.5 3"},
      'csvv "eq1" 3 1 -2.5 3\n', expect_result=QNONE)
 text(Q, "control_set_value_vector_ramp", {"name": "eq1", "count": 2, "values": "1 2", "ramp": 1.0},
@@ -37,7 +39,7 @@ text(Q, "control_set_string_vector", {"name": "names", "count": 2, "strings": '"
 text(Q, "control_trigger", {"name": "play"}, 'ct "play"\n', expect_result=QNONE)
 text(Q, "change_group_create", {}, "cgc 1\n", expect_result=QNONE)
 text(Q, "change_group_add", {"name": "gain1"}, 'cga 1 "gain1"\n')
-text(Q, "change_group_add", {"group": 2, "name": "Room Mute"}, 'cga 2 "Room Mute"\n')
+text(Q, "change_group_add", {"group": 2, "name": "Room Mute"}, 'cga 2 "Room Mute"\n', file="change_group_add-group")
 text(Q, "change_group_remove", {"name": "gain1"}, 'cgr 1 "gain1"\n')
 text(Q, "change_group_clear", {"group": 2}, "cgclr 2\n")
 text(Q, "change_group_destroy", {"group": 2}, "cgd 2\n")
@@ -48,7 +50,7 @@ text(Q, "change_group_schedule", {"group": 2, "period_ms": 100}, "cgs 2 100\n")
 text(Q, "change_group_schedule_no_ack", {"period_ms": 0}, "cgsna 1 0\n")
 text(Q, "snapshot_load", {"bank": "Room Presets", "number": 2, "ramp": 1.5}, 'ssl "Room Presets" 2 1.500\n',
      expect_result=QNONE)
-text(Q, "snapshot_load", {"bank": "Lights", "number": 1}, 'ssl "Lights" 1 0.000\n')
+text(Q, "snapshot_load", {"bank": "Lights", "number": 1}, 'ssl "Lights" 1 0.000\n', file="snapshot_load-no-ramp")
 text(Q, "snapshot_save", {"bank": "Room Presets", "number": 2}, 'sss "Room Presets" 2\n')
 text(Q, "command", {"line": "cg gain1"}, "cg gain1\n", expect_result=QNONE)
 

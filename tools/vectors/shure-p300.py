@@ -13,7 +13,7 @@ text(S, "get_encryption", {}, "< GET ENCRYPTION >", device_reply="< REP ENCRYPTI
 text(S, "get_usb_connected", {}, "< GET USB_CONNECT >", device_reply="< REP USB_CONNECT ON >", expect_result={'ok': {'kind': 'value', 'value': 'ON'}})
 text(S, "get_preset", {}, "< GET PRESET >", device_reply="< REP PRESET 03 >", expect_result={'ok': {'kind': 'value', 'value': '03'}})
 text(S, "recall_preset", {'preset': 3}, "< SET PRESET 03 >", device_reply="< REP PRESET 03 >", expect_result={'ok': {'kind': 'ack'}})
-text(S, "recall_preset", {'preset': 10}, "< SET PRESET 10 >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}})
+text(S, "recall_preset", {'preset': 10}, "< SET PRESET 10 >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}}, file="recall_preset-error")
 text(S, "get_preset_name", {'preset': 2}, "< GET PRESET2 >", device_reply="< REP PRESET2 {Lecture                  } >", expect_result={'ok': {'kind': 'value', 'value': 'Lecture'}})
 text(S, "flash", {'enabled': True}, "< SET FLASH ON >", device_reply="< REP FLASH ON >", expect_result={'ok': {'kind': 'ack'}})
 text(S, "reboot", {}, "< SET REBOOT >", expect_result={'ok': {'kind': 'unverified'}})
@@ -122,7 +122,7 @@ text(S, "increase_matrix_gain", {'input': 21, 'output': 17, 'step': 25}, "< SET 
 text(S, "decrease_matrix_gain", {'input': 21, 'output': 17, 'step': 25}, "< SET 21 MATRIX_MXR_GAIN 17 DEC 25 >", device_reply="< REP 21 MATRIX_MXR_GAIN 17 1125 >", expect_result={'ok': {'kind': 'ack'}})
 text(S, "get_peq_filter", {'block': 1, 'filter': 2}, "< GET 01 PEQ 02 >", device_reply="< REP 01 PEQ 02 ON >", expect_result={'ok': {'kind': 'value', 'value': 'ON'}})
 text(S, "set_peq_filter", {'block': 1, 'filter': 2, 'state': 'OFF'}, "< SET 01 PEQ 02 OFF >", device_reply="< REP 01 PEQ 02 OFF >", expect_result={'ok': {'kind': 'ack'}})
-text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}})
+text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}}, file="get_mute-error")
 telemetry(S, "mute-gain-name", inbound="< REP 01 AUDIO_MUTE ON >< REP 01 AUDIO_GAIN_HI_RES 1040 >< REP 01 CHAN_NAME {Podium     } >< REP PRESET 03 >", expect_state={'channels': {'1': {'mute': True, 'gain': -6.0, 'name': 'Podium'}}, 'device': {'preset': 3}})
 
 # Metering (p.12-16, p.24-25): one level per channel, 000-060 for -60 to 0

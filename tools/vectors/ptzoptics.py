@@ -12,10 +12,11 @@ PRM = "/cgi-bin/param.cgi?"
 # Movement (p.119-138; 2021 sheet p.1)
 http(P, "move", {"direction": "rightup", "pan_speed": 15, "tilt_speed": 13}, "GET", PTZ + "ptzcmd&rightup&15&13",
      http_reply={"status": 200, "body": OK}, expect_result=ACK)
-http(P, "move", {"direction": "left", "pan_speed": 12}, "GET", PTZ + "ptzcmd&left&12&10")
+http(P, "move", {"direction": "left", "pan_speed": 12}, "GET", PTZ + "ptzcmd&left&12&10",
+     file="move-default-tilt-speed")
 http(P, "stop_move", {}, "GET", PTZ + "ptzcmd&ptzstop&1&1")
 http(P, "zoom_in", {"speed": 5}, "GET", PTZ + "ptzcmd&zoomin&5")
-http(P, "zoom_in", {"speed": 0}, "GET", PTZ + "ptzcmd&zoomin&0")
+http(P, "zoom_in", {"speed": 0}, "GET", PTZ + "ptzcmd&zoomin&0", file="zoom_in-speed-0")
 http(P, "zoom_out", {"speed": 7}, "GET", PTZ + "ptzcmd&zoomout&7")
 http(P, "stop_zoom", {}, "GET", PTZ + "ptzcmd&zoomstop&0")
 http(P, "zoom_to", {"speed": 5, "position": "3000"}, "GET", PTZ + "ptzcmd&zoomto&5&3000")
@@ -95,7 +96,8 @@ http(P, "preset_freeze", {"state": 2}, "GET", PTZ + "post_image_value&presetfree
 http(P, "tally_mode", {"state": 2}, "GET", PTZ + "post_image_value&tallymode&2")
 http(P, "tracking_overlay", {"enabled": True}, "GET", PTZ + "post_image_value&trackingoverlay&1", model="move-se")
 http(P, "tracking_start_location", {"location": "1"}, "GET", PTZ + "post_image_value&trackpreset&1")
-http(P, "tracking_start_location", {"location": "home"}, "GET", PTZ + "post_image_value&trackpreset&home")
+http(P, "tracking_start_location", {"location": "home"}, "GET", PTZ + "post_image_value&trackpreset&home",
+     file="tracking_start_location-home")
 http(P, "zoom_mode", {"mode": 2}, "GET", PTZ + "post_image_value&digitalzoom&2")
 
 # OSD (p.159-162; 2021 sheet p.1-2)
@@ -162,7 +164,8 @@ http(P, "ndi_multicast", {"enabled": True}, "GET", PRM + "post_ndi_info&multicas
 http(P, "device_name", {"name": "Conference_Room_Camera"}, "POST", PRM + "post_devinfo_conf&devname=Conference_Room_Camera",
      http_reply={"status": 200, "body": '{\n"Response": {\n"Result": "Success"\n}\n}'}, expect_result=ACK)
 http(P, "device_name", {"name": "Cam_2"}, "POST", PRM + "post_devinfo_conf&devname=Cam_2",
-     http_reply={"status": 200, "body": "{}"}, expect_result={"error": {"error": "device_error"}})
+     http_reply={"status": 200, "body": "{}"}, expect_result={"error": {"error": "device_error"}},
+     file="device_name-error")
 http(P, "dhcp", {"enabled": True}, "POST", PRM + "post_network_info_conf&dhcp=1")
 http(P, "ip_address", {"address": "192.168.1.100"}, "POST", PRM + "post_network_info_conf&ipaddr=192.168.1.100")
 http(P, "netmask", {"mask": "255.255.255.0"}, "POST", PRM + "post_network_info_conf&netmask=255.255.255.0")

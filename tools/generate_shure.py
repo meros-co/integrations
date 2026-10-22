@@ -61,12 +61,14 @@ class Spec:
         lines.append(f"    returns: {returns}")
         self.commands[name] = "\n".join(lines)
 
-    def vec(self, name, inp, wire, reply=None, result=None):
+    def vec(self, name, inp, wire, reply=None, result=None, file=None):
         extra = ""
         if reply is not None:
             extra += f", device_reply={q(reply)}"
         if result is not None:
             extra += f", expect_result={result}"
+        if file is not None:
+            extra += f", file={q(file)}"
         self.vectors.append(f"text(S, {q(name)}, {inp!r}, {q(wire)}{extra})")
 
 
@@ -306,7 +308,7 @@ def presets_etc(s, legacy_names, flash_get=True, defaults=True):
     s.cmd("recall_preset", "Recall a preset (SET PRESET), 1-10", {"preset": lab("{ type: int, min: 1, max: 10, required: true }", "Preset", "Preset number, 1 to 10, as on the device.")},
           "SET PRESET {preset:02d}", set_expect("PRESET"), "ack")
     s.vec("recall_preset", {"preset": 3}, "< SET PRESET 03 >", "< REP PRESET 03 >", ACK)
-    s.vec("recall_preset", {"preset": 10}, "< SET PRESET 10 >", "< REP ERR >", ERR)
+    s.vec("recall_preset", {"preset": 10}, "< SET PRESET 10 >", "< REP ERR >", ERR, file="recall_preset-error")
     if legacy_names:
         s.cmd("get_preset_name", "A preset's name (PRESET1-PRESET10)", {"preset": lab("{ type: int, min: 1, max: 10, required: true }", "Preset", "Preset number, 1 to 10, as on the device.")},
               "GET PRESET{preset}", "{ reply_contains: \" PRESET\", matches: \" PRESET\\\\d+ \\\\{?(.*?) *\\\\}? *>$\" }", "value")
@@ -774,7 +776,7 @@ def mxn5():
 for spec in (p300(), imx(), ani(), mxa(), mxn5()):
     (ROOT / "specs" / f"{spec.sid}.yaml").write_bytes(emit(spec).encode())
     vec = [f"S = {q(spec.sid)}", "# Generated with the spec from Shure's command-string documents (see the spec's sources)."] + spec.vectors
-    vec.append(f"text(S, \"get_mute\", {{'channel': 2}}, \"< GET {spec.chv(2)} AUDIO_MUTE >\", device_reply=\"< REP ERR >\", expect_result={ERR})")
+    vec.append(f"text(S, \"get_mute\", {{'channel': 2}}, \"< GET {spec.chv(2)} AUDIO_MUTE >\", device_reply=\"< REP ERR >\", expect_result={ERR}, file=\"get_mute-error\")")
     name_rep = f"< REP {spec.chv(1)} CHAN_NAME {{Podium     }} >" if "get_name" in spec.commands else ""
     name_state = ", 'name': 'Podium'" if "get_name" in spec.commands else ""
     vec.append(f"telemetry(S, \"mute-gain-name\", inbound=\"< REP {spec.chv(1)} AUDIO_MUTE ON >< REP {spec.chv(1)} AUDIO_GAIN_HI_RES 1040 >{name_rep}< REP PRESET 03 >\", expect_state={{'channels': {{'1': {{'mute': True, 'gain': -6.0{name_state}}}}}, 'device': {{'preset': 3}}}})")

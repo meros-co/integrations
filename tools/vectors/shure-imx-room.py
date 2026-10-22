@@ -41,5 +41,5 @@ text(S, "set_matrix_gain", {'input': 21, 'output': 17, 'gain_tenth_db': -35}, "<
 text(S, "get_matrix_gain", {'input': 21, 'output': 17}, "< GET 21 MATRIX_MXR_GAIN 17 >", device_reply="< REP 21 MATRIX_MXR_GAIN 17 1100 >", expect_result={'ok': {'kind': 'value', 'value': 0.0}})
 text(S, "increase_matrix_gain", {'input': 21, 'output': 17, 'step': 25}, "< SET 21 MATRIX_MXR_GAIN 17 inc 25 >", device_reply="< REP 21 MATRIX_MXR_GAIN 17 1125 >", expect_result={'ok': {'kind': 'ack'}})
 text(S, "decrease_matrix_gain", {'input': 21, 'output': 17, 'step': 25}, "< SET 21 MATRIX_MXR_GAIN 17 dec 25 >", device_reply="< REP 21 MATRIX_MXR_GAIN 17 1125 >", expect_result={'ok': {'kind': 'ack'}})
-text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}})
+text(S, "get_mute", {'channel': 2}, "< GET 02 AUDIO_MUTE >", device_reply="< REP ERR >", expect_result={'error': {'error': 'device_error'}}, file="get_mute-error")
 telemetry(S, "mute-gain-name", inbound="< REP 01 AUDIO_MUTE ON >< REP 01 AUDIO_GAIN_HI_RES 1040 >< REP PRESET 03 >", expect_state={'channels': {'1': {'mute': True, 'gain': -6.0}}, 'device': {'preset': 3}})

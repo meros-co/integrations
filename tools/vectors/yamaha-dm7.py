@@ -269,7 +269,10 @@ def _ydm7_vectors():
                 wire, sval = '"Vox 1"', "Vox 1"
             path = state.replace("{x}", str(xn)).replace("{y}", str(yn))
             tail = "" if wire.startswith('"') else f' "{wire}"'
-            telemetry(S, base, inbound=f"NOTIFY set {addr} {xw} {yw} {wire}{tail}\n", expect_state=nest(path, sval))
+            # Yamaha's own example of the same name keeps the plain file name.
+            file = {"file": f"telemetry-{base}-rendered"} if "telemetry-" + base in done else {}
+            telemetry(S, base, inbound=f"NOTIFY set {addr} {xw} {yw} {wire}{tail}\n", expect_state=nest(path, sval),
+                      **file)
     for args, kw in _ydm7_EXPLICIT.values():
         if args[0] == "text":
             text(S, *args[1:], **kw)

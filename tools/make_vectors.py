@@ -156,7 +156,8 @@ _pp_vectors()
 # Replies, from the document's own examples.
 http(PP, "version_get", {}, "GET", "/version",
      http_reply={"status": 200, "body": '{"name":"ProPresenter","major_version":7}'},
-     expect_result={"ok": {"kind": "value", "value": {"name": "ProPresenter", "major_version": 7}}})
+     expect_result={"ok": {"kind": "value", "value": {"name": "ProPresenter", "major_version": 7}}},
+     file="version_get-reply")
 telemetry(PP, "slide", inbound_http={"path": "/v1/status/slide", "body": json.dumps({
     "current": {"text": "Amazing Grace, how sweet the sound", "notes": "", "uuid": "1"},
     "next": {"text": "That saved a wretch like me", "notes": "Start quiet", "uuid": "2"}})},
@@ -185,19 +186,47 @@ for extra in sorted((ROOT / "tools" / "vectors").glob("*.py")):
     exec(compile(extra.read_text(encoding="utf-8"), str(extra), "exec"), globals())
 
 
-def main() -> None:
-    written = set()
-    for v in V:
-        # `file` names a second vector of one command (the same command on
-        # another model); it is not part of the vector.
+class DuplicateVector(Exception):
+    """Two vectors would be written to one file, so the earlier would be lost."""
+
+
+def vector_files(vectors: list[dict]) -> list[tuple[str, dict]]:
+    """Each vector's path under vectors/ and its body. `file` names a second
+    vector of one command (another case, or the same command on another
+    model); it is not part of the vector. Two vectors on one path (compared
+    without case, as Windows and macOS file systems do) are refused."""
+    out, seen, clashes = [], {}, []
+    for v in vectors:
         v = dict(v)
         name = v.pop("file", None) or (v["command"] if "command" in v else f"telemetry-{v['telemetry']}")
-        path = ROOT / "vectors" / v["spec"] / f"{name}.yaml"
+        rel = f"{v['spec']}/{name}.yaml"
+        if rel.lower() in seen:
+            clashes.append(f"vectors/{rel} is written by two vectors ({seen[rel.lower()]} and {_label(v)})")
+        else:
+            seen[rel.lower()] = _label(v)
+        out.append((rel, v))
+    if clashes:
+        raise DuplicateVector("\n".join(clashes)
+                              + "\ngive one of each pair a distinct file=\"<command>-<case>\"")
+    return out
+
+
+def _label(v: dict) -> str:
+    what = f"command {v['command']}" if "command" in v else f"telemetry {v['telemetry']}"
+    return f"{what}, input {json.dumps(v.get('input'))}" if "input" in v else what
+
+
+def main() -> None:
+    try:
+        files = vector_files(V)
+    except DuplicateVector as e:
+        raise SystemExit(f"make_vectors.py: nothing written; {e}")
+    for rel, v in files:
+        path = ROOT / "vectors" / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         body = yaml.safe_dump(v, sort_keys=False, allow_unicode=True, width=100)
         path.write_text(body, encoding="utf-8", newline="\n")
-        written.add(path)
-    print(f"wrote {len(written)} vectors")
+    print(f"wrote {len(files)} vectors")
 
 
 if __name__ == "__main__":

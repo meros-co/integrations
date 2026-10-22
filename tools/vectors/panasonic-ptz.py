@@ -450,12 +450,14 @@ http(PA, "get_stream_resolution", {}, "GET", "/cgi-bin/aw_ptz?cmd=%23RZL&res=1")
 http(PA, "camera_title", {'title': 'CAM 1'}, "GET", "/cgi-bin/aw_cam?cmd=OSJ%3A5C%3ACAM%201&res=1")
 http(PA, "get_camera_title", {}, "GET", "/cgi-bin/aw_cam?cmd=QSJ%3A5C&res=1")
 http(PA, "get_power", {}, "GET", "/cgi-bin/aw_ptz?cmd=%23O&res=1",
-     http_reply={"status": 200, "body": "p1"}, expect_result={"ok": {"kind": "value", "value": "1"}})
+     http_reply={"status": 200, "body": "p1"}, expect_result={"ok": {"kind": "value", "value": "1"}},
+     file="get_power-reply")
 http(PA, "color_bar", {"enabled": True}, "GET", "/cgi-bin/aw_cam?cmd=DCB%3A1&res=1",
-     http_reply={"status": 200, "body": "DCB:1"}, expect_result={"ok": {"kind": "ack"}})
+     http_reply={"status": 200, "body": "DCB:1"}, expect_result={"ok": {"kind": "ack"}}, file="color_bar-reply")
 # 42 dB (32) needs super gain on; without it the camera answers ER3 (chapter 7).
 http(PA, "gain", {"gain": "32"}, "GET", "/cgi-bin/aw_cam?cmd=OGU%3A32&res=1",
-     http_reply={"status": 200, "body": "ER3:OGU"}, expect_result={"error": {"error": "device_error"}})
+     http_reply={"status": 200, "body": "ER3:OGU"}, expect_result={"error": {"error": "device_error"}},
+     file="gain-error")
 # Telemetry: an update notification or a query reply carries the response
 # text; the same rules apply to both (chapter 5-2, 6-4).
 telemetry(PA, "power", inbound_http={"path": "/cgi-bin/aw_ptz?cmd=%23O&res=1", "body": "p1"},
@@ -473,7 +475,8 @@ http(PA, 'get_auto_iris_close_limit', {}, 'GET', '/cgi-bin/aw_cam?cmd=QSJ%3AC0&r
 http(PA, 'awb_color_temperature_up', {"steps": "1"}, 'GET', '/cgi-bin/aw_cam?cmd=OSJ%3A48%3A1&res=1')
 http(PA, 'awb_color_temperature_down', {"steps": "1"}, 'GET', '/cgi-bin/aw_cam?cmd=OSJ%3A49%3A1&res=1')
 http(PA, 'awb_color_temperature', {"kelvin": "00BB8"}, 'GET', '/cgi-bin/aw_cam?cmd=OSJ%3A4A%3A00BB8&res=1', model='aw-ue150')
-http(PA, 'awb_color_temperature', {"kelvin": "00BB8"}, 'GET', '/cgi-bin/aw_cam?cmd=OSJ%3A4A%3A00BB8%3A0&res=1', model='aw-ue160')
+http(PA, 'awb_color_temperature', {"kelvin": "00BB8"}, 'GET', '/cgi-bin/aw_cam?cmd=OSJ%3A4A%3A00BB8%3A0&res=1', model='aw-ue160',
+     file="awb_color_temperature-aw-ue160")
 http(PA, 'awb_r_gain', {"gain": "800"}, 'GET', '/cgi-bin/aw_cam?cmd=OSJ%3A4B%3A800&res=1')
 http(PA, 'get_awb_r_gain', {}, 'GET', '/cgi-bin/aw_cam?cmd=QSJ%3A4B&res=1')
 http(PA, 'awb_b_gain', {"gain": "800"}, 'GET', '/cgi-bin/aw_cam?cmd=OSJ%3A4C%3A800&res=1')
