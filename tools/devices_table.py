@@ -18,6 +18,7 @@ HEADER = "| Spec | Devices | Vendor group | Transport | Native | Models | Comman
 
 TRANSPORT = {
     "line-tcp": "Line/TCP",
+    "line-serial": "Line/serial (RS-232)",
     "line-udp": "Line/UDP",
     "osc-udp": "OSC/UDP",
     "osc-tcp": "OSC/TCP",

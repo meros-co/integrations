@@ -146,6 +146,8 @@ pub(crate) struct Services {
     pub(crate) http: HttpClients,
     /// Frames of every device's streams, outside the event queue.
     pub(crate) streams: Arc<crate::streams::Streams>,
+    /// Where serial ports are opened: the host's, or a test's in-memory ones.
+    pub(crate) serial: Arc<dyn crate::serial::SerialPorts>,
 }
 
 /// What any consumer can read about a device without asking it.
@@ -679,6 +681,19 @@ impl Session {
                         generation,
                         tunnel,
                         self.ssh.clone(),
+                        self.inbound_tx.clone(),
+                    );
+                    self.tcp.insert(socket, connection);
+                }
+                Action::SerialOpen { socket, port } => {
+                    self.close_tcp(socket);
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let connection = crate::serial::spawn(
+                        socket,
+                        generation,
+                        port,
+                        self.services.serial.clone(),
                         self.inbound_tx.clone(),
                     );
                     self.tcp.insert(socket, connection);
@@ -1329,6 +1344,7 @@ mod tests {
             shared_tcp: Default::default(),
             http: crate::http::HttpClients::new().unwrap(),
             streams: Default::default(),
+            serial: Arc::new(crate::serial::HostPorts),
         });
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: crate::module::Connection::Connecting,

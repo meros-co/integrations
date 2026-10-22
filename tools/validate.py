@@ -425,11 +425,11 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                 errors += check_template("text", template, params, settings,
                                          f"commands.{name}.expect.reply_json")
         if "reply_contains" in expect_:
-            if transport_type not in ("line-tcp", "line-udp"):
+            if transport_type not in ("line-tcp", "line-serial", "line-udp"):
                 errors.append(f"commands.{name}: expect.reply_contains needs a line transport")
             errors += check_template("text", expect_["reply_contains"], params, settings,
                                      f"commands.{name}.expect.reply_contains")
-        if expect_.get("replies", 1) != 1 and transport_type not in ("line-tcp", "line-udp"):
+        if expect_.get("replies", 1) != 1 and transport_type not in ("line-tcp", "line-serial", "line-udp"):
             errors.append(f"commands.{name}: expect.replies needs a line transport")
         if "convert" in expect_:
             if expect_["convert"] not in conversions:
@@ -630,8 +630,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             if conditional and conditional not in settings:
                 errors.append(f"on_connect[{i}]: when_set names unknown setting '{conditional}'")
             transport_type = (doc.get("transport") or {}).get("type")
-            if "after_prompt" in step and transport_type != "line-tcp":
-                errors.append(f"on_connect[{i}]: after_prompt needs a line-tcp transport")
+            if "after_prompt" in step and transport_type not in ("line-tcp", "line-serial"):
+                errors.append(f"on_connect[{i}]: after_prompt needs a line-tcp or line-serial transport")
             for key in ("refused", "accepted"):
                 if key in step:
                     try:
@@ -737,7 +737,7 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
                 if bad:
                     errors.append(f"{where}[{i}]: models names unknown model(s) {sorted(bad)}")
             if (isinstance(item, dict) and "message" in item and where != "telemetry.updates"
-                    and transport.get("type") not in ("line-tcp", "line-udp", "ws")):
+                    and transport.get("type") not in ("line-tcp", "line-serial", "line-udp", "ws")):
                 errors.append(f"{where}[{i}]: {{models, message}} is for line and websocket transports")
             if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
                 errors.append(f"{where}[{i}]: session applies to http requests")
@@ -819,7 +819,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
 
     # JSON messages arrive on a websocket, an event stream, or as the lines of
     # a line transport; HTTP replies are matched with `path`.
-    has_json = (transport_type in ("ws", "line-tcp", "line-udp")
+    has_json = (transport_type in ("ws", "line-tcp", "line-serial", "line-udp")
                 or "websocket" in telemetry or "sse" in telemetry)
     if "sse" in telemetry and transport_type != "http":
         errors.append("telemetry.sse needs an http transport")
@@ -845,8 +845,8 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         errors.append("telemetry.updates: at most one quiet_ms rule")
     for i in quiet:
         rule = telemetry["updates"][i]
-        if transport_type not in ("line-tcp", "osc-tcp", "ws"):
-            errors.append(f"telemetry.updates[{i}]: quiet_ms needs a line-tcp, osc-tcp or ws transport")
+        if transport_type not in ("line-tcp", "line-serial", "osc-tcp", "ws"):
+            errors.append(f"telemetry.updates[{i}]: quiet_ms needs a line-tcp, line-serial, osc-tcp or ws transport")
         others = sorted(k for k in ("match", "address", "header", "path", "json_match",
                                     "then_send", "replace") if k in rule)
         if others:
@@ -867,7 +867,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 re.compile(asked)
             except re.error as e:
                 errors.append(f"{where}.request_match: {e}")
-            if "match" not in rule or transport_type not in ("line-tcp", "line-udp"):
+            if "match" not in rule or transport_type not in ("line-tcp", "line-serial", "line-udp"):
                 errors.append(f"{where}: a request_match regex goes with match, on a line transport")
         if "match_each" in rule and ("match" not in rule or "path" in rule) and "address" not in rule:
             errors.append(f"{where}: match_each reads the rest of a message a match rule matched, "
@@ -979,7 +979,10 @@ def port_checks(doc: dict) -> list[str]:
             errors.append(f"ports[{i}]: a control port with no default needs a note saying so")
     t = doc.get("transport")
     if t is not None:
-        if t.get("port") not in [e["port"] for e in control]:
+        if t.get("type") == "line-serial":
+            if not any(e["protocol"] == "serial" for e in control):
+                errors.append("ports: a line-serial transport needs a serial control entry")
+        elif t.get("port") not in [e["port"] for e in control]:
             errors.append(f"ports: the transport's port {t.get('port')} is not a control port")
         listen = t.get("listen_port")
         if isinstance(listen, dict) and not any(e.get("setting") == listen["setting"] for e in ports):
@@ -1002,6 +1005,61 @@ def port_checks(doc: dict) -> list[str]:
         tel = doc.get("telemetry") or {}
         if ("websocket" in tel or "sse" in tel) and not any(e["role"] == "push" for e in ports):
             errors.append("ports: the push channel has no push entry")
+    return errors
+
+
+# The settings a device on a serial port declares (SPEC.md §2, line-serial),
+# each a type and the values the core can open a port with.
+SERIAL_SETTINGS = ("serial_port", "baud_rate", "data_bits", "parity", "stop_bits", "flow_control")
+SERIAL_CHOICES = {"parity": {"none", "odd", "even"}, "flow_control": {"none", "xon-xoff", "rts-cts"}}
+SERIAL_RANGES = {"data_bits": (5, 8), "stop_bits": (1, 2)}
+
+
+def serial_checks(doc: dict) -> list[str]:
+    """A serial port is named by the serial_port setting, and its line
+    settings are declared with the device's defaults (SPEC.md §2)."""
+    errors = []
+    ports = doc.get("ports") or []
+    entries = [e for e in ports if e["protocol"] == "serial"]
+    line_serial = (doc.get("transport") or {}).get("type") == "line-serial"
+    for i, e in enumerate(ports):
+        if e["protocol"] != "serial":
+            continue
+        if e["port"] is not None:
+            errors.append(f"ports[{i}]: a serial port has no number (port: null)")
+        if e.get("setting") != "serial_port":
+            errors.append(f"ports[{i}]: a serial port's setting is serial_port")
+        if e["role"] != "control" or e.get("listener", "device") != "device":
+            errors.append(f"ports[{i}]: a serial port is a control entry the device listens on")
+    if not entries:
+        return errors
+    settings = doc.get("settings") or {}
+    for name in SERIAL_SETTINGS:
+        s = settings.get(name)
+        if s is None:
+            errors.append(f"settings.{name}: a device on a serial port declares it")
+            continue
+        kind = s.get("type")
+        if name != "serial_port" and "default" not in s:
+            errors.append(f"settings.{name}: needs the device's default")
+        if name == "serial_port":
+            if kind != "string":
+                errors.append("settings.serial_port: must be a string")
+            if line_serial and not s.get("required"):
+                errors.append("settings.serial_port: must be required on a line-serial transport")
+        elif name == "baud_rate":
+            ok = (kind == "int" and s.get("min", 1) >= 1) or (
+                kind == "enum" and all(str(v).isdigit() and int(v) > 0 for v in s.get("values", [])))
+            if not ok:
+                errors.append("settings.baud_rate: an int of 1 or more, or an enum of digits")
+        elif name in SERIAL_RANGES:
+            low, high = SERIAL_RANGES[name]
+            if kind != "int" or s.get("min", 0) < low or s.get("max", 99) > high:
+                errors.append(f"settings.{name}: an int within {low} to {high} (give min and max)")
+        else:
+            bad = set(s.get("values") or []) - SERIAL_CHOICES[name]
+            if kind != "enum" or bad:
+                errors.append(f"settings.{name}: an enum of {sorted(SERIAL_CHOICES[name])}")
     return errors
 
 
@@ -1057,7 +1115,7 @@ def main() -> int:
             print(f"    {exc.message}")
             continue
 
-        errors = cross_field_checks(doc, rel) + port_checks(doc) + label_checks(doc)
+        errors = cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + label_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

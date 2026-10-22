@@ -191,6 +191,161 @@ pub struct TlsTarget {
     pub accept_invalid_certs: bool,
 }
 
+/// A serial port a module asks the session to open: RS-232, RS-422 or a USB
+/// serial adapter on the host running the core.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SerialPort {
+    /// The port's name: `COM3` on Windows, a device path such as
+    /// `/dev/ttyUSB0` (Linux) or `/dev/cu.usbserial-1420` (macOS) elsewhere.
+    pub path: String,
+    /// Bits per second.
+    pub baud_rate: u32,
+    /// Bits per character, 5 to 8.
+    pub data_bits: u8,
+    pub parity: Parity,
+    /// 1 or 2.
+    pub stop_bits: u8,
+    pub flow_control: FlowControl,
+}
+
+/// A serial port's parity bit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Parity {
+    None,
+    Odd,
+    Even,
+}
+
+/// How a serial port paces what is sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowControl {
+    None,
+    /// Software flow control: the XON (11H) and XOFF (13H) characters.
+    XonXoff,
+    /// Hardware flow control on the RTS and CTS lines.
+    RtsCts,
+}
+
+/// The serial settings every spec on a serial port declares, by name
+/// (SPEC.md §2, `line-serial`): the port, then its line settings.
+pub const SERIAL_SETTINGS: [&str; 6] = [
+    "serial_port",
+    "baud_rate",
+    "data_bits",
+    "parity",
+    "stop_bits",
+    "flow_control",
+];
+
+impl SerialPort {
+    /// The port and line settings from a device's settings, by the names in
+    /// [`SERIAL_SETTINGS`]. A line setting left out is 9600 bit/s, 8 data
+    /// bits, no parity, 1 stop bit and no flow control; `baud_rate` may be an
+    /// integer or an enum of digits. The port has no default.
+    pub fn from_settings(settings: &crate::catalog::Params) -> Result<SerialPort, String> {
+        use serde_json::Value;
+        let path = settings
+            .get("serial_port")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .ok_or("no serial port is set: give the serial_port setting")?
+            .to_string();
+        let int = |name: &str, default: u64| -> Result<u64, String> {
+            match settings.get(name) {
+                None | Some(Value::Null) => Ok(default),
+                Some(Value::String(s)) => s
+                    .trim()
+                    .parse()
+                    .map_err(|_| format!("{name} '{s}' is not a number")),
+                Some(v) => v.as_u64().ok_or(format!("{name} {v} is not a number")),
+            }
+        };
+        let baud_rate = int("baud_rate", 9600)?;
+        if !(1..=u32::MAX as u64).contains(&baud_rate) {
+            return Err(format!("baud_rate {baud_rate} is out of range"));
+        }
+        let data_bits = int("data_bits", 8)?;
+        if !(5..=8).contains(&data_bits) {
+            return Err(format!("data_bits {data_bits} is not 5 to 8"));
+        }
+        let stop_bits = int("stop_bits", 1)?;
+        if !(1..=2).contains(&stop_bits) {
+            return Err(format!("stop_bits {stop_bits} is not 1 or 2"));
+        }
+        let text = |name: &str, default: &'static str| -> String {
+            settings
+                .get(name)
+                .and_then(Value::as_str)
+                .unwrap_or(default)
+                .to_string()
+        };
+        let parity = match text("parity", "none").as_str() {
+            "none" => Parity::None,
+            "odd" => Parity::Odd,
+            "even" => Parity::Even,
+            other => return Err(format!("parity '{other}' is not none, odd or even")),
+        };
+        let flow_control = match text("flow_control", "none").as_str() {
+            "none" => FlowControl::None,
+            "xon-xoff" => FlowControl::XonXoff,
+            "rts-cts" => FlowControl::RtsCts,
+            other => {
+                return Err(format!(
+                    "flow_control '{other}' is not none, xon-xoff or rts-cts"
+                ))
+            }
+        };
+        Ok(SerialPort {
+            path,
+            baud_rate: baud_rate as u32,
+            data_bits: data_bits as u8,
+            parity,
+            stop_bits: stop_bits as u8,
+            flow_control,
+        })
+    }
+}
+
+/// Where a native module that offers both reaches its device: a TCP
+/// connection, or a serial port of the host. Both are reported through
+/// [`Module::tcp`], so the module's protocol code is the same for either.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Link {
+    Tcp(std::net::SocketAddr),
+    Serial(SerialPort),
+}
+
+impl Link {
+    /// The link a device's `link` setting chooses: `tcp` (the default) to
+    /// the device's host and port, `serial_port` and its line settings for
+    /// `serial`. A TCP link needs a host: a device opened without one (as a
+    /// device on a serial port may be) is refused here.
+    pub fn from_settings(ctx: &OpenContext, default_port: u16) -> Result<Link, String> {
+        match ctx.settings.get("link").and_then(serde_json::Value::as_str) {
+            None | Some("tcp") => {
+                if ctx.host.is_unspecified() {
+                    return Err("a TCP link needs the device's host".into());
+                }
+                Ok(Link::Tcp(std::net::SocketAddr::new(
+                    ctx.host,
+                    ctx.port.unwrap_or(default_port),
+                )))
+            }
+            Some("serial") => Ok(Link::Serial(SerialPort::from_settings(&ctx.settings)?)),
+            Some(other) => Err(format!("link '{other}' is not tcp or serial")),
+        }
+    }
+
+    /// Open it under `socket`, replacing what was open there.
+    pub fn open(&self, cx: &mut Cx, socket: Key) {
+        match self {
+            Link::Tcp(to) => cx.tcp_open(socket, *to),
+            Link::Serial(port) => cx.serial_open(socket, port.clone()),
+        }
+    }
+}
+
 /// A username and password.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Credentials {
@@ -411,6 +566,16 @@ pub enum Action {
     TcpOpenTls {
         socket: Key,
         target: TlsTarget,
+    },
+    /// Open a serial port, replacing any connection open under this key.
+    /// Reported like `TcpOpen`: `Connected` once the port is open, `Data`
+    /// as bytes arrive, and `Closed` when it cannot be opened or fails (a
+    /// USB adapter unplugged); `TcpSend`, `TcpSendFile` and `TcpClose` work
+    /// on it as on a connection. A port that cannot be opened closes with a
+    /// reason starting `serial:`.
+    SerialOpen {
+        socket: Key,
+        port: SerialPort,
     },
     TcpSend {
         socket: Key,
@@ -689,6 +854,11 @@ impl Cx {
             key,
             task: Task::new(work),
         });
+    }
+
+    /// Open a serial port; see [`Action::SerialOpen`].
+    pub fn serial_open(&mut self, socket: Key, port: SerialPort) {
+        self.push(Action::SerialOpen { socket, port });
     }
 
     /// Open a TCP stream through an SSH tunnel; see [`Action::TcpOpenSsh`].
