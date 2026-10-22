@@ -134,7 +134,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-panasonic", &["panasonic-ptz"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
-    ("vendor-probel", &["probel-swp08"]),
+    ("vendor-probel", &["probel-swp02", "probel-swp08"]),
     ("vendor-ptzoptics", &["ptzoptics"]),
     ("vendor-qsc", &["qsys", "qsys-ecp"]),
     (
@@ -147,10 +147,13 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-roland",
         &[
             "roland-p20hd",
+            "roland-v1200hd",
             "roland-v160hd",
             "roland-v600uhd",
             "roland-v60hd",
             "roland-vr400uhd",
+            "roland-vr4hd",
+            "roland-xs1hd",
             "roland-xs42h",
             "roland-xs62s",
             "roland-xs80h",

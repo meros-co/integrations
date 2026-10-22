@@ -66,6 +66,9 @@ mod oauth_session_tests;
 mod oauth_validate_session_tests;
 #[cfg(feature = "pjlink")]
 mod pjlink_discovery;
+mod serial;
+#[cfg(test)]
+mod serial_session_tests;
 mod session;
 #[cfg(feature = "sony-camera")]
 mod ssdp;
@@ -117,7 +120,10 @@ pub struct OpenRequest {
     /// keep the name, so a TLS certificate is checked against it. May be
     /// empty or left out for an integration on which only the core listens
     /// (every one of its `ports` is `listener: core`), such as `osc-listener`,
-    /// which hears any sender; it is then `0.0.0.0`.
+    /// which hears any sender; it is then `0.0.0.0`. Likewise for a device
+    /// on a serial port of the host (a `serial` entry in its `ports`): the
+    /// port is named in its settings, and a module that can also use the
+    /// network refuses to do so without a host.
     #[serde(default)]
     pub host: String,
     /// The device's port, when it is not the protocol's default: many devices
@@ -331,6 +337,7 @@ impl Core {
                 shared_tcp: Default::default(),
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
                 streams: Default::default(),
+                serial: Arc::new(serial::HostPorts),
             }),
             closing: AtomicBool::new(false),
             in_flight: Arc::new(AtomicUsize::new(0)),
@@ -344,6 +351,16 @@ impl Core {
     pub fn discover(&self, request: DiscoverRequest) -> Result<(), String> {
         let _runtime = self.runtime().enter();
         self.discovery.handle(&self.services, request)
+    }
+
+    /// This core with its serial ports opened through `ports`, for tests
+    /// that play a device on an in-memory port.
+    #[cfg(test)]
+    pub(crate) fn with_serial_ports(mut self, ports: Arc<dyn serial::SerialPorts>) -> Core {
+        Arc::get_mut(&mut self.services)
+            .expect("set before any device is opened")
+            .serial = ports;
+        self
     }
 
     /// The discovery protocols this core runs: those that find a device in
@@ -385,11 +402,12 @@ impl Core {
             })?;
         let settings = catalog::validate(&spec.settings, &request.settings)
             .map_err(|message| OpenError::InvalidSettings { message })?;
-        let host = if request.host.trim().is_empty() && spec.core_listens_only() {
-            IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
-        } else {
-            resolve(&request.host)?
-        };
+        let host =
+            if request.host.trim().is_empty() && (spec.core_listens_only() || spec.uses_serial()) {
+                IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
+            } else {
+                resolve(&request.host)?
+            };
 
         let context = module::OpenContext {
             host,

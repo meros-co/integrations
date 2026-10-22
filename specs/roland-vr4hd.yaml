@@ -1,0 +1,364 @@
+spec: 1
+id: roland-vr4hd
+name: Roland VR-4HD (RS-232 control)
+vendor: Roland
+category: switcher
+
+# The VR-4HD's RS-232 connector takes the "stx" + three letters + optional
+# ":" and comma-separated numbers + ";" grammar of the other Roland switchers
+# (roland-v60hd), acknowledged by the single byte ACK (06H). It has no
+# network control. The unit sends its PinP, key, selected-channel and USB
+# status by itself whenever they change, and on request (QPI, QDK, QPG, QUB);
+# those requests, and VER, are answered by their frame with no ACK.
+source:
+  - title: "VR-4HD Reference Manual, Version 2.100 and later, edition 01 (© 2021)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/VR-4HD_reference_v21_eng01_W.pdf
+    note: >
+      Manufacturer document. Setup menu: REMOTE RS-232 OFF (default) or ON,
+      SYSTEM BAUDRATE 9600, 19200, 38400 or 115200 (default, in bold) p.5;
+      RS-232 connector specifications (no parity, 8 data bits, 1 stop bit,
+      ASCII, XON/XOFF) and command format (stx, ACK 06H, Xon 11H/Xoff 13H,
+      wait for ACK) p.21; received commands p.22; sent commands (ACK, none
+      for VER/QPI/QDK/QPG/QUB, ERR:0/4/5, VER:VR-4HD,a, QPI, QDK, QPG and QUB
+      sent on change and on request) p.23.
+
+transport:
+  type: line-serial
+  # Sent as STX, the command, then ";" (p.21), with no line ending.
+  framing: delimited
+  open: "\u0002"
+  close: ";"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Replies are delimited by ";" or are the bare ACK byte.
+  reply_framing: terminated
+  reply_terminators: [";", "\u0006"]
+  # A command is answered ACK or ERR:a; VER and the status requests by
+  # their frame (p.23). The status frames are also pushed on any change, so
+  # every command names the reply it waits for (reply_contains), and a
+  # pushed frame is never taken for another command's answer.
+  reply_match: '^[\x02\x11\x13]*(\x06|ERR:[0-9]+;|VER:|QPI:|QDK:|QPG:|QUB:)'
+  error_match: '^[\x02\x11\x13]*ERR:[0-9]+;'
+  probe: "VER"
+
+settings:
+  serial_port:
+    type: string
+    required: true
+    max_length: 256
+    label: Serial port
+    description: "The host's serial port wired to the RS-232 connector: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS."
+  baud_rate:
+    type: enum
+    values: ["9600", "19200", "38400", "115200"]
+    default: "115200"
+    label: Baud rate
+    description: "The RS-232 connector's speed in bits per second, as set in the unit's setup menu (SYSTEM BAUDRATE); 115200 by default."
+  data_bits:
+    type: int
+    min: 8
+    max: 8
+    default: 8
+    label: Data bits
+    description: "Bits per character; the VR-4HD uses 8."
+  parity:
+    type: enum
+    values: [none]
+    default: none
+    label: Parity
+    description: "The VR-4HD uses no parity."
+  stop_bits:
+    type: int
+    min: 1
+    max: 1
+    default: 1
+    label: Stop bits
+    description: "The VR-4HD uses 1 stop bit."
+  flow_control:
+    type: enum
+    values: [xon-xoff, none]
+    default: xon-xoff
+    label: Flow control
+    description: "XON/XOFF, as the VR-4HD documents; none ignores its XOFF."
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, note: "RS-232 connector, D-sub 9-pin (male); a crossover cable to the host, and REMOTE RS-232 set to ON on the unit" }
+
+models:
+  - id: vr-4hd
+    name: Roland VR-4HD HD AV Mixer
+    supports:
+      - select_channel
+      - set_input4_connector
+      - set_transition
+      - set_transition_time
+      - set_pinp
+      - set_pinp_channel
+      - set_key
+      - set_key_source
+      - set_output_fade
+      - set_freeze
+      - set_audio_input_level
+      - set_audio_pair_level
+      - set_hdmi_level
+      - set_usb_level
+      - set_main_level
+      - recall_memory
+      - reset_usb
+      - get_version
+      - get_pinp
+      - get_key
+      - get_channel
+      - get_usb
+    verification: none
+    notes: >
+      Four video channels (INPUT 4 on HDMI, RGB or composite), audio
+      channels 1-4, 5/6 and 7/8, HDMI 1-4 and USB inputs, 8 memories.
+      Commands from Reference Manual version 2.100.
+
+commands:
+  select_channel:
+    summary: "Select the video input channel 1-4 (PGM)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "Video channel 1 to 4." }
+    send: "PGM:{channel:-1}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_input4_connector:
+    summary: "Set the connector for INPUT 4: 0 HDMI, 1 RGB, 2 composite (IS4)"
+    params:
+      connector: { type: int, min: 0, max: 2, required: true, label: Connector, description: "0 HDMI, 1 RGB, 2 CVBS (composite)." }
+    send: "IS4:{connector}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_transition:
+    summary: "Specify the transition effect: 0 CUT, 1 MIX, 2 WIPE (TRS)"
+    params:
+      effect: { type: int, min: 0, max: 2, required: true, label: Transition effect, description: "0 CUT, 1 MIX, 2 WIPE." }
+    send: "TRS:{effect}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_transition_time:
+    summary: "Set the transition time, 0-40 tenths of a second (TIM)"
+    params:
+      time: { type: int, min: 0, max: 40, required: true, label: Transition time, description: "Transition time in tenths of a second, 0 to 40 (0.0 to 4.0 s)." }
+    send: "TIM:{time}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_pinp:
+    summary: "Turn PinP on or off (PIP)"
+    params:
+      enabled: { type: bool, required: true, label: PinP, description: "True turns PinP on, false off." }
+    send: "PIP:{enabled:bool01}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_pinp_channel:
+    summary: "Select the video channel 1-4 for the PinP inset (PIS)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true, label: Inset channel, description: "Video channel 1 to 4 shown in the PinP inset." }
+    send: "PIS:{channel:-1}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_key:
+    summary: "Turn key compositing on or off (DSK)"
+    params:
+      enabled: { type: bool, required: true, label: Key, description: "True turns key compositing on, false off." }
+    send: "DSK:{enabled:bool01}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_key_source:
+    summary: "Select the key compositing source: 0 OFF, or channel 1-4 (DSS)"
+    params:
+      channel: { type: int, min: 0, max: 4, required: true, label: Key source, description: "0 OFF, or the video channel 1 to 4 used as the key source." }
+    send: "DSS:{channel:-1}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_output_fade:
+    summary: "Turn the output fade on or off (FDE)"
+    params:
+      enabled: { type: bool, required: true, label: Output fade, description: "True fades the output out, false back in." }
+    send: "FDE:{enabled:bool01}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_freeze:
+    summary: "Turn freeze on or off (FRZ)"
+    params:
+      enabled: { type: bool, required: true, label: Freeze, description: "True freezes the video, false releases it." }
+    send: "FRZ:{enabled:bool01}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_audio_input_level:
+    summary: "Adjust the input level of audio channel 1-4, 0-127 (LM1-LM4)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true, label: Audio channel, description: "Audio channel 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "Input level, 0 to 127." }
+    send: "LM{channel}:{level}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_audio_pair_level:
+    summary: "Adjust the input level of audio channel 5/6 or 7/8, 0-127 (LS1, LS2)"
+    params:
+      pair: { type: int, min: 1, max: 2, required: true, label: Channel pair, description: "1 channel 5/6, 2 channel 7/8." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "Input level, 0 to 127." }
+    send: "LS{pair}:{level}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_hdmi_level:
+    summary: "Adjust the input level of HDMI 1-4 audio, 0-127 (LH1-LH4)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true, label: HDMI input, description: "HDMI input 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "Input level, 0 to 127." }
+    send: "LH{input}:{level}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_usb_level:
+    summary: "Adjust the input level of audio from USB, 0-127 (LUB)"
+    params:
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "USB audio input level, 0 to 127." }
+    send: "LUB:{level}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  set_main_level:
+    summary: "Adjust the level of the main output audio, 0-127 (LMN)"
+    params:
+      level: { type: int, min: 0, max: 127, required: true, label: Level, description: "Main output level, 0 to 127." }
+    send: "LMN:{level}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  recall_memory:
+    summary: "Load memory 1-8 (MEM)"
+    params:
+      memory: { type: int, min: 1, max: 8, required: true, label: Memory, description: "The memory to load, 1 to 8." }
+    send: "MEM:{memory:-1}"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  reset_usb:
+    summary: "Reset the USB connection (RUB)"
+    send: "RUB"
+    expect: { reply_contains: "\u0006", contains: "\u0006" }
+    returns: ack
+
+  get_version:
+    summary: "Model name and version; answered by the VER frame alone (VER)"
+    send: "VER"
+    expect: { reply_contains: "VER:", matches: 'VER:[^,;]*,([^;]+);' }
+    returns: value
+
+  get_pinp:
+    summary: "PinP status as 'on,channel': on 0 or 1, inset channel 0-3 on the wire (QPI)"
+    send: "QPI"
+    expect: { reply_contains: "QPI:", matches: 'QPI:([^;]*);' }
+    returns: value
+
+  get_key:
+    summary: "Key compositing status as 'on,source': on 0 or 1, source -1 (OFF) or 0-3 on the wire (QDK)"
+    send: "QDK"
+    expect: { reply_contains: "QDK:", matches: 'QDK:([^;]*);' }
+    returns: value
+
+  get_channel:
+    summary: "The selected video input channel, 0-3 on the wire (QPG)"
+    send: "QPG"
+    expect: { reply_contains: "QPG:", matches: 'QPG:([^;]*);' }
+    returns: value
+
+  get_usb:
+    summary: "USB connection status: 0 unconnected, 2 USB 2.0, 3 USB 3.0 (QUB)"
+    send: "QUB"
+    expect: { reply_contains: "QUB:", matches: 'QUB:([^;]*);' }
+    returns: value
+
+telemetry:
+  # The four status frames come on every change (p.23); each is asked
+  # once on connecting.
+  subscribe:
+    send: ["VER"]
+  poll:
+    send: ["QPG", "QPI", "QDK", "QUB"]
+  updates:
+    - match: '^[\x02\x11\x13]*QPG:(\d+);'
+      state: { "program.channel": "{1:+1}" }
+    - match: '^[\x02\x11\x13]*QPI:(\d+),(\d+);'
+      state:
+        "pinp.on": { value: "{1}", map: { "1": true, "0": false } }
+        "pinp.channel": "{2:+1}"
+    - match: '^[\x02\x11\x13]*QDK:(\d+),(-?\d+);'
+      state:
+        "key.on": { value: "{1}", map: { "1": true, "0": false } }
+        "key.source": "{2:+1}"
+    - match: '^[\x02\x11\x13]*QUB:(\d+);'
+      state: { "usb.connection": "{1}" }
+    - match: '^[\x02\x11\x13]*VER:([^,;]*),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  program.channel: { type: int, description: "Selected video input channel, 1-4" }
+  pinp.on:         { type: bool, description: "PinP on" }
+  pinp.channel:    { type: int, description: "Video channel in the PinP inset, 1-4" }
+  key.on:          { type: bool, description: "Key compositing on" }
+  key.source:      { type: int, description: "Key compositing source channel, 1-4, or 0 for OFF" }
+  usb.connection:  { type: int, description: "USB connection: 0 unconnected, 2 USB 2.0, 3 USB 3.0" }
+  device.model:    { type: string, description: "Model name from VER (VR-4HD)" }
+  device.version:  { type: string, description: "Version from VER" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_memory loads a whole saved setting at once and cannot be undone
+      from here.
+
+  - models: [all]
+    severity: warning
+    text: >
+      RS-232 commands are taken only with REMOTE RS-232 set to ON in the
+      setup menu, which is OFF from the factory (p.5); until then the unit
+      answers nothing and stays unconfirmed. The speed is set there too
+      (SYSTEM BAUDRATE, 115200 from the factory) and must match baud_rate.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Wait for ACK after each command before sending the next (p.21); the
+      queue does this. ACK is the single byte 06H with no line ending and
+      data replies end in ";", both handled by the reply terminators. VER,
+      QPI, QDK, QPG and QUB are answered by their frame and no ACK (p.23).
+      ERR:0 syntax error, ERR:4 invalid value, ERR:5 out of range. XON (11H)
+      and XOFF (13H) may appear before a frame.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire numbers are 0-based; channels 1-4 and memories 1-8 here are
+      converted, and the key source's OFF (-1 on the wire) is 0. The get_*
+      commands return the frame's values as the wire gives them; state holds
+      them converted.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the only status the unit reports is the selected channel,
+      PinP (on and inset channel), key compositing (on and source), the USB
+      connection and the version (p.23). Nothing reads back the INPUT 4
+      connector, the transition effect and time, the output fade, freeze,
+      the audio levels or the memory last loaded; state does not keep them.
+      The parameter map of the reference manual's MIDI section is reached
+      over MIDI only, not RS-232.

@@ -1,7 +1,8 @@
-//! Generic TCP client or UDP socket: send text or bytes to a device the
-//! catalogue does not cover yet, and see what comes back.
+//! Generic TCP client, UDP socket or serial port: send text or bytes to a
+//! device the catalogue does not cover yet, and see what comes back.
 //!
-//! Nothing here is specific to a device. The operator chooses TCP or UDP, how
+//! Nothing here is specific to a device. The operator chooses TCP, UDP or a
+//! serial port of the host (RS-232, RS-422, a USB adapter), how
 //! received data is split into messages, and what is appended to sent text.
 //!
 //! - Text to send may carry escapes for bytes a parameter cannot hold (the
@@ -24,7 +25,10 @@
 //! - TCP connects when the device is opened and reconnects with backoff (1 s
 //!   doubling to 30 s) whenever the connection fails or the device closes it.
 //!   UDP has no connection: the device is reported `unmonitored`, and alive
-//!   whenever it sends something.
+//!   whenever it sends something. A serial port is a stream like TCP: opened
+//!   with the `serial_port` setting and its line settings, it is the
+//!   connection, and a port that fails (an adapter unplugged) is reopened with
+//!   the same backoff. Its device needs no host.
 //! - Opening for commands only changes nothing: the module never asks a
 //!   device for anything commands did not. The time from a `request` to the
 //!   message answering it is reported as the device's latency.
@@ -38,7 +42,7 @@ use serde_json::{json, Value};
 use crate::catalog::Params;
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
-    Outcome, TcpInput,
+    Outcome, SerialPort, TcpInput,
 };
 
 const SOCKET: Key = "generic";
@@ -216,10 +220,11 @@ impl Framer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Protocol {
     Tcp,
     Udp,
+    Serial(SerialPort),
 }
 
 #[derive(Debug)]
@@ -251,14 +256,23 @@ fn str_setting<'a>(s: &'a Params, name: &str, default: &'a str) -> &'a str {
 
 impl GenericTcpUdp {
     pub(crate) fn new(ctx: OpenContext) -> Result<GenericTcpUdp, String> {
-        let port = ctx
-            .port
-            .ok_or("a generic TCP/UDP device has no standard port: give the device's port")?;
         let s = &ctx.settings;
         let protocol = match str_setting(s, "protocol", "tcp") {
             "tcp" => Protocol::Tcp,
             "udp" => Protocol::Udp,
+            "serial" => Protocol::Serial(SerialPort::from_settings(s)?),
             other => return Err(format!("unknown protocol '{other}'")),
+        };
+        let port = match protocol {
+            Protocol::Serial(_) => 0,
+            _ => {
+                if ctx.host.is_unspecified() {
+                    return Err("a TCP or UDP device needs its host".into());
+                }
+                ctx.port.ok_or(
+                    "a generic TCP/UDP device has no standard port: give the device's port",
+                )?
+            }
         };
         let custom = str_setting(s, "custom_terminator", "");
         let split = match str_setting(s, "terminator", "any") {
@@ -278,7 +292,7 @@ impl GenericTcpUdp {
             .get("listen_port")
             .and_then(Value::as_u64)
             .map(|p| p as u16);
-        if listen_port.is_some() && protocol == Protocol::Tcp {
+        if listen_port.is_some() && protocol != Protocol::Udp {
             return Err("listen_port applies to UDP only".into());
         }
         let recent_size = s
@@ -301,10 +315,14 @@ impl GenericTcpUdp {
     }
 
     fn open(&mut self, cx: &mut Cx) {
-        match self.protocol {
+        match &self.protocol {
             Protocol::Tcp => {
                 cx.connection(Connection::Connecting);
                 cx.tcp_open(SOCKET, self.device);
+            }
+            Protocol::Serial(port) => {
+                cx.connection(Connection::Connecting);
+                cx.serial_open(SOCKET, port.clone());
             }
             Protocol::Udp => {
                 let bind = self.listen_port.map_or(Bind::Ephemeral, Bind::Shared);
@@ -333,7 +351,7 @@ impl GenericTcpUdp {
 
     fn send(&mut self, cx: &mut Cx, data: Vec<u8>) {
         match self.protocol {
-            Protocol::Tcp => cx.tcp_send(SOCKET, data),
+            Protocol::Tcp | Protocol::Serial(_) => cx.tcp_send(SOCKET, data),
             Protocol::Udp => cx.udp_send(SOCKET, self.device, data),
         }
     }
@@ -510,7 +528,7 @@ impl Module for GenericTcpUdp {
 
     fn stop(&mut self, cx: &mut Cx) {
         match self.protocol {
-            Protocol::Tcp => cx.tcp_close(SOCKET),
+            Protocol::Tcp | Protocol::Serial(_) => cx.tcp_close(SOCKET),
             Protocol::Udp => cx.udp_close(SOCKET),
         }
     }
@@ -554,6 +572,91 @@ mod tests {
             Action::Complete { id: i, result } if *i == id => Some(result.clone()),
             _ => None,
         })
+    }
+
+    #[test]
+    fn a_serial_port_is_a_stream_and_needs_no_host() {
+        use crate::module::{FlowControl, Parity};
+        let mut m = GenericTcpUdp::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            host_name: None,
+            port: None,
+            model: "generic".into(),
+            channels: None,
+            settings: params(json!({
+                "protocol": "serial", "serial_port": "COM5", "baud_rate": 19200,
+                "parity": "odd", "flow_control": "rts-cts",
+                "terminator": "cr", "send_terminator": "cr"
+            })),
+            monitor: false,
+        })
+        .unwrap();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let ports: Vec<SerialPort> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::SerialOpen { port, .. } => Some(port),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            ports,
+            [SerialPort {
+                path: "COM5".into(),
+                baud_rate: 19200,
+                data_bits: 8,
+                parity: Parity::Odd,
+                stop_bits: 1,
+                flow_control: FlowControl::RtsCts,
+            }]
+        );
+        let mut cx = Cx::new(1);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        m.command(&mut cx, 1, "request", &params(json!({"text": "PWR?"})));
+        assert_eq!(sent(&cx.take()), [b"PWR?\r".to_vec()]);
+        let mut cx = Cx::new(4);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"PWR=1\r".to_vec()));
+        let a = cx.take();
+        assert!(a.contains(&Action::RoundTrip(3)));
+        assert_eq!(
+            completion(&a, 1),
+            Some(Ok(Outcome::Value {
+                value: json!({"text": "PWR=1", "hex": "5057523d31"})
+            }))
+        );
+        // Unplugged: reported and opened again with backoff.
+        let mut cx = Cx::new(5);
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Closed {
+                reason: "serial: COM5: gone".into(),
+            },
+        );
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: RETRY,
+            after: RETRY_MIN
+        }));
+        let mut cx = Cx::new(1005);
+        m.timer(&mut cx, RETRY);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::SerialOpen { .. })));
+        // TCP and UDP still need the device's host.
+        let no_host = GenericTcpUdp::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            host_name: None,
+            port: Some(5000),
+            model: "generic".into(),
+            channels: None,
+            settings: params(json!({"protocol": "tcp"})),
+            monitor: true,
+        });
+        assert!(no_host.is_err());
     }
 
     #[test]

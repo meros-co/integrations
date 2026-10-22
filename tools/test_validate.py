@@ -77,7 +77,7 @@ class QuietRules(unittest.TestCase):
         quiet = {"quiet_ms": 1000, "state": {"done": "true"}}
         self.assertEqual(validate.telemetry_checks(self.doc("line-tcp", quiet)), [])
         self.assertEqual(validate.telemetry_checks(self.doc("http", quiet)),
-                         ["telemetry.updates[0]: quiet_ms needs a line-tcp, osc-tcp or ws transport"])
+                         ["telemetry.updates[0]: quiet_ms needs a line-tcp, line-serial, osc-tcp or ws transport"])
         self.assertIn("telemetry.updates: at most one quiet_ms rule",
                       validate.telemetry_checks(self.doc("ws", quiet, quiet)))
         mixed = dict(quiet, match="^END$", then_send=["X"])
@@ -109,6 +109,53 @@ class ExtensionCommands(unittest.TestCase):
         doc = dict(self.DOC, commands={"ping": {"send": "PING:"}})
         errors = validate.cross_field_checks(doc, "x")
         self.assertTrue(any("answers 'export_presets'" in e for e in errors), errors)
+
+
+class Serial(unittest.TestCase):
+    SETTINGS = {
+        "serial_port": {"type": "string", "required": True},
+        "baud_rate": {"type": "enum", "values": ["9600", "38400"], "default": "9600"},
+        "data_bits": {"type": "int", "min": 8, "max": 8, "default": 8},
+        "parity": {"type": "enum", "values": ["none"], "default": "none"},
+        "stop_bits": {"type": "int", "min": 1, "max": 1, "default": 1},
+        "flow_control": {"type": "enum", "values": ["none", "xon-xoff"], "default": "none"},
+    }
+    PORT = {"port": None, "protocol": "serial", "role": "control", "setting": "serial_port", "note": "RS-232"}
+
+    def doc(self, settings=None, ports=None):
+        return {"transport": {"type": "line-serial", "framing": "terminated"},
+                "settings": self.SETTINGS if settings is None else settings,
+                "ports": [self.PORT] if ports is None else ports}
+
+    def test_a_serial_device_with_its_settings_is_valid(self):
+        self.assertEqual(validate.serial_checks(self.doc()) + validate.port_checks(self.doc()), [])
+
+    def test_each_serial_setting_is_declared_with_a_default_the_core_can_use(self):
+        settings = dict(self.SETTINGS, parity={"type": "enum", "values": ["mark"], "default": "mark"},
+                        stop_bits={"type": "int", "min": 1, "max": 3})
+        del settings["flow_control"]
+        errors = validate.serial_checks(self.doc(settings))
+        self.assertIn("settings.flow_control: a device on a serial port declares it", errors)
+        self.assertIn("settings.parity: an enum of ['even', 'none', 'odd']", errors)
+        self.assertIn("settings.stop_bits: needs the device's default", errors)
+        self.assertIn("settings.stop_bits: an int within 1 to 2 (give min and max)", errors)
+
+    def test_a_delimited_framing_needs_a_close(self):
+        for close in (None, "", "  ", "\r\n"):
+            t = {"type": "line-tcp", "port": 1, "framing": "delimited", "open": "<"}
+            if close is not None:
+                t["close"] = close
+            doc = {"transport": t, "ports": [{"port": 1, "protocol": "tcp", "role": "control"}]}
+            self.assertIn("transport.close: framing delimited needs a close that is not only whitespace",
+                          validate.port_checks(doc))
+
+    def test_a_line_serial_transport_needs_a_serial_control_entry(self):
+        doc = self.doc(ports=[{"port": 23, "protocol": "tcp", "role": "control"}])
+        self.assertIn("ports: a line-serial transport needs a serial control entry", validate.port_checks(doc))
+        bad = dict(self.PORT, port=1, setting="port")
+        errors = validate.serial_checks(self.doc(ports=[bad]))
+        self.assertIn("ports[0]: a serial port has no number (port: null)", errors)
+        self.assertIn("ports[0]: a serial port's setting is serial_port", errors)
 
 
 if __name__ == "__main__":

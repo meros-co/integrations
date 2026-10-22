@@ -18,6 +18,7 @@ HEADER = "| Spec | Devices | Vendor group | Transport | Native | Models | Comman
 
 TRANSPORT = {
     "line-tcp": "Line/TCP",
+    "line-serial": "Line/serial",
     "line-udp": "Line/UDP",
     "osc-udp": "OSC/UDP",
     "osc-tcp": "OSC/TCP",
@@ -45,7 +46,7 @@ NATIVE = {
     "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",
     "generic-osc": "OSC over UDP or TCP",
-    "generic-tcp-udp": "Text or bytes over TCP or UDP",
+    "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
     "http-snapshot": "HTTP JPEG snapshots",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
@@ -57,7 +58,8 @@ NATIVE = {
     "omt-discovery": "OMT metadata frames over TCP 6399",
     "osc-listener": "OSC over UDP or TCP from any sender; receives",
     "pjlink": "PJLink over TCP 4352",
-    "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default)",
+    "probel-swp02": "SW-P-02 binary messages on a serial port, or over TCP",
+    "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default) or a serial port",
     "qsys": "QRC JSON-RPC over TCP 1710",
     "sennheiser-digital-6000": "SSC over UDP 45",
     "sennheiser-ew-dx": "HTTPS + SSE (SSCv2); UDP (SSCv1 legacy mode)",
@@ -69,7 +71,7 @@ NATIVE = {
     "tally-arbiter": "Socket.IO 4 over a WebSocket on 4455",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
     "tsl-umd-listener": "TSL UMD over UDP, or TCP for V3.1 and V5.0; receives",
-    "visca": "VISCA over IP (UDP 52381), raw VISCA over TCP or UDP",
+    "visca": "VISCA over IP (UDP 52381), raw VISCA over TCP or UDP, or VISCA on a serial port",
     "vmix": "TCP API 8099",
 }
 
@@ -113,7 +115,8 @@ def main():
             kind = TRANSPORT[t["type"]]
             if t["type"] == "http" and t.get("scheme") == "https":
                 kind = "HTTPS"
-            transport = f"{kind} {t['port']}"
+            # A serial port has no number.
+            transport = f"{kind} {t['port']}" if "port" in t else kind
         rows.append(
             f"| `{sid}` | {doc['name']} | `{groups[sid]}` | {transport} | {'yes' if native else ''} "
             f"| {len(models)} | {commands} | {verification(models)} |"

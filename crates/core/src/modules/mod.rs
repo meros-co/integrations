@@ -126,6 +126,8 @@ mod sony_camera_props;
 mod sony_camera_ptpip;
 #[cfg(any(feature = "sennheiser-ew-dx", feature = "sennheiser-spectera"))]
 mod sscv2;
+#[cfg(feature = "probel-swp02")]
+mod swp02;
 #[cfg(feature = "probel-swp08")]
 mod swp08;
 #[cfg(feature = "tally-arbiter")]
@@ -241,7 +243,7 @@ pub(crate) fn construct(
         #[cfg(feature = "vmix")]
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         #[cfg(feature = "visca")]
-        "visca" => Ok(Box::new(visca::Visca::new(context))),
+        "visca" => Ok(Box::new(visca::Visca::new(context)?)),
         #[cfg(feature = "qsys")]
         "qsys" => Ok(Box::new(qsys::Qsys::new(context))),
         #[cfg(any(
@@ -290,6 +292,8 @@ pub(crate) fn construct(
         },
         #[cfg(feature = "dhd-ecp")]
         "dhd-ecp" => Ok(Box::new(dhd_ecp::DhdEcp::new(spec, context)?)),
+        #[cfg(feature = "probel-swp02")]
+        "probel-swp02" => Ok(Box::new(swp02::Swp02::new(context)?)),
         #[cfg(feature = "probel-swp08")]
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]

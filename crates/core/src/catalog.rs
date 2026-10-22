@@ -75,7 +75,8 @@ pub struct DeviceSpec {
 pub struct PortSpec {
     /// The default; `None` when there is none and it must be given.
     pub port: Option<u16>,
-    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls` or `ssh`.
+    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh` or `serial`
+    /// (a serial port on the host, named by its `setting`, with no number).
     pub protocol: String,
     /// `control` (where commands go; `OpenRequest::port` overrides it),
     /// `push`, `feedback`, `notification` or `discovery`.
@@ -267,6 +268,12 @@ impl DeviceSpec {
     /// it reaches out to no device and can be opened without a host.
     pub fn core_listens_only(&self) -> bool {
         !self.ports.is_empty() && self.ports.iter().all(|p| p.listener == "core")
+    }
+
+    /// Whether the device can be reached on a serial port of the host, so it
+    /// may be opened without a network host (SPEC.md §2, Ports).
+    pub fn uses_serial(&self) -> bool {
+        self.ports.iter().any(|p| p.protocol == "serial")
     }
 
     pub fn model(&self, id: &str) -> Option<&ModelSpec> {

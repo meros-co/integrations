@@ -1,4 +1,5 @@
-//! Probel SW-P-08, the General Remote Control Protocol, over TCP.
+//! Probel SW-P-08, the General Remote Control Protocol, over TCP or a
+//! serial port.
 //!
 //! Wire format from Snell's SW-P-08 Issue 30 (2013), section numbers below
 //! being that document's; Pro-Bel's SW-P-88 Issue 1 (2001) has the same
@@ -29,6 +30,11 @@
 //! - Numbers are 1-based in commands and state, 0-based on the wire (§9),
 //!   except the System 2 matrix and level, which the wire carries from 1 (§8).
 //!
+//! The `link` setting chooses TCP (SW-P-08 over IP, §11) or a serial port of
+//! the host (RS-232 or RS-422, the protocol's original physical layer,
+//! SW-P-88 §6.1); the framing, acknowledgements and messages are the same on
+//! both, and a serial port that fails is reopened as a connection is.
+//!
 //! Opened for commands only (`monitor` false), nothing is read on connecting
 //! and NAMES UPDATED reads nothing again; the only message sent unasked is a
 //! DUAL CONTROLLER STATUS REQUEST every 10 s when idle, whose DLE ACK is the
@@ -36,14 +42,13 @@
 //! What the controller pushes, and what replies carry, still reaches state.
 
 use std::collections::{HashSet, VecDeque};
-use std::net::SocketAddr;
 
 use serde_json::{json, Map, Value};
 
 use crate::catalog::{DeviceSpec, Params};
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput,
+    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
+    Outcome, TcpInput,
 };
 
 /// SW-P-08 over IP has no fixed port (§11.4); 2008 is the common choice.
@@ -958,7 +963,7 @@ enum Phase {
 }
 
 pub(crate) struct Swp08 {
-    device: SocketAddr,
+    link: Link,
     model: String,
     supports: HashSet<String>,
     numbering: Numbering,
@@ -1051,7 +1056,7 @@ impl Swp08 {
             },
         };
         let mut m = Swp08 {
-            device: SocketAddr::new(ctx.host, ctx.port.unwrap_or(DEFAULT_PORT)),
+            link: Link::from_settings(&ctx, DEFAULT_PORT)?,
             model: model.id.clone(),
             supports: model.supports.iter().cloned().collect(),
             numbering: Numbering {
@@ -1872,7 +1877,7 @@ impl Module for Swp08 {
     fn start(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         self.phase = Phase::Connecting;
-        cx.tcp_open(SOCKET, self.device);
+        self.link.open(cx, SOCKET);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
@@ -1937,7 +1942,7 @@ impl Module for Swp08 {
                 if self.phase == Phase::Closed {
                     self.phase = Phase::Connecting;
                     cx.connection(Connection::Connecting);
-                    cx.tcp_open(SOCKET, self.device);
+                    self.link.open(cx, SOCKET);
                 }
             }
             PROBE_TIMER => {
@@ -2300,6 +2305,73 @@ mod tests {
         .map(|d| frame(d))
         .collect();
         assert_eq!(frames, expected);
+    }
+
+    #[test]
+    fn a_serial_link_opens_the_port_and_speaks_the_same_frames() {
+        use crate::module::{FlowControl, Parity, SerialPort};
+        let mut m = module(
+            "generic",
+            false,
+            json!({"link": "serial", "serial_port": "COM4", "parity": "even"}),
+        );
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let opened: Vec<_> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::SerialOpen { port, .. } => Some(port),
+                Action::TcpOpen { .. } => panic!("a serial link opens no connection"),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            opened,
+            [SerialPort {
+                path: "COM4".into(),
+                baud_rate: 38400,
+                data_bits: 8,
+                parity: Parity::Even,
+                stop_bits: 1,
+                flow_control: FlowControl::None,
+            }]
+        );
+        let mut cx = Cx::new(0);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        drain(&mut m);
+        // The SW-P-88 §9.3 connect, framed as over TCP.
+        let mut cx = Cx::new(0);
+        m.command(
+            &mut cx,
+            1,
+            "connect",
+            json!({"matrix": 2, "level": 2, "destination": 3, "source": 1})
+                .as_object()
+                .unwrap(),
+        );
+        assert_eq!(
+            sent(&cx.take()),
+            [unhex("10 02 02 11 00 02 00 05 E6 10 03")]
+        );
+        // Without a port the link cannot be opened.
+        let spec = spec();
+        let settings = validate(
+            &spec.settings,
+            json!({"link": "serial"}).as_object().unwrap(),
+        )
+        .unwrap();
+        let ctx = OpenContext {
+            host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            host_name: None,
+            port: None,
+            model: "generic".into(),
+            channels: None,
+            settings,
+            monitor: true,
+        };
+        assert!(Swp08::new(&spec, ctx).is_err());
     }
 
     #[test]

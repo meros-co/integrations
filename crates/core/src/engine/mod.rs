@@ -80,8 +80,13 @@ const RECONNECT_MAX: Millis = 30_000;
 
 #[derive(Debug)]
 enum Transport {
+    /// Text over TCP, or over a serial port of the host (`line-serial`),
+    /// which differs only in what is opened.
     LineTcp {
         port: u16,
+        /// `line-serial`: the port and its line settings, from the
+        /// settings (SPEC.md §2).
+        serial: Option<crate::module::SerialPort>,
         send: SendFraming,
         reply: ReplyFraming,
         ascii: bool,
@@ -1310,10 +1315,17 @@ impl SpecEngine {
     pub(crate) fn new(spec: Arc<DeviceSpec>, ctx: OpenContext) -> Result<SpecEngine, String> {
         let t = spec.transport.clone().ok_or("spec has no transport")?;
         let kind = str_field(&t, "type").ok_or("transport has no type")?;
-        let spec_port = t
-            .get("port")
-            .and_then(Value::as_u64)
-            .ok_or("transport has no port")? as u16;
+        // A serial port has no number: it is named in the settings.
+        let spec_port = if kind == "line-serial" {
+            0
+        } else {
+            t.get("port")
+                .and_then(Value::as_u64)
+                .ok_or("transport has no port")? as u16
+        };
+        if kind == "line-serial" && t.get("endpoints").is_some() {
+            return Err("transport.endpoints needs a network transport, not line-serial".into());
+        }
         // `https_port`: the default port when the operator chooses HTTPS.
         let https_port = match t.get("https_port") {
             None => None,
@@ -1360,10 +1372,15 @@ impl SpecEngine {
             );
         }
         let transport = match kind {
-            "line-tcp" => {
+            "line-tcp" | "line-serial" => {
                 let framing = str_field(&t, "framing").unwrap_or("terminated");
                 let open = str_field(&t, "open").unwrap_or("").to_string();
                 let close = str_field(&t, "close").unwrap_or("").to_string();
+                if framing == "delimited" && close.trim().is_empty() {
+                    return Err(
+                        "framing delimited needs a close that is not only whitespace".into(),
+                    );
+                }
                 let send = match framing {
                     "delimited" => SendFraming::Delimited {
                         open: open.clone(),
@@ -1414,6 +1431,12 @@ impl SpecEngine {
                 };
                 Transport::LineTcp {
                     port,
+                    serial: match kind {
+                        "line-serial" => {
+                            Some(crate::module::SerialPort::from_settings(&ctx.settings)?)
+                        }
+                        _ => None,
+                    },
                     send,
                     reply,
                     ascii: str_field(&t, "encoding") != Some("utf-8"),
@@ -2866,9 +2889,12 @@ impl SpecEngine {
     fn connect(&mut self, cx: &mut Cx) {
         let replies = self.transport.replies();
         match &self.transport {
-            Transport::LineTcp { reply, .. } => {
+            Transport::LineTcp { reply, serial, .. } => {
                 self.framer = Some(Framer::new(reply.clone()));
-                cx.tcp_open(SOCKET, SocketAddr::new(self.host, self.port()));
+                match serial {
+                    Some(port) => cx.serial_open(SOCKET, port.clone()),
+                    None => cx.tcp_open(SOCKET, SocketAddr::new(self.host, self.port())),
+                }
             }
             Transport::OscTcp { framing, .. } => {
                 self.packets = Some(PacketReader::new(*framing));
@@ -4231,6 +4257,15 @@ impl Module for SpecEngine {
             Ok(fresh) => fresh,
             Err(reason) => return SettingsUpdate::Rejected(reason),
         };
+        // Another serial port, or other line settings: the port is opened
+        // again, by building the device afresh.
+        let serial = |t: &Transport| match t {
+            Transport::LineTcp { serial, .. } => serial.clone(),
+            _ => None,
+        };
+        if serial(&self.transport) != serial(&fresh.transport) {
+            return SettingsUpdate::Restart;
+        }
         self.ctx = fresh.ctx;
         self.settings = fresh.settings;
         self.transport = fresh.transport;
