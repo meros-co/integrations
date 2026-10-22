@@ -240,6 +240,25 @@ rv("set_parameter", {"address": "123456", "value": "01"}, "DTH:123456,01;\r\n",
 rv("get_parameter", {"address": "002100"}, "RQH:002100,000001;\r\n",
    device_reply="DTH:002100,21;\nACK;\n", expect_result=RV_OK)
 
+# The same on the RS-232 connector (link serial): nothing after the ";";
+# stx before each command on V-160HD, VR-120HD and VR-6HD (Remote Control
+# Guides, Command Format; ERR:6 "no stx" is RS-232 only), none on V-80HD
+# (V-80HD guide p.35). Replies end at ";" or the ack byte 06H.
+SERIAL = {"link": "serial"}
+rv("select_pgm", {"source": "INPUT2"}, "\x02PGM:INPUT2;", device_reply="\x02ACK;\n",
+   expect_result=RV_OK, settings=SERIAL, file="select_pgm-serial")
+rv("get_video_fader_level", {}, "\x02QVFL;", device_reply="VFL:1024;ACK;\n", expect_result=RV_OK,
+   settings=SERIAL, file="get_video_fader_level-serial", model="vr-120hd")
+rv("select_pst", {"source": "SDI3"}, "\x02PST:SDI3;", device_reply="\x02ERR:6;", expect_result=RV_ERR,
+   settings=SERIAL, file="select_pst-serial", model="vr-6hd")
+rv("set_parameter", {"address": "123456", "value": "01"}, "\x02DTH:123456,01;",
+   device_reply="\x06", expect_result=RV_OK, settings=SERIAL, file="set_parameter-serial")
+rv("select_pgm", {"source": "INPUT2"}, "PGM:INPUT2;", device_reply="\x02ACK;\n",
+   expect_result=RV_OK, settings=SERIAL, file="select_pgm-serial-v80hd", model="v-80hd")
+rv("set_parameter", {"address": "123456", "value": "01"}, "DTH:123456,01;",
+   device_reply="\x02ACK;", expect_result=RV_OK, settings=SERIAL, file="set_parameter-serial-v80hd",
+   model="v-80hd")
+
 # ── Telemetry: one vector per rule ────────────────────────────────────────
 def rvt(name, inbound, state):
     telemetry(RV, name, inbound=inbound, expect_state=state)
@@ -248,6 +267,8 @@ def rvt(name, inbound, state):
 rvt("video-input-source", "VISRC:0,HDMI1;\n", {"video_sources": {"0": {"name": "HDMI1"}}})
 rvt("video-input-status", "VIST:HDMI1,DETECTED;\n", {"video_inputs": {"HDMI1": {"status": "DETECTED"}}})
 rvt("fader-level", "VFL:1024;ACK;\n", {"fader": {"level": 1024}})
+telemetry(RV, "pgm-input-serial", inbound="\x02PGM:HDMI2,INPUT2;", settings={"link": "serial"},
+          expect_state={"program": {"source": "HDMI2", "input": "INPUT2"}})
 rvt("pgm-direct", "PGM:HDMI2;\n", {"program": {"source": "HDMI2", "input": ""}})
 rvt("pgm-input", "\x02PGM:HDMI2,INPUT2;\n", {"program": {"source": "HDMI2", "input": "INPUT2"}})
 rvt("pst-direct", "PST:STILL3;\n", {"preview": {"source": "STILL3", "input": ""}})

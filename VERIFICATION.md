@@ -1868,16 +1868,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## roland-v160hd — Roland V-160HD, V-80HD, VR-120HD, VR-6HD, V-1-4K
 
-- [ ] Confirm commands ended with CR LF are accepted (Roland documents only Telnet). ([specs/roland-v160hd.yaml:84](specs/roland-v160hd.yaml#L84))
-- [ ] Confirm the password prompt and reply texts ("Enter password:", "Welcome to ...", "Authentication error", "Wait a moment"), which are community-sourced. ([specs/roland-v160hd.yaml:2811](specs/roland-v160hd.yaml#L2811))
-- [ ] Check whether a query's value frame and its ACK; arrive on one line or two. ([specs/roland-v160hd.yaml:2827](specs/roland-v160hd.yaml#L2827))
-- [ ] Check whether GRCH, AMCH, SPCH, AUXCH, QSRTIST and QBSY are followed by ACK;. ([specs/roland-v160hd.yaml:2829](specs/roland-v160hd.yaml#L2829))
-- [ ] Confirm a poll of five queries a second does not lock the panel. ([specs/roland-v160hd.yaml:2850](specs/roland-v160hd.yaml#L2850))
-- [ ] Confirm the wire spellings chosen: test tone levels OFF, -20, -10, 0 and frequencies 500, 1k, 2k, and values without the space before the comma. ([specs/roland-v160hd.yaml:2874](specs/roland-v160hd.yaml#L2874))
-- [ ] Confirm the AUXLV and AUXCH replies are QAUXLV and QAUXCH, and QTIM names DSK on V-1-4K. ([specs/roland-v160hd.yaml:2880](specs/roland-v160hd.yaml#L2880))
-- [ ] Confirm the minimum firmware version per model for the Basic commands. ([specs/roland-v160hd.yaml:2886](specs/roland-v160hd.yaml#L2886))
-- [ ] Check whether a second control session receives tally frames after TALLY AUTO SEND. ([specs/roland-v160hd.yaml:2900](specs/roland-v160hd.yaml#L2900))
-- [ ] Check whether RQH sizes other than 000001 are answered. ([specs/roland-v160hd.yaml:2898](specs/roland-v160hd.yaml#L2898))
+- [ ] Confirm commands ended with CR LF are accepted (Roland documents only Telnet). ([specs/roland-v160hd.yaml:103](specs/roland-v160hd.yaml#L103))
+- [ ] Confirm the password prompt and reply texts ("Enter password:", "Welcome to ...", "Authentication error", "Wait a moment"), which are community-sourced. ([specs/roland-v160hd.yaml:2855](specs/roland-v160hd.yaml#L2855))
+- [ ] Check whether a query's value frame and its ACK; arrive on one line or two. ([specs/roland-v160hd.yaml:2871](specs/roland-v160hd.yaml#L2871))
+- [ ] Check whether GRCH, AMCH, SPCH, AUXCH, QSRTIST and QBSY are followed by ACK;. ([specs/roland-v160hd.yaml:2873](specs/roland-v160hd.yaml#L2873))
+- [ ] Confirm a poll of five queries a second does not lock the panel. ([specs/roland-v160hd.yaml:2894](specs/roland-v160hd.yaml#L2894))
+- [ ] Confirm the wire spellings chosen: test tone levels OFF, -20, -10, 0 and frequencies 500, 1k, 2k, and values without the space before the comma. ([specs/roland-v160hd.yaml:2905](specs/roland-v160hd.yaml#L2905))
+- [ ] Confirm the AUXLV and AUXCH replies are QAUXLV and QAUXCH, and QTIM names DSK on V-1-4K. ([specs/roland-v160hd.yaml:2875](specs/roland-v160hd.yaml#L2875))
+- [ ] Confirm the minimum firmware version per model for the Basic commands. ([specs/roland-v160hd.yaml:2932](specs/roland-v160hd.yaml#L2932))
+- [ ] Check whether a second control session receives tally frames after TALLY AUTO SEND. ([specs/roland-v160hd.yaml:2946](specs/roland-v160hd.yaml#L2946))
+- [ ] Check whether RQH sizes other than 000001 are answered. ([specs/roland-v160hd.yaml:2944](specs/roland-v160hd.yaml#L2944))
+- [ ] Drive a V-160HD, VR-120HD or VR-6HD on RS-232 (link serial): confirm commands with stx and nothing after the ";" are accepted, and whether replies end in LF there. ([specs/roland-v160hd.yaml:3281](specs/roland-v160hd.yaml#L3281))
+- [ ] Drive a V-80HD on RS-232 and confirm commands without stx and line ending are accepted. ([specs/roland-v160hd.yaml:3281](specs/roland-v160hd.yaml#L3281))
+- [ ] Check whether DTH is answered by the ack byte 06H or by ACK; on V-160HD, VR-120HD and VR-6HD, on RS-232 and over LAN. ([specs/roland-v160hd.yaml:3288](specs/roland-v160hd.yaml#L3288))
+- [ ] Find the V-80HD's default RS-232 BAUDRATE (115200 assumed, as on the others). ([specs/roland-v160hd.yaml:3291](specs/roland-v160hd.yaml#L3291))
+- [ ] Confirm XON/XOFF flow control on RS-232, which the communication standards leave out. ([specs/roland-v160hd.yaml:3294](specs/roland-v160hd.yaml#L3294))
 
 ## roland-v600uhd — Roland V-600UHD
 
