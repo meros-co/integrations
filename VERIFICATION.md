@@ -1624,6 +1624,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:572](specs/roland-p20hd.yaml#L572))
 - [ ] Confirm the session closes after five minutes without commands and that ACS every ten seconds of silence keeps it open. ([specs/roland-p20hd.yaml:583](specs/roland-p20hd.yaml#L583))
 
+## roland-v1200hd — Roland V-1200HD
+
+- [ ] Confirm ACS (verification of unit status) is answered by a bare ACK, as the liveness check assumes; the guide lists no reply for it. ([specs/roland-v1200hd.yaml:44](specs/roland-v1200hd.yaml#L44))
+- [ ] Check whether ACK is the single byte 06H or "ACK;" as the guide's overview writes it, and that a trailing ";" is harmless. ([specs/roland-v1200hd.yaml:41](specs/roland-v1200hd.yaml#L41))
+- [ ] Confirm the STS frames carry their values comma-separated without spaces, group 5 answering 8 for no memory, and the order of each group as listed. ([specs/roland-v1200hd.yaml:298](specs/roland-v1200hd.yaml#L298))
+
 ## roland-v160hd — Roland V-160HD, V-80HD, VR-120HD, VR-6HD, V-1-4K
 
 - [ ] Confirm commands ended with CR LF are accepted (Roland documents only Telnet). ([specs/roland-v160hd.yaml:84](specs/roland-v160hd.yaml#L84))
@@ -1653,6 +1659,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether get is answered with an ack line as well as the set line. ([specs/roland-vr400uhd.yaml:567](specs/roland-vr400uhd.yaml#L567))
 - [ ] Check the dB scale of levels 0-127. ([specs/roland-vr400uhd.yaml:580](specs/roland-vr400uhd.yaml#L580))
 - [ ] Confirm get answers every parameter of the command list (OUTPUT FADE, DSK, LOGO, transition, MIC and LINE channels, outputs, auto mixing, audio follow video, reverb) with its current value, in the ranges set takes. ([specs/roland-vr400uhd.yaml:419](specs/roland-vr400uhd.yaml#L419))
+
+## roland-vr4hd — Roland VR-4HD
+
+- [ ] Confirm VER, used as the liveness check (the VR-4HD lists no ACS), is answered with REMOTE RS-232 on, and nothing when it is off. ([specs/roland-vr4hd.yaml:44](specs/roland-vr4hd.yaml#L44))
+- [ ] Check that a status frame pushed on a change (QPI, QDK, QPG, QUB) comes besides, not in place of, the ACK of the command that caused it. ([specs/roland-vr4hd.yaml:268](specs/roland-vr4hd.yaml#L268))
+
+## roland-xs1hd — Roland XS-1HD
+
+- [ ] Confirm ACS (obtain the status) is answered by a bare ACK and nothing else, as the liveness check assumes; the manual lists no ACS reply. ([specs/roland-xs1hd.yaml:39](specs/roland-xs1hd.yaml#L39))
 
 ## roland-xs42h — Roland XS-42H / VP-42H
 

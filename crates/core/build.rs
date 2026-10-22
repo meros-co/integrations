@@ -138,10 +138,13 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-roland",
         &[
             "roland-p20hd",
+            "roland-v1200hd",
             "roland-v160hd",
             "roland-v600uhd",
             "roland-v60hd",
             "roland-vr400uhd",
+            "roland-vr4hd",
+            "roland-xs1hd",
             "roland-xs42h",
             "roland-xs62s",
             "roland-xs80h",

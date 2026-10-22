@@ -18,7 +18,7 @@ HEADER = "| Spec | Devices | Vendor group | Transport | Native | Models | Comman
 
 TRANSPORT = {
     "line-tcp": "Line/TCP",
-    "line-serial": "Line/serial (RS-232)",
+    "line-serial": "Line/serial",
     "line-udp": "Line/UDP",
     "osc-udp": "OSC/UDP",
     "osc-tcp": "OSC/TCP",
@@ -111,7 +111,8 @@ def main():
             kind = TRANSPORT[t["type"]]
             if t["type"] == "http" and t.get("scheme") == "https":
                 kind = "HTTPS"
-            transport = f"{kind} {t['port']}"
+            # A serial port has no number.
+            transport = f"{kind} {t['port']}" if "port" in t else kind
         rows.append(
             f"| `{sid}` | {doc['name']} | `{groups[sid]}` | {transport} | {'yes' if native else ''} "
             f"| {len(models)} | {commands} | {verification(models)} |"
