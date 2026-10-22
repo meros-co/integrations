@@ -60,6 +60,7 @@ NATIVE = {
     "omt": "OMT metadata frames over TCP (the source's port, 6400 first)",
     "omt-discovery": "OMT metadata frames over TCP 6399",
     "osc-listener": "OSC over UDP or TCP from any sender; receives",
+    "panasonic-projector": "NTCONTROL over TCP 1024, or RS-232C",
     "pjlink": "PJLink over TCP 4352",
     "probel-swp02": "SW-P-02 binary messages on a serial port, or over TCP",
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default) or a serial port",

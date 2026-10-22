@@ -103,6 +103,10 @@ mod onyx;
 mod osc_listener;
 #[cfg(feature = "panasonic-ptz")]
 mod panasonic_notify;
+#[cfg(feature = "panasonic-projector")]
+mod panasonic_projector;
+#[cfg(feature = "panasonic-projector")]
+mod panasonic_projector_commands;
 #[cfg(feature = "pjlink")]
 mod pjlink;
 #[cfg(feature = "qsys")]
@@ -311,6 +315,10 @@ pub(crate) fn construct(
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
         #[cfg(feature = "epson-projector")]
         "epson-projector" => Ok(Box::new(epson_projector::EpsonProjector::new(spec, context)?)),
+        #[cfg(feature = "panasonic-projector")]
+        "panasonic-projector" => Ok(Box::new(panasonic_projector::PanasonicProjector::new(
+            spec, context,
+        )?)),
         #[cfg(feature = "nec-projector")]
         "nec-projector" => Ok(Box::new(nec_projector::NecProjector::new(context)?)),
         #[cfg(feature = "generic-osc")]
