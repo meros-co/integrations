@@ -769,8 +769,11 @@ the transport's credential (`auth`, its Digest answer, an OAuth token and its
 refresh) and `headers` go with each request, and a refusal of them is the
 terminal refusal above, as on the transport's port: it is the same credential.
 With `auth: none` neither goes, and a 401 or 403 is that request's answer
-only. An `auth` setting is an enum of `inherit` and `none`, for a server whose
-access the operator configures apart from the main one.
+only. With `auth: basic` the endpoint has a credential of its own, Basic from
+the `username` and `password` settings, whatever the transport's (the spec
+declares both settings); a 401 or 403 to it is the terminal refusal above. An
+`auth` setting is an enum of these values, for a server whose access the
+operator configures apart from the main one.
 
 `endpoint` may be named by command messages, telemetry `poll`, `subscribe` and
 `then_send` items and `on_connect` steps. It may not be named by the `probe`
@@ -807,7 +810,21 @@ commands:
 ```
 
 Such an endpoint has no credential to inherit: its `auth` is `none` (the
-default there), and its requests carry no header but their own. A request
+default there), and its requests carry no header but their own, or `basic`,
+for a REST API beside a line protocol that asks for its own login (Panasonic
+KAIROS's REST API on 1234, Basic with the system ID, beside its TCP protocol
+on 3005):
+
+```yaml
+transport:
+  type: line-tcp
+  port: 3005
+  endpoints:
+    rest: { port: { setting: rest_port }, auth: { setting: rest_auth } }   # basic | none
+settings:
+  username: { type: string, default: Kairos, … }
+  password: { type: string, secret: true, … }
+``` A request
 item names the endpoint, as above; its message is an HTTP request like an
 HTTP command's, and its reply goes to the `path` rules. Requests are still
 sent one at a time with the line's messages, in the same queue. Beside a

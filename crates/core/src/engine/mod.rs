@@ -169,6 +169,9 @@ struct Endpoint {
     /// `auth: inherit`: the transport's credential and `headers` go there
     /// too; `auth: none` sends neither.
     credentialed: bool,
+    /// `auth: basic`: Basic from the `username` and `password` settings,
+    /// whatever the transport (a REST API beside a line protocol).
+    basic: bool,
     /// Over HTTPS, accept a self-signed certificate: the endpoint's own
     /// `accept_invalid_certs`, or the HTTP transport's.
     accept_invalid_certs: bool,
@@ -179,7 +182,12 @@ struct Endpoint {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Route {
     Main,
-    Endpoint { credentialed: bool },
+    Endpoint {
+        credentialed: bool,
+    },
+    /// An endpoint with `auth: basic`: its own Basic credential from the
+    /// `username` and `password` settings, refused as the device's.
+    EndpointBasic,
 }
 
 /// `transport.keepalive` (SPEC.md §2, Keep-alives): `send`, a message as
@@ -272,7 +280,9 @@ fn endpoints_of(
                 ))
             }
         };
+        let basic = auth == "basic";
         let credentialed = match auth.as_str() {
+            "basic" => false,
             "inherit" if http => true,
             "inherit" => {
                 return Err(format!(
@@ -282,7 +292,7 @@ fn endpoints_of(
             "none" => false,
             other => {
                 return Err(format!(
-                    "transport.endpoints.{name}.auth '{other}' is not inherit or none"
+                    "transport.endpoints.{name}.auth '{other}' is not inherit, none or basic"
                 ))
             }
         };
@@ -300,6 +310,7 @@ fn endpoints_of(
             Endpoint {
                 base: format!("{scheme}://{host}:{port}"),
                 credentialed,
+                basic,
                 accept_invalid_certs,
             },
         );
@@ -2051,18 +2062,27 @@ impl SpecEngine {
     /// separately.
     fn build(&self, item: &Value, values: &Values) -> Result<Outgoing, String> {
         // A request to an HTTP server of a device whose transport is not
-        // HTTP (SPEC.md §2, Endpoints): no credential, header or session.
+        // HTTP (SPEC.md §2, Endpoints): no header or session, and no
+        // credential but its own Basic one (`auth: basic`).
         if !matches!(self.transport, Transport::Http { .. }) {
             if let Some(name) = str_field(item, "endpoint") {
                 let e = self.endpoint(name)?;
+                let (route, auth) = if e.basic {
+                    (Route::EndpointBasic, HttpAuth::Basic)
+                } else {
+                    (
+                        Route::Endpoint {
+                            credentialed: false,
+                        },
+                        HttpAuth::None,
+                    )
+                };
                 return self.http_request(
                     item,
                     values,
                     &e.base,
-                    Route::Endpoint {
-                        credentialed: false,
-                    },
-                    HttpAuth::None,
+                    route,
+                    auth,
                     e.accept_invalid_certs,
                     &[],
                 );
@@ -2103,21 +2123,23 @@ impl SpecEngine {
                     None => (base, Route::Main, *accept_invalid_certs),
                     Some(name) => {
                         let e = self.endpoint(name)?;
-                        (
-                            &e.base,
+                        let route = if e.basic {
+                            Route::EndpointBasic
+                        } else {
                             Route::Endpoint {
                                 credentialed: e.credentialed,
-                            },
-                            e.accept_invalid_certs,
-                        )
+                            }
+                        };
+                        (&e.base, route, e.accept_invalid_certs)
                     }
                 };
-                let credentialed = route
-                    != Route::Endpoint {
+                let (auth, extra): (HttpAuth, &[(String, String)]) = match route {
+                    Route::Main | Route::Endpoint { credentialed: true } => (*auth, extra),
+                    Route::EndpointBasic => (HttpAuth::Basic, &[]),
+                    Route::Endpoint {
                         credentialed: false,
-                    };
-                let auth = if credentialed { *auth } else { HttpAuth::None };
-                let extra: &[(String, String)] = if credentialed { extra } else { &[] };
+                    } => (HttpAuth::None, &[]),
+                };
                 self.http_request(item, values, base, route, auth, insecure, extra)
             }
         }
@@ -2638,7 +2660,6 @@ impl SpecEngine {
                 self.last_sent = cx.now();
                 cx.ws_send(SOCKET, text)
             }
-
             Outgoing::Http(request, _) => {
                 let id = self.next_request;
                 self.next_request += 1;
@@ -4377,10 +4398,16 @@ impl Module for SpecEngine {
                 let credentialed = match route {
                     Route::Main => *auth != HttpAuth::None,
                     Route::Endpoint { credentialed } => credentialed && *auth != HttpAuth::None,
+                    Route::EndpointBasic => true,
                 };
                 credentialed
                     && (refused_by_status(refusal, refusal_body, response.status, &response.body)
                         || refused_by_body(refusal_json, response.status, &response.body))
+            }
+            // Beside another transport, an endpoint's own Basic credential
+            // refused with 401 or 403 is the device's credential refused.
+            (_, Ok(response)) if route == Route::EndpointBasic => {
+                matches!(response.status, 401 | 403)
             }
             _ => false,
         };
@@ -8181,6 +8208,68 @@ commands:
         };
         let err = SpecEngine::new(Arc::new(spec), ctx).err().unwrap();
         assert!(err.contains("keepalive"), "{err}");
+    }
+
+    #[test]
+    fn a_basic_endpoint_beside_a_line_transport_sends_and_guards_its_credential() {
+        let mut spec: DeviceSpec = crate::yaml::from_str(LINE_ENDPOINT).unwrap();
+        spec.transport.as_mut().unwrap()["endpoints"]["admin"]["auth"] = json!("basic");
+        let settings = json!({
+            "username": { "type": "string", "default": "Kairos", "label": "User", "description": "d" },
+            "password": { "type": "string", "secret": true, "default": "", "label": "Password", "description": "d" },
+            "admin_port": { "type": "int", "min": 1, "max": 65535, "default": 80 },
+            "admin_scheme": { "type": "enum", "values": ["http", "https"], "default": "http" }
+        });
+        spec.settings = serde_json::from_value(settings).unwrap();
+        let given = json!({"password": "SYS-1"});
+        let settings =
+            crate::catalog::validate(&spec.settings, given.as_object().unwrap()).unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings,
+                monitor: false,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, "device", TcpInput::Connected);
+        cx.take();
+
+        // Basic from the username and password settings.
+        let mut cx = Cx::new(1);
+        e.command(&mut cx, 1, "csr", &Params::new());
+        let (rid, request) = requests(&cx.take()).remove(0);
+        use base64::Engine;
+        let token = base64::engine::general_purpose::STANDARD.encode("Kairos:SYS-1");
+        assert_eq!(
+            header(&request, "Authorization"),
+            Some(format!("Basic {token}").as_str())
+        );
+        // Its refusal is terminal, as the transport's would be.
+        let mut cx = Cx::new(2);
+        e.http_response(
+            &mut cx,
+            rid,
+            Ok(HttpResponse {
+                status: 401,
+                headers: Vec::new(),
+                body: Vec::new(),
+            }),
+        );
+        let a = cx.take();
+        assert!(matches!(
+            &completed(&a)[..],
+            [(1, Err(CommandError::Auth { .. }))]
+        ));
+        assert!(e.refused.is_some());
+        assert!(matches!(e.link, Connection::Unauthorized { .. }));
     }
 
     fn named(name: &str) -> Params {

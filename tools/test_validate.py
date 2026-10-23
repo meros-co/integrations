@@ -296,5 +296,25 @@ class LineTls(unittest.TestCase):
         self.assertTrue(any("accept_invalid_certs needs a TLS scheme" in e for e in self.errors(doc)))
 
 
+class EndpointAuth(unittest.TestCase):
+    def doc(self, auth, settings=None):
+        return {"transport": {"type": "line-tcp", "port": 3005, "endpoints": {"rest": {"port": 1234, "auth": auth}}},
+                "settings": settings if settings is not None else {
+                    "username": {"type": "string"}, "password": {"type": "string", "secret": True},
+                    "rest_auth": {"type": "enum", "values": ["basic", "none"]}}}
+
+    def test_beside_a_line_transport_an_endpoint_takes_none_or_its_own_basic(self):
+        self.assertEqual(validate.endpoint_checks(self.doc("basic")), [])
+        self.assertEqual(validate.endpoint_checks(self.doc("none")), [])
+        self.assertEqual(validate.endpoint_checks(self.doc({"setting": "rest_auth"})), [])
+        self.assertEqual(validate.endpoint_checks(self.doc("inherit")),
+                         ["transport.endpoints.rest.auth is none or basic beside a line-tcp transport"])
+
+    def test_basic_needs_the_username_and_password_settings(self):
+        self.assertEqual(validate.endpoint_checks(self.doc("basic", {})),
+                         ["transport.endpoints.rest.auth basic needs a 'username' setting",
+                          "transport.endpoints.rest.auth basic needs a 'password' setting"])
+
+
 if __name__ == "__main__":
     unittest.main()
