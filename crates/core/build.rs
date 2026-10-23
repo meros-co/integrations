@@ -148,7 +148,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-lg", &["lg-display"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
-    ("vendor-magewell", &["magewell-proconvert"]),
+    (
+        "vendor-magewell",
+        &["magewell-proconvert", "magewell-ultra-encode"],
+    ),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
