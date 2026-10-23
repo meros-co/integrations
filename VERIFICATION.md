@@ -2719,6 +2719,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1040](specs/visca.yaml#L1040))
 - [ ] On a serial camera (Sony, Datavideo, Lumens, Marshall), confirm replies come from y0 with y = address + 8 and that only Address Set and IF_Clear broadcasts answer from 88. ([specs/visca.yaml:1126](specs/visca.yaml#L1126))
 - [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
+- [ ] On Sony, confirm the 200 ms before a cancel counts from the pan/tilt drive's ACK (the core's reading of "after executing"); on the other vendors' cameras, which document no such gap and get none, check whether a cancel sent within 200 ms of a drive starting still stops it. ([specs/visca.yaml:1194](specs/visca.yaml#L1194))
 
 ## vmix — vMix
 
