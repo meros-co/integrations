@@ -1543,6 +1543,36 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
+## kiloview-cube-r1 — Kiloview CUBE R1
+
+- [ ] Find out how the CUBE R1 takes the login token back (the API document does not say): confirm that the token sent as it is in Authorization is accepted, or that the cookie user=<user>; token=<token> is, and which one the web interface uses. ([specs/kiloview-cube-r1.yaml:52](specs/kiloview-cube-r1.yaml#L52))
+- [ ] Check that the cookie with an empty token, sent while the token setting is empty, does not make a recorder without a login refuse requests. ([specs/kiloview-cube-r1.yaml:54](specs/kiloview-cube-r1.yaml#L54))
+- [ ] Check which requests need the token at all, how long a token lasts, and that a refused one is answered with HTTP 200 and {"msg":"Token.Error","result":"error"} on every request, not only on logout. ([specs/kiloview-cube-r1.yaml:163](specs/kiloview-cube-r1.yaml#L163))
+- [ ] Confirm that users/login.json takes a JSON body (the document shows one but no Content-Type) and that the token is at data.token. ([specs/kiloview-cube-r1.yaml:152](specs/kiloview-cube-r1.yaml#L152))
+- [ ] Confirm the parameter names of users/modify.json (oldpassword, username, password) and that a non-admin user can change only its own password. ([specs/kiloview-cube-r1.yaml:169](specs/kiloview-cube-r1.yaml#L169))
+- [ ] Confirm that source/get_param.json takes the group as the query parameter disc_id (the document gives no parameter), and that its answer carries disc_id. ([specs/kiloview-cube-r1.yaml:227](specs/kiloview-cube-r1.yaml#L227))
+- [ ] Check that the source list rules read 3.1's answer as documented (data[].disc_id, disc_name, sources[].id, ip, name) and that every group's settings are then read without errors. ([specs/kiloview-cube-r1.yaml:857](specs/kiloview-cube-r1.yaml#L857))
+- [ ] Confirm that output/setSource.json takes the source's name in stream_id (typed as a number 1-20 in the document), and what stream_id names for type display (the swap of two windows). ([specs/kiloview-cube-r1.yaml:311](specs/kiloview-cube-r1.yaml#L311))
+- [ ] Confirm that output/setName.json takes name (the document's parameter table lists stream_id) and answers {"result":"ok"}. ([specs/kiloview-cube-r1.yaml:325](specs/kiloview-cube-r1.yaml#L325))
+- [ ] Confirm that output/window_audio_set.json takes volume as "on"/"off" text rather than a boolean. ([specs/kiloview-cube-r1.yaml:380](specs/kiloview-cube-r1.yaml#L380))
+- [ ] Confirm that layout/setLayout.json switches the layout and that output/get.json then reports the new layout_id and layout_number. ([specs/kiloview-cube-r1.yaml:292](specs/kiloview-cube-r1.yaml#L292))
+- [ ] Confirm that storage/setStoLimit.json takes choose as a string ("1") and not only as the number its example sends, and which values limitType takes (size, time, default). ([specs/kiloview-cube-r1.yaml:399](specs/kiloview-cube-r1.yaml#L399))
+- [ ] Check the units of the storage information's rate and speed, and whether total and used always carry a unit suffix (900G, 30M). ([specs/kiloview-cube-r1.yaml:933](specs/kiloview-cube-r1.yaml#L933))
+- [ ] Confirm that record/getRecStatus.json and record/getinfo.json take project_id in the query, and that setRecStatus.json acts on the whole project without one. ([specs/kiloview-cube-r1.yaml:416](specs/kiloview-cube-r1.yaml#L416))
+- [ ] Find out what "ready state" record/setRecStatus.json requires before recording starts, and how a start refused for it is answered. ([specs/kiloview-cube-r1.yaml:422](specs/kiloview-cube-r1.yaml#L422))
+- [ ] Confirm that record/setinfo.json takes all six fields (solution as a number 0-2, times as YYYY-MM-DD HH:MM:SS) and in which time zone the scheduled times are read. ([specs/kiloview-cube-r1.yaml:440](specs/kiloview-cube-r1.yaml#L440))
+- [ ] Check the units of performance net_up and net_down (KB per second?) and whether cpu and gpu are decimals. ([specs/kiloview-cube-r1.yaml:1010](specs/kiloview-cube-r1.yaml#L1010))
+- [ ] Check what the ip of webrtc/get_sdp.json must be (the recorder's own address, or the client's), and whether the session can be completed by any request the document leaves out. ([specs/kiloview-cube-r1.yaml:468](specs/kiloview-cube-r1.yaml#L468))
+- [ ] Confirm the playback list's channelName is the channel name the storage information lists on the disk, and what a missing disk or channel answers. ([specs/kiloview-cube-r1.yaml:487](specs/kiloview-cube-r1.yaml#L487))
+- [ ] Confirm that playback/remove.json deletes the file from the disk at once, with no recycle bin. ([specs/kiloview-cube-r1.yaml:512](specs/kiloview-cube-r1.yaml#L512))
+- [ ] Confirm the methods of the system and network requests (the document gives none): GET for getHostname, getTimeZone, getTimer and getNet, POST with a JSON body for setHostname, setTimeZone, setTimer and modifyNet. ([specs/kiloview-cube-r1.yaml:528](specs/kiloview-cube-r1.yaml#L528))
+- [ ] Confirm the form of setTimeZone's offset (a string of whole hours, or with minutes for zones such as Asia/Kolkata) and that the time zone list is IANA names. ([specs/kiloview-cube-r1.yaml:543](specs/kiloview-cube-r1.yaml#L543))
+- [ ] Confirm that setTimer.json takes ip with timeType dev as well, and that getTimer's time is milliseconds since 1970 (the document's example ends in a space). ([specs/kiloview-cube-r1.yaml:1045](specs/kiloview-cube-r1.yaml#L1045))
+- [ ] Confirm the path of the one-click time synchronization (API URL system/timer/apply.json, example ntp/apply.json) and that it takes {"project_id":1}. ([specs/kiloview-cube-r1.yaml:573](specs/kiloview-cube-r1.yaml#L573))
+- [ ] Confirm that network/modifyNet.json takes every field with dynamic y/n, applies the change at once, and whether state down disables the interface. ([specs/kiloview-cube-r1.yaml:587](specs/kiloview-cube-r1.yaml#L587))
+- [ ] Find the websocket's path on port 12346 (the spec opens /), whether it needs the token, and that it pushes {"update":"record"} and {"socketType":"storePathUpdate"} as documented. ([specs/kiloview-cube-r1.yaml:806](specs/kiloview-cube-r1.yaml#L806))
+- [ ] Check whether the API has a reboot, shutdown, disk format or firmware upgrade request the document leaves out (its contents name a 13.2 Update software version). ([specs/kiloview-cube-r1.yaml:968](specs/kiloview-cube-r1.yaml#L968))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))

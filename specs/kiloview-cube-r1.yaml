@@ -1,0 +1,1085 @@
+spec: 1
+id: kiloview-cube-r1
+name: Kiloview CUBE R1 NDI recording system
+vendor: Kiloview
+category: recorder
+
+source:
+  - title: CUBE R1 NDI High Bandwidth + NDI|HX Multi-Channel Recording System API (2023.11), CUBE-R1_API_En_V2023-11
+    author: Changsha Kiloview Electronic Technology Co., Ltd.
+    url: https://enstatic.kiloview.com/wp-content/uploads/2025/09/CUBE-R1_API_En_V2023-11.pdf
+    note: >
+      Manufacturer document, linked from https://www.kiloview.com/en/docs/kiloview-cube-r1/api/
+      (the newest version there in October 2026), and the source of every request here unless a
+      command says otherwise. Used: the calling conventions and the {result, data} / {result:
+      error, msg, reason} answers (pp.4-5); the module list (p.6); 1.1 general configuration
+      (websocketPort); 2.1-2.3 login, logout, change password (token in the login's data,
+      "Token.Error"); 3.1-3.6 source discovery groups (list, add, get_param, modify, remove,
+      refresh); 4.1-4.2 layouts; 5.1-5.8 the monitoring windows (output); 6.1-6.3 storage and the
+      websocket's storePathUpdate; 7.1-7.4 recording status, settings and the websocket's record
+      update; 8.1 performance; 9.1-9.2 WebRTC; 10.1-10.3 playback files; 11.1-11.7 host name,
+      time zone and time synchronization; 12.1-12.2 network; 13.1 versions. The contents list a
+      13.2 "Update software version" that the document does not include. Where a section's
+      example request line names another path than its API URL, the API URL is used.
+  - title: Kiloview NDI Device HTTP API (Version 1.0), web edition, "Security rules"
+    author: Changsha Kiloview Electronic Technology Co., Ltd.
+    url: https://www.kiloview.com/en/docs/ndi-device-http-apiversion-1-0/
+    note: >
+      Manufacturer document for other Kiloview devices, used only as background on how Kiloview
+      web APIs take a login token back (headers or cookies); it does not cover the CUBE R1.
+  - title: Kiloview N60 WEB API EN Version 2.01, 1.1.1 User Login and 1.1.2 Login Verification
+    author: Changsha Kiloview Electronic Technology Co., Ltd.
+    url: https://enstatic.kiloview.com/wp-content/uploads/2025/09/N60-WEB-API-EN-Version2.01.pdf
+    note: >
+      Manufacturer document for another Kiloview device whose login answers with the same token,
+      alias and username fields; it has the client build a cookie holding user and token from
+      them. Used only as the basis for the cookie this spec sends (see quirks).
+  - title: Bitfocus Companion module kiloview-encoder (MIT), src/e3-handler.js
+    url: https://github.com/bitfocus/companion-module-kiloview-encoder
+    note: >
+      Community source, MIT licence, for another Kiloview device: after its login it sends the
+      token as it is in the Authorization header. Used only as the basis for the Authorization
+      header this spec sends (see quirks).
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  # The document does not say how the login's token is sent back. The token
+  # setting is sent both ways other Kiloview web APIs take it: as it is in
+  # Authorization (auth: header) and in a cookie with the user name.
+  auth: header
+  auth_header: Authorization
+  headers:
+    Cookie: "user={settings.username}; token={settings.token}"
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/r1/config/general/get.json }
+
+settings:
+  token:
+    type: string
+    secret: true
+    max_length: 512
+    default: ""
+    label: Login token
+    description: "The token the login command returns (users/login.json), sent with every request; leave empty while the recorder takes requests without a login."
+  username:
+    type: string
+    max_length: 64
+    default: admin
+    label: User name
+    description: "The user the token belongs to, sent with the token in the cookie; the recorder's default user is admin."
+  project_id:
+    type: int
+    min: 1
+    max: 65535
+    default: 1
+    label: Project
+    description: "The project whose windows and recording the commands and polls address; the document gives 1 as the default project."
+  websocket_port:
+    type: int
+    min: 1
+    max: 65535
+    default: 12346
+    label: Websocket port
+    description: "The port of the recorder's websocket, which pushes recording and storage changes; the general configuration reports it (12346 in the document)."
+
+ports:
+  - { port: 80, protocol: http, role: control }
+  - { port: 12346, protocol: ws, role: push, setting: websocket_port, note: "the recorder's websocket, pushing recording updates and disk lock changes" }
+
+models:
+  - id: cube-r1
+    name: Kiloview CUBE R1
+    supports:
+      - login
+      - logout
+      - change_password
+      - get_general_config
+      - list_sources
+      - add_auto_discovery_group
+      - add_manual_discovery_group
+      - get_discovery_group
+      - modify_auto_discovery_group
+      - modify_manual_discovery_group
+      - remove_discovery_group
+      - refresh_sources
+      - list_layouts
+      - set_layout
+      - get_output
+      - set_window_source
+      - set_window_name
+      - set_window_display
+      - remove_window_source
+      - clear_window_sources
+      - set_all_windows_visible
+      - set_window_audio
+      - get_storage
+      - set_storage
+      - get_recording_status
+      - start_recording
+      - stop_recording
+      - get_recording_settings
+      - set_recording_settings
+      - get_performance
+      - get_webrtc_offer
+      - remove_webrtc_session
+      - list_recordings
+      - get_recording_info
+      - delete_recording
+      - get_hostname
+      - set_hostname
+      - get_timezone
+      - set_timezone
+      - get_time_sync
+      - set_time_sync
+      - sync_time_now
+      - get_network
+      - set_network
+      - get_firmware
+    verification: none
+    notes: >
+      NDI High Bandwidth and NDI|HX multi-channel recorder with a multiview monitoring output, API
+      under /api/r1/ (CUBE R1 API 2023.11). The CUBE X1 has another API (/api/cube/v2/) and its
+      own spec.
+
+maps:
+  encoding: { native: "0", h264: "1", h265: "2" }
+  dhcp: { "true": "y", "false": "n" }
+
+commands:
+  # ── Users (2.1-2.3) ───────────────────────────────────────────────────────
+  login:
+    summary: Log in and return the token for the token setting (POST users/login.json)
+    params:
+      username: { type: string, max_length: 64, required: true, label: User name,
+        description: "The recorder's user name, admin by default." }
+      password: { type: string, max_length: 128, required: true, secret: true, label: Password,
+        description: "That user's password." }
+    send: { method: POST, path: /api/r1/users/login.json, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.token" }
+    returns: value
+
+  logout:
+    summary: End the token's login (GET users/logout.json)
+    send: { method: GET, path: /api/r1/users/logout.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  change_password:
+    summary: Change a user's password (POST users/modify.json)
+    params:
+      username: { type: string, max_length: 64, required: true, label: User name,
+        description: "The user whose password changes." }
+      old_password: { type: string, max_length: 128, required: true, secret: true, label: Current password,
+        description: "The user's password now." }
+      new_password: { type: string, max_length: 128, required: true, secret: true, label: New password,
+        description: "The password to set." }
+    send: { method: POST, path: /api/r1/users/modify.json, content_type: application/json,
+            body: '{"oldpassword":{old_password:json},"username":{username:json},"password":{new_password:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── General configuration (1.1) ───────────────────────────────────────────
+  get_general_config:
+    summary: The software name, language options and websocket port (GET config/general/get.json)
+    send: { method: GET, path: /api/r1/config/general/get.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  # ── Source discovery (3.1-3.6) ────────────────────────────────────────────
+  list_sources:
+    summary: Every discovery group and the NDI sources it found (GET source/list.json)
+    send: { method: GET, path: /api/r1/source/list.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  add_auto_discovery_group:
+    summary: Add an automatic discovery group, with NDI groups and an optional discovery server (POST source/add.json)
+    params:
+      name: { type: string, max_length: 64, required: true, label: Name,
+        description: "The discovery group's name, different from every other group's." }
+      server_enabled: { type: bool, required: true, label: Discovery server,
+        description: "Whether sources are found through an NDI discovery server." }
+      server: { type: string, max_length: 64, required: true, label: Server address,
+        description: "The NDI discovery server's address, such as 192.168.1.1; empty when none is used." }
+      ndi_groups: { type: json, required: true, label: NDI groups,
+        description: "JSON array of the NDI group names to look in, such as [\"public\",\"studio\"]." }
+    send: { method: POST, path: /api/r1/source/add.json, content_type: application/json,
+            body: '{"disc_name":{name:json},"disc_type":"Auto","discovery_enable":{server_enabled},"discovery_ip":{server:json},"group":{ndi_groups}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  add_manual_discovery_group:
+    summary: Add a manual discovery group that looks for sources at the addresses given (POST source/add.json)
+    params:
+      name: { type: string, max_length: 64, required: true, label: Name,
+        description: "The discovery group's name, different from every other group's." }
+      ndi_groups: { type: json, required: true, label: NDI groups,
+        description: "JSON array of the NDI group names to look in, such as [\"public\"]." }
+      addresses: { type: json, required: true, label: Addresses,
+        description: "JSON array of the IP addresses of the senders to look at, such as [\"192.168.40.11\"]." }
+    send: { method: POST, path: /api/r1/source/add.json, content_type: application/json,
+            body: '{"disc_name":{name:json},"disc_type":"Manual","group":{ndi_groups},"ip":{addresses}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  get_discovery_group:
+    summary: One discovery group's name, type, server, NDI groups or addresses (GET source/get_param.json)
+    params:
+      group_id: { type: string, max_length: 32, required: true, label: Group,
+        description: "The discovery group's disc_id, as the source list gives it." }
+    send: { method: GET, path: /api/r1/source/get_param.json, query: { disc_id: "{group_id}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  modify_auto_discovery_group:
+    summary: Change a discovery group into, or keep it as, an automatic one with these settings (POST source/modify.json)
+    params:
+      group_id: { type: string, max_length: 32, required: true, label: Group,
+        description: "The discovery group's disc_id, as the source list gives it." }
+      name: { type: string, max_length: 64, required: true, label: Name,
+        description: "The discovery group's name." }
+      server_enabled: { type: bool, required: true, label: Discovery server,
+        description: "Whether sources are found through an NDI discovery server." }
+      server: { type: string, max_length: 64, required: true, label: Server address,
+        description: "The NDI discovery server's address; empty when none is used." }
+      ndi_groups: { type: json, required: true, label: NDI groups,
+        description: "JSON array of the NDI group names to look in." }
+    send: { method: POST, path: /api/r1/source/modify.json, content_type: application/json,
+            body: '{"disc_id":{group_id:json},"disc_name":{name:json},"disc_type":"Auto","discovery_enable":{server_enabled},"discovery_ip":{server:json},"group":{ndi_groups}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  modify_manual_discovery_group:
+    summary: Change a discovery group into, or keep it as, a manual one with these addresses (POST source/modify.json)
+    params:
+      group_id: { type: string, max_length: 32, required: true, label: Group,
+        description: "The discovery group's disc_id, as the source list gives it." }
+      name: { type: string, max_length: 64, required: true, label: Name,
+        description: "The discovery group's name." }
+      ndi_groups: { type: json, required: true, label: NDI groups,
+        description: "JSON array of the NDI group names to look in." }
+      addresses: { type: json, required: true, label: Addresses,
+        description: "JSON array of the IP addresses of the senders to look at." }
+    send: { method: POST, path: /api/r1/source/modify.json, content_type: application/json,
+            body: '{"disc_id":{group_id:json},"disc_name":{name:json},"disc_type":"Manual","group":{ndi_groups},"ip":{addresses}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  remove_discovery_group:
+    summary: Delete a discovery group (POST source/remove.json)
+    params:
+      group_id: { type: string, max_length: 32, required: true, label: Group,
+        description: "The discovery group's disc_id, as the source list gives it." }
+    send: { method: POST, path: /api/r1/source/remove.json, content_type: application/json, body: '{"disc_id":{group_id:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  refresh_sources:
+    summary: Search for sources again once (POST source/refresh.json)
+    send: { method: POST, path: /api/r1/source/refresh.json, content_type: application/json, body: '{"refresh":true}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Layouts (4.1-4.2) ─────────────────────────────────────────────────────
+  list_layouts:
+    summary: Every multiview layout and its windows' positions (GET layout/icon.json)
+    send: { method: GET, path: /api/r1/layout/icon.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_layout:
+    summary: Switch the project's multiview to a layout (POST layout/setLayout.json)
+    params:
+      layout_id: { type: int, min: 1, max: 65535, required: true, label: Layout,
+        description: "The layout's id, as the layout list gives it." }
+      windows: { type: int, min: 1, max: 20, required: true, label: Windows,
+        description: "The layout's number of windows (its number in the layout list)." }
+    send: { method: POST, path: /api/r1/layout/setLayout.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id},"layout_id":{layout_id},"layout_number":{windows}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Monitoring windows (5.1-5.8) ──────────────────────────────────────────
+  get_output:
+    summary: The project's layout and each window's source, name, bit rate and display (GET output/get.json)
+    send: { method: GET, path: /api/r1/output/get.json, query: { project_id: "{settings.project_id}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_window_source:
+    summary: Put an NDI source in a window, or swap two windows' sources (POST output/setSource.json)
+    params:
+      position: { type: int, min: 1, max: 20, required: true, label: Window,
+        description: "The window's position in the layout, numbered from 1." }
+      source: { type: string, max_length: 256, required: true, label: Source,
+        description: "The NDI source's id from the source list, such as KILOVIEW (Chan 1); for a swap, what the document calls the stream id of the other window." }
+      operation: { type: enum, values: [source, display], default: source, label: Operation,
+        description: "source puts the source in the window; display swaps the video sources of two windows." }
+    send: { method: POST, path: /api/r1/output/setSource.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id},"position":{position},"stream_id":{source:json},"type":{operation:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  set_window_name:
+    summary: Rename a window (POST output/setName.json)
+    params:
+      position: { type: int, min: 1, max: 20, required: true, label: Window,
+        description: "The window's position in the layout, numbered from 1." }
+      name: { type: string, max_length: 64, required: true, label: Name,
+        description: "The window's new name; empty clears it." }
+    send: { method: POST, path: /api/r1/output/setName.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id},"position":{position},"name":{name:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  set_window_display:
+    summary: Show or hide a window's video and its audio meter (POST output/setEnable.json)
+    params:
+      position: { type: int, min: 1, max: 20, required: true, label: Window,
+        description: "The window's position in the layout, numbered from 1." }
+      show_all: { type: bool, required: true, label: Show both,
+        description: "The window's select-all switch: whether both the video and the audio meter are shown." }
+      show_volume: { type: bool, required: true, label: Show audio,
+        description: "Whether the window shows its audio (speaker) meter." }
+      show_video: { type: bool, required: true, label: Show video,
+        description: "Whether the window shows its video." }
+    send: { method: POST, path: /api/r1/output/setEnable.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id},"position":{position},"showAll":{show_all},"showVolume":{show_volume},"showVideo":{show_video}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  remove_window_source:
+    summary: Take the source out of one window (POST output/remove.json)
+    params:
+      position: { type: int, min: 1, max: 20, required: true, label: Window,
+        description: "The window's position in the layout, numbered from 1." }
+    send: { method: POST, path: /api/r1/output/remove.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id},"position":{position}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  clear_window_sources:
+    summary: Take the sources out of every window of the current layout (POST output/deleteAll.json)
+    send: { method: POST, path: /api/r1/output/deleteAll.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  set_all_windows_visible:
+    summary: Show or hide the video of every window of the current layout (POST output/setGlobalVisible.json)
+    params:
+      visible: { type: bool, required: true, label: Visible,
+        description: "Whether the windows show their video." }
+    send: { method: POST, path: /api/r1/output/setGlobalVisible.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id},"outputGlobalVisible":{visible}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  set_window_audio:
+    summary: Turn a window's sound on or off (POST output/window_audio_set.json)
+    params:
+      position: { type: int, min: 1, max: 20, required: true, label: Window,
+        description: "The window's position in the layout, numbered from 1." }
+      audio: { type: enum, values: ["on", "off"], required: true, label: Sound,
+        description: "on plays the window's sound, off mutes it." }
+    send: { method: POST, path: /api/r1/output/window_audio_set.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id},"position":{position},"volume":{audio:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Storage (6.1-6.2) ─────────────────────────────────────────────────────
+  get_storage:
+    summary: Each disk's state, capacity and channels, the start disk and the file split rule (GET storage/getStoInfo.json)
+    send: { method: GET, path: /api/r1/storage/getStoInfo.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_storage:
+    summary: Choose the disk recording starts on and how recordings are split into files (POST storage/setStoLimit.json)
+    params:
+      start_disk: { type: string, max_length: 32, required: true, label: Start disk,
+        description: "The id of the disk recording starts on, as the storage information gives it." }
+      split: { type: enum, values: [size, time, default], required: true, label: File split,
+        description: "size starts a new file at the size limit, time at the time limit, default uses the recorder's own rule." }
+      limit_size: { type: int, min: 1, max: 1000000, required: true, label: Size limit,
+        description: "The file size that starts a new file with the size rule, in GB." }
+      limit_time: { type: int, min: 1, max: 1000000, required: true, label: Time limit,
+        description: "The duration that starts a new file with the time rule, in minutes." }
+    send: { method: POST, path: /api/r1/storage/setStoLimit.json, content_type: application/json,
+            body: '{"choose":{start_disk:json},"limitType":{split:json},"limitSize":{limit_size},"limitTime":{limit_time}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Recording (7.1-7.4) ───────────────────────────────────────────────────
+  get_recording_status:
+    summary: Whether the project is recording and since when (GET record/getRecStatus.json)
+    send: { method: GET, path: /api/r1/record/getRecStatus.json, query: { project_id: "{settings.project_id}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  start_recording:
+    summary: Start recording every window of the project (POST record/setRecStatus.json)
+    send: { method: POST, path: /api/r1/record/setRecStatus.json, content_type: application/json, body: '{"isRecording":true}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  stop_recording:
+    summary: Stop recording every window of the project (POST record/setRecStatus.json)
+    send: { method: POST, path: /api/r1/record/setRecStatus.json, content_type: application/json, body: '{"isRecording":false}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  get_recording_settings:
+    summary: The recording encoding, time synchronization and schedule (GET record/getinfo.json)
+    send: { method: GET, path: /api/r1/record/getinfo.json, query: { project_id: "{settings.project_id}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_recording_settings:
+    summary: Set the recording encoding, time synchronization and scheduled start and stop (POST record/setinfo.json)
+    params:
+      encoding: { type: enum, values: [native, h264, h265], required: true, label: Encoding,
+        description: "native records the NDI streams as they arrive; h264 and h265 transcode them." }
+      sync: { type: bool, required: true, label: Force time sync,
+        description: "Whether recordings are forced into time synchronization." }
+      scheduled_start: { type: bool, required: true, label: Scheduled start,
+        description: "Whether recording starts by itself at the start time." }
+      start_time: { type: string, max_length: 19, pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$", required: true, label: Start time,
+        description: "When the scheduled recording starts, as YYYY-MM-DD HH:MM:SS in the recorder's time zone." }
+      scheduled_stop: { type: bool, required: true, label: Scheduled stop,
+        description: "Whether recording stops by itself at the stop time." }
+      stop_time: { type: string, max_length: 19, pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$", required: true, label: Stop time,
+        description: "When the scheduled recording stops, as YYYY-MM-DD HH:MM:SS in the recorder's time zone." }
+    send: { method: POST, path: /api/r1/record/setinfo.json, content_type: application/json,
+            body: '{"solution":{encoding:map.encoding},"sync":{sync},"isStart":{scheduled_start},"startTime":{start_time:json},"isStop":{scheduled_stop},"stopTime":{stop_time:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Performance (8.1) ─────────────────────────────────────────────────────
+  get_performance:
+    summary: CPU, GPU and memory use, CPU temperature and network speed (GET performance/getSys.json)
+    send: { method: GET, path: /api/r1/performance/getSys.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  # ── WebRTC preview (9.1-9.2) ──────────────────────────────────────────────
+  get_webrtc_offer:
+    summary: Open a WebRTC preview session and return its SDP offer and session id (GET webrtc/get_sdp.json)
+    params:
+      ip: { type: string, max_length: 64, required: true, label: Address,
+        description: "The IP address the document's request carries, such as the recorder's own address (192.168.39.191 in its example)." }
+    send: { method: GET, path: /api/r1/webrtc/get_sdp.json, query: { pro_id: "1", win_id: "1", ip: "{ip}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  remove_webrtc_session:
+    summary: Close a WebRTC preview session (GET webrtc/remove_session.json)
+    params:
+      session_id: { type: string, max_length: 64, required: true, label: Session,
+        description: "The session id get_webrtc_offer returned." }
+    send: { method: GET, path: /api/r1/webrtc/remove_session.json, query: { session_id: "{session_id}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Playback files (10.1-10.3) ────────────────────────────────────────────
+  list_recordings:
+    summary: The recorded files of one channel on one disk, optionally within a time range (POST playback/getPlayList.json)
+    params:
+      disk_id: { type: string, max_length: 32, required: true, label: Disk,
+        description: "The disk's id, as the storage information gives it." }
+      channel: { type: string, max_length: 256, required: true, label: Channel,
+        description: "The recorded channel's name, as the storage information lists it on the disk." }
+      from: { type: string, max_length: 19, pattern: "^(\\d{4}-\\d{1,2}-\\d{1,2} \\d{1,2}:\\d{2}:\\d{2})?$", default: "", label: From,
+        description: "Earliest file time, as YYYY-MM-DD HH:MM:SS; empty for no earliest time." }
+      to: { type: string, max_length: 19, pattern: "^(\\d{4}-\\d{1,2}-\\d{1,2} \\d{1,2}:\\d{2}:\\d{2})?$", default: "", label: To,
+        description: "Latest file time, as YYYY-MM-DD HH:MM:SS; empty for no latest time." }
+    send: { method: POST, path: /api/r1/playback/getPlayList.json, content_type: application/json,
+            body: '{"disk_id":{disk_id:json},"channelName":{channel:json},"startTime":{from:json},"stopTime":{to:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  get_recording_info:
+    summary: A recorded file's type, size, creation time, duration and video and audio format (POST playback/getVideoInfo.json)
+    params:
+      path: { type: string, max_length: 1024, required: true, label: File,
+        description: "The file's videoSrc path, as the recording list gives it." }
+    send: { method: POST, path: /api/r1/playback/getVideoInfo.json, content_type: application/json, body: '{"videoSrc":{path:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  delete_recording:
+    summary: Delete a recorded file from its disk (POST playback/remove.json)
+    params:
+      path: { type: string, max_length: 1024, required: true, label: File,
+        description: "The file's videoSrc path, as the recording list gives it." }
+    send: { method: POST, path: /api/r1/playback/remove.json, content_type: application/json, body: '{"videoSrc":{path:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── System (11.1-11.7) ────────────────────────────────────────────────────
+  get_hostname:
+    summary: The recorder's host name (GET system/getHostname.json)
+    send: { method: GET, path: /api/r1/system/getHostname.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.hostname" }
+    returns: value
+
+  set_hostname:
+    summary: Rename the recorder (POST system/setHostname.json)
+    params:
+      hostname: { type: string, max_length: 63, pattern: "^[A-Za-z0-9-]+$", required: true, label: Host name,
+        description: "The new host name: letters, digits and hyphens." }
+    send: { method: POST, path: /api/r1/system/setHostname.json, content_type: application/json, body: '{"hostname":{hostname:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  get_timezone:
+    summary: The recorder's time zone and its offset (GET system/getTimeZone.json)
+    send: { method: GET, path: /api/r1/system/getTimeZone.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_timezone:
+    summary: Set the recorder's time zone (POST system/setTimeZone.json)
+    params:
+      timezone: { type: string, max_length: 64, required: true, label: Time zone,
+        description: "The IANA time zone name, such as Europe/London or Asia/Aqtobe." }
+      offset: { type: string, max_length: 8, pattern: "^[+-]?\\d{1,2}(\\.\\d+)?$", required: true, label: Offset,
+        description: "The zone's offset from UTC in hours, as the recorder writes it (5 for Asia/Aqtobe)." }
+    send: { method: POST, path: /api/r1/system/setTimeZone.json, content_type: application/json,
+            body: '{"timezone":{timezone:json},"offset":{offset:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  get_time_sync:
+    summary: The recorder's time and how it is synchronized (GET system/getTimer.json)
+    send: { method: GET, path: /api/r1/system/getTimer.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_time_sync:
+    summary: Synchronize the clock with the device or with an NTP server (POST system/setTimer.json)
+    params:
+      mode: { type: enum, values: [dev, ntp], required: true, label: Synchronize with,
+        description: "dev keeps the recorder's own clock, ntp follows the NTP server." }
+      server: { type: string, max_length: 128, required: true, label: NTP server,
+        description: "The NTP server's address, such as 192.168.1.168." }
+    send: { method: POST, path: /api/r1/system/setTimer.json, content_type: application/json,
+            body: '{"timeType":{mode:json},"ip":{server:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  sync_time_now:
+    summary: Synchronize the clock once, now (POST system/timer/apply.json)
+    send: { method: POST, path: /api/r1/system/timer/apply.json, content_type: application/json,
+            body: '{"project_id":{settings.project_id}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Network (12.1-12.2) ───────────────────────────────────────────────────
+  get_network:
+    summary: Each network interface's addressing, link state and MAC address (GET network/getNet.json)
+    send: { method: GET, path: /api/r1/network/getNet.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  set_network:
+    summary: Set a network interface's addressing and state (POST network/modifyNet.json)
+    params:
+      interface: { type: string, max_length: 16, pattern: "^[A-Za-z0-9_.-]+$", required: true, label: Interface,
+        description: "The interface's device name, as the network information gives it (eth0, ofp0, ofp1)." }
+      dhcp: { type: bool, required: true, label: DHCP,
+        description: "Whether the interface takes its address from DHCP; off uses the address below." }
+      ip: { type: string, max_length: 15, pattern: "^\\d{1,3}(\\.\\d{1,3}){3}$", required: true, label: IP address,
+        description: "The interface's static IPv4 address." }
+      netmask: { type: string, max_length: 15, pattern: "^\\d{1,3}(\\.\\d{1,3}){3}$", required: true, label: Subnet mask,
+        description: "The interface's subnet mask, such as 255.255.255.0." }
+      gateway: { type: string, max_length: 15, pattern: "^\\d{1,3}(\\.\\d{1,3}){3}$", required: true, label: Gateway,
+        description: "The default gateway's IPv4 address." }
+      dns: { type: string, max_length: 15, pattern: "^\\d{1,3}(\\.\\d{1,3}){3}$", required: true, label: DNS server,
+        description: "The DNS server's IPv4 address." }
+      link: { type: enum, values: [up, down], default: up, label: State,
+        description: "up enables the interface, down disables it." }
+    send: { method: POST, path: /api/r1/network/modifyNet.json, content_type: application/json,
+            body: '{"device":{interface:json},"dynamic":"{dhcp:map.dhcp}","dns":{dns:json},"ip":{ip:json},"state":{link:json},"gw":{gateway:json},"sub":{netmask:json}}' }
+    expect: { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+
+  # ── Firmware (13.1) ───────────────────────────────────────────────────────
+  get_firmware:
+    summary: The software and firmware versions (GET firmware/get.json)
+    send: { method: GET, path: /api/r1/firmware/get.json }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The document has the login (users/login.json) answer with a token and other requests answer
+      "Token.Error" when it is missing or wrong, but does not say how the token is sent back. This
+      spec sends the token setting both ways other Kiloview web APIs take one: as it is in the
+      Authorization header, and in a cookie with the user name (user=<username>; token=<token>).
+      A consumer runs the login command and puts the token it returns in the token setting with
+      update_settings; while the setting is empty, no Authorization header is sent and the cookie
+      carries an empty token. A refused token is answered
+      with HTTP 200 and result "error", so it fails only that command and does not stop the
+      device; the document gives no token lifetime, so a consumer logs in again when commands
+      start failing with Token.Error.
+  - models: [all]
+    severity: info
+    text: >
+      Every answer is JSON with result "ok" or "error"; a command fails on an error answer. An
+      error's msg may be a number, which the document says a MsgCode interface turns into text,
+      but it does not give that interface's path for the CUBE R1, so the number is reported as it
+      is.
+  - models: [all]
+    severity: info
+    text: >
+      Several sections' example request lines name other paths than their API URL (record/get.json
+      and record/set.json for getRecStatus and setRecStatus, storage/get.json for getStoInfo,
+      /api/output/... for layout and output requests, ntp/apply.json for system/timer/apply.json).
+      This spec uses the API URLs. The system and network sections give no request method: their
+      reads are sent as GET and their changes as POST with a JSON body, as everywhere else.
+  - models: [all]
+    severity: warning
+    text: >
+      Recording is started and stopped for the whole project, every window at once
+      (record/setRecStatus.json takes only isRecording): the API has no per-channel recording
+      control. Each window records on its own thread, and the recorder announces the result on its
+      websocket. The project must be ready to record before recording can start.
+  - models: [all]
+    severity: info
+    text: >
+      The API has no command to format, erase, lock or unlock a disk, to reboot or shut the
+      recorder down, to reset it to factory settings or to update its firmware (the contents name a
+      13.2 "Update software version" the document does not include). Disk lock changes are only
+      pushed on the websocket (storePathUpdate), and the spec reads the storage information again
+      when one arrives.
+  - models: [all]
+    severity: critical
+    text: >
+      delete_recording deletes the file from the disk at once; there is no recycle bin or undo
+      through the API.
+  - models: [all]
+    severity: critical
+    text: >
+      set_network applies the interface's new addressing at once: a wrong address, mask or gateway,
+      or setting the interface the consumer reaches the recorder through to down, leaves it
+      unreachable, and only its local console or another interface can put it back.
+  - models: [all]
+    severity: warning
+    text: >
+      clear_window_sources empties every window of the current layout at once, and set_layout
+      replaces the windows shown; the previous assignment is not kept by the API.
+  - models: [all]
+    severity: info
+    text: >
+      The document types set_window_source's stream_id as a number 1-20, but its example and the
+      output list carry the source's name (KILOVIEW (Chan 1 )); the name is sent. With the display
+      operation (a swap of two windows' sources) the document does not say what stream_id names.
+  - models: [all]
+    severity: info
+    text: >
+      window_audio_set's volume is typed boolean but sent and reported as "on" or "off"; the text
+      is sent. setStoLimit's choose is typed string (the storage information reports it as "1")
+      but its example sends a number; the string is sent.
+  - models: [all]
+    severity: info
+    text: >
+      Whether all windows show their video (setGlobalVisible) is not reported by any read, so it is
+      not kept in state.
+  - models: [all]
+    severity: info
+    text: >
+      Playback is file management only: the API lists, describes and deletes recorded files, but
+      has no transport (play, pause, seek) and no file download; a file's videoSrc is a path on the
+      recorder. The recording list is a query with filters, returned by list_recordings, not kept
+      in state.
+  - models: [all]
+    severity: info
+    text: >
+      get_webrtc_offer returns the recorder's SDP offer and a session id for a browser-style
+      preview; the API documents no request for the client's answer, so a consumer cannot complete
+      the WebRTC session through this spec. remove_webrtc_session closes one. The document calls
+      pro_id and win_id reserved and always 1, so 1 is sent.
+  - models: [all]
+    severity: info
+    text: >
+      The document names a websocket port in the general configuration (12346) and the messages it
+      pushes (a record update, a storePathUpdate of disk locks) but not the websocket's path; the
+      spec opens it at /. Each push only says something changed, so it has the recording status, or
+      the storage information, read again. The polls keep state current without it.
+  - models: [all]
+    severity: info
+    text: >
+      Telemetry: the recording status and performance are read every 2 seconds, the windows and
+      storage every 5 seconds, everything else every 30 seconds; a change command has what it
+      changed read again at once.
+
+state:
+  device.name: { type: string, description: "The software's name (deviceName.en), CUBE R1" }
+  device.language_switch: { type: bool, description: "Whether the web interface shows its language switch" }
+  device.websocket_port: { type: int, description: "The recorder's websocket port" }
+
+  sources.groups.*.name: { type: string, description: "Discovery group name" }
+  sources.groups.*.type: { type: string, description: "Discovery type: Auto or Manual" }
+  sources.groups.*.server_enabled: { type: bool, description: "Whether an automatic group uses an NDI discovery server" }
+  sources.groups.*.server: { type: string, description: "An automatic group's NDI discovery server address" }
+  sources.groups.*.ndi_groups.*: { type: string, description: "The NDI groups the discovery group looks in, numbered from 0" }
+  sources.groups.*.addresses.*: { type: string, description: "A manual group's sender addresses, numbered from 0" }
+  sources.groups.*.sources.*.name: { type: string, description: "A found NDI source's name, keyed by its id" }
+  sources.groups.*.sources.*.address: { type: string, description: "A found NDI source's IP:port" }
+
+  layouts.*.windows: { type: int, description: "The layout's number of windows" }
+  layouts.*.positions.*.x: { type: float, unit: "%", description: "A window's left edge, in percent of the output width; windows numbered from 1" }
+  layouts.*.positions.*.y: { type: float, unit: "%", description: "A window's top edge, in percent of the output height" }
+  layouts.*.positions.*.width: { type: float, unit: "%", description: "A window's width, in percent of the output width" }
+  layouts.*.positions.*.height: { type: float, unit: "%", description: "A window's height, in percent of the output height" }
+
+  output.layout_id: { type: int, description: "The project's current layout id" }
+  output.layout_number: { type: int, description: "The current layout's number of windows" }
+  output.windows.*.name: { type: string, description: "Window name, keyed by position from 1" }
+  output.windows.*.source: { type: string, description: "The NDI source's id shown in the window" }
+  output.windows.*.source_name: { type: string, description: "The NDI source's name shown in the window" }
+  output.windows.*.bit_rate: { type: int, unit: bit/s, description: "The window's video bit rate" }
+  output.windows.*.ntp_state: { type: string, description: "The source's NTP state as reported: unsync, error or sync" }
+  output.windows.*.show_all: { type: bool, description: "Whether both video and audio meter are shown" }
+  output.windows.*.show_volume: { type: bool, description: "Whether the audio meter is shown" }
+  output.windows.*.show_video: { type: bool, description: "Whether the video is shown" }
+  output.windows.*.official: { type: bool, description: "Whether the source is a Kiloview or NewTek device" }
+  output.windows.*.audio: { type: string, description: "The window's sound: on or off" }
+
+  storage.disks.*.name: { type: string, description: "Disk name, keyed by disk id" }
+  storage.disks.*.unlocked: { type: bool, description: "Whether the disk is unlocked" }
+  storage.disks.*.state: { type: string, description: "Disk state: online or offline" }
+  storage.disks.*.total: { type: string, description: "Disk capacity as the recorder writes it, such as 900G" }
+  storage.disks.*.used: { type: string, description: "Used capacity as the recorder writes it, such as 30M" }
+  storage.disks.*.rate: { type: int, description: "Disk storage percentage as the recorder reports it" }
+  storage.disks.*.speed: { type: int, description: "Disk speed as the recorder reports it; the document gives no unit" }
+  storage.disks.*.recording: { type: bool, description: "Whether the disk is being recorded to" }
+  storage.disks.*.message: { type: string, description: "The disk's message, empty when there is none" }
+  storage.disks.*.channels.*.name: { type: string, description: "A channel recorded on the disk, keyed by its id" }
+  storage.start_disk: { type: string, description: "The id of the disk recording starts on" }
+  storage.split: { type: string, description: "File split rule: size, time or default" }
+  storage.limit_size: { type: int, unit: GB, description: "File size limit of the size rule" }
+  storage.limit_time: { type: int, unit: min, description: "Duration limit of the time rule" }
+
+  record.recording: { type: bool, description: "Whether the project is recording" }
+  record.start_time: { type: int, unit: ms, description: "When recording started, in milliseconds since 1970-01-01 UTC" }
+  record.message: { type: string, description: "The recorder's message about recording, empty when there is none" }
+  record.encoding: { type: string, description: "Recording encoding: native, h264 or h265" }
+  record.sync: { type: bool, description: "Whether recordings are forced into time synchronization" }
+  record.scheduled_start: { type: bool, description: "Whether a scheduled start is set" }
+  record.start_at: { type: string, description: "Scheduled start time, YYYY-MM-DD HH:MM:SS" }
+  record.scheduled_stop: { type: bool, description: "Whether a scheduled stop is set" }
+  record.stop_at: { type: string, description: "Scheduled stop time, YYYY-MM-DD HH:MM:SS" }
+
+  performance.cpu: { type: float, unit: "%", description: "CPU use" }
+  performance.gpu: { type: float, unit: "%", description: "GPU use" }
+  performance.temperature: { type: int, unit: °C, description: "CPU temperature" }
+  performance.memory_used: { type: int, unit: MB, description: "Memory in use" }
+  performance.memory_total: { type: int, unit: MB, description: "Total memory" }
+  performance.network_up: { type: int, unit: KB/s, description: "Upstream network speed (the document gives KB)" }
+  performance.network_down: { type: int, unit: KB/s, description: "Downstream network speed (the document gives KB)" }
+
+  system.hostname: { type: string, description: "Host name" }
+  system.timezone: { type: string, description: "Time zone name, such as Asia/Aqtobe" }
+  system.timezone_offset: { type: string, description: "The time zone's offset from UTC in hours, as the recorder writes it" }
+  system.time: { type: string, description: "The recorder's time as it reports it, milliseconds since 1970-01-01 UTC" }
+  system.time_sync: { type: string, description: "Time synchronization: dev (the device's clock) or ntp" }
+  system.ntp_server: { type: string, description: "NTP server address" }
+
+  network.interfaces.*.dhcp: { type: bool, description: "Whether the interface takes its address from DHCP; keyed by device name" }
+  network.interfaces.*.ip: { type: string, description: "IPv4 address" }
+  network.interfaces.*.netmask: { type: string, description: "Subnet mask" }
+  network.interfaces.*.gateway: { type: string, description: "Default gateway" }
+  network.interfaces.*.dns: { type: string, description: "DNS server" }
+  network.interfaces.*.link: { type: string, description: "Interface state: up or down" }
+  network.interfaces.*.mac: { type: string, description: "MAC address" }
+
+  firmware.software_version: { type: string, description: "Software version" }
+  firmware.firmware_version: { type: string, description: "Firmware version" }
+
+telemetry:
+  websocket:
+    path: /
+    port: { setting: websocket_port }
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/r1/record/getRecStatus.json, query: { project_id: "{settings.project_id}" } }
+        - { method: GET, path: /api/r1/performance/getSys.json }
+    - every_ms: 5000
+      send:
+        - { method: GET, path: /api/r1/output/get.json, query: { project_id: "{settings.project_id}" } }
+        - { method: GET, path: /api/r1/storage/getStoInfo.json }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/r1/config/general/get.json }
+        - { method: GET, path: /api/r1/source/list.json }
+        - { method: GET, path: /api/r1/layout/icon.json }
+        - { method: GET, path: /api/r1/record/getinfo.json, query: { project_id: "{settings.project_id}" } }
+        - { method: GET, path: /api/r1/system/getHostname.json }
+        - { method: GET, path: /api/r1/system/getTimeZone.json }
+        - { method: GET, path: /api/r1/system/getTimer.json }
+        - { method: GET, path: /api/r1/network/getNet.json }
+        - { method: GET, path: /api/r1/firmware/get.json }
+  updates:
+    # General configuration (1.1).
+    - path: "^/api/r1/config/general/get\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.deviceName.en", switch: "$.data.languageShow", port: "$.data.websocketPort" }
+      state:
+        device.name: "{name}"
+        device.language_switch: "{switch}"
+        device.websocket_port: "{port}"
+
+    # Sources (3.1): each group and its sources, the list whole; each group's
+    # settings are read in turn (3.3).
+    - path: "^/api/r1/source/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.disc_id", name: "$.disc_name" }
+      replace: sources.groups
+      state:
+        "sources.groups.{id:key}.name": "{name}"
+      then_send:
+        - { method: GET, path: /api/r1/source/get_param.json, query: { disc_id: "{id}" } }
+    - path: "^/api/r1/source/list\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].sources"
+      json: { group: "$^.disc_id", id: "$.id", name: "$.name", address: "$.ip" }
+      state:
+        "sources.groups.{group:key}.sources.{id:key}.name": "{name}"
+        "sources.groups.{group:key}.sources.{id:key}.address": "{address}"
+    - path: "^/api/r1/source/get_param\\.json"
+      json_match: { "$.result": "^ok$", "$.data.disc_id": "^(.+)$" }
+      json: { name: "$.data.disc_name", type: "$.data.disc_type", enabled: "$.data.discovery_enable", server: "$.data.discovery_ip" }
+      replace: ["sources.groups.{1:key}.ndi_groups", "sources.groups.{1:key}.addresses"]
+      state:
+        "sources.groups.{1:key}.name": "{name}"
+        "sources.groups.{1:key}.type": "{type}"
+        "sources.groups.{1:key}.server_enabled": "{enabled}"
+        "sources.groups.{1:key}.server": "{server}"
+    - path: "^/api/r1/source/get_param\\.json"
+      json_match: { "$.result": "^ok$", "$.data.disc_id": "^(.+)$" }
+      json_each: "$.data.group"
+      json: { group: "$" }
+      state: { "sources.groups.{1:key}.ndi_groups.{index}": "{group}" }
+    - path: "^/api/r1/source/get_param\\.json"
+      json_match: { "$.result": "^ok$", "$.data.disc_id": "^(.+)$" }
+      json_each: "$.data.ip"
+      json: { address: "$" }
+      state: { "sources.groups.{1:key}.addresses.{index}": "{address}" }
+    # A source change has the list read again.
+    - path: "^/api/r1/source/(add|modify|remove|refresh)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/source/list.json }
+
+    # Layouts (4.1).
+    - path: "^/api/r1/layout/icon\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", number: "$.number" }
+      replace: layouts
+      state: { "layouts.{id}.windows": "{number}" }
+    - path: "^/api/r1/layout/icon\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data[*].position"
+      json: { id: "$^.id", x: "$.x", y: "$.y", w: "$.width", h: "$.height" }
+      state:
+        "layouts.{id}.positions.{index:+1}.x": "{x}"
+        "layouts.{id}.positions.{index:+1}.y": "{y}"
+        "layouts.{id}.positions.{index:+1}.width": "{w}"
+        "layouts.{id}.positions.{index:+1}.height": "{h}"
+
+    # Monitoring windows (5.1), the list whole.
+    - path: "^/api/r1/output/get\\.json"
+      json_match: { "$.result": "^ok$" }
+      json: { layout: "$.data.layout_id", number: "$.data.layout_number" }
+      replace: output.windows
+      state:
+        output.layout_id: "{layout}"
+        output.layout_number: "{number}"
+    - path: "^/api/r1/output/get\\.json"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.layout"
+      json: { id: "$.id", name: "$.name", source: "$.stream_id", source_name: "$.stream_name", rate: "$.bit_rate",
+              ntp: "$.ntp_state", all: "$.showAll", volume: "$.showVolume", video: "$.showVideo",
+              official: "$.isKiloview", audio: "$.volume" }
+      state:
+        "output.windows.{id}.name": "{name}"
+        "output.windows.{id}.source": "{source}"
+        "output.windows.{id}.source_name": "{source_name}"
+        "output.windows.{id}.bit_rate": "{rate}"
+        "output.windows.{id}.ntp_state": "{ntp}"
+        "output.windows.{id}.show_all": "{all}"
+        "output.windows.{id}.show_volume": "{volume}"
+        "output.windows.{id}.show_video": "{video}"
+        "output.windows.{id}.official": "{official}"
+        "output.windows.{id}.audio": "{audio}"
+    # A layout or window change has the windows read again.
+    - path: "^/api/r1/(layout/setLayout|output/(setSource|setName|setEnable|remove|deleteAll|setGlobalVisible|window_audio_set))\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/output/get.json, query: { project_id: "{settings.project_id}" } }
+
+    # Storage (6.1), the disk list whole.
+    - path: "^/api/r1/storage/getStoInfo\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { choose: "$.data.choose", type: "$.data.limitType", size: "$.data.limitSize", time: "$.data.limitTime" }
+      replace: storage.disks
+      state:
+        storage.start_disk: "{choose}"
+        storage.split: "{type}"
+        storage.limit_size: "{size}"
+        storage.limit_time: "{time}"
+    - path: "^/api/r1/storage/getStoInfo\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.disk"
+      json: { id: "$.id", name: "$.name", unlock: "$.unlock", state: "$.state", total: "$.total", used: "$.used",
+              rate: "$.rate", speed: "$.speed", recording: "$.recoding", msg: "$.msg" }
+      state:
+        "storage.disks.{id:key}.name": "{name}"
+        "storage.disks.{id:key}.unlocked": "{unlock}"
+        "storage.disks.{id:key}.state": "{state}"
+        "storage.disks.{id:key}.total": "{total}"
+        "storage.disks.{id:key}.used": "{used}"
+        "storage.disks.{id:key}.rate": "{rate}"
+        "storage.disks.{id:key}.speed": "{speed}"
+        "storage.disks.{id:key}.recording": "{recording}"
+        "storage.disks.{id:key}.message": "{msg}"
+    - path: "^/api/r1/storage/getStoInfo\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.disk[*].channel"
+      json: { disk: "$^.id", id: "$.id", name: "$.name" }
+      state: { "storage.disks.{disk:key}.channels.{id:key}.name": "{name}" }
+    - path: "^/api/r1/storage/setStoLimit\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/storage/getStoInfo.json }
+    # The websocket's disk lock change (6.3) only names disks by name.
+    - json_match: { "$.socketType": "^storePathUpdate$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/storage/getStoInfo.json }
+
+    # Recording (7.1-7.4).
+    - path: "^/api/r1/record/getRecStatus\\.json"
+      json_match: { "$.result": "^ok$" }
+      json: { recording: "$.data.isRecording", start: "$.data.startTime", msg: "$.data.msg" }
+      state:
+        record.recording: "{recording}"
+        record.start_time: "{start}"
+        record.message: "{msg}"
+    - path: "^/api/r1/record/setRecStatus\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/record/getRecStatus.json, query: { project_id: "{settings.project_id}" } }
+        - { method: GET, path: /api/r1/storage/getStoInfo.json }
+    - json_match: { "$.update": "^record$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/record/getRecStatus.json, query: { project_id: "{settings.project_id}" } }
+        - { method: GET, path: /api/r1/storage/getStoInfo.json }
+    - path: "^/api/r1/record/getinfo\\.json"
+      json_match: { "$.result": "^ok$" }
+      json: { solution: "$.data.solution", sync: "$.data.sync", is_start: "$.data.isStart", start: "$.data.startTime",
+              is_stop: "$.data.isStop", stop: "$.data.stopTime" }
+      state:
+        record.encoding: { value: "{solution}", map: { "0": native, "1": h264, "2": h265 } }
+        record.sync: "{sync}"
+        record.scheduled_start: "{is_start}"
+        record.start_at: "{start}"
+        record.scheduled_stop: "{is_stop}"
+        record.stop_at: "{stop}"
+    - path: "^/api/r1/record/setinfo\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/record/getinfo.json, query: { project_id: "{settings.project_id}" } }
+
+    # Performance (8.1).
+    - path: "^/api/r1/performance/getSys\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { cpu: "$.data.cpu", gpu: "$.data.gpu", temp: "$.data.temp", mem_use: "$.data.mem_use",
+              mem_total: "$.data.mem_total", up: "$.data.net_up", down: "$.data.net_down" }
+      state:
+        performance.cpu: "{cpu}"
+        performance.gpu: "{gpu}"
+        performance.temperature: "{temp}"
+        performance.memory_used: "{mem_use}"
+        performance.memory_total: "{mem_total}"
+        performance.network_up: "{up}"
+        performance.network_down: "{down}"
+
+    # System (11.1-11.7).
+    - path: "^/api/r1/system/getHostname\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { hostname: "$.data.hostname" }
+      state: { system.hostname: "{hostname}" }
+    - path: "^/api/r1/system/setHostname\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/system/getHostname.json }
+    - path: "^/api/r1/system/getTimeZone\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { zone: "$.data.timezone", offset: "$.data.offset" }
+      state:
+        system.timezone: "{zone}"
+        system.timezone_offset: "{offset}"
+    - path: "^/api/r1/system/setTimeZone\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/system/getTimeZone.json }
+        - { method: GET, path: /api/r1/system/getTimer.json }
+    - path: "^/api/r1/system/getTimer\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { time: "$.data.time", type: "$.data.timeType", ip: "$.data.ip" }
+      state:
+        system.time: "{time}"
+        system.time_sync: "{type}"
+        system.ntp_server: "{ip}"
+    - path: "^/api/r1/system/(setTimer|timer/apply)\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/system/getTimer.json }
+
+    # Network (12.1-12.2).
+    - path: "^/api/r1/network/getNet\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { device: "$.device", dynamic: "$.dynamic", ip: "$.ip", sub: "$.sub", gw: "$.gw", dns: "$.dns",
+              state: "$.state", mac: "$.mac" }
+      replace: network.interfaces
+      state:
+        "network.interfaces.{device:key}.dhcp": { value: "{dynamic}", map: { "y": true, "n": false } }
+        "network.interfaces.{device:key}.ip": "{ip}"
+        "network.interfaces.{device:key}.netmask": "{sub}"
+        "network.interfaces.{device:key}.gateway": "{gw}"
+        "network.interfaces.{device:key}.dns": "{dns}"
+        "network.interfaces.{device:key}.link": "{state}"
+        "network.interfaces.{device:key}.mac": "{mac}"
+    - path: "^/api/r1/network/modifyNet\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/r1/network/getNet.json }
+
+    # Firmware (13.1).
+    - path: "^/api/r1/firmware/get\\.json$"
+      json_match: { "$.result": "^ok$" }
+      json: { software: "$.data.softwareVersion", firmware: "$.data.firmwareVersion" }
+      state:
+        firmware.software_version: "{software}"
+        firmware.firmware_version: "{firmware}"
