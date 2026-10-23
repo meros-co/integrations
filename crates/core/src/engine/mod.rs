@@ -10,6 +10,7 @@
 //! same reason.
 
 mod expect;
+pub(crate) use expect::json_path;
 pub(crate) mod framing;
 mod oauth;
 mod osc;

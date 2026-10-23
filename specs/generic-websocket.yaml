@@ -1,0 +1,233 @@
+spec: 1
+id: generic-websocket
+name: Generic WebSocket device
+vendor: Generic (any device or service with a WebSocket API)
+category: other
+implementation: native
+reason: >
+  A generic client rather than one device's protocol: what is sent (text, bytes or JSON) is chosen by the
+  operator at run time, and received messages are kept in state under a key only known when they arrive,
+  read from each JSON message at a path of the operator's choosing and bounded by evicting the least
+  recently heard key. A request waits for the next message matching a regex or JSON values of the
+  operator's choosing within a timeout of their choosing. The connection is pinged on a schedule to time
+  the device's answers and to notice a connection that died without a close.
+
+source:
+  - title: "RFC 6455: The WebSocket Protocol"
+    author: "I. Fette, A. Melnikov (IETF, 2011)"
+    url: "https://www.rfc-editor.org/rfc/rfc6455"
+    note: >
+      ws and wss URIs, default ports 80 and 443, path and query as the request target (§3). The opening
+      handshake carries extra header fields such as Authorization and cookies (§4.1); Sec-WebSocket-Protocol
+      lists the subprotocols the client offers, in order of preference, and the server answers with the one
+      it chose (§4.1, §4.2.2, §11.3.4); a response other than 101 fails the connection, and the client may
+      answer 401 by authenticating (§4.1, §4.2.2). Text frames carry UTF-8 and binary frames arbitrary bytes
+      (§5.6); ping and pong are control frames with at most 125 bytes of payload, a pong echoing the ping's
+      payload (§5.5.2, §5.5.3). A close frame carries a status code and a UTF-8 reason (§5.5.1, §7.4);
+      1005 and 1006 are never sent on the wire (§7.4.1).
+  - title: "RFC 8259: The JavaScript Object Notation (JSON) Data Interchange Format"
+    author: "T. Bray, Ed. (IETF, 2017)"
+    url: "https://www.rfc-editor.org/rfc/rfc8259"
+    note: "A JSON text is any serialized value (§2); JSON exchanged between systems is UTF-8 (§8.1)."
+  - title: "RFC 4648: The Base16, Base32, and Base64 Data Encodings"
+    author: "S. Josefsson (IETF, 2006)"
+    url: "https://www.rfc-editor.org/rfc/rfc4648"
+    note: "Base64 (§4), as binary parameters take bytes (SPEC.md §4) and as received binary messages are given."
+  - title: "RFC 7617: The 'Basic' HTTP Authentication Scheme"
+    author: "J. Reschke (IETF, 2015)"
+    url: "https://www.rfc-editor.org/rfc/rfc7617"
+    note: "Credentials are base64 of user-id ':' password (§2)."
+  - title: "RFC 6750: The OAuth 2.0 Authorization Framework: Bearer Token Usage"
+    author: "M. Jones, D. Hardt (IETF, 2012)"
+    url: "https://www.rfc-editor.org/rfc/rfc6750"
+    note: "Authorization: Bearer <token> (§2.1)."
+  - title: "RFC 9110: HTTP Semantics"
+    author: "R. Fielding, M. Nottingham, J. Reschke, Eds. (IETF, 2022)"
+    url: "https://www.rfc-editor.org/rfc/rfc9110"
+    note: >
+      Field names are tokens, case-insensitive (§5.1, tchar §5.6.2); field values must not contain CR, LF or
+      NUL (§5.5). 401 Unauthorized (§15.5.2), 403 Forbidden (§15.5.4).
+
+settings:
+  scheme: { type: enum, values: [ws, wss], default: ws,
+    label: Scheme,
+    description: "ws, or wss for an encrypted connection." }
+  # The request target: path and query, percent-encoded (RFC 6455 §3).
+  path: { type: string, pattern: "^/[!-~]*$", max_length: 8192, default: "/",
+    label: Path,
+    description: "The path starting with /, query string included, percent-encoded and sent as given, such as /api/v1?client=1." }
+  # Offered in Sec-WebSocket-Protocol, in order of preference. The one the device chooses is in 'subprotocol'.
+  subprotocols: { type: string, pattern: '^[-!#$%&''*+.^_`|~0-9A-Za-z, ]*$', max_length: 1024, default: "",
+    label: Subprotocols,
+    description: "Subprotocols to offer, comma-separated in order of preference, such as v2.json, v1.json; empty offers none." }
+  # For a device serving wss with a self-signed certificate: still encrypted, the device's identity not checked.
+  accept_invalid_certs: { type: bool, default: false,
+    label: Accept invalid certificates,
+    description: "On accepts a self-signed wss certificate: the connection is still encrypted but the device's identity is not checked." }
+  # basic: Authorization: Basic on the opening request. bearer: Authorization: Bearer <token> (none while empty).
+  auth: { type: enum, values: [none, basic, bearer], default: none,
+    label: Authentication,
+    description: "none; basic sends the username and password on the opening request; bearer sends the token on it." }
+  username: { type: string, default: "",
+    label: Username,
+    description: "Username for basic authentication." }
+  password: { type: string, secret: true, default: "",
+    label: Password,
+    description: "Password for basic authentication." }
+  token: { type: string, secret: true, default: "",
+    label: Token,
+    description: "Bearer token sent as Authorization: Bearer on the opening request; empty sends none." }
+  # Headers on the opening request, as an object of name to value, such as {"Origin": "http://console"}.
+  headers: { type: json, default: {},
+    label: Headers,
+    description: "Headers sent on the opening request, as a JSON object of name to value, such as {\"Origin\": \"http://localhost\"}." }
+  # The same, for headers carrying a credential (an API key, a cookie); they replace same-named headers.
+  secret_headers: { type: json, secret: true, default: {},
+    label: Secret headers,
+    description: "Headers carrying a credential, such as {\"X-Api-Key\": \"...\"}, sent on the opening request; they replace same-named headers, and an Authorization header here replaces the configured authentication." }
+  # A ping every this many ms; a ping unanswered when the next is due drops the connection. 0: no pings.
+  ping_interval_ms: { type: int, min: 0, max: 3600000, default: 10000,
+    label: Ping interval,
+    description: "Time between pings, in milliseconds, each timing the device's pong as its latency; a ping still unanswered when the next is due drops the connection; 0 sends none." }
+  # Reopen after a failure or a close: 1 s, doubling to 30 s.
+  reconnect: { type: bool, default: true,
+    label: Reconnect,
+    description: "On opens the connection again after it fails or the device closes it, after 1 s doubling to 30 s; off leaves it closed until the connect command." }
+  # A JSONPath ($.a.b, $.a[0]) into each JSON message: messages are kept under 'messages' by its value there.
+  key_path: { type: string, pattern: "^(\\$([.][^.\\[\\]]+|\\[[0-9]+\\])*)?$", max_length: 1024, default: "",
+    label: Key path,
+    description: "A JSON path such as $.type or $.event.name: each JSON message with a string, number or boolean there is kept in the messages state under that value; empty keeps none." }
+  # The most keys kept under 'messages'; the least recently received is dropped first.
+  max_keys: { type: int, min: 1, max: 10000, default: 256,
+    label: Maximum keys,
+    description: "The most keys kept in the messages state; the least recently received key is dropped first." }
+
+ports:
+  - { port: 80, protocol: ws, role: control }
+  - { port: 443, protocol: wss, role: control, when: "scheme wss" }
+
+models:
+  - id: generic
+    name: "Any WebSocket API, ws or wss (port defaults to 80, or 443 for wss)"
+    supports: [send_text, send_binary, send_json, request, connect, disconnect, clear_messages]
+    verification: none
+
+commands:
+  send_text:
+    summary: >
+      Send one text message, as given (UTF-8, line breaks and tabs included). Returns unverified: WebSocket
+      has no acknowledgement of a message
+    params:
+      text: { type: string, multiline: true, required: true,
+        label: Text,
+        description: "The text message to send, as given; it may hold line breaks." }
+    returns: none
+  send_binary:
+    summary: >
+      Send one binary message: the bytes given as base64, or a host file's contents. Returns unverified
+    params:
+      data: { type: binary, required: true,
+        label: Bytes,
+        description: "The message's bytes, given as base64 or as a host file." }
+    returns: none
+  send_json:
+    summary: >
+      Send any JSON value as one text message, serialized compactly. Returns unverified
+    params:
+      json: { type: json, required: true,
+        label: JSON,
+        description: "The JSON value to send, such as {\"action\": \"get\", \"id\": 1}." }
+    returns: none
+  request:
+    summary: >
+      Send text (as send_text) or JSON (as send_json), give exactly one, then return the next message received
+      that answers it within timeout_ms, as last_message gives it (whole). A message answers when its text
+      matches the regex 'match' and its JSON holds every value of 'json_match' at that value's path (both
+      optional; a binary message answers only a request with neither). Fails with timeout otherwise.
+      Requests waiting together are answered in the order they were sent
+    params:
+      text: { type: string, multiline: true,
+        label: Text,
+        description: "Text message to send; give either this or json, not both." }
+      json: { type: json,
+        label: JSON,
+        description: "JSON value to send as a text message; give either this or text, not both." }
+      match: { type: string, max_length: 1024,
+        label: Reply pattern,
+        description: "A regex the reply's text must match; leave it unset to take the next message received." }
+      json_match: { type: json,
+        label: Reply JSON values,
+        description: "An object of JSON path to value, such as {\"$.id\": 7}: the reply's JSON must hold each value at its path." }
+      timeout_ms: { type: int, min: 1, max: 25000, default: 2000,
+        label: Timeout,
+        description: "How long to wait for the reply, in milliseconds, before the request fails with timeout." }
+    returns: value
+  connect:
+    summary: "Open the connection now if it is closed, as after disconnect or a failure with reconnect off; nothing if it is open"
+    returns: ack
+  disconnect:
+    summary: >
+      Close the connection with status 1000 and keep it closed, whatever the reconnect setting, until
+      connect. Waiting requests fail
+    returns: ack
+  clear_messages:
+    summary: "Forget the received messages kept in state"
+    returns: ack
+
+state:
+  last_message.type: { type: string, description: "text or binary: the kind of the last message received" }
+  last_message.text: { type: string, description: "The last text message, at most 64 KiB of it here (the message event and a request's result carry it whole)" }
+  last_message.base64: { type: string, description: "The last binary message's bytes in base64, at most 64 KiB of base64 here" }
+  last_message.json: { type: object, description: "The last text message parsed as JSON, when it is JSON (any JSON value) and at most 64 KiB; absent otherwise" }
+  last_message.key: { type: string, description: "The value at key_path in the last message's JSON, as text, when it has one" }
+  last_message.size: { type: int, unit: bytes, description: "The last message's length in bytes" }
+  last_message.truncated: { type: bool, description: "The last message was longer than state keeps, so text or base64 holds only its start" }
+  messages.*.json: { type: object, description: "The last JSON message with this value at key_path (keyed by the value as text, dots and slashes included), when it is at most 64 KiB; the 'max_keys' most recently received keys are kept" }
+  messages.*.count: { type: int, description: "Messages received with the key since it entered state" }
+  received_count: { type: int, description: "Messages received since the device was opened" }
+  sent_count: { type: int, description: "Messages sent since the device was opened" }
+  subprotocol: { type: string, description: "The subprotocol the device chose from those offered; absent when it chose none or none was offered" }
+  close.code: { type: int, description: "The status code of the device's last close frame (RFC 6455 §7.4), such as 1000 or 1001; absent when it closed without one" }
+  close.reason: { type: string, description: "Why the connection last ended: the device's close reason, or what failed" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every message received is a message event, {event: message, device, address, args, source}, even when
+      it repeats the last exactly: address is text or binary, args holds one object as last_message gives it
+      but whole, and source is the device's ip:port. State keeps at most 64 KiB of a message.
+  - models: [all]
+    severity: info
+    text: >
+      The latency reported is the time from each ping to its pong, and from each request to its reply. A
+      device that answers pings late but is otherwise there is still dropped when a ping is unanswered at the
+      next: lengthen ping_interval_ms, or set 0 to send none (the connection is then known lost only when
+      the operating system notices). Pings the device sends are answered by the core.
+  - models: [all]
+    severity: info
+    text: >
+      With subprotocols offered, a device that answers the handshake with none of them chosen is refused,
+      as is one choosing a subprotocol not offered: the core's WebSocket client requires the choice (RFC 6455
+      §4.1 lets a server choose none). Leave subprotocols empty for such a device.
+  - models: [all]
+    severity: warning
+    text: >
+      With credentials configured (auth, or an Authorization header in secret_headers), a handshake
+      answered 401 or 403 reports the device unauthorized and is not tried again until the device is opened
+      again or connect is sent, since retrying credentials on a schedule can lock a device out. Without
+      them, it is retried as any failure.
+  - models: [all]
+    severity: info
+    text: >
+      A binary message is sent whole: a host file is read into memory before it goes, since a WebSocket
+      message is framed with its length. Messages are sent in the order commands arrive, a host file's
+      included. Neither the core nor this module limits a message's size; the device may close the
+      connection with 1009 for one too big for it.
+  - models: [all]
+    severity: info
+    text: >
+      Opened for commands only, nothing changes: the module subscribes to nothing and polls nothing (what a
+      device needs to start sending, such as a subscription message, is sent with the commands), and pings
+      still check the connection. State follows JSON merge patch (RFC 7386), so a member of a message's
+      JSON whose value is null is absent from state; the message event keeps it.

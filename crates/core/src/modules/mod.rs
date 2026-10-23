@@ -75,6 +75,8 @@ mod generic_osc;
     feature = "osc-listener"
 ))]
 mod generic_tcp_udp;
+#[cfg(feature = "generic-websocket")]
+mod generic_websocket;
 #[cfg(feature = "http-listener")]
 mod http_listener;
 #[cfg(feature = "http-snapshot")]
@@ -353,6 +355,10 @@ pub(crate) fn construct(
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
+        #[cfg(feature = "generic-websocket")]
+        "generic-websocket" => Ok(Box::new(generic_websocket::GenericWebsocket::new(
+            context,
+        )?)),
         #[cfg(feature = "http-listener")]
         "http-listener" => Ok(Box::new(http_listener::HttpListener::new(context)?)),
         #[cfg(feature = "http-snapshot")]
