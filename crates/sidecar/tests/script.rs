@@ -250,6 +250,20 @@ async fn the_shared_binding_script() {
                     assert!(port.len() == 1 && port["name"].is_string(), "{label}");
                 }
             }
+            "midi_ports" => {
+                // Whatever ports this machine has: name, input, output.
+                let result = client.get("/v1/midi_ports").await;
+                for port in result["ok"].as_array().expect(&label) {
+                    let port = port.as_object().expect(&label);
+                    assert!(
+                        port.len() == 3
+                            && port["name"].is_string()
+                            && port["input"].is_boolean()
+                            && port["output"].is_boolean(),
+                        "{label}"
+                    );
+                }
+            }
             "open" => {
                 let result = client.post("/v1/open", step["request"].clone()).await;
                 if let Some(expect) = step.get("expect") {

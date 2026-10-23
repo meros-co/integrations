@@ -897,7 +897,7 @@ ports:
 | Field | Meaning |
 |---|---|
 | `port` | The default. `null` when there is none and one must be given; a `note` then says so |
-| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, or `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`) |
+| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`), or `midi`: a MIDI port of the host, with `port: null` and `setting: midi_input` or `midi_output` (native modules only, see [Native modules](#native-modules)) |
 | `role` | `control` (where commands go; the port given when opening a device overrides the transport's, not an HTTP endpoint's), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
 | `listener` | Who listens: `device` (the default) or `core` |
 | `setting` | The setting that changes this port, if any |
@@ -2413,6 +2413,31 @@ A native module can drive a device on a serial port of the host as well
 chooses it, and declares the six serial settings of `line-serial` (§2) with
 the device's defaults; `serial_port` is then optional, required only when
 the serial port is chosen.
+
+A native module can also open a MIDI port of the host (`Cx::midi_open`,
+reported like a TCP connection): a USB or other class-compliant MIDI
+device, or another program's port, named by its input and output as the
+operating system lists them. Its spec lists a `midi` entry in `ports` for
+each, `port: null`, with `setting: midi_input` or `setting: midi_output`
+(string settings), and such a device may be opened without a host. The
+port is the device's connection: one that cannot be opened (absent, or
+held by another program) or goes away (unplugged) is reported
+`disconnected` with a reason starting `midi:`, and the module opens it
+again. MIDI ports are opened on Windows (WinMM), macOS and iOS (CoreMIDI)
+and Linux (the ALSA sequencer) in a build with a MIDI integration; Android
+has none an app's native code can open (docs/MOBILE.md). Every delivery
+lists the host's MIDI ports: `Core::midi_ports` in Rust, `mi_midi_ports` in
+C, `midiPorts()` in Node, `midi_ports()` in Python and `GET /v1/midi_ports`
+in the HTTP service, each with its `name` and whether it is an `input`, an
+`output` or both. The list is empty in a build without a MIDI integration,
+on Android, and on a host whose MIDI system cannot be reached.
+
+The MIDI integrations (`generic-midi`, `midi-show-control`) share one link
+(`link` `rtp` or `port`): an RTP-MIDI session (Apple's MIDI Network Driver
+Protocol and RFC 6295) the core joins as the initiator, or a MIDI port.
+mDNS discovery (`mdns`) reports each RTP-MIDI session advertised as
+`_apple-midi._udp` for each MIDI integration in the core, at its control
+port.
 
 Every spec, spec-driven or native, is one integration, and each integration
 is a Cargo feature of the core named after its spec id (`sennheiser-ew-dx`,

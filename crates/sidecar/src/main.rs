@@ -24,6 +24,7 @@
 //! |------------------------------|---------------------------------------|----------------------------|
 //! | GET  /v1/catalog             |                                       | the catalogue              |
 //! | GET  /v1/serial_ports        |                                       | {ok: [{name}]} or {error}  |
+//! | GET  /v1/midi_ports          |                                       | {ok: [{name, input, output}]} or {error} |
 //! | POST /v1/open                | an OpenRequest                        | {device} or {error}        |
 //! | POST /v1/discover            | {action, protocols?, hints?}          | {ok} or {error}            |
 //! | POST /v1/execute             | {device, command, params}             | {ok} or {error}            |
@@ -44,13 +45,18 @@
 //!
 //! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
 //! (Sony cameras), `pjlink` (PJLink projectors) and `mdns` (Blackmagic ATEM,
-//! Videohub, HyperDeck, SmartView and MultiView, and Meros Cameras); none
+//! Videohub, HyperDeck, SmartView and MultiView, Meros Cameras, and RTP-MIDI
+//! sessions); none
 //! means every protocol that finds a device in the service's catalogue.
 //! `hints` are addresses where devices were last seen.
 //!
 //! `/v1/serial_ports` lists the serial ports of the machine running the
 //! service, by the name a device's `serial_port` setting takes (`COM3`,
 //! `/dev/ttyUSB0`), for a device wired to one of them; names only.
+//!
+//! `/v1/midi_ports` lists the MIDI ports of the machine running the
+//! service, by the name a MIDI device's `midi_input` and `midi_output`
+//! settings take, each with whether it is an input, an output or both.
 //!
 //! `/v1/settings` changes an open device's settings without closing it, as
 //! `update_settings` does in every delivery: `settings` are merged into the
@@ -241,6 +247,13 @@ async fn serial_ports(State(app): State<Shared>, headers: HeaderMap) -> Response
         return unauthorized();
     }
     Json(api::serial_ports(&app.core)).into_response()
+}
+
+async fn midi_ports(State(app): State<Shared>, headers: HeaderMap) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    Json(api::midi_ports(&app.core)).into_response()
 }
 
 async fn open(State(app): State<Shared>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
@@ -663,6 +676,7 @@ fn router(app: Shared) -> Router {
     Router::new()
         .route("/v1/catalog", get(catalog))
         .route("/v1/serial_ports", get(serial_ports))
+        .route("/v1/midi_ports", get(midi_ports))
         .route("/v1/open", post(open))
         .route("/v1/discover", post(discover))
         // A command's `binary` params may carry a file's bytes as base64 in

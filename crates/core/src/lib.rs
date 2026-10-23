@@ -55,9 +55,16 @@ mod mcp_discovery;
     feature = "blackmagic-multiview",
     feature = "blackmagic-smartview",
     feature = "blackmagic-videohub",
-    feature = "meros-camera"
+    feature = "generic-midi",
+    feature = "meros-camera",
+    feature = "midi-show-control"
 ))]
 mod mdns;
+#[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
+mod midi;
+mod midi_ports;
+#[cfg(all(test, feature = "generic-midi"))]
+mod midi_session_tests;
 pub mod module;
 mod modules;
 #[cfg(test)]
@@ -98,6 +105,7 @@ use tokio::sync::{mpsc, oneshot};
 pub use catalog::{Catalog, Params};
 pub use discovery::{DiscoverAction, DiscoverRequest, PROTOCOLS as DISCOVERY_PROTOCOLS};
 pub use events::Event;
+pub use midi_ports::MidiPortInfo;
 pub use module::{CommandError, CommandResult, Connection, Outcome};
 pub use session::{DeviceId, DeviceSnapshot};
 pub use streams::{Frame, StreamError, StreamHandle};
@@ -130,9 +138,9 @@ pub struct OpenRequest {
     /// empty or left out for an integration on which only the core listens
     /// (every one of its `ports` is `listener: core`), such as `osc-listener`,
     /// which hears any sender; it is then `0.0.0.0`. Likewise for a device
-    /// on a serial port of the host (a `serial` entry in its `ports`): the
-    /// port is named in its settings, and a module that can also use the
-    /// network refuses to do so without a host.
+    /// on a serial port or a MIDI port of the host (a `serial` or `midi`
+    /// entry in its `ports`): the port is named in its settings, and a
+    /// module that can also use the network refuses to do so without a host.
     #[serde(default)]
     pub host: String,
     /// The device's port, when it is not the protocol's default: many devices
@@ -347,6 +355,7 @@ impl Core {
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
                 streams: Default::default(),
                 serial: Arc::new(serial::HostPorts),
+                midi: Arc::new(midi_ports::HostMidi),
             }),
             closing: AtomicBool::new(false),
             in_flight: Arc::new(AtomicUsize::new(0)),
@@ -370,6 +379,28 @@ impl Core {
             .expect("set before any device is opened")
             .serial = ports;
         self
+    }
+
+    /// This core with its MIDI ports opened through `ports`, for tests that
+    /// play a device on an in-memory port.
+    #[cfg(test)]
+    pub(crate) fn with_midi_ports(mut self, ports: Arc<dyn midi_ports::MidiPorts>) -> Core {
+        Arc::get_mut(&mut self.services)
+            .expect("set before any device is opened")
+            .midi = ports;
+        self
+    }
+
+    /// The host's MIDI ports, for a consumer choosing the ones a device on a
+    /// MIDI port uses (the `midi_input` and `midi_output` settings): each
+    /// name, and whether it is an input, an output or both. Empty in a build
+    /// without a MIDI integration, on Android, and on a host whose MIDI
+    /// system cannot be reached (no ALSA sequencer).
+    pub fn midi_ports(&self) -> Result<Vec<MidiPortInfo>, String> {
+        self.services
+            .midi
+            .list()
+            .map_err(|e| format!("MIDI ports could not be listed: {e}"))
     }
 
     /// The host's serial ports, for a consumer choosing the one a device on
@@ -458,7 +489,9 @@ impl Core {
             });
         }
         let host = if request.host.trim().is_empty()
-            && (spec.core_listens_only() || (spec.uses_serial() && serial_link != Some(false)))
+            && (spec.core_listens_only()
+                || spec.uses_midi()
+                || (spec.uses_serial() && serial_link != Some(false)))
         {
             IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
         } else {

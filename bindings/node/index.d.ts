@@ -196,6 +196,15 @@ export interface SerialPort {
   name: string;
 }
 
+export interface MidiPort {
+  /** What the `midi_input` and `midi_output` settings take. */
+  name: string;
+  /** Whether it can be received from (`midi_input`). */
+  input: boolean;
+  /** Whether it can be sent to (`midi_output`). */
+  output: boolean;
+}
+
 export class Core extends EventEmitter {
   constructor(options?: CoreOptions);
   catalog(): { devices: Record<string, unknown> };
@@ -205,6 +214,12 @@ export class Core extends EventEmitter {
    * empty on Android and iOS.
    */
   serialPorts(): SerialPort[];
+  /**
+   * The host's MIDI ports, for the `midi_input` and `midi_output` settings of
+   * a MIDI device on one (`link: port`): empty in a build without a MIDI
+   * integration and on Android.
+   */
+  midiPorts(): MidiPort[];
   open(request: OpenRequest): DeviceId;
   /** Found devices arrive as `discovered` events. */
   discover(request: DiscoverRequest): void;

@@ -62,6 +62,10 @@ impl NativeCore {
         api::serial_ports(&self.core).to_string()
     }
 
+    fn midi_ports(&self) -> String {
+        api::midi_ports(&self.core).to_string()
+    }
+
     fn discover(&self, request: &str) -> String {
         match parse(request) {
             Ok(request) => api::discover(&self.core, &request).to_string(),
