@@ -78,6 +78,9 @@ const COMPLETION_TIMEOUT: Millis = 120_000;
 /// Wait after "command buffer full" before sending the command again.
 const BUSY_RETRY: Millis = 100;
 const BUSY_ATTEMPTS: u8 = 20;
+/// Sony: a cancel waits this long after a pan-tilt drive starts, and a
+/// pan-tilt drive this long after "command cancelled" (p.6; H800 p.6).
+const SONY_DRIVE_GAP: Millis = 200;
 /// Consecutive unanswered messages that mean the camera is gone.
 const MISSES_LOST: u32 = 3;
 const RETRY_MIN: Millis = 1_000;
@@ -97,6 +100,8 @@ const PROBE: Key = "probe";
 const LIVENESS: Key = "liveness";
 const TALLY: Key = "tally";
 const BUSY: Key = "busy";
+/// A cancel or pan-tilt drive held for the drive gap.
+const DRIVE_GAP: Key = "drive-gap";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Transport {
@@ -168,6 +173,10 @@ pub(crate) struct Profile {
     /// Camera replies go to the controller's UDP 52381 (Canon's default,
     /// "Response Port Number", CR-N500/CR-N300 Settings Guide p.64, p.103).
     fixed_reply_port: bool,
+    /// Least time from a pan-tilt drive starting to a cancel, and from
+    /// "command cancelled" to the next pan-tilt drive; 0 where the vendor
+    /// documents none.
+    drive_gap: Millis,
 }
 
 impl Profile {
@@ -184,6 +193,7 @@ impl Profile {
             stop_speed: 0x01,
             menu: Menu::Sony,
             fixed_reply_port: false,
+            drive_gap: SONY_DRIVE_GAP,
         };
         match model {
             "sony-brc-x1000" => Profile {
@@ -193,6 +203,7 @@ impl Profile {
                 ..sony
             },
             "ptzoptics" => Profile {
+                drive_gap: 0,
                 transport: Transport::RawTcp,
                 abs_tilt_speed: true,
                 max_tilt_speed: 0x14,
@@ -201,12 +212,14 @@ impl Profile {
                 ..sony
             },
             "birddog" => Profile {
+                drive_gap: 0,
                 abs_tilt_speed: true,
                 max_tilt_speed: 0x14,
                 max_preset: 64,
                 ..sony
             },
             "lumens" | "marshall" => Profile {
+                drive_gap: 0,
                 abs_tilt_speed: true,
                 max_tilt_speed: 0x18,
                 max_preset: 256,
@@ -215,6 +228,7 @@ impl Profile {
                 ..sony
             },
             "datavideo" => Profile {
+                drive_gap: 0,
                 pan_nibbles: 5,
                 max_pan_speed: 0x12,
                 max_tilt_speed: 0x12,
@@ -223,11 +237,13 @@ impl Profile {
                 ..sony
             },
             "aver" => Profile {
+                drive_gap: 0,
                 max_tilt_speed: 0x18,
                 max_preset: 128,
                 ..sony
             },
             "canon" => Profile {
+                drive_gap: 0,
                 max_tilt_speed: 0x18,
                 max_preset: 128,
                 fixed_reply_port: true,
@@ -919,6 +935,12 @@ enum Built {
     Unknown,
 }
 
+/// A PAN-TILT Drive command, `8x 01 06 01`-`05` (p.20): directional drive
+/// and stop, absolute and relative position, home and reset.
+fn is_drive(m: &Msg) -> bool {
+    m.kind == Kind::Command && matches!(m.payload.get(1..4), Some([0x01, 0x06, 0x01..=0x05]))
+}
+
 fn on_off(on: bool) -> u8 {
     if on {
         0x02
@@ -957,6 +979,10 @@ pub(crate) struct Visca {
     in_flight: Option<Flight>,
     executing: Vec<Executing>,
     busy_until: Millis,
+    /// When the last pan-tilt drive was sent or acknowledged.
+    drive_started: Option<Millis>,
+    /// No pan-tilt drive before this ("command cancelled" plus the gap).
+    drive_after: Millis,
     unsupported: BTreeSet<&'static str>,
     misses: u32,
     retry_after: Millis,
@@ -1060,6 +1086,8 @@ impl Visca {
             in_flight: None,
             executing: Vec::new(),
             busy_until: 0,
+            drive_started: None,
+            drive_after: 0,
             unsupported: BTreeSet::new(),
             misses: 0,
             retry_after: RETRY_MIN,
@@ -1752,10 +1780,18 @@ impl Visca {
         if self.in_flight.is_some() || !self.link || !self.ready {
             return;
         }
+        let now = cx.now();
         let blocked = |m: &Msg, s: &Visca| {
-            matches!(m.kind, Kind::Command) && (s.executing.len() >= 2 || cx.now() < s.busy_until)
+            matches!(m.kind, Kind::Command) && (s.executing.len() >= 2 || now < s.busy_until)
         };
-        let command_ready = self.commands.front().is_some_and(|m| !blocked(m, self));
+        let held = self
+            .commands
+            .front()
+            .map_or(0, |m| self.drive_gap_left(m, now));
+        if held > 0 {
+            cx.set_timer(DRIVE_GAP, held);
+        }
+        let command_ready = held == 0 && self.commands.front().is_some_and(|m| !blocked(m, self));
         let msg = if command_ready {
             self.commands.pop_front()
         } else {
@@ -1767,6 +1803,9 @@ impl Visca {
         self.seq = self.seq.wrapping_add(1);
         let seq = self.seq;
         self.transmit(cx, seq, &msg);
+        if is_drive(&msg) {
+            self.drive_started = Some(cx.now());
+        }
         self.in_flight = Some(Flight {
             msg,
             seq,
@@ -1774,6 +1813,27 @@ impl Visca {
             sent_at: cx.now(),
         });
         cx.set_timer(REPLY, REPLY_TIMEOUT);
+    }
+
+    /// How long Sony's drive gap still holds this command: a cancel within
+    /// the gap after a pan-tilt drive started, a pan-tilt drive within the
+    /// gap after "command cancelled" (p.6).
+    fn drive_gap_left(&self, m: &Msg, now: Millis) -> Millis {
+        let gap = self.profile.drive_gap;
+        if gap == 0 {
+            return 0;
+        }
+        let until = match m.kind {
+            Kind::Cancel(_) => self.drive_started.map_or(0, |t| t + gap),
+            Kind::Command if is_drive(m) => self.drive_after,
+            _ => 0,
+        };
+        until.saturating_sub(now)
+    }
+
+    /// "Command cancelled": the next pan-tilt drive waits the gap.
+    fn cancelled(&mut self, cx: &mut Cx) {
+        self.drive_after = cx.now() + self.profile.drive_gap;
     }
 
     fn arm_completion(&self, cx: &mut Cx) {
@@ -1867,7 +1927,9 @@ impl Visca {
             }
         }
         self.polls.clear();
-        for key in [REPLY, COMPLETION, FAST, SLOW, TALLY, BUSY, LIVENESS] {
+        for key in [
+            REPLY, COMPLETION, FAST, SLOW, TALLY, BUSY, DRIVE_GAP, LIVENESS,
+        ] {
             cx.cancel_timer(key);
         }
         self.connected = false;
@@ -2001,6 +2063,10 @@ impl Visca {
                     cx.cancel_timer(REPLY);
                     if matches!(f.msg.kind, Kind::Command) {
                         Self::timed(cx, &f);
+                        if is_drive(&f.msg) {
+                            // The drive executes from its ACK.
+                            self.drive_started = Some(cx.now());
+                        }
                         self.executing.push(Executing {
                             msg: f.msg,
                             socket,
@@ -2095,6 +2161,7 @@ impl Visca {
             self.finish(cx, &e.msg, Err(device_error(code)));
             // The cancel that caused it is answered by the same message.
             if code == 0x04 {
+                self.cancelled(cx);
                 if let Some(f) = self
                     .in_flight
                     .take_if(|f| f.msg.kind == Kind::Cancel(e.socket))
@@ -2115,6 +2182,7 @@ impl Visca {
             (Kind::Cancel(s), 0x04) => {
                 // y0 6p 04 answers the cancel; the cancelled command gets no
                 // Completion (p.7).
+                self.cancelled(cx);
                 if let Some(i) = self.executing.iter().position(|e| e.socket == s) {
                     let e = self.executing.remove(i);
                     self.arm_completion(cx);
@@ -2334,7 +2402,7 @@ impl Module for Visca {
                     self.pump(cx);
                 }
             }
-            BUSY => self.pump(cx),
+            BUSY | DRIVE_GAP => self.pump(cx),
             _ => {}
         }
     }
@@ -3121,6 +3189,8 @@ mod tests {
             &h("01 11 00 03 00 00 00 01 90 41 FF"),
         );
         m.polls.clear();
+        // Sent once the drive has run 200 ms (p.6).
+        let mut cx = Cx::new(SONY_DRIVE_GAP);
         m.command(&mut cx, 2, "cancel", &params(json!({"socket": 1})));
         drain(&mut cx);
         // y0 6p 04: the command in socket 1 was cancelled (p.7).
@@ -3136,6 +3206,89 @@ mod tests {
             result: Ok(Outcome::Ack)
         }));
         assert!(a.iter().any(|x| matches!(x, Action::Complete { id: 1, result: Err(CommandError::DeviceError { code: Some(c), .. }) } if c == "04")));
+    }
+
+    #[test]
+    fn sony_cancels_a_drive_after_200_ms_and_drives_again_200_ms_after_the_cancel() {
+        let mut m = ready("sony-visca-ip");
+        let mut cx = Cx::new(0);
+        m.command(
+            &mut cx,
+            1,
+            "pan_tilt",
+            &params(json!({"pan": "left", "tilt": "stop", "pan_speed": 5, "tilt_speed": 5})),
+        );
+        assert_eq!(sent(&drain(&mut cx)).len(), 1);
+        let mut cx = Cx::new(10);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 03 00 00 00 01 90 41 FF"),
+        );
+        m.polls.clear();
+        drain(&mut cx);
+        // The cancel waits until 200 ms after the drive's ACK (p.6).
+        let mut cx = Cx::new(60);
+        m.command(&mut cx, 2, "cancel", &params(json!({"socket": 1})));
+        let a = drain(&mut cx);
+        assert!(sent(&a).is_empty());
+        assert!(a.contains(&Action::SetTimer {
+            key: DRIVE_GAP,
+            after: 150
+        }));
+        let mut cx = Cx::new(210);
+        m.timer(&mut cx, DRIVE_GAP);
+        assert_eq!(
+            sent(&drain(&mut cx)),
+            [h("01 00 00 03 00 00 00 02 81 21 FF")]
+        );
+        let mut cx = Cx::new(300);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 04 00 00 00 02 90 61 04 FF"),
+        );
+        m.polls.clear();
+        drain(&mut cx);
+        // A drive waits until 200 ms after "command cancelled"; other
+        // commands behind it keep their order.
+        let mut cx = Cx::new(350);
+        m.command(&mut cx, 3, "pan_tilt_home", &params(json!({})));
+        m.command(&mut cx, 4, "zoom", &params(json!({"action": "stop"})));
+        let a = drain(&mut cx);
+        assert!(sent(&a).is_empty());
+        assert!(a.contains(&Action::SetTimer {
+            key: DRIVE_GAP,
+            after: 150
+        }));
+        let mut cx = Cx::new(500);
+        m.timer(&mut cx, DRIVE_GAP);
+        assert_eq!(
+            sent(&drain(&mut cx)),
+            [h("01 00 00 05 00 00 00 03 81 01 06 04 FF")]
+        );
+    }
+
+    #[test]
+    fn vendors_without_the_drive_gap_cancel_at_once() {
+        let mut m = ready("birddog");
+        let mut cx = Cx::new(0);
+        m.command(&mut cx, 1, "pan_tilt_home", &params(json!({})));
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 03 00 00 00 01 90 41 FF"),
+        );
+        m.polls.clear();
+        drain(&mut cx);
+        m.command(&mut cx, 2, "cancel", &params(json!({"socket": 1})));
+        assert_eq!(
+            sent(&drain(&mut cx)),
+            [h("01 00 00 03 00 00 00 02 81 21 FF")]
+        );
     }
 
     #[test]
