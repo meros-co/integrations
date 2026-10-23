@@ -76,6 +76,8 @@ const OAUTH_RETRY: Key = "oauth-retry";
 const OAUTH_VALIDATE: Key = "oauth-validate";
 /// `transport.pacing`: the message held back may go.
 const PACE: Key = "pace";
+/// `transport.keepalive`: nothing sent for a while, so the keep-alive goes.
+const KEEPALIVE: Key = "keepalive";
 
 const DEFAULT_TIMEOUT: Millis = 2_000;
 /// A device silent this long, with nothing in flight, is probed.
@@ -178,6 +180,29 @@ struct Endpoint {
 enum Route {
     Main,
     Endpoint { credentialed: bool },
+}
+
+/// `transport.keepalive` (SPEC.md §2, Keep-alives): `send`, a message as
+/// the transport writes one, and `every_ms`, the longest this side may stay
+/// silent. Only a stream transport has a connection to keep.
+fn keepalive_of(t: &Value, transport: &Transport) -> Result<Option<(Value, Millis)>, String> {
+    let Some(k) = t.get("keepalive") else {
+        return Ok(None);
+    };
+    if !matches!(transport, Transport::LineTcp { .. } | Transport::Ws { .. }) {
+        return Err("transport.keepalive is for line-tcp, line-serial and ws".into());
+    }
+    let item = k
+        .get("send")
+        .filter(|v| v.is_string())
+        .cloned()
+        .ok_or("transport.keepalive.send is the message to send")?;
+    let every = k
+        .get("every_ms")
+        .and_then(Value::as_u64)
+        .filter(|ms| *ms > 0)
+        .ok_or("transport.keepalive.every_ms is a number of milliseconds")?;
+    Ok(Some((item, every)))
 }
 
 /// `transport.endpoints`, resolved against the settings. `http` is false
@@ -769,6 +794,11 @@ pub(crate) struct SpecEngine {
     endpoints: BTreeMap<String, Endpoint>,
     timeout: Millis,
     probe: Option<Value>,
+    /// `transport.keepalive`: the message and the longest silence from this
+    /// side before it is sent (SPEC.md §2, Keep-alives).
+    keepalive: Option<(Value, Millis)>,
+    /// When a message last went out on the stream.
+    last_sent: Millis,
     link: Connection,
     queue: VecDeque<Job>,
     current: Option<InFlight>,
@@ -1626,6 +1656,7 @@ impl SpecEngine {
             }
             _ => endpoints_of(&t, &ctx.settings, &url_host(&ctx), "http", false, false)?,
         };
+        let keepalive = keepalive_of(&t, &transport)?;
         // A list of probes, each for some models: the first for this one.
         let probe = match t.get("probe") {
             Some(Value::Array(items)) => items.iter().find(|i| for_model(i, &ctx.model)).cloned(),
@@ -1948,6 +1979,8 @@ impl SpecEngine {
             endpoints,
             timeout,
             probe,
+            keepalive,
+            last_sent: 0,
             link: Connection::Connecting,
             queue: VecDeque::new(),
             current: None,
@@ -2445,10 +2478,12 @@ impl SpecEngine {
                 .then(|| self.pacer.groups_of(&pace));
             let awaiting = match outgoing {
                 Outgoing::Ws(text) => {
+                    self.last_sent = cx.now();
                     cx.ws_send(SOCKET, text);
                     Await::Ws(flight.ws_reply.clone())
                 }
                 Outgoing::Bytes(bytes) => {
+                    self.last_sent = cx.now();
                     match &self.transport {
                         Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
                             cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
@@ -2595,8 +2630,15 @@ impl SpecEngine {
 
     fn emit_now(&mut self, cx: &mut Cx, outgoing: Outgoing) {
         match outgoing {
-            Outgoing::Bytes(bytes) => self.transmit(cx, bytes),
-            Outgoing::Ws(text) => cx.ws_send(SOCKET, text),
+            Outgoing::Bytes(bytes) => {
+                self.last_sent = cx.now();
+                self.transmit(cx, bytes)
+            }
+            Outgoing::Ws(text) => {
+                self.last_sent = cx.now();
+                cx.ws_send(SOCKET, text)
+            }
+
             Outgoing::Http(request, _) => {
                 let id = self.next_request;
                 self.next_request += 1;
@@ -2986,6 +3028,7 @@ impl SpecEngine {
             }
         }
         cx.cancel_timer(PROBE);
+        cx.cancel_timer(KEEPALIVE);
         cx.cancel_timer(RECONNECT);
         cx.log(
             Level::Warning,
@@ -3174,6 +3217,7 @@ impl SpecEngine {
             _ => cx.tcp_close(SOCKET),
         }
         cx.cancel_timer(PROBE);
+        cx.cancel_timer(KEEPALIVE);
         cx.cancel_timer(RENEW);
         cx.cancel_timer(QUIET);
         // What waited its turn was for the connection lost.
@@ -3297,8 +3341,41 @@ impl SpecEngine {
     fn ready(&mut self, cx: &mut Cx) {
         self.set_link(cx, Connection::Connected);
         cx.set_timer(PROBE, PROBE_WHEN_IDLE);
+        if let Some((_, every)) = &self.keepalive {
+            cx.set_timer(KEEPALIVE, *every);
+        }
         self.start_telemetry(cx);
         self.pump(cx);
+    }
+
+    /// `transport.keepalive`: when nothing has gone out for its interval,
+    /// the keep-alive message goes, awaiting no reply, whether or not the
+    /// device is monitored; then the timer runs to the next interval's end.
+    fn keep_alive(&mut self, cx: &mut Cx) {
+        let Some((item, every)) = self.keepalive.clone() else {
+            return;
+        };
+        if self.link != Connection::Connected {
+            return;
+        }
+        let quiet = cx.now().saturating_sub(self.last_sent);
+        if quiet < every {
+            cx.set_timer(KEEPALIVE, every - quiet);
+            return;
+        }
+        let (no_params, no_specs) = (Params::new(), BTreeMap::new());
+        let values = self.values(&no_params, &no_specs);
+        match self.build(&item, &values) {
+            Ok(outgoing) => {
+                let text = self.line_text(&item, &values);
+                self.emit(cx, outgoing, text.as_deref());
+                // Held by pacing, it still counts as sent: the next one is
+                // due an interval from now.
+                self.last_sent = cx.now();
+            }
+            Err(e) => cx.log(Level::Warning, format!("keep-alive not sent: {e}")),
+        }
+        cx.set_timer(KEEPALIVE, every);
     }
 
     fn enqueue_probe(&mut self, cx: &mut Cx) {
@@ -4414,6 +4491,7 @@ impl Module for SpecEngine {
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
             }
             RECONNECT => self.connect(cx),
+            KEEPALIVE => self.keep_alive(cx),
             PACE => self.pace_turn(cx),
             QUIET => self.quiet(cx),
             PUSH_RECONNECT => self.open_push(cx),
@@ -7978,6 +8056,131 @@ state:
             },
         )
         .unwrap()
+    }
+
+    /// A line device that drops a client silent for ten seconds (KAIROS's
+    /// protocol): an empty line every five seconds of silence keeps it.
+    const KEEPALIVE_LINE: &str = r#"
+spec: 1
+id: keepalive-test
+name: Keep-alive test
+vendor: Test
+category: other
+source: [{ title: test }]
+transport:
+  type: line-tcp
+  port: 3005
+  framing: terminated
+  terminator: crlf
+  keepalive: { send: "", every_ms: 5000 }
+ports: [{ port: 3005, protocol: tcp, role: control }]
+models: [{ id: m, name: M, supports: [go], verification: none }]
+commands:
+  go: { send: go, expect: { contains: OK }, returns: ack }
+"#;
+
+    fn keepalive_device() -> SpecEngine {
+        let spec: DeviceSpec = crate::yaml::from_str(KEEPALIVE_LINE).unwrap();
+        let settings = crate::catalog::validate(&spec.settings, &Params::new()).unwrap();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "m".into(),
+                channels: None,
+                settings,
+                monitor: false,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_keepalive_goes_only_after_the_interval_without_sending() {
+        let mut e = keepalive_device();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1000);
+        e.tcp(&mut cx, "device", TcpInput::Connected);
+        let a = cx.take();
+        assert!(connected(&a));
+        assert!(a.contains(&Action::SetTimer {
+            key: KEEPALIVE,
+            after: 5000
+        }));
+
+        // A command at 4 s is traffic: the timer at 6 s sends nothing and
+        // waits for the rest of the interval from that command.
+        let mut cx = Cx::new(4000);
+        e.command(&mut cx, 1, "go", &Params::new());
+        assert_eq!(tcp_sent(&cx.take()), vec!["go\r\n"]);
+        let mut cx = Cx::new(4100);
+        e.tcp(&mut cx, "device", TcpInput::Data(b"OK\r\n".to_vec()));
+        cx.take();
+        let mut cx = Cx::new(6000);
+        e.timer(&mut cx, KEEPALIVE);
+        let a = cx.take();
+        assert!(tcp_sent(&a).is_empty());
+        assert!(a.contains(&Action::SetTimer {
+            key: KEEPALIVE,
+            after: 3000
+        }));
+
+        // Five seconds of silence: the empty line goes, unmonitored too, and
+        // awaits no reply, so a command goes straight after it.
+        let mut cx = Cx::new(9000);
+        e.timer(&mut cx, KEEPALIVE);
+        let a = cx.take();
+        assert_eq!(tcp_sent(&a), vec!["\r\n"]);
+        assert!(a.contains(&Action::SetTimer {
+            key: KEEPALIVE,
+            after: 5000
+        }));
+        let mut cx = Cx::new(9001);
+        e.command(&mut cx, 2, "go", &Params::new());
+        assert_eq!(tcp_sent(&cx.take()), vec!["go\r\n"]);
+    }
+
+    #[test]
+    fn a_lost_connection_stops_the_keepalive() {
+        let mut e = keepalive_device();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, "device", TcpInput::Connected);
+        cx.take();
+        let mut cx = Cx::new(10);
+        e.tcp(
+            &mut cx,
+            "device",
+            TcpInput::Closed {
+                reason: "reset".into(),
+            },
+        );
+        assert!(cx.take().contains(&Action::CancelTimer { key: KEEPALIVE }));
+        let mut cx = Cx::new(6000);
+        e.timer(&mut cx, KEEPALIVE);
+        assert!(tcp_sent(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn a_keepalive_needs_a_stream_transport() {
+        let mut spec: DeviceSpec = crate::yaml::from_str(KEEPALIVE_LINE).unwrap();
+        spec.transport =
+            Some(json!({"type": "http", "port": 80, "keepalive": {"send": "", "every_ms": 5000}}));
+        let ctx = OpenContext {
+            host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
+            port: None,
+            model: "m".into(),
+            channels: None,
+            settings: Params::new(),
+            monitor: false,
+        };
+        let err = SpecEngine::new(Arc::new(spec), ctx).err().unwrap();
+        assert!(err.contains("keepalive"), "{err}");
     }
 
     fn named(name: &str) -> Params {

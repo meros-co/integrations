@@ -1019,6 +1019,32 @@ named and the regexes; the engine refuses a malformed block when the device
 is opened. Conformance vectors (§7) show what is sent, not when: the
 engine's own tests play pacing on a fake clock.
 
+### Keep-alives
+
+Some devices drop a client that has sent nothing for a while: Panasonic
+KAIROS closes its control connection after ten seconds without a message
+from the client, its own messages not counting, and asks for an empty line
+at least every five. `keepalive` on a `line-tcp`, `line-serial` or `ws`
+transport names that message and the longest this side may stay silent:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 3005
+  framing: terminated
+  terminator: crlf
+  keepalive: { send: "", every_ms: 5000 }   # an empty line: the CR LF alone
+```
+
+Whenever `every_ms` passes with nothing sent on the connection (no command,
+query, poll, login or keep-alive), `send`, a template over settings framed
+as any message is, goes out. It awaits no reply, so it never holds a
+command back, and it goes whether or not the device is monitored, since it
+keeps the connection rather than state; it is paced like any message. The
+timer starts when the connection is ready and stops when it is lost or the
+credential refused. A device that answers its keep-alive should rather have
+a `probe`, which checks the answer.
+
 ### Settings and connection setup
 
 Per-installation values that are not command parameters — credentials, ports,
