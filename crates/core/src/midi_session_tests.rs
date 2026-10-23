@@ -246,3 +246,48 @@ async fn a_hosted_rtp_midi_session_is_joined_over_loopback() {
     .await
     .expect("state within 5 s");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_mtc_generator_runs_on_a_midi_port() {
+    let ports = Arc::new(MemoryMidi::default());
+    let mut sent = ports.plug("Keys");
+    let core = core(ports.clone());
+    let id = open(&core);
+    wait_connection(&core, id, |c| *c == Connection::Connected).await;
+    let result = core
+        .execute(
+            id,
+            "mtc_generator_locate",
+            params(json!({"hours": 10, "rate": "25"})),
+        )
+        .await;
+    assert_eq!(result, Ok(Outcome::Unverified));
+    let full = tokio::time::timeout(Duration::from_secs(5), sent.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(full, [0xF0, 0x7F, 0x7F, 0x01, 0x01, 0x2A, 0, 0, 0, 0xF7]);
+    assert_eq!(
+        core.execute(id, "mtc_generator_start", Params::new()).await,
+        Ok(Outcome::Unverified)
+    );
+    // A run of eight quarter frames (two frames at 25: 80 ms) carrying
+    // 10:00:00:00 at 25.
+    let mut wire = Vec::new();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while wire.len() < 16 {
+            wire.extend(sent.recv().await.unwrap());
+        }
+    })
+    .await
+    .unwrap();
+    let pieces: Vec<u8> = wire[..16].chunks(2).map(|c| c[1]).collect();
+    assert_eq!(pieces, [0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x6A, 0x72]);
+    assert_eq!(
+        core.execute(id, "mtc_generator_stop", Params::new()).await,
+        Ok(Outcome::Unverified)
+    );
+    let state = core.snapshot(id).unwrap().state;
+    assert_eq!(state["mtc_generator"]["running"], false);
+    assert_eq!(state["mtc_generator"]["rate"], "25");
+}

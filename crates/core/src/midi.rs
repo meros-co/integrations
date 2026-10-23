@@ -631,7 +631,7 @@ impl MtcReader {
 }
 
 /// The eight quarter frame messages for `tc`, piece 0 first.
-#[cfg(test)]
+#[cfg(any(test, feature = "generic-midi"))]
 pub(crate) fn quarter_frames(tc: &Timecode) -> Vec<Message> {
     let values = [
         tc.frames & 0x0F,
