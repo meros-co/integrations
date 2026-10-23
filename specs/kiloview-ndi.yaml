@@ -1,0 +1,1616 @@
+spec: 1
+id: kiloview-ndi
+name: Kiloview NDI converters (N3, N4, N30, N40, N5, N6)
+vendor: Kiloview
+category: other
+
+source:
+  - title: "NDI Device HTTP API for N3/N4/N30/N40, Version 1.0"
+    author: Kiloview
+    url: "https://enstatic.kiloview.com/wp-content/uploads/2025/09/NDI-Device-HTTP-API-for-N3N4N30N40-Version-1.0.pdf"
+    note: >
+      Manufacturer-documented, public, linked from the N40/N40 Plus API page
+      (https://www.kiloview.com/en/docs/n40/api/), retrieved 2026-10-23; the
+      same text as the web version at
+      https://www.kiloview.com/en/docs/ndi-device-http-apiversion-1-0/. Read
+      for: URLs /api/v1/<module>/<method> over HTTP 80 or HTTPS 443, GET or
+      POST with query, form or JSON parameters alike, a JSON reply with
+      result ok, error or auth-failed and HTTP 200 whatever the outcome, the
+      timeouts of the slow methods, firmware 1.50 or later (section 1);
+      authorize with username and password, the session and token pair sent
+      as API-Session and API-Token headers (or cookies, or parameters), and
+      their expiry after 10 minutes without requests (section 2); mode get,
+      switch and status (3); encoder get_config, set_config, status,
+      get_audio and set_audio (4); decoder discovery get with force,
+      set_manual_targets (POST JSON only) and get_manual_targets (5); preset
+      status, add, remove and set_blank (6); current status and set (7);
+      output set_smoothness, get_smoothness, set and get (8); tally status
+      and set (9); sys server_info, reconnect, reboot and restore (10);
+      network get and set with the failsafe address (11).
+  - title: "N5 & N6 API (EN), version 3.0 (N5/N6 Bi-Directional NDI Converter, NDI High Bandwidth + NDI|HX, 2023-Aug)"
+    author: Kiloview
+    url: "https://enstatic.kiloview.com/wp-content/uploads/2025/09/NEW-N5ampN6-APIEN-version-3.0.pdf"
+    note: >
+      Manufacturer-documented, public, linked from the N5 and N6 API pages
+      (https://www.kiloview.com/en/docs/n6/api/,
+      https://www.kiloview.com/en/docs/n5-n6-for-ndi/api/), retrieved
+      2026-10-23; no newer version is listed there or in the Download
+      Center. Read for: authorize.json with user and password answering a
+      token and alias, the token sent as the token cookie, and API
+      authorization that the web interface can turn off (section 1); mode
+      get, switch and status (2); encoder get_config, set_config and status
+      with types ndifull or ndihx, get_video_source, select_video_source,
+      audio get_audio and set_audio, get_NDI_enable and set_NDI_enable (3);
+      discovery get, set_manual_targets and get_manual_targets (4); preset
+      status, add (position), remove and set_blank (5); current status and
+      set (6); output resolutions, set and get (7); tally status and set (8);
+      sys-time get and set (9); sys server_info, reboot, restore, device
+      get_hostname, set_hostname, set_discovery_server,
+      get_discovery_server, firmware get (10); users list, add, modify and
+      remove (11); network get and set (12).
+  - title: "Kiloview documentation index (product API pages)"
+    author: Kiloview
+    url: "https://www.kiloview.com/en/docs/n40/"
+    note: >
+      Retrieved 2026-10-23. The N40/N40 Plus documentation links the
+      Version 1.0 document as its API, the N5 and N6 pages the version 3.0
+      document. The N3-s page's API section links no document, so N3-s is
+      not listed as a model; the Version 1.0 document names N3, N4, N30 and
+      N40 in its title.
+  - title: "companion-module-kiloview-ndi (Bitfocus Companion module)"
+    author: Bitfocus
+    url: "https://github.com/bitfocus/companion-module-kiloview-ndi"
+    note: >
+      Community source (MIT license), read 2026-10-23 as corroboration only,
+      for N40, N5 and N6 on the version 3.0 API: it signs in with a form
+      POST of user and password to /api/user/authorize.json, sends the
+      token as the token cookie, posts every other request as JSON, sends
+      types to the encoder methods, adds group when it decodes a source by
+      URL (its comment: the firmware refuses the request without it), and
+      polls; there is no push.
+
+settings:
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Scheme
+    description: "http on port 80, or https on port 443, which Kiloview recommends so the password and token do not travel in clear; the certificate is not checked."
+  api_session:
+    type: string
+    secret: true
+    default: ""
+    max_length: 128
+    label: API session ID
+    description: "N3, N4, N30, N40: the session ID the authorize command returns (data.session), sent as the API-Session header; empty sends none."
+  api_token:
+    type: string
+    secret: true
+    default: ""
+    max_length: 128
+    label: API token
+    description: "The token the authorize command returns (data.token), sent as the API-Token header (N3, N4, N30, N40) or the token cookie (N5, N6); empty sends no API-Token header and an empty token cookie, for a device whose API authorization is turned off."
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+
+# Two dialects. N3, N4, N30, N40 and N40 Plus take /api/v1/<module>/<method>
+# (Version 1.0); N5 and N6 take /api/<module>/<method>.json (version 3.0),
+# with methods of their own. Each message names the models it is for. Every
+# reply is HTTP 200 with a JSON result: ok, error or auth-failed.
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  # Neither document says how the HTTPS certificate is issued.
+  accept_invalid_certs: true
+  # Version 1.0 section 1.5: 5 seconds or more; a mode switch may take 5 s.
+  timeout_ms: 8000
+  probe:
+    - { models: &v1 [n3, n4, n30, n40, n40-plus], method: GET, path: /api/v1/mode/get,
+        headers: &h1 { API-Session: "{settings.api_session}", API-Token: "{settings.api_token}" } }
+    - { models: &v3 [n5, n6], method: GET, path: /api/mode/get.json,
+        headers: &h3 { Cookie: "token={settings.api_token}" } }
+
+models:
+  - id: n3
+    name: Kiloview N3 (HDMI NDI converter)
+    supports: &v1_commands
+      [authorize, get_mode, switch_mode, get_mode_status,
+       get_encoder_config, set_ndi_group, set_ndi_device_name, set_ndi_channel_name, set_ndi_tcp,
+       set_ndi_multicast, set_ndi_bandwidth, get_encoder_status,
+       get_audio, set_audio_source, set_audio_volume,
+       get_ndi_sources, rescan_ndi_sources, get_manual_discovery, set_manual_discovery,
+       get_presets, add_preset, remove_preset, set_blank_color,
+       get_decoding_status, recall_preset, decode_source,
+       get_switch_timeout, set_switch_timeout, get_output_options, set_output_deinterlace, set_output_frame_rate,
+       get_tally, set_tally, set_tally_program, set_tally_preview,
+       get_system_info, reconnect_ndi, reboot, factory_reset,
+       get_network, set_network_dhcp, set_network_static, set_network_mac, set_failsafe_address,
+       set_network_address3]
+    verification: none
+    notes: "NDI Device HTTP API Version 1.0, firmware 1.50 or later."
+  - id: n4
+    name: Kiloview N4 (3G-SDI NDI converter)
+    supports: *v1_commands
+    verification: none
+    notes: "NDI Device HTTP API Version 1.0, firmware 1.50 or later."
+  - id: n30
+    name: Kiloview N30 (NDI|HX converter)
+    supports: *v1_commands
+    verification: none
+    notes: "NDI Device HTTP API Version 1.0, firmware 1.50 or later."
+  - id: n40
+    name: Kiloview N40 (4K NDI converter)
+    supports: *v1_commands
+    verification: none
+    notes: "NDI Device HTTP API Version 1.0, firmware 1.50 or later."
+  - id: n40-plus
+    name: Kiloview N40 Plus
+    supports: *v1_commands
+    verification: none
+    notes: "Listed with the N40 on Kiloview's N40/N40 Plus documentation page, whose API is the Version 1.0 document."
+  - id: n5
+    name: Kiloview N5 (NDI bi-directional converter)
+    supports: &v3_commands
+      [authorize, get_mode, switch_mode, get_mode_status,
+       get_encoder_config, set_ndi_group, set_ndi_channel_name, set_ndi_tcp, set_ndi_no_multi_tcp,
+       set_ndi_multicast, set_hx_quality, set_ndi_ttl, set_ndi_scaling, set_hx_codec, set_hx_version,
+       get_encoder_status, get_video_sources, select_video_source,
+       get_audio, set_audio_input, set_audio_volume, get_ndi_enabled, set_ndi_enabled,
+       get_ndi_sources, rescan_ndi_sources, get_manual_discovery, set_manual_discovery,
+       get_presets, add_preset, remove_preset, set_blank_color,
+       get_decoding_status, recall_preset, decode_source,
+       get_output_resolutions, get_output_options, set_output_resolution,
+       get_tally, set_tally, set_tally_program, set_tally_preview,
+       get_system_time, set_system_time, get_system_info, get_hostname, set_hostname,
+       get_discovery_server, set_discovery_server, get_version,
+       list_users, add_user, set_user_alias, set_user_permissions, set_user_password, remove_user,
+       reboot, factory_reset, get_network, set_network_dhcp, set_network_static, set_network_mac]
+    verification: none
+    notes: "N5 & N6 API version 3.0."
+  - id: n6
+    name: Kiloview N6 (NDI bi-directional converter)
+    supports: *v3_commands
+    verification: none
+    notes: "N5 & N6 API version 3.0."
+
+maps:
+  # Version 1.0 section 8.3: auto follows the source, deint deinterlaces.
+  deinterlace: { "true": deint, "false": auto }
+  # Tally pgm and pvw: 1 on, 0 off (V1.0 9.2, v3.0 8.2).
+  on_off01: { "true": "1", "false": "0" }
+
+commands:
+  authorize:
+    summary: "Sign in and return the session ID and token to put in the api_session and api_token settings (user/authorize; data.session and data.token on N3/N4/N30/N40, data.token and data.alias on N5/N6)"
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name,
+        description: "A user allowed to use the HTTP API; Kiloview advises a user of its own rather than admin." }
+      password: { type: string, required: true, secret: true, max_length: 64, label: Password,
+        description: "That user's password." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/user/authorize, content_type: application/json,
+          body: '{"username":{username:json},"password":{password:json}}' }
+      - { models: *v3, method: POST, path: /api/user/authorize.json, content_type: application/x-www-form-urlencoded,
+          body: "user={username:url}&password={password:url}" }
+    expect: &data { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data" }
+    returns: value
+
+  # Mode (V1.0 section 3, v3.0 section 2).
+  get_mode:
+    summary: "Whether the converter works as an encoder or a decoder (mode/get)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/mode/get, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/mode/get.json, headers: *h3 }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.mode" }
+    returns: value
+  switch_mode:
+    summary: "Switch between encoder and decoder; the device restarts internally and is ready 10 to 15 seconds later (mode/switch)"
+    params:
+      mode: { type: enum, values: [encoder, decoder], required: true, label: Mode,
+        description: "encoder turns the video input into an NDI source; decoder outputs an NDI source on the video output." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/mode/switch, content_type: application/json, body: '{"mode":"{mode}"}', headers: *h1 }
+      - { models: *v3, method: POST, path: /api/mode/switch.json, content_type: application/json, body: '{"mode":"{mode}"}', headers: *h3 }
+    expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+  get_mode_status:
+    summary: "Whether the mode is ready after a switch: data.mode and data.status ready, or an error while it is starting (mode/status)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/mode/status, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/mode/status.json, headers: *h3 }
+    expect: *data
+    returns: value
+
+  # NDI encoder (V1.0 section 4, v3.0 section 3).
+  get_encoder_config:
+    summary: "The NDI encoder settings: group, names, connection, multicast prefix and mask, quality, and on N5/N6 TTL, scaling, video source, codec and NDI|HX version (encoder/ndi/get_config)"
+    params:
+      ndi_type: &ndi_type { type: enum, values: [ndifull, ndihx], default: ndifull, label: NDI type,
+        description: "N5/N6: the encoder the setting is for, full NDI (ndifull) or NDI|HX (ndihx); the Version 1.0 models have one encoder and ignore it." }
+    send:
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *data
+    returns: value
+  set_ndi_group:
+    summary: "Set the NDI group the source is published in; every NDI connection restarts (encoder/ndi/set_config device_group)"
+    params:
+      group: { type: string, required: true, max_length: 255, label: NDI group,
+        description: "The NDI group name; empty is the default group, public." }
+      ndi_type: *ndi_type
+    send:
+      - { models: *v1, method: POST, path: /api/v1/encoder/ndi/set_config, content_type: application/json,
+          body: '{"device_group":{group:json}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}","device_group":{group:json}}', headers: *h3 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_ndi_device_name:
+    summary: "Set the NDI device name, which is also the device's host name; every NDI connection restarts (encoder/ndi/set_config device_name)"
+    params:
+      name: { type: string, required: true, max_length: 255, label: Device name,
+        description: "The NDI device name, the first part of the NDI source name." }
+    send:
+      - { method: POST, path: /api/v1/encoder/ndi/set_config, content_type: application/json,
+          body: '{"device_name":{name:json}}', headers: *h1 }
+      - { method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+    expect: *ok
+    returns: ack
+  set_ndi_channel_name:
+    summary: "Set the NDI channel name, the second part of the source name; every NDI connection restarts (encoder/ndi/set_config channel_name)"
+    params:
+      name: { type: string, required: true, max_length: 255, label: Channel name,
+        description: "The NDI channel name; on N5/N6 full NDI and NDI|HX may not share one." }
+      ndi_type: *ndi_type
+    send:
+      - { models: *v1, method: POST, path: /api/v1/encoder/ndi/set_config, content_type: application/json,
+          body: '{"channel_name":{name:json}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}","channel_name":{name:json}}', headers: *h3 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_ndi_tcp:
+    summary: "Suggest TCP, the default, as receivers' connection to the source; every NDI connection restarts (encoder/ndi/set_config ndi_connection tcp)"
+    params:
+      ndi_type: *ndi_type
+    send:
+      - { models: *v1, method: POST, path: /api/v1/encoder/ndi/set_config, content_type: application/json,
+          body: '{"ndi_connection":"tcp"}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}","ndi_connection":"tcp"}', headers: *h3 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_ndi_no_multi_tcp:
+    summary: "Set the connection mode the document names no_multi_tcp; every NDI connection restarts (encoder/ndi/set_config ndi_connection no_multi_tcp)"
+    params:
+      ndi_type: *ndi_type
+    send:
+      - { method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}","ndi_connection":"no_multi_tcp"}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_ndi_multicast:
+    summary: "Suggest UDP multicast to receivers, from the given subnet; every NDI connection restarts (encoder/ndi/set_config ndi_connection multicast, netprefix, netmask)"
+    params:
+      netprefix: { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', label: Multicast prefix,
+        description: "A multicast address, 224.0.0.0 to 239.255.255.255, that with the mask gives the subnet the NDI SDK picks the stream's address from." }
+      netmask: { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', label: Multicast mask,
+        description: "The mask of that subnet, such as 255.255.0.0." }
+      ndi_type: *ndi_type
+    send:
+      - { models: *v1, method: POST, path: /api/v1/encoder/ndi/set_config, content_type: application/json,
+          body: '{"ndi_connection":"multicast","netprefix":{netprefix:json},"netmask":{netmask:json}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}","ndi_connection":"multicast","netprefix":{netprefix:json},"netmask":{netmask:json}}', headers: *h3 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_ndi_bandwidth:
+    summary: "Set the NDI bitrate as a percentage of NDI's recommended bitrate; every NDI connection restarts (encoder/ndi/set_config quality)"
+    params:
+      percent: { type: int, min: 75, max: 150, required: true, label: Bitrate,
+        description: "Percent of the bitrate NDI recommends, 75 to 150; 100 is the recommendation." }
+    send:
+      - { method: POST, path: /api/v1/encoder/ndi/set_config, content_type: application/json,
+          body: '{"quality":{percent}}', headers: *h1 }
+      - { method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+    expect: *ok
+    returns: ack
+  set_hx_quality:
+    summary: "Set the NDI|HX encoding quality; every NDI connection restarts (encoder/ndi/set_config types ndihx, quality)"
+    params:
+      quality: { type: int, min: 2000, max: 40000, required: true, label: Quality,
+        description: "NDI|HX encoding quality, 2000 to 40000; the document gives no unit." }
+    send:
+      - { method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"ndihx","quality":{quality}}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"ndihx"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_ndi_ttl:
+    summary: "Set the multicast time to live; every NDI connection restarts (encoder/ndi/set_config ttl)"
+    params:
+      ttl: { type: int, min: 1, max: 255, required: true, label: TTL,
+        description: "Hops a multicast packet may cross, 1 to 255 (127 in Kiloview's example)." }
+      ndi_type: *ndi_type
+    send:
+      - { method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}","ttl":{ttl}}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_ndi_scaling:
+    summary: "Scale the encoded video to a resolution of the configuration's list, or none; every NDI connection restarts (encoder/ndi/set_config resolution)"
+    params:
+      resolution: { type: string, required: true, max_length: 32, pattern: '^[A-Za-z0-9._-]+$', label: Resolution,
+        description: "A value of the encoder configuration's resolution list (state encoder.config.<type>.resolutions), such as 1080P60, or none for no scaling." }
+      ndi_type: *ndi_type
+    send:
+      - { method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}","resolution":{resolution:json}}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_hx_codec:
+    summary: "Set the NDI|HX video codec; every NDI connection restarts (encoder/ndi/set_config types ndihx, codec)"
+    params:
+      codec: { type: enum, values: [H265, H264], required: true, label: Codec,
+        description: "H.265 (H265) or H.264 (H264) for the NDI|HX stream." }
+    send:
+      - { method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"ndihx","codec":"{codec}"}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"ndihx"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_hx_version:
+    summary: "Set the NDI|HX version; every NDI connection restarts (encoder/ndi/set_config types ndihx, hx_version)"
+    params:
+      version: { type: int, min: 2, max: 3, required: true, label: NDI|HX version,
+        description: "NDI|HX2 (2) or NDI|HX3 (3)." }
+    send:
+      - { method: POST, path: /api/encoder/ndi/set_config.json, content_type: application/json,
+          body: '{"types":"ndihx","hx_version":{version}}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"ndihx"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  get_encoder_status:
+    summary: "The encoder's input and stream: signal, resolution, frame rate, bitrate, audio format, and on N5/N6 the source format and serial number (encoder/ndi/status)"
+    params:
+      ndi_type: *ndi_type
+    send:
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/encoder/ndi/status.json, content_type: application/json,
+          body: '{"types":"{ndi_type}"}', headers: *h3 }
+    expect: *data
+    returns: value
+  get_video_sources:
+    summary: "The video inputs the encoder can take: HDMI, SDI, and USB while a USB source is connected (encoder/ndi/get_video_source)"
+    send: { method: GET, path: /api/encoder/ndi/get_video_source.json, headers: *h3 }
+    expect: *data
+    returns: value
+  select_video_source:
+    summary: "Choose the encoder's video input (encoder/ndi/select_video_source)"
+    params:
+      source: { type: enum, values: [HDMI, SDI, USB], required: true, label: Video source,
+        description: "One of the inputs get_video_sources lists; USB only while a USB source is connected." }
+    send:
+      - { method: POST, path: /api/encoder/ndi/select_video_source.json, content_type: application/json,
+          body: '{"video_source":"{source}"}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"ndifull"}', headers: *h3 }
+      - { method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+          body: '{"types":"ndihx"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  get_audio:
+    summary: "The encoder's audio input and volume, and on N5/N6 its channel count (encoder/ndi/get_audio, or audio/get_audio)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_audio, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/audio/get_audio.json, headers: *h3 }
+    expect: *data
+    returns: value
+  set_audio_source:
+    summary: "Choose the encoder's audio input (encoder/ndi/set_audio signal)"
+    params:
+      signal: { type: enum, values: [embedded, analog], required: true, label: Audio input,
+        description: "embedded takes the audio in the HDMI or SDI signal; analog the analog input (line or microphone, by model)." }
+    send:
+      - { method: POST, path: /api/v1/encoder/ndi/set_audio, content_type: application/json,
+          body: '{"signal":"{signal}"}', headers: *h1 }
+      - { method: GET, path: /api/v1/encoder/ndi/get_audio, headers: *h1 }
+    expect: *ok
+    returns: ack
+  set_audio_input:
+    summary: "Choose the encoder's audio input (audio/set_audio signal)"
+    params:
+      signal: { type: enum, values: [HDMI, SDI, Line In, USB], required: true, label: Audio input,
+        description: "HDMI or SDI takes the embedded audio, Line In the analog input, USB the USB video source's audio." }
+    send:
+      - { method: POST, path: /api/audio/set_audio.json, content_type: application/json,
+          body: '{"signal":"{signal}"}', headers: *h3 }
+      - { method: GET, path: /api/audio/get_audio.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_audio_volume:
+    summary: "Set the encoder's audio input volume (encoder/ndi/set_audio or audio/set_audio volume)"
+    params:
+      volume: { type: int, min: 0, max: 200, required: true, label: Volume,
+        description: "Percent of the input's level, 0 to 200; 100 leaves it unchanged." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/encoder/ndi/set_audio, content_type: application/json,
+          body: '{"volume":{volume}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_audio, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/audio/set_audio.json, content_type: application/json,
+          body: '{"volume":{volume}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/audio/get_audio.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  get_ndi_enabled:
+    summary: "Whether the full NDI encoder is on (encoder/ndi/get_NDI_enable)"
+    send: { method: GET, path: /api/encoder/ndi/get_NDI_enable.json, headers: *h3 }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.enable" }
+    returns: value
+  set_ndi_enabled:
+    summary: "Turn the full NDI encoder on or off (encoder/ndi/set_NDI_enable)"
+    params:
+      enabled: { type: bool, required: true, label: Full NDI,
+        description: "On publishes the full-bandwidth NDI source; off stops it." }
+    send:
+      - { method: POST, path: /api/encoder/ndi/set_NDI_enable.json, content_type: application/json,
+          body: '{"enable":{enabled}}', headers: *h3 }
+      - { method: GET, path: /api/encoder/ndi/get_NDI_enable.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # NDI discovery (V1.0 section 5, v3.0 section 4).
+  get_ndi_sources:
+    summary: "NDI sources the decoder has discovered, from its cache: group, name, device and channel names, URL (decoder/discovery/get)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/decoder/discovery/get, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/decoder/discovery/get.json, headers: *h3 }
+    expect: *data
+    returns: value
+  rescan_ndi_sources:
+    summary: "Make the decoder scan the network for NDI sources again, and return what it has (decoder/discovery/get force)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/decoder/discovery/get, query: { force: "1" }, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/decoder/discovery/get.json, query: { force: "1" }, headers: *h3 }
+    expect: *data
+    returns: value
+  get_manual_discovery:
+    summary: "The IP addresses and NDI groups the decoder searches besides automatic discovery (decoder/discovery/get_manual_targets)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/decoder/discovery/get_manual_targets, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/decoder/discovery/get_manual_targets.json, headers: *h3 }
+    expect: *data
+    returns: value
+  set_manual_discovery:
+    summary: "Replace the IP addresses and NDI groups searched besides automatic discovery; kept across restarts (decoder/discovery/set_manual_targets, the JSON object {ip, group_name} of V1.0 section 5.2 and v3.0 section 4.2)"
+    params:
+      ips: { type: json, required: true, label: IP addresses,
+        description: "A JSON array of the IP addresses of NDI sources to look for, in any subnet; an empty array clears the list." }
+      groups: { type: json, required: true, label: NDI groups,
+        description: "A JSON array of the NDI group names to look in; an empty array clears the list." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/decoder/discovery/set_manual_targets, content_type: application/json,
+          body: '{"ip":{ips},"group_name":{groups}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/discovery/get_manual_targets, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/decoder/discovery/set_manual_targets.json, content_type: application/json,
+          body: '{"ip":{ips},"group_name":{groups}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/discovery/get_manual_targets.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # Decoder presets (V1.0 section 6, v3.0 section 5).
+  get_presets:
+    summary: "Presets 1 to 9 with their NDI sources and whether each is online and decoded, and preset 0, the blank color (decoder/preset/status)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/decoder/preset/status, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/decoder/preset/status.json, headers: *h3 }
+    expect: *data
+    returns: value
+  add_preset:
+    summary: "Store an NDI source in a preset, replacing what it held (decoder/preset/add)"
+    params:
+      preset: &preset19 { type: int, min: 1, max: 9, required: true, label: Preset,
+        description: "The preset, 1 to 9." }
+      name: &src_name { type: string, required: true, max_length: 255, label: Source name,
+        description: "The NDI source's name, as get_ndi_sources lists it." }
+      url: &src_url { type: string, required: true, max_length: 255, label: Source URL,
+        description: "The NDI source's URL exactly as get_ndi_sources lists it, such as 192.168.100.168:5961." }
+      group: &src_group { type: string, default: "", max_length: 255, label: NDI group,
+        description: "The source's NDI group as get_ndi_sources lists it; empty is the public group." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/decoder/preset/add, content_type: application/json,
+          body: '{"id":"{preset}","name":{name:json},"url":{url:json},"group":{group:json}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/preset/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/decoder/preset/add.json, content_type: application/json,
+          body: '{"position":"{preset}","name":{name:json},"url":{url:json},"group":{group:json}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/preset/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  remove_preset:
+    summary: "Clear a preset's NDI source (decoder/preset/remove)"
+    params:
+      preset: *preset19
+    send:
+      - { models: *v1, method: POST, path: /api/v1/decoder/preset/remove, content_type: application/json,
+          body: '{"id":"{preset}"}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/preset/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/decoder/preset/remove.json, content_type: application/json,
+          body: '{"id":"{preset}"}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/preset/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_blank_color:
+    summary: "Set the color preset 0 (Blank) fills the output with (decoder/preset/set_blank)"
+    params:
+      color: { type: string, required: true, max_length: 9, pattern: '^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$', label: Color,
+        description: "An HTML color, #RGB, #RRGGBB or #RRGGBBAA; the alpha is ignored." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/decoder/preset/set_blank, content_type: application/json,
+          body: '{"color":{color:json}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/preset/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/decoder/preset/set_blank.json, content_type: application/json,
+          body: '{"color":{color:json}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/preset/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # Current decoding output (V1.0 section 7, v3.0 section 6).
+  get_decoding_status:
+    summary: "What the decoder outputs: source name, URL and online state, format, codec, frame rates, bitrate, audio, warning (decoder/current/status)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/decoder/current/status, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/decoder/current/status.json, headers: *h3 }
+    expect: *data
+    returns: value
+  recall_preset:
+    summary: "Decode a preset's NDI source, or preset 0 for the blank color (decoder/current/set id)"
+    params:
+      preset: { type: int, min: 0, max: 9, required: true, label: Preset,
+        description: "The preset to output, 1 to 9, or 0 for Blank, the blank color with nothing decoded." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/decoder/current/set, content_type: application/json,
+          body: '{"id":"{preset}"}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/current/status, headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/preset/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/decoder/current/set.json, content_type: application/json,
+          body: '{"id":"{preset}"}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/current/status.json, headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/preset/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  decode_source:
+    summary: "Decode an NDI source given by name and URL (decoder/current/set name, url; N5/N6 also group)"
+    params:
+      name: *src_name
+      url: *src_url
+      group: *src_group
+    send:
+      - { models: *v1, method: POST, path: /api/v1/decoder/current/set, content_type: application/json,
+          body: '{"name":{name:json},"url":{url:json}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/current/status, headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/decoder/preset/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/decoder/current/set.json, content_type: application/json,
+          body: '{"name":{name:json},"url":{url:json},"group":{group:json}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/current/status.json, headers: *h3 }
+      - { models: *v3, method: GET, path: /api/decoder/preset/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # Advanced decoder output (V1.0 section 8, v3.0 section 7).
+  get_switch_timeout:
+    summary: "How long the decoder keeps the old source on screen while the new one connects, in ms (decoder/output/get_smoothness)"
+    send: { method: GET, path: /api/v1/decoder/output/get_smoothness, headers: *h1 }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.timeout" }
+    returns: value
+  set_switch_timeout:
+    summary: "Set how long the decoder keeps the old source on screen while the new one connects (decoder/output/set_smoothness)"
+    params:
+      timeout_ms: { type: int, min: 0, required: true, label: Smooth switch timeout,
+        description: "Milliseconds to keep decoding the old source while the new one connects; 0 stops the old source at once." }
+    send:
+      - { method: POST, path: /api/v1/decoder/output/set_smoothness, content_type: application/json,
+          body: '{"timeout":{timeout_ms}}', headers: *h1 }
+      - { method: GET, path: /api/v1/decoder/output/get_smoothness, headers: *h1 }
+    expect: *ok
+    returns: ack
+  get_output_resolutions:
+    summary: "The output resolutions set_output_resolution takes, each with a name and value (decoder/output/resolutions)"
+    send: { method: GET, path: /api/decoder/output/resolutions.json, headers: *h3 }
+    expect: *data
+    returns: value
+  get_output_options:
+    summary: "The decoder's output options: resolution or deinterlacing, frame rate, audio sample rate, and on N5/N6 channels and color space (decoder/output/get)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/decoder/output/get, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/decoder/output/get.json, headers: *h3 }
+    expect: *data
+    returns: value
+  set_output_deinterlace:
+    summary: "Deinterlace interlaced sources to progressive output, or follow the source (decoder/output/set resolution deint or auto)"
+    params:
+      deinterlace: { type: bool, required: true, label: Deinterlace,
+        description: "On outputs an interlaced source as progressive (1080i to 1080p); off follows the source's format." }
+    send:
+      - { method: POST, path: /api/v1/decoder/output/set, content_type: application/json,
+          body: '{"resolution":"{deinterlace:map.deinterlace}"}', headers: *h1 }
+      - { method: GET, path: /api/v1/decoder/output/get, headers: *h1 }
+    expect: *ok
+    returns: ack
+  set_output_frame_rate:
+    summary: "Force the output frame rate, or follow the source (decoder/output/set frame_rate)"
+    params:
+      frame_rate: { type: enum, values: ["0", "23.98", "24", "25", "29.97", "30", "50", "59.94", "60"], required: true,
+        label: Frame rate, description: "Output frames per second; 0 follows the source." }
+    send:
+      - { method: POST, path: /api/v1/decoder/output/set, content_type: application/json,
+          body: '{"frame_rate":{frame_rate}}', headers: *h1 }
+      - { method: GET, path: /api/v1/decoder/output/get, headers: *h1 }
+    expect: *ok
+    returns: ack
+  set_output_resolution:
+    summary: "Set the decoder's output resolution (decoder/output/set resolution)"
+    params:
+      resolution: { type: string, required: true, max_length: 32, pattern: '^[A-Za-z0-9._-]+$', label: Resolution,
+        description: "A value of get_output_resolutions (state decoder.output.resolutions), such as 1080P50." }
+    send:
+      - { method: POST, path: /api/decoder/output/set.json, content_type: application/json,
+          body: '{"resolution":{resolution:json}}', headers: *h3 }
+      - { method: GET, path: /api/decoder/output/get.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # Tally (V1.0 section 9, v3.0 section 8).
+  get_tally:
+    summary: "Program and preview tally, 1 on and 0 off (tally/status)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/tally/status, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/tally/status.json, headers: *h3 }
+    expect: *data
+    returns: value
+  set_tally:
+    summary: "Set program and preview tally; a decoder sends them to the source it decodes (tally/set pgm, pvw)"
+    params:
+      program: &tally_pgm { type: bool, required: true, label: Program, description: "On lights program (on air) tally." }
+      preview: &tally_pvw { type: bool, required: true, label: Preview, description: "On lights preview tally." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/tally/set, content_type: application/json,
+          body: '{"pgm":{program:map.on_off01},"pvw":{preview:map.on_off01}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/tally/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/tally/set.json, content_type: application/json,
+          body: '{"pgm":{program:map.on_off01},"pvw":{preview:map.on_off01}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/tally/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_tally_program:
+    summary: "Set program tally alone, preview unchanged (tally/set pgm)"
+    params:
+      program: *tally_pgm
+    send:
+      - { models: *v1, method: POST, path: /api/v1/tally/set, content_type: application/json,
+          body: '{"pgm":{program:map.on_off01}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/tally/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/tally/set.json, content_type: application/json,
+          body: '{"pgm":{program:map.on_off01}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/tally/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_tally_preview:
+    summary: "Set preview tally alone, program unchanged (tally/set pvw)"
+    params:
+      preview: *tally_pvw
+    send:
+      - { models: *v1, method: POST, path: /api/v1/tally/set, content_type: application/json,
+          body: '{"pvw":{preview:map.on_off01}}', headers: *h1 }
+      - { models: *v1, method: GET, path: /api/v1/tally/status, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/tally/set.json, content_type: application/json,
+          body: '{"pvw":{preview:map.on_off01}}', headers: *h3 }
+      - { models: *v3, method: GET, path: /api/tally/status.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # System time (v3.0 section 9).
+  get_system_time:
+    summary: "The system time, time zone, NTP servers and how the time is kept (sys-time/get)"
+    send: { method: GET, path: /api/sys-time/get.json, headers: *h3 }
+    expect: *data
+    returns: value
+  set_system_time:
+    summary: "Set the system time, time zone, NTP servers and how the time is kept (sys-time/set)"
+    params:
+      ntp: { type: string, required: true, max_length: 255, label: NTP servers,
+        description: "NTP server addresses separated by spaces." }
+      timezone: { type: string, required: true, max_length: 64, label: Time zone,
+        description: "An IANA time zone name, such as Asia/Shanghai." }
+      time: { type: string, required: true, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$', label: Time,
+        description: "The time to set, as YYYY-MM-DD HH:MM:SS." }
+      sync: { type: enum, values: [pc, ntp], required: true, label: Time source,
+        description: "pc keeps the time given here (set from a computer); ntp takes it from the NTP servers." }
+    send:
+      - { method: POST, path: /api/sys-time/set.json, content_type: application/json,
+          body: '{"ntp":{ntp:json},"Timezone":{timezone:json},"time":{time:json},"timetype":"{sync}"}', headers: *h3 }
+      - { method: GET, path: /api/sys-time/get.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # System (V1.0 section 10, v3.0 section 10).
+  get_system_info:
+    summary: "Address, web port, uptime, start time, CPU cores and load, memory used and total (sys/server_info)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/sys/server_info, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/sys/server_info.json, headers: *h3 }
+    expect: *data
+    returns: value
+  get_hostname:
+    summary: "The device's host name (device/get_hostname)"
+    send: { method: GET, path: /api/device/get_hostname.json, headers: *h3 }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.data.hostname" }
+    returns: value
+  set_hostname:
+    summary: "Set the device's host name; NDI restarts to take it (device/set_hostname)"
+    params:
+      hostname: { type: string, required: true, max_length: 63, label: Host name,
+        description: "The new host name, such as N6-123456." }
+    send:
+      - { method: POST, path: /api/device/set_hostname.json, content_type: application/json,
+          body: '{"hostname":{hostname:json}}', headers: *h3 }
+      - { method: GET, path: /api/device/get_hostname.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  get_discovery_server:
+    summary: "The NDI discovery server addresses and whether they are used (device/get_discovery_server)"
+    send: { method: GET, path: /api/device/get_discovery_server.json, headers: *h3 }
+    expect: *data
+    returns: value
+  set_discovery_server:
+    summary: "Set the NDI discovery servers and turn their use on or off (device/set_discovery_server)"
+    params:
+      address: { type: string, required: true, max_length: 255, label: Discovery servers,
+        description: "Discovery server addresses separated by commas, such as 192.168.1.168." }
+      enabled: { type: bool, required: true, label: Use discovery server,
+        description: "On makes the device use the discovery servers." }
+    send:
+      - { method: POST, path: /api/device/set_discovery_server.json, content_type: application/json,
+          body: '{"address":{address:json},"enable":{enabled}}', headers: *h3 }
+      - { method: GET, path: /api/device/get_discovery_server.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  get_version:
+    summary: "Software, hardware and NDI versions (firmware/get)"
+    send: { method: GET, path: /api/firmware/get.json, headers: *h3 }
+    expect: *data
+    returns: value
+  reconnect_ndi:
+    summary: "Drop and restart every NDI connection: the encoder's sender restarts, the decoder reconnects to its source; 4 to 6 seconds (sys/reconnect)"
+    send: { method: POST, path: /api/v1/sys/reconnect, headers: *h1 }
+    expect: *ok
+    returns: ack
+  reboot:
+    summary: "Restart the device: it goes down 3 s after answering and is back after 30 s or more; the token must be renewed (sys/reboot)"
+    send:
+      - { models: *v1, method: POST, path: /api/v1/sys/reboot, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/sys/reboot.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  factory_reset:
+    summary: "Restore factory settings (DHCP, default failsafe address, NDI group, names and connection, presets and blank color cleared, users removed, admin password reset) and restart (sys/restore)"
+    send:
+      - { models: *v1, method: POST, path: /api/v1/sys/restore, headers: *h1 }
+      - { models: *v3, method: POST, path: /api/sys/restore.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # Users (v3.0 section 11).
+  list_users:
+    summary: "Users with their alias, API and web permissions and creation time (users/list)"
+    send: { method: GET, path: /api/users/list.json, headers: *h3 }
+    expect: *data
+    returns: value
+  add_user:
+    summary: "Add a user (users/add)"
+    params:
+      user: &user_id { type: string, required: true, max_length: 64, label: User name,
+        description: "The user's login name." }
+      alias: &user_alias { type: string, required: true, max_length: 64, label: Alias,
+        description: "The user's display name." }
+      password: &user_password { type: string, required: true, secret: true, max_length: 64, label: Password,
+        description: "The user's password." }
+      api: &user_api { type: bool, required: true, label: API access,
+        description: "On lets the user use the HTTP API." }
+      web: &user_web { type: bool, required: true, label: Web access,
+        description: "On lets the user sign in to the web interface." }
+    send:
+      - { method: POST, path: /api/users/add.json, content_type: application/json,
+          body: '{"id":{user:json},"alias":{alias:json},"api":{api},"web":{web},"password":{password:json}}', headers: *h3 }
+      - { method: GET, path: /api/users/list.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_user_alias:
+    summary: "Change a user's alias (users/modify alias)"
+    params:
+      user: *user_id
+      alias: *user_alias
+    send:
+      - { method: POST, path: /api/users/modify.json, content_type: application/json,
+          body: '{"id":{user:json},"alias":{alias:json}}', headers: *h3 }
+      - { method: GET, path: /api/users/list.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_user_permissions:
+    summary: "Change whether a user may use the HTTP API and the web interface (users/modify api, web)"
+    params:
+      user: *user_id
+      api: *user_api
+      web: *user_web
+    send:
+      - { method: POST, path: /api/users/modify.json, content_type: application/json,
+          body: '{"id":{user:json},"api":{api},"web":{web}}', headers: *h3 }
+      - { method: GET, path: /api/users/list.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_user_password:
+    summary: "Change a user's password (users/modify password)"
+    params:
+      user: *user_id
+      password: *user_password
+    send:
+      - { method: POST, path: /api/users/modify.json, content_type: application/json,
+          body: '{"id":{user:json},"password":{password:json}}', headers: *h3 }
+      - { method: GET, path: /api/users/list.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+  remove_user:
+    summary: "Delete a user (users/remove)"
+    params:
+      user: *user_id
+    send:
+      - { method: POST, path: /api/users/remove.json, content_type: application/json,
+          body: '{"id":{user:json}}', headers: *h3 }
+      - { method: GET, path: /api/users/list.json, headers: *h3 }
+    expect: *ok
+    returns: ack
+
+  # Network (V1.0 section 11, v3.0 section 12).
+  get_network:
+    summary: "Each network interface: state, address, mask, MAC, gateway, DHCP, DNS, and on N3/N4/N30/N40 the failsafe address (network/get)"
+    send:
+      - { models: *v1, method: GET, path: /api/v1/network/get, headers: *h1 }
+      - { models: *v3, method: GET, path: /api/network/get.json, headers: *h3 }
+    expect: *data
+    returns: value
+  set_network_dhcp:
+    summary: "Take the interface's address from DHCP (network/set dynamic y)"
+    params:
+      interface: &iface { type: string, required: true, max_length: 32, pattern: '^[A-Za-z0-9_.:-]+$', label: Interface,
+        description: "The interface's device name as get_network lists it, such as eth0." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/network/set, content_type: application/json,
+          body: '{"device":{interface:json},"dynamic":"y"}', headers: *h1 }
+      - { models: *v3, method: POST, path: /api/network/set.json, content_type: application/json,
+          body: '{"device":{interface:json},"dynamic":"y"}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_network_static:
+    summary: "Give the interface a static address, mask, gateway and DNS servers (network/set dynamic n)"
+    params:
+      interface: *iface
+      ip: &ipv4 { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', label: IP address,
+        description: "The IPv4 address." }
+      mask: &ipmask { type: string, required: true, max_length: 15, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', label: Subnet mask,
+        description: "The subnet mask, such as 255.255.255.0." }
+      gateway: &ipgw { type: string, required: true, max_length: 15, pattern: '^([0-9]{1,3}(\.[0-9]{1,3}){3})?$', label: Gateway,
+        description: "The default gateway; empty for none." }
+      dns: { type: string, required: true, max_length: 255, label: DNS servers,
+        description: "DNS server addresses separated by semicolons; empty for none." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/network/set, content_type: application/json,
+          body: '{"device":{interface:json},"dynamic":"n","ip":{ip:json},"mask":{mask:json},"gw":{gateway:json},"dns":{dns:json}}', headers: *h1 }
+      - { models: *v3, method: POST, path: /api/network/set.json, content_type: application/json,
+          body: '{"device":{interface:json},"dynamic":"n","ip":{ip:json},"mask":{mask:json},"gw":{gateway:json},"dns":{dns:json}}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_network_mac:
+    summary: "Change the interface's MAC address (network/set mac)"
+    params:
+      interface: *iface
+      mac: { type: string, required: true, max_length: 17, pattern: '^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$', label: MAC address,
+        description: "A valid unicast MAC address, such as 68:3A:7F:8C:A7:96." }
+    send:
+      - { models: *v1, method: POST, path: /api/v1/network/set, content_type: application/json,
+          body: '{"device":{interface:json},"mac":{mac:json}}', headers: *h1 }
+      - { models: *v3, method: POST, path: /api/network/set.json, content_type: application/json,
+          body: '{"device":{interface:json},"mac":{mac:json}}', headers: *h3 }
+    expect: *ok
+    returns: ack
+  set_failsafe_address:
+    summary: "Set or clear the interface's failsafe (second) address, mask and gateway (network/set ip2, mask2, gw2)"
+    params:
+      interface: *iface
+      ip: { type: string, required: true, max_length: 15, pattern: '^([0-9]{1,3}(\.[0-9]{1,3}){3})?$', label: Failsafe address,
+        description: "The failsafe IPv4 address; empty clears it." }
+      mask: { type: string, required: true, max_length: 15, pattern: '^([0-9]{1,3}(\.[0-9]{1,3}){3})?$', label: Failsafe mask,
+        description: "The failsafe address's subnet mask." }
+      gateway: *ipgw
+    send:
+      - { method: POST, path: /api/v1/network/set, content_type: application/json,
+          body: '{"device":{interface:json},"ip2":{ip:json},"mask2":{mask:json},"gw2":{gateway:json}}', headers: *h1 }
+      - { method: GET, path: /api/v1/network/get, headers: *h1 }
+    expect: *ok
+    returns: ack
+  set_network_address3:
+    summary: "Set the interface's third address, mask and gateway, which Kiloview does not guarantee (network/set ip3, mask3, gw3)"
+    params:
+      interface: *iface
+      ip: { type: string, required: true, max_length: 15, pattern: '^([0-9]{1,3}(\.[0-9]{1,3}){3})?$', label: Third address,
+        description: "The third IPv4 address; 0.0.0.0 or empty for none." }
+      mask: { type: string, required: true, max_length: 15, pattern: '^([0-9]{1,3}(\.[0-9]{1,3}){3})?$', label: Third mask,
+        description: "The third address's subnet mask." }
+      gateway: *ipgw
+    send:
+      - { method: POST, path: /api/v1/network/set, content_type: application/json,
+          body: '{"device":{interface:json},"ip3":{ip:json},"mask3":{mask:json},"gw3":{gateway:json}}', headers: *h1 }
+      - { method: GET, path: /api/v1/network/get, headers: *h1 }
+    expect: *ok
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Signing in is a command, not a session the core keeps. authorize posts
+      the user name and password and answers with a token (and, on N3, N4,
+      N30 and N40, a session ID) in its JSON body; the consumer puts them in
+      the api_token and api_session settings with update_settings. The
+      Version 1.0 models take them in the API-Session and API-Token headers,
+      N5 and N6 in the token cookie. On the Version 1.0 models they expire
+      after 10 minutes without a request (polling keeps them alive while the
+      device is monitored) and survive a mode switch; on every model a
+      restart or factory reset ends them. The version 3.0 document gives no
+      lifetime. A missing, wrong or expired token is answered with HTTP 200
+      and result auth-failed, which the core reports as a failed command,
+      not as unauthorized: sign in again and update the settings. N5 and N6
+      can have API authorization turned off in their web interface; leave
+      api_token empty then (an empty token cookie is still sent: a message
+      header is sent whenever its setting has a value, and the empty
+      default is one).
+  - models: [all]
+    severity: info
+    text: >
+      Every reply is HTTP 200 whatever the outcome; success is result ok in
+      the JSON body, and a failure is result error with a message. Requests
+      are POSTed as JSON (Version 1.0 section 1.2 makes GET, form and JSON
+      parameters equivalent; the version 3.0 document states no encoding and
+      the Companion module posts JSON), except N5/N6 sign-in, sent as a form
+      as the Companion module does.
+  - models: [all]
+    severity: info
+    text: >
+      The encoder methods work only in encoder mode and the discovery,
+      preset and output methods only in decoder mode; the other mode's are
+      answered with an error, and their state keeps its last value. The
+      device pushes nothing: mode, mode readiness, tally, the decoded source
+      and the encoder status are polled every 2 s, discovery, presets,
+      audio and system status every 10 s, configuration every 60 s, and
+      each change command reads its setting back.
+  - models: [all]
+    severity: critical
+    text: >
+      switch_mode restarts the device internally: its NDI stream and video
+      output stop, the request may take up to 5 s, and the new mode is ready
+      10 to 15 s later (state mode.ready, polled every 2 s; mode/status
+      answers an error until then).
+  - models: [all]
+    severity: critical
+    text: >
+      reboot restarts the device 3 s after it answers; it is back after about
+      20 s, 30 s or more with DHCP, and its token is no longer valid.
+      factory_reset does the same after restoring DHCP, the failsafe address,
+      the NDI group, names and connection, clearing the presets, the decoded
+      source and the blank color, removing every user and resetting the
+      admin password.
+  - models: [n3, n4, n30, n40, n40-plus]
+    severity: critical
+    text: >
+      reconnect_ndi drops every NDI connection: an encoder's receivers lose
+      the stream and a decoder's output its source for 4 to 6 seconds.
+  - models: [all]
+    severity: warning
+    text: >
+      Any change of the NDI encoder settings (group, names, connection,
+      multicast, quality, TTL, scaling, codec, NDI|HX version) disconnects
+      every NDI receiver and restarts the NDI sender; most receivers
+      reconnect at once. On N5/N6 set_hostname restarts NDI too.
+  - models: [all]
+    severity: critical
+    text: >
+      The network commands can make the device unreachable: a new address
+      takes effect in under a second and the core must be pointed at it
+      (they are not read back for that reason; network state is polled every
+      60 s). DHCP takes as long as the network does. The failsafe address
+      (192.168.100.168 or 192.168.1.168 by default on the Version 1.0
+      models) and the Reset button recover a device; Kiloview advises
+      changing the address in the web interface.
+  - models: [all]
+    severity: warning
+    text: >
+      set_manual_discovery replaces both lists: an address or group list left
+      out is cleared, so give the current values (state
+      decoder.manual_targets) for the list not being changed. The lists are
+      kept across restarts.
+  - models: [all]
+    severity: info
+    text: >
+      Discovery answers from a cache the device refreshes in the background,
+      so a new source may take a while to appear; rescan_ndi_sources forces
+      a new scan. Only sources in the device's subnet are discovered unless
+      they are added with set_manual_discovery. A preset's online state is
+      whether discovery sees the source, not whether it can be decoded.
+  - models: [n3, n4, n30, n40, n40-plus]
+    severity: info
+    text: >
+      The Version 1.0 methods need firmware 1.50 or later. The decoder's
+      output audio is fixed at 48 kHz (the API's sample_rate cannot be set
+      otherwise), so no command sets it. With smooth switching, the old
+      source stays on screen until the new one delivers video or the
+      timeout passes; a change of resolution can still flicker. In encoder
+      mode, a receiver's tally can overwrite a tally set through the API.
+      The API has no user management, host name, clock or version methods.
+  - models: [n5, n6]
+    severity: info
+    text: >
+      The decoder's output audio is fixed at 2 channels and 48 kHz, so no
+      command sets them; output frame rate and deinterlacing have no
+      method. Tally is documented for decoder mode, where it goes to the
+      decoded source. The version 3.0 document has no NDI reconnect method,
+      and prints the discovery server's path without its leading slash
+      (/api/device/set_discovery_server.json is sent). Its encoder methods
+      take types, ndifull or ndihx, whose settings are kept apart (state
+      encoder.config.ndifull and encoder.config.ndihx).
+  - models: [n5, n6]
+    severity: warning
+    text: >
+      decode_source sends the source's group too: the Companion module
+      reports that N5/N6 firmware refuses the request without it (it is not
+      in the version 3.0 document). The same module recalls presets by
+      their name and URL because it found the preset-ID form unreliable on
+      that firmware; recall_preset sends the documented ID.
+
+state:
+  mode.current:          { type: string, description: "Working mode: encoder or decoder" }
+  mode.status:           { type: string, description: "Mode status: ready once the mode works after a switch" }
+  mode.ready:            { type: bool, description: "The mode is working; false while the device restarts after a switch" }
+  encoder.config.*.device_group: { type: string, description: "NDI group (empty is public); the key is ndi on N3/N4/N30/N40, ndifull or ndihx on N5/N6" }
+  encoder.config.*.device_name:  { type: string, description: "N3/N4/N30/N40: NDI device name, also the host name" }
+  encoder.config.*.channel_name: { type: string, description: "NDI channel name" }
+  encoder.config.*.ndi_connection: { type: string, description: "Connection suggested to receivers: tcp, multicast, or on N5/N6 no_multi_tcp" }
+  encoder.config.*.netprefix:    { type: string, description: "Multicast address prefix" }
+  encoder.config.*.netmask:      { type: string, description: "Multicast subnet mask" }
+  encoder.config.*.quality:      { type: int, description: "N3/N4/N30/N40: bitrate in percent of NDI's recommendation, 75 to 150; N5/N6 NDI|HX: quality, 2000 to 40000" }
+  encoder.config.*.ttl:          { type: int, description: "N5/N6: multicast time to live" }
+  encoder.config.*.scaling:      { type: string, description: "N5/N6: scaling resolution value, none for no scaling" }
+  encoder.config.*.video_source: { type: string, description: "N5/N6: video input, HDMI, SDI or USB" }
+  encoder.config.*.codec:        { type: string, description: "N5/N6 NDI|HX: H265 or H264" }
+  encoder.config.*.hx_version:   { type: int, description: "N5/N6 NDI|HX: version, 2 or 3" }
+  encoder.config.*.resolutions.*.name:  { type: string, description: "N5/N6: a scaling resolution's name, by position in the list" }
+  encoder.config.*.resolutions.*.value: { type: string, description: "N5/N6: a scaling resolution's value, for set_ndi_scaling" }
+  encoder.status.*.video_signal:  { type: string, description: "N3/N4/N30/N40: video input, none, hdmi or sdi; the key is ndi, or ndifull or ndihx on N5/N6" }
+  encoder.status.*.video_present: { type: bool, description: "A video input is present and recognized" }
+  encoder.status.*.resolution:    { type: string, description: "Video format, as text, such as 1920x1080p 59.94Hz" }
+  encoder.status.*.width:         { type: int, description: "Video width in pixels, 0 when invalid" }
+  encoder.status.*.height:        { type: int, description: "Video height in pixels, 0 when invalid" }
+  encoder.status.*.frame_rate:    { type: float, description: "Frame rate, frames per second, 0 when invalid" }
+  encoder.status.*.interlaced:    { type: bool, description: "The video is interlaced" }
+  encoder.status.*.bitrate_kbps:  { type: int, description: "NDI video bitrate, kbit/s" }
+  encoder.status.*.audio_format:  { type: string, description: "Audio format, as text" }
+  encoder.status.*.audio_signal:  { type: string, description: "Audio input: none, embedded or analog" }
+  encoder.status.*.audio_sample_rate: { type: int, description: "Audio sample rate, Hz" }
+  encoder.status.*.audio_channels: { type: int, description: "Audio channels" }
+  encoder.status.*.audio_summary: { type: string, description: "N5/N6: sample rate and channels, as text, such as 48KHz/2ch" }
+  encoder.status.*.serial_number: { type: string, description: "N5/N6: the device's serial number" }
+  encoder.status.*.video_source:  { type: string, description: "N5/N6: video input in use" }
+  encoder.status.*.video_format:  { type: string, description: "N5/N6: encoding, such as H.264 NDI|HX2" }
+  encoder.status.*.source_resolution: { type: string, description: "N5/N6: the input's format, as text" }
+  encoder.status.*.source_frame_rate: { type: float, description: "N5/N6: the input's frame rate, frames per second" }
+  encoder.status.*.source_width:  { type: int, description: "N5/N6: the input's width in pixels" }
+  encoder.status.*.source_height: { type: int, description: "N5/N6: the input's height in pixels" }
+  encoder.video_sources.*:        { type: string, description: "N5/N6: a video input the encoder can take, by position" }
+  encoder.ndi_enabled:            { type: bool, description: "N5/N6: the full NDI encoder is on" }
+  audio.signal:                   { type: string, description: "Encoder audio input: embedded, analog or none (N3/N4/N30/N40); HDMI, SDI, Line In or USB (N5/N6)" }
+  audio.volume:                   { type: int, description: "Encoder audio volume in percent, 0 to 200, 100 unchanged" }
+  audio.channels:                 { type: int, description: "N5/N6: audio channels" }
+  decoder.sources.*.name:         { type: string, description: "A discovered NDI source's name, by position in the list" }
+  decoder.sources.*.group:        { type: string, description: "Its NDI group, empty for public" }
+  decoder.sources.*.device_name:  { type: string, description: "Its device name" }
+  decoder.sources.*.channel_name: { type: string, description: "Its channel name" }
+  decoder.sources.*.url:          { type: string, description: "Its URL, for add_preset and decode_source" }
+  decoder.sources.*.ip:           { type: string, description: "N5/N6: its IP address" }
+  decoder.sources.*.port:         { type: int, description: "N5/N6: its port" }
+  decoder.sources.*.original_url: { type: string, description: "N5/N6: its original URL" }
+  decoder.sources.*.series:       { type: string, description: "N5/N6: its series, such as NDI" }
+  decoder.manual_targets.ips.*:   { type: string, description: "An IP address searched besides automatic discovery, by position" }
+  decoder.manual_targets.groups.*: { type: string, description: "An NDI group searched besides automatic discovery, by position" }
+  decoder.presets.*.enabled:      { type: bool, description: "The preset, 1 to 9, holds an NDI source" }
+  decoder.presets.*.group:        { type: string, description: "The preset's source's NDI group" }
+  decoder.presets.*.name:         { type: string, description: "The preset's source's name" }
+  decoder.presets.*.device_name:  { type: string, description: "The preset's source's device name" }
+  decoder.presets.*.channel_name: { type: string, description: "The preset's source's channel name" }
+  decoder.presets.*.url:          { type: string, description: "The preset's source's URL" }
+  decoder.presets.*.ip:           { type: string, description: "The preset's source's IP address" }
+  decoder.presets.*.online:       { type: bool, description: "Discovery sees the preset's source" }
+  decoder.presets.*.current:      { type: bool, description: "The preset is being output" }
+  decoder.presets.*.color:        { type: string, description: "Preset 0 (Blank): the fill color, #RRGGBB" }
+  decoder.current.name:           { type: string, description: "Decoded source's name, (Blank) for preset 0" }
+  decoder.current.url:            { type: string, description: "Decoded source's URL, empty when none" }
+  decoder.current.ip:             { type: string, description: "Decoded source's IP address, 0.0.0.0 when none" }
+  decoder.current.online:         { type: bool, description: "The decoded source is online" }
+  decoder.current.resolution:     { type: string, description: "Decoded format, as text" }
+  decoder.current.codec:          { type: string, description: "Codec: SHQ0, SHQ2, SHQ7 (N3/N4/N30/N40); H264 or NDI-FULL (N5/N6)" }
+  decoder.current.width:          { type: int, description: "Decoded width in pixels" }
+  decoder.current.height:         { type: int, description: "Decoded height in pixels" }
+  decoder.current.frame_rate:     { type: float, description: "Source frame rate, frames per second" }
+  decoder.current.inst_frame_rate: { type: float, description: "Measured frame rate, frames per second" }
+  decoder.current.interlaced:     { type: bool, description: "N3/N4/N30/N40: the source is interlaced" }
+  decoder.current.deinterlaced:   { type: bool, description: "N3/N4/N30/N40: the decoder is deinterlacing the source" }
+  decoder.current.bitrate_kbps:   { type: int, description: "Received bitrate, kbit/s" }
+  decoder.current.audio_format:   { type: string, description: "Audio format, as text" }
+  decoder.current.audio_sample_rate: { type: int, description: "Audio sample rate, Hz" }
+  decoder.current.audio_channels: { type: int, description: "Audio channels" }
+  decoder.current.warning:        { type: string, description: "Decoding warning or error, such as WARN:offline or ERROR:no-video-output; empty when none" }
+  decoder.current.full_ndi:       { type: bool, description: "N5/N6: the source is full NDI" }
+  decoder.current.ptz_icon:       { type: bool, description: "N5/N6: the PTZ icon is shown" }
+  decoder.current.video_mode:     { type: string, description: "N5/N6: output signal, such as hdmi" }
+  decoder.output.resolution:      { type: string, description: "Output resolution: auto or deint (N3/N4/N30/N40), or a resolution value (N5/N6)" }
+  decoder.output.frame_rate:      { type: float, description: "Output frame rate, 0 following the source" }
+  decoder.output.sample_rate:     { type: int, description: "Output audio sample rate, Hz" }
+  decoder.output.channels:        { type: int, description: "N5/N6: output audio channels" }
+  decoder.output.audio_format:    { type: int, description: "N5/N6: output audio sample rate as audio_format, Hz" }
+  decoder.output.enable:          { type: int, description: "N5/N6: the enable field of output/get, which the document does not explain" }
+  decoder.output.frame_rate_mode: { type: int, description: "N5/N6: the frameRate field of output/get, which the document does not explain" }
+  decoder.output.hdmi_mode:       { type: string, description: "N5/N6: the hdmi_mode field of output/get, such as hdmi" }
+  decoder.output.colorspace:      { type: string, description: "N5/N6: the colorspace field of output/get, such as auto" }
+  decoder.output.resolutions.*.name:  { type: string, description: "N5/N6: an output resolution's name, by position" }
+  decoder.output.resolutions.*.value: { type: string, description: "N5/N6: an output resolution's value, for set_output_resolution" }
+  decoder.switch_timeout_ms:      { type: int, description: "N3/N4/N30/N40: smooth switch timeout, ms" }
+  tally.program:                  { type: bool, description: "Program tally on" }
+  tally.preview:                  { type: bool, description: "Preview tally on" }
+  system.address:                 { type: string, description: "Device IP address" }
+  system.port:                    { type: int, description: "Port of the web server answering the API" }
+  system.url:                     { type: string, description: "The address the API is reached at, such as https://192.168.0.100" }
+  system.uptime:                  { type: string, description: "Time running, as <h>H <m>M <s>S" }
+  system.start_time:              { type: string, description: "Start time, YYYY-MM-DD HH:MM:SS" }
+  system.cpu_cores:               { type: int, description: "CPU cores" }
+  system.cpu_load:                { type: float, description: "CPU load, percent" }
+  system.memory_used_mb:          { type: float, description: "Memory in use, MB" }
+  system.memory_total_mb:         { type: float, description: "Memory in total, MB" }
+  time.ntp_servers:               { type: string, description: "N5/N6: NTP servers, separated by spaces" }
+  time.timezone:                  { type: string, description: "N5/N6: time zone, such as Asia/Shanghai" }
+  time.current:                   { type: string, description: "N5/N6: system time when read, YYYY-MM-DD HH:MM:SS" }
+  time.sync:                      { type: string, description: "N5/N6: time source, pc or ntp" }
+  device.hostname:                { type: string, description: "N5/N6: host name" }
+  device.software_version:        { type: string, description: "N5/N6: software version" }
+  device.hardware_version:        { type: string, description: "N5/N6: hardware version" }
+  device.ndi_version:             { type: string, description: "N5/N6: NDI version" }
+  discovery_server.address:       { type: string, description: "N5/N6: discovery server addresses, separated by commas" }
+  discovery_server.enabled:       { type: bool, description: "N5/N6: the discovery servers are used" }
+  users.*.alias:                  { type: string, description: "N5/N6: a user's alias, keyed by user name" }
+  users.*.api:                    { type: bool, description: "N5/N6: the user may use the HTTP API" }
+  users.*.web:                    { type: bool, description: "N5/N6: the user may sign in to the web interface" }
+  users.*.created:                { type: string, description: "N5/N6: when the user was created" }
+  network.*.state:                { type: string, description: "An interface's state, keyed by its device name: up, down, disabled or error" }
+  network.*.ip:                   { type: string, description: "Its IP address" }
+  network.*.mask:                 { type: string, description: "Its subnet mask" }
+  network.*.mac:                  { type: string, description: "Its MAC address" }
+  network.*.gateway:              { type: string, description: "Its default gateway" }
+  network.*.dhcp:                 { type: bool, description: "Its address comes from DHCP" }
+  network.*.dns:                  { type: string, description: "Its DNS servers, separated by semicolons" }
+  network.*.failsafe_ip:          { type: string, description: "N3/N4/N30/N40: its failsafe address" }
+  network.*.failsafe_mask:        { type: string, description: "N3/N4/N30/N40: the failsafe address's mask" }
+  network.*.failsafe_gateway:     { type: string, description: "N3/N4/N30/N40: the failsafe address's gateway" }
+  network.*.ip3:                  { type: string, description: "N3/N4/N30/N40: its third address" }
+  network.*.mask3:                { type: string, description: "N3/N4/N30/N40: the third address's mask" }
+  network.*.gateway3:             { type: string, description: "N3/N4/N30/N40: the third address's gateway" }
+
+telemetry:
+  poll:
+    # What moves during a show.
+    - every_ms: 2000
+      send:
+        - { models: *v1, method: GET, path: /api/v1/mode/get, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/mode/status, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/tally/status, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/decoder/current/status, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/encoder/ndi/status, headers: *h1 }
+        - { models: *v3, method: GET, path: /api/mode/get.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/mode/status.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/tally/status.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/decoder/current/status.json, headers: *h3 }
+        - { models: *v3, method: POST, path: /api/encoder/ndi/status.json, content_type: application/json,
+            body: '{"types":"ndifull"}', headers: *h3 }
+        - { models: *v3, method: POST, path: /api/encoder/ndi/status.json, content_type: application/json,
+            body: '{"types":"ndihx"}', headers: *h3 }
+    # Lists and status that change now and then.
+    - every_ms: 10000
+      send:
+        - { models: *v1, method: GET, path: /api/v1/decoder/discovery/get, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/decoder/preset/status, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_audio, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/sys/server_info, headers: *h1 }
+        - { models: *v3, method: GET, path: /api/decoder/discovery/get.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/decoder/preset/status.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/audio/get_audio.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/sys/server_info.json, headers: *h3 }
+    # What an operator configures.
+    - every_ms: 60000
+      send:
+        - { models: *v1, method: GET, path: /api/v1/encoder/ndi/get_config, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/decoder/discovery/get_manual_targets, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/decoder/output/get, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/decoder/output/get_smoothness, headers: *h1 }
+        - { models: *v1, method: GET, path: /api/v1/network/get, headers: *h1 }
+        - { models: *v3, method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+            body: '{"types":"ndifull"}', headers: *h3 }
+        - { models: *v3, method: POST, path: /api/encoder/ndi/get_config.json, content_type: application/json,
+            body: '{"types":"ndihx"}', headers: *h3 }
+        - { models: *v3, method: GET, path: /api/encoder/ndi/get_video_source.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/encoder/ndi/get_NDI_enable.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/decoder/discovery/get_manual_targets.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/decoder/output/get.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/decoder/output/resolutions.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/sys-time/get.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/device/get_hostname.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/device/get_discovery_server.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/firmware/get.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/users/list.json, headers: *h3 }
+        - { models: *v3, method: GET, path: /api/network/get.json, headers: *h3 }
+  updates:
+    # Mode (V1.0 3.1, 3.3; v3.0 2.1, 2.3).
+    - path: '^/api(?:/v1)?/mode/get(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json: { mode: "$.data.mode" }
+      state: { mode.current: "{mode}" }
+    - path: '^/api(?:/v1)?/mode/status(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json: { mode: "$.data.mode", status: "$.data.status" }
+      state:
+        mode.current: "{mode}"
+        mode.status: "{status}"
+        mode.ready: { value: "{status}", map: { ready: true } }
+    # Not ready: V1.0 reason not-ready (or none while restarting), v3.0
+    # msg waitChangeModeError.
+    - path: '^/api(?:/v1)?/mode/status(?:\.json)?$'
+      json_match: { "$.result": "^error$" }
+      json: {}
+      state: { mode.ready: "false" }
+
+    # Encoder configuration (V1.0 4.1; v3.0 3.1 per types).
+    - path: '^/api/v1/encoder/ndi/get_config$'
+      json_match: { "$.result": "^ok$" }
+      json: { group: "$.data.device_group", device: "$.data.device_name", channel: "$.data.channel_name",
+              connection: "$.data.ndi_connection", prefix: "$.data.netprefix", mask: "$.data.netmask",
+              quality: "$.data.quality" }
+      state:
+        encoder.config.ndi.device_group: "{group}"
+        encoder.config.ndi.device_name: "{device}"
+        encoder.config.ndi.channel_name: "{channel}"
+        encoder.config.ndi.ndi_connection: "{connection}"
+        encoder.config.ndi.netprefix: "{prefix}"
+        encoder.config.ndi.netmask: "{mask}"
+        encoder.config.ndi.quality: "{quality}"
+    - path: '^/api/encoder/ndi/get_config\.json$'
+      request_match: { "$.types": "^(ndifull|ndihx)$" }
+      json_match: { "$.result": "^ok$" }
+      json: { group: "$.data.device_group", channel: "$.data.channel_name", connection: "$.data.ndi_connection",
+              prefix: "$.data.netprefix", mask: "$.data.netmask", quality: "$.data.quality", ttl: "$.data.ttl",
+              scaling: "$.data.resolution", source: "$.data.video_source", codec: "$.data.codec",
+              hx: "$.data.hx_version" }
+      state:
+        "encoder.config.{1}.device_group": "{group}"
+        "encoder.config.{1}.channel_name": "{channel}"
+        "encoder.config.{1}.ndi_connection": "{connection}"
+        "encoder.config.{1}.netprefix": "{prefix}"
+        "encoder.config.{1}.netmask": "{mask}"
+        "encoder.config.{1}.quality": "{quality}"
+        "encoder.config.{1}.ttl": "{ttl}"
+        "encoder.config.{1}.scaling": "{scaling}"
+        "encoder.config.{1}.video_source": "{source}"
+        "encoder.config.{1}.codec": "{codec}"
+        "encoder.config.{1}.hx_version": "{hx}"
+    - path: '^/api/encoder/ndi/get_config\.json$'
+      request_match: { "$.types": "^(ndifull|ndihx)$" }
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.resolution_list"
+      json: { name: "$.name", value: "$.value" }
+      replace: "encoder.config.{1}.resolutions"
+      state:
+        "encoder.config.{1}.resolutions.{index}.name": "{name}"
+        "encoder.config.{1}.resolutions.{index}.value": "{value}"
+
+    # Encoder status (V1.0 4.3; v3.0 3.3 per types).
+    - path: '^/api/v1/encoder/ndi/status$'
+      json_match: { "$.result": "^ok$" }
+      json: { signal: "$.data.video_signal", resolution: "$.data.resolution", width: "$.data.xRes",
+              height: "$.data.yRes", rate: "$.data.frame_rate", interlaced: "$.data.interlaced",
+              bitrate: "$.data.bitrate", aformat: "$.data.audio_format", asignal: "$.data.audio_signal",
+              arate: "$.data.audio_sampling", achannels: "$.data.audio_channels" }
+      state:
+        encoder.status.ndi.video_signal: "{signal}"
+        encoder.status.ndi.video_present: { value: "{signal}", map: { none: false, hdmi: true, sdi: true } }
+        encoder.status.ndi.resolution: "{resolution}"
+        encoder.status.ndi.width: "{width}"
+        encoder.status.ndi.height: "{height}"
+        encoder.status.ndi.frame_rate: "{rate}"
+        encoder.status.ndi.interlaced: "{interlaced}"
+        encoder.status.ndi.bitrate_kbps: "{bitrate}"
+        encoder.status.ndi.audio_format: "{aformat}"
+        encoder.status.ndi.audio_signal: "{asignal}"
+        encoder.status.ndi.audio_sample_rate: "{arate}"
+        encoder.status.ndi.audio_channels: "{achannels}"
+    - path: '^/api/encoder/ndi/status\.json$'
+      request_match: { "$.types": "^(ndifull|ndihx)$" }
+      json_match: { "$.result": "^ok$" }
+      json: { present: "$.data.video_signal", resolution: "$.data.resolution", width: "$.data.xRes",
+              height: "$.data.yRes", rate: "$.data.frame_rate", interlaced: "$.data.interlaced",
+              bitrate: "$.data.bitrate", aformat: "$.data.audio_format", asignal: "$.data.audio_signal",
+              arate: "$.data.audio_sampling", achannels: "$.data.audio_channels", summary: "$.data.samp_chan",
+              serial: "$.data.serial_number", source: "$.data.video_source", vformat: "$.data.mode_version",
+              sres: "$.data.src_resolution", srate: "$.data.src_frame_rate", swidth: "$.data.src_xRes",
+              sheight: "$.data.src_yRes" }
+      state:
+        "encoder.status.{1}.video_present": "{present}"
+        "encoder.status.{1}.resolution": "{resolution}"
+        "encoder.status.{1}.width": "{width}"
+        "encoder.status.{1}.height": "{height}"
+        "encoder.status.{1}.frame_rate": "{rate}"
+        "encoder.status.{1}.interlaced": "{interlaced}"
+        "encoder.status.{1}.bitrate_kbps": "{bitrate}"
+        "encoder.status.{1}.audio_format": "{aformat}"
+        "encoder.status.{1}.audio_signal": "{asignal}"
+        "encoder.status.{1}.audio_sample_rate": "{arate}"
+        "encoder.status.{1}.audio_channels": "{achannels}"
+        "encoder.status.{1}.audio_summary": "{summary}"
+        "encoder.status.{1}.serial_number": "{serial}"
+        "encoder.status.{1}.video_source": "{source}"
+        "encoder.status.{1}.video_format": "{vformat}"
+        "encoder.status.{1}.source_resolution": "{sres}"
+        "encoder.status.{1}.source_frame_rate": "{srate}"
+        "encoder.status.{1}.source_width": "{swidth}"
+        "encoder.status.{1}.source_height": "{sheight}"
+
+    # Encoder inputs and audio (V1.0 4.4; v3.0 3.4, 3.6, 3.8).
+    - path: '^/api/encoder/ndi/get_video_source\.json$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { source: "$" }
+      replace: encoder.video_sources
+      state: { "encoder.video_sources.{index}": "{source}" }
+    - path: '^/api/encoder/ndi/get_NDI_enable\.json$'
+      json_match: { "$.result": "^ok$" }
+      json: { enabled: "$.data.enable" }
+      state: { encoder.ndi_enabled: "{enabled}" }
+    - path: '^/api(?:/v1/encoder/ndi|/audio)/get_audio(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json: { signal: "$.data.signal", volume: "$.data.volume", channels: "$.data.channels" }
+      state:
+        audio.signal: "{signal}"
+        audio.volume: "{volume}"
+        audio.channels: "{channels}"
+
+    # Discovery (V1.0 5.1, 5.3; v3.0 4.1, 4.3).
+    - path: '^/api(?:/v1)?/decoder/discovery/get(?:\.json)?(?:\?.*)?$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { name: "$.name", group: "$.group", device: "$.device_name", channel: "$.channel_name", url: "$.url",
+              ip: "$.ip", port: "$.port", original: "$.original_url", series: "$.series" }
+      replace: decoder.sources
+      state:
+        "decoder.sources.{index}.name": "{name}"
+        "decoder.sources.{index}.group": "{group}"
+        "decoder.sources.{index}.device_name": "{device}"
+        "decoder.sources.{index}.channel_name": "{channel}"
+        "decoder.sources.{index}.url": "{url}"
+        "decoder.sources.{index}.ip": "{ip}"
+        "decoder.sources.{index}.port": "{port}"
+        "decoder.sources.{index}.original_url": "{original}"
+        "decoder.sources.{index}.series": "{series}"
+    - path: '^/api(?:/v1)?/decoder/discovery/get_manual_targets(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.ip"
+      json: { ip: "$" }
+      replace: decoder.manual_targets.ips
+      state: { "decoder.manual_targets.ips.{index}": "{ip}" }
+    - path: '^/api(?:/v1)?/decoder/discovery/get_manual_targets(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data.group_name"
+      json: { group: "$" }
+      replace: decoder.manual_targets.groups
+      state: { "decoder.manual_targets.groups.{index}": "{group}" }
+
+    # Presets (V1.0 6.1; v3.0 5.1).
+    - path: '^/api(?:/v1)?/decoder/preset/status(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { id: "$.id", enable: "$.enable", group: "$.group", name: "$.name", device: "$.device_name",
+              channel: "$.channel_name", url: "$.url", ip: "$.ip", online: "$.online", current: "$.current",
+              color: "$.color" }
+      replace: decoder.presets
+      state:
+        "decoder.presets.{id}.enabled": { value: "{enable}", map: { "1": true, "0": false } }
+        "decoder.presets.{id}.group": "{group}"
+        "decoder.presets.{id}.name": "{name}"
+        "decoder.presets.{id}.device_name": "{device}"
+        "decoder.presets.{id}.channel_name": "{channel}"
+        "decoder.presets.{id}.url": "{url}"
+        "decoder.presets.{id}.ip": "{ip}"
+        "decoder.presets.{id}.online": { value: "{online}", map: { "on": true, "off": false } }
+        "decoder.presets.{id}.current": "{current}"
+        "decoder.presets.{id}.color": "{color}"
+
+    # Current decoding (V1.0 7.1; v3.0 6.1).
+    - path: '^/api(?:/v1)?/decoder/current/status(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json: { name: "$.data.name", url: "$.data.url", ip: "$.data.ip", online: "$.data.online",
+              resolution: "$.data.resolution", codec: "$.data.codec", width: "$.data.xRes", height: "$.data.yRes",
+              rate: "$.data.frame_rate", inst: "$.data.inst_frame_rate", interlaced: "$.data.interlaced",
+              deint: "$.data.de_interlace", bitrate: "$.data.bitrate", aformat: "$.data.audio_format",
+              arate: "$.data.audio_sampling", achannels: "$.data.audio_channels", warning: "$.data.warning",
+              full: "$.data.isFull", ptz: "$.data.ptz", vmode: "$.data.video_mode" }
+      state:
+        decoder.current.name: "{name}"
+        decoder.current.url: "{url}"
+        decoder.current.ip: "{ip}"
+        decoder.current.online: "{online}"
+        decoder.current.resolution: "{resolution}"
+        decoder.current.codec: "{codec}"
+        decoder.current.width: "{width}"
+        decoder.current.height: "{height}"
+        decoder.current.frame_rate: "{rate}"
+        decoder.current.inst_frame_rate: "{inst}"
+        decoder.current.interlaced: "{interlaced}"
+        decoder.current.deinterlaced: "{deint}"
+        decoder.current.bitrate_kbps: "{bitrate}"
+        decoder.current.audio_format: "{aformat}"
+        decoder.current.audio_sample_rate: "{arate}"
+        decoder.current.audio_channels: "{achannels}"
+        decoder.current.warning: "{warning}"
+        decoder.current.full_ndi: "{full}"
+        decoder.current.ptz_icon: { value: "{ptz}", map: { "1": true, "0": false } }
+        decoder.current.video_mode: "{vmode}"
+
+    # Decoder output (V1.0 8.2, 8.4; v3.0 7.1, 7.3).
+    - path: '^/api(?:/v1)?/decoder/output/get(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json: { resolution: "$.data.resolution", rate: "$.data.frame_rate", srate: "$.data.sample_rate",
+              channels: "$.data.channels", aformat: "$.data.audio_format", enable: "$.data.enable",
+              ratemode: "$.data.frameRate", hdmi: "$.data.hdmi_mode", colorspace: "$.data.colorspace" }
+      state:
+        decoder.output.resolution: "{resolution}"
+        decoder.output.frame_rate: "{rate}"
+        decoder.output.sample_rate: "{srate}"
+        decoder.output.channels: "{channels}"
+        decoder.output.audio_format: "{aformat}"
+        decoder.output.enable: "{enable}"
+        decoder.output.frame_rate_mode: "{ratemode}"
+        decoder.output.hdmi_mode: "{hdmi}"
+        decoder.output.colorspace: "{colorspace}"
+    - path: '^/api/decoder/output/resolutions\.json$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { name: "$.name", value: "$.value" }
+      replace: decoder.output.resolutions
+      state:
+        "decoder.output.resolutions.{index}.name": "{name}"
+        "decoder.output.resolutions.{index}.value": "{value}"
+    - path: '^/api/v1/decoder/output/get_smoothness$'
+      json_match: { "$.result": "^ok$" }
+      json: { timeout: "$.data.timeout" }
+      state: { decoder.switch_timeout_ms: "{timeout}" }
+
+    # Tally (V1.0 9.1; v3.0 8.1).
+    - path: '^/api(?:/v1)?/tally/status(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json: { pgm: "$.data.pgm", pvw: "$.data.pvw" }
+      state:
+        tally.program: { value: "{pgm}", map: { "1": true, "0": false } }
+        tally.preview: { value: "{pvw}", map: { "1": true, "0": false } }
+
+    # System (V1.0 10.1; v3.0 9.1, 10.1, 10.4, 10.7, 10.9).
+    - path: '^/api(?:/v1)?/sys/server_info(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json: { addr: "$.data.addr", port: "$.data.port", url: "$.data.name", uptime: "$.data.persis",
+              start: "$.data.start_time", cores: "$.data.cpu_cores", load: "$.data.cpu_payload",
+              used: "$.data.mem_used", total: "$.data.mem_total" }
+      state:
+        system.address: "{addr}"
+        system.port: "{port}"
+        system.url: "{url}"
+        system.uptime: "{uptime}"
+        system.start_time: "{start}"
+        system.cpu_cores: "{cores}"
+        system.cpu_load: "{load}"
+        system.memory_used_mb: "{used}"
+        system.memory_total_mb: "{total}"
+    - path: '^/api/sys-time/get\.json$'
+      json_match: { "$.result": "^ok$" }
+      json: { ntp: "$.data.ntp", zone: "$.data.Timezone", time: "$.data.time", sync: "$.data.timetype" }
+      state:
+        time.ntp_servers: "{ntp}"
+        time.timezone: "{zone}"
+        time.current: "{time}"
+        time.sync: "{sync}"
+    - path: '^/api/device/get_hostname\.json$'
+      json_match: { "$.result": "^ok$" }
+      json: { hostname: "$.data.hostname" }
+      state: { device.hostname: "{hostname}" }
+    - path: '^/api/device/get_discovery_server\.json$'
+      json_match: { "$.result": "^ok$" }
+      json: { address: "$.data.address", enabled: "$.data.enable" }
+      state:
+        discovery_server.address: "{address}"
+        discovery_server.enabled: "{enabled}"
+    - path: '^/api/firmware/get\.json$'
+      json_match: { "$.result": "^ok$" }
+      json: { software: "$.data.softwareVersion", hardware: "$.data.hardwareVersion", ndi: "$.data.ndiVersion" }
+      state:
+        device.software_version: "{software}"
+        device.hardware_version: "{hardware}"
+        device.ndi_version: "{ndi}"
+
+    # Users (v3.0 11.1).
+    - path: '^/api/users/list\.json$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { user: "$.id", alias: "$.alias", api: "$.api", web: "$.web", created: "$.create_time" }
+      replace: users
+      state:
+        "users.{user:key}.alias": "{alias}"
+        "users.{user:key}.api": "{api}"
+        "users.{user:key}.web": "{web}"
+        "users.{user:key}.created": "{created}"
+
+    # Network (V1.0 11.1; v3.0 12.1).
+    - path: '^/api(?:/v1)?/network/get(?:\.json)?$'
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.data"
+      json: { dev: "$.device", state: "$.state", ip: "$.ip", mask: "$.mask", mac: "$.mac", gw: "$.gw",
+              dynamic: "$.dynamic", dns: "$.dns", ip2: "$.ip2", mask2: "$.mask2", gw2: "$.gw2",
+              ip3: "$.ip3", mask3: "$.mask3", gw3: "$.gw3" }
+      replace: network
+      state:
+        "network.{dev:key}.state": "{state}"
+        "network.{dev:key}.ip": "{ip}"
+        "network.{dev:key}.mask": "{mask}"
+        "network.{dev:key}.mac": "{mac}"
+        "network.{dev:key}.gateway": "{gw}"
+        "network.{dev:key}.dhcp": { value: "{dynamic}", map: { "y": true, "n": false } }
+        "network.{dev:key}.dns": "{dns}"
+        "network.{dev:key}.failsafe_ip": "{ip2}"
+        "network.{dev:key}.failsafe_mask": "{mask2}"
+        "network.{dev:key}.failsafe_gateway": "{gw2}"
+        "network.{dev:key}.ip3": "{ip3}"
+        "network.{dev:key}.mask3": "{mask3}"
+        "network.{dev:key}.gateway3": "{gw3}"
