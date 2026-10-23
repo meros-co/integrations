@@ -2366,6 +2366,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
 - [ ] Capture, on a Carbonite-family and an Acuity-family switcher with Cmd Response on and off, the bytes each documented query answers (XPT, MS, MNEM, TRANSRATE, TRANSTYPE, TRANSINCL, MVBOX, USERVAR and KEYSHAPED with ?, KEYSTATE, ACTIVEID, VERSION, HELP, MEM ?), the answer to an unknown source or ME, the answer to a set, the order of answers to queries sent together, and any unasked messages, so state can be kept. ([specs/rosstalk.yaml:1469](specs/rosstalk.yaml#L1469))
 
+## rundown-studio — Rundown Studio
+
+- [ ] Confirm the event stream takes the bearer token and ?events=rundown:fat,cue:fat,column:fat,cell:fat, and sends status first on each connection. ([specs/rundown-studio.yaml:596](specs/rundown-studio.yaml#L596))
+- [ ] Confirm the include query is taken percent-encoded (include=cues%2Ccolumns) and answers cues and columns in included. ([specs/rundown-studio.yaml:288](specs/rundown-studio.yaml#L288))
+- [ ] Record what a delete answers (status and body) and whether the event stream reports deletions of mentions and text variables (it is read every minute). ([specs/rundown-studio.yaml:910](specs/rundown-studio.yaml#L910))
+- [ ] Check how often a restricted-tier token is refused with 429 at the core's pacing and polls. ([specs/rundown-studio.yaml:64](specs/rundown-studio.yaml#L64))
+- [ ] Confirm the cue order's children carry {id} as the shallow rundown example shows (the reorder body names them cue_id). ([specs/rundown-studio.yaml:720](specs/rundown-studio.yaml#L720))
+
 ## samsung-mdc — Samsung displays (MDC)
 
 - [ ] Check the secured mode handshake on a display with the secured protocol on: the plain-text MDCSTART<<TLS>> greeting, a TLS handshake on the same connection, the 4-digit PIN sent bare, and MDCAUTH<<PASS>> or MDCAUTH<<FAIL:xxxx>> (taken from a third-party library, not Ver. 15.0). ([specs/samsung-mdc.yaml:2884](specs/samsung-mdc.yaml#L2884))
