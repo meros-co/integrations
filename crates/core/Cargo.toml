@@ -346,7 +346,7 @@ focusrite-rednet-rcp = []
 # Generic HTTP device (native)
 generic-http = []
 # Generic MIDI device over RTP-MIDI or a MIDI port of the host (native)
-generic-midi = ["dep:midir"] # also MIDI ports of the host (midir) and mDNS discovery of RTP-MIDI sessions
+generic-midi = ["dep:midir", "dep:libc"] # also MIDI ports of the host (midir, or ALSA loaded at run time on Linux) and mDNS discovery of RTP-MIDI sessions
 # Generic OSC device (native)
 generic-osc = []
 # Network presence: ping (ICMP echo or a TCP connection) and Wake-on-LAN (native)
@@ -388,7 +388,7 @@ megapixel-helios = []
 # Meros Camera (Meros Camera Control protocol, version 1) (native); also mDNS discovery, and fleet links (miniz_oxide)
 meros-camera = ["dep:miniz_oxide"]
 # MIDI Show Control over RTP-MIDI or a MIDI port of the host (native)
-midi-show-control = ["dep:midir"] # also MIDI ports of the host (midir) and mDNS discovery of RTP-MIDI sessions
+midi-show-control = ["dep:midir", "dep:libc"] # also MIDI ports of the host (midir, or ALSA loaded at run time on Linux) and mDNS discovery of RTP-MIDI sessions
 # Millumin (OSC API)
 millumin = []
 # Lightware LW2 (bracket protocol) matrices and switchers
@@ -620,17 +620,23 @@ zeroize = { version = "1.9.0", optional = true }
 serial2-tokio = "0.1.25"
 
 # MIDI ports of the host (USB and other class-compliant MIDI devices) for the
-# MIDI integrations: WinMM on Windows, CoreMIDI on macOS and iOS, the ALSA
-# sequencer on Linux (building needs ALSA's headers, libasound2-dev, and
-# running needs libasound.so.2). Android's MIDI API is reached only through
-# Java, so the ports are left out there (docs/MOBILE.md).
-[target.'cfg(not(target_os = "android"))'.dependencies]
+# MIDI integrations: WinMM on Windows, CoreMIDI on macOS and iOS (midir).
+# Android's MIDI API is reached only through Java, so the ports are left out
+# there (docs/MOBILE.md).
+[target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
 midir = { version = "0.11.1", optional = true }
 
 # ICMP echo without elevated privileges goes through the system's ICMP helper
 # API on Windows (src/icmp.rs).
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_IO"] }
+
+# On Linux the ALSA sequencer, whose library (libasound.so.2) is loaded with
+# dlopen when a MIDI port is first listed or opened, never linked: building
+# needs no ALSA headers, and a host without the library starts and lists no
+# MIDI port (crates/core/src/midi_ports/alsa.rs).
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { version = "0.2.177", optional = true }
 
 [dev-dependencies]
 rcgen = "0.13"

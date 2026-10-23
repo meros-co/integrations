@@ -19,6 +19,14 @@
 //! MTC quarter frames are reported only with `realtime_events`, as they
 //! arrive many times a second.
 //!
+//! The core also generates MIDI Time Code (`mtc_generator_*`): running, it
+//! sends the eight quarter frames of every two frames as they fall due by
+//! its own clock (MTC 4.2.1: four a frame, piece 0 when the time they carry
+//! begins, frames counted in drop-frame at 30df), at 24, 25, 29.97 (30df) or
+//! 30 frames a second, and a locate sends the full message. A core that
+//! falls more than a run of eight behind skips whole runs rather than send
+//! them in a burst.
+//!
 //! MIDI carries no acknowledgement, so every command is `unverified`.
 //! Opening for commands only changes nothing: the module asks the device for
 //! nothing, and an RTP-MIDI session's clock synchronisation is part of
@@ -30,12 +38,13 @@ use serde_json::{json, Map, Value};
 
 use super::midi_link::{timecode, MidiLink};
 use crate::catalog::Params;
-use crate::midi::{self, Message, MtcReader, Timecode};
+use crate::midi::{self, Message, MtcReader, Rate, Timecode};
 use crate::module::{
     CommandError, CommandId, Cx, Key, Module, OpenContext, Outcome, SettingsUpdate, TcpInput,
 };
 
 const MTC_IDLE: Key = "mtc-idle";
+const MTC_GENERATOR: Key = "mtc-generator";
 /// MTC is taken to have stopped when no run of quarter frames completes for
 /// this long (a run takes two frames: 83 ms at 24 fps).
 const MTC_IDLE_MS: u64 = 500;
@@ -56,8 +65,77 @@ struct Channel {
     bank_lsb: Option<u8>,
 }
 
+/// The MTC generator: where it is and, running, since when.
+#[derive(Debug, Clone, Copy)]
+struct Generator {
+    /// The time the current run of eight quarter frames carries.
+    position: Timecode,
+    running: bool,
+    /// When quarter frame 0 of the run started at `position` was due, and
+    /// how many have been sent since.
+    started_at: u64,
+    sent: u64,
+    /// The time last reported in state.
+    reported: Option<Timecode>,
+}
+
+impl Generator {
+    fn new() -> Generator {
+        Generator {
+            position: Timecode::new(0, 0, 0, 0, Rate::Fps30).expect("midnight"),
+            running: false,
+            started_at: 0,
+            sent: 0,
+            reported: None,
+        }
+    }
+
+    /// Frames a second as a fraction: 30df runs at 30000/1001.
+    fn rate(&self) -> (u64, u64) {
+        match self.position.rate {
+            Rate::Fps24 => (24, 1),
+            Rate::Fps25 => (25, 1),
+            Rate::Fps30Drop => (30_000, 1001),
+            Rate::Fps30 => (30, 1),
+        }
+    }
+
+    /// When quarter frame `k` of this run falls due (ms).
+    fn due(&self, k: u64) -> u64 {
+        let (num, den) = self.rate();
+        self.started_at + k * 250 * den / num
+    }
+
+    /// How many quarter frames of this run are due by `now`: the k with
+    /// due(k) <= now.
+    fn count_due(&self, now: u64) -> u64 {
+        let (num, den) = self.rate();
+        let Some(elapsed) = now.checked_sub(self.started_at) else {
+            return 0;
+        };
+        ((elapsed + 1) * num - 1) / (250 * den) + 1
+    }
+
+    /// The frame the generator is at: the run's time, one frame on after
+    /// four quarter frames.
+    fn frame(&self) -> Timecode {
+        if self.running {
+            self.position.add_frames((self.sent % 8 / 4) as i64)
+        } else {
+            self.position
+        }
+    }
+
+    fn state(&self) -> Value {
+        let mut v = self.frame().json();
+        v["running"] = json!(self.running);
+        json!({"mtc_generator": v})
+    }
+}
+
 pub(crate) struct GenericMidi {
     link: MidiLink,
+    generator: Generator,
     device_id: u8,
     realtime_events: bool,
     channels: [Channel; 16],
@@ -193,6 +271,7 @@ impl GenericMidi {
             .unwrap_or(false);
         Ok(GenericMidi {
             link,
+            generator: Generator::new(),
             device_id,
             realtime_events,
             channels: [Channel::default(); 16],
@@ -498,6 +577,126 @@ impl GenericMidi {
             }
         };
         Ok(m)
+    }
+
+    /// The time a generator command gives: its fields (0 when left out) at
+    /// its rate, or the generator's rate when it gives none.
+    fn generator_time(&self, params: &Params) -> Result<Timecode, CommandError> {
+        let mut params = params.clone();
+        if !params.contains_key("rate") {
+            params.insert("rate".into(), json!(self.generator.position.rate.name()));
+        }
+        timecode(&params)
+    }
+
+    /// Move the generator to `tc`, restarting its run of quarter frames now.
+    fn generator_move(&mut self, cx: &mut Cx, tc: Timecode) {
+        let g = &mut self.generator;
+        g.position = tc;
+        g.started_at = cx.now();
+        g.sent = 0;
+        g.reported = None;
+    }
+
+    /// Send every quarter frame due by now, and wait for the next.
+    fn generator_run(&mut self, cx: &mut Cx) {
+        if !self.generator.running {
+            return;
+        }
+        let now = cx.now();
+        let mut messages = Vec::new();
+        let g = &mut self.generator;
+        // Far behind (the core was busy): skip whole runs of eight.
+        let due = g.count_due(now).saturating_sub(g.sent);
+        if due > 8 {
+            let skip = (due - 1) / 8 * 8;
+            let runs = (g.sent % 8 + skip) / 8;
+            g.position = g.position.add_frames(2 * runs as i64);
+            g.sent += skip;
+        }
+        while g.due(g.sent) <= now {
+            let piece = (g.sent % 8) as usize;
+            messages.push(midi::quarter_frames(&g.position)[piece].clone());
+            g.sent += 1;
+            if g.sent.is_multiple_of(8) {
+                g.position = g.position.add_frames(2);
+            }
+        }
+        let next = g.due(g.sent).saturating_sub(now).max(1);
+        cx.set_timer(MTC_GENERATOR, next);
+        if !messages.is_empty() {
+            // Sent while the link is up; time runs on either way.
+            let _ = self.link.send(cx, &messages);
+        }
+        let frame = self.generator.frame();
+        let report = self.generator.reported.is_none_or(|r| {
+            (r.hours, r.minutes, r.seconds) != (frame.hours, frame.minutes, frame.seconds)
+        });
+        if report {
+            self.generator.reported = Some(frame);
+            cx.state(self.generator.state());
+        }
+    }
+
+    /// The generator's commands; `None` for any other.
+    fn generator_command(
+        &mut self,
+        cx: &mut Cx,
+        name: &str,
+        params: &Params,
+    ) -> Option<Result<Outcome, CommandError>> {
+        let result = match name {
+            "mtc_generator_start" => {
+                let given = ["hours", "minutes", "seconds", "frames", "rate"]
+                    .iter()
+                    .any(|k| params.contains_key(*k));
+                let tc = if given {
+                    match self.generator_time(params) {
+                        Ok(tc) => tc,
+                        Err(e) => return Some(Err(e)),
+                    }
+                } else {
+                    self.generator.frame()
+                };
+                self.generator_move(cx, tc);
+                self.generator.running = true;
+                self.generator_run(cx);
+                Ok(Outcome::Unverified)
+            }
+            "mtc_generator_stop" => {
+                let at = self.generator.frame();
+                self.generator.running = false;
+                self.generator.position = at;
+                cx.cancel_timer(MTC_GENERATOR);
+                cx.state(self.generator.state());
+                Ok(Outcome::Unverified)
+            }
+            "mtc_generator_locate" => {
+                let tc = match self.generator_time(params) {
+                    Ok(tc) => tc,
+                    Err(e) => return Some(Err(e)),
+                };
+                let device = match self.device(params) {
+                    Ok(d) => d,
+                    Err(e) => return Some(Err(e)),
+                };
+                let full = GenericMidi::universal(
+                    device,
+                    midi::SUB_MTC,
+                    &[0x01, tc.hours_byte(), tc.minutes, tc.seconds, tc.frames],
+                );
+                let sent = self.link.send(cx, &[full]);
+                self.generator_move(cx, tc);
+                if self.generator.running {
+                    self.generator_run(cx);
+                } else {
+                    cx.state(self.generator.state());
+                }
+                sent.map(|()| Outcome::Unverified)
+            }
+            _ => return None,
+        };
+        Some(result)
     }
 
     fn state_channel(&self, channel: u8, patch: Value) -> Value {
@@ -817,10 +1016,15 @@ fn ends_whole(bytes: &[u8]) -> bool {
 impl Module for GenericMidi {
     fn start(&mut self, cx: &mut Cx) {
         cx.state(json!({"link": self.link.kind()}));
+        cx.state(self.generator.state());
         self.link.start(cx);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
+        if let Some(result) = self.generator_command(cx, name, params) {
+            cx.complete(id, result);
+            return;
+        }
         let result = self
             .messages(name, params)
             .and_then(|messages| self.link.send(cx, &messages))
@@ -845,6 +1049,10 @@ impl Module for GenericMidi {
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         if key == MTC_IDLE {
             cx.state(json!({"mtc": {"running": false}}));
+            return;
+        }
+        if key == MTC_GENERATOR {
+            self.generator_run(cx);
             return;
         }
         self.link.timer(cx, key);
@@ -925,6 +1133,98 @@ mod tests {
         let (sent, result) = run(m, name, params);
         assert_eq!(result, Some(Ok(Outcome::Unverified)), "{name}");
         sent
+    }
+
+    /// What a step of the module sent, and when it asks to run again.
+    fn step(actions: Vec<Action>) -> (Vec<u8>, Option<u64>, Option<Value>) {
+        let mut sent = Vec::new();
+        let mut next = None;
+        let mut state = None;
+        for a in actions {
+            match a {
+                Action::TcpSend { data, .. } => sent.extend(data),
+                Action::SetTimer { key, after } if key == MTC_GENERATOR => next = Some(after),
+                Action::State(patch) if patch.get("mtc_generator").is_some() => {
+                    state = Some(patch["mtc_generator"].clone())
+                }
+                _ => {}
+            }
+        }
+        (sent, next, state)
+    }
+
+    #[test]
+    fn the_mtc_generator_locates_runs_and_stops() {
+        let mut m = port_module();
+        // Located while stopped: a full message to device 5, at 30df.
+        let mut cx = Cx::new(0);
+        m.command(
+            &mut cx,
+            1,
+            "mtc_generator_locate",
+            json!({"hours": 1, "minutes": 0, "seconds": 59, "frames": 28, "rate": "30df", "device_id": 5})
+                .as_object()
+                .unwrap(),
+        );
+        let (sent, next, state) = step(cx.take());
+        assert_eq!(sent, [0xF0, 0x7F, 5, 0x01, 0x01, 0x41, 0, 59, 28, 0xF7]);
+        assert_eq!(next, None);
+        assert_eq!(state.unwrap()["timecode"], "01:00:59:28");
+
+        // Started: quarter frames by the clock, 1001/120 ms apart at 29.97.
+        let mut t = 1000;
+        let mut cx = Cx::new(t);
+        m.command(&mut cx, 2, "mtc_generator_start", &Params::new());
+        let (mut wire, mut next, state) = step(cx.take());
+        assert_eq!(state.unwrap()["running"], true);
+        let mut times = vec![t];
+        while wire.len() < 32 {
+            t += next.expect("the generator runs on");
+            let mut cx = Cx::new(t);
+            m.timer(&mut cx, MTC_GENERATOR);
+            let (sent, n, _) = step(cx.take());
+            if !sent.is_empty() {
+                times.push(t);
+            }
+            wire.extend(sent);
+            next = n;
+        }
+        let pieces: Vec<(u8, u8)> = wire.chunks(2).map(|c| (c[1] >> 4, c[1] & 0x0F)).collect();
+        assert!(wire.chunks(2).all(|c| c[0] == 0xF1));
+        // 01:00:59:28, then two frames on across the minute, where
+        // drop-frame skips frames 0 and 1: 01:01:00:02. Rate 2 (30df) in
+        // piece 7.
+        let values: Vec<u8> = pieces.iter().map(|p| p.1).collect();
+        assert_eq!(values, [0xC, 1, 0xB, 3, 0, 0, 1, 4, 2, 0, 0, 0, 1, 0, 1, 4]);
+        assert_eq!(
+            pieces.iter().map(|p| p.0).collect::<Vec<_>>(),
+            [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7]
+        );
+        // The sixteenth went out 125 ms after the first (15 x 1001/120).
+        assert_eq!(*times.last().unwrap(), 1125);
+
+        // Stopped at the frame reached.
+        let mut cx = Cx::new(t);
+        m.command(&mut cx, 3, "mtc_generator_stop", &Params::new());
+        let (sent, _, state) = step(cx.take());
+        assert!(sent.is_empty());
+        let state = state.unwrap();
+        assert_eq!(state["running"], false);
+        assert_eq!(state["timecode"], "01:01:00:04");
+
+        // Started again and held up for a second: whole runs are skipped,
+        // never more than eight sent at once, and the time follows the
+        // clock.
+        let mut cx = Cx::new(10_000);
+        m.command(&mut cx, 4, "mtc_generator_start", &Params::new());
+        cx.take();
+        let mut cx = Cx::new(11_000);
+        m.timer(&mut cx, MTC_GENERATOR);
+        let (sent, _, _) = step(cx.take());
+        assert!(!sent.is_empty() && sent.len() <= 16);
+        let frame = m.generator.frame();
+        // About 30 frames on from 01:01:00:04.
+        assert_eq!((frame.minutes, frame.seconds), (1, 1));
     }
 
     #[test]

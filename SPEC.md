@@ -2491,16 +2491,23 @@ held by another program) or goes away (unplugged) is reported
 `disconnected` with a reason starting `midi:`, and the module opens it
 again. MIDI ports are opened on Windows (WinMM), macOS and iOS (CoreMIDI)
 and Linux (the ALSA sequencer) in a build with a MIDI integration; Android
-has none an app's native code can open (docs/MOBILE.md). Every delivery
+has none an app's native code can open (docs/MOBILE.md). On Linux the ALSA
+library is loaded (`dlopen` of `libasound.so.2`) when ports are first
+listed or opened, never linked: a Linux build needs no ALSA to build or to
+start, and on a host without the library no port is listed and opening one
+fails with a reason saying the library could not be loaded. Every delivery
 lists the host's MIDI ports: `Core::midi_ports` in Rust, `mi_midi_ports` in
 C, `midiPorts()` in Node, `midi_ports()` in Python and `GET /v1/midi_ports`
 in the HTTP service, each with its `name` and whether it is an `input`, an
 `output` or both. The list is empty in a build without a MIDI integration,
-on Android, and on a host whose MIDI system cannot be reached.
+on Android, and on a host whose MIDI system cannot be reached (on Linux:
+without `libasound.so.2` or without the ALSA sequencer).
 
 The MIDI integrations (`generic-midi`, `midi-show-control`) share one link
-(`link` `rtp` or `port`): an RTP-MIDI session (Apple's MIDI Network Driver
-Protocol and RFC 6295) the core joins as the initiator, or a MIDI port.
+(`link` `rtp`, `rtp_host` or `port`): an RTP-MIDI session (Apple's MIDI
+Network Driver Protocol and RFC 6295) the core joins as the initiator
+(`rtp`) or hosts on `local_port` for the device to join (`rtp_host`), with a
+recovery journal in every packet it sends, or a MIDI port.
 mDNS discovery (`mdns`) reports each RTP-MIDI session advertised as
 `_apple-midi._udp` for each MIDI integration in the core, at its control
 port.

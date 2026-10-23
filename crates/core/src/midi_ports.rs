@@ -11,13 +11,16 @@
 //! and parses them as MIDI (`crate::midi`).
 //!
 //! Ports are opened through [`MidiPorts`], so a test hands the session an
-//! in-memory port instead and never opens a real one. On the host they are
-//! opened with the `midir` crate (MIT): Windows Multimedia (WinMM) on
-//! Windows, CoreMIDI on macOS and iOS, and the ALSA sequencer on Linux, in a
-//! build with a MIDI integration (`generic-midi`, `midi-show-control`).
-//! Android is left out: its MIDI API is reached only through Java, which a
-//! library linked into an app cannot start on its own, so there no port is
-//! listed and opening one fails with a reason saying so (docs/MOBILE.md).
+//! in-memory port instead and never opens a real one. On the host, in a
+//! build with a MIDI integration (`generic-midi`, `midi-show-control`), they
+//! are opened with the `midir` crate (MIT) on Windows (Windows Multimedia,
+//! WinMM), macOS and iOS (CoreMIDI), and on Linux with the ALSA sequencer,
+//! whose library is loaded only when a port is first listed or opened
+//! ([`alsa`]): a Linux build needs no ALSA to build or to start, and a host
+//! without `libasound.so.2` lists no port. Android is left out: its MIDI API
+//! is reached only through Java, which a library linked into an app cannot
+//! start on its own, so there no port is listed and opening one fails with a
+//! reason saying so (docs/MOBILE.md).
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -69,7 +72,13 @@ pub(crate) struct HostMidi;
 
 #[cfg(all(
     any(feature = "generic-midi", feature = "midi-show-control"),
-    not(target_os = "android")
+    any(target_os = "linux", test)
+))]
+mod alsa;
+
+#[cfg(all(
+    any(feature = "generic-midi", feature = "midi-show-control"),
+    not(any(target_os = "android", target_os = "linux"))
 ))]
 mod host {
     use std::collections::BTreeMap;
@@ -101,7 +110,7 @@ mod host {
     }
 
     /// Every port either way. A host whose MIDI system cannot be reached
-    /// (no ALSA sequencer on a Linux server) has none to list.
+    /// has none to list.
     pub(super) fn list() -> Vec<MidiPortInfo> {
         let mut ports: BTreeMap<String, (bool, bool)> = BTreeMap::new();
         if let Ok(input) = MidiInput::new(CLIENT) {
@@ -136,7 +145,7 @@ mod host {
     pub(super) fn open(
         port: &MidiPort,
         received: mpsc::UnboundedSender<Vec<u8>>,
-    ) -> Result<Sink, String> {
+    ) -> Result<Box<dyn MidiSink>, String> {
         let mut sink = Sink {
             output: None,
             _input: None,
@@ -185,7 +194,7 @@ mod host {
                 name.clone(),
             ));
         }
-        Ok(sink)
+        Ok(Box::new(sink))
     }
 
     impl MidiSink for Sink {
@@ -214,25 +223,29 @@ mod host {
     }
 }
 
-impl MidiPorts for HostMidi {
-    #[cfg(all(
-        any(feature = "generic-midi", feature = "midi-show-control"),
-        not(target_os = "android")
-    ))]
-    fn open(
-        &self,
-        port: &MidiPort,
-        received: mpsc::UnboundedSender<Vec<u8>>,
-    ) -> Result<Box<dyn MidiSink>, String> {
-        Ok(Box::new(host::open(port, received)?))
-    }
+#[cfg(all(
+    any(feature = "generic-midi", feature = "midi-show-control"),
+    target_os = "linux"
+))]
+use alsa as platform;
+#[cfg(all(
+    any(feature = "generic-midi", feature = "midi-show-control"),
+    not(any(target_os = "android", target_os = "linux"))
+))]
+use host as platform;
 
-    #[cfg(not(all(
-        any(feature = "generic-midi", feature = "midi-show-control"),
-        not(target_os = "android")
-    )))]
-    fn open(
-        &self,
+/// A build without a MIDI integration, or Android: no port to list or open.
+#[cfg(not(all(
+    any(feature = "generic-midi", feature = "midi-show-control"),
+    not(target_os = "android")
+)))]
+mod platform {
+    use tokio::sync::mpsc;
+
+    use super::{MidiPortInfo, MidiSink};
+    use crate::module::MidiPort;
+
+    pub(super) fn open(
         _port: &MidiPort,
         _received: mpsc::UnboundedSender<Vec<u8>>,
     ) -> Result<Box<dyn MidiSink>, String> {
@@ -243,21 +256,22 @@ impl MidiPorts for HostMidi {
         })
     }
 
-    #[cfg(all(
-        any(feature = "generic-midi", feature = "midi-show-control"),
-        not(target_os = "android")
-    ))]
-    fn list(&self) -> Result<Vec<MidiPortInfo>, String> {
-        Ok(host::list())
+    pub(super) fn list() -> Vec<MidiPortInfo> {
+        Vec::new()
+    }
+}
+
+impl MidiPorts for HostMidi {
+    fn open(
+        &self,
+        port: &MidiPort,
+        received: mpsc::UnboundedSender<Vec<u8>>,
+    ) -> Result<Box<dyn MidiSink>, String> {
+        platform::open(port, received)
     }
 
-    /// A build without a MIDI integration, or Android: none to list.
-    #[cfg(not(all(
-        any(feature = "generic-midi", feature = "midi-show-control"),
-        not(target_os = "android")
-    )))]
     fn list(&self) -> Result<Vec<MidiPortInfo>, String> {
-        Ok(Vec::new())
+        Ok(platform::list())
     }
 }
 

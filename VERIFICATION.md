@@ -1394,13 +1394,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## generic-midi — Generic MIDI device
 
-- [ ] Join a macOS Audio MIDI Setup network session (and rtpMIDI on Windows, and a network MIDI interface) and confirm the invitation on both ports is accepted, notes and SysEx arrive, and the session stays up for an hour with the core's clock synchronisation every 10 s. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
-- [ ] Confirm those hosts accept packets with no recovery journal (J clear) from the core, as Apple's driver document says receivers must. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
-- [ ] With packet loss forced (a lossy link or dropped packets), confirm the replay of Apple's recovery journal leaves notes, controllers, programs and pitch bend as the sender has them. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
-- [ ] Capture Apple's RS packet and confirm the sequence number sits in the upper 16 bits of its 32-bit field, and that a host starting its own clock synchronisation accepts the core's count 1 answer. ([specs/generic-midi.yaml:400](specs/generic-midi.yaml#L400))
-- [ ] Confirm 5004 is the port Audio MIDI Setup offers for a new session, and that the session's advertised _apple-midi._udp SRV port is its control port. ([specs/generic-midi.yaml:91](specs/generic-midi.yaml#L91))
-- [ ] With a USB MIDI device on Windows, macOS and Linux, confirm the port listing's names open the device, that unplugging it reports disconnected within a second or two and plugging it back reconnects, and that a port held by another program on Windows fails to open as described. ([specs/generic-midi.yaml:389](specs/generic-midi.yaml#L389))
-- [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:408](specs/generic-midi.yaml#L408))
+- [ ] Join a macOS Audio MIDI Setup network session (and rtpMIDI on Windows, and a network MIDI interface) and confirm the invitation on both ports is accepted, notes and SysEx arrive, and the session stays up for an hour with the core's clock synchronisation every 10 s. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
+- [ ] Confirm those hosts accept the core's recovery journals (J set) and its guard packets (an empty MIDI list with a journal), and that with packets to them dropped they repair notes, controllers, programs, RPN and NRPN, pitch bend, pressure, the sequencer, MTC and SysEx from the core's journal. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
+- [ ] With packet loss forced (a lossy link or dropped packets), confirm the replay of Apple's recovery journal leaves notes, controllers, programs and pitch bend as the sender has them. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
+- [ ] Host a session (link rtp_host) and join it from macOS Audio MIDI Setup (its Directory, adding the core's address and port) and from rtpMIDI on Windows: confirm both invitations are accepted, MIDI flows both ways, the initiator's clock synchronisation keeps the session up for an hour (it must come at least every 90 s), and the initiator leaving (BY) returns the core to waiting for an invitation. ([specs/generic-midi.yaml:429](specs/generic-midi.yaml#L429))
+- [ ] Confirm that an initiator that has joined the core's hosted session sends its data invitation from its control port plus one, or that the core's answering the port it came from suits it, and that it accepts the core's count 1 answers and sends count 2. ([specs/generic-midi.yaml:465](specs/generic-midi.yaml#L465))
+- [ ] Capture Apple's RS packet and confirm the sequence number sits in the upper 16 bits of its 32-bit field, and that a host starting its own clock synchronisation accepts the core's count 1 answer. ([specs/generic-midi.yaml:465](specs/generic-midi.yaml#L465))
+- [ ] Confirm 5004 is the port Audio MIDI Setup offers for a new session, and that the session's advertised _apple-midi._udp SRV port is its control port. ([specs/generic-midi.yaml:101](specs/generic-midi.yaml#L101))
+- [ ] With a USB MIDI device on Windows, macOS and Linux, confirm the port listing's names open the device, that unplugging it reports disconnected within a second or two and plugging it back reconnects, and that a port held by another program on Windows fails to open as described. ([specs/generic-midi.yaml:444](specs/generic-midi.yaml#L444))
+- [ ] On Linux, confirm the core's own ALSA sequencer calls (libasound.so.2 loaded at first use) list a USB MIDI device and a software port under the same names midir gave, send and receive notes and long SysEx both ways, and that on a machine without libasound.so.2, and on one without the sequencer (snd-seq not loaded), the core starts, lists no port and reports why a port device stays disconnected. ([specs/generic-midi.yaml:450](specs/generic-midi.yaml#L450))
+- [ ] Run the MTC generator into a DAW or lighting console chasing MTC, over a MIDI port and over RTP-MIDI, at 24, 25, 30df and 30: confirm it locks at the time located, reads drop-frame across a minute (00:00:59:28 to 00:01:00:02), and stays within a frame of the core's clock for an hour. ([specs/generic-midi.yaml:457](specs/generic-midi.yaml#L457))
+- [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:475](specs/generic-midi.yaml#L475))
 
 ## generic-ping — Network presence (ping) and Wake-on-LAN
 
@@ -1738,10 +1742,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## midi-show-control — MIDI Show Control (MSC) device
 
-- [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:315](specs/midi-show-control.yaml#L315))
-- [ ] Against a controlled device that implements two-phase commit, confirm the checksum is computed with the first byte of each pair as the low byte. ([specs/midi-show-control.yaml:348](specs/midi-show-control.yaml#L348))
-- [ ] Confirm which device ID such a device addresses its STANDING_BY, COMPLETE, CANCELLED and ABORT to, and which status code it uses for "manual override in progress" in CANCELLED (8028 or 8030). ([specs/midi-show-control.yaml:348](specs/midi-show-control.yaml#L348))
-- [ ] Confirm that a GO_2PC's COMPLETE arrives within 125 % of the STANDING_BY's maximum time on a real device, so the core's timeout does not fire early. ([specs/midi-show-control.yaml:329](specs/midi-show-control.yaml#L329))
+- [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:318](specs/midi-show-control.yaml#L318))
+- [ ] Against a controlled device that implements two-phase commit, confirm the checksum is computed with the first byte of each pair as the low byte. ([specs/midi-show-control.yaml:352](specs/midi-show-control.yaml#L352))
+- [ ] Confirm which device ID such a device addresses its STANDING_BY, COMPLETE, CANCELLED and ABORT to, and which status code it uses for "manual override in progress" in CANCELLED (8028 or 8030). ([specs/midi-show-control.yaml:352](specs/midi-show-control.yaml#L352))
+- [ ] Confirm that a GO_2PC's COMPLETE arrives within 125 % of the STANDING_BY's maximum time on a real device, so the core's timeout does not fire early. ([specs/midi-show-control.yaml:332](specs/midi-show-control.yaml#L332))
 
 ## millumin — Millumin
 

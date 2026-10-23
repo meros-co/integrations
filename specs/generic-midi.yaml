@@ -56,9 +56,19 @@ source:
     note: >
       §2-3: the MIDI command section (B, J, Z, P flags and a 4- or 12-bit length), delta times, running status
       within a packet, SysEx whole or in segments (F0..F0, F7..F0, F7..F7, cancel F7 F4, dropped F7 as F5),
-      undefined system commands ended by F7. §5 and Appendix A: the recovery journal (header S Y A H TOTCHAN
+      undefined system commands ended by F7. §4-5 and Appendix A: the recovery journal (header S Y A H TOTCHAN
       and checkpoint sequence number; system journal; channel journals with chapters P, C, M, W, N, E, T, A;
-      LENGTH fields covering the whole structure).
+      LENGTH fields covering the whole structure; S bits; active, N-active and C-active commands). Appendix
+      B: the system chapters D, V, Q, F and X. Appendix C.2.2.2: the closed-loop sending policy, the default,
+      the checkpoint moving with receiver feedback.
+  - title: "RFC 4696: An Implementation Guide for RTP MIDI"
+    author: "J. Lazzaro, J. Wawrzynek (IETF, 2006)"
+    url: "https://www.rfc-editor.org/rfc/rfc4696"
+    note: >
+      §4.2: guard packets (empty MIDI lists with the journal) after MIDI goes out, 100 ms and then 100 ms
+      later, backing off to 1 s, so a lost last packet is repaired without waiting for more MIDI. §6: the
+      note log's Y bit marks a note on "simultaneous" with the packet, which a receiver plays rather than
+      skips.
   - title: "MIDI Network Driver Protocol"
     author: "Apple Inc. (Documentation Archive, updated 2016-12-12)"
     url: "https://developer.apple.com/library/archive/documentation/Audio/Conceptual/MIDINetworkDriverProtocol/MIDI/MIDI.html"
@@ -72,12 +82,12 @@ source:
       timestamps are in the same units; received packets need not carry a journal.
 
 settings:
-  link: { type: enum, values: [rtp, port], default: rtp, label: Link,
-          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); port uses MIDI ports of this computer, named by midi_input and midi_output." }
+  link: { type: enum, values: [rtp, rtp_host, port], default: rtp, label: Link,
+          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); rtp_host hosts a session on local_port for the device's host (any host when none is given) to join; port uses MIDI ports of this computer, named by midi_input and midi_output." }
   session_name: { type: string, max_length: 64, default: "Meros", label: Session name,
-                  description: "With link rtp, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
+                  description: "With link rtp or rtp_host, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
   local_port: { type: int, min: 1024, max: 65534, label: Local RTP port,
-                description: "With link rtp, the local control port to use (the data port is the next); leave unset to pick a free one at random." }
+                description: "The local control port (the data port is the next): with link rtp leave unset to pick a free one at random; with link rtp_host the hosted session's port, 5004 unless set." }
   midi_input: { type: string, max_length: 256, label: MIDI input port,
                 description: "With link port, the input port to receive from, as listed by the MIDI port listing; leave unset to only send." }
   midi_output: { type: string, max_length: 256, label: MIDI output port,
@@ -91,6 +101,8 @@ ports:
   - { port: 5004, protocol: udp, role: control, note: "with link rtp: the RTP-MIDI session's control port (advertised as _apple-midi._udp); 5004 is what macOS Audio MIDI Setup offers for a new session, and the port given when opening overrides it" }
   - { port: 5005, protocol: udp, role: control, when: "link rtp", note: "the session's data port: always the control port plus one" }
   - { port: null, protocol: udp, role: feedback, listener: core, setting: local_port, when: "link rtp", note: "the core's own control port and the one after it, where the session answers; random in 49152-65534 unless local_port is set" }
+  - { port: 5004, protocol: udp, role: control, listener: core, setting: local_port, when: "link rtp_host", note: "the session the core hosts: its control port, where the joining host's invitation arrives" }
+  - { port: 5005, protocol: udp, role: control, listener: core, when: "link rtp_host", note: "the hosted session's data port: always its control port plus one" }
   - { port: null, protocol: midi, role: control, setting: midi_input, when: "link port", note: "a MIDI input of this computer: a USB or other class-compliant device, or another program's port" }
   - { port: null, protocol: midi, role: control, setting: midi_output, when: "link port", note: "a MIDI output of this computer" }
 
@@ -99,7 +111,8 @@ models:
     name: "Any MIDI 1.0 device, over an RTP-MIDI session (give its host) or a MIDI port of this computer"
     supports: [note_on, note_off, control_change, control_change_14bit, program_change, pitch_bend,
                channel_pressure, poly_pressure, nrpn, rpn, channel_mode, sysex, raw, song_position,
-               song_select, tune_request, realtime, mtc_full_frame, mtc_quarter_frame, mtc_user_bits, mmc,
+               song_select, tune_request, realtime, mtc_full_frame, mtc_quarter_frame, mtc_user_bits,
+               mtc_generator_start, mtc_generator_stop, mtc_generator_locate, mmc,
                mmc_locate, mmc_locate_register, mmc_variable_play, mmc_search, mmc_shuttle, mmc_step, mmc_read,
                mmc_write_time]
     verification: none
@@ -246,6 +259,33 @@ commands:
       flags: { type: int, min: 0, max: 3, default: 0, label: Group flags, description: "The binary group flag bits, 0 to 3 (bit 1 is SMPTE bit 59, bit 0 bit 43)." }
       device_id: *device_id
     returns: none
+  mtc_generator_start:
+    summary: >
+      Run MIDI Time Code from the core: the eight quarter frames of every two frames, sent as they fall due by
+      the core's clock at the rate (30df at 29.97 frames a second), from the time given or from where the
+      generator is (00:00:00:00 at 30 until it is first moved)
+    params:
+      hours: { type: int, min: 0, max: 23, label: Hours, description: "Hours to start from, 0 to 23; leave hours, minutes, seconds, frames and rate all unset to carry on from where the generator is." }
+      minutes: { type: int, min: 0, max: 59, label: Minutes, description: "Minutes, 0 to 59 (0 when only other fields are given)." }
+      seconds: { type: int, min: 0, max: 59, label: Seconds, description: "Seconds, 0 to 59 (0 when only other fields are given)." }
+      frames: { type: int, min: 0, max: 29, label: Frames, description: "Frames, below the rate's frames per second (0 when only other fields are given)." }
+      rate: &gen_rate { type: enum, values: ["24", "25", "30df", "30"], label: Frame rate, description: "The rate to run at: 24, 25, 30 drop-frame (29.97) or 30 frames per second; the generator's rate when not given." }
+    returns: none
+  mtc_generator_stop:
+    summary: Stop the MTC generator, which stays at the frame it reached
+    returns: none
+  mtc_generator_locate:
+    summary: >
+      Move the MTC generator to a time and send the MTC full message there, locating every receiver; a running
+      generator carries on from the new time with its next quarter frame
+    params:
+      hours: *hours
+      minutes: *minutes
+      seconds: *seconds
+      frames: *frames
+      rate: *gen_rate
+      device_id: *device_id
+    returns: none
   mmc:
     summary: Send an MMC transport command
     params:
@@ -313,10 +353,11 @@ commands:
     returns: none
 
 state:
-  link:                          { type: string, description: "rtp or port" }
-  session.peer_name:             { type: string, description: "With link rtp, the name the other host gives its session" }
-  session.peer_ssrc:             { type: int, description: "With link rtp, the other host's RTP synchronisation source" }
-  session.local_port:            { type: int, description: "With link rtp, the core's control port (its data port is the next)" }
+  link:                          { type: string, description: "rtp, rtp_host or port" }
+  session.peer_name:             { type: string, description: "With link rtp or rtp_host, the name the other host gives itself in the session" }
+  session.peer_ssrc:             { type: int, description: "With link rtp or rtp_host, the other host's RTP synchronisation source" }
+  session.peer_address:          { type: string, description: "With link rtp or rtp_host, the other host's control port as ip:port (hosting: the host that joined)" }
+  session.local_port:            { type: int, description: "With link rtp or rtp_host, the core's control port (its data port is the next)" }
   port.input:                    { type: string, description: "With link port, the MIDI input port opened, or null" }
   port.output:                   { type: string, description: "With link port, the MIDI output port opened, or null" }
   received_count:                { type: int, description: "MIDI messages received since the device was opened" }
@@ -346,6 +387,13 @@ state:
   mtc.source:                    { type: string, description: "quarter_frame or full_frame: what set the position last" }
   mtc.user_bits:                 { type: string, description: "The last user bits received, eight hex digits, binary group 8 first" }
   mtc.user_bits_flags:           { type: int, description: "Their binary group flag bits" }
+  mtc_generator.running:         { type: bool, description: "Whether the core's MTC generator is running" }
+  mtc_generator.hours:           { type: int, description: "The generator's time: hours (while running, updated each second)" }
+  mtc_generator.minutes:         { type: int, description: "Minutes" }
+  mtc_generator.seconds:         { type: int, description: "Seconds" }
+  mtc_generator.frames:          { type: int, description: "Frames (while running, as of the last update)" }
+  mtc_generator.rate:            { type: string, description: "24, 25, 30df or 30" }
+  mtc_generator.timecode:        { type: string, description: "The generator's time as hh:mm:ss:ff" }
   mmc.command:                   { type: string, description: "The last MMC command received (from another controller on the link), such as play" }
   mmc.transport:                 { type: string, description: "The last MMC motion command received: stop, play, deferred_play, fast_forward, rewind, record_strobe, record_exit, record_pause, pause, eject, chase, variable_play, search, shuttle or step" }
   mmc.device_id:                 { type: int, description: "The device ID that last MMC command was sent to" }
@@ -381,11 +429,18 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Over RTP-MIDI the core joins a session another host offers (as macOS Audio MIDI Setup's network session,
-      rtpMIDI on Windows, or a network MIDI interface); it does not offer one of its own for others to join. It
-      sends no recovery journal: a packet lost on the way to the device is lost. A packet lost on the way back
-      is repaired from the device's journal where it sends one (notes, controllers, programs, pitch bend and
-      pressure).
+      Over RTP-MIDI the core joins a session another host offers (link rtp: macOS Audio MIDI Setup's network
+      session, rtpMIDI on Windows, a network MIDI interface) or hosts one for the device to join (link
+      rtp_host, on local_port). A hosted session is not advertised over Bonjour, as the core has no mDNS
+      responder: the joining host adds the core's address and port by hand (Audio MIDI Setup's Directory).
+      One host is in a hosted session at a time; another's invitation is refused until it leaves.
+      Every packet the core sends carries a recovery journal (RFC 6295: every channel and system chapter,
+      the checkpoint moved by the peer's receiver feedback), and guard packets follow MIDI until the peer has
+      it, so a peer that loses packets repairs them. The system journal holds at most 1023 bytes (its LENGTH
+      has 10 bits): a SysEx of more than about 1000 data bytes, or many SysEx sent before the peer's
+      feedback, is not fully coded, the oldest left out. A note on in the journal is marked to be played
+      (Y) when it went out within 50 ms of the packet. A packet lost on the way back is repaired from the
+      device's journal where it sends one (notes, controllers, programs, pitch bend and pressure).
   - models: [all]
     severity: info
     text: >
@@ -395,16 +450,28 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Running MTC (a quarter frame every quarter frame) is not generated by the core: mtc_quarter_frame sends
-      one piece when asked, so a caller generating time code times them itself. mtc_full_frame locates.
+      On Linux MIDI ports are the ALSA sequencer's, named "client:port client-number:port-number". The ALSA
+      library (libasound.so.2) is loaded when ports are first listed or opened, not linked: on a host without
+      it, or without the sequencer, no port is listed and a device on a port stays disconnected, its reason
+      saying why.
+  - models: [all]
+    severity: info
+    text: >
+      The MTC generator times its quarter frames by the core's millisecond timers, so each may be a
+      millisecond or two late; it keeps to the clock over time, and a core held up by more than eight quarter
+      frames skips whole runs of eight rather than send them at once. Over RTP-MIDI each quarter frame is a
+      packet. 30df runs at 29.97 frames a second and the others at their nominal rate: MTC has no code for
+      29.97 non-drop. mtc_quarter_frame and mtc_full_frame send single messages for a caller timing its own.
   - models: [all]
     severity: info
     text: >
       Undocumented details of Apple's session protocol the core follows: receiver feedback (RS) carries the
       16-bit sequence number in the upper half of its 32-bit field (Apple's figure shows one 32-bit field); the
-      core answers a clock synchronisation the other host starts (count 0) with count 1, and refuses an
-      invitation sent to it with NO, as it only initiates. A host that chooses ports for the core's data that are
-      not its control port plus one is not supported.
+      core answers a clock synchronisation the other host starts (count 0) with count 1 and takes the round
+      trip from its count 2; joining, it refuses an invitation sent to it with NO, and a host that chooses ports
+      for the core's data that are not its control port plus one is not supported. Hosting, the core answers
+      each invitation from the port it came to and sends MIDI to the port the data invitation came from, and
+      ends a session whose initiator has not synchronised clocks for 90 s (Apple: at least once a minute).
   - models: [all]
     severity: info
     text: >
