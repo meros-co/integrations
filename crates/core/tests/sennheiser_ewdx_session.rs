@@ -274,7 +274,12 @@ async fn ewdx_end_to_end() {
     assert_eq!(state["channels"]["1"]["name"], "Mic 1");
     assert_eq!(state["channels"]["1"]["frequency_khz"], 606500);
     assert_eq!(state["channels"]["1"]["transmitter"]["battery_percent"], 65);
-    assert_eq!(state["channels"]["2"]["transmitter"], Value::Null);
+    assert_eq!(state["channels"]["1"]["transmitter"]["linked"], true);
+    // No transmitter linked is an explicit state, not a null (a removal).
+    assert_eq!(
+        state["channels"]["2"]["transmitter"],
+        json!({"linked": false})
+    );
     // Fourteen resources per channel, both channels, and eight of the device.
     assert_eq!(device.lock().unwrap().subscribed.len(), 36);
 
