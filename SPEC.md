@@ -2432,7 +2432,7 @@ in the HTTP service, each with its `name` and whether it is an `input`, an
 `output` or both. The list is empty in a build without a MIDI integration,
 on Android, and on a host whose MIDI system cannot be reached.
 
-A MIDI integration (`generic-midi`) reaches its device over one link
+The MIDI integrations (`generic-midi`, `midi-show-control`) share one link
 (`link` `rtp` or `port`): an RTP-MIDI session (Apple's MIDI Network Driver
 Protocol and RFC 6295) the core joins as the initiator, or a MIDI port.
 mDNS discovery (`mdns`) reports each RTP-MIDI session advertised as

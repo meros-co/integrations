@@ -1,0 +1,354 @@
+spec: 1
+id: midi-show-control
+name: MIDI Show Control (MSC) device
+vendor: Generic (any lighting, sound, video, machinery or show controller taking MIDI Show Control)
+category: other
+implementation: native
+reason: >
+  MIDI Show Control travels as universal real-time SysEx over a MIDI link the spec format has no transport for
+  (an RTP-MIDI session or a MIDI port of the host, as for generic-midi), and its two-phase commit pairs each
+  STANDBY, GO_2PC and CANCEL with an answer by sequence number, checks a checksum over the message, and times
+  the answer out by a duration the device itself states, none of which templates and state rules can express.
+
+source:
+  - title: "MIDI Show Control 1.1.1, including two-phase commit enhancements (RP-002 / RP-014)"
+    author: "MIDI Manufacturers Association (1991, 1994, 1995, 2020)"
+    url: "https://midi.org/midi-show-control"
+    note: >
+      §2: F0 7F <device_ID> 02 <command_format> <command> <data> F7, one command per message and at most 128
+      bytes; device_ID is the destination, 00-6F individual, 70-7E groups, 7F all-call; command format 00 and
+      command 00 reserved for extensions. §3.1: Q_number, Q_list and Q_path as ASCII digits and '.', separated
+      by 00, a list needing its number and a path its list. §3.2: the Standard Time Specification hr mn sc fr
+      ff|st (time type in the hours byte, colour frame bit, sign and final-byte bits in the frames byte). §4.1:
+      the command formats 01 lighting to 64 smoke pots and 7F all-types. §4.3-4.5 and §5: GO 01, STOP 02,
+      RESUME 03, TIMED_GO 04 (time, cue), LOAD 05 (cue required), SET 06 (control and value, 14 bits each LSB
+      first, optional time), FIRE 07 (macro), ALL_OFF 08, RESTORE 09, RESET 0A, GO_OFF 0B, GO/JAM_CLOCK 10,
+      STANDBY_+ 11, STANDBY_- 12, SEQUENCE_+ 13, SEQUENCE_- 14, START_CLOCK 15, STOP_CLOCK 16, ZERO_CLOCK 17,
+      SET_CLOCK 18 (time, list), MTC_CHASE_ON 19, MTC_CHASE_OFF 1A, OPEN_CUE_LIST 1B, CLOSE_CUE_LIST 1C,
+      OPEN_CUE_PATH 1D, CLOSE_CUE_PATH 1E (lists and paths required), and the two-phase commit STANDBY 20,
+      STANDING_BY 21, GO_2PC 22, COMPLETE 23, CANCEL 24, CANCELLED 25, ABORT 26 (checksum and sequence number
+      LSB first, d1-d4 cue data, maximum execution time, status s1 s2 with status = s1 x 4 + s2 x 512). §6:
+      answers within 2 s for STANDBY and CANCEL, COMPLETE within 125 % of the stated maximum time, a timeout
+      or a checksum error treated as an ABORT; sequence numbers 1 to 16383; the checksum (§6.5); the status
+      codes (§6.7) and the d1-d4 usages (§6.8).
+  - title: "MIDI Machine Control 1.0, MMA0016 / RP-013"
+    author: "MIDI Manufacturers Association (1992)"
+    url: "https://midi.org/midi-machine-control"
+    note: "The Standard Time Specification MSC shares (§3, Standard Time Code)."
+  - title: "RFC 6295: RTP Payload Format for MIDI; and Apple's MIDI Network Driver Protocol"
+    author: "J. Lazzaro, J. Wawrzynek (IETF, 2011); Apple Inc. (2016)"
+    url: "https://www.rfc-editor.org/rfc/rfc6295"
+    note: >
+      The RTP-MIDI link, as described for generic-midi
+      (https://developer.apple.com/library/archive/documentation/Audio/Conceptual/MIDINetworkDriverProtocol/MIDI/MIDI.html).
+
+settings:
+  link: { type: enum, values: [rtp, port], default: rtp, label: Link,
+          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); port uses MIDI ports of this computer, named by midi_input and midi_output." }
+  session_name: { type: string, max_length: 64, default: "Meros", label: Session name,
+                  description: "With link rtp, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
+  local_port: { type: int, min: 1024, max: 65534, label: Local RTP port,
+                description: "With link rtp, the local control port to use (the data port is the next); leave unset to pick a free one at random." }
+  midi_input: { type: string, max_length: 256, label: MIDI input port,
+                description: "With link port, the input port to receive MSC and two-phase commit answers from; leave unset to only send." }
+  midi_output: { type: string, max_length: 256, label: MIDI output port,
+                 description: "With link port, the output port to send MSC to; leave unset to only receive." }
+  device_id: { type: int, min: 0, max: 127, default: 127, label: Device ID,
+               description: "The device ID commands go to when they do not give one: 0 to 111 a device, 112 to 126 groups 1 to 15, 127 all-call." }
+  command_format: { type: enum, values: [lighting, moving_lights, color_changers, strobes, lasers, chasers, sound, music, cd_players, eprom_playback, audio_tape_machines, intercoms, amplifiers, audio_effects_devices, equalizers, machinery, rigging, flys, lifts, turntables, trusses, robots, animation, floats, breakaways, barges, video, video_tape_machines, video_cassette_machines, video_disc_players, video_switchers, video_effects, video_character_generators, video_still_stores, video_monitors, projection, film_projectors, slide_projectors, video_projectors, dissolvers, shutter_controls, process_control, hydraulic_oil, h2o, co2, compressed_air, natural_gas, fog, smoke, cracked_haze, pyro, fireworks, explosions, flame, smoke_pots, all_types],
+                    default: all_types, label: Command format,
+                    description: "The kind of equipment commands are addressed to when they do not say; all_types reaches every kind." }
+
+ports:
+  - { port: 5004, protocol: udp, role: control, note: "with link rtp: the RTP-MIDI session's control port (advertised as _apple-midi._udp); 5004 is what macOS Audio MIDI Setup offers for a new session, and the port given when opening overrides it" }
+  - { port: 5005, protocol: udp, role: control, when: "link rtp", note: "the session's data port: always the control port plus one" }
+  - { port: null, protocol: udp, role: feedback, listener: core, setting: local_port, when: "link rtp", note: "the core's own control port and the one after it, where the session answers; random in 49152-65534 unless local_port is set" }
+  - { port: null, protocol: midi, role: control, setting: midi_input, when: "link port", note: "a MIDI input of this computer" }
+  - { port: null, protocol: midi, role: control, setting: midi_output, when: "link port", note: "a MIDI output of this computer" }
+
+models:
+  - id: generic
+    name: "Any MSC controlled device, over an RTP-MIDI session (give its host) or a MIDI port of this computer"
+    supports: [go, stop, resume, timed_go, load, set, fire, all_off, restore, reset, go_off, go_jam_clock,
+               standby_plus, standby_minus, sequence_plus, sequence_minus, start_clock, stop_clock, zero_clock,
+               set_clock, mtc_chase_on, mtc_chase_off, open_cue_list, close_cue_list, open_cue_path,
+               close_cue_path, standby, go_2pc, cancel, raw]
+    verification: none
+
+commands:
+  go:
+    summary: >
+      GO: start the transition to a cue, its time the cue's own; with no cue, the next cue goes. Returns
+      unverified, as MSC without two-phase commit has no answer
+    params:
+      cue: &cue { type: string, pattern: "^[0-9.]*$", max_length: 100, label: Cue number, description: "The cue number, digits and '.', such as 235.6; leave unset for the next cue." }
+      list: &list { type: string, pattern: "^[0-9.]*$", max_length: 100, label: Cue list, description: "The cue list, such as 36.6; needs a cue number. Leave unset for the current or default list." }
+      path: &path { type: string, pattern: "^[0-9.]*$", max_length: 100, label: Cue path, description: "The cue path; needs a cue list. Leave unset for the current or default path." }
+      device_id: &device { type: int, min: 0, max: 127, label: Device ID, description: "The device ID to address; the device_id setting when not given." }
+      command_format: &format_param { type: enum, values: [lighting, moving_lights, color_changers, strobes, lasers, chasers, sound, music, cd_players, eprom_playback, audio_tape_machines, intercoms, amplifiers, audio_effects_devices, equalizers, machinery, rigging, flys, lifts, turntables, trusses, robots, animation, floats, breakaways, barges, video, video_tape_machines, video_cassette_machines, video_disc_players, video_switchers, video_effects, video_character_generators, video_still_stores, video_monitors, projection, film_projectors, slide_projectors, video_projectors, dissolvers, shutter_controls, process_control, hydraulic_oil, h2o, co2, compressed_air, natural_gas, fog, smoke, cracked_haze, pyro, fireworks, explosions, flame, smoke_pots, all_types],
+                                    label: Command format, description: "The kind of equipment addressed; the command_format setting when not given." }
+    returns: none
+  stop:
+    summary: "STOP: halt running transitions: the cue's, or every one with no cue"
+    params: { cue: *cue, list: *list, path: *path, device_id: *device, command_format: *format_param }
+    returns: none
+  resume:
+    summary: "RESUME: continue stopped transitions: the cue's, or every one with no cue"
+    params: { cue: *cue, list: *list, path: *path, device_id: *device, command_format: *format_param }
+    returns: none
+  timed_go:
+    summary: "TIMED_GO: start the transition to a cue taking the time given; a device without it does a GO"
+    params:
+      hours: &hours { type: int, min: 0, max: 23, default: 0, label: Hours, description: "Hours of the time, 0 to 23." }
+      minutes: &minutes { type: int, min: 0, max: 59, default: 0, label: Minutes, description: "Minutes, 0 to 59." }
+      seconds: &seconds { type: int, min: 0, max: 59, default: 0, label: Seconds, description: "Seconds, 0 to 59." }
+      frames: &frames { type: int, min: 0, max: 29, default: 0, label: Frames, description: "Frames, below the rate's frames per second." }
+      subframes: &subframes { type: int, min: 0, max: 99, default: 0, label: Subframes, description: "Hundredths of a frame, 0 to 99." }
+      rate: &rate { type: enum, values: ["24", "25", "30df", "30"], default: "30", label: Frame rate, description: "The time's frame rate: 24, 25, 30 drop-frame or 30 frames per second." }
+      cue: *cue
+      list: *list
+      path: *path
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  load:
+    summary: "LOAD: place a cue in standby, so that it goes at once on the next GO"
+    params:
+      cue: { type: string, pattern: "^[0-9.]+$", max_length: 100, required: true, label: Cue number, description: "The cue number to load, digits and '.'." }
+      list: *list
+      path: *path
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  set:
+    summary: >
+      SET: give a generic control a value, optionally reaching it over a time (give any of hours, minutes,
+      seconds or frames). For lighting the standard controls are 0-127 submasters, 128-191 the 32 playbacks'
+      masters, 192-223 their speeds, 224-255 chase masters, 256-287 chase speeds, 510 the grand master, 511 the
+      general fade speed and 512-1023 channel levels
+    params:
+      control: { type: int, min: 0, max: 16383, required: true, label: Control, description: "The generic control number, 0 to 16383." }
+      value: { type: int, min: 0, max: 16383, required: true, label: Value, description: "The value, 0 to 16383." }
+      hours: { type: int, min: 0, max: 23, label: Hours, description: "Hours of the time to reach the value; leave all time fields unset to send no time." }
+      minutes: { type: int, min: 0, max: 59, label: Minutes, description: "Minutes of the time." }
+      seconds: { type: int, min: 0, max: 59, label: Seconds, description: "Seconds of the time." }
+      frames: { type: int, min: 0, max: 29, label: Frames, description: "Frames of the time." }
+      subframes: *subframes
+      rate: *rate
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  fire:
+    summary: "FIRE: trigger a keyboard macro programmed on the device"
+    params:
+      macro: { type: int, min: 0, max: 127, required: true, label: Macro, description: "The macro number, 0 to 127." }
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  all_off:
+    summary: "ALL_OFF: turn every function and output off without changing settings, until RESTORE"
+    params: { device_id: *device, command_format: *format_param }
+    returns: none
+  restore:
+    summary: "RESTORE: return to exactly how things were before ALL_OFF"
+    params: { device_id: *device, command_format: *format_param }
+    returns: none
+  reset:
+    summary: >
+      RESET: end every running cue, return timed functions to their power-up state and load the first cue of
+      each list to standby: the show stops and goes back to its top
+    params: { device_id: *device, command_format: *format_param }
+    returns: none
+  go_off:
+    summary: "GO_OFF: fade a cue to off: the current cue, or the one given"
+    params: { cue: *cue, list: *list, path: *path, device_id: *device, command_format: *format_param }
+    returns: none
+  go_jam_clock:
+    summary: "GO/JAM_CLOCK: GO a cue and set its list's clock to the cue's go time when it is an auto-follow cue"
+    params: { cue: *cue, list: *list, path: *path, device_id: *device, command_format: *format_param }
+    returns: none
+  standby_plus:
+    summary: "STANDBY_+: place the next cue in standby (in the list given, or the open lists)"
+    params:
+      list: &list_alone { type: string, pattern: "^[0-9.]*$", max_length: 100, label: Cue list, description: "The cue list; leave unset for every open list." }
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  standby_minus:
+    summary: "STANDBY_-: place the previous cue in standby"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  sequence_plus:
+    summary: "SEQUENCE_+: place the next parent cue (the next whole number) in standby"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  sequence_minus:
+    summary: "SEQUENCE_-: place the lowest cue of the previous parent sequence in standby"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  start_clock:
+    summary: "START_CLOCK: start the auto-follow clock (of the list given, or every open list)"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  stop_clock:
+    summary: "STOP_CLOCK: stop the auto-follow clock, keeping its time"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  zero_clock:
+    summary: "ZERO_CLOCK: set the auto-follow clock to 00:00:00:00.00, running or not"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  set_clock:
+    summary: "SET_CLOCK: set the auto-follow clock to a time, running or not"
+    params:
+      hours: *hours
+      minutes: *minutes
+      seconds: *seconds
+      frames: *frames
+      subframes: *subframes
+      rate: *rate
+      list: *list_alone
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  mtc_chase_on:
+    summary: "MTC_CHASE_ON: make the auto-follow clock follow incoming MIDI Time Code"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  mtc_chase_off:
+    summary: "MTC_CHASE_OFF: stop following MIDI Time Code"
+    params: { list: *list_alone, device_id: *device, command_format: *format_param }
+    returns: none
+  open_cue_list:
+    summary: "OPEN_CUE_LIST: make a cue list available to the show"
+    params:
+      list: &list_required { type: string, pattern: "^[0-9.]+$", max_length: 100, required: true, label: Cue list, description: "The cue list, digits and '.'." }
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  close_cue_list:
+    summary: "CLOSE_CUE_LIST: take a cue list out of the show, leaving its cues as they are"
+    params: { list: *list_required, device_id: *device, command_format: *format_param }
+    returns: none
+  open_cue_path:
+    summary: "OPEN_CUE_PATH: make a cue path available"
+    params:
+      path: &path_required { type: string, pattern: "^[0-9.]+$", max_length: 100, required: true, label: Cue path, description: "The cue path, digits and '.'." }
+      device_id: *device
+      command_format: *format_param
+    returns: none
+  close_cue_path:
+    summary: "CLOSE_CUE_PATH: make a cue path unavailable"
+    params: { path: *path_required, device_id: *device, command_format: *format_param }
+    returns: none
+  standby:
+    summary: >
+      Two-phase commit STANDBY: ask the device to ready a cue. Returns the device's STANDING_BY as {sequence,
+      max_time} (the longest the cue may take), fails with device_error carrying the ABORT's status code and
+      meaning, or with timeout when no answer comes within 2 s. The transaction is kept in state
+    params:
+      cue: &cue_required { type: string, pattern: "^[0-9.]+$", max_length: 100, required: true, label: Cue number, description: "The cue number, digits and '.'." }
+      list: *list
+      path: *path
+      d1: &d1 { type: int, min: 0, max: 127, default: 0, label: Cue data 1, description: "Cue data value d1, as the device defines it (a lighting console's go level LSB, a switch box's switch number LSB); 0 when unknown." }
+      d2: &d2 { type: int, min: 0, max: 127, default: 0, label: Cue data 2, description: "Cue data value d2 (go level or switch number MSB); 0 when unknown." }
+      d3: &d3 { type: int, min: 0, max: 127, default: 0, label: Cue data 3, description: "Cue data value d3 (a switch box's switch type); 0 when unknown." }
+      d4: &d4 { type: int, min: 0, max: 127, default: 0, label: Cue data 4, description: "Cue data value d4; 0 when unknown." }
+      device_id: *device
+      command_format: *format_param
+    returns: value
+  go_2pc:
+    summary: >
+      Two-phase commit GO_2PC: start a cue the device stands by for, with the same d1-d4 as its STANDBY.
+      Returns {sequence} at once; the COMPLETE or ABORT arrives as a message event and in transactions, and no
+      answer within 125 % of the cue's maximum time counts as a timeout
+    params: { cue: *cue_required, list: *list, path: *path, d1: *d1, d2: *d2, d3: *d3, d4: *d4, device_id: *device, command_format: *format_param }
+    returns: value
+  cancel:
+    summary: >
+      Two-phase commit CANCEL: drop a standing-by cue or stop a running one. Returns the device's CANCELLED as
+      {sequence, status_code, status} (completing, paused, terminated, reversed, not standing by or manual
+      override in progress), fails with device_error on an ABORT, or with timeout after 2 s
+    params: { cue: *cue_required, list: *list, path: *path, device_id: *device, command_format: *format_param }
+    returns: value
+  raw:
+    summary: >
+      Send any MSC command byte with data given in hex, for a manufacturer's extension or a command this list
+      lacks: F0 7F <device_ID> 02 <command_format> <command> <data> F7
+    params:
+      command: { type: int, min: 0, max: 127, required: true, label: Command, description: "The command byte, 0 to 127 (00 starts an extension)." }
+      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 400, default: "", label: Data, description: "The data bytes after the command, as hex digit pairs, each 00 to 7F." }
+      device_id: *device
+      command_format: *format_param
+    returns: none
+
+state:
+  link:                    { type: string, description: "rtp or port" }
+  session.peer_name:       { type: string, description: "With link rtp, the name the other host gives its session" }
+  session.peer_ssrc:       { type: int, description: "With link rtp, the other host's RTP synchronisation source" }
+  session.local_port:      { type: int, description: "With link rtp, the core's control port (its data port is the next)" }
+  port.input:              { type: string, description: "With link port, the MIDI input port opened, or null" }
+  port.output:             { type: string, description: "With link port, the MIDI output port opened, or null" }
+  last:                    { type: object, description: "The last MSC message received: {device_id, command_format, command} and what it carried: cue, list, path, time, control, value, macro, sequence, max_time, status_code, status, or hex for a command not listed" }
+  cue_lists.*.command:     { type: string, description: "Per cue list received (key: the list, or default when none was given): the last of go, stop, resume, timed_go, load, go_off and go_jam_clock" }
+  cue_lists.*.cue:         { type: string, description: "The cue it named, or null for the next or current cue" }
+  cue_lists.*.path:        { type: string, description: "The cue path it named, or null" }
+  clocks.*.running:        { type: bool, description: "Per cue list (key: the list, or all), whether START_CLOCK or STOP_CLOCK came last" }
+  clocks.*.chasing:        { type: bool, description: "Whether MTC_CHASE_ON or MTC_CHASE_OFF came last" }
+  clocks.*.time:           { type: string, description: "The time ZERO_CLOCK or SET_CLOCK last set, hh:mm:ss:ff" }
+  open_lists.*:            { type: bool, description: "Per cue list, whether OPEN_CUE_LIST (true) or CLOSE_CUE_LIST came last" }
+  open_paths.*:            { type: bool, description: "Per cue path, whether OPEN_CUE_PATH (true) or CLOSE_CUE_PATH came last" }
+  controls.*:              { type: int, description: "Per generic control number, the last value SET gave it" }
+  last_macro:              { type: int, description: "The last macro FIRE named" }
+  all_off:                 { type: bool, description: "true after ALL_OFF, false after RESTORE or RESET" }
+  transactions.*.status:   { type: string, description: "Each two-phase commit transaction the core started, by sequence number: standby, standing_by, go, complete, cancel, cancelled, abort or timeout" }
+  transactions.*.cue:      { type: string, description: "The transaction's cue number" }
+  transactions.*.list:     { type: string, description: "Its cue list, when given" }
+  transactions.*.path:     { type: string, description: "Its cue path, when given" }
+  transactions.*.device_id: { type: int, description: "The device ID it was sent to" }
+  transactions.*.command_format: { type: string, description: "The command format it was sent with" }
+  transactions.*.max_time: { type: object, description: "From STANDING_BY: the longest the cue may take, as a time {hours, minutes, seconds, frames, rate, timecode, subframes}" }
+  transactions.*.status_code: { type: string, description: "From ABORT or CANCELLED (or 8020 for a timeout): the status code, four hex digits" }
+  transactions.*.status_text: { type: string, description: "What the status code means" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      GO, GO_OFF, TIMED_GO, GO/JAM_CLOCK, FIRE, ALL_OFF, RESET and GO_2PC act on the show at once and cannot be
+      undone over MSC: RESET stops every running cue and returns the show to its top, and with device_id 127
+      and command_format all_types (the defaults) a command reaches every MSC device on the link. MSC is not a
+      safety system: the specification requires manual and automatic safety controls for dangerous equipment
+      whatever MSC says.
+  - models: [all]
+    severity: info
+    text: >
+      Without two-phase commit MSC has no answer, so those commands are unverified, and the state holds what the
+      core hears on the link (another controller's commands, or a device echoing its own), not the device's own
+      cue state, which MSC cannot ask for.
+  - models: [all]
+    severity: info
+    text: >
+      Two-phase commit answers are matched by sequence number (1 to 16383, then 1 again). A STANDING_BY,
+      COMPLETE, CANCELLED or ABORT whose checksum does not match counts as an ABORT with checksum error, and
+      one that never comes as a timeout (status 8020), as MSC 1.1.1 §6 has the controller treat them. The core
+      does not retry: the caller decides, as §6.4.4 leaves to the controller.
+  - models: [all]
+    severity: info
+    text: >
+      A device that does not support a command, or the cue list and path fields, ignores them or handles them
+      in a way its maker documents; a device answers only its own device ID, its group IDs and all-call, and
+      only its command format and all_types.
+  - models: [all]
+    severity: info
+    text: >
+      Over RTP-MIDI the core joins a session the other host offers and keeps it with clock synchronisation,
+      reported as the latency; over a MIDI port the device is connected while the port is open. See
+      generic-midi for the link's behaviour.
+  - models: [all]
+    severity: info
+    text: >
+      Undocumented or ambiguous in MSC 1.1.1, as the core reads it: the two-phase commit checksum sums the
+      message as 16-bit values whose first byte is the low one (§6.5 says only "two byte values"); an answer is
+      matched by its sequence number alone, as its device ID is a destination; and CANCELLED's "manual override
+      in progress" is 8028 (§5's table) where ABORT's is 8030 and 8028 is "manual override initiated" (§6.7).

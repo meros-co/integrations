@@ -54,6 +54,7 @@ NATIVE = {
     "http-listener": "HTTP/1.1 requests from any sender (webhooks); receives",
     "http-snapshot": "HTTP JPEG snapshots",
     "meros-camera": "HTTP 8790 (JSON, NDJSON event stream, binary preview)",
+    "midi-show-control": "MSC SysEx over RTP-MIDI (UDP 5004/5005) or a MIDI port of the host",
     "nec-display": "External Control binary messages over TCP 7142, or an RS-232C port",
     "nec-projector": "NEC binary commands over TCP 7142 or a serial port",
     "novastar-central-control": "Binary frames over TCP 5200",

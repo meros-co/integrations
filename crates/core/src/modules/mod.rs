@@ -89,8 +89,10 @@ mod lake_dlm;
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
 mod meros_camera_wire;
-#[cfg(feature = "generic-midi")]
+#[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
 mod midi_link;
+#[cfg(feature = "midi-show-control")]
+mod midi_show_control;
 #[cfg(feature = "nec-display")]
 mod nec_display;
 #[cfg(feature = "nec-projector")]
@@ -125,7 +127,7 @@ mod pjlink;
 mod qsys;
 #[cfg(feature = "resolume")]
 mod resolume_push;
-#[cfg(feature = "generic-midi")]
+#[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
 mod rtp_midi;
 #[cfg(feature = "samsung-mdc")]
 mod samsung_mdc;
@@ -361,6 +363,8 @@ pub(crate) fn construct(
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
         #[cfg(feature = "generic-midi")]
         "generic-midi" => Ok(Box::new(generic_midi::GenericMidi::new(context)?)),
+        #[cfg(feature = "midi-show-control")]
+        "midi-show-control" => Ok(Box::new(midi_show_control::MidiShowControl::new(context)?)),
         #[cfg(feature = "http-listener")]
         "http-listener" => Ok(Box::new(http_listener::HttpListener::new(context)?)),
         #[cfg(feature = "http-snapshot")]

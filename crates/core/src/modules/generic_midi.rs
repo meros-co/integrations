@@ -30,7 +30,7 @@ use serde_json::{json, Map, Value};
 
 use super::midi_link::{timecode, MidiLink};
 use crate::catalog::Params;
-use crate::midi::{self, Message, MtcReader, Rate, Timecode};
+use crate::midi::{self, Message, MtcReader, Timecode};
 use crate::module::{
     CommandError, CommandId, Cx, Key, Module, OpenContext, Outcome, SettingsUpdate, TcpInput,
 };
@@ -869,6 +869,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     use super::*;
+    use crate::midi::Rate;
     use crate::module::{Action, Connection};
 
     fn ctx(settings: Value) -> OpenContext {

@@ -32,8 +32,8 @@
 //! each session's control port is advertised as `_apple-midi._udp`, its data
 //! port being the next one. The instance name is the session's name. A
 //! session is any MIDI device, so it is reported once for each MIDI
-//! integration in the core (`generic-midi`), at the SRV port, and a host
-//! advertising several sessions is reported once per port.
+//! integration in the core (`generic-midi`, `midi-show-control`), at the SRV
+//! port, and a host advertising several sessions is reported once per port.
 //!
 //! What is inferred, and listed in VERIFICATION.md: that TXT `class` names the
 //! product family exactly as Companion filters on it, and that TXT `name` is
@@ -122,6 +122,7 @@ pub(crate) const SPECS: &[&str] = &[
     "blackmagic-videohub",
     "generic-midi",
     "meros-camera",
+    "midi-show-control",
 ];
 
 /// One way to recognise a device: instances of `service` (whose TXT `class`
@@ -220,6 +221,15 @@ const RULES: &[Rule] = &[
         service: APPLE_MIDI,
         class: None,
         spec: "generic-midi",
+        source: APPLE_MIDI_SOURCE,
+        key_txt: None,
+        srv_port: true,
+        name_txt: None,
+    },
+    Rule {
+        service: APPLE_MIDI,
+        class: None,
+        spec: "midi-show-control",
         source: APPLE_MIDI_SOURCE,
         key_txt: None,
         srv_port: true,
@@ -1893,7 +1903,14 @@ mod tests {
         found.sort();
         assert_eq!(
             found,
-            [("10.0.0.50".to_string(), 5004, "generic-midi".to_string()),]
+            [
+                ("10.0.0.50".to_string(), 5004, "generic-midi".to_string()),
+                (
+                    "10.0.0.50".to_string(),
+                    5004,
+                    "midi-show-control".to_string()
+                ),
+            ]
         );
         let Event::Discovered { name, .. } = &events[0] else {
             unreachable!()
@@ -1904,7 +1921,7 @@ mod tests {
         // device.
         let other = parse(&apple_midi_response("Lighting", 5006, [10, 0, 0, 50])).unwrap();
         let events = cache.absorb(LOCAL, &other, Heard::Scan);
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.len(), 2);
         assert!(events.iter().all(|e| discovered(e).2 == 5006));
     }
 

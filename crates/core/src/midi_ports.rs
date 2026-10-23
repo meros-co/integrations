@@ -14,7 +14,7 @@
 //! in-memory port instead and never opens a real one. On the host they are
 //! opened with the `midir` crate (MIT): Windows Multimedia (WinMM) on
 //! Windows, CoreMIDI on macOS and iOS, and the ALSA sequencer on Linux, in a
-//! build with a MIDI integration (`generic-midi`).
+//! build with a MIDI integration (`generic-midi`, `midi-show-control`).
 //! Android is left out: its MIDI API is reached only through Java, which a
 //! library linked into an app cannot start on its own, so there no port is
 //! listed and opening one fails with a reason saying so (docs/MOBILE.md).
@@ -67,7 +67,10 @@ pub(crate) trait MidiPorts: Send + Sync {
 /// The host's MIDI ports.
 pub(crate) struct HostMidi;
 
-#[cfg(all(feature = "generic-midi", not(target_os = "android")))]
+#[cfg(all(
+    any(feature = "generic-midi", feature = "midi-show-control"),
+    not(target_os = "android")
+))]
 mod host {
     use std::collections::BTreeMap;
 
@@ -212,7 +215,10 @@ mod host {
 }
 
 impl MidiPorts for HostMidi {
-    #[cfg(all(feature = "generic-midi", not(target_os = "android")))]
+    #[cfg(all(
+        any(feature = "generic-midi", feature = "midi-show-control"),
+        not(target_os = "android")
+    ))]
     fn open(
         &self,
         port: &MidiPort,
@@ -221,7 +227,10 @@ impl MidiPorts for HostMidi {
         Ok(Box::new(host::open(port, received)?))
     }
 
-    #[cfg(not(all(feature = "generic-midi", not(target_os = "android"))))]
+    #[cfg(not(all(
+        any(feature = "generic-midi", feature = "midi-show-control"),
+        not(target_os = "android")
+    )))]
     fn open(
         &self,
         _port: &MidiPort,
@@ -234,13 +243,19 @@ impl MidiPorts for HostMidi {
         })
     }
 
-    #[cfg(all(feature = "generic-midi", not(target_os = "android")))]
+    #[cfg(all(
+        any(feature = "generic-midi", feature = "midi-show-control"),
+        not(target_os = "android")
+    ))]
     fn list(&self) -> Result<Vec<MidiPortInfo>, String> {
         Ok(host::list())
     }
 
     /// A build without a MIDI integration, or Android: none to list.
-    #[cfg(not(all(feature = "generic-midi", not(target_os = "android"))))]
+    #[cfg(not(all(
+        any(feature = "generic-midi", feature = "midi-show-control"),
+        not(target_os = "android")
+    )))]
     fn list(&self) -> Result<Vec<MidiPortInfo>, String> {
         Ok(Vec::new())
     }

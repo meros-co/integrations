@@ -72,7 +72,7 @@ needs no host.
 
 A MIDI device can be reached on a MIDI port of this machine (a USB or other
 class-compliant MIDI interface or instrument, or another program's port):
-`generic-midi` takes the `link` setting `"port"` and
+`generic-midi` and `midi-show-control` take the `link` setting `"port"` and
 name the ports in `midi_input` and `midi_output`. `mi_midi_ports(core)`
 lists this machine's ports to choose from, as
 `{"ok":[{"name":"...","input":true,"output":true},...]}` (empty in a build

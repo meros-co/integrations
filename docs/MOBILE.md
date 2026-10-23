@@ -191,7 +191,7 @@ the network as elsewhere.
 
 ## MIDI ports
 
-The MIDI integration (`generic-midi`) reaches a device
+The MIDI integrations (`generic-midi`, `midi-show-control`) reach a device
 over an RTP-MIDI session on the network, which works on a phone as
 anywhere, or on a MIDI port of the host (`link` `port`). MIDI ports are
 opened with the `midir` crate:

@@ -203,20 +203,6 @@ impl Message {
             Message::Reset => ("system_reset", json!({})),
         }
     }
-
-    /// Whether this is a real-time message (F8-FF).
-    pub(crate) fn is_real_time(&self) -> bool {
-        matches!(
-            self,
-            Message::Clock
-                | Message::Start
-                | Message::Continue
-                | Message::Stop
-                | Message::ActiveSensing
-                | Message::Reset
-                | Message::RealTime(_)
-        )
-    }
 }
 
 fn real_time(b: u8) -> Message {
@@ -369,7 +355,10 @@ impl Parser {
 /// that takes one message at a time (a local MIDI port) is given. What does
 /// not complete a message is kept for the next call.
 #[cfg_attr(
-    not(all(feature = "generic-midi", not(target_os = "android"))),
+    not(all(
+        any(feature = "generic-midi", feature = "midi-show-control"),
+        not(target_os = "android")
+    )),
     allow(dead_code)
 )]
 pub(crate) fn split(parser: &mut Parser, bytes: &[u8]) -> Vec<Vec<u8>> {
@@ -642,6 +631,7 @@ impl MtcReader {
 }
 
 /// The eight quarter frame messages for `tc`, piece 0 first.
+#[cfg(test)]
 pub(crate) fn quarter_frames(tc: &Timecode) -> Vec<Message> {
     let values = [
         tc.frames & 0x0F,

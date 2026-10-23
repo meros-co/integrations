@@ -56,10 +56,11 @@ mod mcp_discovery;
     feature = "blackmagic-smartview",
     feature = "blackmagic-videohub",
     feature = "generic-midi",
-    feature = "meros-camera"
+    feature = "meros-camera",
+    feature = "midi-show-control"
 ))]
 mod mdns;
-#[cfg(feature = "generic-midi")]
+#[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
 mod midi;
 mod midi_ports;
 #[cfg(all(test, feature = "generic-midi"))]

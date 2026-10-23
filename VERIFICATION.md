@@ -1717,6 +1717,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:596](specs/meros-camera.yaml#L596))
 - [ ] On a phone with talkback on, confirm that get_talkback_url's address takes a director's WebRTC offer, and that new_talkback_address cuts off a director on the old one. ([specs/meros-camera.yaml:536](specs/meros-camera.yaml#L536))
 
+## midi-show-control — MIDI Show Control (MSC) device
+
+- [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:315](specs/midi-show-control.yaml#L315))
+- [ ] Against a controlled device that implements two-phase commit, confirm the checksum is computed with the first byte of each pair as the low byte. ([specs/midi-show-control.yaml:348](specs/midi-show-control.yaml#L348))
+- [ ] Confirm which device ID such a device addresses its STANDING_BY, COMPLETE, CANCELLED and ABORT to, and which status code it uses for "manual override in progress" in CANCELLED (8028 or 8030). ([specs/midi-show-control.yaml:348](specs/midi-show-control.yaml#L348))
+- [ ] Confirm that a GO_2PC's COMPLETE arrives within 125 % of the STANDING_BY's maximum time on a real device, so the core's timeout does not fire early. ([specs/midi-show-control.yaml:329](specs/midi-show-control.yaml#L329))
+
 ## millumin — Millumin
 
 - [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:903](specs/millumin.yaml#L903))

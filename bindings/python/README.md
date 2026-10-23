@@ -72,7 +72,7 @@ device = core.open({"device": "extron-matrix", "model": "mmx-42-62",
 
 A MIDI device can be reached on a MIDI port of this machine (a USB or other
 class-compliant MIDI interface or instrument, or another program's port):
-`generic-midi` takes the `link` setting `"port"` and
+`generic-midi` and `midi-show-control` take the `link` setting `"port"` and
 name the ports in `midi_input` and `midi_output`. `core.midi_ports()` lists
 this machine's ports, each with whether it is an input, an output or both
 (empty in a build without a MIDI integration and on Android):

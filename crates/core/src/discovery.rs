@@ -39,6 +39,7 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
             "blackmagic-videohub",
             "generic-midi",
             "meros-camera",
+            "midi-show-control",
         ],
     ),
 ];
@@ -103,7 +104,8 @@ pub(crate) struct Discovery {
         feature = "blackmagic-smartview",
         feature = "blackmagic-videohub",
         feature = "generic-midi",
-        feature = "meros-camera"
+        feature = "meros-camera",
+        feature = "midi-show-control"
     ))]
     mdns: crate::mdns::Mdns,
     /// The protocols that find a device in the core's catalogue.
@@ -135,7 +137,8 @@ impl Discovery {
                 feature = "blackmagic-smartview",
                 feature = "blackmagic-videohub",
                 feature = "generic-midi",
-                feature = "meros-camera"
+                feature = "meros-camera",
+                feature = "midi-show-control"
             ))]
             mdns: crate::mdns::Mdns::new(catalog),
             available: protocols_for(catalog),
@@ -201,7 +204,8 @@ impl Discovery {
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
                     feature = "generic-midi",
-                    feature = "meros-camera"
+                    feature = "meros-camera",
+                    feature = "midi-show-control"
                 ))]
                 if mdns {
                     self.mdns.stop();
@@ -228,7 +232,8 @@ impl Discovery {
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
                     feature = "generic-midi",
-                    feature = "meros-camera"
+                    feature = "meros-camera",
+                    feature = "midi-show-control"
                 ))]
                 if mdns {
                     self.mdns.listen(services)?;
@@ -258,7 +263,8 @@ impl Discovery {
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
                     feature = "generic-midi",
-                    feature = "meros-camera"
+                    feature = "meros-camera",
+                    feature = "midi-show-control"
                 ))]
                 if mdns {
                     self.mdns.listen(services)?;

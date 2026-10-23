@@ -124,6 +124,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "generic-tcp-udp",
             "http-listener",
             "http-snapshot",
+            "midi-show-control",
             "osc-listener",
         ],
     ),
