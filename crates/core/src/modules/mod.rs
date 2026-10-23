@@ -70,6 +70,12 @@ mod generic_http;
 mod generic_midi;
 #[cfg(any(feature = "generic-osc", feature = "osc-listener"))]
 mod generic_osc;
+#[cfg(feature = "generic-ping")]
+mod generic_ping;
+#[cfg(feature = "generic-snmp")]
+mod generic_snmp;
+#[cfg(all(test, feature = "generic-snmp"))]
+mod generic_snmp_session_tests;
 #[cfg(any(
     feature = "generic-tcp-udp",
     feature = "generic-osc",
@@ -147,6 +153,12 @@ mod sennheiser_mcp;
 mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
+#[cfg(feature = "generic-snmp")]
+mod snmp;
+#[cfg(feature = "generic-snmp")]
+mod snmp_ber;
+#[cfg(feature = "generic-snmp")]
+mod snmp_usm;
 #[cfg(feature = "sony-bravia-serial")]
 mod sony_bravia_serial;
 #[cfg(feature = "sony-camera")]
@@ -185,6 +197,8 @@ mod visca;
 mod vmix;
 #[cfg(feature = "vmix")]
 mod vmix_functions;
+#[cfg(any(feature = "generic-ping", feature = "samsung-mdc"))]
+mod wol;
 
 use std::sync::Arc;
 
@@ -361,6 +375,10 @@ pub(crate) fn construct(
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
+        #[cfg(feature = "generic-ping")]
+        "generic-ping" => Ok(Box::new(generic_ping::GenericPing::new(context)?)),
+        #[cfg(feature = "generic-snmp")]
+        "generic-snmp" => Ok(Box::new(generic_snmp::GenericSnmp::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
         #[cfg(feature = "generic-websocket")]

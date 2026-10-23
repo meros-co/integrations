@@ -144,7 +144,7 @@ vendor-evertz = ["evertz-quartz"]
 vendor-extron = ["extron-ipl", "extron-matrix", "extron-switcher"]
 vendor-figure53 = ["qlab"]
 vendor-focusrite = ["focusrite-rednet", "focusrite-rednet-rcp"]
-vendor-generic = ["generic-http", "generic-midi", "generic-osc", "generic-tcp-udp", "generic-websocket", "http-listener", "http-snapshot", "midi-show-control", "osc-listener"]
+vendor-generic = ["generic-http", "generic-midi", "generic-osc", "generic-ping", "generic-snmp", "generic-tcp-udp", "generic-websocket", "http-listener", "http-snapshot", "midi-show-control", "osc-listener"]
 vendor-google = ["youtube-live"]
 vendor-greenhippo = ["greenhippo-hippotizer"]
 vendor-h2r = ["h2r-graphics"]
@@ -349,6 +349,10 @@ generic-http = []
 generic-midi = ["dep:midir"] # also MIDI ports of the host (midir) and mDNS discovery of RTP-MIDI sessions
 # Generic OSC device (native)
 generic-osc = []
+# Network presence: ping (ICMP echo or a TCP connection) and Wake-on-LAN (native)
+generic-ping = []
+# Generic SNMP agent: v1, v2c and v3 (USM) requests, polling, traps and informs (native)
+generic-snmp = ["dep:aes", "dep:des", "dep:getrandom", "dep:sha1"] # USM privacy (AES, DES) and authentication (SHA-1)
 # Generic TCP or UDP device (native)
 generic-tcp-udp = []
 # Generic WebSocket device (native)
@@ -574,6 +578,8 @@ aes = { version = "0.9.3", optional = true }
 base64 = "0.22"
 cbc = { version = "0.2.1", default-features = false, optional = true }
 crypto-bigint = { version = "0.7.5", default-features = false, features = ["alloc", "zeroize"], optional = true }
+# SNMPv3 USM's DES privacy (generic-snmp, RFC 3414 §8).
+des = { version = "0.9.0", optional = true }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 getrandom = { version = "0.4.3", optional = true }
 # Pure-Rust YAML parser for the specs and vectors; src/yaml.rs maps it onto serde.
@@ -620,6 +626,11 @@ serial2-tokio = "0.1.25"
 # Java, so the ports are left out there (docs/MOBILE.md).
 [target.'cfg(not(target_os = "android"))'.dependencies]
 midir = { version = "0.11.1", optional = true }
+
+# ICMP echo without elevated privileges goes through the system's ICMP helper
+# API on Windows (src/icmp.rs).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_IO"] }
 
 [dev-dependencies]
 rcgen = "0.13"

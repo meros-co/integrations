@@ -1,0 +1,144 @@
+spec: 1
+id: generic-ping
+name: Network presence (ping) and Wake-on-LAN
+vendor: Generic (any host on an IP network)
+category: other
+implementation: native
+reason: >
+  ICMP echo is not a socket the spec engine's transports open: the core sends it the way each operating system
+  allows without elevated privileges (the ICMP helper API on Windows, an unprivileged ICMP datagram socket on
+  Linux and macOS), falls back to a TCP connection when the system refuses, and keeps round-trip and loss
+  statistics over a window of probes, which telemetry rules cannot compute.
+
+source:
+  - title: "RFC 792: Internet Control Message Protocol"
+    author: "J. Postel (1981)"
+    url: "https://www.rfc-editor.org/rfc/rfc792"
+    note: "Echo (type 8) and Echo Reply (type 0): identifier, sequence number and data returned unchanged; the checksum."
+  - title: "RFC 4443: Internet Control Message Protocol (ICMPv6) for the Internet Protocol Version 6 (IPv6) Specification"
+    author: "A. Conta, S. Deering, M. Gupta (IETF, 2006)"
+    url: "https://www.rfc-editor.org/rfc/rfc4443"
+    note: "Echo Request (type 128) and Echo Reply (type 129), §4.1 and §4.2."
+  - title: "RFC 1071: Computing the Internet Checksum"
+    author: "R. Braden, D. Borman, C. Partridge (1988)"
+    url: "https://www.rfc-editor.org/rfc/rfc1071"
+    note: "The checksum of an ICMPv4 message; §3's worked example is a unit test."
+  - title: "IcmpSendEcho function (icmpapi.h) and Icmp6SendEcho2 function (icmpapi.h)"
+    author: "Microsoft Learn, Win32 API reference"
+    url: "https://learn.microsoft.com/en-us/windows/win32/api/icmpapi/nf-icmpapi-icmpsendecho"
+    note: "Windows' ICMP helper API, open to any process: reply buffer size, ICMP_ECHO_REPLY with RoundTripTime in milliseconds and the reply's TTL, IP_STATUS codes such as IP_REQ_TIMED_OUT (11010). Icmp6SendEcho2 and Icmp6ParseReplies for IPv6."
+  - title: "icmp(7): Linux IPv4 ICMP kernel module"
+    author: "Linux man-pages project"
+    url: "https://man7.org/linux/man-pages/man7/icmp.7.html"
+    note: "ping_group_range: the groups whose processes may open SOCK_DGRAM IPPROTO_ICMP sockets for echo requests without privileges; empty (1 0) by default on many distributions, when such a socket is refused."
+  - title: "RFC 9293: Transmission Control Protocol (TCP)"
+    author: "W. Eddy, Ed. (IETF, 2022)"
+    url: "https://www.rfc-editor.org/rfc/rfc9293"
+    note: "A SYN to a port nobody listens on is answered with a reset (§3.10.7.1), so a refused connection shows the host's TCP stack is running."
+  - title: "Magic Packet Technology (white paper, publication 20213)"
+    author: "Advanced Micro Devices (November 1995)"
+    url: "https://opensource.apple.com/source/cups/cups-218.30/cups/standards/wake-on-lan.pdf"
+    note: "Six bytes of FF followed by the target's IEEE address sixteen times, anywhere in a frame; a sleeping adapter scans for it."
+  - title: "Wake-on-LAN"
+    author: "Wikipedia"
+    url: "https://en.wikipedia.org/wiki/Wake-on-LAN"
+    note: "Corroboration only: the SecureOn password, 4 or 6 bytes after the sixteen repetitions; UDP port 9 (discard) as the usual destination."
+
+settings:
+  method: { type: enum, values: [auto, icmp, tcp], default: auto, label: Method,
+            description: "How the host is probed: icmp sends ICMP echo requests, tcp opens a connection to the port given when the device is opened, and auto uses ICMP and falls back to TCP where the system refuses ICMP." }
+  interval_ms: { type: int, min: 100, max: 86400000, default: 1000, label: Probe interval,
+                 description: "Milliseconds between probes; a probe still waiting delays the next." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 1000, label: Probe timeout,
+                description: "Milliseconds to wait for an echo reply or a TCP answer before the probe counts as lost." }
+  payload_size: { type: int, min: 0, max: 65000, default: 32, label: Echo data size,
+                  description: "Bytes of data in each ICMP echo request, after the 8-byte ICMP header." }
+  statistics_window: { type: int, min: 1, max: 100000, default: 20, label: Statistics window,
+                       description: "How many of the latest probes the loss and round-trip statistics cover." }
+  down_after: { type: int, min: 1, max: 1000, default: 3, label: Lost probes before unreachable,
+                description: "Probes in a row that must go unanswered before the host is reported unreachable." }
+  mac_address: { type: string, pattern: '^(([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}|[0-9A-Fa-f]{12}|[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4})?$', default: "", label: MAC address,
+                 description: "The host's MAC address for Wake-on-LAN, such as 00:11:22:33:44:55; empty when it is not woken." }
+  wol_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "255.255.255.255", label: Wake-on-LAN address,
+                 description: "Where the magic packet is sent: the limited broadcast 255.255.255.255, or the host's subnet broadcast address such as 192.168.1.255 to reach it through a router that forwards directed broadcasts." }
+  wol_port: { type: int, min: 1, max: 65535, default: 9, label: Wake-on-LAN port,
+              description: "The UDP port the magic packet is sent to: 9 (discard) as usual, or 7 for equipment that listens there." }
+  secureon_password: { type: string, secret: true, pattern: '^(([0-9A-Fa-f]{2}[:-]){3}[0-9A-Fa-f]{2}|([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}|[0-9A-Fa-f]{8}|[0-9A-Fa-f]{12})?$', default: "", label: SecureOn password,
+                       description: "The 4 or 6 byte SecureOn password the host's network adapter requires, in hex such as 01:23:45:67:89:ab; empty sends none." }
+
+ports:
+  - { port: null, protocol: icmp, role: control, when: "method auto or icmp", note: "ICMP echo has no port" }
+  - { port: null, protocol: tcp, role: control, when: "method tcp, or auto where the system refuses ICMP", note: "no standard port: the port to connect to is given when the device is opened" }
+  - { port: 9, protocol: udp, role: control, setting: wol_port, when: "wake_on_lan", note: "the magic packet, to wol_address and to the host" }
+
+models:
+  - id: generic
+    name: "Any host on an IP network (give its address; and a port for TCP checks)"
+    supports: [ping, wake_on_lan, reset_statistics]
+    verification: none
+
+commands:
+  ping:
+    summary: >
+      Probe the host now, or wait for the probe already in flight, and return {reachable, rtt_ms, ttl, method}
+      for a reply or {reachable: false, error, method} for a lost probe. The result is counted in the
+      statistics like any other probe
+    returns: value
+  wake_on_lan:
+    summary: >
+      Send the Wake-on-LAN magic packet, with the SecureOn password when set, to wol_address and to the host's
+      own address on wol_port. Returns unverified: a sleeping host does not answer; watch reachable for it
+      coming up
+    params:
+      mac_address: { type: string, pattern: '^(([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}|[0-9A-Fa-f]{12}|[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4})?$',
+                     label: MAC address,
+                     description: "The MAC address to wake, such as 00:11:22:33:44:55; leave it unset to wake the mac_address setting's." }
+    returns: none
+  reset_statistics:
+    summary: Start the counts, the loss and the round-trip statistics afresh
+    returns: ack
+
+state:
+  reachable: { type: bool, description: "Whether the host answers: true at the first reply, false after down_after probes in a row are lost; null until known" }
+  method: { type: string, description: "How the host is probed now: icmp or tcp (auto moves to tcp where ICMP is refused); null when it cannot be probed" }
+  rtt_ms: { type: float, unit: ms, description: "The last probe's round trip, null when it was lost. ICMP round trips are the system's measure, in whole milliseconds on Windows; TCP ones are the time to connect (or be refused), to the millisecond" }
+  ttl: { type: int, description: "The last echo reply's time to live (IPv4), where the system reports it (Windows, macOS); null otherwise" }
+  rtt_min_ms: { type: float, unit: ms, description: "The shortest round trip over the statistics window" }
+  rtt_avg_ms: { type: float, unit: ms, description: "The mean round trip over the statistics window" }
+  rtt_max_ms: { type: float, unit: ms, description: "The longest round trip over the statistics window" }
+  loss_percent: { type: float, unit: "%", description: "The share of probes in the statistics window that went unanswered" }
+  sent: { type: int, description: "Probes sent since opening or the last reset_statistics" }
+  received: { type: int, description: "Probes answered since opening or the last reset_statistics" }
+  consecutive_failures: { type: int, description: "Probes lost in a row, 0 after a reply" }
+  last_reply: { type: int, unit: ms, description: "When the last reply came, in milliseconds since the Unix epoch" }
+  last_error: { type: string, description: "Why the last probe was lost (a timeout, an unreachable destination), or why the host cannot be probed; null after a reply" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      ICMP needs no privileges on Windows and macOS, but on Linux only for the groups in net.ipv4.ping_group_range,
+      which many distributions leave empty. There the core cannot send ICMP: auto then checks the port given when
+      opening with a TCP connection, and without a port (or with method icmp) the host is reported disconnected
+      with that reason and not probed.
+  - models: [all]
+    severity: info
+    text: >
+      A TCP probe counts a refused connection as an answer: the host's own TCP stack sent the reset. A firewall
+      that rejects connections on the host's behalf answers the same way, and one that drops them makes a
+      running host look unreachable; choose a port the host listens on.
+  - models: [all]
+    severity: info
+    text: >
+      Many hosts and firewalls drop ICMP echo requests (Windows' firewall does by default), so an unanswered ping
+      does not prove a host is off; use method tcp with a port it listens on for such hosts.
+  - models: [all]
+    severity: info
+    text: >
+      Wake-on-LAN must be enabled on the host (in its firmware and network adapter settings) and reaches it only
+      on its own broadcast domain, unless a router forwards directed broadcasts to the address in wol_address.
+      The packet is also sent to the host's address, which helps only while the network still knows it.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only changes nothing: the probes are both the liveness check and the purpose.

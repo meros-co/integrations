@@ -531,6 +531,38 @@ impl PartialEq for Task {
     }
 }
 
+/// One ICMP echo request (ping) a module asks the session to send: RFC 792
+/// for IPv4, RFC 4443 for IPv6. The session sends it the way the operating
+/// system allows without elevated privileges (the ICMP helper API on
+/// Windows, an unprivileged ICMP datagram socket on Linux, macOS and other
+/// Unix systems) and reports the result to [`Module::icmp`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EchoRequest {
+    pub to: std::net::IpAddr,
+    /// How long to wait for the reply.
+    pub timeout: Millis,
+    /// Bytes of data carried after the ICMP header.
+    pub size: u16,
+}
+
+/// What became of an [`EchoRequest`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EchoResult {
+    /// The host answered. `rtt_micros` is the round trip as the operating
+    /// system measured it (Windows measures whole milliseconds); `ttl` is
+    /// the reply's time to live or hop limit, where the system reports it.
+    Reply { rtt_micros: u64, ttl: Option<u8> },
+    /// No reply within the timeout.
+    Timeout,
+    /// The network answered that the host cannot be reached (an ICMP
+    /// destination unreachable or time exceeded), or the send failed.
+    Unreachable { message: String },
+    /// The operating system does not let this process send ICMP echo
+    /// requests without elevated privileges (Linux outside
+    /// `net.ipv4.ping_group_range`), or has no way to on this platform.
+    Unavailable { message: String },
+}
+
 /// Whether the device is reachable, as the module judges it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -662,6 +694,13 @@ pub enum Action {
         socket: Key,
         file: Key,
         path: String,
+    },
+    /// Send one ICMP echo request; the result goes to [`Module::icmp`]
+    /// under `key`. A newer request under the same key replaces an older one
+    /// still waiting, whose result is then dropped.
+    IcmpEcho {
+        key: Key,
+        request: EchoRequest,
     },
     /// Run a [`Task`] off the session's task; its result goes to
     /// [`Module::computed`] under `key`. A newer task under the same key
@@ -911,6 +950,14 @@ impl Cx {
         });
     }
 
+    /// Send an ICMP echo request; see [`Action::IcmpEcho`].
+    pub fn icmp_echo(&mut self, key: Key, to: std::net::IpAddr, timeout: Millis, size: u16) {
+        self.push(Action::IcmpEcho {
+            key,
+            request: EchoRequest { to, timeout, size },
+        });
+    }
+
     /// Open a serial port; see [`Action::SerialOpen`].
     pub fn serial_open(&mut self, socket: Key, port: SerialPort) {
         self.push(Action::SerialOpen { socket, port });
@@ -1133,6 +1180,12 @@ pub trait Module: Send + 'static {
     /// A file this module writes was closed, or failed.
     fn file(&mut self, cx: &mut Cx, file: Key, input: FileInput) {
         let _ = (cx, file, input);
+    }
+
+    /// An ICMP echo request sent with [`Cx::icmp_echo`] was answered, timed
+    /// out or could not be sent.
+    fn icmp(&mut self, cx: &mut Cx, key: Key, result: EchoResult) {
+        let _ = (cx, key, result);
     }
 
     /// A task started with [`Cx::compute`] finished.
