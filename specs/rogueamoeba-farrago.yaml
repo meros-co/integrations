@@ -1,0 +1,533 @@
+spec: 1
+id: rogueamoeba-farrago
+name: Farrago (OSC)
+vendor: Rogue Amoeba
+category: playback
+
+# Farrago 2's OSC control, over UDP to the OSC Input port set in Farrago's
+# Settings > Controllers. Addresses look like file paths: a tile by its UUID
+# (/tile/<uuid>/<action>), by grid cell in a set (/set/<set>/tile/<x>/<y>/...)
+# or by name (/set/<set>/tile/<name>/...); a set by UUID, name, position or
+# "selected". Farrago never answers the sender: its feedback goes to the OSC
+# Output configured in Farrago, so it is received on a fixed local port, the
+# feedback_port setting, and /ping asks for every current value.
+#
+# The manual lists the addresses and endpoints but no argument types or
+# ranges; those, and the feedback's shape, come from the MIT-licensed Bitfocus
+# Companion module (see the quirks).
+
+source:
+  - title: Farrago manual, "OSC Support"
+    author: Rogue Amoeba
+    url: https://rogueamoeba.com/support/manuals/farrago/?page=osc
+    note: >
+      Manufacturer document (Farrago 2), retrieved 2026-10-23. OSC Input with
+      a port and OSC Output in Settings > Controllers; tile addressing by
+      UUID, by set and grid cell, and by title (spaces as underscores in the
+      example /set/Sample_Sound_Effects/tile/Dog_Bark/play); tile endpoints
+      allowPausing, back, color, currentPosition, currentTime, duration,
+      fadeOut, holdToPlay, loop, mute, notes, peakMeterL/R, play,
+      remainingTime, rmsMeterL/R, select, solo, title, toggleAB, volume (get
+      only marked); set addressing by UUID, name, position and selected; set
+      endpoints select, notes, layout, playbackMode, position, reset,
+      crossfadeDuration; /transport, /master, /inspector, /list and /global
+      addresses; pattern matching (?, *, [..], [!..], {a,b}) except in the
+      endpoint; the example value 1 to /set/selected/tile/0/0/select; /ping
+      sends the current value of everything.
+  - title: Farrago 2.1 release notes ("Farrago 2.1 Brings Over Two Dozen Improvements")
+    author: Rogue Amoeba
+    url: https://weblog.rogueamoeba.com/2024/08/01/farrago-2-1-brings-over-two-dozen-improvements/
+    note: >
+      Manufacturer post: OSC paths for resetting a List-mode set's playback
+      and for its playback mode were added in 2.1.
+  - title: companion-module-rogueamoeba-farrago (Bitfocus Companion module, MIT licence)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-rogueamoeba-farrago
+    note: >
+      Corroboration and gap fill only, licence checked (MIT), read 2026-10-23
+      (main.js, actions.js, feedbacks.js); no code taken. Input port 8090 and
+      output port 8091 as its defaults; every action sent with an int 1;
+      master mute and toggleAB as int 1 or 0 (A is 0, B is 1); playbackMode 0
+      queued, 1 continuous; layout 0 grid, 1 list; /ping on start; feedback
+      in the grid form /set/<n>/tile/<x>/<y>/<endpoint> (title, play, color,
+      icon, duration, remainingTime), /set/selected/tile/<x>/<y>/select,
+      /set/<n>/title and /set/<n>/select, /master/mute, toggleAB and volume
+      (0 to 1); tile colors 0 to 1 in eighths.
+
+transport:
+  type: osc-udp
+  port: 8090
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 8091, label: Feedback port, description: "Local UDP port that receives Farrago's OSC Output; set Farrago's OSC Output to this host and port. Empty for no feedback." }
+
+ports:
+  - { port: 8090, protocol: udp, role: control, note: "Farrago's OSC Input port, as set in its Settings > Controllers" }
+  - { port: 8091, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "where Farrago's OSC Output sends feedback" }
+
+maps:
+  ab: { a: "0", b: "1" }
+  layout: { grid: "0", list: "1" }
+  playback_mode: { queued: "0", continuous: "1" }
+
+models:
+  - id: farrago-2
+    name: Farrago 2
+    supports: [play_tile, back_tile, select_tile, fade_out_tile, toggle_tile_ab, set_tile_allow_pausing,
+               set_tile_hold_to_play, set_tile_loop, set_tile_mute, set_tile_solo, set_tile_color,
+               set_tile_position, set_tile_volume, select_set, set_set_layout, set_set_playback_mode,
+               set_set_position, reset_set, set_set_crossfade_duration, play_pause_all, stop_all,
+               previous, next, master_volume_up, master_volume_down, set_master_mute, set_master_volume,
+               fade_all, set_master_ab, set_inspector_volume, inspector_volume_up, inspector_volume_down,
+               set_inspector_ab, set_inspector_mute, set_inspector_loop, set_inspector_solo,
+               set_inspector_hold_to_play, set_inspector_pausable, set_inspector_color, reset_list,
+               set_list_crossfade_duration, bring_forward, ping]
+    verification: none
+    notes: >
+      List-mode reset and playback mode need Farrago 2.1.
+
+commands:
+  # ── Tiles: the tile parameter is the address before the endpoint ────────
+  play_tile:
+    summary: Play a tile, or stop it when it is playing (<tile>/play with 1)
+    params:
+      tile: { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+    send: { address: "/{tile}/play", args: [ { value: "1", type: int } ] }
+    returns: none
+
+  back_tile:
+    summary: Send a tile back to its start (<tile>/back with 1)
+    params:
+      tile: { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+    send: { address: "/{tile}/back", args: [ { value: "1", type: int } ] }
+    returns: none
+
+  select_tile:
+    summary: Select a tile (<tile>/select with 1)
+    params:
+      tile: { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+    send: { address: "/{tile}/select", args: [ { value: "1", type: int } ] }
+    returns: none
+
+  fade_out_tile:
+    summary: Fade a tile out (<tile>/fadeOut with 1)
+    params:
+      tile: { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+    send: { address: "/{tile}/fadeOut", args: [ { value: "1", type: int } ] }
+    returns: none
+
+  toggle_tile_ab:
+    summary: Set a tile's A/B volume (<tile>/toggleAB with 0 for A, 1 for B)
+    params:
+      tile: { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      side: { type: enum, values: [a, b], required: true, label: A/B, description: "Which of the tile's two volume settings to use, A or B." }
+    send: { address: "/{tile}/toggleAB", args: [ { value: "{side:map.ab}", type: int } ] }
+    returns: none
+
+  set_tile_allow_pausing:
+    summary: Allow or forbid pausing a tile (<tile>/allowPausing with 1 or 0)
+    params:
+      tile:    { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      enabled: { type: bool, required: true, label: Allow pausing, description: "True to let a second trigger pause the tile, false to stop it." }
+    send: { address: "/{tile}/allowPausing", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_tile_hold_to_play:
+    summary: Turn a tile's hold to play on or off (<tile>/holdToPlay with 1 or 0)
+    params:
+      tile:    { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      enabled: { type: bool, required: true, label: Hold to play, description: "True to play the tile only while it is held." }
+    send: { address: "/{tile}/holdToPlay", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_tile_loop:
+    summary: Turn a tile's loop on or off (<tile>/loop with 1 or 0)
+    params:
+      tile:    { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      enabled: { type: bool, required: true, label: Loop, description: "True to loop the tile's sound." }
+    send: { address: "/{tile}/loop", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_tile_mute:
+    summary: Mute or unmute a tile (<tile>/mute with 1 or 0)
+    params:
+      tile:  { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      muted: { type: bool, required: true, label: Muted, description: "True to mute the tile, false to unmute it." }
+    send: { address: "/{tile}/mute", args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  set_tile_solo:
+    summary: Solo or unsolo a tile (<tile>/solo with 1 or 0)
+    params:
+      tile:    { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      enabled: { type: bool, required: true, label: Solo, description: "True to solo the tile, false to unsolo it." }
+    send: { address: "/{tile}/solo", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_tile_color:
+    summary: Set a tile's color, 0.0 to 1.0 in eighths (<tile>/color)
+    params:
+      tile:  { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      color: { type: float, min: 0.0, max: 1.0, required: true, label: Color, description: "Tile color as Farrago numbers it: 0.0 purple, 0.125 pink, 0.25 red, 0.375 orange, 0.5 yellow, 0.625 green, 0.75 teal, 0.875 blue, 1.0 white." }
+    send: { address: "/{tile}/color", args: [ { value: "{color}", type: float } ] }
+    returns: none
+
+  set_tile_position:
+    summary: Move a tile's playhead (<tile>/currentPosition)
+    params:
+      tile:     { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Playhead position in the tile's sound, taken to be a fraction from 0.0 (start) to 1.0 (end)." }
+    send: { address: "/{tile}/currentPosition", args: [ { value: "{position}", type: float } ] }
+    returns: none
+
+  set_tile_volume:
+    summary: Set a tile's volume, 0.0 to 1.0 (<tile>/volume)
+    params:
+      tile:   { type: string, pattern: "^(tile/[^/]+|set/[^/]+/tile/[^/]+(/[0-9]+)?)$", max_length: 512, required: true, label: Tile, description: "The tile: tile/<uuid>, set/<set>/tile/<x>/<y> (grid cell from 0,0 at the top left, the set a position from 0, a name, a UUID or selected), or set/<set>/tile/<name>." }
+      volume: { type: float, min: 0.0, max: 1.0, required: true, label: Volume, description: "Tile volume on Farrago's slider, 0.0 to 1.0 (shown as 0 to 100 percent)." }
+    send: { address: "/{tile}/volume", args: [ { value: "{volume}", type: float } ] }
+    returns: none
+
+  # ── Sets ─────────────────────────────────────────────────────────────────
+  select_set:
+    summary: Select a set (/set/<set>/select with 1)
+    params:
+      set: { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Set, description: "The set: its position in the sets list from 0, its name (spaces as underscores), its UUID, or selected." }
+    send: { address: "/set/{set}/select", args: [ { value: "1", type: int } ] }
+    returns: none
+
+  set_set_layout:
+    summary: Show a set as a grid or a list (/set/<set>/layout with 0 or 1)
+    params:
+      set:    { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Set, description: "The set: its position in the sets list from 0, its name (spaces as underscores), its UUID, or selected." }
+      layout: { type: enum, values: [grid, list], required: true, label: Layout, description: "Grid mode (tiles on a board) or List mode (tiles played in order)." }
+    send: { address: "/set/{set}/layout", args: [ { value: "{layout:map.layout}", type: int } ] }
+    returns: none
+
+  set_set_playback_mode:
+    summary: Set a List-mode set's playback to queued or continuous (/set/<set>/playbackMode with 0 or 1)
+    params:
+      set:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Set, description: "The set: its position in the sets list from 0, its name (spaces as underscores), its UUID, or selected." }
+      mode: { type: enum, values: [queued, continuous], required: true, label: Playback mode, description: "Queued plays one tile per trigger; continuous plays on through the list." }
+    send: { address: "/set/{set}/playbackMode", args: [ { value: "{mode:map.playback_mode}", type: int } ] }
+    returns: none
+
+  set_set_position:
+    summary: Move a set to a position in the sets list (/set/<set>/position)
+    params:
+      set:      { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Set, description: "The set: its position in the sets list from 0, its name (spaces as underscores), its UUID, or selected." }
+      position: { type: int, min: 0, required: true, label: Position, description: "New position of the set in the sets list, counted from 0." }
+    send: { address: "/set/{set}/position", args: [ { value: "{position}", type: int } ] }
+    returns: none
+
+  reset_set:
+    summary: Reset a set's playback (/set/<set>/reset with 1)
+    params:
+      set: { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Set, description: "The set: its position in the sets list from 0, its name (spaces as underscores), its UUID, or selected." }
+    send: { address: "/set/{set}/reset", args: [ { value: "1", type: int } ] }
+    returns: none
+
+  set_set_crossfade_duration:
+    summary: Set a List-mode set's crossfade duration (/set/<set>/crossfadeDuration)
+    params:
+      set:     { type: string, pattern: "^[^/]+$", max_length: 256, required: true, label: Set, description: "The set: its position in the sets list from 0, its name (spaces as underscores), its UUID, or selected." }
+      seconds: { type: float, min: 0.0, required: true, label: Crossfade, description: "Crossfade between the list's tiles, taken to be in seconds." }
+    send: { address: "/set/{set}/crossfadeDuration", args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  # ── Transport, master, inspector, list, global ───────────────────────────
+  play_pause_all:
+    summary: Pause every playing tile, or resume them (/transport/playPauseAll with 1)
+    send: { address: /transport/playPauseAll, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  stop_all:
+    summary: Stop every tile (/transport/stopAll with 1)
+    send: { address: /transport/stopAll, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  previous:
+    summary: Go to the previous tile (/transport/previous with 1)
+    send: { address: /transport/previous, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  next:
+    summary: Go to the next tile (/transport/next with 1)
+    send: { address: /transport/next, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  master_volume_up:
+    summary: Raise the master volume a step (/master/volumeUp with 1)
+    send: { address: /master/volumeUp, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  master_volume_down:
+    summary: Lower the master volume a step (/master/volumeDown with 1)
+    send: { address: /master/volumeDown, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  set_master_mute:
+    summary: Mute or unmute the master output (/master/mute with 1 or 0)
+    params:
+      muted: { type: bool, required: true, label: Muted, description: "True to mute Farrago's output, false to unmute it." }
+    send: { address: /master/mute, args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  set_master_volume:
+    summary: Set the master volume, 0.0 to 1.0 (/master/volume)
+    params:
+      volume: { type: float, min: 0.0, max: 1.0, required: true, label: Volume, description: "Master volume on Farrago's slider, 0.0 to 1.0 (shown as 0 to 100 percent)." }
+    send: { address: /master/volume, args: [ { value: "{volume}", type: float } ] }
+    returns: none
+
+  fade_all:
+    summary: Fade out every playing tile (/master/fadeAll with 1)
+    send: { address: /master/fadeAll, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  set_master_ab:
+    summary: Set the master A/B volume (/master/toggleAB with 0 for A, 1 for B)
+    params:
+      side: { type: enum, values: [a, b], required: true, label: A/B, description: "Which of the two master volume settings to use, A or B." }
+    send: { address: /master/toggleAB, args: [ { value: "{side:map.ab}", type: int } ] }
+    returns: none
+
+  set_inspector_volume:
+    summary: Set the volume of the tile shown in the inspector, 0.0 to 1.0 (/inspector/volume)
+    params:
+      volume: { type: float, min: 0.0, max: 1.0, required: true, label: Volume, description: "Volume of the inspected tile, 0.0 to 1.0 (shown as 0 to 100 percent)." }
+    send: { address: /inspector/volume, args: [ { value: "{volume}", type: float } ] }
+    returns: none
+
+  inspector_volume_up:
+    summary: Raise the inspected tile's volume a step (/inspector/volumeUp with 1)
+    send: { address: /inspector/volumeUp, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  inspector_volume_down:
+    summary: Lower the inspected tile's volume a step (/inspector/volumeDown with 1)
+    send: { address: /inspector/volumeDown, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  set_inspector_ab:
+    summary: Set the inspected tile's A/B volume (/inspector/toggleAB with 0 for A, 1 for B)
+    params:
+      side: { type: enum, values: [a, b], required: true, label: A/B, description: "Which of the inspected tile's two volume settings to use, A or B." }
+    send: { address: /inspector/toggleAB, args: [ { value: "{side:map.ab}", type: int } ] }
+    returns: none
+
+  set_inspector_mute:
+    summary: Mute or unmute the inspected tile (/inspector/mute with 1 or 0)
+    params:
+      muted: { type: bool, required: true, label: Muted, description: "True to mute the inspected tile, false to unmute it." }
+    send: { address: /inspector/mute, args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  set_inspector_loop:
+    summary: Turn the inspected tile's loop on or off (/inspector/loop with 1 or 0)
+    params:
+      enabled: { type: bool, required: true, label: Loop, description: "True to loop the inspected tile's sound." }
+    send: { address: /inspector/loop, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_inspector_solo:
+    summary: Solo or unsolo the inspected tile (/inspector/solo with 1 or 0)
+    params:
+      enabled: { type: bool, required: true, label: Solo, description: "True to solo the inspected tile." }
+    send: { address: /inspector/solo, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_inspector_hold_to_play:
+    summary: Turn the inspected tile's hold to play on or off (/inspector/holdToPlay with 1 or 0)
+    params:
+      enabled: { type: bool, required: true, label: Hold to play, description: "True to play the inspected tile only while it is held." }
+    send: { address: /inspector/holdToPlay, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_inspector_pausable:
+    summary: Allow or forbid pausing the inspected tile (/inspector/pausable with 1 or 0)
+    params:
+      enabled: { type: bool, required: true, label: Pausable, description: "True to let a second trigger pause the inspected tile." }
+    send: { address: /inspector/pausable, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_inspector_color:
+    summary: Set the inspected tile's color, 0.0 to 1.0 in eighths (/inspector/color)
+    params:
+      color: { type: float, min: 0.0, max: 1.0, required: true, label: Color, description: "Tile color as Farrago numbers it: 0.0 purple, 0.125 pink, 0.25 red, 0.375 orange, 0.5 yellow, 0.625 green, 0.75 teal, 0.875 blue, 1.0 white." }
+    send: { address: /inspector/color, args: [ { value: "{color}", type: float } ] }
+    returns: none
+
+  reset_list:
+    summary: Reset the playback of the List-mode set (/list/reset with 1)
+    send: { address: /list/reset, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  set_list_crossfade_duration:
+    summary: Set the List-mode set's crossfade duration (/list/crossfadeDuration)
+    params:
+      seconds: { type: float, min: 0.0, required: true, label: Crossfade, description: "Crossfade between the list's tiles, taken to be in seconds." }
+    send: { address: /list/crossfadeDuration, args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  bring_forward:
+    summary: Bring Farrago's window to the front (/global/bringForward with 1)
+    send: { address: /global/bringForward, args: [ { value: "1", type: int } ] }
+    returns: none
+
+  ping:
+    summary: Ask Farrago to send the current value of every control (/ping)
+    send: { address: /ping }
+    returns: none
+
+telemetry:
+  # Every current value, asked for once the feedback port is open.
+  subscribe:
+    send: [ { address: /ping } ]
+  updates:
+    # Tiles, in the grid form: /set/<set>/tile/<x>/<y>/<endpoint>.
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/title$"
+      state: { "sets.{1}.tiles.{2}.{3}.title": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/notes$"
+      state: { "sets.{1}.tiles.{2}.{3}.notes": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/icon$"
+      state: { "sets.{1}.tiles.{2}.{3}.icon": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/play$"
+      state: { "sets.{1}.tiles.{2}.{3}.playing": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/loop$"
+      state: { "sets.{1}.tiles.{2}.{3}.loop": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/mute$"
+      state: { "sets.{1}.tiles.{2}.{3}.muted": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/solo$"
+      state: { "sets.{1}.tiles.{2}.{3}.solo": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/holdToPlay$"
+      state: { "sets.{1}.tiles.{2}.{3}.hold_to_play": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/allowPausing$"
+      state: { "sets.{1}.tiles.{2}.{3}.allow_pausing": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/toggleAB$"
+      state: { "sets.{1}.tiles.{2}.{3}.ab": { value: "{arg0}", map: { "0": a, "1": b, "0.0": a, "1.0": b } } }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/volume$"
+      state: { "sets.{1}.tiles.{2}.{3}.volume": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/color$"
+      state: { "sets.{1}.tiles.{2}.{3}.color": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/currentPosition$"
+      state: { "sets.{1}.tiles.{2}.{3}.position": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/currentTime$"
+      state: { "sets.{1}.tiles.{2}.{3}.current_time": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/duration$"
+      state: { "sets.{1}.tiles.{2}.{3}.duration": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/remainingTime$"
+      state: { "sets.{1}.tiles.{2}.{3}.remaining_time": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/peakMeterL$"
+      state: { "sets.{1}.tiles.{2}.{3}.peak_left": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/peakMeterR$"
+      state: { "sets.{1}.tiles.{2}.{3}.peak_right": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/rmsMeterL$"
+      state: { "sets.{1}.tiles.{2}.{3}.rms_left": "{arg0}" }
+    - address: "^/set/(\\d+)/tile/(\\d+)/(\\d+)/rmsMeterR$"
+      state: { "sets.{1}.tiles.{2}.{3}.rms_right": "{arg0}" }
+    # Selection: the selected tile of the selected set, the selected set.
+    - address: "^/set/selected/tile/(\\d+)/(\\d+)/select$"
+      arg_match: { "0": "^(1|1\\.0|true)$" }
+      state: { selected_tile.x: "{1}", selected_tile.y: "{2}" }
+    - address: "^/set/(\\d+)/select$"
+      arg_match: { "0": "^(1|1\\.0|true)$" }
+      state: { selected_set: "{1}" }
+    # Sets.
+    - address: "^/set/(\\d+)/title$"
+      state: { "sets.{1}.title": "{arg0}" }
+    - address: "^/set/(\\d+)/notes$"
+      state: { "sets.{1}.notes": "{arg0}" }
+    - address: "^/set/(\\d+)/layout$"
+      state: { "sets.{1}.layout": { value: "{arg0}", map: { "0": grid, "1": list, "0.0": grid, "1.0": list } } }
+    - address: "^/set/(\\d+)/playbackMode$"
+      state: { "sets.{1}.playback_mode": { value: "{arg0}", map: { "0": queued, "1": continuous, "0.0": queued, "1.0": continuous } } }
+    - address: "^/set/(\\d+)/crossfadeDuration$"
+      state: { "sets.{1}.crossfade_duration": "{arg0}" }
+    # Master.
+    - address: "^/master/mute$"
+      state: { master.muted: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/master/volume$"
+      state: { master.volume: "{arg0}" }
+    - address: "^/master/toggleAB$"
+      state: { master.ab: { value: "{arg0}", map: { "0": a, "1": b, "0.0": a, "1.0": b } } }
+
+state:
+  selected_set:                  { type: int, description: "Position of the selected set in the sets list, from 0" }
+  selected_tile.x:               { type: int, description: "Grid column of the selected tile in the selected set, from 0 at the left" }
+  selected_tile.y:               { type: int, description: "Grid row of the selected tile in the selected set, from 0 at the top" }
+  sets.*.title:                  { type: string, description: "The set's name, keyed by its position in the sets list from 0" }
+  sets.*.notes:                  { type: string, description: "The set's notes" }
+  sets.*.layout:                 { type: string, description: "grid or list" }
+  sets.*.playback_mode:          { type: string, description: "queued or continuous, for a List-mode set" }
+  sets.*.crossfade_duration:     { type: float, description: "Crossfade between a List-mode set's tiles, as Farrago reports it (taken to be seconds)" }
+  sets.*.tiles.*.*.title:        { type: string, description: "The tile's title, keyed by set position, then grid column and row from 0,0 at the top left" }
+  sets.*.tiles.*.*.notes:        { type: string, description: "The tile's notes" }
+  sets.*.tiles.*.*.icon:         { type: string, description: "The tile's icon, as Farrago reports it" }
+  sets.*.tiles.*.*.playing:      { type: bool, description: "The tile is playing" }
+  sets.*.tiles.*.*.loop:         { type: bool, description: "The tile loops" }
+  sets.*.tiles.*.*.muted:        { type: bool, description: "The tile is muted" }
+  sets.*.tiles.*.*.solo:         { type: bool, description: "The tile is soloed" }
+  sets.*.tiles.*.*.hold_to_play: { type: bool, description: "The tile plays only while held" }
+  sets.*.tiles.*.*.allow_pausing: { type: bool, description: "A second trigger pauses the tile rather than stopping it" }
+  sets.*.tiles.*.*.ab:           { type: string, description: "The tile's A/B volume, a or b" }
+  sets.*.tiles.*.*.volume:       { type: float, description: "The tile's volume, 0.0 to 1.0" }
+  sets.*.tiles.*.*.color:        { type: float, description: "The tile's color, 0.0 to 1.0 in eighths (0.0 purple ... 1.0 white)" }
+  sets.*.tiles.*.*.position:     { type: float, description: "The tile's playhead position, as Farrago reports it (taken to be a fraction 0.0 to 1.0)" }
+  sets.*.tiles.*.*.current_time: { type: float, unit: s, description: "Time played in the tile's sound" }
+  sets.*.tiles.*.*.duration:     { type: float, unit: s, description: "Duration of the tile's sound" }
+  sets.*.tiles.*.*.remaining_time: { type: float, unit: s, description: "Time left in the tile's sound" }
+  sets.*.tiles.*.*.peak_left:    { type: float, description: "Left peak meter, as Farrago reports it" }
+  sets.*.tiles.*.*.peak_right:   { type: float, description: "Right peak meter, as Farrago reports it" }
+  sets.*.tiles.*.*.rms_left:     { type: float, description: "Left RMS meter, as Farrago reports it" }
+  sets.*.tiles.*.*.rms_right:    { type: float, description: "Right RMS meter, as Farrago reports it" }
+  master.muted:                  { type: bool, description: "Farrago's output is muted" }
+  master.volume:                 { type: float, description: "Master volume, 0.0 to 1.0" }
+  master.ab:                     { type: string, description: "The master A/B volume, a or b" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Farrago listens only with OSC Input enabled in Settings > Controllers,
+      on the port set there, and sends feedback only with OSC Output enabled
+      and pointed at this host and the feedback_port setting. The manual gives
+      no default ports: 8090 in and 8091 out are the Companion module's
+      defaults. Nothing can set either up over OSC.
+  - models: [all]
+    severity: info
+    text: >
+      Farrago never answers the sender: every command reports unverified.
+      /ping (sent once on connecting) makes Farrago send the current value of
+      everything to its OSC Output; changes are taken to be sent there as they
+      happen. Feedback is read in the grid form (/set/<n>/tile/<x>/<y>/...,
+      /set/<n>/...) the Companion module reads; feedback by UUID or name,
+      and the /inspector and /list values, are not documented and not read.
+  - models: [all]
+    severity: info
+    text: >
+      The manual gives no argument types or ranges. As the Companion module
+      sends them, actions (play, back, select, fadeOut, reset, the transport,
+      fadeAll, volume steps, bringForward) carry an int 1, switches an int 1 or
+      0, A/B 0 for A and 1 for B, layout 0 grid and 1 list, playbackMode 0
+      queued and 1 continuous. Volumes are taken to be 0.0 to 1.0 floats (the
+      master volume feedback is), colors 0.0 to 1.0 in eighths, the playhead
+      position a 0.0 to 1.0 fraction and crossfade durations seconds, none of
+      which is documented.
+  - models: [all]
+    severity: info
+    text: >
+      play on a playing tile stops it (or pauses it with pausing allowed),
+      as a click does; there is no separate stop. A tile or set may also be
+      addressed with OSC pattern matching (?, *, [0-2], {0,1}) in any part but
+      the endpoint, and by title with spaces written as underscores; the tile
+      and set parameters pass such patterns through as they are. A name holding
+      a slash cannot be used. The set position endpoint's meaning (moving the
+      set in the list) is inferred from its name.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_all and fade_all end every sound playing; set_master_mute true
+      silences Farrago's output until unmuted.

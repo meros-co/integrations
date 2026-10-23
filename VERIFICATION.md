@@ -2223,6 +2223,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record real streaming updates: that suid is stable for one encoder session, channelId matches the channel list's id, and deleteIncoming and deleteOutgoing arrive when the encoder and destinations stop. ([specs/restream.yaml:1034](specs/restream.yaml#L1034))
 - [ ] Record which updateStatuses fields each platform fills (viewers, followers, streamViews), and how often they arrive. ([specs/restream.yaml:1082](specs/restream.yaml#L1082))
 
+## rogueamoeba-farrago — Farrago
+
+- [ ] Check Farrago's default OSC Input and Output ports (8090 and 8091 here, the Companion module's defaults; the manual gives none). ([specs/rogueamoeba-farrago.yaml:492](specs/rogueamoeba-farrago.yaml#L492))
+- [ ] Check that /ping sends every current value to the OSC Output, that changes are sent there as they happen (from the app, from MIDI and from OSC), and whether feedback also comes by tile UUID or name and for the /inspector and /list addresses. ([specs/rogueamoeba-farrago.yaml:500](specs/rogueamoeba-farrago.yaml#L500))
+- [ ] Check the argument types and ranges: an int 1 for actions, an int 1 or 0 for switches, 0/1 for A/B, layout and playback mode, floats 0.0 to 1.0 for volume and color, and the units of currentPosition (assumed a fraction) and crossfadeDuration (assumed seconds); and the types of the feedback values (play as an OSC boolean, the meters' scale). ([specs/rogueamoeba-farrago.yaml:509](specs/rogueamoeba-farrago.yaml#L509))
+- [ ] Check that play on a playing tile stops it (or pauses it with pausing allowed), and what /set/<set>/position does with its value. ([specs/rogueamoeba-farrago.yaml:520](specs/rogueamoeba-farrago.yaml#L520))
+
 ## roland-p20hd — Roland P-20HD
 
 - [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:588](specs/roland-p20hd.yaml#L588))
