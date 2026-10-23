@@ -1833,7 +1833,7 @@ impl SpecEngine {
         };
         let events = match spec.telemetry.as_ref().and_then(|t| t.get("sse")) {
             None => None,
-            Some(e) => {
+            Some(e) => 'sse: {
                 let Transport::Http {
                     base,
                     auth,
@@ -1843,11 +1843,12 @@ impl SpecEngine {
                 else {
                     return Err("telemetry.sse needs an http transport".into());
                 };
-                // Settings in the path are path segments, as in a websocket's.
-                let path = ws_path(
-                    str_field(e, "path").ok_or("telemetry.sse needs a path")?,
-                    &ctx.settings,
-                )?;
+                // Settings in the path are path segments, as in a websocket's;
+                // a setting with no value leaves the stream unopened.
+                let template = str_field(e, "path").ok_or("telemetry.sse needs a path")?;
+                let Ok(path) = ws_path(template, &ctx.settings) else {
+                    break 'sse None;
+                };
                 let mut headers = auth_headers(*auth, &auth_header, &ctx.settings);
                 headers.extend(side_headers.iter().cloned());
                 let json = match str_field(e, "format") {
