@@ -2,8 +2,10 @@
 //!
 //! One task per connection, like TCP: it connects, reports the result,
 //! forwards every received message and writes whatever the session hands it.
-//! Pings are answered by the library; the module sees text and binary messages
-//! and the close, and sends either. `wss` uses the same TLS as TCP streams (see `crate::tls`).
+//! Pings are answered by the library; the module sees text and binary messages,
+//! pongs, the subprotocol the peer chose and the close, and sends either kind
+//! of message or a ping. `wss` uses the same TLS as TCP streams (see
+//! `crate::tls`).
 
 use std::time::Duration;
 
@@ -24,6 +26,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 pub(crate) enum Outgoing {
     Text(String),
     Binary(Vec<u8>),
+    Ping(Vec<u8>),
     Close,
 }
 
@@ -80,7 +83,19 @@ pub(crate) fn spawn(
         let connecting =
             tokio_tungstenite::connect_async_tls_with_config(http, None, false, Some(connector));
         let stream = match tokio::time::timeout(CONNECT_TIMEOUT, connecting).await {
-            Ok(Ok((stream, _))) => stream,
+            Ok(Ok((stream, response))) => {
+                let chosen = response
+                    .headers()
+                    .get("Sec-WebSocket-Protocol")
+                    .and_then(|v| v.to_str().ok())
+                    .map(str::to_string);
+                if let Some(protocol) = chosen {
+                    if !send(WsInput::Subprotocol(protocol)).await {
+                        return;
+                    }
+                }
+                stream
+            }
             Ok(Err(Error::Http(response))) => {
                 send(WsInput::Closed {
                     code: None,
@@ -133,8 +148,13 @@ pub(crate) fn spawn(
                             None => closed("closed by the device".into()),
                         };
                     }
+                    Some(Ok(Message::Pong(data))) => {
+                        if !send(WsInput::Pong(data.to_vec())).await {
+                            return;
+                        }
+                    }
                     Some(Ok(_)) => {
-                        // Ping, pong or a raw frame: the library answers pings.
+                        // A ping or a raw frame: the library answers pings.
                         if !send(WsInput::Activity).await {
                             return;
                         }
@@ -150,6 +170,11 @@ pub(crate) fn spawn(
                     }
                     Some(Outgoing::Binary(data)) => {
                         if let Err(e) = write.send(Message::binary(data)).await {
+                            break closed(e.to_string());
+                        }
+                    }
+                    Some(Outgoing::Ping(data)) => {
+                        if let Err(e) = write.send(Message::Ping(data.into())).await {
                             break closed(e.to_string());
                         }
                     }
@@ -241,6 +266,9 @@ mod tests {
         assert_eq!(next(&mut rx).await, WsInput::Text("hello".into()));
         c.writer.send(Outgoing::Binary(vec![0x3B, 0, 1])).unwrap();
         assert_eq!(next(&mut rx).await, WsInput::Binary(vec![0x3B, 0, 1]));
+        // A ping's pong carries its payload back (RFC 6455 §5.5.3).
+        c.writer.send(Outgoing::Ping(vec![7, 8])).unwrap();
+        assert_eq!(next(&mut rx).await, WsInput::Pong(vec![7, 8]));
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -2154,12 +2154,12 @@ impl Module for TallyArbiter {
             return;
         }
         match input {
-            WsInput::Opened => {}
+            WsInput::Opened | WsInput::Subprotocol(_) => {}
             WsInput::Text(text) => {
                 cx.alive();
                 self.text(cx, &text);
             }
-            WsInput::Binary(_) | WsInput::Activity => cx.alive(),
+            WsInput::Binary(_) | WsInput::Activity | WsInput::Pong(_) => cx.alive(),
             WsInput::Closed { code, reason } => match code {
                 Some(code) => self.lost(cx, format!("closed by Tally Arbiter ({code}): {reason}")),
                 None => self.lost(cx, reason),
