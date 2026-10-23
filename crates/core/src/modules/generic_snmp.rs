@@ -949,7 +949,7 @@ mod tests {
         assert_eq!(s["system"]["uptime"], 500);
         assert_eq!(
             s["values"]["voltage"],
-            json!({ "oid": "1.3.6.1.4.1.99.1.1.0", "type": "gauge32", "number": 230, "text": "230", "hex": null })
+            json!({ "oid": "1.3.6.1.4.1.99.1.1.0", "type": "gauge32", "number": 230, "text": "230" })
         );
         assert_eq!(
             s["values"]["1.3.6.1.4.1.99.1.9.0"]["type"],
