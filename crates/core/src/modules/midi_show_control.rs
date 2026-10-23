@@ -646,6 +646,7 @@ impl MidiShowControl {
                 if let Some(t) = time {
                     args.insert("time".into(), t);
                 }
+                // "": the message named no cue or path (a null would be a removal).
                 let mut entry = Map::new();
                 entry.insert("command".into(), json!(name));
                 entry.insert(
@@ -653,14 +654,14 @@ impl MidiShowControl {
                     fields
                         .first()
                         .filter(|c| !c.is_empty())
-                        .map_or(Value::Null, |c| json!(c)),
+                        .map_or(json!(""), |c| json!(c)),
                 );
                 entry.insert(
                     "path".into(),
                     fields
                         .get(2)
                         .filter(|c| !c.is_empty())
-                        .map_or(Value::Null, |c| json!(c)),
+                        .map_or(json!(""), |c| json!(c)),
                 );
                 state.insert("cue_lists".into(), json!({list_key(&fields, 1): entry}));
             }
