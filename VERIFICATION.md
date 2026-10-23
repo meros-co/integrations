@@ -1401,6 +1401,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] With a USB MIDI device on Windows, macOS and Linux, confirm the port listing's names open the device, that unplugging it reports disconnected within a second or two and plugging it back reconnects, and that a port held by another program on Windows fails to open as described. ([specs/generic-midi.yaml:389](specs/generic-midi.yaml#L389))
 - [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:408](specs/generic-midi.yaml#L408))
 
+## generic-ping — Network presence (ping) and Wake-on-LAN
+
+- [ ] Check that network adapters with a SecureOn password take it as 4 or 6 bytes right after the sixteen MAC repetitions (from practice, not AMD's paper). ([specs/generic-ping.yaml:66](specs/generic-ping.yaml#L66))
+- [ ] Check on macOS that an unprivileged ICMP datagram socket keeps the identifier sent and prefixes IPv4 echo replies with their IP header, as the core allows for (only Windows was run here; Linux and macOS builds were compiled, not run). ([specs/generic-ping.yaml:120](specs/generic-ping.yaml#L120))
+- [ ] Check on Linux with net.ipv4.ping_group_range including the core's group that echo replies arrive, and that outside it the socket is refused and auto falls back to TCP. ([specs/generic-ping.yaml:120](specs/generic-ping.yaml#L120))
+- [ ] Check that typical show hosts (consoles, media servers, displays) answer a connection to a closed port with a reset rather than dropping it, which a TCP probe counts as reachable. ([specs/generic-ping.yaml:127](specs/generic-ping.yaml#L127))
+- [ ] Check Wake-on-LAN through a router forwarding directed broadcasts to a subnet's broadcast address in wol_address. ([specs/generic-ping.yaml:62](specs/generic-ping.yaml#L62))
+
+## generic-snmp — Generic SNMP agent
+
+- [ ] Check AES-192 and AES-256 against agents that implement draft-blumenthal-aes-usm-04 (Net-SNMP's AES-192/AES-256), with SHA-1 and MD5 users whose keys are extended, and confirm which agents use the draft-reeder extension instead. ([specs/generic-snmp.yaml:255](specs/generic-snmp.yaml#L255))
+- [ ] Check CBC-DES privacy against a real agent (only the core's own round trip and the RFC 3414 §8 salt layout are tested). ([specs/generic-snmp.yaml:91](specs/generic-snmp.yaml#L91))
+- [ ] Check v3 informs from a real sender: that it discovers local_engine_id from the unknownEngineIDs report, then authenticates against this receiver's clock (boots 1, time from opening). ([specs/generic-snmp.yaml:115](specs/generic-snmp.yaml#L115))
+- [ ] Check v3 traps from a real agent are accepted with keys localized to its engine, without the timeliness check. ([specs/generic-snmp.yaml:248](specs/generic-snmp.yaml#L248))
+- [ ] Check a v1 agent's trap through the shared notification port, and the snmpTrapOID derived from it (RFC 3584 §3.1) against what Net-SNMP's snmptrapd shows. ([specs/generic-snmp.yaml:220](specs/generic-snmp.yaml#L220))
+- [ ] Check how agents of PDUs, UPSs and switches answer a polling GET over v1 when one object is missing (noSuchName and the error index), and a GET too big for them (tooBig), which the core splits. ([specs/generic-snmp.yaml:105](specs/generic-snmp.yaml#L105))
+- [ ] Check agents that encode unsigned values (Counter32, Gauge32, TimeTicks) without the leading zero byte their top bit needs; the core reads them as unsigned. ([specs/generic-snmp.yaml:241](specs/generic-snmp.yaml#L241))
+
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))

@@ -48,6 +48,8 @@ NATIVE = {
     "generic-http": "HTTP or HTTPS",
     "generic-midi": "MIDI 1.0 over RTP-MIDI (UDP 5004/5005) or a MIDI port of the host",
     "generic-osc": "OSC over UDP or TCP",
+    "generic-ping": "ICMP echo or a TCP connection; Wake-on-LAN over UDP",
+    "generic-snmp": "SNMP v1, v2c or v3 over UDP 161; traps and informs",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "generic-websocket": "Text, bytes or JSON over WebSocket (ws or wss)",
     "epson-projector": "ESC/VP21 over ESC/VP.net (TCP 3629) or a serial port",

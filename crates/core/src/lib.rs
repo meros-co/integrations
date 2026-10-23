@@ -46,6 +46,7 @@ pub mod events;
 mod facebook_account_session_tests;
 mod files;
 mod http;
+mod icmp;
 pub mod json;
 #[cfg(feature = "sennheiser-ew-g3-g4")]
 mod mcp_discovery;

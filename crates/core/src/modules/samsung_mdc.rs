@@ -45,7 +45,7 @@ use serde_json::{json, Map, Value};
 use super::samsung_mdc_table::DEFS;
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
+    CommandError, CommandId, Connection, Cx, Key, Level, Link, Millis, Module, OpenContext,
     Outcome, SerialPort, TcpInput, TlsTarget,
 };
 
@@ -546,14 +546,6 @@ pub(crate) struct SamsungMdc {
     silent: u32,
 }
 
-fn parse_mac(text: &str) -> Option<[u8; 6]> {
-    let parts: Vec<u8> = text
-        .split([':', '-'])
-        .map(|p| u8::from_str_radix(p, 16).ok())
-        .collect::<Option<_>>()?;
-    parts.try_into().ok()
-}
-
 impl SamsungMdc {
     pub(crate) fn new(ctx: OpenContext) -> Result<SamsungMdc, String> {
         let s = &ctx.settings;
@@ -575,7 +567,8 @@ impl SamsungMdc {
         let mac = match text("mac_address") {
             "" => None,
             m => Some(
-                parse_mac(m).ok_or_else(|| format!("mac_address '{m}' is not a MAC address"))?,
+                super::wol::parse_mac(m)
+                    .ok_or_else(|| format!("mac_address '{m}' is not a MAC address"))?,
             ),
         };
         let wol_to = text("wol_address").parse().unwrap_or(Ipv4Addr::BROADCAST);
@@ -841,19 +834,13 @@ impl SamsungMdc {
         let Some(mac) = self.mac else {
             return false;
         };
-        let mut packet = vec![0xFF; 6];
-        for _ in 0..16 {
-            packet.extend_from_slice(&mac);
-        }
-        cx.udp_open(WOL_SOCKET, Bind::Ephemeral);
-        cx.udp_send(
+        super::wol::send(
+            cx,
             WOL_SOCKET,
+            super::wol::magic_packet(mac, None),
             SocketAddr::new(IpAddr::V4(self.wol_to), 9),
-            packet.clone(),
+            Some(self.host),
         );
-        if !self.host.is_unspecified() && self.host != IpAddr::V4(self.wol_to) {
-            cx.udp_send(WOL_SOCKET, SocketAddr::new(self.host, 9), packet);
-        }
         true
     }
 

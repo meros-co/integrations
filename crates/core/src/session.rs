@@ -110,6 +110,12 @@ pub(crate) enum Inbound {
         generation: u64,
         input: crate::module::FileInput,
     },
+    /// An ICMP echo request the module sent was answered or gave up.
+    Echo {
+        key: Key,
+        generation: u64,
+        result: crate::module::EchoResult,
+    },
     /// A task the module handed off finished.
     Computed {
         key: Key,
@@ -210,6 +216,9 @@ pub(crate) struct Session {
     sends: HashMap<Key, u64>,
     /// Tasks running off the session, by key, with their generation.
     computes: HashMap<Key, u64>,
+    /// ICMP echo requests waiting for their reply, by key, with their
+    /// generation.
+    echoes: HashMap<Key, u64>,
     ws: HashMap<Key, crate::ws::Connection>,
     /// TCP ports this session listens on, by key.
     listening: HashMap<Key, u16>,
@@ -258,6 +267,7 @@ impl Session {
             reads: HashMap::new(),
             sends: HashMap::new(),
             computes: HashMap::new(),
+            echoes: HashMap::new(),
             ws: HashMap::new(),
             listening: HashMap::new(),
             servers: HashMap::new(),
@@ -488,6 +498,13 @@ impl Session {
                                 continue;
                             }
                             self.module.file(&mut cx, file, input);
+                        }
+                        Inbound::Echo { key, generation, result } => {
+                            if self.echoes.get(key) != Some(&generation) {
+                                continue;
+                            }
+                            self.echoes.remove(key);
+                            self.module.icmp(&mut cx, key, result);
                         }
                         Inbound::Computed { key, generation, result } => {
                             if self.computes.get(key) != Some(&generation) {
@@ -777,6 +794,22 @@ impl Session {
                             .unwrap_or_else(|e| Err(format!("the task failed: {e}")));
                         let _ = inbound
                             .send(Inbound::Computed {
+                                key,
+                                generation,
+                                result,
+                            })
+                            .await;
+                    });
+                }
+                Action::IcmpEcho { key, request } => {
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    self.echoes.insert(key, generation);
+                    let inbound = self.inbound_tx.clone();
+                    tokio::spawn(async move {
+                        let result = crate::icmp::echo(request).await;
+                        let _ = inbound
+                            .send(Inbound::Echo {
                                 key,
                                 generation,
                                 result,
@@ -1205,6 +1238,7 @@ impl Session {
         self.reads.clear();
         self.files.clear();
         self.computes.clear();
+        self.echoes.clear();
     }
 }
 

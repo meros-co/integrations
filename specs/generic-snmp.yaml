@@ -1,0 +1,262 @@
+spec: 1
+id: generic-snmp
+name: Generic SNMP agent
+vendor: Generic (any device with an SNMP agent, such as a PDU, a UPS, a network switch or a router's management card)
+category: other
+implementation: native
+reason: >
+  SNMP is BER-encoded binary over UDP, with request-ids matched to responses, retransmission, GETBULK and walks
+  that continue from each response's last OID, and SNMPv3's User-based Security Model: discovery of the agent's
+  engine, its clock, keys derived from passwords and localized to that engine, HMAC authentication and AES or
+  DES encryption of each message. Traps and informs are received on a port of the core's, and informs answered.
+  Objects are named by OID, not by MIB: no MIB file is read.
+
+source:
+  - title: "RFC 1157: A Simple Network Management Protocol (SNMP)"
+    author: "J. Case, M. Fedor, M. Schoffstall, J. Davin (1990)"
+    url: "https://www.rfc-editor.org/rfc/rfc1157"
+    note: "SNMPv1 messages (version 0, community), the Trap-PDU (§4.1.6), and noSuchName (2) as the end of a GETNEXT walk."
+  - title: "RFC 1901: Introduction to Community-based SNMPv2"
+    author: "J. Case, K. McCloghrie, M. Rose, S. Waldbusser (1996)"
+    url: "https://www.rfc-editor.org/rfc/rfc1901"
+    note: "SNMPv2c messages: version 1 and a community, carrying RFC 3416's PDUs."
+  - title: "RFC 2578: Structure of Management Information Version 2 (SMIv2)"
+    author: "K. McCloghrie, D. Perkins, J. Schoenwaelder (1999)"
+    url: "https://www.rfc-editor.org/rfc/rfc2578"
+    note: "The value types (§7.1): Integer32, OCTET STRING, OBJECT IDENTIFIER, IpAddress, Counter32, Gauge32/Unsigned32, TimeTicks, Opaque, Counter64; OIDs of at most 128 sub-identifiers (§3.5)."
+  - title: "RFC 3411: An Architecture for Describing SNMP Management Frameworks"
+    author: "D. Harrington, R. Presuhn, B. Wijnen (2002)"
+    url: "https://www.rfc-editor.org/rfc/rfc3411"
+    note: "SnmpEngineID's format (5 to 32 octets, the high bit set for the enterprise-and-format forms), security levels and models."
+  - title: "RFC 3412: Message Processing and Dispatching for SNMP"
+    author: "J. Case, D. Harrington, R. Presuhn, B. Wijnen (2002)"
+    url: "https://www.rfc-editor.org/rfc/rfc3412"
+    note: "The SNMPv3 message: msgID, msgMaxSize, msgFlags (auth, priv, reportable), msgSecurityModel, the scopedPDU (§6); reports (§7.1)."
+  - title: "RFC 3414: User-based Security Model (USM) for SNMPv3"
+    author: "U. Blumenthal, B. Wijnen (2002)"
+    url: "https://www.rfc-editor.org/rfc/rfc3414"
+    note: "Engine discovery (§4), timeliness and the 150 s window (§3.2), usmStats counters (§5), HMAC-MD5-96 and HMAC-SHA-96 (§6, §7), CBC-DES (§8), password to key and localization with sample results (A.2, A.3, A.5, used as unit tests), 8-character minimum passwords (§11.2)."
+  - title: "RFC 3416: Version 2 of the Protocol Operations for SNMP"
+    author: "R. Presuhn, Ed. (2002)"
+    url: "https://www.rfc-editor.org/rfc/rfc3416"
+    note: "GetRequest, GetNextRequest, GetBulkRequest (non-repeaters, max-repetitions), SetRequest, Response, SNMPv2-Trap, InformRequest and Report PDUs; error-status values; noSuchObject, noSuchInstance and endOfMibView."
+  - title: "RFC 3417: Transport Mappings for SNMP"
+    author: "R. Presuhn, Ed. (2002)"
+    url: "https://www.rfc-editor.org/rfc/rfc3417"
+    note: "SNMP over UDP: agents on port 161, notification receivers on 162 (§3); BER with definite lengths (§8)."
+  - title: "RFC 3418: Management Information Base (MIB) for SNMP"
+    author: "R. Presuhn, Ed. (2002)"
+    url: "https://www.rfc-editor.org/rfc/rfc3418"
+    note: "The system group (sysDescr, sysObjectID, sysUpTime, sysContact, sysName, sysLocation) and snmpTrapOID.0."
+  - title: "RFC 3584: Coexistence between Version 1, Version 2, and Version 3 of SNMP"
+    author: "R. Frye, D. Levi, S. Routhier, B. Wijnen (2003)"
+    url: "https://www.rfc-editor.org/rfc/rfc3584"
+    note: "§3.1: a v1 trap's snmpTrapOID: snmpTraps.(generic-trap+1) for a generic trap, enterprise.0.specific-trap otherwise."
+  - title: "RFC 3826: The AES Cipher Algorithm in the SNMP User-based Security Model"
+    author: "U. Blumenthal, F. Maino, K. McCloghrie (2004)"
+    url: "https://www.rfc-editor.org/rfc/rfc3826"
+    note: "CFB128-AES-128: the IV from engineBoots, engineTime and a 64-bit salt sent as msgPrivacyParameters."
+  - title: "RFC 7860: HMAC-SHA-2 Authentication Protocols in User-Based Security Model (USM) for SNMPv3"
+    author: "J. Merkle, M. Lochter (2016)"
+    url: "https://www.rfc-editor.org/rfc/rfc7860"
+    note: "HMAC-SHA-224, -256, -384 and -512 truncated to 16, 24, 32 and 48 bytes; keys from the same hash (§5)."
+  - title: "draft-blumenthal-aes-usm-04: The AES Cipher Algorithm in the SNMP's User-based Security Model"
+    author: "U. Blumenthal, F. Maino, K. McCloghrie (IETF Internet-Draft, October 2002)"
+    url: "https://www.ietf.org/archive/id/draft-blumenthal-aes-usm-04.txt"
+    note: "AES-192 and AES-256 in CFB128, and the extension of a localized key too short for them, Kul = Kul || H(Kul) (§3.1.2.1), with its sample result (A.1, a unit test). An Internet-Draft that expired, implemented widely but not standardized."
+  - title: "NIST SP 800-38A: Recommendation for Block Cipher Modes of Operation"
+    author: "M. Dworkin, NIST (2001)"
+    url: "https://doi.org/10.6028/NIST.SP.800-38A"
+    note: "CFB mode (§6.3) and its CFB128-AES128 and -AES256 examples (F.3.13, F.3.17), used as unit tests."
+  - title: "RFC 2104 (HMAC), RFC 2202 and RFC 4231 (HMAC test cases)"
+    author: "IETF"
+    url: "https://www.rfc-editor.org/rfc/rfc4231"
+    note: "HMAC over MD5, SHA-1 and SHA-2, checked against the RFCs' test cases."
+
+settings:
+  version: { type: enum, values: [v1, v2c, v3], default: v2c, label: SNMP version,
+             description: "The SNMP version the agent is asked with: v1 and v2c use a community string, v3 a user with authentication and privacy." }
+  community: { type: string, secret: true, max_length: 255, default: public, label: Community,
+               description: "v1 and v2c: the community string for reads, and for SETs when no write community is set." }
+  write_community: { type: string, secret: true, max_length: 255, default: "", label: Write community,
+                     description: "v1 and v2c: the community string SETs are sent with, often private; empty uses the community." }
+  user: { type: string, max_length: 32, default: "", label: User,
+          description: "v3: the user name (securityName) the agent knows." }
+  security_level: { type: enum, values: [no_auth_no_priv, auth_no_priv, auth_priv], default: auth_priv, label: Security level,
+                    description: "v3: no_auth_no_priv sends messages unauthenticated, auth_no_priv authenticates them, auth_priv also encrypts them." }
+  auth_protocol: { type: enum, values: [md5, sha, sha224, sha256, sha384, sha512], default: sha, label: Authentication protocol,
+                   description: "v3: HMAC-MD5-96, HMAC-SHA-96 (sha) or HMAC-SHA-2 (RFC 7860), as the user is set up on the agent." }
+  auth_password: { type: string, secret: true, max_length: 256, default: "", label: Authentication password,
+                   description: "v3: the user's authentication password, at least 8 characters." }
+  priv_protocol: { type: enum, values: [des, aes, aes192, aes256], default: aes, label: Privacy protocol,
+                   description: "v3 at auth_priv: CBC-DES, AES-128 (aes, RFC 3826), or AES-192 or AES-256 as draft-blumenthal-aes-usm-04 defines them." }
+  priv_password: { type: string, secret: true, max_length: 256, default: "", label: Privacy password,
+                   description: "v3 at auth_priv: the user's privacy password, at least 8 characters." }
+  context_name: { type: string, max_length: 32, default: "", label: Context name,
+                  description: "v3: the context requests are made in, empty for the agent's default context." }
+  context_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Context engine ID,
+                       description: "v3: the contextEngineID in hex, for an agent proxying another engine; empty uses the agent's own snmpEngineID." }
+  timeout_ms: { type: int, min: 1, max: 60000, default: 1500, label: Timeout,
+                description: "Milliseconds to wait for each response before sending the request again." }
+  retries: { type: int, min: 0, max: 10, default: 2, label: Retries,
+             description: "How many times an unanswered request is sent again before it fails with timeout." }
+  max_repetitions: { type: int, min: 1, max: 1000, default: 20, label: GETBULK repetitions,
+                     description: "The max-repetitions of walks and of get_bulk when it gives none: objects asked for per GETBULK request." }
+  poll_oids: { type: string, pattern: '^[A-Za-z0-9_.=,; -]*$', max_length: 65536, default: "", label: Polled objects,
+               description: "Objects read into state at every poll, separated by commas or spaces, each an OID or name=OID such as voltage=1.3.6.1.4.1.318.1.1.12.1.15.0; the name keys it in state." }
+  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 5000, label: Poll interval,
+                      description: "Milliseconds between polls of sysUpTime.0 (the liveness check) and the polled objects." }
+  trap_port: { type: int, min: 1, max: 65535, label: Notification port,
+               description: "The UDP port traps and informs are received on, 162 as standard; unset receives none." }
+  trap_bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, default: "", label: Notification bind address,
+                       description: "The local address to receive notifications on with a port of this device's own; empty shares the port with every SNMP device of the core, each hearing its own agent." }
+  trap_community: { type: string, secret: true, max_length: 255, default: "", label: Notification community,
+                    description: "v1 and v2c notifications: accept only this community; empty accepts any." }
+  local_engine_id: { type: string, pattern: '^[0-9A-Fa-fxX :.-]*$', max_length: 100, default: "", label: Local engine ID,
+                     description: "v3 informs: this receiver's snmpEngineID in hex, 5 to 32 bytes, as configured on the agent; empty uses a random one for each opening." }
+
+ports:
+  - { port: 161, protocol: udp, role: control, note: "the agent; requests go from an ephemeral port of the core's" }
+  - { port: null, protocol: udp, role: notification, listener: core, setting: trap_port, note: "traps and informs, when trap_port is set (162 as standard)" }
+
+models:
+  - id: generic
+    name: "Any SNMP v1, v2c or v3 agent (give its address, and its port if not 161)"
+    supports: [get, get_next, get_bulk, walk, set, set_multiple, refresh]
+    verification: none
+
+commands:
+  get:
+    summary: >
+      GET objects by OID and return {varbinds: [{oid, type, value, hex}]}: value is a number, text (OCTET STRING,
+      with hex holding its bytes), dotted OID or address, or null for noSuchObject and noSuchInstance, which type
+      names. A polled object read here updates its state too
+    params:
+      oids: { type: string, pattern: '^[0-9., ;]+$', max_length: 65536, required: true, label: OIDs,
+              description: "One or more OIDs in dotted decimal, separated by commas or spaces, such as 1.3.6.1.2.1.1.3.0." }
+    returns: value
+  get_next:
+    summary: GETNEXT, returning for each OID the next object in the agent's order, as {varbinds}
+    params:
+      oids: { type: string, pattern: '^[0-9., ;]+$', max_length: 65536, required: true, label: OIDs,
+              description: "One or more OIDs in dotted decimal, separated by commas or spaces; each answer is the object after it." }
+    returns: value
+  get_bulk:
+    summary: >
+      GETBULK (v2c and v3): the next object after each of the first non_repeaters OIDs, then up to max_repetitions
+      successors of each remaining one, as {varbinds}
+    params:
+      oids: { type: string, pattern: '^[0-9., ;]+$', max_length: 65536, required: true, label: OIDs,
+              description: "One or more OIDs in dotted decimal, separated by commas or spaces." }
+      non_repeaters: { type: int, min: 0, max: 2147483647, default: 0, label: Non-repeaters,
+                       description: "How many of the OIDs, from the first, get only their next object." }
+      max_repetitions: { type: int, min: 0, max: 2147483647, label: Max repetitions,
+                         description: "How many successors of each other OID to return; unset uses the max_repetitions setting." }
+    returns: value
+  walk:
+    summary: >
+      Every object under an OID, in order, as {varbinds}: with GETBULK (v2c, v3) or GETNEXT (v1, or use_getnext),
+      until the agent answers past the subtree, with endOfMibView or, on v1, noSuchName. Fails if the agent
+      answers an OID that is not after the last
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The subtree's root in dotted decimal, such as 1.3.6.1.2.1.2.2 for the interfaces table." }
+      max_repetitions: { type: int, min: 1, max: 1000, label: Max repetitions,
+                         description: "Objects asked for per GETBULK; unset uses the max_repetitions setting." }
+      use_getnext: { type: bool, default: false, label: Use GETNEXT,
+                     description: "Walk with GETNEXT even over v2c and v3, for an agent whose GETBULK misbehaves." }
+      limit: { type: int, min: 1, max: 100000000, label: Object limit,
+               description: "Stop after this many objects; unset walks the whole subtree." }
+    returns: value
+  set:
+    summary: >
+      SET one object to a typed value and return the agent's response as {varbinds}, which holds the value set; a
+      polled object's state is updated from it. Fails with the agent's error-status (notWritable, wrongType,
+      wrongValue...) as the code
+    params:
+      oid: { type: string, pattern: '^\.?[0-9]+(\.[0-9]+)+$', max_length: 1024, required: true, label: OID,
+             description: "The object instance to set, in dotted decimal, such as 1.3.6.1.2.1.1.6.0 for sysLocation." }
+      type: { type: enum, values: [integer, string, hex, oid, ip_address, counter32, gauge32, timeticks, counter64, opaque], required: true, label: Type,
+              description: "The value's SNMP type: string is UTF-8 text and hex is bytes for an OCTET STRING; opaque is bytes in hex; gauge32 is also Unsigned32." }
+      value: { type: string, max_length: 65536, required: true, label: Value,
+               description: "The value as text: a decimal number, text, hex bytes such as 00 1a ff, a dotted OID or an IPv4 address, as the type asks." }
+    returns: value
+  set_multiple:
+    summary: >
+      SET several objects in one request, which the agent applies all or none of (RFC 3416 §4.2.5), such as a
+      table row's columns with its RowStatus. Returns {varbinds} as set does
+    params:
+      varbinds: { type: json, required: true, label: Variable bindings,
+                  description: "A list of {oid, type, value} objects, each as set's parameters, such as [{\"oid\": \"1.3.6.1.2.1.1.6.0\", \"type\": \"string\", \"value\": \"Rack 4\"}]." }
+    returns: value
+  refresh:
+    summary: Read the system group and every polled object now; answered when they have been read
+    returns: ack
+
+state:
+  version: { type: string, description: "The SNMP version used: v1, v2c or v3" }
+  system.description: { type: string, description: "sysDescr.0: the agent's description of the device" }
+  system.object_id: { type: string, description: "sysObjectID.0: the vendor's OID for the device type" }
+  system.uptime: { type: int, unit: "1/100 s", description: "sysUpTime.0: time since the agent's network management restarted, in hundredths of a second (TimeTicks)" }
+  system.contact: { type: string, description: "sysContact.0" }
+  system.name: { type: string, description: "sysName.0" }
+  system.location: { type: string, description: "sysLocation.0" }
+  values.*.oid: { type: string, description: "A polled object's OID, keyed by its name (or by the OID when it has none)" }
+  values.*.type: { type: string, description: "Its SNMP type (integer, octet_string, counter32, gauge32, timeticks, counter64, oid, ip_address, opaque), or no_such_object, no_such_instance, end_of_mib_view, or the error a v1 agent refused it with (noSuchName)" }
+  values.*.number: { type: float, description: "Its value, for the numeric types (integer, counter32, gauge32, timeticks, counter64); null otherwise" }
+  values.*.text: { type: string, description: "Its value as text: a number in decimal, an OCTET STRING as UTF-8 (bytes that are not shown as U+FFFD), a dotted OID or IPv4 address, Opaque in hex; null for an exception" }
+  values.*.hex: { type: string, description: "An OCTET STRING's or Opaque's bytes in lowercase hex" }
+  engine.id: { type: string, description: "v3: the agent's snmpEngineID in hex" }
+  engine.boots: { type: int, description: "v3: the agent's snmpEngineBoots" }
+  engine.time: { type: int, unit: s, description: "v3: the agent's snmpEngineTime when last heard" }
+  local_engine_id: { type: string, description: "With trap_port: this receiver's snmpEngineID in hex, to configure on agents sending v3 informs" }
+  traps.count: { type: int, description: "Notifications received since opening" }
+  traps.last: { type: object, description: "The last notification: {kind (trap or inform), version, source, trap_oid, uptime, varbinds, and for v1 enterprise, agent_address, generic_trap, specific_trap, and for v3 user}" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Each notification received is a message event, {event: message, address, args, source}: address is its
+      snmpTrapOID (a v1 trap's as RFC 3584 §3.1 derives it), args is the same object as traps.last, and source the
+      sender's ip:port. Informs are answered with a response. A polled object carried in a notification updates its
+      state.
+  - models: [all]
+    severity: info
+    text: >
+      Without trap_bind_address, notifications arrive on a port the core shares among its SNMP devices, each
+      hearing only its agent's address, so several agents can send to 162; with it, the port is this device's own
+      and nothing else of the core may use it. Opened with no host, the integration receives from any sender and
+      answers no commands. Port 162 is privileged on Linux: a core not allowed to bind it reports so in a log
+      and tries again after 1 s, doubling to 30 s; give a port above 1023 and point the agent at it.
+  - models: [all]
+    severity: info
+    text: >
+      v1 and v2c agents drop requests with a wrong community without answering, so a wrong community looks like an
+      agent that is not there (disconnected, commands time out). v3 agents report an unknown user, a wrong
+      password (wrongDigests), an unsupported level or a decryption error, and the device is then unauthorized.
+  - models: [all]
+    severity: info
+    text: >
+      Values are typed by the agent's encoding, not by a MIB: an OCTET STRING is shown as text (bytes that are not
+      UTF-8 as U+FFFD) with its bytes in hex, enumerations as their numbers, TimeTicks as hundredths of a second, and
+      a DisplayString or a MAC address alike as an OCTET STRING. Counter64 values above 2^53 lose precision in
+      consumers that read JSON numbers as doubles.
+  - models: [all]
+    severity: info
+    text: >
+      v3 traps are checked with keys localized to the sending agent's engine, without the timeliness check RFC 3414
+      applies to requests, since this receiver does not track every sender's clock. Informs are checked against this
+      receiver's own engine (local_engine_id) and clock, which senders discover with a report first; a random
+      local_engine_id changes with every opening, so set one when agents are configured with it.
+  - models: [all]
+    severity: warning
+    text: >
+      AES-192 and AES-256 follow draft-blumenthal-aes-usm-04, which most agents implement; some (Cisco's 'AES-192C'
+      and 'AES-256C' in some managers) extend short keys another way (draft-reeder), which this integration does not
+      offer. 3DES (draft-reeder-snmpv3-usm-3desede) is not offered either.
+  - models: [all]
+    severity: info
+    text: >
+      Opening for commands only reads no system group and polls no objects; a GET of sysUpTime.0 each interval stays
+      as the liveness check, and notifications are still received.
