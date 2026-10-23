@@ -54,6 +54,9 @@ transport:
   timeout_ms: 3000
   reply: expected
   probe: "op status ?"
+  # "RS232 by Telnet": at least 200 ms between commands, counted here from each answer. The
+  # manuals give no gap for the RS-232 port itself.
+  pacing: { min_interval_ms: 200, from: reply }
   # The same commands on the RS-232 port: 9600 8N1, no flow control.
   serial:
     baud_rate: 9600
@@ -61,6 +64,7 @@ transport:
     parity: none
     stop_bits: 1
     flow_control: none
+    overrides: { pacing: { min_interval_ms: 0 } }
 
 ports:
   - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "RS232 by Telnet" }
@@ -1908,9 +1912,9 @@ quirks:
     text: >
       The network port is "RS232 by Telnet" on TCP 23: the manuals limit a command to under
       26 bytes, the bytes sent in one go to under 50, and ask for at least 200 ms between
-      commands. The queue sends one command at a time after each answer but adds no delay
-      of its own, and an IP address command ("op net.ipaddr = 192.168.100.100", 31 bytes)
-      is longer than the limit.
+      commands. The queue sends one command at a time after each answer and keeps the 200 ms
+      gap (transport.pacing), counted from the answer; an IP address command ("op
+      net.ipaddr = 192.168.100.100", 31 bytes) is longer than the limit.
   - models: [all]
     severity: info
     text: >
