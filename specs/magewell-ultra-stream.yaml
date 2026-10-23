@@ -1,0 +1,2382 @@
+spec: 1
+id: magewell-ultra-stream
+name: Magewell Ultra Stream
+vendor: Magewell
+category: recorder
+
+source:
+  - title: "Magewell Ultra Stream API (unversioned; methods marked as added up to V1.5; PDF built 2024-08-13)"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/ultra-stream-api/"
+    note: >
+      Manufacturer-documented, public; the same content as the PDF at
+      /api-docs/ultra-stream-api/ultra-stream-api-en_US.pdf (generated
+      2024-08-13). Retrieved 2026-10-23. Overview: the products (Ultra Stream
+      HDMI and SDI), the API agreement (GET http://IP/usapi?method=..., JSON
+      replies with an integer result, POST for file uploads, the sid
+      cookie), the API status codes, the Cloud API status codes, the device
+      status mask, the storage device status codes, the API limits table,
+      the device discovery protocol (multicast 239.255.255.250:2538, SSDP)
+      and the Bluetooth protocol. Universal interfaces: get-info, get-status
+      (with sysstat, input-signal, rec-status, live-status, living-test,
+      check-upgrade, upgrade, upgrade-status, send-file, send-file-test, usb,
+      sd, disk-test, format-status, wifi, eth, mobile), get-settings,
+      start-rec, stop-rec, start-live, stop-live, ping, get-signal-info,
+      clear-rec, clear-live, get-report, export-report. General settings:
+      set-name, set-app-settings, set-app-passwd, set-first-over,
+      set-rec-control, set-softap, set-date-time (and its time zone list),
+      set-signal-lost-ctrl, set-ssdp, set-auto-rec, set-volume,
+      set-video-color, set-low-latency-live, set-auto-live,
+      set-video-input-format, set-video-output-format, set-sync-offset,
+      add-, del-, set- and use-nosignal-file. Storage device: start-, clear-
+      format-usb and -sd, start-, stop-, clear-test-usb, get-media-files,
+      del-media-files. Upload: send-file-add-, -del-, -enable-, -set-server,
+      send-file-start- and -stop-test-server, clear-test-send-file,
+      send-file-add, -del, -clear, -get-status, -set-is-auto, -start, -stop.
+      Stream server: add-, enable-, set-, del-server, start-, stop-,
+      clear-test-server. Encoding parameters: set-stream, set-video,
+      set-audio. Reset and reboot: reboot, reset-all-settings,
+      set-enable-key-reset, set-enable-key-reboot. Log in and out: login (id
+      and the MD5 of the password, the sid cookie), logout. User management:
+      get-users, add-user, del-user, ch-password, set-password. Network:
+      set-net, disconn-wifi, open-softap, close-softap. Firmware update:
+      update, upload-update-file, cancel-download, online-update-check,
+      clear-upgrade, clear-check-update, set-enable-check-update. EDID:
+      import-edid, export-edid, set-default-edid, get-edid-config,
+      set-edid-config, get-loop-through-edid, export-loop-through-edid.
+      Cloud: cloud-reg-ex, cloud-unreg-ex, cloud-status (on port 8070,
+      /cloud-api).
+  - title: "Ultra Stream API demos for Node.js and C (ultra-stream-api-demo-nodejs.zip, ultra-stream-api-demo-c.zip, 2019)"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/demo/ultra-stream-api-demo-nodejs.zip"
+    note: >
+      Manufacturer's sample code linked from the API's DEMO pages (the C demo
+      at /api-docs/demo/ultra-stream-api-demo-c.zip), read for the wire
+      format only: the login request with user Admin and the MD5 of Admin,
+      every Set-Cookie of its answer sent back as Cookie, and the firmware
+      upload as a multipart/form-data POST with one part named file, carrying
+      the file name and Content-Type application/octet-stream.
+
+settings:
+  username:
+    type: string
+    default: Admin
+    max_length: 64
+    label: User name
+    description: "The user the core logs in as; Admin in the vendor's demos."
+  password:
+    type: string
+    secret: true
+    default: Admin
+    max_length: 64
+    label: Password
+    description: "That user's password; the core sends only its MD5 hash, as the login method requires."
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "the API's URLs give no port (http://ip/usapi), so the HTTP default" }
+  - { port: 8070, protocol: http, role: control, note: "the Cloud API (http://ip:8070/cloud-api)" }
+
+# GET http://IP/usapi?method=<name>&<args>, JSON replies whose result is 0
+# for success (API Agreement, API Status Codes). Uploads are POSTs.
+transport:
+  type: http
+  port: 80
+  scheme: http
+  timeout_ms: 5000
+  # ping needs no login (common: ping).
+  probe: { method: GET, path: /usapi, query: { method: ping } }
+  # The Cloud API answers on its own port (cloud-reg-ex, cloud-status).
+  endpoints:
+    cloud:
+      port: 8070
+      auth: none
+  # login: id and the MD5 of the password; the session ID comes back in a
+  # cookie (sid) that every later request carries (API Agreement).
+  session:
+    login: { method: GET, path: /usapi, query: { method: login, id: "{settings.username}", pass: "{settings.password:md5}" } }
+    capture: { cookie: "*" }
+    # -17 errNeedAuth: "An authentication is required" (the session ended).
+    relogin: { status: [401], json: { "$.result": "^-17$" } }
+    # 36: user name or password incorrect (login page); -1 errPasswd; -25
+    # errNoUser.
+    refused: { status: [401, 403], json: { "$.result": "^(36|-1|-25)$" } }
+
+# API Status Codes. 0 is success; positive values are states (1 a repeated
+# request, 2 still running, 27 initial). The errors are negative, which the
+# code table cannot list: they are reported as their raw code (see quirks).
+codes:
+  "1": repeated request
+  "2": the request is running
+  "3": the storage device is too slow to record smooth video
+  "4": not enough free space on the storage device
+  "5": request canceled
+  "27": initial status
+  "36": user name or password incorrect
+
+maps:
+  stream_kind: { main: "0", sub: "1" }
+  codec: { h264: "0", hevc: "1" }
+  full_range: { limited: "0", full: "1" }
+  rtmp_type: { rtmp: "0", twitch: "1", youtube: "2", facebook: "3" }
+  net_mode: { mobile: "0", ethernet: "1", wifi: "2" }
+  ftp_proto: { ftp: "0", sftp: "1" }
+  ftp_encryption: { plain: "0", explicit-tls: "1", implicit-tls: "2" }
+  ftp_login: { anonymous: "0", normal: "1" }
+  ftp_mode: { active: "0", passive: "1" }
+  disk: { usb: "0", sd: "1" }
+  usb_option: { "off": "0", normal: "1" }
+  sd_option: { "off": "0", normal: "1", loop: "2" }
+  file_type: { mp4: "0", mov: "1" }
+  file_name_mode: { custom: "0", time: "1" }
+  input_color: { rgb: "1", bt601: "2", bt709: "3", bt2020: "4" }
+  output_color: { bt601: "2", bt709: "3" }
+  quant_range: { full: "1", limited: "2" }
+  sat_range: { full: "1", limited: "2", extended: "3" }
+
+models:
+  - id: ultra-stream-hdmi
+    name: "Magewell Ultra Stream HDMI"
+    supports: &common
+      [ping, get_info, get_status, get_settings, get_signal_info, get_report, start_recording, stop_recording,
+       start_live, stop_live, clear_recording_status, clear_live_status,
+       set_device_name, set_app_settings_allowed, enable_app_password, disable_app_password, change_app_password,
+       complete_first_setup, complete_first_setup_with_password, set_recording_options, set_softap,
+       set_date_time, set_stop_on_signal_loss, set_ssdp, set_auto_record, set_volume, set_video_color,
+       set_low_latency_live, set_live_lock, set_video_input_format, set_video_output_format,
+       set_audio_sync_offset, add_no_signal_image, delete_no_signal_image, select_no_signal_image,
+       set_no_signal_image_enabled,
+       start_usb_format, start_sd_format, clear_usb_format_status, clear_sd_format_status, start_usb_test,
+       stop_usb_test, clear_usb_test_status, get_media_files, delete_media_files,
+       add_upload_server_ftp, add_upload_server_google_drive, add_upload_server_dropbox,
+       add_upload_server_youtube, set_upload_server_ftp, set_upload_server_google_drive,
+       set_upload_server_dropbox, set_upload_server_youtube, delete_upload_server, enable_upload_server,
+       start_upload_server_test, stop_upload_server_test, clear_upload_test_status, add_upload_files,
+       remove_upload_files, clear_upload_list, get_upload_status, set_auto_upload, start_upload, stop_upload,
+       add_stream_server_rtmp, add_stream_server_rtsp, set_stream_server_rtmp, set_stream_server_rtsp,
+       delete_stream_server, enable_stream_server, start_stream_test, stop_stream_test,
+       clear_stream_test_status,
+       set_stream_assignment, set_main_stream_video, set_sub_stream_video, set_audio_bitrate,
+       reboot, reset_all_settings, set_reset_key_enabled, set_reboot_key_enabled, logout,
+       get_users, add_user, delete_user, change_password, set_user_password,
+       set_ethernet_dhcp, set_ethernet_static, set_wifi_dhcp, set_wifi_static, disconnect_wifi, open_softap,
+       close_softap,
+       upload_firmware, install_uploaded_firmware, install_online_firmware, cancel_firmware_download,
+       check_for_firmware_update, clear_firmware_update_status, clear_firmware_check_status,
+       set_auto_update_check,
+       register_cloud, unregister_cloud, get_cloud_status,
+       get_edid_config, set_edid_config, reset_edid, import_edid, get_loop_through_edid]
+    verification: none
+    notes: "HDMI input with HDMI loop-through; EDID methods apply to its HDMI input."
+  - id: ultra-stream-sdi
+    name: "Magewell Ultra Stream SDI"
+    supports:
+      [ping, get_info, get_status, get_settings, get_signal_info, get_report, start_recording, stop_recording,
+       start_live, stop_live, clear_recording_status, clear_live_status,
+       set_device_name, set_app_settings_allowed, enable_app_password, disable_app_password, change_app_password,
+       complete_first_setup, complete_first_setup_with_password, set_recording_options, set_softap,
+       set_date_time, set_stop_on_signal_loss, set_ssdp, set_auto_record, set_volume, set_video_color,
+       set_low_latency_live, set_live_lock, set_video_input_format, set_video_output_format,
+       set_audio_sync_offset, add_no_signal_image, delete_no_signal_image, select_no_signal_image,
+       set_no_signal_image_enabled,
+       start_usb_format, start_sd_format, clear_usb_format_status, clear_sd_format_status, start_usb_test,
+       stop_usb_test, clear_usb_test_status, get_media_files, delete_media_files,
+       add_upload_server_ftp, add_upload_server_google_drive, add_upload_server_dropbox,
+       add_upload_server_youtube, set_upload_server_ftp, set_upload_server_google_drive,
+       set_upload_server_dropbox, set_upload_server_youtube, delete_upload_server, enable_upload_server,
+       start_upload_server_test, stop_upload_server_test, clear_upload_test_status, add_upload_files,
+       remove_upload_files, clear_upload_list, get_upload_status, set_auto_upload, start_upload, stop_upload,
+       add_stream_server_rtmp, add_stream_server_rtsp, set_stream_server_rtmp, set_stream_server_rtsp,
+       delete_stream_server, enable_stream_server, start_stream_test, stop_stream_test,
+       clear_stream_test_status,
+       set_stream_assignment, set_main_stream_video, set_sub_stream_video, set_audio_bitrate,
+       reboot, reset_all_settings, set_reset_key_enabled, set_reboot_key_enabled, logout,
+       get_users, add_user, delete_user, change_password, set_user_password,
+       set_ethernet_dhcp, set_ethernet_static, set_wifi_dhcp, set_wifi_static, disconnect_wifi, open_softap,
+       close_softap,
+       upload_firmware, install_uploaded_firmware, install_online_firmware, cancel_firmware_download,
+       check_for_firmware_update, clear_firmware_update_status, clear_firmware_check_status,
+       set_auto_update_check,
+       register_cloud, unregister_cloud, get_cloud_status]
+    verification: none
+    notes: "SDI input; the EDID methods, which describe an HDMI input, are left out."
+
+commands:
+  # ── Universal interfaces ─────────────────────────────────────────────
+  ping:
+    summary: "Check the device is ready, with its status mask; needs no login (ping)"
+    send: { method: GET, path: /usapi, query: { method: ping }, session: false }
+    expect: &ok { status: 200, code_path: "$.result", code_range: [0, 0] }
+    returns: ack
+  get_info:
+    summary: "Product and firmware information, MAC addresses and the ranges of every encoding, audio, color, recording and upload setting (get-info)"
+    send: { method: GET, path: /usapi, query: { method: get-info } }
+    expect: &value { status: 200, code_path: "$.result", code_range: [0, 0], json_path: "$" }
+    returns: value
+  get_status:
+    summary: "Running status: status mask, recording, live streaming, tests, firmware update, uploads, input signal, USB, SD card, networks and system load (get-status)"
+    send: { method: GET, path: /usapi, query: { method: get-status } }
+    expect: *value
+    returns: value
+  get_settings:
+    summary: "Every setting: name, switches, encoding, audio, color, recording, networks, streaming and upload servers, no-signal images (get-settings)"
+    send: { method: GET, path: /usapi, query: { method: get-settings } }
+    expect: *value
+    returns: value
+  get_signal_info:
+    summary: "Information on the input audio and video signals (get-signal-info)"
+    send: { method: GET, path: /usapi, query: { method: get-signal-info } }
+    expect: *value
+    returns: value
+  get_report:
+    summary: "The device report as HTML: device information, status and settings (get-report)"
+    send: { method: GET, path: /usapi, query: { method: get-report } }
+    expect: { status: 200 }
+    returns: text
+  start_recording:
+    summary: "Start recording (start-rec)"
+    send: { method: GET, path: /usapi, query: { method: start-rec } }
+    expect: *ok
+    returns: ack
+  stop_recording:
+    summary: "Stop recording (stop-rec)"
+    send: { method: GET, path: /usapi, query: { method: stop-rec } }
+    expect: *ok
+    returns: ack
+  start_live:
+    summary: "Start live streaming to the enabled servers (start-live)"
+    send: { method: GET, path: /usapi, query: { method: start-live } }
+    expect: *ok
+    returns: ack
+  stop_live:
+    summary: "Stop live streaming (stop-live)"
+    send: { method: GET, path: /usapi, query: { method: stop-live } }
+    expect: *ok
+    returns: ack
+  clear_recording_status:
+    summary: "Put the recording status back to its initial state (27) after a recording ended or failed (clear-rec)"
+    send: { method: GET, path: /usapi, query: { method: clear-rec } }
+    expect: *ok
+    returns: ack
+  clear_live_status:
+    summary: "Put the live streaming status back to its initial state (27) after a stream ended or failed (clear-live)"
+    send: { method: GET, path: /usapi, query: { method: clear-live } }
+    expect: *ok
+    returns: ack
+
+  # ── General settings ─────────────────────────────────────────────────
+  set_device_name:
+    summary: "Set the device name (set-name)"
+    params:
+      name: &device_name
+        type: string
+        required: true
+        max_length: 32
+        pattern: "^[A-Za-z0-9._+'\\[\\]()-]([A-Za-z0-9 ._+'\\[\\]()-]*[A-Za-z0-9._+'\\[\\]()-])?$"
+        label: Device name
+        description: "1 to 32 letters, digits, spaces and ._-+'[](), not starting or ending with a space."
+    send: { method: GET, path: /usapi, query: { method: set-name, name: "{name}" } }
+    expect: *ok
+    returns: ack
+  set_app_settings_allowed:
+    summary: "Allow or forbid changing settings from the mobile app (set-app-settings)"
+    params:
+      allowed: { type: bool, required: true, label: App may change settings, description: "On lets users change the device's settings from the mobile app." }
+    send: { method: GET, path: /usapi, query: { method: set-app-settings, is-settings: "{allowed:bool01}" } }
+    expect: *ok
+    returns: ack
+  enable_app_password:
+    summary: "Turn on the password that pairs the mobile app with the device (set-app-passwd is-pass=1)"
+    params:
+      new_password: { type: string, required: true, secret: true, max_length: 64, label: Pairing password, description: "The new pairing password; the core sends its MD5 hash." }
+    send: { method: GET, path: /usapi, query: { method: set-app-passwd, is-pass: "1", new-pass: "{new_password:md5}" } }
+    expect: *ok
+    returns: ack
+  disable_app_password:
+    summary: "Turn off the app pairing password; the current one is required (set-app-passwd is-pass=0)"
+    params:
+      password: { type: string, required: true, secret: true, max_length: 64, label: Current pairing password, description: "The pairing password set now; the core sends its MD5 hash." }
+    send: { method: GET, path: /usapi, query: { method: set-app-passwd, is-pass: "0", pass: "{password:md5}" } }
+    expect: *ok
+    returns: ack
+  change_app_password:
+    summary: "Change the app pairing password; the current one is required (set-app-passwd is-pass=1 with pass)"
+    params:
+      password: { type: string, required: true, secret: true, max_length: 64, label: Current pairing password, description: "The pairing password set now; the core sends its MD5 hash." }
+      new_password: { type: string, required: true, secret: true, max_length: 64, label: New pairing password, description: "The pairing password to set; the core sends its MD5 hash." }
+    send: { method: GET, path: /usapi, query: { method: set-app-passwd, is-pass: "1", pass: "{password:md5}", new-pass: "{new_password:md5}" } }
+    expect: *ok
+    returns: ack
+  complete_first_setup:
+    summary: "Finish the first-run setup with a device name, no pairing password, and the date and time (set-first-over enable-passwd=0)"
+    params:
+      name: *device_name
+      timezone: &timezone { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_+/-]+$", label: Time zone, description: "IANA time zone name from the API's list, such as Europe/London or UTC." }
+      auto_time: &auto_time { type: bool, required: true, label: Automatic time, description: "On takes the time from the network for the time zone; off sets the time given." }
+      time: &time { type: string, default: "", pattern: "^(|[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})$", label: Time, description: "Local time as YYYY-MM-DD HH:MM:SS when automatic time is off; empty when it is on." }
+    send: { method: GET, path: /usapi, query: { method: set-first-over, name: "{name}", enable-passwd: "0", timezone: "{timezone}", is-auto: "{auto_time:bool01}", time: "{time}" } }
+    expect: *ok
+    returns: ack
+  complete_first_setup_with_password:
+    summary: "Finish the first-run setup with a device name, a pairing password, and the date and time (set-first-over enable-passwd=1)"
+    params:
+      name: *device_name
+      password: { type: string, required: true, secret: true, max_length: 64, label: Pairing password, description: "The app pairing password to set; the core sends its MD5 hash." }
+      timezone: *timezone
+      auto_time: *auto_time
+      time: *time
+    send: { method: GET, path: /usapi, query: { method: set-first-over, name: "{name}", enable-passwd: "1", passwd: "{password:md5}", timezone: "{timezone}", is-auto: "{auto_time:bool01}", time: "{time}" } }
+    expect: *ok
+    returns: ack
+  set_recording_options:
+    summary: "Recording targets and files: USB and SD recording, file type, folder, file naming and file length (set-rec-control)"
+    params:
+      usb: { type: enum, values: ["off", normal], required: true, label: USB recording, description: "Record to the USB drive (normal) or not (off)." }
+      sd: { type: enum, values: ["off", normal, loop], required: true, label: SD recording, description: "Record to the SD card normally, in a loop that overwrites the oldest files, or not." }
+      file_type: { type: enum, values: [mp4, mov], required: true, label: File type, description: "Container of the recorded files." }
+      folder:
+        type: string
+        required: true
+        max_length: 255
+        pattern: "^[A-Za-z0-9._+'\\[\\]()-]([A-Za-z0-9 ._+'/\\[\\]()-]*[A-Za-z0-9._+'\\[\\]()-])?$"
+        label: Folder
+        description: "Folder the files are written to, REC_Folder by default; at most two levels separated by /, such as a/b."
+      file_name_mode: { type: enum, values: [custom, time], required: true, label: File naming, description: "Name files with the custom prefix (vid by default) or after the time each was created." }
+      file_minutes: { type: int, min: 1, required: true, label: File length, description: "Minutes per recorded file, from get-info's list (5 to 120); minutes times the recording bitrate may not exceed 4 GB." }
+    send: { method: GET, path: /usapi, query: { method: set-rec-control, usb-option: "{usb:map.usb_option}", sd-option: "{sd:map.sd_option}", mime-type: "{file_type:map.file_type}", root-folder: "{folder}", file-name-mode: "{file_name_mode:map.file_name_mode}", time-unit: "{file_minutes}" } }
+    expect: *ok
+    returns: ack
+  set_softap:
+    summary: "Wi-Fi access point settings: its password, and the fields the document marks reserved (set-softap)"
+    params:
+      enabled: { type: bool, default: true, label: Access point, description: "Documented as reserved, default on." }
+      visible: { type: bool, default: true, label: SSID visible, description: "Documented as reserved, default on: whether the network name is broadcast." }
+      ssid: { type: string, required: true, max_length: 32, label: Network name, description: "Documented as reserved; the default is the serial number, which device.serial holds." }
+      password: { type: string, required: true, secret: true, max_length: 32, pattern: "^[A-Za-z0-9._+'\\[\\]()-]([A-Za-z0-9 ._+'\\[\\]()-]*[A-Za-z0-9._+'\\[\\]()-])?$", label: Access point password, description: "1 to 32 letters, digits, spaces and ._-+'[](), not starting or ending with a space; sent as plain text." }
+    send: { method: GET, path: /usapi, query: { method: set-softap, is-softap: "{enabled:bool01}", is-visible: "{visible:bool01}", softap-ssid: "{ssid}", softap-passwd: "{password}" } }
+    expect: *ok
+    returns: ack
+  set_date_time:
+    summary: "Time zone, and automatic time or the time given (set-date-time)"
+    params:
+      timezone: *timezone
+      auto_time: *auto_time
+      time: *time
+    send: { method: GET, path: /usapi, query: { method: set-date-time, timezone: "{timezone}", is-auto: "{auto_time:bool01}", time: "{time}" } }
+    expect: *ok
+    returns: ack
+  set_stop_on_signal_loss:
+    summary: "Stop recording and streaming when the input signal is lost, or keep going (set-signal-lost-ctrl)"
+    params:
+      enabled: { type: bool, required: true, label: Stop on signal loss, description: "On stops recording and live streaming when the input signal is lost." }
+    send: { method: GET, path: /usapi, query: { method: set-signal-lost-ctrl, is-signal-lost: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  set_ssdp:
+    summary: "Turn UPnP (SSDP) discovery on or off (set-ssdp)"
+    params:
+      enabled: { type: bool, required: true, label: UPnP, description: "On answers UPnP (SSDP) discovery." }
+    send: { method: GET, path: /usapi, query: { method: set-ssdp, is-ssdp: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  set_auto_record:
+    summary: "Record automatically while an input signal is locked, stopping when it is lost (set-auto-rec)"
+    params:
+      enabled: { type: bool, required: true, label: Auto record, description: "On starts recording when a signal locks and stops when it is lost." }
+    send: { method: GET, path: /usapi, query: { method: set-auto-rec, is-auto-rec: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  set_volume:
+    summary: "Gain and mute of the microphone, the input audio and the headphones (set-volume)"
+    params:
+      mic_enabled: { type: bool, required: true, label: Microphone on, description: "Off mutes the microphone." }
+      mic_gain: { type: float, min: -12.0, max: 55.25, required: true, label: Microphone gain, description: "Microphone gain in dB; get-info's audio-range.mic gives the device's range (-12 to 55.25 in the document)." }
+      input_enabled: { type: bool, required: true, label: Input audio on, description: "Off mutes the embedded input audio." }
+      input_gain: { type: float, min: -100.0, max: 6.0, required: true, label: Input gain, description: "Input audio gain in dB; get-info's audio-range.hdmi gives the device's range (-100 to 6 in the document)." }
+      headphone_enabled: { type: bool, required: true, label: Headphones on, description: "Off mutes the headphone output." }
+      headphone_gain: { type: float, min: -57.0, max: 6.0, required: true, label: Headphone gain, description: "Headphone gain in dB; get-info's audio-range.phone gives the device's range (-57 to 6 in the document)." }
+    send: { method: GET, path: /usapi, query: { method: set-volume, is-mic: "{mic_enabled:bool01}", mic-gain: "{mic_gain:.2f}", is-spi: "{input_enabled:bool01}", spi-gain: "{input_gain:.2f}", is-phone: "{headphone_enabled:bool01}", phone-gain: "{headphone_gain:.2f}" } }
+    expect: *ok
+    returns: ack
+  set_video_color:
+    summary: "Picture contrast, brightness, saturation and hue (set-video-color)"
+    params:
+      contrast: { type: int, min: 50, max: 200, required: true, label: Contrast, description: "Contrast from 50 to 200, 100 unchanged." }
+      brightness: { type: int, min: -100, max: 100, required: true, label: Brightness, description: "Brightness from -100 to 100, 0 unchanged." }
+      saturation: { type: int, min: 0, max: 200, required: true, label: Saturation, description: "Saturation from 0 to 200, 100 unchanged." }
+      hue: { type: int, min: -90, max: 90, required: true, label: Hue, description: "Hue shift from -90 to 90, 0 unchanged." }
+    send: { method: GET, path: /usapi, query: { method: set-video-color, contrast: "{contrast}", brightness: "{brightness}", saturation: "{saturation}", hue: "{hue}" } }
+    expect: *ok
+    returns: ack
+  set_low_latency_live:
+    summary: "Low-latency live streaming on or off (set-low-latency-live)"
+    params:
+      enabled: { type: bool, required: true, label: Low latency, description: "On streams with low latency." }
+    send: { method: GET, path: /usapi, query: { method: set-low-latency-live, is-low-latency: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  set_live_lock:
+    summary: "Lock live streaming on: it starts by itself once a server is set and the network allows, and cannot be stopped until unlocked (set-auto-live)"
+    params:
+      locked: { type: bool, required: true, label: Live locked, description: "On starts live streaming automatically and refuses stop_live until it is turned off." }
+    send: { method: GET, path: /usapi, query: { method: set-auto-live, is-auto-live: "{locked:bool01}" } }
+    expect: *ok
+    returns: ack
+  set_video_input_format:
+    summary: "Input color space and quantization, automatic or set by hand (set-video-input-format)"
+    params:
+      custom_color_space: { type: bool, required: true, label: Set color space, description: "Off detects the input's color space; on uses the one given." }
+      color_space: { type: enum, values: [rgb, bt601, bt709, bt2020], required: true, label: Color space, description: "RGB or YUV BT.601, BT.709 or BT.2020, used when set by hand." }
+      custom_quant_range: { type: bool, required: true, label: Set quantization, description: "Off detects the input's quantization range; on uses the one given." }
+      quant_range: { type: enum, values: [full, limited], required: true, label: Quantization, description: "Full (0-255) or limited (16-235) range, used when set by hand." }
+    send: { method: GET, path: /usapi, query: { method: set-video-input-format, is-color-fmt: "{custom_color_space:bool01}", color-fmt: "{color_space:map.input_color}", is-quant-range: "{custom_quant_range:bool01}", quant-range: "{quant_range:map.quant_range}" } }
+    expect: *ok
+    returns: ack
+  set_video_output_format:
+    summary: "Output color space, quantization and saturation range, automatic or set by hand (set-video-output-format)"
+    params:
+      custom_color_space: { type: bool, required: true, label: Set color space, description: "Off chooses the output color space automatically; on uses the one given." }
+      color_space: { type: enum, values: [bt601, bt709], required: true, label: Color space, description: "YUV BT.601 or BT.709, used when set by hand." }
+      custom_quant_range: { type: bool, required: true, label: Set quantization, description: "Off chooses the quantization range automatically; on uses the one given." }
+      quant_range: { type: enum, values: [full, limited], required: true, label: Quantization, description: "Full (0-255) or limited (16-235) range, used when set by hand." }
+      custom_sat_range: { type: bool, required: true, label: Set saturation range, description: "Off chooses the saturation range automatically; on uses the one given." }
+      sat_range: { type: enum, values: [full, limited, extended], required: true, label: Saturation range, description: "Full (0-255), limited (16-235) or extended gamut (1-254), used when set by hand." }
+    send: { method: GET, path: /usapi, query: { method: set-video-output-format, is-color-fmt: "{custom_color_space:bool01}", color-fmt: "{color_space:map.output_color}", is-quant-range: "{custom_quant_range:bool01}", quant-range: "{quant_range:map.quant_range}", is-sat-range: "{custom_sat_range:bool01}", sat-range: "{sat_range:map.sat_range}" } }
+    expect: *ok
+    returns: ack
+  set_audio_sync_offset:
+    summary: "Audio delay against the video, -200 to 200 ms (set-sync-offset)"
+    params:
+      ms: { type: int, min: -200, max: 200, required: true, label: Audio offset, description: "Milliseconds: negative when the audio lags, positive when it is ahead." }
+    send: { method: GET, path: /usapi, query: { method: set-sync-offset, audio-sync-offset: "{ms}" } }
+    expect: *ok
+    returns: ack
+  add_no_signal_image:
+    summary: "Upload a JPEG shown while there is no input signal, at most 1920x1080 (add-nosignal-file, multipart/form-data)"
+    params:
+      image: { type: binary, required: true, label: Image, description: "The JPEG image's contents, given as base64 or as a host file; at most 1920x1080 and the size get-info's nosignal.max-size-kb allows." }
+      filename: &filename_jpg { type: string, default: no-signal.jpg, max_length: 128, pattern: "^[A-Za-z0-9._ ()-]+$", label: File name, description: "The file name sent with the upload." }
+    send:
+      method: POST
+      path: /usapi
+      query: { method: add-nosignal-file }
+      multipart:
+        - { name: file, binary: image, filename: "{filename}", content_type: image/jpeg }
+    expect: *ok
+    returns: ack
+  delete_no_signal_image:
+    summary: "Delete an uploaded no-signal image; the default image cannot be deleted (del-nosignal-file)"
+    params:
+      id: &image_id { type: int, min: 0, required: true, label: Image, description: "The image's id, as no_signal.images lists it." }
+    send: { method: GET, path: /usapi, query: { method: del-nosignal-file, id: "{id}" } }
+    expect: *ok
+    returns: ack
+  select_no_signal_image:
+    summary: "Choose the image shown while there is no signal (set-nosignal-file)"
+    params:
+      id: *image_id
+    send: { method: GET, path: /usapi, query: { method: set-nosignal-file, id: "{id}" } }
+    expect: *ok
+    returns: ack
+  set_no_signal_image_enabled:
+    summary: "Show the chosen image while there is no signal, or not (use-nosignal-file)"
+    params:
+      enabled: { type: bool, required: true, label: No-signal image, description: "On shows the chosen image while there is no input signal." }
+    send: { method: GET, path: /usapi, query: { method: use-nosignal-file, use-nosignal-file: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+
+  # ── Storage devices ──────────────────────────────────────────────────
+  start_usb_format:
+    summary: "Format the USB drive, erasing every file; cannot be canceled (start-format-usb)"
+    send: { method: GET, path: /usapi, query: { method: start-format-usb } }
+    expect: *ok
+    returns: ack
+  start_sd_format:
+    summary: "Format the SD card, erasing every file; cannot be canceled (start-format-sd)"
+    send: { method: GET, path: /usapi, query: { method: start-format-sd } }
+    expect: *ok
+    returns: ack
+  clear_usb_format_status:
+    summary: "Put the format status back to its initial state (27) after a USB format (clear-format-usb)"
+    send: { method: GET, path: /usapi, query: { method: clear-format-usb } }
+    expect: *ok
+    returns: ack
+  clear_sd_format_status:
+    summary: "Put the format status back to its initial state (27) after an SD card format (clear-format-sd)"
+    send: { method: GET, path: /usapi, query: { method: clear-format-sd } }
+    expect: *ok
+    returns: ack
+  start_usb_test:
+    summary: "Test whether the USB drive writes fast enough to record (start-test-usb)"
+    send: { method: GET, path: /usapi, query: { method: start-test-usb } }
+    expect: *ok
+    returns: ack
+  stop_usb_test:
+    summary: "Cancel the USB speed test (stop-test-usb)"
+    send: { method: GET, path: /usapi, query: { method: stop-test-usb } }
+    expect: *ok
+    returns: ack
+  clear_usb_test_status:
+    summary: "Put the USB test status back to its initial state (27) after a test (clear-test-usb)"
+    send: { method: GET, path: /usapi, query: { method: clear-test-usb } }
+    expect: *ok
+    returns: ack
+  get_media_files:
+    summary: "Recorded files on the USB drive or SD card, a page at a time: name, status, time, size, duration, format (get-media-files)"
+    params:
+      disk: &disk { type: enum, values: [usb, sd], required: true, label: Storage, description: "The USB drive or the SD card." }
+      start: { type: int, min: 0, default: 0, label: First file, description: "Index of the first file to list, from 0." }
+      count: { type: int, min: 1, default: 100, label: Files, description: "How many files to list from there." }
+    send: { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "{disk:map.disk}", start: "{start}", count: "{count}" } }
+    expect: *value
+    returns: value
+  delete_media_files:
+    summary: "Delete recorded files from the USB drive or SD card (del-media-files, a JSON body of disk-type and media-files)"
+    params:
+      disk: *disk
+      files: &files { type: json, required: true, label: Files, description: "JSON array of file names as get_media_files lists them, such as [\"VID_9.mp4\"]." }
+    send: { method: POST, path: /usapi, query: { method: del-media-files }, content_type: application/json;charset=UTF-8,
+            body: '{"disk-type":{disk:map.disk},"media-files":{files}}' }
+    expect: *ok
+    returns: ack
+
+  # ── Upload (sending recordings to file servers) ──────────────────────
+  add_upload_server_ftp:
+    summary: "Add an FTP or SFTP server to upload recordings to (send-file-add-server type=0); up to 8 servers"
+    params: &ftp_params
+      network: &network { type: enum, values: [ethernet, wifi, mobile], default: ethernet, label: Network, description: "Network tried first: wired Ethernet, Wi-Fi or mobile broadband." }
+      protocol: &ftp_protocol { type: enum, values: [ftp, sftp], required: true, label: Protocol, description: "FTP or SFTP (SSH)." }
+      url: &ftp_url { type: string, required: true, label: Server, description: "The server's address." }
+      port: &ftp_port { type: int, min: 1, max: 65535, required: true, label: Port, description: "The server's port." }
+      directory: &directory { type: string, default: "", label: Folder, description: "Folder on the server the files go to." }
+      encryption: &ftp_encryption { type: enum, values: [plain, explicit-tls, implicit-tls], default: plain, label: Encryption, description: "FTP only: plain FTP, or FTP over TLS explicit or implicit." }
+      login: &ftp_login { type: enum, values: [anonymous, normal], required: true, label: Login, description: "Anonymous, or with the user name and password given." }
+      user: &ftp_user { type: string, default: "", label: User name, description: "The server account's user name, for a normal login." }
+      password: &ftp_password { type: string, default: "", secret: true, label: Password, description: "The server account's password, for a normal login." }
+      mode: &ftp_mode { type: enum, values: [active, passive], default: passive, label: Transfer mode, description: "Active or passive FTP transfers." }
+    send: { method: GET, path: /usapi, query: { method: send-file-add-server, type: "0", net-mode: "{network:map.net_mode}", proto: "{protocol:map.ftp_proto}", url: "{url}", port: "{port}", dir-name: "{directory}", encryption: "{encryption:map.ftp_encryption}", login-type: "{login:map.ftp_login}", user-name: "{user}", passwd: "{password}", mode: "{mode:map.ftp_mode}" } }
+    expect: *ok
+    returns: ack
+  add_upload_server_google_drive:
+    summary: "Add a Google Drive account to upload recordings to, with tokens the consumer obtained (send-file-add-server type=1)"
+    params:
+      network: *network
+      account_id: &account_id { type: string, required: true, label: Account id, description: "The account's id at the service." }
+      photo_path: &photo_path { type: string, default: "", label: Avatar, description: "Path or URL of the account's picture, shown by the device's interface." }
+      user: &oauth_user { type: string, required: true, label: User name, description: "The account's name, shown by the device's interface." }
+      access_token: &access_token { type: string, required: true, secret: true, label: Access token, description: "OAuth access token for the account." }
+      refresh_token: &refresh_token { type: string, required: true, secret: true, label: Refresh token, description: "OAuth refresh token the device renews the access token with." }
+      directory: *directory
+      parents: &parents { type: string, default: "", label: Parent folder, description: "Id of the Google Drive folder the target folder is in." }
+    send: { method: GET, path: /usapi, query: { method: send-file-add-server, type: "1", net-mode: "{network:map.net_mode}", account-id: "{account_id}", photo-path: "{photo_path}", user-name: "{user}", access-token: "{access_token}", refresh-token: "{refresh_token}", dir-name: "{directory}", parents: "{parents}" } }
+    expect: *ok
+    returns: ack
+  add_upload_server_dropbox:
+    summary: "Add a Dropbox account to upload recordings to, with tokens the consumer obtained (send-file-add-server type=2)"
+    params:
+      network: *network
+      account_id: *account_id
+      photo_path: *photo_path
+      user: *oauth_user
+      access_token: *access_token
+      refresh_token: *refresh_token
+      directory: *directory
+    send: { method: GET, path: /usapi, query: { method: send-file-add-server, type: "2", net-mode: "{network:map.net_mode}", account-id: "{account_id}", photo-path: "{photo_path}", user-name: "{user}", access-token: "{access_token}", refresh-token: "{refresh_token}", dir-name: "{directory}" } }
+    expect: *ok
+    returns: ack
+  add_upload_server_youtube:
+    summary: "Add a YouTube account to upload recordings to, with tokens the consumer obtained (send-file-add-server type=3)"
+    params:
+      network: *network
+      account_id: *account_id
+      photo_path: *photo_path
+      user: *oauth_user
+      access_token: *access_token
+      refresh_token: *refresh_token
+      privacy: &privacy { type: string, required: true, label: Privacy, description: "The uploaded videos' privacy setting; the document names the field without listing its values." }
+    send: { method: GET, path: /usapi, query: { method: send-file-add-server, type: "3", net-mode: "{network:map.net_mode}", account-id: "{account_id}", photo-path: "{photo_path}", user-name: "{user}", access-token: "{access_token}", refresh-token: "{refresh_token}", privacy: "{privacy}" } }
+    expect: *ok
+    returns: ack
+  set_upload_server_ftp:
+    summary: "Change an upload server to the FTP or SFTP settings given (send-file-set-server type=0)"
+    params:
+      id: &upload_id { type: int, min: 0, required: true, label: Server, description: "The upload server's id, as upload_servers lists it." }
+      network: *network
+      protocol: *ftp_protocol
+      url: *ftp_url
+      port: *ftp_port
+      directory: *directory
+      encryption: *ftp_encryption
+      login: *ftp_login
+      user: *ftp_user
+      password: *ftp_password
+      mode: *ftp_mode
+    send: { method: GET, path: /usapi, query: { method: send-file-set-server, id: "{id}", type: "0", net-mode: "{network:map.net_mode}", proto: "{protocol:map.ftp_proto}", url: "{url}", port: "{port}", dir-name: "{directory}", encryption: "{encryption:map.ftp_encryption}", login-type: "{login:map.ftp_login}", user-name: "{user}", passwd: "{password}", mode: "{mode:map.ftp_mode}" } }
+    expect: *ok
+    returns: ack
+  set_upload_server_google_drive:
+    summary: "Change an upload server to the Google Drive account given (send-file-set-server type=1)"
+    params:
+      id: *upload_id
+      network: *network
+      account_id: *account_id
+      photo_path: *photo_path
+      user: *oauth_user
+      access_token: *access_token
+      refresh_token: *refresh_token
+      directory: *directory
+      parents: *parents
+    send: { method: GET, path: /usapi, query: { method: send-file-set-server, id: "{id}", type: "1", net-mode: "{network:map.net_mode}", account-id: "{account_id}", photo-path: "{photo_path}", user-name: "{user}", access-token: "{access_token}", refresh-token: "{refresh_token}", dir-name: "{directory}", parents: "{parents}" } }
+    expect: *ok
+    returns: ack
+  set_upload_server_dropbox:
+    summary: "Change an upload server to the Dropbox account given (send-file-set-server type=2)"
+    params:
+      id: *upload_id
+      network: *network
+      account_id: *account_id
+      photo_path: *photo_path
+      user: *oauth_user
+      access_token: *access_token
+      refresh_token: *refresh_token
+      directory: *directory
+    send: { method: GET, path: /usapi, query: { method: send-file-set-server, id: "{id}", type: "2", net-mode: "{network:map.net_mode}", account-id: "{account_id}", photo-path: "{photo_path}", user-name: "{user}", access-token: "{access_token}", refresh-token: "{refresh_token}", dir-name: "{directory}" } }
+    expect: *ok
+    returns: ack
+  set_upload_server_youtube:
+    summary: "Change an upload server to the YouTube account given (send-file-set-server type=3)"
+    params:
+      id: *upload_id
+      network: *network
+      account_id: *account_id
+      photo_path: *photo_path
+      user: *oauth_user
+      access_token: *access_token
+      refresh_token: *refresh_token
+      privacy: *privacy
+    send: { method: GET, path: /usapi, query: { method: send-file-set-server, id: "{id}", type: "3", net-mode: "{network:map.net_mode}", account-id: "{account_id}", photo-path: "{photo_path}", user-name: "{user}", access-token: "{access_token}", refresh-token: "{refresh_token}", privacy: "{privacy}" } }
+    expect: *ok
+    returns: ack
+  delete_upload_server:
+    summary: "Delete an upload server (send-file-del-server)"
+    params:
+      id: *upload_id
+    send: { method: GET, path: /usapi, query: { method: send-file-del-server, id: "{id}" } }
+    expect: *ok
+    returns: ack
+  enable_upload_server:
+    summary: "Choose whether an upload server is used; one is used at a time (send-file-enable-server)"
+    params:
+      id: *upload_id
+      enabled: { type: bool, required: true, label: Enabled, description: "On uploads to this server." }
+    send: { method: GET, path: /usapi, query: { method: send-file-enable-server, id: "{id}", is-use: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  start_upload_server_test:
+    summary: "Test an FTP or SFTP server's settings before adding it (send-file-start-test-server type=0)"
+    params: *ftp_params
+    send: { method: GET, path: /usapi, query: { method: send-file-start-test-server, type: "0", net-mode: "{network:map.net_mode}", proto: "{protocol:map.ftp_proto}", url: "{url}", port: "{port}", dir-name: "{directory}", encryption: "{encryption:map.ftp_encryption}", login-type: "{login:map.ftp_login}", user-name: "{user}", passwd: "{password}", mode: "{mode:map.ftp_mode}" } }
+    expect: *ok
+    returns: ack
+  stop_upload_server_test:
+    summary: "Stop the upload server test (send-file-stop-test-server)"
+    send: { method: GET, path: /usapi, query: { method: send-file-stop-test-server } }
+    expect: *ok
+    returns: ack
+  clear_upload_test_status:
+    summary: "Put the upload test status back to its initial state (27) after a test (clear-test-send-file)"
+    send: { method: GET, path: /usapi, query: { method: clear-test-send-file } }
+    expect: *ok
+    returns: ack
+  add_upload_files:
+    summary: "Add recorded files to the upload list (send-file-add, a JSON body of disk-type and media-files)"
+    params:
+      disk: *disk
+      files: *files
+    send: { method: POST, path: /usapi, query: { method: send-file-add }, content_type: application/json;charset=UTF-8,
+            body: '{"disk-type":{disk:map.disk},"media-files":{files}}' }
+    expect: *ok
+    returns: ack
+  remove_upload_files:
+    summary: "Remove files from the upload list (send-file-del, a JSON body of disk-type and media-files)"
+    params:
+      disk: *disk
+      files: *files
+    send: { method: POST, path: /usapi, query: { method: send-file-del }, content_type: application/json;charset=UTF-8,
+            body: '{"disk-type":{disk:map.disk},"media-files":{files}}' }
+    expect: *ok
+    returns: ack
+  clear_upload_list:
+    summary: "Empty the upload list (send-file-clear)"
+    send: { method: GET, path: /usapi, query: { method: send-file-clear } }
+    expect: *ok
+    returns: ack
+  get_upload_status:
+    summary: "The upload list and its progress, a page at a time (send-file-get-status)"
+    params:
+      disk: *disk
+      start: { type: int, min: 0, default: 0, label: First upload, description: "Index of the first upload to list, from 0." }
+      count: { type: int, min: 0, default: 0, label: Uploads, description: "How many uploads to list from there (the document's example asks for 0)." }
+    send: { method: GET, path: /usapi, query: { method: send-file-get-status, disk-type: "{disk:map.disk}", start: "{start}", count: "{count}" } }
+    expect: *value
+    returns: value
+  set_auto_upload:
+    summary: "Upload files recorded to the SD card automatically, or not (send-file-set-is-auto)"
+    params:
+      enabled: { type: bool, required: true, label: Auto upload, description: "On uploads SD card recordings automatically." }
+    send: { method: GET, path: /usapi, query: { method: send-file-set-is-auto, is-auto: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  start_upload:
+    summary: "Start uploading the files on the upload list (send-file-start)"
+    send: { method: GET, path: /usapi, query: { method: send-file-start } }
+    expect: *ok
+    returns: ack
+  stop_upload:
+    summary: "Stop uploading, including the file being uploaded (send-file-stop)"
+    send: { method: GET, path: /usapi, query: { method: send-file-stop } }
+    expect: *ok
+    returns: ack
+
+  # ── Stream servers ───────────────────────────────────────────────────
+  add_stream_server_rtmp:
+    summary: "Add an RTMP, Twitch, YouTube or Facebook destination, off until enabled; up to 16 servers (add-server)"
+    params:
+      type: &rtmp_type { type: enum, values: [rtmp, twitch, youtube, facebook], required: true, label: Service, description: "A custom RTMP server, or Twitch, YouTube or Facebook." }
+      name: &server_name
+        type: string
+        required: true
+        max_length: 32
+        pattern: "^[A-Za-z0-9._+'\\[\\]()-]([A-Za-z0-9 ._+'\\[\\]()-]*[A-Za-z0-9._+'\\[\\]()-])?$"
+        label: Name
+        description: "1 to 32 letters, digits, spaces and ._-+'[](), not starting or ending with a space."
+      url: &rtmp_url { type: string, required: true, label: Server URL, description: "The RTMP server address, such as rtmp://a.rtmp.youtube.com/live2." }
+      key: &rtmp_key { type: string, default: "", secret: true, label: Stream key, description: "The stream key." }
+      auth: &rtmp_auth { type: bool, default: false, label: Authentication, description: "On logs in to the server with the user name and password given." }
+      user: &rtmp_user { type: string, default: "", label: User name, description: "User name, when authentication is on." }
+      password: &rtmp_password { type: string, default: "", secret: true, label: Password, description: "Password, when authentication is on." }
+      token: &rtmp_token { type: string, default: "", secret: true, label: Token, description: "The service's token, where it uses one." }
+      event: &rtmp_event { type: string, default: "", label: Event, description: "The streaming event (event-data), where the service uses one." }
+      network: *network
+    send: { method: GET, path: /usapi, query: { method: add-server, type: "{type:map.rtmp_type}", name: "{name}", url: "{url}", key: "{key}", is-auth: "{auth:bool01}", user: "{user}", passwd: "{password}", token: "{token}", event-data: "{event}", net-mode: "{network:map.net_mode}" } }
+    expect: *ok
+    returns: ack
+  add_stream_server_rtsp:
+    summary: "Add an RTSP server on the device, its main and sub streams on the port given, off until enabled (add-server type=100)"
+    params:
+      name: *server_name
+      port: &rtsp_port { type: int, min: 1, max: 65535, default: 554, label: Port, description: "RTSP port, 554 by default." }
+      main: &rtsp_main { type: bool, required: true, label: Main stream, description: "On serves the main stream." }
+      main_name: &rtsp_main_name
+        type: string
+        required: true
+        max_length: 32
+        pattern: "^[A-Za-z0-9._+'\\[\\]()-]([A-Za-z0-9 ._+'\\[\\]()-]*[A-Za-z0-9._+'\\[\\]()-])?$"
+        label: Main stream name
+        description: "The main stream's name in its RTSP URL, 1 to 32 letters, digits, spaces and ._-+'[]()."
+      sub: &rtsp_sub { type: bool, required: true, label: Sub stream, description: "On serves the sub stream." }
+      sub_name: &rtsp_sub_name
+        type: string
+        required: true
+        max_length: 32
+        pattern: "^[A-Za-z0-9._+'\\[\\]()-]([A-Za-z0-9 ._+'\\[\\]()-]*[A-Za-z0-9._+'\\[\\]()-])?$"
+        label: Sub stream name
+        description: "The sub stream's name in its RTSP URL, 1 to 32 letters, digits, spaces and ._-+'[]()."
+      audio: &rtsp_audio { type: bool, required: true, label: Audio, description: "On includes the audio." }
+    send: { method: GET, path: /usapi, query: { method: add-server, type: "100", name: "{name}", port: "{port}", is-main: "{main:bool01}", main-stream-name: "{main_name}", is-sub: "{sub:bool01}", sub-stream-name: "{sub_name}", is-audio: "{audio:bool01}" } }
+    expect: *ok
+    returns: ack
+  set_stream_server_rtmp:
+    summary: "Change a stream server to the RTMP, Twitch, YouTube or Facebook settings given (set-server)"
+    params:
+      id: &server_id { type: int, min: 0, required: true, label: Server, description: "The stream server's id, as stream_servers lists it." }
+      type: *rtmp_type
+      name: *server_name
+      url: *rtmp_url
+      key: *rtmp_key
+      auth: *rtmp_auth
+      user: *rtmp_user
+      password: *rtmp_password
+      token: *rtmp_token
+      event: *rtmp_event
+      network: *network
+    send: { method: GET, path: /usapi, query: { method: set-server, id: "{id}", type: "{type:map.rtmp_type}", name: "{name}", url: "{url}", key: "{key}", is-auth: "{auth:bool01}", user: "{user}", passwd: "{password}", token: "{token}", event-data: "{event}", net-mode: "{network:map.net_mode}" } }
+    expect: *ok
+    returns: ack
+  set_stream_server_rtsp:
+    summary: "Change a stream server to the RTSP settings given (set-server type=100)"
+    params:
+      id: *server_id
+      name: *server_name
+      port: *rtsp_port
+      main: *rtsp_main
+      main_name: *rtsp_main_name
+      sub: *rtsp_sub
+      sub_name: *rtsp_sub_name
+      audio: *rtsp_audio
+    send: { method: GET, path: /usapi, query: { method: set-server, id: "{id}", type: "100", name: "{name}", port: "{port}", is-main: "{main:bool01}", main-stream-name: "{main_name}", is-sub: "{sub:bool01}", sub-stream-name: "{sub_name}", is-audio: "{audio:bool01}" } }
+    expect: *ok
+    returns: ack
+  delete_stream_server:
+    summary: "Delete a stream server (del-server)"
+    params:
+      id: *server_id
+    send: { method: GET, path: /usapi, query: { method: del-server, id: "{id}" } }
+    expect: *ok
+    returns: ack
+  enable_stream_server:
+    summary: "Choose whether live streaming goes to a server; at most 2 at once, 1 above 4 Mbps or with RTSP (enable-server)"
+    params:
+      id: *server_id
+      enabled: { type: bool, required: true, label: Enabled, description: "On streams to this server when live streaming starts." }
+    send: { method: GET, path: /usapi, query: { method: enable-server, id: "{id}", is-use: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  start_stream_test:
+    summary: "Test streaming to an RTMP, Twitch, YouTube or Facebook server for up to 20 seconds (start-test-server)"
+    params:
+      type: *rtmp_type
+      url: *rtmp_url
+      key: *rtmp_key
+      auth: *rtmp_auth
+      user: *rtmp_user
+      password: *rtmp_password
+      token: *rtmp_token
+      network: *network
+    send: { method: GET, path: /usapi, query: { method: start-test-server, type: "{type:map.rtmp_type}", url: "{url}", key: "{key}", is-auth: "{auth:bool01}", user: "{user}", passwd: "{password}", token: "{token}", net-mode: "{network:map.net_mode}" } }
+    expect: *ok
+    returns: ack
+  stop_stream_test:
+    summary: "Cancel the stream test (stop-test-server)"
+    send: { method: GET, path: /usapi, query: { method: stop-test-server } }
+    expect: *ok
+    returns: ack
+  clear_stream_test_status:
+    summary: "Put the stream test status back to its initial state (27) after a test (clear-test-server)"
+    send: { method: GET, path: /usapi, query: { method: clear-test-server } }
+    expect: *ok
+    returns: ack
+
+  # ── Encoding parameters ──────────────────────────────────────────────
+  set_stream_assignment:
+    summary: "Which stream, main or sub, is recorded, streamed live and previewed in the app (set-stream)"
+    params:
+      record: { type: enum, values: [main, sub], required: true, label: Recording, description: "The stream recorded." }
+      live: { type: enum, values: [main, sub], required: true, label: Live, description: "The stream sent live." }
+      preview: { type: enum, values: [main, sub], required: true, label: App preview, description: "The stream the mobile app previews." }
+    send: { method: GET, path: /usapi, query: { method: set-stream, rec: "{record:map.stream_kind}", live: "{live:map.stream_kind}", mws: "{preview:map.stream_kind}" } }
+    expect: *ok
+    returns: ack
+  set_main_stream_video:
+    summary: "Main stream encoding: follow the input or a set format, codec, size, frame interval, bitrate, keyframe interval, profile, bitrate window, range (set-video stream=0)"
+    params:
+      follow_input: { type: bool, required: true, label: Follow input, description: "On encodes at the input's own format." }
+      codec: { type: enum, values: [h264, hevc], required: true, label: Codec, description: "H.264 or HEVC; live streaming is refused with HEVC." }
+      width: &width { type: int, min: 1, required: true, label: Width, description: "Width in pixels, from get-info's resolutions." }
+      height: &height { type: int, min: 1, required: true, label: Height, description: "Height in pixels, from get-info's resolutions." }
+      frame_interval: &frame_interval { type: int, min: 1, required: true, label: Frame interval, description: "Frame interval in 100 ns units from get-info's durations, such as 333333 for 30 fps or 166667 for 60 fps." }
+      kbps: &kbps { type: int, min: 1, required: true, label: Video bitrate, description: "Video bitrate in kbit/s, from get-info's video-kbps (256 to 8192 in the document)." }
+      gop_seconds: &gop { type: int, min: 1, required: true, label: Keyframe interval, description: "Seconds between keyframes, from get-info's gop-sec." }
+      profile: { type: int, min: 0, max: 2, required: true, label: Profile, description: "H.264: 0 Baseline, 1 Main, 2 High; HEVC: 0 Main (get-info's profile and hevc-profile)." }
+      stat_seconds: &stat { type: int, min: 1, required: true, label: Bitrate window, description: "Seconds over which the constant bitrate is held, from get-info's stat-sec." }
+      range: &range { type: enum, values: [limited, full], required: true, label: Range, description: "Encoded range: limited (16-235) or full (0-255)." }
+    send: { method: GET, path: /usapi, query: { method: set-video, stream: "0", is-auto: "{follow_input:bool01}", cx: "{width}", cy: "{height}", duration: "{frame_interval}", kbps: "{kbps}", gop: "{gop_seconds}", fourcc: "0", profile: "{profile}", cbrstat: "{stat_seconds}", fullrange: "{range:map.full_range}", codec: "{codec:map.codec}" } }
+    expect: *ok
+    returns: ack
+  set_sub_stream_video:
+    summary: "Sub stream encoding, always H.264 at a set format: size, frame interval, bitrate, keyframe interval, profile, bitrate window, range (set-video stream=1)"
+    params:
+      width: *width
+      height: *height
+      frame_interval: *frame_interval
+      kbps: *kbps
+      gop_seconds: *gop
+      profile: { type: int, min: 0, max: 2, required: true, label: Profile, description: "H.264 profile: 0 Baseline, 1 Main, 2 High." }
+      stat_seconds: *stat
+      range: *range
+    send: { method: GET, path: /usapi, query: { method: set-video, stream: "1", is-auto: "0", cx: "{width}", cy: "{height}", duration: "{frame_interval}", kbps: "{kbps}", gop: "{gop_seconds}", fourcc: "0", profile: "{profile}", cbrstat: "{stat_seconds}", fullrange: "{range:map.full_range}", codec: "0" } }
+    expect: *ok
+    returns: ack
+  set_audio_bitrate:
+    summary: "Audio encoding bitrate (set-audio)"
+    params:
+      kbps: { type: int, min: 1, required: true, label: Audio bitrate, description: "Audio bitrate in kbit/s, from get-info's audio-kbps (16 to 128 in the document)." }
+    send: { method: GET, path: /usapi, query: { method: set-audio, kbps: "{kbps}" } }
+    expect: *ok
+    returns: ack
+
+  # ── Reset and reboot ─────────────────────────────────────────────────
+  reboot:
+    summary: "Restart the device; recording and streaming stop until it is back (reboot)"
+    send: { method: GET, path: /usapi, query: { method: reboot } }
+    expect: *ok
+    returns: ack
+  reset_all_settings:
+    summary: "Put every setting back to its default and restart; the configuration is lost (reset-all-settings)"
+    send: { method: GET, path: /usapi, query: { method: reset-all-settings } }
+    expect: *ok
+    returns: ack
+  set_reset_key_enabled:
+    summary: "Let holding the LIVE key for 5 seconds reset every setting, or not (set-enable-key-reset)"
+    params:
+      enabled: { type: bool, required: true, label: LIVE key reset, description: "On lets a 5-second press of LIVE reset all settings." }
+    send: { method: GET, path: /usapi, query: { method: set-enable-key-reset, enable-key-reset: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  set_reboot_key_enabled:
+    summary: "Let holding the REC key for 5 seconds reboot the device, or not (set-enable-key-reboot)"
+    params:
+      enabled: { type: bool, required: true, label: REC key reboot, description: "On lets a 5-second press of REC reboot the device." }
+    send: { method: GET, path: /usapi, query: { method: set-enable-key-reboot, enable-key-reboot: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+  logout:
+    summary: "End the core's session; the next request logs in again (logout)"
+    send: { method: GET, path: /usapi, query: { method: logout } }
+    expect: *ok
+    returns: ack
+
+  # ── Users ────────────────────────────────────────────────────────────
+  get_users:
+    summary: "User accounts and whether each is the administrator or a general user (get-users)"
+    send: { method: GET, path: /usapi, query: { method: get-users } }
+    expect: *value
+    returns: value
+  add_user:
+    summary: "Add a general user (add-user)"
+    params:
+      user: &user_id { type: string, required: true, max_length: 64, label: User name, description: "The account's user name." }
+      password: { type: string, required: true, secret: true, max_length: 64, label: Password, description: "The account's password; the core sends its MD5 hash." }
+    send: { method: GET, path: /usapi, query: { method: add-user, id: "{user}", pass: "{password:md5}" } }
+    expect: *ok
+    returns: ack
+  delete_user:
+    summary: "Delete a user (del-user)"
+    params:
+      user: *user_id
+    send: { method: GET, path: /usapi, query: { method: del-user, id: "{user}" } }
+    expect: *ok
+    returns: ack
+  change_password:
+    summary: "Change the logged-in user's password; update the core's password setting afterwards (ch-password)"
+    params:
+      password: { type: string, required: true, secret: true, max_length: 64, label: Current password, description: "The password set now; the core sends its MD5 hash." }
+      new_password: { type: string, required: true, secret: true, max_length: 64, label: New password, description: "The password to set; the core sends its MD5 hash." }
+    send: { method: GET, path: /usapi, query: { method: ch-password, pass: "{password:md5}", new-pass: "{new_password:md5}" } }
+    expect: *ok
+    returns: ack
+  set_user_password:
+    summary: "Set another user's password, as the administrator (set-password)"
+    params:
+      user: *user_id
+      password: { type: string, required: true, secret: true, max_length: 64, label: New password, description: "The password to set; the core sends its MD5 hash." }
+    send: { method: GET, path: /usapi, query: { method: set-password, id: "{user}", pass: "{password:md5}" } }
+    expect: *ok
+    returns: ack
+
+  # ── Network ──────────────────────────────────────────────────────────
+  set_ethernet_dhcp:
+    summary: "Take the wired Ethernet address from DHCP (set-net type=1 is-dhcp=1)"
+    send: { method: GET, path: /usapi, query: { method: set-net, type: "1", is-dhcp: "1" } }
+    expect: *ok
+    returns: ack
+  set_ethernet_static:
+    summary: "Give wired Ethernet a fixed address (set-net type=1 is-dhcp=0)"
+    params: &static_params
+      ip_address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: IP address, description: "The device's address, such as 192.168.1.20." }
+      netmask: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Subnet mask, description: "The subnet mask, such as 255.255.255.0." }
+      gateway: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Gateway, description: "The default gateway's address." }
+      dns: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: DNS server, description: "The DNS server's address." }
+    send: { method: GET, path: /usapi, query: { method: set-net, type: "1", is-dhcp: "0", ip: "{ip_address}", mask: "{netmask}", router: "{gateway}", dns: "{dns}" } }
+    expect: *ok
+    returns: ack
+  set_wifi_dhcp:
+    summary: "Take the Wi-Fi address from DHCP (set-net type=0 is-dhcp=1)"
+    send: { method: GET, path: /usapi, query: { method: set-net, type: "0", is-dhcp: "1" } }
+    expect: *ok
+    returns: ack
+  set_wifi_static:
+    summary: "Give Wi-Fi a fixed address (set-net type=0 is-dhcp=0)"
+    params: *static_params
+    send: { method: GET, path: /usapi, query: { method: set-net, type: "0", is-dhcp: "0", ip: "{ip_address}", mask: "{netmask}", router: "{gateway}", dns: "{dns}" } }
+    expect: *ok
+    returns: ack
+  disconnect_wifi:
+    summary: "Disconnect from the Wi-Fi network (disconn-wifi)"
+    send: { method: GET, path: /usapi, query: { method: disconn-wifi } }
+    expect: *ok
+    returns: ack
+  open_softap:
+    summary: "Turn on the device's Wi-Fi access point (open-softap)"
+    send: { method: GET, path: /usapi, query: { method: open-softap } }
+    expect: *ok
+    returns: ack
+  close_softap:
+    summary: "Turn off the device's Wi-Fi access point (close-softap)"
+    send: { method: GET, path: /usapi, query: { method: close-softap } }
+    expect: *ok
+    returns: ack
+
+  # ── Firmware ─────────────────────────────────────────────────────────
+  upload_firmware:
+    summary: "Upload a .mwf firmware file, ready for install_uploaded_firmware; answers its version and whether the device is up to date (upload-update-file, multipart/form-data)"
+    params:
+      firmware: { type: binary, required: true, label: Firmware file, description: "The .mwf firmware file's contents, given as base64 or as a host file." }
+      filename: { type: string, default: firmware.mwf, max_length: 128, pattern: "^[A-Za-z0-9._ ()-]+$", label: File name, description: "The file name sent with the upload, as the vendor's demo sends the file's own name." }
+    send:
+      method: POST
+      path: /usapi
+      query: { method: upload-update-file }
+      multipart:
+        - { name: file, binary: firmware, filename: "{filename}", content_type: application/octet-stream }
+    expect: { status: 200, code_path: "$.status", code_range: [0, 0], json_path: "$" }
+    returns: value
+  install_uploaded_firmware:
+    summary: "Install the uploaded firmware; the device restarts (update mode=upload)"
+    send: { method: GET, path: /usapi, query: { method: update, mode: upload } }
+    expect: *ok
+    returns: ack
+  install_online_firmware:
+    summary: "Download and install the newer firmware found by check_for_firmware_update; the device restarts (update mode=online)"
+    send: { method: GET, path: /usapi, query: { method: update, mode: online } }
+    expect: *ok
+    returns: ack
+  cancel_firmware_download:
+    summary: "Cancel downloading the online firmware (cancel-download)"
+    send: { method: GET, path: /usapi, query: { method: cancel-download } }
+    expect: *ok
+    returns: ack
+  check_for_firmware_update:
+    summary: "Ask the update server whether newer firmware exists (online-update-check)"
+    send: { method: GET, path: /usapi, query: { method: online-update-check } }
+    expect: *ok
+    returns: ack
+  clear_firmware_update_status:
+    summary: "Put the update status back to its initial state (27) after a failed update (clear-upgrade)"
+    send: { method: GET, path: /usapi, query: { method: clear-upgrade } }
+    expect: *ok
+    returns: ack
+  clear_firmware_check_status:
+    summary: "Put the update check status back to its initial state (27) after a failed check (clear-check-update)"
+    send: { method: GET, path: /usapi, query: { method: clear-check-update } }
+    expect: *ok
+    returns: ack
+  set_auto_update_check:
+    summary: "Check for new firmware automatically, or not (set-enable-check-update)"
+    params:
+      enabled: { type: bool, required: true, label: Automatic check, description: "On lets the device look for new firmware by itself." }
+    send: { method: GET, path: /usapi, query: { method: set-enable-check-update, is-check-update: "{enabled:bool01}" } }
+    expect: *ok
+    returns: ack
+
+  # ── Cloud ────────────────────────────────────────────────────────────
+  register_cloud:
+    summary: "Register the device with a Magewell Cloud, in one of two slots (cloud-reg-ex, port 8070)"
+    params:
+      slot: &cloud_slot { type: int, min: 0, max: 1, required: true, label: Cloud slot, description: "Which of the two Cloud registrations, 0 or 1." }
+      code: { type: string, required: true, pattern: "^[0-9]{4}$", label: Invitation code, description: "The 4-digit invitation code the Cloud gave." }
+      address: { type: string, required: true, label: Cloud address, description: "The Cloud server's IP address." }
+      http_port: { type: int, min: 1, max: 65535, default: 80, label: HTTP port, description: "The Cloud server's HTTP port." }
+      https: { type: bool, default: false, label: HTTPS, description: "On reaches the Cloud over HTTPS." }
+      https_port: { type: int, min: 1, max: 65535, default: 443, label: HTTPS port, description: "The Cloud server's HTTPS port." }
+    send: { endpoint: cloud, method: GET, path: /cloud-api, query: { method: cloud-reg-ex, id: "{slot}", cloud-code: "{code}", cloud-ip-addr: "{address}", cloud-http-port: "{http_port}", cloud-enable-https: "{https:bool01}", cloud-https-port: "{https_port}" } }
+    expect: *ok
+    returns: ack
+  unregister_cloud:
+    summary: "Remove the device from a Magewell Cloud (cloud-unreg-ex, port 8070)"
+    params:
+      slot: *cloud_slot
+    send: { endpoint: cloud, method: GET, path: /cloud-api, query: { method: cloud-unreg-ex, id: "{slot}" } }
+    expect: *ok
+    returns: ack
+  get_cloud_status:
+    summary: "Both Cloud registrations: address, ports, registration and connection status (cloud-status, port 8070)"
+    send: { endpoint: cloud, method: GET, path: /cloud-api, query: { method: cloud-status, version: "1" } }
+    expect: *value
+    returns: value
+
+  # ── EDID (HDMI input) ────────────────────────────────────────────────
+  get_edid_config:
+    summary: "The input EDID and its options: smart EDID, keep the last loop-through EDID, force audio, limit the pixel clock (get-edid-config)"
+    send: { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-edid-config } }
+    expect: *value
+    returns: value
+  set_edid_config:
+    summary: "Input EDID options (set-edid-config)"
+    params:
+      smart_edid: { type: bool, required: true, label: Smart EDID, description: "On builds the input EDID from the display on the loop-through." }
+      keep_last: { type: bool, required: true, label: Keep last EDID, description: "On keeps using the last loop-through display's EDID once it is unplugged." }
+      add_audio: { type: bool, required: true, label: Force audio, description: "On adds audio support to the EDID." }
+      limit_pixel_clock: { type: bool, required: true, label: Limit pixel clock, description: "On limits the pixel clock the EDID offers." }
+    send: { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: set-edid-config, smart-edid: "{smart_edid:bool01}", keep-last: "{keep_last:bool01}", add-audio: "{add_audio:bool01}", limit-pixel-clock: "{limit_pixel_clock:bool01}" } }
+    expect: *ok
+    returns: ack
+  reset_edid:
+    summary: "Put the input EDID back to the default (set-default-edid)"
+    send: { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: set-default-edid } }
+    expect: *ok
+    returns: ack
+  import_edid:
+    summary: "Load an EDID file into the input (import-edid, multipart/form-data)"
+    params:
+      edid: { type: binary, required: true, label: EDID file, description: "The EDID's bytes, given as base64 or as a host file." }
+      filename: { type: string, default: edid.bin, max_length: 128, pattern: "^[A-Za-z0-9._ ()-]+$", label: File name, description: "The file name sent with the upload." }
+    send:
+      models: [ultra-stream-hdmi]
+      method: POST
+      path: /usapi
+      query: { method: import-edid }
+      multipart:
+        - { name: file, binary: edid, filename: "{filename}", content_type: application/octet-stream }
+    expect: *ok
+    returns: ack
+  get_loop_through_edid:
+    summary: "The EDID of the display on the loop-through output (get-loop-through-edid)"
+    send: { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-loop-through-edid } }
+    expect: *value
+    returns: value
+
+state:
+  # get-status (and ping): the running status mask (Device Status Mask).
+  status.mask:              { type: int, description: "The device status mask (cur-status), the sum of the flags below" }
+  status.first_boot:        { type: bool, description: "First boot: complete_first_setup has not been run (0x01)" }
+  status.recording:         { type: bool, description: "Recording (0x02)" }
+  status.live:              { type: bool, description: "Live streaming (0x04)" }
+  status.usb_ready:         { type: bool, description: "The USB drive is ready to record (0x10)" }
+  status.rtmp_ready:        { type: bool, description: "Ready to stream live (0x20)" }
+  status.softap:            { type: bool, description: "The Wi-Fi access point is on (0x40); network.wifi then describes it" }
+  status.usb_testing:       { type: bool, description: "The USB speed test is running (0x1000)" }
+  status.upgrading:         { type: bool, description: "A firmware update is in progress (0x4000)" }
+  status.stream_testing:    { type: bool, description: "A stream test is running (0x8000)" }
+  status.password_set:      { type: bool, description: "The app pairing password is set (0x10000)" }
+  status.app_locked:        { type: bool, description: "Locked by the mobile app, at most two at once (0x20000)" }
+  status.formatting_usb:    { type: bool, description: "The USB drive is being formatted (0x100000)" }
+  status.formatting_sd:     { type: bool, description: "The SD card is being formatted (0x200000)" }
+  status.wifi_searching:    { type: bool, description: "Searching for Wi-Fi networks (0x400000)" }
+  status.wifi_connecting:   { type: bool, description: "Connecting to a Wi-Fi network (0x800000)" }
+  status.checking_update:   { type: bool, description: "Checking for new firmware (0x2000000)" }
+  status.resetting:         { type: bool, description: "Resetting all settings (0x4000000)" }
+  status.rebooting:         { type: bool, description: "Rebooting (0x20000000)" }
+  status.upload_testing:    { type: bool, description: "An upload server test is running (0x40000000)" }
+  status.last_recording_result: { type: int, description: "last-rec-status: the last recording's result, an API status code" }
+  status.locked_by:         { type: string, description: "lock-user: the app clients locking the device, as the JSON text the device sends" }
+  device.time:              { type: string, description: "The device's current time, as it reports it (cur-time)" }
+
+  # get-status: sysstat (units are not documented).
+  system.cpu:               { type: int, description: "sysstat cpu, a value the document does not explain (1500 in its example)" }
+  system.cpu_usage:         { type: int, description: "CPU load, percent" }
+  system.memory_free:       { type: int, description: "Free memory, as reported (apparently kB: 524288 total in the example)" }
+  system.memory_total:      { type: int, description: "Total memory, as reported (apparently kB)" }
+  system.uptime:            { type: int, description: "Time since start, as reported (apparently seconds)" }
+  system.eth_rx:            { type: int, description: "Ethernet receive rate, as reported (unit not documented)" }
+  system.eth_tx:            { type: int, description: "Ethernet send rate, as reported (unit not documented)" }
+  system.wlan_rx:           { type: int, description: "Wi-Fi receive rate, as reported (unit not documented)" }
+  system.wlan_tx:           { type: int, description: "Wi-Fi send rate, as reported (unit not documented)" }
+  system.mobile_rx:         { type: int, description: "Mobile broadband receive rate, as reported (unit not documented)" }
+  system.mobile_tx:         { type: int, description: "Mobile broadband send rate, as reported (unit not documented)" }
+  system.usb_read:          { type: int, description: "USB drive read rate, as reported (unit not documented)" }
+  system.usb_write:         { type: int, description: "USB drive write rate, as reported (unit not documented)" }
+  system.sd_read:           { type: int, description: "SD card read rate, as reported (unit not documented)" }
+  system.sd_write:          { type: int, description: "SD card write rate, as reported (unit not documented)" }
+
+  # get-status: input-signal.
+  input.status:             { type: int, description: "Input signal status code as reported (values not documented; 0 in the no-signal example)" }
+  input.width:              { type: int, description: "Input width, pixels" }
+  input.height:             { type: int, description: "Input height, pixels" }
+  input.interlaced:         { type: bool, description: "The input is interlaced" }
+  input.frame_rate:         { type: float, description: "Input frame rate, frames per second" }
+  input.audio_channels_valid: { type: int, description: "channel-valid as reported: the valid input audio channels (form not documented)" }
+  input.audio_lpcm:         { type: bool, description: "The input audio is LPCM" }
+  input.audio_bits:         { type: int, description: "Input audio bits per sample" }
+  input.audio_sample_rate:  { type: int, description: "Input audio sample rate, Hz" }
+
+  # get-status: rec-status and live-status.
+  recording.result:         { type: int, description: "Recording state, an API status code: 0 recording, 27 initial, 3 too slow, 4 low space, negative an error" }
+  recording.run_ms:         { type: int, description: "Recording time, ms" }
+  recording.bps:            { type: int, description: "Current recording bitrate, bit/s" }
+  recording.avg_bps:        { type: int, description: "Average recording bitrate, bit/s" }
+  live.result:              { type: int, description: "Live state of the first server, an API status code: 22 connected, 23 connecting, 24 waiting, 25 authorizing, 28 resolving DNS, 29 no address set, 30 authentication error, 27 initial" }
+  live.run_ms:              { type: int, description: "Live streaming time, ms" }
+  live.bps:                 { type: int, description: "Current bitrate to the first server, bit/s" }
+  live.avg_bps:             { type: int, description: "Average live bitrate, bit/s" }
+  live.network:             { type: int, description: "Network the first server is reached over, as reported (net)" }
+  live.result2:             { type: int, description: "Live state of the second server, an API status code" }
+  live.bps2:                { type: int, description: "Current bitrate to the second server, bit/s" }
+  live.network2:            { type: int, description: "Network the second server is reached over, as reported (net2)" }
+
+  # get-status: tests, firmware and uploads.
+  stream_test.result:       { type: int, description: "Stream test state: 27 initial, 2 testing, 5 canceled, 0 succeeded, negative an error" }
+  stream_test.upload_bps:   { type: int, description: "Upload speed measured by the stream test, bit/s" }
+  stream_test.percent:      { type: int, description: "Stream test progress, percent" }
+  stream_test.network:      { type: int, description: "Network the stream test uses, as reported" }
+  usb_test.result:          { type: int, description: "USB speed test state: 27 initial, 2 testing, 5 canceled, 0 finished, negative an error" }
+  usb_test.read_bps:        { type: int, description: "USB read speed measured, bytes per second" }
+  usb_test.write_bps:       { type: int, description: "USB write speed measured, bytes per second; enough when above the recording bitrate" }
+  usb_test.percent:         { type: int, description: "USB speed test progress, percent" }
+  format.result:            { type: int, description: "USB or SD format state: 27 initial, 2 formatting, 0 finished, negative an error" }
+  format.percent:           { type: int, description: "Format progress, percent" }
+  firmware.check.result:    { type: int, description: "Firmware check state: 27 initial, 2 checking, 0 finished, negative an error" }
+  firmware.available.version: { type: string, description: "Newer firmware found by the check, empty when none" }
+  firmware.available.date:  { type: string, description: "Release date of that firmware" }
+  firmware.available.size_bytes: { type: int, description: "Size of that firmware, bytes" }
+  firmware.available.notes: { type: string, description: "Release notes of that firmware, as the JSON text of its info list (version and changelog)" }
+  firmware.update.result:   { type: int, description: "Firmware update state: 27 initial, 2 updating, 0 succeeded, negative an error" }
+  firmware.update.step:     { type: int, description: "Firmware update step" }
+  firmware.update.percent:  { type: int, description: "Progress of the update step, percent" }
+  firmware.update.mode:     { type: string, description: "Update kind: none, upload (a file) or online" }
+  firmware.upload.up_to_date: { type: bool, description: "After upload_firmware: the device's firmware is already up to date" }
+  firmware.upload.version:  { type: string, description: "After upload_firmware: the uploaded file's version" }
+  firmware.upload.size_bytes: { type: int, description: "After upload_firmware: the uploaded file's size, bytes" }
+  upload.ongoing:           { type: int, description: "Files waiting to be uploaded" }
+  upload.done:              { type: int, description: "Files uploaded" }
+  upload.disk:              { type: string, description: "Storage the file being uploaded is on: usb or sd" }
+  upload.file:              { type: string, description: "Name of the file being uploaded" }
+  upload.result:            { type: int, description: "Upload state, an API status code: 31 waiting, 2 uploading, negative an error" }
+  upload.message:           { type: string, description: "Upload message from the device" }
+  upload.seconds_left:      { type: int, description: "Time left for the upload, as reported (apparently seconds)" }
+  upload.percent:           { type: int, description: "Upload progress, percent" }
+  upload_test.result:       { type: int, description: "Upload server test state: 27 initial, 2 testing, 0 succeeded, negative an error" }
+  upload_test.server_id:    { type: int, description: "Upload server the test is for" }
+
+  # get-status: usb and sd (Status Code of the Storage Device).
+  storage.*.status:         { type: string, description: "Storage (usb or sd) state: none, valid, full, read-only, low-space (under 200 MB) or invalid" }
+  storage.*.status_code:    { type: int, description: "Storage state code as reported (disk-status)" }
+  storage.*.total_bytes:    { type: int, description: "Capacity, bytes" }
+  storage.*.used_bytes:     { type: int, description: "Space used, bytes" }
+  storage.*.free_bytes:     { type: int, description: "Space free, bytes" }
+  storage.*.block_size:     { type: int, description: "File system block size, bytes" }
+  storage.*.usage_percent:  { type: int, description: "Space used, percent" }
+  storage.*.device_path:    { type: string, description: "System device path, such as /dev/sda1" }
+  storage.*.filesystem:     { type: string, description: "File system type, such as vfat" }
+  storage.*.mount_path:     { type: string, description: "Where the device mounts it" }
+  storage.*.label:          { type: string, description: "Volume label" }
+  storage.*.write_bps:      { type: int, description: "Current write rate, bytes per second" }
+  storage.*.read_bps:       { type: int, description: "Current read rate, bytes per second" }
+  storage.*.free_seconds:   { type: int, description: "Recording time left at the current settings, as reported (apparently seconds)" }
+  storage.*.file_count:     { type: int, description: "Recorded files on it" }
+  storage.*.begin_time:     { type: string, description: "Time of the oldest recording (beign-time)" }
+  storage.*.end_time:       { type: string, description: "Time of the newest recording" }
+  storage.*.cache_seconds:  { type: int, description: "total-cache-time as reported (apparently seconds of recording held)" }
+
+  # get-status: wifi, eth and mobile (the addresses in use).
+  network.ethernet.ip_address: { type: string, description: "Ethernet address in use" }
+  network.ethernet.netmask: { type: string, description: "Ethernet subnet mask in use" }
+  network.ethernet.gateway: { type: string, description: "Ethernet gateway in use" }
+  network.ethernet.dns:     { type: string, description: "Ethernet DNS server in use" }
+  network.wifi.name:        { type: string, description: "Wi-Fi network joined, or the access point's name while it is on" }
+  network.wifi.level:       { type: int, description: "Wi-Fi signal level, as reported" }
+  network.wifi.ip_address:  { type: string, description: "Wi-Fi address in use" }
+  network.wifi.netmask:     { type: string, description: "Wi-Fi subnet mask in use" }
+  network.wifi.gateway:     { type: string, description: "Wi-Fi gateway in use" }
+  network.wifi.dns:         { type: string, description: "Wi-Fi DNS server in use" }
+  network.mobile.ip_address: { type: string, description: "Mobile broadband address in use" }
+  network.mobile.netmask:   { type: string, description: "Mobile broadband subnet mask in use" }
+  network.mobile.gateway:   { type: string, description: "Mobile broadband gateway in use" }
+  network.mobile.dns:       { type: string, description: "Mobile broadband DNS server in use" }
+
+  # get-settings.
+  device.name:              { type: string, description: "Device name" }
+  app.password_enabled:     { type: bool, description: "The mobile app needs the pairing password" }
+  app.settings_allowed:     { type: bool, description: "Settings may be changed from the mobile app" }
+  network.ssdp:             { type: bool, description: "UPnP (SSDP) discovery answered" }
+  control.startup_record:   { type: bool, description: "Recording starts when the device boots (no API sets it)" }
+  control.startup_live:     { type: bool, description: "Live streaming starts when the device boots (no API sets it)" }
+  control.stop_on_signal_loss: { type: bool, description: "Recording and streaming stop when the input signal is lost" }
+  control.hdmi_record_control: { type: bool, description: "A camera may start and stop recording through the HDMI signal (no API sets it)" }
+  control.auto_record:      { type: bool, description: "Recording follows the input signal" }
+  control.live_lock:        { type: bool, description: "Live streaming is locked on (is-auto-live)" }
+  control.low_latency_live: { type: bool, description: "Live streaming uses low latency" }
+  keys.reset_enabled:       { type: bool, description: "Holding LIVE for 5 seconds resets all settings" }
+  keys.reboot_enabled:      { type: bool, description: "Holding REC for 5 seconds reboots" }
+  firmware.auto_check:      { type: bool, description: "The device checks for new firmware by itself" }
+  upload.auto:              { type: bool, description: "SD card recordings are uploaded automatically" }
+  audio.sync_offset_ms:     { type: int, description: "Audio delay, ms: negative when the audio lags" }
+  softap.enabled:           { type: bool, description: "Access point setting is-softap (documented as reserved)" }
+  softap.visible:           { type: bool, description: "Access point network name broadcast (documented as reserved)" }
+  softap.ssid:              { type: string, description: "Access point network name" }
+  time.timezone:            { type: string, description: "Time zone, such as UTC or Asia/Shanghai" }
+  time.auto:                { type: bool, description: "The time is taken from the network" }
+  recording.options.file_type: { type: string, description: "Recorded file type: mp4 or mov" }
+  recording.options.usb:    { type: string, description: "USB recording: off or normal" }
+  recording.options.sd:     { type: string, description: "SD card recording: off, normal or loop" }
+  recording.options.folder: { type: string, description: "Folder recordings are written to" }
+  recording.options.file_prefix: { type: string, description: "Custom prefix of recorded file names (no API sets the text)" }
+  recording.options.file_name_mode: { type: string, description: "File naming: custom (the prefix) or time" }
+  recording.options.file_minutes: { type: int, description: "Minutes per recorded file" }
+  video.contrast:           { type: int, description: "Contrast, 50 to 200" }
+  video.brightness:         { type: int, description: "Brightness, -100 to 100" }
+  video.saturation:         { type: int, description: "Saturation, 0 to 200" }
+  video.hue:                { type: int, description: "Hue, -90 to 90" }
+  audio.mic.enabled:        { type: bool, description: "Microphone on (off is muted)" }
+  audio.mic.gain:           { type: float, description: "Microphone gain, dB" }
+  audio.input.enabled:      { type: bool, description: "Input audio on (off is muted)" }
+  audio.input.gain:         { type: float, description: "Input audio gain, dB" }
+  audio.headphone.enabled:  { type: bool, description: "Headphones on (off is muted)" }
+  audio.headphone.gain:     { type: float, description: "Headphone gain, dB" }
+  streams.recording:        { type: string, description: "Stream recorded: main or sub" }
+  streams.live:             { type: string, description: "Stream sent live: main or sub" }
+  streams.preview:          { type: string, description: "Stream the mobile app previews: main or sub" }
+  encoder.*.follow_input:   { type: bool, description: "Main stream: encodes at the input's format" }
+  encoder.*.codec:          { type: string, description: "Codec: h264 or hevc (the sub stream is always h264)" }
+  encoder.*.width:          { type: int, description: "Encoded width, pixels" }
+  encoder.*.height:         { type: int, description: "Encoded height, pixels" }
+  encoder.*.frame_interval: { type: int, description: "Frame interval, 100 ns units (333333 is 30 fps)" }
+  encoder.*.kbps:           { type: int, description: "Video bitrate, kbit/s" }
+  encoder.*.gop_seconds:    { type: int, description: "Keyframe interval, seconds" }
+  encoder.*.profile:        { type: int, description: "Profile: H.264 0 Baseline, 1 Main, 2 High; HEVC 0 Main" }
+  encoder.*.stat_seconds:   { type: int, description: "Bitrate window, seconds" }
+  encoder.*.range:          { type: string, description: "Encoded range: limited or full" }
+  audio.sample_rate:        { type: int, description: "Encoded audio sample rate, Hz" }
+  audio.channels:           { type: int, description: "Encoded audio channels" }
+  audio.kbps:               { type: int, description: "Audio bitrate, kbit/s" }
+  network.*.config.dhcp:    { type: bool, description: "Configured: the address (ethernet or wifi) comes from DHCP" }
+  network.*.config.ip_address: { type: string, description: "Configured fixed address" }
+  network.*.config.netmask: { type: string, description: "Configured fixed subnet mask" }
+  network.*.config.gateway: { type: string, description: "Configured fixed gateway" }
+  network.*.config.dns:     { type: string, description: "Configured fixed DNS server" }
+  stream_servers.*.type:    { type: string, description: "Service: rtmp, twitch, youtube, facebook or rtsp" }
+  stream_servers.*.name:    { type: string, description: "Server name" }
+  stream_servers.*.url:     { type: string, description: "RTMP server address" }
+  stream_servers.*.auth:    { type: bool, description: "RTMP: logs in with a user name and password" }
+  stream_servers.*.user:    { type: string, description: "RTMP: user name" }
+  stream_servers.*.enabled: { type: bool, description: "Live streaming goes to this server (is-use)" }
+  stream_servers.*.network: { type: string, description: "Network tried first: ethernet, wifi or mobile" }
+  stream_servers.*.event:   { type: string, description: "The streaming event (event-data), where the service uses one" }
+  stream_servers.*.port:    { type: int, description: "RTSP: port" }
+  stream_servers.*.main:    { type: bool, description: "RTSP: the main stream is served" }
+  stream_servers.*.main_name: { type: string, description: "RTSP: the main stream's name" }
+  stream_servers.*.sub:     { type: bool, description: "RTSP: the sub stream is served" }
+  stream_servers.*.sub_name: { type: string, description: "RTSP: the sub stream's name" }
+  stream_servers.*.audio:   { type: bool, description: "RTSP: audio is included" }
+  upload_servers.*.type:    { type: string, description: "Upload service: ftp, google-drive, dropbox or youtube" }
+  upload_servers.*.enabled: { type: bool, description: "Uploads go to this server (is-use)" }
+  upload_servers.*.network: { type: string, description: "Network tried first: ethernet, wifi or mobile" }
+  upload_servers.*.account_id: { type: string, description: "Cloud services: the account's id" }
+  upload_servers.*.user:    { type: string, description: "The account's or FTP login's user name" }
+  upload_servers.*.photo_path: { type: string, description: "Cloud services: the account's picture" }
+  upload_servers.*.directory: { type: string, description: "Folder the files go to" }
+  upload_servers.*.parents: { type: string, description: "Google Drive: the parent folder's id" }
+  upload_servers.*.privacy: { type: string, description: "YouTube: the uploaded videos' privacy" }
+  upload_servers.*.protocol: { type: string, description: "FTP servers: ftp or sftp" }
+  upload_servers.*.url:     { type: string, description: "FTP servers: address" }
+  upload_servers.*.port:    { type: int, description: "FTP servers: port" }
+  upload_servers.*.encryption: { type: string, description: "FTP servers: plain, explicit-tls or implicit-tls" }
+  upload_servers.*.login:   { type: string, description: "FTP servers: anonymous or normal" }
+  upload_servers.*.mode:    { type: string, description: "FTP servers: active or passive transfers" }
+  video.input_format.custom_color_space: { type: bool, description: "The input color space is set by hand (otherwise detected)" }
+  video.input_format.color_space: { type: string, description: "Input color space set by hand: rgb, bt601, bt709 or bt2020" }
+  video.input_format.custom_quant_range: { type: bool, description: "The input quantization range is set by hand" }
+  video.input_format.quant_range: { type: string, description: "Input quantization range set by hand: full or limited" }
+  video.output_format.custom_color_space: { type: bool, description: "The output color space is set by hand" }
+  video.output_format.color_space: { type: string, description: "Output color space set by hand: bt601 or bt709" }
+  video.output_format.custom_quant_range: { type: bool, description: "The output quantization range is set by hand" }
+  video.output_format.quant_range: { type: string, description: "Output quantization range set by hand: full or limited" }
+  video.output_format.custom_sat_range: { type: bool, description: "The output saturation range is set by hand" }
+  video.output_format.sat_range: { type: string, description: "Output saturation range set by hand: full, limited or extended" }
+  no_signal.enabled:        { type: bool, description: "An image is shown while there is no input signal" }
+  no_signal.images.*.selected: { type: bool, description: "This image is the one shown (is-use)" }
+  no_signal.images.*.editable: { type: bool, description: "The image was uploaded and may be deleted (is-edit)" }
+  no_signal.images.*.path:  { type: string, description: "The image's path on the device" }
+  no_signal.images.*.time:  { type: int, description: "The image's time value as reported" }
+
+  # get-info.
+  device.serial:            { type: string, description: "Serial number" }
+  device.product_id:        { type: int, description: "Product id" }
+  device.hardware_revision: { type: string, description: "Hardware revision" }
+  device.firmware_id:       { type: int, description: "Firmware id" }
+  device.firmware:          { type: string, description: "Firmware version" }
+  device.factory_firmware:  { type: string, description: "Factory firmware version" }
+  device.product:           { type: string, description: "Product name: Ultra Stream" }
+  device.model:             { type: string, description: "Model: Ultra Stream HDMI or Ultra Stream SDI" }
+  device.manufacturer:      { type: string, description: "Manufacturer" }
+  device.features:          { type: int, description: "Feature flags as reported (not documented)" }
+  device.max_app_locks:     { type: int, description: "App clients that may lock the device at once" }
+  device.mac.ethernet:      { type: string, description: "Ethernet MAC address" }
+  device.mac.wifi:          { type: string, description: "Wi-Fi MAC address" }
+  device.mac.bluetooth:     { type: string, description: "Bluetooth MAC address" }
+  device.snapshot_path:     { type: string, description: "Path of the device's snapshot image on the device" }
+  capabilities.no_signal.max_count: { type: int, description: "No-signal images the device holds" }
+  capabilities.no_signal.max_width: { type: int, description: "No-signal image maximum width, pixels" }
+  capabilities.no_signal.max_height: { type: int, description: "No-signal image maximum height, pixels" }
+  capabilities.no_signal.max_size_kb: { type: int, description: "No-signal image maximum size, KB" }
+  capabilities.audio.*.min: { type: float, description: "Gain range (input, mic or headphone): minimum, dB" }
+  capabilities.audio.*.max: { type: float, description: "Gain range: maximum, dB" }
+  capabilities.audio.*.default: { type: float, description: "Gain range: default, dB" }
+  capabilities.color.*.min: { type: int, description: "Picture control range (contrast, brightness, saturation or hue): minimum" }
+  capabilities.color.*.max: { type: int, description: "Picture control range: maximum" }
+  capabilities.color.*.default: { type: int, description: "Picture control range: default" }
+  capabilities.encoding.resolutions: { type: string, description: "Encoding sizes offered, as the JSON text of get-info's list of w and h" }
+  capabilities.encoding.frame_intervals: { type: string, description: "Frame intervals offered, as JSON text of name and value (100 ns units)" }
+  capabilities.encoding.profiles: { type: string, description: "H.264 profiles offered, as JSON text of name and value" }
+  capabilities.encoding.hevc_profiles: { type: string, description: "HEVC profiles offered, as JSON text of name and value" }
+  capabilities.encoding.video_kbps: { type: string, description: "Video bitrates offered, as JSON text of name and value (kbit/s)" }
+  capabilities.encoding.audio_kbps: { type: string, description: "Audio bitrates offered, as JSON text of name and value (kbit/s)" }
+  capabilities.encoding.gop_seconds: { type: string, description: "Keyframe intervals offered, as JSON text of name and value (seconds)" }
+  capabilities.encoding.ranges: { type: string, description: "Encoded ranges offered, as JSON text of name and value" }
+  capabilities.encoding.stat_seconds: { type: string, description: "Bitrate windows offered, as JSON text of name and value (seconds)" }
+  capabilities.encoding.codecs: { type: string, description: "Codecs offered, as JSON text of name and value" }
+  capabilities.recording.usb_options: { type: string, description: "USB recording options, as JSON text of name and value" }
+  capabilities.recording.sd_options: { type: string, description: "SD card recording options, as JSON text of name and value" }
+  capabilities.recording.file_minutes: { type: string, description: "File lengths offered, as JSON text of name and value (minutes)" }
+  capabilities.recording.file_types: { type: string, description: "File types offered, as JSON text of name and value" }
+  capabilities.video_format.input_color_spaces: { type: string, description: "Input color spaces offered, as JSON text of name and value" }
+  capabilities.video_format.output_color_spaces: { type: string, description: "Output color spaces offered, as JSON text of name and value" }
+  capabilities.video_format.quant_ranges: { type: string, description: "Quantization ranges offered, as JSON text of name and value" }
+  capabilities.video_format.sat_ranges: { type: string, description: "Saturation ranges offered, as JSON text of name and value" }
+  capabilities.upload.servers: { type: string, description: "Upload services offered, as JSON text of name and value" }
+  capabilities.upload.ftp_protocols: { type: string, description: "FTP protocols offered, as JSON text of name and value" }
+  capabilities.upload.ftp_encryption: { type: string, description: "FTP encryption kinds offered, as JSON text of name and value" }
+  capabilities.upload.ftp_transfer_modes: { type: string, description: "FTP transfer modes offered, as JSON text of name and value" }
+
+  # get-users.
+  users.*.role:             { type: string, description: "The account's role: admin or user" }
+
+  # get-edid-config and get-loop-through-edid (HDMI).
+  edid.smart:               { type: bool, description: "Smart EDID: the input EDID follows the loop-through display" }
+  edid.keep_last:           { type: bool, description: "The last loop-through EDID is kept once the display is unplugged" }
+  edid.add_audio:           { type: bool, description: "Audio support is forced into the EDID" }
+  edid.limit_pixel_clock:   { type: bool, description: "The pixel clock offered is limited" }
+  edid.data:                { type: string, description: "The input EDID, base64" }
+  edid.loop_through_data:   { type: string, description: "The loop-through display's EDID, base64" }
+
+  # cloud-status.
+  cloud.device_id:          { type: string, description: "The serial number the Cloud knows the device by" }
+  cloud.slots:              { type: int, description: "Cloud registrations the device can hold" }
+  cloud.platforms.*.address: { type: string, description: "Cloud slot (0 or 1): server address" }
+  cloud.platforms.*.http_port: { type: int, description: "Cloud slot: HTTP port" }
+  cloud.platforms.*.https:  { type: bool, description: "Cloud slot: reached over HTTPS" }
+  cloud.platforms.*.https_port: { type: int, description: "Cloud slot: HTTPS port" }
+  cloud.platforms.*.code:   { type: string, description: "Cloud slot: the invitation code" }
+  cloud.platforms.*.date:   { type: int, description: "Cloud slot: cloud-date as reported" }
+  cloud.platforms.*.configured: { type: bool, description: "Cloud slot: set up (is-cloud-set)" }
+  cloud.platforms.*.registration: { type: string, description: "Cloud slot: registration accepted, refused, waiting or deleted" }
+  cloud.platforms.*.connection: { type: string, description: "Cloud slot: online, offline or initial" }
+
+  # get-media-files (the first 100 files of each storage).
+  media.*.path:             { type: string, description: "Folder of the recordings (usb or sd) on the device" }
+  media.*.thumbnail_dir:    { type: string, description: "Thumbnail subfolder, under that folder" }
+  media.*.files.*.thumbnail: { type: string, description: "The recording's thumbnail name (a .jpg)" }
+  media.*.files.*.status:   { type: string, description: "The recording's state: recording, normal, error or lost" }
+  media.*.files.*.created:  { type: string, description: "When the recording was created" }
+  media.*.files.*.size_bytes: { type: int, description: "File size, bytes" }
+  media.*.files.*.duration: { type: int, description: "Duration, documented as seconds" }
+  media.*.files.*.width:    { type: int, description: "Video width, pixels" }
+  media.*.files.*.height:   { type: int, description: "Video height, pixels" }
+  media.*.files.*.frame_interval: { type: int, description: "Frame interval, 100 ns units (frame rate is 10000000 divided by it)" }
+  media.*.files.*.codec:    { type: string, description: "Codec: h264 or hevc" }
+
+telemetry:
+  poll:
+    # What moves while recording or streaming.
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /usapi, query: { method: get-status } }
+    # What an operator configures.
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /usapi, query: { method: get-settings } }
+    # What rarely changes: product information, users, EDID, Cloud, files.
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /usapi, query: { method: get-info } }
+        - { method: GET, path: /usapi, query: { method: get-users } }
+        - { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-edid-config } }
+        - { models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-loop-through-edid } }
+        - { endpoint: cloud, method: GET, path: /cloud-api, query: { method: cloud-status, version: "1" } }
+        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "0", start: "0", count: "100" } }
+        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "1", start: "0", count: "100" } }
+  updates:
+    # The status mask, from get-status and ping (Device Status Mask).
+    - path: "^/usapi\\?method=(get-status|ping)$"
+      json_match: { "$.result": "^0$" }
+      json: { mask: "$.cur-status" }
+      state:
+        status.mask: "{mask}"
+        status.first_boot: "{mask:bit.0}"
+        status.recording: "{mask:bit.1}"
+        status.live: "{mask:bit.2}"
+        status.usb_ready: "{mask:bit.4}"
+        status.rtmp_ready: "{mask:bit.5}"
+        status.softap: "{mask:bit.6}"
+        status.usb_testing: "{mask:bit.12}"
+        status.upgrading: "{mask:bit.14}"
+        status.stream_testing: "{mask:bit.15}"
+        status.password_set: "{mask:bit.16}"
+        status.app_locked: "{mask:bit.17}"
+        status.formatting_usb: "{mask:bit.20}"
+        status.formatting_sd: "{mask:bit.21}"
+        status.wifi_searching: "{mask:bit.22}"
+        status.wifi_connecting: "{mask:bit.23}"
+        status.checking_update: "{mask:bit.25}"
+        status.resetting: "{mask:bit.26}"
+        status.rebooting: "{mask:bit.29}"
+        status.upload_testing: "{mask:bit.30}"
+    # get-status.
+    - path: "^/usapi\\?method=get-status$"
+      json_match: { "$.result": "^0$" }
+      json:
+        last_rec: "$.last-rec-status"
+        time: "$.cur-time"
+        box_name: "$.box-name"
+        lock_user: "$.lock-user"
+        cpu: "$.sysstat.cpu"
+        cpu_usage: "$.sysstat.cpu-usage"
+        eth_rx: "$.sysstat.eth-rx"
+        eth_tx: "$.sysstat.eth-tx"
+        mem_free: "$.sysstat.mem-free"
+        mem_total: "$.sysstat.mem-total"
+        mobile_rx: "$.sysstat.mobile-rx"
+        mobile_tx: "$.sysstat.mobile-tx"
+        sd_rd: "$.sysstat.sd-rd"
+        sd_wr: "$.sysstat.sd-wr"
+        uptime: "$.sysstat.uptime"
+        usb_rd: "$.sysstat.usb-rd"
+        usb_wr: "$.sysstat.usb-wr"
+        wlan_rx: "$.sysstat.wlan-rx"
+        wlan_tx: "$.sysstat.wlan-tx"
+        in_status: "$.input-signal.status"
+        in_cx: "$.input-signal.cx"
+        in_cy: "$.input-signal.cy"
+        in_interlaced: "$.input-signal.interlaced"
+        in_rate: "$.input-signal.frame-rate"
+        in_channels: "$.input-signal.channel-valid"
+        in_lpcm: "$.input-signal.is-lpcm"
+        in_bits: "$.input-signal.bits-per-sample"
+        in_sample_rate: "$.input-signal.sample-rate"
+        rec_result: "$.rec-status.result"
+        rec_ms: "$.rec-status.run-ms"
+        rec_bps: "$.rec-status.cur-bps"
+        rec_avg: "$.rec-status.avg-bps"
+        live_result: "$.live-status.result"
+        live_ms: "$.live-status.run-ms"
+        live_bps: "$.live-status.cur-bps"
+        live_avg: "$.live-status.avg-bps"
+        live_net: "$.live-status.net"
+        live_result2: "$.live-status.result2"
+        live_bps2: "$.live-status.cur-bps2"
+        live_net2: "$.live-status.net2"
+        lt_bps: "$.living-test.upload-bps"
+        lt_percent: "$.living-test.percent"
+        lt_result: "$.living-test.result"
+        lt_net: "$.living-test.net"
+        cu_result: "$.check-upgrade.result"
+        up_ver: "$.upgrade.ver"
+        up_date: "$.upgrade.date"
+        up_size: "$.upgrade.size-byte"
+        up_info: "$.upgrade.info"
+        us_step: "$.upgrade-status.step"
+        us_percent: "$.upgrade-status.percent"
+        us_result: "$.upgrade-status.result"
+        us_mode: "$.upgrade-status.mode"
+        sf_ongoing: "$.send-file.total-count-ongoing"
+        sf_done: "$.send-file.total-count-done"
+        sf_disk: "$.send-file.disk-type"
+        sf_name: "$.send-file.name"
+        sf_result: "$.send-file.result"
+        sf_message: "$.send-file.message"
+        sf_left: "$.send-file.left-time"
+        sf_percent: "$.send-file.percent"
+        sft_result: "$.send-file-test.result"
+        sft_id: "$.send-file-test.id"
+        dt_read: "$.disk-test.read-bps"
+        dt_write: "$.disk-test.write-bps"
+        dt_percent: "$.disk-test.percent"
+        dt_result: "$.disk-test.result"
+        fs_percent: "$.format-status.percent"
+        fs_result: "$.format-status.result"
+        wifi_name: "$.wifi.name"
+        wifi_level: "$.wifi.level"
+        wifi_ip: "$.wifi.ip"
+        wifi_mask: "$.wifi.mask"
+        wifi_router: "$.wifi.router"
+        wifi_dns: "$.wifi.dns"
+        eth_ip: "$.eth.ip"
+        eth_mask: "$.eth.mask"
+        eth_router: "$.eth.router"
+        eth_dns: "$.eth.dns"
+        mob_ip: "$.mobile.ip"
+        mob_mask: "$.mobile.mask"
+        mob_router: "$.mobile.router"
+        mob_dns: "$.mobile.dns"
+      state:
+        status.last_recording_result: "{last_rec}"
+        device.time: "{time}"
+        device.name: "{box_name}"
+        status.locked_by: "{lock_user}"
+        system.cpu: "{cpu}"
+        system.cpu_usage: "{cpu_usage}"
+        system.eth_rx: "{eth_rx}"
+        system.eth_tx: "{eth_tx}"
+        system.memory_free: "{mem_free}"
+        system.memory_total: "{mem_total}"
+        system.mobile_rx: "{mobile_rx}"
+        system.mobile_tx: "{mobile_tx}"
+        system.sd_read: "{sd_rd}"
+        system.sd_write: "{sd_wr}"
+        system.uptime: "{uptime}"
+        system.usb_read: "{usb_rd}"
+        system.usb_write: "{usb_wr}"
+        system.wlan_rx: "{wlan_rx}"
+        system.wlan_tx: "{wlan_tx}"
+        input.status: "{in_status}"
+        input.width: "{in_cx}"
+        input.height: "{in_cy}"
+        input.interlaced: { value: "{in_interlaced}", map: &b01 { "0": false, "1": true } }
+        input.frame_rate: "{in_rate}"
+        input.audio_channels_valid: "{in_channels}"
+        input.audio_lpcm: { value: "{in_lpcm}", map: *b01 }
+        input.audio_bits: "{in_bits}"
+        input.audio_sample_rate: "{in_sample_rate}"
+        recording.result: "{rec_result}"
+        recording.run_ms: "{rec_ms}"
+        recording.bps: "{rec_bps}"
+        recording.avg_bps: "{rec_avg}"
+        live.result: "{live_result}"
+        live.run_ms: "{live_ms}"
+        live.bps: "{live_bps}"
+        live.avg_bps: "{live_avg}"
+        live.network: "{live_net}"
+        live.result2: "{live_result2}"
+        live.bps2: "{live_bps2}"
+        live.network2: "{live_net2}"
+        stream_test.upload_bps: "{lt_bps}"
+        stream_test.percent: "{lt_percent}"
+        stream_test.result: "{lt_result}"
+        stream_test.network: "{lt_net}"
+        firmware.check.result: "{cu_result}"
+        firmware.available.version: "{up_ver}"
+        firmware.available.date: "{up_date}"
+        firmware.available.size_bytes: "{up_size}"
+        firmware.available.notes: "{up_info}"
+        firmware.update.step: "{us_step}"
+        firmware.update.percent: "{us_percent}"
+        firmware.update.result: "{us_result}"
+        firmware.update.mode: "{us_mode}"
+        upload.ongoing: "{sf_ongoing}"
+        upload.done: "{sf_done}"
+        upload.disk: { value: "{sf_disk}", map: &disk_name { "0": usb, "1": sd } }
+        upload.file: "{sf_name}"
+        upload.result: "{sf_result}"
+        upload.message: "{sf_message}"
+        upload.seconds_left: "{sf_left}"
+        upload.percent: "{sf_percent}"
+        upload_test.result: "{sft_result}"
+        upload_test.server_id: "{sft_id}"
+        usb_test.read_bps: "{dt_read}"
+        usb_test.write_bps: "{dt_write}"
+        usb_test.percent: "{dt_percent}"
+        usb_test.result: "{dt_result}"
+        format.percent: "{fs_percent}"
+        format.result: "{fs_result}"
+        network.wifi.name: "{wifi_name}"
+        network.wifi.level: "{wifi_level}"
+        network.wifi.ip_address: "{wifi_ip}"
+        network.wifi.netmask: "{wifi_mask}"
+        network.wifi.gateway: "{wifi_router}"
+        network.wifi.dns: "{wifi_dns}"
+        network.ethernet.ip_address: "{eth_ip}"
+        network.ethernet.netmask: "{eth_mask}"
+        network.ethernet.gateway: "{eth_router}"
+        network.ethernet.dns: "{eth_dns}"
+        network.mobile.ip_address: "{mob_ip}"
+        network.mobile.netmask: "{mob_mask}"
+        network.mobile.gateway: "{mob_router}"
+        network.mobile.dns: "{mob_dns}"
+    # get-status: the USB drive and the SD card, read alike.
+    - path: "^/usapi\\?method=get-status$"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.*"
+      each_match: { "$.disk-status": "^\\d+$" }
+      json:
+        status: "$.disk-status"
+        total: "$.total-size"
+        used: "$.used-size"
+        free: "$.free-size"
+        block: "$.block-size"
+        usage: "$.usage"
+        sys_path: "$.sys-path"
+        fs_type: "$.fs-type"
+        mount: "$.mount-path"
+        label: "$.fs-label"
+        write: "$.write-bps"
+        read: "$.read-bps"
+        free_sec: "$.free-sec"
+        files: "$.file-count"
+        begin: "$.beign-time"
+        end: "$.end-time"
+        cache: "$.total-cache-time"
+      state:
+        "storage.{key}.status": { value: "{status}", map: { "0": none, "1": valid, "3": full, "4": read-only, "5": low-space, "6": invalid } }
+        "storage.{key}.status_code": "{status}"
+        "storage.{key}.total_bytes": "{total}"
+        "storage.{key}.used_bytes": "{used}"
+        "storage.{key}.free_bytes": "{free}"
+        "storage.{key}.block_size": "{block}"
+        "storage.{key}.usage_percent": "{usage}"
+        "storage.{key}.device_path": "{sys_path}"
+        "storage.{key}.filesystem": "{fs_type}"
+        "storage.{key}.mount_path": "{mount}"
+        "storage.{key}.label": "{label}"
+        "storage.{key}.write_bps": "{write}"
+        "storage.{key}.read_bps": "{read}"
+        "storage.{key}.free_seconds": "{free_sec}"
+        "storage.{key}.file_count": "{files}"
+        "storage.{key}.begin_time": "{begin}"
+        "storage.{key}.end_time": "{end}"
+        "storage.{key}.cache_seconds": "{cache}"
+
+    # get-settings.
+    - path: "^/usapi\\?method=get-settings$"
+      json_match: { "$.result": "^0$" }
+      json:
+        name: "$.name"
+        passwd: "$.passwd"
+        is_settings: "$.is-settings"
+        is_ssdp: "$.is-ssdp"
+        startup_rec: "$.is-startup-rec"
+        startup_live: "$.is-startup-live"
+        signal_lost: "$.is-signal-lost"
+        hdmi_rec: "$.is-hdmi-rec-ctrl"
+        auto_send: "$.is-auto-send-file"
+        check_update: "$.is-check-update"
+        auto_rec: "$.is-auto-rec"
+        auto_live: "$.is-auto-live"
+        low_latency: "$.is-low-latency"
+        key_reset: "$.enable-key-reset"
+        key_reboot: "$.enable-key-reboot"
+        sync: "$.audio-sync-offset"
+        ap_on: "$.softap.is-softap"
+        ap_visible: "$.softap.is-visible"
+        ap_ssid: "$.softap.softap-ssid"
+        tz: "$.date-time.timezone"
+        tz_auto: "$.date-time.is-auto"
+        rc_mime: "$.rec-control.mime-type"
+        rc_usb: "$.rec-control.usb-option"
+        rc_sd: "$.rec-control.sd-option"
+        rc_folder: "$.rec-control.root-folder"
+        rc_prefix: "$.rec-control.file-prefix"
+        rc_mode: "$.rec-control.file-name-mode"
+        rc_unit: "$.rec-control.time-unit"
+        contrast: "$.video-color.contrast"
+        brightness: "$.video-color.brightness"
+        saturation: "$.video-color.saturation"
+        hue: "$.video-color.hue"
+        is_mic: "$.volume.is-mic"
+        mic_gain: "$.volume.mic-gain"
+        is_spi: "$.volume.is-spi"
+        spi_gain: "$.volume.spi-gain"
+        is_phone: "$.volume.is-phone"
+        phone_gain: "$.volume.phone-gain"
+        rec_stream: "$.rec-stream"
+        live_stream: "$.live-stream"
+        mws_stream: "$.mws-stream"
+        main_auto: "$.main-stream.is-auto"
+        main_codec: "$.main-stream.codec"
+        sub_codec: "$.sub-stream.codec"
+        a_rate: "$.audio.sample-rate"
+        a_channels: "$.audio.channels"
+        a_kbps: "$.audio.kbps"
+        in_custom_color: "$.video-input-format.is-color-fmt"
+        in_color: "$.video-input-format.color-fmt"
+        in_custom_quant: "$.video-input-format.is-quant-range"
+        in_quant: "$.video-input-format.quant-range"
+        out_custom_color: "$.video-output-format.is-color-fmt"
+        out_color: "$.video-output-format.color-fmt"
+        out_custom_quant: "$.video-output-format.is-quant-range"
+        out_quant: "$.video-output-format.quant-range"
+        out_custom_sat: "$.video-output-format.is-sat-range"
+        out_sat: "$.video-output-format.sat-range"
+        use_nosignal: "$.use-nosignal-file"
+      state:
+        device.name: "{name}"
+        app.password_enabled: { value: "{passwd}", map: *b01 }
+        app.settings_allowed: { value: "{is_settings}", map: *b01 }
+        network.ssdp: { value: "{is_ssdp}", map: *b01 }
+        control.startup_record: { value: "{startup_rec}", map: *b01 }
+        control.startup_live: { value: "{startup_live}", map: *b01 }
+        control.stop_on_signal_loss: { value: "{signal_lost}", map: *b01 }
+        control.hdmi_record_control: { value: "{hdmi_rec}", map: *b01 }
+        upload.auto: { value: "{auto_send}", map: *b01 }
+        firmware.auto_check: { value: "{check_update}", map: *b01 }
+        control.auto_record: { value: "{auto_rec}", map: *b01 }
+        control.live_lock: { value: "{auto_live}", map: *b01 }
+        control.low_latency_live: { value: "{low_latency}", map: *b01 }
+        keys.reset_enabled: { value: "{key_reset}", map: *b01 }
+        keys.reboot_enabled: { value: "{key_reboot}", map: *b01 }
+        audio.sync_offset_ms: "{sync}"
+        softap.enabled: { value: "{ap_on}", map: *b01 }
+        softap.visible: { value: "{ap_visible}", map: *b01 }
+        softap.ssid: "{ap_ssid}"
+        time.timezone: "{tz}"
+        time.auto: { value: "{tz_auto}", map: *b01 }
+        recording.options.file_type: { value: "{rc_mime}", map: { "0": mp4, "1": mov } }
+        recording.options.usb: { value: "{rc_usb}", map: { "0": "off", "1": normal } }
+        recording.options.sd: { value: "{rc_sd}", map: { "0": "off", "1": normal, "2": loop } }
+        recording.options.folder: "{rc_folder}"
+        recording.options.file_prefix: "{rc_prefix}"
+        recording.options.file_name_mode: { value: "{rc_mode}", map: { "0": custom, "1": time } }
+        recording.options.file_minutes: "{rc_unit}"
+        video.contrast: "{contrast}"
+        video.brightness: "{brightness}"
+        video.saturation: "{saturation}"
+        video.hue: "{hue}"
+        audio.mic.enabled: { value: "{is_mic}", map: *b01 }
+        audio.mic.gain: "{mic_gain}"
+        audio.input.enabled: { value: "{is_spi}", map: *b01 }
+        audio.input.gain: "{spi_gain}"
+        audio.headphone.enabled: { value: "{is_phone}", map: *b01 }
+        audio.headphone.gain: "{phone_gain}"
+        streams.recording: { value: "{rec_stream}", map: &stream_name_map { "0": main, "1": sub } }
+        streams.live: { value: "{live_stream}", map: *stream_name_map }
+        streams.preview: { value: "{mws_stream}", map: *stream_name_map }
+        encoder.main.follow_input: { value: "{main_auto}", map: *b01 }
+        encoder.main.codec: { value: "{main_codec}", map: &codec_name { "0": h264, "1": hevc } }
+        encoder.sub.codec: { value: "{sub_codec}", map: *codec_name }
+        audio.sample_rate: "{a_rate}"
+        audio.channels: "{a_channels}"
+        audio.kbps: "{a_kbps}"
+        video.input_format.custom_color_space: { value: "{in_custom_color}", map: *b01 }
+        video.input_format.color_space: { value: "{in_color}", map: { "1": rgb, "2": bt601, "3": bt709, "4": bt2020 } }
+        video.input_format.custom_quant_range: { value: "{in_custom_quant}", map: *b01 }
+        video.input_format.quant_range: { value: "{in_quant}", map: &quant_name { "1": full, "2": limited } }
+        video.output_format.custom_color_space: { value: "{out_custom_color}", map: *b01 }
+        video.output_format.color_space: { value: "{out_color}", map: { "2": bt601, "3": bt709 } }
+        video.output_format.custom_quant_range: { value: "{out_custom_quant}", map: *b01 }
+        video.output_format.quant_range: { value: "{out_quant}", map: *quant_name }
+        video.output_format.custom_sat_range: { value: "{out_custom_sat}", map: *b01 }
+        video.output_format.sat_range: { value: "{out_sat}", map: { "1": full, "2": limited, "3": extended } }
+        no_signal.enabled: { value: "{use_nosignal}", map: *b01 }
+    # get-settings: the main and sub streams' encoding.
+    - path: "^/usapi\\?method=get-settings$"
+      json_match: { "$.result": "^0$" }
+      json:
+        m_cx: "$.main-stream.cx"
+        m_cy: "$.main-stream.cy"
+        m_duration: "$.main-stream.duration"
+        m_kbps: "$.main-stream.kbps"
+        m_gop: "$.main-stream.gop"
+        m_profile: "$.main-stream.profile"
+        m_cbrstat: "$.main-stream.cbrstat"
+        m_fullrange: "$.main-stream.fullrange"
+        s_cx: "$.sub-stream.cx"
+        s_cy: "$.sub-stream.cy"
+        s_duration: "$.sub-stream.duration"
+        s_kbps: "$.sub-stream.kbps"
+        s_gop: "$.sub-stream.gop"
+        s_profile: "$.sub-stream.profile"
+        s_cbrstat: "$.sub-stream.cbrstat"
+        s_fullrange: "$.sub-stream.fullrange"
+        e_dhcp: "$.eth.is-dhcp"
+        e_ip: "$.eth.ip"
+        e_mask: "$.eth.mask"
+        e_router: "$.eth.router"
+        e_dns: "$.eth.dns"
+        w_dhcp: "$.wifi.is-dhcp"
+        w_ip: "$.wifi.ip"
+        w_mask: "$.wifi.mask"
+        w_router: "$.wifi.router"
+        w_dns: "$.wifi.dns"
+      state:
+        encoder.main.width: "{m_cx}"
+        encoder.main.height: "{m_cy}"
+        encoder.main.frame_interval: "{m_duration}"
+        encoder.main.kbps: "{m_kbps}"
+        encoder.main.gop_seconds: "{m_gop}"
+        encoder.main.profile: "{m_profile}"
+        encoder.main.stat_seconds: "{m_cbrstat}"
+        encoder.main.range: { value: "{m_fullrange}", map: &range_name { "0": limited, "1": full } }
+        encoder.sub.width: "{s_cx}"
+        encoder.sub.height: "{s_cy}"
+        encoder.sub.frame_interval: "{s_duration}"
+        encoder.sub.kbps: "{s_kbps}"
+        encoder.sub.gop_seconds: "{s_gop}"
+        encoder.sub.profile: "{s_profile}"
+        encoder.sub.stat_seconds: "{s_cbrstat}"
+        encoder.sub.range: { value: "{s_fullrange}", map: *range_name }
+        network.ethernet.config.dhcp: { value: "{e_dhcp}", map: *b01 }
+        network.ethernet.config.ip_address: "{e_ip}"
+        network.ethernet.config.netmask: "{e_mask}"
+        network.ethernet.config.gateway: "{e_router}"
+        network.ethernet.config.dns: "{e_dns}"
+        network.wifi.config.dhcp: { value: "{w_dhcp}", map: *b01 }
+        network.wifi.config.ip_address: "{w_ip}"
+        network.wifi.config.netmask: "{w_mask}"
+        network.wifi.config.gateway: "{w_router}"
+        network.wifi.config.dns: "{w_dns}"
+    # get-settings: the stream servers, replaced whole (the key, password
+    # and token are kept out of state).
+    - path: "^/usapi\\?method=get-settings$"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.stream-server"
+      json:
+        id: "$.id"
+        type: "$.type"
+        name: "$.name"
+        url: "$.url"
+        auth: "$.is-auth"
+        user: "$.user"
+        use: "$.is-use"
+        net: "$.net-mode"
+        event: "$.event-data"
+        port: "$.port"
+        main: "$.is-main"
+        main_name: "$.main-stream-name"
+        sub: "$.is-sub"
+        sub_name: "$.sub-stream-name"
+        audio: "$.is-audio"
+      replace: stream_servers
+      state:
+        "stream_servers.{id}.type": { value: "{type}", map: { "0": rtmp, "1": twitch, "2": youtube, "3": facebook, "100": rtsp } }
+        "stream_servers.{id}.name": "{name}"
+        "stream_servers.{id}.url": "{url}"
+        "stream_servers.{id}.auth": { value: "{auth}", map: *b01 }
+        "stream_servers.{id}.user": "{user}"
+        "stream_servers.{id}.enabled": { value: "{use}", map: *b01 }
+        "stream_servers.{id}.network": { value: "{net}", map: &net_name { "0": mobile, "1": ethernet, "2": wifi } }
+        "stream_servers.{id}.event": "{event}"
+        "stream_servers.{id}.port": "{port}"
+        "stream_servers.{id}.main": { value: "{main}", map: *b01 }
+        "stream_servers.{id}.main_name": "{main_name}"
+        "stream_servers.{id}.sub": { value: "{sub}", map: *b01 }
+        "stream_servers.{id}.sub_name": "{sub_name}"
+        "stream_servers.{id}.audio": { value: "{audio}", map: *b01 }
+    # get-settings: the upload servers, replaced whole (passwords and
+    # tokens are kept out of state).
+    - path: "^/usapi\\?method=get-settings$"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.send-file-cloud"
+      json:
+        id: "$.id"
+        type: "$.type"
+        use: "$.is-use"
+        net: "$.net-mode"
+        account: "$.account-id"
+        user: "$.user-name"
+        photo: "$.photo-path"
+        dir: "$.dir-name"
+        parents: "$.parents"
+        privacy: "$.privacy"
+        proto: "$.proto"
+        url: "$.url"
+        port: "$.port"
+        encryption: "$.encryption"
+        login: "$.login-type"
+        mode: "$.mode"
+      replace: upload_servers
+      state:
+        "upload_servers.{id}.type": { value: "{type}", map: { "0": ftp, "1": google-drive, "2": dropbox, "3": youtube } }
+        "upload_servers.{id}.enabled": { value: "{use}", map: *b01 }
+        "upload_servers.{id}.network": { value: "{net}", map: *net_name }
+        "upload_servers.{id}.account_id": "{account}"
+        "upload_servers.{id}.user": "{user}"
+        "upload_servers.{id}.photo_path": "{photo}"
+        "upload_servers.{id}.directory": "{dir}"
+        "upload_servers.{id}.parents": "{parents}"
+        "upload_servers.{id}.privacy": "{privacy}"
+        "upload_servers.{id}.protocol": { value: "{proto}", map: { "0": ftp, "1": sftp } }
+        "upload_servers.{id}.url": "{url}"
+        "upload_servers.{id}.port": "{port}"
+        "upload_servers.{id}.encryption": { value: "{encryption}", map: { "0": plain, "1": explicit-tls, "2": implicit-tls } }
+        "upload_servers.{id}.login": { value: "{login}", map: { "0": anonymous, "1": normal } }
+        "upload_servers.{id}.mode": { value: "{mode}", map: { "0": active, "1": passive } }
+    # get-settings: the no-signal images, replaced whole.
+    - path: "^/usapi\\?method=get-settings$"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.nosignal-files"
+      json: { id: "$.id", use: "$.is-use", edit: "$.is-edit", path: "$.file-path", time: "$.time" }
+      replace: no_signal.images
+      state:
+        "no_signal.images.{id}.selected": { value: "{use}", map: *b01 }
+        "no_signal.images.{id}.editable": { value: "{edit}", map: *b01 }
+        "no_signal.images.{id}.path": "{path}"
+        "no_signal.images.{id}.time": "{time}"
+
+    # get-info.
+    - path: "^/usapi\\?method=get-info$"
+      json_match: { "$.result": "^0$" }
+      json:
+        sn: "$.product.sn"
+        pid: "$.product.product-id"
+        hw: "$.product.hardware-ver"
+        fw_id: "$.product.firmware-id"
+        fw: "$.product.firmware-ver-s"
+        factory: "$.product.factory-firmware-ver-s"
+        product: "$.product.product-name"
+        model: "$.product.module-name"
+        manu: "$.product.manu-name"
+        features: "$.product.features"
+        locks: "$.product.max-lock-count"
+        mac_eth: "$.mac-addr.eth"
+        mac_wifi: "$.mac-addr.wifi"
+        mac_blue: "$.mac-addr.blue"
+        snapshot: "$.snapshot"
+        ns_count: "$.nosignal.max-count"
+        ns_width: "$.nosignal.max-width"
+        ns_height: "$.nosignal.max-height"
+        ns_size: "$.nosignal.max-size-kb"
+        resolutions: "$.codec-cap.resolutions"
+        durations: "$.codec-cap.durations"
+        profile: "$.codec-cap.profile"
+        hevc_profile: "$.codec-cap.hevc-profile"
+        video_kbps: "$.codec-cap.video-kbps"
+        audio_kbps: "$.codec-cap.audio-kbps"
+        gop: "$.codec-cap.gop-sec"
+        video_range: "$.codec-cap.video-range"
+        stat: "$.codec-cap.stat-sec"
+        codecs: "$.codec-cap.video-codec"
+        usb_opt: "$.rec-control.usb-option"
+        sd_opt: "$.rec-control.sd-option"
+        units: "$.rec-control.time-unit"
+        exts: "$.rec-control.file-ext"
+        in_color: "$.video-format.input-color-fmt"
+        out_color: "$.video-format.output-color-fmt"
+        quant: "$.video-format.quant-range"
+        sat: "$.video-format.sat-range"
+        sf_server: "$.send-file.server"
+        sf_proto: "$.send-file.ftp-proto"
+        sf_enc: "$.send-file.ftp-encryption"
+        sf_mode: "$.send-file.ftp-transfer-mode"
+        a_in_min: "$.audio-range.hdmi.min"
+        a_in_max: "$.audio-range.hdmi.max"
+        a_in_def: "$.audio-range.hdmi.def"
+        a_mic_min: "$.audio-range.mic.min"
+        a_mic_max: "$.audio-range.mic.max"
+        a_mic_def: "$.audio-range.mic.def"
+        a_ph_min: "$.audio-range.phone.min"
+        a_ph_max: "$.audio-range.phone.max"
+        a_ph_def: "$.audio-range.phone.def"
+      state:
+        device.serial: "{sn}"
+        device.product_id: "{pid}"
+        device.hardware_revision: "{hw}"
+        device.firmware_id: "{fw_id}"
+        device.firmware: "{fw}"
+        device.factory_firmware: "{factory}"
+        device.product: "{product}"
+        device.model: "{model}"
+        device.manufacturer: "{manu}"
+        device.features: "{features}"
+        device.max_app_locks: "{locks}"
+        device.mac.ethernet: "{mac_eth}"
+        device.mac.wifi: "{mac_wifi}"
+        device.mac.bluetooth: "{mac_blue}"
+        device.snapshot_path: "{snapshot}"
+        capabilities.no_signal.max_count: "{ns_count}"
+        capabilities.no_signal.max_width: "{ns_width}"
+        capabilities.no_signal.max_height: "{ns_height}"
+        capabilities.no_signal.max_size_kb: "{ns_size}"
+        capabilities.encoding.resolutions: "{resolutions}"
+        capabilities.encoding.frame_intervals: "{durations}"
+        capabilities.encoding.profiles: "{profile}"
+        capabilities.encoding.hevc_profiles: "{hevc_profile}"
+        capabilities.encoding.video_kbps: "{video_kbps}"
+        capabilities.encoding.audio_kbps: "{audio_kbps}"
+        capabilities.encoding.gop_seconds: "{gop}"
+        capabilities.encoding.ranges: "{video_range}"
+        capabilities.encoding.stat_seconds: "{stat}"
+        capabilities.encoding.codecs: "{codecs}"
+        capabilities.recording.usb_options: "{usb_opt}"
+        capabilities.recording.sd_options: "{sd_opt}"
+        capabilities.recording.file_minutes: "{units}"
+        capabilities.recording.file_types: "{exts}"
+        capabilities.video_format.input_color_spaces: "{in_color}"
+        capabilities.video_format.output_color_spaces: "{out_color}"
+        capabilities.video_format.quant_ranges: "{quant}"
+        capabilities.video_format.sat_ranges: "{sat}"
+        capabilities.upload.servers: "{sf_server}"
+        capabilities.upload.ftp_protocols: "{sf_proto}"
+        capabilities.upload.ftp_encryption: "{sf_enc}"
+        capabilities.upload.ftp_transfer_modes: "{sf_mode}"
+        capabilities.audio.input.min: "{a_in_min}"
+        capabilities.audio.input.max: "{a_in_max}"
+        capabilities.audio.input.default: "{a_in_def}"
+        capabilities.audio.mic.min: "{a_mic_min}"
+        capabilities.audio.mic.max: "{a_mic_max}"
+        capabilities.audio.mic.default: "{a_mic_def}"
+        capabilities.audio.headphone.min: "{a_ph_min}"
+        capabilities.audio.headphone.max: "{a_ph_max}"
+        capabilities.audio.headphone.default: "{a_ph_def}"
+    # get-info: the picture control ranges, read alike.
+    - path: "^/usapi\\?method=get-info$"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.color-range.*"
+      json: { min: "$.min", max: "$.max", def: "$.def" }
+      state:
+        "capabilities.color.{key}.min": "{min}"
+        "capabilities.color.{key}.max": "{max}"
+        "capabilities.color.{key}.default": "{def}"
+
+    # get-users, replaced whole.
+    - path: "^/usapi\\?method=get-users$"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.users"
+      json: { id: "$.id", type: "$.type" }
+      replace: users
+      state:
+        "users.{id:key}.role": { value: "{type}", map: { "1": admin, "2": user } }
+
+    # get-edid-config and get-loop-through-edid.
+    - path: "^/usapi\\?method=get-edid-config$"
+      json_match: { "$.result": "^0$" }
+      json: { smart: "$.smart-edid", keep: "$.keep-last", audio: "$.add-audio", clock: "$.limit-pixel-clock", data: "$.data" }
+      state:
+        edid.smart: { value: "{smart}", map: *b01 }
+        edid.keep_last: { value: "{keep}", map: *b01 }
+        edid.add_audio: { value: "{audio}", map: *b01 }
+        edid.limit_pixel_clock: { value: "{clock}", map: *b01 }
+        edid.data: "{data}"
+    # set-default-edid answers the default EDID it put back.
+    - path: "^/usapi\\?method=set-default-edid$"
+      json_match: { "$.result": "^0$" }
+      json: { data: "$.data" }
+      state: { edid.data: "{data}" }
+      then_send: [{ models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-edid-config } }]
+    - path: "^/usapi\\?method=get-loop-through-edid$"
+      json_match: { "$.result": "^0$" }
+      json: { data: "$.data" }
+      state: { edid.loop_through_data: "{data}" }
+
+    # cloud-status (port 8070).
+    - path: "^/cloud-api\\?method=cloud-status&"
+      json_match: { "$.result": "^0$" }
+      json: { device: "$.device_id", number: "$.number" }
+      state: { cloud.device_id: "{device}", cloud.slots: "{number}" }
+    - path: "^/cloud-api\\?method=cloud-status&"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.status"
+      json:
+        id: "$.id"
+        code: "$.cloud-code"
+        date: "$.cloud-date"
+        https: "$.cloud-enable-https"
+        http_port: "$.cloud-http-port"
+        https_port: "$.cloud-https-port"
+        address: "$.cloud-ip-addr"
+        reg: "$.cloud-reg-status"
+        conn: "$.cloud-status"
+        set: "$.is-cloud-set"
+      replace: cloud.platforms
+      state:
+        "cloud.platforms.{id}.code": "{code}"
+        "cloud.platforms.{id}.date": "{date}"
+        "cloud.platforms.{id}.https": { value: "{https}", map: *b01 }
+        "cloud.platforms.{id}.http_port": "{http_port}"
+        "cloud.platforms.{id}.https_port": "{https_port}"
+        "cloud.platforms.{id}.address": "{address}"
+        "cloud.platforms.{id}.registration": { value: "{reg}", map: { "101": accepted, "102": refused, "103": waiting, "104": deleted } }
+        "cloud.platforms.{id}.connection": { value: "{conn}", map: { "35": online, "36": offline, "27": initial } }
+        "cloud.platforms.{id}.configured": { value: "{set}", map: *b01 }
+
+    # get-media-files: a first page replaces the list; every page adds to it.
+    - path: "^/usapi\\?method=get-media-files&disk-type=0&"
+      json_match: { "$.result": "^0$" }
+      json: { path: "$.path", thumbs: "$.thumbnail" }
+      state: { media.usb.path: "{path}", media.usb.thumbnail_dir: "{thumbs}" }
+    - path: "^/usapi\\?method=get-media-files&disk-type=1&"
+      json_match: { "$.result": "^0$" }
+      json: { path: "$.path", thumbs: "$.thumbnail" }
+      state: { media.sd.path: "{path}", media.sd.thumbnail_dir: "{thumbs}" }
+    - path: "^/usapi\\?method=get-media-files&disk-type=0&start=0&"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      replace: media.usb.files
+    - path: "^/usapi\\?method=get-media-files&disk-type=0&"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.media-files"
+      json: &media_file
+        name: "$.name"
+        thumb: "$.thumbnail-name"
+        status: "$.status"
+        created: "$.create-time"
+        size: "$.size-bytes"
+        duration: "$.duration"
+        width: "$.width"
+        height: "$.height"
+        interval: "$.interval"
+        codec: "$.codec"
+      state:
+        "media.usb.files.{name:key}.thumbnail": "{thumb}"
+        "media.usb.files.{name:key}.status": { value: "{status}", map: &file_status { "0": recording, "1": normal, "2": error, "3": lost } }
+        "media.usb.files.{name:key}.created": "{created}"
+        "media.usb.files.{name:key}.size_bytes": "{size}"
+        "media.usb.files.{name:key}.duration": "{duration}"
+        "media.usb.files.{name:key}.width": "{width}"
+        "media.usb.files.{name:key}.height": "{height}"
+        "media.usb.files.{name:key}.frame_interval": "{interval}"
+        "media.usb.files.{name:key}.codec": { value: "{codec}", map: *codec_name }
+    - path: "^/usapi\\?method=get-media-files&disk-type=1&start=0&"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      replace: media.sd.files
+    - path: "^/usapi\\?method=get-media-files&disk-type=1&"
+      json_match: { "$.result": "^0$" }
+      json_each: "$.media-files"
+      json: *media_file
+      state:
+        "media.sd.files.{name:key}.thumbnail": "{thumb}"
+        "media.sd.files.{name:key}.status": { value: "{status}", map: *file_status }
+        "media.sd.files.{name:key}.created": "{created}"
+        "media.sd.files.{name:key}.size_bytes": "{size}"
+        "media.sd.files.{name:key}.duration": "{duration}"
+        "media.sd.files.{name:key}.width": "{width}"
+        "media.sd.files.{name:key}.height": "{height}"
+        "media.sd.files.{name:key}.frame_interval": "{interval}"
+        "media.sd.files.{name:key}.codec": { value: "{codec}", map: *codec_name }
+
+    # upload-update-file answers with a status, not a result.
+    - path: "^/usapi\\?method=upload-update-file$"
+      json_match: { "$.status": "^0$" }
+      json: { up_to_date: "$.up-to-date", version: "$.version", size: "$.size" }
+      state:
+        firmware.upload.up_to_date: "{up_to_date}"
+        firmware.upload.version: "{version}"
+        firmware.upload.size_bytes: "{size}"
+      then_send: [{ method: GET, path: /usapi, query: { method: get-status } }]
+
+    # Re-reads after a change: what a command changed is read again as soon
+    # as the device accepts it.
+    - path: "^/usapi\\?method=(set-name|set-app-settings|set-app-passwd|set-rec-control|set-softap|set-date-time|set-signal-lost-ctrl|set-ssdp|set-auto-rec|set-volume|set-video-color|set-low-latency-live|set-auto-live|set-video-input-format|set-video-output-format|set-sync-offset|add-nosignal-file|del-nosignal-file|set-nosignal-file|use-nosignal-file|send-file-add-server|send-file-del-server|send-file-enable-server|send-file-set-server|send-file-set-is-auto|add-server|enable-server|set-server|del-server|set-stream|set-video|set-audio|set-enable-key-reboot|set-enable-key-reset|set-net|set-enable-check-update)(&|$)"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /usapi, query: { method: get-settings } }]
+    - path: "^/usapi\\?method=(start-rec|stop-rec|start-live|stop-live|clear-rec|clear-live|start-format-usb|start-format-sd|clear-format-usb|clear-format-sd|start-test-usb|stop-test-usb|clear-test-usb|start-test-server|stop-test-server|clear-test-server|send-file-start-test-server|send-file-stop-test-server|clear-test-send-file|send-file-add|send-file-del|send-file-clear|send-file-start|send-file-stop|update|cancel-download|online-update-check|clear-upgrade|clear-check-update|disconn-wifi|open-softap|close-softap|set-auto-live|set-app-passwd)(&|$)"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /usapi, query: { method: get-status } }]
+    - path: "^/usapi\\?method=set-first-over&"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /usapi, query: { method: get-settings } }
+        - { method: GET, path: /usapi, query: { method: get-status } }
+    - path: "^/usapi\\?method=(set-edid-config|import-edid)(&|$)"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      then_send: [{ models: [ultra-stream-hdmi], method: GET, path: /usapi, query: { method: get-edid-config } }]
+    - path: "^/usapi\\?method=(add-user|del-user|set-password)&"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      then_send: [{ method: GET, path: /usapi, query: { method: get-users } }]
+    - path: "^/cloud-api\\?method=cloud-(reg|unreg)-ex&"
+      json_match: { "$.result": "^0$" }
+      json: {}
+      then_send: [{ endpoint: cloud, method: GET, path: /cloud-api, query: { method: cloud-status, version: "1" } }]
+    - path: "^/usapi\\?method=del-media-files$"
+      request_match: { "$.disk-type": "^([01])$" }
+      json_match: { "$.result": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /usapi, query: { method: get-media-files, disk-type: "{1}", start: "0", count: "100" } }
+        - { method: GET, path: /usapi, query: { method: get-status } }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      None of these asks for confirmation. start_usb_format and
+      start_sd_format erase every recording and cannot be canceled;
+      delete_media_files cannot be undone; reset_all_settings loses the whole
+      configuration and restarts the device; reboot, install_uploaded_firmware
+      and install_online_firmware stop recording and streaming until the
+      device is back (an update cannot be interrupted); stop_recording and
+      stop_live end a take or broadcast at once, and set_live_lock refuses
+      stop_live until it is turned off; delete_stream_server,
+      delete_upload_server, delete_user, delete_no_signal_image,
+      remove_upload_files, clear_upload_list and unregister_cloud cannot be
+      undone; set_ethernet_static, set_ethernet_dhcp, set_wifi_static,
+      set_wifi_dhcp, disconnect_wifi and close_softap can move the device to
+      another address or network, where the core no longer reaches it;
+      set_main_stream_video, set_sub_stream_video, set_audio_bitrate and
+      set_stream_assignment change what is being recorded and streamed.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no push. get-status (status mask, recording, live, tests,
+      firmware update, uploads, input signal, storage, networks, system load)
+      is polled every 2 seconds; get-settings every 30 seconds; get-info,
+      the users, the EDIDs, the Cloud status and the first 100 recordings of
+      each storage every 60 seconds; and what a command changes is read again
+      as soon as the device accepts it. Opened for commands only, the core
+      polls nothing and checks the device with ping, which needs no login.
+      The core logs in (id and the MD5 of the password, the sid cookie)
+      before the first request that needs a session and again whenever the
+      device answers -17 (authentication required) or HTTP 401, repeating
+      that request once; a refused login (36, -1 or -25, or HTTP 401 or 403)
+      is final until the settings are corrected. change_password changes the
+      logged-in user's password: update the password setting with it, or the
+      next login is refused.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The device refuses requests that clash (API Limits): a USB format,
+      USB test, stream test, live streaming, recording, an encoding change,
+      a firmware update, a reset and a reboot exclude one another in the
+      combinations the document tabulates, and a repeated request answers 1
+      (repeat). Live streaming goes to at most two enabled servers, to one
+      only above 4 Mbps or with RTSP (-29, -30, -41, -42), never with HEVC
+      (-32), and never to Facebook beside another service (-31). A recording
+      file may not exceed 4 GB (-33): file_minutes times the bitrate must
+      stay below it. After a recording, stream, test, format, check or
+      update ends, its status stays at its last result until the matching
+      clear_* command puts it back to 27.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits. Joining a Wi-Fi network (its name and password), the
+      Bluetooth GATT protocol and the BLE advertisement are served only over
+      Bluetooth, which this integration does not use; the multicast
+      discovery on 239.255.255.250:2538 and SSDP are not used either. No
+      method sets the startup recording and live switches, the HDMI record
+      control switch, the custom file name prefix (file-prefix), or the
+      encoded audio's sample rate and channels that get-settings reports;
+      they are read only, as are the user roles (add_user adds general
+      users). The access point's
+      is-softap, is-visible and SSID are documented as reserved. The file
+      downloads (http://IP:8080/download/...), recording thumbnails, the
+      snapshot image, export-report, export-edid and
+      export-loop-through-edid give files to save, which the spec format
+      cannot do; the EDIDs are read as base64 into state instead, and the
+      report as HTML text by get_report.
+
+  - models: [all]
+    severity: info
+    text: >
+      The API's errors are negative numbers, which the spec's code table
+      cannot hold: a command the device refuses fails with the raw code (for
+      example -9 system busy, -10 invalid parameters, -14 data does not
+      exist, -16 no free space, -28 invalid characters, -43 live streaming
+      locked, -100 FTP server error), as the API Status Codes page lists
+      them; positive states (1 repeated, 2 running) carry their message.
+      Stream keys, passwords, tokens and the access point password are kept
+      out of state. Values are reported in words where the document names
+      them (main or sub, h264 or hevc, the storage, server, FTP and color
+      settings); status results are the API status codes. The units of
+      sysstat (CPU, memory, network and storage rates, uptime) and the
+      meaning of input-signal's status and channel-valid are not documented,
+      and are kept as reported. get-signal-info and send-file-get-status
+      document only their result, so get_signal_info and get_upload_status
+      return the reply unread; get-status's send-file object gives the
+      upload progress. The recording list kept in state is each storage's
+      first 100 files; get_media_files reads further pages, which are added
+      to it. The document's examples of the JSON bodies of del-media-files,
+      send-file-add and send-file-del leave the keys unquoted; the core
+      sends standard JSON.
+
+  - models: [all]
+    severity: info
+    text: >
+      The Cloud methods answer on port 8070 (/cloud-api), which the document
+      gives without a login; the core sends them without the session cookie.
+      Uploads (firmware, EDID, no-signal image) are multipart/form-data with
+      one part named file, as the vendor's demo sends firmware. The default
+      user Admin with password Admin is taken from the vendor's demos.
+
+  - models: [ultra-stream-sdi]
+    severity: info
+    text: >
+      The EDID methods describe the HDMI input and its loop-through, so they
+      are offered on the HDMI model only; the document does not say which
+      models have them. get-info's input audio range is named hdmi on both.

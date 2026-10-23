@@ -150,7 +150,11 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
     (
         "vendor-magewell",
-        &["magewell-proconvert", "magewell-ultra-encode"],
+        &[
+            "magewell-proconvert",
+            "magewell-ultra-encode",
+            "magewell-ultra-stream",
+        ],
     ),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
