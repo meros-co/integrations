@@ -1,0 +1,414 @@
+spec: 1
+id: generic-midi
+name: Generic MIDI device
+vendor: Generic (any device or software taking MIDI 1.0 over RTP-MIDI or a MIDI port)
+category: other
+implementation: native
+reason: >
+  A generic sender and receiver rather than one device's protocol, over a link the spec format has no
+  transport for. RTP-MIDI is a stateful session (an invitation on two UDP ports, clock synchronisation the
+  peer answers, receiver feedback, segmented SysEx and recovery journals in binary RTP packets), and a MIDI
+  port of the host is opened through the operating system's MIDI API. MIDI itself is a binary stream with
+  running status and real-time bytes inside other messages, its 14-bit values, NRPNs and MTC are spread over
+  several messages, and what is kept from them depends on what came before, none of which text framing and
+  state rules can express.
+
+source:
+  - title: "The Complete MIDI 1.0 Detailed Specification, document version 96.1, MIDI 1.0 Detailed Specification 4.2.1"
+    author: "MIDI Manufacturers Association (1996)"
+    url: "https://midi.org/midi-1-0-detailed-specification"
+    note: >
+      Channel voice messages (note off 8n, note on 9n, poly pressure An, control change Bn, program change Cn,
+      channel pressure Dn, pitch bend En with the LSB first and 2000H at the centre); a note on with velocity
+      0 is a note off. Channel mode messages (controllers 120-127). Registered and non-registered parameter
+      numbers (controllers 101/100 and 99/98 select, 6 and 38 are the data entry MSB and LSB, 127/127 is the
+      null parameter); bank select (controllers 0 and 32) before a program change; controllers 0-31 with
+      their LSB at 32-63. System common (F1 MTC quarter frame, F2 song position in MIDI beats, F3 song
+      select, F6 tune request; F4 and F5 undefined), system real-time (F8 clock, FA start, FB continue, FC
+      stop, FE active sensing, FF reset; F9 and FD undefined), SysEx (F0 ... F7, ended by any status but a
+      real-time one). Running status; system common messages cancel it, real-time bytes do not.
+  - title: "MIDI Time Code, MMA document 4.2.1"
+    author: "MIDI Manufacturers Association (1987, 1991, 1994, 2020)"
+    url: "https://midi.org/midi-time-code"
+    note: >
+      Quarter frame messages F1 0nnn dddd, pieces 0-7 from frames LS nibble to hours MS nibble with the
+      type in bits 1-2 of piece 7 (0 = 24, 1 = 25, 2 = 30 drop-frame, 3 = 30 fps); eight in a row give the
+      time, two frames late when running forward, so the receiver adds two frames; in reverse they arrive
+      7 to 0. Full message F0 7F <device> 01 01 hr mn sc fr F7 (hours byte 0 yy zzzzz), after which time
+      runs again with the next quarter frame. User bits F0 7F <device> 01 02 u1 ... u9 F7, nibbles of binary
+      groups 1-8, read as group 8 first.
+  - title: "MIDI Machine Control 1.0, MMA0016 / RP-013"
+    author: "MIDI Manufacturers Association (1992)"
+    url: "https://midi.org/midi-machine-control"
+    note: >
+      Commands F0 7F <device> 06 <commands> F7 and responses F0 7F <device> 07 <responses> F7; device 7F is
+      all-call. Commands 01-3F carry no data, 40-77 a byte count and data. The transport commands STOP 01,
+      PLAY 02, DEFERRED PLAY 03, FAST FORWARD 04, REWIND 05, RECORD STROBE 06, RECORD EXIT 07, RECORD PAUSE
+      08, PAUSE 09, EJECT 0A, CHASE 0B, COMMAND ERROR RESET 0C, MMC RESET 0D; WRITE 40, READ 42, LOCATE 44
+      ([TARGET] 01 with a Standard Time, [I/F] 00 with a register GP0-GP7, 08-0F), VARIABLE PLAY 45, SEARCH
+      46, SHUTTLE 47 (Standard Speed sh sm sl: sign, a shift count and a 17-bit value), STEP 48 (0 g ssssss).
+      Standard Time hr mn sc fr ff|st with the rate in the hours byte. Responses: fields 01-1F carry a
+      5-byte time code, 20-3F a 2-byte short form (frames and subframes of field minus 20), 40-77 a count;
+      MOTION CONTROL TALLY 48 (state, process, success levels), VELOCITY TALLY 49.
+  - title: "RFC 6295: RTP Payload Format for MIDI"
+    author: "J. Lazzaro, J. Wawrzynek (IETF, 2011)"
+    url: "https://www.rfc-editor.org/rfc/rfc6295"
+    note: >
+      §2-3: the MIDI command section (B, J, Z, P flags and a 4- or 12-bit length), delta times, running status
+      within a packet, SysEx whole or in segments (F0..F0, F7..F0, F7..F7, cancel F7 F4, dropped F7 as F5),
+      undefined system commands ended by F7. §5 and Appendix A: the recovery journal (header S Y A H TOTCHAN
+      and checkpoint sequence number; system journal; channel journals with chapters P, C, M, W, N, E, T, A;
+      LENGTH fields covering the whole structure).
+  - title: "MIDI Network Driver Protocol"
+    author: "Apple Inc. (Documentation Archive, updated 2016-12-12)"
+    url: "https://developer.apple.com/library/archive/documentation/Audio/Conceptual/MIDINetworkDriverProtocol/MIDI/MIDI.html"
+    note: >
+      RTP-MIDI sessions: two UDP ports per participant, N (control, advertised over Bonjour as
+      _apple-midi._udp) and N+1 (MIDI); IN, OK, NO and BY packets (FF FF, the command, protocol version 2, the
+      initiator token, the sender's SSRC and an optional NUL-terminated name), the invitation sent to the
+      control port and then the data port and repeated every second up to 12 times; clock synchronisation
+      CK (SSRC, count, three 64-bit timestamps in 100-microsecond units) at least once a minute; receiver
+      feedback RS (SSRC and sequence number) on the control port; RTP packets with payload type 0x61 whose
+      timestamps are in the same units; received packets need not carry a journal.
+
+settings:
+  link: { type: enum, values: [rtp, port], default: rtp, label: Link,
+          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); port uses MIDI ports of this computer, named by midi_input and midi_output." }
+  session_name: { type: string, max_length: 64, default: "Meros", label: Session name,
+                  description: "With link rtp, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
+  local_port: { type: int, min: 1024, max: 65534, label: Local RTP port,
+                description: "With link rtp, the local control port to use (the data port is the next); leave unset to pick a free one at random." }
+  midi_input: { type: string, max_length: 256, label: MIDI input port,
+                description: "With link port, the input port to receive from, as listed by the MIDI port listing; leave unset to only send." }
+  midi_output: { type: string, max_length: 256, label: MIDI output port,
+                 description: "With link port, the output port to send to, as listed by the MIDI port listing; leave unset to only receive." }
+  device_id: { type: int, min: 0, max: 127, default: 127, label: Device ID,
+               description: "The device ID MTC full messages and MMC commands go to when a command does not give one; 127 is all-call." }
+  realtime_events: { type: bool, default: false, label: Real-time events,
+                     description: "On also reports each MIDI clock, active sensing and MTC quarter frame received as a message event; they are many a second." }
+
+ports:
+  - { port: 5004, protocol: udp, role: control, note: "with link rtp: the RTP-MIDI session's control port (advertised as _apple-midi._udp); 5004 is what macOS Audio MIDI Setup offers for a new session, and the port given when opening overrides it" }
+  - { port: 5005, protocol: udp, role: control, when: "link rtp", note: "the session's data port: always the control port plus one" }
+  - { port: null, protocol: udp, role: feedback, listener: core, setting: local_port, when: "link rtp", note: "the core's own control port and the one after it, where the session answers; random in 49152-65534 unless local_port is set" }
+  - { port: null, protocol: midi, role: control, setting: midi_input, when: "link port", note: "a MIDI input of this computer: a USB or other class-compliant device, or another program's port" }
+  - { port: null, protocol: midi, role: control, setting: midi_output, when: "link port", note: "a MIDI output of this computer" }
+
+models:
+  - id: generic
+    name: "Any MIDI 1.0 device, over an RTP-MIDI session (give its host) or a MIDI port of this computer"
+    supports: [note_on, note_off, control_change, control_change_14bit, program_change, pitch_bend,
+               channel_pressure, poly_pressure, nrpn, rpn, channel_mode, sysex, raw, song_position,
+               song_select, tune_request, realtime, mtc_full_frame, mtc_quarter_frame, mtc_user_bits, mmc,
+               mmc_locate, mmc_locate_register, mmc_variable_play, mmc_search, mmc_shuttle, mmc_step, mmc_read,
+               mmc_write_time]
+    verification: none
+
+commands:
+  note_on:
+    summary: Send a note on. Returns unverified, as every MIDI command does
+    params:
+      channel: &channel { type: int, min: 1, max: 16, default: 1, label: Channel, description: "The MIDI channel, 1 to 16." }
+      note: &note { type: int, min: 0, max: 127, required: true, label: Note, description: "The note number, 0 to 127; 60 is middle C." }
+      velocity: { type: int, min: 1, max: 127, default: 100, label: Velocity, description: "How hard the note is struck, 1 to 127 (a note on with 0 is a note off: use note_off)." }
+    returns: none
+  note_off:
+    summary: Send a note off
+    params:
+      channel: *channel
+      note: *note
+      velocity: { type: int, min: 0, max: 127, default: 64, label: Release velocity, description: "The release velocity, 0 to 127; 64 when the device does not sense it." }
+    returns: none
+  control_change:
+    summary: Send a control change (any controller 0 to 127, the channel mode controllers 120 to 127 included)
+    params:
+      channel: *channel
+      controller: { type: int, min: 0, max: 127, required: true, label: Controller, description: "The controller number, 0 to 127, such as 7 for volume or 64 for the sustain pedal." }
+      value: { type: int, min: 0, max: 127, required: true, label: Value, description: "The value, 0 to 127." }
+    returns: none
+  control_change_14bit:
+    summary: Send a 14-bit controller value as its MSB on controller N and its LSB on N + 32, MSB first
+    params:
+      channel: *channel
+      controller: { type: int, min: 0, max: 31, required: true, label: Controller, description: "The MSB controller, 0 to 31; its LSB goes to this number plus 32." }
+      value: { type: int, min: 0, max: 16383, required: true, label: Value, description: "The value, 0 to 16383." }
+    returns: none
+  program_change:
+    summary: Send a program change, after bank select MSB and LSB (controllers 0 and 32) when given
+    params:
+      channel: *channel
+      program: { type: int, min: 0, max: 127, required: true, label: Program, description: "The program number on the wire, 0 to 127 (many devices show it as 1 to 128)." }
+      bank_msb: { type: int, min: 0, max: 127, label: Bank MSB, description: "Bank select MSB (controller 0) to send first; leave unset to send none." }
+      bank_lsb: { type: int, min: 0, max: 127, label: Bank LSB, description: "Bank select LSB (controller 32) to send first; leave unset to send none." }
+    returns: none
+  pitch_bend:
+    summary: Send a pitch bend
+    params:
+      channel: *channel
+      value: { type: int, min: -8192, max: 8191, default: 0, label: Bend, description: "The bend from -8192 to 8191, 0 at the centre." }
+    returns: none
+  channel_pressure:
+    summary: Send channel pressure (aftertouch)
+    params:
+      channel: *channel
+      pressure: { type: int, min: 0, max: 127, required: true, label: Pressure, description: "The pressure, 0 to 127." }
+    returns: none
+  poly_pressure:
+    summary: Send polyphonic key pressure for one note
+    params:
+      channel: *channel
+      note: *note
+      pressure: { type: int, min: 0, max: 127, required: true, label: Pressure, description: "The pressure, 0 to 127." }
+    returns: none
+  nrpn:
+    summary: >
+      Set a non-registered parameter: controllers 99 and 98 select it, 6 carries the value's MSB and 38 its
+      LSB when given; deselect then sends the null parameter (101/100 = 127/127)
+    params:
+      channel: *channel
+      parameter: { type: int, min: 0, max: 16383, required: true, label: Parameter, description: "The parameter number, 0 to 16383 (MSB times 128 plus LSB)." }
+      value_msb: { type: int, min: 0, max: 127, required: true, label: Value MSB, description: "The value's MSB (data entry, controller 6)." }
+      value_lsb: { type: int, min: 0, max: 127, label: Value LSB, description: "The value's LSB (data entry LSB, controller 38); leave unset for a 7-bit parameter." }
+      deselect: { type: bool, default: false, label: Deselect, description: "On sends the null parameter afterwards, so later data entry changes nothing." }
+    returns: none
+  rpn:
+    summary: >
+      Set a registered parameter (0 pitch bend range, 1 fine tuning, 2 coarse tuning, and so on): controllers
+      101 and 100 select it, then as for nrpn
+    params:
+      channel: *channel
+      parameter: { type: int, min: 0, max: 16383, required: true, label: Parameter, description: "The registered parameter number, 0 to 16383, such as 0 for pitch bend sensitivity." }
+      value_msb: { type: int, min: 0, max: 127, required: true, label: Value MSB, description: "The value's MSB (data entry, controller 6)." }
+      value_lsb: { type: int, min: 0, max: 127, label: Value LSB, description: "The value's LSB (data entry LSB, controller 38); leave unset to send none." }
+      deselect: { type: bool, default: false, label: Deselect, description: "On sends the null parameter afterwards." }
+    returns: none
+  channel_mode:
+    summary: Send a channel mode message (controllers 120 to 127)
+    params:
+      channel: *channel
+      mode: { type: enum, values: [all_sound_off, reset_all_controllers, local_control_off, local_control_on, all_notes_off, omni_off, omni_on, mono_on, poly_on], required: true, label: Mode, description: "The channel mode message to send." }
+      channels: { type: int, min: 0, max: 16, default: 0, label: Mono channels, description: "With mono_on, how many channels to use, 0 meaning as many as there are voices." }
+    returns: none
+  sysex:
+    summary: >
+      Send a system exclusive message: its bytes in hex, with or without F0 and F7, every byte between them
+      00 to 7F. Over RTP-MIDI a message too long for one packet is sent in segments
+    params:
+      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 1048576, required: true, label: SysEx bytes, description: "The message as hex digit pairs, such as F0 7E 7F 06 01 F7 or 7E 7F 06 01." }
+    returns: none
+  raw:
+    summary: >
+      Send MIDI bytes as given in hex: one or more whole messages, running status allowed; bytes that do not
+      end on a whole message are refused. Sent with every status byte written
+    params:
+      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 1048576, required: true, label: MIDI bytes, description: "Whole MIDI messages as hex digit pairs, such as 90 3C 40." }
+    returns: none
+  song_position:
+    summary: Send a song position pointer
+    params:
+      beats: { type: int, min: 0, max: 16383, required: true, label: MIDI beats, description: "The position in MIDI beats (sixteenth notes) from the start of the song." }
+    returns: none
+  song_select:
+    summary: Send a song select
+    params:
+      song: { type: int, min: 0, max: 127, required: true, label: Song, description: "The song number, 0 to 127." }
+    returns: none
+  tune_request:
+    summary: Send a tune request
+    returns: none
+  realtime:
+    summary: Send a system real-time message
+    params:
+      message: { type: enum, values: [clock, start, continue, stop, active_sensing, system_reset], required: true, label: Message, description: "The real-time message: a clock tick, start, continue, stop, active sensing or a system reset." }
+    returns: none
+  mtc_full_frame:
+    summary: Send an MTC full message, locating MTC receivers to the time; time runs again with the next quarter frame
+    params:
+      hours: &hours { type: int, min: 0, max: 23, default: 0, label: Hours, description: "Hours, 0 to 23." }
+      minutes: &minutes { type: int, min: 0, max: 59, default: 0, label: Minutes, description: "Minutes, 0 to 59." }
+      seconds: &seconds { type: int, min: 0, max: 59, default: 0, label: Seconds, description: "Seconds, 0 to 59." }
+      frames: &frames { type: int, min: 0, max: 29, default: 0, label: Frames, description: "Frames, below the rate's frames per second." }
+      rate: &rate { type: enum, values: ["24", "25", "30df", "30"], default: "30", label: Frame rate, description: "The time code's rate: 24, 25, 30 drop-frame (29.97) or 30 frames per second." }
+      device_id: &device_id { type: int, min: 0, max: 127, label: Device ID, description: "The device ID to address, 0 to 127 with 127 all-call; the device_id setting when not given." }
+    returns: none
+  mtc_quarter_frame:
+    summary: >
+      Send one MTC quarter frame. A running time code is eight of these every two frames, timed by the sender:
+      the core sends each when asked, so their timing is the caller's
+    params:
+      piece: { type: int, min: 0, max: 7, required: true, label: Piece, description: "Which nibble: 0 frames LS to 7 hours MS and rate." }
+      value: { type: int, min: 0, max: 15, required: true, label: Value, description: "The nibble's value, 0 to 15." }
+    returns: none
+  mtc_user_bits:
+    summary: Send the SMPTE user bits as an MTC user bits message
+    params:
+      user_bits: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: User bits, description: "Eight hex digits, binary group 8 first, as user bits are read." }
+      flags: { type: int, min: 0, max: 3, default: 0, label: Group flags, description: "The binary group flag bits, 0 to 3 (bit 1 is SMPTE bit 59, bit 0 bit 43)." }
+      device_id: *device_id
+    returns: none
+  mmc:
+    summary: Send an MMC transport command
+    params:
+      command: { type: enum, values: [stop, play, deferred_play, fast_forward, rewind, record_strobe, record_exit, record_pause, pause, eject, chase, command_error_reset, mmc_reset], required: true, label: Command, description: "The MMC command." }
+      device_id: *device_id
+    returns: none
+  mmc_locate:
+    summary: Send an MMC LOCATE [TARGET] to a time
+    params:
+      hours: *hours
+      minutes: *minutes
+      seconds: *seconds
+      frames: *frames
+      subframes: &subframes { type: int, min: 0, max: 99, default: 0, label: Subframes, description: "Hundredths of a frame, 0 to 99." }
+      rate: *rate
+      device_id: *device_id
+    returns: none
+  mmc_locate_register:
+    summary: Send an MMC LOCATE [I/F] to the time held in a general purpose register (GP0, the locate point, to GP7)
+    params:
+      register: { type: int, min: 0, max: 7, default: 0, label: Register, description: "The register: 0 for GP0 (the locate point) to 7." }
+      device_id: *device_id
+    returns: none
+  mmc_variable_play:
+    summary: Send MMC VARIABLE PLAY at a speed
+    params:
+      speed: &speed { type: float, min: -1023.99, max: 1023.99, required: true, label: Speed, description: "Times play speed, negative for reverse, such as 2 or -0.5." }
+      device_id: *device_id
+    returns: none
+  mmc_search:
+    summary: Send MMC SEARCH at a speed (moving with picture or sound monitored)
+    params:
+      speed: *speed
+      device_id: *device_id
+    returns: none
+  mmc_shuttle:
+    summary: Send MMC SHUTTLE at a speed (moving without necessarily monitoring)
+    params:
+      speed: *speed
+      device_id: *device_id
+    returns: none
+  mmc_step:
+    summary: Send MMC STEP, moving by a number of step lengths (one video field unless the device is set otherwise)
+    params:
+      steps: { type: int, min: -63, max: 63, required: true, label: Steps, description: "How many step lengths to move, negative for backward." }
+      device_id: *device_id
+    returns: none
+  mmc_read:
+    summary: Send MMC READ for an information field; the device's response is kept in mmc.responses
+    params:
+      field: { type: enum, values: [selected_time_code, selected_master_code, requested_offset, actual_offset, lock_deviation, generator_time_code, mtc_input, gp0, gp1, gp2, gp3, gp4, gp5, gp6, gp7, motion_control_tally, velocity_tally], required: true, label: Field, description: "The information field to read." }
+      device_id: *device_id
+    returns: none
+  mmc_write_time:
+    summary: Send MMC WRITE of a time to a time code field, such as a locate point register
+    params:
+      field: { type: enum, values: [selected_time_code, selected_master_code, requested_offset, actual_offset, lock_deviation, generator_time_code, mtc_input, gp0, gp1, gp2, gp3, gp4, gp5, gp6, gp7], required: true, label: Field, description: "The time code field to write." }
+      hours: *hours
+      minutes: *minutes
+      seconds: *seconds
+      frames: *frames
+      subframes: *subframes
+      rate: *rate
+      device_id: *device_id
+    returns: none
+
+state:
+  link:                          { type: string, description: "rtp or port" }
+  session.peer_name:             { type: string, description: "With link rtp, the name the other host gives its session" }
+  session.peer_ssrc:             { type: int, description: "With link rtp, the other host's RTP synchronisation source" }
+  session.local_port:            { type: int, description: "With link rtp, the core's control port (its data port is the next)" }
+  port.input:                    { type: string, description: "With link port, the MIDI input port opened, or null" }
+  port.output:                   { type: string, description: "With link port, the MIDI output port opened, or null" }
+  received_count:                { type: int, description: "MIDI messages received since the device was opened" }
+  channels.*.notes.*.on:         { type: bool, description: "Whether the note (key: note number) on the channel (key: 1 to 16) is on: the last note on with velocity above 0 and no note off, all notes off or all sound off since" }
+  channels.*.notes.*.velocity:   { type: int, description: "The velocity of the note's last note on, or the release velocity of its last note off (0 for a note on with velocity 0)" }
+  channels.*.cc.*:               { type: int, description: "The last value of each controller (key: 0 to 127), channel mode controllers included" }
+  channels.*.program:            { type: int, description: "The last program change, 0 to 127" }
+  channels.*.bank.msb:           { type: int, description: "Bank select MSB (controller 0) in force at the last program change, or null" }
+  channels.*.bank.lsb:           { type: int, description: "Bank select LSB (controller 32) in force at the last program change, or null" }
+  channels.*.pitch_bend:         { type: int, description: "The last pitch bend, -8192 to 8191" }
+  channels.*.pressure:           { type: int, description: "The last channel pressure" }
+  channels.*.poly_pressure.*:    { type: int, description: "The last polyphonic pressure of each note" }
+  channels.*.nrpn.*.value_msb:   { type: int, description: "The last data entry MSB for each non-registered parameter (key: 0 to 16383)" }
+  channels.*.nrpn.*.value_lsb:   { type: int, description: "The last data entry LSB for the parameter" }
+  channels.*.nrpn.*.value:       { type: int, description: "The parameter's 14-bit value: MSB times 128 plus the LSB last received after it (0 until one is)" }
+  channels.*.rpn.*.value_msb:    { type: int, description: "The last data entry MSB for each registered parameter" }
+  channels.*.rpn.*.value_lsb:    { type: int, description: "The last data entry LSB for the parameter" }
+  channels.*.rpn.*.value:        { type: int, description: "The parameter's 14-bit value, as for nrpn" }
+  mtc.hours:                     { type: int, description: "MIDI Time Code position: hours" }
+  mtc.minutes:                   { type: int, description: "Minutes" }
+  mtc.seconds:                   { type: int, description: "Seconds" }
+  mtc.frames:                    { type: int, description: "Frames" }
+  mtc.rate:                      { type: string, description: "24, 25, 30df or 30" }
+  mtc.timecode:                  { type: string, description: "The position as hh:mm:ss:ff" }
+  mtc.running:                   { type: bool, description: "Whether quarter frames are arriving: false after a full message, and 500 ms after the last run of eight" }
+  mtc.direction:                 { type: string, description: "forward or reverse, from the order of the quarter frames" }
+  mtc.source:                    { type: string, description: "quarter_frame or full_frame: what set the position last" }
+  mtc.user_bits:                 { type: string, description: "The last user bits received, eight hex digits, binary group 8 first" }
+  mtc.user_bits_flags:           { type: int, description: "Their binary group flag bits" }
+  mmc.command:                   { type: string, description: "The last MMC command received (from another controller on the link), such as play" }
+  mmc.transport:                 { type: string, description: "The last MMC motion command received: stop, play, deferred_play, fast_forward, rewind, record_strobe, record_exit, record_pause, pause, eject, chase, variable_play, search, shuttle or step" }
+  mmc.device_id:                 { type: int, description: "The device ID that last MMC command was sent to" }
+  mmc.locate:                    { type: object, description: "The last LOCATE received: a time {hours, minutes, seconds, frames, rate, timecode, subframes} or {register}" }
+  mmc.speed:                     { type: float, description: "The speed of the last VARIABLE PLAY, SEARCH or SHUTTLE received, times play speed" }
+  mmc.responses.*:               { type: object, description: "MMC response fields by the responding device's ID: selected_time_code and the other time fields as {hours, minutes, seconds, frames, rate, timecode, negative, color_frame, subframes or status}, motion_control_tally as {state, process, state_success, process_success}, velocity_tally as a speed, others as {hex}" }
+  sequencer.running:             { type: bool, description: "true after start or continue, false after stop" }
+  sequencer.song_position:       { type: int, description: "The last song position pointer, in MIDI beats" }
+  sequencer.song:                { type: int, description: "The last song select" }
+  sysex.last:                    { type: string, description: "The last system exclusive message received, as hex from F0 to F7" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      MIDI has no acknowledgement, so every command is unverified, and a MIDI port gives no sign of the device
+      itself: the device is connected while the port is open. An RTP-MIDI session is connected while the other
+      host answers its clock synchronisation (every 10 s, with three missed ending the session); its round
+      trip is the latency.
+  - models: [all]
+    severity: info
+    text: >
+      Every message received is reported as a message event (address the message kind, such as note_on,
+      control_change, sysex, mmc or mtc_full_frame), except MIDI clock, active sensing and MTC quarter frames,
+      which arrive many times a second: set realtime_events to have them too. Their effect on state (the MTC
+      position, the sequencer running) is kept either way.
+  - models: [all]
+    severity: info
+    text: >
+      State holds the last of everything received, not the device's own settings: MIDI has no general way to
+      ask a device for its state, so a value the device has not sent since the link opened is absent. MMC
+      responses are the exception: mmc_read asks for one.
+  - models: [all]
+    severity: info
+    text: >
+      Over RTP-MIDI the core joins a session another host offers (as macOS Audio MIDI Setup's network session,
+      rtpMIDI on Windows, or a network MIDI interface); it does not offer one of its own for others to join. It
+      sends no recovery journal: a packet lost on the way to the device is lost. A packet lost on the way back
+      is repaired from the device's journal where it sends one (notes, controllers, programs, pitch bend and
+      pressure).
+  - models: [all]
+    severity: info
+    text: >
+      On Windows a MIDI port can usually be open in only one program at a time (the Windows Multimedia MIDI
+      API): a port another program holds fails to open, is reported disconnected, and is tried again after
+      1 s, doubling to 30 s. Two ports with the same name are told apart by nothing: the first is used.
+  - models: [all]
+    severity: info
+    text: >
+      Running MTC (a quarter frame every quarter frame) is not generated by the core: mtc_quarter_frame sends
+      one piece when asked, so a caller generating time code times them itself. mtc_full_frame locates.
+  - models: [all]
+    severity: info
+    text: >
+      Undocumented details of Apple's session protocol the core follows: receiver feedback (RS) carries the
+      16-bit sequence number in the upper half of its 32-bit field (Apple's figure shows one 32-bit field); the
+      core answers a clock synchronisation the other host starts (count 0) with count 1, and refuses an
+      invitation sent to it with NO, as it only initiates. A host that chooses ports for the core's data that are
+      not its control port plus one is not supported.
+  - models: [all]
+    severity: info
+    text: >
+      MMC responses are kept as the device sends them: a short time code field (21-3F) updates the frames and
+      subframes of the full field it shortens, once that has been received, and a field this module does not
+      decode is kept as hex. mmc_read asks once; MMC's UPDATE, which has a device send a field whenever it
+      changes, is sent with sysex.

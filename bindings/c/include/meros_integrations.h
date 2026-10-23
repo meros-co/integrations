@@ -45,6 +45,12 @@ char *mi_catalog(const MiCore *core);
  * Android and iOS. */
 char *mi_serial_ports(const MiCore *core);
 
+/* The host's MIDI ports, for the midi_input and midi_output settings of a
+ * device on one: {"ok":[{"name":"...","input":true,"output":false},...]} or
+ * {"error":{...}}. Empty in a build without a MIDI integration and on
+ * Android. */
+char *mi_midi_ports(const MiCore *core);
+
 /* request: {"device":"<spec id>","model":"<model id>","host":"<ip or name>",
  *           "port":<optional>,"settings":{...},"monitor":<optional bool>}
  * "monitor":false opens the device for commands only: no subscription,

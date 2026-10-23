@@ -8,7 +8,8 @@
 //! Sennheiser EW G3/G4 receivers (MCP) are found by `crate::mcp_discovery`,
 //! Sony cameras (SSDP) by `crate::ssdp`, and PJLink Class 2 projectors
 //! (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`, and
-//! Blackmagic Design devices and Meros Cameras (mDNS / DNS-SD) by
+//! Blackmagic Design devices, Meros Cameras and RTP-MIDI sessions (mDNS /
+//! DNS-SD) by
 //! `crate::mdns`, whose rules are there. Each is compiled only with the
 //! integrations whose devices it finds. Protocols are independent: each listens, scans and stops on its own.
 
@@ -36,6 +37,7 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
             "blackmagic-multiview",
             "blackmagic-smartview",
             "blackmagic-videohub",
+            "generic-midi",
             "meros-camera",
         ],
     ),
@@ -48,8 +50,8 @@ pub struct DiscoverRequest {
     pub action: DiscoverAction,
     /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
     /// cameras), `pjlink` (PJLink Class 2 projectors) and `mdns` (Blackmagic
-    /// ATEM, Videohub, HyperDeck, SmartView and MultiView, and Meros
-    /// Cameras). Empty means every
+    /// ATEM, Videohub, HyperDeck, SmartView and MultiView, Meros Cameras,
+    /// and RTP-MIDI sessions). Empty means every
     /// protocol that finds a device in this core's catalogue; naming one that
     /// finds none of them is an error.
     #[serde(default)]
@@ -100,6 +102,7 @@ pub(crate) struct Discovery {
         feature = "blackmagic-multiview",
         feature = "blackmagic-smartview",
         feature = "blackmagic-videohub",
+        feature = "generic-midi",
         feature = "meros-camera"
     ))]
     mdns: crate::mdns::Mdns,
@@ -131,6 +134,7 @@ impl Discovery {
                 feature = "blackmagic-multiview",
                 feature = "blackmagic-smartview",
                 feature = "blackmagic-videohub",
+                feature = "generic-midi",
                 feature = "meros-camera"
             ))]
             mdns: crate::mdns::Mdns::new(catalog),
@@ -196,6 +200,7 @@ impl Discovery {
                     feature = "blackmagic-multiview",
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
+                    feature = "generic-midi",
                     feature = "meros-camera"
                 ))]
                 if mdns {
@@ -222,6 +227,7 @@ impl Discovery {
                     feature = "blackmagic-multiview",
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
+                    feature = "generic-midi",
                     feature = "meros-camera"
                 ))]
                 if mdns {
@@ -251,6 +257,7 @@ impl Discovery {
                     feature = "blackmagic-multiview",
                     feature = "blackmagic-smartview",
                     feature = "blackmagic-videohub",
+                    feature = "generic-midi",
                     feature = "meros-camera"
                 ))]
                 if mdns {

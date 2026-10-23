@@ -67,6 +67,22 @@ device = core.open({"device": "extron-matrix", "model": "mmx-42-62",
                     "settings": {"link": "serial", "serial_port": port["name"]}})  # no host needed
 ```
 
+
+## MIDI ports
+
+A MIDI device can be reached on a MIDI port of this machine (a USB or other
+class-compliant MIDI interface or instrument, or another program's port):
+`generic-midi` takes the `link` setting `"port"` and
+name the ports in `midi_input` and `midi_output`. `core.midi_ports()` lists
+this machine's ports, each with whether it is an input, an output or both
+(empty in a build without a MIDI integration and on Android):
+
+```python
+keys = next(p for p in core.midi_ports() if p["input"] and p["output"])
+device = core.open({"device": "generic-midi", "model": "generic",
+                    "settings": {"link": "port", "midi_input": keys["name"],
+                                 "midi_output": keys["name"]}})
+```
 ## Files sent to devices
 
 A command's `binary` parameter (a show file, a media file, an image) takes

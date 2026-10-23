@@ -66,6 +66,8 @@ mod focusrite_rednet;
 mod ftp;
 #[cfg(feature = "generic-http")]
 mod generic_http;
+#[cfg(feature = "generic-midi")]
+mod generic_midi;
 #[cfg(any(feature = "generic-osc", feature = "osc-listener"))]
 mod generic_osc;
 #[cfg(any(
@@ -87,6 +89,8 @@ mod lake_dlm;
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
 mod meros_camera_wire;
+#[cfg(feature = "generic-midi")]
+mod midi_link;
 #[cfg(feature = "nec-display")]
 mod nec_display;
 #[cfg(feature = "nec-projector")]
@@ -121,6 +125,8 @@ mod pjlink;
 mod qsys;
 #[cfg(feature = "resolume")]
 mod resolume_push;
+#[cfg(feature = "generic-midi")]
+mod rtp_midi;
 #[cfg(feature = "samsung-mdc")]
 mod samsung_mdc;
 #[cfg(feature = "samsung-mdc")]
@@ -353,6 +359,8 @@ pub(crate) fn construct(
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
+        #[cfg(feature = "generic-midi")]
+        "generic-midi" => Ok(Box::new(generic_midi::GenericMidi::new(context)?)),
         #[cfg(feature = "http-listener")]
         "http-listener" => Ok(Box::new(http_listener::HttpListener::new(context)?)),
         #[cfg(feature = "http-snapshot")]

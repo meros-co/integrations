@@ -46,6 +46,7 @@ NATIVE = {
     "emberplus": "Ember+ (S101) over TCP",
     "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",
+    "generic-midi": "MIDI 1.0 over RTP-MIDI (UDP 5004/5005) or a MIDI port of the host",
     "generic-osc": "OSC over UDP or TCP",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "epson-projector": "ESC/VP21 over ESC/VP.net (TCP 3629) or a serial port",

@@ -1391,6 +1391,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1696](specs/freeshow.yaml#L1696))
 - [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1698](specs/freeshow.yaml#L1698))
 
+## generic-midi — Generic MIDI device
+
+- [ ] Join a macOS Audio MIDI Setup network session (and rtpMIDI on Windows, and a network MIDI interface) and confirm the invitation on both ports is accepted, notes and SysEx arrive, and the session stays up for an hour with the core's clock synchronisation every 10 s. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
+- [ ] Confirm those hosts accept packets with no recovery journal (J clear) from the core, as Apple's driver document says receivers must. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
+- [ ] With packet loss forced (a lossy link or dropped packets), confirm the replay of Apple's recovery journal leaves notes, controllers, programs and pitch bend as the sender has them. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
+- [ ] Capture Apple's RS packet and confirm the sequence number sits in the upper 16 bits of its 32-bit field, and that a host starting its own clock synchronisation accepts the core's count 1 answer. ([specs/generic-midi.yaml:400](specs/generic-midi.yaml#L400))
+- [ ] Confirm 5004 is the port Audio MIDI Setup offers for a new session, and that the session's advertised _apple-midi._udp SRV port is its control port. ([specs/generic-midi.yaml:91](specs/generic-midi.yaml#L91))
+- [ ] With a USB MIDI device on Windows, macOS and Linux, confirm the port listing's names open the device, that unplugging it reports disconnected within a second or two and plugging it back reconnects, and that a port held by another program on Windows fails to open as described. ([specs/generic-midi.yaml:389](specs/generic-midi.yaml#L389))
+- [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:408](specs/generic-midi.yaml#L408))
+
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))

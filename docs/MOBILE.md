@@ -189,6 +189,24 @@ this platform, and the list of the host's serial ports (`serial_ports` in
 every delivery) is empty. Everything else in those integrations builds and works over
 the network as elsewhere.
 
+## MIDI ports
+
+The MIDI integration (`generic-midi`) reaches a device
+over an RTP-MIDI session on the network, which works on a phone as
+anywhere, or on a MIDI port of the host (`link` `port`). MIDI ports are
+opened with the `midir` crate:
+
+- **iOS** has CoreMIDI, which `midir` uses as on macOS: a USB MIDI device
+  on the camera connection kit or USB-C, a Bluetooth MIDI device paired in
+  the app, or another app's port is listed and opened. The app needs no
+  entitlement for it. This has not been built for iOS here; CI builds it.
+- **Android** reaches MIDI only through its Java `android.media.midi` API,
+  which a native library cannot start on its own, so MIDI ports are left
+  out of Android builds: a device opened on a MIDI port stays
+  `disconnected`, its reason saying MIDI ports are not available on this
+  platform, and the list of the host's MIDI ports (`midi_ports` in every
+  delivery) is empty. RTP-MIDI works.
+
 ## What has been verified
 
 - Android: `cargo build` of the core and the C binding (including linking

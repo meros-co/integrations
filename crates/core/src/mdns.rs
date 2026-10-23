@@ -1,5 +1,5 @@
-//! Finding Blackmagic Design devices and Meros Cameras over Multicast DNS
-//! and DNS-SD (Bonjour).
+//! Finding Blackmagic Design devices, Meros Cameras and RTP-MIDI sessions
+//! over Multicast DNS and DNS-SD (Bonjour).
 //!
 //! Multicast DNS (RFC 6762) carries ordinary DNS messages to 224.0.0.251 on
 //! UDP 5353; DNS-SD (RFC 6763) names each advertised service instance
@@ -27,6 +27,13 @@
 //! setting), `model` (the phone or tablet's model) and `proto`, and the port
 //! in SRV (8790 by default). A camera is told apart by its id, never by name
 //! or address, since its address can change with DHCP.
+//!
+//! Apple documents RTP-MIDI's advertisement (MIDI Network Driver Protocol):
+//! each session's control port is advertised as `_apple-midi._udp`, its data
+//! port being the next one. The instance name is the session's name. A
+//! session is any MIDI device, so it is reported once for each MIDI
+//! integration in the core (`generic-midi`), at the SRV port, and a host
+//! advertising several sessions is reported once per port.
 //!
 //! What is inferred, and listed in VERIFICATION.md: that TXT `class` names the
 //! product family exactly as Companion filters on it, and that TXT `name` is
@@ -113,6 +120,7 @@ pub(crate) const SPECS: &[&str] = &[
     "blackmagic-multiview",
     "blackmagic-smartview",
     "blackmagic-videohub",
+    "generic-midi",
     "meros-camera",
 ];
 
@@ -139,6 +147,10 @@ struct Rule {
 const MEROS_CAMERA: &str = "_meros-cam._tcp.local";
 
 const BLACKMAGIC: &str = "_blackmagic._tcp.local";
+
+const APPLE_MIDI: &str = "_apple-midi._udp.local";
+
+const APPLE_MIDI_SOURCE: &str = "Apple, MIDI Network Driver Protocol: the control port of an RTP-MIDI session is advertised as _apple-midi._udp; the session's data port is the next one";
 
 const RULES: &[Rule] = &[
     Rule {
@@ -202,6 +214,15 @@ const RULES: &[Rule] = &[
         source: "companion-module-bmd-multiview4: _blackmagic._tcp with TXT class=MultiView and name=Blackmagic MultiView 4",
         key_txt: None,
         srv_port: false,
+        name_txt: None,
+    },
+    Rule {
+        service: APPLE_MIDI,
+        class: None,
+        spec: "generic-midi",
+        source: APPLE_MIDI_SOURCE,
+        key_txt: None,
+        srv_port: true,
         name_txt: None,
     },
     Rule {
@@ -632,8 +653,9 @@ struct Instance {
     /// Where its records last came from.
     source: IpAddr,
     unknown_reported: bool,
-    /// What it was reported under, and the address reported.
-    reported: Option<(ReportKey, IpAddr)>,
+    /// What it was reported under, and the address reported, once per
+    /// integration it is a device of.
+    reported: Vec<(ReportKey, IpAddr)>,
 }
 
 /// What a device is reported once under: its address, or `id <value>` for
@@ -709,7 +731,7 @@ impl Cache {
                     txt: None,
                     source: from,
                     unknown_reported: false,
-                    reported: None,
+                    reported: Vec::new(),
                 },
             );
         }
@@ -821,13 +843,15 @@ impl Cache {
 
     fn goodbye(&mut self, key: &str) -> Option<Event> {
         let instance = self.instances.remove(key)?;
-        let (reported, address) = instance.reported?;
-        if !self
-            .instances
-            .values()
-            .any(|i| i.reported.as_ref().is_some_and(|(k, _)| *k == reported))
-        {
-            self.reported.remove(&reported);
+        let address = instance.reported.first()?.1;
+        for (reported, _) in &instance.reported {
+            if !self
+                .instances
+                .values()
+                .any(|i| i.reported.iter().any(|(k, _)| k == reported))
+            {
+                self.reported.remove(reported);
+            }
         }
         Some(message(format!(
             "{} ({}) at {} announced it is leaving (mDNS goodbye)",
@@ -837,20 +861,22 @@ impl Cache {
         )))
     }
 
-    /// The event for an instance whose identification or address is now
-    /// complete or has changed.
-    fn evaluate(&mut self, key: &str, heard: Heard) -> Option<Event> {
-        let table = self.table.clone();
-        let instance = self.instances.get_mut(key)?;
+    /// The events for an instance whose identification or address is now
+    /// complete or has changed: one per integration it is a device of (an
+    /// RTP-MIDI session serves every MIDI integration).
+    fn evaluate(&mut self, key: &str, heard: Heard) -> Vec<Event> {
+        let Some(instance) = self.instances.get_mut(key) else {
+            return Vec::new();
+        };
         let rule = match identify(instance.service, instance.txt.as_deref()) {
             Identity::Found(rule) => rule,
-            Identity::NeedsTxt => return None,
+            Identity::NeedsTxt => return Vec::new(),
             Identity::MissingKey(rule) => {
                 if instance.unknown_reported {
-                    return None;
+                    return Vec::new();
                 }
                 instance.unknown_reported = true;
-                return Some(message(format!(
+                return vec![message(format!(
                     "{} at {} advertises {} without TXT {}, which identifies {}; it is not \
                      identified",
                     instance.name.first(),
@@ -858,23 +884,42 @@ impl Cache {
                     instance.service,
                     rule.key_txt.unwrap_or_default(),
                     rule.spec,
-                )));
+                ))];
             }
             Identity::Unknown(class) => {
                 if instance.unknown_reported {
-                    return None;
+                    return Vec::new();
                 }
                 instance.unknown_reported = true;
-                return Some(message(format!(
+                return vec![message(format!(
                     "{} at {} advertises {} with TXT class {}, which no integration here is \
                      known to serve; it is not identified",
                     instance.name.first(),
                     instance.source,
                     instance.service,
                     class.map_or("(none)".into(), |c| format!("'{c}'")),
-                )));
+                ))];
             }
         };
+        // Every class-less rule of the service applies alike.
+        let rules: Vec<&'static Rule> = match rule.class {
+            Some(_) => vec![rule],
+            None => RULES
+                .iter()
+                .filter(|r| r.service == rule.service && r.class.is_none())
+                .collect(),
+        };
+        rules
+            .into_iter()
+            .filter_map(|rule| self.evaluate_rule(key, heard, rule))
+            .collect()
+    }
+
+    /// The event for an identified instance as a device of `rule`'s
+    /// integration, when that is new or has changed.
+    fn evaluate_rule(&mut self, key: &str, heard: Heard, rule: &'static Rule) -> Option<Event> {
+        let table = self.table.clone();
+        let instance = self.instances.get(key)?;
         let spec = table.specs.get(rule.spec)?;
         let (srv_port, target) = instance.srv.clone()?;
         let instance_name = instance.name.clone();
@@ -912,8 +957,11 @@ impl Cache {
         let name = own_name.map_or_else(|| instance_name.first(), String::from);
         let identity = rule.key_txt.and_then(|k| txt_get(&txt, k));
         let port = if rule.srv_port { srv_port } else { spec.port };
+        // A host can advertise several instances, each on its own SRV port
+        // (RTP-MIDI sessions): each is its own device.
         let reported_key: ReportKey = match identity {
             Some(id) => (format!("id {id}"), rule.spec),
+            None if rule.srv_port => (SocketAddr::new(address, port).to_string(), rule.spec),
             None => (address.to_string(), rule.spec),
         };
         let reported = (address, port, models.clone(), name.clone());
@@ -925,7 +973,8 @@ impl Cache {
         }
         self.reported.insert(reported_key.clone(), reported);
         if let Some(instance) = self.instances.get_mut(key) {
-            instance.reported = Some((reported_key, address));
+            instance.reported.retain(|(k, _)| k.1 != rule.spec);
+            instance.reported.push((reported_key, address));
         }
         let host = self.hosts.get(&target.key());
         let model_basis = match (product, &named) {
@@ -1611,6 +1660,7 @@ mod tests {
                 "_switcher_ctrl._udp.local",
                 "_hyperdeck_ctrl._tcp.local",
                 "_smartview._tcp.local",
+                APPLE_MIDI,
                 MEROS_CAMERA
             ]
         );
@@ -1805,6 +1855,57 @@ mod tests {
         p.extend_from_slice(&host);
         rr(&mut p, TYPE_A, true, 120, &ip);
         p
+    }
+
+    /// An RTP-MIDI session's answer, as Apple documents it: the session
+    /// named as the instance, its control port in SRV, no TXT needed.
+    fn apple_midi_response(session: &str, port: u16, ip: [u8; 4]) -> Vec<u8> {
+        let service = labels(&["_apple-midi", "_udp", "local"]);
+        let instance = labels(&[session, "_apple-midi", "_udp", "local"]);
+        let host = labels(&["Studio-Mac", "local"]);
+        let mut p = header(1, 2);
+        p.extend_from_slice(&service);
+        rr(&mut p, TYPE_PTR, false, 4500, &instance);
+        p.extend_from_slice(&instance);
+        let mut srv = vec![0, 0, 0, 0];
+        srv.extend_from_slice(&port.to_be_bytes());
+        srv.extend_from_slice(&host);
+        rr(&mut p, TYPE_SRV, true, 120, &srv);
+        p.extend_from_slice(&host);
+        rr(&mut p, TYPE_A, true, 120, &ip);
+        p
+    }
+
+    #[test]
+    fn an_rtp_midi_session_is_reported_for_each_midi_integration_by_port() {
+        let mut cache = Cache::new(table());
+        let packet = parse(&apple_midi_response("Show Session", 5004, [10, 0, 0, 50])).unwrap();
+        let events = cache.absorb(LOCAL, &packet, Heard::Scan);
+        let mut found: Vec<(String, u16, String)> = events
+            .iter()
+            .map(|e| {
+                let (_, address, port, device, models, evidence) = discovered(e);
+                assert_eq!(models, ["generic"]);
+                assert!(evidence["port"].as_str().unwrap().starts_with("the SRV"));
+                (address.to_string(), port, device.to_string())
+            })
+            .collect();
+        found.sort();
+        assert_eq!(
+            found,
+            [("10.0.0.50".to_string(), 5004, "generic-midi".to_string()),]
+        );
+        let Event::Discovered { name, .. } = &events[0] else {
+            unreachable!()
+        };
+        assert_eq!(name.as_deref(), Some("Show Session"));
+        assert!(cache.absorb(LOCAL, &packet, Heard::Listener).is_empty());
+        // A second session on the same host, on its own port, is its own
+        // device.
+        let other = parse(&apple_midi_response("Lighting", 5006, [10, 0, 0, 50])).unwrap();
+        let events = cache.absorb(LOCAL, &other, Heard::Scan);
+        assert_eq!(events.len(), 1);
+        assert!(events.iter().all(|e| discovered(e).2 == 5006));
     }
 
     const CAMERA_ID: &str = "00112233aabbccdd";
