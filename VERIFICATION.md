@@ -2529,6 +2529,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sony-camera — Sony cameras
 
+- [ ] Check which settings the 500 ms after an exposure mode change really covers (the reference says shooting parameters; the core holds every property change and step control, counted from the camera's answer). ([specs/sony-camera.yaml:2968](specs/sony-camera.yaml#L2968))
 - [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:3187](specs/sony-camera.yaml#L3187))
 - [ ] Check zoom and focus preset slot numbering: that slot 0 is the first preset, matching save_zoom_focus_position, before relying on set_preset_zoom_only. ([specs/sony-camera.yaml:2609](specs/sony-camera.yaml#L2609))
 - [ ] Check the display-list mapping: that base look, AE level offset, scene file, creative look and stream destination names come from the list types the module uses and match what the camera shows. ([crates/core/src/modules/sony_camera_info.rs:94](crates/core/src/modules/sony_camera_info.rs#L94))
