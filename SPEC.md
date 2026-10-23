@@ -722,8 +722,12 @@ request like a command's, a template over settings) and takes the session
 from its answer: with `capture: { cookie: name }` the named cookie of its
 `Set-Cookie` headers, with `"*"` (the default) every cookie, sent back as
 `Cookie: name=value; ...`; with `capture: { header: name }` that header's
-value, sent back in a header of the same name. Every later request carries
-it, except the probe and a request marked `session: false` (Magewell's ping),
+value, sent back in a header of the same name; with `capture: { json: path,
+header: name }` the string at that JSON path of the answer's body, sent back
+in the header named (Logos Proclaim answers its login with
+`{"proclaimAuthToken": "..."}` and takes it back as `ProclaimAuthToken`). An
+answer without it, or with it empty, holds no session. Every later request
+carries it, except the probe and a request marked `session: false` (Magewell's ping),
 which need none and never log in. Requests go one at a time, so nothing is
 sent while the login is answered.
 

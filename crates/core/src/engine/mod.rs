@@ -313,6 +313,10 @@ enum Capture {
     Cookie(Option<String>),
     /// A response header's value, sent back in a header of the same name.
     Header(String),
+    /// A string in the answer's JSON body, at this JSON path, sent back in
+    /// the header named: Logos Proclaim answers its login with
+    /// `{"proclaimAuthToken": "..."}`, sent back as `ProclaimAuthToken`.
+    Json { path: String, header: String },
 }
 
 impl SessionSpec {
@@ -324,13 +328,18 @@ impl SessionSpec {
         }
         .ok_or(format!("transport.session has no login for model {model}"))?;
         let capture = match v.get("capture") {
-            Some(c) => match (c.get("cookie"), c.get("header")) {
-                (Some(Value::String(name)), None) if name == "*" => Capture::Cookie(None),
-                (Some(Value::String(name)), None) => Capture::Cookie(Some(name.clone())),
-                (None, Some(Value::String(h))) => Capture::Header(h.clone()),
+            Some(c) => match (c.get("cookie"), c.get("header"), c.get("json")) {
+                (Some(Value::String(name)), None, None) if name == "*" => Capture::Cookie(None),
+                (Some(Value::String(name)), None, None) => Capture::Cookie(Some(name.clone())),
+                (None, Some(Value::String(h)), None) => Capture::Header(h.clone()),
+                (None, Some(Value::String(h)), Some(Value::String(path))) => Capture::Json {
+                    path: path.clone(),
+                    header: h.clone(),
+                },
                 _ => {
                     return Err(
-                        "transport.session.capture is {cookie: name} or {header: name}".into(),
+                        "transport.session.capture is {cookie: name}, {header: name} or {json: path, header: name}"
+                            .into(),
                     )
                 }
             },
@@ -397,6 +406,15 @@ impl SessionSpec {
                 .next()
                 .filter(|v| !v.is_empty())
                 .map(|v| (h.clone(), v.to_string())),
+            Capture::Json { path, header } => {
+                let doc = serde_json::from_slice::<Value>(&response.body).ok()?;
+                match expect::json_path(&doc, path) {
+                    Some(Value::String(token)) if !token.is_empty() => {
+                        Some((header.clone(), token.clone()))
+                    }
+                    _ => None,
+                }
+            }
         }
     }
 }
@@ -5320,6 +5338,43 @@ mod tests {
             .take()
             .iter()
             .any(|a| matches!(a, Action::UdpOpen { .. })));
+    }
+
+    #[test]
+    fn a_session_can_be_a_json_value_sent_in_a_header() {
+        let session = SessionSpec::parse(
+            &json!({
+                "login": {"method": "POST", "path": "/appCommand/authenticate"},
+                "capture": {"json": "$.proclaimAuthToken", "header": "ProclaimAuthToken"},
+            }),
+            "any",
+        )
+        .unwrap();
+        let answer = |body: &str| HttpResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: body.as_bytes().to_vec(),
+        };
+        assert_eq!(
+            session.captured(&answer(r#"{"proclaimAuthToken":"oxdBKO0NkEyMGj4-UqYVGQ"}"#)),
+            Some((
+                "ProclaimAuthToken".to_string(),
+                "oxdBKO0NkEyMGj4-UqYVGQ".to_string()
+            ))
+        );
+        // No token, an empty one, or not JSON: no session.
+        assert_eq!(session.captured(&answer("{}")), None);
+        assert_eq!(
+            session.captured(&answer(r#"{"proclaimAuthToken":""}"#)),
+            None
+        );
+        assert_eq!(session.captured(&answer("denied")), None);
+        // A JSON path needs the header to send it in.
+        assert!(SessionSpec::parse(
+            &json!({"login": {"method": "POST", "path": "/"}, "capture": {"json": "$.t"}}),
+            "any"
+        )
+        .is_err());
     }
 
     #[test]
