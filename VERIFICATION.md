@@ -79,7 +79,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how the router answers wait_for_config_events with an expired connection id, and that /config (not /json) gives the connection id. ([specs/aja-kumo.yaml:1608](specs/aja-kumo.yaml#L1608))
 - [ ] Check whether the firmware on hand answers eParamID_XPT_DestinationAll_Status through /options, or {} as older firmware does. ([specs/aja-kumo.yaml:1618](specs/aja-kumo.yaml#L1618))
 - [ ] Confirm that a number above the router's count, and a switch to a locked destination, fail with HTTP 403 (or note the actual status). ([specs/aja-kumo.yaml:1578](specs/aja-kumo.yaml#L1578))
-- [ ] Confirm the router handles back-to-back requests without the pauses AJA's examples add. ([specs/aja-kumo.yaml:1627](specs/aja-kumo.yaml#L1627))
+- [ ] Check whether a burst of back-to-back requests (several routes or a salvo set at once, a full read on connecting) overloads the router's queue without the 0.1-0.25 s pauses AJA's examples add; the core sends one request at a time and paces nothing, since AJA documents no required gap. ([specs/aja-kumo.yaml:1633](specs/aja-kumo.yaml#L1633))
 - [ ] Confirm button colour writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1680](specs/aja-kumo.yaml#L1680))
 - [ ] Read a button colour (eParamID_Button_Settings_{n}) and its event, and check the value holds color_N as written, for a source and a destination in each bank. ([specs/aja-kumo.yaml:1690](specs/aja-kumo.yaml#L1690))
 - [ ] Record the values and names eParamID_SuppressPSAlarm reads, and the ids of the switching mode, reference and temperature alarm suppression from desc.json. ([specs/aja-kumo.yaml:1715](specs/aja-kumo.yaml#L1715))
