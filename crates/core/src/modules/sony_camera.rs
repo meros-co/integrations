@@ -102,6 +102,8 @@ const INIT: Key = "init";
 const RETRY: Key = "retry";
 const POLL: Key = "poll";
 const PAUSE: Key = "pause";
+/// A command held for the spacing the reference asks for.
+const GAP: Key = "gap";
 const EXT_RETRY: Key = "ext-info-retry";
 const HTTP_TIMEOUT: Key = "http-timeout";
 
@@ -116,6 +118,14 @@ const EXT_INFO_RETRY: Millis = 500;
 const EXT_INFO_ATTEMPTS: u32 = 40;
 /// Between the down and up halves of a momentary button press.
 const PRESS: Millis = 100;
+/// SDIO_ControlPTZF messages go more than 100 ms apart (reference, PTZF
+/// Operation).
+const PTZF_SPACING: Millis = 101;
+/// After the exposure program mode (0x500E) changes, shooting parameters
+/// wait 500 ms (reference, Exposure Program Mode note).
+const EXPOSURE_MODE_SETTLE: Millis = 500;
+/// Exposure Program Mode.
+const PROP_EXPOSURE_MODE: u16 = 0x500E;
 /// Live view: at most 30 frames a second, and a frame asked for too soon
 /// comes back empty and is asked for again.
 const LIVE_VIEW_RETRY: Millis = 40;
@@ -552,6 +562,12 @@ pub(crate) struct SonyCamera {
     background: VecDeque<Op>,
     current: Option<InFlight>,
     pausing: Option<Op>,
+    /// The next command, held until the spacing it needs has passed.
+    held: Option<Op>,
+    /// When the last SDIO_ControlPTZF was sent.
+    last_ptzf_at: Option<Millis>,
+    /// When the camera answered the last change of exposure program mode.
+    exposure_mode_at: Option<Millis>,
     ext_info_attempts: u32,
 
     /// The handshake is done and the property set has been read once.
@@ -892,6 +908,9 @@ impl SonyCamera {
             background: VecDeque::new(),
             current: None,
             pausing: None,
+            held: None,
+            last_ptzf_at: None,
+            exposure_mode_at: None,
             ext_info_attempts: 0,
             ready: false,
             extended: false,
@@ -969,6 +988,7 @@ impl SonyCamera {
             failed.extend(inflight.op.command);
         }
         failed.extend(self.pausing.take().and_then(|op| op.command));
+        failed.extend(self.held.take().and_then(|op| op.command));
         failed.extend(self.commands.drain(..).filter_map(|op| op.command));
         failed.extend(self.background.drain(..).filter_map(|op| op.command));
         if let Some(listing) = self.listing.take() {
@@ -998,6 +1018,7 @@ impl SonyCamera {
             INIT,
             POLL,
             PAUSE,
+            GAP,
             EXT_RETRY,
             files::UPLOAD_WAIT,
             files::DELETE_WAIT,
@@ -1103,11 +1124,7 @@ impl SonyCamera {
             return;
         }
         self.live_check_transfer(cx);
-        let Some(op) = self
-            .live_cut_in(cx.now())
-            .or_else(|| self.commands.pop_front())
-            .or_else(|| self.next_background())
-        else {
+        let Some(op) = self.next_op(cx) else {
             return;
         };
         if let Step::Pause(ms) = op.step {
@@ -1128,6 +1145,9 @@ impl SonyCamera {
         };
         cx.tcp_send(CMD, bytes);
         cx.set_timer(REPLY, REPLY_TIMEOUT);
+        if op.code == OP_CONTROL_PTZF {
+            self.last_ptzf_at = Some(cx.now());
+        }
         self.current = Some(InFlight {
             op,
             transaction,
@@ -1135,6 +1155,52 @@ impl SonyCamera {
             data: Vec::new(),
             streamed: 0,
         });
+    }
+
+    /// The next operation to send: a live view frame cutting into a
+    /// download, the next command once the spacing it needs has passed, or
+    /// else a background operation. A command held for its spacing keeps
+    /// the commands behind it waiting, in order; the background goes on.
+    fn next_op(&mut self, cx: &mut Cx) -> Option<Op> {
+        let now = cx.now();
+        if let Some(op) = self.live_cut_in(now) {
+            return Some(op);
+        }
+        if let Some(op) = self.held.take().or_else(|| self.commands.pop_front()) {
+            let wait = self.spacing(&op, now);
+            if wait == 0 {
+                return Some(op);
+            }
+            self.held = Some(op);
+            cx.set_timer(GAP, wait);
+        }
+        self.next_background()
+    }
+
+    /// How long an operation still waits for the spacing the reference
+    /// asks for: SDIO_ControlPTZF more than 100 ms after the last, and a
+    /// shooting parameter (any property change) 500 ms after the exposure
+    /// program mode changed.
+    fn spacing(&self, op: &Op, now: Millis) -> Millis {
+        let after =
+            |at: Option<Millis>, gap: Millis| at.map_or(0, |t| (t + gap).saturating_sub(now));
+        let mut wait = 0;
+        if op.code == OP_CONTROL_PTZF {
+            wait = after(self.last_ptzf_at, PTZF_SPACING);
+        }
+        let code = op.params.first().map(|&c| c as u16);
+        let sets_property = match op.code {
+            OP_SET_PROPERTY => code != Some(PROP_EXPOSURE_MODE),
+            // A step control of a property's own code.
+            OP_CONTROL => {
+                code.is_some_and(|c| c != PROP_EXPOSURE_MODE && self.props.contains_key(&c))
+            }
+            _ => false,
+        };
+        if sets_property {
+            wait = wait.max(after(self.exposure_mode_at, EXPOSURE_MODE_SETTLE));
+        }
+        wait
     }
 
     /// The next background operation. Opened for commands only, the
@@ -1259,6 +1325,12 @@ impl SonyCamera {
         }
         cx.cancel_timer(REPLY);
         let inflight = self.current.take().unwrap();
+        if code == RC_OK
+            && inflight.op.code == OP_SET_PROPERTY
+            && inflight.op.params.first() == Some(&(PROP_EXPOSURE_MODE as u32))
+        {
+            self.exposure_mode_at = Some(cx.now());
+        }
         if inflight.op.times_latency() {
             cx.round_trip(cx.now().saturating_sub(inflight.sent_at));
         }
@@ -3763,6 +3835,7 @@ impl Module for SonyCamera {
                     format!("no reply to operation 0x{code:04X} within 10 s"),
                 );
             }
+            GAP => self.pump(cx),
             PAUSE => {
                 if let Some(op) = self.pausing.take() {
                     if let (Some(id), true) = (op.command, op.last) {
@@ -3784,6 +3857,7 @@ impl Module for SonyCamera {
                 } else if self.ready
                     && self.current.is_none()
                     && self.pausing.is_none()
+                    && self.held.is_none()
                     && self.commands.is_empty()
                     && self.background.is_empty()
                 {
@@ -4661,6 +4735,96 @@ mod tests {
         assert_eq!(
             (stop.params, stop.data.unwrap()),
             (vec![6], vec![100, 0, 0, 0])
+        );
+    }
+
+    /// Answers the property read the module queues after a command.
+    fn answer_refresh(m: &mut SonyCamera, now: Millis, sent: &[Action]) -> Vec<Action> {
+        let (code, t, _) = last_request(sent);
+        assert_eq!(code, OP_GET_ALL_PROPERTIES);
+        let mut packets = data_in(t, props_dataset());
+        packets.push(ok(t, vec![]));
+        at(m, now, CMD, &packets)
+    }
+
+    #[test]
+    fn pan_tilt_messages_go_more_than_100_ms_apart() {
+        let mut m = camera_model("ilme-fr7", json!({}));
+        connected(&mut m, 300);
+        let version =
+            build::prop_array(&[build::enum_prop(0xE0C0, dt::UINT16, false, 1, 100, &[])]);
+        let mut cx = Cx::new(0);
+        m.apply(&mut cx, parse_prop_info_array(&version).unwrap());
+        m.background.clear();
+        let a = run(
+            &mut m,
+            1,
+            "pan_tilt_drive",
+            json!({"pan_speed": 10, "tilt_speed": 0}),
+        );
+        let (code, t, _) = last_request(&a);
+        assert_eq!(code, OP_CONTROL_PTZF);
+        // Sent at 10; the stop is asked for straight away.
+        assert!(sent(&run(&mut m, 2, "pan_tilt_stop", json!({})), CMD).is_empty());
+        // Answered at 30: the stop is held until 111, and the property
+        // read goes meanwhile.
+        let a = at(&mut m, 30, CMD, &[ok(t, vec![])]);
+        assert_eq!(completion(&a, 1), Some(Ok(Outcome::Ack)));
+        assert_eq!(timer_set(&a, GAP), Some(81));
+        let a = answer_refresh(&mut m, 60, &a);
+        assert!(sent(&a, CMD).is_empty());
+        assert_eq!(timer_set(&a, GAP), Some(51));
+        let a = tick(&mut m, 111, GAP);
+        let (code, _, params) = last_request(&a);
+        assert_eq!((code, params), (OP_CONTROL_PTZF, vec![PTZF_CANCEL]));
+    }
+
+    #[test]
+    fn settings_wait_500_ms_after_the_exposure_mode_changes() {
+        let mut m = camera(json!({}));
+        connected(&mut m, 300);
+        let mode = build::prop_array(&[build::enum_prop(
+            PROP_EXPOSURE_MODE,
+            dt::UINT32,
+            true,
+            1,
+            1,
+            &[1, 0x0001_0002],
+        )]);
+        let mut cx = Cx::new(0);
+        m.apply(&mut cx, parse_prop_info_array(&mode).unwrap());
+        m.background.clear();
+        let a = run(
+            &mut m,
+            1,
+            "set_property",
+            json!({"code": "500E", "value": 0x0001_0002}),
+        );
+        let (code, t, params) = last_request(&a);
+        assert_eq!((code, params), (OP_SET_PROPERTY, vec![0x500E, 0]));
+        assert!(sent(
+            &run(
+                &mut m,
+                2,
+                "set_property",
+                json!({"code": "5005", "value": 4})
+            ),
+            CMD
+        )
+        .is_empty());
+        // The mode is answered at 100: the next setting waits until 600.
+        let a = at(&mut m, 100, CMD, &[ok(t, vec![])]);
+        assert_eq!(completion(&a, 1), Some(Ok(Outcome::Ack)));
+        assert_eq!(timer_set(&a, GAP), Some(500));
+        let a = answer_refresh(&mut m, 150, &a);
+        assert!(sent(&a, CMD).is_empty());
+        let a = tick(&mut m, 600, GAP);
+        let (code, _, params) = last_request(&a);
+        assert_eq!((code, params), (OP_SET_PROPERTY, vec![0x5005, 0]));
+        // Pan/tilt and other operations are not held by the mode.
+        assert_eq!(
+            m.spacing(&Op::new(OP_GET_DEVICE_INFO, vec![], Step::DeviceInfo), 0),
+            0
         );
     }
 
