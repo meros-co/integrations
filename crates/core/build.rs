@@ -111,6 +111,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-extron",
         &["extron-ipl", "extron-matrix", "extron-switcher"],
     ),
+    ("vendor-faithlife", &["logos-proclaim"]),
     ("vendor-figure53", &["qlab"]),
     (
         "vendor-focusrite",

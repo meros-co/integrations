@@ -1622,6 +1622,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Drive an MX2 and a UMX-HDMI-140 (Control mode, LW3) on RS-232 (link serial) and confirm the same answers and CHG notifications as over TCP 6107, with no flow control. ([specs/lightware-lw3.yaml:161](specs/lightware-lw3.yaml#L161))
 - [ ] Check when a Cleartext login on the RS-232 port ends (not documented) and that the login step works there. ([specs/lightware-lw3.yaml:4333](specs/lightware-lw3.yaml#L4333))
 
+## logos-proclaim — Logos Proclaim
+
+- [ ] Check what /appCommand/authenticate answers a wrong password with, and what /appCommand/perform answers an expired or wrong token with (401 or 403 is assumed for both), and whether a token expires. ([specs/logos-proclaim.yaml:314](specs/logos-proclaim.yaml#L314))
+- [ ] Record /onair/session's answer on air and off air (an id as plain text, and an empty body, are assumed). ([specs/logos-proclaim.yaml:347](specs/logos-proclaim.yaml#L347))
+- [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
+- [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
+
 ## magewell-proconvert — Magewell Pro Convert
 
 - [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([spec](specs/magewell-proconvert.yaml#L186))
