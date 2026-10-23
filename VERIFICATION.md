@@ -1672,6 +1672,33 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that set_time with mode pc sets the time given, as manual does. ([specs/kiloview-e3.yaml:300](specs/kiloview-e3.yaml#L300))
 - [ ] Check that a write refused for a bad value answers HTTP 200 with result error, and not an HTTP error status. ([specs/kiloview-e3.yaml:216](specs/kiloview-e3.yaml#L216))
 
+## kiloview-n60 — Kiloview N60 / N50
+
+- [ ] Find which endpoints need a login token, and which of the three ways the core sends it (Authorization header as the Companion module does, the Cookie of language, user and token the document describes, or the App header) the device checks. ([specs/kiloview-n60.yaml:1783](specs/kiloview-n60.yaml#L1783))
+- [ ] Record how the device answers a missing, wrong or expired token (HTTP status, or a 200 with result error or code 401), how long a token lasts, and whether a reboot or a new login ends it. ([specs/kiloview-n60.yaml:1783](specs/kiloview-n60.yaml#L1783))
+- [ ] Confirm that sending the Cookie and App headers with an empty token is harmless on a device that needs no login. ([specs/kiloview-n60.yaml:84](specs/kiloview-n60.yaml#L84))
+- [ ] Record the default user name and password of a new N60 and N50 (the document's example is admin / Admin123, the Companion module's admin / admin). ([specs/kiloview-n60.yaml:1805](specs/kiloview-n60.yaml#L1805))
+- [ ] Confirm set_mode's reply is the bare value true and how long the device is away while it restarts. ([specs/kiloview-n60.yaml:1815](specs/kiloview-n60.yaml#L1815))
+- [ ] Find whether upload_firmware installs and restarts on its own, and the form field name it really takes (file, per the document). ([specs/kiloview-n60.yaml:1831](specs/kiloview-n60.yaml#L1831))
+- [ ] Check whether set_bonding answers at all, and whether link aggregation can be left through the API. ([specs/kiloview-n60.yaml:1839](specs/kiloview-n60.yaml#L1839))
+- [ ] Find what target_bitrate and max_bitrate read back after set_encoder_quality sets 55, 75, 100, 150 or 200, and their unit. ([specs/kiloview-n60.yaml:1864](specs/kiloview-n60.yaml#L1864))
+- [ ] Check which picture each of NV12, NV16, NV12_10LE32 and NV16_10LE32 gives (4:2:0 or 4:2:2, 8 or 10 bit); the document's labels disagree with the format names. ([specs/kiloview-n60.yaml:1877](specs/kiloview-n60.yaml#L1877))
+- [ ] On firmware before 2.02.0008, check whether choose_encode accepts or rejects the srt field, and whether Kilolink answers on /api/kilolink/ or only /api/KiloLink/. ([specs/kiloview-n60.yaml:1894](specs/kiloview-n60.yaml#L1894))
+- [ ] Check what the encoder endpoints answer in decoding mode, and the decoder endpoints in encoding mode, so the polls of the other mode cost nothing. ([specs/kiloview-n60.yaml:1907](specs/kiloview-n60.yaml#L1907))
+- [ ] Find the unit of getNetworkSpeed's receive and transmit, and of a stream's get_dynamic_state bitrate. ([specs/kiloview-n60.yaml:1088](specs/kiloview-n60.yaml#L1088))
+- [ ] Find the PTZ action names for zoom, focus and presets, and check that home, stop-move and stop-all accept a speed. ([specs/kiloview-n60.yaml:1936](specs/kiloview-n60.yaml#L1936))
+- [ ] Check the camera address range ptz_addr accepts (0 to 255 here) and the parity values (none, odd, even) set_ptz_serial takes. ([specs/kiloview-n60.yaml:644](specs/kiloview-n60.yaml#L644))
+- [ ] Check that set_ptz_network and set_ptz_serial keep the other link's saved settings when they leave its fields out. ([specs/kiloview-n60.yaml:1936](specs/kiloview-n60.yaml#L1936))
+- [ ] On an N50, check what the HDMI channel count and map of set_decode_output do on its SDI output, and the line-out channel range. ([specs/kiloview-n60.yaml:1946](specs/kiloview-n60.yaml#L1946))
+- [ ] Confirm the request forms the document leaves implicit: setHostname?name=, remove_nas?id=, get_disk_files?device=&stream=, ptzControl?action=&speed=, check_proxy_token?token=, and setDiscoveryServer's JSON body of enable and address. ([specs/kiloview-n60.yaml:1964](specs/kiloview-n60.yaml#L1964))
+- [ ] Check get_mode's reply on current firmware: plain text (the document) or JSON (the Companion module). ([specs/kiloview-n60.yaml:1974](specs/kiloview-n60.yaml#L1974))
+- [ ] Check whether current firmware serves the endpoints only the Companion module uses (encoders/get_encode, signal_status, net_stream, streams/multi_protocol/get), which would warrant an updated document. ([specs/kiloview-n60.yaml:1974](specs/kiloview-n60.yaml#L1974))
+- [ ] Check the NAS file systems add_nas accepts (nfs per the document; cifs is inferred from its mention of CIFS options). ([specs/kiloview-n60.yaml:923](specs/kiloview-n60.yaml#L923))
+- [ ] Check the record format values set_record_settings accepts besides mov, and whether it and start_recording answer with a body. ([specs/kiloview-n60.yaml:1987](specs/kiloview-n60.yaml#L1987))
+- [ ] Check the shape of the static route reply on a device with several routes (the document shows a single object without an id). ([specs/kiloview-n60.yaml:773](specs/kiloview-n60.yaml#L773))
+- [ ] Check which values set_talk_language takes (the document gives cn for English and zh for Chinese). ([specs/kiloview-n60.yaml:1998](specs/kiloview-n60.yaml#L1998))
+- [ ] Check whether the Kiloview FN-50 and FN-60 cards answer this API. ([specs/kiloview-n60.yaml:1987](specs/kiloview-n60.yaml#L1987))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))
