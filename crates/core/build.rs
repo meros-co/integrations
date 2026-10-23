@@ -234,6 +234,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "shure-wireless",
         ],
     ),
+    ("vendor-sofie", &["sofie-chef"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
         "vendor-sony",

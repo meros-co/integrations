@@ -2571,6 +2571,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On ULX-D, check that a metering interval above 65535 ms (to 99999, as documented) is accepted. ([specs/shure-wireless.yaml:260](specs/shure-wireless.yaml#L260))
 - [ ] On ULX-D, confirm set_encryption, regenerate_encryption_key and set_frequency_diversity_mode need an IR sync before audio returns, and how long a key regeneration takes. ([specs/shure-wireless.yaml:582](specs/shure-wireless.yaml#L582))
 
+## sofie-chef — Sofie Chef
+
+- [ ] Record the REST answers: GET /api/status and /api/list bodies (the list is read as the WebSocket list body) and the PUT routes' status and body. ([specs/sofie-chef.yaml:177](specs/sofie-chef.yaml#L177))
+- [ ] Confirm an empty apiKey query parameter is accepted when no apiKey is configured. ([specs/sofie-chef.yaml:175](specs/sofie-chef.yaml#L175))
+- [ ] Confirm the WebSocket API on apiPort + 1 (path /) pushes status on connecting and on each change without a request or the apiKey. ([specs/sofie-chef.yaml:186](specs/sofie-chef.yaml#L186))
+
 ## softouch-easyworship — Softouch EasyWorship
 
 - [ ] Confirm the whole exchange against EasyWorship 7.3 or later: the pairing request and its paired and notPaired answers, a heartbeat after each message, and status messages. ([specs/softouch-easyworship.yaml:130](specs/softouch-easyworship.yaml#L130))
