@@ -1119,7 +1119,48 @@ def midi_checks(doc: dict) -> list[str]:
 # The transport keys a `serial` block's `overrides` may change (SPEC.md §2,
 # "The same protocol on a serial port"), as in the core's SERIAL_OVERRIDES.
 SERIAL_OVERRIDES = ("framing", "open", "close", "terminator", "reply_framing",
-                    "reply_terminators", "reply_fence", "reply_match", "error_match")
+                    "reply_terminators", "reply_fence", "reply_match", "error_match", "pacing")
+
+
+def pacing_checks(doc: dict) -> list[str]:
+    """`transport.pacing` and a serial block's `pacing` overrides (SPEC.md §2,
+    Pacing): the models they name exist, each model is named once in a
+    `by_model` list, and every group's `match` is a regex."""
+    t = doc.get("transport") or {}
+    model_ids = {m["id"] for m in doc.get("models") or []}
+    blocks = []
+    if isinstance(t.get("pacing"), dict):
+        blocks.append(("transport.pacing", t["pacing"]))
+    overrides = (t.get("serial") or {}).get("overrides")
+    entries = overrides if isinstance(overrides, list) else [overrides] if isinstance(overrides, dict) else []
+    for i, entry in enumerate(entries):
+        if isinstance(entry, dict) and isinstance(entry.get("pacing"), dict):
+            blocks.append((f"transport.serial.overrides[{i}].pacing", entry["pacing"]))
+    errors: list[str] = []
+
+    def by_model(at: str, owner: dict) -> None:
+        named: set[str] = set()
+        for entry in owner.get("by_model") or []:
+            for m in entry.get("models") or []:
+                if m not in model_ids:
+                    errors.append(f"{at}.by_model: no model '{m}'")
+                elif m in named:
+                    errors.append(f"{at}.by_model: model '{m}' is named twice")
+                named.add(m)
+
+    for at, block in blocks:
+        by_model(at, block)
+        for name, group in (block.get("groups") or {}).items():
+            by_model(f"{at}.groups.{name}", group)
+            pattern = group.get("match")
+            try:
+                re.compile(pattern)
+            except (re.error, TypeError) as e:
+                errors.append(f"{at}.groups.{name}.match: {e}")
+            else:
+                if re.search(r"\(\?<?[=!]|\[1-9]", pattern):
+                    errors.append(f"{at}.groups.{name}.match: lookaround and backreferences are not RE2")
+    return errors
 
 
 def expand_serial(doc: dict) -> list[str]:
@@ -1154,7 +1195,7 @@ def expand_serial(doc: dict) -> list[str]:
     for i, entry in enumerate(entries):
         for key in entry:
             if key != "models" and key not in SERIAL_OVERRIDES:
-                errors.append(f"transport.serial.overrides[{i}].{key}: not a framing or reply key a serial port can change")
+                errors.append(f"transport.serial.overrides[{i}].{key}: not a framing, reply or pacing key a serial port can change")
         for m in entry.get("models") or []:
             if m not in model_ids:
                 errors.append(f"transport.serial.overrides[{i}].models: no model '{m}'")
@@ -1298,6 +1339,7 @@ def main() -> int:
 
         errors = expand_serial(doc)
         errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + midi_checks(doc) + label_checks(doc)
+        errors += pacing_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

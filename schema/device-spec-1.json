@@ -1443,7 +1443,7 @@
                   ]
                 },
                 "overrides": {
-                  "description": "The transport keys the vendor documents differently on the serial port (STX before each command, no line ending, an ACK byte as the reply): framing, open, close, terminator, reply_framing, reply_terminators, reply_fence, reply_match and error_match. A mapping for every model, or a list of them each for the models it names (every model when it names none), laid over the transport in order with link serial only.",
+                  "description": "The transport keys the vendor documents differently on the serial port (STX before each command, no line ending, an ACK byte as the reply): framing, open, close, terminator, reply_framing, reply_terminators, reply_fence, reply_match, error_match and pacing (which replaces the transport's pacing as a whole). A mapping for every model, or a list of them each for the models it names (every model when it names none), laid over the transport in order with link serial only.",
                   "oneOf": [
                     {
                       "type": "object",
@@ -1483,6 +1483,9 @@
                         },
                         "error_match": {
                           "$ref": "#/$defs/transport/oneOf/0/properties/error_match"
+                        },
+                        "pacing": {
+                          "$ref": "#/$defs/pacing"
                         }
                       }
                     },
@@ -1527,6 +1530,9 @@
                           },
                           "error_match": {
                             "$ref": "#/$defs/transport/oneOf/0/properties/error_match"
+                          },
+                          "pacing": {
+                            "$ref": "#/$defs/pacing"
                           }
                         }
                       }
@@ -1534,6 +1540,9 @@
                   ]
                 }
               }
+            },
+            "pacing": {
+              "$ref": "#/$defs/pacing"
             }
           },
           "required": [
@@ -1623,6 +1632,9 @@
             },
             "probe": {
               "type": "string"
+            },
+            "pacing": {
+              "$ref": "#/$defs/pacing"
             }
           },
           "required": [
@@ -1697,6 +1709,9 @@
             },
             "endpoints": {
               "$ref": "#/$defs/endpoints"
+            },
+            "pacing": {
+              "$ref": "#/$defs/pacing"
             }
           },
           "required": [
@@ -1752,6 +1767,9 @@
             },
             "endpoints": {
               "$ref": "#/$defs/endpoints"
+            },
+            "pacing": {
+              "$ref": "#/$defs/pacing"
             }
           },
           "required": [
@@ -1784,6 +1802,9 @@
             },
             "endpoints": {
               "$ref": "#/$defs/endpoints"
+            },
+            "pacing": {
+              "$ref": "#/$defs/pacing"
             }
           },
           "required": [
@@ -2068,6 +2089,9 @@
                   "description": "An answer to the login refusing the credential: terminal, as any refusal."
                 }
               }
+            },
+            "pacing": {
+              "$ref": "#/$defs/pacing"
             }
           },
           "required": [
@@ -2151,6 +2175,9 @@
             },
             "endpoints": {
               "$ref": "#/$defs/endpoints"
+            },
+            "pacing": {
+              "$ref": "#/$defs/pacing"
             }
           },
           "required": [
@@ -2901,6 +2928,129 @@
               "integer",
               "string"
             ]
+          }
+        }
+      }
+    },
+    "pacing": {
+      "type": "object",
+      "description": "The least time the device needs between the messages it is sent (SPEC.md §2, Pacing). A message that would go too soon is held back with everything behind it, so nothing is reordered; commands, their several messages, polls, subscriptions and on_connect steps are all paced. Requests to an endpoint are not.",
+      "additionalProperties": false,
+      "properties": {
+        "min_interval_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600000,
+          "description": "Between any two messages, ms; 0 when absent."
+        },
+        "from": {
+          "enum": [
+            "send",
+            "reply"
+          ],
+          "default": "send",
+          "description": "Where a gap is counted from: the previous message's sending, or its reply (its sending when it awaited none)."
+        },
+        "by_model": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Models whose vendor documents another gap.",
+          "items": {
+            "type": "object",
+            "required": [
+              "models",
+              "min_interval_ms"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "models": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "description": "The models this entry is for."
+              },
+              "min_interval_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3600000
+              }
+            }
+          }
+        },
+        "groups": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Messages told apart by their text, by name, each with its own gap.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "match"
+            ],
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "min_interval_ms"
+                ]
+              },
+              {
+                "required": [
+                  "after_ms"
+                ]
+              }
+            ],
+            "properties": {
+              "match": {
+                "type": "string",
+                "description": "An RE2-safe regex on the message as sent without framing: a line message's text, an HTTP request's path and query, a websocket message, an OSC address."
+              },
+              "min_interval_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3600000,
+                "description": "Between two messages of the group, ms."
+              },
+              "after_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3600000,
+                "description": "After a message of the group, before any message, ms (a projector's power command)."
+              },
+              "by_model": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Models whose vendor documents other values.",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "models"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The models this entry is for."
+                    },
+                    "min_interval_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    },
+                    "after_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

@@ -67,6 +67,15 @@ transport:
   reply_match: '^[^\x06]'
   error_match: '^\x02?[Ee]R[1-3]:'
   timeout_ms: 4000
+  # A gap of 40 ms between pan-tilt head commands (chapter 4, restriction 1; 16 ms on the AW-UE160),
+  # counted from each reply.
+  pacing:
+    from: reply
+    groups:
+      pan_tilt:
+        match: "^#"
+        min_interval_ms: 40
+        by_model: [{ models: [aw-ue160], min_interval_ms: 16 }]
   probe: "#O\r"
 
 # The AW-UE160 writes format codes as two hex digits (OSA:87:01).
@@ -10200,9 +10209,10 @@ quirks:
     severity: critical
     text: >
       The RS-422 line is half duplex (chapter 4-1): the core sends one message at a time and the next
-      only after the reply to the one before. Leave at least 40 ms between pan-tilt head commands (16 ms
-      on the AW-UE160); the format has no inter-command delay, so a caller streaming pan_tilt_speed
-      updates must pace them itself.
+      only after the reply to the one before. Panasonic asks for a gap of 40 ms between pan-tilt head
+      commands (16 ms on the AW-UE160), which the core keeps (transport.pacing), counted from each
+      reply; a caller streaming pan_tilt_speed updates faster than that builds a queue behind them, so
+      it should send only the latest speed.
 
   - models: [all]
     severity: warning
@@ -10381,9 +10391,9 @@ quirks:
   - models: [aw-ue160]
     severity: warning
     text: >
-      The AW-UE160 asks for at least 16 ms between pan-tilt head commands (chapter 4), and refuses many
-      paint settings with ER3 while V-Log is on with V-Log paint off, while HDR is on, or while their
-      switch (knee, gamma, black gamma, detail, matrix and so on) is off (chapter 8).
+      The AW-UE160 asks for at least 16 ms between pan-tilt head commands (chapter 4; the core keeps
+      it), and refuses many paint settings with ER3 while V-Log is on with V-Log paint off, while HDR is
+      on, or while their switch (knee, gamma, black gamma, detail, matrix and so on) is off (chapter 8).
 
   - models: [aw-ue160]
     severity: info

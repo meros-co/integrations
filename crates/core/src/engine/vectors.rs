@@ -264,6 +264,9 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     };
     let link = spec.serial_link(&model.id, &ctx.settings);
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
+    // Vectors check what is sent, not when: pacing (SPEC.md §2) has its own
+    // engine tests.
+    engine.pacer = super::pacing::Pacer::default();
     let mut cx = Cx::new(0);
     engine.start(&mut cx);
     let mut connected = cx.take();
@@ -429,7 +432,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         let waiting: Vec<super::Job> = engine.queue.drain(..).collect();
         for job in waiting {
             let flight = engine.prepare(&job)?;
-            for (outgoing, _, _) in flight.messages {
+            for (outgoing, _, _, _) in flight.messages {
                 match outgoing {
                     super::Outgoing::Http(request, _) => {
                         sent.extend(wire(&[Action::Http { id: 0, request }]))
@@ -572,6 +575,9 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     };
     let link = spec.serial_link(&model.id, &ctx.settings);
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
+    // Vectors check what is sent, not when: pacing (SPEC.md §2) has its own
+    // engine tests.
+    engine.pacer = super::pacing::Pacer::default();
 
     // Bring the session up: connect, and answer any probe the engine sends
     // first, so only the command's own messages are compared.

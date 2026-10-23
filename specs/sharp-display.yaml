@@ -71,6 +71,13 @@ transport:
   timeout_ms: 15000
   reply: expected
   probe: "POWR????"
+  # 100 ms between a reply and the next command, and one minute after a power (POWR with a value)
+  # or reset (RSET) command before the next.
+  pacing:
+    min_interval_ms: 100
+    from: reply
+    groups:
+      power_or_reset: { match: "^(POWR|RSET)[0-9]", after_ms: 60000 }
   # The same commands and replies on the RS-232C input terminal, with no
   # login: 8 data bits, no parity, 1 stop bit, no flow control on every
   # family; 9600 bps fixed on PN-LA, PN-LC (p.1), PN-HW2 (p.2), PN-ME2 (p.2)
@@ -5698,7 +5705,9 @@ quirks:
     text: >
       Only one command is answered at a time, and Sharp asks for 100 ms between a reply and the next command
       and one minute after a power or reset command before the next; the core sends the next command once a
-      reply arrives. A command that takes time is answered WAIT and then OK; the WAIT is skipped.
+      reply arrives and keeps both gaps (transport.pacing), on the network and the RS-232C port alike, so
+      after set_power or reset_all everything else, the power read-back included, waits a minute. A
+      command that takes time is answered WAIT and then OK; the WAIT is skipped.
   - models: [all]
     severity: info
     text: >
