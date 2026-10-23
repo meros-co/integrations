@@ -1399,6 +1399,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that typical show hosts (consoles, media servers, displays) answer a connection to a closed port with a reset rather than dropping it, which a TCP probe counts as reachable. ([specs/generic-ping.yaml:127](specs/generic-ping.yaml#L127))
 - [ ] Check Wake-on-LAN through a router forwarding directed broadcasts to a subnet's broadcast address in wol_address. ([specs/generic-ping.yaml:62](specs/generic-ping.yaml#L62))
 
+## generic-snmp — Generic SNMP agent
+
+- [ ] Check AES-192 and AES-256 against agents that implement draft-blumenthal-aes-usm-04 (Net-SNMP's AES-192/AES-256), with SHA-1 and MD5 users whose keys are extended, and confirm which agents use the draft-reeder extension instead. ([specs/generic-snmp.yaml:255](specs/generic-snmp.yaml#L255))
+- [ ] Check CBC-DES privacy against a real agent (only the core's own round trip and the RFC 3414 §8 salt layout are tested). ([specs/generic-snmp.yaml:91](specs/generic-snmp.yaml#L91))
+- [ ] Check v3 informs from a real sender: that it discovers local_engine_id from the unknownEngineIDs report, then authenticates against this receiver's clock (boots 1, time from opening). ([specs/generic-snmp.yaml:115](specs/generic-snmp.yaml#L115))
+- [ ] Check v3 traps from a real agent are accepted with keys localized to its engine, without the timeliness check. ([specs/generic-snmp.yaml:248](specs/generic-snmp.yaml#L248))
+- [ ] Check a v1 agent's trap through the shared notification port, and the snmpTrapOID derived from it (RFC 3584 §3.1) against what Net-SNMP's snmptrapd shows. ([specs/generic-snmp.yaml:220](specs/generic-snmp.yaml#L220))
+- [ ] Check how agents of PDUs, UPSs and switches answer a polling GET over v1 when one object is missing (noSuchName and the error index), and a GET too big for them (tooBig), which the core splits. ([specs/generic-snmp.yaml:105](specs/generic-snmp.yaml#L105))
+- [ ] Check agents that encode unsigned values (Counter32, Gauge32, TimeTicks) without the leading zero byte their top bit needs; the core reads them as unsigned. ([specs/generic-snmp.yaml:241](specs/generic-snmp.yaml#L241))
+
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))

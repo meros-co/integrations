@@ -48,6 +48,7 @@ NATIVE = {
     "generic-http": "HTTP or HTTPS",
     "generic-osc": "OSC over UDP or TCP",
     "generic-ping": "ICMP echo or a TCP connection; Wake-on-LAN over UDP",
+    "generic-snmp": "SNMP v1, v2c or v3 over UDP 161; traps and informs",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "epson-projector": "ESC/VP21 over ESC/VP.net (TCP 3629) or a serial port",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
