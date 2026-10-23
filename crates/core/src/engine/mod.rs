@@ -1453,7 +1453,21 @@ impl SpecEngine {
                 let reply = match (str_field(&t, "reply_framing"), framing) {
                     (Some("line"), _) => ReplyFraming::Line,
                     (Some("block"), _) => ReplyFraming::Block,
-                    (Some("headed-block"), _) => ReplyFraming::HeadedBlock,
+                    (Some("headed-block"), _) => {
+                        let header = |key: &str| -> Result<Option<String>, String> {
+                            match str_field(&t, key) {
+                                Some(p) => {
+                                    Regex::new(p).map_err(|e| format!("{key}: {e}"))?;
+                                    Ok(Some(p.to_string()))
+                                }
+                                None => Ok(None),
+                            }
+                        };
+                        ReplyFraming::HeadedBlock(framing::Headers {
+                            block: header("reply_block_header")?,
+                            line: header("reply_line_header")?,
+                        })
+                    }
                     (Some("terminated"), _) => ReplyFraming::Terminated(
                         t.get("reply_terminators")
                             .and_then(Value::as_array)
@@ -2922,7 +2936,7 @@ impl SpecEngine {
         let headed = matches!(
             self.transport,
             Transport::LineTcp {
-                reply: ReplyFraming::HeadedBlock,
+                reply: ReplyFraming::HeadedBlock(_),
                 ..
             }
         ) && matches!(reply, Reply::Text(_));

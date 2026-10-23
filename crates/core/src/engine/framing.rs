@@ -33,8 +33,9 @@ pub(crate) enum ReplyFraming {
     Line,
     /// Lines up to a blank line.
     Block,
-    /// One line, unless it ends in ':', then lines up to a blank line.
-    HeadedBlock,
+    /// One line, unless it ends in ':', then lines up to a blank line; or,
+    /// with headers given, as they say (SPEC.md §2, Replies).
+    HeadedBlock(Headers),
     /// Text between `open` and `close`, whole, including the delimiters.
     Delimited { open: String, close: String },
     /// Text up to and including any of these, with no line ending needed:
@@ -48,6 +49,20 @@ pub(crate) enum ReplyFraming {
     /// and whatever lies between them: Barco Pulse's JSON-RPC, which sends
     /// bare JSON values back to back on one stream.
     Json,
+}
+
+/// `reply_block_header` and `reply_line_header`: which first lines of a
+/// `headed-block` reply have more lines after them. CasparCG's AMCP answers
+/// `200 ... OK` with lines up to a blank line, and `201 ... OK` with exactly
+/// one line of data; neither ends in ':'.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) struct Headers {
+    /// A first line matching this regex opens a block ended by a blank
+    /// line, in place of the line ending in ':'.
+    pub(crate) block: Option<String>,
+    /// A first line matching this regex is followed by exactly one more
+    /// line of the message, whatever that line holds.
+    pub(crate) line: Option<String>,
 }
 
 /// Where a `Json` framer is in the value it is reading.
@@ -105,6 +120,11 @@ pub(crate) struct Framer {
     framing: ReplyFraming,
     /// `Fenced`: the fence, compiled.
     fence: Option<regex::Regex>,
+    /// `HeadedBlock`'s headers, compiled.
+    block_header: Option<regex::Regex>,
+    line_header: Option<regex::Regex>,
+    /// A line header was read: the next line completes the message.
+    line_pending: bool,
     lines: Lines,
     block: Vec<String>,
     in_block: bool,
@@ -118,9 +138,19 @@ impl Framer {
             ReplyFraming::Fenced(re) => regex::Regex::new(re).ok(),
             _ => None,
         };
+        let header = |pick: fn(&Headers) -> &Option<String>| match &framing {
+            ReplyFraming::HeadedBlock(h) => {
+                pick(h).as_deref().and_then(|re| regex::Regex::new(re).ok())
+            }
+            _ => None,
+        };
+        let (block_header, line_header) = (header(|h| &h.block), header(|h| &h.line));
         Framer {
             framing,
             fence,
+            block_header,
+            line_header,
+            line_pending: false,
             lines: Lines::default(),
             block: Vec::new(),
             in_block: false,
@@ -198,15 +228,31 @@ impl Framer {
                         self.block.push(line);
                     }
                 }
-                ReplyFraming::HeadedBlock => {
-                    if self.in_block {
+                ReplyFraming::HeadedBlock(_) => {
+                    let opens_block = match &self.block_header {
+                        Some(re) => re.is_match(&line),
+                        None => line.trim_end().ends_with(':'),
+                    };
+                    if self.line_pending {
+                        // The one line after a line header, even an empty one.
+                        self.line_pending = false;
+                        self.block.push(line);
+                        out.push(std::mem::take(&mut self.block).join("\n"));
+                    } else if self.in_block {
                         if line.is_empty() {
                             self.in_block = false;
                             out.push(std::mem::take(&mut self.block).join("\n"));
                         } else {
                             self.block.push(line);
                         }
-                    } else if line.trim_end().ends_with(':') {
+                    } else if self
+                        .line_header
+                        .as_ref()
+                        .is_some_and(|re| re.is_match(&line))
+                    {
+                        self.line_pending = true;
+                        self.block.push(line);
+                    } else if opens_block {
                         self.in_block = true;
                         self.block.push(line);
                     } else if !line.is_empty() {
@@ -431,11 +477,38 @@ mod tests {
 
     #[test]
     fn headed_blocks_follow_hyperdeck() {
-        let mut f = Framer::new(ReplyFraming::HeadedBlock);
+        let mut f = Framer::new(ReplyFraming::HeadedBlock(Headers::default()));
         let out = f.feed(b"200 ok\r\n208 transport info:\r\nstatus: play\r\nspeed: 100\r\n\r\n");
         assert_eq!(
             out,
             ["200 ok", "208 transport info:\nstatus: play\nspeed: 100"]
+        );
+    }
+
+    #[test]
+    fn headed_blocks_follow_amcp_headers() {
+        let mut f = Framer::new(ReplyFraming::HeadedBlock(Headers {
+            block: Some("^200 ".into()),
+            line: Some("^(101|201|400|500) ".into()),
+        }));
+        // 202 is one line; 201 one line of data; 200 lines up to a blank
+        // line.
+        let out = f.feed(b"202 PLAY OK\r\n201 VERSION OK\r\n2.3.3 LTS\r\n200 INFO OK\r\n");
+        assert_eq!(out, ["202 PLAY OK", "201 VERSION OK\n2.3.3 LTS"]);
+        let out =
+            f.feed(b"1 1080i5000 PLAYING\r\n2 PAL PLAYING\r\n\r\n201 DATA RETRIEVE OK\r\n\r\n");
+        assert_eq!(
+            out,
+            [
+                "200 INFO OK\n1 1080i5000 PLAYING\n2 PAL PLAYING",
+                "201 DATA RETRIEVE OK\n"
+            ]
+        );
+        // A 200 with nothing listed ends at its blank line, and with a block
+        // header a line ending in ':' is one line.
+        assert_eq!(
+            f.feed(b"200 TLS OK\r\n\r\nnote:\r\n"),
+            ["200 TLS OK", "note:"]
         );
     }
 

@@ -116,6 +116,29 @@ several lines is still one message. Whatever arrives between values
 (whitespace, stray bytes) is no message. Each message is JSON, so it goes to
 the `json_match` rules (§8) as well as the text rules.
 
+A `headed-block` reply whose first line says what follows by other means
+than a closing `:` names the first lines that do: `reply_block_header`, a
+regex, for a first line opening a block that a blank line ends (in place of
+the line ending in `:`), and `reply_line_header` for a first line followed by
+exactly one more line, whatever it holds, even an empty one. CasparCG's AMCP
+answers `200 CLS OK` with a line per media file and a blank line, `201
+VERSION OK` with one line of data, and `202 PLAY OK` alone:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 5250
+  framing: terminated
+  terminator: crlf
+  reply_framing: headed-block
+  reply_block_header: "^200 "
+  reply_line_header: "^(101|201|400|500) "
+  reply_match: "^[2-5][0-9][0-9] "
+```
+
+The message is the first line and what follows it, joined by line breaks,
+so `returns: text` is the lines after the first, as for HyperDeck's.
+
 With `fenced`, a fence line opens a block and the next fence line after any
 other text closes it, so two fences in a row open one block; the fences, and
 the blank lines at the block's start and end, are not part of the message.

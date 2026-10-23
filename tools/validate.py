@@ -570,6 +570,15 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             re.compile(transport["reply_fence"])
         except re.error as e:
             errors.append(f"transport.reply_fence does not compile: {e}")
+    for key in ("reply_block_header", "reply_line_header"):
+        if key not in transport:
+            continue
+        if transport.get("reply_framing") != "headed-block":
+            errors.append(f"transport.{key} goes with reply_framing headed-block")
+        try:
+            re.compile(transport[key])
+        except re.error as e:
+            errors.append(f"transport.{key} does not compile: {e}")
     for path, pattern in (transport.get("refusal_json") or {}).items():
         try:
             re.compile(pattern)
