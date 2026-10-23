@@ -2919,6 +2919,32 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a 3.3.0 server, confirm chat_enabled is ignored and a duplicate manage event is answered with no result; on a later one, that set_chat_enabled is echoed to every client and duplicate_device answers the copy's deviceId. ([specs/tally-arbiter.yaml:584](specs/tally-arbiter.yaml#L584))
 - [ ] On a phone, confirm Tally Arbiter's Engine.IO pings are answered so it keeps the connection, that a connection dropped while the app was suspended is reopened by mi_reconnect_all with the listener client registered again, and that two unanswered version requests (10 s) drop a silent connection. ([specs/tally-arbiter.yaml:591](specs/tally-arbiter.yaml#L591))
 
+## teradek-prism — Teradek Prism (Jetpack, Flex, Mobile, Rack Unit)
+
+- [ ] Confirm the API answers on HTTPS port 443 with a self-signed certificate the core accepts, and whether plain HTTP is served at all (the SDK has an https: false option; the documents name only HTTPS). ([specs/teradek-prism.yaml:72](specs/teradek-prism.yaml#L72))
+- [ ] Confirm the token endpoint takes the form-encoded password and refresh grants without an Authorization header, and record its answer to a wrong password and to an expired refresh token (status and body), which the documents do not give. ([specs/teradek-prism.yaml:164](specs/teradek-prism.yaml#L164))
+- [ ] Confirm the token endpoint is on port 443 beside the API, and how its 30 requests per minute are counted apart from the API's 60. ([specs/teradek-prism.yaml:86](specs/teradek-prism.yaml#L86))
+- [ ] Record what an expired or missing access token answers on an /api/v1 path (status 401 and its body), and check that a request with the old token still works for the token commands. ([specs/teradek-prism.yaml:77](specs/teradek-prism.yaml#L77))
+- [ ] Confirm GET /api/v1 answers without a token on both 2.25 and 2.26, and whether it counts toward the 60 requests per minute (the core probes with it after 10 s of silence). ([specs/teradek-prism.yaml:83](specs/teradek-prism.yaml#L83))
+- [ ] Confirm the rate limit headers come with every API answer, as decimal text. ([specs/teradek-prism.yaml:1080](specs/teradek-prism.yaml#L1080))
+- [ ] Check that the core's bodiless POSTs (record start and stop, stream actions, restarts, adding pipelines and streams, a plain SCTE marker, the firmware upgrade) carry Content-Length: 0 and are not answered 411. ([specs/teradek-prism.yaml:2160](specs/teradek-prism.yaml#L2160))
+- [ ] Confirm input_type network is the value that selects a network input on PUT /api/v1/encoders/{id} (the documents show only physical). ([specs/teradek-prism.yaml:298](specs/teradek-prism.yaml#L298))
+- [ ] Record the allowed ranges of the snapshot's width, height and quality (taken here as up to 7680 x 4320 and 1-100), and check that POST snapshot answers 200 with the image. ([specs/teradek-prism.yaml:552](specs/teradek-prism.yaml#L552))
+- [ ] Check the video bitrate range (100-80000 kbit/s from the 2.25 description example) on each product and codec. ([specs/teradek-prism.yaml:373](specs/teradek-prism.yaml#L373))
+- [ ] Confirm that every settings GET answers with a message starting "Settings retrieved" and every PUT with "Set successfully", so the whole-object JSON text is taken from reads only, on 2.25 and 2.26. ([specs/teradek-prism.yaml:1307](specs/teradek-prism.yaml#L1307))
+- [ ] Confirm GET /api/v1/network/wifi answers with the message "Statuses received" (its whole-object JSON text depends on it). ([specs/teradek-prism.yaml:1733](specs/teradek-prism.yaml#L1733))
+- [ ] Confirm the delete answers' exact messages ("Encoder 3 removed", "Decoder 1 removed", "Stream 8 removed"), which remove the item from state. ([specs/teradek-prism.yaml:1200](specs/teradek-prism.yaml#L1200))
+- [ ] Confirm the 16 audio output channels, like the audio output settings, are shared by all decoders, so reading them through the first decoder listed is right. ([specs/teradek-prism.yaml:1500](specs/teradek-prism.yaml#L1500))
+- [ ] Confirm GET /api/v1/streams lists the base stream 0 first, so the fast poll reads the main pipeline's status. ([specs/teradek-prism.yaml:1654](specs/teradek-prism.yaml#L1654))
+- [ ] Record which products have modem endpoints and what a modem slot with nothing in it answers (the core polls slots 0-7 every 5 minutes). ([specs/teradek-prism.yaml:1069](specs/teradek-prism.yaml#L1069))
+- [ ] Confirm start_all and stop_all act on every stream when sent on stream 0, as Teradek's SDK sends them. ([specs/teradek-prism.yaml:917](specs/teradek-prism.yaml#L917))
+- [ ] Record what complete_stream does on each mode (taken to end a platform's broadcast), and what preview and endpreview do. ([specs/teradek-prism.yaml:2097](specs/teradek-prism.yaml#L2097))
+- [ ] Record which settings other than the encoder input restart encoding when changed (codec, resolution, audio, decoder ingest). ([specs/teradek-prism.yaml:2084](specs/teradek-prism.yaml#L2084))
+- [ ] Record what upgrade_firmware does (download and install, reboot, output stopped) and how long the unit is gone. ([specs/teradek-prism.yaml:2103](specs/teradek-prism.yaml#L2103))
+- [ ] Record the values import_settings's type takes besides encoder. ([specs/teradek-prism.yaml:1013](specs/teradek-prism.yaml#L1013))
+- [ ] On a 2.25 unit, confirm the list, inputs and capacity endpoints answer 404 and that encoder 0, decoder 0 and streams 0-4 answer on the shared paths. ([specs/teradek-prism.yaml:2061](specs/teradek-prism.yaml#L2061))
+- [ ] Record the units of the audio delay and volume fields (encoder audio delay, audio output delay and embedded volume, channel volume). ([specs/teradek-prism.yaml:1963](specs/teradek-prism.yaml#L1963))
+
 ## tsl-umd-display — TSL UMD tally sent to displays and multiviewers
 
 - [ ] Check that a V4.0 display or multiviewer with a right display lights the right display's tallies from the second XDATA byte (right_lh, right_text_tally, right_rh), and that one without ignores it. ([specs/tsl-umd-display.yaml:76](specs/tsl-umd-display.yaml#L76))
