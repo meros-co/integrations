@@ -1988,6 +1988,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a set command's network reply echoes the command after "00" (as "00PON"), and the serial reply is the bare data without "00". ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 - [ ] Check which serial speeds the older series offer (the PT-RZ120's menu gives 9600, 19200 and 38400). ([specs/panasonic-projector.yaml:57](specs/panasonic-projector.yaml#L57))
 - [ ] Check that commands addressed to ZZ are answered with RESPONSE (ID ALL) off on a single projector. ([specs/panasonic-projector.yaml:16368](specs/panasonic-projector.yaml#L16368))
+- [ ] Check whether commands over the network also need the 60 s after the light source lights that the RS-232C section asks for (the core waits only on the serial port), and whether a power read during lighting answers 001 (the core starts the 60 s when it first reads on after standby). ([specs/panasonic-projector.yaml:16369](specs/panasonic-projector.yaml#L16369))
 - [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 ## philips-sicp — Philips professional displays (SICP)
