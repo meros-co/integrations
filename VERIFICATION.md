@@ -2570,6 +2570,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2717](specs/sony-camera.yaml#L2717))
 - [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2685](specs/sony-camera.yaml#L2685))
 
+## streamlabs-desktop — Streamlabs Desktop
+
+- [ ] Confirm the raw websocket at /api/websocket on port 59650 carries the JSON-RPC messages unframed, and that remote connections reach it from another computer. ([specs/streamlabs-desktop.yaml:52](specs/streamlabs-desktop.yaml#L52))
+- [ ] Record the auth answer for a good and a wrong token, and confirm the refused and accepted patterns. ([specs/streamlabs-desktop.yaml:64](specs/streamlabs-desktop.yaml#L64))
+- [ ] Confirm string request ids are echoed in the replies, and what a void method returns as its result. ([specs/streamlabs-desktop.yaml:103](specs/streamlabs-desktop.yaml#L103))
+- [ ] Record getScenes with getModel data: confirm the nodes' fields (id, sceneNodeType, sourceId, visible, transform, parentId) and that a node's id is the SceneItem resource's second part. ([specs/streamlabs-desktop.yaml:637](specs/streamlabs-desktop.yaml#L637))
+- [ ] Confirm the event payloads: itemUpdated as an ISceneItemModel with sceneId, sourceUpdated as an ISourceModel, and the streaming status events as bare strings. ([specs/streamlabs-desktop.yaml:662](specs/streamlabs-desktop.yaml#L662))
+- [ ] Confirm AudioService.getSources returns each source's IAudioSourceModel (fader db, deflection, mul). ([specs/streamlabs-desktop.yaml:716](specs/streamlabs-desktop.yaml#L716))
+- [ ] Confirm SceneItemFolder resources take the scene and folder IDs as SceneItemFolder["scene","folder"]. ([specs/streamlabs-desktop.yaml:191](specs/streamlabs-desktop.yaml#L191))
+
 ## symetrix-composer — Symetrix Composer DSPs
 
 - [ ] Check that pushed GSYSS strings (with "Enable System String Pushing") do not start with "#" lines that look like controller pushes, and what they look like; they are currently ignored, or taken as an answer. ([specs/symetrix-composer.yaml:44](specs/symetrix-composer.yaml#L44))
