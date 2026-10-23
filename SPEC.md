@@ -897,7 +897,7 @@ ports:
 | Field | Meaning |
 |---|---|
 | `port` | The default. `null` when there is none and one must be given; a `note` then says so |
-| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, or `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`) |
+| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`: a serial port of the host, with `port: null` and `setting: serial_port` (§2, `line-serial`), or `icmp`: ICMP echo, which has no port (`port: null`) |
 | `role` | `control` (where commands go; the port given when opening a device overrides the transport's, not an HTTP endpoint's), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
 | `listener` | Who listens: `device` (the default) or `core` |
 | `setting` | The setting that changes this port, if any |

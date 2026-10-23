@@ -75,8 +75,9 @@ pub struct DeviceSpec {
 pub struct PortSpec {
     /// The default; `None` when there is none and it must be given.
     pub port: Option<u16>,
-    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh` or `serial`
-    /// (a serial port on the host, named by its `setting`, with no number).
+    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`
+    /// (a serial port on the host, named by its `setting`, with no number) or
+    /// `icmp` (ICMP echo, with no number).
     pub protocol: String,
     /// `control` (where commands go; `OpenRequest::port` overrides it),
     /// `push`, `feedback`, `notification` or `discovery`.
