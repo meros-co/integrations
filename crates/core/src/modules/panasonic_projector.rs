@@ -21,7 +21,8 @@
 //!   all, `01`-`64`, or a group `0A`-`0Z`), `;`, the command, ETX; the
 //!   answer is STX, the reply, ETX, or `ER401` (cannot be executed now) or
 //!   `ER402` (invalid parameter). Commands are sent 0.5 s after the previous
-//!   answer, as the manual asks.
+//!   answer, and 60 s after the light source starts lighting, as the manual
+//!   asks.
 //! - The projector pushes nothing, so state is polled: the power status
 //!   every 5 s, and while the projector is on, every query the model's
 //!   command list has, one sweep a minute at most.
@@ -58,6 +59,9 @@ const POLL_EVERY: Millis = 5_000;
 const SWEEP_EVERY: u32 = 12;
 /// Serial: 0.5 s after an answer before the next command.
 const SERIAL_GAP: Millis = 500;
+/// Serial: 60 s after the light source starts lighting before the next
+/// command (RS-232C "Attention").
+const LIGHTING_GAP: Millis = 60_000;
 const MISSES: u32 = 3;
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
@@ -129,6 +133,8 @@ pub(crate) struct PanasonicProjector {
     port_open: bool,
     reachable: bool,
     powered: bool,
+    /// The power has been read since the link opened.
+    power_known: bool,
     refused: Option<String>,
     misses: u32,
     retry_after: Millis,
@@ -185,6 +191,7 @@ impl PanasonicProjector {
             port_open: false,
             reachable: false,
             powered: false,
+            power_known: false,
             refused: None,
             misses: 0,
             retry_after: RETRY_MIN,
@@ -272,6 +279,7 @@ impl PanasonicProjector {
         self.buf.clear();
         self.misses = 0;
         self.reachable = false;
+        self.power_known = false;
         self.port_open = false;
         self.phase = Phase::Closed;
         cx.log(Level::Debug, format!("Panasonic projector: {reason}"));
@@ -340,6 +348,17 @@ impl PanasonicProjector {
             Some(_) => reply.strip_prefix("00").unwrap_or(reply),
             None => reply,
         };
+        // The light source starts lighting: power on accepted while not
+        // known to be on, or the power read on after it was read standby.
+        let was_on = self.power_known && self.powered;
+        let lighting = error_meaning(reply).is_none()
+            && !was_on
+            && (job.line == "PON" || (job.line == "QPW" && reply == "001" && self.power_known));
+        if job.line == "PON" && error_meaning(reply).is_none() {
+            // On from now: the read that follows does not light it again.
+            self.powered = true;
+            self.power_known = true;
+        }
         let result = match error_meaning(reply) {
             Some(meaning) => Err(CommandError::DeviceError {
                 code: Some(reply.to_string()),
@@ -350,6 +369,7 @@ impl PanasonicProjector {
                     let mut patch = json!({});
                     if job.line == "QPW" {
                         self.powered = reply == "001";
+                        self.power_known = true;
                         patch["power"] = json!(match reply {
                             "000" => "standby",
                             "001" => "on",
@@ -384,7 +404,7 @@ impl PanasonicProjector {
         } else {
             self.phase = Phase::Idle;
             self.paced = true;
-            cx.set_timer(PACE, SERIAL_GAP);
+            cx.set_timer(PACE, if lighting { LIGHTING_GAP } else { SERIAL_GAP });
         }
     }
 
@@ -844,6 +864,83 @@ mod tests {
             completed(&a, 1),
             Some(Err(CommandError::DeviceError { .. }))
         ));
+    }
+
+    #[test]
+    fn serial_commands_wait_60_s_once_the_light_source_lights() {
+        let mut m = serial_module();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        input(&mut m, TcpInput::Connected);
+        data(&mut m, b"000");
+        let mut cx = Cx::new(10);
+        m.command(
+            &mut cx,
+            1,
+            "set_power",
+            json!({"on": true}).as_object().unwrap(),
+        );
+        let mut cx = Cx::new(500);
+        m.timer(&mut cx, PACE);
+        assert_eq!(sent(&cx.take()), [b"ADZZ;PON".to_vec()]);
+        let mut cx = Cx::new(10);
+        m.command(
+            &mut cx,
+            2,
+            "set_input_select",
+            json!({"value": "HD1"}).as_object().unwrap(),
+        );
+        let a = data(&mut m, b"PON");
+        assert!(a.contains(&Action::SetTimer {
+            key: PACE,
+            after: LIGHTING_GAP
+        }));
+        assert!(sent(&a).is_empty());
+        let mut cx = Cx::new(60_000);
+        m.timer(&mut cx, PACE);
+        assert_eq!(sent(&cx.take()), [b"ADZZ;IIS:HD1".to_vec()]);
+        data(&mut m, b"IIS:HD1");
+        // Read on afterwards: the light source is not lit again.
+        m.polls.push_back(Job::query("QPW", None));
+        let mut cx = Cx::new(0);
+        m.timer(&mut cx, PACE);
+        let a = data(&mut m, b"001");
+        assert!(a.contains(&Action::SetTimer {
+            key: PACE,
+            after: SERIAL_GAP
+        }));
+        // Already on: power on lights nothing, and the gap is 0.5 s.
+        m.commands.push_back(Job::query("PON", None));
+        let mut cx = Cx::new(0);
+        m.timer(&mut cx, PACE);
+        let a = data(&mut m, b"PON");
+        assert!(a.contains(&Action::SetTimer {
+            key: PACE,
+            after: SERIAL_GAP
+        }));
+    }
+
+    #[test]
+    fn serial_commands_wait_60_s_after_the_power_is_read_turning_on() {
+        let mut m = serial_module();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        // The first read says nothing about lighting.
+        input(&mut m, TcpInput::Connected);
+        let a = data(&mut m, b"001");
+        assert!(a.contains(&Action::SetTimer {
+            key: PACE,
+            after: SERIAL_GAP
+        }));
+        m.powered = false;
+        m.polls.push_back(Job::query("QPW", None));
+        let mut cx = Cx::new(0);
+        m.timer(&mut cx, PACE);
+        let a = data(&mut m, b"001");
+        assert!(a.contains(&Action::SetTimer {
+            key: PACE,
+            after: LIGHTING_GAP
+        }));
     }
 
     #[test]
