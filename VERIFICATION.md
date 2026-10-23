@@ -1186,6 +1186,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the size, creationDate and lastWriteDate units of media/list (uint64 strings; the epoch of the dates is not documented), and whether provision overwrites a file already at the destination. ([specs/disguise.yaml:2413](specs/disguise.yaml#L2413))
 - [ ] Confirm the proof of play subscription to one dictionary of subsystem:ProofOfPlaySubsystem (getRecords, called if it is a method, and getRecentRecords(n)), that it is available without enabling anything, and which release added it. ([specs/disguise.yaml:1350](specs/disguise.yaml#L1350))
 
+## dtvideolabs-playbackpro-plus — PlaybackPro Plus
+
+- [ ] Check the TCP port on PlaybackPro Plus 3.8 (7000 in its guide) and on Plus X (4647), and whether the UDP port takes the same commands. ([specs/dtvideolabs-playbackpro-plus.yaml:416](specs/dtvideolabs-playbackpro-plus.yaml#L416))
+- [ ] Record what PlaybackPro Plus sends back for an inquiry (PS, TE, AN) and for a command that changes something: the line ending, if any, and whether commands are answered at all; and whether a command sent with a CR or CRLF after it is still accepted. ([specs/dtvideolabs-playbackpro-plus.yaml:425](specs/dtvideolabs-playbackpro-plus.yaml#L425))
+- [ ] Check what SF answers for an unnamed show and VU/GU for a clip with no number (nothing, an empty line, or N/A). ([specs/dtvideolabs-playbackpro-plus.yaml:431](specs/dtvideolabs-playbackpro-plus.yaml#L431))
+- [ ] Check that GO, GT, SI and TI take a number without leading zeros (GO7) and the largest number they accept. ([specs/dtvideolabs-playbackpro-plus.yaml:437](specs/dtvideolabs-playbackpro-plus.yaml#L437))
+- [ ] Record the ID inquiry's answer, to read each clip's number and file name apart. ([specs/dtvideolabs-playbackpro-plus.yaml:453](specs/dtvideolabs-playbackpro-plus.yaml#L453))
+
 ## emberplus — Ember+
 
 - [ ] Check the device's Ember+ port, since the module's default of 9000 is a common choice, not a standard. ([specs/emberplus.yaml:199](specs/emberplus.yaml#L199))
