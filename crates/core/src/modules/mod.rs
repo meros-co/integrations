@@ -68,6 +68,8 @@ mod ftp;
 mod generic_http;
 #[cfg(any(feature = "generic-osc", feature = "osc-listener"))]
 mod generic_osc;
+#[cfg(feature = "generic-ping")]
+mod generic_ping;
 #[cfg(any(
     feature = "generic-tcp-udp",
     feature = "generic-osc",
@@ -175,6 +177,8 @@ mod visca;
 mod vmix;
 #[cfg(feature = "vmix")]
 mod vmix_functions;
+#[cfg(any(feature = "generic-ping", feature = "samsung-mdc"))]
+mod wol;
 
 use std::sync::Arc;
 
@@ -351,6 +355,8 @@ pub(crate) fn construct(
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         #[cfg(feature = "generic-tcp-udp")]
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
+        #[cfg(feature = "generic-ping")]
+        "generic-ping" => Ok(Box::new(generic_ping::GenericPing::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
         #[cfg(feature = "http-listener")]

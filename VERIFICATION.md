@@ -1391,6 +1391,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1696](specs/freeshow.yaml#L1696))
 - [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1698](specs/freeshow.yaml#L1698))
 
+## generic-ping — Network presence (ping) and Wake-on-LAN
+
+- [ ] Check that network adapters with a SecureOn password take it as 4 or 6 bytes right after the sixteen MAC repetitions (from practice, not AMD's paper). ([specs/generic-ping.yaml:66](specs/generic-ping.yaml#L66))
+- [ ] Check on macOS that an unprivileged ICMP datagram socket keeps the identifier sent and prefixes IPv4 echo replies with their IP header, as the core allows for (only Windows was run here; Linux and macOS builds were compiled, not run). ([specs/generic-ping.yaml:120](specs/generic-ping.yaml#L120))
+- [ ] Check on Linux with net.ipv4.ping_group_range including the core's group that echo replies arrive, and that outside it the socket is refused and auto falls back to TCP. ([specs/generic-ping.yaml:120](specs/generic-ping.yaml#L120))
+- [ ] Check that typical show hosts (consoles, media servers, displays) answer a connection to a closed port with a reset rather than dropping it, which a TCP probe counts as reachable. ([specs/generic-ping.yaml:127](specs/generic-ping.yaml#L127))
+- [ ] Check Wake-on-LAN through a router forwarding directed broadcasts to a subnet's broadcast address in wol_address. ([specs/generic-ping.yaml:62](specs/generic-ping.yaml#L62))
+
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))

@@ -120,6 +120,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &[
             "generic-http",
             "generic-osc",
+            "generic-ping",
             "generic-tcp-udp",
             "http-listener",
             "http-snapshot",

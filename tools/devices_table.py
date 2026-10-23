@@ -47,6 +47,7 @@ NATIVE = {
     "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",
     "generic-osc": "OSC over UDP or TCP",
+    "generic-ping": "ICMP echo or a TCP connection; Wake-on-LAN over UDP",
     "generic-tcp-udp": "Text or bytes over TCP, UDP or a serial port",
     "epson-projector": "ESC/VP21 over ESC/VP.net (TCP 3629) or a serial port",
     "labgruppen-lake": "DLM over UDP 6016 (or 6015, answers on 6004)",
