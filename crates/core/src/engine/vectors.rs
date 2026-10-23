@@ -712,6 +712,26 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             reply: super::ReplyFraming::Block,
             ..
         } => format!("{line}\r\n\r\n"),
+        // A headed block whose headers say this first line has more after
+        // it (CasparCG's `200 ...` lines up to a blank line, `201 ...` one
+        // line of data).
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::HeadedBlock(headers),
+            ..
+        } => {
+            let matches = |re: &Option<String>| {
+                re.as_deref()
+                    .and_then(|re| regex::Regex::new(re).ok())
+                    .is_some_and(|re| re.is_match(line))
+            };
+            if matches(&headers.block) {
+                format!("{line}\r\n\r\n")
+            } else if matches(&headers.line) {
+                format!("{line}\r\nok\r\n")
+            } else {
+                format!("{line}\r\n")
+            }
+        }
         // A JSON stream's messages are JSON values (Barco Pulse).
         super::Transport::LineTcp {
             reply: super::ReplyFraming::Json,
