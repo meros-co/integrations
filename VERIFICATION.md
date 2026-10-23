@@ -1497,6 +1497,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how MESSAGE treats a quote or a character outside ASCII in the text. ([specs/irisdown-countdown-timer.yaml:187](specs/irisdown-countdown-timer.yaml#L187))
 - [ ] Confirm JOG takes negative minutes while stopped or paused as well as while running. ([specs/irisdown-countdown-timer.yaml:98](specs/irisdown-countdown-timer.yaml#L98))
 
+## irisdown-remote-show-control — Irisdown Remote Show Control
+
+- [ ] Confirm the add-in takes each command as a single UDP datagram with no line ending, and plain ASCII double quotes around names. ([specs/irisdown-remote-show-control.yaml:138](specs/irisdown-remote-show-control.yaml#L138))
+- [ ] Record how FIND answers (over UDP and over TCP 61001) and how the end of the list is marked. ([specs/irisdown-remote-show-control.yaml:135](specs/irisdown-remote-show-control.yaml#L135))
+- [ ] Check whether GO takes a slide number with the space (GO 23), as the manual's syntax shows, as well as without (GO2 in the Spyder example). ([specs/irisdown-remote-show-control.yaml:102](specs/irisdown-remote-show-control.yaml#L102))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))

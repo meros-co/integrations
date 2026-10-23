@@ -1,0 +1,156 @@
+spec: 1
+id: irisdown-remote-show-control
+name: Irisdown Remote Show Control (PowerPoint)
+vendor: Irisdown
+category: playback
+
+# Remote Show Control is a free PowerPoint add-in that takes plain-text
+# commands over the network to open, run and step through presentations.
+# It answers nothing (except FIND), so commands are unacknowledged. The
+# spec sends each command as one UDP datagram to port 61000, the way the
+# vendor's own example does; the add-in takes the same commands on TCP
+# 61001.
+
+source:
+  - title: Remote Show Control v1.2.4 (user manual, PDF)
+    author: Irisdown Technical Solutions (Dave Shepherd)
+    url: https://release.irisdown.co.uk/RemoteShowControl%20Manual%20v1.2.pdf
+    note: >
+      Vendor document (5 pages, linked from the product page), retrieved
+      2026-10-23. Text commands as a UDP packet to port 61000 or a TCP
+      packet to port 61001, UTF-8; one command processed at a time, a
+      command may fail while PowerPoint is busy, no response is sent back;
+      broadcast packets are taken like any other. OPEN "<filename>" (with
+      .ppt or .pptx, MyDocuments when no path), CLOSE "<filename>" and
+      CLOSE (every saved presentation), RUN "<filename>" and RUN,
+      RUNCURRENT, STOP "<filename>" and STOP, PREV, NEXT, GO <slidenumber>
+      and GO "<sectionname>", SETBG (experimental), FIND "<path>" answering
+      a list of file names or "none". Example with Spyder: UDP port 61000.
+  - title: Irisdown Remote Show Control product page (v1.2.4, change log)
+    author: Irisdown Technical Solutions
+    url: https://www.irisdown.co.uk/rsc.html
+    note: >
+      Vendor page, retrieved 2026-10-23. Commands as UTF-8 via UDP and
+      TCP; FIND, RUNCURRENT and UTF-8 from 1.2.4.3; GO "<sectionname>" from
+      1.2.4.0; TCP connections persist from 1.2.1.16.
+
+transport:
+  type: line-udp
+  port: 61000
+  terminator: none
+  encoding: utf-8
+  reply: none
+
+ports:
+  - { port: 61000, protocol: udp, role: control }
+
+models:
+  - id: remote-show-control
+    name: Remote Show Control 1.2.4 (PowerPoint 2010 or later, Windows)
+    supports: [open, close, close_all, run, run_active, run_current, stop, stop_all,
+               next, previous, go_to_slide, go_to_section, set_background]
+    verification: none
+
+commands:
+  open:
+    summary: Open a presentation (OPEN "<filename>")
+    params:
+      file: &file { type: string, max_length: 1024, required: true, pattern: "^[^\"]+\\.(ppt|pptx|PPT|PPTX)$",
+                    label: Presentation,
+                    description: "File name ending in .ppt or .pptx; a full path, or a name in the PowerPoint computer's Documents folder." }
+    send: "OPEN \"{file}\""
+    returns: none
+  close:
+    summary: Close a presentation, only if it is saved (CLOSE "<filename>")
+    params: { file: *file }
+    send: "CLOSE \"{file}\""
+    returns: none
+  close_all:
+    summary: Close every saved presentation (CLOSE)
+    send: "CLOSE"
+    returns: none
+  run:
+    summary: Start a presentation's slide show, opening it if needed and stopping other shows (RUN "<filename>")
+    params: { file: *file }
+    send: "RUN \"{file}\""
+    returns: none
+  run_active:
+    summary: Start the active presentation's slide show, when no other show runs (RUN)
+    send: "RUN"
+    returns: none
+  run_current:
+    summary: Start the active presentation's slide show at the selected slide (RUNCURRENT)
+    send: "RUNCURRENT"
+    returns: none
+  stop:
+    summary: Stop a presentation's slide show (STOP "<filename>")
+    params: { file: *file }
+    send: "STOP \"{file}\""
+    returns: none
+  stop_all:
+    summary: Stop every slide show (STOP)
+    send: "STOP"
+    returns: none
+  next:
+    summary: Advance one click in the slide show (NEXT)
+    send: "NEXT"
+    returns: none
+  previous:
+    summary: Go back one click in the slide show (PREV)
+    send: "PREV"
+    returns: none
+  go_to_slide:
+    summary: Go to a numbered slide (GO <slidenumber>)
+    params:
+      slide: { type: int, min: 1, required: true,
+               label: Slide, description: "Slide number, from 1." }
+    send: "GO {slide}"
+    returns: none
+  go_to_section:
+    summary: Go to the start of a named section (GO "<sectionname>")
+    params:
+      section: { type: string, max_length: 256, required: true, pattern: "^[^\"]+$",
+                 label: Section, description: "Name of the section, as in PowerPoint; no double quotes." }
+    send: "GO \"{section}\""
+    returns: none
+  set_background:
+    summary: Set the desktop wallpaper to the slide showing, as a safety while presentations change (SETBG; experimental)
+    send: "SETBG"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Remote Show Control sends nothing back: every command is
+      unacknowledged and there is no state to read. It processes one
+      command at a time and a command may fail while PowerPoint is busy (for
+      example loading a presentation), so leave time after OPEN and RUN. If
+      the PowerPoint window does not have focus, animations do not animate;
+      transitions still work.
+
+  - models: [all]
+    severity: info
+    text: >
+      FIND "<path>" answers a list of presentations in a folder, but the
+      manual does not say how the list is sent back over UDP or how its end
+      is marked on TCP, so it is not offered. The manual prints the quotes
+      around file and section names as typographic quotes; the spec sends
+      plain double quotes. The add-in also takes the commands on TCP 61001,
+      with no line ending documented.
+
+  - models: [all]
+    severity: critical
+    text: >
+      RUN "<filename>" stops every other slide show. CLOSE without a file
+      name closes every saved presentation. SETBG is experimental and needs
+      a display chosen explicitly in PowerPoint's Slide Show > Monitors (not
+      Automatic, in PowerPoint 2013 and later).
+
+  - models: [all]
+    severity: info
+    text: >
+      A command sent to the subnet's broadcast address reaches every
+      PowerPoint computer running the add-in. The add-in needs Visual Studio
+      Tools for Office, downloaded when it is installed; without them it is
+      installed but disabled.
