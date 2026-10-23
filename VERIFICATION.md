@@ -1378,6 +1378,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm begin_crossposting_handshake and accept_crossposting_handshake are accepted in a JSON body as arrays of objects, and answer success true. ([specs/facebook-live.yaml:782](specs/facebook-live.yaml#L782))
 - [ ] Confirm crossposting_actions in a JSON body answers the live video with crosspost_shared_pages and crossposted_broadcasts as edges, when asked for in fields on the POST. ([specs/facebook-live.yaml:747](specs/facebook-live.yaml#L747))
 
+## figure53-go-button — Figure 53 Go Button
+
+- [ ] Check the address a rootless query is answered on: /reply/<the address sent> (assumed, so query commands wait for it exactly), or with a show prefix as the dictionary's /reply/show_id/{id}/volumePercent example has it; and whether a hit read by /hit_id/{id} is answered on /reply/hit_id/{id}/... ([specs/figure53-go-button.yaml:1448](specs/figure53-go-button.yaml#L1448))
+- [ ] Check that a wrong passcode answers /reply/connect with badpass over TCP and that later show and cue queries then go unanswered rather than answered with an error. ([specs/figure53-go-button.yaml:1467](specs/figure53-go-button.yaml#L1467))
+- [ ] Check whether percentActionElapsed and percentPreWaitElapsed are fractions from 0 to 1 or percentages from 0 to 100. ([specs/figure53-go-button.yaml:1478](specs/figure53-go-button.yaml#L1478))
+- [ ] Check the update Go Button sends when cues are added, deleted or moved: an update for the root group ("[root group of cue lists]" per a third-party client, or __root__), or /update/show/{id} alone. ([specs/figure53-go-button.yaml:1487](specs/figure53-go-button.yaml#L1487))
+- [ ] Check that the * and ? wildcards work in an action address such as /hit/1*/start, and that cue and hit messages sent to /hit/{number} count hits in display order from the top left. ([specs/figure53-go-button.yaml:1496](specs/figure53-go-button.yaml#L1496))
+- [ ] Check that Go Button 3.0 to 3.2 take the integers 0 and 1 as booleans (the dictionary marks OSC True and False as 3.3.0 and later). ([specs/figure53-go-button.yaml:1507](specs/figure53-go-button.yaml#L1507))
+- [ ] Check the arguments of /update/show/{id}/volume (dB alone, or dB and a percentage) and whether a second update message carries the percentage. ([specs/figure53-go-button.yaml:1521](specs/figure53-go-button.yaml#L1521))
+- [ ] Check what Go Button answers to show and cue queries with no show open (a third-party client reads data ignoring_show_methods) and with which status. ([specs/figure53-go-button.yaml:1529](specs/figure53-go-button.yaml#L1529))
+- [ ] Check that /show/{displayName}/open opens a show by display name, and that rootless show messages reach the open show. ([specs/figure53-go-button.yaml:1536](specs/figure53-go-button.yaml#L1536))
+
 ## focusrite-rednet — Focusrite RedNet (AES70)
 
 - [ ] Note the OCP.1 port a RedNet unit advertises as _oca._tcp once AES70 is enabled in RedNet Control, and check it accepts OCP.1 on plain TCP. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))

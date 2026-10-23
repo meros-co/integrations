@@ -1,0 +1,1556 @@
+spec: 1
+id: figure53-go-button
+name: Figure 53 Go Button
+vendor: Figure 53
+category: playback
+
+source:
+  - title: Go Button 3 Documentation, Working With Your Show, "OSC Dictionary"
+    author: Figure 53
+    url: https://gobutton.app/docs/v3/working-with-your-show/osc-dictionary/
+    note: >
+      Manufacturer-documented. Retrieved 2026-10-23. Sections used: Getting
+      Started (UDP and TCP on 53100 since 3.2.0, earlier 53000; SLIP framing
+      over TCP; UDP replies to 53101), Getting status updates (/updates and the
+      /update/show/... messages), Replies (/reply/... with a JSON string
+      argument), OSC Booleans, Application messages, Show messages, Cue and Hit
+      messages (addressing by number or unique ID, increment/decrement syntax,
+      which only preWait supports).
+  - title: Go Button 3 Documentation, Working With Your Show, "Working With Remote Controls"
+    author: Figure 53
+    url: https://gobutton.app/docs/v3/working-with-your-show/working-with-remote-controls/
+    note: >
+      Retrieved 2026-10-23. Remote control profiles, MIDI and MSC; none of it is
+      reachable over the network beyond the OSC dictionary.
+  - title: companion-module-figure53-go-button
+    author: Bitfocus Companion contributors
+    url: https://github.com/bitfocus/companion-module-figure53-go-button
+    note: >
+      MIT. Retrieved 2026-10-23. Read as corroboration only, no code used: TCP
+      is needed for replies and updates; /update/show/{id}/cue_id/{id} names a
+      cue to read again, and the cue lists themselves change as a cue id
+      "[root group of cue lists]"; /reply/connect answers ok, badpass or error;
+      a reply's data "ignoring_show_methods" means no show is open.
+
+# Go Button answers queries with /reply/<the address sent> carrying a JSON
+# string, and pushes /update/show/... to clients that sent /updates 1. Over TCP
+# both arrive on the one connection, and large replies (/cueLists) fit, which
+# the dictionary says a UDP datagram may not; over UDP replies go to port 53101
+# rather than the sending socket, and an idle UDP client is forgotten after 61
+# seconds with its passcode and subscriptions. TCP keeps the client connected
+# until it closes, so TCP it is, as for QLab.
+transport:
+  type: osc-tcp
+  port: 53100
+  framing: slip
+  timeout_ms: 1000
+  probe: /version
+
+settings:
+  passcode: { type: string, secret: true, label: Passcode, description: "The OSC passcode set in Sidebar > OSC Control Settings; leave empty when none is set." }
+
+on_connect:
+  - when_set: passcode
+    send: { address: /connect, args: [ { value: "{settings.passcode}", type: string } ] }
+
+ports:
+  - { port: 53100, protocol: tcp, role: control, note: "Sidebar > OSC Control Settings > Network; installs upgraded from 3.1.5 or earlier keep 53000" }
+
+models:
+  - id: go-button-3
+    name: "Go Button 3 (3.3.0 and later)"
+    supports:
+      - set_always_reply
+      - get_always_reply
+      - connect
+      - disconnect
+      - set_forget_me_not
+      - get_forget_me_not
+      - set_udp_keep_alive
+      - get_udp_keep_alive
+      - set_reply_format
+      - reset_reply_format
+      - get_reply_format
+      - get_shows
+      - thump
+      - get_version
+      - open_show
+      - close_show
+      - get_cue_lists
+      - get_cue_lists_shallow
+      - get_cue_lists_ids
+      - get_cue_lists_ids_shallow
+      - get_running_cues
+      - get_running_cues_shallow
+      - get_running_cues_ids
+      - get_running_cues_ids_shallow
+      - get_running_or_paused_cues
+      - get_running_or_paused_cues_shallow
+      - get_running_or_paused_cues_ids
+      - get_running_or_paused_cues_ids_shallow
+      - set_dim
+      - get_dim
+      - toggle_dim
+      - set_full_screen
+      - get_full_screen
+      - toggle_full_screen
+      - set_main_volume_visible
+      - get_main_volume_visible
+      - toggle_main_volume_visible
+      - set_mute
+      - get_mute
+      - toggle_mute
+      - set_dim_over
+      - go
+      - oops
+      - panic
+      - panic_in_time
+      - pause
+      - resume
+      - stop
+      - hard_stop
+      - reset
+      - set_playhead
+      - playhead_next
+      - playhead_previous
+      - get_playhead_id
+      - set_timer_elapsed
+      - get_timer_elapsed
+      - set_timer_duration
+      - get_timer_duration
+      - start_timer
+      - stop_timer
+      - toggle_timer
+      - reset_timer
+      - reset_timer_duration
+      - reset_timer_elapsed
+      - set_volume
+      - get_volume
+      - set_volume_percent
+      - get_volume_percent
+      - volume_step_up
+      - volume_step_down
+      - get_cue_action_elapsed
+      - get_cue_percent_action_elapsed
+      - get_cue_default_name
+      - get_cue_display_name
+      - get_cue_duration
+      - get_cue_go_button_text
+      - get_cue_is_broken
+      - get_cue_is_loaded
+      - get_cue_is_paused
+      - get_cue_is_running
+      - get_cue_pre_wait_elapsed
+      - get_cue_percent_pre_wait_elapsed
+      - get_cue_unique_id
+      - get_cue_color
+      - get_cue_name
+      - get_cue_number
+      - get_cue_pre_wait
+      - set_cue_color
+      - set_cue_name
+      - set_cue_number
+      - set_cue_pre_wait
+      - adjust_cue_pre_wait
+      - load_cue
+      - panic_cue
+      - pause_cue
+      - toggle_pause_cue
+      - reset_cue
+      - resume_cue
+      - start_cue
+      - stop_cue
+      - hard_stop_cue
+      - load_cue_at
+      - panic_cue_in_time
+    verification: none
+  - id: go-button-3-early
+    name: "Go Button 3 (3.0 to 3.2)"
+    supports:
+      - set_always_reply
+      - get_always_reply
+      - connect
+      - disconnect
+      - set_forget_me_not
+      - get_forget_me_not
+      - set_udp_keep_alive
+      - get_udp_keep_alive
+      - set_reply_format
+      - reset_reply_format
+      - get_reply_format
+      - get_shows
+      - thump
+      - get_version
+      - open_show
+      - close_show
+      - get_cue_lists
+      - get_running_cues
+      - get_running_or_paused_cues
+      - set_dim
+      - get_dim
+      - toggle_dim
+      - set_full_screen
+      - get_full_screen
+      - toggle_full_screen
+      - set_main_volume_visible
+      - get_main_volume_visible
+      - toggle_main_volume_visible
+      - set_mute
+      - get_mute
+      - toggle_mute
+      - set_dim_over
+      - go
+      - oops
+      - panic
+      - panic_in_time
+      - pause
+      - resume
+      - stop
+      - hard_stop
+      - reset
+      - set_playhead
+      - playhead_next
+      - playhead_previous
+      - get_playhead_id
+      - set_timer
+      - get_timer
+      - start_timer
+      - stop_timer
+      - toggle_timer
+      - reset_timer_early
+      - set_volume
+      - get_volume
+      - set_volume_percent
+      - get_volume_percent
+      - volume_step_up
+      - volume_step_down
+      - get_cue_action_elapsed
+      - get_cue_percent_action_elapsed
+      - get_cue_default_name
+      - get_cue_display_name
+      - get_cue_duration
+      - get_cue_go_button_text
+      - get_cue_is_broken
+      - get_cue_is_loaded
+      - get_cue_is_paused
+      - get_cue_is_running
+      - get_cue_pre_wait_elapsed
+      - get_cue_percent_pre_wait_elapsed
+      - get_cue_unique_id
+      - get_cue_color
+      - get_cue_name
+      - get_cue_number
+      - get_cue_pre_wait
+      - set_cue_color
+      - set_cue_name
+      - set_cue_number
+      - set_cue_pre_wait
+      - adjust_cue_pre_wait
+      - load_cue
+      - panic_cue
+      - pause_cue
+      - toggle_pause_cue
+      - reset_cue
+      - resume_cue
+      - start_cue
+      - stop_cue
+      - hard_stop_cue
+      - load_cue_at
+      - panic_cue_in_time
+    verification: none
+    notes: "Before 3.3.0: /timer instead of /timer/elapsed and /timer/duration, and no shallow or uniqueIDs list variants."
+
+commands:
+  set_always_reply:
+    summary: "Have Go Button reply to every message from this client, or only to queries"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On makes Go Button answer every message with a status reply; off answers queries only." }
+    send:
+      - { address: "/alwaysReply", args: [{ value: "{enabled:bool01}", type: int }] }
+      - { address: "/alwaysReply" }
+    returns: none
+
+  get_always_reply:
+    summary: "Whether Go Button replies to every message from this client"
+    send: { address: "/alwaysReply" }
+    expect: { address: "/reply/alwaysReply", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  connect:
+    summary: "Connect with an OSC passcode (sent on connecting when the passcode setting is set)"
+    params:
+      passcode: { type: string, max_length: 64, secret: true, required: true, label: Passcode, description: "The OSC passcode set in Sidebar > OSC Control Settings." }
+    send: { address: "/connect", args: [{ value: "{passcode}", type: string }] }
+    expect: { address: "/reply/connect", json_path: "$.data" }
+    returns: value
+
+  disconnect:
+    summary: "Tell Go Button this client is done; it then ignores the connection's further messages until it connects again"
+    send: { address: "/disconnect" }
+    returns: none
+
+  set_forget_me_not:
+    summary: "Have Go Button remember this client and its settings until it quits"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On keeps this client's passcode and settings; off lets Go Button forget them." }
+    send:
+      - { address: "/forgetMeNot", args: [{ value: "{enabled:bool01}", type: int }] }
+      - { address: "/forgetMeNot" }
+    returns: none
+
+  get_forget_me_not:
+    summary: "Whether Go Button remembers this client"
+    send: { address: "/forgetMeNot" }
+    expect: { address: "/reply/forgetMeNot", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_udp_keep_alive:
+    summary: "Have Go Button remember this client (the same as forgetMeNot)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On keeps this client's passcode and settings; off lets Go Button forget them." }
+    send:
+      - { address: "/udpKeepAlive", args: [{ value: "{enabled:bool01}", type: int }] }
+      - { address: "/udpKeepAlive" }
+    returns: none
+
+  get_udp_keep_alive:
+    summary: "Whether Go Button remembers this client (udpKeepAlive)"
+    send: { address: "/udpKeepAlive" }
+    expect: { address: "/reply/udpKeepAlive", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_reply_format:
+    summary: "Set the format of Go Button's replies to this client"
+    params:
+      format: { type: string, max_length: 256, required: true, label: Format, description: "Reply format with the tokens #show_id#, #address#, #status# and #data#; an empty text restores the default." }
+    send:
+      - { address: "/replyFormat", args: [{ value: "{format}", type: string }] }
+      - { address: "/replyFormat" }
+    returns: none
+
+  reset_reply_format:
+    summary: "Restore Go Button's default reply format"
+    send:
+      - { address: "/replyFormat", args: [{ value: "", type: string }] }
+      - { address: "/replyFormat" }
+    returns: none
+
+  get_reply_format:
+    summary: "The reply format Go Button uses for this client"
+    send: { address: "/replyFormat" }
+    expect: { address: "/reply/replyFormat", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_shows:
+    summary: "The available shows: uniqueID, displayName, port, udpReplyPort and version of each"
+    send: { address: "/shows" }
+    expect: { address: "/reply/shows", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  thump:
+    summary: "Heartbeat: Go Button answers thump"
+    send: { address: "/thump" }
+    expect: { address: "/reply/thump", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_version:
+    summary: "Go Button's version number"
+    send: { address: "/version" }
+    expect: { address: "/reply/version", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  open_show:
+    summary: "Open a show, by unique ID or display name"
+    params:
+      show: { type: string, max_length: 128, pattern: "^[^/\\s#*?,\\[\\]{}]+$", required: true, label: Show, description: "The show's unique ID or display name, without spaces or OSC pattern characters." }
+    send: { address: "/show/{show}/open" }
+    returns: none
+
+  close_show:
+    summary: "Close the open show"
+    send: { address: "/close" }
+    returns: none
+
+  get_cue_lists:
+    summary: "Cue dictionaries of the main cue list and the hits list, with every cue, Group children included"
+    send: { address: "/cueLists" }
+    expect: { address: "/reply/cueLists", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_lists_shallow:
+    summary: "Cue dictionaries of the main cue list and the hits list, with every cue, without Group children"
+    send: { address: "/cueLists/shallow" }
+    expect: { address: "/reply/cueLists/shallow", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_lists_ids:
+    summary: "Unique IDs of the main cue list and the hits list, with every cue, Group children included"
+    send: { address: "/cueLists/uniqueIDs" }
+    expect: { address: "/reply/cueLists/uniqueIDs", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_lists_ids_shallow:
+    summary: "Unique IDs of the main cue list and the hits list, with every cue, without Group children"
+    send: { address: "/cueLists/uniqueIDs/shallow" }
+    expect: { address: "/reply/cueLists/uniqueIDs/shallow", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_cues:
+    summary: "Cue dictionaries of the running cues and hits, Group children included"
+    send: { address: "/runningCues" }
+    expect: { address: "/reply/runningCues", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_cues_shallow:
+    summary: "Cue dictionaries of the running cues and hits, without Group children"
+    send: { address: "/runningCues/shallow" }
+    expect: { address: "/reply/runningCues/shallow", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_cues_ids:
+    summary: "Unique IDs of the running cues and hits, Group children included"
+    send: { address: "/runningCues/uniqueIDs" }
+    expect: { address: "/reply/runningCues/uniqueIDs", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_cues_ids_shallow:
+    summary: "Unique IDs of the running cues and hits, without Group children"
+    send: { address: "/runningCues/uniqueIDs/shallow" }
+    expect: { address: "/reply/runningCues/uniqueIDs/shallow", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_or_paused_cues:
+    summary: "Cue dictionaries of the running or paused cues and hits, Group children included"
+    send: { address: "/runningOrPausedCues" }
+    expect: { address: "/reply/runningOrPausedCues", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_or_paused_cues_shallow:
+    summary: "Cue dictionaries of the running or paused cues and hits, without Group children"
+    send: { address: "/runningOrPausedCues/shallow" }
+    expect: { address: "/reply/runningOrPausedCues/shallow", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_or_paused_cues_ids:
+    summary: "Unique IDs of the running or paused cues and hits, Group children included"
+    send: { address: "/runningOrPausedCues/uniqueIDs" }
+    expect: { address: "/reply/runningOrPausedCues/uniqueIDs", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_running_or_paused_cues_ids_shallow:
+    summary: "Unique IDs of the running or paused cues and hits, without Group children"
+    send: { address: "/runningOrPausedCues/uniqueIDs/shallow" }
+    expect: { address: "/reply/runningOrPausedCues/uniqueIDs/shallow", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_dim:
+    summary: "Set the main volume's DIM"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On engages DIM, fading the main volume over the show's Main Volume Dim Duration; off disengages it." }
+    send:
+      - { address: "/dim", args: [{ value: "{enabled:bool01}", type: int }] }
+      - { address: "/dim" }
+    returns: none
+
+  get_dim:
+    summary: "Whether the main volume's DIM is on"
+    send: { address: "/dim" }
+    expect: { address: "/reply/dim", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  toggle_dim:
+    summary: "Toggle the main volume's DIM"
+    send:
+      - { address: "/toggleDim" }
+      - { address: "/dim" }
+    returns: none
+
+  set_full_screen:
+    summary: "Set full screen mode (iPad only)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On enters full screen mode, off leaves it; no effect on iPhone or iPod touch." }
+    send:
+      - { address: "/fullScreen", args: [{ value: "{enabled:bool01}", type: int }] }
+      - { address: "/fullScreen" }
+    returns: none
+
+  get_full_screen:
+    summary: "Whether full screen mode (iPad only) is on"
+    send: { address: "/fullScreen" }
+    expect: { address: "/reply/fullScreen", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  toggle_full_screen:
+    summary: "Toggle full screen mode (iPad only)"
+    send:
+      - { address: "/toggleFullScreen" }
+      - { address: "/fullScreen" }
+    returns: none
+
+  set_main_volume_visible:
+    summary: "Set the main volume slider's visibility"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On shows the main volume slider, off hides it." }
+    send:
+      - { address: "/mainVolumeVisible", args: [{ value: "{enabled:bool01}", type: int }] }
+      - { address: "/mainVolumeVisible" }
+    returns: none
+
+  get_main_volume_visible:
+    summary: "Whether the main volume slider's visibility is on"
+    send: { address: "/mainVolumeVisible" }
+    expect: { address: "/reply/mainVolumeVisible", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  toggle_main_volume_visible:
+    summary: "Toggle the main volume slider's visibility"
+    send:
+      - { address: "/toggleMainVolumeVisible" }
+      - { address: "/mainVolumeVisible" }
+    returns: none
+
+  set_mute:
+    summary: "Set the main volume's mute"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On mutes the show's main volume, off unmutes it." }
+    send:
+      - { address: "/mute", args: [{ value: "{enabled:bool01}", type: int }] }
+      - { address: "/mute" }
+    returns: none
+
+  get_mute:
+    summary: "Whether the main volume's mute is on"
+    send: { address: "/mute" }
+    expect: { address: "/reply/mute", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  toggle_mute:
+    summary: "Toggle the main volume's mute"
+    send:
+      - { address: "/toggleMute" }
+      - { address: "/mute" }
+    returns: none
+
+  set_dim_over:
+    summary: "Engage or disengage DIM, fading over a given time"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "On engages DIM, off disengages it." }
+      seconds: { type: float, min: 0, required: true, label: Fade time, description: "Seconds the main volume takes to fade to or from the dim level." }
+    send:
+      - { address: "/dim", args: [{ value: "{enabled:bool01}", type: int }, { value: "{seconds}", type: float }] }
+      - { address: "/dim" }
+    returns: none
+
+  go:
+    summary: "GO: start the cue standing by at the playhead"
+    send: { address: "/go" }
+    returns: none
+
+  oops:
+    summary: "Stop and re-select the most recently played cue; again to undo earlier ones in reverse order"
+    send:
+      - { address: "/oops" }
+      - { address: "/cue/playhead/uniqueID" }
+    returns: none
+
+  panic:
+    summary: "Panic the show: fade out and stop every cue and hit over the panic duration"
+    send: { address: "/panic" }
+    returns: none
+
+  panic_in_time:
+    summary: "Panic the show over a given time"
+    params:
+      seconds: { type: float, min: 0, required: true, label: Panic time, description: "Seconds over which every cue and hit fades out before stopping." }
+    send: { address: "/panicInTime", args: [{ value: "{seconds}", type: float }] }
+    returns: none
+
+  pause:
+    summary: "Pause every running cue and hit"
+    send: { address: "/pause" }
+    returns: none
+
+  resume:
+    summary: "Resume the show and every paused cue and hit"
+    send: { address: "/resume" }
+    returns: none
+
+  stop:
+    summary: "Stop every cue and hit at once"
+    send: { address: "/stop" }
+    returns: none
+
+  hard_stop:
+    summary: "Stop every cue and hit at once (hardStop, the same as stop)"
+    send: { address: "/hardStop" }
+    returns: none
+
+  reset:
+    summary: "Reset the show: stop everything, return the playhead to the top and reset the show timer"
+    send:
+      - { address: "/reset" }
+      - { address: "/cue/playhead/uniqueID" }
+    returns: none
+
+  set_playhead:
+    summary: "Stand a cue by at the playhead"
+    params:
+      cue: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue number, description: "Number of the cue list cue to stand by." }
+    send:
+      - { address: "/playhead/{cue}" }
+      - { address: "/cue/playhead/uniqueID" }
+    returns: none
+
+  playhead_next:
+    summary: "Move the playhead to the next cue"
+    send:
+      - { address: "/playhead/next" }
+      - { address: "/cue/playhead/uniqueID" }
+    returns: none
+
+  playhead_previous:
+    summary: "Move the playhead to the previous cue"
+    send:
+      - { address: "/playhead/previous" }
+      - { address: "/cue/playhead/uniqueID" }
+    returns: none
+
+  get_playhead_id:
+    summary: "Unique ID of the cue standing by at the playhead"
+    send: { address: "/cue/playhead/uniqueID" }
+    expect: { address: "/reply/cue/playhead/uniqueID", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_timer:
+    summary: "Set the Elapsed Show Timer's elapsed time (before Go Button 3.3)"
+    params:
+      seconds: { type: float, required: true, label: Seconds, description: "Elapsed time of the Elapsed Show Timer, in seconds." }
+    send:
+      - { address: "/timer", args: [{ value: "{seconds}", type: float }] }
+      - { address: "/timer" }
+    returns: none
+
+  get_timer:
+    summary: "The Elapsed Show Timer's elapsed time in seconds (before Go Button 3.3)"
+    send: { address: "/timer" }
+    expect: { address: "/reply/timer", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_timer_elapsed:
+    summary: "Set the Elapsed Show Timer's elapsed time"
+    params:
+      seconds: { type: float, required: true, label: Seconds, description: "Elapsed time of the Elapsed Show Timer, in seconds." }
+    send:
+      - { address: "/timer/elapsed", args: [{ value: "{seconds}", type: float }] }
+      - { address: "/timer/elapsed" }
+    returns: none
+
+  get_timer_elapsed:
+    summary: "The Elapsed Show Timer's elapsed time in seconds"
+    send: { address: "/timer/elapsed" }
+    expect: { address: "/reply/timer/elapsed", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_timer_duration:
+    summary: "Set the Elapsed Show Timer's duration (starting time); 0 counts up"
+    params:
+      seconds: { type: float, min: 0, required: true, label: Duration, description: "Seconds the timer counts down from when started; 0 makes it count up from 00:00." }
+    send:
+      - { address: "/timer/duration", args: [{ value: "{seconds}", type: float }] }
+      - { address: "/timer/duration" }
+    returns: none
+
+  get_timer_duration:
+    summary: "The Elapsed Show Timer's duration (starting time) in seconds"
+    send: { address: "/timer/duration" }
+    expect: { address: "/reply/timer/duration", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  start_timer:
+    summary: "Start the Elapsed Show Timer"
+    send: { address: "/timer/start" }
+    returns: none
+
+  stop_timer:
+    summary: "Stop the Elapsed Show Timer"
+    send: { address: "/timer/stop" }
+    returns: none
+
+  toggle_timer:
+    summary: "Start or stop the Elapsed Show Timer"
+    send: { address: "/timer/toggleRunning" }
+    returns: none
+
+  reset_timer:
+    summary: "Reset the timer's elapsed time to 0 and its duration to the show's starting time"
+    send:
+      - { address: "/timer/reset" }
+      - { address: "/timer/elapsed" }
+      - { address: "/timer/duration" }
+    returns: none
+
+  reset_timer_early:
+    summary: "Reset the Elapsed Show Timer (before Go Button 3.3)"
+    send:
+      - { address: "/timer/reset" }
+      - { address: "/timer" }
+    returns: none
+
+  reset_timer_duration:
+    summary: "Reset the timer's duration (starting time) to 0"
+    send:
+      - { address: "/timer/reset/duration" }
+      - { address: "/timer/duration" }
+    returns: none
+
+  reset_timer_elapsed:
+    summary: "Reset the timer's elapsed time to 0"
+    send:
+      - { address: "/timer/reset/elapsed" }
+      - { address: "/timer/elapsed" }
+    returns: none
+
+  set_volume:
+    summary: "Set the show's main volume in decibels"
+    params:
+      db: { type: float, min: -96.0, max: 0.0, required: true, label: Main volume, description: "Main volume in dB, from -96 (silent) to 0." }
+    send:
+      - { address: "/volume", args: [{ value: "{db}", type: float }] }
+      - { address: "/volume" }
+      - { address: "/volumePercent" }
+    returns: none
+
+  get_volume:
+    summary: "The show's main volume in decibels"
+    send: { address: "/volume" }
+    expect: { address: "/reply/volume", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_volume_percent:
+    summary: "Set the show's main volume on a linear scale"
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Main volume, description: "Main volume from 0 (silent) to 1 (full), linear." }
+    send:
+      - { address: "/volumePercent", args: [{ value: "{level}", type: float }] }
+      - { address: "/volume" }
+      - { address: "/volumePercent" }
+    returns: none
+
+  get_volume_percent:
+    summary: "The show's main volume on a linear scale, 0 to 1"
+    send: { address: "/volumePercent" }
+    expect: { address: "/reply/volumePercent", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  volume_step_up:
+    summary: "Fade the main volume up 6 dB"
+    send:
+      - { address: "/volumeStepUp" }
+      - { address: "/volume" }
+      - { address: "/volumePercent" }
+    returns: none
+
+  volume_step_down:
+    summary: "Fade the main volume down 6 dB"
+    send:
+      - { address: "/volumeStepDown" }
+      - { address: "/volume" }
+      - { address: "/volumePercent" }
+    returns: none
+
+  get_cue_action_elapsed:
+    summary: "A cue's or hit's elapsed action in seconds"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/actionElapsed" }
+    expect: { address: "/reply/{kind}/{ref}/actionElapsed", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_percent_action_elapsed:
+    summary: "A cue's or hit's elapsed action as a fraction of the whole action"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/percentActionElapsed" }
+    expect: { address: "/reply/{kind}/{ref}/percentActionElapsed", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_default_name:
+    summary: "A cue's or hit's default name"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/defaultName" }
+    expect: { address: "/reply/{kind}/{ref}/defaultName", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_display_name:
+    summary: "A cue's or hit's display name"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/displayName" }
+    expect: { address: "/reply/{kind}/{ref}/displayName", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_duration:
+    summary: "A cue's or hit's duration in seconds"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/duration" }
+    expect: { address: "/reply/{kind}/{ref}/duration", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_go_button_text:
+    summary: "A cue's or hit's GO button text when it is selected (cue list cues)"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/goButtonText" }
+    expect: { address: "/reply/{kind}/{ref}/goButtonText", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_is_broken:
+    summary: "A cue's or hit's broken flag"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/isBroken" }
+    expect: { address: "/reply/{kind}/{ref}/isBroken", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_is_loaded:
+    summary: "A cue's or hit's loaded flag"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/isLoaded" }
+    expect: { address: "/reply/{kind}/{ref}/isLoaded", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_is_paused:
+    summary: "A cue's or hit's paused flag"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/isPaused" }
+    expect: { address: "/reply/{kind}/{ref}/isPaused", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_is_running:
+    summary: "A cue's or hit's running flag"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/isRunning" }
+    expect: { address: "/reply/{kind}/{ref}/isRunning", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_pre_wait_elapsed:
+    summary: "A cue's or hit's elapsed pre-wait in seconds"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/preWaitElapsed" }
+    expect: { address: "/reply/{kind}/{ref}/preWaitElapsed", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_percent_pre_wait_elapsed:
+    summary: "A cue's or hit's elapsed pre-wait as a fraction of the whole pre-wait"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/percentPreWaitElapsed" }
+    expect: { address: "/reply/{kind}/{ref}/percentPreWaitElapsed", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_unique_id:
+    summary: "A cue's or hit's unique ID"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/uniqueID" }
+    expect: { address: "/reply/{kind}/{ref}/uniqueID", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_color:
+    summary: "A cue's or hit's color (hits)"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/colorName" }
+    expect: { address: "/reply/{kind}/{ref}/colorName", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_name:
+    summary: "A cue's or hit's name"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/name" }
+    expect: { address: "/reply/{kind}/{ref}/name", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_number:
+    summary: "A cue's or hit's cue or hit number"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/number" }
+    expect: { address: "/reply/{kind}/{ref}/number", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  get_cue_pre_wait:
+    summary: "A cue's or hit's pre-wait in seconds"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+    send: { address: "/{kind}/{ref}/preWait" }
+    expect: { address: "/reply/{kind}/{ref}/preWait", json_path: "$.data", json_equals: { "$.status": "ok" } }
+    returns: value
+
+  set_cue_color:
+    summary: "Set a hit's color (no effect on cue list cues)"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+      color: { type: enum, values: [none, red, orange, green, blue, purple], required: true, label: Color, description: "The hit's color; none clears it." }
+    send:
+      - { address: "/{kind}/{ref}/colorName", args: [{ value: "{color}", type: string }] }
+      - { address: "/{kind}/{ref}/colorName" }
+    returns: none
+
+  set_cue_name:
+    summary: "Set a cue's or hit's name"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "Name to give the cue or hit." }
+    send:
+      - { address: "/{kind}/{ref}/name", args: [{ value: "{name}", type: string }] }
+      - { address: "/{kind}/{ref}/name" }
+    returns: none
+
+  set_cue_number:
+    summary: "Set a cue's or hit's number"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID of one cue or hit; selected, playhead and playbackPosition address the selected cue or the cue at the playhead." }
+      number: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._-]*$", required: true, label: New number, description: "New cue number, without spaces (which OSC addresses cannot carry); empty removes it." }
+    send:
+      - { address: "/{kind}/{ref}/number", args: [{ value: "{number}", type: string }] }
+      - { address: "/{kind}/{ref}/number" }
+    returns: none
+
+  set_cue_pre_wait:
+    summary: "Set a cue's or hit's pre-wait"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+      seconds: { type: float, min: 0, required: true, label: Pre-wait, description: "Seconds between the cue being started and its action beginning." }
+    send:
+      - { address: "/{kind}/{ref}/preWait", args: [{ value: "{seconds}", type: float }] }
+      - { address: "/{kind}/{ref}/preWait" }
+    returns: none
+
+  adjust_cue_pre_wait:
+    summary: "Add to or subtract from a cue's or hit's pre-wait"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+      op: { type: enum, values: ["+", "-"], required: true, label: Direction, description: "+ adds the amount to the pre-wait, - subtracts it." }
+      seconds: { type: float, min: 0, required: true, label: Amount, description: "Seconds to add or subtract." }
+    send:
+      - { address: "/{kind}/{ref}/preWait/{op}", args: [{ value: "{seconds}", type: float }] }
+      - { address: "/{kind}/{ref}/preWait" }
+    returns: none
+
+  load_cue:
+    summary: "Load a cue or hit"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/load" }
+    returns: none
+
+  panic_cue:
+    summary: "Panic a cue or hit: fade it out and stop it over the show's panic duration"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/panic" }
+    returns: none
+
+  pause_cue:
+    summary: "Pause a playing cue or hit"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/pause" }
+    returns: none
+
+  toggle_pause_cue:
+    summary: "Pause a playing cue or hit, or resume a paused one"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/togglePause" }
+    returns: none
+
+  reset_cue:
+    summary: "Reset a cue or hit, reverting its temporary changes"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/reset" }
+    returns: none
+
+  resume_cue:
+    summary: "Resume a paused cue or hit"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/resume" }
+    returns: none
+
+  start_cue:
+    summary: "Start a cue or hit without moving the playhead"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/start" }
+    returns: none
+
+  stop_cue:
+    summary: "Stop a cue or hit at once"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/stop" }
+    returns: none
+
+  hard_stop_cue:
+    summary: "Stop a cue or hit at once (hardStop, the same as stop)"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+    send: { address: "/{kind}/{ref}/hardStop" }
+    returns: none
+
+  load_cue_at:
+    summary: "Load a cue or hit to a time"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+      seconds: { type: float, min: 0, required: true, label: Time, description: "Seconds into the cue to load to, its pre-wait counted." }
+    send: { address: "/{kind}/{ref}/loadAt", args: [{ value: "{seconds}", type: float }] }
+    returns: none
+
+  panic_cue_in_time:
+    summary: "Panic a cue or hit over a given time"
+    params:
+      kind: { type: enum, values: [cue, cue_id, hit, hit_id], default: cue, label: Addressed by, description: "cue and hit take a cue number or a hit number (hits count in display order from the top left of the hits panel); cue_id and hit_id take the unique ID Go Button reports." }
+      ref: { type: string, max_length: 64, pattern: "^[A-Za-z0-9._*?-]+$", required: true, label: Cue or hit, description: "Cue number, hit number or unique ID; selected, playhead and playbackPosition address the selected cues or the cue at the playhead, and * and ? are wildcards matching many." }
+      seconds: { type: float, min: 0, required: true, label: Panic time, description: "Seconds over which the cue fades out before stopping." }
+    send: { address: "/{kind}/{ref}/panicInTime", args: [{ value: "{seconds}", type: float }] }
+    returns: none
+
+state:
+  app.version: { type: string, description: "Go Button's version number (/version)" }
+  app.connect: { type: string, description: "Answer to the last /connect: ok, badpass (wrong passcode) or error" }
+  app.always_reply: { type: bool, description: "Whether Go Button answers every message from this client (/alwaysReply)" }
+  app.forget_me_not: { type: bool, description: "Whether Go Button remembers this client and its settings (/forgetMeNot or /udpKeepAlive)" }
+  app.reply_format: { type: string, description: "The reply format set for this client; empty for the default" }
+  shows.*.name: { type: string, description: "Display name of an available show, keyed by its unique ID" }
+  shows.*.port: { type: int, description: "OSC listening port of the show" }
+  shows.*.udp_reply_port: { type: int, description: "UDP reply port of the show" }
+  shows.*.version: { type: string, description: "Go Button version the show reports" }
+  show.id: { type: string, description: "Unique ID of the open show, from its update messages" }
+  show.playhead_id: { type: string, description: "Unique ID of the cue standing by at the playhead; absent when none is" }
+  show.dim: { type: bool, description: "Whether the main volume's DIM is engaged" }
+  show.mute: { type: bool, description: "Whether the main volume is muted" }
+  show.full_screen: { type: bool, description: "Whether the show is in full screen mode (iPad)" }
+  show.main_volume_visible: { type: bool, description: "Whether the main volume slider is shown" }
+  show.volume_db: { type: float, unit: dB, description: "Main volume in dB, -96 to 0" }
+  show.volume_percent: { type: float, description: "Main volume on a linear scale, 0 to 1" }
+  show.timer.elapsed: { type: float, unit: s, description: "Elapsed time of the Elapsed Show Timer, polled once a second" }
+  show.timer.duration: { type: float, unit: s, description: "Duration (starting time) of the Elapsed Show Timer; 0 counts up (3.3.0 and later)" }
+  cue_lists.*.index: { type: int, description: "Position of the main cue list (0) and the hits list in /cueLists, keyed by unique ID" }
+  cues.*.number: { type: string, description: "Cue or hit number, keyed by unique ID; empty when it has none" }
+  cues.*.name: { type: string, description: "Name of the cue or hit" }
+  cues.*.list_name: { type: string, description: "Name as the list shows it" }
+  cues.*.type: { type: string, description: "Cue type" }
+  cues.*.color: { type: string, description: "Color name (hits): none, red, orange, green, blue or purple" }
+  cues.*.armed: { type: bool, description: "Whether the cue or hit is armed" }
+  cues.*.index: { type: int, description: "Position of the cue in its list or Group, from 0" }
+  cues.*.parent: { type: string, description: "Unique ID of the list or Group cue the cue is in" }
+  cues.*.children.*: { type: string, description: "Unique IDs of a list's or Group's children, in order from 0" }
+  cues.*.display_name: { type: string, description: "Display name of the cue or hit" }
+  cues.*.default_name: { type: string, description: "Default name of the cue or hit" }
+  cues.*.duration: { type: float, unit: s, description: "Duration in seconds" }
+  cues.*.pre_wait: { type: float, unit: s, description: "Pre-wait in seconds" }
+  cues.*.go_button_text: { type: string, description: "Text on the GO button while the cue is selected (cue list cues)" }
+  cues.*.broken: { type: bool, description: "Whether the cue or hit is broken" }
+  cues.*.loaded: { type: bool, description: "Whether the cue or hit is loaded" }
+  cues.*.paused: { type: bool, description: "Whether the cue or hit is paused" }
+  cues.*.running: { type: bool, description: "Whether the cue or hit is running" }
+  cues.*.action_elapsed: { type: float, unit: s, description: "Elapsed action in seconds, read once a second while running or paused" }
+  cues.*.percent_action_elapsed: { type: float, description: "Elapsed action as a fraction of the whole action (the dictionary calls it a percentage)" }
+  cues.*.pre_wait_elapsed: { type: float, unit: s, description: "Elapsed pre-wait in seconds, read once a second while running or paused" }
+  cues.*.percent_pre_wait_elapsed: { type: float, description: "Elapsed pre-wait as a fraction of the whole pre-wait" }
+  active.*: { type: string, description: "Unique IDs of the running or paused cues and hits, in Go Button's order from 0, polled once a second" }
+  running.*: { type: string, description: "Unique IDs of the running cues and hits, from the last get_running_cues" }
+
+telemetry:
+  # /updates 1 subscribes this client to /update/show/...; over TCP it lasts as
+  # long as the connection.
+  subscribe:
+    send:
+      - { address: /updates, args: [ { value: "1", type: int } ] }
+  poll:
+    # What moves during a show: the running or paused cues (each one's times
+    # are read in turn) and the show timer, once a second.
+    - every_ms: 1000
+      send:
+        - { address: /runningOrPausedCues/shallow, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?runningOrPausedCues/shallow$", models: [go-button-3] }
+        - { address: /runningOrPausedCues, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?runningOrPausedCues$", models: [go-button-3-early] }
+        - { address: /timer/elapsed, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?timer/elapsed$", models: [go-button-3] }
+        - { address: /timer, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?timer$", models: [go-button-3-early] }
+    # Everything else is read on connecting, and again when Go Button says it
+    # changed (the update rules below).
+    - send:
+        - { address: /version, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?version$" }
+        - { address: /shows, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?shows$" }
+        - { address: /alwaysReply, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?alwaysReply$" }
+        - { address: /forgetMeNot, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?forgetMeNot$" }
+        - { address: /replyFormat, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?replyFormat$" }
+        - { address: "/cueLists", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cueLists$" }
+        - { address: "/cue/playhead/uniqueID", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue/playhead/uniqueID$" }
+        - { address: "/dim", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?dim$" }
+        - { address: "/mute", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?mute$" }
+        - { address: "/fullScreen", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?fullScreen$" }
+        - { address: "/mainVolumeVisible", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?mainVolumeVisible$" }
+        - { address: "/volume", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?volume$" }
+        - { address: "/volumePercent", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?volumePercent$" }
+        - { address: "/timer/duration", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?timer/duration$", models: [go-button-3] }
+  updates:
+    # The show changed: its cue lists and settings are read again.
+    - address: "^/update/show/([^/]+)$"
+      state: { show.id: "{1}" }
+      then_send:
+        - { address: "/cueLists", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cueLists$" }
+        - { address: "/cue/playhead/uniqueID", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue/playhead/uniqueID$" }
+        - { address: "/dim", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?dim$" }
+        - { address: "/mute", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?mute$" }
+        - { address: "/fullScreen", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?fullScreen$" }
+        - { address: "/mainVolumeVisible", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?mainVolumeVisible$" }
+        - { address: "/volume", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?volume$" }
+        - { address: "/volumePercent", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?volumePercent$" }
+        - { address: "/timer/duration", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?timer/duration$", models: [go-button-3] }
+    # The cue lists themselves changed (named as a cue, the root group).
+    - address: "^/update/show/([^/]+)/cue_id/(?:\\[root group of cue lists\\]|__root__)$"
+      then_send:
+        - { address: /cueLists, reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cueLists$" }
+    # A cue or hit changed: its properties are read again.
+    - address: "^/update/show/([^/]+)/cue_id/([A-Za-z0-9-]+)$"
+      then_send:
+        - { address: "/cue_id/{2}/name", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/name$" }
+        - { address: "/cue_id/{2}/number", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/number$" }
+        - { address: "/cue_id/{2}/colorName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/colorName$" }
+        - { address: "/cue_id/{2}/displayName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/displayName$" }
+        - { address: "/cue_id/{2}/defaultName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/defaultName$" }
+        - { address: "/cue_id/{2}/duration", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/duration$" }
+        - { address: "/cue_id/{2}/preWait", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/preWait$" }
+        - { address: "/cue_id/{2}/goButtonText", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/goButtonText$" }
+        - { address: "/cue_id/{2}/isBroken", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isBroken$" }
+        - { address: "/cue_id/{2}/isLoaded", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isLoaded$" }
+        - { address: "/cue_id/{2}/isPaused", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isPaused$" }
+        - { address: "/cue_id/{2}/isRunning", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isRunning$" }
+    - address: "^/update/show/([^/]+)/playbackPosition$"
+      arg_types: s
+      state: { show.id: "{1}", show.playhead_id: "{arg0}" }
+    # No argument: no cue stands by.
+    - address: "^/update/show/([^/]+)/playbackPosition$"
+      arg_types: ""
+      state: { show.playhead_id: { delete: true } }
+    - address: "^/update/show/([^/]+)/volume$"
+      state: { show.id: "{1}", show.volume_db: "{arg0}" }
+    # The show is closing: everything known about it goes.
+    - address: "^/update/show/([^/]+)/disconnect$"
+      state:
+        show: { delete: true }
+        cues: { delete: true }
+        cue_lists: { delete: true }
+        active: { delete: true }
+        running: { delete: true }
+    # Replies.
+    - address: "^/reply/connect$"
+      json: { v: "$.data" }
+      state: { app.connect: "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?version$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { app.version: "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:alwaysReply)$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { app.always_reply: { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:forgetMeNot|udpKeepAlive)$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { app.forget_me_not: { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?replyFormat$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { app.reply_format: "{v}" }
+    - address: "^/reply/shows$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { name: "$.displayName", port: "$.port", udp: "$.udpReplyPort", version: "$.version" }
+      replace: shows
+      state:
+        "shows.{1}.name": "{name}"
+        "shows.{1}.port": "{port}"
+        "shows.{1}.udp_reply_port": "{udp}"
+        "shows.{1}.version": "{version}"
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?dim$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.dim: { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?mute$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.mute: { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?fullScreen$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.full_screen: { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?mainVolumeVisible$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.main_volume_visible: { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?volume$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.volume_db: "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?volumePercent$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.volume_percent: "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:timer|timer/elapsed)$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.timer.elapsed: "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?timer/duration$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.timer.duration: "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue/playhead/uniqueID$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { show.playhead_id: "{v}" }
+    # The cue lists, Group cues three levels deep; the tree replaces what was known.
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?cueLists(?:/shallow)?$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { id: "$.uniqueID", number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", armed: "$.armed" }
+      replace: [cues, cue_lists]
+      state:
+        "cues.{1}.number": "{number}"
+        "cues.{1}.name": "{name}"
+        "cues.{1}.list_name": "{list_name}"
+        "cues.{1}.type": "{type}"
+        "cues.{1}.color": "{color}"
+        "cues.{1}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "cues.{1}.index": "{index}"
+        "cue_lists.{1}.index": "{index}"
+      then_send:
+        - { address: "/cue_id/{id}/displayName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/displayName$" }
+        - { address: "/cue_id/{id}/defaultName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/defaultName$" }
+        - { address: "/cue_id/{id}/duration", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/duration$" }
+        - { address: "/cue_id/{id}/preWait", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/preWait$" }
+        - { address: "/cue_id/{id}/goButtonText", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/goButtonText$" }
+        - { address: "/cue_id/{id}/isBroken", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isBroken$" }
+        - { address: "/cue_id/{id}/isLoaded", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isLoaded$" }
+        - { address: "/cue_id/{id}/isPaused", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isPaused$" }
+        - { address: "/cue_id/{id}/isRunning", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isRunning$" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?cueLists(?:/shallow)?$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { id: "$.uniqueID", number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "cues.{1}.number": "{number}"
+        "cues.{1}.name": "{name}"
+        "cues.{1}.list_name": "{list_name}"
+        "cues.{1}.type": "{type}"
+        "cues.{1}.color": "{color}"
+        "cues.{1}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "cues.{1}.index": "{index}"
+        "cues.{1}.parent": "{parent}"
+        "cues.{parent}.children.{index}": "{1}"
+      then_send:
+        - { address: "/cue_id/{id}/displayName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/displayName$" }
+        - { address: "/cue_id/{id}/defaultName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/defaultName$" }
+        - { address: "/cue_id/{id}/duration", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/duration$" }
+        - { address: "/cue_id/{id}/preWait", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/preWait$" }
+        - { address: "/cue_id/{id}/goButtonText", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/goButtonText$" }
+        - { address: "/cue_id/{id}/isBroken", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isBroken$" }
+        - { address: "/cue_id/{id}/isLoaded", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isLoaded$" }
+        - { address: "/cue_id/{id}/isPaused", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isPaused$" }
+        - { address: "/cue_id/{id}/isRunning", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isRunning$" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?cueLists(?:/shallow)?$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { id: "$.uniqueID", number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "cues.{1}.number": "{number}"
+        "cues.{1}.name": "{name}"
+        "cues.{1}.list_name": "{list_name}"
+        "cues.{1}.type": "{type}"
+        "cues.{1}.color": "{color}"
+        "cues.{1}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "cues.{1}.index": "{index}"
+        "cues.{1}.parent": "{parent}"
+        "cues.{parent}.children.{index}": "{1}"
+      then_send:
+        - { address: "/cue_id/{id}/displayName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/displayName$" }
+        - { address: "/cue_id/{id}/defaultName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/defaultName$" }
+        - { address: "/cue_id/{id}/duration", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/duration$" }
+        - { address: "/cue_id/{id}/preWait", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/preWait$" }
+        - { address: "/cue_id/{id}/goButtonText", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/goButtonText$" }
+        - { address: "/cue_id/{id}/isBroken", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isBroken$" }
+        - { address: "/cue_id/{id}/isLoaded", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isLoaded$" }
+        - { address: "/cue_id/{id}/isPaused", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isPaused$" }
+        - { address: "/cue_id/{id}/isRunning", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isRunning$" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?cueLists(?:/shallow)?$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { id: "$.uniqueID", number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "cues.{1}.number": "{number}"
+        "cues.{1}.name": "{name}"
+        "cues.{1}.list_name": "{list_name}"
+        "cues.{1}.type": "{type}"
+        "cues.{1}.color": "{color}"
+        "cues.{1}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "cues.{1}.index": "{index}"
+        "cues.{1}.parent": "{parent}"
+        "cues.{parent}.children.{index}": "{1}"
+      then_send:
+        - { address: "/cue_id/{id}/displayName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/displayName$" }
+        - { address: "/cue_id/{id}/defaultName", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/defaultName$" }
+        - { address: "/cue_id/{id}/duration", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/duration$" }
+        - { address: "/cue_id/{id}/preWait", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/preWait$" }
+        - { address: "/cue_id/{id}/goButtonText", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/goButtonText$" }
+        - { address: "/cue_id/{id}/isBroken", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isBroken$" }
+        - { address: "/cue_id/{id}/isLoaded", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isLoaded$" }
+        - { address: "/cue_id/{id}/isPaused", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isPaused$" }
+        - { address: "/cue_id/{id}/isRunning", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isRunning$" }
+    # The running or paused cues, in order; each one's times are read.
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?runningOrPausedCues(?:/shallow)?$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { id: "$.uniqueID" }
+      replace: active
+      state: { "active.{index}": "{1}" }
+      then_send:
+        - { address: "/cue_id/{id}/isRunning", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isRunning$" }
+        - { address: "/cue_id/{id}/isPaused", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/isPaused$" }
+        - { address: "/cue_id/{id}/actionElapsed", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/actionElapsed$" }
+        - { address: "/cue_id/{id}/percentActionElapsed", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/percentActionElapsed$" }
+        - { address: "/cue_id/{id}/preWaitElapsed", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/preWaitElapsed$" }
+        - { address: "/cue_id/{id}/percentPreWaitElapsed", reply_address: "^/reply/(?:show(?:_id)?/[^/]+/)?cue_id/[^/]+/percentPreWaitElapsed$" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?runningCues(?:/shallow)?$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      replace: running
+      json: {}
+      state: { "running.{index}": "{1}" }
+    # A cue's or hit's properties, read by unique ID.
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/name$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.name": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/number$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.number": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/colorName$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.color": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/displayName$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.display_name": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/defaultName$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.default_name": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/duration$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.duration": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/preWait$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.pre_wait": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/goButtonText$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.go_button_text": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/isBroken$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.broken": { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/isLoaded$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.loaded": { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/isPaused$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.paused": { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/isRunning$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.running": { value: "{v}", map: { "true": true, "false": false, "1": true, "0": false } } }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/actionElapsed$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.action_elapsed": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/percentActionElapsed$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.percent_action_elapsed": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/preWaitElapsed$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.pre_wait_elapsed": "{v}" }
+    - address: "^/reply/(?:show(?:_id)?/[^/]+/)?(?:cue|hit)_id/([A-Za-z0-9-]+)/percentPreWaitElapsed$"
+      json_match: { "$.status": "^ok$" }
+      json: { v: "$.data" }
+      state: { "cues.{1}.percent_pre_wait_elapsed": "{v}" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Go Button answers a query with /reply/<the address sent> carrying one
+      string argument holding JSON: show_id (when the show answers), address,
+      status (ok or error) and data. The dictionary's own example answers
+      /show/{id}/volumePercent on /reply/show_id/{id}/volumePercent, so the
+      telemetry rules take a reply with or without a show prefix, and every
+      command is sent rootless, which addresses the one open show. A query
+      command waits for /reply/<the address sent> exactly.
+
+  - models: [all]
+    severity: info
+    text: >
+      Actions (go, start, setting a property) produce no reply unless
+      /alwaysReply is on, so they report unverified. Every write is followed by
+      the query that reads it back, whose reply updates state; the update
+      messages read changed cues and shows again as well.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A passcoded Go Button ignores application and show messages until
+      /connect has been sent with the passcode; /version and /shows are always
+      answered. The /reply/connect answer (ok, badpass or error) goes to
+      app.connect but is not a refusal of the credential (an OSC transport has
+      no refusal text), so a wrong passcode shows up as app.connect badpass and
+      unanswered queries. Over TCP the connection stays authorised until it
+      closes; over UDP Go Button forgets the client after 61 seconds.
+
+  - models: [all]
+    severity: info
+    text: >
+      Go Button sends no update when a cue's elapsed times move or the
+      show timer runs. The running or paused cues are polled once a second, each
+      one's elapsed and percentage times, running and paused flags read in turn,
+      and the timer's elapsed time with them. A percentage reply is taken as the
+      dictionary's data, assumed a fraction from 0 to 1.
+
+  - models: [all]
+    severity: info
+    text: >
+      /update/show/{id}/cue_id/{id} names a cue or hit to read again; the
+      dictionary has no valuesForKeys, so each property is read with its own
+      message. The cue lists themselves changing arrives as an update for the
+      root group ([root group of cue lists], or __root__ as in QLab 5.5), which
+      reads /cueLists again (third-party corroboration, not in the dictionary).
+
+  - models: [all]
+    severity: info
+    text: >
+      Hits are numbered in display order from the top left of the hits
+      panel; /hit/{number} and /hit_id/{id} take every cue message. colorName
+      applies to hits only and goButtonText to cue list cues only. Spaces cannot
+      be sent in an OSC address, so cue numbers with spaces cannot be reached
+      by number (use cue_id); the * and ? wildcards address many cues in an
+      action, and are refused in queries, whose single reply could not say
+      which cue it answers.
+
+  - models: [all]
+    severity: info
+    text: >
+      Booleans are sent as the integers 0 and 1, which every Go Button
+      3 version takes; OSC 1.1 True and False need 3.3.0.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_reply_format changes the form of every later reply to this
+      client. Replies in another form no longer match the reply rules or the
+      query commands, so state stops updating and queries time out until
+      reset_reply_format restores the default.
+
+  - models: [all]
+    severity: info
+    text: >
+      The update for a change of main volume carries the level in dB as
+      its first argument. The dictionary says both of two messages are sent
+      when the volume changes but lists only one; the percentage is read again
+      with the show's other settings.
+
+  - models: [all]
+    severity: info
+    text: >
+      A reply whose data is ignoring_show_methods means no show is open.
+      Go Button then answers show and cue queries with it, so they return that
+      text, and the cue lists read empty.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Messages are sent rootless, to the open show; open_show is the one
+      that needs the /show/{id} prefix, and takes the show's unique ID or its
+      display name. Display names with spaces cannot be sent in an OSC
+      address.
+
+  - models: [all]
+    severity: critical
+    text: >
+      stop, hard_stop, panic, panic_in_time and reset stop every cue and
+      hit in the show (panic after a fade; a second panic during the fade stops
+      at once; reset also returns the playhead to the top and resets the show
+      timer). close_show and open_show close the running show. None can be
+      undone live.
+
+  - models: [all]
+    severity: info
+    text: >
+      The default port is 53100 for TCP and UDP since Go Button 3.2.0;
+      an install upgraded from 3.1.5 or earlier keeps 53000 and 53001 until
+      changed. Go Button also reads plain text on UDP 53535 as OSC, which is
+      not used here.
