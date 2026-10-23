@@ -167,6 +167,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-panasonic",
         &[
+            "panasonic-kairos",
             "panasonic-projector",
             "panasonic-ptz",
             "panasonic-ptz-serial",

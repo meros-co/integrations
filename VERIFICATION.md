@@ -1970,6 +1970,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that /oscpoint/feedbacks/refresh resends every feedback, the v2 presentation and presentations JSON included, and that /oscpoint/files/list is harmless while file access is off. ([specs/oscpoint.yaml:356](specs/oscpoint.yaml#L356))
 - [ ] Check the slide show state values (edit, running, paused from 2.1) and what OSCPoint sends for the slide show, section and media values when a slide show ends or a slide has no media. ([specs/oscpoint.yaml:501](specs/oscpoint.yaml#L501))
 
+## panasonic-kairos — Panasonic KAIROS
+
+- [ ] Confirm the control protocol answers an assignment or function with OK only after any change it pushes, or record the order, since replies name no request. ([specs/panasonic-kairos.yaml:71](specs/panasonic-kairos.yaml#L71))
+- [ ] Record the paths of transitions, players, macros and audio in a typical production, so they can become typed commands. ([specs/panasonic-kairos.yaml:297](specs/panasonic-kairos.yaml#L297))
+- [ ] Confirm the empty-line keep-alive every five seconds keeps the connection on current KAIROS software. ([specs/panasonic-kairos.yaml:48](specs/panasonic-kairos.yaml#L48))
+- [ ] Confirm the REST API on current software answers the V1.0 paths, and record the macro states and the multiviewer preset field when set. ([specs/panasonic-kairos.yaml:191](specs/panasonic-kairos.yaml#L191))
+- [ ] Confirm the REST login: user Kairos with the system ID, and the answer to a wrong one. ([specs/panasonic-kairos.yaml:54](specs/panasonic-kairos.yaml#L54))
+- [ ] Record the tally values of inputs and scenes beyond 0 and 1. ([specs/panasonic-kairos.yaml:281](specs/panasonic-kairos.yaml#L281))
+
 ## panasonic-ptz — Panasonic PTZ
 
 - [ ] On an HE camera, check whether menu up and down take DUP:1 and DDW:1, as sent, or the bare DUP and DDW the v1.12 HE rows show. ([specs/panasonic-ptz.yaml:13665](specs/panasonic-ptz.yaml#L13665))
