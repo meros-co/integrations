@@ -4102,6 +4102,11 @@ fn build_osc(item: &Value, values: &Values) -> Result<Vec<u8>, String> {
             ),
             "string" => osc::Arg::Str(render(template, values, no_escape)?),
             "blob" => osc::Arg::Blob(render(template, values, no_escape)?.into_bytes()),
+            "bool" => match render(template, values, no_escape)?.as_str() {
+                "true" => osc::Arg::Bool(true),
+                "false" => osc::Arg::Bool(false),
+                _ => return Err(format!("'{template}' is not a bool")),
+            },
             other => return Err(format!("OSC type '{other}' is not supported")),
         });
     }

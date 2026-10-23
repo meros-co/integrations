@@ -1410,9 +1410,12 @@ commands:
     returns: none
 ```
 
-OSC argument types: `int`, `float`, `string`, `blob`. A `blob` carries its
+OSC argument types: `int`, `float`, `string`, `blob`, `bool`. A `blob` carries its
 rendered template's text as UTF-8 bytes, for a device that takes text beyond
-ASCII that way (OSCPoint's section and file names).
+ASCII that way (OSCPoint's section and file names). A `bool` is OSC 1.1's
+`T` or `F` type tag, which carries no data; its template renders `true` or
+`false` (a `bool` parameter as it is), for a device that takes an OSC
+boolean (Clock-8001's `/clock/automation`).
 
 A query is a message carrying no arguments. For a device that answers on the
 same address, the spec declares the reply address, and the value is the
