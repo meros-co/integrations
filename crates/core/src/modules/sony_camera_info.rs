@@ -281,7 +281,7 @@ pub(super) fn parse_preset_info(data: &[u8]) -> Result<Vec<Value>, String> {
             "set": set,
             "lens": lens,
             "zoom_mm": zoom as f64 / 1000.0,
-            "focus_m": if focus == u32::MAX { Value::Null } else { json!(focus as f64 / 1000.0) },
+            "focus_m": if focus == u32::MAX { json!("inf") } else { json!(focus as f64 / 1000.0) },
             "zoom_only_available": zoom_only_available,
             "zoom_only": zoom_only,
         }));
@@ -1336,7 +1336,7 @@ mod tests {
         let p = parse_preset_info(&build::presets()).unwrap();
         assert_eq!(p[0]["slot"], 0);
         assert_eq!(p[0]["zoom_mm"], 35.0);
-        assert_eq!(p[0]["focus_m"], Value::Null);
+        assert_eq!(p[0]["focus_m"], "inf");
         assert_eq!(p[0]["zoom_only_available"], true);
         assert_eq!(p[0]["zoom_only"], false);
         let (png, meta) = parse_osd(&build::osd(b"\x89PNG")).unwrap();
