@@ -152,7 +152,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-nec",
         &["nec-display", "nec-projector", "nec-projector-ascii"],
     ),
-    ("vendor-newtek", &["newtek-tricaster"]),
+    ("vendor-newtek", &["newtek-3play", "newtek-tricaster"]),
     (
         "vendor-novastar",
         &["novastar-central-control", "novastar-coex", "novastar-h"],

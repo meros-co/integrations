@@ -1805,6 +1805,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how negative lens travel times and half-second values are written ("lens focus time -1.5"). ([specs/nec-projector-ascii.yaml:246](specs/nec-projector-ascii.yaml#L246))
 - [ ] Confirm the NORMAL standby mode refuses ASCII commands on the network on other models. ([specs/nec-projector-ascii.yaml:435](specs/nec-projector-ascii.yaml#L435))
 
+## newtek-3play — NewTek / Vizrt 3Play
+
+- [ ] Record the shortcuts a 3Play's macro recorder shows for replay operations (mark in and out, cue, play on outputs A and B, play speed, play lists, recording), so they can become typed commands. ([specs/newtek-3play.yaml:258](specs/newtek-3play.yaml#L258))
+- [ ] Confirm which dictionaries a 3Play serves (shortcut_states, tally, macros_list and others) and record their content. ([specs/newtek-3play.yaml:164](specs/newtek-3play.yaml#L164))
+- [ ] Confirm a 3Play answers /v1/trigger, /v1/datalink and /v1/live as a TriCaster does. ([specs/newtek-3play.yaml:148](specs/newtek-3play.yaml#L148))
+- [ ] Confirm the change notification websocket is on the web port on a 3Play and which dictionary names it sends. ([specs/newtek-3play.yaml:162](specs/newtek-3play.yaml#L162))
+- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-3play.yaml:273](specs/newtek-3play.yaml#L273))
+
 ## newtek-tricaster — NewTek / Vizrt TriCaster and Vectar
 
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:770](specs/newtek-tricaster.yaml#L770))

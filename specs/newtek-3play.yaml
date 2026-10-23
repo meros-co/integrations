@@ -1,0 +1,297 @@
+spec: 1
+id: newtek-3play
+name: NewTek / Vizrt 3Play
+vendor: NewTek (Vizrt)
+category: recorder
+
+source:
+  - title: Vizrt Live Production Automation, Integration & Control User Guide, Version 8-4 (May 2022 edition)
+    author: Vizrt
+    url: https://cms.vizrt.com/wp-content/uploads/2025/12/Automation-and-Integration-Guide.pdf
+    note: >
+      Manufacturer document covering the TriCaster and Viz 3Play families alike. Used for: the
+      shortcut model and finding shortcuts by recording a macro (section 4.5.1, p.17-18;
+      section 8.2.1, p.157-158), the macro shortcuts play_macro_byname, play_macro_byid,
+      record_macro_byname, stop_record_macro, stop_macro_byname and stop_macro_byid (p.159), the
+      XML command format with extra keys (p.159-160), the HTTP interface (section 8.3, p.162-165):
+      GET /v1/shortcut?name=&value=, POST of the XML to /v1/shortcut as text/xml, GET /v1/trigger
+      and /v1/datalink, /v1/live answering TRUE or FALSE, Live Panel password admin / admin by
+      default with Digest recommended; the dictionaries (p.167-171) and the change notification
+      websocket /v1/change_notifications, which sends the name of the dictionary that changed
+      (p.171-172); product information at /version (p.168); and the 3Play Control Surface's
+      functions, two output channels A and B, recording and transport (section 6.6, p.119-130).
+  - title: NewTek Automation and Integration Guide (January 2022)
+    author: NewTek
+    url: https://downloads.newtek.com/LiveProductionSystems/Legacy/AE/Automation%20and%20Integration%20Guide.pdf
+    note: >
+      Manufacturer document, the NewTek edition of the same text: the HTTP interface (p.62-64)
+      and the macros_list dictionary (p.59-60).
+  - title: Bitfocus Companion, companion-module-newtek-tricaster
+    url: https://github.com/bitfocus/companion-module-newtek-tricaster
+    note: >
+      MIT-licensed; cross-check only for the shared HTTP interface (shortcuts on port 80, the
+      change notification websocket on the web port, /v1/version).
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: basic
+  timeout_ms: 4000
+  probe: { method: GET, path: /v1/live }
+
+settings:
+  username: { type: string, default: admin, label: Username, description: "The user name for the 3Play's web interface, admin unless changed." }
+  password: { type: string, secret: true, default: admin, label: Password, description: "The password for the 3Play's web interface, admin unless changed." }
+
+ports:
+  - { port: 80, protocol: http, role: control }
+  - { port: 80, protocol: ws, role: push }
+
+models:
+  - id: viz-3play
+    name: NewTek 3Play 3P1, 4800, 440, 425 and Mini, and Viz 3Play
+    supports: [shortcut, shortcut_with_value, post_shortcut_xml, play_macro, play_macro_by_id,
+               stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, trigger,
+               set_datalink]
+    verification: none
+
+commands:
+  shortcut:
+    summary: >
+      Run any shortcut by name, as the 3Play's macro recorder and its LivePanel
+      Shortcut Commands page name them (guide p.17-18, p.157)
+    params:
+      name: { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true, label: Shortcut, description: "Shortcut name as a recorded macro or the LivePanel Shortcut Commands page shows it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  shortcut_with_value:
+    summary: Run a shortcut that takes a value (guide p.163)
+    params:
+      name:  { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true, label: Shortcut, description: "Shortcut name that takes a value, as a recorded macro shows it." }
+      value: { type: string, max_length: 256, required: true, label: Value, description: "The value the shortcut takes, as a recorded macro shows it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{name}", value: "{value}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  post_shortcut_xml:
+    summary: >
+      Post one shortcut, or several in a <shortcuts> list, in the XML command
+      format, for shortcuts that take keys beside their value (guide p.159-160,
+      p.163-164)
+    params:
+      xml: { type: string, pattern: '^\s*<shortcuts?[\s>/]', max_length: 65536, required: true, label: Shortcut XML, description: "One <shortcut name=\"...\" value=\"...\" key1=\"...\"/> element, or a <shortcuts> element holding several, XML-escaped." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: "{xml}"
+    expect: { status: 200 }
+    returns: ack
+
+  play_macro:
+    summary: Run a macro by name (play_macro_byname, guide p.159)
+    params:
+      name: { type: string, max_length: 128, required: true, label: Macro, description: "Macro name as shown in the 3Play's macro list." }
+    send: { method: GET, path: /v1/shortcut, query: { name: play_macro_byname, value: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  play_macro_by_id:
+    summary: Run a macro by its id, which survives renaming (play_macro_byid, guide p.159)
+    params:
+      id: { type: string, max_length: 128, required: true, label: Macro id, description: "The macro's id, as the macros_list dictionary gives it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: play_macro_byid, value: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_macro:
+    summary: Stop a running macro by name (stop_macro_byname, guide p.159)
+    params:
+      name: { type: string, max_length: 128, required: true, label: Macro, description: "Macro name as shown in the 3Play's macro list." }
+    send: { method: GET, path: /v1/shortcut, query: { name: stop_macro_byname, value: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_macro_by_id:
+    summary: Stop a running macro by its id (stop_macro_byid, guide p.159)
+    params:
+      id: { type: string, max_length: 128, required: true, label: Macro id, description: "The macro's id, as the macros_list dictionary gives it." }
+    send: { method: GET, path: /v1/shortcut, query: { name: stop_macro_byid, value: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  record_macro:
+    summary: Start recording the operator's actions into a macro of this name (record_macro_byname, guide p.159)
+    params:
+      name: { type: string, max_length: 128, required: true, label: Macro, description: "Name of the macro to record; recording runs until stop_recording_macro." }
+    send: { method: GET, path: /v1/shortcut, query: { name: record_macro_byname, value: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_recording_macro:
+    summary: Stop recording the macro being recorded (stop_record_macro, guide p.159)
+    send: { method: GET, path: /v1/shortcut, query: { name: stop_record_macro } }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger:
+    summary: Fire a named trigger (guide p.163)
+    params:
+      name: { type: string, max_length: 128, required: true, label: Trigger, description: "Name of the trigger to fire, as defined on the 3Play." }
+    send: { method: GET, path: /v1/trigger, query: { name: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_datalink:
+    summary: Set a DataLink key's value (guide p.163)
+    params:
+      key:   { type: string, max_length: 128, required: true, label: DataLink key, description: "DataLink key name." }
+      value: { type: string, max_length: 4096, required: true, label: Value, description: "Text to give the DataLink key." }
+    send: { method: GET, path: /v1/datalink, query: { key: "{key}", value: "{value}" } }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # The change notification websocket (guide p.171-172) sends the name of the
+  # dictionary that changed, which is read again; the dictionaries are also
+  # read every ten seconds, and product information once.
+  websocket:
+    path: /v1/change_notifications
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /v1/dictionary, query: { key: shortcut_states } }
+        - { method: GET, path: /v1/dictionary, query: { key: tally } }
+        - { method: GET, path: /v1/dictionary, query: { key: macros_list } }
+        - { method: GET, path: /v1/datalink }
+        - { method: GET, path: /v1/live }
+    - send:
+        - { method: GET, path: /version }
+        - { method: GET, path: /v1/version }
+  updates:
+    - match: "^(shortcut_states|tally|macros_list|ddr_playlist|buffer|switcher|switcher_ui_effects|audiomixer|audio_bins|ndi_sources)$"
+      then_send:
+        - { method: GET, path: /v1/dictionary, query: { key: "{1}" } }
+    # Every shortcut state the system reports: recording, the output
+    # channels' play states, clip and play list selections and more.
+    - path: "^/v1/dictionary\\?key=shortcut_states$"
+      xml_each: shortcut_state
+      state:
+        "shortcuts.{name}": "{value}"
+    # One <column> per source, with on_pgm and on_prev (guide p.167-168).
+    - path: "^/v1/dictionary\\?key=tally$"
+      xml_each: column
+      state:
+        "tally.{name}.program": { value: "{on_pgm}", map: { "true": true, "false": false } }
+        "tally.{name}.preview": { value: "{on_prev}", map: { "true": true, "false": false } }
+    # Macros by name, the list replaced whole (guide p.159).
+    - path: "^/v1/dictionary\\?key=macros_list$"
+      xml_each: macro
+      replace: macros
+      state:
+        "macros.{name:key}.name": "{name}"
+        "macros.{name:key}.id": "{id}"
+    # Any other dictionary the system names, kept whole as its XML.
+    - path: "^/v1/dictionary\\?key=(ddr_playlist|buffer|switcher|switcher_ui_effects|audiomixer|audio_bins|ndi_sources)$"
+      match: '(?s)^\s*(<.*>)\s*$'
+      state: { "dictionaries.{1}": "{2}" }
+    # The DataLink keys and values (guide p.163), the list replaced whole.
+    - path: "^/v1/datalink$"
+      xml_each: data
+      replace: datalink
+      state: { "datalink.{key:key}": "{value}" }
+    - path: "^/v1/live$"
+      match: '(?i)^\s*(true|false)\s*$'
+      state: { session.live: { value: "{1:lower}", map: { "true": true, "false": false } } }
+    # Product information (guide p.168).
+    - path: "^/(?:v1/)?version$"
+      xml_each: product_information
+      state:
+        product.model: "{product_model}"
+        product.name: "{product_name}"
+        product.version: "{product_version}"
+        product.id: "{product_id}"
+        product.serial_number: "{product_serial_no}"
+        product.build: "{product_build_no}"
+        product.machine_name: "{machine_name}"
+        session.name: "{session_name}"
+        session.width: "{session_x_resolution}"
+        session.height: "{session_y_resolution}"
+        session.frame_rate: "{session_frame_rate}"
+        session.aspect_ratio: "{session_aspect_ratio}"
+        session.fielded: { value: "{session_fielded}", map: { "true": true, "false": false } }
+        session.color_format: "{session_color_format}"
+        session.color_coding: "{session_color_coding}"
+
+state:
+  shortcuts.*: { type: string, description: "Each shortcut state the 3Play reports, keyed by its name, as the shortcut_states dictionary gives it" }
+  tally.*.program: { type: bool, description: "Source on program, keyed by internal source name, when the tally dictionary lists it" }
+  tally.*.preview: { type: bool, description: "Source on preview, keyed by internal source name" }
+  macros.*.name: { type: string, description: "Each macro the 3Play lists, keyed by its name" }
+  macros.*.id: { type: string, description: "The macro's id, when the macros_list dictionary gives one" }
+  dictionaries.*: { type: string, description: "Any other dictionary the 3Play names on its change notification websocket, kept whole as the XML it sends, keyed by its name" }
+  datalink.*: { type: string, description: "Each DataLink key's current value, keyed by the key's name" }
+  session.live: { type: bool, description: "A session is open (true) rather than the start screen (false), from /v1/live" }
+  product.model: { type: string, description: "Product model" }
+  product.name: { type: string, description: "Product name" }
+  product.version: { type: string, description: "Software version" }
+  product.build: { type: string, description: "Software build" }
+  product.machine_name: { type: string, description: "The system's machine name" }
+  product.id: { type: string, description: "Product id" }
+  product.serial_number: { type: string, description: "Serial number; empty when the system reports none" }
+  session.name: { type: string, description: "The open session's name" }
+  session.width: { type: int, unit: px, description: "Session video width" }
+  session.height: { type: int, unit: px, description: "Session video height" }
+  session.frame_rate: { type: float, unit: Hz, description: "Session frame rate" }
+  session.fielded: { type: bool, description: "The session is interlaced" }
+  session.aspect_ratio: { type: float, description: "Session picture aspect ratio" }
+  session.color_format: { type: string, description: "Session color format, such as CCIR709" }
+  session.color_coding: { type: string, description: "Session color coding, such as NTSC" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The guide documents the 3Play's network interface (shortcuts, macros,
+      triggers, DataLink, dictionaries and the change notification websocket)
+      together with the TriCaster's, but lists no 3Play replay shortcuts: it
+      tells integrators to record a macro, or read the LivePanel Shortcut
+      Commands page, to find them (p.157). Replay operations (marking, cueing,
+      playing clips on outputs A and B, play speed, play lists, recording)
+      are therefore sent with shortcut, shortcut_with_value or
+      post_shortcut_xml by the names the system itself shows. The
+      channel commands (clip_store, clip_restore, clip_select, clip_move,
+      clip_play, clip_scrub) are addressed to a 3Play through a TriCaster's
+      NDI input, and are in the newtek-tricaster spec.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The Live Panel password is on by default (admin / admin) and covers the
+      HTTP interface. A wrong password is not retried: the first 401 marks the
+      device unauthorized until it is opened again with corrected settings.
+      The guide recommends Digest authentication; the core sends Basic and
+      answers a Digest challenge if the system replies with one.
+
+  - models: [all]
+    severity: info
+    text: >
+      An ack is HTTP 200: the 3Play accepted the shortcut; the reply carries
+      no result, so whether it applied shows only in the dictionaries. Which
+      dictionaries a 3Play serves is not listed separately from the
+      TriCaster's: shortcut_states, tally and macros_list are read every ten
+      seconds, and any other the change notification websocket names is read
+      when named and kept whole as XML. The guide's text puts the websocket on
+      port 5951 while its examples use the web port, which is used here.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not kept in state: JPEG previews of outputs and sources (/v1/image),
+      which are pictures, and the audio, VU, shortcut and timecode websockets,
+      whose messages the guide does not document. Product information is
+      documented at /version, and recent software also answers /v1/version;
+      both are read once on connecting.
