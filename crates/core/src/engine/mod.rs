@@ -626,7 +626,7 @@ enum Paced {
     Flight,
     /// A message sent without waiting for a reply (`on_connect`, a
     /// subscription), and the pacing groups it is in.
-    Loose(Outgoing, Vec<usize>),
+    Loose(Box<Outgoing>, Vec<usize>),
 }
 
 /// The OSC reply a message waits for.
@@ -2550,7 +2550,7 @@ impl SpecEngine {
             match self.outbox.pop_front() {
                 Some(Paced::Loose(outgoing, groups)) => {
                     self.pacer.sent(&groups, cx.now(), false);
-                    self.emit_now(cx, outgoing);
+                    self.emit_now(cx, *outgoing);
                 }
                 Some(Paced::Flight) => {
                     // A command failed meanwhile has nothing left to send.
@@ -2586,7 +2586,8 @@ impl SpecEngine {
             self.pacer.sent(&groups, cx.now(), false);
             self.emit_now(cx, outgoing);
         } else {
-            self.outbox.push_back(Paced::Loose(outgoing, groups));
+            self.outbox
+                .push_back(Paced::Loose(Box::new(outgoing), groups));
             self.arm_pace(cx);
         }
     }
