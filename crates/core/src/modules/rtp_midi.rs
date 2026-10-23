@@ -1,7 +1,9 @@
 //! RTP-MIDI: MIDI over UDP as Apple's network MIDI driver and the programs
 //! that interoperate with it carry it, for the MIDI integrations. The core
-//! takes the initiator's part: it invites a session another host offers
-//! (advertised as `_apple-midi._udp`, found by mDNS discovery) and joins it.
+//! takes either part: the initiator's, inviting a session another host
+//! offers (advertised as `_apple-midi._udp`, found by mDNS discovery) and
+//! joining it, or the responder's, hosting a session on its own ports and
+//! accepting the invitation of the host that joins it.
 //!
 //! Session protocol from Apple's "MIDI Network Driver Protocol" (2016):
 //!
@@ -57,6 +59,16 @@
 //! times after joining, then every 10 s; three unanswered in a row end the
 //! session, which is then invited again after 1 s, doubling to 30 s, as after
 //! a refusal, an unanswered invitation or the peer's `BY`.
+//!
+//! Hosting, the core listens on its control port (5004 unless set) and the
+//! next, answers an invitation (`IN`) on each with `OK` from the same port,
+//! and sends to the ports the invitations came from. Only the device's host
+//! may join when one is given, otherwise any host; while one host is in the
+//! session another's invitation is refused (`NO`). The initiator keeps the
+//! session with clock synchronisation, which the core answers (the round
+//! trip of the exchange is the latency); Apple has it run at least once a
+//! minute, so a session with none for 90 s is ended (`BY`), and the core
+//! waits for an invitation again, as after the peer's `BY`.
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -73,6 +85,7 @@ const SYNC: Key = "rtp-sync";
 const FEEDBACK: Key = "rtp-feedback";
 const RETRY: Key = "rtp-retry";
 const GUARD: Key = "rtp-guard";
+const WATCH: Key = "rtp-watch";
 
 /// The default control port: the one Apple's Audio MIDI Setup offers for a
 /// new session.
@@ -89,6 +102,10 @@ const RETRY_MIN: Millis = 1000;
 const RETRY_MAX: Millis = 30_000;
 const GUARD_FIRST: Millis = 100;
 const GUARD_MAX: Millis = 1000;
+/// Hosting, a session whose initiator has not synchronised clocks for this
+/// long is ended, and how often that is checked.
+const PEER_SYNC_TIMEOUT: Millis = 90_000;
+const WATCH_EVERY: Millis = 10_000;
 /// The MIDI list of one packet stays under this, so a packet is never
 /// fragmented on an Ethernet path.
 const MAX_LIST: usize = 1000;
@@ -108,14 +125,26 @@ enum Phase {
     Data {
         tries: u32,
     },
+    /// Hosting: waiting for an invitation.
+    Listen,
+    /// Hosting: the control port's invitation accepted, the data port's
+    /// awaited.
+    Accepted,
     Open,
 }
 
-/// One RTP-MIDI session, the core as initiator.
+/// One RTP-MIDI session, the core as initiator or hosting it.
 #[derive(Debug)]
 pub(crate) struct Rtp {
     peer: IpAddr,
     peer_control: u16,
+    peer_data: u16,
+    /// Hosting the session rather than joining one, and the only host that
+    /// may join, if any.
+    hosting: bool,
+    only: Option<IpAddr>,
+    /// Hosting: when the initiator last synchronised clocks.
+    last_sync: Millis,
     name: String,
     /// The local control port the operator fixed, if any.
     fixed_local: Option<u16>,
@@ -181,6 +210,10 @@ impl Rtp {
         let mut rtp = Rtp {
             peer: peer.ip(),
             peer_control: peer.port(),
+            peer_data: peer.port().wrapping_add(1),
+            hosting: false,
+            only: None,
+            last_sync: 0,
             name: name.to_string(),
             fixed_local,
             local: 0,
@@ -205,6 +238,27 @@ impl Rtp {
         rtp.seq = rtp.random() as u16 as u64;
         rtp.local = rtp.pick_local();
         rtp
+    }
+
+    /// A session the core hosts on `local` (control) and the port after it,
+    /// which `only` may join when given, otherwise any host.
+    pub(crate) fn host(local: u16, only: Option<IpAddr>, name: &str, seed: u64) -> Rtp {
+        let unspecified = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
+        let mut rtp = Rtp::new(
+            SocketAddr::new(only.unwrap_or(unspecified), 0),
+            name,
+            Some(local),
+            seed,
+        );
+        rtp.hosting = true;
+        rtp.only = only;
+        rtp.phase = Phase::Listen;
+        rtp
+    }
+
+    /// Whether the core hosts the session.
+    pub(crate) fn hosting(&self) -> bool {
+        self.hosting
     }
 
     /// xorshift64*: unpredictable enough for SSRCs, tokens and ports.
@@ -244,7 +298,7 @@ impl Rtp {
     }
 
     fn data_addr(&self) -> SocketAddr {
-        SocketAddr::new(self.peer, self.peer_control.wrapping_add(1))
+        SocketAddr::new(self.peer, self.peer_data)
     }
 
     fn open_sockets(&self, cx: &mut Cx) {
@@ -267,7 +321,11 @@ impl Rtp {
     pub(crate) fn start(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         self.open_sockets(cx);
-        self.invite(cx);
+        if self.hosting {
+            self.phase = Phase::Listen;
+        } else {
+            self.invite(cx);
+        }
     }
 
     fn invite(&mut self, cx: &mut Cx) {
@@ -284,17 +342,47 @@ impl Rtp {
         cx.udp_send(CONTROL, self.control_addr(), packet);
     }
 
-    /// The session failed: report it and invite again after a while.
+    /// The session failed: report it and invite again after a while, or,
+    /// hosting, wait for the next invitation.
     fn fail(&mut self, cx: &mut Cx, reason: String) {
-        for key in [INVITE, SYNC, FEEDBACK, GUARD] {
+        for key in [INVITE, SYNC, FEEDBACK, GUARD, WATCH] {
             cx.cancel_timer(key);
         }
-        self.phase = Phase::Idle;
         self.sync_sent = None;
         self.feedback_armed = false;
+        if self.hosting {
+            self.phase = Phase::Listen;
+            self.peer_ssrc = None;
+            cx.connection(Connection::Disconnected {
+                reason: format!("{reason}; waiting for an invitation"),
+            });
+            return;
+        }
+        self.phase = Phase::Idle;
         cx.connection(Connection::Disconnected { reason });
         cx.set_timer(RETRY, self.retry);
         self.retry = (self.retry * 2).min(RETRY_MAX);
+    }
+
+    /// Both ports joined: the session is open.
+    fn opened(&mut self, cx: &mut Cx) {
+        cx.cancel_timer(INVITE);
+        self.phase = Phase::Open;
+        self.retry = RETRY_MIN;
+        self.syncs = 0;
+        self.misses = 0;
+        self.sync_sent = None;
+        self.received_seq = None;
+        self.decoder = Decoder::default();
+        self.journal = Journal::new();
+        self.guards = None;
+        cx.connection(Connection::Connected);
+        if self.hosting {
+            self.last_sync = cx.now();
+            cx.set_timer(WATCH, WATCH_EVERY);
+        } else {
+            self.sync(cx);
+        }
     }
 
     fn sync(&mut self, cx: &mut Cx) {
@@ -368,7 +456,28 @@ impl Rtp {
                     cx.udp_send(CONTROL, self.control_addr(), out);
                 }
             }
+            RETRY if self.hosting => {
+                cx.connection(Connection::Connecting);
+                self.open_sockets(cx);
+                self.phase = Phase::Listen;
+            }
             RETRY => self.invite(cx),
+            WATCH => {
+                if self.is_open() {
+                    if cx.now().saturating_sub(self.last_sync) >= PEER_SYNC_TIMEOUT {
+                        self.bye(cx);
+                        self.fail(
+                            cx,
+                            format!(
+                                "the peer has not synchronised clocks for {} s",
+                                PEER_SYNC_TIMEOUT / 1000
+                            ),
+                        );
+                    } else {
+                        cx.set_timer(WATCH, WATCH_EVERY);
+                    }
+                }
+            }
             GUARD => {
                 if let Some(sent) = self.guards {
                     if self.is_open() && !self.journal.acknowledged(self.last_midi) {
@@ -394,6 +503,24 @@ impl Rtp {
         }
         cx.udp_close(CONTROL);
         cx.udp_close(DATA);
+        if self.hosting {
+            let reason = format!(
+                "local UDP port {} or {}: {message}",
+                self.local,
+                self.local + 1
+            );
+            if self.phase == Phase::Open {
+                self.bye(cx);
+            }
+            for key in [SYNC, FEEDBACK, GUARD, WATCH] {
+                cx.cancel_timer(key);
+            }
+            self.phase = Phase::Idle;
+            cx.connection(Connection::Disconnected { reason });
+            cx.set_timer(RETRY, self.retry);
+            self.retry = (self.retry * 2).min(RETRY_MAX);
+            return true;
+        }
         let fixed = self.fixed_local.is_some();
         let reason = format!(
             "local UDP port {} or {}: {message}",
@@ -418,10 +545,15 @@ impl Rtp {
         from: SocketAddr,
         data: &[u8],
     ) -> Vec<u8> {
+        let session = data.starts_with(&[0xFF, 0xFF]) && data.len() >= 4;
+        if self.hosting && session && &data[2..4] == b"IN" {
+            self.invited(cx, socket, from, data);
+            return Vec::new();
+        }
         if from.ip() != self.peer {
             return Vec::new();
         }
-        if data.starts_with(&[0xFF, 0xFF]) && data.len() >= 4 {
+        if session {
             self.session(cx, socket, data);
             return Vec::new();
         }
@@ -475,6 +607,7 @@ impl Rtp {
                     cx.state(json!({"session": {
                         "peer_name": name,
                         "peer_ssrc": ssrc,
+                        "peer_address": self.control_addr().to_string(),
                         "local_port": self.local,
                     }}));
                     self.phase = Phase::Data { tries: 1 };
@@ -482,23 +615,13 @@ impl Rtp {
                     cx.udp_send(DATA, self.data_addr(), packet);
                     cx.set_timer(INVITE, INVITE_EVERY);
                 } else {
-                    cx.cancel_timer(INVITE);
-                    self.phase = Phase::Open;
-                    self.retry = RETRY_MIN;
-                    self.syncs = 0;
-                    self.misses = 0;
-                    self.sync_sent = None;
-                    self.received_seq = None;
-                    self.decoder = Decoder::default();
-                    self.journal = Journal::new();
-                    self.guards = None;
-                    cx.connection(Connection::Connected);
-                    self.sync(cx);
+                    self.opened(cx);
                 }
             }
             b"BY" => {
                 let ssrc = u32_at(data, 12);
-                if self.phase != Phase::Idle && ssrc.is_some() && ssrc == self.peer_ssrc {
+                let joined = !matches!(self.phase, Phase::Idle | Phase::Listen);
+                if joined && ssrc.is_some() && ssrc == self.peer_ssrc {
                     self.fail(cx, "the peer ended the session".into());
                 }
             }
@@ -526,6 +649,7 @@ impl Rtp {
                     0 => {
                         let Some(t1) = stamps[0] else { return };
                         cx.alive();
+                        self.last_sync = cx.now();
                         let reply = sync_packet(self.ssrc, 1, [t1, now, 0]);
                         cx.udp_send(DATA, self.data_addr(), reply);
                     }
@@ -542,6 +666,14 @@ impl Rtp {
                         cx.round_trip(now.saturating_sub(t1) / 10);
                         let reply = sync_packet(self.ssrc, 2, [t1, t2, now]);
                         cx.udp_send(DATA, self.data_addr(), reply);
+                    }
+                    // The end of an exchange the peer started: our answer's
+                    // time came back, so its round trip is the latency.
+                    2 => {
+                        cx.alive();
+                        if let Some(t2) = stamps[1] {
+                            cx.round_trip(now.saturating_sub(t2) / 10);
+                        }
                     }
                     _ => cx.alive(),
                 }
@@ -600,21 +732,92 @@ impl Rtp {
 
     /// Leave the session.
     pub(crate) fn stop(&mut self, cx: &mut Cx) {
-        if self.phase != Phase::Idle {
+        if !matches!(self.phase, Phase::Idle | Phase::Listen) {
             self.bye(cx);
         }
         self.phase = Phase::Idle;
     }
 
-    /// Leave and join again now.
+    /// Leave and join again now; hosting, end the session and wait for an
+    /// invitation.
     pub(crate) fn reconnect(&mut self, cx: &mut Cx) {
         self.stop(cx);
-        for key in [INVITE, SYNC, FEEDBACK, RETRY, GUARD] {
+        for key in [INVITE, SYNC, FEEDBACK, RETRY, GUARD, WATCH] {
             cx.cancel_timer(key);
         }
         self.retry = RETRY_MIN;
         cx.connection(Connection::Connecting);
-        self.invite(cx);
+        if self.hosting {
+            self.peer_ssrc = None;
+            self.open_sockets(cx);
+            self.phase = Phase::Listen;
+        } else {
+            self.invite(cx);
+        }
+    }
+
+    /// Hosting: an invitation on the control or the data port.
+    fn invited(&mut self, cx: &mut Cx, socket: Key, from: SocketAddr, data: &[u8]) {
+        let (Some(token), Some(ssrc)) = (u32_at(data, 8), u32_at(data, 12)) else {
+            return;
+        };
+        let refuse = |cx: &mut Cx, ssrc_ours: u32| {
+            cx.udp_send(socket, from, session_packet(b"NO", token, ssrc_ours, None));
+        };
+        if self.only.is_some_and(|only| only != from.ip()) {
+            refuse(cx, self.ssrc);
+            return;
+        }
+        let joined = matches!(self.phase, Phase::Accepted | Phase::Open);
+        let same_peer = joined && from.ip() == self.peer && Some(ssrc) == self.peer_ssrc;
+        if socket == CONTROL {
+            if joined && !same_peer {
+                // Another host's: one is in the session already.
+                refuse(cx, self.ssrc);
+                return;
+            }
+            if self.phase == Phase::Open {
+                // The peer invites again (it restarted): a new session.
+                for key in [FEEDBACK, GUARD, WATCH] {
+                    cx.cancel_timer(key);
+                }
+            }
+            let name = data
+                .get(16..)
+                .map(|n| {
+                    let end = n.iter().position(|&b| b == 0).unwrap_or(n.len());
+                    String::from_utf8_lossy(&n[..end]).into_owned()
+                })
+                .unwrap_or_default();
+            self.peer = from.ip();
+            self.peer_control = from.port();
+            self.peer_data = from.port().wrapping_add(1);
+            self.token = token;
+            self.peer_ssrc = Some(ssrc);
+            self.phase = Phase::Accepted;
+            cx.alive();
+            cx.state(json!({"session": {
+                "peer_name": name,
+                "peer_ssrc": ssrc,
+                "peer_address": from.to_string(),
+                "local_port": self.local,
+            }}));
+            let ok = session_packet(b"OK", token, self.ssrc, Some(&self.name));
+            cx.udp_send(CONTROL, from, ok);
+        } else if socket == DATA {
+            if !same_peer || token != self.token {
+                if !same_peer {
+                    refuse(cx, self.ssrc);
+                }
+                return;
+            }
+            self.peer_data = from.port();
+            let ok = session_packet(b"OK", token, self.ssrc, Some(&self.name));
+            cx.udp_send(DATA, from, ok);
+            if self.phase != Phase::Open {
+                self.opened(cx);
+            }
+        }
     }
 }
 
@@ -1291,6 +1494,174 @@ mod tests {
         // both before its own command.
         let (midi, _) = d.packet(&packets[3]).unwrap();
         assert_eq!(midi, [0xB3, 7, 20, 0x83, 64, 0x40, 0xF8]);
+    }
+
+    fn joiner() -> SocketAddr {
+        "192.0.2.20:6100".parse().unwrap()
+    }
+
+    fn joiner_data() -> SocketAddr {
+        "192.0.2.20:6101".parse().unwrap()
+    }
+
+    /// A hosted session joined by `joiner()`.
+    fn hosted() -> Rtp {
+        let mut rtp = Rtp::host(5004, None, "Meros", 9);
+        let mut cx = Cx::new(0);
+        rtp.start(&mut cx);
+        let a = cx.take();
+        assert!(a.contains(&Action::UdpOpen {
+            socket: DATA,
+            bind: Bind::Any {
+                address: None,
+                port: 5005
+            }
+        }));
+        assert!(sent(&a).is_empty(), "a host invites no one");
+        let invite = session_packet(b"IN", 77, 0x1234, Some("Desk"));
+        let mut cx = Cx::new(10);
+        rtp.datagram(&mut cx, CONTROL, joiner(), &invite);
+        let a = cx.take();
+        assert_eq!(
+            sent(&a),
+            [(
+                CONTROL,
+                joiner(),
+                session_packet(b"OK", 77, rtp.ssrc, Some("Meros"))
+            )]
+        );
+        assert!(!a.contains(&Action::Connection(Connection::Connected)));
+        let mut cx = Cx::new(20);
+        rtp.datagram(&mut cx, DATA, joiner_data(), &invite);
+        let a = cx.take();
+        assert_eq!(
+            sent(&a),
+            [(
+                DATA,
+                joiner_data(),
+                session_packet(b"OK", 77, rtp.ssrc, Some("Meros"))
+            )]
+        );
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(a.contains(&Action::SetTimer {
+            key: WATCH,
+            after: WATCH_EVERY
+        }));
+        rtp
+    }
+
+    #[test]
+    fn a_hosted_session_is_joined_synchronised_and_left() {
+        let mut rtp = hosted();
+        // The initiator's synchronisation is answered, and the end of its
+        // exchange gives the round trip.
+        let mut cx = Cx::new(30);
+        rtp.datagram(
+            &mut cx,
+            DATA,
+            joiner_data(),
+            &sync_packet(0x1234, 0, [5, 0, 0]),
+        );
+        assert_eq!(
+            sent(&cx.take()),
+            [(DATA, joiner_data(), sync_packet(rtp.ssrc, 1, [5, 300, 0]))]
+        );
+        let mut cx = Cx::new(34);
+        rtp.datagram(
+            &mut cx,
+            DATA,
+            joiner_data(),
+            &sync_packet(0x1234, 2, [5, 300, 9]),
+        );
+        assert!(cx.take().contains(&Action::RoundTrip(4)));
+        // MIDI goes to the port the data invitation came from.
+        let mut cx = Cx::new(40);
+        rtp.send(&mut cx, &[Message::Start]).unwrap();
+        assert_eq!(sent(&cx.take())[0].1, joiner_data());
+        // Another host is refused while one is in the session.
+        let other: SocketAddr = "192.0.2.30:7000".parse().unwrap();
+        let mut cx = Cx::new(50);
+        rtp.datagram(
+            &mut cx,
+            CONTROL,
+            other,
+            &session_packet(b"IN", 5, 0x99, Some("Other")),
+        );
+        assert_eq!(
+            sent(&cx.take()),
+            [(CONTROL, other, session_packet(b"NO", 5, rtp.ssrc, None))]
+        );
+        // The peer leaves: disconnected, waiting for the next invitation.
+        let mut cx = Cx::new(60);
+        rtp.datagram(
+            &mut cx,
+            CONTROL,
+            joiner(),
+            &session_packet(b"BY", 77, 0x1234, None),
+        );
+        let a = cx.take();
+        assert!(a.iter().any(|a| matches!(
+            a,
+            Action::Connection(Connection::Disconnected { reason })
+                if reason.contains("ended") && reason.contains("invitation")
+        )));
+        assert!(!a
+            .iter()
+            .any(|a| matches!(a, Action::SetTimer { key: RETRY, .. })));
+        // The other host may join now.
+        let mut cx = Cx::new(70);
+        rtp.datagram(
+            &mut cx,
+            CONTROL,
+            other,
+            &session_packet(b"IN", 5, 0x99, Some("Other")),
+        );
+        assert_eq!(&sent(&cx.take())[0].2[2..4], b"OK");
+    }
+
+    #[test]
+    fn a_hosted_session_without_synchronisation_is_ended() {
+        let mut rtp = hosted();
+        let mut cx = Cx::new(WATCH_EVERY);
+        rtp.timer(&mut cx, WATCH);
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: WATCH,
+            after: WATCH_EVERY
+        }));
+        let mut cx = Cx::new(20 + PEER_SYNC_TIMEOUT);
+        rtp.timer(&mut cx, WATCH);
+        let a = cx.take();
+        assert_eq!(&sent(&a)[0].2[2..4], b"BY");
+        assert!(a.iter().any(|a| matches!(
+            a,
+            Action::Connection(Connection::Disconnected { reason }) if reason.contains("synchronised")
+        )));
+    }
+
+    #[test]
+    fn a_host_given_only_takes_that_hosts_invitation() {
+        let only: IpAddr = "192.0.2.20".parse().unwrap();
+        let mut rtp = Rtp::host(5004, Some(only), "Meros", 3);
+        let mut cx = Cx::new(0);
+        rtp.start(&mut cx);
+        cx.take();
+        let stranger: SocketAddr = "192.0.2.31:6000".parse().unwrap();
+        let mut cx = Cx::new(1);
+        rtp.datagram(
+            &mut cx,
+            CONTROL,
+            stranger,
+            &session_packet(b"IN", 1, 2, None),
+        );
+        assert_eq!(&sent(&cx.take())[0].2[2..4], b"NO");
+        let mut cx = Cx::new(2);
+        rtp.datagram(
+            &mut cx,
+            CONTROL,
+            joiner(),
+            &session_packet(b"IN", 1, 2, None),
+        );
+        assert_eq!(&sent(&cx.take())[0].2[2..4], b"OK");
     }
 
     fn rtp_packet(seq: u16, section: &[u8]) -> Vec<u8> {

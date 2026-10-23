@@ -2438,8 +2438,10 @@ on Android, and on a host whose MIDI system cannot be reached (on Linux:
 without `libasound.so.2` or without the ALSA sequencer).
 
 The MIDI integrations (`generic-midi`, `midi-show-control`) share one link
-(`link` `rtp` or `port`): an RTP-MIDI session (Apple's MIDI Network Driver
-Protocol and RFC 6295) the core joins as the initiator, or a MIDI port.
+(`link` `rtp`, `rtp_host` or `port`): an RTP-MIDI session (Apple's MIDI
+Network Driver Protocol and RFC 6295) the core joins as the initiator
+(`rtp`) or hosts on `local_port` for the device to join (`rtp_host`), with a
+recovery journal in every packet it sends, or a MIDI port.
 mDNS discovery (`mdns`) reports each RTP-MIDI session advertised as
 `_apple-midi._udp` for each MIDI integration in the core, at its control
 port.

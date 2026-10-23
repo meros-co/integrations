@@ -1,7 +1,8 @@
 //! The link a MIDI integration reaches its device over, chosen by the `link`
-//! setting: an RTP-MIDI session on the network (`rtp`, [`super::rtp_midi`]),
-//! or a MIDI port of the host (`port`: `midi_input` and `midi_output`,
-//! opened by the session, `crate::midi_ports`). Either way the module sends
+//! setting: an RTP-MIDI session on the network that the core joins (`rtp`)
+//! or hosts (`rtp_host`, [`super::rtp_midi`]), or a MIDI port of the host
+//! (`port`: `midi_input` and `midi_output`, opened by the session,
+//! `crate::midi_ports`). Either way the module sends
 //! and receives MIDI messages; what differs is only what is opened, and how
 //! the device's presence shows.
 //!
@@ -67,8 +68,9 @@ fn seed() -> u64 {
 
 impl MidiLink {
     /// The link the settings choose: `link` `rtp` (the default) to the
-    /// device's host and port (5004 unless given), or `port` with
-    /// `midi_input` and `midi_output`.
+    /// device's host and port (5004 unless given), `rtp_host` on
+    /// `local_port` (5004 unless given) for the device's host (or any) to
+    /// join, or `port` with `midi_input` and `midi_output`.
     pub(crate) fn from_context(ctx: &OpenContext) -> Result<MidiLink, String> {
         let kind = match ctx.settings.get("link").and_then(Value::as_str) {
             None | Some("rtp") => {
@@ -88,6 +90,18 @@ impl MidiLink {
                     .filter(|p| *p > 0 && *p < u16::MAX);
                 Kind::Rtp(Box::new(Rtp::new(peer, &name, local, seed())))
             }
+            Some("rtp_host") => {
+                let name = text_setting(ctx, "session_name").unwrap_or_else(|| "Meros".into());
+                let local = ctx
+                    .settings
+                    .get("local_port")
+                    .and_then(Value::as_u64)
+                    .and_then(|p| u16::try_from(p).ok())
+                    .filter(|p| *p > 0 && *p < u16::MAX)
+                    .unwrap_or(rtp_midi::DEFAULT_PORT);
+                let only = (!ctx.host.is_unspecified()).then_some(ctx.host);
+                Kind::Rtp(Box::new(Rtp::host(local, only, &name, seed())))
+            }
             Some("port") => {
                 let port = MidiPort {
                     input: text_setting(ctx, "midi_input"),
@@ -105,7 +119,7 @@ impl MidiLink {
                     retry: RETRY_MIN,
                 }
             }
-            Some(other) => return Err(format!("link '{other}' is not rtp or port")),
+            Some(other) => return Err(format!("link '{other}' is not rtp, rtp_host or port")),
         };
         Ok(MidiLink {
             kind,
@@ -124,9 +138,10 @@ impl MidiLink {
         }
     }
 
-    /// `rtp` or `port`.
+    /// `rtp`, `rtp_host` or `port`.
     pub(crate) fn kind(&self) -> &'static str {
         match &self.kind {
+            Kind::Rtp(rtp) if rtp.hosting() => "rtp_host",
             Kind::Rtp(_) => "rtp",
             Kind::Port { .. } => "port",
         }

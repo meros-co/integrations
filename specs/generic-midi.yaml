@@ -82,12 +82,12 @@ source:
       timestamps are in the same units; received packets need not carry a journal.
 
 settings:
-  link: { type: enum, values: [rtp, port], default: rtp, label: Link,
-          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); port uses MIDI ports of this computer, named by midi_input and midi_output." }
+  link: { type: enum, values: [rtp, rtp_host, port], default: rtp, label: Link,
+          description: "rtp joins the RTP-MIDI session the host offers (its control port is the device port, 5004 unless given); rtp_host hosts a session on local_port for the device's host (any host when none is given) to join; port uses MIDI ports of this computer, named by midi_input and midi_output." }
   session_name: { type: string, max_length: 64, default: "Meros", label: Session name,
-                  description: "With link rtp, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
+                  description: "With link rtp or rtp_host, the name the core gives itself in the RTP-MIDI session, which the other host shows." }
   local_port: { type: int, min: 1024, max: 65534, label: Local RTP port,
-                description: "With link rtp, the local control port to use (the data port is the next); leave unset to pick a free one at random." }
+                description: "The local control port (the data port is the next): with link rtp leave unset to pick a free one at random; with link rtp_host the hosted session's port, 5004 unless set." }
   midi_input: { type: string, max_length: 256, label: MIDI input port,
                 description: "With link port, the input port to receive from, as listed by the MIDI port listing; leave unset to only send." }
   midi_output: { type: string, max_length: 256, label: MIDI output port,
@@ -101,6 +101,8 @@ ports:
   - { port: 5004, protocol: udp, role: control, note: "with link rtp: the RTP-MIDI session's control port (advertised as _apple-midi._udp); 5004 is what macOS Audio MIDI Setup offers for a new session, and the port given when opening overrides it" }
   - { port: 5005, protocol: udp, role: control, when: "link rtp", note: "the session's data port: always the control port plus one" }
   - { port: null, protocol: udp, role: feedback, listener: core, setting: local_port, when: "link rtp", note: "the core's own control port and the one after it, where the session answers; random in 49152-65534 unless local_port is set" }
+  - { port: 5004, protocol: udp, role: control, listener: core, setting: local_port, when: "link rtp_host", note: "the session the core hosts: its control port, where the joining host's invitation arrives" }
+  - { port: 5005, protocol: udp, role: control, listener: core, when: "link rtp_host", note: "the hosted session's data port: always its control port plus one" }
   - { port: null, protocol: midi, role: control, setting: midi_input, when: "link port", note: "a MIDI input of this computer: a USB or other class-compliant device, or another program's port" }
   - { port: null, protocol: midi, role: control, setting: midi_output, when: "link port", note: "a MIDI output of this computer" }
 
@@ -323,10 +325,11 @@ commands:
     returns: none
 
 state:
-  link:                          { type: string, description: "rtp or port" }
-  session.peer_name:             { type: string, description: "With link rtp, the name the other host gives its session" }
-  session.peer_ssrc:             { type: int, description: "With link rtp, the other host's RTP synchronisation source" }
-  session.local_port:            { type: int, description: "With link rtp, the core's control port (its data port is the next)" }
+  link:                          { type: string, description: "rtp, rtp_host or port" }
+  session.peer_name:             { type: string, description: "With link rtp or rtp_host, the name the other host gives itself in the session" }
+  session.peer_ssrc:             { type: int, description: "With link rtp or rtp_host, the other host's RTP synchronisation source" }
+  session.peer_address:          { type: string, description: "With link rtp or rtp_host, the other host's control port as ip:port (hosting: the host that joined)" }
+  session.local_port:            { type: int, description: "With link rtp or rtp_host, the core's control port (its data port is the next)" }
   port.input:                    { type: string, description: "With link port, the MIDI input port opened, or null" }
   port.output:                   { type: string, description: "With link port, the MIDI output port opened, or null" }
   received_count:                { type: int, description: "MIDI messages received since the device was opened" }
@@ -391,8 +394,11 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Over RTP-MIDI the core joins a session another host offers (as macOS Audio MIDI Setup's network session,
-      rtpMIDI on Windows, or a network MIDI interface); it does not offer one of its own for others to join.
+      Over RTP-MIDI the core joins a session another host offers (link rtp: macOS Audio MIDI Setup's network
+      session, rtpMIDI on Windows, a network MIDI interface) or hosts one for the device to join (link
+      rtp_host, on local_port). A hosted session is not advertised over Bonjour, as the core has no mDNS
+      responder: the joining host adds the core's address and port by hand (Audio MIDI Setup's Directory).
+      One host is in a hosted session at a time; another's invitation is refused until it leaves.
       Every packet the core sends carries a recovery journal (RFC 6295: every channel and system chapter,
       the checkpoint moved by the peer's receiver feedback), and guard packets follow MIDI until the peer has
       it, so a peer that loses packets repairs them. The system journal holds at most 1023 bytes (its LENGTH
@@ -423,9 +429,11 @@ quirks:
     text: >
       Undocumented details of Apple's session protocol the core follows: receiver feedback (RS) carries the
       16-bit sequence number in the upper half of its 32-bit field (Apple's figure shows one 32-bit field); the
-      core answers a clock synchronisation the other host starts (count 0) with count 1, and refuses an
-      invitation sent to it with NO, as it only initiates. A host that chooses ports for the core's data that are
-      not its control port plus one is not supported.
+      core answers a clock synchronisation the other host starts (count 0) with count 1 and takes the round
+      trip from its count 2; joining, it refuses an invitation sent to it with NO, and a host that chooses ports
+      for the core's data that are not its control port plus one is not supported. Hosting, the core answers
+      each invitation from the port it came to and sends MIDI to the port the data invitation came from, and
+      ends a session whose initiator has not synchronised clocks for 90 s (Apple: at least once a minute).
   - models: [all]
     severity: info
     text: >
