@@ -85,6 +85,29 @@ class QuietRules(unittest.TestCase):
                       validate.telemetry_checks(self.doc("line-tcp", mixed)))
 
 
+class NullStates(unittest.TestCase):
+    def doc(self, *rules):
+        return {"transport": {"type": "line-tcp"}, "state": {"tx": {"type": "string"}},
+                "telemetry": {"updates": list(rules)}}
+
+    def test_a_rule_never_writes_null(self):
+        self.assertEqual(validate.telemetry_checks(self.doc({"match": "^X$", "state": {"tx": None}})),
+                         ["telemetry.updates[0]: 'tx' is written as null; remove with "
+                          "{delete: true}, or write 'none' as an explicit value"])
+        mapped = {"match": "^(.)$", "state": {"tx": {"value": "{1}", "map": {"0": None, "1": "a"}}}}
+        self.assertEqual(validate.telemetry_checks(self.doc(mapped)),
+                         ["telemetry.updates[0]: 'tx' maps a value to null; write 'none' as an explicit value"])
+        fields = {"header": "^S:$", "fields": {"t": {"path": "tx", "map": {"-": None}}}}
+        self.assertEqual(validate.telemetry_checks(self.doc(fields)),
+                         ["telemetry.updates[0]: 'tx' maps a value to null; write 'none' as an explicit value"])
+
+    def test_explicit_values_and_removals_pass(self):
+        ok = {"match": "^(.)$", "state": {"tx": {"value": "{1}", "map": {"0": "none", "1": "a"}}}}
+        self.assertEqual(validate.telemetry_checks(self.doc(ok)), [])
+        gone = {"match": "^X$", "state": {"tx": {"delete": True}}}
+        self.assertEqual(validate.telemetry_checks(self.doc(gone)), [])
+
+
 class ExtensionCommands(unittest.TestCase):
     DOC = {"id": "x", "transport": {"type": "line-tcp"}, "extension": "ultimatte-preset-archive",
            "models": [{"id": "m", "supports": []}]}
