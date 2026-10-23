@@ -264,10 +264,11 @@ impl Atem {
                 let index = u16_at(b, 2);
                 Some(json!({"macro_recording": {
                     "recording": b[0] != 0,
+                    // 0: none is being recorded (slots are from 1).
                     "macro": if b[0] != 0 && index != 0xFFFF {
-                        json!(index as u32 + 1)
+                        index as u32 + 1
                     } else {
-                        Value::Null
+                        0
                     },
                 }}))
             }

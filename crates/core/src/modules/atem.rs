@@ -440,11 +440,11 @@ fn layers(mask: u8) -> Vec<&'static str> {
         .collect()
 }
 
-/// Classic audio gain: 32768 is 0 dB, 0 is silence (Sofie
+/// Classic audio gain: 32768 is 0 dB, 0 is silence, "-inf" (Sofie
 /// `lib/atemUtil.ts:15-22`).
 fn classic_db(raw: u16) -> Value {
     if raw == 0 {
-        Value::Null
+        json!("-inf")
     } else {
         json!(((raw as f64 / 32768.0).log10() * 2_000.0).round() / 100.0)
     }
@@ -1612,10 +1612,11 @@ impl Atem {
                 let running = b[0] & 1 != 0;
                 let index = u16_at(b, 2);
                 Some(json!({
+                    // 0: no macro runs (slots are from 1).
                     "macro_running": if running && index != 0xFFFF {
-                        json!(index as u32 + 1)
+                        index as u32 + 1
                     } else {
-                        Value::Null
+                        0
                     },
                     "macro_waiting": b[0] & 2 != 0,
                     "macro_loop": b[1] != 0,
