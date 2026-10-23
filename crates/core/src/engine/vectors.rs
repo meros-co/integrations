@@ -256,7 +256,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     let ctx = OpenContext {
         host: HOST,
         host_name: None,
-        port: None,
+        port: vector_port(spec),
         model: model.id.clone(),
         channels: model.channels,
         settings,
@@ -474,6 +474,20 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     Ok(())
 }
 
+/// The port a vector opens a device on: none (the spec's default), or for a
+/// device with no standard port (`port: null`) one standing for the port the
+/// operator gives.
+fn vector_port(spec: &crate::catalog::DeviceSpec) -> Option<u16> {
+    spec.transport
+        .as_ref()
+        .and_then(|t| t.get("port"))
+        .is_some_and(Value::is_null)
+        .then_some(VECTOR_PORT)
+}
+
+/// The port a vector gives a device with no standard port.
+const VECTOR_PORT: u16 = 53000;
+
 /// Answer the internal job in flight (probe, subscription or telemetry
 /// query) with a plain success: on its OSC address, or as a text line.
 fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
@@ -575,7 +589,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let ctx = OpenContext {
         host: HOST,
         host_name: None,
-        port: None,
+        port: vector_port(spec),
         model: model.id.clone(),
         channels: model.channels,
         settings,
@@ -1012,7 +1026,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
         let ctx = OpenContext {
             host: HOST,
             host_name: None,
-            port: None,
+            port: vector_port(spec),
             model: model.id.clone(),
             channels: model.channels,
             // With no value for a required setting (a token), the defaults

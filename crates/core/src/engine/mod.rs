@@ -1366,13 +1366,22 @@ impl SpecEngine {
     pub(crate) fn new(spec: Arc<DeviceSpec>, ctx: OpenContext) -> Result<SpecEngine, String> {
         let t = spec.transport.clone().ok_or("spec has no transport")?;
         let kind = str_field(&t, "type").ok_or("transport has no type")?;
-        // A serial port has no number: it is named in the settings.
-        let spec_port = if kind == "line-serial" {
-            0
-        } else {
-            t.get("port")
+        // A serial port has no number: it is named in the settings. A
+        // device with no standard port (`port: null`, a program whose port
+        // the operator chooses) is opened with the port given.
+        let spec_port = match t.get("port") {
+            _ if kind == "line-serial" => 0,
+            Some(Value::Null) => match ctx.port {
+                Some(p) => p,
+                None => {
+                    return Err(
+                        "this device has no standard port: give its port when opening it".into(),
+                    )
+                }
+            },
+            port => port
                 .and_then(Value::as_u64)
-                .ok_or("transport has no port")? as u16
+                .ok_or("transport has no port")? as u16,
         };
         if kind == "line-serial" && t.get("endpoints").is_some() {
             return Err("transport.endpoints needs a network transport, not line-serial".into());
@@ -5327,6 +5336,32 @@ mod tests {
             .take()
             .iter()
             .any(|a| matches!(a, Action::UdpClose { socket } if *socket == OSC_LISTEN)));
+    }
+
+    #[test]
+    fn a_device_with_no_standard_port_opens_only_on_the_port_given() {
+        let open = |port: Option<u16>| {
+            let mut spec = Catalog::source_tree()
+                .device("behringer-x32")
+                .unwrap()
+                .clone();
+            spec.transport.as_mut().unwrap()["port"] = Value::Null;
+            SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port,
+                    model: "x32".into(),
+                    channels: Some(32),
+                    settings: Params::new(),
+                    monitor: false,
+                },
+            )
+        };
+        let refused = open(None).err().unwrap();
+        assert!(refused.contains("no standard port"), "{refused}");
+        assert_eq!(open(Some(58000)).unwrap().port(), 58000);
     }
 
     #[test]

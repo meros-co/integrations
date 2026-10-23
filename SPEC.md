@@ -931,6 +931,12 @@ ports:
 | `setting` | The setting that changes this port, if any |
 | `when` | When the entry applies, if not always: a setting's value or a model |
 
+A program whose port the operator chooses, with no standard one (Show Cue
+Systems' network cue control listens on whatever port it is given), sets the
+transport's `port` to `null`: the port is then given when the device is
+opened, and opening it without one fails, saying so. Its control entry is
+`port: null` with a `note`.
+
 There is always at least one `control` entry. For a spec-driven device the
 transport's `port` must be one of them, each HTTP endpoint (§2, Endpoints)
 needs one too (naming its setting, at the setting's default, when its port
