@@ -56,6 +56,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a wrong key or identity shows as a refused handshake (and which alert the device sends), and that the device answers the keep-alive sent first inside the secure session as it does over TCP. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
 - [ ] On a device that speaks secure OCP.1 over DTLS, confirm it takes one OCP.1 PDU per record and datagram and answers the same way, whether it asks for a cookie, and that it sends its flight again when the controller's is lost. ([specs/aes70.yaml:444](specs/aes70.yaml#L444))
 
+## aja-helo — AJA HELO and HELO Plus
+
+- [ ] Confirm what eParamID_ReplicatorCommand 5 (Shutdown) shuts down on HELO and HELO Plus (the replicator engine or the whole unit) and how the unit comes back from it. ([specs/aja-helo.yaml:745](specs/aja-helo.yaml#L745))
+- [ ] Confirm that a request without the session cookie, and one with an expired session, is answered with the HTML 404 page, so a 404 is the right signal to log in again. ([specs/aja-helo.yaml:104](specs/aja-helo.yaml#L104))
+- [ ] Check how /authenticator/login answers a wrong password (status, body, whether a session cookie is set), since AJA documents only {"login":"success"}. ([specs/aja-helo.yaml:786](specs/aja-helo.yaml#L786))
+- [ ] Confirm the HELO event elements carry param_type, int_value and str_value as on Ki Pro (AJA's HELO example reads only param_id), and that the connection id expires as on Ki Pro. ([specs/aja-helo.yaml:802](specs/aja-helo.yaml#L802))
+- [ ] Record the names and numbers of eParamID_ReplicatorStreamState (only 2, streaming, is documented) and of eParamID_RegisterRecallResult (only 2, Complete, is documented; Recalling appears in AJA's example). ([specs/aja-helo.yaml:816](specs/aja-helo.yaml#L816))
+- [ ] Confirm that eParamID_RegisterRecallResult arrives as an event when a recall completes (AJA's example waits for it), so the configuration re-read is triggered. ([specs/aja-helo.yaml:711](specs/aja-helo.yaml#L711))
+- [ ] Confirm that eParamID_RegisterRecall and eParamID_RegisterSave are reported as events with the preset number when another client recalls or saves a preset. ([specs/aja-helo.yaml:700](specs/aja-helo.yaml#L700))
+- [ ] Confirm that eParamID_StreamingVideoBitrate_1 is the first streaming profile's video bit rate, find its unit (kbit/s assumed), and list the ids of the other profile instances. ([specs/aja-helo.yaml:827](specs/aja-helo.yaml#L827))
+- [ ] Confirm that eParamID_RecordingProfileSel and eParamID_StreamingProfileSel 0 to 9 are the web UI's profiles 1 to 10 in order. ([specs/aja-helo.yaml:822](specs/aja-helo.yaml#L822))
+- [ ] Confirm that eParamID_FilenamePrefix follows the selected recording profile (a mapped parameter), as the HELO manual places the prefix in the recording profile. ([specs/aja-helo.yaml:725](specs/aja-helo.yaml#L725))
+- [ ] On a HELO Plus, check desc.json for eParamID_ReplicatorCommand, eParamID_ReplicatorRecordState, eParamID_ReplicatorStreamState, eParamID_FilenamePrefix, eParamID_MediaState, eParamID_Authentication and the preset parameters, and whether it keeps eParamID_RecordingProfileSel, eParamID_StreamingProfileSel and eParamID_VideoInSelect. ([specs/aja-helo.yaml:860](specs/aja-helo.yaml#L860))
+- [ ] Confirm that eParamID_VideoInSelect on current HELO firmware still has 0 SDI, 1 HDMI and 2 Test Pattern. ([specs/aja-helo.yaml:530](specs/aja-helo.yaml#L530))
+- [ ] Confirm that a recall's immediate read of eParamID_RegisterRecallResult (the recall reply's re-read) gives the in-progress value rather than the previous recall's result. ([specs/aja-helo.yaml:761](specs/aja-helo.yaml#L761))
+
 ## aja-kipro — AJA Ki Pro
 
 - [ ] Confirm that an event connection id expires when no wait_for_config_events is made within a minute, and that the extension's back-to-back waits keep it alive over a long session. ([specs/aja-kipro.yaml:1410](specs/aja-kipro.yaml#L1410))

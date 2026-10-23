@@ -8,7 +8,7 @@
 
 #[cfg(any(feature = "aes70", feature = "focusrite-rednet", feature = "dbaudio"))]
 mod aes70;
-#[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
+#[cfg(any(feature = "aja-helo", feature = "aja-kipro", feature = "aja-kumo"))]
 mod aja_config_events;
 #[cfg(any(
     feature = "allenheath-ahm",
@@ -237,7 +237,7 @@ pub(crate) fn construct(
             Some("panasonic-update-notification") => Ok(Box::new(
                 panasonic_notify::PanasonicNotify::new(engine, &context),
             )),
-            #[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
+            #[cfg(any(feature = "aja-helo", feature = "aja-kipro", feature = "aja-kumo"))]
             Some("aja-config-events") => Ok(Box::new(aja_config_events::AjaConfigEvents::new(
                 engine, spec, &context,
             )?)),
