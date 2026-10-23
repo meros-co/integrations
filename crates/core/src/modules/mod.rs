@@ -130,6 +130,8 @@ mod qsys;
 #[cfg(feature = "resolume")]
 mod resolume_push;
 #[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
+mod rtp_journal;
+#[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
 mod rtp_midi;
 #[cfg(feature = "samsung-mdc")]
 mod samsung_mdc;

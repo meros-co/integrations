@@ -21,7 +21,8 @@
 //!   end the session, and more often at first.
 //! - Receiver feedback (`RS`) on the control port names the last packet
 //!   received, so the sender can shorten its recovery journal: SSRC, then the
-//!   sequence number in a 32-bit field.
+//!   sequence number in a 32-bit field. The core sends it a second after a
+//!   packet arrives, and moves its own journal's checkpoint on the peer's.
 //! - MIDI travels in RTP packets on the data ports (RFC 6295): version 2,
 //!   payload type 0x61, the timestamp in the same units (its low 32 bits).
 //!   Apple sends a recovery journal in every packet; received packets need
@@ -34,8 +35,12 @@
 //! status within a packet, and SysEx whole or in segments
 //! (`F0..F0`, `F7..F0`, `F7..F7`, cancelled by `F7 F4`, a dropped F7 coded
 //! as F5). The core sends whole messages with delta times of 0, segments a
-//! SysEx longer than fits in one packet, and sends no recovery journal (J
-//! clear).
+//! SysEx longer than fits in one packet, and puts a recovery journal in
+//! every packet (J set; [`super::rtp_journal`]). After MIDI goes out it
+//! sends guard packets (an empty MIDI list with the journal) 100 ms later,
+//! again 100 ms after that, then doubling to 1 s until the peer's feedback
+//! says it has the last packet, so a lost last packet is repaired without
+//! waiting for more MIDI (RFC 4696 §4.2, the guard packets of its [NMP]).
 //!
 //! A packet that arrives after a gap in the sequence numbers is repaired
 //! from its recovery journal, when it carries one (RFC 6295 §5 and
@@ -57,6 +62,7 @@ use std::net::{IpAddr, SocketAddr};
 
 use serde_json::json;
 
+use super::rtp_journal::{Item, Journal};
 use crate::midi::Message;
 use crate::module::{Bind, CommandError, Connection, Cx, Key, Millis};
 
@@ -66,6 +72,7 @@ const INVITE: Key = "rtp-invite";
 const SYNC: Key = "rtp-sync";
 const FEEDBACK: Key = "rtp-feedback";
 const RETRY: Key = "rtp-retry";
+const GUARD: Key = "rtp-guard";
 
 /// The default control port: the one Apple's Audio MIDI Setup offers for a
 /// new session.
@@ -80,6 +87,8 @@ const SYNC_MISSES: u32 = 3;
 const FEEDBACK_AFTER: Millis = 1000;
 const RETRY_MIN: Millis = 1000;
 const RETRY_MAX: Millis = 30_000;
+const GUARD_FIRST: Millis = 100;
+const GUARD_MAX: Millis = 1000;
 /// The MIDI list of one packet stays under this, so a packet is never
 /// fragmented on an Ethernet path.
 const MAX_LIST: usize = 1000;
@@ -115,7 +124,14 @@ pub(crate) struct Rtp {
     token: u32,
     phase: Phase,
     peer_ssrc: Option<u32>,
-    seq: u16,
+    /// The next packet's extended sequence number (its low 16 bits go on
+    /// the wire).
+    seq: u64,
+    journal: Journal,
+    /// Guard packets sent since MIDI last went out, while they are being
+    /// sent, and the last packet that carried MIDI.
+    guards: Option<u32>,
+    last_midi: u64,
     /// The last sequence number received, for feedback.
     received_seq: Option<u16>,
     feedback_armed: bool,
@@ -173,6 +189,9 @@ impl Rtp {
             phase: Phase::Idle,
             peer_ssrc: None,
             seq: 0,
+            journal: Journal::new(),
+            guards: None,
+            last_midi: 0,
             received_seq: None,
             feedback_armed: false,
             sync_sent: None,
@@ -183,7 +202,7 @@ impl Rtp {
             rng: seed | 1,
         };
         rtp.ssrc = rtp.random() as u32;
-        rtp.seq = rtp.random() as u16;
+        rtp.seq = rtp.random() as u16 as u64;
         rtp.local = rtp.pick_local();
         rtp
     }
@@ -267,7 +286,7 @@ impl Rtp {
 
     /// The session failed: report it and invite again after a while.
     fn fail(&mut self, cx: &mut Cx, reason: String) {
-        for key in [INVITE, SYNC, FEEDBACK] {
+        for key in [INVITE, SYNC, FEEDBACK, GUARD] {
             cx.cancel_timer(key);
         }
         self.phase = Phase::Idle;
@@ -350,6 +369,18 @@ impl Rtp {
                 }
             }
             RETRY => self.invite(cx),
+            GUARD => {
+                if let Some(sent) = self.guards {
+                    if self.is_open() && !self.journal.acknowledged(self.last_midi) {
+                        self.packet(cx, &[], Vec::new());
+                        let sent = sent + 1;
+                        self.guards = Some(sent);
+                        cx.set_timer(GUARD, (GUARD_FIRST << (sent - 1).min(4)).min(GUARD_MAX));
+                    } else {
+                        self.guards = None;
+                    }
+                }
+            }
             _ => return false,
         }
         true
@@ -459,6 +490,8 @@ impl Rtp {
                     self.sync_sent = None;
                     self.received_seq = None;
                     self.decoder = Decoder::default();
+                    self.journal = Journal::new();
+                    self.guards = None;
                     cx.connection(Connection::Connected);
                     self.sync(cx);
                 }
@@ -513,8 +546,18 @@ impl Rtp {
                     _ => cx.alive(),
                 }
             }
-            // Receiver feedback and bitrate limits concern a sender that
-            // keeps a journal; the core keeps none.
+            b"RS" => {
+                let (Some(ssrc), Some(seq)) = (u32_at(data, 4), u32_at(data, 8)) else {
+                    return;
+                };
+                if self.peer_ssrc.is_some_and(|p| p != ssrc) || !self.is_open() {
+                    return;
+                }
+                cx.alive();
+                self.journal.acknowledge((seq >> 16) as u16);
+            }
+            // A bitrate limit (RL) asks a sender to keep under a rate; the
+            // core sends only what it is asked to.
             _ => cx.alive(),
         }
     }
@@ -524,23 +567,35 @@ impl Rtp {
         if !self.is_open() {
             return Err(CommandError::NotConnected);
         }
-        let to = self.data_addr();
-        for list in pack(messages) {
-            let mut packet = vec![0x80, 0x80 | PAYLOAD_TYPE];
-            packet.extend_from_slice(&self.seq.to_be_bytes());
-            packet.extend_from_slice(&(Rtp::stamp(cx) as u32).to_be_bytes());
-            packet.extend_from_slice(&self.ssrc.to_be_bytes());
-            if list.len() <= 15 {
-                packet.push(list.len() as u8);
-            } else {
-                packet.push(0x80 | (list.len() >> 8) as u8);
-                packet.push(list.len() as u8);
-            }
-            packet.extend_from_slice(&list);
-            self.seq = self.seq.wrapping_add(1);
-            cx.udp_send(DATA, to, packet);
+        for (list, items) in pack(messages) {
+            self.last_midi = self.seq;
+            self.packet(cx, &list, items);
         }
+        self.guards = Some(0);
+        cx.set_timer(GUARD, GUARD_FIRST);
         Ok(())
+    }
+
+    /// Send one RTP packet: the MIDI list (empty for a guard packet) and
+    /// the recovery journal, which then takes in what the list carried.
+    fn packet(&mut self, cx: &mut Cx, list: &[u8], items: Vec<Item>) {
+        let now = cx.now();
+        let mut packet = vec![0x80, 0x80 | PAYLOAD_TYPE];
+        packet.extend_from_slice(&(self.seq as u16).to_be_bytes());
+        packet.extend_from_slice(&(Rtp::stamp(cx) as u32).to_be_bytes());
+        packet.extend_from_slice(&self.ssrc.to_be_bytes());
+        // J set: a journal follows the list.
+        if list.len() <= 15 {
+            packet.push(0x40 | list.len() as u8);
+        } else {
+            packet.push(0x80 | 0x40 | (list.len() >> 8) as u8);
+            packet.push(list.len() as u8);
+        }
+        packet.extend_from_slice(list);
+        packet.extend(self.journal.encode(self.seq, now));
+        self.journal.record(self.seq, now, &items);
+        self.seq += 1;
+        cx.udp_send(DATA, self.data_addr(), packet);
     }
 
     /// Leave the session.
@@ -554,7 +609,7 @@ impl Rtp {
     /// Leave and join again now.
     pub(crate) fn reconnect(&mut self, cx: &mut Cx) {
         self.stop(cx);
-        for key in [INVITE, SYNC, FEEDBACK, RETRY] {
+        for key in [INVITE, SYNC, FEEDBACK, RETRY, GUARD] {
             cx.cancel_timer(key);
         }
         self.retry = RETRY_MIN;
@@ -563,43 +618,51 @@ impl Rtp {
     }
 }
 
-/// The MIDI lists of the packets that carry `messages`: whole messages, each
-/// after a delta time of 0 but the first, a SysEx too long for one packet in
-/// segments.
-fn pack(messages: &[Message]) -> Vec<Vec<u8>> {
-    let mut commands: Vec<Vec<u8>> = Vec::new();
+/// The MIDI lists of the packets that carry `messages`, with what each
+/// carries for the journal: whole messages, each after a delta time of 0
+/// but the first, a SysEx too long for one packet in segments.
+fn pack(messages: &[Message]) -> Vec<(Vec<u8>, Vec<Item>)> {
+    let mut commands: Vec<(Vec<u8>, Item)> = Vec::new();
     for m in messages {
         match m {
             Message::SysEx(body) if body.len() + 2 > MAX_LIST - 1 => {
                 let chunk = MAX_LIST - 3;
                 let pieces: Vec<&[u8]> = body.chunks(chunk).collect();
                 for (i, piece) in pieces.iter().enumerate() {
+                    let last = i + 1 == pieces.len();
                     let head = if i == 0 { 0xF0 } else { 0xF7 };
-                    let tail = if i + 1 == pieces.len() { 0xF7 } else { 0xF0 };
+                    let tail = if last { 0xF7 } else { 0xF0 };
                     let mut c = vec![head];
                     c.extend_from_slice(piece);
                     c.push(tail);
-                    commands.push(c);
+                    let item = Item::Segment {
+                        data: piece.to_vec(),
+                        first: i == 0,
+                        last,
+                    };
+                    commands.push((c, item));
                 }
             }
-            other => commands.push(other.encode()),
+            other => commands.push((other.encode(), Item::Message(other.clone()))),
         }
     }
-    let mut lists: Vec<Vec<u8>> = Vec::new();
+    let mut packets: Vec<(Vec<u8>, Vec<Item>)> = Vec::new();
     let mut list: Vec<u8> = Vec::new();
-    for c in commands {
+    let mut items: Vec<Item> = Vec::new();
+    for (c, item) in commands {
         if !list.is_empty() && list.len() + 1 + c.len() > MAX_LIST {
-            lists.push(std::mem::take(&mut list));
+            packets.push((std::mem::take(&mut list), std::mem::take(&mut items)));
         }
         if !list.is_empty() {
             list.push(0x00);
         }
         list.extend_from_slice(&c);
+        items.push(item);
     }
     if !list.is_empty() {
-        lists.push(list);
+        packets.push((list, items));
     }
-    lists
+    packets
 }
 
 /// Received RTP-MIDI packets to MIDI bytes, whole messages with their status
@@ -763,6 +826,11 @@ impl Decoder {
             }
         }
     }
+}
+
+#[cfg(test)]
+pub(crate) fn recover_for_tests(journal: &[u8], out: &mut Vec<u8>) {
+    recover(journal, out)
 }
 
 /// Replay what a recovery journal records of each channel (RFC 6295 §5 and
@@ -1092,16 +1160,28 @@ mod tests {
         let p = &s[0].2;
         assert_eq!(s[0].0, DATA);
         assert_eq!(&p[..2], &[0x80, 0xE1]);
-        assert_eq!(u16::from_be_bytes([p[2], p[3]]), seq);
+        assert_eq!(u16::from_be_bytes([p[2], p[3]]), seq as u16);
         assert_eq!(u32_at(p, 4), Some(1000));
-        assert_eq!(&p[12..], &[7, 0x90, 60, 100, 0x00, 0xB1, 7, 90]);
+        // J set, then the list, then an empty journal (nothing sent before)
+        // whose checkpoint is this packet.
+        assert_eq!(
+            &p[12..21],
+            &[0x40 | 7, 0x90, 60, 100, 0x00, 0xB1, 7, 90, 0x80]
+        );
+        assert_eq!(&p[21..], &(seq as u16).to_be_bytes());
         // A SysEx of 2500 bytes: three packets, F0..F0, F7..F0, F7..F7.
         let mut cx = Cx::new(101);
         rtp.send(&mut cx, &[Message::SysEx(vec![0x11; 2500])])
             .unwrap();
         let s = sent(&cx.take());
         assert_eq!(s.len(), 3);
-        let lists: Vec<&[u8]> = s.iter().map(|(_, _, p)| &p[14..]).collect();
+        let lists: Vec<&[u8]> = s
+            .iter()
+            .map(|(_, _, p)| {
+                let len = ((p[12] as usize & 0x0F) << 8) | p[13] as usize;
+                &p[14..14 + len]
+            })
+            .collect();
         assert_eq!((lists[0][0], *lists[0].last().unwrap()), (0xF0, 0xF0));
         assert_eq!((lists[1][0], *lists[1].last().unwrap()), (0xF7, 0xF0));
         assert_eq!((lists[2][0], *lists[2].last().unwrap()), (0xF7, 0xF7));
@@ -1112,6 +1192,105 @@ mod tests {
             out.extend(d.packet(p).unwrap().0);
         }
         assert_eq!(out.len(), 2502);
+    }
+
+    #[test]
+    fn the_journal_follows_feedback_and_guards_the_last_packet() {
+        let (mut rtp, _) = joined();
+        let first = rtp.seq;
+        let mut cx = Cx::new(100);
+        rtp.send(
+            &mut cx,
+            &[Message::NoteOn {
+                channel: 0,
+                note: 60,
+                velocity: 100,
+            }],
+        )
+        .unwrap();
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: GUARD,
+            after: 100
+        }));
+        // A guard packet: an empty list, and the journal coding the note.
+        let mut cx = Cx::new(200);
+        assert!(rtp.timer(&mut cx, GUARD));
+        let a = cx.take();
+        let p = &sent(&a)[0].2;
+        assert_eq!(p[12], 0x40);
+        let journal = &p[13..];
+        assert_eq!(&journal[1..3], &(first as u16).to_be_bytes());
+        assert_eq!(journal[0] & 0x2F, 0x20, "one channel journal");
+        assert_eq!(journal[5], 0x08, "chapter N");
+        assert!(a.contains(&Action::SetTimer {
+            key: GUARD,
+            after: 100
+        }));
+        // Unacknowledged, the next waits twice as long.
+        let mut cx = Cx::new(300);
+        rtp.timer(&mut cx, GUARD);
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: GUARD,
+            after: 200
+        }));
+        // The peer has the packets: no more guards, and the journal starts
+        // after the last one it has.
+        let mut rs = vec![0xFF, 0xFF, b'R', b'S'];
+        rs.extend_from_slice(&0xABCDu32.to_be_bytes());
+        rs.extend_from_slice(&(((first + 2) as u16 as u32) << 16).to_be_bytes());
+        let mut cx = Cx::new(350);
+        rtp.datagram(&mut cx, CONTROL, peer(), &rs);
+        let mut cx = Cx::new(500);
+        rtp.timer(&mut cx, GUARD);
+        assert!(sent(&cx.take()).is_empty());
+        let mut cx = Cx::new(600);
+        rtp.send(&mut cx, &[Message::Clock]).unwrap();
+        let p = &sent(&cx.take())[0].2;
+        let checkpoint = ((first + 3) as u16).to_be_bytes();
+        assert_eq!(&p[12..], &[0x41, 0xF8, 0x80, checkpoint[0], checkpoint[1]]);
+    }
+
+    #[test]
+    fn a_lost_packet_is_repaired_from_the_cores_journal() {
+        let (mut rtp, _) = joined();
+        let mut packets = Vec::new();
+        for (t, m) in [
+            (
+                100,
+                Message::NoteOn {
+                    channel: 3,
+                    note: 64,
+                    velocity: 90,
+                },
+            ),
+            (
+                200,
+                Message::NoteOff {
+                    channel: 3,
+                    note: 64,
+                    velocity: 64,
+                },
+            ),
+            (
+                300,
+                Message::ControlChange {
+                    channel: 3,
+                    controller: 7,
+                    value: 20,
+                },
+            ),
+            (400, Message::Clock),
+        ] {
+            let mut cx = Cx::new(t);
+            rtp.send(&mut cx, &[m]).unwrap();
+            packets.push(sent(&cx.take())[0].2.clone());
+        }
+        let mut d = Decoder::default();
+        assert_eq!(d.packet(&packets[0]).unwrap().0, [0x93, 64, 90]);
+        // The note off and the volume are lost; the clock's packet repairs
+        // both before its own command.
+        let (midi, _) = d.packet(&packets[3]).unwrap();
+        assert_eq!(midi, [0xB3, 7, 20, 0x83, 64, 0x40, 0xF8]);
     }
 
     fn rtp_packet(seq: u16, section: &[u8]) -> Vec<u8> {
