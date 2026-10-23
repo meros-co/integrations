@@ -86,6 +86,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["christie-1dlp", "christie-spyder", "christie-trulife"],
     ),
     ("vendor-churchapps", &["freeshow"]),
+    ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-digico", &["digico-sd"]),
     (

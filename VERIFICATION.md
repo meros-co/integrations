@@ -955,6 +955,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Whether LAS+EBLU/EGRN/ERED (and LAS+EPOW on Mirage SST) are safe on the 4K40-RGB and Mirage SST, where they are still documented (not offered). ([specs/christie-trulife.yaml:2724](specs/christie-trulife.yaml#L2724))
 - [ ] The RS232 IN data bits, parity, stop bits and connector (not in these references). ([specs/christie-trulife.yaml:2731](specs/christie-trulife.yaml#L2731))
 
+## clock-8001 — Clock-8001
+
+- [ ] Confirm the default command and feedback port 1245 and that feedback is broadcast as one bundle on every change. ([specs/clock-8001.yaml:57](specs/clock-8001.yaml#L57))
+- [ ] Record the source mode numbers and the icon names the state messages carry. ([specs/clock-8001.yaml:399](specs/clock-8001.yaml#L399))
+- [ ] Confirm the cue commands take an empty UUID string from an external sender. ([specs/clock-8001.yaml:405](specs/clock-8001.yaml#L405))
+- [ ] Check whether /clock/automation and /clock/cue/blank take OSC T/F booleans, as sent. ([specs/clock-8001.yaml:314](specs/clock-8001.yaml#L314))
+
 ## cockos-reaper — Cockos REAPER (OSC)
 
 - [ ] Confirm REAPER's default Local listen port (8000) and Device port (9000) when a new OSC control surface is added. ([specs/cockos-reaper.yaml:59](specs/cockos-reaper.yaml#L59))

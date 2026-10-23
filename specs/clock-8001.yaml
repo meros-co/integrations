@@ -1,0 +1,419 @@
+spec: 1
+id: clock-8001
+name: Clock-8001 (OSC)
+vendor: Clock-8001
+category: other
+
+# Clock-8001 is an open-source studio clock and timer display, usually run
+# on a Raspberry Pi. It takes OSC commands over UDP for its ten timers, four
+# time sources, text messages, colors and cue symbols, and sends its state
+# as an OSC bundle of /clock/source/N/state and /clock/timer/N/state
+# messages to a configured address (by default broadcast) and port.
+
+source:
+  - title: Clock-8001 v4 OSC API commands (v4/osc.md)
+    author: Clock-8001 project (Depili and contributors)
+    url: https://gitlab.com/clock-8001/clock-8001/-/blob/master/v4/osc.md
+    note: >
+      The project's own protocol document (markdown in a GPL-2.0 repository;
+      only the document was read, no source code), retrieved 2026-10-23.
+      Feedback as one OSC bundle: /clock/source/*/state (uuid s, hidden b,
+      output s, compact s, icon s, progress f 0-1, expired b, paused b,
+      title s, mode i) and /clock/timer/*/state (uuid, active, output,
+      compact, icon, progress, expired, paused). Timers 0-9:
+      /clock/timer/*/countdown i seconds, /countdown/target s HH:MM:SS,
+      /countup, /countup/target s, /modify i seconds, /pause, /restart,
+      /resume, /set i seconds, /stop, /signal i r g b a; /clock/pause and
+      /clock/resume for all. Sources 1-4: /clock/source/*/hide, /show,
+      /title s, /colors 8 i; /clock/hide and /clock/show for all. Misc:
+      /clock/info i seconds, /clock/background i, /clock/text 8 i colors,
+      i duration (0 forever), s text, /clock/titlecolors 8 i,
+      /clock/seconds/off|on, /clock/time/set s HH:MM:SS, /clock/flash
+      (200 ms white), /clock/signal/<group> i r g b, /clock/automation
+      bool. Cues: /clock/cue/right and /left (s uuid, blank from external
+      senders), /clock/cue/blank (s uuid, bool). Internal: /clock/ltc and
+      /clock/ltc2 s HH:MM:SS:FF, /clock/media/*, /clock/resetmedia/*,
+      /clock/limitimer/*. Deprecated version 3 aliases.
+  - title: Getting started on clock-8001 version 4 (project wiki)
+    author: Clock-8001 project
+    url: https://gitlab.com/clock-8001/clock-8001/-/wikis/Getting-started-on-clock-8001-version-4
+    note: >
+      Project documentation, retrieved 2026-10-23. The OSC settings: remote
+      OSC commands can be disabled, OSC state feedback can be disabled (one
+      clock should send it in a multi-clock setup), the address and port
+      listened on (0.0.0.0 for every interface) and the address and port the
+      feedback goes to (255.255.255.255 broadcasts); /clock/time/set
+      overrides NTP; numbered background images.
+  - title: companion-module-depili-clock-8001 (MIT licence)
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-depili-clock-8001
+    note: >
+      Read for corroboration only (config.ts), retrieved 2026-10-23: port
+      1245 is the clock's default for both commands and feedback, and the
+      default feedback address is 255.255.255.255. No code taken.
+
+transport:
+  type: osc-udp
+  port: 1245
+  reply: none
+  # The clock sends its feedback to the address and port set in its OSC
+  # settings, not back to the sender.
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 1245,
+    label: Feedback port,
+    description: "Local port the clock's OSC state feedback is sent to, as set under the clock's OSC feedback address; empty for no feedback." }
+
+ports:
+  - { port: 1245, protocol: udp, role: control, note: "the clock's OSC listen port, set in its OSC settings" }
+  - { port: 1245, protocol: udp, role: feedback, listener: core, setting: feedback_port,
+      note: "the clock's OSC feedback, broadcast to this port by default" }
+
+models:
+  - id: clock-8001-v4
+    name: Clock-8001 version 4
+    supports: [timer_countdown, timer_countdown_to, timer_countup, timer_countup_from, timer_modify,
+               timer_pause, timer_resume, timer_restart, timer_set, timer_stop, timer_signal,
+               pause_all, resume_all, source_hide, source_show, source_title, source_colors,
+               hide_all, show_all, show_info, set_background, show_text, title_colors,
+               seconds_on, seconds_off, set_time, flash, set_signal, set_automation,
+               cue_right, cue_left, cue_blank, relay_ltc]
+    verification: none
+
+commands:
+  # ── Timers (0-9) ─────────────────────────────────────────────────────────
+  timer_countdown:
+    summary: Start a timer counting down (/clock/timer/N/countdown <seconds>)
+    params:
+      timer: &timer { type: int, min: 0, max: 9, required: true,
+                      label: Timer, description: "Timer number, 0 to 9." }
+      seconds: { type: int, min: 0, max: 2147483647, required: true,
+                 label: Duration, description: "Countdown duration in seconds." }
+    send: { address: "/clock/timer/{timer}/countdown", args: [ { value: "{seconds}", type: int } ] }
+    returns: none
+  timer_countdown_to:
+    summary: Start a timer counting down to a time of day within the next 24 hours (/clock/timer/N/countdown/target)
+    params:
+      timer: *timer
+      time: &time_of_day { type: string, required: true, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$",
+                           label: Time of day, description: "Time of day as HH:MM:SS, 24-hour." }
+    send: { address: "/clock/timer/{timer}/countdown/target", args: [ { value: "{time}", type: string } ] }
+    returns: none
+  timer_countup:
+    summary: Start a timer counting up from now (/clock/timer/N/countup)
+    params: { timer: *timer }
+    send: { address: "/clock/timer/{timer}/countup" }
+    returns: none
+  timer_countup_from:
+    summary: Start a timer counting up from a time of day within the past 24 hours (/clock/timer/N/countup/target)
+    params: { timer: *timer, time: *time_of_day }
+    send: { address: "/clock/timer/{timer}/countup/target", args: [ { value: "{time}", type: string } ] }
+    returns: none
+  timer_modify:
+    summary: Add time to a timer, or take it off with a negative number (/clock/timer/N/modify)
+    params:
+      timer: *timer
+      seconds: { type: int, min: -2147483648, max: 2147483647, required: true,
+                 label: Seconds, description: "Seconds to add; negative takes time off." }
+    send: { address: "/clock/timer/{timer}/modify", args: [ { value: "{seconds}", type: int } ] }
+    returns: none
+  timer_pause:
+    summary: Pause a timer (/clock/timer/N/pause)
+    params: { timer: *timer }
+    send: { address: "/clock/timer/{timer}/pause" }
+    returns: none
+  timer_resume:
+    summary: Resume a paused timer (/clock/timer/N/resume)
+    params: { timer: *timer }
+    send: { address: "/clock/timer/{timer}/resume" }
+    returns: none
+  timer_restart:
+    summary: Restart a timer with its last duration and count type (/clock/timer/N/restart)
+    params: { timer: *timer }
+    send: { address: "/clock/timer/{timer}/restart" }
+    returns: none
+  timer_set:
+    summary: Show an external time on a timer, which then does not advance on its own (/clock/timer/N/set)
+    params:
+      timer: *timer
+      seconds: { type: int, min: -2147483648, max: 2147483647, required: true,
+                 label: Time, description: "Time to show, in seconds." }
+    send: { address: "/clock/timer/{timer}/set", args: [ { value: "{seconds}", type: int } ] }
+    returns: none
+  timer_stop:
+    summary: Stop a timer (/clock/timer/N/stop)
+    params: { timer: *timer }
+    send: { address: "/clock/timer/{timer}/stop" }
+    returns: none
+  timer_signal:
+    summary: Set a timer's signal color (/clock/timer/N/signal r g b a)
+    params:
+      timer: *timer
+      red: &red { type: int, min: 0, max: 255, required: true, label: Red, description: "Red component, 0-255." }
+      green: &green { type: int, min: 0, max: 255, required: true, label: Green, description: "Green component, 0-255." }
+      blue: &blue { type: int, min: 0, max: 255, required: true, label: Blue, description: "Blue component, 0-255." }
+      alpha: &alpha { type: int, min: 0, max: 255, default: 255, label: Alpha, description: "Opacity, 0-255." }
+    send: { address: "/clock/timer/{timer}/signal",
+            args: [ { value: "{red}", type: int }, { value: "{green}", type: int },
+                    { value: "{blue}", type: int }, { value: "{alpha}", type: int } ] }
+    returns: none
+  pause_all:
+    summary: Pause every timer (/clock/pause)
+    send: { address: /clock/pause }
+    returns: none
+  resume_all:
+    summary: Resume every timer (/clock/resume)
+    send: { address: /clock/resume }
+    returns: none
+
+  # ── Time sources (1-4) ───────────────────────────────────────────────────
+  source_hide:
+    summary: Hide a time source (/clock/source/N/hide)
+    params:
+      source: &source { type: int, min: 1, max: 4, required: true,
+                        label: Source, description: "Time source, 1 to 4." }
+    send: { address: "/clock/source/{source}/hide" }
+    returns: none
+  source_show:
+    summary: Show a time source (/clock/source/N/show)
+    params: { source: *source }
+    send: { address: "/clock/source/{source}/show" }
+    returns: none
+  source_title:
+    summary: Set a time source's title (/clock/source/N/title)
+    params:
+      source: *source
+      title: { type: string, max_length: 256, required: true,
+               label: Title, description: "Title text, UTF-8." }
+    send: { address: "/clock/source/{source}/title", args: [ { value: "{title}", type: string } ] }
+    returns: none
+  source_colors:
+    summary: Set a time source's text and background colors (/clock/source/N/colors)
+    params:
+      source: *source
+      text_red: &text_red { type: int, min: 0, max: 255, required: true, label: Text red, description: "Red component of the text color, 0-255." }
+      text_green: &text_green { type: int, min: 0, max: 255, required: true, label: Text green, description: "Green component of the text color, 0-255." }
+      text_blue: &text_blue { type: int, min: 0, max: 255, required: true, label: Text blue, description: "Blue component of the text color, 0-255." }
+      text_alpha: &text_alpha { type: int, min: 0, max: 255, default: 255, label: Text alpha, description: "Opacity of the text, 0-255." }
+      back_red: &back_red { type: int, min: 0, max: 255, required: true, label: Background red, description: "Red component of the background color, 0-255." }
+      back_green: &back_green { type: int, min: 0, max: 255, required: true, label: Background green, description: "Green component of the background color, 0-255." }
+      back_blue: &back_blue { type: int, min: 0, max: 255, required: true, label: Background blue, description: "Blue component of the background color, 0-255." }
+      back_alpha: &back_alpha { type: int, min: 0, max: 255, default: 255, label: Background alpha, description: "Opacity of the background, 0-255." }
+    send:
+      address: "/clock/source/{source}/colors"
+      args: &color_args
+        - { value: "{text_red}", type: int }
+        - { value: "{text_green}", type: int }
+        - { value: "{text_blue}", type: int }
+        - { value: "{text_alpha}", type: int }
+        - { value: "{back_red}", type: int }
+        - { value: "{back_green}", type: int }
+        - { value: "{back_blue}", type: int }
+        - { value: "{back_alpha}", type: int }
+    returns: none
+  hide_all:
+    summary: Hide every time source (/clock/hide)
+    send: { address: /clock/hide }
+    returns: none
+  show_all:
+    summary: Show every time source (/clock/show)
+    send: { address: /clock/show }
+    returns: none
+
+  # ── Display ──────────────────────────────────────────────────────────────
+  show_info:
+    summary: Show the information overlay (/clock/info <seconds>)
+    params:
+      seconds: { type: int, min: 0, max: 2147483647, required: true,
+                 label: Duration, description: "How long the overlay shows, in seconds." }
+    send: { address: /clock/info, args: [ { value: "{seconds}", type: int } ] }
+    returns: none
+  set_background:
+    summary: Change the background to a numbered image from the clock's background folder (/clock/background)
+    params:
+      number: { type: int, min: 0, max: 2147483647, required: true,
+                label: Background, description: "Number of the image file, such as 1 for 1.png or 001.png." }
+    send: { address: /clock/background, args: [ { value: "{number}", type: int } ] }
+    returns: none
+  show_text:
+    summary: Show a text message on the clock face (/clock/text)
+    params:
+      text_red: *text_red
+      text_green: *text_green
+      text_blue: *text_blue
+      text_alpha: *text_alpha
+      back_red: *back_red
+      back_green: *back_green
+      back_blue: *back_blue
+      back_alpha: *back_alpha
+      seconds: { type: int, min: 0, max: 2147483647, default: 0,
+                 label: Duration, description: "How long the text shows, in seconds; 0 keeps it until replaced." }
+      text: { type: string, max_length: 1024, required: true,
+              label: Text, description: "Text to show, UTF-8; empty clears it." }
+    send:
+      address: /clock/text
+      args:
+        - { value: "{text_red}", type: int }
+        - { value: "{text_green}", type: int }
+        - { value: "{text_blue}", type: int }
+        - { value: "{text_alpha}", type: int }
+        - { value: "{back_red}", type: int }
+        - { value: "{back_green}", type: int }
+        - { value: "{back_blue}", type: int }
+        - { value: "{back_alpha}", type: int }
+        - { value: "{seconds}", type: int }
+        - { value: "{text}", type: string }
+    returns: none
+  title_colors:
+    summary: Set the text and background colors of the source titles (/clock/titlecolors)
+    params:
+      text_red: *text_red
+      text_green: *text_green
+      text_blue: *text_blue
+      text_alpha: *text_alpha
+      back_red: *back_red
+      back_green: *back_green
+      back_blue: *back_blue
+      back_alpha: *back_alpha
+    send: { address: /clock/titlecolors, args: *color_args }
+    returns: none
+  seconds_on:
+    summary: Show the seconds ring on round clocks (/clock/seconds/on)
+    send: { address: /clock/seconds/on }
+    returns: none
+  seconds_off:
+    summary: Hide the seconds ring on round clocks (/clock/seconds/off)
+    send: { address: /clock/seconds/off }
+    returns: none
+  set_time:
+    summary: Set the clock's time of day, overriding NTP (/clock/time/set)
+    params: { time: *time_of_day }
+    send: { address: /clock/time/set, args: [ { value: "{time}", type: string } ] }
+    returns: none
+  flash:
+    summary: Flash the screen white for 200 ms (/clock/flash)
+    send: { address: /clock/flash }
+    returns: none
+  set_signal:
+    summary: Set the color of a signal group's hardware LEDs (/clock/signal/<group>)
+    params:
+      group: { type: int, min: 0, max: 2147483647, required: true,
+               label: Signal group, description: "Number of the signal group." }
+      red: *red
+      green: *green
+      blue: *blue
+    send: { address: "/clock/signal/{group}",
+            args: [ { value: "{red}", type: int }, { value: "{green}", type: int }, { value: "{blue}", type: int } ] }
+    returns: none
+  set_automation:
+    summary: Turn the signal color automation on or off (/clock/automation)
+    params:
+      enabled: { type: bool, required: true,
+                 label: Automation, description: "True turns the signal color automation on." }
+    send: { address: /clock/automation, args: [ { value: "{enabled}", type: bool } ] }
+    returns: none
+
+  # ── Cues ─────────────────────────────────────────────────────────────────
+  cue_right:
+    summary: Show the right arrow cue symbol, clearing a blank cue (/clock/cue/right)
+    send: { address: /clock/cue/right, args: [ { value: "", type: string } ] }
+    returns: none
+  cue_left:
+    summary: Show the left arrow cue symbol, clearing a blank cue (/clock/cue/left)
+    send: { address: /clock/cue/left, args: [ { value: "", type: string } ] }
+    returns: none
+  cue_blank:
+    summary: Turn the blank cue on or off (/clock/cue/blank)
+    params:
+      blank: { type: bool, required: true,
+               label: Blank, description: "True blanks the cue symbol." }
+    send: { address: /clock/cue/blank, args: [ { value: "", type: string }, { value: "{blank}", type: bool } ] }
+    returns: none
+  relay_ltc:
+    summary: Relay an LTC time to the clock (/clock/ltc or /clock/ltc2)
+    params:
+      input: { type: enum, values: [ltc, ltc2], default: ltc,
+               label: LTC input, description: "Which LTC input the time is for." }
+      timecode: { type: string, required: true, pattern: "^[0-9]{2}:[0-5][0-9]:[0-5][0-9]:[0-9]{2}$",
+                  label: Timecode, description: "Timecode as HH:MM:SS:FF." }
+    send: { address: "/clock/{input}", args: [ { value: "{timecode}", type: string } ] }
+    returns: none
+
+telemetry:
+  updates:
+    - address: "^/clock/source/([1-4])/state$"
+      state:
+        "sources.{1}.uuid": "{arg0}"
+        "sources.{1}.hidden": "{arg1}"
+        "sources.{1}.output": "{arg2}"
+        "sources.{1}.compact": "{arg3}"
+        "sources.{1}.icon": "{arg4}"
+        "sources.{1}.progress": "{arg5}"
+        "sources.{1}.expired": "{arg6}"
+        "sources.{1}.paused": "{arg7}"
+        "sources.{1}.title": "{arg8}"
+        "sources.{1}.mode": "{arg9}"
+    - address: "^/clock/timer/([0-9])/state$"
+      state:
+        "timers.{1}.uuid": "{arg0}"
+        "timers.{1}.active": "{arg1}"
+        "timers.{1}.output": "{arg2}"
+        "timers.{1}.compact": "{arg3}"
+        "timers.{1}.icon": "{arg4}"
+        "timers.{1}.progress": "{arg5}"
+        "timers.{1}.expired": "{arg6}"
+        "timers.{1}.paused": "{arg7}"
+
+state:
+  sources.*.uuid: { type: string, description: "UUID of the clock sending the source's state, by source 1-4" }
+  sources.*.hidden: { type: bool, description: "Whether the source is hidden" }
+  sources.*.output: { type: string, description: "Source's output, usually HH:MM:SS, or HH:MM:SS:FF for timecode" }
+  sources.*.compact: { type: string, description: "Source's compact output" }
+  sources.*.icon: { type: string, description: "Icon of the source's mode" }
+  sources.*.progress: { type: float, description: "Source's timer progress, 0 to 1" }
+  sources.*.expired: { type: bool, description: "Whether the source's timer has expired" }
+  sources.*.paused: { type: bool, description: "Whether the source's timer is paused" }
+  sources.*.title: { type: string, description: "Source's title" }
+  sources.*.mode: { type: int, description: "Source's mode number, as the clock reports it" }
+  timers.*.uuid: { type: string, description: "UUID of the clock sending the timer's state, by timer 0-9" }
+  timers.*.active: { type: bool, description: "Whether the timer is active" }
+  timers.*.output: { type: string, description: "Timer's output, usually HH:MM:SS, or HH:MM:SS:FF for timecode" }
+  timers.*.compact: { type: string, description: "Timer's compact output" }
+  timers.*.icon: { type: string, description: "Icon of the timer's mode" }
+  timers.*.progress: { type: float, description: "Timer's progress, 0 to 1" }
+  timers.*.expired: { type: bool, description: "Whether the timer has expired" }
+  timers.*.paused: { type: bool, description: "Whether the timer is paused" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Clock-8001 acknowledges no command; its state comes as OSC feedback to
+      the address and port set in its OSC settings (broadcast to
+      255.255.255.255 by default, port 1245 as the Companion module
+      defaults it), which the core hears on feedback_port. Several clocks
+      can share one feedback port, each told apart by its address; the
+      wiki advises letting only one clock of a group send feedback, and a
+      clock can have feedback or remote commands turned off. The state is
+      the clock's own words (output text, icon, mode number); the document
+      does not list the mode numbers.
+
+  - models: [all]
+    severity: info
+    text: >
+      Cue symbols take the sending clock's UUID, which an external sender
+      leaves blank, as the spec does. The OSC page lists the commands the
+      clocks use among themselves (/clock/media/*, /clock/resetmedia/*,
+      /clock/limitimer/*) beside the LTC relay; only the LTC relay is offered,
+      the others carrying a time tag or another device's state. The version
+      3 aliases are deprecated and not offered. Colors only change where the
+      clock draws background boxes. The document numbers the limitimer
+      relay's arguments with 4 twice.
+
+  - models: [all]
+    severity: info
+    text: >
+      Clock-8001 also receives and sends the Interspace Industries Countdown2
+      UDP format (from CDEther, Stagetimer 2 or Irisdown Countdown Timer);
+      that format is not documented by the project and is not used.
