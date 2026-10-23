@@ -2338,6 +2338,37 @@ over settings. Its messages go through the rules like any other.
 A telemetry vector for a websocket gives `inbound_ws` (the message text), and
 optionally `expect_connect_ws`, the messages sent when it opens.
 
+#### OSC feedback beside the transport
+
+A device controlled over a line protocol, a websocket or HTTP may send its
+state as OSC over UDP, to a port of the controller's: CasparCG Server
+starts an OSC client for each AMCP connection, aimed at the client's
+address on its configured `default-port` (6250). `telemetry.osc` names the
+local port to listen on, a number or `{setting: name}`:
+
+```yaml
+telemetry:
+  osc:
+    listen_port: { setting: osc_port }
+  updates:
+    - address: "^/channel/(\\d+)/stage/layer/(\\d+)/foreground/file/name$"
+      state: { "channels.{1}.layers.{2}.file": "{arg0}" }
+ports:
+  - { port: 6250, protocol: udp, role: feedback, listener: core, setting: osc_port }
+```
+
+The port is shared, as `listen_port` on `osc-udp` is: each datagram goes to
+the device whose address it came from. Each OSC message (or each message of
+a bundle) goes to the `address` rules; it is never taken as a command's
+reply, whatever the transport waits for. The port is listened on while the
+device is open and monitored (never for commands only), kept across
+reconnections of the transport, and moved at once when `update_settings`
+changes it. A setting left empty means no listener. A UDP transport has its
+own `listen_port` and takes no `telemetry.osc`; `tools/validate.py` checks
+that, and that `ports` has a `udp` `feedback` entry listened on by the core
+for it. A telemetry vector gives the datagram as `inbound_hex`, as for an OSC
+transport.
+
 #### A status dump that ends in silence
 
 A device that sends its whole state on connecting may mark the end of it

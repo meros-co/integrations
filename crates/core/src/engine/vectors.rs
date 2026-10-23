@@ -362,7 +362,15 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     } else if let Some(text) = v.get("inbound").and_then(Value::as_str) {
         engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
     } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
-        engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &unhex(h));
+        // Beside a stream or HTTP transport, a datagram is OSC feedback on
+        // `telemetry.osc`'s port.
+        let socket = match engine.transport {
+            super::Transport::OscUdp { .. }
+            | super::Transport::LineUdp { .. }
+            | super::Transport::OscTcp { .. } => "device",
+            _ => super::OSC_LISTEN,
+        };
+        engine.datagram(&mut cx, socket, SocketAddr::new(HOST, 1), &unhex(h));
     } else if let Some(text) = v.get("inbound_ws").and_then(Value::as_str) {
         let socket = match engine.transport {
             super::Transport::Ws { .. } => "device",

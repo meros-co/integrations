@@ -52,6 +52,9 @@ const PUSH_RENEW: Key = "push-renew";
 const PUSH_IDLE: Key = "push-idle";
 /// The server-sent event stream (`telemetry.sse`).
 const EVENTS: Key = "events";
+/// `telemetry.osc`: the fixed UDP port the device sends OSC feedback to,
+/// beside a transport of another kind.
+const OSC_LISTEN: Key = "osc-listen";
 const EVENTS_RECONNECT: Key = "events-reconnect";
 const REPLY: Key = "reply";
 const PROBE: Key = "probe";
@@ -819,6 +822,10 @@ pub(crate) struct SpecEngine {
     /// part is offered under, as that GET's reply would be.
     events_reply: Option<AsReply>,
     events_backoff: Millis,
+    /// `telemetry.osc.listen_port`: the shared UDP port the device's OSC
+    /// feedback arrives on, beside a transport of another kind (CasparCG's
+    /// OSC beside its AMCP line protocol).
+    osc_listen: Option<u16>,
     /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
     /// opened: no subscription, poll or push websocket. Replies and anything
     /// the device sends unasked still go to the rules.
@@ -1680,6 +1687,16 @@ impl SpecEngine {
             }
             _ => Vec::new(),
         };
+        let osc_listen = match spec.telemetry.as_ref().and_then(|t| t.get("osc")) {
+            None => None,
+            Some(_) if matches!(transport, Transport::OscUdp { .. } | Transport::LineUdp { .. }) => {
+                return Err(
+                    "telemetry.osc is for a stream or HTTP transport: a UDP transport has listen_port"
+                        .into(),
+                )
+            }
+            Some(o) => listen_port(o.get("listen_port"), &ctx.settings)?,
+        };
         let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
             None => None,
             Some(w) => {
@@ -1986,6 +2003,7 @@ impl SpecEngine {
             events_json,
             events_reply,
             events_backoff: RECONNECT_MIN,
+            osc_listen,
             pacer,
             outbox: VecDeque::new(),
             pace_pass: false,
@@ -3690,6 +3708,14 @@ impl SpecEngine {
     }
 
     /// The push channel (`telemetry.websocket`).
+    /// `telemetry.osc`: listen on the shared port for the device's OSC
+    /// feedback, while monitored.
+    fn open_osc_listen(&mut self, cx: &mut Cx) {
+        if let (true, Some(port)) = (self.monitor, self.osc_listen) {
+            cx.udp_open(OSC_LISTEN, Bind::Shared(port));
+        }
+    }
+
     fn open_push(&mut self, cx: &mut Cx) {
         if !self.monitor {
             return;
@@ -4126,6 +4152,7 @@ impl Module for SpecEngine {
     fn start(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         self.connect(cx);
+        self.open_osc_listen(cx);
         self.open_push(cx);
         self.open_events(cx);
         self.validate_token(cx);
@@ -4233,7 +4260,22 @@ impl Module for SpecEngine {
         }
     }
 
-    fn datagram(&mut self, cx: &mut Cx, _socket: Key, _from: SocketAddr, data: &[u8]) {
+    fn datagram(&mut self, cx: &mut Cx, socket: Key, _from: SocketAddr, data: &[u8]) {
+        if socket == OSC_LISTEN {
+            // Feedback beside the transport: offered to the rules only, never
+            // a reply to anything sent on the transport.
+            for message in osc::decode(data) {
+                self.offer(
+                    cx,
+                    &telemetry::Inbound::Osc {
+                        address: &message.address,
+                        types: &message.types,
+                        args: &message.args,
+                    },
+                );
+            }
+            return;
+        }
         if matches!(self.transport, Transport::LineUdp { .. }) {
             // One message per datagram; its line ending is not part of it.
             let text = String::from_utf8_lossy(data);
@@ -4509,6 +4551,9 @@ impl Module for SpecEngine {
         if self.events.is_some() {
             cx.sse_close(EVENTS);
         }
+        if self.osc_listen.is_some() {
+            cx.udp_close(OSC_LISTEN);
+        }
     }
 
     fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
@@ -4544,6 +4589,14 @@ impl Module for SpecEngine {
         self.transport = fresh.transport;
         self.endpoints = fresh.endpoints;
         self.events = fresh.events;
+        // Another OSC feedback port: listen there instead.
+        if self.osc_listen != fresh.osc_listen {
+            if self.osc_listen.is_some() {
+                cx.udp_close(OSC_LISTEN);
+            }
+            self.osc_listen = fresh.osc_listen;
+            self.open_osc_listen(cx);
+        }
         // A session was opened with the old credential: the next request
         // logs in with the new one.
         self.session = fresh.session;
@@ -5165,6 +5218,108 @@ mod tests {
             Some(Bind::Shared(9000))
         );
         assert_eq!(open(by_setting, json!({})), Some(Bind::Ephemeral));
+    }
+
+    /// A line-tcp spec with `telemetry.osc`: HyperDeck's, given an OSC
+    /// listener and a rule for what arrives on it.
+    fn osc_beside_tcp(settings: Value, monitor: bool) -> SpecEngine {
+        let mut spec = Catalog::source_tree()
+            .device("blackmagic-hyperdeck")
+            .unwrap()
+            .clone();
+        spec.settings.insert(
+            "osc_port".into(),
+            serde_json::from_value(json!({"type": "int", "min": 1, "max": 65535, "default": 6250}))
+                .unwrap(),
+        );
+        let telemetry = spec.telemetry.as_mut().unwrap();
+        telemetry["osc"] = json!({"listen_port": {"setting": "osc_port"}});
+        telemetry["updates"].as_array_mut().unwrap().push(
+            json!({"address": "^/channel/(\\d+)/format$", "state": {"device.model": "{arg0}"}}),
+        );
+        let settings =
+            crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+        let model = spec.models[0].id.clone();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model,
+                channels: None,
+                settings,
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn osc_feedback_beside_a_line_transport_goes_to_the_rules() {
+        let mut e = osc_beside_tcp(json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let opened: Vec<_> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::UdpOpen { socket, bind } => Some((socket, bind)),
+                Action::TcpOpen { socket, .. } => Some((socket, Bind::Ephemeral)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            opened,
+            [(SOCKET, Bind::Ephemeral), (OSC_LISTEN, Bind::Shared(6250))]
+        );
+        // A datagram on the listener is offered to the rules, and is no reply.
+        let mut cx = Cx::new(1);
+        let packet = osc::encode("/channel/1/format", &[osc::Arg::Str("1080i5000".into())]);
+        e.datagram(
+            &mut cx,
+            OSC_LISTEN,
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6250),
+            &packet,
+        );
+        let state: Vec<_> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::State(p) => Some(p),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(state, [json!({"device": {"model": "1080i5000"}})]);
+        // Another port: the listener moves.
+        let mut cx = Cx::new(2);
+        let new = json!({"osc_port": 6251});
+        let new = crate::catalog::validate(&e.spec.settings, new.as_object().unwrap()).unwrap();
+        let result = e.update_settings(&mut cx, &new);
+        assert!(matches!(result, SettingsUpdate::Applied), "{result:?}");
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|a| matches!(a, Action::UdpClose { socket } if *socket == OSC_LISTEN)));
+        assert!(a.iter().any(|a| matches!(a, Action::UdpOpen { socket, bind: Bind::Shared(6251) } if *socket == OSC_LISTEN)));
+        // Closing stops listening.
+        let mut cx = Cx::new(3);
+        e.stop(&mut cx);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::UdpClose { socket } if *socket == OSC_LISTEN)));
+    }
+
+    #[test]
+    fn osc_feedback_is_not_listened_for_commands_only() {
+        let mut e = osc_beside_tcp(json!({}), false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        assert!(!cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::UdpOpen { .. })));
     }
 
     #[test]
