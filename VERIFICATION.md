@@ -1730,6 +1730,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether tally can be read and set in encoder mode on N5/N6 (documented for decoder mode only). ([spec](specs/kiloview-ndi.yaml#L1088))
 - [ ] Confirm the failsafe and third addresses are cleared with empty strings, and that a static address change keeps the API reachable at the new address. ([spec](specs/kiloview-ndi.yaml#L950))
 
+## kiloview-p3 — Kiloview P3 / P3 Mini
+
+- [ ] With API authentication on, confirm the login's token is accepted sent as it is in the Authorization header (no Bearer), what a missing or wrong token answers (401?), and whether the token expires. ([specs/kiloview-p3.yaml:72](specs/kiloview-p3.yaml#L72))
+- [ ] Confirm the login path /api/systemctrl/user/login and the auth switch path /api/systemctrl/user/auth_info (the usage example says /users/). ([specs/kiloview-p3.yaml:103](specs/kiloview-p3.yaml#L103))
+- [ ] Check the document's typo paths on a unit: /api/systemctr/user/add, /api/ststemctrl/system/production_stat and /api/networkamanager/wifi/getWifiName, and whether the correctly spelled paths work instead. ([specs/kiloview-p3.yaml:1692](specs/kiloview-p3.yaml#L1692))
+- [ ] Find how recording is started and stopped: the documented GET /api/record/v1/get_recording_status with {"start":true}, or POST /api/record/v1/recording as on the E3. ([specs/kiloview-p3.yaml:474](specs/kiloview-p3.yaml#L474))
+- [ ] Confirm the KiloLink server field is ip (lower case) in /api/kilolink/bonding/connect and its reads. ([specs/kiloview-p3.yaml:1268](specs/kiloview-p3.yaml#L1268))
+- [ ] Confirm the spellings chosen over garbled translation: SRT bandwidth (not bindWidth), limit_type time_loop (not time-loop), NDI|HX connection value multicast, PTZ typ network, OSD type date and style bold, upper or lower case of USB, DNS and Timezone keys. ([specs/kiloview-p3.yaml:1711](specs/kiloview-p3.yaml#L1711))
+- [ ] Check the NDI|HX multicast connection value. ([specs/kiloview-p3.yaml:600](specs/kiloview-p3.yaml#L600))
+- [ ] Find how a PTZ move stops (no stop action documented) and how long a move lasts. ([specs/kiloview-p3.yaml:764](specs/kiloview-p3.yaml#L764))
+- [ ] Confirm the form field name file and the {file_type} values crt and key for the certificate upload. ([specs/kiloview-p3.yaml:289](specs/kiloview-p3.yaml#L289))
+- [ ] Confirm the form field name file for the one-request firmware upload. ([specs/kiloview-p3.yaml:345](specs/kiloview-p3.yaml#L345))
+- [ ] Confirm the form field name file for the EDID upload. ([specs/kiloview-p3.yaml:1321](specs/kiloview-p3.yaml#L1321))
+- [ ] Check the log service name for the bonding service (Kilolink as documented, or kilolink). ([specs/kiloview-p3.yaml:402](specs/kiloview-p3.yaml#L402))
+- [ ] Find the units of the link and NIC rates (receive, transmit), the recording size and time limits, memory, disk and uptime. ([specs/kiloview-p3.yaml:1761](specs/kiloview-p3.yaml#L1761))
+- [ ] Confirm whether HTTPS uses a self-signed certificate (accept_invalid_certs is set). ([specs/kiloview-p3.yaml:62](specs/kiloview-p3.yaml#L62))
+- [ ] Check the system information load fields' spelling (precent in the example, percent in the table). ([specs/kiloview-p3.yaml:338](specs/kiloview-p3.yaml#L338))
+- [ ] Check what the P3 Mini lacks against the P3 (inputs, SIM slots, Wi-Fi interfaces) and whether any interface answers differently. ([specs/kiloview-p3.yaml:1768](specs/kiloview-p3.yaml#L1768))
+- [ ] Check the panel write's mixed-case source values (HDMI, sdi, UVC, line-in) and its single gain number. ([specs/kiloview-p3.yaml:1658](specs/kiloview-p3.yaml#L1658))
+- [ ] Check whether modify_user can change a password (the document says so but lists no password field). ([specs/kiloview-p3.yaml:167](specs/kiloview-p3.yaml#L167))
+- [ ] Check whether a GET on the recording file list with a mount point needs it percent-encoded as sent. ([specs/kiloview-p3.yaml:421](specs/kiloview-p3.yaml#L421))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))

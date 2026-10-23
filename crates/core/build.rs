@@ -148,6 +148,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "kiloview-e3",
             "kiloview-n60",
             "kiloview-ndi",
+            "kiloview-p3",
         ],
     ),
     ("vendor-kramer", &["kramer-p3000"]),
