@@ -78,6 +78,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-boinx", &["boinx-mimolive"]),
     ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-canon", &["canon-ptz"]),
+    ("vendor-casparcg", &["casparcg"]),
     ("vendor-castr", &["castr"]),
     ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
