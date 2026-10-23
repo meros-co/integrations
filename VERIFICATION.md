@@ -1923,6 +1923,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the shape of GET /data/custom-fields (label, type and colour per key are assumed). ([specs/ontime.yaml:1026](specs/ontime.yaml#L1026))
 - [ ] Record the status and body of a refused playback command (an unknown event id or cue). ([specs/ontime.yaml:190](specs/ontime.yaml#L190))
 
+## ontime-osc — Ontime (OSC API)
+
+- [ ] Check whether the boolean arguments (blackout, skip, visible, blink) are taken as the strings true and false, or need OSC T/F or an int. ([specs/ontime-osc.yaml:351](specs/ontime-osc.yaml#L351))
+- [ ] Confirm /ontime/message/timer/text, /visible and /blink exist beside the documented blackout and secondarySource. ([specs/ontime-osc.yaml:352](specs/ontime-osc.yaml#L352))
+- [ ] Confirm /ontime/auxtimer/2/... and /3/... act on auxiliary timers 2 and 3. ([specs/ontime-osc.yaml:355](specs/ontime-osc.yaml#L355))
+- [ ] Check whether integer arguments sent as OSC int32 are taken for millisecond values and indexes, or must be floats or strings. ([specs/ontime-osc.yaml:78](specs/ontime-osc.yaml#L78))
+
 ## openlp — OpenLP
 
 - [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:91](specs/openlp.yaml#L91))
