@@ -2372,19 +2372,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sharp-display — Sharp professional displays (S-Format)
 
-- [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:94](specs/sharp-display.yaml#L94))
-- [ ] Confirm the login is asked for with no user name or password set, and that CR alone is taken then. ([specs/sharp-display.yaml:98](specs/sharp-display.yaml#L98))
-- [ ] Confirm zero padding (`VOLM0030`) is taken on the PN-HB and PN-R903A, whose manuals show space padding (`VOLM  30`). ([specs/sharp-display.yaml:1250](specs/sharp-display.yaml#L1250))
-- [ ] Confirm a negative value as a minus and three digits (`OFSR-005`) and a positive one zero-padded (`OFSR0005`). ([specs/sharp-display.yaml:364](specs/sharp-display.yaml#L364))
+- [ ] Record the login exchange on TCP 10008: the exact `Login:` and `Password:` prompts (trailing space, any line ending), the `OK` after the password, and what a wrong user name or password is answered with (Sharp documents nothing). ([specs/sharp-display.yaml:101](specs/sharp-display.yaml#L101))
+- [ ] Confirm the login is asked for with no user name or password set, and that CR alone is taken then. ([specs/sharp-display.yaml:105](specs/sharp-display.yaml#L105))
+- [ ] Confirm zero padding (`VOLM0030`) is taken on the PN-HB and PN-R903A, whose manuals show space padding (`VOLM  30`). ([specs/sharp-display.yaml:1257](specs/sharp-display.yaml#L1257))
+- [ ] Confirm a negative value as a minus and three digits (`OFSR-005`) and a positive one zero-padded (`OFSR0005`). ([specs/sharp-display.yaml:371](specs/sharp-display.yaml#L371))
 - [ ] Note whether sending the next command right after a reply, without Sharp's 100 ms gap, is ever refused, and how long WAIT lasts for power, input and size changes against the 15 s timeout. ([specs/sharp-display.yaml:71](specs/sharp-display.yaml#L71))
-- [ ] Confirm query replies carry no leading zeros (`30`, not `0030`) for the enum codes read into names (inputs and others). ([specs/sharp-display.yaml:152](specs/sharp-display.yaml#L152))
-- [ ] Record the `INF1` and `SRNO` replies (padding, quotes) on each family. ([specs/sharp-display.yaml:3486](specs/sharp-display.yaml#L3486))
-- [ ] Confirm `ERRT` is in degrees Celsius and record the PN-R903A's six-value reply. ([specs/sharp-display.yaml:3471](specs/sharp-display.yaml#L3471))
-- [ ] Record the `TSAD????` and `INnE????` replies (with or without quotes). ([specs/sharp-display.yaml:2067](specs/sharp-display.yaml#L2067))
-- [ ] Record what `SCnn????` answers and the meaning of its two weekday digits. ([specs/sharp-display.yaml:2248](specs/sharp-display.yaml#L2248))
-- [ ] Confirm the exact `LOCKED` and `UNSELECTED` texts on the PN-HB and PN-R903A (read from garbled Japanese PDFs). ([specs/sharp-display.yaml:5718](specs/sharp-display.yaml#L5718))
-- [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5691](specs/sharp-display.yaml#L5691))
-- [ ] Drive a Sharp display on its RS-232C terminal (link serial): confirm no login is asked for and the replies are those of the LAN, each ended CR LF. ([specs/sharp-display.yaml:5727](specs/sharp-display.yaml#L5727))
+- [ ] Confirm query replies carry no leading zeros (`30`, not `0030`) for the enum codes read into names (inputs and others). ([specs/sharp-display.yaml:159](specs/sharp-display.yaml#L159))
+- [ ] Record the `INF1` and `SRNO` replies (padding, quotes) on each family. ([specs/sharp-display.yaml:3493](specs/sharp-display.yaml#L3493))
+- [ ] Confirm `ERRT` is in degrees Celsius and record the PN-R903A's six-value reply. ([specs/sharp-display.yaml:3478](specs/sharp-display.yaml#L3478))
+- [ ] Record the `TSAD????` and `INnE????` replies (with or without quotes). ([specs/sharp-display.yaml:2074](specs/sharp-display.yaml#L2074))
+- [ ] Record what `SCnn????` answers and the meaning of its two weekday digits. ([specs/sharp-display.yaml:2255](specs/sharp-display.yaml#L2255))
+- [ ] Confirm the exact `LOCKED` and `UNSELECTED` texts on the PN-HB and PN-R903A (read from garbled Japanese PDFs). ([specs/sharp-display.yaml:5727](specs/sharp-display.yaml#L5727))
+- [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5698](specs/sharp-display.yaml#L5698))
+- [ ] Drive a Sharp display on its RS-232C terminal (link serial): confirm no login is asked for and the replies are those of the LAN, each ended CR LF. ([specs/sharp-display.yaml:5736](specs/sharp-display.yaml#L5736))
+- [ ] Confirm the minute Sharp asks for after a power or reset command counts from the final OK (after any WAIT), and that RSET (all reset) is the reset command meant; ARST and CRST are not held. ([specs/sharp-display.yaml:80](specs/sharp-display.yaml#L80))
 
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 
