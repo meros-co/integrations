@@ -1,0 +1,106 @@
+spec: 1
+id: dsan-perfectcue
+name: DSAN PerfectCue (TP-2000X-PC serial interface)
+vendor: DSAN
+category: other
+
+# DSAN's PerfectCue presenter cue lights take a touch panel's commands
+# through the TP-2000X-PC, an RS-485 to RS-232 adapter, in DSAN's ASCII
+# protocol: ">" + command + space + two hex checksum digits + CR, at 9600
+# 8N1. The cue light reports its arrow and blank LEDs the same way.
+
+source:
+  - title: PerfectCue — Connections for Touch Panel Control of PerfectCue TP-2000X-PC; PerfectCue Serial Control Protocol ASCII API
+    author: DSAN Corporation
+    url: https://www.dsan.com/wp-content/uploads/2024/05/TouchPanelIntegrationCueLights.pdf
+    note: >
+      Vendor document (2 pages, from https://www.dsan.com/touch-panel-interface/),
+      retrieved 2026-10-23. Page 1: the TP-2000X-PC between the PerfectCue's
+      RS-485 and a touch panel controller's RS-232 DB-9 (pins 2, 3, 5), 9600
+      baud, 8 bits, 1 stop bit, no parity. Page 2: message format > +
+      command string + space + checksum high + checksum low + CR, the
+      checksum being the low byte of the sum of the command string and the
+      space (worked example FORWARD, >FORWARD 35); the buttons FORWARD (green
+      arrow), REVERSE (red arrow), BLANKON and BLANKOF (yellow light); the
+      LED indicators FRWLEDON/OF, RVSLEDON/OF and BLKLEDON/OF.
+
+transport:
+  type: line-tcp
+  # A serial-to-Ethernet gateway's port (Global Cache's iTach, as the
+  # Companion module for this adapter uses); the cue light has no network
+  # port.
+  port: 4999
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  reply: none
+  serial:
+    link: serial
+    baud_rate: 9600
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial",
+      note: "the TP-2000X-PC's DB-9 (RS-232: pin 2 TXD-RXD, 3 RXD-TXD, 5 GND)" }
+  - { port: 4999, protocol: tcp, role: control, when: "link tcp",
+      note: "a serial-to-Ethernet gateway carrying the TP-2000X-PC's RS-232, such as a Global Cache iTach" }
+
+models:
+  - id: perfectcue
+    name: PerfectCue with TP-2000X-PC
+    supports: [forward, reverse, blank_on, blank_off]
+    verification: none
+
+commands:
+  forward:
+    summary: Press Forward, the green arrow (>FORWARD 35)
+    send: ">FORWARD 35"
+    returns: none
+  reverse:
+    summary: Press Back, the red arrow (>REVERSE 3C)
+    send: ">REVERSE 3C"
+    returns: none
+  blank_on:
+    summary: Blank on, the yellow light (>BLANKON 25)
+    send: ">BLANKON 25"
+    returns: none
+  blank_off:
+    summary: Blank off, the yellow light off (>BLANKOF 1D)
+    send: ">BLANKOF 1D"
+    returns: none
+
+telemetry:
+  updates:
+    - match: "^>?FRWLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.forward: { value: "{1}", map: { "ON": true, "OF": false } } }
+    - match: "^>?RVSLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.reverse: { value: "{1}", map: { "ON": true, "OF": false } } }
+    - match: "^>?BLKLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.blank: { value: "{1}", map: { "ON": true, "OF": false } } }
+
+state:
+  leds.forward: { type: bool, description: "Green forward arrow lit" }
+  leds.reverse: { type: bool, description: "Red back arrow lit" }
+  leds.blank: { type: bool, description: "Yellow blank light lit" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The PerfectCue has no network port: the TP-2000X-PC gives it an RS-232
+      port at 9600 8N1, reached on a serial port of the host (link serial,
+      the default) or through a serial-to-Ethernet gateway (link tcp, port
+      4999 on a Global Cache iTach). Flow control is not documented; none is
+      used. The commands are button presses with no acknowledgement: their
+      effect shows in the LED messages the cue light sends.
+
+  - models: [all]
+    severity: info
+    text: >
+      DSAN writes the line ending as "/x0D" for commands and "\x0D" for
+      replies; both are taken as a carriage return. The LEDs are reported as
+      they change; nothing reports them on connecting. The received checksums
+      are not checked.

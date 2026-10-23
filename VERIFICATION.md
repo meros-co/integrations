@@ -1181,6 +1181,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the size, creationDate and lastWriteDate units of media/list (uint64 strings; the epoch of the dates is not documented), and whether provision overwrites a file already at the destination. ([specs/disguise.yaml:2413](specs/disguise.yaml#L2413))
 - [ ] Confirm the proof of play subscription to one dictionary of subsystem:ProofOfPlaySubsystem (getRecords, called if it is a method, and getRecentRecords(n)), that it is available without enabling anything, and which release added it. ([specs/disguise.yaml:1350](specs/disguise.yaml#L1350))
 
+## dsan-limitimer — DSAN Limitimer
+
+- [ ] Confirm the TP-2000XLT takes commands ended by a carriage return alone and sends its messages with the > prefix and a CR (the PDF writes /x0D and \x0D). ([specs/dsan-limitimer.yaml:195](specs/dsan-limitimer.yaml#L195))
+- [ ] Record the time strings in hours mode and over 99 minutes, and in overtime. ([specs/dsan-limitimer.yaml:199](specs/dsan-limitimer.yaml#L199))
+- [ ] Check whether the TP-2000XLT sends the LED states on connecting or only on change, and whether flow control is needed. ([specs/dsan-limitimer.yaml:188](specs/dsan-limitimer.yaml#L188))
+- [ ] Confirm INCMIN and INCHOUR (struck through in the PDF) are no longer taken. ([specs/dsan-limitimer.yaml:203](specs/dsan-limitimer.yaml#L203))
+- [ ] Record what a Global Cache iTach (or other gateway) adds between messages (the Companion module skips a byte after each CR). ([specs/dsan-limitimer.yaml:41](specs/dsan-limitimer.yaml#L41))
+
+## dsan-perfectcue — DSAN PerfectCue
+
+- [ ] Confirm the TP-2000X-PC takes commands ended by a carriage return alone and sends its LED messages with the > prefix and a CR. ([specs/dsan-perfectcue.yaml:103](specs/dsan-perfectcue.yaml#L103))
+- [ ] Check whether the LED states are sent on connecting or only on change, and whether flow control is needed. ([specs/dsan-perfectcue.yaml:96](specs/dsan-perfectcue.yaml#L96))
+
 ## emberplus — Ember+
 
 - [ ] Check the device's Ember+ port, since the module's default of 9000 is a common choice, not a standard. ([specs/emberplus.yaml:199](specs/emberplus.yaml#L199))
