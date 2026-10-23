@@ -395,7 +395,8 @@ impl Core {
     /// MIDI port uses (the `midi_input` and `midi_output` settings): each
     /// name, and whether it is an input, an output or both. Empty in a build
     /// without a MIDI integration, on Android, and on a host whose MIDI
-    /// system cannot be reached (no ALSA sequencer).
+    /// system cannot be reached (on Linux: no `libasound.so.2`, which is
+    /// loaded at first use rather than linked, or no ALSA sequencer).
     pub fn midi_ports(&self) -> Result<Vec<MidiPortInfo>, String> {
         self.services
             .midi

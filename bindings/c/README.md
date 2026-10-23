@@ -76,8 +76,14 @@ class-compliant MIDI interface or instrument, or another program's port):
 name the ports in `midi_input` and `midi_output`. `mi_midi_ports(core)`
 lists this machine's ports to choose from, as
 `{"ok":[{"name":"...","input":true,"output":true},...]}` (empty in a build
-without a MIDI integration and on Android). Linux builds with a MIDI
-integration link the ALSA library (`libasound2-dev` to build).
+without a MIDI integration and on Android).
+
+On Linux the ALSA library is not linked: it is loaded when MIDI ports are
+first listed or opened, so building needs no ALSA headers and a machine
+without `libasound.so.2` (the `libasound2` or `alsa-lib` package) still
+runs; there the list is empty and a device on a MIDI port stays
+disconnected, its reason saying the ALSA library could not be loaded. The
+same holds on a machine without the ALSA sequencer (no sound support).
 
 ## Files sent to devices
 
