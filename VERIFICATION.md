@@ -1573,6 +1573,36 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find the websocket's path on port 12346 (the spec opens /), whether it needs the token, and that it pushes {"update":"record"} and {"socketType":"storePathUpdate"} as documented. ([specs/kiloview-cube-r1.yaml:806](specs/kiloview-cube-r1.yaml#L806))
 - [ ] Check whether the API has a reboot, shutdown, disk format or firmware upgrade request the document leaves out (its contents name a 13.2 Update software version). ([specs/kiloview-cube-r1.yaml:968](specs/kiloview-cube-r1.yaml#L968))
 
+## kiloview-cube-x1 — Kiloview CUBE X1
+
+- [ ] Record how the server answers an expired or invalid bearer token (the document does not say; 401 is assumed, which stops all requests until the token setting changes). ([specs/kiloview-cube-x1.yaml:675](specs/kiloview-cube-x1.yaml#L675))
+- [ ] Confirm that get_long_term_token (user/token/permanent) works without an Authorization header, as the document's example sends it, and that the token it returns without minutes never expires. ([specs/kiloview-cube-x1.yaml:183](specs/kiloview-cube-x1.yaml#L183))
+- [ ] Confirm that get_timed_token's minutes sets the token's lifetime in minutes. ([specs/kiloview-cube-x1.yaml:195](specs/kiloview-cube-x1.yaml#L195))
+- [ ] Check how login answers a wrong user name or password: HTTP 200 with the error envelope (the document's error example), or a 401 (which the core would take as a refused token). ([specs/kiloview-cube-x1.yaml:160](specs/kiloview-cube-x1.yaml#L160))
+- [ ] Confirm that errors come with HTTP 200 and {"result": "error", ...}, and list the error codes seen. ([specs/kiloview-cube-x1.yaml:709](specs/kiloview-cube-x1.yaml#L709))
+- [ ] Confirm that system/info answers without a token, since the probe relies on it. ([specs/kiloview-cube-x1.yaml:60](specs/kiloview-cube-x1.yaml#L60))
+- [ ] Check that the language header is accepted as en on every request, and what the server does without it. ([specs/kiloview-cube-x1.yaml:58](specs/kiloview-cube-x1.yaml#L58))
+- [ ] Check whether HTTPS uses a self-signed certificate on port 443 by default. ([specs/kiloview-cube-x1.yaml:51](specs/kiloview-cube-x1.yaml#L51))
+- [ ] Record the event websocket's messages (ws://<host>/api_event/cube/ws/info?token=...), which the document does not describe, so they can replace polling. ([specs/kiloview-cube-x1.yaml:717](specs/kiloview-cube-x1.yaml#L717))
+- [ ] Check whether manage_panel_inputs removes the inputs left out of its list, or only adds and changes those given. ([specs/kiloview-cube-x1.yaml:479](specs/kiloview-cube-x1.yaml#L479))
+- [ ] Check whether manage_panel_outputs removes the outputs left out of its list, or only adds and changes those given. ([specs/kiloview-cube-x1.yaml:487](specs/kiloview-cube-x1.yaml#L487))
+- [ ] Confirm that output ids are unique across panels, and that route takes the output's id as panel/detail lists it. ([specs/kiloview-cube-x1.yaml:510](specs/kiloview-cube-x1.yaml#L510))
+- [ ] Confirm that disconnect_output (input_id null) leaves the output with no source and that panel/detail then shows input_id null. ([specs/kiloview-cube-x1.yaml:519](specs/kiloview-cube-x1.yaml#L519))
+- [ ] Confirm that stop_rotation (r_id and loop null) stops the rotation list and what the output then carries. ([specs/kiloview-cube-x1.yaml:537](specs/kiloview-cube-x1.yaml#L537))
+- [ ] Check what select_input_all with select off does to the outputs carrying that input. ([specs/kiloview-cube-x1.yaml:545](specs/kiloview-cube-x1.yaml#L545))
+- [ ] Confirm that restart_service (server/reboot) restarts only the service, not the hardware, and how long the outputs stop. ([specs/kiloview-cube-x1.yaml:327](specs/kiloview-cube-x1.yaml#L327))
+- [ ] Check what switch_template does with a template of another panel, and that save saves the panel's current template first. ([specs/kiloview-cube-x1.yaml:629](specs/kiloview-cube-x1.yaml#L629))
+- [ ] Check what text find_users' filter is matched against. ([specs/kiloview-cube-x1.yaml:268](specs/kiloview-cube-x1.yaml#L268))
+- [ ] Check that log/operate/download answers the log as plain text. ([specs/kiloview-cube-x1.yaml:320](specs/kiloview-cube-x1.yaml#L320))
+- [ ] Check that discover_server's dis_s_ip is the Discovery Server's address (the document calls it the device IP there). ([specs/kiloview-cube-x1.yaml:406](specs/kiloview-cube-x1.yaml#L406))
+- [ ] Check that set_http_ports takes effect at once and whether turning HTTP off keeps HTTPS answering. ([specs/kiloview-cube-x1.yaml:287](specs/kiloview-cube-x1.yaml#L287))
+- [ ] Check what get_webrtc_sdp's server_ip must be (the server's own address is assumed). ([specs/kiloview-cube-x1.yaml:646](specs/kiloview-cube-x1.yaml#L646))
+- [ ] Confirm that system_running_time is in seconds. ([specs/kiloview-cube-x1.yaml:752](specs/kiloview-cube-x1.yaml#L752))
+- [ ] Find the unit and period of bytes_sent and bytes_recv (bytes in the last second is likely), and which of the two is sent, since the document's descriptions swap upstream and downstream. ([specs/kiloview-cube-x1.yaml:766](specs/kiloview-cube-x1.yaml#L766))
+- [ ] Find the unit of the bitrates v_b and a_b in panel details. ([specs/kiloview-cube-x1.yaml:806](specs/kiloview-cube-x1.yaml#L806))
+- [ ] Find the unit of cr_progress (seconds played, or a percentage). ([specs/kiloview-cube-x1.yaml:865](specs/kiloview-cube-x1.yaml#L865))
+- [ ] Confirm the user roles: 0 for the built-in admin, 1 administrator, 2 ordinary user. ([specs/kiloview-cube-x1.yaml:784](specs/kiloview-cube-x1.yaml#L784))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))

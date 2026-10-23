@@ -1,0 +1,1303 @@
+spec: 1
+id: kiloview-cube-x1
+name: Kiloview CUBE X1 NDI routing and distribution server
+vendor: Kiloview
+category: router
+
+source:
+  - title: CUBE X1 HTTP API, v2 (firmware 0.01.0085), CUBEX1-0.01.0085-v2-API-EN.pdf
+    author: Kiloview
+    url: https://enstatic.kiloview.com/wp-content/uploads/2025/09/CUBEX1-0.01.0085-v2-API-EN.pdf
+    note: >
+      Manufacturer document, linked from https://www.kiloview.com/en/docs/kiloview-cube-x1/api/
+      (the newest one there and in the Download Center, checked 2026-10-23). The
+      source of every request, field and reply here: the reply envelope
+      (result, msg, error.code, error.info); 1 User Management (login,
+      logout, add, delete, modify, password, query, token renewal, long-term
+      token); 2 System Management (system info, HTTP ports); 3 Log
+      Management (operation log, its download, the log archive); 4 Service
+      Management (restart, version); 5 Resource Management (inputs,
+      discovery methods and the sources they find, rotation lists); 6 Panel
+      Management (panels, panel details, panel inputs and outputs, panel
+      permissions, routing, rotation lists on outputs, select all, lock,
+      favorites, looping); 7 Template Management (add, delete, rename,
+      query, save, save as, switch, undo); 8 Message Management (WebRTC SDP);
+      9 Websocket Messages (the event websocket's URL only).
+  - title: CUBE X1 User Manual V2.2 (2023-12-22)
+    author: Kiloview
+    url: https://enstatic.kiloview.com/wp-content/uploads/2025/08/CUBE-X1-user-manual_EN%EF%BC%88V2.2%EF%BC%88231222%EF%BC%89.pdf
+    note: >
+      Manufacturer document, linked from https://www.kiloview.com/en/products/ndi-sys/cube-x1/.
+      Used for the default web login (admin / admin) and port 80, HTTPS web
+      access, 16 NDI inputs and 32 NDI outputs, playlists of up to 16
+      items, user roles, and the firmware upgrade being a web-console
+      upload.
+  - title: CUBE X1 Data Manual V1.1 (2024-11-08)
+    author: Kiloview
+    url: https://enstatic.kiloview.com/wp-content/uploads/2025/12/CUBE-X1-Datasheet_En_LG_V1.1.pdf
+    note: >
+      Manufacturer document. What the device is (an embedded NDI routing and
+      distribution server with a 1 GbE port and two 10 GbE SFP+ ports),
+      copy-forward and "jump" routing, preset templates, rotation switching,
+      and the three discovery methods.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  # The web console is served over HTTPS (Data Manual 2.3); no certificate
+  # is documented, so it is not checked.
+  accept_invalid_certs: true
+  # Every request carries the bearer token (1.2 onward: "Bearer" + space +
+  # token), sent while the token setting is set.
+  auth: bearer
+  timeout_ms: 5000
+  # Every request carries the language header (cn or en).
+  headers:
+    language: "{settings.language}"
+  # 2.1 lists no header for system/info: it needs no token.
+  probe: { method: GET, path: /api/cube/v2/system/info }
+
+settings:
+  token:
+    type: string
+    secret: true
+    default: ""
+    label: Access token
+    description: "The bearer token sent with every request: run get_long_term_token (or login) and store its result here with update_settings; empty sends none."
+  language:
+    type: enum
+    values: [en, cn]
+    default: en
+    label: Language
+    description: "The language header sent with every request, en for English or cn for Chinese, which sets the language of the device's messages."
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Scheme
+    description: "http, or https for the server's HTTPS port; the certificate is not checked."
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http", note: "the web console's default port (user manual); set_http_ports can move it" }
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+
+models:
+  - id: cube-x1
+    name: Kiloview CUBE X1
+    supports:
+      - login
+      - logout
+      - renew_token
+      - get_long_term_token
+      - get_timed_token
+      - add_user
+      - delete_user
+      - modify_user
+      - set_user_password
+      - get_users
+      - get_user
+      - find_users
+      - get_system_info
+      - get_http_ports
+      - set_http_ports
+      - get_operation_log
+      - find_operation_log
+      - download_operation_log
+      - restart_service
+      - get_version
+      - get_inputs
+      - add_manual_discovery
+      - add_manual_discoveries
+      - add_auto_discovery
+      - add_discovery_server
+      - delete_discovery
+      - get_discovery_methods
+      - discover_manual
+      - discover_auto
+      - discover_server
+      - add_rotation_list
+      - delete_rotation_list
+      - modify_rotation_list
+      - get_rotation_lists
+      - get_rotation_list
+      - get_rotation_list_status
+      - get_panels
+      - get_panel
+      - manage_panel_inputs
+      - manage_panel_outputs
+      - set_panel_permissions
+      - get_panel_permissions
+      - route
+      - disconnect_output
+      - start_rotation
+      - stop_rotation
+      - select_input_all
+      - lock_output
+      - favorite_output
+      - set_rotation_loop
+      - add_template
+      - delete_template
+      - rename_template
+      - get_templates
+      - save_template
+      - save_template_as
+      - switch_template
+      - undo
+      - get_webrtc_sdp
+      - get_webrtc_sdps
+    verification: none
+    notes: >
+      An embedded NDI routing and distribution server: up to 16 NDI inputs
+      (NDI High Bandwidth, NDI|HX2, NDI|HX3) forwarded to at least 32 NDI
+      outputs, organized in panels, with preset templates and rotation
+      (playlist) switching. One 1 GbE RJ45 port (eth0) and two 10 GbE SFP+
+      ports.
+
+commands:
+  # ── 1 User management ────────────────────────────────────────────────
+  login:
+    summary: Log in with a user name and password and return a bearer token valid for 5 minutes by default
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The CUBE X1 user to log in as; the web console's default is admin." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password; the default admin password is admin." }
+    send:
+      method: POST
+      path: /api/cube/v2/user/login
+      content_type: application/x-www-form-urlencoded
+      headers: { screen: "false" }
+      body: "grant_type=&username={username:url}&password={password:url}&scope=&client_id=&client_secret="
+    expect: { status: 200, json_path: "$.access_token" }
+    returns: value
+  logout:
+    summary: Log out the user the token belongs to
+    send: { method: POST, path: /api/cube/v2/user/logout }
+    expect: &ok { status: 200, json_equals: { "$.result": "ok" } }
+    returns: ack
+  renew_token:
+    summary: Return a new bearer token for the current one's user, valid for 5 minutes by default
+    send: { method: GET, path: /api/cube/v2/user/token/get }
+    expect: &token { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.msg.access_token" }
+    returns: value
+  get_long_term_token:
+    summary: Return a bearer token that does not expire, for a user name and password
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The CUBE X1 user the token is for." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password." }
+    send:
+      method: POST
+      path: /api/cube/v2/user/token/permanent
+      content_type: application/json
+      body: '{"username":{username:json},"password":{password:json}}'
+    expect: *token
+    returns: value
+  get_timed_token:
+    summary: Return a bearer token valid for the minutes given, for a user name and password
+    params:
+      username: { type: string, required: true, max_length: 64, label: User name, description: "The CUBE X1 user the token is for." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "That user's password." }
+      minutes: { type: int, min: 1, required: true, label: Validity, description: "How long the token stays valid, in minutes." }
+    send:
+      method: POST
+      path: /api/cube/v2/user/token/permanent
+      content_type: application/json
+      body: '{"username":{username:json},"password":{password:json},"minutes":{minutes}}'
+    expect: *token
+    returns: value
+  add_user:
+    summary: Add a user (needs an administrator's token)
+    params:
+      name: { type: string, required: true, max_length: 64, label: User name, description: "The new user's login name." }
+      alias: { type: string, required: true, max_length: 64, label: Alias, description: "The new user's display name." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: Password, description: "The new user's password." }
+      administrator: { type: bool, default: false, label: Administrator, description: "On for a system administrator, who also gets every permission below; off for an ordinary user." }
+      panel_management: { type: bool, default: false, label: Panel permission, description: "Whether the user may operate panels." }
+      resource_management: { type: bool, default: false, label: Resource permission, description: "Whether the user may manage resources (inputs, discovery, rotation lists)." }
+      firmware_management: { type: bool, default: false, label: Firmware permission, description: "Whether the user may upgrade the firmware." }
+    send:
+      method: POST
+      path: /api/cube/v2/user/add
+      content_type: application/json
+      body: '{"name":{name:json},"alias":{alias:json},"passwd":{password:json},"system_m":{administrator},"panel_m_per":{panel_management},"resource_m_per":{resource_management},"firmware_m_per":{firmware_management}}'
+    expect: *ok
+    returns: ack
+  delete_user:
+    summary: Delete a user
+    params:
+      user: { type: int, min: 0, required: true, label: User ID, description: "The user's id, as users.<id> in state lists it." }
+    send: { method: POST, path: /api/cube/v2/user/del, content_type: application/json, body: '{"user_id":{user}}' }
+    expect: *ok
+    returns: ack
+  modify_user:
+    summary: Change a user's alias and permissions
+    params:
+      user: { type: int, min: 0, required: true, label: User ID, description: "The user's id, as users.<id> in state lists it." }
+      alias: { type: string, required: true, max_length: 64, label: Alias, description: "The user's display name." }
+      administrator: { type: bool, required: true, label: Administrator, description: "On for a system administrator, who also gets every permission below; off for an ordinary user." }
+      panel_management: { type: bool, required: true, label: Panel permission, description: "Whether the user may operate panels." }
+      resource_management: { type: bool, required: true, label: Resource permission, description: "Whether the user may manage resources (inputs, discovery, rotation lists)." }
+      firmware_management: { type: bool, required: true, label: Firmware permission, description: "Whether the user may upgrade the firmware." }
+    send:
+      method: POST
+      path: /api/cube/v2/user/modify
+      content_type: application/json
+      body: '{"user_id":{user},"alias":{alias:json},"system_m":{administrator},"panel_m_per":{panel_management},"resource_m_per":{resource_management},"firmware_m_per":{firmware_management}}'
+    expect: *ok
+    returns: ack
+  set_user_password:
+    summary: Change a user's password
+    params:
+      user: { type: int, min: 0, required: true, label: User ID, description: "The user's id, as users.<id> in state lists it." }
+      password: { type: string, required: true, secret: true, max_length: 128, label: New password, description: "The user's new password." }
+    send: { method: POST, path: /api/cube/v2/user/passwd/modify, content_type: application/json, body: '{"user_id":{user},"passwd":{password:json}}' }
+    expect: *ok
+    returns: ack
+  get_users:
+    summary: Return every user with its role, permissions and panel permissions
+    send: { method: GET, path: /api/cube/v2/user/query }
+    expect: &msg { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.msg" }
+    returns: value
+  get_user:
+    summary: Return the user with the name given
+    params:
+      name: { type: string, required: true, max_length: 64, label: User name, description: "The login name to look up." }
+    send: { method: GET, path: /api/cube/v2/user/query, query: { user_name: "{name}" } }
+    expect: *msg
+    returns: value
+  find_users:
+    summary: Return the users matching a filter
+    params:
+      filter: { type: string, required: true, max_length: 64, label: Filter, description: "Text the users are filtered by." }
+    send: { method: GET, path: /api/cube/v2/user/query, query: { filter: "{filter}" } }
+    expect: *msg
+    returns: value
+
+  # ── 2 System management ──────────────────────────────────────────────
+  get_system_info:
+    summary: Return CPU, memory, temperature, network and input/output counts
+    send: { method: GET, path: /api/cube/v2/system/info }
+    expect: *msg
+    returns: value
+  get_http_ports:
+    summary: Return the web server's HTTP and HTTPS ports
+    send: { method: GET, path: /api/cube/v2/system/http/get }
+    expect: *msg
+    returns: value
+  set_http_ports:
+    summary: Turn the web server's HTTP and HTTPS on or off and set their ports
+    params:
+      http: { type: bool, required: true, label: HTTP on, description: "Whether the server answers plain HTTP." }
+      https: { type: bool, required: true, label: HTTPS on, description: "Whether the server answers HTTPS." }
+      http_port: { type: int, min: 1, max: 65535, required: true, label: HTTP port, description: "The TCP port for HTTP; 80 by default." }
+      https_port: { type: int, min: 1, max: 65535, required: true, label: HTTPS port, description: "The TCP port for HTTPS; 443 by default." }
+    send:
+      method: POST
+      path: /api/cube/v2/system/http/set
+      content_type: application/json
+      body: '{"enable_http":{http},"enable_https":{https},"http_port":{http_port},"https_port":{https_port}}'
+    expect: *ok
+    returns: ack
+
+  # ── 3 Log management ─────────────────────────────────────────────────
+  get_operation_log:
+    summary: Return one page of the operation log (total_num and records)
+    params:
+      page: { type: int, min: 1, default: 1, label: Page, description: "The page to return, numbered from 1." }
+      page_size: { type: int, min: 1, default: 20, label: Page size, description: "Records per page." }
+    send: { method: GET, path: /api/cube/v2/log/operate/record, query: { page_index: "{page}", page_size: "{page_size}" } }
+    expect: *msg
+    returns: value
+  find_operation_log:
+    summary: Return one page of the operation log records matching a filter
+    params:
+      page: { type: int, min: 1, default: 1, label: Page, description: "The page to return, numbered from 1." }
+      page_size: { type: int, min: 1, default: 20, label: Page size, description: "Records per page." }
+      filter: { type: string, required: true, max_length: 64, label: Filter, description: "Text the records are filtered by, such as a user name." }
+    send: { method: GET, path: /api/cube/v2/log/operate/record, query: { page_index: "{page}", page_size: "{page_size}", filter: "{filter}" } }
+    expect: *msg
+    returns: value
+  download_operation_log:
+    summary: Return the operation log file's text
+    send: { method: GET, path: /api/cube/v2/log/operate/download }
+    expect: { status: 200 }
+    returns: text
+
+  # ── 4 Service management ─────────────────────────────────────────────
+  restart_service:
+    summary: Restart the CUBE X1 service, stopping every NDI output until it is back
+    send: { method: POST, path: /api/cube/v2/server/reboot }
+    expect: *ok
+    returns: ack
+  get_version:
+    summary: Return the serial number and the software version
+    send: { method: GET, path: /api/cube/v2/server/version }
+    expect: *msg
+    returns: value
+
+  # ── 5 Resource management ────────────────────────────────────────────
+  get_inputs:
+    summary: Return every input source the server has
+    send: { method: GET, path: /api/cube/v2/resource/input/all }
+    expect: *msg
+    returns: value
+  add_manual_discovery:
+    summary: Add a manual discovery of the NDI sources of one device
+    params:
+      group: { type: string, default: public, max_length: 64, label: NDI group, description: "The NDI group the sources are found in; public by default." }
+      device_ip: { type: string, required: true, max_length: 64, label: Device address, description: "The IP address of the device whose sources are added." }
+    send:
+      method: POST
+      path: /api/cube/v2/resource/input/manual/add
+      content_type: application/json
+      body: '{"manuals":[{"dis_g_name":{group:json},"dis_d_ip":{device_ip:json}}]}'
+    expect: *ok
+    returns: ack
+  add_manual_discoveries:
+    summary: "Add several manual discoveries; manuals is the API's manuals list of {dis_g_name, dis_d_ip}"
+    params:
+      manuals: { type: json, required: true, label: Manual discoveries, description: "A list of objects each with dis_g_name (the NDI group) and dis_d_ip (the device's IP address)." }
+    send: { method: POST, path: /api/cube/v2/resource/input/manual/add, content_type: application/json, body: '{"manuals":{manuals}}' }
+    expect: *ok
+    returns: ack
+  add_auto_discovery:
+    summary: Add automatic discovery of the NDI sources in a group
+    params:
+      group: { type: string, required: true, max_length: 64, label: NDI group, description: "The NDI group whose sources are discovered automatically." }
+    send: { method: POST, path: /api/cube/v2/resource/input/auto/add, content_type: application/json, body: '{"dis_g_name":{group:json}}' }
+    expect: *ok
+    returns: ack
+  add_discovery_server:
+    summary: Add an NDI Discovery Server to find sources through
+    params:
+      group: { type: string, default: public, max_length: 64, label: NDI group, description: "The NDI group the sources are found in; public by default." }
+      server_ip: { type: string, required: true, max_length: 64, label: Server address, description: "The IP address of the NDI Discovery Server." }
+    send:
+      method: POST
+      path: /api/cube/v2/resource/input/server/add
+      content_type: application/json
+      body: '{"dis_g_name":{group:json},"dis_s_ip":{server_ip:json}}'
+    expect: *ok
+    returns: ack
+  delete_discovery:
+    summary: Delete a discovery method (manual, automatic or server)
+    params:
+      discovery: { type: int, min: 0, required: true, label: Discovery ID, description: "The discovery method's id, as discovery.<id> in state lists it." }
+    send: { method: POST, path: /api/cube/v2/resource/input/discovery/del, content_type: application/json, body: '{"dis_id":{discovery}}' }
+    expect: *ok
+    returns: ack
+  get_discovery_methods:
+    summary: Return every discovery method, as manual and auto_server lists
+    send: { method: GET, path: /api/cube/v2/resource/input/discovery/all }
+    expect: *msg
+    returns: value
+  discover_manual:
+    summary: Return the NDI sources found by the manual discoveries
+    send: { method: GET, path: /api/cube/v2/resource/input/manual/discovery }
+    expect: *msg
+    returns: value
+  discover_auto:
+    summary: Return the NDI sources found automatically in a group
+    params:
+      group: { type: string, default: public, max_length: 64, label: NDI group, description: "The NDI group to list; public by default." }
+    send: { method: GET, path: /api/cube/v2/resource/input/auto/discovery, query: { dis_g_name: "{group}" } }
+    expect: *msg
+    returns: value
+  discover_server:
+    summary: Return the NDI sources an NDI Discovery Server lists in a group
+    params:
+      group: { type: string, default: public, max_length: 64, label: NDI group, description: "The NDI group to list; public by default." }
+      server_ip: { type: string, required: true, max_length: 64, label: Server address, description: "The IP address of the NDI Discovery Server." }
+    send: { method: GET, path: /api/cube/v2/resource/input/server/discovery, query: { dis_g_name: "{group}", dis_s_ip: "{server_ip}" } }
+    expect: *msg
+    returns: value
+  add_rotation_list:
+    summary: "Add a rotation list; sources is the API's rotation_srcs list of {input_id, play_duration}"
+    params:
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The rotation list's name." }
+      sources: { type: json, required: true, label: Sources, description: "The sources in playing order: a list of objects each with input_id (an input's id) and play_duration (seconds)." }
+    send:
+      method: POST
+      path: /api/cube/v2/resource/rotation-list/add
+      content_type: application/json
+      body: '{"name":{name:json},"rotation_srcs":{sources}}'
+    expect: *ok
+    returns: ack
+  delete_rotation_list:
+    summary: Delete a rotation list
+    params:
+      list: { type: int, min: 0, required: true, label: Rotation list, description: "The rotation list's id, as rotation_lists.<id> in state lists it." }
+    send: { method: POST, path: /api/cube/v2/resource/rotation-list/del, content_type: application/json, body: '{"id":{list}}' }
+    expect: *ok
+    returns: ack
+  modify_rotation_list:
+    summary: "Rename a rotation list and replace its sources; sources is the API's rotation_srcs list of {id, input_id, play_duration}"
+    params:
+      list: { type: int, min: 0, required: true, label: Rotation list, description: "The rotation list's id, as rotation_lists.<id> in state lists it." }
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The rotation list's name." }
+      sources: { type: json, required: true, label: Sources, description: "The sources in playing order: objects each with id (the rotation source's id, or null for a new one), input_id (an input's id) and play_duration (seconds)." }
+    send:
+      method: POST
+      path: /api/cube/v2/resource/rotation-list/modify
+      content_type: application/json
+      body: '{"id":{list},"name":{name:json},"rotation_srcs":{sources}}'
+    expect: *ok
+    returns: ack
+  get_rotation_lists:
+    summary: Return every rotation list with its source count and total play time
+    send: { method: GET, path: /api/cube/v2/resource/rotation-list/all }
+    expect: *msg
+    returns: value
+  get_rotation_list:
+    summary: Return a rotation list with its sources
+    params:
+      list: { type: int, min: 0, required: true, label: Rotation list, description: "The rotation list's id, as rotation_lists.<id> in state lists it." }
+    send: { method: GET, path: /api/cube/v2/resource/rotation-list, query: { id: "{list}" } }
+    expect: *msg
+    returns: value
+  get_rotation_list_status:
+    summary: Return whether a rotation list is playing on an output
+    params:
+      list: { type: int, min: 0, required: true, label: Rotation list, description: "The rotation list's id, as rotation_lists.<id> in state lists it." }
+    send: { method: GET, path: /api/cube/v2/resource/rotation-list/status, query: { id: "{list}" } }
+    expect: { status: 200, json_equals: { "$.result": "ok" }, json_path: "$.msg.status" }
+    returns: value
+
+  # ── 6 Panel management ───────────────────────────────────────────────
+  get_panels:
+    summary: Return every panel with its input and output counts
+    send: { method: GET, path: /api/cube/v2/panel/all }
+    expect: *msg
+    returns: value
+  get_panel:
+    summary: Return a panel's inputs, outputs, templates and rotation lists
+    params:
+      panel: &panel { type: int, min: 0, required: true, label: Panel, description: "The panel's id, as panels.<id> in state lists it." }
+    send: { method: GET, path: /api/cube/v2/panel/detail, query: { id: "{panel}" } }
+    expect: *msg
+    returns: value
+  manage_panel_inputs:
+    summary: "Add, remove and change a panel's input sources; inputs is the API's inputs list (id, name, alias, c_name, g_name, d_ip, d_port, url, available, dis_method, dis_g_name, dis_d_ip, dis_s_ip, label_id)"
+    params:
+      panel: *panel
+      inputs: { type: json, required: true, label: Inputs, description: "The panel's input sources as the API's inputs list; id null adds a source, and label_id is its key on the front panel (1-16)." }
+    send: { method: POST, path: /api/cube/v2/panel/input/manage, content_type: application/json, body: '{"id":{panel},"inputs":{inputs}}' }
+    expect: *ok
+    returns: ack
+  manage_panel_outputs:
+    summary: "Add, remove and change a panel's NDI outputs; outputs is the API's outputs list (id, name, alias, c_name, g_name, smooth, router, dis_s_ip, lock, collect, label_id, codec_k)"
+    params:
+      panel: *panel
+      outputs: { type: json, required: true, label: Outputs, description: "The panel's outputs as the API's outputs list; id null adds an output, router true selects jump (routing) mode, and codec_k 1 resets client connections on a switch." }
+    send: { method: POST, path: /api/cube/v2/panel/output/manage, content_type: application/json, body: '{"id":{panel},"outputs":{outputs}}' }
+    expect: *ok
+    returns: ack
+  set_panel_permissions:
+    summary: "Set every user's permissions on a panel; users is the API's users list of {id, view_per, switch_per, modify_per}"
+    params:
+      panel: *panel
+      users: { type: json, required: true, label: Users, description: "One object per user with id (the user's id) and view_per, switch_per and modify_per (true or false)." }
+    send: { method: POST, path: /api/cube/v2/panel/permission/modify, content_type: application/json, body: '{"id":{panel},"users":{users}}' }
+    expect: *ok
+    returns: ack
+  get_panel_permissions:
+    summary: Return every user's permissions on a panel
+    params:
+      panel: *panel
+    send: { method: GET, path: /api/cube/v2/panel/permission, query: { id: "{panel}" } }
+    expect: *msg
+    returns: value
+  route:
+    summary: Route an input source to an output of a panel
+    params:
+      panel: *panel
+      output: &output { type: int, min: 0, required: true, label: Output, description: "The output's id, as panel_outputs.<panel>.<id> in state lists it." }
+      input: { type: int, min: 0, required: true, label: Input, description: "The input source's id, as inputs.<id> in state lists it." }
+    send: { method: POST, path: /api/cube/v2/panel/output/input, content_type: application/json, body: '{"id":{panel},"output_id":{output},"input_id":{input}}' }
+    expect: *ok
+    returns: ack
+  disconnect_output:
+    summary: Disconnect an output of a panel from its input source
+    params:
+      panel: *panel
+      output: *output
+    send: { method: POST, path: /api/cube/v2/panel/output/input, content_type: application/json, body: '{"id":{panel},"output_id":{output},"input_id":null}' }
+    expect: *ok
+    returns: ack
+  start_rotation:
+    summary: Play a rotation list on an output of a panel
+    params:
+      panel: *panel
+      output: *output
+      list: &list { type: int, min: 0, required: true, label: Rotation list, description: "The rotation list's id, as rotation_lists.<id> in state lists it." }
+      loop: { type: bool, default: true, label: Loop, description: "On to loop the list; off to play it once." }
+    send: { method: POST, path: /api/cube/v2/panel/output/rotation-list, content_type: application/json, body: '{"id":{panel},"output_id":{output},"r_id":{list},"loop":{loop}}' }
+    expect: *ok
+    returns: ack
+  stop_rotation:
+    summary: Stop the rotation list playing on an output of a panel
+    params:
+      panel: *panel
+      output: *output
+    send: { method: POST, path: /api/cube/v2/panel/output/rotation-list, content_type: application/json, body: '{"id":{panel},"output_id":{output},"r_id":null,"loop":null}' }
+    expect: *ok
+    returns: ack
+  select_input_all:
+    summary: Route an input source to every output of a panel, or take it off them all (outputs playing a rotation list are skipped)
+    params:
+      panel: *panel
+      input: { type: int, min: 0, required: true, label: Input, description: "The input source's id, as inputs.<id> in state lists it." }
+      select: { type: bool, default: true, label: Select, description: "On to route the input to every output; off to deselect it." }
+    send: { method: POST, path: /api/cube/v2/panel/input/select, content_type: application/json, body: '{"id":{panel},"input_id":{input},"select":{select}}' }
+    expect: *ok
+    returns: ack
+  lock_output:
+    summary: Lock or unlock an output of a panel
+    params:
+      panel: *panel
+      output: *output
+      lock: { type: bool, default: true, label: Locked, description: "On to lock the output against switching; off to unlock it." }
+    send: { method: POST, path: /api/cube/v2/panel/output/lock, content_type: application/json, body: '{"id":{panel},"output_id":{output},"lock":{lock}}' }
+    expect: *ok
+    returns: ack
+  favorite_output:
+    summary: Add an output of a panel to the favorites, or take it off
+    params:
+      panel: *panel
+      output: *output
+      favorite: { type: bool, default: true, label: Favorite, description: "On to add the output to the favorites list; off to take it off." }
+    send: { method: POST, path: /api/cube/v2/panel/output/collect, content_type: application/json, body: '{"id":{panel},"output_id":{output},"collect":{favorite}}' }
+    expect: *ok
+    returns: ack
+  set_rotation_loop:
+    summary: Set whether the rotation list on an output of a panel loops
+    params:
+      panel: *panel
+      output: *output
+      list: *list
+      loop: { type: bool, required: true, label: Loop, description: "On to loop the list; off to play it once." }
+    send: { method: POST, path: /api/cube/v2/panel/output/rotation-list/loop, content_type: application/json, body: '{"id":{panel},"output_id":{output},"r_id":{list},"loop":{loop}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 7 Template management ────────────────────────────────────────────
+  add_template:
+    summary: Add a template to a panel
+    params:
+      panel: *panel
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The template's name." }
+    send: { method: POST, path: /api/cube/v2/template/add, content_type: application/json, body: '{"id":{panel},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  delete_template:
+    summary: Delete a template
+    params:
+      template: &template { type: int, min: 0, required: true, label: Template, description: "The template's id, as panel_templates.<panel>.<id> in state lists it." }
+    send: { method: POST, path: /api/cube/v2/template/del, content_type: application/json, body: '{"id":{template}}' }
+    expect: *ok
+    returns: ack
+  rename_template:
+    summary: Rename a template
+    params:
+      template: *template
+      name: { type: string, required: true, max_length: 64, label: Name, description: "The template's new name." }
+    send: { method: POST, path: /api/cube/v2/template/name, content_type: application/json, body: '{"id":{template},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  get_templates:
+    summary: Return a panel's templates and which one is started
+    params:
+      panel: *panel
+    send: { method: GET, path: /api/cube/v2/template/query, query: { id: "{panel}" } }
+    expect: *msg
+    returns: value
+  save_template:
+    summary: Save the current routing into a template, overwriting it
+    params:
+      template: *template
+    send: { method: POST, path: /api/cube/v2/template/save, content_type: application/json, body: '{"id":{template}}' }
+    expect: *ok
+    returns: ack
+  save_template_as:
+    summary: Save a template under a new name, as a new template
+    params:
+      template: *template
+      name: { type: string, required: true, max_length: 64, label: New name, description: "The new template's name." }
+    send: { method: POST, path: /api/cube/v2/template/save-as, content_type: application/json, body: '{"id":{template},"name":{name:json}}' }
+    expect: *ok
+    returns: ack
+  switch_template:
+    summary: Switch to a template, applying its routing at once
+    params:
+      template: *template
+      save: { type: bool, default: false, label: Save current, description: "On to save the current template before switching; off to drop its unsaved changes." }
+    send: { method: POST, path: /api/cube/v2/template/switch, content_type: application/json, body: '{"switch_id":{template},"save":{save}}' }
+    expect: *ok
+    returns: ack
+  undo:
+    summary: Undo the last operation on a panel
+    params:
+      panel: *panel
+    send: { method: POST, path: /api/cube/v2/template/cancel, content_type: application/json, body: '{"id":{panel}}' }
+    expect: *ok
+    returns: ack
+
+  # ── 8 Message management ─────────────────────────────────────────────
+  get_webrtc_sdp:
+    summary: Return the WebRTC SDP offer for previewing an input source in a browser
+    params:
+      source: { type: string, required: true, max_length: 256, label: Source name, description: "The NDI source's full name, such as N60-ABC (Chan1)." }
+      server_ip: { type: string, required: true, max_length: 64, label: Server address, description: "The CUBE X1's own IP address, which the offer's candidate names." }
+    send:
+      method: POST
+      path: /api/cube/CubeServer/ws/queryWebrtcSdp
+      content_type: application/json
+      body: '{"input_src_name_list":[{source:json}],"server_ip":{server_ip:json}}'
+    expect: *msg
+    returns: value
+  get_webrtc_sdps:
+    summary: "Return the WebRTC SDP offers for several input sources; sources is the API's input_src_name_list"
+    params:
+      sources: { type: json, required: true, label: Source names, description: "A list of the NDI sources' full names." }
+      server_ip: { type: string, required: true, max_length: 64, label: Server address, description: "The CUBE X1's own IP address, which the offers' candidates name." }
+    send:
+      method: POST
+      path: /api/cube/CubeServer/ws/queryWebrtcSdp
+      content_type: application/json
+      body: '{"input_src_name_list":{sources},"server_ip":{server_ip:json}}'
+    expect: *msg
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication: every request but system/info carries "Authorization:
+      Bearer <token>". The login answers its token in the JSON body (and
+      the event websocket takes it in its URL), which the core cannot
+      capture into a session, so the token is a setting. Run
+      get_long_term_token once (a token that does not expire, or
+      get_timed_token for one valid the minutes given) and store the result
+      in the token setting with update_settings. login and renew_token
+      return tokens valid for only 5 minutes by default, after which the
+      server refuses them and the device reports unauthorized until a new
+      token is set; a consumer using them must renew the token (renew_token,
+      then update_settings) before it expires. A refused token (401 or 403)
+      stops all requests until the settings change.
+  - models: [all]
+    severity: critical
+    text: >
+      route, disconnect_output, start_rotation, stop_rotation,
+      select_input_all and switch_template change what NDI outputs carry at
+      once; switch_template replaces the routing of the whole panel, and
+      with save off drops the current template's unsaved changes;
+      save_template overwrites a template; delete_template,
+      delete_rotation_list, delete_user and delete_discovery cannot be
+      undone; restart_service stops every output until the service is back;
+      set_http_ports moves (or turns off) the web server the core reaches.
+      None asks for confirmation.
+  - models: [all]
+    severity: warning
+    text: >
+      manage_panel_inputs and manage_panel_outputs send the API's lists as
+      given. The document says they add (id null), remove and change
+      entries, but not whether an entry left out of the list is removed, so
+      send the whole list as get_panel returns it, with the changes made.
+  - models: [all]
+    severity: info
+    text: >
+      Errors come back as {"result": "error", "error": {"code", "info"}},
+      which fails the command as a device error with that body; the
+      document shows HTTP 200 for its answers and gives no list of error
+      codes. login answers {access_token, token_type, first_login} without
+      the result envelope.
+  - models: [all]
+    severity: info
+    text: >
+      The server pushes events on a websocket (ws://<host>/api_event/cube/ws/info?token=<token>),
+      but the document gives only its URL, not one message, so it is not
+      used: state is polled. Panels and rotation progress every 2 seconds
+      (the panel list, then each panel's details); CPU, memory, temperature
+      and network every 5 seconds; the version, HTTP ports, inputs,
+      discovery methods and the sources each finds, rotation lists and
+      users every 30 seconds. Every change a command makes has what it
+      changed read again as soon as the server accepts it.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the API has no network address settings, no NDI settings
+      of the server itself, no shutdown or reboot of the hardware (only the
+      service restart), no firmware upgrade (a web console upload) and no
+      way to create or delete panels; the HTTP and HTTPS on/off flags
+      set_http_ports writes cannot be read back (system/http/get gives only
+      the ports). Panel details carry each panel's rotation lists too; they
+      are the same as the rotation lists read under resource management and
+      are kept there. A panel deleted in the web console stays in panel_*
+      state until the device is opened again, since the panel list does not
+      name the details it replaces. log/download returns a .tar.gz archive
+      of the server's logs, which a command cannot hand to the host, so it
+      is not offered.
+  - models: [all]
+    severity: info
+    text: >
+      Field names follow the document where it is ambiguous: bytes_sent and
+      bytes_recv are kept as the device names them (the document calls
+      them real-time traffic, with no unit or period stated); the user
+      role is 0 for the built-in admin, 1 for an administrator and 2 for an
+      ordinary user; system_running_time is taken as seconds.
+
+state:
+  # system/info (2.1)
+  system.start_time: { type: string, description: "When the system started, as the server's local ISO 8601 time" }
+  system.running_time: { type: float, unit: s, description: "How long the system has been running" }
+  system.cpu_temperature: { type: int, unit: degC, description: "CPU temperature in degrees Celsius" }
+  system.cpu_temperature_f: { type: int, unit: degF, description: "CPU temperature in degrees Fahrenheit" }
+  system.cpu: { type: int, unit: "%", description: "CPU use" }
+  system.memory: { type: int, unit: "%", description: "Memory use" }
+  system.cpu_record: { type: string, description: "CPU use over the last 60 seconds as JSON text: a list of percentages, one a second, oldest first" }
+  system.memory_record: { type: string, description: "Memory use over the last 60 seconds as JSON text: a list of percentages, oldest first" }
+  system.received_record: { type: string, description: "The system's total received traffic over the last 60 seconds as JSON text (sys_recv_total_record), oldest first" }
+  system.sent_record: { type: string, description: "The system's total sent traffic over the last 60 seconds as JSON text (sys_sent_total_record), oldest first" }
+  system.input_count: { type: int, description: "Number of input sources" }
+  system.output_count: { type: int, description: "Number of outputs" }
+  system.abnormal_input_count: { type: int, description: "Number of input sources in an abnormal state" }
+  system.abnormal_output_count: { type: int, description: "Number of outputs in an abnormal state" }
+  network.interfaces.*.ip: { type: string, description: "The interface's IP address, empty when it has none (eth0 is the 1 GbE port, the others the 10 GbE SFP+ ports)" }
+  network.interfaces.*.bytes_sent: { type: int, description: "Real-time traffic sent (bytes_sent)" }
+  network.interfaces.*.bytes_received: { type: int, description: "Real-time traffic received (bytes_recv)" }
+  network.interfaces.*.bytes_sent_total: { type: int, unit: bytes, description: "Traffic sent since the system started" }
+  network.interfaces.*.bytes_received_total: { type: int, unit: bytes, description: "Traffic received since the system started" }
+  network.interfaces.*.up: { type: bool, description: "Whether the interface has a link" }
+  network.interfaces.*.speed: { type: int, unit: Mbps, description: "Link speed" }
+  network.interfaces.*.type: { type: string, description: "Ethernet or Fiber" }
+  network.interfaces.*.sent_record: { type: string, description: "Traffic sent over the last 60 seconds as JSON text, oldest first" }
+  network.interfaces.*.received_record: { type: string, description: "Traffic received over the last 60 seconds as JSON text, oldest first" }
+  # system/http/get (2.2)
+  system.http_port: { type: int, description: "The web server's HTTP port" }
+  system.https_port: { type: int, description: "The web server's HTTPS port" }
+  # server/version (4.3)
+  device.serial: { type: string, description: "Serial number" }
+  device.version: { type: string, description: "Software version" }
+  # user/query (1.7) and panel/permission (6.6)
+  users.*.name: { type: string, description: "The user's login name" }
+  users.*.alias: { type: string, description: "The user's display name" }
+  users.*.role: { type: string, description: "admin (the built-in supervisor), administrator, or user (an ordinary user)" }
+  users.*.panel_management: { type: bool, description: "Whether the user may operate panels" }
+  users.*.resource_management: { type: bool, description: "Whether the user may manage resources" }
+  users.*.firmware_management: { type: bool, description: "Whether the user may upgrade the firmware" }
+  users.*.created: { type: string, description: "When the user was created, as the server's local ISO 8601 time" }
+  users.*.panels.*.view: { type: bool, description: "Whether the user may view the panel" }
+  users.*.panels.*.switch: { type: bool, description: "Whether the user may switch on the panel" }
+  users.*.panels.*.modify: { type: bool, description: "Whether the user may modify the panel" }
+  # resource/input/all (5.1)
+  inputs.*.name: { type: string, description: "The input source's NDI name" }
+  inputs.*.alias: { type: string, description: "The input source's alias" }
+  inputs.*.channel_name: { type: string, description: "The NDI channel name (the part in brackets)" }
+  inputs.*.group: { type: string, description: "The NDI group" }
+  inputs.*.device_ip: { type: string, description: "The sending device's IP address" }
+  inputs.*.device_port: { type: int, description: "The sending device's NDI port" }
+  inputs.*.available: { type: bool, description: "True when the source is available, false when unstable" }
+  inputs.*.label_id: { type: int, description: "The input's key on the front panel (1-16), absent when it has none" }
+  inputs.*.connection: { type: string, description: "unicast, or unicast and multicast" }
+  inputs.*.discovery: { type: string, description: "How the source was discovered" }
+  # panel/detail (6.2): the live status of each input
+  input_status.*.available: { type: bool, description: "True when the source is available, false when unstable (from the panel details)" }
+  input_status.*.resolution: { type: string, description: "The source's video format, such as 1920x1080@50HZ (0x0@0HZ without signal)" }
+  input_status.*.video_bitrate: { type: int, description: "The source's video bitrate (v_b)" }
+  input_status.*.audio_bitrate: { type: int, description: "The source's audio bitrate (a_b)" }
+  # resource/input/discovery/all (5.6)
+  discovery.*.method: { type: string, description: "manual (one device), auto (a group) or server (an NDI Discovery Server)" }
+  discovery.*.group: { type: string, description: "The NDI group" }
+  discovery.*.device_ip: { type: string, description: "Manual discovery: the device's IP address" }
+  discovery.*.server_ip: { type: string, description: "Server discovery: the NDI Discovery Server's IP address" }
+  # resource/input/{manual,auto,server}/discovery (5.7-5.9), keyed by the source's URL
+  discovered.manual.*.name: { type: string, description: "A source the manual discoveries find, keyed by its URL (address:port): its NDI name" }
+  discovered.manual.*.channel_name: { type: string, description: "Its NDI channel name" }
+  discovered.manual.*.group: { type: string, description: "Its discovery group" }
+  discovered.manual.*.available: { type: bool, description: "True when available, false when unstable" }
+  discovered.auto.*.*.name: { type: string, description: "A source automatic discovery finds, keyed by group then URL (address:port): its NDI name" }
+  discovered.auto.*.*.channel_name: { type: string, description: "Its NDI channel name" }
+  discovered.auto.*.*.available: { type: bool, description: "True when available, false when unstable" }
+  discovered.server.*.*.*.name: { type: string, description: "A source an NDI Discovery Server lists, keyed by server address, group, then URL (address:port): its NDI name" }
+  discovered.server.*.*.*.channel_name: { type: string, description: "Its NDI channel name" }
+  discovered.server.*.*.*.available: { type: bool, description: "True when available, false when unstable" }
+  # resource/rotation-list/all, rotation-list, rotation-list/status (5.13-5.15)
+  rotation_lists.*.name: { type: string, description: "The rotation list's name" }
+  rotation_lists.*.source_count: { type: int, description: "Number of sources in the list" }
+  rotation_lists.*.play_duration: { type: int, unit: s, description: "Total play time of the list" }
+  rotation_sources.*.*.source_id: { type: int, description: "A rotation list's source, keyed by list then place (from 0): the rotation source's id" }
+  rotation_sources.*.*.input: { type: int, description: "The input source it plays" }
+  rotation_sources.*.*.input_name: { type: string, description: "That input's NDI name" }
+  rotation_sources.*.*.input_alias: { type: string, description: "That input's alias" }
+  rotation_sources.*.*.input_channel_name: { type: string, description: "That input's NDI channel name" }
+  rotation_sources.*.*.play_duration: { type: int, unit: s, description: "How long it plays" }
+  rotation_in_use.*: { type: bool, description: "Whether the rotation list is playing on an output, keyed by list" }
+  # panel/all (6.1)
+  panels.*.name: { type: string, description: "The panel's name" }
+  panels.*.input_count: { type: int, description: "Number of inputs in the panel" }
+  panels.*.output_count: { type: int, description: "Number of outputs in the panel" }
+  panels.*.icon: { type: int, description: "The panel's icon number" }
+  panels.*.enabled: { type: bool, description: "Whether the panel is enabled" }
+  # panel/detail (6.2)
+  panel_info.*.undo_count: { type: int, description: "Number of operations on the panel that can be undone (cancel_num)" }
+  panel_info.*.audio_status: { type: bool, description: "The panel's audio column (deprecated by Kiloview)" }
+  panel_inputs.*.*.channel_name: { type: string, description: "An input source in the panel, keyed by panel then input id: its NDI channel name" }
+  panel_inputs.*.*.label_id: { type: int, description: "Its key on the front panel (1-16), absent when it has none" }
+  panel_outputs.*.*.name: { type: string, description: "An output of the panel, keyed by panel then output id: its name" }
+  panel_outputs.*.*.alias: { type: string, description: "Its alias" }
+  panel_outputs.*.*.channel_name: { type: string, description: "Its NDI channel name" }
+  panel_outputs.*.*.group: { type: string, description: "Its NDI group" }
+  panel_outputs.*.*.smooth: { type: int, unit: ms, description: "Smoothness (deprecated by Kiloview)" }
+  panel_outputs.*.*.routed: { type: bool, description: "True in routing (jump) mode, false in copy-forward mode" }
+  panel_outputs.*.*.discovery_server_ip: { type: string, description: "The NDI Discovery Server it registers with, empty for none" }
+  panel_outputs.*.*.connection: { type: string, description: "unicast, or unicast and multicast" }
+  panel_outputs.*.*.multicast_address: { type: string, description: "Its multicast address, absent when not set" }
+  panel_outputs.*.*.multicast_mask: { type: string, description: "Its multicast mask, absent when not set" }
+  panel_outputs.*.*.ttl: { type: int, description: "Its multicast TTL, absent when not set" }
+  panel_outputs.*.*.on_switch: { type: string, description: "Whether a switch keeps client connections or resets them (codec_k)" }
+  panel_outputs.*.*.locked: { type: bool, description: "Whether the output is locked" }
+  panel_outputs.*.*.favorite: { type: bool, description: "Whether the output is in the favorites (collect)" }
+  panel_outputs.*.*.input: { type: int, description: "The input source routed to it, absent when disconnected" }
+  panel_outputs.*.*.rotation_list: { type: int, description: "The rotation list playing on it, absent when none" }
+  panel_outputs.*.*.rotation_loop: { type: bool, description: "Whether that rotation list loops" }
+  panel_outputs.*.*.rotation_input: { type: int, description: "The input source the rotation list is playing" }
+  panel_outputs.*.*.rotation_index: { type: int, description: "The place in the rotation list being played" }
+  panel_outputs.*.*.rotation_progress: { type: int, description: "Progress of the source the rotation list is playing" }
+  panel_outputs.*.*.label_id: { type: int, description: "Its key on the front panel" }
+  panel_outputs.*.*.connections: { type: int, description: "Number of NDI clients connected to it (link_num)" }
+  panel_outputs.*.*.resolution: { type: string, description: "Its video format, such as 1920x1080@50HZ" }
+  panel_outputs.*.*.video_bitrate: { type: int, description: "Its video bitrate (v_b)" }
+  panel_outputs.*.*.audio_bitrate: { type: int, description: "Its audio bitrate (a_b)" }
+  # panel/detail panel_templates (6.2) and template/query (7.4)
+  panel_templates.*.*.name: { type: string, description: "A template of the panel, keyed by panel then template id: its name" }
+  panel_templates.*.*.started: { type: bool, description: "Whether it is the template in use" }
+
+
+telemetry:
+  poll:
+    # Routing, locks and rotation progress: the panel list, and each panel's
+    # details read in turn (then_send below).
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/cube/v2/panel/all }
+    - every_ms: 5000
+      send:
+        - { method: GET, path: /api/cube/v2/system/info }
+    # Configuration.
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/cube/v2/server/version }
+        - { method: GET, path: /api/cube/v2/system/http/get }
+        - { method: GET, path: /api/cube/v2/resource/input/all }
+        - { method: GET, path: /api/cube/v2/resource/input/discovery/all }
+        - { method: GET, path: /api/cube/v2/resource/rotation-list/all }
+        - { method: GET, path: /api/cube/v2/user/query }
+  updates:
+    # ── system/info (2.1) ─────────────────────────────────────────────
+    - path: "^/api/cube/v2/system/info$"
+      json_match: { "$.result": "^ok$" }
+      json:
+        start: "$.msg.system_start_time"
+        running: "$.msg.system_running_time"
+        temp_c: "$.msg.cpu_temp.c"
+        temp_f: "$.msg.cpu_temp.f"
+        cpu: "$.msg.cpu"
+        mem: "$.msg.mem"
+        cpu_record: "$.msg.cpu_record"
+        mem_record: "$.msg.mem_record"
+        recv_record: "$.msg.sys_recv_total_record"
+        sent_record: "$.msg.sys_sent_total_record"
+        inputs: "$.msg.input_src_num"
+        outputs: "$.msg.output_num"
+        bad_inputs: "$.msg.abnormal_input_src_num"
+        bad_outputs: "$.msg.abnormal_output_num"
+      state:
+        system.start_time: "{start}"
+        system.running_time: "{running}"
+        system.cpu_temperature: "{temp_c}"
+        system.cpu_temperature_f: "{temp_f}"
+        system.cpu: "{cpu}"
+        system.memory: "{mem}"
+        system.cpu_record: "{cpu_record}"
+        system.memory_record: "{mem_record}"
+        system.received_record: "{recv_record}"
+        system.sent_record: "{sent_record}"
+        system.input_count: "{inputs}"
+        system.output_count: "{outputs}"
+        system.abnormal_input_count: "{bad_inputs}"
+        system.abnormal_output_count: "{bad_outputs}"
+    - path: "^/api/cube/v2/system/info$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.net_card.*"
+      json:
+        ip: "$.ip"
+        sent: "$.bytes_sent"
+        recv: "$.bytes_recv"
+        sent_total: "$.bytes_sent_total"
+        recv_total: "$.bytes_recv_total"
+        up: "$.is_up"
+        speed: "$.speed"
+        type: "$.type"
+        sent_record: "$.bytes_send_record"
+        recv_record: "$.bytes_recv_record"
+      replace: network.interfaces
+      state:
+        "network.interfaces.{key:key}.ip": "{ip}"
+        "network.interfaces.{key:key}.bytes_sent": "{sent}"
+        "network.interfaces.{key:key}.bytes_received": "{recv}"
+        "network.interfaces.{key:key}.bytes_sent_total": "{sent_total}"
+        "network.interfaces.{key:key}.bytes_received_total": "{recv_total}"
+        "network.interfaces.{key:key}.up": "{up}"
+        "network.interfaces.{key:key}.speed": "{speed}"
+        "network.interfaces.{key:key}.type": "{type}"
+        "network.interfaces.{key:key}.sent_record": "{sent_record}"
+        "network.interfaces.{key:key}.received_record": "{recv_record}"
+
+    # ── system/http/get (2.2), server/version (4.3) ───────────────────
+    - path: "^/api/cube/v2/system/http/get$"
+      json_match: { "$.result": "^ok$" }
+      json: { http: "$.msg.http_port", https: "$.msg.https_port" }
+      state: { system.http_port: "{http}", system.https_port: "{https}" }
+    - path: "^/api/cube/v2/server/version$"
+      json_match: { "$.result": "^ok$" }
+      json: { sn: "$.msg.sn", version: "$.msg.version" }
+      state: { device.serial: "{sn}", device.version: "{version}" }
+
+    # ── user/query (1.7): the unfiltered list replaces the users ──────
+    - path: "^/api/cube/v2/user/query$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: &user_fields
+        id: "$.id"
+        name: "$.name"
+        alias: "$.alias"
+        role: "$.role"
+        panel: "$.panel_m_per"
+        resource: "$.resource_m_per"
+        firmware: "$.firmware_m_per"
+        created: "$.create_time"
+      replace: users
+      state: &user_state
+        "users.{id}.name": "{name}"
+        "users.{id}.alias": "{alias}"
+        "users.{id}.role": { value: "{role}", map: { "0": admin, "1": administrator, "2": user } }
+        "users.{id}.panel_management": "{panel}"
+        "users.{id}.resource_management": "{resource}"
+        "users.{id}.firmware_management": "{firmware}"
+        "users.{id}.created": "{created}"
+    # A filtered query (get_user, find_users) adds what it finds.
+    - path: "^/api/cube/v2/user/query\\?"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: *user_fields
+      state: *user_state
+    - path: "^/api/cube/v2/user/query(\\?.*)?$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg[*].panel_per_list"
+      json: { user: "$^.id", panel: "$.panel_id", view: "$.view_per", switch: "$.switch_per", modify: "$.modify_per" }
+      state: &panel_perm
+        "users.{user}.panels.{panel}.view": "{view}"
+        "users.{user}.panels.{panel}.switch": "{switch}"
+        "users.{user}.panels.{panel}.modify": "{modify}"
+    # panel/permission (6.6): every user's permissions on one panel.
+    - path: "^/api/cube/v2/panel/permission\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: { user: "$.id", view: "$.view_per", switch: "$.switch_per", modify: "$.modify_per" }
+      state:
+        "users.{user}.panels.{1}.view": "{view}"
+        "users.{user}.panels.{1}.switch": "{switch}"
+        "users.{user}.panels.{1}.modify": "{modify}"
+
+    # ── resource/input/all (5.1) ──────────────────────────────────────
+    - path: "^/api/cube/v2/resource/input/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json:
+        id: "$.id"
+        name: "$.name"
+        alias: "$.alias"
+        channel: "$.c_name"
+        group: "$.g_name"
+        ip: "$.d_ip"
+        port: "$.d_port"
+        available: "$.available"
+        label: "$.label_id"
+        conn: "$.conn_type"
+        dis: "$.dis_method"
+      replace: inputs
+      state:
+        "inputs.{id}.name": "{name}"
+        "inputs.{id}.alias": "{alias}"
+        "inputs.{id}.channel_name": "{channel}"
+        "inputs.{id}.group": "{group}"
+        "inputs.{id}.device_ip": "{ip}"
+        "inputs.{id}.device_port": "{port}"
+        "inputs.{id}.available": "{available}"
+        "inputs.{id}.label_id": "{label}"
+        "inputs.{id}.connection": { value: "{conn}", map: { "0": unicast, "1": unicast_multicast } }
+        "inputs.{id}.discovery": { value: "{dis}", map: { "0": manual, "1": auto, "2": server } }
+
+    # ── resource/input/discovery/all (5.6): both lists replace the
+    # methods, and each method's sources are read in turn ───────────────
+    - path: "^/api/cube/v2/resource/input/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.manual"
+      json: &dis_fields { id: "$.id", method: "$.dis_method", group: "$.dis_g_name", device: "$.dis_d_ip", server: "$.dis_s_ip" }
+      replace: discovery
+      state: &dis_state
+        "discovery.{id}.method": { value: "{method}", map: { "0": manual, "1": auto, "2": server } }
+        "discovery.{id}.group": "{group}"
+        "discovery.{id}.device_ip": "{device}"
+        "discovery.{id}.server_ip": "{server}"
+      then_send: [{ method: GET, path: /api/cube/v2/resource/input/manual/discovery }]
+    - path: "^/api/cube/v2/resource/input/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.auto_server"
+      json: *dis_fields
+      replace: discovery
+      state: *dis_state
+    - path: "^/api/cube/v2/resource/input/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.auto_server"
+      each_match: { "$.dis_method": "^1$" }
+      json: { group: "$.dis_g_name" }
+      then_send: [{ method: GET, path: /api/cube/v2/resource/input/auto/discovery, query: { dis_g_name: "{group}" } }]
+    - path: "^/api/cube/v2/resource/input/discovery/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.auto_server"
+      each_match: { "$.dis_method": "^2$" }
+      json: { group: "$.dis_g_name", server: "$.dis_s_ip" }
+      then_send: [{ method: GET, path: /api/cube/v2/resource/input/server/discovery, query: { dis_g_name: "{group}", dis_s_ip: "{server}" } }]
+    # 5.7-5.9: the sources each discovery finds, keyed by URL.
+    - path: "^/api/cube/v2/resource/input/manual/discovery$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: &found { url: "$.url", name: "$.name", channel: "$.c_name", group: "$.dis_g_name", available: "$.available" }
+      replace: discovered.manual
+      state:
+        "discovered.manual.{url:key}.name": "{name}"
+        "discovered.manual.{url:key}.channel_name": "{channel}"
+        "discovered.manual.{url:key}.group": "{group}"
+        "discovered.manual.{url:key}.available": "{available}"
+    - path: "^/api/cube/v2/resource/input/auto/discovery\\?dis_g_name=([^&]*)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: *found
+      replace: "discovered.auto.{1:url_decode:key}"
+      state:
+        "discovered.auto.{1:url_decode:key}.{url:key}.name": "{name}"
+        "discovered.auto.{1:url_decode:key}.{url:key}.channel_name": "{channel}"
+        "discovered.auto.{1:url_decode:key}.{url:key}.available": "{available}"
+    - path: "^/api/cube/v2/resource/input/server/discovery\\?dis_g_name=([^&]*)&dis_s_ip=([^&]*)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: *found
+      replace: "discovered.server.{2:url_decode:key}.{1:url_decode:key}"
+      state:
+        "discovered.server.{2:url_decode:key}.{1:url_decode:key}.{url:key}.name": "{name}"
+        "discovered.server.{2:url_decode:key}.{1:url_decode:key}.{url:key}.channel_name": "{channel}"
+        "discovered.server.{2:url_decode:key}.{1:url_decode:key}.{url:key}.available": "{available}"
+
+    # ── rotation lists (5.13-5.15) ────────────────────────────────────
+    - path: "^/api/cube/v2/resource/rotation-list/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: { id: "$.id", name: "$.name", count: "$.src_num", duration: "$.play_duration" }
+      replace: rotation_lists
+      state:
+        "rotation_lists.{id}.name": "{name}"
+        "rotation_lists.{id}.source_count": "{count}"
+        "rotation_lists.{id}.play_duration": "{duration}"
+      then_send:
+        - { method: GET, path: /api/cube/v2/resource/rotation-list, query: { id: "{id}" } }
+        - { method: GET, path: /api/cube/v2/resource/rotation-list/status, query: { id: "{id}" } }
+    - path: "^/api/cube/v2/resource/rotation-list\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.rotation_srcs"
+      json: { sid: "$.id", input: "$.input_id", name: "$.input_name", alias: "$.input_alias", channel: "$.input_c_name", duration: "$.play_duration" }
+      replace: "rotation_sources.{1}"
+      state:
+        "rotation_sources.{1}.{index}.source_id": "{sid}"
+        "rotation_sources.{1}.{index}.input": "{input}"
+        "rotation_sources.{1}.{index}.input_name": "{name}"
+        "rotation_sources.{1}.{index}.input_alias": "{alias}"
+        "rotation_sources.{1}.{index}.input_channel_name": "{channel}"
+        "rotation_sources.{1}.{index}.play_duration": "{duration}"
+    - path: "^/api/cube/v2/resource/rotation-list/status\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { status: "$.msg.status" }
+      state: { "rotation_in_use.{1}": "{status}" }
+
+    # ── panel/all (6.1): the panels, then each one's details ──────────
+    - path: "^/api/cube/v2/panel/all$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.panels"
+      json: { id: "$.id", name: "$.name", inputs: "$.input_n", outputs: "$.output_n", icon: "$.icon", enabled: "$.enable" }
+      replace: panels
+      state:
+        "panels.{id}.name": "{name}"
+        "panels.{id}.input_count": "{inputs}"
+        "panels.{id}.output_count": "{outputs}"
+        "panels.{id}.icon": "{icon}"
+        "panels.{id}.enabled": "{enabled}"
+      then_send: [{ method: GET, path: /api/cube/v2/panel/detail, query: { id: "{id}" } }]
+
+    # ── panel/detail (6.2) ────────────────────────────────────────────
+    - path: "^/api/cube/v2/panel/detail\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json: { undo: "$.msg.cancel_num", audio: "$.msg.audio_status" }
+      state:
+        "panel_info.{1}.undo_count": "{undo}"
+        "panel_info.{1}.audio_status": "{audio}"
+    - path: "^/api/cube/v2/panel/detail\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.panel_inputs"
+      json: &status_fields { id: "$.id", channel: "$.c_name", label: "$.label_id", available: "$.available", resolution: "$.resolution", vb: "$.v_b", ab: "$.a_b" }
+      replace: "panel_inputs.{1}"
+      state:
+        "panel_inputs.{1}.{id}.channel_name": "{channel}"
+        "panel_inputs.{1}.{id}.label_id": "{label}"
+        "input_status.{id}.available": "{available}"
+        "input_status.{id}.resolution": "{resolution}"
+        "input_status.{id}.video_bitrate": "{vb}"
+        "input_status.{id}.audio_bitrate": "{ab}"
+    - path: "^/api/cube/v2/panel/detail\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.other_inputs"
+      json: *status_fields
+      state:
+        "input_status.{id}.available": "{available}"
+        "input_status.{id}.resolution": "{resolution}"
+        "input_status.{id}.video_bitrate": "{vb}"
+        "input_status.{id}.audio_bitrate": "{ab}"
+    - path: "^/api/cube/v2/panel/detail\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.panel_outputs"
+      json:
+        id: "$.id"
+        name: "$.name"
+        alias: "$.alias"
+        channel: "$.c_name"
+        group: "$.g_name"
+        smooth: "$.smooth"
+        router: "$.router"
+        server: "$.dis_s_ip"
+        conn: "$.conn_type"
+        mult_add: "$.mult_add"
+        mult_mask: "$.mult_mask"
+        ttl: "$.ttl_time"
+        codec_k: "$.codec_k"
+        lock: "$.lock"
+        collect: "$.collect"
+        input: "$.input_id"
+        r_id: "$.r_id"
+        r_loop: "$.r_loop"
+        cri_id: "$.cri_id"
+        cri_index: "$.cri_index"
+        progress: "$.cr_progress"
+        label: "$.label_id"
+        links: "$.link_num"
+        resolution: "$.resolution"
+        vb: "$.v_b"
+        ab: "$.a_b"
+      replace: "panel_outputs.{1}"
+      state:
+        "panel_outputs.{1}.{id}.name": "{name}"
+        "panel_outputs.{1}.{id}.alias": "{alias}"
+        "panel_outputs.{1}.{id}.channel_name": "{channel}"
+        "panel_outputs.{1}.{id}.group": "{group}"
+        "panel_outputs.{1}.{id}.smooth": "{smooth}"
+        "panel_outputs.{1}.{id}.routed": "{router}"
+        "panel_outputs.{1}.{id}.discovery_server_ip": "{server}"
+        "panel_outputs.{1}.{id}.connection": { value: "{conn}", map: { "0": unicast, "1": unicast_multicast } }
+        "panel_outputs.{1}.{id}.multicast_address": "{mult_add}"
+        "panel_outputs.{1}.{id}.multicast_mask": "{mult_mask}"
+        "panel_outputs.{1}.{id}.ttl": "{ttl}"
+        "panel_outputs.{1}.{id}.on_switch": { value: "{codec_k}", map: { "0": keep_connection, "1": reset_connection } }
+        "panel_outputs.{1}.{id}.locked": "{lock}"
+        "panel_outputs.{1}.{id}.favorite": "{collect}"
+        "panel_outputs.{1}.{id}.input": "{input}"
+        "panel_outputs.{1}.{id}.rotation_list": "{r_id}"
+        "panel_outputs.{1}.{id}.rotation_loop": "{r_loop}"
+        "panel_outputs.{1}.{id}.rotation_input": "{cri_id}"
+        "panel_outputs.{1}.{id}.rotation_index": "{cri_index}"
+        "panel_outputs.{1}.{id}.rotation_progress": "{progress}"
+        "panel_outputs.{1}.{id}.label_id": "{label}"
+        "panel_outputs.{1}.{id}.connections": "{links}"
+        "panel_outputs.{1}.{id}.resolution": "{resolution}"
+        "panel_outputs.{1}.{id}.video_bitrate": "{vb}"
+        "panel_outputs.{1}.{id}.audio_bitrate": "{ab}"
+    # panel/detail panel_templates (6.2) and template/query (7.4).
+    - path: "^/api/cube/v2/panel/detail\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg.panel_templates"
+      json: &template_fields { id: "$.id", name: "$.name", start: "$.start" }
+      replace: "panel_templates.{1}"
+      state: &template_state
+        "panel_templates.{1}.{id}.name": "{name}"
+        "panel_templates.{1}.{id}.started": "{start}"
+    - path: "^/api/cube/v2/template/query\\?id=(\\d+)$"
+      json_match: { "$.result": "^ok$" }
+      json_each: "$.msg"
+      json: *template_fields
+      replace: "panel_templates.{1}"
+      state: *template_state
+
+    # ── Read-backs: what a command changed is read again once the
+    # server accepts it ─────────────────────────────────────────────────
+    - path: "^/api/cube/v2/user/(add|del|modify|passwd/modify)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/cube/v2/user/query }]
+    - path: "^/api/cube/v2/system/http/set$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/cube/v2/system/http/get }]
+    - path: "^/api/cube/v2/resource/input/(manual/add|auto/add|server/add|discovery/del)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/cube/v2/resource/input/discovery/all }
+        - { method: GET, path: /api/cube/v2/resource/input/all }
+    - path: "^/api/cube/v2/resource/rotation-list/(add|modify)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/cube/v2/resource/rotation-list/all }]
+    # A deleted list's sources and status go with it.
+    - path: "^/api/cube/v2/resource/rotation-list/del$"
+      request_match: { "$.id": "^(\\d+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      state:
+        "rotation_sources.{1}": { delete: true }
+        "rotation_in_use.{1}": { delete: true }
+      then_send: [{ method: GET, path: /api/cube/v2/resource/rotation-list/all }]
+    - path: "^/api/cube/v2/panel/(output/input|output/rotation-list|output/rotation-list/loop|input/select|output/lock|output/collect|output/manage)$"
+      request_match: { "$.id": "^(\\d+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/cube/v2/panel/detail, query: { id: "{2}" } }]
+    - path: "^/api/cube/v2/panel/input/manage$"
+      request_match: { "$.id": "^(\\d+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/cube/v2/panel/detail, query: { id: "{1}" } }
+        - { method: GET, path: /api/cube/v2/resource/input/all }
+    - path: "^/api/cube/v2/panel/permission/modify$"
+      request_match: { "$.id": "^(\\d+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/cube/v2/panel/permission, query: { id: "{1}" } }]
+    - path: "^/api/cube/v2/template/(add|cancel)$"
+      request_match: { "$.id": "^(\\d+)$" }
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/cube/v2/panel/detail, query: { id: "{2}" } }]
+    # The other template commands name a template, not its panel: the panels
+    # are read again (and with them every panel's details).
+    - path: "^/api/cube/v2/template/(del|name|save|save-as|switch)$"
+      json_match: { "$.result": "^ok$" }
+      json: {}
+      then_send: [{ method: GET, path: /api/cube/v2/panel/all }]
