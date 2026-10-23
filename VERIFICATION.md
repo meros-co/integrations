@@ -1007,6 +1007,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether CueTimer answers a command or a malformed command at all. ([specs/cuetimer.yaml:51](specs/cuetimer.yaml#L51))
 - [ ] Confirm h, m and s are the running timer's remaining time and how overtime is shown in them. ([specs/cuetimer.yaml:265](specs/cuetimer.yaml#L265))
 
+## cuez-automator — Cuez Automator
+
+- [ ] Record the bodies the triggering and timer endpoints answer (documented only as 200 OK) and whether an unknown id answers an error status. ([specs/cuez-automator.yaml:431](specs/cuez-automator.yaml#L431))
+- [ ] Record the device-state socket (/ws/device-state) and the Automator's WebSocket messages, so state can be pushed instead of polled. ([specs/cuez-automator.yaml:437](specs/cuez-automator.yaml#L437))
+- [ ] Confirm a step index counts the trigger itself as 0, and what /api/trigger/step/<n> answers past the last step. ([specs/cuez-automator.yaml:104](specs/cuez-automator.yaml#L104))
+- [ ] Record the shapes of /api/timer, /api/macro/ and /api/trigger/current so timers, macros and the current trigger can be kept in state. ([specs/cuez-automator.yaml:241](specs/cuez-automator.yaml#L241))
+
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
 - [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))
