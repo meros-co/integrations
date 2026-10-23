@@ -27,7 +27,7 @@ use crate::catalog::{DeviceSpec, ParamSpec, Params};
 use crate::module::{
     Bind, BodyPiece, CommandError, CommandId, Connection, Credentials, Cx, HttpRequest,
     HttpResponse, Key, Level, Millis, Module, OpenContext, Outcome, RequestId, SettingsUpdate,
-    SseInput, TcpInput, WsInput, WsRequest,
+    SseInput, TcpInput, TlsTarget, WsInput, WsRequest,
 };
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
@@ -95,6 +95,9 @@ enum Transport {
         /// An error answer, which names nothing it answers: taken as the
         /// reply of a command waiting with `expect.reply_contains`.
         error_match: Option<Regex>,
+        /// `scheme: tls` on a TCP link: the name the certificate is checked
+        /// against, and whether any certificate is accepted.
+        tls: Option<(String, bool)>,
     },
     /// Text messages, one per datagram (ChamSys, XPression over UDP).
     LineUdp {
@@ -1337,8 +1340,18 @@ impl SpecEngine {
         let secure = kind == "http"
             && https_port.is_some()
             && scheme_of(&t, &ctx.settings, "http", "https")? == "https";
-        let port = ctx.port.unwrap_or(match https_port {
-            Some(p) if secure => p,
+        // `scheme: tls` on line-tcp, and `tls_port`, its default port.
+        let tls_port = match t.get("tls_port") {
+            None => None,
+            Some(v) => match v.as_u64() {
+                Some(p @ 1..=65535) => Some(p as u16),
+                _ => return Err("transport.tls_port is not a port".into()),
+            },
+        };
+        let line_tls = kind == "line-tcp" && scheme_of(&t, &ctx.settings, "tcp", "tls")? == "tls";
+        let port = ctx.port.unwrap_or(match (https_port, tls_port) {
+            (Some(p), _) if secure => p,
+            (_, Some(p)) if line_tls => p,
             _ => spec_port,
         });
         let timeout = t
@@ -1411,6 +1424,7 @@ impl SpecEngine {
                         _ => return Err("terminated framing needs a terminator".into()),
                     }),
                     "block" => SendFraming::Block,
+                    "json" => SendFraming::Json,
                     other => return Err(format!("line-tcp framing '{other}' is not implemented")),
                 };
                 let reply = match (str_field(&t, "reply_framing"), framing) {
@@ -1436,6 +1450,7 @@ impl SpecEngine {
                         Regex::new(fence).map_err(|e| format!("reply_fence: {e}"))?;
                         ReplyFraming::Fenced(fence.to_string())
                     }
+                    (Some("json"), _) | (None, "json") => ReplyFraming::Json,
                     (None, "block") => ReplyFraming::Block,
                     (None, "delimited") => ReplyFraming::Delimited { open, close },
                     (None, _) => ReplyFraming::Line,
@@ -1471,6 +1486,13 @@ impl SpecEngine {
                         Some(p) => Some(Regex::new(p).map_err(|e| format!("error_match: {e}"))?),
                         None => None,
                     },
+                    // TLS is the TCP link's: a serial port has none.
+                    tls: (line_tls && !on_serial).then(|| {
+                        (
+                            url_host(&ctx),
+                            t.get("accept_invalid_certs").and_then(Value::as_bool) == Some(true),
+                        )
+                    }),
                 }
             }
             "line-udp" => Transport::LineUdp {
@@ -2038,6 +2060,13 @@ impl SpecEngine {
 
     /// A declared endpoint (`transport.endpoints`), by name.
     fn endpoint(&self, name: &str) -> Result<&Endpoint, String> {
+        // Beside a `serial` block, a device on its serial port may have been
+        // opened without a host: its HTTP servers cannot be reached then.
+        if self.host.is_unspecified() {
+            return Err(format!(
+                "endpoint '{name}' needs the device's host: open it with one to reach its HTTP server"
+            ));
+        }
         self.endpoints
             .get(name)
             .ok_or_else(|| format!("no endpoint '{name}' in transport.endpoints"))
@@ -2914,11 +2943,23 @@ impl SpecEngine {
     fn connect(&mut self, cx: &mut Cx) {
         let replies = self.transport.replies();
         match &self.transport {
-            Transport::LineTcp { reply, serial, .. } => {
+            Transport::LineTcp {
+                reply, serial, tls, ..
+            } => {
                 self.framer = Some(Framer::new(reply.clone()));
-                match serial {
-                    Some(port) => cx.serial_open(SOCKET, port.clone()),
-                    None => cx.tcp_open(SOCKET, SocketAddr::new(self.host, self.port())),
+                let to = SocketAddr::new(self.host, self.port());
+                match (serial, tls) {
+                    (Some(port), _) => cx.serial_open(SOCKET, port.clone()),
+                    (None, Some((server_name, accept_invalid_certs))) => cx.tcp_open_tls(
+                        SOCKET,
+                        TlsTarget {
+                            to,
+                            server_name: server_name.clone(),
+                            accept_invalid_certs: *accept_invalid_certs,
+                            preamble: None,
+                        },
+                    ),
+                    (None, None) => cx.tcp_open(SOCKET, to),
                 }
             }
             Transport::OscTcp { framing, .. } => {
@@ -4295,13 +4336,14 @@ impl Module for SpecEngine {
             Ok(fresh) => fresh,
             Err(reason) => return SettingsUpdate::Rejected(reason),
         };
-        // Another serial port, or other line settings: the port is opened
-        // again, by building the device afresh.
-        let serial = |t: &Transport| match t {
-            Transport::LineTcp { serial, .. } => serial.clone(),
-            _ => None,
+        // Another serial port, or other line settings, or TLS turned on or
+        // off (and with it the port): the link is opened again, by building
+        // the device afresh.
+        let link = |e: &SpecEngine| match &e.transport {
+            Transport::LineTcp { serial, tls, .. } => (serial.clone(), tls.clone(), e.port()),
+            _ => (None, None, 0),
         };
-        if serial(&self.transport) != serial(&fresh.transport) {
+        if link(self) != link(&fresh) {
             return SettingsUpdate::Restart;
         }
         self.ctx = fresh.ctx;
@@ -5982,6 +6024,130 @@ mod tests {
             TcpInput::Data(b"{\"type\":\"level\",\"db\":-6.5}\r\n".to_vec()),
         );
         assert!(cx.take().contains(&Action::State(json!({"level": -6.5}))));
+    }
+
+    #[test]
+    fn a_json_stream_is_read_one_value_at_a_time() {
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        spec.transport = Some(json!({"type": "line-tcp", "port": 9090, "framing": "json"}));
+        spec.telemetry = Some(json!({"updates": [{
+            "json_match": {"$.method": "^property\\.changed$"},
+            "json": {"v": "$.params.property[0].v"},
+            "state": {"level": "{v}"},
+        }]}));
+        spec.state =
+            serde_json::from_value(json!({"level": {"type": "float", "description": "x"}}))
+                .unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        // Pretty-printed and split across reads, with no line ending after.
+        let mut cx = Cx::new(1);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(
+                b"{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"property.changed\",".to_vec(),
+            ),
+        );
+        assert!(!cx.take().iter().any(|a| matches!(a, Action::State(_))));
+        let mut cx = Cx::new(2);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"\n  \"params\": {\"property\": [{\"v\": 2.5}]}\n}".to_vec()),
+        );
+        assert!(cx.take().contains(&Action::State(json!({"level": 2.5}))));
+    }
+
+    #[test]
+    fn a_line_transport_can_open_tls_on_its_own_port() {
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        spec.transport = Some(json!({"type": "line-tcp", "port": 9090, "framing": "json",
+            "scheme": {"setting": "scheme"}, "tls_port": 9091, "accept_invalid_certs": true}));
+        let open = |scheme: &str, port: Option<u16>, host_name: Option<&str>| {
+            let mut settings = Params::new();
+            settings.insert("scheme".into(), json!(scheme));
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+                    host_name: host_name.map(str::to_string),
+                    port,
+                    model: "p3000-generic".into(),
+                    channels: None,
+                    settings,
+                    monitor: true,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            cx.take()
+        };
+        let to = |port| SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)), port);
+        // TLS on tls_port, the certificate checked against the address or
+        // the name the device was opened with (here, any is accepted).
+        assert!(open("tls", None, None).contains(&Action::TcpOpenTls {
+            socket: SOCKET,
+            target: TlsTarget {
+                to: to(9091),
+                server_name: "10.0.0.5".into(),
+                accept_invalid_certs: true,
+                preamble: None,
+            },
+        }));
+        assert!(
+            open("tls", Some(4000), Some("pj.example")).contains(&Action::TcpOpenTls {
+                socket: SOCKET,
+                target: TlsTarget {
+                    to: to(4000),
+                    server_name: "pj.example".into(),
+                    accept_invalid_certs: true,
+                    preamble: None,
+                },
+            })
+        );
+        // Plain TCP on the transport's own port.
+        assert!(open("tcp", None, None).contains(&Action::TcpOpen {
+            socket: SOCKET,
+            to: to(9090),
+        }));
+        // A scheme the transport does not know is refused.
+        spec.transport = Some(json!({"type": "line-tcp", "port": 9090, "framing": "json",
+            "scheme": "https"}));
+        assert!(SpecEngine::new(
+            Arc::new(spec.clone()),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: true,
+            },
+        )
+        .is_err());
     }
 
     #[test]
@@ -7716,6 +7882,63 @@ state:
         assert_eq!(completed(&a), vec![(4, Err(CommandError::Timeout))]);
         assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
         assert_eq!(e.link, Connection::Connected);
+    }
+
+    #[test]
+    fn endpoints_beside_a_serial_link_need_the_host() {
+        let text = LINE_ENDPOINT.replace(
+            "  probe: ping\n",
+            "  probe: ping\n  serial: { baud_rate: 9600, data_bits: 8, parity: none, stop_bits: 1, flow_control: none }\n",
+        )
+        .replace(
+            "  - { port: 9993, protocol: tcp, role: control }\n",
+            "  - { port: 9993, protocol: tcp, role: control, when: \"link tcp\" }\n  - { port: null, protocol: serial, role: control, setting: serial_port, when: \"link serial\" }\n",
+        );
+        let spec = DeviceSpec::from_yaml(&text).unwrap();
+        let open = |host: IpAddr| {
+            let settings = crate::catalog::validate(
+                &spec.settings,
+                json!({"link": "serial", "serial_port": "COM9"})
+                    .as_object()
+                    .unwrap(),
+            )
+            .unwrap();
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host,
+                    host_name: None,
+                    port: None,
+                    model: "m".into(),
+                    channels: None,
+                    settings,
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            assert!(cx
+                .take()
+                .iter()
+                .any(|a| matches!(a, Action::SerialOpen { .. })));
+            let mut cx = Cx::new(1);
+            e.command(&mut cx, 1, "csr", &Params::new());
+            cx.take()
+        };
+        // With a host, the endpoint is reached over the network.
+        let a = open(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        assert_eq!(
+            requests(&a).remove(0).1.url,
+            "http://127.0.0.1:80/admin/api/v1/csr"
+        );
+        // Without one, there is no HTTP server to reach.
+        let a = open(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+        assert!(requests(&a).is_empty());
+        assert!(matches!(
+            completed(&a).as_slice(),
+            [(1, Err(CommandError::InvalidParams { message }))] if message.contains("needs the device's host")
+        ));
     }
 
     #[test]

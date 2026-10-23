@@ -222,5 +222,34 @@ class SerialBlock(unittest.TestCase):
         self.assertTrue(validate.expand_serial(self.doc(overrides=5)))
 
 
+class LineTls(unittest.TestCase):
+    def doc(self):
+        return {
+            "transport": {"type": "line-tcp", "port": 9090, "scheme": {"setting": "scheme"},
+                          "tls_port": 9091, "accept_invalid_certs": True},
+            "settings": {"scheme": {"type": "enum", "values": ["tcp", "tls"], "default": "tls"}},
+            "ports": [{"port": 9091, "protocol": "tls", "role": "control", "when": "scheme tls"},
+                      {"port": 9090, "protocol": "tcp", "role": "control", "when": "scheme tcp"}],
+        }
+
+    def errors(self, doc):
+        return validate.session_checks(doc) + [
+            e for e in validate.cross_field_checks(doc, "x.yaml") if "scheme" in e or "accept" in e]
+
+    def test_a_line_transport_may_choose_tls(self):
+        self.assertEqual(self.errors(self.doc()), [])
+
+    def test_what_tls_on_a_line_transport_needs(self):
+        doc = self.doc()
+        doc["ports"] = doc["ports"][1:]
+        self.assertIn("ports: no tls control entry for tls_port 9091", self.errors(doc))
+        doc = self.doc()
+        doc["settings"]["scheme"]["values"] = ["http", "https"]
+        self.assertTrue(any("enum of tcp and tls" in e for e in self.errors(doc)))
+        doc = self.doc()
+        doc["transport"] = {"type": "line-tcp", "port": 9090, "accept_invalid_certs": True}
+        self.assertTrue(any("accept_invalid_certs needs a TLS scheme" in e for e in self.errors(doc)))
+
+
 if __name__ == "__main__":
     unittest.main()

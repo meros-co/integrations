@@ -456,7 +456,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     transport = doc.get("transport") or {}
     websocket = (doc.get("telemetry") or {}).get("websocket")
     schemes = [("transport", transport.get("scheme"),
-                {"ws", "wss"} if transport_type == "ws" else {"http", "https"})]
+                {"ws", "wss"} if transport_type == "ws"
+                else {"tcp", "tls"} if transport_type == "line-tcp" else {"http", "https"})]
     if websocket:
         schemes.append(("telemetry.websocket", websocket.get("scheme"), {"ws", "wss"}))
     for where_, block in (("telemetry.websocket", websocket or {}),
@@ -485,11 +486,12 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                           + (" (or of http and https)" if allowed == {"ws", "wss"} else ""))
     # accept_invalid_certs only means something over TLS.
     for where_, obj, default in [
-            ("transport", transport, "ws" if transport_type == "ws" else "http"),
+            ("transport", transport, "ws" if transport_type == "ws"
+             else "tcp" if transport_type == "line-tcp" else "http"),
             ("telemetry.websocket", websocket or {}, "ws")]:
         scheme = obj.get("scheme", default)
-        if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http"):
-            errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https or a setting)")
+        if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http", "tcp"):
+            errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https, tls or a setting)")
     if websocket:
         url = websocket.get("url")
         if url is not None:
@@ -781,6 +783,18 @@ def session_checks(doc: dict) -> list[str]:
                     re.compile(pattern)
                 except re.error as e:
                     errors.append(f"transport.session.{key}.json: {e}")
+    # `scheme: tls` on line-tcp, and `tls_port` (SPEC.md §2, TLS).
+    if "scheme" in transport and transport.get("type") not in ("http", "ws", "line-tcp"):
+        errors.append(f"transport.scheme is not for {transport.get('type')}")
+    if "tls_port" in transport:
+        if not isinstance(transport.get("scheme"), dict):
+            errors.append("transport.tls_port needs scheme: {setting: name}")
+        if not any(e["port"] == transport["tls_port"] and e["role"] == "control" and e["protocol"] == "tls"
+                   for e in doc.get("ports") or []):
+            errors.append(f"ports: no tls control entry for tls_port {transport['tls_port']}")
+    if transport.get("type") == "line-tcp" and transport.get("scheme") not in (None, "tcp") and "tls_port" not in transport:
+        if not any(e["role"] == "control" and e["protocol"] == "tls" for e in doc.get("ports") or []):
+            errors.append("ports: a line-tcp transport with a tls scheme needs a tls control entry")
     if "https_port" in transport:
         if not isinstance(transport.get("scheme"), dict):
             errors.append("transport.https_port needs scheme: {setting: name}")
@@ -1098,8 +1112,6 @@ def expand_serial(doc: dict) -> list[str]:
         return errors
     if t.get("type") != "line-tcp":
         return ["transport.serial is for a line-tcp transport"]
-    if "endpoints" in t:
-        errors.append("transport.serial: a serial port reaches no endpoints")
     model_ids = {m["id"] for m in doc.get("models") or []}
     for key in ("serial_only", "models"):
         for m in block.get(key) or []:
@@ -1198,7 +1210,9 @@ def expand_serial(doc: dict) -> list[str]:
     ports = doc.get("ports") or []
     if not any(e["protocol"] == "serial" and e.get("when") == "link serial" for e in ports):
         errors.append('ports: transport.serial needs a serial control entry with when: "link serial"')
-    if not any(e["protocol"] == "tcp" and e["port"] == t.get("port") and e.get("when") == "link tcp"
+    # "link tcp", or "link tcp, scheme tcp" beside a TLS scheme setting.
+    if not any(e["protocol"] == "tcp" and e["port"] == t.get("port")
+               and str(e.get("when", "")).split(",")[0].strip() == "link tcp"
                for e in ports):
         errors.append(f'ports: the transport port {t.get("port")} needs when: "link tcp" beside transport.serial')
     return errors

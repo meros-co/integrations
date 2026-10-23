@@ -268,10 +268,12 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     engine.start(&mut cx);
     let mut connected = cx.take();
     check_link(link, &connected)?;
-    if connected
-        .iter()
-        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::SerialOpen { .. }))
-    {
+    if connected.iter().any(|a| {
+        matches!(
+            a,
+            Action::TcpOpen { .. } | Action::TcpOpenTls { .. } | Action::SerialOpen { .. }
+        )
+    }) {
         let mut cx = Cx::new(1);
         engine.tcp(&mut cx, "device", TcpInput::Connected);
         // A login that waits for the device's prompts is given each in turn
@@ -578,10 +580,12 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let started = cx.take();
     check_link(link, &started)?;
     let mut cx = Cx::new(1);
-    if started
-        .iter()
-        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::SerialOpen { .. }))
-    {
+    if started.iter().any(|a| {
+        matches!(
+            a,
+            Action::TcpOpen { .. } | Action::TcpOpenTls { .. } | Action::SerialOpen { .. }
+        )
+    }) {
         engine.tcp(&mut cx, "device", TcpInput::Connected);
         // A login that waits for the device's prompts is given each in turn
         // (Sharp's user name, then password).
@@ -694,6 +698,14 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             reply: super::ReplyFraming::Block,
             ..
         } => format!("{line}\r\n\r\n"),
+        // A JSON stream's messages are JSON values (Barco Pulse).
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::Json,
+            ..
+        } => format!(
+            "{{\"jsonrpc\":\"2.0\",\"result\":{}}}",
+            Value::String(line.into())
+        ),
         _ => format!("{line}\r\n"),
     }
     .into_bytes();
@@ -920,7 +932,9 @@ fn check_link(serial: Option<bool>, started: &[Action]) -> Result<(), String> {
     let opened_serial = started
         .iter()
         .any(|a| matches!(a, Action::SerialOpen { .. }));
-    let opened_tcp = started.iter().any(|a| matches!(a, Action::TcpOpen { .. }));
+    let opened_tcp = started
+        .iter()
+        .any(|a| matches!(a, Action::TcpOpen { .. } | Action::TcpOpenTls { .. }));
     match serial {
         Some(true) if !opened_serial => Err("link serial did not open the serial port".into()),
         Some(false) if !opened_tcp => Err("link tcp did not open a TCP connection".into()),

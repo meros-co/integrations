@@ -48,6 +48,9 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "barco-encore",
             "barco-eventmaster",
             "barco-eventmaster-telnet",
+            "barco-projection-protocol",
+            "barco-pulse",
+            "barco-rlm-w14",
         ],
     ),
     (
@@ -78,7 +81,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-castr", &["castr"]),
     ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
-    ("vendor-christie", &["christie-spyder"]),
+    (
+        "vendor-christie",
+        &["christie-1dlp", "christie-spyder", "christie-trulife"],
+    ),
     ("vendor-churchapps", &["freeshow"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-digico", &["digico-sd"]),
@@ -88,6 +94,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-dbaudio", &["dbaudio"]),
     ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
+    (
+        "vendor-digitalprojection",
+        &[
+            "digitalprojection-evision-6500",
+            "digitalprojection-evision-op",
+            "digitalprojection-projector",
+        ],
+    ),
     ("vendor-disguise", &["disguise"]),
     ("vendor-epson", &["epson-projector"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),

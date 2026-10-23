@@ -42,6 +42,10 @@ mod allenheath_sq;
 mod analogway;
 #[cfg(feature = "blackmagic-atem")]
 mod atem;
+#[cfg(feature = "barco-projection-protocol")]
+mod barco_projection;
+#[cfg(feature = "barco-projection-protocol")]
+mod barco_projection_table;
 #[cfg(feature = "bss-london")]
 mod bss_london;
 #[cfg(feature = "dbaudio")]
@@ -315,6 +319,10 @@ pub(crate) fn construct(
             None => Err("EasyWorship has no fixed port: give the port it advertises over Bonjour (_ezwremote._tcp)"
                 .into()),
         },
+        #[cfg(feature = "barco-projection-protocol")]
+        "barco-projection-protocol" => Ok(Box::new(barco_projection::BarcoProjection::new(
+            context,
+        )?)),
         #[cfg(feature = "dhd-ecp")]
         "dhd-ecp" => Ok(Box::new(dhd_ecp::DhdEcp::new(spec, context)?)),
         #[cfg(feature = "nec-display")]

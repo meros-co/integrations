@@ -1,0 +1,587 @@
+spec: 1
+id: digitalprojection-evision-6500
+name: Digital Projection E-Vision Laser 6500 II (VXX command set)
+vendor: Digital Projection
+category: display
+
+# The E-Vision Laser 6500 II takes "V" + a two-digit projector ID (99 for every
+# projector) + "G" (get) or "S" (set) + a four-digit command code + the value,
+# ended by CR, on RS-232 and as "RS232 by Telnet" on TCP 23. It answers "P" (and
+# the value for a get) or "F". Power on is "op power.on" from software V04.
+source:
+  - title: "Protocol Commands E-Vision Laser 6500 II rev B, 122-724A, 2021-06-17"
+    author: Digital Projection Ltd
+    url: http://www.digitalprojection.co.uk/dpdownloads/Protocol/122-724A%20Protocol%20Commands%20E-Vision%20Laser%206500%20II%20rev%20B%2020210617.xlsx
+    note: "Manufacturer document (spreadsheet). RS232 settings, TCP 23, command structure and P/F results, command groups 00 to 03."
+
+settings:
+  projector_id: { type: int, min: 0, max: 99, default: 99, label: "Projector ID", description: "Projector ID in each command; 99 addresses every projector, another ID only the projector set to it." }
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  probe: "V{settings.projector_id:02d}G0007"
+  # The same commands on the RS-232 port: 9600 8N1, no flow control.
+  serial:
+    baud_rate: 9600
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "RS232 by Telnet" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232, 9-pin D-sub" }
+
+models:
+  - id: e-vision-laser-6500-ii
+    name: "Digital Projection E-Vision Laser 6500 II"
+    supports: [
+      power_on, power_off, resync, system_reset, select_input, set_brightness, get_brightness, set_contrast,
+      get_contrast, set_color, get_color, set_tint, get_tint, set_sharpness, get_sharpness, set_color_temperature,
+      get_color_temperature, set_gamma, get_gamma, set_display_mode, get_display_mode, set_scaling, get_scaling,
+      set_blank, get_blank, set_freeze, get_freeze, set_volume, get_volume, set_projection_mode,
+      get_projection_mode, set_vertical_keystone, get_vertical_keystone, set_horizontal_keystone,
+      get_horizontal_keystone, set_zoom, get_zoom, set_threed, get_threed, set_threed_sync_invert,
+      get_threed_sync_invert, set_threed_format, get_threed_format, set_lamp_mode, get_lamp_mode, set_logo,
+      get_logo, set_fan_speed, get_fan_speed, set_sleep_timer, get_sleep_timer, get_lamp_hours, get_filter_hours,
+      get_status, get_firmware_version, get_source
+    ]
+    verification: none
+
+maps:
+  input: { "rgb": "01", "dvi": "03", "video": "04", "hdmi": "06", "bnc": "07", "hdmi2": "09", "hdbaset": "13" }
+
+commands:
+  power_on:
+    summary: "Power on (\"op power.on\", which replaces VXXS0001 from software V04)"
+    send: "op power.on"
+    expect: { matches: "^(?:P|(?i:op ))" }
+    returns: ack
+  power_off:
+    summary: "Power off (VXXS0002)"
+    send: "V{settings.projector_id:02d}S0002"
+    expect: { matches: "^P" }
+    returns: ack
+  resync:
+    summary: "Resync to the input (VXXS0003)"
+    send: "V{settings.projector_id:02d}S0003"
+    expect: { matches: "^P" }
+    returns: ack
+  system_reset:
+    summary: "System reset: restores the factory settings (VXXS0006)"
+    send: "V{settings.projector_id:02d}S0006"
+    expect: { matches: "^P" }
+    returns: ack
+  select_input:
+    summary: "Select the input (VXXS0201 to VXXS0213)"
+    params:
+      input: { type: "enum", values: ["rgb", "dvi", "video", "hdmi", "bnc", "hdmi2", "hdbaset"], required: true, label: "Input", description: "Input to select: rgb, dvi, video, hdmi, bnc, hdmi2 or hdbaset." }
+    send: "V{settings.projector_id:02d}S02{input:map.input}"
+    expect: { matches: "^P" }
+    returns: ack
+  set_brightness:
+    summary: "Set brightness (VXXS0101n)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Brightness", description: "Picture brightness, 0 to 100." }
+    send: "V{settings.projector_id:02d}S0101{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_brightness:
+    summary: "Read brightness (VXXG0101); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0101"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_contrast:
+    summary: "Set contrast (VXXS0102n)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Contrast", description: "Picture contrast, 0 to 100." }
+    send: "V{settings.projector_id:02d}S0102{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_contrast:
+    summary: "Read contrast (VXXG0102); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0102"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_color:
+    summary: "Set color (VXXS0103n)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Color", description: "Color saturation, 0 to 100." }
+    send: "V{settings.projector_id:02d}S0103{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_color:
+    summary: "Read color (VXXG0103); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0103"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_tint:
+    summary: "Set tint (VXXS0104n)"
+    params:
+      value: { type: "int", min: 0, max: 100, required: true, label: "Tint", description: "Tint, 0 to 100." }
+    send: "V{settings.projector_id:02d}S0104{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_tint:
+    summary: "Read tint (VXXG0104); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0104"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_sharpness:
+    summary: "Set sharpness (VXXS0105n)"
+    params:
+      value: { type: "int", min: 0, max: 31, required: true, label: "Sharpness", description: "Sharpness, 0 to 31." }
+    send: "V{settings.projector_id:02d}S0105{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_sharpness:
+    summary: "Read sharpness (VXXG0105); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0105"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_color_temperature:
+    summary: "Set color temperature (VXXS0106n)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Color temperature", description: "Color temperature: 0 = Warm, 1 = Normal, 2 = Cold." }
+    send: "V{settings.projector_id:02d}S0106{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_color_temperature:
+    summary: "Read color temperature (VXXG0106); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0106"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_gamma:
+    summary: "Set gamma (VXXS0107n)"
+    params:
+      value: { type: "int", min: 0, max: 5, required: true, label: "Gamma", description: "Gamma: 0 = 1.8, 1 = 2.0, 2 = 2.2, 3 = 2.4, 4 = B&W, 5 = Linear." }
+    send: "V{settings.projector_id:02d}S0107{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_gamma:
+    summary: "Read gamma (VXXG0107); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0107"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_display_mode:
+    summary: "Set display mode (VXXS0108n)"
+    params:
+      value: { type: "int", min: 0, max: 10, required: true, label: "Display mode", description: "Display (picture) mode; 7 Blackboard is not used on the 6500 II B: 0 = Presentation, 1 = Bright, 2 = Game, 3 = Movie, 4 = Vivid, 5 = TV, 6 = sRGB, 7 = Blackboard, 8 = DICOM SIM, 9 = User, 10 = User2." }
+    send: "V{settings.projector_id:02d}S0108{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_display_mode:
+    summary: "Read display mode (VXXG0108); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0108"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_scaling:
+    summary: "Set scaling (VXXS0301n)"
+    params:
+      value: { type: "int", min: 0, max: 5, required: true, label: "Scaling", description: "Aspect scaling: 0 = Fill, 1 = 4:3, 2 = 16:9, 3 = Letter Box, 4 = Native, 5 = 2.35:1." }
+    send: "V{settings.projector_id:02d}S0301{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_scaling:
+    summary: "Read scaling (VXXG0301); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0301"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_blank:
+    summary: "Set blank (VXXS0302n)"
+    params:
+      value: { type: "bool", required: true, label: "Blank", description: "On sets blank on, off sets it off." }
+    send: "V{settings.projector_id:02d}S0302{value:bool01}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_blank:
+    summary: "Read blank (VXXG0302); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0302"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_freeze:
+    summary: "Set freeze (VXXS0304n)"
+    params:
+      value: { type: "bool", required: true, label: "Freeze", description: "On sets freeze on, off sets it off." }
+    send: "V{settings.projector_id:02d}S0304{value:bool01}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_freeze:
+    summary: "Read freeze (VXXG0304); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0304"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_volume:
+    summary: "Set volume (VXXS0305n)"
+    params:
+      value: { type: "int", min: 0, max: 10, required: true, label: "Volume", description: "Volume, 0 to 10." }
+    send: "V{settings.projector_id:02d}S0305{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_volume:
+    summary: "Read volume (VXXG0305); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0305"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_projection_mode:
+    summary: "Set projection mode (VXXS0308n)"
+    params:
+      value: { type: "int", min: 0, max: 3, required: true, label: "Projection mode", description: "Projection mode: 0 = Front tabletop, 1 = Rear tabletop, 2 = Front ceiling, 3 = Rear ceiling." }
+    send: "V{settings.projector_id:02d}S0308{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_projection_mode:
+    summary: "Read projection mode (VXXG0308); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0308"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_vertical_keystone:
+    summary: "Set vertical keystone (VXXS0309n)"
+    params:
+      value: { type: "int", min: -30, max: 30, required: true, label: "Vertical keystone", description: "Vertical keystone, -30 to 30." }
+    send: "V{settings.projector_id:02d}S0309{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_vertical_keystone:
+    summary: "Read vertical keystone (VXXG0309); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0309"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_horizontal_keystone:
+    summary: "Set horizontal keystone (VXXS0310n)"
+    params:
+      value: { type: "int", min: -25, max: 25, required: true, label: "Horizontal keystone", description: "Horizontal keystone, -25 to 25." }
+    send: "V{settings.projector_id:02d}S0310{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_horizontal_keystone:
+    summary: "Read horizontal keystone (VXXG0310); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0310"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_zoom:
+    summary: "Set digital zoom (VXXS0311n)"
+    params:
+      value: { type: "int", min: -10, max: 10, required: true, label: "Digital zoom", description: "Digital zoom, -10 to 10." }
+    send: "V{settings.projector_id:02d}S0311{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_zoom:
+    summary: "Read digital zoom (VXXG0311); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0311"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_threed:
+    summary: "Set 3D (VXXS0315n)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "3D", description: "3D mode: 0 = Off, 1 = DLP-Link, 2 = IR." }
+    send: "V{settings.projector_id:02d}S0315{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_threed:
+    summary: "Read 3D (VXXG0315); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0315"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_threed_sync_invert:
+    summary: "Set 3D sync invert (VXXS0316n)"
+    params:
+      value: { type: "bool", required: true, label: "3D sync invert", description: "On sets 3d sync invert on, off sets it off." }
+    send: "V{settings.projector_id:02d}S0316{value:bool01}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_threed_sync_invert:
+    summary: "Read 3D sync invert (VXXG0316); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0316"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_threed_format:
+    summary: "Set 3D format (VXXS0317n)"
+    params:
+      value: { type: "int", min: 0, max: 4, required: true, label: "3D format", description: "3D format: 0 = Frame Sequential, 1 = Top/Bottom, 2 = Side-By-Side, 3 = Frame Packing, 4 = Auto." }
+    send: "V{settings.projector_id:02d}S0317{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_threed_format:
+    summary: "Read 3D format (VXXG0317); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0317"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_lamp_mode:
+    summary: "Set light mode (VXXS0319n)"
+    params:
+      value: { type: "int", min: 0, max: 5, required: true, label: "Light mode", description: "Light source mode: 0 = Normal, 1 = Eco, 2 = Eco Plus, 3 = Dimming, 4 = Extreme Dimming, 5 = Custom Light." }
+    send: "V{settings.projector_id:02d}S0319{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_lamp_mode:
+    summary: "Read light mode (VXXG0319); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0319"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_logo:
+    summary: "Set logo (VXXS0321n)"
+    params:
+      value: { type: "int", min: 0, max: 2, required: true, label: "Logo", description: "Startup logo: 0 = Standard Logo, 1 = Black screen, 2 = Blue screen." }
+    send: "V{settings.projector_id:02d}S0321{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_logo:
+    summary: "Read logo (VXXG0321); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0321"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_fan_speed:
+    summary: "Set fan speed (VXXS0322n)"
+    params:
+      value: { type: "int", min: 0, max: 1, required: true, label: "Fan speed", description: "Fan speed: 0 = Normal, 1 = High." }
+    send: "V{settings.projector_id:02d}S0322{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_fan_speed:
+    summary: "Read fan speed (VXXG0322); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0322"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  set_sleep_timer:
+    summary: "Set sleep timer (VXXS0330n)"
+    params:
+      value: { type: "int", min: 0, max: 120, required: true, label: "Sleep timer", description: "Sleep timer, 0 to 120 (0 is off)." }
+    send: "V{settings.projector_id:02d}S0330{value}"
+    expect: { matches: "^P" }
+    returns: ack
+  get_sleep_timer:
+    summary: "Read sleep timer (VXXG0330); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0330"
+    expect: { matches: "^P ?(-?[0-9]+)$" }
+    returns: value
+  get_lamp_hours:
+    summary: "Light source hours (VXXG0004); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0004"
+    expect: { matches: "^P ?(-?[0-9]+) *$" }
+    returns: value
+  get_filter_hours:
+    summary: "Air filter hours, 0 to 60000 (VXXG0005); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0005"
+    expect: { matches: "^P ?(-?[0-9]+) *$" }
+    returns: value
+  get_status:
+    summary: "System status: 0 Reset, 1 Standby, 2 Operation, 3 Cooling (VXXG0007); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0007"
+    expect: { matches: "^P ?(-?[0-9]+) *$" }
+    returns: value
+  get_firmware_version:
+    summary: "Firmware version (VXXG0008); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0008"
+    expect: { matches: "^P ?(.+?) *$" }
+    returns: value
+  get_source:
+    summary: "Current source: 1 RGB, 3 DVI, 4 Video, 6 HDMI, 7 BNC, 9 HDMI 2, 13 HDBaseT (2 RGB2, 5 S-Video, 8 Component and 10 DisplayPort are listed but not used on the 6500 II B) (VXXG0220); the reply also updates state"
+    send: "V{settings.projector_id:02d}G0220"
+    expect: { matches: "^P ?(-?[0-9]+) *$" }
+    returns: value
+
+telemetry:
+  # Nothing is pushed and a reply does not name what it answers, so each rule
+  # reads the reply to its own query. Status, input, blank and freeze every 2 s,
+  # hours every 60 s, settings every 60 s, firmware once.
+  poll:
+    - every_ms: 2000
+      send:
+        - "V{settings.projector_id:02d}G0302"
+        - "V{settings.projector_id:02d}G0304"
+        - "V{settings.projector_id:02d}G0007"
+        - "V{settings.projector_id:02d}G0220"
+    - every_ms: 60000
+      send:
+        - "V{settings.projector_id:02d}G0101"
+        - "V{settings.projector_id:02d}G0102"
+        - "V{settings.projector_id:02d}G0103"
+        - "V{settings.projector_id:02d}G0104"
+        - "V{settings.projector_id:02d}G0105"
+        - "V{settings.projector_id:02d}G0106"
+        - "V{settings.projector_id:02d}G0107"
+        - "V{settings.projector_id:02d}G0108"
+        - "V{settings.projector_id:02d}G0301"
+        - "V{settings.projector_id:02d}G0305"
+        - "V{settings.projector_id:02d}G0308"
+        - "V{settings.projector_id:02d}G0309"
+        - "V{settings.projector_id:02d}G0310"
+        - "V{settings.projector_id:02d}G0311"
+        - "V{settings.projector_id:02d}G0315"
+        - "V{settings.projector_id:02d}G0316"
+        - "V{settings.projector_id:02d}G0317"
+        - "V{settings.projector_id:02d}G0319"
+        - "V{settings.projector_id:02d}G0321"
+        - "V{settings.projector_id:02d}G0322"
+        - "V{settings.projector_id:02d}G0330"
+        - "V{settings.projector_id:02d}G0004"
+        - "V{settings.projector_id:02d}G0005"
+    - send:
+        - "V{settings.projector_id:02d}G0008"
+  updates:
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0101$"
+      state: { "picture.brightness": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0102$"
+      state: { "picture.contrast": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0103$"
+      state: { "picture.color": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0104$"
+      state: { "picture.tint": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0105$"
+      state: { "picture.sharpness": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0106$"
+      state: { "picture.color_temperature": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0107$"
+      state: { "picture.gamma": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0108$"
+      state: { "picture.display_mode": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0301$"
+      state: { "picture.scaling": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0302$"
+      state: { "blank": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0304$"
+      state: { "freeze": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0305$"
+      state: { "audio.volume": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0308$"
+      state: { "setup.projection_mode": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0309$"
+      state: { "geometry.vertical_keystone": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0310$"
+      state: { "geometry.horizontal_keystone": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0311$"
+      state: { "geometry.zoom": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0315$"
+      state: { "threed.mode": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0316$"
+      state: { "threed.sync_invert": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0317$"
+      state: { "threed.format": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0319$"
+      state: { "light.mode": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0321$"
+      state: { "setup.logo": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0322$"
+      state: { "setup.fan_speed": "{1}" }
+    - match: "^P ?(-?[0-9]+)$"
+      request_match: "^V[0-9]{2}G0330$"
+      state: { "setup.sleep_timer": "{1}" }
+    - match: "^P ?(-?[0-9]+) *$"
+      request_match: "^V[0-9]{2}G0004$"
+      state: { "light.hours": "{1}" }
+    - match: "^P ?(-?[0-9]+) *$"
+      request_match: "^V[0-9]{2}G0005$"
+      state: { "filter.hours": "{1}" }
+    - match: "^P ?(-?[0-9]+) *$"
+      request_match: "^V[0-9]{2}G0007$"
+      state: { "status": "{1}" }
+    - match: "^P ?(.+?) *$"
+      request_match: "^V[0-9]{2}G0008$"
+      state: { "device.firmware_version": "{1}" }
+    - match: "^P ?(-?[0-9]+) *$"
+      request_match: "^V[0-9]{2}G0220$"
+      state: { "input": "{1}" }
+
+state:
+  audio.volume: { type: int, description: "Volume, 0 to 10." }
+  blank: { type: bool, description: "Picture blanked; while blanked only this command releases it." }
+  device.firmware_version: { type: string, description: "Firmware version." }
+  filter.hours: { type: int, description: "Air filter hours, 0 to 60000." }
+  freeze: { type: bool, description: "Picture frozen; while frozen only this command releases it." }
+  geometry.horizontal_keystone: { type: int, description: "Horizontal keystone, -25 to 25." }
+  geometry.vertical_keystone: { type: int, description: "Vertical keystone, -30 to 30." }
+  geometry.zoom: { type: int, description: "Digital zoom, -10 to 10." }
+  input: { type: int, description: "Current source: 1 RGB, 3 DVI, 4 Video, 6 HDMI, 7 BNC, 9 HDMI 2, 13 HDBaseT (2 RGB2, 5 S-Video, 8 Component and 10 DisplayPort are listed but not used on the 6500 II B)." }
+  light.hours: { type: int, description: "Light source hours." }
+  light.mode: { type: int, description: "Light source mode: 0 = Normal, 1 = Eco, 2 = Eco Plus, 3 = Dimming, 4 = Extreme Dimming, 5 = Custom Light." }
+  picture.brightness: { type: int, description: "Picture brightness, 0 to 100." }
+  picture.color: { type: int, description: "Color saturation, 0 to 100." }
+  picture.color_temperature: { type: int, description: "Color temperature: 0 = Warm, 1 = Normal, 2 = Cold." }
+  picture.contrast: { type: int, description: "Picture contrast, 0 to 100." }
+  picture.display_mode: { type: int, description: "Display (picture) mode; 7 Blackboard is not used on the 6500 II B: 0 = Presentation, 1 = Bright, 2 = Game, 3 = Movie, 4 = Vivid, 5 = TV, 6 = sRGB, 7 = Blackboard, 8 = DICOM SIM, 9 = User, 10 = User2." }
+  picture.gamma: { type: int, description: "Gamma: 0 = 1.8, 1 = 2.0, 2 = 2.2, 3 = 2.4, 4 = B&W, 5 = Linear." }
+  picture.scaling: { type: int, description: "Aspect scaling: 0 = Fill, 1 = 4:3, 2 = 16:9, 3 = Letter Box, 4 = Native, 5 = 2.35:1." }
+  picture.sharpness: { type: int, description: "Sharpness, 0 to 31." }
+  picture.tint: { type: int, description: "Tint, 0 to 100." }
+  setup.fan_speed: { type: int, description: "Fan speed: 0 = Normal, 1 = High." }
+  setup.logo: { type: int, description: "Startup logo: 0 = Standard Logo, 1 = Black screen, 2 = Blue screen." }
+  setup.projection_mode: { type: int, description: "Projection mode: 0 = Front tabletop, 1 = Rear tabletop, 2 = Front ceiling, 3 = Rear ceiling." }
+  setup.sleep_timer: { type: int, description: "Sleep timer, 0 to 120 (0 is off)." }
+  status: { type: int, description: "System status: 0 Reset, 1 Standby, 2 Operation, 3 Cooling." }
+  threed.format: { type: int, description: "3D format: 0 = Frame Sequential, 1 = Top/Bottom, 2 = Side-By-Side, 3 = Frame Packing, 4 = Auto." }
+  threed.mode: { type: int, description: "3D mode: 0 = Off, 1 = DLP-Link, 2 = IR." }
+  threed.sync_invert: { type: bool, description: "3D sync inverted." }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A command is "V", the projector ID as two digits (99 for all, the projector_id
+      setting), "G" to read or "S" to set, the four-digit code and, for a set, the value as
+      ASCII digits with a minus sign when negative ("V99S0309-20"), ended by CR. The answer
+      is "P" (pass) followed by the value for a read, or "F" (fail). The answer does not
+      repeat the code, so the reply to each read is matched to the read that asked for it,
+      and a set's "P" does not update state until the next poll.
+  - models: [all]
+    severity: warning
+    text: >
+      The network port is "RS232 by Telnet" on TCP 23 and the document gives no further
+      detail of it (a Telnet option negotiation, a login or a delay between commands); the
+      queue sends one command after each answer.
+  - models: [all]
+    severity: critical
+    text: >
+      system_reset restores the factory settings and cannot be undone. power_off starts the
+      cool-down.
+  - models: [all]
+    severity: info
+    text: >
+      Power on is "op power.on" from software V04; the document says VXXS0001 is replaced
+      and gives no answer for the op form, so P, F or an "OP" line ends it. Inputs are
+      selected with one code each (select_input) and read back with get_source.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the command set has no lens, color gain, edge blend or network commands
+      and no temperatures; the light source power level of Custom Light cannot be set. The
+      document lists some codes and values as not used on the 6500 II B (display mode 7,
+      inputs 2, 5, 8 and 10).
+  - models: [all]
+    severity: info
+    text: >
+      The document's hexadecimal column disagrees with the ASCII column for VXXS0317 (shown
+      as 0316) and VXXG0319/VXXS0319 (shown as 0318); the ASCII codes are used.
+  - models: [all]
+    severity: info
+    text: >
+      The same commands work on the RS-232 port (link serial): 9600 baud, 8 data bits, no
+      parity, 1 stop bit, no flow control (UART FIFO disabled).

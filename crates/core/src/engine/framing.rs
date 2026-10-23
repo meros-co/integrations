@@ -44,6 +44,60 @@ pub(crate) enum ReplyFraming {
     /// matching this regex (the fences), which is one message without them:
     /// Turtle AV's status between lines of `=`.
     Fenced(String),
+    /// Each complete top-level JSON object or array, however it is laid out
+    /// and whatever lies between them: Barco Pulse's JSON-RPC, which sends
+    /// bare JSON values back to back on one stream.
+    Json,
+}
+
+/// Where a `Json` framer is in the value it is reading.
+#[derive(Default)]
+struct JsonScan {
+    /// The value's bytes so far, from its opening bracket.
+    value: Vec<u8>,
+    /// Brackets opened and not yet closed.
+    depth: usize,
+    in_string: bool,
+    escaped: bool,
+}
+
+impl JsonScan {
+    fn feed(&mut self, bytes: &[u8], out: &mut Vec<String>) {
+        for &b in bytes {
+            if self.depth == 0 {
+                // Between values only an opening bracket starts one; anything
+                // else (whitespace, stray bytes) is no message.
+                if b == b'{' || b == b'[' {
+                    self.value.push(b);
+                    self.depth = 1;
+                }
+                continue;
+            }
+            self.value.push(b);
+            if self.in_string {
+                if self.escaped {
+                    self.escaped = false;
+                } else if b == b'\\' {
+                    self.escaped = true;
+                } else if b == b'"' {
+                    self.in_string = false;
+                }
+                continue;
+            }
+            match b {
+                b'"' => self.in_string = true,
+                b'{' | b'[' => self.depth += 1,
+                b'}' | b']' => {
+                    self.depth -= 1;
+                    if self.depth == 0 {
+                        let value = std::mem::take(&mut self.value);
+                        out.push(String::from_utf8_lossy(&value).into_owned());
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 /// Turns received bytes into complete reply messages.
@@ -55,6 +109,7 @@ pub(crate) struct Framer {
     block: Vec<String>,
     in_block: bool,
     text: String,
+    json: JsonScan,
 }
 
 impl Framer {
@@ -70,11 +125,16 @@ impl Framer {
             block: Vec::new(),
             in_block: false,
             text: String::new(),
+            json: JsonScan::default(),
         }
     }
 
     pub(crate) fn feed(&mut self, bytes: &[u8]) -> Vec<String> {
         let mut out = Vec::new();
+        if self.framing == ReplyFraming::Json {
+            self.json.feed(bytes, &mut out);
+            return out;
+        }
         if let ReplyFraming::Terminated(ends) = &self.framing {
             self.text.push_str(&String::from_utf8_lossy(bytes));
             loop {
@@ -176,7 +236,9 @@ impl Framer {
                         out.push(line);
                     }
                 }
-                ReplyFraming::Delimited { .. } | ReplyFraming::Terminated(_) => unreachable!(),
+                ReplyFraming::Delimited { .. }
+                | ReplyFraming::Terminated(_)
+                | ReplyFraming::Json => unreachable!(),
             }
         }
         out
@@ -193,11 +255,14 @@ pub(crate) enum SendFraming {
     Terminated(&'static str),
     /// Lines ending in a blank line.
     Block,
+    /// The payload as it is, nothing added: a JSON value is its own frame.
+    Json,
 }
 
 pub(crate) fn frame(framing: &SendFraming, payload: &str) -> String {
     match framing {
         SendFraming::Delimited { open, close } => format!("{open}{payload}{close}"),
+        SendFraming::Json => payload.to_string(),
         SendFraming::Terminated(t) => format!("{payload}{t}"),
         SendFraming::Block => format!("{}\n\n", payload.trim_end_matches(['\n', '\r'])),
     }
@@ -326,6 +391,29 @@ mod tests {
         assert_eq!(f.feed(b"\x06"), vec!["\u{6}"]);
         assert_eq!(f.feed(b"\x02VFL:"), Vec::<String>::new());
         assert_eq!(f.feed(b"a;\r\nACK;"), vec!["\u{2}VFL:a;", "ACK;"]);
+    }
+
+    #[test]
+    fn json_values_are_read_whole_however_they_arrive() {
+        let mut f = Framer::new(ReplyFraming::Json);
+        // Pretty-printed across lines and reads, with brackets, quotes and
+        // escapes inside a string, then two compact values back to back.
+        assert!(f
+            .feed(b"{\n  \"jsonrpc\": \"2.0\",\n  \"result\": \"a}")
+            .is_empty());
+        assert_eq!(
+            f.feed(b" \\\"{[\"\n}\r\n{\"id\":1,\"result\":[1,{\"x\":2}]}[3]"),
+            [
+                "{\n  \"jsonrpc\": \"2.0\",\n  \"result\": \"a} \\\"{[\"\n}",
+                "{\"id\":1,\"result\":[1,{\"x\":2}]}",
+                "[3]"
+            ]
+        );
+        // Bytes between values are no message, and a character split across
+        // reads arrives whole.
+        assert!(f.feed(b"junk {\"n\":\"\xc3").is_empty());
+        assert_eq!(f.feed(b"\xa9\"}"), ["{\"n\":\"\u{e9}\"}"]);
+        assert_eq!(frame(&SendFraming::Json, "{\"a\":1}"), "{\"a\":1}");
     }
 
     #[test]

@@ -57,13 +57,13 @@ websocket under `telemetry.websocket` (§8).
 
 ### `line-tcp`
 
-Plaintext over TCP. Four framings cover the devices specced so far.
+Plaintext over TCP. Five framings cover the devices specced so far.
 
 ```yaml
 transport:
   type: line-tcp
   port: 2202
-  framing: delimited          # delimited | terminated | block | length-prefixed
+  framing: delimited          # delimited | terminated | block | length-prefixed | json
   open: "< "                  # framing: delimited
   close: " >"
   encoding: ascii             # ascii | utf-8
@@ -78,6 +78,7 @@ transport:
 | `terminated` | Payload plus `terminator` | Kramer P3000 (`cr`), RossTalk and HyperDeck (`crlf`) |
 | `block` | Multi-line payload ended by a blank line | Blackmagic Videohub |
 | `length-prefixed` | Payload preceded by a byte count | — |
+| `json` | The payload as it is, nothing added: each message is one JSON value | Barco Pulse's JSON-RPC |
 
 `terminated` requires `terminator`: `cr`, `crlf` or `lf`.
 
@@ -103,8 +104,17 @@ command is sent:
 | `headed-block` | The end of the first line, unless that line ends in `:`, in which case a blank line | Blackmagic HyperDeck: `200 ok`, or `208 transport info:` followed by fields |
 | `terminated` | The first of `reply_terminators`, kept as part of the message; no line ending is needed | Roland V-60HD: `VFL:a;`, and a bare ACK byte (`reply_terminators: [";", "\u0006"]`) |
 | `fenced` | The end of the line, unless the line matches `reply_fence`: then the next such line after other text, the lines between being one message | Turtle AV controllers: a status block between lines of `=` (`reply_fence: "^=+\\s*$"`) |
+| `json` | The end of a complete top-level JSON object or array | Barco Pulse: bare JSON-RPC objects back to back, compact or spread over lines |
 
-It defaults to `block` for `framing: block` and to `line` otherwise.
+It defaults to `block` for `framing: block`, to `json` for `framing: json`, and
+to `line` otherwise.
+
+With `json`, a message runs from an opening `{` or `[` to the bracket that
+closes it, brackets inside JSON strings (and escaped quotes) not counting, so
+neither a line ending nor a separator is needed and a value laid out over
+several lines is still one message. Whatever arrives between values
+(whitespace, stray bytes) is no message. Each message is JSON, so it goes to
+the `json_match` rules (§8) as well as the text rules.
 
 With `fenced`, a fence line opens a block and the next fence line after any
 other text closes it, so two fences in a row open one block; the fences, and
@@ -170,6 +180,42 @@ A device whose error answer names nothing (Shure's `< REP ERR >`) declares it
 as the transport's `error_match`, a regex: such a message is taken as the
 reply of a command waiting with `reply_contains`, which then fails on its
 `expect`.
+
+#### TLS
+
+A device that serves its line protocol over TLS (Barco Pulse's JSON-RPC on
+9091, its plain port 9090 being turned off on current firmware) sets
+`scheme: tls`, or names an enum setting of `tcp` and `tls` for a device
+the operator can switch, with `tls_port` the default port when it chooses
+`tls`, as `https_port` is for HTTP:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 9090
+  scheme: { setting: scheme }
+  tls_port: 9091
+  accept_invalid_certs: true      # a self-signed certificate
+settings:
+  scheme: { type: enum, values: [tcp, tls], default: tls, label: Connection, description: "…" }
+ports:
+  - { port: 9091, protocol: tls, role: control, when: "scheme tls" }
+  - { port: 9090, protocol: tcp, role: control, when: "scheme tcp" }
+```
+
+The stream is TLS 1.2 or later, its certificate checked against the same
+public roots as `https`, and against the host name the device was opened
+with, or its address; `accept_invalid_certs: true` takes a device's
+self-signed certificate (the link is encrypted, the device not
+authenticated). Everything above the stream (framing, replies, telemetry)
+is as over plain TCP. A handshake that fails is a connection that fails,
+retried with backoff; its reason in the log starts `tls:`. Changing the
+setting with `update_settings` opens the new link at once. TLS is the
+network link's: with a `serial` block (below), link serial opens the
+serial port as it is, and the network entries in `ports` name both choices
+(`when: "link tcp, scheme tls"`). `tools/validate.py` checks that the setting is an enum
+of `tcp` and `tls`, that `tls_port` has a `tls` control entry in `ports`,
+and that `accept_invalid_certs` goes with a TLS scheme.
 
 ### `line-serial`
 
@@ -304,6 +350,14 @@ serial without `serial_port`. Link tcp without a host fails as for any
 network device. Changing `link` or a line setting with `update_settings`
 opens the new link at once, as for `line-serial`; on Android and iOS link
 serial fails to open as `line-serial` does.
+
+A device with HTTP `endpoints` (§2, Endpoints) beside its line protocol
+(Barco Pulse's file endpoints on its web server) keeps them on link serial
+too: they are reached at the host the device was opened with, over the
+network, while the line protocol goes over the serial port. Opened on link
+serial without a host, it reaches no HTTP server, and a command or poll
+naming an endpoint fails with `invalid_params` saying so. The same holds
+for TLS (§2, `line-tcp`, TLS): it is the network link's.
 
 The ports list both links, the transport's port with `when: "link tcp"` and
 a `serial` control entry with `when: "link serial"`. A step of `on_connect`
