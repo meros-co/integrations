@@ -56,6 +56,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a wrong key or identity shows as a refused handshake (and which alert the device sends), and that the device answers the keep-alive sent first inside the secure session as it does over TCP. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
 - [ ] On a device that speaks secure OCP.1 over DTLS, confirm it takes one OCP.1 PDU per record and datagram and answers the same way, whether it asks for a cookie, and that it sends its flight again when the controller's is lost. ([specs/aes70.yaml:444](specs/aes70.yaml#L444))
 
+## aja-bridge-live — AJA BRIDGE LIVE
+
+- [ ] Confirm the unit's remote API address: https on 443 with a self-signed certificate (as the API document's examples), and whether http on 8080 is reachable from the network or only on the unit (the manual's examples). ([specs/aja-bridge-live.yaml:51](specs/aja-bridge-live.yaml#L51))
+- [ ] Compare the unit's current on-box API documentation (v1.20) with the public v1.16 PDF this spec follows, and note any endpoint or field that changed. ([specs/aja-bridge-live.yaml:8](specs/aja-bridge-live.yaml#L8))
+- [ ] Confirm that the replies to PUT /api/pipeline/{id} and DELETE /api/pipeline/{id} have an empty body (the rule dropping a pipeline's runtime state relies on it), and what the replies to POST /api/pipelines and PUT .../start and .../stop carry. ([specs/aja-bridge-live.yaml:437](specs/aja-bridge-live.yaml#L437))
+- [ ] Check what GET /api/pipeline/{id}/state returns for a pipeline that is not started (the document describes it for a running pipeline). ([specs/aja-bridge-live.yaml:293](specs/aja-bridge-live.yaml#L293))
+- [ ] Confirm that elementaryStreams appear in the state of every input, and that the order is stable between reads, since streams are keyed by their place. ([specs/aja-bridge-live.yaml:384](specs/aja-bridge-live.yaml#L384))
+- [ ] Confirm that ndiGroup in GET /api/system/ndi-devices takes a comma-separated list as sent percent-encoded. ([specs/aja-bridge-live.yaml:494](specs/aja-bridge-live.yaml#L494))
+
 ## aja-helo — AJA HELO and HELO Plus
 
 - [ ] Confirm what eParamID_ReplicatorCommand 5 (Shutdown) shuts down on HELO and HELO Plus (the replicator engine or the whole unit) and how the unit comes back from it. ([specs/aja-helo.yaml:745](specs/aja-helo.yaml#L745))

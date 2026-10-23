@@ -1,0 +1,637 @@
+spec: 1
+id: aja-bridge-live
+name: AJA BRIDGE LIVE video I/O and streaming appliances
+vendor: AJA Video Systems
+category: other
+
+source:
+  - title: BRIDGE LIVE v1.16 REST API Documentation (print of the unit's API page, last updated 2024-09-04)
+    author: AJA Video Systems
+    url: https://www.aja.com/support/item-download/9832/BRIDGE_LIVE_v1.16_REST_API_Documentation.pdf
+    note: >
+      Manufacturer-documented, the source of every command and state rule
+      here. Authentication (HTTP Basic); JSON object definitions: Pipeline
+      (schema version "0.16", id, name, runningState INACTIVE or ACTIVE,
+      inputs, outputs, uploadedLogos), Input Stream (source.address.url for
+      rtp, udp, srt, hls, sdi, ndi and file, SRT mode, latency 10-2000 ms,
+      stream ID, passphrase 10-79 characters, redundancy, NDI group, HLS
+      buffer 0-999 s, streamType MPEG_TS, SDI, NDI or HLS, complianceWith
+      AUTO, EVERTZ or MEDIALINKS, addressPCR), Input Video (J2K, H262, H264,
+      H265; filters applied at runtime), Input Audios, Captions, Metadata,
+      Output Stream, Output Video, Audios, Captions, Metadata, Uploaded Logos,
+      Pipeline State (status, operationState, licenseStatus,
+      licenseExpirationDate, licenseRemainingTime, uniqueId, inputs,
+      outputs), Input Stream State, Elementary Streams, Output Stream State.
+      Endpoints: GET and POST /api/pipelines; POST /api/pipeline (201 with
+      Location); GET, PUT and DELETE /api/pipeline/{id}; PUT
+      /api/pipeline/{id}/start and /stop (503 when already in that state or
+      changing); GET /api/pipeline/{id}/state; GET /api/system/version,
+      network-interfaces, sdi-devices, ndi-devices?ndiGroup=, reinstall,
+      reinstall-state, factory-reset, factory-reset-state, restart-service,
+      reboot, shutdown; the error reply {status, error}. Examples address
+      https://<unit>/api.
+  - title: BRIDGE LIVE Family Installation and Operation Guide, version 1.20 (August 12, 2026)
+    author: AJA Video Systems
+    url: https://www.aja.com/support/item-download/10507/AJA_BRIDGE_LIVE_Family_Manual_v1.20.pdf
+    note: >
+      Models (BRIDGE LIVE and BRIDGE LIVE 12G-4); the admin user and the
+      unit-specific default password from the Quick Start Guide (p.20);
+      chapter 6, Using the REST API (p.111): the complete API documentation is
+      served by the unit through the Dashboard's API button, and curl
+      examples on the unit itself at http://localhost:8080/api; chapter 7,
+      SNMP (p.112-114).
+
+transport:
+  type: http
+  port: 8080
+  https_port: 443
+  scheme: { setting: scheme }
+  # The unit's certificate is not documented; an appliance's is taken to be
+  # self-signed.
+  accept_invalid_certs: true
+  auth: basic
+  refusal_status: [401]
+  timeout_ms: 10000
+  probe: { method: GET, path: /api/system/version }
+
+settings:
+  username: { type: string, default: admin, label: Username, description: "The unit's web user; admin, as the manual and the API document name it." }
+  password: { type: string, secret: true, default: "", label: Password, description: "That user's password; each unit ships with its own, printed in its Quick Start Guide." }
+  scheme:
+    type: enum
+    values: [https, http]
+    default: https
+    label: Scheme
+    description: "https on port 443 as AJA's API document addresses the unit, or http on port 8080 as the manual's examples do; the certificate is not checked."
+
+ports:
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+  - { port: 8080, protocol: http, role: control, setting: scheme, when: "scheme http", note: "the manual's curl examples, run on the unit itself" }
+
+models:
+  - id: bridge-live
+    name: AJA BRIDGE LIVE
+    supports: &all
+      - list_pipelines
+      - replace_pipelines
+      - create_pipeline
+      - get_pipeline
+      - modify_pipeline
+      - start_pipeline
+      - stop_pipeline
+      - delete_pipeline
+      - get_pipeline_state
+      - get_version
+      - list_network_interfaces
+      - list_sdi_devices
+      - list_ndi_sources
+      - reinstall
+      - get_reinstall_state
+      - factory_reset
+      - get_factory_reset_state
+      - restart_service
+      - reboot
+      - shutdown
+    verification: none
+    notes: >
+      12G-SDI/3G-SDI I/O with multi-channel HD or UltraHD, encoding and
+      decoding between SDI, NDI and IP streams (manual v1.20).
+  - id: bridge-live-12g-4
+    name: AJA BRIDGE LIVE 12G-4
+    supports: *all
+    verification: none
+    notes: >
+      12G-SDI/3G-SDI I/O with multi-channel UltraHD as standard (manual
+      v1.20); the same API.
+
+commands:
+  # ── All pipelines ───────────────────────────────────────────────────────
+  list_pipelines:
+    summary: List every pipeline's configuration, an array of Pipeline objects (GET /api/pipelines)
+    send: { method: GET, path: /api/pipelines }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  replace_pipelines:
+    summary: >
+      Remove every pipeline and create those given (POST /api/pipelines);
+      the body is an array of the API document's Pipeline objects, as
+      list_pipelines returns them
+    params:
+      pipelines: { type: json, required: true, label: Pipelines, description: "JSON array of Pipeline objects in the shape AJA's API document gives; every pipeline not in it is removed." }
+    send: { method: POST, path: /api/pipelines, body: "{pipelines}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── One pipeline ────────────────────────────────────────────────────────
+  create_pipeline:
+    summary: >
+      Create a pipeline from the API document's Pipeline object (POST
+      /api/pipeline); the unit answers 201 with the new pipeline's URL in
+      its Location header, and the new pipeline reaches state through the
+      list read back
+    params:
+      pipeline: { type: json, required: true, label: Pipeline, description: "JSON Pipeline object in the shape AJA's API document gives: name, inputs and outputs." }
+    send: { method: POST, path: /api/pipeline, body: "{pipeline}", content_type: application/json }
+    expect: { status: 201 }
+    returns: ack
+
+  get_pipeline:
+    summary: Read one pipeline's configuration, a Pipeline object (GET /api/pipeline/{id})
+    params:
+      id: { type: int, min: 0, required: true, label: Pipeline, description: "The pipeline's id, as list_pipelines gives it." }
+    send: { method: GET, path: "/api/pipeline/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  modify_pipeline:
+    summary: >
+      Replace one pipeline's configuration with the API document's Pipeline
+      object (PUT /api/pipeline/{id}); changes to the input video and audio
+      filters apply without restarting it
+    params:
+      id: { type: int, min: 0, required: true, label: Pipeline, description: "The pipeline's id, as list_pipelines gives it." }
+      pipeline: { type: json, required: true, label: Pipeline, description: "JSON Pipeline object in the shape AJA's API document gives; it replaces the pipeline's whole configuration." }
+    send: { method: PUT, path: "/api/pipeline/{id}", body: "{pipeline}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  start_pipeline:
+    summary: Start a pipeline (PUT /api/pipeline/{id}/start); refused with 503 when it is started or starting or stopping
+    params:
+      id: { type: int, min: 0, required: true, label: Pipeline, description: "The pipeline's id, as list_pipelines gives it." }
+    send: { method: PUT, path: "/api/pipeline/{id}/start", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_pipeline:
+    summary: Stop a pipeline (PUT /api/pipeline/{id}/stop); refused with 503 when it is stopped or starting or stopping
+    params:
+      id: { type: int, min: 0, required: true, label: Pipeline, description: "The pipeline's id, as list_pipelines gives it." }
+    send: { method: PUT, path: "/api/pipeline/{id}/stop", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_pipeline:
+    summary: Remove a pipeline (DELETE /api/pipeline/{id}); 404 when there is none with that id
+    params:
+      id: { type: int, min: 0, required: true, label: Pipeline, description: "The pipeline's id, as list_pipelines gives it." }
+    send: { method: DELETE, path: "/api/pipeline/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_pipeline_state:
+    summary: >
+      Read a pipeline's runtime state (GET /api/pipeline/{id}/state): status,
+      operation and license state, and each input's and output's status,
+      frame rates, latencies and messages
+    params:
+      id: { type: int, min: 0, required: true, label: Pipeline, description: "The pipeline's id, as list_pipelines gives it." }
+    send: { method: GET, path: "/api/pipeline/{id}/state" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── System ──────────────────────────────────────────────────────────────
+  get_version:
+    summary: Read the transcoder, JPEG 2000 SDK and GPU driver versions (GET /api/system/version)
+    send: { method: GET, path: /api/system/version }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_network_interfaces:
+    summary: List the network interfaces whose ids pipeline URLs name, with whether each is connected (GET /api/system/network-interfaces)
+    send: { method: GET, path: /api/system/network-interfaces }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_sdi_devices:
+    summary: List the SDI devices and their ports, which sdi:// pipeline URLs name (GET /api/system/sdi-devices)
+    send: { method: GET, path: /api/system/sdi-devices }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_ndi_sources:
+    summary: >
+      List the NDI sources found in the given groups (GET
+      /api/system/ndi-devices?ndiGroup=). The search runs in the background:
+      the first call starts it and later calls return more as they are found
+    params:
+      groups: { type: string, default: public, max_length: 1024, label: NDI groups, description: "Comma-separated NDI groups to search, such as cameras,studio1; public is NDI's default group." }
+    send: { method: GET, path: /api/system/ndi-devices, query: { ndiGroup: "{groups}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  reinstall:
+    summary: >
+      Reinstall the running software version cleanly, keeping only the
+      licenses, then reboot (GET /api/system/reinstall); returns the
+      outcome, SUCCESS or FAILED (IN-PROGRESS when one is already running)
+    send: { method: GET, path: /api/system/reinstall }
+    expect: { status: 200, json_path: "$.state" }
+    returns: value
+
+  get_reinstall_state:
+    summary: Read the reinstallation's state, NOT-STARTED, IN-PROGRESS, FAILED or SUCCESS (GET /api/system/reinstall-state)
+    send: { method: GET, path: /api/system/reinstall-state }
+    expect: { status: 200, json_path: "$.state" }
+    returns: value
+
+  factory_reset:
+    summary: >
+      Reset the unit to factory settings, then reboot (GET
+      /api/system/factory-reset); returns the outcome, SUCCESS or FAILED
+      (IN-PROGRESS when one is already running)
+    send: { method: GET, path: /api/system/factory-reset }
+    expect: { status: 200, json_path: "$.state" }
+    returns: value
+
+  get_factory_reset_state:
+    summary: Read the factory reset's state, NOT-STARTED, IN-PROGRESS, FAILED or SUCCESS (GET /api/system/factory-reset-state)
+    send: { method: GET, path: /api/system/factory-reset-state }
+    expect: { status: 200, json_path: "$.state" }
+    returns: value
+
+  restart_service:
+    summary: Restart the main program service, which stops every pipeline meanwhile (GET /api/system/restart-service); returns the unit's message
+    send: { method: GET, path: /api/system/restart-service }
+    expect: { status: 200, json_path: "$.message" }
+    returns: value
+
+  reboot:
+    summary: Reboot the unit (GET /api/system/reboot); returns the unit's message
+    send: { method: GET, path: /api/system/reboot }
+    expect: { status: 200, json_path: "$.message" }
+    returns: value
+
+  shutdown:
+    summary: Shut the unit down (GET /api/system/shutdown); returns the unit's message
+    send: { method: GET, path: /api/system/shutdown }
+    expect: { status: 200, json_path: "$.message" }
+    returns: value
+
+telemetry:
+  # The unit pushes nothing over this API. The pipeline list is read every
+  # 10 seconds, and each pipeline listed has its runtime state read after it;
+  # the network interfaces and SDI devices every minute; the versions and
+  # the reinstall and factory reset states on connecting. Every command reply
+  # also goes through these rules, and a change reads back what it changed.
+  subscribe:
+    send:
+      - { method: GET, path: /api/system/version }
+      - { method: GET, path: /api/system/reinstall-state }
+      - { method: GET, path: /api/system/factory-reset-state }
+  poll:
+    - every_ms: 10000
+      send:
+        - { method: GET, path: /api/pipelines }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: /api/system/network-interfaces }
+        - { method: GET, path: /api/system/sdi-devices }
+  updates:
+    # Pipeline configuration, the list whole.
+    - path: "^/api/pipelines$"
+      json_each: "$"
+      json: { id: "$.id", name: "$.name", running: "$.runningState", version: "$.version" }
+      replace: pipelines
+      state:
+        "pipelines.{id}.name": "{name}"
+        "pipelines.{id}.running_state": "{running}"
+        "pipelines.{id}.active": { value: "{running}", map: { ACTIVE: true, INACTIVE: false } }
+        "pipelines.{id}.schema_version": "{version}"
+      then_send:
+        - { method: GET, path: "/api/pipeline/{id}/state" }
+    - path: "^/api/pipelines$"
+      json_each: "$[*].inputs"
+      json:
+        pipeline: "$^.id"
+        id: "$.id"
+        url: "$.source.address.url"
+        type: "$.source.streamType"
+        format: "$.video.format"
+        width: "$.video.width"
+        height: "$.video.height"
+        rate: "$.video.scanRate"
+        scan: "$.video.scan"
+      state:
+        "pipelines.{pipeline}.inputs.{id}.url": "{url}"
+        "pipelines.{pipeline}.inputs.{id}.stream_type": "{type}"
+        "pipelines.{pipeline}.inputs.{id}.video_format": "{format}"
+        "pipelines.{pipeline}.inputs.{id}.width": "{width}"
+        "pipelines.{pipeline}.inputs.{id}.height": "{height}"
+        "pipelines.{pipeline}.inputs.{id}.scan_rate": "{rate}"
+        "pipelines.{pipeline}.inputs.{id}.scan": "{scan}"
+    - path: "^/api/pipelines$"
+      json_each: "$[*].outputs"
+      json:
+        pipeline: "$^.id"
+        id: "$.id"
+        name: "$.name"
+        url: "$.sink.address.url"
+        type: "$.streamType"
+        format: "$.video.format"
+        width: "$.video.width"
+        height: "$.video.height"
+        bitrate: "$.video.bitrate"
+        ts_bitrate: "$.ts.bitrate"
+      state:
+        "pipelines.{pipeline}.outputs.{id}.name": "{name}"
+        "pipelines.{pipeline}.outputs.{id}.url": "{url}"
+        "pipelines.{pipeline}.outputs.{id}.stream_type": "{type}"
+        "pipelines.{pipeline}.outputs.{id}.video_format": "{format}"
+        "pipelines.{pipeline}.outputs.{id}.width": "{width}"
+        "pipelines.{pipeline}.outputs.{id}.height": "{height}"
+        "pipelines.{pipeline}.outputs.{id}.video_bitrate": "{bitrate}"
+        "pipelines.{pipeline}.outputs.{id}.ts_bitrate": "{ts_bitrate}"
+
+    # Runtime state of one pipeline.
+    - path: "^/api/pipeline/(\\d+)/state$"
+      json:
+        status: "$.status"
+        operation: "$.operationState"
+        license: "$.licenseStatus"
+        expires: "$.licenseExpirationDate"
+        remaining: "$.licenseRemainingTime"
+        uid: "$.uniqueId"
+      state:
+        "runtime.{1}.status": "{status}"
+        "runtime.{1}.operation_state": "{operation}"
+        "runtime.{1}.license_status": "{license}"
+        "runtime.{1}.license_expiration_date": "{expires}"
+        "runtime.{1}.license_remaining_time": "{remaining}"
+        "runtime.{1}.unique_id": "{uid}"
+    - path: "^/api/pipeline/(\\d+)/state$"
+      json_each: "$.inputs"
+      json:
+        id: "$.id"
+        status: "$.status"
+        name: "$.name"
+        description: "$.description"
+        fps: "$.decodedFps"
+        latency: "$.decodingLatency"
+        invalid: "$.invalidFps"
+        messages: "$.messages"
+      replace: "runtime.{1}.inputs"
+      state:
+        "runtime.{1}.inputs.{id}.status": "{status}"
+        "runtime.{1}.inputs.{id}.name": "{name}"
+        "runtime.{1}.inputs.{id}.description": "{description}"
+        "runtime.{1}.inputs.{id}.decoded_fps": "{fps}"
+        "runtime.{1}.inputs.{id}.decoding_latency_ms": "{latency}"
+        "runtime.{1}.inputs.{id}.invalid_fps": "{invalid}"
+        "runtime.{1}.inputs.{id}.messages": "{messages}"
+    - path: "^/api/pipeline/(\\d+)/state$"
+      json_each: "$.inputs[*].elementaryStreams"
+      json:
+        input: "$^.id"
+        type: "$.type"
+        pid: "$.pid"
+        state: "$.state"
+        format: "$.format"
+        description: "$.elementaryStream.streamDescription"
+      state:
+        "runtime.{1}.inputs.{input}.streams.{index}.type": "{type}"
+        "runtime.{1}.inputs.{input}.streams.{index}.pid": "{pid}"
+        "runtime.{1}.inputs.{input}.streams.{index}.state": "{state}"
+        "runtime.{1}.inputs.{input}.streams.{index}.format": "{format}"
+        "runtime.{1}.inputs.{input}.streams.{index}.description": "{description}"
+    - path: "^/api/pipeline/(\\d+)/state$"
+      json_each: "$.outputs"
+      json:
+        id: "$.id"
+        uid: "$.uniqueId"
+        status: "$.status"
+        name: "$.name"
+        sink: "$.sink"
+        description: "$.description"
+        encoding: "$.encodingLatency"
+        fps: "$.transcodedFps"
+        transcoding: "$.transcodingLatency"
+        dropped: "$.droppedFps"
+        added: "$.latencyAddition"
+        messages: "$.messages"
+      replace: "runtime.{1}.outputs"
+      state:
+        "runtime.{1}.outputs.{id}.unique_id": "{uid}"
+        "runtime.{1}.outputs.{id}.status": "{status}"
+        "runtime.{1}.outputs.{id}.name": "{name}"
+        "runtime.{1}.outputs.{id}.sink": "{sink}"
+        "runtime.{1}.outputs.{id}.description": "{description}"
+        "runtime.{1}.outputs.{id}.encoding_latency_ms": "{encoding}"
+        "runtime.{1}.outputs.{id}.transcoded_fps": "{fps}"
+        "runtime.{1}.outputs.{id}.transcoding_latency_ms": "{transcoding}"
+        "runtime.{1}.outputs.{id}.dropped_fps": "{dropped}"
+        "runtime.{1}.outputs.{id}.latency_addition_ms": "{added}"
+        "runtime.{1}.outputs.{id}.messages": "{messages}"
+
+    # A pipeline started or stopped: read its state and the list back.
+    - path: "^/api/pipeline/(\\d+)/(?:start|stop)$"
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/pipeline/{1}/state" }
+        - { method: GET, path: /api/pipelines }
+    # A pipeline modified or removed (an empty reply; a read's holds the
+    # pipeline): its runtime state is dropped and read again (a removed
+    # pipeline's read fails, leaving it gone), and the list is read back.
+    - path: "^/api/pipeline/(\\d+)$"
+      match: "^$"
+      state: { "runtime.{1}": { delete: true } }
+      then_send:
+        - { method: GET, path: /api/pipelines }
+        - { method: GET, path: "/api/pipeline/{1}/state" }
+    # A pipeline created, or every pipeline replaced: read the list back.
+    - path: "^/api/pipeline$"
+      json: {}
+      then_send:
+        - { method: GET, path: /api/pipelines }
+    - path: "^/api/pipelines$"
+      match: "^$"
+      then_send:
+        - { method: GET, path: /api/pipelines }
+
+    # System.
+    - path: "^/api/system/version$"
+      json:
+        full: "$.transcoder.fullVersionName"
+        version: "$.transcoder.version"
+        date: "$.transcoder.date"
+        mode: "$.transcoder.deploymentMode"
+        dec: "$.j2kDec.version"
+        enc: "$.j2kEnc.version"
+        trc: "$.j2kTrc.version"
+        nvidia: "$.nvidiaDriver"
+        cuda: "$.cudaDriver"
+        runtime: "$.cudaRuntime"
+      state:
+        system.transcoder_version: "{version}"
+        system.transcoder_full_version: "{full}"
+        system.transcoder_date: "{date}"
+        system.deployment_mode: "{mode}"
+        system.j2k_decoder_version: "{dec}"
+        system.j2k_encoder_version: "{enc}"
+        system.j2k_transcoder_version: "{trc}"
+        system.nvidia_driver: "{nvidia}"
+        system.cuda_driver: "{cuda}"
+        system.cuda_runtime: "{runtime}"
+    - path: "^/api/system/network-interfaces$"
+      json_each: "$"
+      json: { id: "$.id", name: "$.name", connected: "$.connected" }
+      replace: system.network_interfaces
+      state:
+        "system.network_interfaces.{id:key}.name": "{name}"
+        "system.network_interfaces.{id:key}.connected": "{connected}"
+    - path: "^/api/system/sdi-devices$"
+      json_each: "$"
+      json: { id: "$.id", name: "$.name", ports: "$.ports" }
+      replace: system.sdi_devices
+      state:
+        "system.sdi_devices.{id:key}.name": "{name}"
+        "system.sdi_devices.{id:key}.ports": "{ports}"
+    - path: "^/api/system/ndi-devices"
+      json_each: "$"
+      json: { name: "$.name" }
+      replace: ndi.sources
+      state: { "ndi.sources.{index}": "{name}" }
+    - path: "^/api/system/reinstall(?:-state)?$"
+      json: { state: "$.state", error: "$.errorMessage" }
+      state:
+        system.reinstall.state: "{state}"
+        system.reinstall.error_message: "{error}"
+    - path: "^/api/system/factory-reset(?:-state)?$"
+      json: { state: "$.state", error: "$.errorMessage" }
+      state:
+        system.factory_reset.state: "{state}"
+        system.factory_reset.error_message: "{error}"
+
+state:
+  pipelines.*.name: { type: string, description: "Pipeline name shown in the UI, keyed by pipeline id" }
+  pipelines.*.running_state: { type: string, description: "runningState: ACTIVE or INACTIVE, the policy for loading the pipeline automatically after a restart" }
+  pipelines.*.active: { type: bool, description: "True when runningState is ACTIVE" }
+  pipelines.*.schema_version: { type: string, description: "Version of the pipeline JSON schema, such as 0.16" }
+  pipelines.*.inputs.*.url: { type: string, description: "Input source URL: rtp, udp, srt, hls, sdi, ndi or file, ending in the network interface id for network streams" }
+  pipelines.*.inputs.*.stream_type: { type: string, description: "Input stream type: MPEG_TS, SDI, NDI or HLS" }
+  pipelines.*.inputs.*.video_format: { type: string, description: "Input video format: J2K, H262, H264 or H265" }
+  pipelines.*.inputs.*.width: { type: int, unit: px, description: "Input video frame width" }
+  pipelines.*.inputs.*.height: { type: int, unit: px, description: "Input video frame height" }
+  pipelines.*.inputs.*.scan_rate: { type: string, description: "Input frame rate (progressive) or field rate (interlaced), such as 50 or 60000/1001" }
+  pipelines.*.inputs.*.scan: { type: string, description: "Input scan: PROGRESSIVE or INTERLACED" }
+  pipelines.*.outputs.*.name: { type: string, description: "Output stream name" }
+  pipelines.*.outputs.*.url: { type: string, description: "Output sink URL: rtp, udp, srt, rtmp(s), sdi, ndi or file" }
+  pipelines.*.outputs.*.stream_type: { type: string, description: "Output stream type: MPEG_TS or RTMP" }
+  pipelines.*.outputs.*.video_format: { type: string, description: "Output video format, such as H264" }
+  pipelines.*.outputs.*.width: { type: int, unit: px, description: "Output video frame width" }
+  pipelines.*.outputs.*.height: { type: int, unit: px, description: "Output video frame height" }
+  pipelines.*.outputs.*.video_bitrate: { type: int, unit: bit/s, description: "Output video bit rate; 0 passes the input video through" }
+  pipelines.*.outputs.*.ts_bitrate: { type: int, unit: bit/s, description: "Output transport stream bit rate" }
+  runtime.*.status: { type: string, description: "Pipeline status, the worst of its inputs: ERROR, WARNING, OK or UNKNOWN (while starting, stopping, restarting or not started)" }
+  runtime.*.operation_state: { type: string, description: "NOT_STARTED, STARTED, FAILED (crashed), STOPPING, STARTING or RESTARTING" }
+  runtime.*.license_status: { type: string, description: "BEING_CHECKED, BEING_RETURNED, GRANTED, DENIED_BLOCKED, DENIED_INVALID, EMERGENCY_LICENSE_SERVER, EMERGENCY_TRANSCODER or UNKNOWN" }
+  runtime.*.license_expiration_date: { type: string, description: "ISO 8601 date the pipeline's license expires on the license server" }
+  runtime.*.license_remaining_time: { type: string, description: "ISO 8601 time before the license status changes on its own" }
+  runtime.*.unique_id: { type: string, description: "The pipeline's UUID, kept across stops and restarts" }
+  runtime.*.inputs.*.status: { type: string, description: "Input status: ERROR, WARNING, OK or UNKNOWN" }
+  runtime.*.inputs.*.name: { type: string, description: "Input stream name, its source URL" }
+  runtime.*.inputs.*.description: { type: string, description: "Input description, such as JPEG2000 1920x1080 4:4:4 10-bit" }
+  runtime.*.inputs.*.decoded_fps: { type: float, unit: fps, description: "Frames or fields decoded per second, averaged over the last few seconds" }
+  runtime.*.inputs.*.decoding_latency_ms: { type: float, unit: ms, description: "Decoding latency per frame or field, averaged over the last few seconds" }
+  runtime.*.inputs.*.invalid_fps: { type: float, unit: fps, description: "Frames or fields dropped per second, averaged over the last few seconds" }
+  runtime.*.inputs.*.messages: { type: string, description: "The input's messages as JSON text, a list of {severity, message}" }
+  runtime.*.inputs.*.streams.*.type: { type: string, description: "Elementary stream type: VIDEO, AUDIO, CAPTIONS, METADATA or UNKNOWN, keyed by its place in the list" }
+  runtime.*.inputs.*.streams.*.pid: { type: int, description: "Elementary stream PID" }
+  runtime.*.inputs.*.streams.*.state: { type: string, description: "Elementary stream state as the unit reports it, such as NEW" }
+  runtime.*.inputs.*.streams.*.format: { type: string, description: "Elementary stream format, such as J2K or AES3" }
+  runtime.*.inputs.*.streams.*.description: { type: string, description: "Elementary stream description from the unit" }
+  runtime.*.outputs.*.unique_id: { type: string, description: "The output's UUID, kept across stops and restarts" }
+  runtime.*.outputs.*.status: { type: string, description: "Output status: ERROR, WARNING, OK or UNKNOWN" }
+  runtime.*.outputs.*.name: { type: string, description: "Output stream name" }
+  runtime.*.outputs.*.sink: { type: string, description: "Output sink URL" }
+  runtime.*.outputs.*.description: { type: string, description: "Output description, such as H.264 1920x1080 4:2:0 8-bit" }
+  runtime.*.outputs.*.encoding_latency_ms: { type: float, unit: ms, description: "Encoding latency per frame or field, averaged over the last few seconds" }
+  runtime.*.outputs.*.transcoded_fps: { type: float, unit: fps, description: "Frames or fields transcoded per second, averaged over the last few seconds" }
+  runtime.*.outputs.*.transcoding_latency_ms: { type: float, unit: ms, description: "Transcoding latency per frame or field, averaged over the last few seconds" }
+  runtime.*.outputs.*.dropped_fps: { type: float, unit: fps, description: "Frames or fields dropped per second, averaged over the last few seconds" }
+  runtime.*.outputs.*.latency_addition_ms: { type: int, unit: ms, description: "Difference between the PTS of an input frame and its output frame; negative when undefined" }
+  runtime.*.outputs.*.messages: { type: string, description: "The output's messages as JSON text, a list of {severity, message}" }
+  system.transcoder_version: { type: string, description: "Transcoder version, major.minor.maintenance" }
+  system.transcoder_full_version: { type: string, description: "Transcoder full version string" }
+  system.transcoder_date: { type: string, description: "Transcoder release date, year-month-day" }
+  system.deployment_mode: { type: string, description: "Deployment mode: host or docker" }
+  system.j2k_decoder_version: { type: string, description: "JPEG 2000 SDK decoder version" }
+  system.j2k_encoder_version: { type: string, description: "JPEG 2000 SDK encoder version" }
+  system.j2k_transcoder_version: { type: string, description: "JPEG 2000 SDK transcoder version" }
+  system.nvidia_driver: { type: string, description: "NVIDIA driver version" }
+  system.cuda_driver: { type: string, description: "CUDA driver version" }
+  system.cuda_runtime: { type: string, description: "CUDA runtime version" }
+  system.network_interfaces.*.name: { type: string, description: "Network interface display name, keyed by the interface id pipeline URLs use" }
+  system.network_interfaces.*.connected: { type: bool, description: "True when the interface is connected" }
+  system.sdi_devices.*.name: { type: string, description: "SDI device name, keyed by the device id sdi:// URLs use" }
+  system.sdi_devices.*.ports: { type: string, description: "The device's ports as JSON text, such as [\"1\",\"2\",\"3\",\"4\"]" }
+  ndi.sources.*: { type: string, description: "NDI source names from the last list_ndi_sources, keyed by place from 0" }
+  system.reinstall.state: { type: string, description: "Reinstallation state: NOT-STARTED, IN-PROGRESS, FAILED or SUCCESS" }
+  system.reinstall.error_message: { type: string, description: "The failed reinstallation's error message" }
+  system.factory_reset.state: { type: string, description: "Factory reset state: NOT-STARTED, IN-PROGRESS, FAILED or SUCCESS" }
+  system.factory_reset.error_message: { type: string, description: "The failed factory reset's error message" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset and reinstall cannot be undone: a factory reset restores
+      factory settings and a reinstallation keeps only the licenses, and both
+      reboot the unit on success. Each call is synchronous and answers with
+      the outcome. reboot, shutdown and restart_service stop every pipeline;
+      after shutdown the unit must be powered on locally.
+
+  - models: [all]
+    severity: critical
+    text: >
+      replace_pipelines removes every pipeline and creates only those given;
+      modify_pipeline replaces a pipeline's whole configuration, so a change
+      to one field means sending the whole Pipeline object (list_pipelines or
+      get_pipeline gives it). Only the input video and audio filters apply
+      without restarting a running pipeline; other changes restart it.
+      delete_pipeline removes the pipeline and its UUID.
+
+  - models: [all]
+    severity: warning
+    text: >
+      start_pipeline and stop_pipeline are refused with 503 ("try again
+      later") when the pipeline is already in that state or still starting or
+      stopping; read runtime.<id>.operation_state first. Pipeline state is
+      polled: the list every 10 seconds, each listed pipeline's runtime state
+      right after it; a start, stop, change or removal reads both back at
+      once. The runtime state of a pipeline removed by another client stays
+      until the core reopens the device, since only this client's removals
+      are seen.
+
+  - models: [all]
+    severity: info
+    text: >
+      AJA's v1.16 API document addresses the unit as https://<unit>/api with
+      HTTP Basic credentials (admin and the unit's password), and the manual's
+      curl examples run on the unit itself at http://localhost:8080/api
+      without credentials; this spec uses https on 443 by default (the
+      certificate is not checked) and http on 8080 when the scheme setting
+      says so. The full and current API documentation is served by the unit
+      (Dashboard, API button); the public PDF is for v1.16 and the manual's
+      example body ("source", "complianceWith": "TR_01", "framerate") does
+      not match the v1.16 Pipeline schema, which this spec follows.
+
+  - models: [all]
+    severity: info
+    text: >
+      Pipelines are configured with the API document's JSON objects
+      (Pipeline, Input Stream, Output Stream and their parts): their fields,
+      ranges and allowed values are those of the document, and the unit
+      validates them, answering {status: 400, error} for a missing or wrong
+      field. Uploaded logos travel inside the Pipeline object as base64 PNG.
+      list_ndi_sources searches in the background: the first call for a group
+      may return none, later calls the full list.
+
+  - models: [all]
+    severity: info
+    text: >
+      SNMP (manual chapter 7: SNMPv2c, community public, CPU, GPU, stream,
+      dropped frame and status OIDs under enterprise 50087, enabled by
+      editing an .ini file) and the unit's on-box documentation are outside
+      this spec.
