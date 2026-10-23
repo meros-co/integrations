@@ -351,6 +351,19 @@ impl Link {
     }
 }
 
+/// A MIDI port of the host a module asks the session to open: a USB or
+/// other class-compliant MIDI device, or another program's virtual port,
+/// named as [`crate::Core::midi_ports`] lists them. A device reached on a
+/// MIDI port often has an input and an output of the same name; either may
+/// be left out, to only receive or only send.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MidiPort {
+    /// The input port to receive from.
+    pub input: Option<String>,
+    /// The output port to send to.
+    pub output: Option<String>,
+}
+
 /// A username and password.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Credentials {
@@ -442,8 +455,15 @@ pub enum WsInput {
     Opened,
     Text(String),
     Binary(Vec<u8>),
-    /// A ping or pong arrived: proof of life, nothing to handle.
+    /// A ping, or a pong to a ping the module did not send, arrived: proof
+    /// of life, nothing to handle.
     Activity,
+    /// A pong arrived, with its payload: the answer to a ping the module
+    /// sent with `ws_ping` (RFC 6455 §5.5.3), or one the peer sent unasked.
+    Pong(Vec<u8>),
+    /// The subprotocol the peer chose in its handshake answer, reported
+    /// before `Opened` when it chose one (RFC 6455 §4.1).
+    Subprotocol(String),
     /// The connection failed or ended. `code` is the close code the peer sent,
     /// if it sent one. It is gone; open it again to retry.
     Closed {
@@ -582,6 +602,16 @@ pub enum Action {
         socket: Key,
         port: SerialPort,
     },
+    /// Open a MIDI port of the host, replacing any connection open under
+    /// this key. Reported like `TcpOpen`: `Connected` once the port is open,
+    /// `Data` as MIDI bytes arrive on its input, and `Closed` when it cannot
+    /// be opened or goes away (a USB device unplugged), with a reason
+    /// starting `midi:`. `TcpSend` sends MIDI bytes to its output, one whole
+    /// message at a time, and `TcpClose` closes it.
+    MidiOpen {
+        socket: Key,
+        port: MidiPort,
+    },
     TcpSend {
         socket: Key,
         data: Vec<u8>,
@@ -691,6 +721,12 @@ pub enum Action {
     /// Send a binary message, for protocols that frame bytes in WebSocket
     /// binary messages (AES70's OCP.1).
     WsSendBinary {
+        socket: Key,
+        data: Vec<u8>,
+    },
+    /// Send a ping with this payload, at most 125 bytes (RFC 6455 §5.5); its
+    /// pong arrives as `WsInput::Pong`.
+    WsPing {
         socket: Key,
         data: Vec<u8>,
     },
@@ -880,6 +916,11 @@ impl Cx {
         self.push(Action::SerialOpen { socket, port });
     }
 
+    /// Open a MIDI port; see [`Action::MidiOpen`].
+    pub fn midi_open(&mut self, socket: Key, port: MidiPort) {
+        self.push(Action::MidiOpen { socket, port });
+    }
+
     /// Open a TCP stream through an SSH tunnel; see [`Action::TcpOpenSsh`].
     pub fn tcp_open_ssh(&mut self, socket: Key, tunnel: SshTunnel) {
         self.push(Action::TcpOpenSsh { socket, tunnel });
@@ -952,6 +993,13 @@ impl Cx {
 
     pub fn ws_send_binary(&mut self, socket: Key, data: impl Into<Vec<u8>>) {
         self.push(Action::WsSendBinary {
+            socket,
+            data: data.into(),
+        });
+    }
+
+    pub fn ws_ping(&mut self, socket: Key, data: impl Into<Vec<u8>>) {
+        self.push(Action::WsPing {
             socket,
             data: data.into(),
         });

@@ -151,6 +151,8 @@ pub(crate) struct Services {
     pub(crate) streams: Arc<crate::streams::Streams>,
     /// Where serial ports are opened: the host's, or a test's in-memory ones.
     pub(crate) serial: Arc<dyn crate::serial::SerialPorts>,
+    /// Where MIDI ports are opened: the host's, or a test's in-memory ones.
+    pub(crate) midi: Arc<dyn crate::midi_ports::MidiPorts>,
 }
 
 /// What any consumer can read about a device without asking it.
@@ -708,6 +710,19 @@ impl Session {
                     );
                     self.tcp.insert(socket, connection);
                 }
+                Action::MidiOpen { socket, port } => {
+                    self.close_tcp(socket);
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let connection = crate::midi_ports::spawn(
+                        socket,
+                        generation,
+                        port,
+                        self.services.midi.clone(),
+                        self.inbound_tx.clone(),
+                    );
+                    self.tcp.insert(socket, connection);
+                }
                 Action::TcpClose { socket } => self.close_tcp(socket),
                 Action::FileOpen { file, path } => {
                     let generation = self.next_generation;
@@ -847,6 +862,11 @@ impl Session {
                 Action::WsSendBinary { socket, data } => {
                     if let Some(c) = self.ws.get(socket) {
                         let _ = c.writer.send(crate::ws::Outgoing::Binary(data));
+                    }
+                }
+                Action::WsPing { socket, data } => {
+                    if let Some(c) = self.ws.get(socket) {
+                        let _ = c.writer.send(crate::ws::Outgoing::Ping(data));
                     }
                 }
                 Action::WsClose { socket } => self.close_ws(socket),
@@ -1391,6 +1411,7 @@ mod tests {
             http: crate::http::HttpClients::new().unwrap(),
             streams: Default::default(),
             serial: Arc::new(crate::serial::HostPorts),
+            midi: Arc::new(crate::midi_ports::HostMidi),
         });
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: crate::module::Connection::Connecting,
@@ -1500,6 +1521,7 @@ mod tests {
             http: crate::http::HttpClients::new().unwrap(),
             streams: Default::default(),
             serial: Arc::new(crate::serial::HostPorts),
+            midi: Arc::new(crate::midi_ports::HostMidi),
         });
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: Connection::Connecting,

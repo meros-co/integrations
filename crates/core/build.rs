@@ -119,10 +119,13 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-generic",
         &[
             "generic-http",
+            "generic-midi",
             "generic-osc",
             "generic-tcp-udp",
+            "generic-websocket",
             "http-listener",
             "http-snapshot",
+            "midi-show-control",
             "osc-listener",
         ],
     ),

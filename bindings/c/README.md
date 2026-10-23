@@ -68,6 +68,17 @@ only; empty on Android and iOS):
 `mi_open(core, "{\"device\":\"extron-matrix\",\"model\":\"mmx-42-62\",\"settings\":{\"link\":\"serial\",\"serial_port\":\"COM3\"}}")`
 needs no host.
 
+## MIDI ports
+
+A MIDI device can be reached on a MIDI port of this machine (a USB or other
+class-compliant MIDI interface or instrument, or another program's port):
+`generic-midi` and `midi-show-control` take the `link` setting `"port"` and
+name the ports in `midi_input` and `midi_output`. `mi_midi_ports(core)`
+lists this machine's ports to choose from, as
+`{"ok":[{"name":"...","input":true,"output":true},...]}` (empty in a build
+without a MIDI integration and on Android). Linux builds with a MIDI
+integration link the ALSA library (`libasound2-dev` to build).
+
 ## Files sent to devices
 
 A command's `binary` parameter (a show file, a media file, an image) takes

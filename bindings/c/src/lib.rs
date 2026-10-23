@@ -155,6 +155,17 @@ pub unsafe extern "C" fn mi_serial_ports(core: *const MiCore) -> *mut c_char {
     guard(|| to_c(api::serial_ports(&(*core).core)))
 }
 
+/// The host's MIDI ports: `{"ok":[{"name":"...","input":true,"output":true},...]}`
+/// or `{"error":{...}}`; empty in a build without a MIDI integration and on
+/// Android.
+///
+/// # Safety
+/// `core` must be a live core.
+#[no_mangle]
+pub unsafe extern "C" fn mi_midi_ports(core: *const MiCore) -> *mut c_char {
+    guard(|| to_c(api::midi_ports(&(*core).core)))
+}
+
 /// Open a device: `request` is an OpenRequest as JSON. Returns `{"device":id}`
 /// or `{"error":{...}}`.
 ///

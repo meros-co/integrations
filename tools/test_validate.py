@@ -158,6 +158,29 @@ class Serial(unittest.TestCase):
         self.assertIn("ports[0]: a serial port's setting is serial_port", errors)
 
 
+class MidiPorts(unittest.TestCase):
+    SETTINGS = {"midi_input": {"type": "string"}, "midi_output": {"type": "string"}}
+
+    def doc(self, ports, implementation="native", settings=None):
+        return {"implementation": implementation, "settings": self.SETTINGS if settings is None else settings,
+                "ports": ports}
+
+    def test_a_midi_port_is_named_by_its_setting_on_a_native_module(self):
+        ports = [{"port": None, "protocol": "midi", "role": "control", "setting": "midi_input", "note": "in"},
+                 {"port": None, "protocol": "midi", "role": "control", "setting": "midi_output", "note": "out"}]
+        self.assertEqual(validate.midi_checks(self.doc(ports)), [])
+
+    def test_what_a_midi_port_may_not_be(self):
+        ports = [{"port": 5004, "protocol": "midi", "role": "feedback", "setting": "midi_port"}]
+        errors = validate.midi_checks(self.doc(ports, implementation="spec"))
+        self.assertIn("ports[0]: a MIDI port has no number (port: null)", errors)
+        self.assertIn("ports[0]: a MIDI port's setting is midi_input or midi_output", errors)
+        self.assertIn("ports[0]: a MIDI port is a control entry the device listens on", errors)
+        self.assertIn("ports[0]: only a native module opens a MIDI port", errors)
+        ports = [{"port": None, "protocol": "midi", "role": "control", "setting": "midi_input", "note": "in"}]
+        errors = validate.midi_checks(self.doc(ports, settings={"midi_input": {"type": "int"}}))
+        self.assertEqual(errors, ["settings.midi_input: must be a string"])
+
 
 class SerialBlock(unittest.TestCase):
     def doc(self, **block):

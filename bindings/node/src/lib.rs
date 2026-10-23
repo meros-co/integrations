@@ -71,6 +71,12 @@ impl NativeCore {
         json::serial_ports(&self.core)
     }
 
+    /// The host's MIDI ports: `{ok: [{name, input, output}]}` or `{error}`.
+    #[napi]
+    pub fn midi_ports(&self) -> Value {
+        json::midi_ports(&self.core)
+    }
+
     /// `{device}` or `{error}`.
     #[napi]
     pub fn open(&self, request: Value) -> Value {

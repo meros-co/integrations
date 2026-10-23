@@ -105,6 +105,17 @@ class Core extends EventEmitter {
     return result.ok;
   }
 
+  /**
+   * The host's MIDI ports, [{ name, input, output }], for the midi_input and
+   * midi_output settings of a MIDI device on one. Throws an IntegrationsError
+   * if they cannot be listed.
+   */
+  midiPorts() {
+    const result = this.#native.midiPorts();
+    if (result.error) throw new IntegrationsError(result.error);
+    return result.ok;
+  }
+
   /** Open a device; returns its id. The connection is made in the background. */
   open(request) {
     const result = this.#native.open(request);

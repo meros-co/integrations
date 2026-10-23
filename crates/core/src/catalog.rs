@@ -75,8 +75,9 @@ pub struct DeviceSpec {
 pub struct PortSpec {
     /// The default; `None` when there is none and it must be given.
     pub port: Option<u16>,
-    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh` or `serial`
-    /// (a serial port on the host, named by its `setting`, with no number).
+    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls`, `ssh`, `serial`
+    /// (a serial port on the host, named by its `setting`, with no number)
+    /// or `midi` (a MIDI port on the host, likewise).
     pub protocol: String,
     /// `control` (where commands go; `OpenRequest::port` overrides it),
     /// `push`, `feedback`, `notification` or `discovery`.
@@ -280,6 +281,12 @@ impl DeviceSpec {
     /// may be opened without a network host (SPEC.md §2, Ports).
     pub fn uses_serial(&self) -> bool {
         self.ports.iter().any(|p| p.protocol == "serial")
+    }
+
+    /// Whether the device can be reached on a MIDI port of the host, so it
+    /// may be opened without a network host (SPEC.md §2, Ports).
+    pub fn uses_midi(&self) -> bool {
+        self.ports.iter().any(|p| p.protocol == "midi")
     }
 
     pub fn model(&self, id: &str) -> Option<&ModelSpec> {

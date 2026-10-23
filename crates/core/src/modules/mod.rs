@@ -66,6 +66,8 @@ mod focusrite_rednet;
 mod ftp;
 #[cfg(feature = "generic-http")]
 mod generic_http;
+#[cfg(feature = "generic-midi")]
+mod generic_midi;
 #[cfg(any(feature = "generic-osc", feature = "osc-listener"))]
 mod generic_osc;
 #[cfg(any(
@@ -75,6 +77,8 @@ mod generic_osc;
     feature = "osc-listener"
 ))]
 mod generic_tcp_udp;
+#[cfg(feature = "generic-websocket")]
+mod generic_websocket;
 #[cfg(feature = "http-listener")]
 mod http_listener;
 #[cfg(feature = "http-snapshot")]
@@ -87,6 +91,10 @@ mod lake_dlm;
 mod meros_camera;
 #[cfg(feature = "meros-camera")]
 mod meros_camera_wire;
+#[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
+mod midi_link;
+#[cfg(feature = "midi-show-control")]
+mod midi_show_control;
 #[cfg(feature = "nec-display")]
 mod nec_display;
 #[cfg(feature = "nec-projector")]
@@ -121,6 +129,8 @@ mod pjlink;
 mod qsys;
 #[cfg(feature = "resolume")]
 mod resolume_push;
+#[cfg(any(feature = "generic-midi", feature = "midi-show-control"))]
+mod rtp_midi;
 #[cfg(feature = "samsung-mdc")]
 mod samsung_mdc;
 #[cfg(feature = "samsung-mdc")]
@@ -353,6 +363,14 @@ pub(crate) fn construct(
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
         #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
+        #[cfg(feature = "generic-websocket")]
+        "generic-websocket" => Ok(Box::new(generic_websocket::GenericWebsocket::new(
+            context,
+        )?)),
+        #[cfg(feature = "generic-midi")]
+        "generic-midi" => Ok(Box::new(generic_midi::GenericMidi::new(context)?)),
+        #[cfg(feature = "midi-show-control")]
+        "midi-show-control" => Ok(Box::new(midi_show_control::MidiShowControl::new(context)?)),
         #[cfg(feature = "http-listener")]
         "http-listener" => Ok(Box::new(http_listener::HttpListener::new(context)?)),
         #[cfg(feature = "http-snapshot")]

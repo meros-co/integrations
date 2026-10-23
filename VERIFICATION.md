@@ -1392,6 +1392,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1696](specs/freeshow.yaml#L1696))
 - [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1698](specs/freeshow.yaml#L1698))
 
+## generic-midi — Generic MIDI device
+
+- [ ] Join a macOS Audio MIDI Setup network session (and rtpMIDI on Windows, and a network MIDI interface) and confirm the invitation on both ports is accepted, notes and SysEx arrive, and the session stays up for an hour with the core's clock synchronisation every 10 s. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
+- [ ] Confirm those hosts accept packets with no recovery journal (J clear) from the core, as Apple's driver document says receivers must. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
+- [ ] With packet loss forced (a lossy link or dropped packets), confirm the replay of Apple's recovery journal leaves notes, controllers, programs and pitch bend as the sender has them. ([specs/generic-midi.yaml:381](specs/generic-midi.yaml#L381))
+- [ ] Capture Apple's RS packet and confirm the sequence number sits in the upper 16 bits of its 32-bit field, and that a host starting its own clock synchronisation accepts the core's count 1 answer. ([specs/generic-midi.yaml:400](specs/generic-midi.yaml#L400))
+- [ ] Confirm 5004 is the port Audio MIDI Setup offers for a new session, and that the session's advertised _apple-midi._udp SRV port is its control port. ([specs/generic-midi.yaml:91](specs/generic-midi.yaml#L91))
+- [ ] With a USB MIDI device on Windows, macOS and Linux, confirm the port listing's names open the device, that unplugging it reports disconnected within a second or two and plugging it back reconnects, and that a port held by another program on Windows fails to open as described. ([specs/generic-midi.yaml:389](specs/generic-midi.yaml#L389))
+- [ ] Against an MMC device (a DAW or recorder), confirm READ answers for selected_time_code and motion_control_tally decode as kept, including short time code updates. ([specs/generic-midi.yaml:408](specs/generic-midi.yaml#L408))
+
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))
@@ -1707,6 +1717,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a camera given a new fleet key answers 401 to the old one at once, including on an event stream or preview already open. ([specs/meros-camera.yaml:462](specs/meros-camera.yaml#L462))
 - [ ] Confirm that settings.exposure.iso is null (absent from state) in automatic exposure, and which settings fields the camera writes as null in other modes. ([specs/meros-camera.yaml:596](specs/meros-camera.yaml#L596))
 - [ ] On a phone with talkback on, confirm that get_talkback_url's address takes a director's WebRTC offer, and that new_talkback_address cuts off a director on the old one. ([specs/meros-camera.yaml:536](specs/meros-camera.yaml#L536))
+
+## midi-show-control — MIDI Show Control (MSC) device
+
+- [ ] Against an MSC lighting console (ETC Eos, grandMA, Chamsys), confirm GO, STOP, RESUME, TIMED_GO, SET and FIRE act as described for its device ID and command format, and whether it answers all_types and the all-call ID 127. ([specs/midi-show-control.yaml:315](specs/midi-show-control.yaml#L315))
+- [ ] Against a controlled device that implements two-phase commit, confirm the checksum is computed with the first byte of each pair as the low byte. ([specs/midi-show-control.yaml:348](specs/midi-show-control.yaml#L348))
+- [ ] Confirm which device ID such a device addresses its STANDING_BY, COMPLETE, CANCELLED and ABORT to, and which status code it uses for "manual override in progress" in CANCELLED (8028 or 8030). ([specs/midi-show-control.yaml:348](specs/midi-show-control.yaml#L348))
+- [ ] Confirm that a GO_2PC's COMPLETE arrives within 125 % of the STANDING_BY's maximum time on a real device, so the core's timeout does not fire early. ([specs/midi-show-control.yaml:329](specs/midi-show-control.yaml#L329))
 
 ## millumin — Millumin
 
@@ -2825,4 +2842,4 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## Integrations with no open items
 
-Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-listener, http-snapshot, obs-studio.
+Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, generic-websocket, http-listener, http-snapshot, obs-studio.
