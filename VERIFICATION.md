@@ -1501,6 +1501,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
+## imimot-mitti — Mitti
+
+- [ ] Check that a Custom OSC Feedback target (this host and the feedback_port setting) receives every feedback message, and which port Mitti suggests by default. ([specs/imimot-mitti.yaml:617](specs/imimot-mitti.yaml#L617))
+- [ ] Confirm that /mitti/resendOSCFeedback sends every feedback value again, including each cue's properties, and that changes made over OSC are fed back too. ([specs/imimot-mitti.yaml:626](specs/imimot-mitti.yaml#L626))
+- [ ] Compare the command names taken from the Companion module (stop, panic, jumpToPrevCue, playCueWithCueID, playCueAtIndex, the ForceCut forms, fullscreenOn, loopOn, transitionOnPlayOn, autoFade, mainFader, playhead, playheadScrub, locateCurrentCue, videoOutputsOn, unmuteAudio, setInFromPlayhead, the cue-level On/Off/toggle forms, setGotoToCueID and the AsPercent/AsPixels/AsDegrees/AsDecibels properties) with the address space Mitti's OSC Query server lists at http://<host>:51000. ([specs/imimot-mitti.yaml:635](specs/imimot-mitti.yaml#L635))
+- [ ] Check the feedback addresses read into state that only the Companion module names: currentCueID, selectedCueName, selectedCueID, playhead, mainFader, toggleVideoOutputs, toggleAudio, toggleFullscreen, toggleLoop, toggleTransitionOnPlay, in/outFromPlayheadEnabled, and the per-cue cueName, deleted and property messages (and whether they use the AsPercent names). ([specs/imimot-mitti.yaml:635](specs/imimot-mitti.yaml#L635))
+- [ ] Check the argument types Mitti accepts: values are sent as OSC strings ("75", "-3.5", "0.50") as the Companion module does; check whether floats or ints are what the OSC Query server advertises, and the types Mitti's feedback carries. ([specs/imimot-mitti.yaml:647](specs/imimot-mitti.yaml#L647))
+- [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
+- [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))
