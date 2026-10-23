@@ -79,7 +79,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how the router answers wait_for_config_events with an expired connection id, and that /config (not /json) gives the connection id. ([specs/aja-kumo.yaml:1608](specs/aja-kumo.yaml#L1608))
 - [ ] Check whether the firmware on hand answers eParamID_XPT_DestinationAll_Status through /options, or {} as older firmware does. ([specs/aja-kumo.yaml:1618](specs/aja-kumo.yaml#L1618))
 - [ ] Confirm that a number above the router's count, and a switch to a locked destination, fail with HTTP 403 (or note the actual status). ([specs/aja-kumo.yaml:1578](specs/aja-kumo.yaml#L1578))
-- [ ] Confirm the router handles back-to-back requests without the pauses AJA's examples add. ([specs/aja-kumo.yaml:1627](specs/aja-kumo.yaml#L1627))
+- [ ] Check whether a burst of back-to-back requests (several routes or a salvo set at once, a full read on connecting) overloads the router's queue without the 0.1-0.25 s pauses AJA's examples add; the core sends one request at a time and paces nothing, since AJA documents no required gap. ([specs/aja-kumo.yaml:1633](specs/aja-kumo.yaml#L1633))
 - [ ] Confirm button colour writes in the {'classes': 'color_N'} form are accepted. ([specs/aja-kumo.yaml:1680](specs/aja-kumo.yaml#L1680))
 - [ ] Read a button colour (eParamID_Button_Settings_{n}) and its event, and check the value holds color_N as written, for a source and a destination in each bank. ([specs/aja-kumo.yaml:1690](specs/aja-kumo.yaml#L1690))
 - [ ] Record the values and names eParamID_SuppressPSAlarm reads, and the ids of the switching mode, reference and temperature alarm suppression from desc.json. ([specs/aja-kumo.yaml:1715](specs/aja-kumo.yaml#L1715))
@@ -1992,6 +1992,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a set command's network reply echoes the command after "00" (as "00PON"), and the serial reply is the bare data without "00". ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 - [ ] Check which serial speeds the older series offer (the PT-RZ120's menu gives 9600, 19200 and 38400). ([specs/panasonic-projector.yaml:57](specs/panasonic-projector.yaml#L57))
 - [ ] Check that commands addressed to ZZ are answered with RESPONSE (ID ALL) off on a single projector. ([specs/panasonic-projector.yaml:16368](specs/panasonic-projector.yaml#L16368))
+- [ ] Check whether commands over the network also need the 60 s after the light source lights that the RS-232C section asks for (the core waits only on the serial port), and whether a power read during lighting answers 001 (the core starts the 60 s when it first reads on after standby). ([specs/panasonic-projector.yaml:16369](specs/panasonic-projector.yaml#L16369))
 - [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
 ## philips-sicp — Philips professional displays (SICP)
@@ -2533,6 +2534,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sony-camera — Sony cameras
 
+- [ ] Check which settings the 500 ms after an exposure mode change really covers (the reference says shooting parameters; the core holds every property change and step control, counted from the camera's answer). ([specs/sony-camera.yaml:2968](specs/sony-camera.yaml#L2968))
 - [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:3187](specs/sony-camera.yaml#L3187))
 - [ ] Check zoom and focus preset slot numbering: that slot 0 is the first preset, matching save_zoom_focus_position, before relying on set_preset_zoom_only. ([specs/sony-camera.yaml:2609](specs/sony-camera.yaml#L2609))
 - [ ] Check the display-list mapping: that base look, AE level offset, scene file, creative look and stream destination names come from the list types the module uses and match what the camera shows. ([crates/core/src/modules/sony_camera_info.rs:94](crates/core/src/modules/sony_camera_info.rs#L94))
@@ -2723,6 +2725,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1040](specs/visca.yaml#L1040))
 - [ ] On a serial camera (Sony, Datavideo, Lumens, Marshall), confirm replies come from y0 with y = address + 8 and that only Address Set and IF_Clear broadcasts answer from 88. ([specs/visca.yaml:1126](specs/visca.yaml#L1126))
 - [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
+- [ ] On Sony, confirm the 200 ms before a cancel counts from the pan/tilt drive's ACK (the core's reading of "after executing"); on the other vendors' cameras, which document no such gap and get none, check whether a cancel sent within 200 ms of a drive starting still stops it. ([specs/visca.yaml:1194](specs/visca.yaml#L1194))
 
 ## vmix — vMix
 
