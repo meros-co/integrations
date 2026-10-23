@@ -862,7 +862,8 @@ fn decode(decode: Decode, reply: &[u8]) -> Option<Value> {
             })
         }
         Decode::LastPreset => match first? {
-            0x7F => Value::Null,
+            // 0: none recalled (presets are from 1).
+            0x7F => json!(0),
             b => json!(u32::from(b) + 1),
         },
         Decode::Pair => json!({"pan": first?, "tilt": *data.get(1)?}),
@@ -2892,8 +2893,8 @@ mod tests {
             (
                 "get_last_preset",
                 "90 50 7F FF",
-                Value::Null,
-                json!({"presets": {"last_recalled": null}}),
+                json!(0),
+                json!({"presets": {"last_recalled": 0}}),
             ),
             (
                 "get_last_preset",
