@@ -202,7 +202,7 @@ impl GenericPing {
                 let reason = format!(
                     "ICMP echo is not allowed here ({message}); give a port to check with a TCP connection instead"
                 );
-                cx.state(json!({ "method": Value::Null, "last_error": reason }));
+                cx.state(json!({ "method": "none", "last_error": reason }));
                 cx.connection(Connection::Disconnected {
                     reason: reason.clone(),
                 });
