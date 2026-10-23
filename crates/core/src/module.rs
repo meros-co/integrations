@@ -442,8 +442,15 @@ pub enum WsInput {
     Opened,
     Text(String),
     Binary(Vec<u8>),
-    /// A ping or pong arrived: proof of life, nothing to handle.
+    /// A ping, or a pong to a ping the module did not send, arrived: proof
+    /// of life, nothing to handle.
     Activity,
+    /// A pong arrived, with its payload: the answer to a ping the module
+    /// sent with `ws_ping` (RFC 6455 §5.5.3), or one the peer sent unasked.
+    Pong(Vec<u8>),
+    /// The subprotocol the peer chose in its handshake answer, reported
+    /// before `Opened` when it chose one (RFC 6455 §4.1).
+    Subprotocol(String),
     /// The connection failed or ended. `code` is the close code the peer sent,
     /// if it sent one. It is gone; open it again to retry.
     Closed {
@@ -691,6 +698,12 @@ pub enum Action {
     /// Send a binary message, for protocols that frame bytes in WebSocket
     /// binary messages (AES70's OCP.1).
     WsSendBinary {
+        socket: Key,
+        data: Vec<u8>,
+    },
+    /// Send a ping with this payload, at most 125 bytes (RFC 6455 §5.5); its
+    /// pong arrives as `WsInput::Pong`.
+    WsPing {
         socket: Key,
         data: Vec<u8>,
     },
@@ -952,6 +965,13 @@ impl Cx {
 
     pub fn ws_send_binary(&mut self, socket: Key, data: impl Into<Vec<u8>>) {
         self.push(Action::WsSendBinary {
+            socket,
+            data: data.into(),
+        });
+    }
+
+    pub fn ws_ping(&mut self, socket: Key, data: impl Into<Vec<u8>>) {
+        self.push(Action::WsPing {
             socket,
             data: data.into(),
         });

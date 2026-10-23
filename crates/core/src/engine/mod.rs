@@ -3659,7 +3659,9 @@ impl SpecEngine {
                 self.push_heard(cx);
                 cx.alive();
             }
-            WsInput::Binary(_) | WsInput::Activity => {
+            // The subprotocol chosen: the spec asked for it, nothing to do.
+            WsInput::Subprotocol(_) => {}
+            WsInput::Binary(_) | WsInput::Activity | WsInput::Pong(_) => {
                 self.last_heard = cx.now();
                 self.push_heard(cx);
                 cx.alive();
@@ -4024,7 +4026,9 @@ impl Module for SpecEngine {
                 self.inbound_ws(cx, text);
                 self.rearm_quiet(cx);
             }
-            WsInput::Binary(_) | WsInput::Activity => {
+            // The subprotocol chosen: the spec asked for it, nothing to do.
+            WsInput::Subprotocol(_) => {}
+            WsInput::Binary(_) | WsInput::Activity | WsInput::Pong(_) => {
                 self.last_heard = cx.now();
                 cx.alive();
             }
