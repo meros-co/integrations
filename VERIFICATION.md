@@ -2741,6 +2741,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm Update Channel Stream Schedule takes its vacation fields as query parameters, not a body, and answers 204. ([specs/twitch.yaml:1073](specs/twitch.yaml#L1073))
 - [ ] Confirm Delete Videos answers 200 with the deleted ids, and what it answers for a video that is not the channel's. ([specs/twitch.yaml:1160](specs/twitch.yaml#L1160))
 
+## videolan-vlc — VLC media player
+
+- [ ] Confirm the .json pages take the same commands as the .xml ones, the status and playlist field names read here, and the rate and audiodelay commands. ([specs/videolan-vlc.yaml:315](specs/videolan-vlc.yaml#L315))
+- [ ] Check that the playlist tree's first child is the Playlist (not the Media Library) in a localized VLC, and how nested folders appear. ([specs/videolan-vlc.yaml:332](specs/videolan-vlc.yaml#L332))
+- [ ] Check the largest volume value VLC accepts on the web interface. ([specs/videolan-vlc.yaml:325](specs/videolan-vlc.yaml#L325))
+
 ## vimeo-live — Vimeo Live
 
 - [ ] Confirm a refused or revoked token answers 401 with error_code 8000 or 8003 on the live endpoints, and that error 3200 under 401 is only a permission refusal. ([specs/vimeo-live.yaml:91](specs/vimeo-live.yaml#L91))

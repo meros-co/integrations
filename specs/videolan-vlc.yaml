@@ -1,0 +1,346 @@
+spec: 1
+id: videolan-vlc
+name: VLC media player (web interface)
+vendor: VideoLAN
+category: playback
+
+source:
+  - title: VLC HTTP requests (VideoLAN wiki)
+    url: https://wiki.videolan.org/VLC_HTTP_requests
+    note: >
+      VideoLAN's wiki page reproducing the web interface's request list:
+      GET requests/status, playlist, browse, vlm and vlm_cmd; status with
+      command= in_play and in_enqueue (input=<mrl>), pl_play and pl_pause
+      (with or without id=), pl_stop, pl_next, pl_previous, pl_delete (id),
+      pl_empty, pl_sort (id 0 normal or 1 reverse order, val the sort mode:
+      0 id, 1 name, 3 author, 5 random, 7 track number), pl_random, pl_loop,
+      pl_repeat, pl_sd (val, a service discovery module), fullscreen, volume
+      (val +<int>, -<int>, <int> or <int>%) and seek (val in seconds, an
+      [+|-]h:m:s time, or a percentage); parameters URL-encoded. Read as
+      documentation of a GPL program; no VLC source (and no file of its
+      source tree) was read
+  - title: Documentation:Modules/http_intf (VideoLAN wiki)
+    url: https://wiki.videolan.org/Documentation:Modules/http_intf
+    note: >
+      The web (Lua http) interface: enabled as an extra interface
+      (--extraintf=http, or Preferences > All > Interface > Main interfaces >
+      Web), port 8080 by default (--http-port), and from VLC 2.1 a password
+      (Lua HTTP password, --http-password) with the user name left blank
+  - title: companion-module-videolan-vlc (MIT)
+    url: https://github.com/bitfocus/companion-module-videolan-vlc
+    note: >
+      MIT licence (top-level LICENSE). Read, not copied, for what the wiki
+      does not give: the JSON forms requests/status.json and
+      requests/playlist.json (the wiki names the .xml pages), the commands
+      rate (val, 1 the normal speed) and audiodelay (val in seconds), the
+      status fields state (stopped, paused, playing), time, length,
+      position, volume (256 for 100 %), rate, audiodelay, random, loop,
+      repeat, fullscreen, currentplid and version, and the playlist tree
+      with the playlist's items under the first child (index.js,
+      actions.js)
+
+transport:
+  type: http
+  port: 8080
+  scheme: http
+  auth: basic
+  timeout_ms: 4000
+  probe: { method: GET, path: /requests/status.json }
+
+settings:
+  username: { type: string, default: "", max_length: 255, label: Username, description: "Leave empty: the web interface asks for a password only." }
+  password: { type: string, secret: true, default: "", max_length: 255, label: Password, description: "The web interface's password (Preferences > All > Interface > Main interfaces > Lua > Lua HTTP > Password, or --http-password)." }
+
+ports:
+  - { port: 8080, protocol: http, role: control, note: "VLC's web interface (--http-port)" }
+
+models:
+  - id: vlc-3
+    name: VLC media player 2.1 and later, web interface
+    supports:
+      [play_now, enqueue, play, play_item, toggle_pause, toggle_pause_item, stop, next, previous,
+       delete_item, empty_playlist, sort_playlist, toggle_random, toggle_loop, toggle_repeat,
+       toggle_service_discovery, toggle_fullscreen, set_volume, seek, set_rate, set_audio_delay,
+       get_status, get_playlist, browse, get_vlm, vlm_command]
+    verification: none
+
+commands:
+  play_now:
+    summary: Add a media item to the playlist and play it (in_play)
+    params:
+      input: { type: string, required: true, max_length: 4096, label: Media, description: "The media's MRL: a file path or URL such as file:///C:/media/clip.mp4 or rtsp://camera/stream." }
+    send: { method: GET, path: /requests/status.json, query: { command: in_play, input: "{input}" } }
+    expect: { status: 200 }
+    returns: ack
+  enqueue:
+    summary: Add a media item to the end of the playlist (in_enqueue)
+    params:
+      input: { type: string, required: true, max_length: 4096, label: Media, description: "The media's MRL: a file path or URL such as file:///C:/media/clip.mp4." }
+    send: { method: GET, path: /requests/status.json, query: { command: in_enqueue, input: "{input}" } }
+    expect: { status: 200 }
+    returns: ack
+  play:
+    summary: Play the playlist (pl_play)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_play } }
+    expect: { status: 200 }
+    returns: ack
+  play_item:
+    summary: Play a playlist item (pl_play with its id)
+    params:
+      id: { type: int, min: 0, required: true, label: Item, description: "The item's id, as the playlist lists it." }
+    send: { method: GET, path: /requests/status.json, query: { command: pl_play, id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+  toggle_pause:
+    summary: Pause, or resume (pl_pause)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_pause } }
+    expect: { status: 200 }
+    returns: ack
+  toggle_pause_item:
+    summary: Pause or resume, or when stopped play a playlist item (pl_pause with its id)
+    params:
+      id: { type: int, min: 0, required: true, label: Item, description: "The item to play when stopped, by its playlist id." }
+    send: { method: GET, path: /requests/status.json, query: { command: pl_pause, id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+  stop:
+    summary: Stop playback (pl_stop)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_stop } }
+    expect: { status: 200 }
+    returns: ack
+  next:
+    summary: Play the next playlist item (pl_next)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_next } }
+    expect: { status: 200 }
+    returns: ack
+  previous:
+    summary: Play the previous playlist item (pl_previous)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_previous } }
+    expect: { status: 200 }
+    returns: ack
+  delete_item:
+    summary: Remove an item from the playlist, and read the playlist again (pl_delete)
+    params:
+      id: { type: int, min: 0, required: true, label: Item, description: "The item to remove, by its playlist id." }
+    send:
+      - { method: GET, path: /requests/status.json, query: { command: pl_delete, id: "{id}" } }
+      - { method: GET, path: /requests/playlist.json }
+    expect: { status: 200 }
+    returns: ack
+  empty_playlist:
+    summary: Remove every item from the playlist, and read it again (pl_empty)
+    send:
+      - { method: GET, path: /requests/status.json, query: { command: pl_empty } }
+      - { method: GET, path: /requests/playlist.json }
+    expect: { status: 200 }
+    returns: ack
+  sort_playlist:
+    summary: Sort the playlist, and read it again (pl_sort)
+    params:
+      mode: { type: enum, values: ["0", "1", "3", "5", "7"], required: true, label: Sort by, description: "0 id, 1 name, 3 author, 5 random, 7 track number (the wiki's list, which it calls not exhaustive)." }
+      reverse: { type: bool, default: false, label: Reverse, description: "Sort in reverse order." }
+    send:
+      - { method: GET, path: /requests/status.json, query: { command: pl_sort, id: "{reverse:bool01}", val: "{mode}" } }
+      - { method: GET, path: /requests/playlist.json }
+    expect: { status: 200 }
+    returns: ack
+  toggle_random:
+    summary: Turn random playback on or off (pl_random)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_random } }
+    expect: { status: 200 }
+    returns: ack
+  toggle_loop:
+    summary: Turn playlist looping on or off (pl_loop)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_loop } }
+    expect: { status: 200 }
+    returns: ack
+  toggle_repeat:
+    summary: Turn repeating the current item on or off (pl_repeat)
+    send: { method: GET, path: /requests/status.json, query: { command: pl_repeat } }
+    expect: { status: 200 }
+    returns: ack
+  toggle_service_discovery:
+    summary: Turn a service discovery module on or off (pl_sd)
+    params:
+      module: { type: string, required: true, pattern: "^[A-Za-z0-9_]+$", label: Module, description: "The service discovery module, such as sap, shoutcast or podcast." }
+    send: { method: GET, path: /requests/status.json, query: { command: pl_sd, val: "{module}" } }
+    expect: { status: 200 }
+    returns: ack
+  toggle_fullscreen:
+    summary: Enter or leave full screen (fullscreen)
+    send: { method: GET, path: /requests/status.json, query: { command: fullscreen } }
+    expect: { status: 200 }
+    returns: ack
+  set_volume:
+    summary: Set the volume, or change it by an amount (volume)
+    params:
+      volume: { type: string, required: true, pattern: "^[+-]?[0-9]+%?$", label: Volume, description: "256 for 100 % (an integer), a percentage such as 50%, or +10 or -10 to change it." }
+    send: { method: GET, path: /requests/status.json, query: { command: volume, val: "{volume}" } }
+    expect: { status: 200 }
+    returns: ack
+  seek:
+    summary: Jump to a time, or by a time or percentage (seek)
+    params:
+      position: { type: string, required: true, max_length: 32, pattern: "^[+-]?([0-9]+[Hh]:?([0-9]+[Mm']:?)?([0-9]+[Ss\"]?)?|[0-9]+[Mm']:?([0-9]+[Ss\"]?)?|[0-9]+[Ss\"]?|[0-9]+%)$", label: Position, description: "Seconds (1000), a time such as 1H:2M:3S, either with + or - to move by it, or a percentage such as 50% or -10%." }
+    send: { method: GET, path: /requests/status.json, query: { command: seek, val: "{position}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_rate:
+    summary: Set the playback speed (rate)
+    params:
+      rate: { type: float, min: 0.0, required: true, label: Speed, description: "Playback speed, 1 the normal speed, 2 double." }
+    send: { method: GET, path: /requests/status.json, query: { command: rate, val: "{rate:.3f}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_audio_delay:
+    summary: Set the audio delay (audiodelay)
+    params:
+      delay: { type: float, required: true, label: Delay, description: "Audio delay in seconds; negative plays the audio earlier." }
+    send: { method: GET, path: /requests/status.json, query: { command: audiodelay, val: "{delay:.3f}" } }
+    expect: { status: 200 }
+    returns: ack
+  get_status:
+    summary: Read the player status, the current item's information and meta
+    send: { method: GET, path: /requests/status.json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_playlist:
+    summary: Read the whole playlist tree
+    send: { method: GET, path: /requests/playlist.json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  browse:
+    summary: List the files of a folder on the computer running VLC (browse)
+    params:
+      dir: { type: string, required: true, max_length: 4096, label: Folder, description: "The folder to list, a path or a file:// URI on the VLC computer." }
+    send: { method: GET, path: /requests/browse.json, query: { dir: "{dir}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_vlm:
+    summary: Read the list of VLM elements (vlm.xml)
+    send: { method: GET, path: /requests/vlm.xml }
+    expect: { status: 200 }
+    returns: text
+  vlm_command:
+    summary: Run a VLM command and read its error message, if any (vlm_cmd.xml)
+    params:
+      command: { type: string, required: true, max_length: 4096, label: VLM command, description: "The VLM command, such as new channel1 broadcast enabled." }
+    send: { method: GET, path: /requests/vlm_cmd.xml, query: { command: "{command}" } }
+    expect: { status: 200 }
+    returns: text
+
+state:
+  version: { type: string, description: "VLC's version, as the status gives it" }
+  playback.state: { type: string, description: "playing, paused or stopped" }
+  playback.time: { type: int, description: "Position in the current item, in seconds" }
+  playback.length: { type: int, description: "Length of the current item in seconds, 0 or -1 when unknown" }
+  playback.position: { type: float, description: "Position in the current item, 0 to 1" }
+  playback.volume: { type: int, description: "Volume, 256 being 100 %" }
+  playback.rate: { type: float, description: "Playback speed, 1 the normal speed" }
+  playback.audio_delay: { type: float, description: "Audio delay in seconds" }
+  playback.random: { type: bool, description: "Whether random playback is on" }
+  playback.loop: { type: bool, description: "Whether the playlist loops" }
+  playback.repeat: { type: bool, description: "Whether the current item repeats" }
+  playback.fullscreen: { type: bool, description: "Whether video is full screen" }
+  playback.current_item: { type: int, description: "Playlist id of the current item, -1 or less than 2 when there is none" }
+  playback.title: { type: string, description: "Title of the current item, from its meta" }
+  playback.filename: { type: string, description: "File name of the current item, from its meta" }
+  playlist.*.name: { type: string, description: "Name of a playlist item, keyed by its playlist id" }
+  playlist.*.uri: { type: string, description: "MRL of a playlist item" }
+  playlist.*.duration: { type: int, description: "Duration of a playlist item in seconds, -1 when unknown" }
+  playlist.*.position: { type: int, description: "Place of the item in the playlist, from 0" }
+
+telemetry:
+  # VLC pushes nothing: the status every second, the playlist every five.
+  poll:
+    - every_ms: 1000
+      send: [{ method: GET, path: /requests/status.json }]
+    - every_ms: 5000
+      send: [{ method: GET, path: /requests/playlist.json }]
+  updates:
+    - path: "^/requests/status\\.json"
+      json:
+        version: "$.version"
+        state: "$.state"
+        time: "$.time"
+        length: "$.length"
+        position: "$.position"
+        volume: "$.volume"
+        rate: "$.rate"
+        delay: "$.audiodelay"
+        random: "$.random"
+        loop: "$.loop"
+        repeat: "$.repeat"
+        fullscreen: "$.fullscreen"
+        current: "$.currentplid"
+        title: "$.information.category.meta.title"
+        filename: "$.information.category.meta.filename"
+      state:
+        version: "{version}"
+        playback.state: "{state}"
+        playback.time: "{time}"
+        playback.length: "{length}"
+        playback.position: "{position}"
+        playback.volume: "{volume}"
+        playback.rate: "{rate}"
+        playback.audio_delay: "{delay}"
+        playback.random: "{random}"
+        playback.loop: "{loop}"
+        playback.repeat: "{repeat}"
+        playback.fullscreen: "{fullscreen}"
+        playback.current_item: "{current}"
+        playback.title: "{title}"
+        playback.filename: "{filename}"
+    - path: "^/requests/playlist\\.json$"
+      json_each: "$.children[0].children"
+      json: { id: "$.id", name: "$.name", uri: "$.uri", duration: "$.duration" }
+      replace: playlist
+      state:
+        "playlist.{id}.name": "{name}"
+        "playlist.{id}.uri": "{uri}"
+        "playlist.{id}.duration": "{duration}"
+        "playlist.{id}.position": "{index}"
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The web interface is off until it is added as an interface (--extraintf=http,
+      or Preferences > All > Interface > Main interfaces > Web), and since
+      VLC 2.1 it refuses every request until a password is set; the user
+      name stays empty. It listens on 8080 unless --http-port says otherwise.
+  - models: [all]
+    severity: warning
+    text: >
+      The wiki gives the requests as .xml pages; the same requests are made
+      on the .json pages here, whose field names (state, time, length,
+      position, volume, rate, audiodelay, random, loop, repeat, fullscreen,
+      currentplid, information.category.meta, the playlist's children) come
+      from the Bitfocus Companion module, as do the rate and audiodelay
+      commands the wiki's list does not give. pl_sort's sort modes are the
+      wiki's, which it calls a non-exhaustive list.
+  - models: [all]
+    severity: info
+    text: >
+      Random, loop, repeat, full screen and pause are toggles: the API has no
+      command setting them on or off, so a consumer reads the state (polled
+      every second, as VLC pushes nothing) before toggling. Volume 256 is
+      100 %; VLC takes a value up to its own maximum.
+  - models: [all]
+    severity: warning
+    text: >
+      The playlist kept in state is the first child of the playlist tree
+      (VLC's Playlist, beside the Media Library), keyed by item id; a nested
+      folder's items are not read.
+  - models: [all]
+    severity: info
+    text: >
+      VLC's other remote interface, rc over a TCP socket (--rc-host), is a
+      second dialect, its commands given by its own help; it is not offered
+      here (one transport per spec), nor is the VLM's command language,
+      which vlm_command sends as written.
+  - models: [all]
+    severity: critical
+    text: >
+      play_now and stop change what plays at once, and empty_playlist and
+      delete_item remove items from the playlist.
