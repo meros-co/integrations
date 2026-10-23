@@ -1,0 +1,1096 @@
+spec: 1
+id: ontime
+name: Ontime (HTTP and WebSocket API)
+vendor: Ontime
+category: other
+
+# Ontime is a show timer and rundown server (Windows, macOS, Linux, Docker)
+# serving its web views, its HTTP API and its WebSocket API on one port, 4001
+# by default. Commands go over the HTTP API (every request a GET, a 2xx
+# status for success); the runtime state (timers, playback, messages,
+# auxiliary timers, the events now and next) is pushed on the WebSocket at
+# /ws, and the rundown and custom fields are read over HTTP. The same control
+# surface over OSC is the ontime-osc integration.
+
+source:
+  - title: Ontime documentation, API > Protocols > HTTP API
+    author: Ontime (Carlos Valente)
+    url: https://docs.getontime.no/api/protocols/http/
+    note: >
+      Vendor document (docs source cpvalente/ontime-docs, main branch of
+      2026-09-13, src/content/docs/api/protocols/http.mdx), retrieved
+      2026-10-23. Every request is a GET; a request that changes playback
+      answers 2xx. GET /api/version and /api/poll; the /data/ table
+      (automations, custom-fields, db, project, report, rundowns,
+      rundowns/current, session, settings, url-presets, view-settings);
+      /api/change/<event-id>?<property>=<value> with the property table
+      (title, note, cue, skip, colour, custom:<field>, timeWarning,
+      timeDanger, endAction, timerType, duration, timeStart, timeEnd) and the
+      throttling caution; /api/message/secondary/<text> and
+      /api/message/timer?secondarySource=|blackout= answering the message
+      state; /api/start[/index|id|cue/<v>|/next|/previous], /api/pause,
+      /api/load/..., /api/reload, /api/stop, /api/roll,
+      /api/addtime/add|remove/<ms>; /api/auxtimer/1/duration/<ms>,
+      /direction/count-up|count-down, /start, /pause, /stop, /addtime/<ms>.
+  - title: Ontime documentation, API > Protocols > WebSockets API
+    author: Ontime
+    url: https://docs.getontime.no/api/protocols/websockets/
+    note: >
+      Vendor document (websockets.mdx, same revision). The server is
+      ws://<ip>:<port>/ws; every client receives a snapshot of the runtime
+      data on connecting; {"tag":"version"} answers
+      {"tag":"version","payload":"4.0.0"} and {"tag":"poll"} answers
+      {"tag":"poll","payload":<runtime-data>}; the message tag's payload
+      {"secondary", "timer": {text, visible, blink, blackout,
+      secondarySource}}.
+  - title: Ontime documentation, API > Data > Runtime data; Event data; Project data
+    author: Ontime
+    url: https://docs.getontime.no/api/data/runtime-data/
+    note: >
+      Vendor documents (runtime-data.mdx, event-data.mdx, project-data.mdx).
+      Broadcasts {type: "ontime", payload: <runtime>} and per-section
+      {type: "ontime-timer" | "ontime-offset" | "ontime-eventNow" ...,
+      payload: <section>}; the sections clock, timer (addedTime, current,
+      duration, elapsed, playback play|pause|armed|stop|roll, startedAt,
+      expectedFinish, finishedAt), message, rundown (numEvents,
+      selectedEventIndex, plannedStart, plannedEnd, actualStart, currentDay,
+      actualGroupStart, offset, expectedEnd), offset (absolute, relative,
+      mode, expectedGroupEnd, expectedRundownEnd, expectedFlagStart) and
+      auxtimer1 to auxtimer3 (duration, current, playback, direction); all
+      times in milliseconds from midnight. The event fields and their
+      values (endAction none|load-next|play-next, timerType
+      count-down|count-up|clock|none, timeStrategy). The rundown
+      {id, title, order, flatOrder, entries, revision}; POST
+      .../:rundownId/entry, PUT .../:rundownId/:entryId and DELETE
+      .../:rundownId/:entryId with {ids}; the page states it is incomplete
+      on purpose.
+  - title: Ontime documentation, API > Automation (Finding variables)
+    author: Ontime
+    url: https://docs.getontime.no/api/automation/
+    note: >
+      Vendor document (automation/index.mdx). The runtime object's own keys
+      as /api/poll returns them: clock, timer.* (with phase and
+      secondaryTimer), onAir, runtime.* (the section the runtime-data page
+      heads "ontime-rundown"), eventNow.*, eventNext.* and auxtimer1.*.
+  - title: Ontime documentation, Features (Auxiliary timer, Custom fields, Secondary message); Network and security; Headless Ontime; MCP server
+    author: Ontime
+    url: https://docs.getontime.no/features/aux-timer/
+    note: >
+      Vendor documents. Port 4001 the only server setting; OSC input 8888;
+      any device on the network can send commands; a session password
+      protects views, and an authenticated client sends the hashed token as
+      the token query parameter or as Authorization: Bearer (MCP server
+      page).
+  - title: companion-module-getontime-ontime (v5.4.2-beta.2, MIT licence)
+    author: Ontime / Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-getontime-ontime
+    note: >
+      Read for corroboration only (src/actions/message.ts, auxTimer.ts,
+      playback.ts, src/socket.ts, src/connection.ts, src/http.ts,
+      companion/HELP.md), retrieved 2026-10-23. Confirms Ontime 4 tags its
+      WebSocket messages with "tag", that auxiliary timers 1 to 3 exist,
+      that the message state's timer takes text, visible and blink as well
+      as blackout and secondarySource (aux1, aux2, aux3, secondary or null),
+      and that the rundown is read from GET /data/rundowns/current and the
+      custom fields from GET /data/custom-fields. Ontime's own type package
+      the module imports is GPL-licensed and was not read. No code taken.
+
+transport:
+  type: http
+  port: 4001
+  scheme: http
+  # Ontime's session password: an authenticated client carries the hashed
+  # token (the token of Ontime's share links) as a bearer token. None is
+  # sent while the setting is empty.
+  auth: bearer
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/version }
+
+settings:
+  token: { type: string, secret: true, default: "",
+    label: Session token,
+    description: "The hashed token from an authenticated Ontime share link, sent as a bearer token; leave empty when Ontime has no session password." }
+
+ports:
+  - { port: 4001, protocol: http, role: control }
+  - { port: 4001, protocol: ws, role: push, note: "Ontime's WebSocket API at /ws, on the same port" }
+
+models:
+  - id: ontime
+    name: Ontime 4
+    supports: [get_version, poll, get_data, get_current_rundown,
+               start, start_index, start_id, start_cue, start_next, start_previous, pause,
+               load_index, load_id, load_cue, load_next, load_previous, reload, stop, roll,
+               add_time, remove_time,
+               aux_set_duration, aux_set_direction, aux_start, aux_pause, aux_stop, aux_add_time,
+               set_secondary_message, set_secondary_source, set_blackout,
+               set_timer_message_text, set_timer_message_visible, set_timer_message_blink,
+               set_event_title, set_event_note, set_event_cue, set_event_colour, set_event_skip,
+               set_event_end_action, set_event_timer_type, set_event_time_warning,
+               set_event_time_danger, set_event_duration, set_event_time_start, set_event_time_end,
+               set_event_custom_field, create_entry, update_entry, delete_entry]
+    verification: none
+
+commands:
+  # ── State ────────────────────────────────────────────────────────────────
+  get_version:
+    summary: Read Ontime's version (GET /api/version)
+    send: { method: GET, path: /api/version }
+    expect: { status: 200, json_path: "$.payload" }
+    returns: value
+
+  poll:
+    summary: Read the whole runtime data object (GET /api/poll); the WebSocket keeps the same data in state
+    send: { method: GET, path: /api/poll }
+    expect: { status: 200, json_path: "$.payload" }
+    returns: value
+
+  get_data:
+    summary: Read one of Ontime's project data resources as Ontime returns it (GET /data/<resource>)
+    params:
+      resource: { type: enum, required: true,
+                  values: [automations, custom-fields, db, project, report, rundowns, session,
+                           settings, url-presets, view-settings],
+                  label: Resource,
+                  description: "Project data to read: automations, custom fields, the loaded project file (db), project data, the session report, every rundown, session stats, application settings, URL presets or view settings." }
+    send: { method: GET, path: "/data/{resource}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_current_rundown:
+    summary: Read the current rundown (GET /data/rundowns/current); its entries go to state
+    send: { method: GET, path: /data/rundowns/current }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Playback ─────────────────────────────────────────────────────────────
+  start:
+    summary: Start the loaded event (GET /api/start)
+    send: { method: GET, path: /api/start }
+    expect: { status: 200 }
+    returns: ack
+  start_index:
+    summary: Start the event at an index of the rundown (GET /api/start/index/<index>)
+    params:
+      index: &event_index { type: int, min: 0, required: true,
+                            label: Event index,
+                            description: "Place of the event in the rundown, as Ontime's API counts it (see the quirks)." }
+    send: { method: GET, path: "/api/start/index/{index}" }
+    expect: { status: 200 }
+    returns: ack
+  start_id:
+    summary: Start the event with an id (GET /api/start/id/<id>)
+    params:
+      id: &event_id { type: string, max_length: 256, required: true,
+                      label: Event id,
+                      description: "Id of the event, as the rundown in state lists it." }
+    send: { method: GET, path: "/api/start/id/{id}" }
+    expect: { status: 200 }
+    returns: ack
+  start_cue:
+    summary: Start the event with a cue (GET /api/start/cue/<cue>)
+    params:
+      cue: &event_cue { type: string, max_length: 256, required: true,
+                        label: Cue,
+                        description: "The event's cue, as entered in Ontime's rundown." }
+    send: { method: GET, path: "/api/start/cue/{cue}" }
+    expect: { status: 200 }
+    returns: ack
+  start_next:
+    summary: Start the next event (GET /api/start/next)
+    send: { method: GET, path: /api/start/next }
+    expect: { status: 200 }
+    returns: ack
+  start_previous:
+    summary: Start the previous event (GET /api/start/previous)
+    send: { method: GET, path: /api/start/previous }
+    expect: { status: 200 }
+    returns: ack
+  pause:
+    summary: Pause the running timer (GET /api/pause)
+    send: { method: GET, path: /api/pause }
+    expect: { status: 200 }
+    returns: ack
+  load_index:
+    summary: Load the event at an index without starting it (GET /api/load/index/<index>)
+    params: { index: *event_index }
+    send: { method: GET, path: "/api/load/index/{index}" }
+    expect: { status: 200 }
+    returns: ack
+  load_id:
+    summary: Load the event with an id (GET /api/load/id/<id>)
+    params: { id: *event_id }
+    send: { method: GET, path: "/api/load/id/{id}" }
+    expect: { status: 200 }
+    returns: ack
+  load_cue:
+    summary: Load the event with a cue (GET /api/load/cue/<cue>)
+    params: { cue: *event_cue }
+    send: { method: GET, path: "/api/load/cue/{cue}" }
+    expect: { status: 200 }
+    returns: ack
+  load_next:
+    summary: Load the next event (GET /api/load/next)
+    send: { method: GET, path: /api/load/next }
+    expect: { status: 200 }
+    returns: ack
+  load_previous:
+    summary: Load the previous event (GET /api/load/previous)
+    send: { method: GET, path: /api/load/previous }
+    expect: { status: 200 }
+    returns: ack
+  reload:
+    summary: Reload the current event, resetting its timer (GET /api/reload)
+    send: { method: GET, path: /api/reload }
+    expect: { status: 200 }
+    returns: ack
+  stop:
+    summary: Stop playback (GET /api/stop)
+    send: { method: GET, path: /api/stop }
+    expect: { status: 200 }
+    returns: ack
+  roll:
+    summary: Activate Roll mode, which follows the rundown's scheduled times (GET /api/roll)
+    send: { method: GET, path: /api/roll }
+    expect: { status: 200 }
+    returns: ack
+  add_time:
+    summary: Add time to the running timer (GET /api/addtime/add/<ms>)
+    params:
+      ms: &added_ms { type: int, min: 0, required: true,
+                      label: Time,
+                      description: "Time to add or remove, in milliseconds." }
+    send: { method: GET, path: "/api/addtime/add/{ms}" }
+    expect: { status: 200 }
+    returns: ack
+  remove_time:
+    summary: Remove time from the running timer (GET /api/addtime/remove/<ms>)
+    params: { ms: *added_ms }
+    send: { method: GET, path: "/api/addtime/remove/{ms}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Auxiliary timers ─────────────────────────────────────────────────────
+  aux_set_duration:
+    summary: Set an auxiliary timer's duration (GET /api/auxtimer/<n>/duration/<ms>)
+    params:
+      aux: &aux { type: int, min: 1, max: 3, default: 1,
+                  label: Auxiliary timer,
+                  description: "Auxiliary timer 1, 2 or 3." }
+      ms: { type: int, min: 0, required: true,
+            label: Duration,
+            description: "The timer's duration, in milliseconds." }
+    send: { method: GET, path: "/api/auxtimer/{aux}/duration/{ms}" }
+    expect: { status: 200 }
+    returns: ack
+  aux_set_direction:
+    summary: Set whether an auxiliary timer counts down or up (GET /api/auxtimer/<n>/direction/<direction>)
+    params:
+      aux: *aux
+      direction: { type: enum, values: [count-down, count-up], required: true,
+                   label: Direction,
+                   description: "Count down from the duration, or count up from zero." }
+    send: { method: GET, path: "/api/auxtimer/{aux}/direction/{direction}" }
+    expect: { status: 200 }
+    returns: ack
+  aux_start:
+    summary: Start an auxiliary timer (GET /api/auxtimer/<n>/start)
+    params: { aux: *aux }
+    send: { method: GET, path: "/api/auxtimer/{aux}/start" }
+    expect: { status: 200 }
+    returns: ack
+  aux_pause:
+    summary: Pause an auxiliary timer (GET /api/auxtimer/<n>/pause)
+    params: { aux: *aux }
+    send: { method: GET, path: "/api/auxtimer/{aux}/pause" }
+    expect: { status: 200 }
+    returns: ack
+  aux_stop:
+    summary: Stop an auxiliary timer (GET /api/auxtimer/<n>/stop)
+    params: { aux: *aux }
+    send: { method: GET, path: "/api/auxtimer/{aux}/stop" }
+    expect: { status: 200 }
+    returns: ack
+  aux_add_time:
+    summary: Add time to an auxiliary timer, or remove it with a negative value (GET /api/auxtimer/<n>/addtime/<ms>)
+    params:
+      aux: *aux
+      ms: { type: int, required: true,
+            label: Time,
+            description: "Time to add in milliseconds; a negative value removes time." }
+    send: { method: GET, path: "/api/auxtimer/{aux}/addtime/{ms}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Messages ─────────────────────────────────────────────────────────────
+  set_secondary_message:
+    summary: Set the secondary message's text (GET /api/message/secondary/<text>); showing it is set_secondary_source
+    params:
+      text: { type: string, max_length: 1024, required: true,
+              label: Text,
+              description: "The secondary message's text." }
+    send: { method: GET, path: "/api/message/secondary/{text}" }
+    expect: { status: 200 }
+    returns: ack
+  set_secondary_source:
+    summary: Choose what the stage timer view shows as its secondary field (GET /api/message/timer?secondarySource=<source>)
+    params:
+      source: { type: enum, values: [secondary, aux1, aux2, aux3, aux, "off"], required: true,
+                label: Secondary source,
+                description: "The secondary message, auxiliary timer 1 to 3 (aux is the documents' older name for timer 1), or off to hide the field." }
+    send: { method: GET, path: /api/message/timer, query: { secondarySource: "{source}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_blackout:
+    summary: Black out, or show again, every screen in the stage timer view (GET /api/message/timer?blackout=<bool>)
+    params:
+      blackout: { type: bool, required: true,
+                  label: Blackout,
+                  description: "True blacks the stage timer screens out; false shows them again." }
+    send: { method: GET, path: /api/message/timer, query: { blackout: "{blackout}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_timer_message_text:
+    summary: Set the timer message's text (GET /api/message/timer?text=<text>)
+    params:
+      text: { type: string, max_length: 1024, required: true,
+              label: Text,
+              description: "Text of the message shown over the stage timer; empty clears it." }
+    send: { method: GET, path: /api/message/timer, query: { text: "{text}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_timer_message_visible:
+    summary: Show or hide the timer message (GET /api/message/timer?visible=<bool>)
+    params:
+      visible: { type: bool, required: true,
+                 label: Visible,
+                 description: "True shows the timer message on the stage timer; false hides it." }
+    send: { method: GET, path: /api/message/timer, query: { visible: "{visible}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_timer_message_blink:
+    summary: Make the stage timer blink, or stop it (GET /api/message/timer?blink=<bool>)
+    params:
+      blink: { type: bool, required: true,
+               label: Blink,
+               description: "True makes the stage timer blink; false stops it." }
+    send: { method: GET, path: /api/message/timer, query: { blink: "{blink}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Change an event (GET /api/change/<id>?<property>=<value>) ────────────
+  set_event_title:
+    summary: Change an event's title
+    params:
+      id: *event_id
+      title: { type: string, max_length: 1024, required: true,
+               label: Title, description: "The event's new title." }
+    send: { method: GET, path: "/api/change/{id}", query: { title: "{title}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_note:
+    summary: Change an event's note
+    params:
+      id: *event_id
+      note: { type: string, max_length: 4096, required: true,
+              label: Note, description: "The event's new note, shown in some views." }
+    send: { method: GET, path: "/api/change/{id}", query: { note: "{note}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_cue:
+    summary: Change an event's cue
+    params:
+      id: *event_id
+      cue: { type: string, max_length: 256, required: true,
+             label: Cue, description: "The event's new cue; Ontime asks to keep it under 8 characters." }
+    send: { method: GET, path: "/api/change/{id}", query: { cue: "{cue}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_colour:
+    summary: Change an event's colour
+    params:
+      id: *event_id
+      colour: { type: string, max_length: 64, required: true,
+                label: Colour, description: "A # hex colour or a named CSS colour; empty for none." }
+    send: { method: GET, path: "/api/change/{id}", query: { colour: "{colour}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_skip:
+    summary: Skip an event, or stop skipping it (playback ignores skipped events)
+    params:
+      id: *event_id
+      skip: { type: bool, required: true,
+              label: Skip, description: "True makes playback ignore the event." }
+    send: { method: GET, path: "/api/change/{id}", query: { skip: "{skip}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_end_action:
+    summary: Change what happens when an event's timer reaches zero
+    params:
+      id: *event_id
+      end_action: { type: enum, values: [none, load-next, play-next], required: true,
+                    label: End action,
+                    description: "None runs on into overtime; load-next loads the next event; play-next loads and starts it." }
+    send: { method: GET, path: "/api/change/{id}", query: { endAction: "{end_action}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_timer_type:
+    summary: Change how an event's timer is shown
+    params:
+      id: *event_id
+      timer_type: { type: enum, values: [count-down, count-up, clock, none], required: true,
+                    label: Timer type,
+                    description: "Count down the duration, count up from the start, show the clock, or show a --:--:-- placeholder." }
+    send: { method: GET, path: "/api/change/{id}", query: { timerType: "{timer_type}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_time_warning:
+    summary: Change an event's warning threshold
+    params:
+      id: *event_id
+      ms: &event_ms { type: int, min: 0, required: true,
+                      label: Time, description: "The time, in milliseconds (times of day from midnight)." }
+    send: { method: GET, path: "/api/change/{id}", query: { timeWarning: "{ms}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_time_danger:
+    summary: Change an event's danger threshold
+    params: { id: *event_id, ms: *event_ms }
+    send: { method: GET, path: "/api/change/{id}", query: { timeDanger: "{ms}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_duration:
+    summary: Change an event's duration (recalculates the rundown; throttled)
+    params: { id: *event_id, ms: *event_ms }
+    send: { method: GET, path: "/api/change/{id}", query: { duration: "{ms}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_time_start:
+    summary: Change an event's scheduled start, in milliseconds from midnight (recalculates the rundown; throttled)
+    params: { id: *event_id, ms: *event_ms }
+    send: { method: GET, path: "/api/change/{id}", query: { timeStart: "{ms}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_time_end:
+    summary: Change an event's scheduled end, in milliseconds from midnight (recalculates the rundown; throttled)
+    params: { id: *event_id, ms: *event_ms }
+    send: { method: GET, path: "/api/change/{id}", query: { timeEnd: "{ms}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_event_custom_field:
+    summary: Change one of an event's custom fields (the field must exist in the project)
+    params:
+      id: *event_id
+      field: { type: string, max_length: 256, required: true,
+               label: Custom field,
+               description: "Key of the custom field, as the custom fields in state list it." }
+      value: { type: string, max_length: 4096, required: true,
+               label: Value, description: "The field's new value." }
+    send: { method: GET, path: "/api/change/{id}", raw_query: "custom:{field:url}={value:url}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Rundown entries (project data) ───────────────────────────────────────
+  create_entry:
+    summary: >
+      Add an entry to a rundown (POST /data/rundowns/<rundown>/entry). The
+      body holds any Ontime event fields (Event data page), type event,
+      delay, group or milestone, and optionally after, the id of the entry
+      to add it after; without after it is appended.
+    params:
+      rundown: &rundown_id { type: string, max_length: 256, required: true,
+                             label: Rundown id,
+                             description: "Id of the rundown, as rundown.id in state gives the current one." }
+      body: { type: json, required: true,
+              label: Entry,
+              description: "JSON object of the entry's fields as Ontime's Event data page lists them, with type and optionally after." }
+    send: { method: POST, path: "/data/rundowns/{rundown}/entry", body: "{body}", content_type: application/json }
+    expect: { status: [200, 201] }
+    returns: ack
+  update_entry:
+    summary: >
+      Patch an entry of a rundown (PUT /data/rundowns/<rundown>/<entry>). The
+      body is a patch holding the entry's id and any Ontime event fields.
+    params:
+      rundown: *rundown_id
+      entry: { type: string, max_length: 256, required: true,
+               label: Entry id, description: "Id of the entry to patch." }
+      body: { type: json, required: true,
+              label: Patch,
+              description: "JSON object with the entry's id and the event fields to change, as Ontime's Event data page names them." }
+    send: { method: PUT, path: "/data/rundowns/{rundown}/{entry}", body: "{body}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  delete_entry:
+    summary: Delete an entry of a rundown (DELETE /data/rundowns/<rundown>/<entry> with {"ids":[entry]})
+    params:
+      rundown: *rundown_id
+      entry: { type: string, max_length: 256, required: true,
+               label: Entry id, description: "Id of the entry to delete." }
+    send: { method: DELETE, path: "/data/rundowns/{rundown}/{entry}", body: '{"ids":[{entry:json}]}', content_type: application/json }
+    expect: { status: [200, 204] }
+    returns: ack
+
+telemetry:
+  # Ontime pushes the runtime data on /ws: a snapshot on connecting, then
+  # each section as it changes. The version and a poll are asked for on
+  # opening, so state is whole even where the snapshot is not.
+  websocket:
+    path: /ws
+    send: ['{"tag":"version"}', '{"tag":"poll"}']
+  # The rundown and custom fields change from the editor too; Ontime's
+  # notice of that change is not documented, so they are read every 15 s
+  # and after every write of the spec's own.
+  poll:
+    - every_ms: 15000
+      send:
+        - { method: GET, path: /data/rundowns/current }
+        - { method: GET, path: /data/custom-fields }
+  updates:
+    # ── WebSocket: version ─────────────────────────────────────────────────
+    - json_match: { "$.tag": "^version$", "$.payload": "^(.+)$" }
+      json: {}
+      state: { app.version: "{1}" }
+    - path: "^/api/version$"
+      json: { version: "$.payload" }
+      state: { app.version: "{version}" }
+
+    # ── Runtime sections inside a payload (the snapshot, {type: ontime},
+    #    {tag: poll} and section patches) ──────────────────────────────────
+    - json_match: { "$.payload.clock": "^-?\\d+$" }
+      json: { clock: "$.payload.clock" }
+      state: { clock: "{clock}" }
+    - json_match: { "$.payload.onAir": "^(true|false)$" }
+      json: { on_air: "$.payload.onAir" }
+      state: { on_air: "{on_air}" }
+    - json_match: { "$.payload.timer": "^\\{" }
+      json:
+        added_time: "$.payload.timer.addedTime"
+        current: "$.payload.timer.current"
+        duration: "$.payload.timer.duration"
+        elapsed: "$.payload.timer.elapsed"
+        playback: "$.payload.timer.playback"
+        phase: "$.payload.timer.phase"
+        secondary_timer: "$.payload.timer.secondaryTimer"
+        started_at: "$.payload.timer.startedAt"
+        expected_finish: "$.payload.timer.expectedFinish"
+        finished_at: "$.payload.timer.finishedAt"
+      replace: timer
+      state: &timer_state
+        timer.added_time: "{added_time}"
+        timer.current: "{current}"
+        timer.duration: "{duration}"
+        timer.elapsed: "{elapsed}"
+        timer.playback: "{playback}"
+        timer.phase: "{phase}"
+        timer.secondary_timer: "{secondary_timer}"
+        timer.started_at: "{started_at}"
+        timer.expected_finish: "{expected_finish}"
+        timer.finished_at: "{finished_at}"
+    - json_match: { "$.payload.runtime": "^\\{" }
+      json:
+        num_events: "$.payload.runtime.numEvents"
+        selected_event_index: "$.payload.runtime.selectedEventIndex"
+        planned_start: "$.payload.runtime.plannedStart"
+        planned_end: "$.payload.runtime.plannedEnd"
+        actual_start: "$.payload.runtime.actualStart"
+        current_day: "$.payload.runtime.currentDay"
+        actual_group_start: "$.payload.runtime.actualGroupStart"
+        offset: "$.payload.runtime.offset"
+        expected_end: "$.payload.runtime.expectedEnd"
+      replace: runtime
+      state: &runtime_state
+        runtime.num_events: "{num_events}"
+        runtime.selected_event_index: "{selected_event_index}"
+        runtime.planned_start: "{planned_start}"
+        runtime.planned_end: "{planned_end}"
+        runtime.actual_start: "{actual_start}"
+        runtime.current_day: "{current_day}"
+        runtime.actual_group_start: "{actual_group_start}"
+        runtime.offset: "{offset}"
+        runtime.expected_end: "{expected_end}"
+    - json_match: { "$.payload.offset": "^\\{" }
+      json:
+        absolute: "$.payload.offset.absolute"
+        relative: "$.payload.offset.relative"
+        mode: "$.payload.offset.mode"
+        expected_group_end: "$.payload.offset.expectedGroupEnd"
+        expected_rundown_end: "$.payload.offset.expectedRundownEnd"
+        expected_flag_start: "$.payload.offset.expectedFlagStart"
+      replace: offset
+      state: &offset_state
+        offset.absolute: "{absolute}"
+        offset.relative: "{relative}"
+        offset.mode: "{mode}"
+        offset.expected_group_end: "{expected_group_end}"
+        offset.expected_rundown_end: "{expected_rundown_end}"
+        offset.expected_flag_start: "{expected_flag_start}"
+    - json_match: { "$.payload.message": "^\\{" }
+      json:
+        secondary: "$.payload.message.secondary"
+        text: "$.payload.message.timer.text"
+        visible: "$.payload.message.timer.visible"
+        blink: "$.payload.message.timer.blink"
+        blackout: "$.payload.message.timer.blackout"
+        secondary_source: "$.payload.message.timer.secondarySource"
+      replace: message
+      state: &message_state
+        message.secondary: "{secondary}"
+        message.timer.text: "{text}"
+        message.timer.visible: "{visible}"
+        message.timer.blink: "{blink}"
+        message.timer.blackout: "{blackout}"
+        message.timer.secondary_source: "{secondary_source}"
+    - json_match: { "$.payload.auxtimer1": "^\\{" }
+      json:
+        duration: "$.payload.auxtimer1.duration"
+        current: "$.payload.auxtimer1.current"
+        playback: "$.payload.auxtimer1.playback"
+        direction: "$.payload.auxtimer1.direction"
+      replace: aux_timers.1
+      state:
+        aux_timers.1.duration: "{duration}"
+        aux_timers.1.current: "{current}"
+        aux_timers.1.playback: "{playback}"
+        aux_timers.1.direction: "{direction}"
+    - json_match: { "$.payload.auxtimer2": "^\\{" }
+      json:
+        duration: "$.payload.auxtimer2.duration"
+        current: "$.payload.auxtimer2.current"
+        playback: "$.payload.auxtimer2.playback"
+        direction: "$.payload.auxtimer2.direction"
+      replace: aux_timers.2
+      state:
+        aux_timers.2.duration: "{duration}"
+        aux_timers.2.current: "{current}"
+        aux_timers.2.playback: "{playback}"
+        aux_timers.2.direction: "{direction}"
+    - json_match: { "$.payload.auxtimer3": "^\\{" }
+      json:
+        duration: "$.payload.auxtimer3.duration"
+        current: "$.payload.auxtimer3.current"
+        playback: "$.payload.auxtimer3.playback"
+        direction: "$.payload.auxtimer3.direction"
+      replace: aux_timers.3
+      state:
+        aux_timers.3.duration: "{duration}"
+        aux_timers.3.current: "{current}"
+        aux_timers.3.playback: "{playback}"
+        aux_timers.3.direction: "{direction}"
+    # eventNow and eventNext are null when there is none: the section is
+    # then emptied.
+    - json_match: { "$.payload.eventNow": "^(null|\\{)" }
+      json:
+        id: "$.payload.eventNow.id"
+        type: "$.payload.eventNow.type"
+        title: "$.payload.eventNow.title"
+        cue: "$.payload.eventNow.cue"
+        note: "$.payload.eventNow.note"
+        colour: "$.payload.eventNow.colour"
+        time_start: "$.payload.eventNow.timeStart"
+        time_end: "$.payload.eventNow.timeEnd"
+        duration: "$.payload.eventNow.duration"
+        delay: "$.payload.eventNow.delay"
+        skip: "$.payload.eventNow.skip"
+        end_action: "$.payload.eventNow.endAction"
+        timer_type: "$.payload.eventNow.timerType"
+        time_warning: "$.payload.eventNow.timeWarning"
+        time_danger: "$.payload.eventNow.timeDanger"
+      replace: event_now
+      state: &event_now_state
+        event_now.id: "{id}"
+        event_now.type: "{type}"
+        event_now.title: "{title}"
+        event_now.cue: "{cue}"
+        event_now.note: "{note}"
+        event_now.colour: "{colour}"
+        event_now.time_start: "{time_start}"
+        event_now.time_end: "{time_end}"
+        event_now.duration: "{duration}"
+        event_now.delay: "{delay}"
+        event_now.skip: "{skip}"
+        event_now.end_action: "{end_action}"
+        event_now.timer_type: "{timer_type}"
+        event_now.time_warning: "{time_warning}"
+        event_now.time_danger: "{time_danger}"
+    - json_match: { "$.payload.eventNow": "^\\{" }
+      json_each: "$.payload.eventNow.custom.*"
+      json: { value: "$" }
+      state: { "event_now.custom.{key:key}": "{value}" }
+    - json_match: { "$.payload.eventNext": "^(null|\\{)" }
+      json:
+        id: "$.payload.eventNext.id"
+        type: "$.payload.eventNext.type"
+        title: "$.payload.eventNext.title"
+        cue: "$.payload.eventNext.cue"
+        note: "$.payload.eventNext.note"
+        colour: "$.payload.eventNext.colour"
+        time_start: "$.payload.eventNext.timeStart"
+        time_end: "$.payload.eventNext.timeEnd"
+        duration: "$.payload.eventNext.duration"
+        delay: "$.payload.eventNext.delay"
+        skip: "$.payload.eventNext.skip"
+        end_action: "$.payload.eventNext.endAction"
+        timer_type: "$.payload.eventNext.timerType"
+        time_warning: "$.payload.eventNext.timeWarning"
+        time_danger: "$.payload.eventNext.timeDanger"
+      replace: event_next
+      state: &event_next_state
+        event_next.id: "{id}"
+        event_next.type: "{type}"
+        event_next.title: "{title}"
+        event_next.cue: "{cue}"
+        event_next.note: "{note}"
+        event_next.colour: "{colour}"
+        event_next.time_start: "{time_start}"
+        event_next.time_end: "{time_end}"
+        event_next.duration: "{duration}"
+        event_next.delay: "{delay}"
+        event_next.skip: "{skip}"
+        event_next.end_action: "{end_action}"
+        event_next.timer_type: "{timer_type}"
+        event_next.time_warning: "{time_warning}"
+        event_next.time_danger: "{time_danger}"
+    - json_match: { "$.payload.eventNext": "^\\{" }
+      json_each: "$.payload.eventNext.custom.*"
+      json: { value: "$" }
+      state: { "event_next.custom.{key:key}": "{value}" }
+
+    # ── Runtime sections as their own messages ({type: "ontime-<section>"},
+    #    the payload being the section) ───────────────────────────────────
+    - json_match: { "$.type": "^ontime-clock$" }
+      json: { clock: "$.payload" }
+      state: { clock: "{clock}" }
+    - json_match: { "$.type": "^ontime-timer$", "$.payload": "^\\{" }
+      json:
+        added_time: "$.payload.addedTime"
+        current: "$.payload.current"
+        duration: "$.payload.duration"
+        elapsed: "$.payload.elapsed"
+        playback: "$.payload.playback"
+        phase: "$.payload.phase"
+        secondary_timer: "$.payload.secondaryTimer"
+        started_at: "$.payload.startedAt"
+        expected_finish: "$.payload.expectedFinish"
+        finished_at: "$.payload.finishedAt"
+      replace: timer
+      state: *timer_state
+    - json_match: { "$.type": "^ontime-(runtime|rundown)$", "$.payload": "^\\{" }
+      json:
+        num_events: "$.payload.numEvents"
+        selected_event_index: "$.payload.selectedEventIndex"
+        planned_start: "$.payload.plannedStart"
+        planned_end: "$.payload.plannedEnd"
+        actual_start: "$.payload.actualStart"
+        current_day: "$.payload.currentDay"
+        actual_group_start: "$.payload.actualGroupStart"
+        offset: "$.payload.offset"
+        expected_end: "$.payload.expectedEnd"
+      replace: runtime
+      state: *runtime_state
+    - json_match: { "$.type": "^ontime-offset$", "$.payload": "^\\{" }
+      json:
+        absolute: "$.payload.absolute"
+        relative: "$.payload.relative"
+        mode: "$.payload.mode"
+        expected_group_end: "$.payload.expectedGroupEnd"
+        expected_rundown_end: "$.payload.expectedRundownEnd"
+        expected_flag_start: "$.payload.expectedFlagStart"
+      replace: offset
+      state: *offset_state
+    - json_match: { "$.type": "^ontime-message$", "$.payload": "^\\{" }
+      json: &message_fields
+        secondary: "$.payload.secondary"
+        text: "$.payload.timer.text"
+        visible: "$.payload.timer.visible"
+        blink: "$.payload.timer.blink"
+        blackout: "$.payload.timer.blackout"
+        secondary_source: "$.payload.timer.secondarySource"
+      replace: message
+      state: *message_state
+    - json_match: { "$.type": "^ontime-auxtimer([123])$", "$.payload": "^\\{" }
+      json:
+        duration: "$.payload.duration"
+        current: "$.payload.current"
+        playback: "$.payload.playback"
+        direction: "$.payload.direction"
+      replace: "aux_timers.{1}"
+      state:
+        "aux_timers.{1}.duration": "{duration}"
+        "aux_timers.{1}.current": "{current}"
+        "aux_timers.{1}.playback": "{playback}"
+        "aux_timers.{1}.direction": "{direction}"
+    - json_match: { "$.type": "^ontime-eventNow$", "$.payload": "^(null|\\{)" }
+      json: &event_fields
+        id: "$.payload.id"
+        type: "$.payload.type"
+        title: "$.payload.title"
+        cue: "$.payload.cue"
+        note: "$.payload.note"
+        colour: "$.payload.colour"
+        time_start: "$.payload.timeStart"
+        time_end: "$.payload.timeEnd"
+        duration: "$.payload.duration"
+        delay: "$.payload.delay"
+        skip: "$.payload.skip"
+        end_action: "$.payload.endAction"
+        timer_type: "$.payload.timerType"
+        time_warning: "$.payload.timeWarning"
+        time_danger: "$.payload.timeDanger"
+      replace: event_now
+      state: *event_now_state
+    - json_match: { "$.type": "^ontime-eventNow$", "$.payload": "^\\{" }
+      json_each: "$.payload.custom.*"
+      json: { value: "$" }
+      state: { "event_now.custom.{key:key}": "{value}" }
+    - json_match: { "$.type": "^ontime-eventNext$", "$.payload": "^(null|\\{)" }
+      json: *event_fields
+      replace: event_next
+      state: *event_next_state
+    - json_match: { "$.type": "^ontime-eventNext$", "$.payload": "^\\{" }
+      json_each: "$.payload.custom.*"
+      json: { value: "$" }
+      state: { "event_next.custom.{key:key}": "{value}" }
+
+    # ── HTTP: the message state each message request answers with ─────────
+    - path: "^/api/message"
+      json_match: { "$.payload": "^\\{" }
+      json: *message_fields
+      replace: message
+      state: *message_state
+
+    # ── HTTP: the rundown and custom fields ───────────────────────────────
+    - path: "^/data/rundowns/current$"
+      json: { id: "$.id", title: "$.title", revision: "$.revision" }
+      state:
+        rundown.id: "{id}"
+        rundown.title: "{title}"
+        rundown.revision: "{revision}"
+    - path: "^/data/rundowns/current$"
+      json_each: "$.entries.*"
+      json:
+        type: "$.type"
+        title: "$.title"
+        cue: "$.cue"
+        note: "$.note"
+        colour: "$.colour"
+        time_start: "$.timeStart"
+        time_end: "$.timeEnd"
+        duration: "$.duration"
+        delay: "$.delay"
+        skip: "$.skip"
+        link_start: "$.linkStart"
+        time_warning: "$.timeWarning"
+        time_danger: "$.timeDanger"
+        end_action: "$.endAction"
+        timer_type: "$.timerType"
+        count_to_end: "$.countToEnd"
+        time_strategy: "$.timeStrategy"
+        revision: "$.revision"
+      replace: rundown.entries
+      state:
+        "rundown.entries.{key:key}.type": "{type}"
+        "rundown.entries.{key:key}.title": "{title}"
+        "rundown.entries.{key:key}.cue": "{cue}"
+        "rundown.entries.{key:key}.note": "{note}"
+        "rundown.entries.{key:key}.colour": "{colour}"
+        "rundown.entries.{key:key}.time_start": "{time_start}"
+        "rundown.entries.{key:key}.time_end": "{time_end}"
+        "rundown.entries.{key:key}.duration": "{duration}"
+        "rundown.entries.{key:key}.delay": "{delay}"
+        "rundown.entries.{key:key}.skip": "{skip}"
+        "rundown.entries.{key:key}.link_start": "{link_start}"
+        "rundown.entries.{key:key}.time_warning": "{time_warning}"
+        "rundown.entries.{key:key}.time_danger": "{time_danger}"
+        "rundown.entries.{key:key}.end_action": "{end_action}"
+        "rundown.entries.{key:key}.timer_type": "{timer_type}"
+        "rundown.entries.{key:key}.count_to_end": "{count_to_end}"
+        "rundown.entries.{key:key}.time_strategy": "{time_strategy}"
+        "rundown.entries.{key:key}.revision": "{revision}"
+    - path: "^/data/rundowns/current$"
+      json_each: "$.entries.*.custom.*"
+      json: { value: "$" }
+      state: { "rundown.entries.{^key:key}.custom.{key:key}": "{value}" }
+    - path: "^/data/rundowns/current$"
+      json_each: "$.flatOrder"
+      json: { id: "$" }
+      state: { "rundown.entries.{id:key}.index": "{index}" }
+    - path: "^/data/custom-fields$"
+      json_each: "$.*"
+      json: { label: "$.label", type: "$.type", colour: "$.colour" }
+      replace: custom_fields
+      state:
+        "custom_fields.{key:key}.label": "{label}"
+        "custom_fields.{key:key}.type": "{type}"
+        "custom_fields.{key:key}.colour": "{colour}"
+    # Every write of an event or an entry reads the rundown again.
+    - path: "^/(api/change/|data/rundowns/[^/]+/)"
+      headers: {}
+      then_send:
+        - { method: GET, path: /data/rundowns/current }
+
+state:
+  app.version: { type: string, description: "Ontime's version, such as 4.0.0" }
+  clock: { type: int, unit: ms, description: "Ontime server's wall clock, in milliseconds from midnight" }
+  on_air: { type: bool, description: "Whether playback is active (onAir in the runtime data)" }
+  timer.added_time: { type: int, unit: ms, description: "Time the operator added to the running timer (negative when removed)" }
+  timer.current: { type: int, unit: ms, description: "Running timer's current value; negative in overtime; absent with no event loaded" }
+  timer.duration: { type: int, unit: ms, description: "Duration of the loaded event's timer" }
+  timer.elapsed: { type: int, unit: ms, description: "Time elapsed in the current timer" }
+  timer.playback: { type: string, description: "Playback state: play, pause, armed, stop or roll" }
+  timer.phase: { type: string, description: "Timer phase in Ontime's words (for example default, warning, danger, overtime), as the runtime data names it" }
+  timer.secondary_timer: { type: int, unit: ms, description: "Secondary timer's value, when Ontime uses one" }
+  timer.started_at: { type: int, unit: ms, description: "When the current timer started, in milliseconds from midnight" }
+  timer.expected_finish: { type: int, unit: ms, description: "When the current timer is expected to finish, in milliseconds from midnight" }
+  timer.finished_at: { type: int, unit: ms, description: "When the current timer reached zero, in milliseconds from midnight" }
+  runtime.num_events: { type: int, description: "Number of events in the rundown" }
+  runtime.selected_event_index: { type: int, description: "Index of the loaded event, as Ontime counts it" }
+  runtime.planned_start: { type: int, unit: ms, description: "Rundown's scheduled start, in milliseconds from midnight" }
+  runtime.planned_end: { type: int, unit: ms, description: "Rundown's scheduled end, in milliseconds from midnight" }
+  runtime.actual_start: { type: int, unit: ms, description: "When the rundown actually started, in milliseconds from midnight" }
+  runtime.current_day: { type: int, description: "Day offset Ontime uses internally for rundowns past midnight" }
+  runtime.actual_group_start: { type: int, unit: ms, description: "When the current group actually started, in milliseconds from midnight" }
+  runtime.offset: { type: int, unit: ms, description: "Difference between the running show and its schedule" }
+  runtime.expected_end: { type: int, unit: ms, description: "When the rundown is expected to end, in milliseconds from midnight" }
+  offset.absolute: { type: int, unit: ms, description: "Offset counting the planned times" }
+  offset.relative: { type: int, unit: ms, description: "Offset generated since the rundown started" }
+  offset.mode: { type: string, description: "Offset mode selected in Ontime: absolute or relative" }
+  offset.expected_group_end: { type: int, unit: ms, description: "Expected end of the current group, in milliseconds from midnight" }
+  offset.expected_rundown_end: { type: int, unit: ms, description: "Expected end of the rundown, in milliseconds from midnight" }
+  offset.expected_flag_start: { type: int, unit: ms, description: "Expected start of the next flagged event, in milliseconds from midnight" }
+  message.secondary: { type: string, description: "Secondary message text" }
+  message.timer.text: { type: string, description: "Timer message text" }
+  message.timer.visible: { type: bool, description: "Whether the timer message shows on the stage timer" }
+  message.timer.blink: { type: bool, description: "Whether the stage timer blinks" }
+  message.timer.blackout: { type: bool, description: "Whether the stage timer screens are blacked out" }
+  message.timer.secondary_source: { type: string, description: "What the stage timer shows as its secondary field: secondary, aux1, aux2 or aux3; absent when off" }
+  aux_timers.*.duration: { type: int, unit: ms, description: "Auxiliary timer's duration, by timer 1 to 3" }
+  aux_timers.*.current: { type: int, unit: ms, description: "Auxiliary timer's current value" }
+  aux_timers.*.playback: { type: string, description: "Auxiliary timer's playback: play, pause or stop" }
+  aux_timers.*.direction: { type: string, description: "Auxiliary timer's direction: count-down or count-up" }
+  event_now.id: { type: string, description: "Id of the event now playing; the event_now section is absent when there is none" }
+  event_now.type: { type: string, description: "Entry type of the event now, event" }
+  event_now.title: { type: string, description: "Title of the event now" }
+  event_now.cue: { type: string, description: "Cue of the event now" }
+  event_now.note: { type: string, description: "Note of the event now" }
+  event_now.colour: { type: string, description: "Colour of the event now" }
+  event_now.time_start: { type: int, unit: ms, description: "Scheduled start of the event now, from midnight" }
+  event_now.time_end: { type: int, unit: ms, description: "Scheduled end of the event now, from midnight" }
+  event_now.duration: { type: int, unit: ms, description: "Duration of the event now" }
+  event_now.delay: { type: int, unit: ms, description: "Delay applied to the event now" }
+  event_now.skip: { type: bool, description: "Whether the event now is skipped" }
+  event_now.end_action: { type: string, description: "End action of the event now: none, load-next or play-next" }
+  event_now.timer_type: { type: string, description: "Timer type of the event now: count-down, count-up, clock or none" }
+  event_now.time_warning: { type: int, unit: ms, description: "Warning threshold of the event now" }
+  event_now.time_danger: { type: int, unit: ms, description: "Danger threshold of the event now" }
+  event_now.custom.*: { type: string, description: "Custom field of the event now, by field key" }
+  event_next.id: { type: string, description: "Id of the next event; the event_next section is absent when there is none" }
+  event_next.type: { type: string, description: "Entry type of the next event" }
+  event_next.title: { type: string, description: "Title of the next event" }
+  event_next.cue: { type: string, description: "Cue of the next event" }
+  event_next.note: { type: string, description: "Note of the next event" }
+  event_next.colour: { type: string, description: "Colour of the next event" }
+  event_next.time_start: { type: int, unit: ms, description: "Scheduled start of the next event, from midnight" }
+  event_next.time_end: { type: int, unit: ms, description: "Scheduled end of the next event, from midnight" }
+  event_next.duration: { type: int, unit: ms, description: "Duration of the next event" }
+  event_next.delay: { type: int, unit: ms, description: "Delay applied to the next event" }
+  event_next.skip: { type: bool, description: "Whether the next event is skipped" }
+  event_next.end_action: { type: string, description: "End action of the next event" }
+  event_next.timer_type: { type: string, description: "Timer type of the next event" }
+  event_next.time_warning: { type: int, unit: ms, description: "Warning threshold of the next event" }
+  event_next.time_danger: { type: int, unit: ms, description: "Danger threshold of the next event" }
+  event_next.custom.*: { type: string, description: "Custom field of the next event, by field key" }
+  rundown.id: { type: string, description: "Id of the current rundown, which create_entry, update_entry and delete_entry take" }
+  rundown.title: { type: string, description: "Title of the current rundown" }
+  rundown.revision: { type: int, description: "Revision of the current rundown, rising with each change" }
+  rundown.entries.*.index: { type: int, description: "Entry's place in the rundown's flat order, from 0" }
+  rundown.entries.*.type: { type: string, description: "Entry type: event, delay, group or milestone; keyed by entry id" }
+  rundown.entries.*.title: { type: string, description: "Entry's title" }
+  rundown.entries.*.cue: { type: string, description: "Event's cue" }
+  rundown.entries.*.note: { type: string, description: "Entry's note" }
+  rundown.entries.*.colour: { type: string, description: "Entry's colour" }
+  rundown.entries.*.time_start: { type: int, unit: ms, description: "Event's scheduled start, from midnight" }
+  rundown.entries.*.time_end: { type: int, unit: ms, description: "Event's scheduled end, from midnight" }
+  rundown.entries.*.duration: { type: int, unit: ms, description: "Entry's duration" }
+  rundown.entries.*.delay: { type: int, unit: ms, description: "Delay applied to the event" }
+  rundown.entries.*.skip: { type: bool, description: "Whether playback skips the event" }
+  rundown.entries.*.link_start: { type: bool, description: "Whether the event's start is linked to the previous event's end" }
+  rundown.entries.*.time_warning: { type: int, unit: ms, description: "Event's warning threshold" }
+  rundown.entries.*.time_danger: { type: int, unit: ms, description: "Event's danger threshold" }
+  rundown.entries.*.end_action: { type: string, description: "Event's end action: none, load-next or play-next" }
+  rundown.entries.*.timer_type: { type: string, description: "Event's timer type: count-down, count-up, clock or none" }
+  rundown.entries.*.count_to_end: { type: bool, description: "Whether the event counts to its scheduled end rather than its duration" }
+  rundown.entries.*.time_strategy: { type: string, description: "Event's time strategy, such as lock-duration or lock-end" }
+  rundown.entries.*.revision: { type: int, description: "Entry's revision" }
+  rundown.entries.*.custom.*: { type: string, description: "Entry's custom field value, by field key" }
+  custom_fields.*.label: { type: string, description: "Custom field's label, keyed by field key" }
+  custom_fields.*.type: { type: string, description: "Custom field's type in Ontime's words" }
+  custom_fields.*.colour: { type: string, description: "Custom field's colour" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Ontime has no access control on its APIs beyond the network: any
+      device that reaches port 4001 can change playback (Network and
+      security page). A session password protects the views; whether the
+      HTTP API and the WebSocket take the hashed token as a bearer token, as
+      the MCP server page documents for /mcp, is not documented. Ontime Cloud
+      stages are served under a path of their own, which this spec does not
+      add: it reaches a local or self-hosted Ontime server.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The runtime data's push format is documented as {type: "ontime",
+      payload} with granular {type: "ontime-<section>", payload: <section>}
+      messages, while the WebSocket page tags its replies with tag (version,
+      poll) and Ontime 4 tags its pushes too. The rules read a section
+      wherever it arrives: inside any message's payload (the snapshot, a
+      poll reply, a patch of several sections) or as a section message of
+      its own. Each section replaces what state held for it, so a value
+      Ontime sends as null (no event loaded) leaves state. Ontime's notice
+      that the rundown or custom fields changed is not documented: they are
+      read every 15 seconds and after each change made through this spec.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Ontime's documents disagree on the rundown's path: the HTTP API page
+      lists GET /data/rundowns/current (as the vendor-listed Companion module
+      reads it) and the Project data page writes /data/rundown/current and
+      /data/rundown/:rundownId/... for the entry writes. The spec uses
+      /data/rundowns throughout. The Project data page says it is
+      incomplete on purpose: project, settings, automations, URL presets and
+      view settings have no documented write, so they are read whole
+      (get_data) and not kept in state.
+
+  - models: [all]
+    severity: info
+    text: >
+      The documents do not say whether an event index counts from 0 or 1
+      (the WebSocket page's example uses 1). The HTTP page writes loading by
+      cue as /api/load/index/<event-cue>, a slip for /api/load/cue/<cue>,
+      the OSC page's form, which the spec sends. Auxiliary timers are
+      documented on number 1 only; the runtime data holds three
+      (auxtimer1 to auxtimer3), and the API takes the number in the path.
+
+  - models: [all]
+    severity: info
+    text: >
+      The HTTP page documents secondarySource and blackout on
+      /api/message/timer; the timer message's text, visible and blink are
+      the same message state's other fields (runtime data, and the
+      Companion module sets them over the WebSocket), sent here the same way
+      as query parameters. secondarySource takes aux in the documents and
+      aux1 to aux3 in Ontime 4's runtime data; any other value, such as off,
+      turns the secondary field off. The secondary message's text goes in
+      the path, so it cannot be set empty.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Changing an event's skip, endAction, duration, timeStart or timeEnd
+      recalculates the rundown, and Ontime throttles writes to them. A cue
+      should be kept under 8 characters. delete_entry and create_entry
+      change the show file at once; there is no undo through the API.

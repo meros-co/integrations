@@ -1909,6 +1909,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check whether a newly connected client receives the current registrations, or only later changes (the server sends them before the subscription can arrive). ([specs/omt-discovery.yaml:56](specs/omt-discovery.yaml#L56))
 
+## ontime — Ontime
+
+- [ ] Record the WebSocket pushes of Ontime 4 as sent (tag or type, and payload shape): whole runtime objects, section patches or per-section messages, and whether each section arrives whole. ([specs/ontime.yaml:1048](specs/ontime.yaml#L1048))
+- [ ] Confirm that every client gets a runtime snapshot on connecting to /ws, and that {"tag":"poll"} and {"tag":"version"} are answered as the WebSocket page shows. ([specs/ontime.yaml:540](specs/ontime.yaml#L540))
+- [ ] Record Ontime's WebSocket notice that the rundown or custom fields changed (Companion reads a refetch tag), so the 15-second rundown poll can follow it instead. ([specs/ontime.yaml:1052](specs/ontime.yaml#L1052))
+- [ ] Confirm GET /data/rundowns/current and the entry writes on /data/rundowns/<id>/entry and /data/rundowns/<id>/<entry> (the Project data page writes /data/rundown/...), and record what POST, PUT and DELETE answer. ([specs/ontime.yaml:1059](specs/ontime.yaml#L1059))
+- [ ] Check whether event indexes in /api/start/index and /api/load/index count from 0 or 1. ([specs/ontime.yaml:1071](specs/ontime.yaml#L1071))
+- [ ] Confirm /api/load/cue/<cue> loads by cue (the HTTP page writes /api/load/index/<event-cue>). ([specs/ontime.yaml:1073](specs/ontime.yaml#L1073))
+- [ ] Confirm auxiliary timers 2 and 3 answer /api/auxtimer/2/... and /3/... like timer 1, and that secondarySource takes aux1 to aux3 (and aux). ([specs/ontime.yaml:1074](specs/ontime.yaml#L1074))
+- [ ] Confirm /api/message/timer takes text, visible and blink as query parameters, as it takes secondarySource and blackout. ([specs/ontime.yaml:1081](specs/ontime.yaml#L1081))
+- [ ] Check whether the HTTP API and /ws take the session password's hashed token as Authorization: Bearer, and what they answer without it. ([specs/ontime.yaml:1036](specs/ontime.yaml#L1036))
+- [ ] Record the shape of GET /data/custom-fields (label, type and colour per key are assumed). ([specs/ontime.yaml:1026](specs/ontime.yaml#L1026))
+- [ ] Record the status and body of a refused playback command (an unknown event id or cue). ([specs/ontime.yaml:190](specs/ontime.yaml#L190))
+
 ## openlp — OpenLP
 
 - [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:91](specs/openlp.yaml#L91))
