@@ -595,6 +595,8 @@ fn channel_patch(block: &Map<String, Value>) -> Map<String, Value> {
     }
     if let Some(v) = block.get("testtone").and_then(Value::as_i64) {
         // -60 to 0 dBFS when on, 1 when off.
+        // Off is test_tone false, and the level is removed.
+        ch.insert("test_tone".into(), json!(v <= 0));
         ch.insert("test_tone_dbfs".into(), json!((v <= 0).then_some(v)));
     }
     if let Some(sync) = block.get("sync_settings").and_then(Value::as_object) {
@@ -1596,6 +1598,7 @@ mod tests {
         assert_eq!(ch["bank_channel"], 63);
         assert_eq!(ch["encryption"], true);
         assert_eq!(ch["test_tone_dbfs"], Value::Null);
+        assert_eq!(ch["test_tone"], false);
         assert_eq!(ch["status"], "SyncFail");
         assert_eq!(ch["status_detail"], "SyncResultTimeout");
         assert_eq!(ch["af_out_db"], 6);
@@ -1620,6 +1623,7 @@ mod tests {
         assert_eq!(p["channels"]["2"]["bank"], "manual");
         assert_eq!(p["channels"]["2"]["bank_channel"], Value::Null);
         assert_eq!(p["channels"]["2"]["test_tone_dbfs"], -52);
+        assert_eq!(p["channels"]["2"]["test_tone"], true);
 
         let p = patch(&feed(
             &mut d,
