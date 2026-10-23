@@ -48,7 +48,7 @@ MODELS = ["aw-ue80", "aw-ue50", "aw-ue40", "aw-ue30", "aw-ue150", "aw-ue155", "a
 # update notification registration; the serial ones below replace them. Each
 # is named by how its text starts, and a missing one stops the generator.
 DROPPED_QUIRKS = [
-    "Leave at least 40 ms between pan-tilt head commands",
+    "Panasonic asks for a gap of 40 ms between pan-tilt head commands",
     "Errors come back as the reply text, with HTTP 200",
     "At most five clients",
     "The Web settings (set_* CGIs",
@@ -99,8 +99,10 @@ SOURCES = [
 SERIAL_QUIRKS = [
     ("critical",
      "The RS-422 line is half duplex (chapter 4-1): the core sends one message at a time and the next only after "
-     "the reply to the one before. Leave at least 40 ms between pan-tilt head commands (16 ms on the AW-UE160); "
-     "the format has no inter-command delay, so a caller streaming pan_tilt_speed updates must pace them itself."),
+     "the reply to the one before. Panasonic asks for a gap of 40 ms between pan-tilt head commands (16 ms on "
+     "the AW-UE160), which the core keeps (transport.pacing), counted from each reply; a caller streaming "
+     "pan_tilt_speed updates faster than that builds a queue behind them, so it should send only the latest "
+     "speed."),
     ("warning",
      "Pan-tilt head commands are sent as # + command + CR, camera commands as STX (02H) + command + ETX (03H), and "
      "the replies come back framed the same way (chapter 3 and 4-1). A camera command is answered with ACK (06H) "
@@ -628,6 +630,15 @@ def emit(models, maps, commands, state, poll, rules, quirks):
     w("  reply_match: '^[^\\x06]'")
     w("  error_match: '^\\x02?[Ee]R[1-3]:'")
     w("  timeout_ms: 4000")
+    w("  # A gap of 40 ms between pan-tilt head commands (chapter 4, restriction 1; 16 ms on the AW-UE160),")
+    w("  # counted from each reply.")
+    w("  pacing:")
+    w("    from: reply")
+    w("    groups:")
+    w("      pan_tilt:")
+    w('        match: "^#"')
+    w("        min_interval_ms: 40")
+    w("        by_model: [{ models: [aw-ue160], min_interval_ms: 16 }]")
     w(f"  probe: {q(frame('ptz', '#O'))}")
     w("")
     if maps:

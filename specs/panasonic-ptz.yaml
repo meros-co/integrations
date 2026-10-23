@@ -103,6 +103,18 @@ transport:
   scheme: http
   auth: { setting: auth }
   timeout_ms: 4000
+  # A gap of 40 ms between pan-tilt head commands on the AW-UE models (chapter 4, restriction 1; 16 ms
+  # on the AW-UE160), 130 ms between any two commands on the models of the HE document; counted from
+  # each reply.
+  pacing:
+    from: reply
+    by_model:
+      - { models: [aw-ue70, aw-he40, aw-he50, aw-he60, aw-he65, aw-he70, aw-he120, aw-he130], min_interval_ms: 130 }
+    groups:
+      pan_tilt:
+        match: "^/cgi-bin/aw_ptz"
+        min_interval_ms: 40
+        by_model: [{ models: [aw-ue160], min_interval_ms: 16 }]
   probe:
     method: GET
     path: /cgi-bin/aw_ptz
@@ -13447,10 +13459,12 @@ quirks:
   - models: [all]
     severity: critical
     text: >
-      Leave at least 40 ms between pan-tilt head commands (aw_ptz) on the AW-UE models (chapter 4,
-      restriction 1); the HE document asks for 130 ms between commands of either kind. The format has no
-      inter-command delay, so a caller streaming pan_tilt_speed updates must pace them itself. Every HTTP
-      request opens and closes its own connection; Keep-Alive is not supported.
+      Panasonic asks for a gap of 40 ms between pan-tilt head commands (aw_ptz) on the AW-UE models
+      (chapter 4, restriction 1; 16 ms on the AW-UE160), and the HE document for 130 ms between commands
+      of either kind. The core keeps these gaps (transport.pacing), counted from each reply, polls
+      included; a caller streaming pan_tilt_speed updates faster than that builds a queue behind them, so
+      it should send only the latest speed. Every HTTP request opens and closes its own connection;
+      Keep-Alive is not supported.
 
   - models: [all]
     severity: critical
@@ -13597,7 +13611,8 @@ quirks:
   - models: [aw-ue160]
     severity: warning
     text: >
-      The AW-UE160 asks for at least 16 ms between pan-tilt head commands (chapter 4), and refuses many
+      The AW-UE160 asks for at least 16 ms between pan-tilt head commands (chapter 4; the core keeps
+      it), and refuses many
       paint settings with ER3 while V-Log is on with V-Log paint off, while HDR is on, or while their
       switch (knee, gamma, black gamma, detail, matrix and so on) is off (chapter 8).
 
