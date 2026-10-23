@@ -206,10 +206,13 @@ impl SscDevice for EwdxDevice {
     fn read_failed(&self, cx: &mut Cx, path: &str, status: u16) {
         let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
         match (status, parts.as_slice()) {
-            // No transmitter linked: its resources answer 422.
+            // No transmitter linked: its resources answer 422. The channel
+            // says so with linked false, and the last transmitter's fields go.
             (422, ["api", "transmitters", id, ..]) => {
                 if let Ok(id) = id.parse::<u32>() {
-                    cx.state(json!({"channels": {(id + 1).to_string(): {"transmitter": null}}}));
+                    cx.state(
+                        json!({"channels": {(id + 1).to_string(): {"transmitter": unlinked()}}}),
+                    );
                 }
             }
             (404, ["api", "channel", _]) => cx.log(
@@ -555,6 +558,45 @@ fn first_string(v: &Value) -> Option<Value> {
     v.as_array()?.first().filter(|f| f.is_string()).cloned()
 }
 
+/// Every field the module keeps under `channels.N.transmitter`, besides `linked`.
+const TRANSMITTER_FIELDS: [&str; 17] = [
+    "type",
+    "capsule",
+    "version",
+    "name",
+    "mute",
+    "identifying",
+    "lowcut",
+    "trim_db",
+    "cable_emulation",
+    "led",
+    "lock",
+    "mute_config",
+    "mute_config_table_stand",
+    "battery_percent",
+    "battery_type",
+    "battery_lifetime_min",
+    "warnings",
+];
+
+/// A channel's transmitter when none is linked: `linked` false, and every
+/// field the last one left removed, in one patch.
+fn unlinked() -> Value {
+    let mut tx: Map<String, Value> = TRANSMITTER_FIELDS
+        .iter()
+        .map(|f| ((*f).to_string(), Value::Null))
+        .collect();
+    tx.insert("linked".into(), json!(false));
+    Value::Object(tx)
+}
+
+/// A transmitter resource answered: one is linked.
+fn linked(channel: &mut Map<String, Value>) -> &mut Map<String, Value> {
+    let tx = object(channel, "transmitter");
+    tx.insert("linked".into(), json!(true));
+    tx
+}
+
 /// The transmitter fields shared by `/api/transmitters` and its items.
 fn transmitter_fields(value: &Value, tx: &mut Map<String, Value>) {
     copy(tx, "type", value, "type", as_string);
@@ -767,15 +809,15 @@ fn apply_one(path: &str, value: &Value, patch: &mut Map<String, Value>) {
                 copy(ignore, param, value, field, as_bool);
             }
         }
-        "transmitter" => transmitter_fields(value, object(channel, "transmitter")),
+        "transmitter" => transmitter_fields(value, linked(channel)),
         "battery" => {
-            let tx = object(channel, "transmitter");
+            let tx = linked(channel);
             copy(tx, "battery_percent", value, "gauge", as_number);
             copy(tx, "battery_type", value, "type", word);
             copy(tx, "battery_lifetime_min", value, "lifetime", as_number);
         }
         "tx_warnings" if value.is_array() => {
-            object(channel, "transmitter").insert("warnings".into(), value.clone());
+            linked(channel).insert("warnings".into(), value.clone());
         }
         _ => {}
     }
@@ -1157,7 +1199,7 @@ mod tests {
         );
         assert_eq!(
             ch["transmitter"],
-            json!({"type": "EW_DX_SKM", "capsule": "MMD_935", "version": "3.1.0", "name": "LEAD",
+            json!({"linked": true, "type": "EW_DX_SKM", "capsule": "MMD_935", "version": "3.1.0", "name": "LEAD",
                    "mute": false, "identifying": false, "lowcut": "100hz", "trim_db": 2,
                    "led": true, "lock": false, "battery_percent": 80, "battery_type": "primary_cell",
                    "battery_lifetime_min": 312, "warnings": ["LowBattery"]})
@@ -1196,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    fn an_unlinked_transmitter_is_null() {
+    fn an_unlinked_transmitter_is_linked_false() {
         // The read of channel 2's transmitter answers 422.
         let (mut d, actions) = streaming();
         let reads = requests(&actions);
@@ -1207,9 +1249,22 @@ mod tests {
         let mut cx = Cx::new(60);
         d.http_response(&mut cx, *id, status(422));
         let a = cx.take();
-        assert!(a.contains(&Action::State(
-            json!({"channels": {"2": {"transmitter": null}}})
-        )));
+        let tx = a
+            .iter()
+            .find_map(|x| match x {
+                Action::State(p) => p.pointer("/channels/2/transmitter").cloned(),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(tx["linked"], json!(false));
+        // The last transmitter's fields are removed in the same patch.
+        assert_eq!(tx.get("name"), Some(&Value::Null));
+        assert_eq!(tx.get("battery_percent"), Some(&Value::Null));
+        assert!(tx
+            .as_object()
+            .unwrap()
+            .values()
+            .all(|v| v.is_null() || *v == json!(false)));
     }
 
     /// Run a command on a streaming device and return its request.

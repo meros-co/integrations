@@ -132,7 +132,11 @@ impl MidiLink {
             Kind::Rtp(rtp) => rtp.start(cx),
             Kind::Port { port, .. } => {
                 cx.connection(Connection::Connecting);
-                cx.state(json!({"port": {"input": port.input, "output": port.output}}));
+                // "": no port opened that way (a null would be a removal).
+                let name = |p: &Option<String>| p.clone().unwrap_or_default();
+                cx.state(
+                    json!({"port": {"input": name(&port.input), "output": name(&port.output)}}),
+                );
                 cx.midi_open(PORT, port.clone());
             }
         }

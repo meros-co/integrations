@@ -48,6 +48,18 @@ state:
   outputs.*.input: { type: int, description: "Input routed to the output, numbered from 1" }
 ```
 
+State reaches consumers as RFC 7386 merge patches, where a `null` removes the
+key. A `null` in a state patch therefore always means the value is gone or no
+longer known, never a state of its own: a consumer applying patches cannot
+tell it from a value never reported. A state that means "none" (no
+transmitter linked, no macro running, a tone off, a level at -inf) is written
+as an explicit value that fits the path's type, such as `false`, `0` where
+numbering starts at 1, `""`, `"none"`, `"-inf"` or `{linked: false}`, and the
+state description says which. Inside an array a `null` is an element, not a
+removal. A telemetry rule removes with `{delete: true}` (§8) and never writes
+`null`, and `tools/validate.py` refuses a rule or map that does; native
+modules follow the same rule.
+
 ## 2. Transports
 
 One transport per spec. The core implements each transport once. A device that
@@ -1771,7 +1783,8 @@ deleted:
       state: { "{1}.{2}": { delete: true } }
 ```
 
-The state patch carries `null` there, which RFC 7386 reads as a removal:
+The state patch carries `null` there, which RFC 7386 reads as a removal
+(see §1: a `null` never stands for a state such as "none"):
 the snapshot loses the subtree, and the `state` event tells consumers so.
 The path must be declared, or lead to declared paths; a captured segment
 that renders empty or holds a `.` removes nothing, so a device can never

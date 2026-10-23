@@ -759,7 +759,11 @@ impl GenericMidi {
                 let c = self.channels[channel as usize];
                 let patch = json!({
                     "program": program,
-                    "bank": {"msb": c.bank_msb, "lsb": c.bank_lsb},
+                    // -1: no bank select came before the program change.
+                    "bank": {
+                        "msb": c.bank_msb.map_or(-1, i16::from),
+                        "lsb": c.bank_lsb.map_or(-1, i16::from),
+                    },
                 });
                 cx.state(self.state_channel(channel, patch));
             }

@@ -931,7 +931,20 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     errors.append(f"{where}.then_send: '{{{name}}}' is not one of the rule's captures")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
+        # A null in a state patch is a removal (SPEC.md §1, state):
+        # a rule removes with {delete: true}, and a state meaning "none" is
+        # written as an explicit value, never as null.
+        fields_ = [f for f in (rule.get("fields") or {}).values() if isinstance(f, dict)]
+        for path, value in list((rule.get("state") or {}).items()) + [
+                (f.get("path", ""), f) for f in fields_]:
+            if value is None:
+                errors.append(f"{where}: '{path}' is written as null; remove with "
+                              "{delete: true}, or write 'none' as an explicit value")
+            elif isinstance(value, dict) and any(v is None for v in (value.get("map") or {}).values()):
+                errors.append(f"{where}: '{path}' maps a value to null; write 'none' as an explicit value")
         for value in (rule.get("state") or {}).values():
+            if value is None:
+                continue
             template = value if isinstance(value, str) else value.get("value", "")
             for m in PLACEHOLDER.finditer(template):
                 for d in [d for d in m.group(2).split(":") if d]:
