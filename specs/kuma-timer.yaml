@@ -1,0 +1,509 @@
+spec: 1
+id: kuma-timer
+name: KUMA Timer (HTTP API)
+vendor: PL Tech
+category: other
+
+# KUMA Timer is a speaker and show timer (Windows and macOS) with a
+# runsheet of cues, presets and on-screen messages. Its HTTP API shares the
+# Web Mirror's port (5555): GET /api/status returns the whole state and
+# POST /api/command takes {"action": ..., params}. KUMA pushes nothing over
+# HTTP, so the status is polled every second.
+
+source:
+  - title: KUMA Timer — API Reference (HTTP/JSON API and OSC protocol)
+    author: PL Tech Ltd
+    url: https://kuma.pl-tech.co.uk/api.html
+    note: >
+      Vendor document, retrieved 2026-10-23. HTTP server on the Web Mirror's
+      port (5555 by default), no authentication, application/json, CORS *.
+      GET /api/status: status live|paused|standby|hidden, timer ("MM:SS",
+      "-MM:SS" in overtime), timer_seconds (negative in overtime),
+      overtime, progress (100 to 0), cue_name, cue_index (-1 for none),
+      sms_active. POST /api/command with {"action": ...}: 200 {"ok": true},
+      400 {"error": "unknown action: foo"}. Actions start, pause (toggle),
+      reset, hide (toggle), add_minute, sub_minute, load_time {seconds},
+      preset {index >= 0}, load_cue {index}, next_cue (wraps), send_sms
+      {text (300 characters), duration 1-600 (10), color (#ffffff),
+      border_color (#ffaa00), size small|medium|large, position
+      bottom|top, flash, scroll, scroll_invert}, cancel_sms. OSC in on UDP
+      8000 and out to 12321.
+  - title: companion-module-pltech-kumatimer (v2.6.2, MIT licence)
+    author: PL Tech Ltd (vendor-maintained)
+    url: https://github.com/bitfocus/companion-module-pltech-kumatimer
+    note: >
+      Read to fill the gaps the API page leaves (src/actions.ts,
+      src/main.ts, src/types.ts), retrieved 2026-10-23; nothing here
+      overrides the page. The actions the page does not list: add_seconds
+      {seconds} (signed), cut_nudge {delta_seconds}, prev_cue,
+      recall_layout {slot} or {name}, set_mode {mode TIMER|CLOCK}, count_up,
+      warp_time and warp_duration {hours, minutes, seconds}, cancel_warp,
+      cancel_jump, qlab_follow_hold, qlab_follow_enable,
+      qlab_triggers_enable, omt_enable, ltc_generator_enable,
+      ltc_chase_enable and blackmagic_enable {on}, qlab_set_follow_cue
+      {cue}; send_sms's fullscreen flag; a key in every command when the
+      host's web control password is set (401 auth_required otherwise);
+      the status fields beyond the page's (cues, presets, preset_seconds,
+      display_mode, is_countup, the QLab follow, OMT, LTC and Blackmagic
+      flags, warp and jump state, layout presets, ppt, app_version). No
+      code taken.
+
+transport:
+  type: http
+  port: 5555
+  scheme: http
+  auth: none
+  timeout_ms: 2000
+  probe: { method: GET, path: /api/status }
+
+settings:
+  password: { type: string, secret: true, default: "", max_length: 256,
+    label: Web control password,
+    description: "KUMA's web control password, sent as key with every command; leave empty when none is set." }
+
+ports:
+  - { port: 5555, protocol: http, role: control, note: "the Web Mirror's port, set in Settings > Connections" }
+
+models:
+  - id: kuma-timer
+    name: KUMA Timer (Lite or Full)
+    supports: [start, pause, reset, hide, add_minute, subtract_minute, add_seconds, cut_nudge,
+               load_time, load_preset, load_cue, next_cue, previous_cue, count_up, set_mode,
+               recall_layout, recall_layout_by_name, send_message, cancel_message,
+               glide_to_time, glide_for_duration, cancel_glide, cancel_jump,
+               set_qlab_hold, set_qlab_follow, set_qlab_triggers, set_qlab_follow_cue,
+               set_omt_output, set_ltc_generator, set_ltc_chase, set_blackmagic_output]
+    verification: none
+
+commands:
+  # ── Playback ─────────────────────────────────────────────────────────────
+  start:
+    summary: Start the timer
+    send: { method: POST, path: /api/command, content_type: application/json,
+                 body: '{"action":"start","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  pause:
+    summary: Pause the timer, or resume it when paused
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"pause","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  reset:
+    summary: Stop the timer and reset it to zero
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"reset","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  hide:
+    summary: Hide the display window, or show it when hidden
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"hide","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  count_up:
+    summary: Count up from zero
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"count_up","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_mode:
+    summary: Show the timer or the clock
+    params:
+      mode: { type: enum, values: [TIMER, CLOCK], required: true,
+              label: Display, description: "TIMER shows the timer; CLOCK shows the time of day." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"set_mode","mode":{mode:json},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── Time ─────────────────────────────────────────────────────────────────
+  add_minute:
+    summary: Add 60 seconds to the running timer
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"add_minute","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  subtract_minute:
+    summary: Take 60 seconds off the running timer
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"sub_minute","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  add_seconds:
+    summary: Add seconds to the running timer, or take them off with a negative number
+    params:
+      seconds: { type: int, min: -86399, max: 86399, required: true,
+                 label: Seconds, description: "Seconds to add; negative takes time off." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"add_seconds","seconds":{seconds},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cut_nudge:
+    summary: Nudge the running Time Cut by seconds (positive cuts more, negative less)
+    params:
+      delta_seconds: { type: int, min: -3599, max: 3599, required: true,
+                       label: Nudge, description: "Seconds to change the time cut by; positive removes more time." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"cut_nudge","delta_seconds":{delta_seconds},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  load_time:
+    summary: Load an exact duration
+    params:
+      seconds: { type: int, min: 0, required: true,
+                 label: Duration, description: "The duration in seconds, such as 300 for 5:00." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"load_time","seconds":{seconds},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  load_preset:
+    summary: Activate a preset button
+    params:
+      index: { type: int, min: 0, required: true,
+               label: Preset, description: "Preset by index, 0 for the first; up to 10 presets in Lite." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"preset","index":{index},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  glide_to_time:
+    summary: Time Glide so the timer ends exactly at a time of day (the timer runs faster or slower)
+    params:
+      hours: { type: int, min: 0, max: 23, required: true, label: Hour, description: "Hour of day the timer should end, 0-23." }
+      minutes: { type: int, min: 0, max: 59, required: true, label: Minute, description: "Minute of that time." }
+      seconds: { type: int, min: 0, max: 59, default: 0, label: Second, description: "Second of that time." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"warp_time","hours":{hours},"minutes":{minutes},"seconds":{seconds},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  glide_for_duration:
+    summary: Time Glide so the timer ends after a set duration
+    params:
+      hours: { type: int, min: 0, max: 23, default: 0, label: Hours, description: "Hours until the timer should end." }
+      minutes: { type: int, min: 0, max: 59, required: true, label: Minutes, description: "Minutes until it should end." }
+      seconds: { type: int, min: 0, max: 59, default: 0, label: Seconds, description: "Seconds until it should end." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"warp_duration","hours":{hours},"minutes":{minutes},"seconds":{seconds},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cancel_glide:
+    summary: Cancel the running Time Glide
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"cancel_warp","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cancel_jump:
+    summary: Cancel the running Time Jump
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"cancel_jump","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── Cues and layouts ─────────────────────────────────────────────────────
+  load_cue:
+    summary: Load a runsheet cue's time and name
+    params:
+      index: { type: int, min: 0, required: true,
+               label: Cue, description: "Runsheet row, 0 for the first." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"load_cue","index":{index},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  next_cue:
+    summary: Advance to the next runsheet cue (wraps to the top)
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"next_cue","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  previous_cue:
+    summary: Go back to the previous runsheet cue
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"prev_cue","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  recall_layout:
+    summary: Recall a layout preset by slot
+    params:
+      slot: { type: int, min: 1, max: 99, required: true,
+              label: Slot, description: "Layout preset slot, 1 for the first." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"recall_layout","slot":{slot},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  recall_layout_by_name:
+    summary: Recall a layout preset by name
+    params:
+      name: { type: string, max_length: 256, required: true,
+              label: Layout, description: "Name of the layout preset, as the layouts in state list it." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"recall_layout","name":{name:json},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── Messages ─────────────────────────────────────────────────────────────
+  send_message:
+    summary: Show a message (SMS) on screen
+    params:
+      text: { type: string, max_length: 300, required: true,
+              label: Message, description: "Text to show, up to 300 characters." }
+      duration: { type: int, min: 1, max: 600, default: 10,
+                  label: Duration, description: "How long the message stays, in seconds." }
+      color: { type: string, default: "#ffffff", pattern: "^#[0-9A-Fa-f]{6}$",
+               label: Text color, description: "Text color as #rrggbb; black text gets a white container." }
+      border_color: { type: string, default: "#ffaa00", pattern: "^#[0-9A-Fa-f]{6}$",
+                      label: Border color, description: "Container border color as #rrggbb." }
+      size: { type: enum, values: [small, medium, large], default: medium,
+              label: Size, description: "Text size." }
+      position: { type: enum, values: [bottom, top], default: bottom,
+                  label: Position, description: "Where the message sits on screen." }
+      flash: { type: bool, default: false, label: Flash, description: "True flashes the container on and off." }
+      scroll: { type: bool, default: false, label: Scroll, description: "True scrolls even text that fits; longer text always scrolls." }
+      scroll_invert: { type: bool, default: false, label: Right to left, description: "True scrolls right to left, for Arabic or Hebrew." }
+      fullscreen: { type: bool, default: false, label: Fullscreen, description: "True shows the message fullscreen, hiding the timer." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"send_sms","text":{text:json},"duration":{duration},"color":{color:json},"border_color":{border_color:json},"size":{size:json},"position":{position:json},"flash":{flash},"scroll":{scroll},"scroll_invert":{scroll_invert},"fullscreen":{fullscreen},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  cancel_message:
+    summary: Remove the message from the screen at once
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"cancel_sms","key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+  # ── Follow, outputs and timecode ─────────────────────────────────────────
+  set_qlab_hold:
+    summary: Arm or release the audition hold, which hides the followed source's readout
+    params:
+      "on": &on { type: bool, required: true, label: "On", description: "True turns it on; false turns it off." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"qlab_follow_hold","on":{on},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_qlab_follow:
+    summary: Turn QLab follow on or off
+    params: { "on": *on }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"qlab_follow_enable","on":{on},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_qlab_triggers:
+    summary: Turn QLab triggers on or off
+    params: { "on": *on }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"qlab_triggers_enable","on":{on},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_qlab_follow_cue:
+    summary: Set the QLab cue to follow (cue mode)
+    params:
+      cue: { type: string, max_length: 256, required: true,
+             label: Cue, description: "QLab cue number or id to follow." }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"qlab_set_follow_cue","cue":{cue:json},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_omt_output:
+    summary: Turn the OMT output on or off
+    params: { "on": *on }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"omt_enable","on":{on},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_ltc_generator:
+    summary: Turn the LTC generator on or off
+    params: { "on": *on }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"ltc_generator_enable","on":{on},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_ltc_chase:
+    summary: Turn chase to timecode on or off
+    params: { "on": *on }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"ltc_chase_enable","on":{on},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+  set_blackmagic_output:
+    summary: Start or stop the timer on the Blackmagic video output
+    params: { "on": *on }
+    send: { method: POST, path: /api/command, content_type: application/json,
+            body: '{"action":"blackmagic_enable","on":{on},"key":{settings.password:json}}' }
+    expect: { status: 200, json_equals: { "$.ok": true } }
+    returns: ack
+
+telemetry:
+  poll:
+    every_ms: 1000
+    send: [{ method: GET, path: /api/status }]
+  updates:
+    - path: "^/api/status$"
+      json:
+        status: "$.status"
+        timer: "$.timer"
+        timer_seconds: "$.timer_seconds"
+        overtime: "$.overtime"
+        progress: "$.progress"
+        cue_name: "$.cue_name"
+        cue_index: "$.cue_index"
+        sms_active: "$.sms_active"
+        display_mode: "$.display_mode"
+        is_countup: "$.is_countup"
+        app_version: "$.app_version"
+        qlab_triggers: "$.qlab_triggers_enabled"
+        qlab_follow: "$.qlab_follow_enabled"
+        qlab_following: "$.qlab_following"
+        qlab_follow_cue: "$.qlab_follow_cue"
+        qlab_follow_mode: "$.qlab_follow_mode"
+        qlab_health: "$.qlab_health"
+        qlab_hold: "$.qlab_hold"
+        omt_enabled: "$.omt_enabled"
+        omt_active: "$.omt_active"
+        ltc_tx_enabled: "$.ltc_tx_enabled"
+        ltc_tx_active: "$.ltc_tx_active"
+        ltc_chase_enabled: "$.ltc_chase_enabled"
+        ltc_chase_active: "$.ltc_chase_active"
+        blackmagic_active: "$.blackmagic_active"
+        warp_active: "$.warp_active"
+        jump_active: "$.jump_active"
+        layout_active: "$.layout_preset_active"
+      state:
+        timer.status: "{status}"
+        timer.display: "{timer}"
+        timer.seconds: "{timer_seconds}"
+        timer.overtime: "{overtime}"
+        timer.progress: "{progress}"
+        timer.count_up: "{is_countup}"
+        timer.glide_active: "{warp_active}"
+        timer.jump_active: "{jump_active}"
+        display.mode: "{display_mode}"
+        cue.name: "{cue_name}"
+        cue.index: "{cue_index}"
+        message.active: "{sms_active}"
+        app.version: "{app_version}"
+        qlab.triggers: "{qlab_triggers}"
+        qlab.follow: "{qlab_follow}"
+        qlab.following: "{qlab_following}"
+        qlab.follow_cue: "{qlab_follow_cue}"
+        qlab.follow_mode: "{qlab_follow_mode}"
+        qlab.health: "{qlab_health}"
+        qlab.hold: "{qlab_hold}"
+        outputs.omt_enabled: "{omt_enabled}"
+        outputs.omt_active: "{omt_active}"
+        outputs.blackmagic_active: "{blackmagic_active}"
+        ltc.generator_enabled: "{ltc_tx_enabled}"
+        ltc.generator_active: "{ltc_tx_active}"
+        ltc.chase_enabled: "{ltc_chase_enabled}"
+        ltc.chase_active: "{ltc_chase_active}"
+        layouts.active: "{layout_active}"
+    - path: "^/api/status$"
+      json_each: "$.cues"
+      json: { name: "$" }
+      replace: cues
+      state: { "cues.{index}.name": "{name}" }
+    - path: "^/api/status$"
+      json_each: "$.preset_seconds"
+      json: { seconds: "$" }
+      replace: presets
+      state: { "presets.{index}.seconds": "{seconds}" }
+    - path: "^/api/status$"
+      json_each: "$.layout_presets"
+      json: { slot: "$.slot", id: "$.id", name: "$.name" }
+      replace: layouts.presets
+      state:
+        "layouts.presets.{slot}.id": "{id}"
+        "layouts.presets.{slot}.name": "{name}"
+    # The PowerPoint add-in's show: the object is left out when no show runs.
+    - path: "^/api/status$"
+      json_match: { "$.status": "" }
+      json:
+        file: "$.ppt.file"
+        slide: "$.ppt.slide"
+        total: "$.ppt.total"
+        builds_remaining: "$.ppt.builds_remaining"
+        builds_total: "$.ppt.builds_total"
+        media: "$.ppt.media"
+        media_remaining: "$.ppt.media_remaining"
+      replace: powerpoint
+      state:
+        powerpoint.file: "{file}"
+        powerpoint.slide: "{slide}"
+        powerpoint.total: "{total}"
+        powerpoint.builds_remaining: "{builds_remaining}"
+        powerpoint.builds_total: "{builds_total}"
+        powerpoint.media: "{media}"
+        powerpoint.media_remaining: "{media_remaining}"
+
+state:
+  timer.status: { type: string, description: "Timer state: live, paused, standby or hidden (countup while counting up)" }
+  timer.display: { type: string, description: "Time shown, MM:SS, with a leading - in overtime" }
+  timer.seconds: { type: int, unit: s, description: "Time remaining in seconds; negative in overtime" }
+  timer.overtime: { type: bool, description: "Whether the timer has passed zero" }
+  timer.progress: { type: float, unit: "%", description: "Progress bar, from 100 at the start down to 0" }
+  timer.count_up: { type: bool, description: "Whether the timer is counting up" }
+  timer.glide_active: { type: bool, description: "Whether a Time Glide is running" }
+  timer.jump_active: { type: bool, description: "Whether a Time Jump is running" }
+  display.mode: { type: string, description: "Display mode in KUMA's words, such as TIMER or CLOCK" }
+  cue.name: { type: string, description: "Name of the loaded cue; empty when none" }
+  cue.index: { type: int, description: "Runsheet row of the loaded cue from 0; -1 when none" }
+  cues.*.name: { type: string, description: "Name of each runsheet cue, by row from 0" }
+  presets.*.seconds: { type: int, unit: s, description: "Duration of each preset, by index from 0" }
+  layouts.active: { type: string, description: "Id of the active layout preset" }
+  layouts.presets.*.id: { type: string, description: "Layout preset's id, by slot from 1" }
+  layouts.presets.*.name: { type: string, description: "Layout preset's name" }
+  message.active: { type: bool, description: "Whether a message is on screen" }
+  app.version: { type: string, description: "KUMA Timer's version (newer hosts only)" }
+  qlab.triggers: { type: bool, description: "Whether QLab triggers are on" }
+  qlab.follow: { type: bool, description: "Whether QLab follow is on" }
+  qlab.following: { type: bool, description: "Whether the timer is following a running QLab cue" }
+  qlab.follow_cue: { type: string, description: "QLab cue followed in cue mode" }
+  qlab.follow_mode: { type: string, description: "QLab follow mode: active or cue" }
+  qlab.health: { type: string, description: "QLab link health: ok, idle, error or off" }
+  qlab.hold: { type: bool, description: "Whether the audition hold is armed (the followed readout hidden)" }
+  outputs.omt_enabled: { type: bool, description: "Whether the OMT output is enabled in settings" }
+  outputs.omt_active: { type: bool, description: "Whether the OMT output is running" }
+  outputs.blackmagic_active: { type: bool, description: "Whether the timer is on the Blackmagic output" }
+  ltc.generator_enabled: { type: bool, description: "Whether the LTC generator is enabled" }
+  ltc.generator_active: { type: bool, description: "Whether the LTC generator is running" }
+  ltc.chase_enabled: { type: bool, description: "Whether chase to timecode is enabled" }
+  ltc.chase_active: { type: bool, description: "Whether chase to timecode is armed and counting to a cue" }
+  powerpoint.file: { type: string, description: "PowerPoint add-in's presentation file; the section is absent when no show runs" }
+  powerpoint.slide: { type: int, description: "Current slide in the show" }
+  powerpoint.total: { type: int, description: "Slides in the deck" }
+  powerpoint.builds_remaining: { type: int, description: "Animation clicks still ahead on this slide" }
+  powerpoint.builds_total: { type: int, description: "Animation clicks on this slide" }
+  powerpoint.media: { type: string, description: "Slide media: playing or idle" }
+  powerpoint.media_remaining: { type: int, unit: s, description: "Seconds left on the playing clip" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API page documents start, pause, reset, hide, add_minute,
+      sub_minute, load_time, preset, load_cue, next_cue, send_sms and
+      cancel_sms, and the status fields status, timer, timer_seconds,
+      overtime, progress, cue_name, cue_index and sms_active. Every other
+      action and status field comes from the vendor's own Companion module,
+      as the page lags the program: the Time Glide and Time Jump, layout,
+      mode, QLab follow, OMT, LTC and Blackmagic actions, send_sms's
+      fullscreen flag and the extra status fields; an older KUMA answers an
+      action it lacks with 400 and leaves out the fields.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no authentication unless KUMA's web control password is
+      set; every command then carries it as key, and a wrong one is
+      answered 401 auth_required (a device error of that command, as the
+      key travels in the body, not as an HTTP credential). The status
+      endpoint stays open either way. pause and hide
+      toggle; set them to a state by reading timer.status first. next_cue
+      wraps from the last cue to the first.
+
+  - models: [all]
+    severity: info
+    text: >
+      KUMA pushes nothing over HTTP, so the status is read every second; its
+      OSC output (/kuma/status and /kuma/overtime to a configured address)
+      is not used. Presets beyond 10 need KUMA Full. The OSC input (UDP 8000)
+      takes a subset of the same actions and is not used.

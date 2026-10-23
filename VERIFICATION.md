@@ -1541,6 +1541,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On each product, confirm the RS-232 control port runs 115200 8N1 with no flow control and takes the same commands and handshake as TCP 5000, and that #BAUD? 0 lists the rates link serial offers. ([specs/kramer-p3000.yaml:110](specs/kramer-p3000.yaml#L110))
 - [ ] Check whether the RS-232 port needs LOGIN when security is on (product-specific, guide p.49). ([specs/kramer-p3000.yaml:3931](specs/kramer-p3000.yaml#L3931))
 
+## kuma-timer — KUMA Timer
+
+- [ ] Confirm the actions the API page does not list (add_seconds, cut_nudge, prev_cue, recall_layout, set_mode, count_up, warp_time, warp_duration, cancel_warp, cancel_jump, the QLab, OMT, LTC and Blackmagic switches) and send_sms's fullscreen flag on the current KUMA. ([specs/kuma-timer.yaml:485](specs/kuma-timer.yaml#L485))
+- [ ] Confirm an empty key is accepted when no web control password is set, and record the answer to a wrong key. ([specs/kuma-timer.yaml:62](specs/kuma-timer.yaml#L62))
+- [ ] Record the status fields beyond the documented ones (cues, preset_seconds, layout_presets, ppt, the QLab, OMT, LTC and Blackmagic flags) and their types. ([specs/kuma-timer.yaml:340](specs/kuma-timer.yaml#L340))
+- [ ] Check whether recall_layout's slot counts from 1 and how a name that does not exist is answered. ([specs/kuma-timer.yaml:224](specs/kuma-timer.yaml#L224))
+
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 
 - [ ] Confirm a frame answers `Dev.Network.ID?` sent to its address with the broadcast id and class 0, and that the answer's source id is its frame id. ([specs/labgruppen-lake.yaml:768](specs/labgruppen-lake.yaml#L768))
