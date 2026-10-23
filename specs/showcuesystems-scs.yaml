@@ -1,0 +1,218 @@
+spec: 1
+id: showcuesystems-scs
+name: SCS (Show Cue System) network cue control
+vendor: Show Cue Systems
+category: playback
+
+# SCS 11's Network Cue Control: OSC messages to the port SCS listens on as a
+# Network Server, set up as a Cue Control Device in Production Properties
+# (Remote Device "Any Device or Product", Network Protocol UDP, SCS is a
+# Network Server). SCS documents no answer to these messages and no state
+# feedback, so every command reports unverified and nothing is kept in state.
+
+source:
+  - title: SCS 11 Help, "Production Properties - Cue Control Devices - Network"
+    author: Show Cue Systems
+    url: https://showcuesystems.com/scs11help/topics/prod-cc-network.htm
+    note: >
+      Manufacturer document, retrieved 2026-10-23. Network Cue Control needs
+      SCS Professional Plus or higher; up to four cue control devices; TCP or
+      UDP, SCS as network client or server, the listening port chosen by the
+      user; the Network Message Assignments table with the OSC and ASCII
+      formats: /ctrl/go, /ctrl/stopall, /ctrl/pauseresumeall, /ctrl/gotop,
+      /ctrl/goback, /ctrl/gotonext, /ctrl/gotoend, /ctrl/goto ,s x,
+      /cue/go ,s x, /cue/stop ,s x, /cue/pauseresume ,s x, /hkey/go ,s x,
+      /hkey/on ,s x, /hkey/off ,s x, /fader/setmaster ,f n.n,
+      /fader/setmasterrel ,f n.n, /fader/setdevice ,sf x n.n,
+      /fader/setdevicerel ,sf x n.n (dB, out-of-range values capped, "eg
+      -75dB to 0dB"); the optional /scs prefix; commands and cue labels not
+      case-sensitive; ASCII commands ended by CR or a pipe.
+  - title: SCS 11 Help, "Cue Control using a Behringer X32 Mixer" and "Control Send - Network - OSC Free Format"
+    author: Show Cue Systems
+    url: https://showcuesystems.com/scs11help/topics/prod-cc-network-x32.htm
+    note: >
+      Manufacturer documents: the X32 remote device preset, and SCS's OSC
+      type tags (i, f, s) as it builds them; read for context, no further
+      cue control messages.
+  - title: companion-module-showcuesystems-scs (Bitfocus Companion module, MIT licence)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-showcuesystems-scs
+    note: >
+      Corroboration and gap fill only, licence checked (MIT), read 2026-10-23
+      (src/actions.js, api.js, configFields.js); no code taken. OSC over UDP
+      to a user-given port, with the /scs prefix, cue labels and hotkeys as
+      strings, the master fader as a float; and /ctrl/fadeall, which the help
+      table does not list.
+
+transport:
+  type: osc-udp
+  port: null
+  reply: none
+
+ports:
+  - { port: null, protocol: udp, role: control, note: "SCS has no default: the Listen on Port No. set for the cue control device in SCS, given when the device is opened" }
+
+models:
+  - id: scs-11
+    name: SCS 11 Professional Plus and higher
+    supports: [go, stop_all, pause_resume_all, go_to_top, go_back, go_to_next, go_to_end, go_to_cue,
+               play_cue, stop_cue, pause_resume_cue, hotkey, hotkey_on, hotkey_off, set_master_fader,
+               adjust_master_fader, set_device_fader, adjust_device_fader, fade_all]
+    verification: none
+
+commands:
+  go:
+    summary: Press the Go button (/ctrl/go)
+    send: { address: /ctrl/go }
+    returns: none
+
+  stop_all:
+    summary: Stop all cues (/ctrl/stopall)
+    send: { address: /ctrl/stopall }
+    returns: none
+
+  pause_resume_all:
+    summary: Pause all playing cues, or resume them (/ctrl/pauseresumeall)
+    send: { address: /ctrl/pauseresumeall }
+    returns: none
+
+  go_to_top:
+    summary: Move the next-cue pointer to the top of the cue list (/ctrl/gotop)
+    send: { address: /ctrl/gotop }
+    returns: none
+
+  go_back:
+    summary: Move the next-cue pointer back one cue (/ctrl/goback)
+    send: { address: /ctrl/goback }
+    returns: none
+
+  go_to_next:
+    summary: Move the next-cue pointer on one cue (/ctrl/gotonext)
+    send: { address: /ctrl/gotonext }
+    returns: none
+
+  go_to_end:
+    summary: Move the next-cue pointer to the end of the cue list (/ctrl/gotoend)
+    send: { address: /ctrl/gotoend }
+    returns: none
+
+  go_to_cue:
+    summary: Move the next-cue pointer to a cue (/ctrl/goto ,s label)
+    params:
+      cue: { type: string, required: true, label: Cue label, description: "The cue's label as shown in SCS, such as Q90; not case-sensitive." }
+    send: { address: /ctrl/goto, args: [ { value: "{cue}", type: string } ] }
+    returns: none
+
+  play_cue:
+    summary: Play a cue (/cue/go ,s label)
+    params:
+      cue: { type: string, required: true, label: Cue label, description: "The cue's label as shown in SCS, such as Q90; not case-sensitive." }
+    send: { address: /cue/go, args: [ { value: "{cue}", type: string } ] }
+    returns: none
+
+  stop_cue:
+    summary: Stop a cue (/cue/stop ,s label)
+    params:
+      cue: { type: string, required: true, label: Cue label, description: "The cue's label as shown in SCS, such as Q90; not case-sensitive." }
+    send: { address: /cue/stop, args: [ { value: "{cue}", type: string } ] }
+    returns: none
+
+  pause_resume_cue:
+    summary: Pause a cue, or resume it (/cue/pauseresume ,s label)
+    params:
+      cue: { type: string, required: true, label: Cue label, description: "The cue's label as shown in SCS, such as Q90; not case-sensitive." }
+    send: { address: /cue/pauseresume, args: [ { value: "{cue}", type: string } ] }
+    returns: none
+
+  hotkey:
+    summary: Activate a hotkey (/hkey/go ,s key)
+    params:
+      key: { type: string, required: true, label: Hotkey, description: "The hotkey as set in SCS, such as A." }
+    send: { address: /hkey/go, args: [ { value: "{key}", type: string } ] }
+    returns: none
+
+  hotkey_on:
+    summary: Start a note hotkey (/hkey/on ,s key)
+    params:
+      key: { type: string, required: true, label: Hotkey, description: "The note hotkey as set in SCS, such as A." }
+    send: { address: /hkey/on, args: [ { value: "{key}", type: string } ] }
+    returns: none
+
+  hotkey_off:
+    summary: Stop a note hotkey (/hkey/off ,s key)
+    params:
+      key: { type: string, required: true, label: Hotkey, description: "The note hotkey as set in SCS, such as A." }
+    send: { address: /hkey/off, args: [ { value: "{key}", type: string } ] }
+    returns: none
+
+  set_master_fader:
+    summary: Set the master fader level in dB (/fader/setmaster ,f dB)
+    params:
+      db: { type: float, min: -75.0, max: 0.0, required: true, label: Level, description: "Master fader level in dB, -75 to 0 (the help page's example range)." }
+    send: { address: /fader/setmaster, args: [ { value: "{db}", type: float } ] }
+    returns: none
+
+  adjust_master_fader:
+    summary: Raise or lower the master fader by dB (/fader/setmasterrel ,f dB)
+    params:
+      db: { type: float, min: -75.0, max: 75.0, required: true, label: Change, description: "Change of the master fader in dB: negative lowers it, positive raises it; SCS caps the result at its range." }
+    send: { address: /fader/setmasterrel, args: [ { value: "{db}", type: float } ] }
+    returns: none
+
+  set_device_fader:
+    summary: Set an audio output device's fader level in dB (/fader/setdevice ,sf device dB)
+    params:
+      device: { type: string, required: true, label: Device, description: "The audio output device's logical name in SCS, such as Front." }
+      db:     { type: float, min: -75.0, max: 0.0, required: true, label: Level, description: "Device fader level in dB, -75 to 0 (the help page's example range)." }
+    send: { address: /fader/setdevice, args: [ { value: "{device}", type: string }, { value: "{db}", type: float } ] }
+    returns: none
+
+  adjust_device_fader:
+    summary: Raise or lower an audio output device's fader by dB (/fader/setdevicerel ,sf device dB)
+    params:
+      device: { type: string, required: true, label: Device, description: "The audio output device's logical name in SCS, such as Front." }
+      db:     { type: float, min: -75.0, max: 75.0, required: true, label: Change, description: "Change of the device fader in dB: negative lowers it, positive raises it; SCS caps the result at its range." }
+    send: { address: /fader/setdevicerel, args: [ { value: "{device}", type: string }, { value: "{db}", type: float } ] }
+    returns: none
+
+  fade_all:
+    summary: Fade out all playing cues (/ctrl/fadeall); see quirks
+    send: { address: /ctrl/fadeall }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Network Cue Control needs SCS Professional Plus or higher. In
+      Production Properties > Cue Control Devices, add a Network device with
+      Network Protocol UDP and "SCS is a Network Server", and give its Listen
+      on Port No. when opening this device: SCS has no default port, so none
+      is assumed. SCS takes cue control from at most four devices.
+  - models: [all]
+    severity: info
+    text: >
+      SCS documents no reply and no state feedback for network cue control
+      (its Control Send cues ignore what a device answers too), so every
+      command reports unverified and the integration keeps no state. The
+      Test Network Control window in SCS shows what it receives.
+  - models: [all]
+    severity: info
+    text: >
+      Over TCP, or with the ASCII format (scsGo("Q90"), scsStopAll and so on,
+      each ended by a carriage return or a pipe), SCS takes the same functions
+      except pause/resume, go to end, hotkeys and faders; this integration
+      sends OSC over UDP only, one transport per spec. The optional /scs
+      prefix is left out; commands and cue labels are not case-sensitive.
+  - models: [all]
+    severity: info
+    text: >
+      Fader levels are in dB and SCS caps a level or a result outside its
+      range ("eg -75dB to 0dB" in the help page) rather than refusing it; the
+      ranges here are that example. fade_all (/ctrl/fadeall) is not in SCS's
+      table and comes from the Bitfocus Companion module.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_all and fade_all end every playing cue; go and play_cue start cues
+      at once.

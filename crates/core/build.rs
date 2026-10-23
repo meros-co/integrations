@@ -216,6 +216,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-sharp", &["sharp-display"]),
+    ("vendor-showcuesystems", &["showcuesystems-scs"]),
     (
         "vendor-shure",
         &[

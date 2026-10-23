@@ -2445,6 +2445,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Drive a Sharp display on its RS-232C terminal (link serial): confirm no login is asked for and the replies are those of the LAN, each ended CR LF. ([specs/sharp-display.yaml:5736](specs/sharp-display.yaml#L5736))
 - [ ] Confirm the minute Sharp asks for after a power or reset command counts from the final OK (after any WAIT), and that RSET (all reset) is the reset command meant; ARST and CRST are not held. ([specs/sharp-display.yaml:80](specs/sharp-display.yaml#L80))
 
+## showcuesystems-scs — SCS (Show Cue System)
+
+- [ ] Check that OSC over UDP is accepted with SCS as a Network Server on the Listen on Port No. given, and whether SCS offers a port of its own when none is set. ([specs/showcuesystems-scs.yaml:187](specs/showcuesystems-scs.yaml#L187))
+- [ ] Confirm that SCS sends nothing back to the sender for network cue control messages. ([specs/showcuesystems-scs.yaml:195](specs/showcuesystems-scs.yaml#L195))
+- [ ] Check the master and device fader range SCS caps at (the help page gives -75 dB to 0 dB as an example). ([specs/showcuesystems-scs.yaml:210](specs/showcuesystems-scs.yaml#L210))
+- [ ] Check that /ctrl/fadeall (from the Companion module, not in SCS's table) fades all cues. ([specs/showcuesystems-scs.yaml:212](specs/showcuesystems-scs.yaml#L212))
+
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 
 - [ ] Check that the ANI4IN and ANI4OUT accept two-digit channel numbers (01), which the session sends, though their documents write one digit. ([specs/shure-ani.yaml:443](specs/shure-ani.yaml#L443))
