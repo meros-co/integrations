@@ -22,8 +22,8 @@
 //!   a bad check code) is answered by the NULL message, BE.
 //! - The controller waits for each reply, then 15 s after power on or off and
 //!   10 s after an input change, auto setup or factory reset, before the next
-//!   message (§3.3); the oldest generation also needs `packet_interval_ms`
-//!   (600 ms) between messages. The display drops a LAN connection silent for
+//!   message (§3.3); the oldest generation also needs 600 ms between
+//!   messages, which `packet_interval_ms` changes. The display drops a LAN connection silent for
 //!   15 minutes; the reads below keep it busy.
 //! - Nothing is pushed: power, input, volume and mute are read every
 //!   `poll_ms`, every other setting, the temperature sensors and the
@@ -797,7 +797,12 @@ impl NecDisplay {
             monitor: ctx.monitor,
             monitor_id: num("monitor_id", 1).clamp(1, 100) as u8,
             poll_ms: num("poll_ms", 5_000).max(1_000),
-            gap: num("packet_interval_ms", 0).min(10_000),
+            // The 2011-2013 generation needs 600 ms between messages (§3.3).
+            gap: num(
+                "packet_interval_ms",
+                if ctx.model == "g1" { 600 } else { 0 },
+            )
+            .min(10_000),
             open: false,
             closed: false,
             reachable: false,
@@ -1466,6 +1471,28 @@ mod tests {
             let planned = plan(name, &params);
             assert!(planned.is_ok(), "{name}: {:?}", planned.err());
         }
+    }
+
+    #[test]
+    fn the_oldest_generation_waits_600_ms_unless_told_otherwise() {
+        let gap = |model: &str, settings: Value| {
+            let spec = Catalog::source_tree().devices["nec-display"].clone();
+            let settings = validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+            NecDisplay::new(OpenContext {
+                host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 9)),
+                host_name: None,
+                port: None,
+                model: model.into(),
+                channels: None,
+                settings,
+                monitor: true,
+            })
+            .unwrap()
+            .gap
+        };
+        assert_eq!(gap("g1", json!({})), 600);
+        assert_eq!(gap("g1", json!({"packet_interval_ms": 0})), 0);
+        assert_eq!(gap("m-series", json!({})), 0);
     }
 
     #[test]
