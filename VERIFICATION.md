@@ -2564,6 +2564,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2717](specs/sony-camera.yaml#L2717))
 - [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2685](specs/sony-camera.yaml#L2685))
 
+## stagetimer — Stagetimer
+
+- [ ] Confirm the desktop app serves the API and Socket.IO under /v1/ on its own port, as the cloud's API URL has it, and record the API URL its Menu > API shows. ([specs/stagetimer.yaml:971](specs/stagetimer.yaml#L971))
+- [ ] Confirm the Socket.IO endpoint takes Engine.IO 4 and the handshake auth {room_id, api_key}, and sends room, playback_status, current_timer, next_timer and the message on connecting. ([specs/stagetimer.yaml:683](specs/stagetimer.yaml#L683))
+- [ ] Confirm a single labels[0][name] and labels[0][color] pair replaces a timer's labels rather than adding to them. ([specs/stagetimer.yaml:998](specs/stagetimer.yaml#L998))
+- [ ] Confirm boolean query values are taken as true and false (autostart, from_memory, focus, bold, uppercase, start_time_uses_date). ([specs/stagetimer.yaml:162](specs/stagetimer.yaml#L162))
+- [ ] Check whether the rate limit answers 429 and how RateLimit-* headers report it with the 600 ms pacing. ([specs/stagetimer.yaml:72](specs/stagetimer.yaml#L72))
+- [ ] Check whether create_timer accepts every documented field at once with its documented default (including an empty speaker and notes). ([specs/stagetimer.yaml:376](specs/stagetimer.yaml#L376))
+
 ## symetrix-composer — Symetrix Composer DSPs
 
 - [ ] Check that pushed GSYSS strings (with "Enable System String Pushing") do not start with "#" lines that look like controller pushes, and what they look like; they are currently ignored, or taken as an answer. ([specs/symetrix-composer.yaml:44](specs/symetrix-composer.yaml#L44))

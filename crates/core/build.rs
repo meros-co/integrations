@@ -237,6 +237,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "visca",
         ],
     ),
+    ("vendor-stagetimer", &["stagetimer"]),
     ("vendor-studiocoast", &["vmix"]),
     (
         "vendor-symetrix",
