@@ -1090,6 +1090,32 @@ def serial_checks(doc: dict) -> list[str]:
 LINK_SETTINGS = ("link",) + SERIAL_SETTINGS
 
 
+# The settings that name a MIDI port of the host (SPEC.md §2, Ports).
+MIDI_SETTINGS = ("midi_input", "midi_output")
+
+
+def midi_checks(doc: dict) -> list[str]:
+    """A MIDI port is named by the midi_input or midi_output setting, a
+    string, and is only a native module's (no transport opens one)."""
+    errors = []
+    ports = doc.get("ports") or []
+    settings = doc.get("settings") or {}
+    for i, e in enumerate(ports):
+        if e["protocol"] != "midi":
+            continue
+        if e["port"] is not None:
+            errors.append(f"ports[{i}]: a MIDI port has no number (port: null)")
+        if e.get("setting") not in MIDI_SETTINGS:
+            errors.append(f"ports[{i}]: a MIDI port's setting is midi_input or midi_output")
+        elif (settings.get(e["setting"]) or {}).get("type") != "string":
+            errors.append(f"settings.{e['setting']}: must be a string")
+        if e["role"] != "control" or e.get("listener", "device") != "device":
+            errors.append(f"ports[{i}]: a MIDI port is a control entry the device listens on")
+        if doc.get("implementation") != "native":
+            errors.append(f"ports[{i}]: only a native module opens a MIDI port")
+    return errors
+
+
 # The transport keys a `serial` block's `overrides` may change (SPEC.md §2,
 # "The same protocol on a serial port"), as in the core's SERIAL_OVERRIDES.
 SERIAL_OVERRIDES = ("framing", "open", "close", "terminator", "reply_framing",
@@ -1271,7 +1297,7 @@ def main() -> int:
             continue
 
         errors = expand_serial(doc)
-        errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + label_checks(doc)
+        errors += cross_field_checks(doc, rel) + port_checks(doc) + serial_checks(doc) + midi_checks(doc) + label_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

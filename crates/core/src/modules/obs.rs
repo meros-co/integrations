@@ -1740,12 +1740,12 @@ impl Module for Obs {
             return;
         }
         match input {
-            WsInput::Opened => {}
+            WsInput::Opened | WsInput::Subprotocol(_) => {}
             WsInput::Text(text) => {
                 cx.alive();
                 self.message(cx, &text);
             }
-            WsInput::Binary(_) | WsInput::Activity => cx.alive(),
+            WsInput::Binary(_) | WsInput::Activity | WsInput::Pong(_) => cx.alive(),
             WsInput::Closed { code, reason } => match code {
                 Some(CLOSE_AUTHENTICATION_FAILED) => self.refuse(cx, "OBS rejected the password"),
                 Some(CLOSE_UNSUPPORTED_RPC_VERSION) => self.lost(

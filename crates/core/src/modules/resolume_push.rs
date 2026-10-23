@@ -1072,7 +1072,8 @@ impl Module for ResolumePush {
                 cx.alive();
                 self.inbound(cx, &text);
             }
-            WsInput::Binary(_) | WsInput::Activity => cx.alive(),
+            WsInput::Binary(_) | WsInput::Activity | WsInput::Pong(_) => cx.alive(),
+            WsInput::Subprotocol(_) => {}
             WsInput::Closed { reason, .. } => {
                 self.open = false;
                 self.subscribed.clear();

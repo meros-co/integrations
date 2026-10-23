@@ -2241,7 +2241,8 @@ impl Module for Aes70 {
                     ),
                 );
             }
-            WsInput::Activity => {
+            WsInput::Subprotocol(_) => {}
+            WsInput::Activity | WsInput::Pong(_) => {
                 // A ping or pong: the device is there.
                 if self.socket_open {
                     self.last_heard = cx.now();
