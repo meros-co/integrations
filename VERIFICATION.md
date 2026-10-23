@@ -1489,6 +1489,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
+## irisdown-countdown-timer — Irisdown Countdown Timer
+
+- [ ] Confirm that UPDATEMODE and UPDATES apply per connection and that UPDATEMODE 2 answers OK before UPDATES ON turns other answers off. ([specs/irisdown-countdown-timer.yaml:180](specs/irisdown-countdown-timer.yaml#L180))
+- [ ] Record the mode 2 update line in overtime and past 99 minutes (the sign, the hour digits), and how often updates come while running. ([specs/irisdown-countdown-timer.yaml:132](specs/irisdown-countdown-timer.yaml#L132))
+- [ ] Check whether a command line ended with CRLF is taken once (the document allows CR, LF or CRLF). ([specs/irisdown-countdown-timer.yaml:46](specs/irisdown-countdown-timer.yaml#L46))
+- [ ] Check how MESSAGE treats a quote or a character outside ASCII in the text. ([specs/irisdown-countdown-timer.yaml:187](specs/irisdown-countdown-timer.yaml#L187))
+- [ ] Confirm JOG takes negative minutes while stopped or paused as well as while running. ([specs/irisdown-countdown-timer.yaml:98](specs/irisdown-countdown-timer.yaml#L98))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))

@@ -1,0 +1,199 @@
+spec: 1
+id: irisdown-countdown-timer
+name: Irisdown Countdown Timer
+vendor: Irisdown
+category: other
+
+# Irisdown Countdown Timer 2.0 is a Windows presenter countdown with a
+# plain-text remote control protocol on TCP 61002: one command per line,
+# answered OK, ERROR or INVALID, or, once UPDATES is on, by a status line
+# whenever the time, play state, display mode or message changes (and by
+# nothing else). The spec turns UPDATES on in the richer mode 2 and keeps
+# state from those lines, so the commands themselves are unacknowledged.
+
+source:
+  - title: Countdown Timer v2.0.10.0 Remote Control Protocol
+    author: Irisdown Technical Solutions (Dave Shepherd)
+    url: http://release.irisdown.co.uk/Countdown%20Timer%20v2.0%20-%20Remote%20Control%20Protocol.pdf
+    note: >
+      Vendor document (4 pages, linked from the product page), retrieved
+      2026-10-23. TCP port 61002; ASCII commands ended by CR, LF or CRLF;
+      responses end in CRLF, OK for success, ERROR for a command that does
+      not parse, INVALID for one out of context; while UPDATES is on every
+      other response is off. The commands GO, PAUSE, TOGGLEPAUSE, RESET,
+      RESET <time> (minutes, or hh:mm:ss with leading zeros), JOG <minutes>
+      (JOG 5, JOG -5), REMAINING, STATE (PLAYING, PAUSED, STOPPED),
+      DISPLAY TIMER|CLOCK|BLACK|TEST, UPDATES ON|OFF, UPDATEMODE 1|2,
+      VERSION (VERSION a.b.c.d), MESSAGE "text" (truncated past 90
+      characters) and MESSAGE CLEAR. UPDATES mode 1 sends
+      "hh:mm:ss <PlayingState> <DisplayMode>" and mode 2
+      "TIME=±hh:mm:ss&STATE=<PlayingState>&DISPLAY=<DisplayMode>&MESSAGE=TRUE|FALSE".
+      Version history (2.0.6.0, 2.0.9.1, 2.0.10.0). The UDP broadcast on
+      61003 (IDCT: header, sign, seconds remaining, instance id).
+  - title: Irisdown Countdown Timer product page (v2.0.17, change log)
+    author: Irisdown Technical Solutions
+    url: https://www.irisdown.co.uk/countdowntimer.html
+    note: >
+      Vendor page, retrieved 2026-10-23. Current version 2.0.17; network
+      messages are UTF-8 from 2.0.12.0; maximum timer 99:59; RESET hh:mm:ss,
+      JOG, MESSAGE and UPDATEMODE from 2.0.10.0; UPDATES and VERSION from
+      2.0.9.1; a 15-minute limit after the 30-day trial without a licence.
+
+transport:
+  type: line-tcp
+  port: 61002
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  # With UPDATES on, the timer answers no command: state comes from its
+  # update lines instead.
+  reply: none
+  timeout_ms: 2000
+
+ports:
+  - { port: 61002, protocol: tcp, role: control }
+
+models:
+  - id: countdown-timer-2
+    name: Countdown Timer 2.0 (2.0.10.0 or later)
+    supports: [go, pause, toggle_pause, reset, reset_to, reset_minutes, jog, set_display,
+               show_message, clear_message]
+    verification: none
+
+commands:
+  go:
+    summary: Start the timer with its last set duration, or resume it when paused (GO)
+    send: "GO"
+    returns: none
+  pause:
+    summary: Pause the running timer (PAUSE)
+    send: "PAUSE"
+    returns: none
+  toggle_pause:
+    summary: Pause the timer if running, or resume it if paused (TOGGLEPAUSE)
+    send: "TOGGLEPAUSE"
+    returns: none
+  reset:
+    summary: Stop the timer and load its last set duration (RESET)
+    send: "RESET"
+    returns: none
+  reset_to:
+    summary: Stop the timer and load a new duration in hours, minutes and seconds (RESET hh:mm:ss)
+    params:
+      hours: { type: int, min: 0, max: 99, default: 0,
+               label: Hours, description: "Hours of the new duration." }
+      minutes: { type: int, min: 0, max: 59, required: true,
+                 label: Minutes, description: "Minutes of the new duration." }
+      seconds: { type: int, min: 0, max: 59, default: 0,
+                 label: Seconds, description: "Seconds of the new duration." }
+    send: "RESET {hours:02d}:{minutes:02d}:{seconds:02d}"
+    returns: none
+  reset_minutes:
+    summary: Stop the timer and load a new duration in whole minutes (RESET <minutes>)
+    params:
+      minutes: { type: int, min: 0, max: 5999, required: true,
+                 label: Minutes, description: "The new duration, in minutes." }
+    send: "RESET {minutes}"
+    returns: none
+  jog:
+    summary: Adjust the timer up or down by whole minutes, even while it runs (JOG <minutes>)
+    params:
+      minutes: { type: int, min: -5999, max: 5999, required: true,
+                 label: Minutes, description: "Minutes to add; a negative number takes minutes off." }
+    send: "JOG {minutes}"
+    returns: none
+  set_display:
+    summary: Set the display mode (DISPLAY TIMER|CLOCK|BLACK|TEST)
+    params:
+      mode: { type: enum, values: [TIMER, CLOCK, BLACK, TEST], required: true,
+              label: Display,
+              description: "Show the timer, the clock only, black, or a test pattern." }
+    send: "DISPLAY {mode}"
+    returns: none
+  show_message:
+    summary: Show a message on screen (MESSAGE "text")
+    params:
+      text: { type: string, max_length: 90, required: true, pattern: "^[^\"]*$",
+              label: Message,
+              description: "Text to show, up to 90 characters (the timer truncates longer text); no double quotes." }
+    send: "MESSAGE \"{text}\""
+    returns: none
+  clear_message:
+    summary: Remove the message from the screen (MESSAGE CLEAR)
+    send: "MESSAGE CLEAR"
+    returns: none
+
+telemetry:
+  # Mode 2 updates carry the sign, the display mode and the message state;
+  # the setting persists for the connection, so it is sent on connecting.
+  subscribe:
+    send: ["UPDATEMODE 2", "UPDATES ON"]
+  updates:
+    - match: "^TIME=([+-])(\\d+):(\\d+):(\\d+)&STATE=(PLAYING|PAUSED|STOPPED)&DISPLAY=(TIMER|CLOCK|BLACK|TEST)&MESSAGE=(TRUE|FALSE)$"
+      state:
+        timer.remaining: "{2:02d}:{3:02d}:{4:02d}"
+        timer.hours: "{2}"
+        timer.minutes: "{3}"
+        timer.seconds: "{4}"
+        timer.overtime: { value: "{1}", map: { "+": false, "-": true } }
+        timer.state: "{5}"
+        display.mode: "{6}"
+        message.showing: { value: "{7}", map: { "TRUE": true, "FALSE": false } }
+    # Mode 1, should an older version refuse UPDATEMODE.
+    - match: "^(\\d+):(\\d+):(\\d+) (PLAYING|PAUSED|STOPPED) (TIMER|CLOCK|BLACK|TEST)$"
+      state:
+        timer.remaining: "{1:02d}:{2:02d}:{3:02d}"
+        timer.hours: "{1}"
+        timer.minutes: "{2}"
+        timer.seconds: "{3}"
+        timer.state: "{4}"
+        display.mode: "{5}"
+
+state:
+  timer.remaining: { type: string, description: "Time remaining as hh:mm:ss; time past zero while in overtime" }
+  timer.hours: { type: int, unit: h, description: "Hours of the time remaining" }
+  timer.minutes: { type: int, unit: min, description: "Minutes of the time remaining" }
+  timer.seconds: { type: int, unit: s, description: "Seconds of the time remaining" }
+  timer.overtime: { type: bool, description: "Whether the timer has run past zero (mode 2 only)" }
+  timer.state: { type: string, description: "Play state: PLAYING, PAUSED or STOPPED" }
+  display.mode: { type: string, description: "Display mode: TIMER, CLOCK, BLACK or TEST" }
+  message.showing: { type: bool, description: "Whether a message is on screen (mode 2 only)" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      While UPDATES is on, Countdown Timer answers no command (no OK, ERROR
+      or INVALID), so every command is unacknowledged: its effect shows in
+      the next update line. The queries REMAINING, STATE and VERSION are
+      answered only with UPDATES off; the updates carry the time and state,
+      and the version cannot be read alongside them. A device opened for
+      commands only does not turn UPDATES on, and then its OK and ERROR
+      answers go unread.
+
+  - models: [all]
+    severity: info
+    text: >
+      UPDATEMODE 2 arrived in 2.0.10.0, with RESET hh:mm:ss, JOG and
+      MESSAGE; an older version answers it with ERROR and keeps sending mode
+      1 lines, which the spec reads too (without the sign or the message
+      state). The protocol document does not say whether the update mode
+      and UPDATES apply per connection; the spec sends both on every
+      connection. The maximum timer is 99:59:59.
+
+  - models: [all]
+    severity: info
+    text: >
+      MESSAGE takes its text in double quotes; the document gives no way to
+      send a quote inside it, so text with a double quote is refused. Text
+      past 90 characters would be truncated by the timer, so the spec
+      refuses it. Messages are UTF-8 from 2.0.12.0. The text of the message
+      shown cannot be read back, only whether one is shown.
+
+  - models: [all]
+    severity: info
+    text: >
+      Countdown Timer also broadcasts the time remaining every 0.1 s on UDP
+      61003 (an IDCT: packet) for its remote displays; the spec does not
+      read it, as the TCP updates carry the same time. Unlicensed copies
+      stop after 15 minutes once the 30-day trial ends.
