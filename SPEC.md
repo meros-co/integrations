@@ -2428,7 +2428,11 @@ telemetry:
     as_reply: { path: "$.url", body: "$.data" }
 ```
 
-A path without a leading `/` is given one.
+A path without a leading `/` is given one. The path may name settings as
+`{settings.name}`, each value percent-encoded as one path segment, as a
+websocket's path does (§2, `ws`): Rundown Studio streams one rundown's
+events from `/rundowns/{settings.rundown_id}/events`. A setting with no
+value is an error, so the path never loses a segment.
 
 A telemetry vector for an event stream gives `inbound_sse: { event, data }`,
 one event as the stream would deliver it (`event` defaults to `message`);

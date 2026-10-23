@@ -1843,7 +1843,11 @@ impl SpecEngine {
                 else {
                     return Err("telemetry.sse needs an http transport".into());
                 };
-                let path = str_field(e, "path").ok_or("telemetry.sse needs a path")?;
+                // Settings in the path are path segments, as in a websocket's.
+                let path = ws_path(
+                    str_field(e, "path").ok_or("telemetry.sse needs a path")?,
+                    &ctx.settings,
+                )?;
                 let mut headers = auth_headers(*auth, &auth_header, &ctx.settings);
                 headers.extend(side_headers.iter().cloned());
                 let json = match str_field(e, "format") {
@@ -6129,6 +6133,45 @@ mod tests {
             "w"
         )
         .is_err());
+    }
+
+    #[test]
+    fn an_event_stream_path_takes_settings_as_segments() {
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        spec.telemetry =
+            Some(json!({"sse": {"path": "/rundowns/{settings.room}/events?events=cue:fat"}}));
+        let mut settings = Params::new();
+        settings.insert("room".into(), json!("a b/c"));
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings,
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let url = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::SseOpen { request, .. } => Some(request.url),
+                _ => None,
+            })
+            .expect("the event stream");
+        assert!(
+            url.ends_with("/rundowns/a%20b%2Fc/events?events=cue:fat"),
+            "{url}"
+        );
     }
 
     #[test]
