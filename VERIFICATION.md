@@ -1610,6 +1610,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Drive an MX2 and a UMX-HDMI-140 (Control mode, LW3) on RS-232 (link serial) and confirm the same answers and CHG notifications as over TCP 6107, with no flow control. ([specs/lightware-lw3.yaml:161](specs/lightware-lw3.yaml#L161))
 - [ ] Check when a Cleartext login on the RS-232 port ends (not documented) and that the login step works there. ([specs/lightware-lw3.yaml:4333](specs/lightware-lw3.yaml#L4333))
 
+## magewell-director — Magewell Director Mini, Director One and Director Plus
+
+- [ ] Confirm the API listens on port 8080 (the document's demo port) and takes no authentication. ([specs/magewell-director.yaml:36](specs/magewell-director.yaml#L36))
+- [ ] Confirm the get methods answer GET as the set methods do, and that their replies are the documented JSON. ([specs/magewell-director.yaml:3373](specs/magewell-director.yaml#L3373))
+- [ ] Check the value formats the API accepts: true and false for booleans, decimals with two or three places, and the replay camera list [0,1,2,3] percent-encoded. ([specs/magewell-director.yaml:2017](specs/magewell-director.yaml#L2017))
+- [ ] Confirm a refused action (content missing, action not allowed) answers HTTP 403, and what a 400 answer's body holds. ([specs/magewell-director.yaml:3787](specs/magewell-director.yaml#L3787))
+- [ ] Confirm the scene list's order is the order switch_by_index counts from 1, and that the show list's switch_by_index counts from 0 as documented. ([specs/magewell-director.yaml:3401](specs/magewell-director.yaml#L3401))
+- [ ] Check what a scoreboard command addresses with an ID but no scene ID, and with both, on global and private scoreboards. ([specs/magewell-director.yaml:582](specs/magewell-director.yaml#L582))
+- [ ] Record the units of the BGM duration (documented as ms, 240 in the example), the phone camera's videoBitrate (documented as Mbps, 8192 in the example) and recording duration. ([specs/magewell-director.yaml:3673](specs/magewell-director.yaml#L3673))
+- [ ] Confirm the phone camera's mute parameter and micMute field mean audio is captured when true, as the document says. ([specs/magewell-director.yaml:2683](specs/magewell-director.yaml#L2683))
+- [ ] Confirm the Director Mini and One's USB-C output modes 0 to 5 match the Director Plus's numbering (mirror, program, loop HDMI 1 and 2, multiview, preview). ([specs/magewell-director.yaml:3252](specs/magewell-director.yaml#L3252))
+- [ ] Check the meter levels' unit and refresh, and whether volume is whole dB. ([specs/magewell-director.yaml:3618](specs/magewell-director.yaml#L3618))
+
 ## magewell-proconvert — Magewell Pro Convert
 
 - [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([spec](specs/magewell-proconvert.yaml#L186))
