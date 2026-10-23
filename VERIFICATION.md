@@ -1000,6 +1000,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record a LYRICS reply: beat and lyric pairs after the track number. ([spec](specs/cockos-reaper-web.yaml#L871))
 - [ ] Check that the EXTSTATE and PROJEXTSTATE replies give the section and key decoded, as sent before encoding. ([spec](specs/cockos-reaper-web.yaml#L878))
 
+## cuetimer — CueTimer
+
+- [ ] Confirm CueTimer sends its state document on connecting and every 200 ms, each ended by $ with nothing between documents. ([specs/cuetimer.yaml:49](specs/cuetimer.yaml#L49))
+- [ ] Record what Pause does (pause, or toggle pause and resume) and whether Undo$ (sent by the Companion module) exists. ([specs/cuetimer.yaml:347](specs/cuetimer.yaml#L347))
+- [ ] Check whether CueTimer answers a command or a malformed command at all. ([specs/cuetimer.yaml:51](specs/cuetimer.yaml#L51))
+- [ ] Confirm h, m and s are the running timer's remaining time and how overtime is shown in them. ([specs/cuetimer.yaml:265](specs/cuetimer.yaml#L265))
+
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
 - [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))

@@ -1,0 +1,373 @@
+spec: 1
+id: cuetimer
+name: CueTimer (TCP API)
+vendor: PresentationTools
+category: other
+
+# CueTimer (Mac and Windows) is a presentation and conference timer run from
+# cue lists. Its TCP API on port 31601 takes ASCII commands ended by $ and,
+# once a client connects, sends the whole state as one JSON document every
+# 200 ms, also ended by $. Commands get no answer of their own: their effect
+# shows in the next state document.
+
+source:
+  - title: CueTimer API, TCP API (tcp.md)
+    author: PresentationTools (Morten Brekke Stensland), CueTimer
+    url: https://github.com/MortenBrekkeStensland/api_public_cuetimer/blob/HEAD/tcp.md
+    note: >
+      Vendor document (MIT-licensed repository linked from
+      https://cuetimer.com/api/, last commit 2026-06-20), retrieved
+      2026-10-23. TCP server on 31601 by default (configurable in the app);
+      ASCII commands ended by $, parameters after #. The 32 commands:
+      FireNext, CueNext, CueCurrent, Pause, Restart, Blackout (toggle),
+      AddMinute, SubMinute, AddSpeed and SubSpeed (5 %), Fullscreen, NDI,
+      Message, Clock, MoveNextUp, MoveNextDown, FireTimerWithID#<id>,
+      CueTimerWithID#<id> (no # in an id), STM, SetDuration#hh:mm:ss,
+      AddXMinutes#<n>, SubXMinutes#<n>, InitList, Preview, Presenter,
+      select_list#<guid>, ActivateNextList, ActivatePreviousList,
+      ActivateListByGUID#<guid>, MultitimerPreview, MultitimerFullscreen,
+      MultitimerNDI; Fullscreen, Preview, Presenter, MultitimerPreview and
+      MultitimerFullscreen take #on, #off or #toggle. The feedback document
+      every 200 ms and its fields (listNumber, listGUID, lists[guid, title,
+      isActive], h, m, s, fg, bg, speed, name, endTime, the mode booleans,
+      nextTimerName, nextTimerDuration, scheduleOffset,
+      scheduleOffsetStatus Delayed|Ahead|NA, timers by id).
+  - title: CueTimer API, README and OSC API (osc.md); cuetimer.com/api
+    author: PresentationTools, CueTimer
+    url: https://cuetimer.com/api/
+    note: >
+      Vendor documents, retrieved 2026-10-23. The public API is free to use
+      and the Companion module is built on it; TCP is the full command set
+      with state, OSC (UDP 4779 in) a focused subset of the same triggers
+      (/global/fire, /global/cue, /global/pause, /global/restart,
+      /timer/fire and /timer/cue with an id) with event triggers out.
+
+transport:
+  type: line-tcp
+  port: 31601
+  framing: delimited
+  close: "$"
+  encoding: ascii
+  # CueTimer answers no command; it streams its state instead.
+  reply: none
+  timeout_ms: 2000
+
+ports:
+  - { port: 31601, protocol: tcp, role: control, note: "configurable in CueTimer's settings" }
+
+models:
+  - id: cuetimer
+    name: CueTimer 4 and 5 (Mac and Windows)
+    supports: [fire_next, cue_next, cue_current, pause, restart, toggle_blackout, add_minute,
+               subtract_minute, speed_up, slow_down, add_minutes, subtract_minutes, set_duration,
+               fire_timer, cue_timer, move_next_up, move_next_down, set_fullscreen, set_preview,
+               set_presenter, set_multitimer_preview, set_multitimer_fullscreen, toggle_ndi,
+               toggle_multitimer_ndi, toggle_message, toggle_clock, toggle_single_timer_mode,
+               init_list, select_list, select_active_list, activate_next_list,
+               activate_previous_list, activate_list]
+    verification: none
+
+commands:
+  # ── Playback ─────────────────────────────────────────────────────────────
+  fire_next:
+    summary: Fire the next timer (FireNext)
+    send: "FireNext"
+    returns: none
+  cue_next:
+    summary: Move the next indicator on to the following timer (CueNext)
+    send: "CueNext"
+    returns: none
+  cue_current:
+    summary: Move the next indicator to the current timer (CueCurrent)
+    send: "CueCurrent"
+    returns: none
+  pause:
+    summary: Press Pause (Pause)
+    send: "Pause"
+    returns: none
+  restart:
+    summary: Restart the current timer (Restart)
+    send: "Restart"
+    returns: none
+  toggle_blackout:
+    summary: Turn blackout on or off (Blackout)
+    send: "Blackout"
+    returns: none
+  add_minute:
+    summary: Add one minute to the active timer (AddMinute)
+    send: "AddMinute"
+    returns: none
+  subtract_minute:
+    summary: Take one minute off the active timer (SubMinute)
+    send: "SubMinute"
+    returns: none
+  speed_up:
+    summary: Raise the timer's speed by 5 % (AddSpeed)
+    send: "AddSpeed"
+    returns: none
+  slow_down:
+    summary: Lower the timer's speed by 5 % (SubSpeed)
+    send: "SubSpeed"
+    returns: none
+  add_minutes:
+    summary: Add minutes to the active timer (AddXMinutes#<n>)
+    params:
+      minutes: &minutes { type: int, min: 0, required: true,
+                          label: Minutes, description: "Whole minutes to add or take off." }
+    send: "AddXMinutes#{minutes}"
+    returns: none
+  subtract_minutes:
+    summary: Take minutes off the active timer (SubXMinutes#<n>)
+    params: { minutes: *minutes }
+    send: "SubXMinutes#{minutes}"
+    returns: none
+  set_duration:
+    summary: Set the active timer's duration (SetDuration#hh:mm:ss)
+    params:
+      hours: { type: int, min: 0, max: 99, default: 0, label: Hours, description: "Hours of the duration." }
+      minutes: { type: int, min: 0, max: 59, required: true, label: Minutes, description: "Minutes of the duration." }
+      seconds: { type: int, min: 0, max: 59, default: 0, label: Seconds, description: "Seconds of the duration." }
+    send: "SetDuration#{hours:02d}:{minutes:02d}:{seconds:02d}"
+    returns: none
+  fire_timer:
+    summary: Start the timer with an ID (FireTimerWithID#<id>)
+    params:
+      id: &timer_id { type: string, max_length: 256, required: true, pattern: "^[^#$]+$",
+                      label: Timer ID, description: "The ID set in the timer's ID field in the cue list; no # or $." }
+    send: "FireTimerWithID#{id}"
+    returns: none
+  cue_timer:
+    summary: Move the next indicator to the timer with an ID (CueTimerWithID#<id>)
+    params: { id: *timer_id }
+    send: "CueTimerWithID#{id}"
+    returns: none
+  move_next_up:
+    summary: Move the next indicator one row up (MoveNextUp)
+    send: "MoveNextUp"
+    returns: none
+  move_next_down:
+    summary: Move the next indicator one row down (MoveNextDown)
+    send: "MoveNextDown"
+    returns: none
+
+  # ── Output windows and modes ─────────────────────────────────────────────
+  set_fullscreen:
+    summary: Turn the Fullscreen output on or off, or toggle it (Fullscreen#on|off|toggle)
+    params:
+      state: &window_state { type: enum, values: ["on", "off", toggle], required: true,
+                             label: State, description: "On, off, or toggle from its current state." }
+    send: "Fullscreen#{state}"
+    returns: none
+  set_preview:
+    summary: Turn the Preview window on or off, or toggle it (Preview#on|off|toggle)
+    params: { state: *window_state }
+    send: "Preview#{state}"
+    returns: none
+  set_presenter:
+    summary: Turn Presenter mode on or off, or toggle it (Presenter#on|off|toggle)
+    params: { state: *window_state }
+    send: "Presenter#{state}"
+    returns: none
+  set_multitimer_preview:
+    summary: Turn the Multitimer Preview on or off, or toggle it (MultitimerPreview#on|off|toggle)
+    params: { state: *window_state }
+    send: "MultitimerPreview#{state}"
+    returns: none
+  set_multitimer_fullscreen:
+    summary: Turn the Multitimer Fullscreen output on or off, or toggle it (MultitimerFullscreen#on|off|toggle)
+    params: { state: *window_state }
+    send: "MultitimerFullscreen#{state}"
+    returns: none
+  toggle_ndi:
+    summary: Turn the NDI output on or off (NDI)
+    send: "NDI"
+    returns: none
+  toggle_multitimer_ndi:
+    summary: Turn the Multitimer NDI output on or off (MultitimerNDI)
+    send: "MultitimerNDI"
+    returns: none
+  toggle_message:
+    summary: Show or hide the message (Message)
+    send: "Message"
+    returns: none
+  toggle_clock:
+    summary: Show or hide the clock screen (Clock)
+    send: "Clock"
+    returns: none
+  toggle_single_timer_mode:
+    summary: Turn single timer mode on or off (STM)
+    send: "STM"
+    returns: none
+
+  # ── Cue lists ────────────────────────────────────────────────────────────
+  init_list:
+    summary: Clear the whole list and create one new timer with the default new timer's properties (InitList)
+    send: "InitList"
+    returns: none
+  select_list:
+    summary: Route this connection's commands and feedback to a list (select_list#<guid>)
+    params:
+      guid: &guid { type: string, required: true, pattern: "^[0-9A-Fa-f-]{1,64}$",
+                    label: List, description: "GUID of the list, as the lists in state give it." }
+    send: "select_list#{guid}"
+    returns: none
+  select_active_list:
+    summary: Route this connection back to whichever list is active (select_list#)
+    send: "select_list#"
+    returns: none
+  activate_next_list:
+    summary: Switch to the next list (ActivateNextList)
+    send: "ActivateNextList"
+    returns: none
+  activate_previous_list:
+    summary: Switch to the previous list (ActivatePreviousList)
+    send: "ActivatePreviousList"
+    returns: none
+  activate_list:
+    summary: Make a list the active one (ActivateListByGUID#<guid>)
+    params: { guid: *guid }
+    send: "ActivateListByGUID#{guid}"
+    returns: none
+
+telemetry:
+  updates:
+    - json_match: { "$.listGUID": "" }
+      json:
+        list_number: "$.listNumber"
+        list_guid: "$.listGUID"
+        h: "$.h"
+        m: "$.m"
+        s: "$.s"
+        fg: "$.fg"
+        bg: "$.bg"
+        speed: "$.speed"
+        name: "$.name"
+        end_time: "$.endTime"
+        fullscreen: "$.Fullscreen"
+        preview: "$.Preview"
+        presenter: "$.Presenter"
+        multitimer_preview: "$.MultitimerPreview"
+        multitimer_fullscreen: "$.MultitimerFullscreen"
+        ndi: "$.NDI"
+        multitimer_ndi: "$.MultitimerNDI"
+        message: "$.Message"
+        stm: "$.STM"
+        clock: "$.Clock"
+        pause: "$.Pause"
+        blackout: "$.Blackout"
+        next_name: "$.nextTimerName"
+        next_duration: "$.nextTimerDuration"
+        schedule_offset: "$.scheduleOffset"
+        schedule_status: "$.scheduleOffsetStatus"
+      state:
+        list.number: "{list_number}"
+        list.guid: "{list_guid}"
+        timer.hours: "{h}"
+        timer.minutes: "{m}"
+        timer.seconds: "{s}"
+        timer.foreground: "{fg}"
+        timer.background: "{bg}"
+        timer.speed: "{speed}"
+        timer.name: "{name}"
+        timer.end_time: "{end_time}"
+        outputs.fullscreen: "{fullscreen}"
+        outputs.preview: "{preview}"
+        outputs.presenter: "{presenter}"
+        outputs.multitimer_preview: "{multitimer_preview}"
+        outputs.multitimer_fullscreen: "{multitimer_fullscreen}"
+        outputs.ndi: "{ndi}"
+        outputs.multitimer_ndi: "{multitimer_ndi}"
+        modes.message: "{message}"
+        modes.single_timer: "{stm}"
+        modes.clock: "{clock}"
+        modes.pause: "{pause}"
+        modes.blackout: "{blackout}"
+        next_timer.name: "{next_name}"
+        next_timer.duration: "{next_duration}"
+        schedule.offset: "{schedule_offset}"
+        schedule.status: "{schedule_status}"
+    - json_match: { "$.listGUID": "" }
+      json_each: "$.lists"
+      json: { guid: "$.guid", title: "$.title", active: "$.isActive" }
+      replace: lists
+      state:
+        "lists.{index:+1}.guid": "{guid}"
+        "lists.{index:+1}.title": "{title}"
+        "lists.{index:+1}.active": "{active}"
+    - json_match: { "$.listGUID": "" }
+      json_each: "$.timers.*"
+      json: { name: "$.name", duration: "$.duration", bg: "$.bg" }
+      replace: timers
+      state:
+        "timers.{key:key}.name": "{name}"
+        "timers.{key:key}.duration": "{duration}"
+        "timers.{key:key}.background": "{bg}"
+
+state:
+  list.number: { type: int, description: "Number of the list the feedback comes from" }
+  list.guid: { type: string, description: "GUID of the list the feedback comes from" }
+  lists.*.guid: { type: string, description: "List's GUID, by its place in CueTimer's order from 1" }
+  lists.*.title: { type: string, description: "List's name, without its number prefix" }
+  lists.*.active: { type: bool, description: "Whether the list is the active one in CueTimer" }
+  timer.hours: { type: int, unit: h, description: "Hours shown on the running timer" }
+  timer.minutes: { type: int, unit: min, description: "Minutes shown on the running timer" }
+  timer.seconds: { type: int, unit: s, description: "Seconds shown on the running timer" }
+  timer.foreground: { type: string, description: "Timer's text color, #AARRGGBB (#FF000000 during blackout)" }
+  timer.background: { type: string, description: "Timer's background color, #AARRGGBB (#FF000000 during blackout)" }
+  timer.speed: { type: int, unit: "%", description: "Timer speed, 100 being real time" }
+  timer.name: { type: string, description: "Name of the running timer" }
+  timer.end_time: { type: string, description: "Time of day the timer ends, hh:mm:ss; empty when none" }
+  outputs.fullscreen: { type: bool, description: "Whether the Fullscreen output is on" }
+  outputs.preview: { type: bool, description: "Whether the Preview window is on" }
+  outputs.presenter: { type: bool, description: "Whether Presenter mode is on" }
+  outputs.multitimer_preview: { type: bool, description: "Whether the Multitimer Preview is on" }
+  outputs.multitimer_fullscreen: { type: bool, description: "Whether the Multitimer Fullscreen output is on" }
+  outputs.ndi: { type: bool, description: "Whether the NDI output is on" }
+  outputs.multitimer_ndi: { type: bool, description: "Whether the Multitimer NDI output is on" }
+  modes.message: { type: bool, description: "Whether the message is shown" }
+  modes.single_timer: { type: bool, description: "Whether single timer mode is on" }
+  modes.clock: { type: bool, description: "Whether the clock screen is shown" }
+  modes.pause: { type: bool, description: "Whether Pause is pressed" }
+  modes.blackout: { type: bool, description: "Whether blackout is on" }
+  next_timer.name: { type: string, description: "Name of the next timer" }
+  next_timer.duration: { type: string, description: "Duration of the next timer, hh:mm:ss" }
+  schedule.offset: { type: string, description: "Difference between the current timer's end and the next start time, signed hh:mm:ss" }
+  schedule.status: { type: string, description: "Whether the show is Delayed or Ahead, or NA" }
+  timers.*.name: { type: string, description: "Name of a timer with an ID set, keyed by that ID" }
+  timers.*.duration: { type: string, description: "Duration of the timer, hh:mm:ss" }
+  timers.*.background: { type: string, description: "Timer's background color as CueTimer sends it" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      CueTimer answers no command; it sends its whole state every 200 ms,
+      in which each command's effect shows. Blackout, NDI, Multitimer NDI,
+      Message, Clock and single timer mode only toggle: set one to a state by
+      sending its toggle when the state read differs. Pause has no
+      documented description; it acts as the program's Pause button.
+
+  - models: [all]
+    severity: info
+    text: >
+      Commands and feedback concern the active list unless select_list
+      routes the connection to another list by GUID; an unknown GUID falls
+      back to the active list. Only timers with an ID set appear in the
+      feedback's timers, keyed by that ID, and only they can be fired or
+      cued by ID; an ID cannot hold #. The feedback carries the running
+      time as hours, minutes and seconds text, and the speed as a
+      percentage.
+
+  - models: [all]
+    severity: critical
+    text: >
+      InitList clears the whole list and leaves one new timer; it cannot be
+      undone through the API.
+
+  - models: [all]
+    severity: info
+    text: >
+      The OSC input (UDP 4779) takes a subset of the same triggers (fire,
+      cue, pause, restart, fire and cue by ID) without feedback; this spec
+      uses the TCP API, the full command set. CueTimer Cloud has no
+      documented API.
