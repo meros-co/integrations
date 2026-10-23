@@ -32,6 +32,21 @@ commands, odd replies.
 Line links point to where each note was when this list was written, so they
 can drift as specs change. The quirk text in the spec is the reference.
 
+## ableton-live — Ableton Live (AbletonOSC)
+
+- [ ] Confirm that AbletonOSC sends replies and listener updates to the last sender's address on UDP 11001, so commands sent from local port 11001 get their replies, and that a second client moves the updates away. ([specs/ableton-live.yaml:3007](specs/ableton-live.yaml#L3007))
+- [ ] Check what happens to registered listeners when a track or scene is inserted or deleted, and that resync registers them again under the new indexes. ([specs/ableton-live.yaml:3015](specs/ableton-live.yaml#L3015))
+- [ ] Check which properties Live really lets AbletonOSC listen to (start_listen) on tracks, clip slots, clips, scenes and devices, and which answer /live/error instead (the spec follows the Live Object Model's observe flags). ([specs/ableton-live.yaml:3027](specs/ableton-live.yaml#L3027))
+- [ ] Confirm each walk ends with a /live/error reply past the last index (is_foldable, is_empty, is_group_slot, class_name, send), and how long a walk of a large Set takes. ([specs/ableton-live.yaml:3037](specs/ableton-live.yaml#L3037))
+- [ ] Check the "*" track index on start_listen for color, color_index, fired_slot_index, mute, name, panning, playing_slot_index, solo and volume covers every track, including group tracks, without one track's error stopping the rest. ([specs/ableton-live.yaml:3037](specs/ableton-live.yaml#L3037))
+- [ ] Check watch_device_parameters on a large device (a rack, a plug-in) and the load listening to every parameter puts on Live. ([specs/ableton-live.yaml:3046](specs/ableton-live.yaml#L3046))
+- [ ] Confirm Live accepts integer 1 and 0 for boolean properties (mute, solo, arm, loop, warping...) and for a note's mute in /live/clip/add/notes, and that it reports booleans as OSC true and false. ([specs/ableton-live.yaml:3065](specs/ableton-live.yaml#L3065))
+- [ ] Confirm fired_slot_index reports -2 when the track's stop button is fired and -1 when nothing is fired, and that playing_slot_index follows clips started from Live. ([specs/ableton-live.yaml:3071](specs/ableton-live.yaml#L3071))
+- [ ] Check that arm and current_monitoring_state are readable on every track that can be armed, and fold_state on every group track, and that they answer /live/error elsewhere. ([specs/ableton-live.yaml:3078](specs/ableton-live.yaml#L3078))
+- [ ] Check current_monitoring_state's values (0 In, 1 Auto, 2 Off) and the device type values (1, 2, 4 in the README; 0, 1, 2 in a source comment). ([specs/ableton-live.yaml:3104](specs/ableton-live.yaml#L3104))
+- [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
+- [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
+
 ## aes70 — AES70 / OCA devices
 
 - [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))
