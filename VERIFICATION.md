@@ -1641,6 +1641,37 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm users/list's create_time unit (ms since 1970 in one example, a date in the login's). ([spec](specs/kiloview-decoder.yaml#L1485))
 - [ ] Confirm the stream status codes 0 to 4 have the same meaning in output/get and preview/get as in the source list. ([spec](specs/kiloview-decoder.yaml#L1595))
 
+## kiloview-e3 — Kiloview E3 / RE-3 encoder
+
+- [ ] With API authentication on, check that every request takes the login token in the Authorization header as it is (no Bearer prefix), that a missing or wrong token is answered with HTTP 401 (Unauthorized), and how long a token lasts. ([specs/kiloview-e3.yaml:114](specs/kiloview-e3.yaml#L114))
+- [ ] Check how a failed login is answered (status and body, with and without the App header) and that a successful one gives the token at data.token. ([specs/kiloview-e3.yaml:182](specs/kiloview-e3.yaml#L182))
+- [ ] Confirm that set_hostname is a GET with the name in a query parameter named name, as the document's table implies. ([specs/kiloview-e3.yaml:335](specs/kiloview-e3.yaml#L335))
+- [ ] Check which reads answer bare JSON and which wrap it in result and data (the document mixes both): stream list, audio encoder list, video encoding, input detail, audio input, crop, orientation, OSD, EDID, PIP, ONVIF and NDI bridge are taken as bare. ([specs/kiloview-e3.yaml:2715](specs/kiloview-e3.yaml#L2715))
+- [ ] Check how the device answers a read or write for a channel that is not in use (pip or uvc when not active): HTTP status and body. ([specs/kiloview-e3.yaml:2470](specs/kiloview-e3.yaml#L2470))
+- [ ] Check whether the NDI-standard check answers valid JSON (true/false) or Python True/False as in the document's example; with JSON the state rule applies. ([specs/kiloview-e3.yaml:1750](specs/kiloview-e3.yaml#L1750))
+- [ ] Confirm the PTZ diagonal actions (left-up, left-down, right-up, right-down) on the E3, as the P3 document names them. ([specs/kiloview-e3.yaml:1078](specs/kiloview-e3.yaml#L1078))
+- [ ] Find the names of the PTZ preset actions (ending in preset) and of the zoom, focus, iris and white balance actions the web panel sends. ([specs/kiloview-e3.yaml:1098](specs/kiloview-e3.yaml#L1098))
+- [ ] Confirm the recording status read GET /api/record/{interface}/recording (the Companion module uses /get_recording_status instead). ([specs/kiloview-e3.yaml:704](specs/kiloview-e3.yaml#L704))
+- [ ] Confirm that list_audio_encoders is a POST and delete_audio_encoder a POST to the encoder's path, as documented, and not a GET and a DELETE. ([specs/kiloview-e3.yaml:1561](specs/kiloview-e3.yaml#L1561))
+- [ ] Check the multipart part names and file names the uploads need (certificate, firmware, preset, EDID, image with its name field, standby image), and how long a whole firmware upload takes against the 5-second timeout. ([specs/kiloview-e3.yaml:442](specs/kiloview-e3.yaml#L442))
+- [ ] Check what merge_firmware's number means (the chunk count, or the last chunk's number) and the chunk size the web page uses. ([specs/kiloview-e3.yaml:477](specs/kiloview-e3.yaml#L477))
+- [ ] Find the unit of the network speed's receive and transmit values and of the temperature (degrees Celsius assumed). ([specs/kiloview-e3.yaml:2224](specs/kiloview-e3.yaml#L2224))
+- [ ] Check the shape of the static route list (a list, an object, or inside result and data) and where each route's id is given. ([specs/kiloview-e3.yaml:2669](specs/kiloview-e3.yaml#L2669))
+- [ ] Check that the NDI bridge write takes enable (as its example and the read) rather than enabled (its table), and port as a string. ([specs/kiloview-e3.yaml:2146](specs/kiloview-e3.yaml#L2146))
+- [ ] Check that set_orientation's rotate is accepted as a number (the example) and not only as a string (the table). ([specs/kiloview-e3.yaml:1868](specs/kiloview-e3.yaml#L1868))
+- [ ] Check that SetSwitch, SetEthernets and ChangeLinkinfo take the port as ifname (their examples) rather than iframe (their tables). ([specs/kiloview-e3.yaml:1290](specs/kiloview-e3.yaml#L1290))
+- [ ] Check the EDID priority values (1 for 1080p, 2 for 4K, empty for none) on writing. ([specs/kiloview-e3.yaml:1421](specs/kiloview-e3.yaml#L1421))
+- [ ] Check what get_webrtc answers and what set_webrtc's mode changes; the document's request and reply are unclear. ([specs/kiloview-e3.yaml:1035](specs/kiloview-e3.yaml#L1035))
+- [ ] Confirm that RTMPS is added as type rtmp with an rtmps:// address. ([specs/kiloview-e3.yaml:782](specs/kiloview-e3.yaml#L782))
+- [ ] Check which fields each stream type gives in the stream list (bindVideo, address, user, passwords) beyond the NDI example. ([specs/kiloview-e3.yaml:2717](specs/kiloview-e3.yaml#L2717))
+- [ ] Check that modify_user and set_user_password accept a body with only some fields, as the document says. ([specs/kiloview-e3.yaml:240](specs/kiloview-e3.yaml#L240))
+- [ ] Check the intercom language values (en and cn assumed from the examples). ([specs/kiloview-e3.yaml:2011](specs/kiloview-e3.yaml#L2011))
+- [ ] Check that set_ptz's enable is 0 or 1 and the parity names the device takes. ([specs/kiloview-e3.yaml:1137](specs/kiloview-e3.yaml#L1137))
+- [ ] Check how set_pip_input (vin/source) and set_pip_input_format (pip_fps_setting) differ on the device. ([specs/kiloview-e3.yaml:1471](specs/kiloview-e3.yaml#L1471))
+- [ ] On an RE-3 in a chassis, check what the quick-stream and tally display settings do without a front panel. ([specs/kiloview-e3.yaml:3368](specs/kiloview-e3.yaml#L3368))
+- [ ] Check that set_time with mode pc sets the time given, as manual does. ([specs/kiloview-e3.yaml:300](specs/kiloview-e3.yaml#L300))
+- [ ] Check that a write refused for a bad value answers HTTP 200 with result error, and not an HTTP error status. ([specs/kiloview-e3.yaml:216](specs/kiloview-e3.yaml#L216))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))
