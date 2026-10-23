@@ -222,6 +222,28 @@ class SerialBlock(unittest.TestCase):
         self.assertTrue(validate.expand_serial(self.doc(overrides=5)))
 
 
+class Pacing(unittest.TestCase):
+    def doc(self, pacing, overrides=None):
+        t = {"type": "line-tcp", "port": 23, "pacing": pacing}
+        if overrides is not None:
+            t["serial"] = {"overrides": overrides}
+        return {"transport": t, "models": [{"id": "a"}, {"id": "b"}]}
+
+    def test_a_pacing_block_names_known_models_and_regexes(self):
+        good = {"min_interval_ms": 40, "by_model": [{"models": ["b"], "min_interval_ms": 16}],
+                "groups": {"pan_tilt": {"match": "^#P", "min_interval_ms": 40,
+                                        "by_model": [{"models": ["a"], "min_interval_ms": 16}]}}}
+        self.assertEqual(validate.pacing_checks(self.doc(good)), [])
+        bad = {"by_model": [{"models": ["c"], "min_interval_ms": 1}, {"models": ["a", "a"], "min_interval_ms": 2}],
+               "groups": {"g": {"match": "(", "min_interval_ms": 1}, "h": {"match": "(?=x)", "after_ms": 1}}}
+        errors = validate.pacing_checks(self.doc(None, overrides=[{"pacing": bad}]))
+        at = "transport.serial.overrides[0].pacing"
+        self.assertIn(f"{at}.by_model: no model 'c'", errors)
+        self.assertIn(f"{at}.by_model: model 'a' is named twice", errors)
+        self.assertTrue(any(e.startswith(f"{at}.groups.g.match") for e in errors))
+        self.assertIn(f"{at}.groups.h.match: lookaround and backreferences are not RE2", errors)
+
+
 class LineTls(unittest.TestCase):
     def doc(self):
         return {

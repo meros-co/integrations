@@ -414,8 +414,8 @@ impl DeviceSpec {
                 for key in entry.keys() {
                     if !SERIAL_OVERRIDES.contains(&key.as_str()) && key != "models" {
                         return Err(format!(
-                            "transport.serial.overrides.{key}: not a framing or reply key a serial \
-                             port can change"
+                            "transport.serial.overrides.{key}: not a framing, reply or pacing key a \
+                             serial port can change"
                         ));
                     }
                 }
@@ -721,8 +721,8 @@ type Line = (Value, Vec<Value>, Vec<(Vec<String>, Value)>);
 
 /// Whether a list of model ids holds `model`.
 /// The transport keys a `serial` block's `overrides` may change: how a
-/// message is framed and how replies are told apart (SPEC.md §2, "The same
-/// protocol on a serial port").
+/// message is framed, how replies are told apart, and how messages are
+/// paced (SPEC.md §2, "The same protocol on a serial port").
 pub(crate) const SERIAL_OVERRIDES: &[&str] = &[
     "framing",
     "open",
@@ -733,6 +733,7 @@ pub(crate) const SERIAL_OVERRIDES: &[&str] = &[
     "reply_fence",
     "reply_match",
     "error_match",
+    "pacing",
 ];
 
 fn names_model(list: Option<&Value>, model: &str) -> bool {

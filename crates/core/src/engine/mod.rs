@@ -13,6 +13,7 @@ mod expect;
 pub(crate) mod framing;
 mod oauth;
 mod osc;
+mod pacing;
 mod telemetry;
 pub(crate) mod template;
 
@@ -32,6 +33,7 @@ use crate::module::{
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
 use oauth::{OAuth, Refreshed, Validated};
+use pacing::Pacer;
 use template::{
     no_escape, percent_encode, render, sole_converted, sole_value, Conversions, Maps, Values,
 };
@@ -71,6 +73,8 @@ const PROMPT: Key = "login-prompt";
 const OAUTH_RETRY: Key = "oauth-retry";
 /// `oauth.validate`: the access token checked again.
 const OAUTH_VALIDATE: Key = "oauth-validate";
+/// `transport.pacing`: the message held back may go.
+const PACE: Key = "pace";
 
 const DEFAULT_TIMEOUT: Millis = 2_000;
 /// A device silent this long, with nothing in flight, is probed.
@@ -614,6 +618,17 @@ enum Outgoing {
     Ws(String),
 }
 
+/// What waits for its turn under `transport.pacing`, in the order it was
+/// to be sent.
+#[derive(Debug)]
+enum Paced {
+    /// The next message of the command in flight.
+    Flight,
+    /// A message sent without waiting for a reply (`on_connect`, a
+    /// subscription), and the pacing groups it is in.
+    Loose(Outgoing, Vec<usize>),
+}
+
 /// The OSC reply a message waits for.
 #[derive(Debug, Clone)]
 enum OscReply {
@@ -663,9 +678,10 @@ impl Await {
 struct InFlight {
     /// `None` for a liveness probe.
     id: Option<CommandId>,
-    /// Each message, the OSC reply it waits for, and on a line transport
-    /// its text without framing (what a reply's `request_match` reads).
-    messages: VecDeque<(Outgoing, Option<OscReply>, Option<String>)>,
+    /// Each message, the OSC reply it waits for, on a line transport its
+    /// text without framing (what a reply's `request_match` reads), and the
+    /// text its pacing groups are matched against.
+    messages: VecDeque<(Outgoing, Option<OscReply>, Option<String>, String)>,
     /// Over a websocket: what identifies the reply (`expect.reply_json`).
     ws_reply: Option<Vec<(String, String)>>,
     /// On a line transport: text the reply holds (`expect.reply_contains`).
@@ -808,6 +824,12 @@ pub(crate) struct SpecEngine {
     monitor: bool,
     /// The quiet rule (`quiet_ms`) has applied on this connection.
     quiet_done: bool,
+    /// `transport.pacing`: the gaps the device needs between messages.
+    pacer: Pacer,
+    /// What waits for its turn under the pacing, in order.
+    outbox: VecDeque<Paced>,
+    /// The pacing timer let the command in flight's next message go.
+    pace_pass: bool,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -1894,6 +1916,12 @@ impl SpecEngine {
         let sse = spec.telemetry.as_ref().and_then(|t| t.get("sse"));
         let events_json = sse.and_then(|e| str_field(e, "format")) == Some("json");
         let events_reply = as_reply_of(sse.and_then(|e| e.get("as_reply")), "telemetry.sse")?;
+        // `pacing`, or on a serial link the `pacing` its `overrides` give.
+        let serial_pacing = (kind == "line-tcp"
+            && spec.serial_link(&ctx.model, &ctx.settings) == Some(true))
+        .then(|| spec.serial_overrides(&ctx.model).remove("pacing"))
+        .flatten();
+        let pacer = Pacer::parse(serial_pacing.as_ref().or(t.get("pacing")), &ctx.model)?;
         let oauth = match &transport {
             Transport::Http {
                 auth: HttpAuth::OAuth2,
@@ -1943,6 +1971,9 @@ impl SpecEngine {
             events_json,
             events_reply,
             events_backoff: RECONNECT_MIN,
+            pacer,
+            outbox: VecDeque::new(),
+            pace_pass: false,
         })
     }
 
@@ -2238,7 +2269,8 @@ impl SpecEngine {
                 }
                 _ => None,
             };
-            messages.push_back((outgoing, awaited_address.clone(), text));
+            let pace = pace_text(&outgoing, text.as_deref());
+            messages.push_back((outgoing, awaited_address.clone(), text, pace));
         }
         Ok(InFlight {
             id: job.id,
@@ -2392,7 +2424,13 @@ impl SpecEngine {
                 return;
             };
             let waits = replies && (flight.returns != "none" || flight.id.is_none());
-            let Some((outgoing, address, text)) = flight.messages.pop_front() else {
+            if self.pace_holds(cx) {
+                return;
+            }
+            let Some(flight) = self.current.as_mut() else {
+                return;
+            };
+            let Some((outgoing, address, text, pace)) = flight.messages.pop_front() else {
                 // Everything sent and, where the protocol replies, answered.
                 let flight = self.current.take().unwrap();
                 if let Some(id) = flight.id {
@@ -2401,6 +2439,9 @@ impl SpecEngine {
                 return;
             };
             flight.request_text = text;
+            // A request to an endpoint goes to another server: not paced.
+            let groups = (!matches!(&outgoing, Outgoing::Http(_, route) if *route != Route::Main))
+                .then(|| self.pacer.groups_of(&pace));
             let awaiting = match outgoing {
                 Outgoing::Ws(text) => {
                     cx.ws_send(SOCKET, text);
@@ -2428,7 +2469,11 @@ impl SpecEngine {
                     Await::Http(self.send_http(cx, request))
                 }
             };
-            if waits || matches!(awaiting, Await::Http(_)) {
+            let awaits = waits || matches!(awaiting, Await::Http(_));
+            if let Some(groups) = groups {
+                self.pacer.sent(&groups, cx.now(), awaits);
+            }
+            if awaits {
                 let flight = self.current.as_mut().unwrap();
                 flight.awaiting = Some(awaiting);
                 flight.sent_at = cx.now();
@@ -2443,6 +2488,128 @@ impl SpecEngine {
                 }
                 return;
             }
+        }
+    }
+
+    // ── Pacing ───────────────────────────────────────────────────────────
+
+    /// Whether the next message of the command in flight must wait its
+    /// turn under `transport.pacing`: it is then put behind what waits
+    /// already, and the timer is armed.
+    fn pace_holds(&mut self, cx: &mut Cx) -> bool {
+        if self.pacer.is_off() || std::mem::take(&mut self.pace_pass) {
+            return false;
+        }
+        let Some((outgoing, _, _, text)) = self.current.as_ref().and_then(|f| f.messages.front())
+        else {
+            return false;
+        };
+        if matches!(outgoing, Outgoing::Http(_, route) if *route != Route::Main) {
+            return false;
+        }
+        let groups = self.pacer.groups_of(text);
+        if self.outbox.is_empty() && self.pacer.wait(&groups, cx.now()) == 0 {
+            return false;
+        }
+        self.outbox.push_back(Paced::Flight);
+        self.arm_pace(cx);
+        true
+    }
+
+    /// The pacing groups of the next message of the command in flight.
+    fn flight_groups(&self) -> Vec<usize> {
+        self.current
+            .as_ref()
+            .and_then(|f| f.messages.front())
+            .map(|(_, _, _, text)| self.pacer.groups_of(text))
+            .unwrap_or_default()
+    }
+
+    /// Arm the timer for what waits first under the pacing.
+    fn arm_pace(&self, cx: &mut Cx) {
+        let groups = match self.outbox.front() {
+            None => return,
+            Some(Paced::Loose(_, groups)) => groups.clone(),
+            Some(Paced::Flight) => self.flight_groups(),
+        };
+        cx.set_timer(PACE, self.pacer.wait(&groups, cx.now()).max(1));
+    }
+
+    /// The pacing timer: send what waits, in order, as far as the gaps
+    /// allow.
+    fn pace_turn(&mut self, cx: &mut Cx) {
+        while let Some(next) = self.outbox.front() {
+            let groups = match next {
+                Paced::Loose(_, groups) => groups.clone(),
+                Paced::Flight => self.flight_groups(),
+            };
+            if self.pacer.wait(&groups, cx.now()) > 0 {
+                self.arm_pace(cx);
+                break;
+            }
+            match self.outbox.pop_front() {
+                Some(Paced::Loose(outgoing, groups)) => {
+                    self.pacer.sent(&groups, cx.now(), false);
+                    self.emit_now(cx, outgoing);
+                }
+                Some(Paced::Flight) => {
+                    // A command failed meanwhile has nothing left to send.
+                    let ready = self
+                        .current
+                        .as_ref()
+                        .is_some_and(|f| f.awaiting.is_none() && !f.messages.is_empty());
+                    if ready {
+                        self.pace_pass = true;
+                        self.send_next(cx);
+                        self.pace_pass = false;
+                    }
+                }
+                None => break,
+            }
+        }
+        if self.current.is_none() {
+            self.pump(cx);
+        }
+    }
+
+    /// Send a message that awaits no reply (`on_connect`, a subscription),
+    /// in its turn under the pacing.
+    fn emit(&mut self, cx: &mut Cx, outgoing: Outgoing, text: Option<&str>) {
+        if self.pacer.is_off()
+            || matches!(&outgoing, Outgoing::Http(_, route) if *route != Route::Main)
+        {
+            self.emit_now(cx, outgoing);
+            return;
+        }
+        let groups = self.pacer.groups_of(&pace_text(&outgoing, text));
+        if self.outbox.is_empty() && self.pacer.wait(&groups, cx.now()) == 0 {
+            self.pacer.sent(&groups, cx.now(), false);
+            self.emit_now(cx, outgoing);
+        } else {
+            self.outbox.push_back(Paced::Loose(outgoing, groups));
+            self.arm_pace(cx);
+        }
+    }
+
+    fn emit_now(&mut self, cx: &mut Cx, outgoing: Outgoing) {
+        match outgoing {
+            Outgoing::Bytes(bytes) => self.transmit(cx, bytes),
+            Outgoing::Ws(text) => cx.ws_send(SOCKET, text),
+            Outgoing::Http(request, _) => {
+                let id = self.next_request;
+                self.next_request += 1;
+                cx.http(id, request);
+            }
+        }
+    }
+
+    /// A line message's text without framing, on a line transport.
+    fn line_text(&self, item: &Value, values: &Values) -> Option<String> {
+        match self.transport {
+            Transport::LineTcp { .. } | Transport::LineUdp { .. } => {
+                line_message(item).and_then(|t| render(t, values, no_escape).ok())
+            }
+            _ => None,
         }
     }
 
@@ -2735,6 +2902,7 @@ impl SpecEngine {
         let main = flight.route == Route::Main;
         if flight.awaiting.take().is_some() && main {
             cx.round_trip(cx.now().saturating_sub(flight.sent_at));
+            self.pacer.answered(cx.now());
         }
 
         if flight.id.is_none() {
@@ -3006,6 +3174,10 @@ impl SpecEngine {
         cx.cancel_timer(PROBE);
         cx.cancel_timer(RENEW);
         cx.cancel_timer(QUIET);
+        // What waited its turn was for the connection lost.
+        cx.cancel_timer(PACE);
+        self.outbox.clear();
+        self.pace_pass = false;
         for key in POLLS {
             cx.cancel_timer(key);
         }
@@ -3087,12 +3259,9 @@ impl SpecEngine {
             }
             let values = self.values(&empty, &empty_specs);
             match self.build(&item, &values) {
-                Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
-                Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
-                Ok(Outgoing::Http(request, _)) => {
-                    let id = self.next_request;
-                    self.next_request += 1;
-                    cx.http(id, request);
+                Ok(outgoing) => {
+                    let text = self.line_text(&item, &values);
+                    self.emit(cx, outgoing, text.as_deref());
                 }
                 Err(e) => cx.log(Level::Warning, format!("on_connect step not sent: {e}")),
             }
@@ -3228,8 +3397,10 @@ impl SpecEngine {
             };
             let values = self.values(&params, &specs);
             match self.build(&item, &values) {
-                Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
-                Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
+                Ok(outgoing @ (Outgoing::Bytes(_) | Outgoing::Ws(_))) => {
+                    let text = self.line_text(&item, &values);
+                    self.emit(cx, outgoing, text.as_deref());
+                }
                 Ok(Outgoing::Http(..)) => {
                     cx.log(Level::Warning, "telemetry over HTTP is not implemented")
                 }
@@ -4205,6 +4376,7 @@ impl Module for SpecEngine {
                 let Some(flight) = self.current.take() else {
                     return;
                 };
+                self.pacer.answered(cx.now());
                 match flight.id {
                     Some(id) => cx.complete(id, Err(CommandError::Timeout)),
                     None => {
@@ -4236,6 +4408,7 @@ impl Module for SpecEngine {
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
             }
             RECONNECT => self.connect(cx),
+            PACE => self.pace_turn(cx),
             QUIET => self.quiet(cx),
             PUSH_RECONNECT => self.open_push(cx),
             // `idle_ms`: nothing heard, so the connection is dead.
@@ -4394,6 +4567,29 @@ impl Module for SpecEngine {
     }
 }
 
+/// The text a message's pacing groups are matched against (SPEC.md §2,
+/// Pacing): a line message without framing, an HTTP request's path and
+/// query, a websocket message, an OSC message's address.
+fn pace_text(outgoing: &Outgoing, text: Option<&str>) -> String {
+    match outgoing {
+        Outgoing::Http(request, _) => request
+            .url
+            .splitn(4, '/')
+            .nth(3)
+            .map(|target| format!("/{target}"))
+            .unwrap_or_else(|| "/".into()),
+        Outgoing::Ws(text) => text.clone(),
+        Outgoing::Bytes(bytes) => match text {
+            Some(text) => text.to_string(),
+            // An OSC message starts with its address, ended by a NUL.
+            None => {
+                let end = bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len());
+                String::from_utf8_lossy(&bytes[..end]).into_owned()
+            }
+        },
+    }
+}
+
 /// `transport.listen_port`: a port, or `{setting: name}` naming an integer
 /// setting; a setting left empty means no fixed port.
 fn listen_port(v: Option<&Value>, settings: &Params) -> Result<Option<u16>, String> {
@@ -4426,6 +4622,8 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
+#[cfg(test)]
+mod pacing_tests;
 #[cfg(test)]
 mod vectors;
 

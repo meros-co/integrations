@@ -375,7 +375,8 @@ wants STX (02H) before each command on RS-232 and no line ending after its
 `;`, and answers with an ACK byte (06H) where the network gets `ACK` and a
 line feed. The block's `overrides` give the transport keys that differ
 there: `framing`, `open`, `close`, `terminator`, `reply_framing`,
-`reply_terminators`, `reply_fence`, `reply_match` and `error_match`. It is a
+`reply_terminators`, `reply_fence`, `reply_match`, `error_match`, and
+`pacing` (§2, Pacing), which replaces the transport's as a whole. It is a
 mapping for every model, or a list of mappings each for the `models` it
 names (every model when it names none); every entry for the device's model
 is laid over the transport, in order, when the link is serial, and the TCP
@@ -952,6 +953,71 @@ discarded.
 {"event": "credentials", "device": 3,
  "settings": {"access_token": "ya29...", "expires_at": 1791234567}}
 ```
+
+### Pacing
+
+Some devices need time between the messages they are sent: a pan-tilt head
+40 ms between its commands, a projector 200 ms between any two, a display a
+minute after a power command before the next. `pacing` on the transport
+gives those gaps, as the vendor documents them, and the core keeps them, so
+no consumer paces commands itself:
+
+```yaml
+transport:
+  type: line-serial
+  pacing:
+    min_interval_ms: 0            # between any two messages
+    from: send                    # send (default) | reply
+    by_model:                     # models whose vendor gives another value
+      - { models: [p402, v422], min_interval_ms: 600 }
+    groups:                       # messages told apart by their text
+      pan_tilt:
+        match: "^#"
+        min_interval_ms: 40       # between two messages of the group
+        by_model: [{ models: [aw-ue160], min_interval_ms: 16 }]
+      power:
+        match: "^POWR"
+        after_ms: 60000           # after one of the group, before any message
+```
+
+Every message to the device is paced: each message of a command of several,
+telemetry polls and subscriptions, `then_send` re-reads, the probe, a session
+login and the `on_connect` steps. A message that would go too soon is held
+until its gaps have passed, and everything sent after it waits behind it, so
+messages always reach the device in the order they were sent; the wait is a
+timer, so other devices, and replies and pushed state from this one, are
+never held up. Commands queued meanwhile wait their turn as they would
+behind a slow reply, and their timeouts start when they are sent. What is
+held when the connection is lost is dropped with it (its commands fail as
+any in flight do). Requests to an `endpoint` (§2, Endpoints) go to another
+server and are not paced.
+
+- `min_interval_ms` is the least time between any two messages; 0, or left
+  out, for none.
+- `from` says where a gap is counted from: `send`, the previous message
+  being sent, or `reply`, its reply arriving (or its timeout; a message that
+  awaits no reply ends when it is sent), for a vendor that asks for time
+  "between a reply and the next command".
+- `by_model` lists models with their own `min_interval_ms`; each model is
+  named once.
+- `groups` names groups of messages, each told apart by `match`, an RE2-safe
+  regex on the message as sent without framing: a line message's text, an
+  HTTP request's path and query (`/cgi-bin/aw_ptz?cmd=%23P50`, its
+  characters as they are sent), a websocket message, an OSC message's
+  address. A message is in every group its text matches. A group's
+  `min_interval_ms` is the least time between two of its messages, whatever
+  goes between them; its `after_ms` is the least time after one of its
+  messages before the next message of any kind. Each group gives one or both,
+  and its own `by_model`.
+
+A message waits for the longest of these that applies. On a `line-tcp`
+transport with a `serial` block, the block's `overrides` (§2, "The same
+protocol on a serial port") may give a `pacing` of their own for the serial
+port, for every model or the models an entry names; it replaces the
+transport's `pacing` as a whole there. `tools/validate.py` checks the models
+named and the regexes; the engine refuses a malformed block when the device
+is opened. Conformance vectors (§7) show what is sent, not when: the
+engine's own tests play pacing on a fake clock.
 
 ### Settings and connection setup
 
