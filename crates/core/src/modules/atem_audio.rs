@@ -13,8 +13,8 @@ use std::collections::BTreeSet;
 use serde_json::{json, Map, Value};
 
 use super::{
-    classic_db, classic_raw, fields, fits, hundredths, i16_at, i64_at, int, invalid, one, opt_bool,
-    opt_int, opt_num, put16, put32, text, u16_at, u32_at, unsupported, Atem, Body, CommandError,
+    classic_db, classic_gain, fields, fits, hundredths, i16_at, i64_at, int, invalid, one,
+    opt_bool, opt_int, put16, put32, text, u16_at, u32_at, unsupported, Atem, Body, CommandError,
     Out, Params, V2_30, W,
 };
 
@@ -801,9 +801,9 @@ impl Atem {
                     .flag("solo", 3, 5)
                     .flag("dim", 5, 8)
                     .num("dim_level", 6, 10, 100.0, W::U16);
-                if let Some(db) = opt_num(params, "gain") {
+                if let Some(word) = classic_gain(params, "gain") {
                     body.mask |= 1 << 1;
-                    put16(&mut body.b, 2, classic_raw(db));
+                    put16(&mut body.b, 2, word);
                 }
                 if let Some(input) = opt_int(params, "solo_input") {
                     if !self.topology.classic_inputs.contains(&(input as u16)) {
@@ -823,9 +823,9 @@ impl Atem {
                     .iter()
                     .enumerate()
                 {
-                    if let Some(db) = opt_num(params, field) {
+                    if let Some(word) = classic_gain(params, field) {
                         b[0] |= 1 << i;
-                        put16(&mut b, 2 + 2 * i, classic_raw(db));
+                        put16(&mut b, 2 + 2 * i, word);
                     }
                 }
                 if b[0] == 0 {
@@ -1295,6 +1295,15 @@ mod tests {
             p,
             command(b"CAMH", &[4, 0, 0, 0, 0, 0, 0x40, 0x26, 0, 0, 0, 0])
         );
+        // "-inf", as the state reports silence, sends gain word 0.
+        let p = payload(&mut m, "set_audio_monitor", json!({"gain": "-inf"}));
+        assert_eq!(p, command(b"CAMm", &[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+        let p = payload(
+            &mut m,
+            "set_audio_headphones",
+            json!({"gain": "-inf", "sidetone_gain": "-inf"}),
+        );
+        assert_eq!(p, command(b"CAMH", &[9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
         let p = payload(&mut m, "set_audio_follow_video", json!({"enabled": false}));
         assert_eq!(p, command(b"CAMP", &[1, 0, 0, 0]));
         let p = payload(

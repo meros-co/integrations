@@ -172,6 +172,12 @@ def check_template(
         if ptype == "binary":
             errors.append(f"{where}: binary '{name}' is sent only as a body or a multipart part, never in a template")
             continue
+        # "-inf" for a float is only for a native module's own encoding.
+        if decl.get("negative_infinity"):
+            if ptype != "float":
+                errors.append(f"{where}: negative_infinity applies to a float, not {ptype} '{name}'")
+            else:
+                errors.append(f"{where}: negative_infinity '{name}' is for native modules, which encode it themselves")
         # A multiline string may hold line breaks: only `:json` escapes them.
         if decl.get("multiline"):
             if ptype != "string":

@@ -183,6 +183,10 @@ pub struct ParamSpec {
     /// sends it through `:json`, which escapes them (SPEC.md §4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub multiline: bool,
+    /// A float that also takes the string `"-inf"`: a level a native module
+    /// can set to silence, as its state reports it (SPEC.md §4).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub negative_infinity: bool,
     /// The default for the models named here, in place of `default`: a
     /// serial line setting whose factory value differs by model (a `serial`
     /// block's `by_model`, SPEC.md §2). Listed in the catalogue; a spec does
@@ -764,6 +768,7 @@ fn setting(kind: ParamType, label: &str, description: &str) -> ParamSpec {
         required: false,
         secret: false,
         multiline: false,
+        negative_infinity: false,
         default_by_model: None,
     }
 }
@@ -949,6 +954,7 @@ fn check_value(name: &str, spec: &ParamSpec, value: &Value) -> Result<(), String
                 .ok_or_else(|| format!("'{name}' must be an integer"))?;
             in_range(n as f64)
         }
+        ParamType::Float if spec.negative_infinity && value.as_str() == Some("-inf") => Ok(()),
         ParamType::Float => {
             let n = value
                 .as_f64()
@@ -1025,6 +1031,19 @@ mod tests {
 
     fn params(v: Value) -> Params {
         v.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn a_float_takes_minus_infinity_only_when_declared() {
+        let decl = spec(concat!(
+            "gain: { type: float, min: -60.0, max: 6.0, negative_infinity: true }
+",
+            "level: { type: float, min: -60.0, max: 6.0 }",
+        ));
+        assert!(validate(&decl, &params(json!({"gain": "-inf"}))).is_ok());
+        assert!(validate(&decl, &params(json!({"gain": -6.0}))).is_ok());
+        assert!(validate(&decl, &params(json!({"gain": "inf"}))).is_err());
+        assert!(validate(&decl, &params(json!({"level": "-inf"}))).is_err());
     }
 
     #[test]

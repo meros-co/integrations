@@ -1592,6 +1592,7 @@ fn spec_of(kind: ParamType) -> ParamSpec {
         required: false,
         secret: false,
         multiline: false,
+        negative_infinity: false,
         default_by_model: None,
     }
 }

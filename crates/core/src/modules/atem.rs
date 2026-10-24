@@ -454,6 +454,15 @@ fn classic_raw(db: f64) -> u16 {
     (10f64.powf(db / 20.0) * 32768.0).floor().min(65535.0) as u16
 }
 
+/// A classic gain parameter as its wire word: dB, or "-inf" for silence (0),
+/// the value the state reports for it.
+fn classic_gain(params: &Params, name: &str) -> Option<u16> {
+    match params.get(name)? {
+        Value::String(s) if s == "-inf" => Some(0),
+        v => v.as_f64().map(classic_raw),
+    }
+}
+
 /// Classic audio balance: -10000 to 10000 for -50 to 50 (Sofie
 /// `lib/atemUtil.ts:24-30`).
 fn classic_balance(raw: i16) -> f64 {
@@ -2482,9 +2491,9 @@ impl Atem {
                     b[0] |= 1;
                     b[4] = m;
                 }
-                if let Some(db) = opt_num(params, "gain") {
+                if let Some(word) = classic_gain(params, "gain") {
                     b[0] |= 2;
-                    put16(&mut b, 6, classic_raw(db));
+                    put16(&mut b, 6, word);
                 }
                 if let Some(v) = scaled(params, "balance", 200.0) {
                     b[0] |= 4;
@@ -2506,9 +2515,9 @@ impl Atem {
                     return Err(unsupported(name, "this switcher (no classic audio mixer)"));
                 }
                 let mut b = vec![0u8; 8];
-                if let Some(db) = opt_num(params, "gain") {
+                if let Some(word) = classic_gain(params, "gain") {
                     b[0] |= 1;
-                    put16(&mut b, 2, classic_raw(db));
+                    put16(&mut b, 2, word);
                 }
                 if let Some(v) = scaled(params, "balance", 200.0) {
                     b[0] |= 2;

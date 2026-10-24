@@ -1250,6 +1250,11 @@ before transmission. A CR or LF in a label would otherwise end the command and
 start another. Rejecting rather than stripping follows the no-clamping rule
 above.
 
+A native module's float parameter may take `negative_infinity: true`: it then
+also accepts the string `"-inf"`, the value its state reports for silence, and
+the module encodes it as the device's silence value (an ATEM classic gain of
+`"-inf"` sends gain word 0). Spec-driven parameters may not use it.
+
 A string that is text by nature, such as a script or a note, takes
 `multiline: true`: its value may then hold line breaks, tabs and any other
 control character, because it is only ever sent through the `json` directive,
