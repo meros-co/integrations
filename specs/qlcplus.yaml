@@ -1,0 +1,497 @@
+spec: 1
+id: qlcplus
+name: QLC+ (Web API)
+vendor: QLC+
+category: lighting
+
+# Written from the QLC+ documentation's Web API page (the documentation site,
+# not the program's source, which is GPL and was not read). QLC+ started with
+# -w serves a WebSocket at ws://host:9999/qlcplusWS taking pipe-separated text:
+# QLC+API queries answered as QLC+API|<command>|<result...>, widget control by
+# widget id, Simple Desk channels and the Grand Master, which it pushes back.
+source:
+  - title: QLC+ Documentation, 11. Advanced > Web Interface > Web API (Version 5 English)
+    author: QLC+ project (Massimo Callegari and contributors)
+    url: https://docs.qlcplus.org/v5/advanced/web-interface/web-api
+    note: >
+      Retrieved 2026-10-27; documents "the API used by the version 5 (QML) web access". Start
+      QLC+ with -w; WebSocket ws://[IP address]:9999/qlcplusWS; plain-text messages, fields
+      separated by |, command first; replies on the same socket in the same format; QLC+
+      "pushes unsolicited messages when something changes"; functions and widgets by numeric
+      ID, universes and channels from 1. HTTP: GET / (Virtual Console), GET /vc.json ("The
+      current Virtual Console layout and widget state as JSON"), /simpleDesk, /config, /system,
+      POST /loadProject, POST /loadFixture. QLC+API: isProjectLoaded, getFunctionsNumber,
+      getFunctionsList ("A flat list of id|name| pairs"), getFunctionType|<fID>,
+      getFunctionStatus|<fID> (Running or Stopped), setFunctionStatus|<fID>|<status> (1 start,
+      0 stop), getWidgetsNumber, getWidgetsList (id|caption| pairs), getWidgetType|<wID>,
+      getWidgetFunction|<wID>, getWidgetStatus|<wID> (button 255, 127 or 0; slider value; cue
+      list PLAY|<index> or STOP; animation fader level), getChannelsValues|<universe>|
+      <startAddress>|[count], sdResetChannel|<channel>, sdResetUniverse|<universe>. Widgets:
+      <wID>|<value>, SLIDER_OVERRIDE, CNG_PRESET, CNG_COLORS; cue list PLAY, STOP, PREV, NEXT,
+      STEP|<index>, CUE_SIDECHANGE|<level>; frame NEXT_PG, PREV_PG, PAGE|<n>, FRAME_DISABLE,
+      COLLAPSE; animation MATRIX_SLIDER, MATRIX_COLOR_1..5, MATRIX_COMBO; XY pad XYPAD,
+      XYPAD_RANGE_H, XYPAD_RANGE_V, XYPAD_PRESET; speed dial SPEED_UP, SPEED_DOWN, SPEED_TIME|
+      <ms>, SPEED_FACTOR, SPEED_APPLY; audio triggers <0/1>, AUDIO_VOLUME|<0-100>; clock
+      CLOCK_PLAY|<0/1>, CLOCK_RESET. Global: CH|<absoluteAddress>|<value> (0-255, addresses
+      continuous across universes), VC_PAGE|<n>, GM_VALUE|<value> ("QLC+ also pushes
+      GM_VALUE|<value>|<display> when it changes"), POLL (a keep-alive QLC+ ignores). With -wa,
+      access depends on the user's level.
+  - title: QLC+ Documentation, 11. Advanced > Web Interface (Version 5 English)
+    author: QLC+ project
+    url: https://docs.qlcplus.org/v5/advanced/web-interface
+    note: >
+      Authorized users: "available only when QLC+ is started with -wa / --web-auth. It enables
+      basic HTTP authentication (no HTTPS/certificates)"; access levels Everything, Virtual
+      Console and Simple Desk, Only Virtual Console. DMX addresses are contiguous across
+      universes (Universe 1 is 1-512, Universe 2 is 513-1024).
+
+transport:
+  type: ws
+  port: 9999
+  path: /qlcplusWS
+  scheme: ws
+  auth: basic
+  timeout_ms: 3000
+  reply: expected
+  # Only QLC+API answers are replies; pushes (GM_VALUE and widget updates)
+  # go to the rules alone.
+  reply_match: "^QLC\\+API\\|"
+  keepalive: { send: POLL, every_ms: 30000 }
+  endpoints:
+    web:
+      port: { setting: web_port }
+      auth: basic
+
+settings:
+  username: { type: string, max_length: 128, label: Username, description: "Web access user for a QLC+ started with -wa; leave empty when QLC+ runs without web authentication." }
+  password: { type: string, secret: true, max_length: 128, label: Password, description: "That user's password; leave empty without web authentication." }
+  web_port: { type: int, min: 1, max: 65535, default: 9999, label: Web port, description: "The port of QLC+'s web server, where /vc.json is served; the same port as the WebSocket, 9999." }
+
+ports:
+  - { port: 9999, protocol: ws, role: control, note: "QLC+ web access WebSocket, /qlcplusWS (QLC+ started with -w)" }
+  - { port: 9999, protocol: http, role: control, setting: web_port, note: "QLC+ web server, the same port: /vc.json" }
+
+maps:
+  cue_list_action: { play: PLAY, stop: STOP, previous: PREV, next: NEXT }
+  frame_page: { next: NEXT_PG, previous: PREV_PG }
+  speed_action: { up: SPEED_UP, down: SPEED_DOWN, apply: SPEED_APPLY }
+
+models:
+  - id: qlcplus-5
+    name: QLC+ 5
+    supports: &all [is_project_loaded, get_functions_number, get_functions_list, get_function_type,
+      get_function_status, set_function_status, get_widgets_number, get_widgets_list,
+      get_widget_type, get_widget_function, get_widget_status, get_channels_values,
+      reset_channel, reset_universe, set_widget_value, set_slider_override, set_slider_cng_preset,
+      set_slider_cng_colors, cue_list, cue_list_step, cue_list_side_fader, frame_page,
+      frame_go_to_page, set_frame_disabled, set_frame_collapsed, set_matrix_slider,
+      set_matrix_color, set_matrix_combo, set_xy_pad, set_xy_pad_range_h, set_xy_pad_range_v,
+      set_xy_pad_preset, speed_dial, set_speed_time, set_speed_factor, set_audio_capture,
+      set_audio_volume, set_clock_running, reset_clock, set_channel, set_vc_page,
+      set_grand_master, get_vc_json]
+    verification: none
+  - id: qlcplus-4
+    name: QLC+ 4
+    supports: *all
+    verification: none
+
+commands:
+  is_project_loaded:
+    summary: "Whether a project is loaded (QLC+API|isProjectLoaded), true or false"
+    send: "QLC+API|isProjectLoaded"
+    expect: { matches: "^QLC\\+API\\|isProjectLoaded\\|(true|false)\\s*$" }
+    returns: value
+
+  get_functions_number:
+    summary: "The number of functions in the project (QLC+API|getFunctionsNumber)"
+    send: "QLC+API|getFunctionsNumber"
+    expect: { matches: "^QLC\\+API\\|getFunctionsNumber\\|(\\d+)\\s*$" }
+    returns: value
+
+  get_functions_list:
+    summary: "Every function's id and name, as id|name| pairs (QLC+API|getFunctionsList); also kept in functions.<id>.name"
+    send: "QLC+API|getFunctionsList"
+    expect: { matches: "(?s)^QLC\\+API\\|getFunctionsList\\|(.*)$" }
+    returns: value
+
+  get_function_type:
+    summary: "A function's type, such as Scene or Chaser (QLC+API|getFunctionType|<fID>)"
+    params:
+      function: &function { type: int, min: 0, max: 2147483647, required: true, label: Function, description: "Function ID as QLC+ numbers it, from getFunctionsList." }
+    send: "QLC+API|getFunctionType|{function}"
+    expect: { matches: "^QLC\\+API\\|getFunctionType\\|(.*?)\\s*$" }
+    returns: value
+
+  get_function_status:
+    summary: "Whether a function is Running or Stopped (QLC+API|getFunctionStatus|<fID>)"
+    params: { function: *function }
+    send: "QLC+API|getFunctionStatus|{function}"
+    expect: { matches: "^QLC\\+API\\|getFunctionStatus\\|(.*?)\\s*$" }
+    returns: value
+
+  set_function_status:
+    summary: "Start or stop a function (QLC+API|setFunctionStatus|<fID>|<1/0>)"
+    params:
+      function: *function
+      running: { type: bool, required: true, label: Running, description: "On starts the function, off stops it." }
+    send: "QLC+API|setFunctionStatus|{function}|{running:bool01}"
+    returns: none
+
+  get_widgets_number:
+    summary: "The number of Virtual Console widgets (QLC+API|getWidgetsNumber)"
+    send: "QLC+API|getWidgetsNumber"
+    expect: { matches: "^QLC\\+API\\|getWidgetsNumber\\|(\\d+)\\s*$" }
+    returns: value
+
+  get_widgets_list:
+    summary: "Every widget's id and caption, as id|caption| pairs (QLC+API|getWidgetsList); also kept in widgets.<id>.caption"
+    send: "QLC+API|getWidgetsList"
+    expect: { matches: "(?s)^QLC\\+API\\|getWidgetsList\\|(.*)$" }
+    returns: value
+
+  get_widget_type:
+    summary: "A widget's type, such as Button or Slider (QLC+API|getWidgetType|<wID>)"
+    params:
+      widget: &widget { type: int, min: 0, max: 2147483647, required: true, label: Widget, description: "Virtual Console widget ID as QLC+ numbers it, from getWidgetsList." }
+    send: "QLC+API|getWidgetType|{widget}"
+    expect: { matches: "^QLC\\+API\\|getWidgetType\\|(.*?)\\s*$" }
+    returns: value
+
+  get_widget_function:
+    summary: "The function attached to a widget: id, type and name (QLC+API|getWidgetFunction|<wID>)"
+    params: { widget: *widget }
+    send: "QLC+API|getWidgetFunction|{widget}"
+    expect: { matches: "^QLC\\+API\\|getWidgetFunction\\|(.*?)\\s*$" }
+    returns: value
+
+  get_widget_status:
+    summary: "A widget's value or state: a button 255, 127 or 0, a slider its value, a cue list PLAY|<index> or STOP (QLC+API|getWidgetStatus|<wID>)"
+    params: { widget: *widget }
+    send: "QLC+API|getWidgetStatus|{widget}"
+    expect: { matches: "^QLC\\+API\\|getWidgetStatus\\|(.*?)\\s*$" }
+    returns: value
+
+  get_channels_values:
+    summary: "The DMX values of channels of a universe (QLC+API|getChannelsValues|<universe>|<start>|<count>)"
+    params:
+      universe: &universe { type: int, min: 1, max: 65535, required: true, label: Universe, description: "Universe number, from 1." }
+      start: { type: int, min: 1, max: 512, required: true, label: Start channel, description: "First channel of the universe, 1 to 512." }
+      count: { type: int, min: 1, max: 512, default: 1, label: Count, description: "How many channels to read from the start channel." }
+    send: "QLC+API|getChannelsValues|{universe}|{start}|{count}"
+    expect: { matches: "^QLC\\+API\\|getChannelsValues\\|(.*?)\\s*$" }
+    returns: value
+
+  reset_channel:
+    summary: "Reset a Simple Desk channel (QLC+API|sdResetChannel|<channel>); QLC+ answers with the refreshed values, in a form not documented"
+    params:
+      channel: &absolute { type: int, min: 1, max: 2147483647, required: true, label: Channel, description: "Absolute DMX address, continuous across universes: universe 1 is 1-512, universe 2 513-1024." }
+    send: "QLC+API|sdResetChannel|{channel}"
+    returns: ack
+
+  reset_universe:
+    summary: "Reset every Simple Desk channel of a universe (QLC+API|sdResetUniverse|<universe>)"
+    params: { universe: *universe }
+    send: "QLC+API|sdResetUniverse|{universe}"
+    returns: ack
+
+  set_widget_value:
+    summary: "Press a button (value above 0) or release it (0), or set a slider, audio trigger or other widget's value (<wID>|<value>)"
+    params:
+      widget: *widget
+      value: { type: int, min: 0, max: 255, required: true, label: Value, description: "Button: above 0 presses, 0 releases; slider: its value, 0 to 255; audio triggers: 1 enables capture, 0 disables it." }
+    send: "{widget}|{value}"
+    returns: none
+
+  set_slider_override:
+    summary: "Turn a slider's override mode on or off (<wID>|SLIDER_OVERRIDE|<0/1>)"
+    params:
+      widget: *widget
+      enabled: { type: bool, required: true, label: Override, description: "On enables override mode, off disables it." }
+    send: "{widget}|SLIDER_OVERRIDE|{enabled:bool01}"
+    returns: none
+
+  set_slider_cng_preset:
+    summary: "Apply a slider's Click & Go preset value (<wID>|CNG_PRESET|<value>)"
+    params:
+      widget: *widget
+      value: { type: int, min: 0, max: 255, required: true, label: Preset value, description: "The Click & Go preset value." }
+    send: "{widget}|CNG_PRESET|{value}"
+    returns: none
+
+  set_slider_cng_colors:
+    summary: "Set a slider's Click & Go primary and secondary colors (<wID>|CNG_COLORS|<primary>|<secondary>)"
+    params:
+      widget: *widget
+      primary: &color { type: string, pattern: "^#[0-9a-fA-F]{6}$", max_length: 7, required: true, label: Color, description: "Color as #RRGGBB, such as #ff0000." }
+      secondary: { type: string, pattern: "^#[0-9a-fA-F]{6}$", max_length: 7, required: true, label: Secondary color, description: "Secondary color as #RRGGBB." }
+    send: "{widget}|CNG_COLORS|{primary}|{secondary}"
+    returns: none
+
+  cue_list:
+    summary: "Play, stop, or go to the previous or next cue of a cue list widget (<wID>|PLAY|STOP|PREV|NEXT)"
+    params:
+      widget: *widget
+      action: { type: enum, values: [play, stop, previous, next], required: true, label: Action, description: "play, stop, previous or next (GO)." }
+    send: "{widget}|{action:map.cue_list_action}"
+    returns: none
+
+  cue_list_step:
+    summary: "Jump a cue list widget to a step (<wID>|STEP|<index>)"
+    params:
+      widget: *widget
+      index: { type: int, min: 0, max: 65535, required: true, label: Step, description: "Step index as the cue list numbers it." }
+    send: "{widget}|STEP|{index}"
+    returns: none
+
+  cue_list_side_fader:
+    summary: "Move a cue list widget's side fader (<wID>|CUE_SIDECHANGE|<level>)"
+    params:
+      widget: *widget
+      level: { type: int, min: 0, max: 255, required: true, label: Level, description: "Side fader level." }
+    send: "{widget}|CUE_SIDECHANGE|{level}"
+    returns: none
+
+  frame_page:
+    summary: "Go to a frame's next or previous page (<wID>|NEXT_PG|PREV_PG)"
+    params:
+      widget: *widget
+      direction: { type: enum, values: [next, previous], required: true, label: Page, description: "next or previous page." }
+    send: "{widget}|{direction:map.frame_page}"
+    returns: none
+
+  frame_go_to_page:
+    summary: "Go to a page of a frame (<wID>|PAGE|<n>)"
+    params:
+      widget: *widget
+      page: { type: int, min: 0, max: 65535, required: true, label: Page, description: "Page number of the frame." }
+    send: "{widget}|PAGE|{page}"
+    returns: none
+
+  set_frame_disabled:
+    summary: "Disable or enable a frame (<wID>|FRAME_DISABLE|<0/1>)"
+    params:
+      widget: *widget
+      disabled: { type: bool, required: true, label: Disabled, description: "On disables the frame, off enables it." }
+    send: "{widget}|FRAME_DISABLE|{disabled:bool01}"
+    returns: none
+
+  set_frame_collapsed:
+    summary: "Collapse or expand a frame (<wID>|COLLAPSE|<0/1>)"
+    params:
+      widget: *widget
+      collapsed: { type: bool, required: true, label: Collapsed, description: "On collapses the frame, off expands it." }
+    send: "{widget}|COLLAPSE|{collapsed:bool01}"
+    returns: none
+
+  set_matrix_slider:
+    summary: "Set an animation widget's intensity fader (<wID>|MATRIX_SLIDER|<value>)"
+    params:
+      widget: *widget
+      value: { type: int, min: 0, max: 255, required: true, label: Intensity, description: "Fader level, 0 to 255." }
+    send: "{widget}|MATRIX_SLIDER|{value}"
+    returns: none
+
+  set_matrix_color:
+    summary: "Set one of an animation widget's colors 1-5 (<wID>|MATRIX_COLOR_<n>|<color>)"
+    params:
+      widget: *widget
+      index: { type: int, min: 1, max: 5, required: true, label: Color number, description: "Which color, 1 to 5." }
+      color: *color
+    send: "{widget}|MATRIX_COLOR_{index}|{color}"
+    returns: none
+
+  set_matrix_combo:
+    summary: "Select an animation widget's algorithm or preset (<wID>|MATRIX_COMBO|<index>)"
+    params:
+      widget: *widget
+      index: { type: int, min: 0, max: 65535, required: true, label: Algorithm, description: "Index of the algorithm or preset in the widget's list." }
+    send: "{widget}|MATRIX_COMBO|{index}"
+    returns: none
+
+  set_xy_pad:
+    summary: "Set an XY pad's position (<wID>|XYPAD|<x>|<y>)"
+    params:
+      widget: *widget
+      x: &xy { type: int, min: 0, max: 65535, required: true, label: X, description: "Position on the axis, as the pad takes it." }
+      y: { type: int, min: 0, max: 65535, required: true, label: Y, description: "Position on the axis, as the pad takes it." }
+    send: "{widget}|XYPAD|{x}|{y}"
+    returns: none
+
+  set_xy_pad_range_h:
+    summary: "Set an XY pad's horizontal range (<wID>|XYPAD_RANGE_H|<min>|<max>)"
+    params:
+      widget: *widget
+      min: { type: int, min: 0, max: 65535, required: true, label: Minimum, description: "Lower end of the range." }
+      max: { type: int, min: 0, max: 65535, required: true, label: Maximum, description: "Upper end of the range." }
+    send: "{widget}|XYPAD_RANGE_H|{min}|{max}"
+    returns: none
+
+  set_xy_pad_range_v:
+    summary: "Set an XY pad's vertical range (<wID>|XYPAD_RANGE_V|<min>|<max>)"
+    params:
+      widget: *widget
+      min: { type: int, min: 0, max: 65535, required: true, label: Minimum, description: "Lower end of the range." }
+      max: { type: int, min: 0, max: 65535, required: true, label: Maximum, description: "Upper end of the range." }
+    send: "{widget}|XYPAD_RANGE_V|{min}|{max}"
+    returns: none
+
+  set_xy_pad_preset:
+    summary: "Apply an XY pad preset (<wID>|XYPAD_PRESET|<presetID>)"
+    params:
+      widget: *widget
+      preset: { type: int, min: 0, max: 65535, required: true, label: Preset, description: "Preset ID in the pad." }
+    send: "{widget}|XYPAD_PRESET|{preset}"
+    returns: none
+
+  speed_dial:
+    summary: "Nudge a speed dial's time up or down, or apply it (<wID>|SPEED_UP|SPEED_DOWN|SPEED_APPLY)"
+    params:
+      widget: *widget
+      action: { type: enum, values: [up, down, apply], required: true, label: Action, description: "up or down nudges the time, apply applies it." }
+    send: "{widget}|{action:map.speed_action}"
+    returns: none
+
+  set_speed_time:
+    summary: "Set a speed dial's time in milliseconds (<wID>|SPEED_TIME|<ms>)"
+    params:
+      widget: *widget
+      ms: { type: int, min: 0, max: 2147483647, required: true, label: Time, description: "Time in milliseconds." }
+    send: "{widget}|SPEED_TIME|{ms}"
+    returns: none
+
+  set_speed_factor:
+    summary: "Set a speed dial's multiplier factor (<wID>|SPEED_FACTOR|<factor>)"
+    params:
+      widget: *widget
+      factor: { type: string, pattern: "^[0-9]+(/[0-9]+)?$|^[0-9]*\\.[0-9]+$", max_length: 16, required: true, label: Factor, description: "The multiplier factor as the speed dial lists it, such as 2 or 1/4." }
+    send: "{widget}|SPEED_FACTOR|{factor}"
+    returns: none
+
+  set_audio_capture:
+    summary: "Enable or disable an audio triggers widget's capture (<wID>|<0/1>)"
+    params:
+      widget: *widget
+      enabled: { type: bool, required: true, label: Capture, description: "On enables audio capture, off disables it." }
+    send: "{widget}|{enabled:bool01}"
+    returns: none
+
+  set_audio_volume:
+    summary: "Set an audio triggers widget's input volume, 0-100 (<wID>|AUDIO_VOLUME|<volume>)"
+    params:
+      widget: *widget
+      volume: { type: int, min: 0, max: 100, required: true, label: Volume, description: "Input volume, 0 to 100." }
+    send: "{widget}|AUDIO_VOLUME|{volume}"
+    returns: none
+
+  set_clock_running:
+    summary: "Start or stop a stopwatch or countdown clock widget (<wID>|CLOCK_PLAY|<0/1>)"
+    params:
+      widget: *widget
+      running: { type: bool, required: true, label: Running, description: "On starts the clock, off stops it." }
+    send: "{widget}|CLOCK_PLAY|{running:bool01}"
+    returns: none
+
+  reset_clock:
+    summary: "Reset a clock widget (<wID>|CLOCK_RESET)"
+    params: { widget: *widget }
+    send: "{widget}|CLOCK_RESET"
+    returns: none
+
+  set_channel:
+    summary: "Set an absolute DMX channel in the Simple Desk, 0-255 (CH|<address>|<value>)"
+    params:
+      channel: *absolute
+      value: { type: int, min: 0, max: 255, required: true, label: Value, description: "DMX value, 0 to 255." }
+    send: "CH|{channel}|{value}"
+    returns: none
+
+  set_vc_page:
+    summary: "Switch the Virtual Console to a page (VC_PAGE|<n>)"
+    params:
+      page: { type: int, min: 0, max: 65535, required: true, label: Page, description: "Virtual Console page number." }
+    send: "VC_PAGE|{page}"
+    returns: none
+
+  set_grand_master:
+    summary: "Set the Grand Master (GM_VALUE|<value>), 0-255"
+    params:
+      value: { type: int, min: 0, max: 255, required: true, label: Grand Master, description: "Grand Master level, 0 to 255." }
+    send: "GM_VALUE|{value}"
+    returns: none
+
+  get_vc_json:
+    summary: "The Virtual Console layout and widget state as JSON (GET /vc.json)"
+    send: { endpoint: web, method: GET, path: /vc.json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+state:
+  project_loaded: { type: bool, description: "Whether QLC+ has a project loaded" }
+  functions_count: { type: int, description: "Number of functions in the project" }
+  functions.*.name: { type: string, description: "Function name, keyed by function ID" }
+  widgets_count: { type: int, description: "Number of Virtual Console widgets" }
+  widgets.*.caption: { type: string, description: "Widget caption, keyed by widget ID" }
+  grand_master.value: { type: int, description: "Grand Master level, 0 to 255, as QLC+ pushes it" }
+  grand_master.display: { type: string, description: "Grand Master as QLC+ displays it, pushed with the value" }
+
+telemetry:
+  poll:
+    - every_ms: 30000
+      send: ["QLC+API|isProjectLoaded", "QLC+API|getFunctionsNumber", "QLC+API|getFunctionsList",
+             "QLC+API|getWidgetsNumber", "QLC+API|getWidgetsList"]
+  updates:
+    - match: "^QLC\\+API\\|isProjectLoaded\\|(true|false)\\s*$"
+      state:
+        project_loaded: { value: "{1}", map: { "true": true, "false": false } }
+    - match: "^QLC\\+API\\|getFunctionsNumber\\|(\\d+)\\s*$"
+      state: { functions_count: "{1}" }
+    - match: "^QLC\\+API\\|getWidgetsNumber\\|(\\d+)\\s*$"
+      state: { widgets_count: "{1}" }
+    - match: "^QLC\\+API\\|getFunctionsList\\|"
+      match_each: '(\d+)\|([^|]*)(?:\||$)'
+      replace: functions
+      state: { "functions.{1}.name": "{2}" }
+    - match: "^QLC\\+API\\|getWidgetsList\\|"
+      match_each: '(\d+)\|([^|]*)(?:\||$)'
+      replace: widgets
+      state: { "widgets.{1}.caption": "{2}" }
+    - match: "^GM_VALUE\\|(\\d+)\\|(.*?)\\s*$"
+      state: { grand_master.value: "{1}", grand_master.display: "{2}" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Start QLC+ with -w (web access) for the WebSocket, and -wa to require a login, which is
+      HTTP Basic on the WebSocket's opening request; with no username set an empty Basic
+      credential is sent, which QLC+ without -wa is assumed to ignore. The documented push is GM_VALUE; QLC+ also
+      pushes widget and function changes, but their messages are not documented, so they are not
+      read. Function status, widget status and channel values are read on demand only: their
+      replies do not name the function, widget or channel asked about, and the WebSocket gives
+      the rules no way to tie a reply to its request. Function and widget names are polled every
+      30 s with getFunctionsList and getWidgetsList.
+  - models: [all]
+    severity: warning
+    text: >
+      Widget control messages are not answered and report unverified. Value ranges the page
+      leaves open (slider and fader levels 0-255, XY pad positions, page and step numbers, the
+      speed factor's form) are bounds of this spec; a value the widget does not take is
+      ignored by QLC+. The documentation calls the API "a work in progress" that "may change
+      between releases".
+  - models: [qlcplus-4]
+    severity: warning
+    text: >
+      The documentation describes the API of QLC+ 5's web access. QLC+ 4 serves its web access
+      on the same port and path; that each command is answered as documented for version 5 is
+      unverified.
+  - models: [all]
+    severity: info
+    text: >
+      Project and fixture uploads (POST /loadProject, /loadFixture) are listed without their
+      form fields, so they are not built here. /vc.json is returned whole by get_vc_json; its
+      structure is not documented. A POLL keep-alive is sent every 30 s.
+  - models: [all]
+    severity: critical
+    text: >
+      reset_universe and reset_channel drop Simple Desk values on live output, and set_channel
+      takes over a channel at once; neither can be undone remotely.

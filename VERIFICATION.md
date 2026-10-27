@@ -2942,6 +2942,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that the rootless /selectedCues/shallow is answered once per open workspace with its workspace_id and an empty array when nothing is selected, whether a QLab 5 workspace answers with the current cue list's selection only, and whether a selection change sends any /update message. ([specs/qlab.yaml:14455](specs/qlab.yaml#L14455))
 - [ ] Check whether QLab pushes anything when an override or a window changes; they are re-read only with the workspace. ([specs/qlab.yaml:13806](specs/qlab.yaml#L13806))
 
+## qlcplus — QLC+ (Web API)
+
+- [ ] Check that QLC+ without -wa accepts a WebSocket opened with an empty Basic credential. ([specs/qlcplus.yaml:462](specs/qlcplus.yaml#L462))
+- [ ] Record the messages QLC+ pushes for widget and function changes, so they can be read into state. ([specs/qlcplus.yaml:462](specs/qlcplus.yaml#L462))
+- [ ] Check the value ranges widgets take (sliders, XY pads, speed dial factors, page and step numbers) and what sdResetChannel and sdResetUniverse answer. ([specs/qlcplus.yaml:473](specs/qlcplus.yaml#L473))
+- [ ] On QLC+ 4, check that each documented QLC+API command and widget message works as on version 5. ([specs/qlcplus.yaml:481](specs/qlcplus.yaml#L481))
+
 ## qsys — Q-SYS
 
 - [ ] Record how the Core answers a refused Logon (error object shape, with and without an id). ([specs/qsys.yaml:443](specs/qsys.yaml#L443))
