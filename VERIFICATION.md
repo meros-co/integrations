@@ -2954,6 +2954,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Drive an XS-8xH on RS-232C (link serial, FUNCTION RECEIVER) with no CR after the ";" and confirm the same replies as over LAN, with XON/XOFF. ([specs/roland-xs80h.yaml:48](specs/roland-xs80h.yaml#L48))
 - [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:510](specs/roland-xs80h.yaml#L510))
 
+## ross-video-server — Ross Video servers (Tria, Mira, Kiva)
+
+- [ ] Confirm the servers send nothing back to RossTalk commands (no acknowledgement or error text), as Ross documents none. ([specs/ross-video-server.yaml:47](specs/ross-video-server.yaml#L47))
+- [ ] Confirm the jog amount's forms: frames with an f ("-20f", "5f" forward), and whether a plain or timecode amount is taken. ([specs/ross-video-server.yaml:128](specs/ross-video-server.yaml#L128))
+- [ ] Confirm the ISO angle numbering starts at 1 and its upper limit. ([specs/ross-video-server.yaml:143](specs/ross-video-server.yaml#L143))
+- [ ] Confirm LOAD_PLAYLIST with two channels takes the preview channel first, then the program channel. ([specs/ross-video-server.yaml:162](specs/ross-video-server.yaml#L162))
+- [ ] Confirm a RossTalk port other than 7788 (7788-7798) is taken only from V9.2 software. ([specs/ross-video-server.yaml:50](specs/ross-video-server.yaml#L50))
+- [ ] Confirm the channel letters each model has (A-H; G and H on a Mira with two PGM players). ([specs/ross-video-server.yaml:87](specs/ross-video-server.yaml#L87))
+
 ## ross-xpression — Ross XPression (TCP)
 
 - [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression.yaml:348](specs/ross-xpression.yaml#L348))
