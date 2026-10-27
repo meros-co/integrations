@@ -2274,6 +2274,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the NP-U321H's eco modes (OFF 00h, ECO 01h; the appendix's cells are shared with the next columns). ([specs/nec-projector.yaml:571](specs/nec-projector.yaml#L571))
 - [ ] Check the 2024 keys on 2020 models and the 2020 keys (AUTO, PICTURE, COMPUTER1-2, VIDEO1, S-VIDEO1, FREEZE, ASPECT, SOURCE) on 2024 models. ([specs/nec-projector.yaml:924](specs/nec-projector.yaml#L924))
 - [ ] Check which characters 098-45 accepts in a projector name beyond letters and digits. ([specs/nec-projector.yaml:1044](specs/nec-projector.yaml#L1044))
+
 ## nec-projector-ascii — Sharp NEC projectors and monitors (Common ASCII Control Command)
 
 - [ ] Confirm current-value responses repeat the command's words before the value (">volume 5", ">lens zoom 1000", ">usage light hours 120", ">avmute video on", ">tilematrix position 2"); the manual shows only the power, volume, input and status forms. ([specs/nec-projector-ascii.yaml:421](specs/nec-projector-ascii.yaml#L421))
@@ -2517,6 +2518,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether commands over the network also need the 60 s after the light source lights that the RS-232C section asks for (the core waits only on the serial port), and whether a power read during lighting answers 001 (the core starts the 60 s when it first reads on after standby). ([specs/panasonic-projector.yaml:16369](specs/panasonic-projector.yaml#L16369))
 - [ ] Check the older section-per-command lists against a projector where their titles and bytes disagree (GMFI2 printed GMFI1, QJB as QJK, QFI as QEI, and value conflicts such as SHIFT -327 and -127). ([specs/panasonic-projector.yaml:16353](specs/panasonic-projector.yaml#L16353))
 - [ ] Confirm QPW codes other than 000 and 001 that some series may return (warm-up, cooling). ([specs/panasonic-projector.yaml:9094](specs/panasonic-projector.yaml#L9094))
+
 ## philips-sicp — Philips professional displays (SICP)
 
 - [ ] Confirm the command set of current models (Q, D, C, E and T Line, 55BDL4107X video walls) against SICP V2.03, the newest public version; record get_platform and get_sicp_version on each. ([specs/philips-sicp.yaml:947](specs/philips-sicp.yaml#L947))
