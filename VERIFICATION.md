@@ -1800,6 +1800,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
+## holographics — Holographics
+
+- [ ] Confirm the REST API takes a call's data as the whole JSON body (as the vendor SDK sends it), not wrapped as {id, data}. ([specs/holographics.yaml:534](specs/holographics.yaml#L534))
+- [ ] Check that list_entries' widgetId filter is honoured when sent as the body of a GET (or whether it must be a query parameter, ?widgetId=). ([specs/holographics.yaml:293](specs/holographics.yaml#L293))
+- [ ] Confirm the Socket.IO server speaks Engine.IO 3 (Socket.IO 2) and pushes stateChanged with the whole state on every change. ([specs/holographics.yaml:421](specs/holographics.yaml#L421))
+- [ ] Record whether an entry in the state carries widgetId or widget_id. ([specs/holographics.yaml:528](specs/holographics.yaml#L528))
+- [ ] Record the reply of GET /api/update/ and /api/license/ so they can be kept in state. ([specs/holographics.yaml:385](specs/holographics.yaml#L385))
+
 ## holyrics — Holyrics
 
 - [ ] Confirm the API Server's default port (8091 is taken from the GetAPIServerInfo example; the documentation names no default). ([specs/holyrics.yaml:31](specs/holyrics.yaml#L31))
