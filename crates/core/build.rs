@@ -243,7 +243,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     (
         "vendor-ross",
-        &["ross-xpression", "ross-xpression-udp", "rosstalk"],
+        &[
+            "ross-ultrix",
+            "ross-xpression",
+            "ross-xpression-udp",
+            "rosstalk",
+        ],
     ),
     ("vendor-rundownstudio", &["rundown-studio"]),
     ("vendor-samsung", &["samsung-mdc"]),

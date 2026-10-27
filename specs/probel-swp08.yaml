@@ -105,6 +105,7 @@ settings:
 ports:
   - { port: 2008, protocol: tcp, role: control, when: "link tcp", note: "SW-P-08 over IP has no fixed port: 2008 is a common choice" }
   - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232 or RS-422 port of the host, wired to the controller's SW-P-08 port" }
+  - { port: 8910, protocol: tcp, role: control, when: "model ross-ultrix with link tcp", note: "Ross Ultrix's SW-P-08 server listens on 8910 by default: give it when the device is opened" }
 
 models:
   - id: generic
@@ -194,6 +195,31 @@ models:
       get_umd_labels, get_umd_label, connect_tie_line, get_tie_line, refresh]
     verification: none
     notes: Issue 30 §8 column 02; the general set only.
+  - id: ross-ultrix
+    name: "Ross Ultrix routers and Ultricore BCS (SW-P-08 server, TCP 8910)"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_umd_labels, get_umd_label, salvo_add, salvo_fire, salvo_clear, get_salvo, get_implementation,
+      refresh]
+    verification: none
+    notes: >
+      Supported commands from the Ultrix User Guide (2101DR-004-28, Table 30, p.82-83): 01, 02, 10, 12, 14,
+      17, 19, 21, 97, 100-105, 120, 121, 124 and the extended 129, 130, 138, 140, 142, 147, 149, 228-233,
+      248, 252. No master protect, source association names, update name, tie-lines, maintenance or dual
+      controller status. The server listens on TCP 8910, not 2008 (Table 18, p.76): give the port when
+      opening. Serial needs a USB-serial adapter on the Ultrix, 38400 8N1 by default (Table 28). UMD labels
+      repeat the source labels (16 characters).
+  - id: ross-nk-3rd
+    name: "Ross NK-3RD third-party interface for NK Series routers (RS-422)"
+    supports: [connect, interrogate, refresh]
+    verification: none
+    notes: >
+      From the NK-3RD User Guide (9807DR-1020-05, p.24-25): CROSSPOINT INTERROGATE, TALLY, CONNECT and
+      CONNECTED only (Issue 13, the general set), matrix number 0-15 as set on the NK-3RD (0 by default),
+      up to 16 levels and 1024 sources and destinations. RS-422 only, 1 stop bit and odd parity, 38400 or
+      19200 baud: set parity to odd. Reach it over the network only through a serial-to-Ethernet
+      converter's raw TCP port.
   - id: probel-system2
     name: "Pro-Bel System 2 controller"
     supports: [connect, interrogate, get_tally_dump, refresh]

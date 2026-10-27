@@ -2611,23 +2611,26 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## probel-swp02 — Probel / Grass Valley SW-P-02 routers
 
-- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:131](specs/probel-swp02.yaml#L131))
-- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:106](specs/probel-swp02.yaml#L106))
-- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:127](specs/probel-swp02.yaml#L127))
+- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:139](specs/probel-swp02.yaml#L139))
+- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:114](specs/probel-swp02.yaml#L114))
+- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:135](specs/probel-swp02.yaml#L135))
+- [ ] On an NK-3RD, confirm odd parity is needed and that CONNECTED is broadcast after a take. ([specs/probel-swp02.yaml:62](specs/probel-swp02.yaml#L62))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
-- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:463](specs/probel-swp08.yaml#L463))
-- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:404](specs/probel-swp08.yaml#L404))
-- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:419](specs/probel-swp08.yaml#L419))
-- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:435](specs/probel-swp08.yaml#L435))
-- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:446](specs/probel-swp08.yaml#L446))
-- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:476](specs/probel-swp08.yaml#L476))
-- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
-- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
-- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:497](specs/probel-swp08.yaml#L497))
-- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:469](specs/probel-swp08.yaml#L469))
-- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:515](specs/probel-swp08.yaml#L515))
+- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:489](specs/probel-swp08.yaml#L489))
+- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:430](specs/probel-swp08.yaml#L430))
+- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:445](specs/probel-swp08.yaml#L445))
+- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:461](specs/probel-swp08.yaml#L461))
+- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:472](specs/probel-swp08.yaml#L472))
+- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:502](specs/probel-swp08.yaml#L502))
+- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
+- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
+- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:523](specs/probel-swp08.yaml#L523))
+- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:495](specs/probel-swp08.yaml#L495))
+- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:541](specs/probel-swp08.yaml#L541))
+- [ ] On Ultrix, confirm the SW-P-08 server port (8910) and how the Protocol Variant setting answers general and extended commands. ([specs/probel-swp08.yaml:198](specs/probel-swp08.yaml#L198))
+- [ ] On an NK-3RD, confirm matrix 0 and level 0 on the wire address NK level 1, and that no tally dump is answered. ([specs/probel-swp08.yaml:213](specs/probel-swp08.yaml#L213))
 
 ## propresenter — ProPresenter
 
@@ -2840,6 +2843,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:584](specs/roland-xs80h.yaml#L584))
 - [ ] Drive an XS-8xH on RS-232C (link serial, FUNCTION RECEIVER) with no CR after the ";" and confirm the same replies as over LAN, with XON/XOFF. ([specs/roland-xs80h.yaml:48](specs/roland-xs80h.yaml#L48))
 - [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:510](specs/roland-xs80h.yaml#L510))
+
+## ross-ultrix — Ross Ultrix (RossTalk)
+
+- [ ] Confirm GPI takes the salvo number unpadded (GPI 4 as well as GPI 04). ([specs/ross-ultrix.yaml:91](specs/ross-ultrix.yaml#L91))
+- [ ] Check the TIMER SET value format: two-digit fields and one digit of tenths. ([specs/ross-ultrix.yaml:133](specs/ross-ultrix.yaml#L133))
+- [ ] Confirm a TXTLABEL with text and no color fields, ending TEXT:text;, sets the text and keeps the colors. ([specs/ross-ultrix.yaml:196](specs/ross-ultrix.yaml#L196))
+- [ ] Confirm decimal R,G,B colors in TXTLABEL (255,255,255) as well as 0x hex. ([specs/ross-ultrix.yaml:216](specs/ross-ultrix.yaml#L216))
+- [ ] Record the largest salvo, timer, user, label, source, destination and level IDs accepted. ([specs/ross-ultrix.yaml:245](specs/ross-ultrix.yaml#L245))
+- [ ] Confirm Ultrix sends nothing back on the RossTalk connection, not even an error for a bad command. ([specs/ross-ultrix.yaml:229](specs/ross-ultrix.yaml#L229))
 
 ## ross-xpression — Ross XPression (TCP)
 
