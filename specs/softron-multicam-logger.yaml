@@ -1,0 +1,190 @@
+spec: 1
+id: softron-multicam-logger
+name: Softron Multicam Logger (REST API)
+vendor: Softron
+category: recorder
+
+# Multicam Logger's REST API on port 8888 (set in its preferences): start and stop logging, add markers, change the
+# program and preview angles, and read the inputs, status, markers and angle changes. The front-most document
+# answers; documents are created in the app, not through the API.
+source:
+  - title: "Multicam Logger REST API (REST API Quick start guide), Softron support article 360021661233"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/article_attachments/360005413619
+    note: >
+      Manufacturer document (© 2014-2018, retrieved 2026-10-27). Port 8888 by default, set in the preferences; the
+      front-most document answers. GET /start and /stop; GET /inputs (a list of input names); GET /status (preview
+      and program as zero-based indexes in strings, document_name, logging_state, timecode); add_marker by POST with
+      {"name"}, with "reference": "live" and "offset" (-HH:mm:ss:ff for the past) or "reference": "absolute" and
+      "time", or by GET /add_marker?name=; GET /markers ([{name, time}]) and /markers/<index>; change_angle by POST
+      or GET with program and/or preview (zero-based), or neither for a take; GET angle_changes ([{in_point,
+      out_point, program, duration}]).
+
+transport:
+  type: http
+  port: 8888
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /status }
+
+ports:
+  - { port: 8888, protocol: http, role: control, note: "set in Multicam Logger's preferences" }
+
+models:
+  - id: multicam-logger
+    name: Softron Multicam Logger
+    supports: [start_logging, stop_logging, get_inputs, get_status, add_marker, add_marker_offset, add_marker_at,
+      get_markers, get_marker, change_angle, set_program, set_preview, take, get_angle_changes]
+    verification: none
+
+commands:
+  start_logging:
+    summary: Start logging in the front document (GET /start)
+    send: { method: GET, path: /start }
+    expect: { status: 200 }
+    returns: ack
+  stop_logging:
+    summary: Stop logging in the front document (GET /stop)
+    send: { method: GET, path: /stop }
+    expect: { status: 200 }
+    returns: ack
+  get_inputs:
+    summary: "List the front document's inputs (GET /inputs): their names, in index order from 0"
+    send: { method: GET, path: /inputs }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_status:
+    summary: "Read the status (GET /status): program and preview indexes, timecode, document name, logging"
+    send: { method: GET, path: /status }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  add_marker:
+    summary: Add a marker now (GET /add_marker?name=)
+    params:
+      name: &name { type: string, max_length: 1024, required: true, label: Name, description: "The marker's title." }
+    send: { method: GET, path: /add_marker, query: { name: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+  add_marker_offset:
+    summary: Add a marker at an offset from now (POST add_marker, reference live)
+    params:
+      name: *name
+      offset: { type: string, pattern: "^-?[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true, label: Offset,
+        description: "HH:mm:ss:ff from now; negative (-00:00:05:00) for a time in the past." }
+    send: { method: POST, path: /add_marker, content_type: application/json,
+            body: '{"name":{name:json},"reference":"live","offset":{offset:json}}' }
+    expect: { status: 200 }
+    returns: ack
+  add_marker_at:
+    summary: Add a marker at a given time (POST add_marker, reference absolute)
+    params:
+      name: *name
+      time: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}$", required: true, label: Time, description: "The marker's time, HH:mm:ss:ff." }
+    send: { method: POST, path: /add_marker, content_type: application/json,
+            body: '{"name":{name:json},"reference":"absolute","time":{time:json}}' }
+    expect: { status: 200 }
+    returns: ack
+  get_markers:
+    summary: "List the markers (GET /markers): name and time of each"
+    send: { method: GET, path: /markers }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_marker:
+    summary: "Read one marker by its index from 0 (GET /markers/<index>)"
+    params:
+      index: { type: int, min: 0, max: 99999, required: true, label: Marker, description: "The marker's index, from 0." }
+    send: { method: GET, path: "/markers/{index}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  change_angle:
+    summary: Put one input in program and another in preview (GET /change_angle?program=&preview=)
+    params:
+      program: &program { type: int, min: 0, max: 99, required: true, label: Program, description: "The input for program, its index from 0 as get_inputs lists it." }
+      preview: &preview { type: int, min: 0, max: 99, required: true, label: Preview, description: "The input for preview, its index from 0." }
+    send: { method: GET, path: /change_angle, query: { program: "{program}", preview: "{preview}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_program:
+    summary: Put an input in program (GET /change_angle?program=)
+    params: { program: *program }
+    send: { method: GET, path: /change_angle, query: { program: "{program}" } }
+    expect: { status: 200 }
+    returns: ack
+  set_preview:
+    summary: Put an input in preview (GET /change_angle?preview=)
+    params: { preview: *preview }
+    send: { method: GET, path: /change_angle, query: { preview: "{preview}" } }
+    expect: { status: 200 }
+    returns: ack
+  take:
+    summary: Swap program and preview (GET /change_angle with neither)
+    send: { method: GET, path: /change_angle }
+    expect: { status: 200 }
+    returns: ack
+  get_angle_changes:
+    summary: "List the angle changes (GET /angle_changes): in and out points, program input and duration of each"
+    send: { method: GET, path: /angle_changes }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+state:
+  program: { type: int, description: "The input in program, its index from 0 (status)" }
+  preview: { type: int, description: "The input in preview, its index from 0 (status)" }
+  timecode: { type: string, description: "The current timecode (status)" }
+  document_name: { type: string, description: "The front document's name (status)" }
+  logging: { type: bool, description: "Whether the front document is logging (status)" }
+  inputs.*: { type: string, description: "An input's name, keyed by its index from 0 (inputs)" }
+  markers.*.name: { type: string, description: "A marker's name, keyed by its index from 0 (markers)" }
+  markers.*.time: { type: string, description: "A marker's time (markers)" }
+  angle_changes.*.in_point: { type: string, description: "An angle change's in point, keyed by its index from 0 (angle_changes)" }
+  angle_changes.*.out_point: { type: string, description: "Its out point (angle_changes)" }
+  angle_changes.*.program: { type: int, description: "The input in program during it, its index from 0 (angle_changes)" }
+  angle_changes.*.duration: { type: string, description: "Its duration (angle_changes)" }
+
+telemetry:
+  poll:
+    - every_ms: 1000
+      send: [{ method: GET, path: /status }]
+    - every_ms: 10000
+      send: [{ method: GET, path: /inputs }, { method: GET, path: /markers }, { method: GET, path: /angle_changes }]
+  updates:
+    - path: "^/status$"
+      json: { program: "$.program", preview: "$.preview", timecode: "$.timecode", name: "$.document_name", logging: "$.logging_state" }
+      state: { program: "{program}", preview: "{preview}", timecode: "{timecode}", document_name: "{name}", logging: "{logging}" }
+    - path: "^/inputs$"
+      json_each: "$"
+      json: { name: "$" }
+      replace: inputs
+      state: { "inputs.{index}": "{name}" }
+    - path: "^/markers$"
+      json_each: "$"
+      json: { name: "$.name", time: "$.time" }
+      replace: markers
+      state: { "markers.{index}.name": "{name}", "markers.{index}.time": "{time}" }
+    - path: "^/angle_changes$"
+      json_each: "$"
+      json: { in: "$.in_point", out: "$.out_point", program: "$.program", duration: "$.duration" }
+      replace: angle_changes
+      state: { "angle_changes.{index}.in_point": "{in}", "angle_changes.{index}.out_point": "{out}",
+        "angle_changes.{index}.program": "{program}", "angle_changes.{index}.duration": "{duration}" }
+    # Each change made through the API is read back.
+    - path: "^/(start|stop|change_angle)"
+      headers: {}
+      then_send: [{ method: GET, path: /status }]
+    - path: "^/add_marker"
+      headers: {}
+      then_send: [{ method: GET, path: /markers }]
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The front-most document answers every request; documents are created in the app, not through the API. With
+      an ATEM or TriCaster connected, changing the angle also switches the production switcher.
+  - models: [all]
+    severity: info
+    text: >
+      The guide shows add_marker and angle_changes without a leading slash; the spec uses /add_marker and
+      /angle_changes. It documents no error answer, and no answer body for the commands. The guide's angle changes
+      example wraps its list in braces as well as brackets; the spec reads a list.

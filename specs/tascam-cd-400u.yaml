@@ -1,0 +1,573 @@
+spec: 1
+id: tascam-cd-400u
+name: TASCAM CD-400U / CD-400UDAB CD and media players (RS-232C / TELNET protocol)
+vendor: TASCAM
+category: playback
+
+# TEAC's RS-232C/TELNET protocol for the CD-400U and CD-400UDAB: the same ASCII commands on the RS-232C port and,
+# with the IF-E100 Ethernet card fitted, on its Telnet server (TCP 23, a password asked first). On the network a
+# message is the machine ID "0", a two-character command and its data, ended by CR LF; on RS-232C the same message
+# is preceded by LF and ended by CR. Transport and preset commands are not acknowledged; sense commands are answered
+# by a return command (the command with its top bit set); the player pushes F6 CHANGE STATUS when its transport,
+# track or tuner station changes, F0 and F1 when its error or caution status changes, and F4 when it powers on.
+# Functions of its own are the 7F vendor commands, answered by FF. Track numbers and minutes are sent as four digits
+# in the order tens, ones, thousands, hundreds ("2301" is 123).
+source:
+  - title: "TASCAM CD-400U/CD-400UDAB CONTROL I/O Terminals RS-232C/TELNET Protocol Specifications, Ver. 1.21 (Nov. 2022)"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/cd-400u/rs-232c_protocol_cd400u_v1.21_e.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-27), offered for download with a protocol use agreement that grants
+      its use for developing compatible devices and software; nothing of it is copied here. RS-232C (4800-57600
+      bit/s set on the unit, 8 data bits, no parity, 1 stop bit; RTS and CTS joined inside), command format on
+      RS-232C (LF, ID, command, data, CR) and TELNET (ID, command, data, CR LF; the vendor command page shows LF CR),
+      ID 0, the command sequence (no ACK, return commands, CHANGED STATUS, at least 100 ms between commands), the
+      command and vendor command lists with the firmware each needs (search, clear, enter and back from 1.14), each
+      command and return, the tuner's preset and frequency data (Ver. 1.20) and the vendor commands (device select,
+      play area, enter, back).
+  - title: "TASCAM CD-400U Owner's Manual"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/cd-400u/cd-400u_om_es_vn.pdf
+    note: >
+      Manufacturer document. Serial Mode (RS-232C by default, or Ethernet with the card fitted, p.38); Baud Rate
+      (4800, 9600 by default, 19200, 38400 or 57600 bit/s, p.38); the panel lock leaves RS-232C control working
+      (p.22).
+  - title: "TASCAM IF-E100 Reference Manual"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/if-e100/if-e100_rm_e_vc.pdf
+    note: >
+      Manufacturer document. Serial Mode must be Ethernet to control a CD-400U over the card (p.4); a numeric
+      password of up to 10 digits (p.5); Telnet on port 23, press Enter, "Enter Password", "Login Successful"; one
+      connection at a time; changing a network setting drops the connection (p.8).
+  - title: "TASCAM IF-E100 Product Spec Sheet (Jan. 2019)"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/if-e100/if-e100_e-spec_om_va.pdf
+    note: "Manufacturer document. Telnet, port 23, password of digits only, 400 by default."
+  - title: "TASCAM IF-E100 Network Settings Owner's Manual V1.1.0"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/if-e100/if-e100_network-settings_om_e_vb.pdf
+    note: "Manufacturer document. Initializing the card replaces the password with a unique one, shown on the unit (p.13)."
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 3000
+  reply: expected
+  # A reply is a return command, which has its top bit set (8F to FF): an echo of a command sent (00 to 7F) is
+  # never taken for one.
+  reply_match: "^0[89A-F][0-9A-F]"
+  error_match: "^0F2$"
+  probe: "00F"
+  # At least 100 ms between commands.
+  pacing:
+    min_interval_ms: 100
+  # RS-232C: LF before each message and CR after it; the speed is set on the unit (Baud Rate menu).
+  serial:
+    baud_rate: { default: 9600, values: [4800, 9600, 19200, 38400, 57600] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+    overrides:
+      - { framing: delimited, open: "\n", close: "\r", reply_framing: line }
+
+settings:
+  password: { type: string, secret: true, max_length: 10, default: "400", label: Password,
+    description: "The IF-E100 card's Telnet password, digits only, set on the unit's Network Set. > Password screen; 400 by default, and a unique one after the card is initialized." }
+
+# Enter first, then the password at "Enter Password", on the network only. TEAC documents no answer to a wrong
+# password.
+on_connect:
+  - link: tcp
+    send: ""
+  - link: tcp
+    after_prompt: "Enter Password"
+    send: "{settings.password}"
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "the Telnet server of the IF-E100 Ethernet card (sold separately); one connection at a time" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-sub 9-pin female" }
+
+models:
+  - id: cd-400u
+    name: TASCAM CD-400U (CD, SD, USB, Bluetooth, FM and AM tuner)
+    supports: [stop, play, ready, search, eject, skip, locate_track, select_preset, set_resume, get_resume, set_repeat,
+      get_repeat, set_incremental_play, get_incremental_play, clear, set_remote_local, get_remote_local, set_play_mode,
+      get_play_mode, get_status, get_track_number, get_media_status, get_track_info, get_time, get_totals, get_error,
+      get_caution, get_information, select_device, get_device, set_play_area, get_play_area, enter, back]
+    verification: none
+  - id: cd-400udab
+    name: TASCAM CD-400UDAB (CD, SD, USB, Bluetooth, DAB+ and FM tuner)
+    supports: [stop, play, ready, search, eject, skip, locate_track, select_preset, set_resume, get_resume, set_repeat,
+      get_repeat, set_incremental_play, get_incremental_play, clear, set_remote_local, get_remote_local, set_play_mode,
+      get_play_mode, get_status, get_track_number, get_media_status, get_track_info, get_time, get_totals, get_error,
+      get_caution, get_information, select_device_dab, get_device, set_play_area, get_play_area, enter, back]
+    verification: none
+
+maps:
+  # A number as the four digits the player takes: tens, ones, thousands, hundreds ("2301" is 123).
+  num: {
+    "1": "0100", "2": "0200", "3": "0300", "4": "0400", "5": "0500", "6": "0600", "7": "0700", "8": "0800", "9": "0900", "10": "1000",
+    "11": "1100", "12": "1200", "13": "1300", "14": "1400", "15": "1500", "16": "1600", "17": "1700", "18": "1800", "19": "1900", "20": "2000",
+    "21": "2100", "22": "2200", "23": "2300", "24": "2400", "25": "2500", "26": "2600", "27": "2700", "28": "2800", "29": "2900", "30": "3000",
+    "31": "3100", "32": "3200", "33": "3300", "34": "3400", "35": "3500", "36": "3600", "37": "3700", "38": "3800", "39": "3900", "40": "4000",
+    "41": "4100", "42": "4200", "43": "4300", "44": "4400", "45": "4500", "46": "4600", "47": "4700", "48": "4800", "49": "4900", "50": "5000",
+    "51": "5100", "52": "5200", "53": "5300", "54": "5400", "55": "5500", "56": "5600", "57": "5700", "58": "5800", "59": "5900", "60": "6000",
+    "61": "6100", "62": "6200", "63": "6300", "64": "6400", "65": "6500", "66": "6600", "67": "6700", "68": "6800", "69": "6900", "70": "7000",
+    "71": "7100", "72": "7200", "73": "7300", "74": "7400", "75": "7500", "76": "7600", "77": "7700", "78": "7800", "79": "7900", "80": "8000",
+    "81": "8100", "82": "8200", "83": "8300", "84": "8400", "85": "8500", "86": "8600", "87": "8700", "88": "8800", "89": "8900", "90": "9000",
+    "91": "9100", "92": "9200", "93": "9300", "94": "9400", "95": "9500", "96": "9600", "97": "9700", "98": "9800", "99": "9900", "100": "0001",
+    "101": "0101", "102": "0201", "103": "0301", "104": "0401", "105": "0501", "106": "0601", "107": "0701", "108": "0801", "109": "0901", "110": "1001",
+    "111": "1101", "112": "1201", "113": "1301", "114": "1401", "115": "1501", "116": "1601", "117": "1701", "118": "1801", "119": "1901", "120": "2001",
+    "121": "2101", "122": "2201", "123": "2301", "124": "2401", "125": "2501", "126": "2601", "127": "2701", "128": "2801", "129": "2901", "130": "3001",
+    "131": "3101", "132": "3201", "133": "3301", "134": "3401", "135": "3501", "136": "3601", "137": "3701", "138": "3801", "139": "3901", "140": "4001",
+    "141": "4101", "142": "4201", "143": "4301", "144": "4401", "145": "4501", "146": "4601", "147": "4701", "148": "4801", "149": "4901", "150": "5001",
+    "151": "5101", "152": "5201", "153": "5301", "154": "5401", "155": "5501", "156": "5601", "157": "5701", "158": "5801", "159": "5901", "160": "6001",
+    "161": "6101", "162": "6201", "163": "6301", "164": "6401", "165": "6501", "166": "6601", "167": "6701", "168": "6801", "169": "6901", "170": "7001",
+    "171": "7101", "172": "7201", "173": "7301", "174": "7401", "175": "7501", "176": "7601", "177": "7701", "178": "7801", "179": "7901", "180": "8001",
+    "181": "8101", "182": "8201", "183": "8301", "184": "8401", "185": "8501", "186": "8601", "187": "8701", "188": "8801", "189": "8901", "190": "9001",
+    "191": "9101", "192": "9201", "193": "9301", "194": "9401", "195": "9501", "196": "9601", "197": "9701", "198": "9801", "199": "9901", "200": "0002",
+    "201": "0102", "202": "0202", "203": "0302", "204": "0402", "205": "0502", "206": "0602", "207": "0702", "208": "0802", "209": "0902", "210": "1002",
+    "211": "1102", "212": "1202", "213": "1302", "214": "1402", "215": "1502", "216": "1602", "217": "1702", "218": "1802", "219": "1902", "220": "2002",
+    "221": "2102", "222": "2202", "223": "2302", "224": "2402", "225": "2502", "226": "2602", "227": "2702", "228": "2802", "229": "2902", "230": "3002",
+    "231": "3102", "232": "3202", "233": "3302", "234": "3402", "235": "3502", "236": "3602", "237": "3702", "238": "3802", "239": "3902", "240": "4002",
+    "241": "4102", "242": "4202", "243": "4302", "244": "4402", "245": "4502", "246": "4602", "247": "4702", "248": "4802", "249": "4902", "250": "5002",
+    "251": "5102", "252": "5202", "253": "5302", "254": "5402", "255": "5502", "256": "5602", "257": "5702", "258": "5802", "259": "5902", "260": "6002",
+    "261": "6102", "262": "6202", "263": "6302", "264": "6402", "265": "6502", "266": "6602", "267": "6702", "268": "6802", "269": "6902", "270": "7002",
+    "271": "7102", "272": "7202", "273": "7302", "274": "7402", "275": "7502", "276": "7602", "277": "7702", "278": "7802", "279": "7902", "280": "8002",
+    "281": "8102", "282": "8202", "283": "8302", "284": "8402", "285": "8502", "286": "8602", "287": "8702", "288": "8802", "289": "8902", "290": "9002",
+    "291": "9102", "292": "9202", "293": "9302", "294": "9402", "295": "9502", "296": "9602", "297": "9702", "298": "9802", "299": "9902", "300": "0003",
+    "301": "0103", "302": "0203", "303": "0303", "304": "0403", "305": "0503", "306": "0603", "307": "0703", "308": "0803", "309": "0903", "310": "1003",
+    "311": "1103", "312": "1203", "313": "1303", "314": "1403", "315": "1503", "316": "1603", "317": "1703", "318": "1803", "319": "1903", "320": "2003",
+    "321": "2103", "322": "2203", "323": "2303", "324": "2403", "325": "2503", "326": "2603", "327": "2703", "328": "2803", "329": "2903", "330": "3003",
+    "331": "3103", "332": "3203", "333": "3303", "334": "3403", "335": "3503", "336": "3603", "337": "3703", "338": "3803", "339": "3903", "340": "4003",
+    "341": "4103", "342": "4203", "343": "4303", "344": "4403", "345": "4503", "346": "4603", "347": "4703", "348": "4803", "349": "4903", "350": "5003",
+    "351": "5103", "352": "5203", "353": "5303", "354": "5403", "355": "5503", "356": "5603", "357": "5703", "358": "5803", "359": "5903", "360": "6003",
+    "361": "6103", "362": "6203", "363": "6303", "364": "6403", "365": "6503", "366": "6603", "367": "6703", "368": "6803", "369": "6903", "370": "7003",
+    "371": "7103", "372": "7203", "373": "7303", "374": "7403", "375": "7503", "376": "7603", "377": "7703", "378": "7803", "379": "7903", "380": "8003",
+    "381": "8103", "382": "8203", "383": "8303", "384": "8403", "385": "8503", "386": "8603", "387": "8703", "388": "8803", "389": "8903", "390": "9003",
+    "391": "9103", "392": "9203", "393": "9303", "394": "9403", "395": "9503", "396": "9603", "397": "9703", "398": "9803", "399": "9903", "400": "0004",
+    "401": "0104", "402": "0204", "403": "0304", "404": "0404", "405": "0504", "406": "0604", "407": "0704", "408": "0804", "409": "0904", "410": "1004",
+    "411": "1104", "412": "1204", "413": "1304", "414": "1404", "415": "1504", "416": "1604", "417": "1704", "418": "1804", "419": "1904", "420": "2004",
+    "421": "2104", "422": "2204", "423": "2304", "424": "2404", "425": "2504", "426": "2604", "427": "2704", "428": "2804", "429": "2904", "430": "3004",
+    "431": "3104", "432": "3204", "433": "3304", "434": "3404", "435": "3504", "436": "3604", "437": "3704", "438": "3804", "439": "3904", "440": "4004",
+    "441": "4104", "442": "4204", "443": "4304", "444": "4404", "445": "4504", "446": "4604", "447": "4704", "448": "4804", "449": "4904", "450": "5004",
+    "451": "5104", "452": "5204", "453": "5304", "454": "5404", "455": "5504", "456": "5604", "457": "5704", "458": "5804", "459": "5904", "460": "6004",
+    "461": "6104", "462": "6204", "463": "6304", "464": "6404", "465": "6504", "466": "6604", "467": "6704", "468": "6804", "469": "6904", "470": "7004",
+    "471": "7104", "472": "7204", "473": "7304", "474": "7404", "475": "7504", "476": "7604", "477": "7704", "478": "7804", "479": "7904", "480": "8004",
+    "481": "8104", "482": "8204", "483": "8304", "484": "8404", "485": "8504", "486": "8604", "487": "8704", "488": "8804", "489": "8904", "490": "9004",
+    "491": "9104", "492": "9204", "493": "9304", "494": "9404", "495": "9504", "496": "9604", "497": "9704", "498": "9804", "499": "9904", "500": "0005",
+    "501": "0105", "502": "0205", "503": "0305", "504": "0405", "505": "0505", "506": "0605", "507": "0705", "508": "0805", "509": "0905", "510": "1005",
+    "511": "1105", "512": "1205", "513": "1305", "514": "1405", "515": "1505", "516": "1605", "517": "1705", "518": "1805", "519": "1905", "520": "2005",
+    "521": "2105", "522": "2205", "523": "2305", "524": "2405", "525": "2505", "526": "2605", "527": "2705", "528": "2805", "529": "2905", "530": "3005",
+    "531": "3105", "532": "3205", "533": "3305", "534": "3405", "535": "3505", "536": "3605", "537": "3705", "538": "3805", "539": "3905", "540": "4005",
+    "541": "4105", "542": "4205", "543": "4305", "544": "4405", "545": "4505", "546": "4605", "547": "4705", "548": "4805", "549": "4905", "550": "5005",
+    "551": "5105", "552": "5205", "553": "5305", "554": "5405", "555": "5505", "556": "5605", "557": "5705", "558": "5805", "559": "5905", "560": "6005",
+    "561": "6105", "562": "6205", "563": "6305", "564": "6405", "565": "6505", "566": "6605", "567": "6705", "568": "6805", "569": "6905", "570": "7005",
+    "571": "7105", "572": "7205", "573": "7305", "574": "7405", "575": "7505", "576": "7605", "577": "7705", "578": "7805", "579": "7905", "580": "8005",
+    "581": "8105", "582": "8205", "583": "8305", "584": "8405", "585": "8505", "586": "8605", "587": "8705", "588": "8805", "589": "8905", "590": "9005",
+    "591": "9105", "592": "9205", "593": "9305", "594": "9405", "595": "9505", "596": "9605", "597": "9705", "598": "9805", "599": "9905", "600": "0006",
+    "601": "0106", "602": "0206", "603": "0306", "604": "0406", "605": "0506", "606": "0606", "607": "0706", "608": "0806", "609": "0906", "610": "1006",
+    "611": "1106", "612": "1206", "613": "1306", "614": "1406", "615": "1506", "616": "1606", "617": "1706", "618": "1806", "619": "1906", "620": "2006",
+    "621": "2106", "622": "2206", "623": "2306", "624": "2406", "625": "2506", "626": "2606", "627": "2706", "628": "2806", "629": "2906", "630": "3006",
+    "631": "3106", "632": "3206", "633": "3306", "634": "3406", "635": "3506", "636": "3606", "637": "3706", "638": "3806", "639": "3906", "640": "4006",
+    "641": "4106", "642": "4206", "643": "4306", "644": "4406", "645": "4506", "646": "4606", "647": "4706", "648": "4806", "649": "4906", "650": "5006",
+    "651": "5106", "652": "5206", "653": "5306", "654": "5406", "655": "5506", "656": "5606", "657": "5706", "658": "5806", "659": "5906", "660": "6006",
+    "661": "6106", "662": "6206", "663": "6306", "664": "6406", "665": "6506", "666": "6606", "667": "6706", "668": "6806", "669": "6906", "670": "7006",
+    "671": "7106", "672": "7206", "673": "7306", "674": "7406", "675": "7506", "676": "7606", "677": "7706", "678": "7806", "679": "7906", "680": "8006",
+    "681": "8106", "682": "8206", "683": "8306", "684": "8406", "685": "8506", "686": "8606", "687": "8706", "688": "8806", "689": "8906", "690": "9006",
+    "691": "9106", "692": "9206", "693": "9306", "694": "9406", "695": "9506", "696": "9606", "697": "9706", "698": "9806", "699": "9906", "700": "0007",
+    "701": "0107", "702": "0207", "703": "0307", "704": "0407", "705": "0507", "706": "0607", "707": "0707", "708": "0807", "709": "0907", "710": "1007",
+    "711": "1107", "712": "1207", "713": "1307", "714": "1407", "715": "1507", "716": "1607", "717": "1707", "718": "1807", "719": "1907", "720": "2007",
+    "721": "2107", "722": "2207", "723": "2307", "724": "2407", "725": "2507", "726": "2607", "727": "2707", "728": "2807", "729": "2907", "730": "3007",
+    "731": "3107", "732": "3207", "733": "3307", "734": "3407", "735": "3507", "736": "3607", "737": "3707", "738": "3807", "739": "3907", "740": "4007",
+    "741": "4107", "742": "4207", "743": "4307", "744": "4407", "745": "4507", "746": "4607", "747": "4707", "748": "4807", "749": "4907", "750": "5007",
+    "751": "5107", "752": "5207", "753": "5307", "754": "5407", "755": "5507", "756": "5607", "757": "5707", "758": "5807", "759": "5907", "760": "6007",
+    "761": "6107", "762": "6207", "763": "6307", "764": "6407", "765": "6507", "766": "6607", "767": "6707", "768": "6807", "769": "6907", "770": "7007",
+    "771": "7107", "772": "7207", "773": "7307", "774": "7407", "775": "7507", "776": "7607", "777": "7707", "778": "7807", "779": "7907", "780": "8007",
+    "781": "8107", "782": "8207", "783": "8307", "784": "8407", "785": "8507", "786": "8607", "787": "8707", "788": "8807", "789": "8907", "790": "9007",
+    "791": "9107", "792": "9207", "793": "9307", "794": "9407", "795": "9507", "796": "9607", "797": "9707", "798": "9807", "799": "9907", "800": "0008",
+    "801": "0108", "802": "0208", "803": "0308", "804": "0408", "805": "0508", "806": "0608", "807": "0708", "808": "0808", "809": "0908", "810": "1008",
+    "811": "1108", "812": "1208", "813": "1308", "814": "1408", "815": "1508", "816": "1608", "817": "1708", "818": "1808", "819": "1908", "820": "2008",
+    "821": "2108", "822": "2208", "823": "2308", "824": "2408", "825": "2508", "826": "2608", "827": "2708", "828": "2808", "829": "2908", "830": "3008",
+    "831": "3108", "832": "3208", "833": "3308", "834": "3408", "835": "3508", "836": "3608", "837": "3708", "838": "3808", "839": "3908", "840": "4008",
+    "841": "4108", "842": "4208", "843": "4308", "844": "4408", "845": "4508", "846": "4608", "847": "4708", "848": "4808", "849": "4908", "850": "5008",
+    "851": "5108", "852": "5208", "853": "5308", "854": "5408", "855": "5508", "856": "5608", "857": "5708", "858": "5808", "859": "5908", "860": "6008",
+    "861": "6108", "862": "6208", "863": "6308", "864": "6408", "865": "6508", "866": "6608", "867": "6708", "868": "6808", "869": "6908", "870": "7008",
+    "871": "7108", "872": "7208", "873": "7308", "874": "7408", "875": "7508", "876": "7608", "877": "7708", "878": "7808", "879": "7908", "880": "8008",
+    "881": "8108", "882": "8208", "883": "8308", "884": "8408", "885": "8508", "886": "8608", "887": "8708", "888": "8808", "889": "8908", "890": "9008",
+    "891": "9108", "892": "9208", "893": "9308", "894": "9408", "895": "9508", "896": "9608", "897": "9708", "898": "9808", "899": "9908", "900": "0009",
+    "901": "0109", "902": "0209", "903": "0309", "904": "0409", "905": "0509", "906": "0609", "907": "0709", "908": "0809", "909": "0909", "910": "1009",
+    "911": "1109", "912": "1209", "913": "1309", "914": "1409", "915": "1509", "916": "1609", "917": "1709", "918": "1809", "919": "1909", "920": "2009",
+    "921": "2109", "922": "2209", "923": "2309", "924": "2409", "925": "2509", "926": "2609", "927": "2709", "928": "2809", "929": "2909", "930": "3009",
+    "931": "3109", "932": "3209", "933": "3309", "934": "3409", "935": "3509", "936": "3609", "937": "3709", "938": "3809", "939": "3909", "940": "4009",
+    "941": "4109", "942": "4209", "943": "4309", "944": "4409", "945": "4509", "946": "4609", "947": "4709", "948": "4809", "949": "4909", "950": "5009",
+    "951": "5109", "952": "5209", "953": "5309", "954": "5409", "955": "5509", "956": "5609", "957": "5709", "958": "5809", "959": "5909", "960": "6009",
+    "961": "6109", "962": "6209", "963": "6309", "964": "6409", "965": "6509", "966": "6609", "967": "6709", "968": "6809", "969": "6909", "970": "7009",
+    "971": "7109", "972": "7209", "973": "7309", "974": "7409", "975": "7509", "976": "7609", "977": "7709", "978": "7809", "979": "7909", "980": "8009",
+    "981": "8109", "982": "8209", "983": "8309", "984": "8409", "985": "8509", "986": "8609", "987": "8709", "988": "8809", "989": "8909", "990": "9009",
+    "991": "9109", "992": "9209", "993": "9309", "994": "9409", "995": "9509", "996": "9609", "997": "9709", "998": "9809", "999": "9909" }
+  search: { forward: "00", reverse: "01", forward_high: "10", reverse_high: "11" }
+  skip: { next: "00", previous: "01" }
+  onoff: { "true": "01", "false": "00" }
+  remote_local: { remote: "00", local: "01", serial_only: "10", ir_disabled: "11" }
+  play_mode: { continuous: "00", single: "01", random: "06" }
+  time: { elapsed: "00", remaining: "01", total_elapsed: "02", total_remaining: "03" }
+  device: { sd: "00", usb: "10", cd: "11", bluetooth: "20", fm: "30", am: "31", aux: "40" }
+  device_dab: { sd: "00", usb: "10", cd: "11", bluetooth: "20", dab: "30", fm: "31", aux: "40" }
+  play_area: { all: "00", folder: "01", folder_skip: "0F" }
+  back: { push: "01", hold: "20" }
+
+commands:
+  stop:
+    summary: Stop playback; with the tuner selected, switch between frequency and preset modes (10)
+    send: "010"
+    returns: none
+  play:
+    summary: Start playback from stop or playback standby (12)
+    send: "012"
+    returns: none
+  ready:
+    summary: Enter playback standby (14, data 01)
+    send: "01401"
+    returns: none
+  search:
+    summary: Search forward or back until stopped, played or readied; with FM or AM selected, seek the next station up or down (16)
+    params:
+      direction: { type: enum, values: [forward, reverse, forward_high, reverse_high], required: true, label: Direction,
+        description: "forward or reverse at normal speed, forward_high or reverse_high at high speed; on the FM or AM tuner forward seeks up and reverse down." }
+    send: "016{direction:map.search}"
+    returns: none
+  eject:
+    summary: Eject the CD (18)
+    send: "018"
+    returns: none
+  skip:
+    summary: Skip to the next or previous track; on the tuner, step the frequency or the preset (1A)
+    params:
+      to: { type: enum, values: [next, previous], required: true, label: Skip to,
+        description: "next or previous track (previous restarts the current track when more than a second into it); on the FM or AM tuner the next or previous frequency step, or preset in preset mode." }
+    send: "01A{to:map.skip}"
+    returns: none
+  locate_track:
+    summary: Go to a track by number; from stop it stays stopped at the track's start, otherwise the state is kept (23)
+    params:
+      track: { type: int, min: 1, max: 999, required: true, label: Track, description: "The track's number, 1-999 on SD, USB or data CDs, 1-99 on audio CDs." }
+    send: "023{track:map.num}"
+    returns: none
+  select_preset:
+    summary: Tune to a tuner preset (23, with the FM, AM or DAB source selected)
+    params:
+      preset: { type: int, min: 1, max: 20, required: true, label: Preset, description: "The tuner preset, 1-20." }
+    send: "023{preset:02d}00"
+    returns: none
+  set_resume:
+    summary: Turn resume playback on or off (34), then read it back
+    params:
+      enabled: &enabled { type: bool, required: true, label: Enabled, description: "On turns the function on, off turns it off." }
+    send: ["034{enabled:map.onoff}", "034FF"]
+    returns: none
+  get_resume:
+    summary: "Read resume playback (34 sense, answered B4): 00 off, 01 on"
+    send: "034FF"
+    expect: { reply_contains: "0B4", matches: "^0B4([0-9]{2})$" }
+    returns: value
+  set_repeat:
+    summary: Turn repeat playback on or off (37), then read it back
+    params: { enabled: *enabled }
+    send: ["037{enabled:map.onoff}", "037FF"]
+    returns: none
+  get_repeat:
+    summary: "Read repeat playback (37 sense, answered B7): 00 off, 01 on"
+    send: "037FF"
+    expect: { reply_contains: "0B7", matches: "^0B7([0-9]{2})$" }
+    returns: value
+  set_incremental_play:
+    summary: Turn incremental playback on or off (3A), then read it back
+    params: { enabled: *enabled }
+    send: ["03A{enabled:map.onoff}", "03AFF"]
+    returns: none
+  get_incremental_play:
+    summary: "Read incremental playback (3A sense, answered BA): 00 off, 01 on"
+    send: "03AFF"
+    expect: { reply_contains: "0BA", matches: "^0BA([0-9]{2})$" }
+    returns: value
+  clear:
+    summary: Answer no to, or cancel, a message on the display, as the CLEAR key does (4A)
+    send: "04A"
+    returns: none
+  set_remote_local:
+    summary: Choose which of the front keys and the IR remote work beside RS-232C and Ethernet (4C), then read it back
+    params:
+      mode: { type: enum, values: [remote, local, serial_only, ir_disabled], required: true, label: Control,
+        description: "remote (front keys off, IR remote on), local (everything on), serial_only (front keys and IR remote off) or ir_disabled (front keys on, IR remote off); RS-232C and Ethernet always work." }
+    send: ["04C{mode:map.remote_local}", "04CFF"]
+    returns: none
+  get_remote_local:
+    summary: "Read which controls are enabled (4C sense, answered CC): 00 remote, 01 local, 10 serial only, 11 IR remote off"
+    send: "04CFF"
+    expect: { reply_contains: "0CC", matches: "^0CC([0-9]{2})$" }
+    returns: value
+  set_play_mode:
+    summary: Set continuous, single or random playback (4D), then read it back
+    params:
+      mode: { type: enum, values: [continuous, single, random], required: true, label: Play mode, description: "continuous, single (one track) or random playback." }
+    send: ["04D{mode:map.play_mode}", "04E"]
+    returns: none
+  get_play_mode:
+    summary: "Read the play mode (4E, answered CE): 00 continuous, 01 single, 06 random"
+    send: "04E"
+    expect: { reply_contains: "0CE", matches: "^0CE([0-9]{2})$" }
+    returns: value
+  get_status:
+    summary: "Read the transport (50, answered D0): 00 no media, 01 ejecting, 10 stop, 11 play, 12 ready, 28 searching forward, 29 searching back, 81 record, 82 record ready, 83 writing, FF other"
+    send: "050"
+    expect: { reply_contains: "0D0", matches: "^0D0([0-9A-F]{2})$" }
+    returns: value
+  get_track_number:
+    summary: "Read the current track, or the tuner preset (55, answered D5: the number's four digits); refused in tuner frequency mode"
+    send: "055"
+    expect: { reply_contains: "0D5", matches: "^0D5([0-9]{4,6})$" }
+    returns: value
+  get_media_status:
+    summary: "Read whether media is loaded and its type (56, answered D6: 00 none or 01 loaded, then 00 CD-DA, SD or USB, or 10 data CD)"
+    send: "056"
+    expect: { reply_contains: "0D6", matches: "^0D6([0-9]{4})$" }
+    returns: value
+  get_track_info:
+    summary: "Read the current track's number and length, or the tuner's preset and frequency or DAB station (57, answered D7)"
+    send: "057"
+    expect: { reply_contains: "0D7", matches: "^0D7([0-9A-Z ]{12})$" }
+    returns: value
+  get_time:
+    summary: "Read a time of the current track or the disc (58, answered D8: the kind, minutes, seconds); all but elapsed only for audio CDs"
+    params:
+      kind: { type: enum, values: [elapsed, remaining, total_elapsed, total_remaining], required: true, label: Time,
+        description: "elapsed or remaining in the track, or total_elapsed or total_remaining on the disc; remaining and the totals only on audio CDs, the totals not in random play." }
+    send: "058{kind:map.time}"
+    expect: { reply_contains: "0D8{kind:map.time}", matches: "^0D8[0-9]{2}([0-9]{8})$" }
+    returns: value
+  get_totals:
+    summary: "Read the number of tracks and the disc's total time (5D, answered DD); the time only for audio CDs"
+    send: "05D"
+    expect: { reply_contains: "0DD", matches: "^0DD([0-9]{12})$" }
+    returns: value
+  get_error:
+    summary: "Read the last error (78, answered F8): the code N1-N2N3 as four characters N2 N3 0 N1"
+    send: "078"
+    expect: { reply_contains: "0F8", matches: "^0F8([0-9A-F]{4})$" }
+    returns: value
+  get_caution:
+    summary: "Read the last caution (79, answered F9): the code N1-N2N3 as four characters N2 N3 0 N1"
+    send: "079"
+    expect: { reply_contains: "0F9", matches: "^0F9([0-9A-F]{4})$" }
+    returns: value
+  get_information:
+    summary: "Read the software version (0F, answered 8F): four digits, 0123 being 1.23"
+    send: "00F"
+    expect: { reply_contains: "08F", matches: "^08F([0-9]{4})$" }
+    returns: value
+  select_device:
+    summary: Select the source (7F 01), then read it back
+    params:
+      device: { type: enum, values: [sd, usb, cd, bluetooth, fm, am, aux], required: true, label: Source,
+        description: "sd, usb, cd, bluetooth, the fm or am tuner, or the aux input." }
+    send: ["07F01{device:map.device}", "07F01FF"]
+    returns: none
+  select_device_dab:
+    summary: Select the source (7F 01), then read it back
+    params:
+      device: { type: enum, values: [sd, usb, cd, bluetooth, dab, fm, aux], required: true, label: Source,
+        description: "sd, usb, cd, bluetooth, the dab or fm tuner, or the aux input." }
+    send: ["07F01{device:map.device_dab}", "07F01FF"]
+    returns: none
+  get_device:
+    summary: "Read the source (7F 01 sense, answered FF 01): 00 SD, 10 USB, 11 CD, 20 Bluetooth, 30 FM (DAB on the CD-400UDAB), 31 AM (FM on the CD-400UDAB), 40 AUX"
+    send: "07F01FF"
+    expect: { reply_contains: "0FF01", matches: "^0FF01([0-9]{2})$" }
+    returns: value
+  set_play_area:
+    summary: Play all tracks or the current folder (7F 07 4F), then read it back; refused for audio CDs
+    params:
+      area: { type: enum, values: [all, folder, folder_skip], required: true, label: Play area,
+        description: "all tracks, the current folder, or the current folder in skip mode." }
+    send: ["07F074F{area:map.play_area}", "07F074FFF"]
+    returns: none
+  get_play_area:
+    summary: "Read the play area (7F 07 4F sense, answered FF 07 CF): 00 all, 01 folder, 0F folder in skip mode; refused for audio CDs"
+    send: "07F074FFF"
+    expect: { reply_contains: "0FF07CF", matches: "^0FF07CF([0-9A-F]{2})$" }
+    returns: value
+  enter:
+    summary: "Press ENTER, as the MULTI JOG dial does: confirm a menu item, play a selected track or open a folder, or answer yes (7F 70 49)"
+    send: "07F704901"
+    returns: none
+  back:
+    summary: "Press or hold BACK [PAIRING]: leave a menu level or a folder; on Bluetooth, hold to pair or press to disconnect (7F 70 4A)"
+    params:
+      action: { type: enum, values: [push, hold], required: true, label: Action, description: "push presses the key; hold presses and holds it (Bluetooth pairing)." }
+    send: "07F704A{action:map.back}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Transport and preset commands are not acknowledged (the commands report unverified): a set is followed by its
+      sense, whose answer updates state, and a command the player refuses is answered ILLEGAL (F2), which sets
+      last_illegal in state. Some senses are refused in some states too: the track number in tuner frequency mode,
+      the play area for audio CDs, and the remaining and total times for anything but an audio CD; the polls ask for
+      them, so last_illegal can be set by a poll.
+  - models: [all]
+    severity: info
+    text: >
+      Ethernet control needs the IF-E100 card and the unit's Serial Mode set to Ethernet; RS-232C then stops
+      answering, and with Serial Mode at RS-232C (the default) the card does not answer. The card takes one Telnet
+      connection at a time, asks for its password after an Enter, and drops the connection when a network setting
+      changes; TEAC documents no answer to a wrong password. The panel lock leaves RS-232C and Ethernet control
+      working.
+  - models: [all]
+    severity: info
+    text: >
+      Track numbers and minutes travel as four digits in the order tens, ones, thousands, hundreds; the commands
+      take plain numbers. Frames are not given: times are minutes and seconds. Search, clear, enter and back need
+      firmware 1.14 or later; the protocol has no recording, dubbing, tuner frequency entry or volume commands.
+  - models: [all]
+    severity: info
+    text: >
+      With a tuner selected, track.number holds the preset, and the current track information carries the
+      frequency (AM in kHz, FM in MHz) or the DAB channel and service in place of the track's length. The message
+      does not say which source it describes, so its digits are written to track.length, tuner.am_khz and
+      tuner.fm_mhz alike, each meaningful only while device is that source; a DAB station (a channel holding a
+      letter) is told apart by its letter.
+  - models: [cd-400udab]
+    severity: info
+    text: >
+      On the CD-400UDAB the device codes 30 and 31 are DAB and FM (on the CD-400U, FM and AM); there is no AM
+      tuner.
+
+state:
+  transport.status: { type: string, description: "The transport: no_media, ejecting, stop, play, ready, cue (searching forward), review (searching back), record, record_ready, writing or other (D0)" }
+  track.number: { type: int, description: "The current track, numbered from 1, or with a tuner selected the preset; 0 with none (D5)" }
+  track.eom: { type: bool, description: "True while the end-of-track warning shows, when the player gives it (D5's six-digit form; inferred)" }
+  track.length: { type: string, description: "The current track's length, MMMM:SS (D7), while device is sd, usb or cd" }
+  tuner.am_khz: { type: int, unit: kHz, description: "The AM frequency (D7), meaningful while device is am" }
+  tuner.fm_mhz: { type: float, unit: MHz, description: "The FM frequency (D7), meaningful while device is fm" }
+  tuner.dab_channel: { type: string, description: "The DAB channel, such as 12B (D7), while device is dab" }
+  tuner.dab_service: { type: int, description: "The DAB service number on the channel (D7), while device is dab" }
+  media.loaded: { type: bool, description: "Whether media is loaded in the current source (D6)" }
+  media.type: { type: string, description: "audio (CD-DA, SD or USB) or data_cd (CD-ROM) (D6)" }
+  time.elapsed: { type: string, description: "Elapsed time in the track, MMMM:SS (D8 00)" }
+  time.remaining: { type: string, description: "Remaining time in the track, MMMM:SS (D8 01, audio CDs only)" }
+  time.total_elapsed: { type: string, description: "Elapsed time on the disc, MMMM:SS (D8 02, audio CDs only)" }
+  time.total_remaining: { type: string, description: "Remaining time on the disc, MMMM:SS (D8 03, audio CDs only)" }
+  tracks.total: { type: int, description: "Tracks on the media (DD)" }
+  tracks.total_time: { type: string, description: "The disc's total time, MMMM:SS; 0000:00 for anything but an audio CD (DD)" }
+  resume: { type: bool, description: "Resume playback on (B4)" }
+  repeat: { type: bool, description: "Repeat playback on (B7)" }
+  incremental_play: { type: bool, description: "Incremental playback on (BA)" }
+  remote_local: { type: string, description: "remote, local, serial_only or ir_disabled (CC)" }
+  play_mode: { type: string, description: "continuous, single or random (CE)" }
+  version: { type: string, description: "The software version, such as 1.23 (8F)" }
+  powered_on: { type: bool, description: "Set when the player reports it has powered on (F4)" }
+  error.code: { type: string, description: "The last error as N1-N2N3; 0-00 for none (F8)" }
+  error.text: { type: string, description: "The last error: none, dubbing_error, device_error or other_error (F8)" }
+  caution.code: { type: string, description: "The last caution as N1-N2N3; 0-00 for none (F9)" }
+  caution.text: { type: string, description: "The last caution: none, media_error, media_full, write_protected, not_executed, cannot_select, name_full, decode_error, media_not_match or other (F9)" }
+  last_illegal: { type: bool, description: "True once the player has answered a command ILLEGAL (F2)" }
+  device: { type: string, description: "The current source: sd, usb, cd, bluetooth, fm, am (CD-400U), dab (CD-400UDAB) or aux (FF01)" }
+  play_area: { type: string, description: "all, folder or folder_skip (FF07CF)" }
+
+telemetry:
+  poll:
+    - every_ms: 1000
+      send: ["050", "05800"]
+    - every_ms: 5000
+      send: ["055", "056", "057", "05801", "05802", "05803", "05D"]
+    - every_ms: 30000
+      send: ["00F", "034FF", "037FF", "03AFF", "04CFF", "04E", "078", "079", "07F01FF", "07F074FFF"]
+  updates:
+    - match: "^0F600$"
+      then_send: ["050"]
+    - match: "^0F603$"
+      then_send: ["055", "057", "05D"]
+    - match: "^0F0$"
+      then_send: ["078"]
+    - match: "^0F1$"
+      then_send: ["079"]
+    - match: "^0F2$"
+      state: { last_illegal: "true" }
+    - match: "^0F4$"
+      state: { powered_on: "true" }
+    - match: "^0D0([0-9A-F]{2})$"
+      state:
+        transport.status: { value: "{1}", map: { "00": no_media, "01": ejecting, "10": stop, "11": play, "12": ready, "28": cue,
+          "29": review, "81": record, "82": record_ready, "83": writing, FF: other } }
+    # The track's (or preset's) digits: tens, ones, thousands, hundreds; a six-digit answer has the EOM status first.
+    - match: "^0D5([0-9])([0-9])([0-9])([0-9])$"
+      state: { track.number: "{3}{4}{1}{2}" }
+    - match: "^0D5(0[01])([0-9])([0-9])([0-9])([0-9])$"
+      state:
+        track.number: "{4}{5}{2}{3}"
+        track.eom: { value: "{1}", map: { "00": false, "01": true } }
+    - match: "^0D601([0-9]{2})$"
+      state:
+        media.loaded: "true"
+        media.type: { value: "{1}", map: { "00": audio, "10": data_cd } }
+    - match: "^0D600[0-9]{2}$"
+      state: { media.loaded: "false" }
+    # Track information: the number, then minutes (tens, ones, thousands, hundreds) and seconds; with a tuner,
+    # the same digits are the AM kHz or the FM MHz to two decimals.
+    - match: "^0D7([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])00$"
+      state:
+        track.number: "{3}{4}{1}{2}"
+        track.length: "{7}{8}{5}{6}:{9}{10}"
+        tuner.am_khz: "{5}{6}{7}{8}{9}"
+        tuner.fm_mhz: "{5}{6}{7}.{8}{9}"
+    # DAB: the preset, the channel's three characters (one a letter), the service's two digits.
+    - match: "^0D7([0-9])([0-9])00([0-9 ][0-9][A-Z])([0-9]{2})000$"
+      state: { track.number: "{1}{2}", tuner.dab_channel: "{3}", tuner.dab_service: "{4}" }
+    # Times: the kind, minutes (tens, ones, thousands, hundreds), seconds, frames (always 00).
+    - match: "^0D800([0-9])([0-9])([0-9])([0-9])([0-9]{2})[0-9]{2}$"
+      state: { time.elapsed: "{3}{4}{1}{2}:{5:02d}" }
+    - match: "^0D801([0-9])([0-9])([0-9])([0-9])([0-9]{2})[0-9]{2}$"
+      state: { time.remaining: "{3}{4}{1}{2}:{5:02d}" }
+    - match: "^0D802([0-9])([0-9])([0-9])([0-9])([0-9]{2})[0-9]{2}$"
+      state: { time.total_elapsed: "{3}{4}{1}{2}:{5:02d}" }
+    - match: "^0D803([0-9])([0-9])([0-9])([0-9])([0-9]{2})[0-9]{2}$"
+      state: { time.total_remaining: "{3}{4}{1}{2}:{5:02d}" }
+    - match: "^0DD([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9]{2})[0-9]{2}$"
+      state: { tracks.total: "{3}{4}{1}{2}", tracks.total_time: "{7}{8}{5}{6}:{9:02d}" }
+    - match: "^0B4([0-9]{2})$"
+      state: { resume: { value: "{1}", map: &onoff { "00": false, "01": true } } }
+    - match: "^0B7([0-9]{2})$"
+      state: { repeat: { value: "{1}", map: *onoff } }
+    - match: "^0BA([0-9]{2})$"
+      state: { incremental_play: { value: "{1}", map: *onoff } }
+    - match: "^0CC([0-9]{2})$"
+      state: { remote_local: { value: "{1}", map: { "00": remote, "01": local, "10": serial_only, "11": ir_disabled } } }
+    - match: "^0CE([0-9]{2})$"
+      state: { play_mode: { value: "{1}", map: { "00": continuous, "01": single, "06": random } } }
+    - match: "^08F([0-9]{2})([0-9])([0-9])$"
+      state: { version: "{1}.{2}{3}" }
+    # Error and caution codes N1-N2N3 arrive as N2 N3 0 N1.
+    - match: "^0F8([0-9A-F])([0-9A-F])0([0-9A-F])$"
+      state:
+        error.code: "{3}-{1}{2}"
+        error.text: { value: "{3}-{1}{2}", map: { "0-00": none, "1-01": dubbing_error, "1-02": device_error, "1-FF": other_error } }
+    - match: "^0F9([0-9A-F])([0-9A-F])0([0-9A-F])$"
+      state:
+        caution.code: "{3}-{1}{2}"
+        caution.text: { value: "{3}-{1}{2}", map: { "0-00": none, "1-02": media_error, "1-06": media_full, "1-0C": write_protected,
+          "1-0D": not_executed, "1-13": cannot_select, "1-16": name_full, "1-1E": decode_error, "1-1F": media_not_match, "1-FF": other } }
+    - models: [cd-400u]
+      match: "^0FF01([0-9]{2})$"
+      state: { device: { value: "{1}", map: { "00": sd, "10": usb, "11": cd, "20": bluetooth, "30": fm, "31": am, "40": aux } } }
+    - models: [cd-400udab]
+      match: "^0FF01([0-9]{2})$"
+      state: { device: { value: "{1}", map: { "00": sd, "10": usb, "11": cd, "20": bluetooth, "30": dab, "31": fm, "40": aux } } }
+    - match: "^0FF07CF([0-9A-F]{2})$"
+      state: { play_area: { value: "{1}", map: { "00": all, "01": folder, "0F": folder_skip } } }

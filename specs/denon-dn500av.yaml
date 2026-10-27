@@ -1,0 +1,1073 @@
+spec: 1
+id: denon-dn500av
+name: Denon Professional DN-500AV surround pre-amplifier (RS-232C / IP control)
+vendor: Denon Professional
+category: other
+
+# The DN-500AV's serial remote control protocol, the same on its RS-232C port and on TCP port 23 (telnet): a
+# message is a two-character command and its parameter, then CR. A status request is the command and "?"; the
+# answer has the same form as the command that sets it (MV? is answered MV80). The unit also sends that form by
+# itself whenever its state changes, from the panel, the remote or another controller. Control commands are not
+# acknowledged.
+source:
+  - title: "Denon Professional DN-500AV Owner's Manual (DN-500AVEM, CD-ROM edition v00)"
+    author: D&M Holdings Inc.
+    url: https://cdn.inmusicbrands.com/DenonPro/cdn/1121/documents/DN500AVEM_ENG_CD-ROM_IM_v00.zip
+    note: >
+      Manufacturer document (retrieved 2026-10-27; the owner's manual PDF in the zip). Serial remote control
+      (pp.89-109): RS-232C at 9600 bit/s, 8 data bits, no parity, 1 stop bit, no flow control (p.89); IP control on
+      TCP port 23 (telnet), at most 135 bytes a message (p.90); COMMAND, RESPONSE (to COMMAND + ? + CR, within 200 ms)
+      and EVENT (sent when the state changes) of the same form, at least 200 ms between commands, one request at a
+      time, one second after PWON (p.91); the control command table (pp.93-101) and the status request and status
+      information table (pp.102-109).
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 1000
+  reply: expected
+  probe: "PW?"
+  # At least 200 ms between commands, one second after power on (p.91).
+  pacing:
+    min_interval_ms: 200
+    groups:
+      power_on:
+        match: "^PWON$"
+        after_ms: 1000
+  serial:
+    baud_rate: 9600
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "IP control (telnet), p.90" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-sub 9-pin male" }
+
+models:
+  - id: dn-500av
+    name: Denon Professional DN-500AV
+    supports: [power_on, standby, get_power, volume_up, volume_down, set_volume, set_volume_minimum, get_volume,
+        channel_volume_step, set_channel_volume, request_channel_volumes, set_mute, get_mute, select_input, get_input,
+        set_main_zone, get_main_zone, set_input_mode, get_input_mode, set_digital_mode, get_digital_mode,
+        set_video_select, get_video_select, set_sleep, sleep_off, get_sleep, set_surround_mode, get_surround_mode,
+        quick_select, quick_select_memory, get_quick_select, set_hdmi_audio_out, get_hdmi_audio_out,
+        set_video_processing, get_video_processing, set_tone_control, get_tone_control, set_surround_back,
+        get_surround_back, set_cinema_eq, get_cinema_eq, set_pl_mode, get_pl_mode, set_front_height, get_front_height,
+        set_height_gain, get_height_gain, bass_step, set_bass, get_bass, treble_step, set_treble, get_treble, set_drc,
+        get_drc, set_dynamic_compression, get_dynamic_compression, lfe_step, set_lfe, get_lfe, effect_step,
+        set_effect, get_effect, delay_step, set_delay, get_delay, set_afdm, get_afdm, set_panorama, get_panorama,
+        dimension_step, set_dimension, get_dimension, center_width_step, set_center_width, get_center_width,
+        center_image_step, set_center_image, get_center_image, set_subwoofer, get_subwoofer, set_room_size,
+        get_room_size, audio_delay_step, set_audio_delay, get_audio_delay, set_restorer, get_restorer,
+        z2_select_input, z2_power, z2_volume_up, z2_volume_down, z2_set_volume, request_zone2, z2_quick_select,
+        z2_quick_select_memory, z2_get_quick_select, set_z2_mute, get_z2_mute, z2_channel_volume_step,
+        z2_set_channel_volume, request_zone2_channel_volumes, z2_set_sleep, z2_sleep_off, z2_get_sleep, net_key,
+        net_favorites_folder, net_favorite_memory, request_net_presets, request_net_display,
+        request_net_display_ascii, dock_key, menu_key, gui_menu, source_menu, remote_lock, panel_lock, get_upgrade_id,
+        remote_maintenance, get_remote_maintenance, set_auto_lip_sync_disabled, get_auto_lip_sync_disabled,
+        set_screen_saver_disabled, get_screen_saver_disabled]
+    verification: none
+
+maps:
+  up_down: { up: "UP", down: "DOWN" }
+  channel: { FL: "FL", FR: "FR", C: "C", SW: "SW", SL: "SL", SR: "SR", SBL: "SBL", SBR: "SBR", SB: "SB", FHL: "FHL",
+    FHR: "FHR" }
+  mute: { "true": "ON", "false": "OFF" }
+  source: { CD: "CD", DVD: "DVD", BD: "BD", TV: "TV", SAT/CBL: "SAT/CBL", GAME: "GAME", GAME2: "GAME2", DOCK: "DOCK",
+    V.AUX: "V.AUX", IPOD: "IPOD", NET/USB: "NET/USB", SERVER: "SERVER", FAVORITES: "FAVORITES", USB/IPOD: "USB/IPOD",
+    USB: "USB", IPD: "IPD" }
+  main_zone: { "true": "ON", "false": "OFF" }
+  input_mode: { auto: "AUTO", hdmi: "HDMI", digital: "DIGITAL", analog: "ANALOG" }
+  digital_mode: { auto: "AUTO", pcm: "PCM", dts: "DTS" }
+  video_select: { dvd: "DVD", bd: "BD", tv: "TV", sat_cbl: "SAT/CBL", game: "GAME", game2: "GAME2", dock: "DOCK",
+    v_aux: "V.AUX", source: "SOURCE" }
+  surround: { MOVIE: "MOVIE", MUSIC: "MUSIC", GAME: "GAME", DIRECT: "DIRECT", PURE DIRECT: "PURE DIRECT", STEREO:
+    "STEREO", STANDARD: "STANDARD", DOLBY DIGITAL: "DOLBY DIGITAL", DTS SURROUND: "DTS SURROUND", MCH STEREO: "MCH
+    STEREO", ROCK ARENA: "ROCK ARENA", JAZZ CLUB: "JAZZ CLUB", CLASSIC CONCERT: "CLASSIC CONCERT", MONO MOVIE: "MONO
+    MOVIE", MATRIX: "MATRIX", VIDEO GAME: "VIDEO GAME", VIRTUAL: "VIRTUAL" }
+  hdmi_audio_out: { amp: "AMP", tv: "TV" }
+  video_processing: { auto: "AUTO", game: "GAME", movie: "MOVI" }
+  tone_control: { "true": "ON", "false": "OFF" }
+  surround_back: { matrix: "MTRX ON", plgx_cinema: "PLgX CINEMA", plgx_music: "PLgX MUSIC", "on": "ON", "off": "OFF" }
+  cinema_eq: { "true": "ON", "false": "OFF" }
+  pl_mode: { music: "MUSIC", cinema: "CINEMA", game: "GAME", pro_logic: "PRO LOGIC" }
+  front_height: { "true": "ON", "false": "OFF" }
+  height_gain: { low: "LOW", mid: "MID", high: "HI" }
+  drc: { auto: "AUTO", low: "LOW", mid: "MID", high: "HI", "off": "OFF" }
+  dynamic_compression: { "off": "OFF", low: "LOW", mid: "MID", high: "HIGH" }
+  afdm: { "true": "ON", "false": "OFF" }
+  panorama: { "true": "ON", "false": "OFF" }
+  subwoofer: { "true": "ON", "false": "OFF" }
+  room_size: { s: "S", ms: "MS", m: "M", ml: "ML", l: "L" }
+  restorer: { "off": "OFF", mode1: "MODE1", mode2: "MODE2", mode3: "MODE3" }
+  z2_source: { CD: "CD", DVD: "DVD", BD: "BD", SAT/CBL: "SAT/CBL", DOCK: "DOCK", V.AUX: "V.AUX", IPOD: "IPOD",
+    NET/USB: "NET/USB", SERVER: "SERVER", FAVORITES: "FAVORITES", USB/IPOD: "USB/IPOD", SOURCE: "SOURCE", USB: "USB",
+    IPD: "IPD" }
+  z2_power: { "true": "ON", "false": "OFF" }
+  z2_mute: { "true": "ON", "false": "OFF" }
+  z2_channel: { FL: "FL", FR: "FR" }
+  net_key: { up: "90", down: "91", left: "92", right: "93", enter: "94", play: "9A", pause: "9B", stop: "9C",
+    skip_plus: "9D", skip_minus: "9E", repeat_one: "9H", repeat_all: "9I", repeat_off: "9J", random_on: "9K",
+    random_off: "9M", browse_remote_toggle: "9W", page_next: "9X", page_previous: "9Y" }
+  dock_key: { up: "90", down: "91", left: "92", right: "93", enter: "94", play_pause: "9A", stop: "9C", skip_plus:
+    "9D", skip_minus: "9E", search_plus: "9F", search_minus: "9G", repeat_one: "9H", repeat_all: "9I", repeat_off:
+    "9J", shuffle_songs: "9K", shuffle_album: "9L", shuffle_off: "9M", menu: "9N", browse_mode: "9P", remote_mode:
+    "9Q", page_next: "9X", page_previous: "9Y" }
+  menu_key: { up: "CUP", down: "CDN", left: "CLT", right: "CRT", enter: "ENT", return: "RTN" }
+  on_off: { "true": "ON", "false": "OFF" }
+  panel_lock: { buttons: "SYPANEL LOCK ON", buttons_and_volume: "SYPANEL+V LOCK ON", "off": "SYPANEL LOCK OFF" }
+  maintenance: { "true": "STA", "false": "END" }
+  auto_lip_sync_disabled: { "true": "ON", "false": "OFF" }
+  screen_saver_disabled: { "true": "ON", "false": "OFF" }
+
+commands:
+  power_on:
+    summary: "Power on (PWON); the next command waits a second"
+    send: "PWON"
+    returns: none
+  standby:
+    summary: "Put the unit in standby (PWSTANDBY)"
+    send: "PWSTANDBY"
+    returns: none
+  get_power:
+    summary: "Read the power (PW?): ON or STANDBY"
+    send: "PW?"
+    expect: { reply_contains: "PW", matches: '^PW(ON|STANDBY)$' }
+    returns: value
+  volume_up:
+    summary: "Raise the master volume a step (MVUP)"
+    send: "MVUP"
+    returns: none
+  volume_down:
+    summary: "Lower the master volume a step (MVDOWN)"
+    send: "MVDOWN"
+    returns: none
+  set_volume:
+    summary: "Set the master volume in dB (MV), then read it back"
+    params:
+      db: { type: int, min: -80, max: 18, required: true, label: "Master volume", description: "The master volume in
+        dB, -80 to +18 (0 dB is the reference)." }
+    send: ["MV{db:+80:02d}", "MV?"]
+    returns: none
+  set_volume_minimum:
+    summary: "Set the master volume to its minimum, --- (MV99), then read it back"
+    send: ["MV99", "MV?"]
+    returns: none
+  get_volume:
+    summary: "Read the master volume (MV?): 00-98, 80 being 0 dB, or 99 the minimum (---)"
+    send: "MV?"
+    expect: { reply_contains: "MV", matches: '^MV([0-9]{2})$' }
+    returns: value
+  channel_volume_step:
+    summary: "Step one channel's level up or down (CV UP/DOWN), then read the levels back"
+    params:
+      channel: { type: enum, values: [FL, FR, C, SW, SL, SR, SBL, SBR, SB, FHL, FHR], required: true, label:
+        "Channel", description: "FL, FR, C, SW, SL, SR, SBL, SBR, SB (one surround back), FHL or FHR." }
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["CV{channel:map.channel} {direction:map.up_down}", "CV?"]
+    returns: none
+  set_channel_volume:
+    summary: "Set one channel's level in dB (CV), then read the levels back"
+    params:
+      channel: { type: enum, values: [FL, FR, C, SW, SL, SR, SBL, SBR, SB, FHL, FHR], required: true, label:
+        "Channel", description: "FL, FR, C, SW, SL, SR, SBL, SBR, SB (one surround back), FHL or FHR." }
+      db: { type: int, min: -12, max: 12, required: true, label: "Level", description: "The channel's level in dB, -12
+        to +12." }
+    send: ["CV{channel:map.channel} {db:+50:02d}", "CV?"]
+    returns: none
+  request_channel_volumes:
+    summary: "Ask for every channel's level (CV?); the answers, one per channel, update state"
+    send: "CV?"
+    returns: none
+  set_mute:
+    summary: "Turn mute on or off (MU), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Mute", description: "On mutes the main zone's outputs, off
+        unmutes them." }
+    send: ["MU{enabled:map.mute}", "MU?"]
+    returns: none
+  get_mute:
+    summary: "Read mute (MU?): ON or OFF"
+    send: "MU?"
+    expect: { reply_contains: "MU", matches: '^MU(ON|OFF)$' }
+    returns: value
+  select_input:
+    summary: "Select the input source (SI), then read it back"
+    params:
+      source: { type: enum, values: [CD, DVD, BD, TV, SAT/CBL, GAME, GAME2, DOCK, V.AUX, IPOD, NET/USB, SERVER,
+        FAVORITES, USB/IPOD, USB, IPD], required: true, label: "Input", description: "The input source, as the unit
+        names it." }
+    send: ["SI{source:map.source}", "SI?"]
+    returns: none
+  get_input:
+    summary: "Read the input source (SI?)"
+    send: "SI?"
+    expect: { reply_contains: "SI", matches: '^SI(.+)$' }
+    returns: value
+  set_main_zone:
+    summary: "Turn main zone on or off (ZM), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Main zone", description: "On turns the main zone on, off turns it
+        off." }
+    send: ["ZM{enabled:map.main_zone}", "ZM?"]
+    returns: none
+  get_main_zone:
+    summary: "Read main zone (ZM?): ON or OFF"
+    send: "ZM?"
+    expect: { reply_contains: "ZM", matches: '^ZM(ON|OFF)$' }
+    returns: value
+  set_input_mode:
+    summary: "Set input mode (SD), then read it back"
+    params:
+      value: { type: enum, values: [auto, hdmi, digital, analog], required: true, label: "Input mode", description:
+        "auto (HDMI, then digital, then analog), or hdmi, digital or analog forced." }
+    send: ["SD{value:map.input_mode}", "SD?"]
+    returns: none
+  get_input_mode:
+    summary: "Read input mode (SD?): AUTO, HDMI, DIGITAL, ANALOG"
+    send: "SD?"
+    expect: { reply_contains: "SD", matches: '^SD(DIGITAL|ANALOG|AUTO|HDMI)$' }
+    returns: value
+  set_digital_mode:
+    summary: "Set digital input mode (DC), then read it back"
+    params:
+      value: { type: enum, values: [auto, pcm, dts], required: true, label: "Digital input mode", description: "auto,
+        or pcm or dts forced." }
+    send: ["DC{value:map.digital_mode}", "DC?"]
+    returns: none
+  get_digital_mode:
+    summary: "Read digital input mode (DC?): AUTO, PCM, DTS"
+    send: "DC?"
+    expect: { reply_contains: "DC", matches: '^DC(AUTO|PCM|DTS)$' }
+    returns: value
+  set_video_select:
+    summary: "Set video select (SV), then read it back"
+    params:
+      value: { type: enum, values: [dvd, bd, tv, sat_cbl, game, game2, dock, v_aux, source], required: true, label:
+        "Video select", description: "The video source shown with the audio of another input, or source to cancel." }
+    send: ["SV{value:map.video_select}", "SV?"]
+    returns: none
+  get_video_select:
+    summary: "Read video select (SV?): DVD, BD, TV, SAT/CBL, GAME, GAME2, DOCK, V.AUX, SOURCE"
+    send: "SV?"
+    expect: { reply_contains: "SV", matches: '^SV(SAT/CBL|SOURCE|GAME2|V\.AUX|GAME|DOCK|DVD|BD|TV)$' }
+    returns: value
+  set_sleep:
+    summary: "Set the main zone's sleep timer (SLP), then read it back"
+    params:
+      minutes: { type: int, min: 1, max: 120, required: true, label: "Sleep timer", description: "Minutes until the
+        main zone goes to standby, 1-120." }
+    send: ["SLP{minutes:03d}", "SLP?"]
+    returns: none
+  sleep_off:
+    summary: "Turn the main zone's sleep timer off (SLPOFF), then read it back"
+    send: ["SLPOFF", "SLP?"]
+    returns: none
+  get_sleep:
+    summary: "Read the main zone's sleep timer (SLP?): OFF or the minutes"
+    send: "SLP?"
+    expect: { reply_contains: "SLP", matches: '^SLP(OFF|[0-9]{3})$' }
+    returns: value
+  set_surround_mode:
+    summary: "Select the surround mode (MS), then read it back"
+    params:
+      mode: { type: enum, values: [MOVIE, MUSIC, GAME, DIRECT, PURE DIRECT, STEREO, STANDARD, DOLBY DIGITAL, DTS
+        SURROUND, MCH STEREO, ROCK ARENA, JAZZ CLUB, CLASSIC CONCERT, MONO MOVIE, MATRIX, VIDEO GAME, VIRTUAL],
+        required: true, label: "Surround mode", description: "The surround mode, as the unit names it." }
+    send: ["MS{mode:map.surround}", "MS?"]
+    returns: none
+  get_surround_mode:
+    summary: "Read the surround mode (MS?)"
+    send: "MS?"
+    expect: { reply_contains: "MS", matches: '^MS(.+)$' }
+    returns: value
+  quick_select:
+    summary: "Recall a quick select (MSQUICK), then read it back"
+    params:
+      number: { type: int, min: 1, max: 4, required: true, label: "Quick select", description: "The quick select,
+        1-4." }
+    send: ["MSQUICK{number}", "MSQUICK ?"]
+    returns: none
+  quick_select_memory:
+    summary: "Store the current settings in a quick select (MSQUICK MEMORY), then read it back"
+    params:
+      number: { type: int, min: 1, max: 4, required: true, label: "Quick select", description: "The quick select,
+        1-4." }
+    send: ["MSQUICK{number} MEMORY", "MSQUICK ?"]
+    returns: none
+  get_quick_select:
+    summary: "Read the quick select (MSQUICK ?): 0 none, or 1-4"
+    send: "MSQUICK ?"
+    expect: { reply_contains: "MSQUICK", matches: '^MSQUICK([0-4])$' }
+    returns: value
+  set_hdmi_audio_out:
+    summary: "Set HDMI audio output (VSAUDIO), then read it back"
+    params:
+      value: { type: enum, values: [amp, tv], required: true, label: "HDMI audio output", description: "amp plays HDMI
+        audio on the unit; tv passes it to the TV." }
+    send: ["VSAUDIO {value:map.hdmi_audio_out}", "VSAUDIO ?"]
+    returns: none
+  get_hdmi_audio_out:
+    summary: "Read HDMI audio output (VSAUDIO ?): AMP, TV"
+    send: "VSAUDIO ?"
+    expect: { reply_contains: "VSAUDIO ", matches: '^VSAUDIO (AMP|TV)$' }
+    returns: value
+  set_video_processing:
+    summary: "Set video processing mode (VSVPM), then read it back"
+    params:
+      value: { type: enum, values: [auto, game, movie], required: true, label: "Video processing mode", description:
+        "auto, game or movie." }
+    send: ["VSVPM{value:map.video_processing}", "VSVPM ?"]
+    returns: none
+  get_video_processing:
+    summary: "Read video processing mode (VSVPM ?): AUTO, GAME, MOVI"
+    send: "VSVPM ?"
+    expect: { reply_contains: "VSVPM", matches: '^VSVPM(AUTO|GAME|MOVI)$' }
+    returns: value
+  set_tone_control:
+    summary: "Turn tone control on or off (PSTONE CTRL), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Tone control", description: "On applies the bass and treble
+        settings." }
+    send: ["PSTONE CTRL {enabled:map.tone_control}", "PSTONE CTRL ?"]
+    returns: none
+  get_tone_control:
+    summary: "Read tone control (PSTONE CTRL ?): ON or OFF"
+    send: "PSTONE CTRL ?"
+    expect: { reply_contains: "PSTONE CTRL ", matches: '^PSTONE CTRL (ON|OFF)$' }
+    returns: value
+  set_surround_back:
+    summary: "Set surround back mode (PSSB:), then read it back"
+    params:
+      value: { type: enum, values: [matrix, plgx_cinema, plgx_music, "on", "off"], required: true, label: "Surround
+        back mode", description: "The surround back speakers' mode." }
+    send: ["PSSB:{value:map.surround_back}", "PSSB: ?"]
+    returns: none
+  get_surround_back:
+    summary: "Read surround back mode (PSSB: ?): MTRX ON, PLgX CINEMA, PLgX MUSIC, ON, OFF, ESDSCRT, ESMTRX, DSCRT ON"
+    send: "PSSB: ?"
+    expect: { reply_contains: "PSSB:", matches: '^PSSB:(PLgX CINEMA|PLgX MUSIC|DSCRT ON|MTRX ON|ESDSCRT|ESMTRX|OFF|ON)$' }
+    returns: value
+  set_cinema_eq:
+    summary: "Turn cinema EQ on or off (PSHTEQ), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Cinema EQ", description: "On softens harsh treble in film
+        soundtracks." }
+    send: ["PSHTEQ {enabled:map.cinema_eq}", "PSCINEMA EQ. ?"]
+    returns: none
+  get_cinema_eq:
+    summary: "Read cinema EQ (PSCINEMA EQ. ?): ON or OFF"
+    send: "PSCINEMA EQ. ?"
+    expect: { reply_contains: "PSHTEQ ", matches: '^PSHTEQ (ON|OFF)$' }
+    returns: value
+  set_pl_mode:
+    summary: "Set decoding mode (PSMODE:), then read it back"
+    params:
+      value: { type: enum, values: [music, cinema, game, pro_logic], required: true, label: "Decoding mode",
+        description: "The Dolby Pro Logic and DTS NEO:6 decoding mode: music, cinema, game or pro_logic." }
+    send: ["PSMODE:{value:map.pl_mode}", "PSMODE: ?"]
+    returns: none
+  get_pl_mode:
+    summary: "Read decoding mode (PSMODE: ?): MUSIC, CINEMA, GAME, PRO LOGIC"
+    send: "PSMODE: ?"
+    expect: { reply_contains: "PSMODE:", matches: '^PSMODE:(PRO LOGIC|CINEMA|MUSIC|GAME)$' }
+    returns: value
+  set_front_height:
+    summary: "Turn front height output on or off (PSFH:), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Front height output", description: "On outputs the front height
+        (PLIIz height) channels." }
+    send: ["PSFH:{enabled:map.front_height}", "PSFH: ?"]
+    returns: none
+  get_front_height:
+    summary: "Read front height output (PSFH: ?): ON or OFF"
+    send: "PSFH: ?"
+    expect: { reply_contains: "PSFH:", matches: '^PSFH:(ON|OFF)$' }
+    returns: value
+  set_height_gain:
+    summary: "Set height gain (PSPHG), then read it back"
+    params:
+      value: { type: enum, values: [low, mid, high], required: true, label: "Height gain", description: "The PLIIz
+        height gain: low, mid or high." }
+    send: ["PSPHG {value:map.height_gain}", "PSPHG ?"]
+    returns: none
+  get_height_gain:
+    summary: "Read height gain (PSPHG ?): LOW, MID, HI"
+    send: "PSPHG ?"
+    expect: { reply_contains: "PSPHG ", matches: '^PSPHG (LOW|MID|HI)$' }
+    returns: value
+  bass_step:
+    summary: "Step bass up or down (PSBAS UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSBAS {direction:map.up_down}", "PSBAS ?"]
+    returns: none
+  set_bass:
+    summary: "Set bass (PSBAS), then read it back"
+    params:
+      value: { type: int, min: -6, max: 6, required: true, label: "Bass", description: "The bass in dB, -6 to +6." }
+    send: ["PSBAS {value:+50:02d}", "PSBAS ?"]
+    returns: none
+  get_bass:
+    summary: "Read bass (PSBAS ?): 44-56, 50 being 0 dB"
+    send: "PSBAS ?"
+    expect: { reply_contains: "PSBAS ", matches: '^PSBAS ([0-9]{2})$' }
+    returns: value
+  treble_step:
+    summary: "Step treble up or down (PSTRE UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSTRE {direction:map.up_down}", "PSTRE ?"]
+    returns: none
+  set_treble:
+    summary: "Set treble (PSTRE), then read it back"
+    params:
+      value: { type: int, min: -6, max: 6, required: true, label: "Treble", description: "The treble in dB, -6 to +6."
+        }
+    send: ["PSTRE {value:+50:02d}", "PSTRE ?"]
+    returns: none
+  get_treble:
+    summary: "Read treble (PSTRE ?): 44-56, 50 being 0 dB"
+    send: "PSTRE ?"
+    expect: { reply_contains: "PSTRE ", matches: '^PSTRE ([0-9]{2})$' }
+    returns: value
+  set_drc:
+    summary: "Set dynamic range compression (PSDRC), then read it back"
+    params:
+      value: { type: enum, values: [auto, low, mid, high, "off"], required: true, label: "Dynamic range compression",
+        description: "auto, low, mid, high or off." }
+    send: ["PSDRC {value:map.drc}", "PSDRC ?"]
+    returns: none
+  get_drc:
+    summary: "Read dynamic range compression (PSDRC ?): AUTO, LOW, MID, HI, OFF"
+    send: "PSDRC ?"
+    expect: { reply_contains: "PSDRC ", matches: '^PSDRC (AUTO|LOW|MID|OFF|HI)$' }
+    returns: value
+  set_dynamic_compression:
+    summary: "Set D.COMP (PSDCO), then read it back"
+    params:
+      value: { type: enum, values: ["off", low, mid, high], required: true, label: "D.COMP", description: "Dynamic
+        compression: off, low, mid or high." }
+    send: ["PSDCO {value:map.dynamic_compression}", "PSDCO ?"]
+    returns: none
+  get_dynamic_compression:
+    summary: "Read D.COMP (PSDCO ?): OFF, LOW, MID, HIGH"
+    send: "PSDCO ?"
+    expect: { reply_contains: "PSDCO ", matches: '^PSDCO (HIGH|OFF|LOW|MID)$' }
+    returns: value
+  lfe_step:
+    summary: "Step the LFE level up or down (PSLFE UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSLFE {direction:map.up_down}", "PSLFE ?"]
+    returns: none
+  set_lfe:
+    summary: "Set the LFE level's cut (PSLFE), then read it back"
+    params:
+      cut: { type: int, min: 0, max: 10, required: true, label: "LFE cut", description: "How far the LFE level is
+        below 0 dB, 0-10 dB." }
+    send: ["PSLFE {cut:02d}", "PSLFE ?"]
+    returns: none
+  get_lfe:
+    summary: "Read the LFE level (PSLFE ?): 00 for 0 dB to 10 for -10 dB"
+    send: "PSLFE ?"
+    expect: { reply_contains: "PSLFE ", matches: '^PSLFE ([0-9]{2})$' }
+    returns: value
+  effect_step:
+    summary: "Step effect level up or down (PSEFF UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSEFF {direction:map.up_down}", "PSEFF ?"]
+    returns: none
+  set_effect:
+    summary: "Set effect level (PSEFF), then read it back"
+    params:
+      value: { type: int, min: 0, max: 99, required: true, label: "Effect level", description: "The effect level, 0-99
+        as the unit takes it." }
+    send: ["PSEFF {value:02d}", "PSEFF ?"]
+    returns: none
+  get_effect:
+    summary: "Read effect level (PSEFF ?): 00-99"
+    send: "PSEFF ?"
+    expect: { reply_contains: "PSEFF ", matches: '^PSEFF ([0-9]{2})$' }
+    returns: value
+  delay_step:
+    summary: "Step delay up or down (PSDEL UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSDEL {direction:map.up_down}", "PSDEL ?"]
+    returns: none
+  set_delay:
+    summary: "Set delay (PSDEL), then read it back"
+    params:
+      value: { type: int, min: 0, max: 300, required: true, label: "Delay", description: "The surround delay in
+        milliseconds, 0-300." }
+    send: ["PSDEL {value:03d}", "PSDEL ?"]
+    returns: none
+  get_delay:
+    summary: "Read delay (PSDEL ?): 000-300 ms"
+    send: "PSDEL ?"
+    expect: { reply_contains: "PSDEL ", matches: '^PSDEL ([0-9]{3})$' }
+    returns: value
+  set_afdm:
+    summary: "Turn AFDM on or off (PSAFD), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "AFDM", description: "On detects the surround back channel of a
+        source automatically." }
+    send: ["PSAFD {enabled:map.afdm}", "PSAFD ?"]
+    returns: none
+  get_afdm:
+    summary: "Read AFDM (PSAFD ?): ON or OFF"
+    send: "PSAFD ?"
+    expect: { reply_contains: "PSAFD ", matches: '^PSAFD (ON|OFF)$' }
+    returns: value
+  set_panorama:
+    summary: "Turn panorama on or off (PSPAN), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Panorama", description: "On extends the front image to the
+        surround speakers." }
+    send: ["PSPAN {enabled:map.panorama}", "PSPAN ?"]
+    returns: none
+  get_panorama:
+    summary: "Read panorama (PSPAN ?): ON or OFF"
+    send: "PSPAN ?"
+    expect: { reply_contains: "PSPAN ", matches: '^PSPAN (ON|OFF)$' }
+    returns: value
+  dimension_step:
+    summary: "Step dimension up or down (PSDIM UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSDIM {direction:map.up_down}", "PSDIM ?"]
+    returns: none
+  set_dimension:
+    summary: "Set dimension (PSDIM), then read it back"
+    params:
+      value: { type: int, min: 0, max: 6, required: true, label: "Dimension", description: "The dimension, 0-6." }
+    send: ["PSDIM {value:02d}", "PSDIM ?"]
+    returns: none
+  get_dimension:
+    summary: "Read dimension (PSDIM ?): 00-06"
+    send: "PSDIM ?"
+    expect: { reply_contains: "PSDIM ", matches: '^PSDIM ([0-9]{2})$' }
+    returns: value
+  center_width_step:
+    summary: "Step center width up or down (PSCEN UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSCEN {direction:map.up_down}", "PSCEN ?"]
+    returns: none
+  set_center_width:
+    summary: "Set center width (PSCEN), then read it back"
+    params:
+      value: { type: int, min: 0, max: 7, required: true, label: "Center width", description: "The center width, 0-7."
+        }
+    send: ["PSCEN {value:02d}", "PSCEN ?"]
+    returns: none
+  get_center_width:
+    summary: "Read center width (PSCEN ?): 00-07"
+    send: "PSCEN ?"
+    expect: { reply_contains: "PSCEN ", matches: '^PSCEN ([0-9]{2})$' }
+    returns: value
+  center_image_step:
+    summary: "Step center image up or down (PSCEI UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSCEI {direction:map.up_down}", "PSCEI ?"]
+    returns: none
+  set_center_image:
+    summary: "Set center image (PSCEI), then read it back"
+    params:
+      value: { type: int, min: 0, max: 10, required: true, label: "Center image", description: "The center image in
+        tenths, 0-10 (0.0 to 1.0)." }
+    send: ["PSCEI {value:02d}", "PSCEI ?"]
+    returns: none
+  get_center_image:
+    summary: "Read center image (PSCEI ?): 00-10, tenths"
+    send: "PSCEI ?"
+    expect: { reply_contains: "PSCEI ", matches: '^PSCEI ([0-9]{2})$' }
+    returns: value
+  set_subwoofer:
+    summary: "Turn subwoofer on or off (PSSWR), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Subwoofer", description: "On uses the subwoofer." }
+    send: ["PSSWR {enabled:map.subwoofer}", "PSSWR ?"]
+    returns: none
+  get_subwoofer:
+    summary: "Read subwoofer (PSSWR ?): ON or OFF"
+    send: "PSSWR ?"
+    expect: { reply_contains: "PSSWR ", matches: '^PSSWR (ON|OFF)$' }
+    returns: value
+  set_room_size:
+    summary: "Set room size (PSRSZ), then read it back"
+    params:
+      value: { type: enum, values: [s, ms, m, ml, l], required: true, label: "Room size", description: "s, ms, m, ml
+        or l." }
+    send: ["PSRSZ {value:map.room_size}", "PSRSZ ?"]
+    returns: none
+  get_room_size:
+    summary: "Read room size (PSRSZ ?): S, MS, M, ML, L"
+    send: "PSRSZ ?"
+    expect: { reply_contains: "PSRSZ ", matches: '^PSRSZ (MS|ML|S|M|L)$' }
+    returns: value
+  audio_delay_step:
+    summary: "Step audio delay up or down (PSDELAY UP/DOWN), then read it back"
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["PSDELAY {direction:map.up_down}", "PSDELAY ?"]
+    returns: none
+  set_audio_delay:
+    summary: "Set audio delay (PSDELAY), then read it back"
+    params:
+      value: { type: int, min: 0, max: 200, required: true, label: "Audio delay", description: "The audio delay in
+        milliseconds, 0-200." }
+    send: ["PSDELAY {value:03d}", "PSDELAY ?"]
+    returns: none
+  get_audio_delay:
+    summary: "Read audio delay (PSDELAY ?): 000-200 ms"
+    send: "PSDELAY ?"
+    expect: { reply_contains: "PSDELAY ", matches: '^PSDELAY ([0-9]{3})$' }
+    returns: value
+  set_restorer:
+    summary: "Set audio restorer (PSRSTR), then read it back"
+    params:
+      value: { type: enum, values: ["off", mode1, mode2, mode3], required: true, label: "Audio restorer", description:
+        "off, mode1, mode2 or mode3." }
+    send: ["PSRSTR {value:map.restorer}", "PSRSTR ?"]
+    returns: none
+  get_restorer:
+    summary: "Read audio restorer (PSRSTR ?): OFF, MODE1, MODE2, MODE3"
+    send: "PSRSTR ?"
+    expect: { reply_contains: "PSRSTR ", matches: '^PSRSTR (MODE1|MODE2|MODE3|OFF)$' }
+    returns: value
+  z2_select_input:
+    summary: "Turn zone 2 on with a source, or SOURCE to follow the main zone (Z2), then read zone 2 back"
+    params:
+      source: { type: enum, values: [CD, DVD, BD, SAT/CBL, DOCK, V.AUX, IPOD, NET/USB, SERVER, FAVORITES, USB/IPOD,
+        SOURCE, USB, IPD], required: true, label: "Zone 2 input", description: "The source, or SOURCE for the main
+        zone's." }
+    send: ["Z2{source:map.z2_source}", "Z2?"]
+    returns: none
+  z2_power:
+    summary: "Turn zone 2 on or off (Z2ON, Z2OFF), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Zone 2", description: "On turns zone 2 on, off turns it off." }
+    send: ["Z2{enabled:map.z2_power}", "Z2?"]
+    returns: none
+  z2_volume_up:
+    summary: "Raise zone 2's volume a step (Z2UP)"
+    send: "Z2UP"
+    returns: none
+  z2_volume_down:
+    summary: "Lower zone 2's volume a step (Z2DOWN)"
+    send: "Z2DOWN"
+    returns: none
+  z2_set_volume:
+    summary: "Set zone 2's volume in dB (Z2), then read zone 2 back"
+    params:
+      db: { type: int, min: -80, max: 18, required: true, label: "Zone 2 volume", description: "Zone 2's volume in dB,
+        -80 to +18." }
+    send: ["Z2{db:+80:02d}", "Z2?"]
+    returns: none
+  request_zone2:
+    summary: "Ask for zone 2's source, volume and power (Z2?); the answers update state"
+    send: "Z2?"
+    returns: none
+  z2_quick_select:
+    summary: "Recall a zone 2 quick select (Z2QUICK), then read it back"
+    params:
+      number: { type: int, min: 1, max: 4, required: true, label: "Quick select", description: "The quick select,
+        1-4." }
+    send: ["Z2QUICK{number}", "Z2QUICK ?"]
+    returns: none
+  z2_quick_select_memory:
+    summary: "Store zone 2's settings in a quick select (Z2QUICK MEMORY), then read it back"
+    params:
+      number: { type: int, min: 1, max: 4, required: true, label: "Quick select", description: "The quick select,
+        1-4." }
+    send: ["Z2QUICK{number} MEMORY", "Z2QUICK ?"]
+    returns: none
+  z2_get_quick_select:
+    summary: "Read zone 2's quick select (Z2QUICK ?): 1-4"
+    send: "Z2QUICK ?"
+    expect: { reply_contains: "Z2QUICK", matches: '^Z2QUICK([0-4])$' }
+    returns: value
+  set_z2_mute:
+    summary: "Turn zone 2 mute on or off (Z2MU), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Zone 2 mute", description: "On mutes zone 2, off unmutes it." }
+    send: ["Z2MU{enabled:map.z2_mute}", "Z2MU?"]
+    returns: none
+  get_z2_mute:
+    summary: "Read zone 2 mute (Z2MU?): ON or OFF"
+    send: "Z2MU?"
+    expect: { reply_contains: "Z2MU", matches: '^Z2MU(ON|OFF)$' }
+    returns: value
+  z2_channel_volume_step:
+    summary: "Step one of zone 2's channels up or down (Z2CV UP/DOWN), then read them back"
+    params:
+      channel: { type: enum, values: [FL, FR], required: true, label: "Channel", description: "FL or FR." }
+      direction: { type: enum, values: [up, down], required: true, label: "Direction", description: "up or down by one
+        step." }
+    send: ["Z2CV{channel:map.z2_channel} {direction:map.up_down}", "Z2CV?"]
+    returns: none
+  z2_set_channel_volume:
+    summary: "Set one of zone 2's channels in dB (Z2CV), then read them back"
+    params:
+      channel: { type: enum, values: [FL, FR], required: true, label: "Channel", description: "FL or FR." }
+      db: { type: int, min: -12, max: 12, required: true, label: "Level", description: "The channel's level in dB, -12
+        to +12." }
+    send: ["Z2CV{channel:map.z2_channel} {db:+50:02d}", "Z2CV?"]
+    returns: none
+  request_zone2_channel_volumes:
+    summary: "Ask for zone 2's channel levels (Z2CV?); the answers update state"
+    send: "Z2CV?"
+    returns: none
+  z2_set_sleep:
+    summary: "Set zone 2's sleep timer (Z2SLP), then read it back"
+    params:
+      minutes: { type: int, min: 1, max: 120, required: true, label: "Sleep timer", description: "Minutes until zone 2
+        turns off, 1-120." }
+    send: ["Z2SLP{minutes:03d}", "Z2SLP?"]
+    returns: none
+  z2_sleep_off:
+    summary: "Turn zone 2's sleep timer off (Z2SLPOFF), then read it back"
+    send: ["Z2SLPOFF", "Z2SLP?"]
+    returns: none
+  z2_get_sleep:
+    summary: "Read zone 2's sleep timer (Z2SLP?): OFF or the minutes"
+    send: "Z2SLP?"
+    expect: { reply_contains: "Z2SLP", matches: '^Z2SLP(OFF|[0-9]{3})$' }
+    returns: value
+  net_key:
+    summary: "Send a NET/USB control (NS)"
+    params:
+      key: { type: enum, values: [up, down, left, right, enter, play, pause, stop, skip_plus, skip_minus, repeat_one,
+        repeat_all, repeat_off, random_on, random_off, browse_remote_toggle, page_next, page_previous], required:
+        true, label: "Control", description: "A cursor, enter, transport, repeat, random or page control;
+        browse_remote_toggle switches an iPod's browse and remote modes." }
+    send: "NS{key:map.net_key}"
+    returns: none
+  net_favorites_folder:
+    summary: "Add the current item to the Favorites folder (NSFV MEM)"
+    send: "NSFV MEM"
+    returns: none
+  net_favorite_memory:
+    summary: "Store the current item as Favorite 1-3 (NSP MEM)"
+    params:
+      number: { type: int, min: 1, max: 3, required: true, label: "Favorite", description: "The favorite, 1-3." }
+    send: "NSP{number} MEM"
+    returns: none
+  request_net_presets:
+    summary: "Ask for the net audio preset names (NSH); the answers, one per preset, update state"
+    send: "NSH"
+    returns: none
+  request_net_display:
+    summary: "Ask for the NET/USB on-screen list in UTF-8 (NSE); its nine lines update state"
+    send: "NSE"
+    returns: none
+  request_net_display_ascii:
+    summary: "Ask for the NET/USB on-screen list in ASCII (NSA); its nine lines update state"
+    send: "NSA"
+    returns: none
+  dock_key:
+    summary: "Send a dock (iPod) control (IP)"
+    params:
+      key: { type: enum, values: [up, down, left, right, enter, play_pause, stop, skip_plus, skip_minus, search_plus,
+        search_minus, repeat_one, repeat_all, repeat_off, shuffle_songs, shuffle_album, shuffle_off, menu,
+        browse_mode, remote_mode, page_next, page_previous], required: true, label: "Control", description: "A cursor,
+        enter, transport, search, repeat, shuffle, menu, mode or page control; some only on some docks." }
+    send: "IP{key:map.dock_key}"
+    returns: none
+  menu_key:
+    summary: "Move the menu cursor, enter or return (MN)"
+    params:
+      key: { type: enum, values: [up, down, left, right, enter, return], required: true, label: "Control",
+        description: "up, down, left, right, enter or return." }
+    send: "MN{key:map.menu_key}"
+    returns: none
+  gui_menu:
+    summary: "Show or hide the GUI menu (MNMEN)"
+    params:
+      shown: { type: bool, required: true, label: "Menu", description: "On shows the GUI menu, off hides it." }
+    send: "MNMEN {shown:map.on_off}"
+    returns: none
+  source_menu:
+    summary: "Show or hide the GUI source select menu (MNSRC)"
+    params:
+      shown: { type: bool, required: true, label: "Source menu", description: "On shows the source select menu, off
+        hides it." }
+    send: "MNSRC {shown:map.on_off}"
+    returns: none
+  remote_lock:
+    summary: "Lock or unlock the IR remote (SYREMOTE LOCK)"
+    params:
+      locked: { type: bool, required: true, label: "Locked", description: "On ignores the IR remote, off obeys it." }
+    send: "SYREMOTE LOCK {locked:map.on_off}"
+    returns: none
+  panel_lock:
+    summary: "Lock the panel buttons, with or without the master volume, or unlock them (SYPANEL)"
+    params:
+      lock: { type: enum, values: [buttons, buttons_and_volume, "off"], required: true, label: "Panel lock",
+        description: "buttons (all but the master volume), buttons_and_volume, or off." }
+    send: "{lock:map.panel_lock}"
+    returns: none
+  get_upgrade_id:
+    summary: "Show the upgrade ID on the display and read it (UGIDN): twelve digits, or NG"
+    send: "UGIDN"
+    expect: { reply_contains: "UGIDN", matches: '^UGIDN ?([0-9]{12}|NG)$' }
+    returns: value
+  remote_maintenance:
+    summary: "Start or end the remote maintenance mode (RM STA, RM END), then read it back"
+    params:
+      start: { type: bool, required: true, label: "Maintenance", description: "On starts the remote maintenance mode,
+        off ends it." }
+    send: ["RM {start:map.maintenance}", "RM?"]
+    returns: none
+  get_remote_maintenance:
+    summary: "Read the remote maintenance mode (RM?): ON or OFF"
+    send: "RM?"
+    expect: { reply_contains: "RM ", matches: '^RM (ON|OFF)$' }
+    returns: value
+  set_auto_lip_sync_disabled:
+    summary: "Turn auto lip sync disabling on or off (SSHOSALS), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Auto lip sync disabling", description: "On disables auto lip sync
+        (HOSALS ON), off enables it." }
+    send: ["SSHOSALS {enabled:map.auto_lip_sync_disabled}", "SSHOS ?"]
+    returns: none
+  get_auto_lip_sync_disabled:
+    summary: "Read auto lip sync disabling (SSHOS ?): ON or OFF"
+    send: "SSHOS ?"
+    expect: { reply_contains: "SSHOSALS ", matches: '^SSHOSALS (ON|OFF)$' }
+    returns: value
+  set_screen_saver_disabled:
+    summary: "Turn screen saver disabling on or off (SSOSDSCR), then read it back"
+    params:
+      enabled: { type: bool, required: true, label: "Screen saver disabling", description: "On turns the GUI screen
+        saver off (OSDSCR ON), off turns it on." }
+    send: ["SSOSDSCR {enabled:map.screen_saver_disabled}", "SSOSD ?"]
+    returns: none
+  get_screen_saver_disabled:
+    summary: "Read screen saver disabling (SSOSD ?): ON or OFF"
+    send: "SSOSD ?"
+    expect: { reply_contains: "SSOSDSCR ", matches: '^SSOSDSCR (ON|OFF)$' }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Control commands are not acknowledged (they report unverified): each set is followed by its request, and the
+      unit also reports every change by itself. Requests are answered within 200 ms; commands closer than 200 ms are
+      ignored (the core paces them).
+  - models: [all]
+    severity: info
+    text: >
+      The guide marks power on (PWON) as available with IP control only. Some codes of the guide are taken as its
+      tables' code column gives them: Cinema EQ is set with PSHTEQ and asked with "PSCINEMA EQ. ?"; the video
+      processing mode is asked with "VSVPM ?" (the guide prints "VSVPN ?"), the HDMI setup and GUI requests with
+      "SSHOS ?" and "SSOSD ?" (printed "HOS ?" and "OSD ?"). Auto lip sync is disabled by SSHOSALS ON and the screen
+      saver by SSOSDSCR ON, as the guide gives them.
+  - models: [all]
+    severity: info
+    text: >
+      Master and zone 2 volumes are whole dB here (two digits, 80 for 0 dB, 99 for the minimum ---); the guide shows
+      no half steps. The on-screen list lines 1-7 of NSA and NSE start with a flag byte (playable, directory, cursor,
+      picture) that is kept as part of the line's text, not decoded. The effect level is taken as two digits, 00-99,
+      as the guide gives its form; the unit limits it further.
+
+state:
+  power: { type: string, description: "on or standby (PW)" }
+  volume.db: { type: int, unit: dB, description: "The master volume in dB, -80 to +18 (MV); absent meaning at the
+    minimum is volume.minimum" }
+  volume.minimum: { type: bool, description: "True at the minimum, --- (MV99)" }
+  "channels.*.db": { type: int, unit: dB, description: "A channel's level in dB, -12 to +12 (CV), keyed FL, FR, C, SW,
+    SL, SR, SBL, SBR, SB, FHL or FHR" }
+  mute: { type: bool, description: "Mute (MU)" }
+  input: { type: string, description: "The input source: CD, DVD, BD, TV, SAT/CBL, GAME, GAME2, DOCK, V.AUX, IPOD,
+    NET/USB, SERVER, FAVORITES, USB/IPOD, USB or IPD (SI)" }
+  main_zone: { type: bool, description: "Main zone (ZM)" }
+  input_mode: { type: string, description: "Input mode: auto, hdmi, digital, analog (SD)" }
+  digital_mode: { type: string, description: "Digital input mode: auto, pcm, dts (DC)" }
+  video_select: { type: string, description: "Video select: dvd, bd, tv, sat_cbl, game, game2, dock, v_aux, source
+    (SV)" }
+  sleep_minutes: { type: int, unit: min, description: "The main zone's sleep timer in minutes; 0 when off (SLP)" }
+  surround_mode: { type: string, description: "The surround mode as the unit names it, such as STEREO or DOLBY DIGITAL
+    (MS)" }
+  quick_select: { type: int, description: "The quick select in use, 1-4; 0 for none (MSQUICK)" }
+  hdmi_audio_out: { type: string, description: "HDMI audio output: amp, tv (VSAUDIO)" }
+  video_processing: { type: string, description: "Video processing mode: auto, game, movie (VSVPM)" }
+  tone_control: { type: bool, description: "Tone control (PSTONE CTRL)" }
+  surround_back: { type: string, description: "Surround back mode: matrix, plgx_cinema, plgx_music, on, off,
+    es_discrete, es_matrix, discrete (PSSB:)" }
+  cinema_eq: { type: bool, description: "Cinema EQ (PSHTEQ)" }
+  pl_mode: { type: string, description: "Decoding mode: music, cinema, game, pro_logic (PSMODE:)" }
+  front_height: { type: bool, description: "Front height output (PSFH:)" }
+  height_gain: { type: string, description: "Height gain: low, mid, high (PSPHG)" }
+  tone.bass_db: { type: int, unit: dB, description: "Bass (PSBAS; 44-56, 50 being 0 dB)" }
+  tone.treble_db: { type: int, unit: dB, description: "Treble (PSTRE; 44-56, 50 being 0 dB)" }
+  drc: { type: string, description: "Dynamic range compression: auto, low, mid, high, off (PSDRC)" }
+  dynamic_compression: { type: string, description: "D.COMP: off, low, mid, high (PSDCO)" }
+  lfe_db: { type: int, unit: dB, description: "The LFE level in dB, 0 to -10 (PSLFE)" }
+  effect_level: { type: int, description: "Effect level (PSEFF; 00-99)" }
+  delay_ms: { type: int, unit: ms, description: "Delay (PSDEL; 000-300 ms)" }
+  afdm: { type: bool, description: "AFDM (PSAFD)" }
+  panorama: { type: bool, description: "Panorama (PSPAN)" }
+  dimension: { type: int, description: "Dimension (PSDIM; 00-06)" }
+  center_width: { type: int, description: "Center width (PSCEN; 00-07)" }
+  center_image_tenths: { type: int, description: "Center image (PSCEI; 00-10, tenths)" }
+  subwoofer: { type: bool, description: "Subwoofer (PSSWR)" }
+  room_size: { type: string, description: "Room size: s, ms, m, ml, l (PSRSZ)" }
+  audio_delay_ms: { type: int, unit: ms, description: "Audio delay (PSDELAY; 000-200 ms)" }
+  restorer: { type: string, description: "Audio restorer: off, mode1, mode2, mode3 (PSRSTR)" }
+  zone2.power: { type: bool, description: "Zone 2 on (Z2ON, Z2OFF)" }
+  zone2.input: { type: string, description: "Zone 2's source, or SOURCE following the main zone (Z2)" }
+  zone2.volume_db: { type: int, unit: dB, description: "Zone 2's volume in dB (Z2; 00 is -80 dB, 80 0 dB)" }
+  zone2.volume_minimum: { type: bool, description: "True at zone 2's minimum, --- (Z299)" }
+  zone2.quick_select: { type: int, description: "Zone 2's quick select, 1-4; 0 for none (Z2QUICK)" }
+  zone2.mute: { type: bool, description: "Zone 2 mute (Z2MU)" }
+  "zone2.channels.*.db": { type: int, unit: dB, description: "A zone 2 channel's level in dB, -12 to +12 (Z2CV), keyed
+    FL or FR" }
+  zone2.sleep_minutes: { type: int, unit: min, description: "Zone 2's sleep timer in minutes; 0 when off (Z2SLP)" }
+  "net.presets.*.name": { type: string, description: "A net audio preset's name, keyed 0-55 (A1 to G8) (NSH)" }
+  "net.display.*": { type: string, description: "A line of the NET/USB on-screen list, keyed 0-8, up to its Null (NSE,
+    NSA); lines 1-7 lead with a flag byte" }
+  upgrade_id: { type: string, description: "The 12-digit upgrade ID, or NG (UGIDN)" }
+  remote_maintenance: { type: bool, description: "Remote maintenance mode on (RM)" }
+  auto_lip_sync_disabled: { type: bool, description: "Auto lip sync disabling (SSHOSALS)" }
+  screen_saver_disabled: { type: bool, description: "Screen saver disabling (SSOSDSCR)" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send: ["PW?", "MV?", "SI?", "MS?", "Z2?"]
+    - every_ms: 30000
+      send: ["CV?", "MU?", "ZM?", "SD?", "DC?", "SV?", "SLP?", "MSQUICK ?", "VSAUDIO ?", "VSVPM ?", "PSTONE CTRL ?", "PSSB:
+          ?", "PSCINEMA EQ. ?", "PSMODE: ?", "PSFH: ?", "PSPHG ?", "PSBAS ?", "PSTRE ?", "PSDRC ?", "PSDCO ?", "PSLFE
+          ?", "PSEFF ?", "PSDEL ?", "PSAFD ?", "PSPAN ?", "PSDIM ?", "PSCEN ?", "PSCEI ?", "PSSWR ?", "PSRSZ ?",
+          "PSDELAY ?", "PSRSTR ?", "Z2QUICK ?", "Z2MU?", "Z2CV?", "Z2SLP?", "RM?", "SSHOS ?", "SSOSD ?"]
+  updates:
+    - match: '^PW(ON|STANDBY)$'
+      state: { power: { value: "{1}", map: { "ON": "on", STANDBY: standby } } }
+    - match: '^MV(9[0-8]|[0-8][0-9])$'
+      state: { volume.db: "{1:-80}", volume.minimum: "false" }
+    - match: '^MV99$'
+      state: { volume.minimum: "true" }
+    - match: '^CV(FL|FR|C|SW|SL|SR|SBL|SBR|SB|FHL|FHR) ([0-9]{2})$'
+      state: { "channels.{1}.db": "{2:-50}" }
+    - match: '^MU(ON|OFF)$'
+      state: { mute: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^SI(.+)$'
+      state: { input: "{1}" }
+    - match: '^ZM(ON|OFF)$'
+      state: { main_zone: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^SD(DIGITAL|ANALOG|AUTO|HDMI)$'
+      state: { input_mode: { value: "{1}", map: { AUTO: auto, HDMI: hdmi, DIGITAL: digital, ANALOG: analog } } }
+    - match: '^DC(AUTO|PCM|DTS)$'
+      state: { digital_mode: { value: "{1}", map: { AUTO: auto, PCM: pcm, DTS: dts } } }
+    - match: '^SV(SAT/CBL|SOURCE|GAME2|V\.AUX|GAME|DOCK|DVD|BD|TV)$'
+      state: { video_select: { value: "{1}", map: { DVD: dvd, BD: bd, TV: tv, SAT/CBL: sat_cbl, GAME: game, GAME2:
+        game2, DOCK: dock, V.AUX: v_aux, SOURCE: source } } }
+    - match: '^SLP([0-9]{3})$'
+      state: { sleep_minutes: "{1}" }
+    - match: '^SLPOFF$'
+      state: { sleep_minutes: "0" }
+    # The surround mode; MSQUICK answers are the quick select.
+    - match: '^MS((?:[^Q]|Q[^U]|QU[^I]).*)$'
+      state: { surround_mode: "{1}" }
+    - match: '^MSQUICK([0-4])$'
+      state: { quick_select: "{1}" }
+    - match: '^VSAUDIO (AMP|TV)$'
+      state: { hdmi_audio_out: { value: "{1}", map: { AMP: amp, TV: tv } } }
+    - match: '^VSVPM(AUTO|GAME|MOVI)$'
+      state: { video_processing: { value: "{1}", map: { AUTO: auto, GAME: game, MOVI: movie } } }
+    - match: '^PSTONE CTRL (ON|OFF)$'
+      state: { tone_control: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^PSSB:(PLgX CINEMA|PLgX MUSIC|DSCRT ON|MTRX ON|ESDSCRT|ESMTRX|OFF|ON)$'
+      state: { surround_back: { value: "{1}", map: { MTRX ON: matrix, PLgX CINEMA: plgx_cinema, PLgX MUSIC:
+        plgx_music, "ON": "on", "OFF": "off", ESDSCRT: es_discrete, ESMTRX: es_matrix, DSCRT ON: discrete } } }
+    - match: '^PSHTEQ (ON|OFF)$'
+      state: { cinema_eq: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^PSMODE:(PRO LOGIC|CINEMA|MUSIC|GAME)$'
+      state: { pl_mode: { value: "{1}", map: { MUSIC: music, CINEMA: cinema, GAME: game, PRO LOGIC: pro_logic } } }
+    - match: '^PSFH:(ON|OFF)$'
+      state: { front_height: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^PSPHG (LOW|MID|HI)$'
+      state: { height_gain: { value: "{1}", map: { LOW: low, MID: mid, HI: high } } }
+    - match: '^PSBAS ([0-9]{2})$'
+      state: { tone.bass_db: "{1:-50}" }
+    - match: '^PSTRE ([0-9]{2})$'
+      state: { tone.treble_db: "{1:-50}" }
+    - match: '^PSDRC (AUTO|LOW|MID|OFF|HI)$'
+      state: { drc: { value: "{1}", map: { AUTO: auto, LOW: low, MID: mid, HI: high, "OFF": "off" } } }
+    - match: '^PSDCO (HIGH|OFF|LOW|MID)$'
+      state: { dynamic_compression: { value: "{1}", map: { "OFF": "off", LOW: low, MID: mid, HIGH: high } } }
+    - match: '^PSLFE ([0-9]{2})$'
+      state: { lfe_db: "-{1}" }
+    - match: '^PSEFF ([0-9]{2})$'
+      state: { effect_level: "{1}" }
+    - match: '^PSDEL ([0-9]{3})$'
+      state: { delay_ms: "{1}" }
+    - match: '^PSAFD (ON|OFF)$'
+      state: { afdm: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^PSPAN (ON|OFF)$'
+      state: { panorama: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^PSDIM ([0-9]{2})$'
+      state: { dimension: "{1}" }
+    - match: '^PSCEN ([0-9]{2})$'
+      state: { center_width: "{1}" }
+    - match: '^PSCEI ([0-9]{2})$'
+      state: { center_image_tenths: "{1}" }
+    - match: '^PSSWR (ON|OFF)$'
+      state: { subwoofer: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^PSRSZ (MS|ML|S|M|L)$'
+      state: { room_size: { value: "{1}", map: { S: s, MS: ms, M: m, ML: ml, L: l } } }
+    - match: '^PSDELAY ([0-9]{3})$'
+      state: { audio_delay_ms: "{1}" }
+    - match: '^PSRSTR (MODE1|MODE2|MODE3|OFF)$'
+      state: { restorer: { value: "{1}", map: { "OFF": "off", MODE1: mode1, MODE2: mode2, MODE3: mode3 } } }
+    - match: '^Z2(ON|OFF)$'
+      state: { zone2.power: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^Z2(9[0-8]|[0-8][0-9])$'
+      state: { zone2.volume_db: "{1:-80}", zone2.volume_minimum: "false" }
+    - match: '^Z299$'
+      state: { zone2.volume_minimum: "true" }
+    - match: '^Z2(CD|DVD|BD|SAT/CBL|DOCK|V\.AUX|IPOD|NET/USB|SERVER|FAVORITES|USB/IPOD|SOURCE|USB|IPD)$'
+      state: { zone2.input: "{1}" }
+    - match: '^Z2QUICK([0-4])$'
+      state: { zone2.quick_select: "{1}" }
+    - match: '^Z2MU(ON|OFF)$'
+      state: { zone2.mute: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^Z2CV(FL|FR) ([0-9]{2})$'
+      state: { "zone2.channels.{1}.db": "{2:-50}" }
+    - match: '^Z2SLP([0-9]{3})$'
+      state: { zone2.sleep_minutes: "{1}" }
+    - match: '^Z2SLPOFF$'
+      state: { zone2.sleep_minutes: "0" }
+    - match: '^NSH([0-5][0-9])(.*)$'
+      state: { "net.presets.{1}.name": "{2}" }
+    - match: '^NS[EA]([0-8])([^\x00]*)'
+      state: { "net.display.{1}": "{2}" }
+    - match: '^UGIDN ?([0-9]{12}|NG)$'
+      state: { upgrade_id: "{1}" }
+    - match: '^RM (ON|OFF)$'
+      state: { remote_maintenance: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^SSHOSALS (ON|OFF)$'
+      state: { auto_lip_sync_disabled: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^SSOSDSCR (ON|OFF)$'
+      state: { screen_saver_disabled: { value: "{1}", map: { "ON": true, "OFF": false } } }

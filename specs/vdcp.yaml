@@ -1,0 +1,507 @@
+spec: 1
+id: vdcp
+name: VDCP (Video Disk Control Protocol) video servers
+vendor: Imagine Communications
+category: recorder
+implementation: native
+reason: >
+  VDCP is binary: each message is STX, a byte count, a command type and unit address, a command, data and a
+  two's-complement checksum; commands are answered by a bare ACK or NAK byte and sense requests by a framed
+  return. A controller must open and select a signal port before commands reach it, lists of IDs come ten at a
+  time and are read with NEXT until none remain, status comes as bit maps whose fields depend on a request bit
+  map, and a macro's completion is sent in place of a port status and must be acknowledged by the controller.
+
+# The automation protocol of broadcast video disk servers (Louth's, then Harris's, now Imagine Communications'),
+# implemented by most playout and ingest servers. It is specified for RS-422 at 38.4 kbit/s with odd parity; many
+# servers also take it over TCP on a port of their own, or through a serial-to-Ethernet converter, carrying the
+# same bytes.
+source:
+  - title: "VDCP Protocol Guide, Revision 20 (May 31, 2023)"
+    author: Imagine Communications Corp.
+    url: https://imaginecommunications.com/insights-and-resources/vdcp-protocol
+    note: >
+      Manufacturer document, published on Imagine's site without registration (retrieved 2026-10-27; marked
+      proprietary and confidential; nothing of it is copied here). Electrical specification (RS-422A, 38.4 kbit/s,
+      8 data bits, odd parity, 1 stop bit) and pin-out, the session (STX, byte count, CMD-1 type and unit
+      address, CMD-2, data, checksum; ACK 04, NAK 05 and its error byte, sense returns with the top bit set),
+      deferred (type 4) commands, 50p timing, fixed and variable-length IDs, macros, the command table with
+      required and optional commands, and each command's data (pp.21-60): system, immediate, preset/select,
+      sense, port status 1-5, system status 1-6, ID request bits and macro status.
+  - title: "Video Disk Control Protocol (Wikipedia)"
+    author: Wikipedia contributors
+    url: https://en.wikipedia.org/wiki/Video_Disk_Control_Protocol
+    note: "Background only: Louth's origin, derivation from the Sony 9-pin protocol, RS-422 and TCP use."
+
+settings:
+  link: { type: enum, values: [serial, tcp], default: serial, label: Link,
+    description: "serial uses a serial port of the host (an RS-422 adapter); tcp reaches the server's VDCP over the network, natively or through a serial-to-Ethernet converter, at the device's host and port." }
+  port: { type: int, min: -127, max: 127, default: 1, label: Signal port,
+    description: "The signal port to open and select on connecting: 1 to 127 for output (play) ports, -1 to -127 for input (record) ports, or 0 to open none (send open_port and select_port yourself)." }
+  lock_port: { type: bool, default: false, label: Lock the port,
+    description: "On opens the signal port locked, so no other controller can take it; off opens it unlocked." }
+  variable_ids: { type: bool, default: false, label: Variable-length IDs,
+    description: "On sends and reads IDs with a length byte (the 8X, AX, BX and DX commands) for servers that support them; off uses eight-character IDs padded with spaces." }
+  serial_port: { type: string, max_length: 256, label: Serial port,
+    description: "With link serial, the host's serial port wired to the server's RS-422 control port: COM3 on Windows, /dev/ttyUSB0 on Linux." }
+  baud_rate: { type: enum, values: ["38400"], default: "38400", label: Baud rate, description: "VDCP runs at 38400 bit/s." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "8 data bits." }
+  parity: { type: enum, values: [odd], default: odd, label: Parity, description: "Odd parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "1 stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "No flow control." }
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-422 on the server's 9-pin D-sub control port, through an RS-422 adapter" }
+  - { port: null, protocol: tcp, role: control, when: "link tcp", note: "the server's VDCP TCP port, or a converter's, given when the device is opened" }
+
+models:
+  - id: generic
+    name: Any video server controlled over VDCP
+    supports: &all [local_disable, local_enable, delete_from_archive, protect_id, unprotect_id, stop, play, play_prepared,
+      record, freeze, still, step, continue, jog, variable_play, unfreeze, ee_mode, at, rename_id, preset_standard_time,
+      new_copy, sort_mode, close_port, select_port, record_init, play_cue, play_cue_prepared, cue_with_data,
+      delete_id, get_from_archive, clear, send_to_archive, set_signal_full, record_init_with_data,
+      select_logical_drive, system_delete_id, preset, set_video_compression_rate, set_audio_sample_rate,
+      set_audio_compression_rate, set_audio_in_level, set_audio_out_level, set_video_compression_parameters,
+      select_output, select_input, set_record_mode, set_subcarrier, set_h_position, set_disk_preroll, copy_file_to,
+      delete_file_from, abort_copy_file_to, set_asi_program, open_port, get_last, get_port_status, get_position,
+      get_active_id, get_device_type, get_system_status, list_ids, get_id_size, list_ids_added_to_archive,
+      get_id_status, get_compression_settings, list_ids_added, list_ids_deleted, get_multi_port_status,
+      get_asi_program, abort_macro, get_active_macros, get_macro_status, copy_file_macro, get_from_archive_macro,
+      send_to_archive_macro, prepare_to_play, prepare_to_play_with_data, close_from_play, send_raw]
+    verification: none
+  - id: ross-server
+    name: Ross Video servers controlled over VDCP (Tria, Mira, Kiva)
+    supports: *all
+    verification: none
+
+commands:
+  local_disable:
+    summary: Disable the server's control panel except the remote/local switch (0X.0C)
+    returns: ack
+  local_enable:
+    summary: Enable the server's control panel (0X.0D)
+    returns: ack
+  delete_from_archive:
+    summary: Delete an ID from archive storage, not from the disk (0X.14)
+    params:
+      id: &id { type: string, max_length: 255, pattern: "^[ -~]+$", required: true, label: ID, description: "The material's ID: up to 8 printable ASCII characters, or longer with variable_ids." }
+    returns: ack
+  protect_id:
+    summary: Protect an ID from deletion (0X.15)
+    params: { id: *id }
+    returns: ack
+  unprotect_id:
+    summary: Allow an ID to be deleted again (0X.16)
+    params: { id: *id }
+    returns: ack
+  stop:
+    summary: Return the selected port to idle (1X.00); a recording stops and keeps what was recorded
+    returns: ack
+  play:
+    summary: Play the cued ID (1X.01); the cue/init done bit must be set
+    returns: ack
+  play_prepared:
+    summary: Play an ID prepared with prepare_to_play, by its handle (1X.01 with the handle)
+    params:
+      handle: &handle { type: int, min: 1, max: 255, required: true, label: Handle, description: "The prepared file handle, from 1." }
+    returns: ack
+  record:
+    summary: Start recording the ID initialized with record_init (1X.02)
+    returns: ack
+  freeze:
+    summary: Freeze the input on its current frame (1X.03, input ports)
+    returns: ack
+  still:
+    summary: Pause the playing ID on its frame (1X.04)
+    returns: ack
+  step:
+    summary: Advance one frame and still (1X.05)
+    returns: ack
+  continue:
+    summary: Continue playing from still (1X.06)
+    returns: ack
+  jog:
+    summary: Move a number of frames forward or back (1X.07, one or four bytes)
+    params:
+      frames: { type: int, min: -2592000, max: 2592000, required: true, label: Frames, description: "Frames to move: positive forward, negative back." }
+    returns: ack
+  variable_play:
+    summary: Play at a speed and direction (1X.08, a 24-bit signed speed)
+    params:
+      speed: { type: float, min: -128, max: 127, required: true, label: Speed, description: "Times play speed: 1 normal forward, -1 normal reverse, 0 still." }
+    returns: ack
+  unfreeze:
+    summary: Return to the live input (1X.09)
+    returns: ack
+  ee_mode:
+    summary: Set the output's EE mode (1X.0A)
+    params:
+      mode: { type: enum, values: ["off", "on", auto], required: true, label: EE mode, description: "off (never the input), on (always the input) or auto (the input except while playing)." }
+    returns: ack
+  at:
+    summary: Run an immediate command at a standard time (4X, a deferred command)
+    params:
+      command: { type: enum, values: [stop, play, record, freeze, still, step, continue, unfreeze], required: true, label: Command, description: "The immediate command to run." }
+      timecode: &tc { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Time, description: "HH:MM:SS:FF of the server's standard time." }
+    returns: ack
+  rename_id:
+    summary: Rename an ID (2X.1D)
+    params:
+      id: *id
+      new_id: { type: string, max_length: 255, pattern: "^[ -~]+$", required: true, label: New ID, description: "The new ID." }
+    returns: ack
+  preset_standard_time:
+    summary: Set the standard time deferred commands run by (2X.1E)
+    params:
+      mode: { type: enum, values: [drop_frame, non_drop, pal], required: true, label: Time mode, description: "drop_frame, non_drop or pal." }
+      timecode: *tc
+    returns: ack
+  new_copy:
+    summary: Make a new ID from part of an existing one (2X.1F)
+    params:
+      id: *id
+      new_id: { type: string, max_length: 255, pattern: "^[ -~]+$", required: true, label: New ID, description: "The new ID." }
+      offset: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Offset, description: "Where the copy starts within the original, HH:MM:SS:FF." }
+      duration: &duration { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Duration, description: "HH:MM:SS:FF." }
+    returns: ack
+  sort_mode:
+    summary: Choose the order ID lists come in (2X.20)
+    params:
+      order: { type: enum, values: [alphabetic, fifo], required: true, label: Order, description: "alphabetic, or fifo (oldest first, the default)." }
+    returns: ack
+  close_port:
+    summary: Close a signal port (2X.21)
+    params:
+      port: &port { type: int, min: -127, max: 127, required: true, label: Signal port, description: "1 to 127 for output ports, -1 to -127 for input ports." }
+    returns: ack
+  select_port:
+    summary: Select an opened signal port for the commands that follow (2X.22)
+    params: { port: *port }
+    returns: ack
+  record_init:
+    summary: Prepare the input port to record an ID for a duration (2X.23)
+    params: { id: *id, duration: *duration }
+    returns: ack
+  play_cue:
+    summary: Cue an ID to play on the output port (2X.24)
+    params: { id: *id }
+    returns: ack
+  play_cue_prepared:
+    summary: Cue a prepared ID by its handle (2X.24 with the handle)
+    params: { id: *id, handle: *handle }
+    returns: ack
+  cue_with_data:
+    summary: Cue part of an ID to play (2X.25)
+    params:
+      id: *id
+      start: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Start, description: "Where playout starts within the ID, HH:MM:SS:FF." }
+      duration: *duration
+    returns: ack
+  delete_id:
+    summary: Delete an ID from the disk (2X.26)
+    params: { id: *id }
+    returns: ack
+  get_from_archive:
+    summary: Transfer an ID from the archive to the disk (2X.27)
+    params: { id: *id }
+    returns: ack
+  clear:
+    summary: Remove every ID from the disk and clear the archive transfer list (2X.29); for maintenance only
+    returns: ack
+  send_to_archive:
+    summary: Copy an ID to the archive (2X.2A)
+    params: { id: *id }
+    returns: ack
+  set_signal_full:
+    summary: Set the free space at which the disk full bit is set (2X.2B)
+    params:
+      percent: { type: int, min: 0, max: 100, required: true, label: Percent free, description: "Percent of the disk still free when the full flag sets; 1-10 is usual." }
+    returns: ack
+  record_init_with_data:
+    summary: Prepare to record an ID, or dub over part of an existing one (2X.2C)
+    params:
+      id: *id
+      start: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Start, description: "Where the recording starts within the ID (or its first timecode), HH:MM:SS:FF." }
+      duration: *duration
+    returns: ack
+  select_logical_drive:
+    summary: Choose which logical drive is searched for IDs, and how (2X.2D)
+    params:
+      drive: { type: int, min: 0, max: 31, required: true, label: Drive, description: "The logical drive's number." }
+      only: { type: bool, default: false, label: Only this drive, description: "On searches only this drive; off searches it first, then the others." }
+      descending: { type: bool, default: false, label: Descending, description: "With only off, search the other drives in descending order." }
+    returns: ack
+  system_delete_id:
+    summary: Delete an ID from this and every networked disk system (2X.2E)
+    params: { id: *id }
+    returns: ack
+  preset:
+    summary: Return the port's configuration to the maker's defaults (2X.30)
+    returns: ack
+  set_video_compression_rate:
+    summary: Set the video compression rate in bits per second (2X.31, device dependent)
+    params:
+      rate: { type: int, min: 0, max: 4294967295, required: true, label: Rate, description: "Bits per second." }
+    returns: ack
+  set_audio_sample_rate:
+    summary: Set the audio sample rate code (2X.32, device dependent)
+    params:
+      value: &byte { type: int, min: 0, max: 255, required: true, label: Value, description: "The device's code for the setting." }
+    returns: ack
+  set_audio_compression_rate:
+    summary: Set the audio compression rate code (2X.33, device dependent)
+    params: { value: *byte }
+    returns: ack
+  set_audio_in_level:
+    summary: Set the input audio level (2X.34, device dependent)
+    params:
+      value: &word { type: int, min: 0, max: 65535, required: true, label: Value, description: "The device's 16-bit value." }
+    returns: ack
+  set_audio_out_level:
+    summary: Set the output audio level (2X.35, device dependent)
+    params: { value: *word }
+    returns: ack
+  set_video_compression_parameters:
+    summary: Set the video compression parameters (2X.37, device dependent)
+    params:
+      parameters: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: Parameters, description: "The four parameter bytes as hex." }
+    returns: ack
+  select_output:
+    summary: Select the output format and connector (2X.38)
+    params:
+      mode: &mode { type: enum, values: ["off", composite, s_video, yuv, d1], required: true, label: Format, description: "off (black), composite, s_video, yuv or d1." }
+    returns: ack
+  select_input:
+    summary: Select the input format and connector (2X.39)
+    params: { mode: *mode }
+    returns: ack
+  set_record_mode:
+    summary: Select the tracks recorded (2X.3A)
+    params:
+      video: { type: bool, default: true, label: Video, description: "Record video." }
+      audio: { type: json, label: Audio channels, description: "A list of audio channels to record, 1-15." }
+    returns: ack
+  set_subcarrier:
+    summary: Set the subcarrier phase (2X.41, device dependent)
+    params: { value: *word }
+    returns: ack
+  set_h_position:
+    summary: Set the horizontal timing (2X.42, device dependent)
+    params: { value: *word }
+    returns: ack
+  set_disk_preroll:
+    summary: Set the delay a play or record starts after (2X.43)
+    params:
+      frames: { type: int, min: 0, max: 99, required: true, label: Frames, description: "Frames of preroll." }
+      seconds: { type: int, min: 0, max: 255, required: true, label: Seconds, description: "Seconds of preroll." }
+    returns: ack
+  copy_file_to:
+    summary: Copy an ID from one disk system to others (2X.50)
+    params:
+      id: *id
+      source: &source { type: int, min: 0, max: 255, required: true, label: Source, description: "The source disk system's number." }
+      destinations: &dest { type: json, required: true, label: Destinations, description: "A list of destination disk system numbers, 0-255." }
+    returns: ack
+  delete_file_from:
+    summary: Delete an ID from other disk systems (2X.51)
+    params: { id: *id, destinations: *dest }
+    returns: ack
+  abort_copy_file_to:
+    summary: Abort a copy started with copy_file_to (2X.52)
+    params: { id: *id, source: *source, destinations: *dest }
+    returns: ack
+  set_asi_program:
+    summary: Select the program number in the ASI stream (2X.67)
+    params:
+      program: { type: int, min: 0, max: 65535, required: true, label: Program, description: "The program number, 0-65535." }
+    returns: ack
+  open_port:
+    summary: "Open a signal port (3X.01, answered 3X.81: granted or not)"
+    params:
+      port: *port
+      lock: { type: bool, default: false, label: Lock, description: "On opens the port locked." }
+    returns: value
+  get_last:
+    summary: "Read the last response again (3X.03) as hex"
+    returns: value
+  get_port_status:
+    summary: "Read the port status 1-5 (3X.05): state flags, port, media, errors and format"
+    returns: value
+  get_position:
+    summary: "Read the position in the active ID (3X.06)"
+    params:
+      kind: { type: enum, values: [remaining, timecode, offset], required: true, label: Position, description: "remaining time, the frame's timecode, or the offset from the ID's start." }
+    returns: value
+  get_active_id:
+    summary: "Read whether the port is active and its ID (3X.07)"
+    returns: value
+  get_device_type:
+    summary: "Read the device type (3X.08): the maker's ID, a colon and its specification"
+    returns: value
+  get_system_status:
+    summary: "Read the system status 1-6 (3X.10): time remaining, IDs stored, disk and archive status, standard time, signal full level"
+    returns: value
+  list_ids:
+    summary: "List every ID on the disk (3X.11, then NEXT until none remain), into state"
+    returns: value
+  get_id_size:
+    summary: "Read an ID's duration (3X.14)"
+    params: { id: *id }
+    returns: value
+  list_ids_added_to_archive:
+    summary: "List the IDs added to the archive since last asked (3X.15, then NEXT)"
+    returns: value
+  get_id_status:
+    summary: "Read whether an ID is on the disk, in the archive, protected, being transferred or not ready (3X.16)"
+    params: { id: *id }
+    returns: value
+  get_compression_settings:
+    summary: "Read the compression and port settings 1-6 (3X.17) as hex"
+    returns: value
+  list_ids_added:
+    summary: "List the IDs added since last asked (3X.18, then NEXT)"
+    returns: value
+  list_ids_deleted:
+    summary: "List the IDs deleted since last asked (3X.19, then NEXT)"
+    returns: value
+  get_multi_port_status:
+    summary: "Read several ports' status at once (3X.25) as hex"
+    params:
+      start: *port
+      count: { type: int, min: 1, max: 127, required: true, label: Ports, description: "How many ports from start." }
+    returns: value
+  get_asi_program:
+    summary: "Read the ASI program number (3X.67)"
+    returns: value
+  abort_macro:
+    summary: Abort a macro, or with 0 every pending macro (5X.60)
+    params:
+      macro: { type: int, min: 0, max: 65535, required: true, label: Macro, description: "The macro's number, or 0 for all." }
+    returns: ack
+  get_active_macros:
+    summary: "List the pending macros' numbers (5X.61)"
+    returns: value
+  get_macro_status:
+    summary: "Read a macro's state, completion code, command and ID (5X.62)"
+    params:
+      macro: &macro { type: int, min: 1, max: 65535, required: true, label: Macro, description: "The macro's number, 1-65535, chosen by the controller." }
+    returns: value
+  copy_file_macro:
+    summary: Copy an ID between disk systems as a macro (5X.63)
+    params: { macro: *macro, id: *id, source: *source, destinations: *dest }
+    returns: ack
+  get_from_archive_macro:
+    summary: Transfer an ID from the archive as a macro (5X.64)
+    params: { macro: *macro, id: *id }
+    returns: ack
+  send_to_archive_macro:
+    summary: Copy an ID to the archive as a macro (5X.65)
+    params: { macro: *macro, id: *id }
+    returns: ack
+  prepare_to_play:
+    summary: Open an ID ready to play soon under a handle (5X.66)
+    params: { macro: *macro, id: *id, handle: *handle }
+    returns: ack
+  prepare_to_play_with_data:
+    summary: Open part of an ID ready to play under a handle (5X.66 with start and duration)
+    params:
+      macro: *macro
+      id: *id
+      handle: *handle
+      start: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Start, description: "Where playout starts within the ID, HH:MM:SS:FF." }
+      duration: *duration
+    returns: ack
+  close_from_play:
+    summary: Close a prepared ID (5X.67), stopping it if playing
+    params: { macro: *macro, id: *id }
+    returns: ack
+  send_raw:
+    summary: Send any VDCP message (STX, the count and the checksum added) and return the reply's bytes as hex
+    params:
+      message: { type: string, pattern: "^([0-9A-Fa-f]{2} ?)+$", max_length: 600, required: true, label: Message, description: "CMD-1, CMD-2 and the data as hexadecimal bytes, such as 30 05 0F." }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      clear removes every ID from the disk; delete_id, system_delete_id (every networked disk), delete_from_archive
+      and delete_file_from remove material for good; record and record_init_with_data on an existing ID record over
+      it; stop ends a recording. None can be undone.
+  - models: [all]
+    severity: warning
+    text: >
+      Commands are acknowledged when received, not when done: a command the port cannot carry out (an unknown ID,
+      a play without a finished cue) is reported in the port status's error bits, which the server clears once
+      read, so port_status.errors shows the last error once. Unsupported optional commands are acknowledged too,
+      with the not_supported error bit set.
+  - models: [all]
+    severity: info
+    text: >
+      The core opens and selects the signal port named by the port setting on connecting, and again when the port
+      status reports the server rebooted. Monitored, it asks the port status every 250 ms, the position (timecode
+      and remaining) while the port is active, the active ID every second and the system status every 10 s; when
+      the port status says IDs were added or deleted it reads those lists and updates ids; the whole ID list is
+      read on connecting. Opened for commands only, only a port status every 10 s while idle.
+  - models: [all]
+    severity: info
+    text: >
+      Device-dependent values (compression rates, audio sample rate and level codes, subcarrier and H timing) are
+      sent as given; get_compression_settings and get_multi_port_status return their data as hex. A macro's
+      completion return, which the server sends in place of a port status, is applied to macros in state and
+      acknowledged with ACK.
+
+state:
+  port.number: { type: int, description: "The signal port opened on connecting" }
+  port.granted: { type: bool, description: "Whether the server granted it (3X.81)" }
+  device_type: { type: string, description: "The device type text (3X.88)" }
+  port_status.state: { type: string, description: "The port's state: idle, cueing, cued, play_record, still, jog or unknown (Status 1)" }
+  port_status.port_id: { type: int, description: "The signal port selected (Status 1)" }
+  port_status.idle: { type: bool, description: "Status 1 bit 0" }
+  port_status.cue_init: { type: bool, description: "Cueing or initializing (Status 1)" }
+  port_status.play_record: { type: bool, description: "Playing or recording (Status 1)" }
+  port_status.still: { type: bool, description: "Still (Status 1)" }
+  port_status.jog: { type: bool, description: "Jog (Status 1)" }
+  port_status.variable_play: { type: bool, description: "Variable play (Status 1)" }
+  port_status.busy: { type: bool, description: "Busy: only immediate commands and status are taken (Status 1)" }
+  port_status.cue_init_done: { type: bool, description: "Cue or record init done: play or record may follow (Status 1)" }
+  port_status.port_down: { type: bool, description: "The port is inoperative (Status 2)" }
+  port_status.ids_added: { type: bool, description: "IDs were added and not yet listed (Status 2)" }
+  port_status.ids_deleted: { type: bool, description: "IDs were deleted and not yet listed (Status 2)" }
+  port_status.ids_added_to_archive: { type: bool, description: "IDs were added to the archive (Status 2)" }
+  port_status.no_reference: { type: bool, description: "No reference input (Status 2)" }
+  port_status.no_video_input: { type: bool, description: "No video input (Status 2, input ports)" }
+  port_status.no_audio_input: { type: bool, description: "No audio input (Status 2, input ports)" }
+  port_status.audio_overload: { type: bool, description: "Audio input over the limit (Status 2)" }
+  port_status.errors.*: { type: bool, description: "Each error bit of Status 3 by name (system_error, illegal_value, id_not_found, disk_full, not_supported, system_rebooted...), set once per occurrence" }
+  port_status.format: { type: string, description: "The active formats from Status 4: off, composite, s_video, yuv, d1, comma-separated" }
+  position.timecode: { type: string, description: "The current frame's timecode in the active ID (3X.86)" }
+  position.remaining: { type: string, description: "Time remaining in the active ID (3X.86)" }
+  position.offset: { type: string, description: "Offset from the ID's start (3X.86)" }
+  active_id: { type: string, description: "The ID playing, recording or cued on the port; empty when idle (3X.87)" }
+  system.time_remaining: { type: string, description: "Estimated recording time left, HH:MM:SS:FF (System Status 1)" }
+  system.largest_block: { type: string, description: "The largest single recording possible (System Status 1)" }
+  system.ids_stored: { type: int, description: "IDs on the disk (System Status 2)" }
+  system.disk_full: { type: bool, description: "System Status 3" }
+  system.system_down: { type: bool, description: "System Status 3" }
+  system.disk_down: { type: bool, description: "System Status 3" }
+  system.remote_control_disabled: { type: bool, description: "The server is set to local (System Status 3)" }
+  system.local_offline_storage_available: { type: bool, description: "System Status 4" }
+  system.system_offline_storage_available: { type: bool, description: "System Status 4" }
+  system.local_offline_storage_full: { type: bool, description: "System Status 4" }
+  system.system_offline_storage_full: { type: bool, description: "System Status 4" }
+  system.archive_available: { type: bool, description: "System Status 4" }
+  system.archive_full: { type: bool, description: "System Status 4" }
+  system.standard_time: { type: string, description: "The standard time deferred commands run by (System Status 5)" }
+  system.signal_full_percent: { type: int, unit: "%", description: "The free space at which the full flag sets (System Status 6)" }
+  ids.*: { type: bool, description: "Each ID on the disk, keyed by the ID (true); kept current from the added and deleted lists" }
+  last_added: { type: array, description: "The IDs in the last added list read" }
+  last_deleted: { type: array, description: "The IDs in the last deleted list read" }
+  last_archive_added: { type: array, description: "The IDs in the last added-to-archive list read" }
+  compression.data: { type: string, description: "The last compression settings return's data, as hex" }
+  asi_program: { type: int, description: "The ASI program number (3X.E7)" }
+  macros.*.macro: { type: int, description: "A macro's number" }
+  macros.*.state: { type: string, description: "unknown, pending, in_progress, complete, failed or aborted" }
+  macros.*.completion: { type: string, description: "Its completion code's four bytes as hex; 00000000 is success" }
+  macros.*.command: { type: string, description: "The command it ran, as hex" }
+  macros.*.id: { type: string, description: "The ID it worked on" }

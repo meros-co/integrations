@@ -442,7 +442,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             if transport_type not in ("line-tcp", "line-serial", "line-udp"):
                 errors.append(f"commands.{name}: expect.reply_contains needs a line transport")
             errors += check_template("text", expect_["reply_contains"], params, settings,
-                                     f"commands.{name}.expect.reply_contains")
+                                     f"commands.{name}.expect.reply_contains",
+                                     conversions=conversions, maps=doc.get("maps") or {})
         if expect_.get("replies", 1) != 1 and transport_type not in ("line-tcp", "line-serial", "line-udp"):
             errors.append(f"commands.{name}: expect.replies needs a line transport")
         if "convert" in expect_:

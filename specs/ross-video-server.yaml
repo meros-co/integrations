@@ -1,0 +1,220 @@
+spec: 1
+id: ross-video-server
+name: Ross Video servers (Tria, Mira, Kiva) over RossTalk
+vendor: Ross Video
+category: playback
+
+# RossTalk "receive" commands of the Ross video servers: plain text over TCP, each command ended by CR LF, case
+# sensitive. A channel is a server video channel, a letter A to H. Ross documents no reply, so the transport reads
+# none and every command reports unverified. The playlist commands came with V9.2 software.
+source:
+  - title: "Carbonite Device DashBoard Setup (online help), RossTalk > Ross Video Server (Mira, Tria, Kiva) Commands (help build 2026-01-30)"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device-db/Topics/Protocol/External/TRIA/RT-TRIA-Comm.html
+    note: >
+      Manufacturer document (retrieved 2026-10-27). Port 7788, CR/LF termination, commands case sensitive, clip
+      names relative to H:\video\ with a subfolder path, and Table 1 "RossTalk Commands": CUE channel:clip, CUE
+      channel:clip:timecode, PLAY channel, PLAY channel:clip, PLAY channel:clip:timecode, STOP channel, GOTO
+      channel:timecode, JOG channel:amount, LOOP channel:mode (off, loop, loop-to, ping-pong, ping-pong-to), ANGLE
+      channel:angle and EJECT channel, with timecodes written HH,MM,SS,FF. No reply is documented.
+  - title: "Carbonite Device Setup (Legacy) (online help), RossTalk > Ross Video Server (Mira, Tria, Kiva) Commands"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device/Topics/Protocol/RossTalk/TRIA/RT-TRIA-Comm.html
+    note: "Manufacturer document, earlier edition: the same commands, its examples with .clip extensions."
+  - title: "Tria & Tria+ Production Server Software Release Notes, V9.2.0 (November 2023)"
+    author: Ross Video Ltd.
+    url: "https://documentation.rossvideo.com/files/Release%20Notes%20(ARCHIVED%20DO%20NOT%20USE)/Video%20Servers/V9.2.0%20Software%20Release%20Notes%20TRIA%20%26%20TRIA%2B.pdf"
+    note: >
+      Manufacturer document. The RossTalk port set in the Tria Config app's RS422 tab, 7788 by default, 7788-7798
+      (item 2); the new receive commands LOAD_PLAYLIST (pvw-channel:)pgm-channel:playlistname, LOOP_PLAYLIST
+      channel:mode (loop, off), TAKE channel, UP_ONE_ITEM, DOWN_ONE_ITEM, RECUE_TO_FIRST_ITEM and EJECT_PLAYLIST
+      channel (items 3-11); forward slashes accepted for folders (item 5).
+  - title: "Tria Express, Mira Express and Kiva+ Software Release Notes, V9.2.0 (November 2023)"
+    author: Ross Video Ltd.
+    url: "https://documentation.rossvideo.com/files/Release%20Notes%20(ARCHIVED%20DO%20NOT%20USE)/Video%20Servers/V9.2.0%20Software%20Release%20Notes%20KIVA+.pdf"
+    note: >
+      Manufacturer documents (the Tria Express and Mira Express notes beside it in the same folder). The same port
+      range and receive commands for Tria Express, Mira and Kiva; TAKE G on a Mira with two PGM players (ChG and ChH)
+      swaps them; RossTalk receive commands first came in Kiva 8.2.3 (February 2022).
+
+transport:
+  type: line-tcp
+  port: 7788
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 2000
+  reply: none
+
+ports:
+  - { port: 7788, protocol: tcp, role: control, note: "set on the server's Config app RS422 tab, 7788-7798 (V9.2 and later); give the port when opening the device" }
+
+models:
+  - id: tria
+    name: Ross Tria
+    supports: &all [cue, cue_at, play, play_clip, play_clip_at, stop, goto, jog, loop, angle, eject, load_playlist,
+      load_playlist_pair, loop_playlist, take, up_one_item, down_one_item, recue_to_first_item, eject_playlist]
+    verification: none
+  - id: tria-plus
+    name: Ross Tria+
+    supports: *all
+    verification: none
+  - id: tria-express
+    name: Ross Tria Express
+    supports: *all
+    verification: none
+  - id: mira
+    name: Ross Mira
+    supports: *all
+    verification: none
+  - id: mira-plus
+    name: Ross Mira+
+    supports: *all
+    verification: none
+  - id: kiva
+    name: Ross Kiva
+    supports: *all
+    verification: none
+
+maps:
+  loop: { "off": "off", loop: loop, loop_to: loop-to, ping_pong: ping-pong, ping_pong_to: ping-pong-to }
+  loop_playlist: { "true": loop, "false": "off" }
+
+commands:
+  cue:
+    summary: Load a clip into a channel (CUE channel:clip)
+    params:
+      channel: &channel { type: enum, values: [A, B, C, D, E, F, G, H], required: true, label: Channel, description: "The server's video channel, A-H." }
+      clip: &clip { type: string, max_length: 255, pattern: "^[^\\x00-\\x1F:]+$", required: true, label: Clip,
+        description: "The clip's name, with its folder path relative to H:\\video\\ when it is in a subfolder (\\ or /)." }
+    send: "CUE {channel}:{clip}"
+    returns: none
+  cue_at:
+    summary: Load a clip into a channel and seek to a timecode (CUE channel:clip:timecode)
+    params:
+      channel: *channel
+      clip: *clip
+      hours: &hours { type: int, min: 0, max: 23, required: true, label: Hours, description: "Hours, 0-23." }
+      minutes: &minutes { type: int, min: 0, max: 59, required: true, label: Minutes, description: "Minutes, 0-59." }
+      seconds: &seconds { type: int, min: 0, max: 59, required: true, label: Seconds, description: "Seconds, 0-59." }
+      frames: &frames { type: int, min: 0, max: 59, required: true, label: Frames, description: "Frames, from 0, below the frame rate." }
+    send: "CUE {channel}:{clip}:{hours:02d},{minutes:02d},{seconds:02d},{frames:02d}"
+    returns: none
+  play:
+    summary: Play the clip loaded in a channel (PLAY channel)
+    params: { channel: *channel }
+    send: "PLAY {channel}"
+    returns: none
+  play_clip:
+    summary: Load a clip into a channel and play it from its start (PLAY channel:clip)
+    params: { channel: *channel, clip: *clip }
+    send: "PLAY {channel}:{clip}"
+    returns: none
+  play_clip_at:
+    summary: Load a clip into a channel and play it from a timecode (PLAY channel:clip:timecode)
+    params: { channel: *channel, clip: *clip, hours: *hours, minutes: *minutes, seconds: *seconds, frames: *frames }
+    send: "PLAY {channel}:{clip}:{hours:02d},{minutes:02d},{seconds:02d},{frames:02d}"
+    returns: none
+  stop:
+    summary: Stop the clip playing in a channel (STOP channel)
+    params: { channel: *channel }
+    send: "STOP {channel}"
+    returns: none
+  goto:
+    summary: Seek to a timecode in the clip loaded in a channel (GOTO channel:timecode)
+    params: { channel: *channel, hours: *hours, minutes: *minutes, seconds: *seconds, frames: *frames }
+    send: "GOTO {channel}:{hours:02d},{minutes:02d},{seconds:02d},{frames:02d}"
+    returns: none
+  jog:
+    summary: Jog forward or back by a number of frames in the clip loaded in a channel (JOG channel:amount)
+    params:
+      channel: *channel
+      frames: { type: int, min: -9999, max: 9999, required: true, label: Frames, description: "Frames to jog: positive forward, negative back." }
+    send: "JOG {channel}:{frames}f"
+    returns: none
+  loop:
+    summary: Set a channel's clip repeat mode (LOOP channel:mode)
+    params:
+      channel: *channel
+      mode: { type: enum, values: ["off", loop, loop_to, ping_pong, ping_pong_to], required: true, label: Repeat,
+        description: "off, loop, loop_to, ping_pong or ping_pong_to." }
+    send: "LOOP {channel}:{mode:map.loop}"
+    returns: none
+  angle:
+    summary: Choose the camera angle of the ISO clip loaded in a channel (ANGLE channel:angle)
+    params:
+      channel: *channel
+      angle: { type: int, min: 1, max: 99, required: true, label: Angle, description: "The camera angle of the ISO clip, from 1." }
+    send: "ANGLE {channel}:{angle}"
+    returns: none
+  eject:
+    summary: Unload the clip loaded in a channel (EJECT channel)
+    params: { channel: *channel }
+    send: "EJECT {channel}"
+    returns: none
+  load_playlist:
+    summary: Load a playlist into a channel, its first item there (LOAD_PLAYLIST channel:playlist)
+    params:
+      channel: *channel
+      playlist: &playlist { type: string, max_length: 255, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Playlist, description: "The playlist's name." }
+    send: "LOAD_PLAYLIST {channel}:{playlist}"
+    returns: none
+  load_playlist_pair:
+    summary: Load a playlist into a program and a preview channel, its first item in program and its second in preview (LOAD_PLAYLIST pvw:pgm:playlist)
+    params:
+      preview: { type: enum, values: [A, B, C, D, E, F, G, H], required: true, label: Preview channel, description: "The channel playing the preview (next) item, A-H." }
+      program: { type: enum, values: [A, B, C, D, E, F, G, H], required: true, label: Program channel, description: "The channel playing the program item, A-H." }
+      playlist: *playlist
+    send: "LOAD_PLAYLIST {preview}:{program}:{playlist}"
+    returns: none
+  loop_playlist:
+    summary: Loop the playlist loaded in a channel, or stop looping it (LOOP_PLAYLIST channel:mode)
+    params:
+      channel: *channel
+      enabled: { type: bool, required: true, label: Loop, description: "On loops the playlist, off plays it once." }
+    send: "LOOP_PLAYLIST {channel}:{enabled:map.loop_playlist}"
+    returns: none
+  take:
+    summary: Take the playlist's next item into a program channel, or swap a pair of program players (TAKE channel)
+    params: { channel: *channel }
+    send: "TAKE {channel}"
+    returns: none
+  up_one_item:
+    summary: Move the playlist's current item cursor up one item (UP_ONE_ITEM channel)
+    params: { channel: *channel }
+    send: "UP_ONE_ITEM {channel}"
+    returns: none
+  down_one_item:
+    summary: Move the playlist's current item cursor down one item (DOWN_ONE_ITEM channel)
+    params: { channel: *channel }
+    send: "DOWN_ONE_ITEM {channel}"
+    returns: none
+  recue_to_first_item:
+    summary: Move the playlist's current item cursor to its first item; a TAKE then plays it (RECUE_TO_FIRST_ITEM channel)
+    params: { channel: *channel }
+    send: "RECUE_TO_FIRST_ITEM {channel}"
+    returns: none
+  eject_playlist:
+    summary: Unload the playlist in a channel, the program item playing on (EJECT_PLAYLIST channel)
+    params: { channel: *channel }
+    send: "EJECT_PLAYLIST {channel}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      PLAY, STOP, TAKE, EJECT and EJECT_PLAYLIST change what a channel puts on air at once.
+  - models: [all]
+    severity: warning
+    text: >
+      Ross documents no reply to RossTalk commands, so every command reports unverified and the server's state is
+      not read: a clip that does not exist, a channel the server does not have or a playlist command on older
+      software fails silently.
+  - models: [all]
+    severity: info
+    text: >
+      The playlist commands (LOAD_PLAYLIST, LOOP_PLAYLIST, TAKE, UP_ONE_ITEM, DOWN_ONE_ITEM, RECUE_TO_FIRST_ITEM,
+      EJECT_PLAYLIST), forward slashes in folder paths, and a RossTalk port other than 7788 (7788-7798, set on the
+      Config app's RS422 tab) need V9.2 software. Channels run A-H; how many a server has depends on its model and
+      configuration. The jog amount is written as frames with an f ("-20f"), the only form Ross shows.

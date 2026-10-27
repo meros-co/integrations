@@ -1185,6 +1185,58 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a DS10 and DS100, find the OCP.1 port and walk the tree: record its roles and classes so they can be named here. ([specs/dbaudio.yaml:716](specs/dbaudio.yaml#L716))
 - [ ] Confirm set_device_time (SetDeviceTimeNTP, 3.2, on object 9 or 10 by family) sets the amplifier's clock. ([specs/dbaudio.yaml:579](specs/dbaudio.yaml#L579))
 
+## denon-dn500av — Denon Professional DN-500AV
+
+- [ ] Confirm IP control on TCP 23 needs no login, and how many connections the unit takes. ([specs/denon-dn500av.yaml:26](specs/denon-dn500av.yaml#L26))
+- [ ] Confirm PWON works only over IP control, as the guide marks it. ([specs/denon-dn500av.yaml:37](specs/denon-dn500av.yaml#L37))
+- [ ] Confirm the video processing mode is asked with VSVPM ? (the guide prints VSVPN ?). ([specs/denon-dn500av.yaml:328](specs/denon-dn500av.yaml#L328))
+- [ ] Confirm the HDMI setup and GUI requests are SSHOS ? and SSOSD ? (printed HOS ? and OSD ?), and that SSHOSALS ON disables auto lip sync and SSOSDSCR ON turns the screen saver off. ([specs/denon-dn500av.yaml:853](specs/denon-dn500av.yaml#L853))
+- [ ] Confirm Cinema EQ is set with PSHTEQ and asked with "PSCINEMA EQ. ?". ([specs/denon-dn500av.yaml:357](specs/denon-dn500av.yaml#L357))
+- [ ] Check whether the unit sends half-dB volume steps (three digits, MV805) or MVMAX lines, which the spec does not read. ([specs/denon-dn500av.yaml:967](specs/denon-dn500av.yaml#L967))
+- [ ] Confirm the on-screen list's line form (NSE0 to NSE8, a flag byte on lines 1-7, text up to a Null) and whether it is sent unasked. ([specs/denon-dn500av.yaml:1064](specs/denon-dn500av.yaml#L1064))
+- [ ] Confirm the effect level's range (00-99 is the guide's form). ([specs/denon-dn500av.yaml:492](specs/denon-dn500av.yaml#L492))
+- [ ] Confirm the LFE level's form: 00 for 0 dB to 10 for -10 dB. ([specs/denon-dn500av.yaml:473](specs/denon-dn500av.yaml#L473))
+
+## denon-dn500bd — Denon Professional DN-500BD / DN-500BD MKII
+
+- [ ] Confirm IP control on TCP 9030 for the DN-500BD MKII (its guide documents RS-232C only; the port is the DN-500BD guide's and the Companion module's). ([specs/denon-dn500bd.yaml:48](specs/denon-dn500bd.yaml#L48))
+- [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, on TCP as on RS-232C. ([specs/denon-dn500bd.yaml:56](specs/denon-dn500bd.yaml#L56))
+- [ ] Confirm the player repeats an unacknowledged status once and nothing worse follows when the host never answers ACK, and which statuses it sends by itself. ([specs/denon-dn500bd.yaml:1325](specs/denon-dn500bd.yaml#L1325))
+- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500bd.yaml:68](specs/denon-dn500bd.yaml#L68))
+- [ ] Confirm the total group and group answers carry the "?" (@0?PCTG0003) as the guide prints them. ([specs/denon-dn500bd.yaml:776](specs/denon-dn500bd.yaml#L776))
+- [ ] Confirm ?DVANGL is answered @0DVANGL and the angle's number. ([specs/denon-dn500bd.yaml:337](specs/denon-dn500bd.yaml#L337))
+- [ ] Confirm the speaker setting's level form (a sign and two digits; the guide writes vvv and vvvv) and the delay's unit and range. ([specs/denon-dn500bd.yaml:557](specs/denon-dn500bd.yaml#L557))
+- [ ] Confirm the output volume answers: a sign and two digits, 000, inf and FX. ([specs/denon-dn500bd.yaml:612](specs/denon-dn500bd.yaml#L612))
+- [ ] Confirm the speaker configurations 4.1, 5.1 and 6.1 (the guide gives LR, ST, 2.1, 3.1 and 7.1 as examples) and whether ?DVSCCh reads it back. ([specs/denon-dn500bd.yaml:549](specs/denon-dn500bd.yaml#L549))
+- [ ] Confirm the DN-500BD MKII's rewind (PCSLSR) and that its guide's fast forward code (PCGPPV, the previous title's) is a misprint. ([specs/denon-dn500bd.yaml:400](specs/denon-dn500bd.yaml#L400))
+- [ ] Check whether the DN-500BD MKII answers the menu settings' requests (?PCAP and the others) as the DN-500BD does; its guide lists none, so the spec does not ask it. ([specs/denon-dn500bd.yaml:854](specs/denon-dn500bd.yaml#L854))
+- [ ] Confirm DHCP is set with @0IpAUTO and eight zeros, and the IP settings' twelve-digit form. ([specs/denon-dn500bd.yaml:663](specs/denon-dn500bd.yaml#L663))
+
+## denon-dn500cb — Denon Professional DN-500CB
+
+- [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, and statuses end in CR. ([specs/denon-dn500cb.yaml:33](specs/denon-dn500cb.yaml#L33))
+- [ ] Confirm the player repeats an unacknowledged status once and nothing worse follows when the host never answers ACK. ([specs/denon-dn500cb.yaml:207](specs/denon-dn500cb.yaml#L207))
+- [ ] Confirm the RS-232C speed's factory setting (115200 assumed). ([specs/denon-dn500cb.yaml:47](specs/denon-dn500cb.yaml#L47))
+- [ ] Confirm track selection is @0Tr and four digits with no space, and the artist and album answers' form (the guide shows a space after at and al). ([specs/denon-dn500cb.yaml:126](specs/denon-dn500cb.yaml#L126))
+- [ ] Confirm the track time answer is MMMSS (five digits) on this model. ([specs/denon-dn500cb.yaml:263](specs/denon-dn500cb.yaml#L263))
+
+## denon-dn500r — Denon Professional DN-500R
+
+- [ ] Confirm ACK and NACK are the bare bytes 06H and 15H with no CR, and statuses end in CR. ([specs/denon-dn500r.yaml:44](specs/denon-dn500r.yaml#L44))
+- [ ] Confirm the recorder repeats an unacknowledged status once and nothing worse follows when the host never answers ACK. ([specs/denon-dn500r.yaml:1669](specs/denon-dn500r.yaml#L1669))
+- [ ] Confirm the RS-232C speed's factory setting (9600 assumed). ([specs/denon-dn500r.yaml:58](specs/denon-dn500r.yaml#L58))
+- [ ] Check random's and program list playback's codes: set 00 for on, but answered 01 for on as the guide prints it. ([specs/denon-dn500r.yaml:1318](specs/denon-dn500r.yaml#L1318))
+- [ ] Confirm rename_file (@0RN, a four-digit file number and a name) is not taken for random (@0RN00 or @0RN01). ([specs/denon-dn500r.yaml:788](specs/denon-dn500r.yaml#L788))
+- [ ] Confirm ?FE answers each media's free space and its unit; the media size request (?SF in the guide) is the folder name's. ([specs/denon-dn500r.yaml:882](specs/denon-dn500r.yaml#L882))
+- [ ] Confirm the track change the recorder sends by itself: "@Tr NNNN" as printed, or @0Tr. ([specs/denon-dn500r.yaml:1919](specs/denon-dn500r.yaml#L1919))
+- [ ] Confirm the three-digit hot start assignment @0HS, and the four-digit one's code (printed @hs without the ID). ([specs/denon-dn500r.yaml:702](specs/denon-dn500r.yaml#L702))
+- [ ] Confirm the codes printed with a space (@0PO XX, @0IN XX and others) take no space. ([specs/denon-dn500r.yaml:1087](specs/denon-dn500r.yaml#L1087))
+- [ ] Confirm the fade in answer's code: FL as printed, or FI. ([specs/denon-dn500r.yaml:1360](specs/denon-dn500r.yaml#L1360))
+- [ ] Confirm the recording sample rate is asked with ?FS (the guide prints @0FSNN as the request). ([specs/denon-dn500r.yaml:1225](specs/denon-dn500r.yaml#L1225))
+- [ ] Confirm the recording volume answer's form: two characters per channel, signed or not. ([specs/denon-dn500r.yaml:915](specs/denon-dn500r.yaml#L915))
+- [ ] Confirm the hot start information's time is HHHmmssttt (ten digits) after the colon. ([specs/denon-dn500r.yaml:1961](specs/denon-dn500r.yaml#L1961))
+- [ ] Confirm the timer answers carry no timer number (the spec takes it from the request) and their field order. ([specs/denon-dn500r.yaml:1890](specs/denon-dn500r.yaml#L1890))
+
 ## dhd-aes67 — DHD audio AES67 / RAVENNA interfaces (Control API)
 
 - [ ] Check the module path /modules/1/api/ws on an AES67 interface itself, and the module ID Toolbox gives an XC3 52-7010 AES67 module. ([specs/dhd-aes67.yaml:40](specs/dhd-aes67.yaml#L40))
@@ -1680,6 +1732,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the command-line forms composed from syntax rather than examples: Page X.Y with Goto, Load and On/Off, "FaderMaster Master 2.1 At", "Group N At", and the Rate/Speed targets. ([specs/grandma3.yaml:1826](specs/grandma3.yaml#L1826))
 - [ ] Check the fader_fade fade argument (two integers) and any upper bound on fade time. ([specs/grandma3.yaml:1807](specs/grandma3.yaml#L1807))
 - [ ] Check the upper bounds of cue and pool numbers (four digits, 9999, 99999 assumed). ([specs/grandma3.yaml:1831](specs/grandma3.yaml#L1831))
+
+## grassvalley-amp — Grass Valley AMP video servers
+
+- [ ] Confirm a K2's replies over TCP: hexadecimal digits with no prefix, line end or checksum, one reply per command, and lower or upper case. ([specs/grassvalley-amp.yaml:332](specs/grassvalley-amp.yaml#L332))
+- [ ] Confirm the channel request (CRAT0007204Vtr1) is answered 1001, a refused one 1111, and the channel-less form (CRAT00014). ([specs/grassvalley-amp.yaml:53](specs/grassvalley-amp.yaml#L53))
+- [ ] Check the inferred layouts: erase_clip (A2.10), create_folder (A2.31), delete_folder (A2.29), get_clip_duration (A2.17 answered 84.17) and A2.xx single-name commands sent as the name's length then the name. ([specs/grassvalley-amp.yaml:324](specs/grassvalley-amp.yaml#L324))
+- [ ] Check set_mute's data byte (21.62 with 1 on, 0 off). ([specs/grassvalley-amp.yaml:119](specs/grassvalley-amp.yaml#L119))
+- [ ] Confirm List Next ID (A1.15 with a count of ten) answers 8X.14 with more names and 80.14 when none are left, and List First ID as a2140000. ([specs/grassvalley-amp.yaml:280](specs/grassvalley-amp.yaml#L280))
+- [ ] Check the status bits a K2 sets (the names follow the T2's AMP manual) and whether 61.20 0F returns fifteen bytes. ([specs/grassvalley-amp.yaml:354](specs/grassvalley-amp.yaml#L354))
+- [ ] Check which AMP commands Ross Tria, Mira and Kiva servers take over TCP 3811 and what their channels are called. ([specs/grassvalley-amp.yaml:87](specs/grassvalley-amp.yaml#L87))
+- [ ] Check the times a K2 answers for 61.0C 01, 04, 08 and 40, and whether 02 (VITC) is answered or 70.0D. ([specs/grassvalley-amp.yaml:199](specs/grassvalley-amp.yaml#L199))
 
 ## greenhippo-hippotizer — Green Hippo Hippotizer
 
@@ -2964,6 +3027,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the largest salvo, timer, user, label, source, destination and level IDs accepted. ([specs/ross-ultrix.yaml:245](specs/ross-ultrix.yaml#L245))
 - [ ] Confirm Ultrix sends nothing back on the RossTalk connection, not even an error for a bad command. ([specs/ross-ultrix.yaml:229](specs/ross-ultrix.yaml#L229))
 
+## ross-video-server — Ross Video servers (Tria, Mira, Kiva)
+
+- [ ] Confirm the servers send nothing back to RossTalk commands (no acknowledgement or error text), as Ross documents none. ([specs/ross-video-server.yaml:47](specs/ross-video-server.yaml#L47))
+- [ ] Confirm the jog amount's forms: frames with an f ("-20f", "5f" forward), and whether a plain or timecode amount is taken. ([specs/ross-video-server.yaml:128](specs/ross-video-server.yaml#L128))
+- [ ] Confirm the ISO angle numbering starts at 1 and its upper limit. ([specs/ross-video-server.yaml:143](specs/ross-video-server.yaml#L143))
+- [ ] Confirm LOAD_PLAYLIST with two channels takes the preview channel first, then the program channel. ([specs/ross-video-server.yaml:162](specs/ross-video-server.yaml#L162))
+- [ ] Confirm a RossTalk port other than 7788 (7788-7798) is taken only from V9.2 software. ([specs/ross-video-server.yaml:50](specs/ross-video-server.yaml#L50))
+- [ ] Confirm the channel letters each model has (A-H; G and H on a Mira with two PGM players). ([specs/ross-video-server.yaml:87](specs/ross-video-server.yaml#L87))
+
 ## ross-xpression — Ross XPression (TCP)
 
 - [ ] Confirm take IDs are read padded or unpadded, including UNCUE and UPNEXT in the padded form. ([specs/ross-xpression.yaml:348](specs/ross-xpression.yaml#L348))
@@ -3225,6 +3297,47 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
 - [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
 
+## softron-movierecorder — Softron MovieRecorder
+
+- [ ] Confirm PUT /sources/record, /pause, /resume and /stop take a JSON list of source ids, as the Companion module sends them (not in Softron's public material). ([specs/softron-movierecorder.yaml:89](specs/softron-movierecorder.yaml#L89))
+- [ ] Confirm GET /sources/<id>/lock, /unlock and /manual_split (from the Companion module). ([specs/softron-movierecorder.yaml:119](specs/softron-movierecorder.yaml#L119))
+- [ ] Confirm PUT /sources/<id>/recording_name {recording_name} and PUT /sources/<id>/destinations with a list of ids (from the Companion module). ([specs/softron-movierecorder.yaml:137](specs/softron-movierecorder.yaml#L137))
+- [ ] Confirm PUT /scheduled_recordings/<id> with duration and start_time in minutes, and stopped_by_user false (fields from the Companion module and the 4.6.0 release note). ([specs/softron-movierecorder.yaml:155](specs/softron-movierecorder.yaml#L155))
+- [ ] Confirm PUT /restore_configuration and its restore_* keys, restore_vtr_bach_list as spelled. ([specs/softron-movierecorder.yaml:180](specs/softron-movierecorder.yaml#L180))
+- [ ] Confirm the password goes as ?password= on every request, that an empty one is accepted when none is set, and the answer to a wrong one (401 assumed). ([specs/softron-movierecorder.yaml:61](specs/softron-movierecorder.yaml#L61))
+- [ ] Confirm the /remote websocket needs no password, and the source fields of its messages (unique_id, display_name, is_recording, is_paused, is_locked, recording_name, video_format, recording_start_date, recording_end_date). ([specs/softron-movierecorder.yaml:256](specs/softron-movierecorder.yaml#L256))
+- [ ] Confirm the scheduled recording fields (unique_id, name, source_unique_id, start_time, duration, is_enabled, weekly_repeated, date, stopped_by_user). ([specs/softron-movierecorder.yaml:295](specs/softron-movierecorder.yaml#L295))
+- [ ] Confirm the statuses the commands answer with (200, 201 or 202 assumed). ([specs/softron-movierecorder.yaml:94](specs/softron-movierecorder.yaml#L94))
+
+## softron-mreplay — Softron M|Replay
+
+- [ ] Confirm the playback rate call: GET /playbackrate?rate= as the 2.2 release note gives it, or /set_playback_rate?rate= as the Companion module sends it. ([specs/softron-mreplay.yaml:137](specs/softron-mreplay.yaml#L137))
+- [ ] Confirm GET /set_position?position=&reference= and its references (from the Companion module). ([specs/softron-mreplay.yaml:144](specs/softron-mreplay.yaml#L144))
+- [ ] Confirm PUT /outputs/<id> with {selected: true} or {input_unique_id} (from the Companion module). ([specs/softron-mreplay.yaml:152](specs/softron-mreplay.yaml#L152))
+- [ ] Confirm POST /clips and its keys (name, unique_name, reference_in_point, in_point, reference_out_point, out_point, duration) (from the Companion module). ([specs/softron-mreplay.yaml:100](specs/softron-mreplay.yaml#L100))
+- [ ] Confirm the playlist calls /playlists/<id>/play, pause, stop, skip_previous, skip_next and /items/<n>/play and pause (from the Companion module). ([specs/softron-mreplay.yaml:177](specs/softron-mreplay.yaml#L177))
+- [ ] Confirm the /status fields and their types (playback_rate, the *_time and *_timecode pairs, remaining_space, framerate, drop_frame, loop_recording). ([specs/softron-mreplay.yaml:291](specs/softron-mreplay.yaml#L291))
+- [ ] Confirm the /inputs, /outputs, /playlists and /info fields (unique_id, name, enabled, selected, input_unique_id; application_version and the others). ([specs/softron-mreplay.yaml:317](specs/softron-mreplay.yaml#L317))
+- [ ] Confirm the password goes as ?password= on every request and an empty one is accepted when none is set; and the port, 8090 (the marker article gives 8082). ([specs/softron-mreplay.yaml:56](specs/softron-mreplay.yaml#L56))
+
+## softron-multicam-logger — Softron Multicam Logger
+
+- [ ] Confirm add_marker and angle_changes are served at /add_marker and /angle_changes (the guide writes them without a leading slash). ([specs/softron-multicam-logger.yaml:66](specs/softron-multicam-logger.yaml#L66))
+- [ ] Confirm the status and body Multicam Logger answers the commands with, and its answer when no document is open. ([specs/softron-multicam-logger.yaml:45](specs/softron-multicam-logger.yaml#L45))
+- [ ] Confirm GET /angle_changes answers a JSON list (the guide's example also wraps it in braces). ([specs/softron-multicam-logger.yaml:165](specs/softron-multicam-logger.yaml#L165))
+- [ ] Confirm /status gives program and preview as numbers in strings, and logging_state as a boolean. ([specs/softron-multicam-logger.yaml:105](specs/softron-multicam-logger.yaml#L105))
+
+## sony-9pin — Sony 9-pin (RS-422 VTR protocol) decks and servers
+
+- [ ] Check the jog, var and shuttle speeds the device runs at for the speed bytes sent (10^(N/32-2) times play speed, a second byte for finer steps), and whether speed 0 pauses it or creeps. ([specs/sony-9pin.yaml:121](specs/sony-9pin.yaml#L121))
+- [ ] Check how many status bytes the device returns for 61.20 0A (ten asked; a NAK makes the core ask four), and which bits it sets. ([specs/sony-9pin.yaml:299](specs/sony-9pin.yaml#L299))
+- [ ] Check what 61.0C 03 (the best of LTC and VITC) returns on the device (74.04, 74.06, 74.14 or 74.16), and the 70.0D answer when a time is missing. ([specs/sony-9pin.yaml:302](specs/sony-9pin.yaml#L302))
+- [ ] Confirm the user bits' byte and nibble order (Drastic's example: 06364454 is sent 60 63 44 45) on a deck's generator and in its 74.05 returns. ([specs/sony-9pin.yaml:201](specs/sony-9pin.yaml#L201))
+- [ ] Check whether the device steps a frame on 20.14 and 20.24 (documented by Drastic as an extension, not in Sony's table). ([specs/sony-9pin.yaml:135](specs/sony-9pin.yaml#L135))
+- [ ] Record the device type code the device returns, and whether its model is named. ([specs/sony-9pin.yaml:95](specs/sony-9pin.yaml#L95))
+- [ ] Check a serial-to-Ethernet converter at 38400 8-O-1 carries the bytes and the 9-pin timing (a reply within about 10 ms, no gap over 10 ms inside a message) closely enough for the device. ([specs/sony-9pin.yaml:351](specs/sony-9pin.yaml#L351))
+- [ ] Confirm the DA-6400's 9-pin subset (shuttle by its first speed byte, cue up then pause, edit on and off) and its device type F0 1A. ([specs/sony-9pin.yaml:82](specs/sony-9pin.yaml#L82))
+
 ## sony-bravia — Sony BRAVIA Professional Displays (REST API and IRCC-IP)
 
 - [ ] Check what a wrong or missing pre-shared key is answered with (HTTP 403 or 401, or a 200 carrying error 403), since that decides whether the core reports unauthorized. ([specs/sony-bravia.yaml:460](specs/sony-bravia.yaml#L460))
@@ -3263,6 +3376,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Opened for commands only, confirm the camera tolerates GetDeviceInfo once a second as the liveness check. ([crates/core/src/modules/sony_camera.rs:48](crates/core/src/modules/sony_camera.rs#L48))
 - [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2717](specs/sony-camera.yaml#L2717))
 - [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2685](specs/sony-camera.yaml#L2685))
+
+## sounddevices-pixnet — Sound Devices / Video Devices PIX and 970 (PIXNET)
+
+- [ ] Check every call against Sound Devices' PIXNET Web API (v1.02), which could not be retrieved: the POST of {} to /sounddevices/settransport/play, stop and rec. ([specs/sounddevices-pixnet.yaml:74](specs/sounddevices-pixnet.yaml#L74))
+- [ ] Confirm the RemoteApi call encoding (/invoke/RemoteApi/<name>(<types>)/<count>/<type>,<value>...) and the PlaybackSpeed values PlayX2 and PlayX16. ([specs/sounddevices-pixnet.yaml:89](specs/sounddevices-pixnet.yaml#L89))
+- [ ] Confirm the key codes and KeyEventType values of simulateKey. ([specs/sounddevices-pixnet.yaml:117](specs/sounddevices-pixnet.yaml#L117))
+- [ ] Confirm setsetting/RecordToDrive<n>=<mode> and the mode names (Off, Record, Ethernet File Transfer, Switch to Network upon Full), and the drives each model has. ([specs/sounddevices-pixnet.yaml:152](specs/sounddevices-pixnet.yaml#L152))
+- [ ] Confirm formatAllDrives's label rules and the EXFAT argument. ([specs/sounddevices-pixnet.yaml:140](specs/sounddevices-pixnet.yaml#L140))
+- [ ] Confirm PIXNET answers 200 to a command, its answer to a refused one, and whether it asks for a login. ([specs/sounddevices-pixnet.yaml:77](specs/sounddevices-pixnet.yaml#L77))
+- [ ] Find the PIXNET status replies (GET /sounddevices/transport and the settings) so the recorder's state can be read. ([specs/sounddevices-pixnet.yaml:172](specs/sounddevices-pixnet.yaml#L172))
 
 ## stagetimer — Stagetimer
 
@@ -3312,6 +3435,71 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm delete_user deletes the account yet is answered with result error, "User not found." (deleteUser returns false in every case in the source read). ([specs/tally-arbiter.yaml:569](specs/tally-arbiter.yaml#L569))
 - [ ] On a 3.3.0 server, confirm chat_enabled is ignored and a duplicate manage event is answered with no result; on a later one, that set_chat_enabled is echoed to every client and duplicate_device answers the copy's deviceId. ([specs/tally-arbiter.yaml:584](specs/tally-arbiter.yaml#L584))
 - [ ] On a phone, confirm Tally Arbiter's Engine.IO pings are answered so it keeps the connection, that a connection dropped while the app was suspended is reopened by mi_reconnect_all with the listener client registered again, and that two unanswered version requests (10 s) drop a silent connection. ([specs/tally-arbiter.yaml:591](specs/tally-arbiter.yaml#L591))
+
+## tascam-bd-mp1 — TASCAM BD-MP1 / BD-MP1MKII
+
+- [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; TEAC's later document shows them without CR. ([specs/tascam-bd-mp1.yaml:50](specs/tascam-bd-mp1.yaml#L50))
+- [ ] Confirm the player repeats an unacknowledged status notification once and nothing worse follows when the host never answers "ack". ([specs/tascam-bd-mp1.yaml:566](specs/tascam-bd-mp1.yaml#L566))
+- [ ] Confirm no flow control is needed on RS-232C. ([specs/tascam-bd-mp1.yaml:63](specs/tascam-bd-mp1.yaml#L63))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp1.yaml:131](specs/tascam-bd-mp1.yaml#L131))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp1.yaml:644](specs/tascam-bd-mp1.yaml#L644))
+- [ ] Confirm the answer to ?SCN is the direction and speed letters (!7SCNFf). ([specs/tascam-bd-mp1.yaml:670](specs/tascam-bd-mp1.yaml#L670))
+- [ ] Confirm the BD-MP1MKII's color keys are CBCX1-CBCX4 as its document writes them, not CBC1-CBC4. ([specs/tascam-bd-mp1.yaml:284](specs/tascam-bd-mp1.yaml#L284))
+- [ ] Confirm power on works only on RS-232C, and that get_power gets no answer in standby. ([specs/tascam-bd-mp1.yaml:128](specs/tascam-bd-mp1.yaml#L128))
+- [ ] Confirm the speaker setting's level form (a sign and two digits) and the delay's unit (centimeters on the BD-MP1MKII, milliseconds on the BD-MP1) and range. ([specs/tascam-bd-mp1.yaml:470](specs/tascam-bd-mp1.yaml#L470))
+
+## tascam-bd-mp4k — TASCAM BD-MP4K
+
+- [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; Ver. 1.01 shows them without CR. ([specs/tascam-bd-mp4k.yaml:48](specs/tascam-bd-mp4k.yaml#L48))
+- [ ] Confirm the player repeats an unacknowledged status notification once and nothing worse follows when the host never answers "ack". ([specs/tascam-bd-mp4k.yaml:679](specs/tascam-bd-mp4k.yaml#L679))
+- [ ] Confirm the RS-232C speed's factory setting (115200 assumed), and that no flow control is needed. ([specs/tascam-bd-mp4k.yaml:57](specs/tascam-bd-mp4k.yaml#L57))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp4k.yaml:146](specs/tascam-bd-mp4k.yaml#L146))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp4k.yaml:760](specs/tascam-bd-mp4k.yaml#L760))
+- [ ] Confirm the downmix is read with ?DNM (as the document gives it) and answered DMX. ([specs/tascam-bd-mp4k.yaml:626](specs/tascam-bd-mp4k.yaml#L626))
+- [ ] Confirm the color adjustment answer is the color letter then three signed two-digit values (!7MVCR+01-02+03). ([specs/tascam-bd-mp4k.yaml:825](specs/tascam-bd-mp4k.yaml#L825))
+- [ ] Confirm power on works only on RS-232C at 57600 bit/s, and that get_power gets no answer in standby. ([specs/tascam-bd-mp4k.yaml:143](specs/tascam-bd-mp4k.yaml#L143))
+- [ ] Confirm the speaker level's form, four characters in tenths of a dB rounded to 0 or 5, and the delay in centimeters. ([specs/tascam-bd-mp4k.yaml:482](specs/tascam-bd-mp4k.yaml#L482))
+
+## tascam-cd-400u — TASCAM CD-400U / CD-400UDAB
+
+- [ ] Confirm the RS-232C framing: LF before and CR after each message, and the player's own messages framed the same way; the network framing CR LF (the vendor command page shows LF CR). ([specs/tascam-cd-400u.yaml:68](specs/tascam-cd-400u.yaml#L68))
+- [ ] Confirm no flow control is needed on RS-232C (RTS and CTS are joined inside the player). ([specs/tascam-cd-400u.yaml:73](specs/tascam-cd-400u.yaml#L73))
+- [ ] Confirm the IF-E100's Telnet password is 400 by default, digits only, and what the card answers to a wrong one (TEAC documents nothing). ([specs/tascam-cd-400u.yaml:78](specs/tascam-cd-400u.yaml#L78))
+- [ ] Confirm 100 ms between commands is enough, polls included. ([specs/tascam-cd-400u.yaml:66](specs/tascam-cd-400u.yaml#L66))
+- [ ] Check TRACK No. RETURN's layout: the document lists four digits but gives six bytes; confirm whether two EOM digits come first (as on the SS-R250N) or there are only four. ([specs/tascam-cd-400u.yaml:512](specs/tascam-cd-400u.yaml#L512))
+- [ ] Check how a DAB station travels in CURRENT TRACK INFORMATION RETURN: the channel's three characters (padding of a two-character channel such as 5A) and the service number's two digits. ([specs/tascam-cd-400u.yaml:531](specs/tascam-cd-400u.yaml#L531))
+- [ ] Confirm the AM (kHz, five digits) and FM (MHz to two decimals) frequency digits in CURRENT TRACK INFORMATION RETURN with the FM or AM tuner selected. ([specs/tascam-cd-400u.yaml:529](specs/tascam-cd-400u.yaml#L529))
+- [ ] Confirm the play area sense answers 0F for folder skip mode, and that polls of it on an audio CD only set last_illegal. ([specs/tascam-cd-400u.yaml:402](specs/tascam-cd-400u.yaml#L402))
+- [ ] Confirm which senses answer ILLEGAL in which states (track number in tuner frequency mode, remaining and total times on data CDs, SD and USB), as the polls ask for them. ([specs/tascam-cd-400u.yaml:417](specs/tascam-cd-400u.yaml#L417))
+- [ ] Confirm the CD-400UDAB answers device code 30 for DAB and 31 for FM, and the CD-400U 30 for FM and 31 for AM. ([specs/tascam-cd-400u.yaml:569](specs/tascam-cd-400u.yaml#L569))
+- [ ] Confirm ENTER and BACK take data 01 (and BACK 20 for push and hold), and that no release message is needed after them. ([specs/tascam-cd-400u.yaml:404](specs/tascam-cd-400u.yaml#L404))
+
+## tascam-da6400 — TASCAM DA-6400 / DA-6400dp (TELNET protocol)
+
+- [ ] Confirm the recorder takes and sends LF then CR at the end of each message, as its TELNET document says (TEAC's SS-series document gives CR LF for TELNET), and whether it takes CR LF as well. ([specs/tascam-da6400.yaml:56](specs/tascam-da6400.yaml#L56))
+- [ ] Confirm the login: an Enter, "Enter Password", the password, "Login Successful", and what the recorder answers to a wrong password. ([specs/tascam-da6400.yaml:77](specs/tascam-da6400.yaml#L77))
+- [ ] Check whether the Telnet server echoes the commands it receives (the spec never takes an echo for a reply). ([specs/tascam-da6400.yaml:62](specs/tascam-da6400.yaml#L62))
+- [ ] Check what CURRENT TRACK INFORMATION (D7) returns besides the take number: the take's length (assumed) or the position in it. ([specs/tascam-da6400.yaml:915](specs/tascam-da6400.yaml#L915))
+- [ ] Check where the start and end status sits in the long-operation answers (create, rebuild and delete project, format, take rename, erase and copy): the document puts it at Data 5-6 for some and Data 7-8 for others. ([specs/tascam-da6400.yaml:1063](specs/tascam-da6400.yaml#L1063))
+- [ ] Confirm the output routing sense is 7F1251 with 0, the slot and FF, and its answer's 01, slot, 0 lead-in. ([specs/tascam-da6400.yaml:821](specs/tascam-da6400.yaml#L821))
+- [ ] Check how MEDIA REMAIN splits the free space (whole GB and the MB beyond them, or a total in MB in the last four digits). ([specs/tascam-da6400.yaml:968](specs/tascam-da6400.yaml#L968))
+- [ ] Confirm error and caution codes arrive as N2 N3 0 N1, so 1-06 is sent 0601. ([specs/tascam-da6400.yaml:1042](specs/tascam-da6400.yaml#L1042))
+- [ ] Confirm CLOCK DATA RETURN carries seconds (twelve digits) while the preset takes ten. ([specs/tascam-da6400.yaml:1029](specs/tascam-da6400.yaml#L1029))
+- [ ] Confirm the new project's name follows 7F024001 directly (Data 7 on) and is answered the same way. ([specs/tascam-da6400.yaml:428](specs/tascam-da6400.yaml#L428))
+- [ ] Confirm take numbers above 99 (four digits tens, ones, thousands, hundreds) on a project with that many takes. ([specs/tascam-da6400.yaml:282](specs/tascam-da6400.yaml#L282))
+
+## tascam-ss-r250n — TASCAM SS-CDR250N / SS-R250N / SS-R300N
+
+- [ ] Confirm messages on TELNET end CR LF (the vendor command page shows LF CR), and that the recorder's own messages end the same way. ([specs/tascam-ss-r250n.yaml:44](specs/tascam-ss-r250n.yaml#L44))
+- [ ] Confirm the recorder's RS-232C answers are LF, the message, then CR, as its commands are. ([specs/tascam-ss-r250n.yaml:64](specs/tascam-ss-r250n.yaml#L64))
+- [ ] Confirm the login (Enter, "Enter Password", the password, "Login Successful") and the SS-R300N's default password. ([specs/tascam-ss-r250n.yaml:73](specs/tascam-ss-r250n.yaml#L73))
+- [ ] Check whether the Telnet server echoes commands. ([specs/tascam-ss-r250n.yaml:50](specs/tascam-ss-r250n.yaml#L50))
+- [ ] Check whether CLOCK DATA RETURN carries ten digits (as its example) or twelve (as its byte count says). ([specs/tascam-ss-r250n.yaml:992](specs/tascam-ss-r250n.yaml#L992))
+- [ ] Confirm SPECIFIED DEVICE STATUS is answered D1 (the document prints 51 for the return) on the SS-CDR250N, and refused on the SS-R250N and SS-R300N. ([specs/tascam-ss-r250n.yaml:592](specs/tascam-ss-r250n.yaml#L592))
+- [ ] Check that the SS-R300N takes the SS-R250N's commands (the document adds it to the list of devices without other changes) and whether it has commands of its own. ([specs/tascam-ss-r250n.yaml:118](specs/tascam-ss-r250n.yaml#L118))
+- [ ] Confirm CREATE FOLDER's final answer carries the new folder's number after 11. ([specs/tascam-ss-r250n.yaml:1068](specs/tascam-ss-r250n.yaml#L1068))
+- [ ] Check where MEDIA FORMAT's status sits (the document says Data 7-8). ([specs/tascam-ss-r250n.yaml:1064](specs/tascam-ss-r250n.yaml#L1064))
+- [ ] Confirm TIME SEARCH's minutes are four digits in the tens, ones, thousands, hundreds order and its seconds are seconds and hundredths (the document's example disagrees with its own description); the command takes minutes up to 999. ([specs/tascam-ss-r250n.yaml:440](specs/tascam-ss-r250n.yaml#L440))
 
 ## teradek-prism — Teradek Prism (Jetpack, Flex, Mobile, Rack Unit)
 
@@ -3463,6 +3651,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the error message for an out-of-range position (pan, tilt, zoom set) and for an unknown command. ([specs/vaddio-roboshot.yaml:886](specs/vaddio-roboshot.yaml#L886))
 - [ ] Record the answers to streaming ip enable on and get on a RoboSHOT 40 UHD or SDI camera, to settle whether OK comes after a second prompt ("> OK"). ([specs/vaddio-roboshot.yaml:893](specs/vaddio-roboshot.yaml#L893))
 - [ ] Record camera glass mode get on a RoboSHOT IW. ([specs/vaddio-roboshot.yaml:898](specs/vaddio-roboshot.yaml#L898))
+
+## vdcp — VDCP video servers
+
+- [ ] Record the TCP port the server takes VDCP on, and whether it carries the RS-422 bytes unchanged. ([specs/vdcp.yaml:54](specs/vdcp.yaml#L54))
+- [ ] Confirm opening and selecting the signal port on connecting (3X.01 with the lock byte, answered 3X.81, then 2X.22), and what a denied open does. ([specs/vdcp.yaml:38](specs/vdcp.yaml#L38))
+- [ ] Check the port status's lengths: Status 2 one byte (two extended), Status 3 three bytes (four extended), and that the error bits clear once read. ([specs/vdcp.yaml:476](specs/vdcp.yaml#L476))
+- [ ] Confirm a macro's completion return comes in place of a port status and that the controller's ACK (04) is what the server waits for. ([specs/vdcp.yaml:452](specs/vdcp.yaml#L452))
+- [ ] Check that asking the position only while the port is active keeps the error bits clear, and the load the 250 ms port status puts on the server. ([specs/vdcp.yaml:445](specs/vdcp.yaml#L445))
+- [ ] Check the server's variable-length ID commands (8X, AX, BX, DX) and the length byte before each ID in returns. ([specs/vdcp.yaml:42](specs/vdcp.yaml#L42))
+- [ ] Confirm the ID list's first two bytes count the IDs still to come after this message, and that NEXT (3X.02, answered 3X.82) continues it ten at a time. ([specs/vdcp.yaml:344](specs/vdcp.yaml#L344))
+- [ ] Check which VDCP commands Ross Tria, Mira and Kiva servers take and on which port. ([specs/vdcp.yaml:72](specs/vdcp.yaml#L72))
 
 ## videolan-vlc — VLC media player
 

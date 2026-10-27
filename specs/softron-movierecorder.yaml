@@ -1,0 +1,339 @@
+spec: 1
+id: softron-movierecorder
+name: Softron MovieRecorder (REST API and WebSocket)
+vendor: Softron
+category: recorder
+
+# MovieRecorder's remote control: a REST API on port 8080 (set in Settings > Remote Control) and a websocket on
+# /remote that pushes every change to the sources. Softron documents the REST calls only inside the running app
+# (api.html on that port); this spec takes the calls Softron's release notes and support articles name, and the
+# rest from the Bitfocus Companion module, each one marked inferred.
+source:
+  - title: "HOW TO: Control MovieRecorder with the REST API, Softron support article 115000049673 (updated 2024-06-11)"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/115000049673-HOW-TO-Control-MovieRecorder-with-the-REST-API
+    note: >
+      Manufacturer document (retrieved 2026-10-27). REST answers in JSON, current documentation in the app at
+      http://localhost:8080/api.html; the websockets on /remote with the protocols
+      v1.1.main_update.movierecorder.softronmedia.com (sources, destinations and other changes) and
+      v1.0.activity_update.movierecorder.softronmedia.com (performance and logs); each message a JSON dictionary
+      with dataType ("source" on the main socket), data, and on the main socket change (insertion, removal,
+      update); the whole data model pushed on connecting.
+  - title: "HOW TO: Remotely Control MovieRecorder 4, Softron support article 207694797 (updated 2024-09-19)"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/207694797-HOW-TO-Remotely-Control-MovieRecorder-4
+    note: "Manufacturer document. Remote Control in the preferences, port 8080 by default, an optional password (1234 by default)."
+  - title: "List of port numbers of our applications using a REST API, Softron support article 360013226694 (updated 2026-08-24)"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/360013226694-List-of-port-numbers-of-our-applications-using-a-REST-API
+    note: "Manufacturer document. MovieRecorder 8080."
+  - title: "HOW TO: Enable HTTPS for Remote Control of Softron Applications, Softron support article 20830222066972"
+    author: Softron Media Services
+    url: https://softron.zendesk.com/hc/en-us/articles/20830222066972-HOW-TO-Enable-HTTPS-for-Remote-Control-of-Softron-Applications
+    note: "Manufacturer document. HTTP by default; with HTTPS enabled (a .p12 certificate) HTTP is off."
+  - title: "MovieRecorder release notes (softron.tv)"
+    author: Softron Media Services
+    url: https://softron.tv/support/release-notes?category=MovieRecorder
+    note: >
+      Manufacturer document (retrieved 2026-10-27). 4.5: GET /info (application and computer information). 4.6.0:
+      scheduled recordings' stopped_by_user can be set to false. 4.6.5: GET /sources?include_disabled_sources=YES,
+      PUT /sources/record?selected_only=YES, HTTPS. 4.6.6: GET /applescripts/<script name>, HTTPS.
+  - title: "bitfocus/companion-module-softron-movierecorder (MIT)"
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-softron-movierecorder
+    note: >
+      Corroboration and the source of the inferred calls, not copied (retrieved 2026-10-27): ?password= on each
+      request; PUT /sources/record, /pause, /resume and /stop with a JSON list of source ids; GET
+      /sources/<id>/lock, /unlock and /manual_split; PUT /sources/<id>/recording_name {recording_name}; PUT
+      /sources/<id>/destinations with a list of destination ids; GET /destinations, /scheduled_recordings and
+      /configurations; PUT /scheduled_recordings/<id> {duration} or {start_time} in minutes; PUT
+      /restore_configuration {name, restore_*}; the source fields unique_id, display_name, is_recording,
+      is_paused, is_locked, recording_name, video_format, recording_start_date and recording_end_date.
+
+transport:
+  type: http
+  port: 8080
+  https_port: 8080
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /info, query: { password: "{settings.password}" } }
+
+settings:
+  password: { type: string, secret: true, default: "", max_length: 128, label: Password,
+    description: "The remote control password set in MovieRecorder's settings (1234 when first enabled); leave empty when none is required." }
+  scheme: { type: enum, values: [http, https], default: http, label: Connection,
+    description: "http, or https once HTTPS is enabled in MovieRecorder (a self-signed certificate is accepted)." }
+
+ports:
+  - { port: 8080, protocol: http, role: control, when: "scheme http", note: "set in MovieRecorder's Remote Control settings" }
+  - { port: 8080, protocol: https, role: control, when: "scheme https" }
+  - { port: 8080, protocol: ws, role: push, when: "scheme http", note: "/remote, the main update protocol" }
+  - { port: 8080, protocol: wss, role: push, when: "scheme https" }
+
+models:
+  - id: movierecorder
+    name: Softron MovieRecorder
+    supports: &all [record, pause, resume, stop, record_selected, lock, unlock, split, set_recording_name,
+      set_destination, set_scheduled_duration, set_scheduled_start, resume_scheduled, restore_configuration,
+      run_applescript, get_info, get_sources, get_all_sources, get_destinations, get_scheduled_recordings,
+      get_configurations]
+    verification: none
+  - id: movierecorder-express
+    name: Softron MovieRecorder Express
+    supports: *all
+    verification: none
+
+commands:
+  record:
+    summary: Start recording a source (PUT /sources/record with its id)
+    params:
+      source: &source { type: string, max_length: 256, required: true, label: Source, description: "The source's unique id, as sources in state are keyed." }
+    send: { method: PUT, path: /sources/record, query: { password: "{settings.password}" }, content_type: application/json, body: '[{source:json}]' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  pause:
+    summary: Pause a source's recording, for classic destinations (PUT /sources/pause)
+    params: { source: *source }
+    send: { method: PUT, path: /sources/pause, query: { password: "{settings.password}" }, content_type: application/json, body: '[{source:json}]' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  resume:
+    summary: Resume a source's paused recording (PUT /sources/resume)
+    params: { source: *source }
+    send: { method: PUT, path: /sources/resume, query: { password: "{settings.password}" }, content_type: application/json, body: '[{source:json}]' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  stop:
+    summary: Stop a source's recording (PUT /sources/stop)
+    params: { source: *source }
+    send: { method: PUT, path: /sources/stop, query: { password: "{settings.password}" }, content_type: application/json, body: '[{source:json}]' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  record_selected:
+    summary: Start recording the sources selected in MovieRecorder (PUT /sources/record?selected_only=YES)
+    send: { method: PUT, path: /sources/record, query: { selected_only: "YES", password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  lock:
+    summary: Lock a source's controls (GET /sources/<id>/lock)
+    params: { source: *source }
+    send: { method: GET, path: "/sources/{source}/lock", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  unlock:
+    summary: Unlock a source's controls (GET /sources/<id>/unlock)
+    params: { source: *source }
+    send: { method: GET, path: "/sources/{source}/unlock", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  split:
+    summary: Continue a source's recording in a new file, where its destinations allow it (GET /sources/<id>/manual_split)
+    params: { source: *source }
+    send: { method: GET, path: "/sources/{source}/manual_split", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  set_recording_name:
+    summary: Set the name of a source's next recording (PUT /sources/<id>/recording_name)
+    params:
+      source: *source
+      name: { type: string, max_length: 1024, required: true, label: Recording name, description: "The recording's name." }
+    send: { method: PUT, path: "/sources/{source}/recording_name", query: { password: "{settings.password}" },
+            content_type: application/json, body: '{"recording_name":{name:json}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  set_destination:
+    summary: Record a source to one destination (PUT /sources/<id>/destinations with that one id)
+    params:
+      source: *source
+      destination: { type: string, max_length: 256, required: true, label: Destination, description: "The destination's unique id, as destinations in state are keyed." }
+    send: { method: PUT, path: "/sources/{source}/destinations", query: { password: "{settings.password}" },
+            content_type: application/json, body: '[{destination:json}]' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  set_scheduled_duration:
+    summary: Set a scheduled recording's duration (PUT /scheduled_recordings/<id> {duration})
+    params:
+      recording: &scheduled { type: string, max_length: 256, required: true, label: Scheduled recording, description: "The scheduled recording's unique id, as scheduled recordings in state are keyed." }
+      minutes: { type: int, min: 1, max: 100000, required: true, label: Duration, description: "The recording's duration in minutes." }
+    send: { method: PUT, path: "/scheduled_recordings/{recording}", query: { password: "{settings.password}" },
+            content_type: application/json, body: '{"duration":{minutes}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  set_scheduled_start:
+    summary: Set a scheduled recording's start time (PUT /scheduled_recordings/<id> {start_time})
+    params:
+      recording: *scheduled
+      minute_of_day: { type: int, min: 0, max: 1439, required: true, label: Start, description: "The start as minutes after midnight, 0-1439." }
+    send: { method: PUT, path: "/scheduled_recordings/{recording}", query: { password: "{settings.password}" },
+            content_type: application/json, body: '{"start_time":{minute_of_day}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  resume_scheduled:
+    summary: Clear a scheduled recording's stopped-by-user flag so it records again (PUT /scheduled_recordings/<id> {stopped_by_user false})
+    params: { recording: *scheduled }
+    send: { method: PUT, path: "/scheduled_recordings/{recording}", query: { password: "{settings.password}" },
+            content_type: application/json, body: '{"stopped_by_user":false}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  restore_configuration:
+    summary: Restore a saved configuration, choosing which parts (PUT /restore_configuration)
+    params:
+      name: { type: string, max_length: 1024, required: true, label: Configuration, description: "The configuration's name, as configurations in state list it." }
+      vtr_batch_list: { type: bool, default: true, label: VTR batch list, description: "On restores this part of the configuration." }
+      sources: { type: bool, default: true, label: Sources, description: "On restores the sources." }
+      av_presets: { type: bool, default: true, label: AV presets, description: "On restores the AV presets." }
+      destinations: { type: bool, default: true, label: Destinations, description: "On restores the destinations." }
+      schedule: { type: bool, default: true, label: Schedule, description: "On restores the schedule." }
+      layout: { type: bool, default: true, label: Layout, description: "On restores the layout." }
+    send: { method: PUT, path: /restore_configuration, query: { password: "{settings.password}" }, content_type: application/json,
+            body: '{"name":{name:json},"restore_vtr_bach_list":{vtr_batch_list},"restore_sources":{sources},"restore_av_presets":{av_presets},"restore_destinations":{destinations},"restore_schedule":{schedule},"restore_layout":{layout}}' }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  run_applescript:
+    summary: Run an AppleScript MovieRecorder has (GET /applescripts/<name>)
+    params:
+      script: { type: string, max_length: 256, required: true, label: Script, description: "The AppleScript's name." }
+    send: { method: GET, path: "/applescripts/{script}", query: { password: "{settings.password}" } }
+    expect: { status: [200, 201, 202] }
+    returns: ack
+  get_info:
+    summary: Read information about the application and computer (GET /info)
+    send: { method: GET, path: /info, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_sources:
+    summary: List the enabled sources and their recording status (GET /sources)
+    send: { method: GET, path: /sources, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_all_sources:
+    summary: List every source, the disabled ones too (GET /sources?include_disabled_sources=YES)
+    send: { method: GET, path: /sources, query: { include_disabled_sources: "YES", password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_destinations:
+    summary: List the destinations (GET /destinations)
+    send: { method: GET, path: /destinations, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_scheduled_recordings:
+    summary: List the scheduled recordings (GET /scheduled_recordings)
+    send: { method: GET, path: /scheduled_recordings, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_configurations:
+    summary: List the saved configurations' names (GET /configurations)
+    send: { method: GET, path: /configurations, query: { password: "{settings.password}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+state:
+  sources.*.name: { type: string, description: "A source's display name, keyed by its unique id" }
+  sources.*.recording: { type: bool, description: "Whether the source is recording" }
+  sources.*.paused: { type: bool, description: "Whether its recording is paused" }
+  sources.*.locked: { type: bool, description: "Whether its controls are locked" }
+  sources.*.recording_name: { type: string, description: "The name its recording takes" }
+  sources.*.video_format: { type: string, description: "Its video format (resolution and frame rate)" }
+  sources.*.recording_start: { type: string, description: "When its recording started, as MovieRecorder gives it" }
+  sources.*.recording_end: { type: string, description: "When its recording ends, if set" }
+  destinations.*.name: { type: string, description: "A destination's name, keyed by its unique id" }
+  scheduled.*.name: { type: string, description: "A scheduled recording's name, keyed by its unique id" }
+  scheduled.*.source: { type: string, description: "The unique id of the source it records" }
+  scheduled.*.start_minute: { type: int, unit: min, description: "Its start, minutes after midnight" }
+  scheduled.*.duration_minutes: { type: int, unit: min, description: "Its duration in minutes" }
+  scheduled.*.enabled: { type: bool, description: "Whether it is enabled" }
+  scheduled.*.weekly: { type: bool, description: "Whether it repeats weekly" }
+  scheduled.*.date: { type: string, description: "Its date, when not weekly" }
+  scheduled.*.stopped_by_user: { type: bool, description: "Whether it was stopped by hand (it does not record again until cleared)" }
+  configurations.*: { type: string, description: "A saved configuration's name, keyed by its place in the list from 0" }
+
+telemetry:
+  websocket:
+    path: /remote
+    scheme: { setting: scheme }
+    subprotocol: v1.1.main_update.movierecorder.softronmedia.com
+  poll:
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /sources, query: { password: "{settings.password}" } }
+        - { method: GET, path: /destinations, query: { password: "{settings.password}" } }
+        - { method: GET, path: /scheduled_recordings, query: { password: "{settings.password}" } }
+        - { method: GET, path: /configurations, query: { password: "{settings.password}" } }
+  updates:
+    # The main websocket: a source inserted or updated, or removed.
+    - json_match: { "$.dataType": "^source$", "$.change": "^(insertion|update)$" }
+      json: { id: "$.data.unique_id", name: "$.data.display_name", recording: "$.data.is_recording", paused: "$.data.is_paused",
+        locked: "$.data.is_locked", rec_name: "$.data.recording_name", format: "$.data.video_format",
+        start: "$.data.recording_start_date", end: "$.data.recording_end_date" }
+      state: &source_state
+        "sources.{id:key}.name": "{name}"
+        "sources.{id:key}.recording": "{recording}"
+        "sources.{id:key}.paused": "{paused}"
+        "sources.{id:key}.locked": "{locked}"
+        "sources.{id:key}.recording_name": "{rec_name}"
+        "sources.{id:key}.video_format": "{format}"
+        "sources.{id:key}.recording_start": "{start}"
+        "sources.{id:key}.recording_end": "{end}"
+    - json_match: { "$.dataType": "^source$", "$.change": "^removal$", "$.data.unique_id": "^(.+)$" }
+      json: {}
+      state: { "sources.{1:key}": { delete: true } }
+    # The REST lists.
+    - path: "^/sources\\?password="
+      json_each: "$"
+      replace: sources
+      json: { id: "$.unique_id", name: "$.display_name", recording: "$.is_recording", paused: "$.is_paused",
+        locked: "$.is_locked", rec_name: "$.recording_name", format: "$.video_format",
+        start: "$.recording_start_date", end: "$.recording_end_date" }
+      state: *source_state
+    - path: "^/destinations\\?"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.name" }
+      replace: destinations
+      state: { "destinations.{id:key}.name": "{name}" }
+    - path: "^/scheduled_recordings\\?"
+      json_each: "$"
+      json: { id: "$.unique_id", name: "$.name", source: "$.source_unique_id", start: "$.start_time", duration: "$.duration",
+        enabled: "$.is_enabled", weekly: "$.weekly_repeated", date: "$.date", stopped: "$.stopped_by_user" }
+      replace: scheduled
+      state:
+        "scheduled.{id:key}.name": "{name}"
+        "scheduled.{id:key}.source": "{source}"
+        "scheduled.{id:key}.start_minute": "{start}"
+        "scheduled.{id:key}.duration_minutes": "{duration}"
+        "scheduled.{id:key}.enabled": "{enabled}"
+        "scheduled.{id:key}.weekly": "{weekly}"
+        "scheduled.{id:key}.date": "{date}"
+        "scheduled.{id:key}.stopped_by_user": "{stopped}"
+    - path: "^/configurations\\?"
+      json_each: "$"
+      json: { name: "$" }
+      replace: configurations
+      state: { "configurations.{index}": "{name}" }
+    # Changes to the schedule are read back.
+    - path: "^/scheduled_recordings/"
+      headers: {}
+      then_send: [{ method: GET, path: /scheduled_recordings, query: { password: "{settings.password}" } }]
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      record, stop and split start, end or split a recording at once; restore_configuration replaces the sources,
+      destinations, presets, schedule and layout it restores; run_applescript runs a script on the Mac.
+  - models: [all]
+    severity: warning
+    text: >
+      Softron documents its REST calls only inside the running app (api.html on port 8080). The calls its release
+      notes name (GET /info, /sources?include_disabled_sources=YES, PUT /sources/record?selected_only=YES, GET
+      /applescripts/<name>, the stopped_by_user flag) and the websocket are documented; every other call, the
+      JSON fields and the password query are taken from the Bitfocus Companion module and inferred, as are the
+      answer statuses (200, 201 or 202).
+  - models: [all]
+    severity: info
+    text: >
+      Commands take one source or destination: the API takes a list of ids, which the format sends with one id.
+      The password is sent on every request as ?password=, empty when none is set, and not on the websocket. With
+      HTTPS enabled MovieRecorder serves no HTTP. The thumbnails (GET /sources/<id>/thumbnail) and the activity
+      websocket (performance values and logs) are not read.

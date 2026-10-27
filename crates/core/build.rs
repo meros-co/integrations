@@ -98,6 +98,15 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-dahua", &["dahua-ptz"]),
+    (
+        "vendor-denon",
+        &[
+            "denon-dn500av",
+            "denon-dn500bd",
+            "denon-dn500cb",
+            "denon-dn500r",
+        ],
+    ),
     ("vendor-digico", &["digico-sd"]),
     (
         "vendor-dataton",
@@ -150,10 +159,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-google", &["youtube-live"]),
+    ("vendor-grassvalley", &["grassvalley-amp"]),
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
     ("vendor-holyrics", &["holyrics"]),
+    ("vendor-imagine", &["vdcp"]),
     ("vendor-imimot", &["imimot-mitti"]),
     (
         "vendor-irisdown",
@@ -256,6 +267,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-ross",
         &[
             "ross-ultrix",
+            "ross-video-server",
             "ross-xpression",
             "ross-xpression-udp",
             "rosstalk",
@@ -290,8 +302,17 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-sofie", &["sofie-chef"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
+        "vendor-softron",
+        &[
+            "softron-movierecorder",
+            "softron-mreplay",
+            "softron-multicam-logger",
+        ],
+    ),
+    (
         "vendor-sony",
         &[
+            "sony-9pin",
             "sony-bravia",
             "sony-bravia-ip",
             "sony-bravia-serial",
@@ -299,6 +320,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "visca",
         ],
     ),
+    ("vendor-sounddevices", &["sounddevices-pixnet"]),
     ("vendor-stagetimer", &["stagetimer"]),
     ("vendor-streamlabs", &["streamlabs-desktop"]),
     ("vendor-studiocoast", &["vmix"]),
@@ -307,6 +329,16 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["symetrix-composer", "symetrix-jupiter"],
     ),
     ("vendor-tallyarbiter", &["tally-arbiter"]),
+    (
+        "vendor-tascam",
+        &[
+            "tascam-bd-mp1",
+            "tascam-bd-mp4k",
+            "tascam-cd-400u",
+            "tascam-da6400",
+            "tascam-ss-r250n",
+        ],
+    ),
     ("vendor-teradek", &["teradek-prism"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),

@@ -1,0 +1,383 @@
+spec: 1
+id: sony-9pin
+name: Sony 9-pin (RS-422 VTR protocol) decks and servers
+vendor: Sony
+category: recorder
+implementation: native
+reason: >
+  The 9-pin protocol is binary: each message is CMD-1 (a command type and a data count), CMD-2, the data and a
+  checksum, and the device answers each one with ACK, NAK and an error byte, or the data asked for, whose length
+  only its own first byte gives. Status comes as bit fields in ten status bytes, and times as BCD; speeds are a
+  logarithmic byte pair. Replies are read against the request in flight, one at a time, and nothing is pushed.
+
+# The serial remote protocol of Sony's broadcast VTRs (BVW-75 and its family), which nearly every deck, disk
+# recorder and video server still emulates on its RS-422 "9-pin" port. The device is reached on a serial port of
+# the host (an RS-422 adapter) or through a serial-to-Ethernet converter at its host and port, which carries the
+# same bytes. Grass Valley's AMP, which extends the protocol and also runs over TCP, is the grassvalley-amp spec.
+source:
+  - title: "Sony VIDEOCASSETTE RECORDER / PLAYER U-matic SERIES PROTOCOL OF REMOTE-1 (9 Pin) CONNECTOR, 1st Edition (9-967-242-01, 1989)"
+    author: Sony Corporation
+    url: https://ftp.mirrorservice.org/sites/www.bitsavers.org/pdf/sony/u-matic/9-967-242-01_U-matic_9-Pin_Remote_Protocol_1989.pdf
+    note: >
+      Manufacturer document, archived by bitsavers (retrieved 2026-10-27). The interface (EIA RS-422A, 38.4 kbit/s,
+      1 start bit, 8 data bits, odd parity, 1 stop bit), the controller and device roles, the command block
+      (CMD-1 with the data count, CMD-2, data, checksum), ACK, NAK and its error bits, and the command families
+      (0X system, 2X transport, 4X preset and select, 6X sense, 7X sense return). Read only; nothing copied.
+  - title: "Drastic Technologies: VVCR 422 Serial Protocol (legacy, the Sony 9-pin protocol as its VVCR supports it)"
+    author: Drastic Technologies Ltd.
+    url: https://www.drastic.tv/support-59/legacysoftwarehardware/37-miscellaneous-legacy/180-vvcr-422-serial-protocol
+    note: >
+      A device maker's public protocol page, offered "for historic interest". Communication format, the checksum
+      with a worked example, ACK and NAK with each error bit, worked byte sequences for every command it lists
+      (cue up 24 31 13 58 16 02 A7, jog, shuttle, presets, senses and their 74.xx and 78.xx returns), the status
+      return bits, the timecode format with the drop-frame and color-frame flags, frame step (20.14 and 20.24),
+      and device type codes (BVW-75 20 25).
+  - title: "Sony 9-Pin Remote Protocol (summary of the DVR-2000/2100 command table), updated 6/16/96"
+    author: Rick Davis, Silicon Graphics
+    url: https://ftp.zx.net.nz/pub/archive/ftp.sgi.com/sgi/video/rld/vidpage/s9pin.html
+    note: >
+      A published summary of Sony's command table, used for coverage: the full command list with CMD-1 and CMD-2,
+      the jog, var and shuttle speed formula (10^(N/32-2) with a second byte for finer steps), the device type
+      table, the status bytes 0-9 bit by bit, current time sense's request bits and returns (74.04 LTC, 74.06
+      VITC, 74.14 corrected LTC, 74.16 held VITC, 74.00 and 74.01 timers, 74.05 and 74.07 user bits), the edit
+      preset, servo reference, color frame, timer mode, edit field and freeze mode selects.
+  - title: "TASCAM DA-6400 RS-422 command implementation, revision 1"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/da-6400/da-6400_p2_implementation.pdf
+    note: >
+      Manufacturer document: the 9-pin commands the DA-6400 acts on, those it only acknowledges, its device type
+      (12 11 F0 1A), current time sense requests and returns (74.04, 74.06, 74.00, 74.05/74.07, 78.04/78.06, 70.0D
+      when the time data is missing), status sense, edit preset sense (61.30, 7X.30) and its status bits.
+
+settings:
+  link: { type: enum, values: [serial, tcp], default: serial, label: Link,
+    description: "serial uses a serial port of the host (an RS-422 adapter); tcp reaches the device's 9-pin port through a serial-to-Ethernet converter at the device's host and port." }
+  serial_port: { type: string, max_length: 256, label: Serial port,
+    description: "With link serial, the host's serial port wired to the device's 9-pin port: COM3 on Windows, /dev/ttyUSB0 on Linux." }
+  baud_rate: { type: enum, values: ["9600", "19200", "38400"], default: "38400", label: Baud rate, description: "The protocol runs at 38400 bit/s; some devices can be set slower." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "The protocol uses 8 data bits." }
+  parity: { type: enum, values: [odd], default: odd, label: Parity, description: "The protocol uses odd parity." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "The protocol uses 1 stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "The protocol uses no flow control." }
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-422 on the device's 9-pin D-sub (REMOTE-1), through an RS-422 adapter; the host is the controller" }
+  - { port: null, protocol: tcp, role: control, when: "link tcp", note: "a serial-to-Ethernet converter's port, given when the device is opened" }
+
+models:
+  - id: generic
+    name: Any deck, disk recorder or server with a Sony 9-pin (BVW-75 protocol) port
+    supports: &all [local_disable, local_enable, get_device_type, stop, play, record, standby, eject, fast_forward, rewind,
+      jog, var, shuttle, frame_step, preroll, cue_up, sync_play, program_speed_play, preview, review, auto_edit,
+      outpoint_preview, anti_clog_timer, full_ee, select_ee_on, edit, freeze, set_timer1, reset_timer1, set_generator,
+      set_user_bits, enter_point, set_point, shift_point, reset_point, recall_point, reset_lost_lock, set_edit_preset,
+      get_edit_preset, set_preroll_time, set_tape_auto, set_servo_reference, set_color_frame, set_timer_mode,
+      input_check, set_edit_field, set_freeze_mode, auto_mode, spot_erase, audio_split, get_status, get_time,
+      get_generator, get_point, get_preroll_time, get_timer_mode, send_raw]
+    verification: none
+  - id: sony-vtr
+    name: Sony broadcast VTRs and disk recorders (BVW, PVW, DVW, DVR and their successors)
+    supports: *all
+    verification: none
+  - id: tascam-da-6400
+    name: TASCAM DA-6400 / DA-6400dp on its RS-422 port
+    supports: [get_device_type, stop, play, record, fast_forward, rewind, shuttle, cue_up, edit, get_status, get_time,
+      set_edit_preset, get_edit_preset, send_raw]
+    verification: none
+
+commands:
+  local_disable:
+    summary: Disable the device's own transport controls (00.0C)
+    returns: ack
+  local_enable:
+    summary: Enable the device's own controls again (00.1D)
+    returns: ack
+  get_device_type:
+    summary: "Read the device type (00.11, answered 12.11): {device_type, model}, the model where the code is a known one"
+    returns: value
+  stop:
+    summary: Stop (20.00)
+    returns: ack
+  play:
+    summary: Play from the current position (20.01)
+    returns: ack
+  record:
+    summary: Record; what happens depends on auto mode, record inhibit and the edit presets (20.02)
+    returns: ack
+  standby:
+    summary: Standby on (20.05) or off (20.04)
+    params:
+      enabled: { type: bool, required: true, label: Standby, description: "On keeps a tape threaded (a disk cued) in stop; off releases it." }
+    returns: ack
+  eject:
+    summary: Eject the media (20.0F)
+    returns: ack
+  fast_forward:
+    summary: Fast forward at the device's highest speed (20.10)
+    returns: ack
+  rewind:
+    summary: Rewind at the device's highest speed (20.20)
+    returns: ack
+  jog:
+    summary: Jog forward or back at a speed (2X.11, 2X.21)
+    params:
+      direction: &direction { type: enum, values: [forward, reverse], required: true, label: Direction, description: "forward or reverse." }
+      rate: &rate { type: float, min: 0, max: 95, required: true, label: Speed, description: "Times play speed, 0 to about 95: sent as the protocol's speed bytes (10^(N/32-2)); 0 sends speed byte 0, which many devices take as a stop." }
+    returns: ack
+  var:
+    summary: Play forward or back at a variable speed (2X.12, 2X.22)
+    params: { direction: *direction, rate: *rate }
+    returns: ack
+  shuttle:
+    summary: Shuttle forward or back at a speed (2X.13, 2X.23)
+    params: { direction: *direction, rate: *rate }
+    returns: ack
+  frame_step:
+    summary: Step one frame forward (20.14) or back (20.24) and pause
+    params: { direction: *direction }
+    returns: ack
+  preroll:
+    summary: Cue to the in point less the preroll time (20.30)
+    returns: ack
+  cue_up:
+    summary: Cue up to a timecode (24.31)
+    params:
+      timecode: &tc { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;.][0-9]{2}$", required: true, label: Timecode, description: "Hours, minutes, seconds and frames, HH:MM:SS:FF." }
+    returns: ack
+  sync_play:
+    summary: Preroll, then play (20.34)
+    returns: ack
+  program_speed_play:
+    summary: Play at play speed plus or minus up to 25.5 % in 0.1 % steps (21.38, 21.39)
+    params:
+      percent: { type: float, min: -25.5, max: 25.5, required: true, label: Deviation, description: "The deviation from play speed in percent, in steps of 0.1." }
+    returns: ack
+  preview:
+    summary: Preview the edit (20.40)
+    returns: ack
+  review:
+    summary: Review the last edit (20.41)
+    returns: ack
+  auto_edit:
+    summary: Run the edit from preroll through the out point (20.42)
+    returns: ack
+  outpoint_preview:
+    summary: Preview the out point (20.43)
+    returns: ack
+  anti_clog_timer:
+    summary: Enable (2X.55) or disable (2X.54) the anti-clog timer
+    params:
+      enabled: &enabled { type: bool, required: true, label: Enabled, description: "On enables the function, off disables it." }
+    returns: ack
+  full_ee:
+    summary: Full EE on (20.61) or off (20.60)
+    params: { enabled: *enabled }
+    returns: ack
+  select_ee_on:
+    summary: EE on the channels the edit preset selects (20.63)
+    returns: ack
+  edit:
+    summary: Edit on (20.65, recording the preset channels) or off (20.64)
+    params: { enabled: *enabled }
+    returns: ack
+  freeze:
+    summary: Freeze the output on (20.6B) or off (20.6A)
+    params: { enabled: *enabled }
+    returns: ack
+  set_timer1:
+    summary: Preset timer 1 (44.00)
+    params: { timecode: *tc }
+    returns: ack
+  reset_timer1:
+    summary: Reset timer 1 to zero (40.08)
+    returns: ack
+  set_generator:
+    summary: Preset the timecode generator (44.04), then read it back
+    params:
+      timecode: *tc
+      drop_frame: { type: bool, default: false, label: Drop frame, description: "On sets drop-frame counting." }
+      color_frame: { type: bool, default: false, label: Color frame, description: "On sets color framing." }
+    returns: ack
+  set_user_bits:
+    summary: Preset the generator's user bits (44.05), then read them back
+    params:
+      user_bits: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true, label: User bits, description: "Eight hexadecimal digits as a display shows them, binary group 8 first." }
+    returns: ack
+  enter_point:
+    summary: Mark the in, out, audio in or audio out point at the current position (40.10-40.13), then read it back
+    params:
+      point: &point { type: enum, values: [in, out, audio_in, audio_out], required: true, label: Point, description: "in, out, audio_in or audio_out." }
+    returns: ack
+  set_point:
+    summary: Preset an in, out, audio in or audio out point (44.14-44.17), then read it back
+    params: { point: *point, timecode: *tc }
+    returns: ack
+  shift_point:
+    summary: Move a point one frame later or earlier (40.18-40.1F), then read it back
+    params:
+      point: *point
+      direction: { type: enum, values: [plus, minus], required: true, label: Direction, description: "plus one frame or minus one frame." }
+    returns: ack
+  reset_point:
+    summary: Reset a point's flag (40.20-40.23), then read it back
+    params: { point: *point }
+    returns: ack
+  recall_point:
+    summary: Recall a point's last value (40.24-40.27), then read it back
+    params: { point: *point }
+    returns: ack
+  reset_lost_lock:
+    summary: Clear the lost lock status bit (40.2D)
+    returns: ack
+  set_edit_preset:
+    summary: Choose insert or assemble and the channels an edit records (42.30), then read it back
+    params:
+      insert: { type: bool, default: false, label: Insert, description: "Insert edit." }
+      assemble: { type: bool, default: false, label: Assemble, description: "Assemble edit." }
+      video: { type: bool, default: false, label: Video, description: "Record video." }
+      timecode: { type: bool, default: false, label: Timecode, description: "Record timecode." }
+      cue_a1: { type: bool, default: false, label: Cue A1, description: "The cue channel's bit 0." }
+      cue_a2: { type: bool, default: false, label: Cue A2, description: "The cue channel's bit 1." }
+      audio1: { type: bool, default: false, label: Audio 1, description: "Record digital audio channel 1." }
+      audio2: { type: bool, default: false, label: Audio 2, description: "Record digital audio channel 2." }
+      audio3: { type: bool, default: false, label: Audio 3, description: "Record digital audio channel 3." }
+      audio4: { type: bool, default: false, label: Audio 4, description: "Record digital audio channel 4." }
+    returns: ack
+  get_edit_preset:
+    summary: "Read the edit preset (61.30, answered 72.30)"
+    returns: value
+  set_preroll_time:
+    summary: Preset the preroll time (44.31), then read it back
+    params: { timecode: *tc }
+    returns: ack
+  set_tape_auto:
+    summary: Select tape or auto (tape/EE) mode, or the device's own setting (41.32)
+    params:
+      mode: { type: enum, values: [auto, tape, local], required: true, label: Mode, description: "auto, tape, or local (the device's menu setting)." }
+    returns: ack
+  set_servo_reference:
+    summary: Select the servo reference (41.33)
+    params:
+      reference: { type: enum, values: [auto, external, input, local], required: true, label: Reference, description: "auto, external, input, or local (the device's menu setting)." }
+    returns: ack
+  set_color_frame:
+    summary: Select the color frame mode (41.35)
+    params:
+      mode: { type: enum, values: [two_field, four_field, eight_field, local], required: true, label: Color frame, description: "2, 4 or 8 field, or local (the device's menu setting)." }
+    returns: ack
+  set_timer_mode:
+    summary: Select the timer the device counts and returns (41.36), then read it back
+    params:
+      mode: { type: enum, values: [timecode, timer1, timer2, local], required: true, label: Timer, description: "timecode, timer1, timer2, or local (the device's menu setting)." }
+    returns: ack
+  input_check:
+    summary: Input check on or off (41.37)
+    params: { enabled: *enabled }
+    returns: ack
+  set_edit_field:
+    summary: Select the field edits start on (41.3A)
+    params:
+      field: { type: enum, values: [either, field1, field2, local], required: true, label: Field, description: "either (the field the command arrives in), field1, field2, or local (the device's menu setting)." }
+    returns: ack
+  set_freeze_mode:
+    summary: Select what a freeze holds (41.3B)
+    params:
+      mode: { type: enum, values: [either_field, field1, field2, frame], required: true, label: Freeze, description: "either field, field 1, field 2 or a frame." }
+    returns: ack
+  auto_mode:
+    summary: Auto mode on (40.41) or off (40.40)
+    params: { enabled: *enabled }
+    returns: ack
+  spot_erase:
+    summary: Spot erase on (40.43) or off (40.42)
+    params: { enabled: *enabled }
+    returns: ack
+  audio_split:
+    summary: Audio split on (40.45) or off (40.44)
+    params: { enabled: *enabled }
+    returns: ack
+  get_status:
+    summary: "Read the status bytes (61.20, answered 7X.20): every status bit, and the transport in one word"
+    returns: value
+  get_time:
+    summary: "Read a time or user bits (61.0C, answered 74.xx or 78.xx): {timecode, source, drop_frame} or {user_bits, source}"
+    params:
+      source: { type: enum, values: [best, ltc, vitc, timer1, timer2, ltc_user_bits, vitc_user_bits], required: true, label: Source,
+        description: "best (LTC, or VITC at low speed, as the device chooses), ltc, vitc, timer1, timer2, or the LTC or VITC user bits." }
+    returns: value
+  get_generator:
+    summary: "Read the timecode generator's time and user bits (61.0A, answered 78.08)"
+    returns: value
+  get_point:
+    summary: "Read a point (60.10-60.13, answered 74.10-74.13)"
+    params: { point: *point }
+    returns: value
+  get_preroll_time:
+    summary: "Read the preroll time (60.31, answered 74.31)"
+    returns: value
+  get_timer_mode:
+    summary: "Read the timer mode (60.36, answered 71.36): timecode, timer1 or timer2"
+    returns: value
+  send_raw:
+    summary: Send any 9-pin message (the checksum is added) and return the reply's bytes as hex
+    params:
+      message: { type: string, pattern: "^([0-9A-Fa-f]{2} ?)+$", max_length: 64, required: true, label: Message, description: "CMD-1, CMD-2 and the data as hexadecimal bytes, such as 61 0C 01; the count nibble is as given." }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      record, edit (on) and auto_edit record over what is on the media from the current position or the in point;
+      eject unloads it. None can be undone.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed: monitored, the core asks the status bytes and the best time every 250 ms and the points,
+      timer 1, the LTC user bits, the generator, the preroll time, the timer mode and the edit preset every 5 s;
+      opened for commands only, it asks the device type every 10 s while idle as the liveness check. A serial
+      port shows nothing of the device, which is reported connected once it answers. A device that refuses ten
+      status bytes is asked four from then on.
+  - models: [all]
+    severity: info
+    text: >
+      Which commands a device acts on varies widely: many emulate a Sony VTR and acknowledge commands they ignore
+      (the DA-6400 acknowledges standby, jog, var, full EE and the tape, servo and timer selects without acting).
+      send_raw reaches device-specific commands (audio levels, phase, local key maps, a maker's extensions). The
+      device type table only names models Sony and Drastic list; other codes are returned as hex.
+  - models: [all]
+    severity: info
+    text: >
+      Over a serial-to-Ethernet converter the bytes are the same; the converter must be set to the protocol's
+      serial format (38400 bit/s, 8 data bits, odd parity, 1 stop bit) and pass bytes unchanged. Replies are
+      awaited 1 s.
+  - models: [tascam-da-6400]
+    severity: info
+    text: >
+      The DA-6400 acts on stop, play, record, fast forward, rewind, shuttle (its first speed byte only), cue up
+      (the time only; it then pauses), edit on and off, the time and status senses and the edit preset; its
+      status bytes 3, 4 and 7-15 are always zero.
+
+state:
+  device.device_type: { type: string, description: "The device type's two bytes as hex (12.11)" }
+  device.model: { type: string, description: "The model the device type code stands for, where it is a known one" }
+  device.line_625: { type: bool, description: "Whether a known model code says a 625-line (PAL) model" }
+  transport: { type: string, description: "The transport from the status bits: eject, record, fast_forward, rewind, shuttle, jog, var, play, still, stop, standby or unknown" }
+  status.*: { type: bool, description: "Each status bit of the 7X.20 status data by name (local, tape_out, play, record, stop, servo_lock, cue_complete, in_point, edit, eot...)" }
+  timecode: { type: string, description: "The current time from the last time sense, HH:MM:SS:FF" }
+  timecode_source: { type: string, description: "Where it came from: ltc, vitc, ltc_corrected (interpolated) or vitc_hold" }
+  drop_frame: { type: bool, description: "The time's drop-frame flag" }
+  timer1: { type: string, description: "Timer 1 (74.00), HH:MM:SS:FF" }
+  timer2: { type: string, description: "Timer 2 (74.01), HH:MM:SS:FF" }
+  windows_time: { type: string, description: "A server's clock (74.0A), where a device answers with it" }
+  user_bits.ltc: { type: string, description: "LTC user bits, eight hexadecimal digits" }
+  user_bits.vitc: { type: string, description: "VITC user bits, eight hexadecimal digits" }
+  generator.timecode: { type: string, description: "The timecode generator's time (78.08)" }
+  generator.user_bits: { type: string, description: "The generator's user bits" }
+  points.in: { type: string, description: "The in point (74.10)" }
+  points.out: { type: string, description: "The out point (74.11)" }
+  points.audio_in: { type: string, description: "The audio in point (74.12)" }
+  points.audio_out: { type: string, description: "The audio out point (74.13)" }
+  preroll_time: { type: string, description: "The preroll time (74.31)" }
+  timer_mode: { type: string, description: "timecode, timer1, timer2 or other (71.36)" }
+  edit_preset.*: { type: bool, description: "The edit preset's bits: insert, assemble, video, timecode, cue_a1, cue_a2, audio1-audio4 (7X.30)" }
