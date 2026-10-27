@@ -1,6 +1,6 @@
 spec: 1
 id: extron-ipl
-name: Extron IP Link control interfaces (IPL 250, IPL T S Series)
+name: Extron IP Link control interfaces (IPL 250, IPL T S, IPL T SFI244, IPL T CR48, IPL T PCS4)
 vendor: Extron
 category: other
 
@@ -8,12 +8,15 @@ category: other
 # speak it over Telnet (TCP 23): serial ports (send data, port settings,
 # receive timeouts, pass-through), and on the IPL 250 IR outputs, relays and
 # contact inputs, plus information requests, network, time, verbose mode,
-# passwords and port maps. Each model supports only what its own guide
+# passwords and port maps; on the IPL T SFI244 Flex I/O ports, on the IPL T
+# CR48 relays and contact inputs, and on the IPL T PCS4 power receptacles
+# with current sensing, alarms and schedules. Each model supports only what
+# its own guide
 # documents; page numbers are the guides' printed page numbers.
 #
-# Not here, on either model: e-mail alerts and the mail server, the file
+# Not here, on any model: e-mail alerts and the mail server, the file
 # system and file streaming, event buffers (their replies carry binary data),
-# the UDP broadcast mode (IPL T S), resets (Esc ZXXX, ZFFF, ZY, ZQQQ), IR
+# the UDP broadcast mode (IPL T S, SFI244, CR48), resets (Esc ZXXX, ZFFF, ZY, ZQQQ), IR
 # learning and firmware. The IPL Pro and IPCP Pro control processors are not
 # models: their user guides document no SIS (they are programmed with Global
 # Configurator and Global Scripter; see the quirks).
@@ -56,6 +59,45 @@ source:
       session security level p.36; port maps p.37; connections p.39; direct
       port access on TCP 2001-2006, no password, data passed unprocessed
       p.47.
+  - title: "IPL T PCS4, IPL T PCS4i IP Link Power Control Interfaces User Guide, 68-738-07 Rev. C (11/21)"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-738-07_C_IPL_T_PCS4_UG.pdf
+    note: >
+      Manufacturer document. Telnet port 23, password prompt, factory
+      passwords the serial number p.39 and p.42-43; error codes E12-E28
+      p.43; command and response table: receptacle power (PC), current sense
+      (PS), groups (GP), power-up delay (DT), thresholds (TH) p.45;
+      executive mode (X), alarm conditions and monitoring (SA), alarm mode
+      (MA), schedules (SS) p.46; alarm relay (O), port timeouts (TC),
+      firmware (Q, 0Q-4Q), part number, model name and description, memory
+      p.47; e-mail, unit name, time p.48; GMT offset, daylight saving, DHCP,
+      IP, MAC, subnet, gateway, verbose mode (0 by default), connections
+      p.49; passwords, security level, port maps (MT, MH) p.50; files p.50-51.
+  - title: "IPL T CR48 IP Link Ethernet Control Interface User Guide, 68-738-05 Rev. D (08/19)"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-738-05_D_IPL_T_CR48_UG.pdf
+    note: >
+      Manufacturer document. Command and response table p.27-31: relays
+      (O: pulse, toggle, on, off, view; 8 relays), contact inputs (n], four
+      inputs, 0 or 1 or 0-4095 on a 12-bit scale), firmware (Q, 0Q-4Q), part
+      number, model name and description, memory, unit name, time, GMT
+      offset, daylight saving 0-3, DHCP, IP, MAC, subnet, gateway, passwords,
+      verbose mode, security level, broadcast mode, connections, port maps
+      (MT, MH), e-mail, events, resets; copyright and password prompt p.24.
+  - title: "IPL T SFI244 IP Link Ethernet Control Interface User Manual, 68-738-06 Rev. C (02/10)"
+    author: Extron Electronics
+    url: https://archive.org/download/manualzilla-id-7247692/
+    note: >
+      Manufacturer document (the Internet Archive's copy of Extron's manual;
+      Rev. B, 12/08, covers the earlier IPL T SF24 too). Symbols p.32-34;
+      copyright, password and error codes p.35; command and response table:
+      serial ports (RS, CP, CY 0 only, CF, CE, CD; two RS-232 ports, 300-115200
+      baud), Flex I/O modes 0-7 with thresholds ([) p.36; I/O state (]:
+      on, off, toggle, pulse, view), IR (IR, four ports), firmware, part
+      number and model p.37; IP setup, passwords and verbose mode p.38-39;
+      broadcast mode, files, port maps including direct access (MD) p.39-40;
+      e-mail, events and resets p.40-41; Telnet port 23 p.53; direct port
+      access on TCP 2001-2002 p.54.
   - title: "IPL Pro Series User Guide, 68-2437-01 Rev. H (2021), and IPCP Pro xi Series User Guide, 68-3496-01 Rev. B"
     author: Extron Electronics
     url: https://media.extron.com/public/download/files/userman/68-2437-01_H_IPL_Pro_Series_UG.pdf
@@ -80,7 +122,7 @@ transport:
   # tagged verbose-mode replies, bare numbers and E-codes. The copyright
   # banner, its date line, "Password:" and "Login ..." never match, so they
   # are never taken as a reply.
-  reply_match: '^(E\d\d$|Cpn|Irs|Ver|Pno|Inf|Ipn|Ipt|Ipz|Ipx|Idh|Ipi|Iph|Ips|Ipg|Ipa|Ipu|Icc|Pvl|Pti|Pmt|Pmh|Pmd|Vrb|[HSN],\d|\d|[-+]\d)'
+  reply_match: '^(E\d\d$|Cpn|Irs|Exe|Pgp|Pdt|Pt[fsc]|Ast|Arl|Set|Ver|Pno|Inf|Ipn|Ipt|Ipz|Ipx|Idh|Ipi|Iph|Ips|Ipg|Ipa|Ipu|Icc|Pvl|Pti|Pmt|Pmh|Pmd|Vrb|[HSN],\d|\d|[-+]\d)'
   # Q (firmware version) answers on every model and keeps the session open.
   probe: "Q"
 
@@ -107,6 +149,7 @@ maps:
   relay_state: { open: "0", closed: "1", toggle: "2" }
   ir_mode: { once: "0", continuous: "1", stop: "2" }
   timeout_scope: { this: "0", global: "1" }
+  threshold: { clear: "0", standby: "1", full: "2" }
 
 ports:
   - { port: 23, protocol: tcp, role: control }
@@ -149,6 +192,60 @@ models:
       Serial interfaces only: the S1 has one RS-232 port, the S2 two and the
       S4 four RS-232, RS-422 or RS-485 ports (p.1). No relays, IR or contact
       inputs.
+
+  - id: ipl-t-sfi244
+    name: Extron IPL T SFI244
+    supports:
+      [send_serial_data, send_serial_data_timed, set_serial_port, get_serial_port, set_serial_port_type,
+       get_serial_port_type, set_serial_flow_control, get_serial_flow_control, set_serial_receive_timeout,
+       get_serial_receive_timeout, set_serial_passthrough, end_serial_passthrough, get_serial_passthrough,
+       play_ir, set_io_mode, set_io_mode_thresholds, get_io_mode, set_io_state, toggle_io_state, pulse_io_state,
+       get_io_state, get_firmware, get_firmware_versions, get_part_number, get_model_name, get_model_description,
+       get_system_memory, get_user_memory, set_unit_name, reset_unit_name, get_unit_name, set_date_time,
+       get_date_time, set_gmt_offset, get_gmt_offset, set_daylight_saving, get_daylight_saving, set_dhcp,
+       get_dhcp, set_ip_address, get_ip_address, get_mac_address, set_subnet_mask, get_subnet_mask,
+       set_gateway, get_gateway, set_verbose_mode, get_verbose_mode, get_connection_count,
+       get_security_level, set_admin_password, set_user_password, set_telnet_port, get_telnet_port,
+       set_web_port, get_web_port, set_direct_port, get_direct_port]
+    verification: none
+    notes: >
+      Two RS-232 ports (COM1-2, RS-232 only: port type 0), four Flex I/O
+      ports (digital or analog inputs and outputs) and four IR outputs
+      (68-738-06 p.36-37). No IP connection timeout command.
+  - id: ipl-t-cr48
+    name: Extron IPL T CR48
+    supports:
+      [set_relay, pulse_relay, get_relay, get_contact_input,
+       get_firmware, get_firmware_versions, get_part_number, get_model_name, get_model_description,
+       get_system_memory, get_user_memory, set_unit_name, reset_unit_name, get_unit_name, set_date_time,
+       get_date_time, set_gmt_offset, get_gmt_offset, set_daylight_saving, get_daylight_saving, set_dhcp,
+       get_dhcp, set_ip_address, get_ip_address, get_mac_address, set_subnet_mask, get_subnet_mask,
+       set_gateway, get_gateway, set_verbose_mode, get_verbose_mode, get_connection_count,
+       get_security_level, set_admin_password, set_user_password, set_telnet_port, get_telnet_port,
+       set_web_port, get_web_port]
+    verification: none
+    notes: >
+      Four contact inputs and eight relays (68-738-05 p.27); no serial or
+      IR ports and no direct port access. Daylight saving adds 3 Brazil.
+  - id: ipl-t-pcs4
+    name: Extron IPL T PCS4, IPL T PCS4i
+    supports:
+      [set_receptacle_power, get_receptacle_power, get_receptacle_current, set_receptacle_groups,
+       get_receptacle_groups, set_power_up_delay, get_power_up_delay, set_threshold, get_thresholds,
+       set_executive_mode, get_executive_mode, set_alarm_conditions, set_monitoring, get_alarm_conditions,
+       set_alarm_mode, get_alarm_mode, set_schedule, get_schedule, set_relay, pulse_relay, get_relay,
+       get_firmware, get_firmware_versions, get_part_number, get_model_name, get_model_description,
+       get_system_memory, get_user_memory, set_unit_name, reset_unit_name, get_unit_name, set_date_time,
+       get_date_time, set_gmt_offset, get_gmt_offset, set_daylight_saving, get_daylight_saving, set_dhcp,
+       get_dhcp, set_ip_address, get_ip_address, get_mac_address, set_subnet_mask, get_subnet_mask,
+       set_gateway, get_gateway, set_verbose_mode, get_verbose_mode, get_connection_count,
+       get_security_level, set_admin_password, set_user_password, set_port_timeout, get_port_timeout,
+       set_telnet_port, get_telnet_port, set_web_port, get_web_port]
+    verification: none
+    notes: >
+      Four switched power receptacles with current sensing, an alarm relay
+      (relay 1) and a front panel (68-738-07 p.45-47). The PCS4i is the
+      international (200-240 V) version. No serial, IR or contact inputs.
 
 commands:
   # ── Serial ports (IPL 250 p.4-8 to 4-10, IPL T S p.28-30) ───────────────
@@ -371,7 +468,7 @@ commands:
   set_relay:
     summary: Open, close or toggle a relay (X!*0O, X!*1O, X!*2O)
     params:
-      relay: { type: int, min: 1, max: 4, required: true,
+      relay: { type: int, min: 1, max: 8, required: true,
                label: Relay,
                description: "The relay, from 1 as on the rear panel." }
       state: { type: enum, values: [open, closed, toggle], required: true,
@@ -384,7 +481,7 @@ commands:
   pulse_relay:
     summary: Close a relay for a time in 20 ms steps, then open it (X!*3*X6#O)
     params:
-      relay: { type: int, min: 1, max: 4, required: true,
+      relay: { type: int, min: 1, max: 8, required: true,
                label: Relay,
                description: "The relay, from 1 as on the rear panel." }
       ticks: { type: int, min: 1, max: 65535, required: true,
@@ -397,7 +494,7 @@ commands:
   get_relay:
     summary: A relay's state (0 open, 1 closed)
     params:
-      relay: { type: int, min: 1, max: 4, required: true,
+      relay: { type: int, min: 1, max: 8, required: true,
                label: Relay,
                description: "The relay, from 1 as on the rear panel." }
     send: "{relay:02d}O"
@@ -405,13 +502,13 @@ commands:
     returns: value
 
   get_contact_input:
-    summary: A contact input's state (0 open, 1 closed) (X!])
+    summary: A contact input's state (0 open, 1 closed; the CR48 reads 0-4095 in analog use) (X!])
     params:
       input: { type: int, min: 1, max: 4, required: true,
                label: Contact input,
                description: "The contact input, from 1 as on the rear panel." }
     send: "{input:02d}]"
-    expect: { matches: '^(?:\S*\*)?([01])$' }
+    expect: { matches: '^(?:\S*\*)?(\d+)$' }
     returns: value
 
   # ── Information (IPL 250 p.4-12 to 4-14, IPL T S p.31-32) ───────────────
@@ -513,19 +610,19 @@ commands:
     returns: value
 
   set_daylight_saving:
-    summary: Set daylight saving time, 0 off, 1 USA, 2 Europe
+    summary: Set daylight saving time, 0 off, 1 USA, 2 Europe, 3 Brazil (CR48)
     params:
-      mode: { type: int, min: 0, max: 2, required: true,
+      mode: { type: int, min: 0, max: 3, required: true,
               label: Daylight saving,
-              description: "0 off, 1 USA (second Sunday of March to first Sunday of November), 2 Europe (last Sunday of March to last Sunday of October)." }
+              description: "0 off, 1 USA (second Sunday of March to first Sunday of November), 2 Europe (last Sunday of March to last Sunday of October), 3 Brazil (CR48 only)." }
     send: "\x1b{mode}CX"
-    expect: { matches: '^Ipx[0-2]$' }
+    expect: { matches: '^Ipx[0-3]$' }
     returns: ack
 
   get_daylight_saving:
-    summary: Daylight saving time, 0 off, 1 USA, 2 Europe
+    summary: Daylight saving time, 0 off, 1 USA, 2 Europe, 3 Brazil (CR48)
     send: "\x1bCX"
-    expect: { matches: '^(?:Ipx)?([0-2])$' }
+    expect: { matches: '^(?:Ipx)?([0-3])$' }
     returns: value
 
   set_dhcp:
@@ -721,6 +818,215 @@ commands:
     expect: { matches: '^(?:Pmd\s*)?0*(\d+)$' }
     returns: value
 
+
+  # ── IPL T PCS4 receptacles, alarms and schedules (68-738-07 Rev. C p.45-46) ──
+  set_receptacle_power:
+    summary: Turn a power receptacle on or off (Esc n*1PC, Esc n*0PC)
+    params:
+      receptacle: &receptacle { type: int, min: 1, max: 4, required: true, label: Receptacle, description: "The power receptacle, 1-4." }
+      power: { type: bool, required: true, label: Power, description: "On powers the receptacle; off cuts it." }
+    send: "\x1b{receptacle}*{power:bool01}PC"
+    expect: { matches: '^Cpn\s*0*\d+\s*Ppc[01]$' }
+    returns: ack
+
+  get_receptacle_power:
+    summary: Read whether a receptacle is powered, 1 or 0 (Esc nPC)
+    params: { receptacle: *receptacle }
+    send: "\x1b{receptacle}PC"
+    expect: { matches: '^(?:Cpn\s*0*\d+\s*Ppc)?([01])$' }
+    returns: value
+
+  get_receptacle_current:
+    summary: Read a receptacle's current sense against its thresholds, 0 none, 1 standby, 2 full (Esc nPS)
+    params: { receptacle: *receptacle }
+    send: "\x1b{receptacle}PS"
+    expect: { matches: '^([0-2])$' }
+    returns: value
+
+  set_receptacle_groups:
+    summary: Assign the four receptacles to groups, a digit each, 0 none, 1 yellow, 2 green, 3 red (Esc ggggGP)
+    params:
+      groups: { type: string, pattern: '^[0-3]{4}$', required: true, label: Groups,
+                description: "Four digits, one per receptacle from 1: 0 no group, 1 yellow, 2 green, 3 red; 0000 ungroups all." }
+    send: "\x1b{groups}GP"
+    expect: { matches: '^Pgp\s*[0-3]\s*[0-3]\s*[0-3]\s*[0-3]$' }
+    returns: ack
+
+  get_receptacle_groups:
+    summary: Read the receptacle groups, a digit each (Esc GP)
+    send: "\x1bGP"
+    expect: { matches: '^(?:Pgp\s*)?([0-3]\s*[0-3]\s*[0-3]\s*[0-3])$' }
+    returns: value
+
+  set_power_up_delay:
+    summary: Set the delay between receptacles powering up, in thirds of a second (Esc nDT)
+    params:
+      steps: { type: int, min: 1, max: 255, required: true, label: Delay, description: "Thirds of a second between receptacles, 1-255; 3 (1 second) by default." }
+    send: "\x1b{steps}DT"
+    expect: { matches: '^Pdt\s*\d+$' }
+    returns: ack
+
+  get_power_up_delay:
+    summary: Read the power-up delay, in thirds of a second (Esc DT)
+    send: "\x1bDT"
+    expect: { matches: '^(?:Pdt\s*)?(\d+)$' }
+    returns: value
+
+  set_threshold:
+    summary: Set a receptacle's current threshold from what it draws now, full or standby, or clear it (Esc n*2TH, n*1TH, n*0TH)
+    params:
+      receptacle: *receptacle
+      threshold: { type: enum, values: [clear, standby, full], required: true, label: Threshold,
+                   description: "full sets the full-power threshold (set it first), standby the standby threshold, clear removes both." }
+    send: "\x1b{receptacle}*{threshold:map.threshold}TH"
+    expect: { matches: '^Pt[fsc]\s*\d+$' }
+    returns: ack
+
+  get_thresholds:
+    summary: Read every receptacle's threshold setting, 0 none, 1 standby, 2 full, comma separated (Esc TH)
+    send: "\x1bTH"
+    expect: { matches: '^([0-2],[0-2],[0-2],[0-2])$' }
+    returns: value
+
+  set_executive_mode:
+    summary: Lock or unlock the front panel (1X, 0X)
+    params:
+      locked: { type: bool, required: true, label: Locked, description: "On locks the front panel; off unlocks it." }
+    send: "{locked:bool01}X"
+    expect: { matches: '^Exe[01]$' }
+    returns: ack
+
+  get_executive_mode:
+    summary: Read whether the front panel is locked, 1 or 0 (X)
+    send: "X"
+    expect: { matches: '^(?:Exe)?([01])$' }
+    returns: value
+
+  set_alarm_conditions:
+    summary: Set what a receptacle's alarm watches, whether it closes the alarm relay and which e-mail it sends (Esc n*c*r*eSA)
+    params:
+      receptacle: *receptacle
+      condition: { type: int, min: 0, max: 5, required: true, label: Condition,
+                   description: "0 receptacle off, 1 on, 2 reference none, 3 reference standby, 4 reference full, 5 any change." }
+      relay: { type: bool, required: true, label: Use alarm relay, description: "On closes the alarm relay when the condition is met." }
+      email: { type: int, min: 61, max: 64, required: true, label: E-mail, description: "The e-mail event used, 61-64." }
+    send: "\x1b{receptacle}*{condition}*{relay:bool01}*{email}SA"
+    expect: { matches: '^Ast\s*0*\d+(?:\*\d+){5}$' }
+    returns: ack
+
+  set_monitoring:
+    summary: Turn a receptacle's alarm monitoring off, on, or on with e-mail (Esc n*mSA)
+    params:
+      receptacle: *receptacle
+      mode: { type: int, min: 0, max: 2, required: true, label: Monitoring, description: "0 off, 1 on, 2 on with e-mail." }
+    send: "\x1b{receptacle}*{mode}SA"
+    expect: { matches: '^Ast\s*0*\d+(?:\*\d+){5}$' }
+    returns: ack
+
+  get_alarm_conditions:
+    summary: Read a receptacle's alarm as condition*relay*e-mail*monitoring*status (Esc nSA)
+    params: { receptacle: *receptacle }
+    send: "\x1b{receptacle}SA"
+    expect: { matches: '(\d+\*\d+\*\d+\*\d+\*\d+)$' }
+    returns: value
+
+  set_alarm_mode:
+    summary: Set the alarm relay mode, five fields in the guide's order (Esc a*b*c*d*eMA)
+    params:
+      fields: { type: string, pattern: '^\d{1,2}(\*\d{1,2}){4}$', required: true, label: Alarm mode,
+                description: "Five numbers joined by asterisks in the guide's order: alarm status (0 inactive, 1 active, 2 silenced), clear value (0-7), relay polarity (0 normally open, 1 normally closed), hold time (0 never times out, 1-7 minutes) and off-timed value (0-15 x 250 ms); see the quirks." }
+    send: "\x1b{fields}MA"
+    expect: { matches: '^Arl\s*\d+(?:\*\d+){4}$' }
+    returns: ack
+
+  get_alarm_mode:
+    summary: Read the alarm relay mode, its five fields as the guide lists them (Esc MA)
+    send: "\x1bMA"
+    expect: { matches: '^(?:Arl\s*)?(\d+(?:\*\d+){4})$' }
+    returns: value
+
+  set_schedule:
+    summary: Schedule a receptacle to turn on or off at a time of day on a weekday (Esc n*d*s*mSS)
+    params:
+      receptacle: *receptacle
+      day: &weekday { type: int, min: 1, max: 7, required: true, label: Day, description: "1 Sunday to 7 Saturday." }
+      power_on: &sched_on { type: bool, required: true, label: Power on, description: "On schedules the turn-on time, off the turn-off time." }
+      minutes: { type: int, min: 0, max: 1440, required: true, label: Time,
+                 description: "Minutes after midnight, hour x 60 + minutes (1439 = 23:59); 1440 clears the schedule." }
+    send: "\x1b{receptacle}*{day}*{power_on:bool01}*{minutes}SS"
+    expect: { matches: '^Set\s*0*\d+\*\d\*[01]\*\d+$' }
+    returns: ack
+
+  get_schedule:
+    summary: Read a receptacle's scheduled on or off time for a weekday, in minutes after midnight (Esc n*d*sSS)
+    params: { receptacle: *receptacle, day: *weekday, power_on: *sched_on }
+    send: "\x1b{receptacle}*{day}*{power_on:bool01}SS"
+    expect: { matches: '^(\d+)$' }
+    returns: value
+
+  # ── IPL T SFI244 Flex I/O (68-738-06 Rev. C p.36-37) ──
+  set_io_mode:
+    summary: Set a Flex I/O port's mode (n*m[)
+    params:
+      port: &io_port { type: int, min: 1, max: 4, required: true, label: Flex I/O port, description: "The Flex I/O port, 1-4." }
+      mode: { type: int, min: 0, max: 5, required: true, label: Mode,
+              description: "0 digital input, 1 digital output, 2 input with pull-up, 3 output with pull-up, 4 analog input, 5 analog input with pull-up." }
+    send: "{port:02d}*{mode}["
+    expect: { matches: '^Cpn\s*0*\d+\s*Iom\d' }
+    returns: ack
+
+  set_io_mode_thresholds:
+    summary: Set a Flex I/O port to an adjustable digital input with its thresholds (n*m*upper*lower[)
+    params:
+      port: *io_port
+      mode: { type: int, min: 6, max: 7, required: true, label: Mode, description: "6 adjustable input, 7 adjustable input with pull-up." }
+      upper: { type: int, min: 0, max: 4095, required: true, label: Upper threshold,
+               description: "Level above which the input reads on, 0-4095 on a 12-bit scale, 162 counts per volt (2 V by default)." }
+      lower: { type: int, min: 0, max: 4095, required: true, label: Lower threshold,
+               description: "Level below which the input reads off, lower than the upper threshold (1 V by default)." }
+    send: "{port:02d}*{mode}*{upper}*{lower}["
+    expect: { matches: '^Cpn\s*0*\d+\s*Iom\d' }
+    returns: ack
+
+  get_io_mode:
+    summary: Read a Flex I/O port's mode and thresholds as mode,upper,lower (n[)
+    params: { port: *io_port }
+    send: "{port:02d}["
+    expect: { matches: '(\d(?:,\d+,\d+)?)$' }
+    returns: value
+
+  set_io_state:
+    summary: Set a Flex I/O output on or off (n*1], n*0])
+    params:
+      port: *io_port
+      state: { type: bool, required: true, label: State, description: "On drives the output on; off releases it." }
+    send: "{port:02d}*{state:bool01}]"
+    expect: { matches: '^Cpn\s*0*\d+\s*Sio[01]$' }
+    returns: ack
+
+  toggle_io_state:
+    summary: Toggle a Flex I/O output (n*2])
+    params: { port: *io_port }
+    send: "{port:02d}*2]"
+    expect: { matches: '^Cpn\s*0*\d+\s*Sio[01]$' }
+    returns: ack
+
+  pulse_io_state:
+    summary: Pulse a Flex I/O output for a time in 20 ms steps (n*3*t])
+    params:
+      port: *io_port
+      ticks: { type: int, min: 1, max: 65535, required: true, label: Pulse time, description: "Pulse length in 20 ms steps; 25 is 500 ms." }
+    send: "{port:02d}*3*{ticks}]"
+    expect: { matches: '^Cpn\s*0*\d+\s*Sio[01]$' }
+    returns: ack
+
+  get_io_state:
+    summary: Read a Flex I/O port, 0 or 1 in digital modes, 0-4095 in analog modes (n])
+    params: { port: *io_port }
+    send: "{port:02d}]"
+    expect: { matches: '^(?:\S*\*)?(\d+)$' }
+    returns: value
+
 quirks:
   - models: [all]
     severity: info
@@ -729,9 +1035,7 @@ quirks:
       control processors document no SIS commands; they are configured with
       Global Configurator and programmed with Global Scripter, and a consumer
       reaches what they control through their program. They are therefore not
-      models here. Flex I/O, power receptacles and eBUS belong to models whose
-      SIS guides are not published on Extron's site (IPL T SFI244, IPL T PCS4,
-      IPL T CR48) and are not covered. The IR function name query (Esc
+      models here. The IR function name query (Esc
       file,functionIR) answers free text without a tag, which the transport's
       reply allow-list cannot take as a reply (format limit), so it is not
       offered.
@@ -795,9 +1099,13 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      State: relays and contact inputs (IPL 250) are read every 10 seconds,
-      since the guides document no message on their changes; relay changes
-      this connection makes are read from the replies. Serial port settings,
+      State: relays, contact inputs and Flex I/O (IPL 250, CR48, SFI244) and
+      the PCS4's receptacle power, current sense, alarms and alarm relay are
+      read every 10 seconds, since the guides document no message on their
+      changes; changes this connection makes are read from the replies. The
+      PCS4's groups, power-up delay, thresholds, front panel lock, alarm mode
+      and the SFI244's Flex I/O modes are read every 2 minutes; schedules (28
+      per receptacle) are read from set_schedule's reply and get_schedule. Serial port settings,
       pass-through, network, time, port maps and the information requests are
       read on connecting and every 2 minutes, and after each change from the
       reply. Queries are answered tagged in verbose mode 3 (Cpn01 Ccp...),
@@ -815,6 +1123,43 @@ quirks:
       and copyright banner are not printed and are taken as the IPL 250's.
       The pass-through and receive timeout views are printed with commas or
       asterisks between fields; both are accepted.
+
+  - models: [ipl-t-pcs4]
+    severity: critical
+    text: >
+      set_receptacle_power, set_schedule and set_receptacle_groups switch
+      mains power to whatever is plugged in (a display, an amplifier, a
+      computer), at once or at the scheduled time; a grouped receptacle
+      switches with its group. set_executive_mode locks the front panel.
+      set_relay and pulse_relay act on the alarm relay (relay 1). Thresholds
+      are taken from the current the receptacle draws when set_threshold is
+      sent, so the device must be in that power state first (full before
+      standby).
+
+  - models: [ipl-t-pcs4]
+    severity: warning
+    text: >
+      The PCS4 guide prints the alarm mode (MA) fields with the symbols
+      X70^, X70&, X70*, X70* and X71), one symbol twice, and its key lists
+      alarm status, clear value, relay polarity, hold time and off-timed
+      value without tying them clearly to those symbols. set_alarm_mode
+      therefore takes the five fields as the guide orders them, and the
+      alarm_mode state keeps the unit's answer as text. The guide's PS answer
+      (current status) and SS answer (scheduled minutes) are untagged.
+      Commands are case insensitive; the guide's examples are taken as
+      written.
+
+  - models: [ipl-t-sfi244, ipl-t-cr48]
+    severity: info
+    text: >
+      The SFI244 and CR48 send their copyright banner in capitals ("(c)
+      COPYRIGHT 2009, EXTRON ELECTRONICS IPL T CR48, Vx.xx, 60-544-x5"),
+      which the banner rule reads either way. Their contact inputs (CR48)
+      and Flex I/O ports (SFI244) answer 0 or 1 in digital modes and 0-4095
+      in analog modes; the value is kept as a number, and as closed or open
+      when it is 0 or 1. The SFI244 IR command info (Esc file,functionIR) and
+      the CR48 and SFI244 broadcast mode are not offered, as on the IPL 250.
+      Set Flex I/O output modes (1 or 3) before set_io_state, toggle or pulse.
 
 state:
   device.model:             { type: string, description: "Model name from the copyright banner sent on connecting" }
@@ -834,8 +1179,28 @@ state:
   ir.*.file:                { type: int, description: "IPL 250: the IR file last played on an IR port" }
   ir.*.function:            { type: int, description: "IPL 250: the IR function last played on an IR port" }
   ir.*.mode:                { type: int, description: "IPL 250: the last playback mode on an IR port: 0 once, 1 continuous, 2 stopped" }
-  relays.*.closed:          { type: bool, description: "IPL 250: the relay is closed (on)" }
-  contacts.*.closed:        { type: bool, description: "IPL 250: the contact input is closed (on, shorted)" }
+  receptacles.*.power:      { type: bool, description: "PCS4: whether the receptacle is powered (PC)" }
+  receptacles.*.current:    { type: int, description: "PCS4: current sense, 0 none, 1 standby, 2 full (PS)" }
+  receptacles.*.group:      { type: int, description: "PCS4: receptacle group, 0 none, 1 yellow, 2 green, 3 red (GP)" }
+  receptacles.*.threshold:  { type: int, description: "PCS4: threshold set, 0 none, 1 standby, 2 full (TH)" }
+  receptacles.*.alarm_condition: { type: int, description: "PCS4: condition the alarm watches, 0-5 (SA)" }
+  receptacles.*.alarm_relay: { type: bool, description: "PCS4: whether the alarm closes the alarm relay (SA)" }
+  receptacles.*.alarm_email: { type: int, description: "PCS4: e-mail event the alarm sends (SA)" }
+  receptacles.*.monitoring: { type: int, description: "PCS4: monitoring, 0 off, 1 on, 2 on with e-mail (SA)" }
+  receptacles.*.alarm_status: { type: int, description: "PCS4: alarm status, 0 inactive, 1 active, 2 silenced (SA)" }
+  receptacles.*.schedule.*.on:  { type: int, unit: min, description: "PCS4: scheduled turn-on time after midnight by weekday 1 Sunday to 7 Saturday, 1440 for none (SS)" }
+  receptacles.*.schedule.*.off: { type: int, unit: min, description: "PCS4: scheduled turn-off time after midnight by weekday, 1440 for none (SS)" }
+  power_up_delay:           { type: int, description: "PCS4: delay between receptacles powering up, in thirds of a second (DT)" }
+  front_panel_locked:       { type: bool, description: "PCS4: whether the front panel is locked (executive mode, X)" }
+  alarm_mode:               { type: string, description: "PCS4: alarm relay mode fields as the unit answers MA" }
+  io.*.mode:                { type: int, description: "SFI244: Flex I/O mode 0-7 ([)" }
+  io.*.upper_threshold:     { type: int, description: "SFI244: Flex I/O upper threshold, 0-4095 ([)" }
+  io.*.lower_threshold:     { type: int, description: "SFI244: Flex I/O lower threshold, 0-4095 ([)" }
+  io.*.state:               { type: bool, description: "SFI244: Flex I/O output state (Sio)" }
+  io.*.value:               { type: int, description: "SFI244: Flex I/O reading, 0 or 1, or 0-4095 for analog modes (])" }
+  relays.*.closed:          { type: bool, description: "IPL 250, CR48, PCS4 (alarm relay 1): the relay is closed (on)" }
+  contacts.*.closed:        { type: bool, description: "IPL 250, CR48: the contact input is closed (on, shorted)" }
+  contacts.*.value:         { type: int, description: "CR48: the contact input's reading, 0 or 1, or 0-4095 on a 12-bit scale" }
   network.dhcp:             { type: bool, description: "DHCP is on" }
   network.address:          { type: string, description: "IP address" }
   network.netmask:          { type: string, description: "Subnet mask" }
@@ -848,7 +1213,7 @@ state:
   network.direct_port:      { type: int, description: "First direct access port, 0 disabled" }
   clock.date_time:          { type: string, description: "Date and time as the unit last gave it" }
   clock.gmt_offset:         { type: string, description: "Offset from GMT" }
-  clock.daylight_saving:    { type: int, description: "Daylight saving: 0 off, 1 USA, 2 Europe" }
+  clock.daylight_saving:    { type: int, description: "Daylight saving: 0 off, 1 USA, 2 Europe, 3 Brazil (CR48)" }
   port_timeout.connection:  { type: int, description: "This connection's IP timeout, in 10-second steps" }
   port_timeout.global:      { type: int, description: "The global IP timeout, in 10-second steps" }
 
@@ -865,8 +1230,42 @@ telemetry:
         - { models: [ipl-250], message: "02]" }
         - { models: [ipl-250], message: "03]" }
         - { models: [ipl-250], message: "04]" }
+        - { models: [ipl-t-cr48], message: "01O" }
+        - { models: [ipl-t-cr48], message: "02O" }
+        - { models: [ipl-t-cr48], message: "03O" }
+        - { models: [ipl-t-cr48], message: "04O" }
+        - { models: [ipl-t-cr48], message: "05O" }
+        - { models: [ipl-t-cr48], message: "06O" }
+        - { models: [ipl-t-cr48], message: "07O" }
+        - { models: [ipl-t-cr48], message: "08O" }
+        - { models: [ipl-t-cr48, ipl-t-sfi244], message: "01]" }
+        - { models: [ipl-t-cr48, ipl-t-sfi244], message: "02]" }
+        - { models: [ipl-t-cr48, ipl-t-sfi244], message: "03]" }
+        - { models: [ipl-t-cr48, ipl-t-sfi244], message: "04]" }
+        - { models: [ipl-t-pcs4], message: "\x1b1PC" }
+        - { models: [ipl-t-pcs4], message: "\x1b2PC" }
+        - { models: [ipl-t-pcs4], message: "\x1b3PC" }
+        - { models: [ipl-t-pcs4], message: "\x1b4PC" }
+        - { models: [ipl-t-pcs4], message: "\x1b1PS" }
+        - { models: [ipl-t-pcs4], message: "\x1b2PS" }
+        - { models: [ipl-t-pcs4], message: "\x1b3PS" }
+        - { models: [ipl-t-pcs4], message: "\x1b4PS" }
+        - { models: [ipl-t-pcs4], message: "\x1b1SA" }
+        - { models: [ipl-t-pcs4], message: "\x1b2SA" }
+        - { models: [ipl-t-pcs4], message: "\x1b3SA" }
+        - { models: [ipl-t-pcs4], message: "\x1b4SA" }
+        - { models: [ipl-t-pcs4], message: "01O" }
     - every_ms: 120000
       send:
+        - { models: [ipl-t-sfi244], message: "01[" }
+        - { models: [ipl-t-sfi244], message: "02[" }
+        - { models: [ipl-t-sfi244], message: "03[" }
+        - { models: [ipl-t-sfi244], message: "04[" }
+        - { models: [ipl-t-pcs4], message: "\x1bGP" }
+        - { models: [ipl-t-pcs4], message: "\x1bDT" }
+        - { models: [ipl-t-pcs4], message: "\x1bTH" }
+        - { models: [ipl-t-pcs4], message: "X" }
+        - { models: [ipl-t-pcs4], message: "\x1bMA" }
         - "N"
         - "1I"
         - "2I"
@@ -880,26 +1279,26 @@ telemetry:
         - "\x1bCZ"
         - "\x1bCX"
         - "\x1bCC"
-        - "\x1b0TC"
-        - "\x1b1TC"
+        - { models: [ipl-250, ipl-t-s, ipl-t-pcs4], message: "\x1b0TC" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-pcs4], message: "\x1b1TC" }
         - "\x1bMT"
         - "\x1bMH"
-        - "\x1bMD"
-        - "\x1b01CP"
-        - "\x1b01CY"
-        - "\x1b01CF"
-        - "\x1b01CE"
-        - "\x1b01CD"
-        - "\x1b02CP"
-        - "\x1b02CY"
-        - "\x1b02CF"
-        - "\x1b02CE"
-        - "\x1b02CD"
-        - "\x1b03CP"
-        - "\x1b03CY"
-        - "\x1b03CF"
-        - "\x1b03CE"
-        - "\x1b03CD"
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1bMD" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b01CP" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b01CY" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b01CF" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b01CE" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b01CD" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b02CP" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b02CY" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b02CF" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b02CE" }
+        - { models: [ipl-250, ipl-t-s, ipl-t-sfi244], message: "\x1b02CD" }
+        - { models: [ipl-250, ipl-t-s], message: "\x1b03CP" }
+        - { models: [ipl-250, ipl-t-s], message: "\x1b03CY" }
+        - { models: [ipl-250, ipl-t-s], message: "\x1b03CF" }
+        - { models: [ipl-250, ipl-t-s], message: "\x1b03CE" }
+        - { models: [ipl-250, ipl-t-s], message: "\x1b03CD" }
         - { models: [ipl-t-s], message: "\x1b04CP" }
         - { models: [ipl-t-s], message: "\x1b04CY" }
         - { models: [ipl-t-s], message: "\x1b04CF" }
@@ -908,7 +1307,7 @@ telemetry:
   updates:
     # Copyright banner on connecting (IPL 250 p.4-2). Not anchored: Telnet
     # option bytes may come first.
-    - match: '\(c\) Copyright \d{4}, Extron Electronics,?\s*([^,]+?),\s*V(\d+\.\d+),\s*(60-[0-9-]+)'
+    - match: '(?i)\(c\) Copyright \d{4}, Extron Electronics,?\s*([^,]+?),\s*V(\d+\.\d+),\s*(60-[0-9-]+)'
       state: { device.model: "{1}", device.firmware: "{2}", device.part_number: "{3}" }
     - match: '^Login (Administrator|User)$'
       state: { device.login: "{1}" }
@@ -967,6 +1366,7 @@ telemetry:
       state: { "relays.{2}.closed": { value: "{1}", map: { "0": false, "1": true } } }
     - match: '^(?:\S*\*)?([01])$'
       request_match: '^0*(\d+)\]$'
+      models: [ipl-250, ipl-t-cr48]
       state: { "contacts.{2}.closed": { value: "{1}", map: { "0": false, "1": true } } }
     # Network and time (IPL 250 p.4-14 to 4-17).
     - match: '^Ipn\s*(\S+)$'
@@ -1012,7 +1412,7 @@ telemetry:
     - match: '^(?:Ipz\s*)?([+-]?\d+[:.]\d\d)$'
       request_match: '^\x1b.*CZ$'
       state: { clock.gmt_offset: "{1}" }
-    - match: '^(?:Ipx)?([0-2])$'
+    - match: '^(?:Ipx)?([0-3])$'
       request_match: '^\x1b\d?CX$'
       state: { clock.daylight_saving: "{1}" }
     - match: '^(?:Pti0\*)?0*(\d+)$'
@@ -1021,3 +1421,87 @@ telemetry:
     - match: '^(?:Pti1\*)?0*(\d+)$'
       request_match: '^\x1b1(?:\*\d+)?TC$'
       state: { port_timeout.global: "{1}" }
+    # Contact inputs on the CR48 and Flex I/O on the SFI244 also read 0-4095.
+    - match: '^(?:\S*\*)?(\d+)$'
+      request_match: '^0*(\d+)\]$'
+      models: [ipl-t-cr48]
+      state: { "contacts.{2}.value": "{1}" }
+    - match: '^(?:\S*\*)?(\d+)$'
+      request_match: '^0*(\d+)\]$'
+      models: [ipl-t-sfi244]
+      state: { "io.{2}.value": "{1}" }
+    - match: '^Cpn\s*0*(\d+)\s*Sio([01])$'
+      state: { "io.{1}.state": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^Cpn\s*0*(\d+)\s*Iom(\d)$'
+      state: { "io.{1}.mode": "{2}" }
+    - match: '^Cpn\s*0*(\d+)\s*Iom(\d),0*(\d+),0*(\d+)$'
+      state: { "io.{1}.mode": "{2}", "io.{1}.upper_threshold": "{3}", "io.{1}.lower_threshold": "{4}" }
+    - match: '^(\d)$'
+      request_match: '^0*(\d+)\[$'
+      state: { "io.{2}.mode": "{1}" }
+    - match: '^(\d),0*(\d+),0*(\d+)$'
+      request_match: '^0*(\d+)\[$'
+      state: { "io.{4}.mode": "{1}", "io.{4}.upper_threshold": "{2}", "io.{4}.lower_threshold": "{3}" }
+    # PCS4 receptacles, alarms and schedules (68-738-07 p.45-46).
+    - match: '^Cpn\s*0*(\d+)\s*Ppc([01])$'
+      state: { "receptacles.{1}.power": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^\x1b0*(\d+)PC$'
+      state: { "receptacles.{2}.power": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^([0-2])$'
+      request_match: '^\x1b0*(\d+)PS$'
+      state: { "receptacles.{2}.current": "{1}" }
+    - match: '^(?:Pgp\s*)?([0-3])\s*([0-3])\s*([0-3])\s*([0-3])$'
+      request_match: '^\x1b[0-3]*GP$'
+      state: { receptacles.1.group: "{1}", receptacles.2.group: "{2}", receptacles.3.group: "{3}", receptacles.4.group: "{4}" }
+    - match: '^Pgp\s*([0-3])\s*([0-3])\s*([0-3])\s*([0-3])$'
+      state: { receptacles.1.group: "{1}", receptacles.2.group: "{2}", receptacles.3.group: "{3}", receptacles.4.group: "{4}" }
+    - match: '^Pdt\s*0*(\d+)$'
+      state: { power_up_delay: "{1}" }
+    - match: '^0*(\d+)$'
+      request_match: '^\x1bDT$'
+      state: { power_up_delay: "{1}" }
+    - match: '^([0-2]),([0-2]),([0-2]),([0-2])$'
+      request_match: '^\x1bTH$'
+      state: { receptacles.1.threshold: "{1}", receptacles.2.threshold: "{2}", receptacles.3.threshold: "{3}", receptacles.4.threshold: "{4}" }
+    - match: '^Ptf\s*0*(\d+)$'
+      state: { "receptacles.{1}.threshold": "2" }
+    - match: '^Pts\s*0*(\d+)$'
+      state: { "receptacles.{1}.threshold": "1" }
+    - match: '^Ptc\s*0*(\d+)$'
+      state: { "receptacles.{1}.threshold": "0" }
+    - match: '^Exe([01])$'
+      state: { front_panel_locked: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^([01])$'
+      request_match: '^X$'
+      state: { front_panel_locked: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Ast\s*0*(\d+)\*(\d+)\*([01])\*(\d+)\*(\d+)\*(\d+)$'
+      state:
+        "receptacles.{1}.alarm_condition": "{2}"
+        "receptacles.{1}.alarm_relay": { value: "{3}", map: { "0": false, "1": true } }
+        "receptacles.{1}.alarm_email": "{4}"
+        "receptacles.{1}.monitoring": "{5}"
+        "receptacles.{1}.alarm_status": "{6}"
+    - match: '^(\d+)\*([01])\*(\d+)\*(\d+)\*(\d+)$'
+      request_match: '^\x1b0*(\d+)SA$'
+      state:
+        "receptacles.{6}.alarm_condition": "{1}"
+        "receptacles.{6}.alarm_relay": { value: "{2}", map: { "0": false, "1": true } }
+        "receptacles.{6}.alarm_email": "{3}"
+        "receptacles.{6}.monitoring": "{4}"
+        "receptacles.{6}.alarm_status": "{5}"
+    - match: '^(?:Arl\s*)?(\d+(?:\*\d+){4})$'
+      request_match: '^\x1b[\d*]*MA$'
+      state: { alarm_mode: "{1}" }
+    - match: '^Arl\s*(\d+(?:\*\d+){4})$'
+      state: { alarm_mode: "{1}" }
+    - match: '^Set\s*0*(\d+)\*(\d)\*1\*0*(\d+)$'
+      state: { "receptacles.{1}.schedule.{2}.on": "{3}" }
+    - match: '^Set\s*0*(\d+)\*(\d)\*0\*0*(\d+)$'
+      state: { "receptacles.{1}.schedule.{2}.off": "{3}" }
+    - match: '^0*(\d+)$'
+      request_match: '^\x1b0*(\d+)\*(\d)\*1SS$'
+      state: { "receptacles.{2}.schedule.{3}.on": "{1}" }
+    - match: '^0*(\d+)$'
+      request_match: '^\x1b0*(\d+)\*(\d)\*0SS$'
+      state: { "receptacles.{2}.schedule.{3}.off": "{1}" }

@@ -228,6 +228,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
 - [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
 
+## atlona-matrix — Atlona matrix switchers and switchers
+
+- [ ] Record the Telnet login prompts (Username:, Password:) and what a wrong login answers. ([specs/atlona-matrix.yaml:203](specs/atlona-matrix.yaml#L203))
+- [ ] Confirm the RS-232 factory default of PRO3 matrices and the AT-HDR-H2H-88MA (115200 8N1 assumed from the CSpara example). ([specs/atlona-matrix.yaml:183](specs/atlona-matrix.yaml#L183))
+- [ ] Confirm CSpara and RS232para write parity as 0 none, 1 odd, 2 even. ([specs/atlona-matrix.yaml:214](specs/atlona-matrix.yaml#L214))
+- [ ] Check whether PRO3 matrices and the H2H need a gap between commands (none is documented; Omega asks for 500 ms). ([specs/atlona-matrix.yaml:174](specs/atlona-matrix.yaml#L174))
+- [ ] Confirm the PS62 sets the repeat count with RepeatCmd n, as its document writes RepCmdTime. ([specs/atlona-matrix.yaml:1063](specs/atlona-matrix.yaml#L1063))
+- [ ] Record Status on the PS62 and SW32: xINAVxOUT or xINVxOUT as their examples show. ([specs/atlona-matrix.yaml:1640](specs/atlona-matrix.yaml#L1640))
+- [ ] Record what a PRO3 answers to VOUTn + and VOUTn - (the new level, or the command echoed). ([specs/atlona-matrix.yaml:511](specs/atlona-matrix.yaml#L511))
+- [ ] Record the MH21 InputFormat answer: the format alone or prefixed with InputFormatN. ([specs/atlona-matrix.yaml:623](specs/atlona-matrix.yaml#L623))
+- [ ] Confirm the MH21 takes HDCPSet with a space before the input (HDCPSet 1 on). ([specs/atlona-matrix.yaml:671](specs/atlona-matrix.yaml#L671))
+- [ ] Confirm Unlock is answered Unlock (the PRO3 document shows Lock for both). ([specs/atlona-matrix.yaml:738](specs/atlona-matrix.yaml#L738))
+- [ ] Confirm show_host_name answers the bare host name. ([specs/atlona-matrix.yaml:1247](specs/atlona-matrix.yaml#L1247))
+- [ ] Record what Broadcast on sends when routing changes in the web GUI (assumed the same text as the echoes). ([specs/atlona-matrix.yaml:999](specs/atlona-matrix.yaml#L999))
+- [ ] Confirm IPChangePass takes user, old and new password (the document lists a fourth, the confirmation, but its example has three). ([specs/atlona-matrix.yaml:1220](specs/atlona-matrix.yaml#L1220))
+- [ ] Check whether TCP 9000 on Omega switchers needs a login and answers like Telnet. ([specs/atlona-matrix.yaml:85](specs/atlona-matrix.yaml#L85))
+- [ ] Confirm All# is answered All# on PRO3 matrices and with the new routes on the H2H and PS62. ([specs/atlona-matrix.yaml:407](specs/atlona-matrix.yaml#L407))
+
 ## avolites-titan — Avolites Titan
 
 - [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1779](specs/avolites-titan.yaml#L1779))
@@ -247,6 +265,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether the WebAPI has any read of a playback's or master's current level, for per-handle levels in state. ([specs/avolites-titan.yaml:1868](specs/avolites-titan.yaml#L1868))
 - [ ] Confirm a property set takes its value as the POST body text (the introduction's False), for set_palette_number, set_palette_name and the other set_ commands, and the record types set_record_type takes. ([specs/avolites-titan.yaml:1429](specs/avolites-titan.yaml#L1429))
 - [ ] Check that store_cue's group and index are a handle's group and handleLocation.index, and what the Int32 it returns is. ([specs/avolites-titan.yaml:1857](specs/avolites-titan.yaml#L1857))
+
+## avproedge-matrix — AVPro Edge AUHD matrices
+
+- [ ] Record the answers to SET and GET commands (assumed to be the command without SET or GET, as GET DHCP answers DHCP 0). ([specs/avproedge-matrix.yaml:74](specs/avproedge-matrix.yaml#L74))
+- [ ] Record the lines GET STA prints and confirm it starts with ADDR. ([specs/avproedge-matrix.yaml:130](specs/avproedge-matrix.yaml#L130))
+- [ ] Record what GET OUT0 VS and GET IN0 SIG STA answer (assumed a line per output or input). ([specs/avproedge-matrix.yaml:619](specs/avproedge-matrix.yaml#L619))
+- [ ] Confirm the CR terminator alone is accepted on Telnet (the manual says to add a return; its examples show CR LF). ([specs/avproedge-matrix.yaml:71](specs/avproedge-matrix.yaml#L71))
+- [ ] Check whether the matrix sends status lines unasked after a front-panel change. ([specs/avproedge-matrix.yaml:703](specs/avproedge-matrix.yaml#L703))
+- [ ] Confirm the 4x4 GEN2 matrix takes the same command list as the 88. ([specs/avproedge-matrix.yaml:94](specs/avproedge-matrix.yaml#L94))
 
 ## avstumpfl-pixera — AV Stumpfl PIXERA
 
@@ -764,6 +791,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the RS-422 port needs no flow control, which Blackmagic leaves unstated. ([specs/blackmagic-videohub-leitch.yaml:107](specs/blackmagic-videohub-leitch.yaml#L107))
 - [ ] Confirm which models have an RS-422 router control port that answers in Leitch server mode (Smart Videohub 12x12/20x20/40x40, CleanSwitch 12x12, Universal Videohub 72/288 from the manuals; older Smart Videohub, Broadcast and Studio Videohub not checked) and the connector each uses. ([specs/blackmagic-videohub-leitch.yaml:112](specs/blackmagic-videohub-leitch.yaml#L112))
 - [ ] Confirm a read-back right after a route (`@ X?`) reports the new source, and that @ B:R behaves as @ B:C. ([specs/blackmagic-videohub-leitch.yaml:160](specs/blackmagic-videohub-leitch.yaml#L160))
+
+## blustream-matrix — Blustream matrix switchers
+
+- [ ] Record what each model answers to a command (Blustream documents none; a [SUCCESS] line and a prompt are reported). ([specs/blustream-matrix.yaml:17](specs/blustream-matrix.yaml#L17))
+- [ ] Record the STATUS report of each model other than the PLA88CS, and check the table rules read it. ([specs/blustream-matrix.yaml:1449](specs/blustream-matrix.yaml#L1449))
+- [ ] Confirm RESET followed at once by Yes resets the matrix (the help text asks for Yes to confirm). ([specs/blustream-matrix.yaml:554](specs/blustream-matrix.yaml#L554))
+- [ ] Confirm the HDBaseT models accept OUTxx FR yy with a space before FR, as their help text writes it, and the CMX models OUT xx FR yy. ([specs/blustream-matrix.yaml:327](specs/blustream-matrix.yaml#L327))
+- [ ] Confirm the HMX and HMXL models take MUTE On/Off and AUDOUT xx On/Off in that case. ([specs/blustream-matrix.yaml:691](specs/blustream-matrix.yaml#L691))
+- [ ] Confirm the RS-232 factory default of the CMX, MX and Pro models (57600 assumed from the HDBaseT models and the CMX88CS-V2). ([specs/blustream-matrix.yaml:92](specs/blustream-matrix.yaml#L92))
+- [ ] Check the CECUSERCMD form with a space before the closing bracket, as the help text example writes it. ([specs/blustream-matrix.yaml:1173](specs/blustream-matrix.yaml#L1173))
+- [ ] Record what the CTRLSTA report looks like on models other than the PLA88CS. ([specs/blustream-matrix.yaml:1292](specs/blustream-matrix.yaml#L1292))
+- [ ] Confirm the [SUCCESS] routing line text on current firmware. ([specs/blustream-matrix.yaml:1505](specs/blustream-matrix.yaml#L1505))
 
 ## boinx-mimolive — Boinx mimoLive
 
@@ -1398,21 +1437,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the tieline source encoding (source in the lower 12 bits, level above) on a system with tielines. ([specs/evertz-quartz.yaml:499](specs/evertz-quartz.yaml#L499))
 - [ ] Confirm a name write (.WD, .WS, .WL) is answered with the .RA name update and then .A, in that order, that a space within a name is accepted, and record what an invalid number or a name over eight characters answers. ([specs/evertz-quartz.yaml:401](specs/evertz-quartz.yaml#L401))
 
-## extron-ipl — Extron IP Link control interfaces (IPL 250, IPL T S Series)
+## extron-ipl — Extron IP Link control interfaces (IPL 250, IPL T S, IPL T SFI244, IPL T CR48, IPL T PCS4)
 
-- [ ] On an IPL T S, record the copyright banner, the date line and the password prompt on a Telnet connection (not printed in its guide; taken as the IPL 250's), and on both models what a wrong password produces. ([spec](specs/extron-ipl.yaml#L810))
-- [ ] Confirm the contact input query is the input number followed by the ] character (03]), and record its tagged reply in verbose mode 3. ([spec](specs/extron-ipl.yaml#L407))
-- [ ] Record the tagged forms of the relay, serial port, flow control, receive timeout and pass-through views in verbose mode 3 (Cpn02 Rly1, Cpn02 Ccp9600,N,8,1 assumed). ([spec](specs/extron-ipl.yaml#L798))
-- [ ] Check whether a relay or contact input change, from a program, a touchpanel or the input itself, sends any message on a verbose Telnet connection; if one does, the 10-second poll can be replaced by it. ([spec](specs/extron-ipl.yaml#L798))
-- [ ] Check whether the CR the core adds after send_serial_data's data is forwarded to the attached device, and how the device's answer arrives on the Telnet session (one line, ending CR LF assumed). ([spec](specs/extron-ipl.yaml#L155))
-- [ ] On an IPL T S, confirm its serial ports are numbered 1 to 4 in SIS commands (the guide's key names another product's ports). ([spec](specs/extron-ipl.yaml#L810))
-- [ ] On an IPL T S, record the date and time set format (the guide's key gives none; MM/DD/YY-HH:MM:SS assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L483))
-- [ ] Record the GMT offset as set and read (-05:00 or -05.00), and the daylight saving values on the IPL T S (0-2 assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L499))
-- [ ] Record the IR reply's padding (Irs01,03,001,00 assumed) and what playing a function missing from a loaded file answers (E13 or E28). ([spec](specs/extron-ipl.yaml#L350))
-- [ ] Record the receive timeout view's separator (the IPL 250 prints commas, the IPL T S an asterisk after the first field). ([spec](specs/extron-ipl.yaml#L298))
-- [ ] On an IPL 250, record what a port type other than 0 (Esc 01*1CY) answers. ([spec](specs/extron-ipl.yaml#L225))
-- [ ] Record the port map replies' padding (Pmt00023) and the bare views, and confirm a remapped Telnet port takes effect at once. ([spec](specs/extron-ipl.yaml#L676))
-- [ ] Record the Q reply's tagged form in verbose mode 3 (Ver01*1.15 assumed) and the 0Q reply's. ([spec](specs/extron-ipl.yaml#L418))
+- [ ] On an IPL T S, record the copyright banner, the date line and the password prompt on a Telnet connection (not printed in its guide; taken as the IPL 250's), and on both models what a wrong password produces. ([spec](specs/extron-ipl.yaml#L1118))
+- [ ] Confirm the contact input query is the input number followed by the ] character (03]), and record its tagged reply in verbose mode 3. ([spec](specs/extron-ipl.yaml#L504))
+- [ ] Record the tagged forms of the relay, serial port, flow control, receive timeout and pass-through views in verbose mode 3 (Cpn02 Rly1, Cpn02 Ccp9600,N,8,1 assumed). ([spec](specs/extron-ipl.yaml#L1101))
+- [ ] Check whether a relay or contact input change, from a program, a touchpanel or the input itself, sends any message on a verbose Telnet connection; if one does, the 10-second poll can be replaced by it. ([spec](specs/extron-ipl.yaml#L1101))
+- [ ] Check whether the CR the core adds after send_serial_data's data is forwarded to the attached device, and how the device's answer arrives on the Telnet session (one line, ending CR LF assumed). ([spec](specs/extron-ipl.yaml#L252))
+- [ ] On an IPL T S, confirm its serial ports are numbered 1 to 4 in SIS commands (the guide's key names another product's ports). ([spec](specs/extron-ipl.yaml#L1118))
+- [ ] On an IPL T S, record the date and time set format (the guide's key gives none; MM/DD/YY-HH:MM:SS assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L580))
+- [ ] Record the GMT offset as set and read (-05:00 or -05.00), and the daylight saving values on the IPL T S (0-2 assumed as on the IPL 250). ([spec](specs/extron-ipl.yaml#L596))
+- [ ] Record the IR reply's padding (Irs01,03,001,00 assumed) and what playing a function missing from a loaded file answers (E13 or E28). ([spec](specs/extron-ipl.yaml#L447))
+- [ ] Record the receive timeout view's separator (the IPL 250 prints commas, the IPL T S an asterisk after the first field). ([spec](specs/extron-ipl.yaml#L395))
+- [ ] On an IPL 250, record what a port type other than 0 (Esc 01*1CY) answers. ([spec](specs/extron-ipl.yaml#L322))
+- [ ] Record the port map replies' padding (Pmt00023) and the bare views, and confirm a remapped Telnet port takes effect at once. ([spec](specs/extron-ipl.yaml#L773))
+- [ ] Record the Q reply's tagged form in verbose mode 3 (Ver01*1.15 assumed) and the 0Q reply's. ([spec](specs/extron-ipl.yaml#L515))
+- [ ] On an IPL T PCS4, record the tagged forms of the receptacle replies in verbose mode 3 (Cpn1 Ppc1, Pgp1120, Pdt6, Ptf2, Exe1, Ast1*2*1*61*1*0, Set2*2*1*450 assumed from the guide) and the untagged PS, TH and SS answers. ([spec](specs/extron-ipl.yaml#L823))
+- [ ] On an IPL T PCS4, record which alarm mode (MA) field is which (the guide prints the symbol X70* twice) and what set_alarm_mode 0*0*0*1*4 answers. ([spec](specs/extron-ipl.yaml#L933))
+- [ ] On an IPL T PCS4, check whether a receptacle, current sense, alarm or front panel change sends any message on a verbose Telnet connection; if one does, the 10-second poll can be replaced by it. ([spec](specs/extron-ipl.yaml#L1103))
+- [ ] On an IPL T PCS4, confirm the alarm relay answers the relay commands as relay 1 (Cpn1 Rly1) and the view of a receptacle's alarm (Esc 1SA) has five fields. ([spec](specs/extron-ipl.yaml#L926))
+- [ ] On an IPL T SFI244, record the Flex I/O replies in verbose mode 3 (Cpn02 Iom1, Cpn02 Sio1) and the view of an analog input (n] answering 0-4095). ([spec](specs/extron-ipl.yaml#L968))
+- [ ] On an IPL T CR48 and SFI244, record the copyright banner (in capitals, no comma after EXTRON ELECTRONICS in the guides) and the contact input view in analog use. ([spec](specs/extron-ipl.yaml#L1310))
+- [ ] On an IPL T CR48, confirm the eight relays answer as Cpn01-Cpn08 Rly and daylight saving 3 (Brazil) is accepted. ([spec](specs/extron-ipl.yaml#L215))
 
 ## extron-matrix — Extron SIS matrix switchers
 
@@ -1440,6 +1486,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On each family, drive the matrix on its rear Remote port (link serial) and confirm replies, change reports and the verbose-mode step behave as over Telnet, with the banner only at power-up. ([spec](specs/extron-matrix.yaml#L157))
 - [ ] On DXP HD 4K PLUS, confirm the Remote RS-232 and USB ports ask for no password when one is set (documented for DXP DVI/HDMI, XTP II and SMX only). ([spec](specs/extron-matrix.yaml#L181))
 - [ ] On DXP HD 4K PLUS, confirm the Remote port uses no flow control (not documented). ([spec](specs/extron-matrix.yaml#L2059))
+- [ ] On an MVX 44-88, confirm Esc nVC (the examples) reads a preset's ties, not Esc n1VC (the symbol line). ([specs/extron-matrix.yaml:2049](specs/extron-matrix.yaml#L2049))
+- [ ] On an MVX 44-88, confirm n*40# reads the output level (the example) and record its answer. ([specs/extron-matrix.yaml:2101](specs/extron-matrix.yaml#L2101))
+- [ ] On an MVX 128-1616, record the Esc VM answer (a digit per output assumed, with or without separators). ([specs/extron-matrix.yaml:3477](specs/extron-matrix.yaml#L3477))
+- [ ] On an MVX, confirm front panel ties are reported as Qik only, and record the answer of a bare tie query (12 or In12). ([specs/extron-matrix.yaml:406](specs/extron-matrix.yaml#L406))
+- [ ] On an MTPX Plus in verbose mode 3, record the VC answer (tagged Vgp or bare) for starting outputs 1 and 17. ([specs/extron-matrix.yaml:2842](specs/extron-matrix.yaml#L2842))
+- [ ] On an MTPX Plus, record the answers of the twisted-pair commands (Typ, Lrpt, Ipek, Iseq, Oseq, Opek, Opol) in verbose mode 3. ([specs/extron-matrix.yaml:2202](specs/extron-matrix.yaml#L2202))
+- [ ] On an MTPX Plus, confirm the input grouping answer (GrI in the example, Gri in the syntax). ([specs/extron-matrix.yaml:2373](specs/extron-matrix.yaml#L2373))
+- [ ] On an MMX 32 VGA A, confirm the capitalized answers (OUT02 IN01 ALL, VMT2*1, AMT1) and the I answer. ([specs/extron-matrix.yaml:443](specs/extron-matrix.yaml#L443))
 
 ## extron-switcher — Extron IN-series scaling presentation switchers
 
@@ -1472,6 +1526,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On IN1806/IN1808 and IN1606/IN1608, confirm the Remote RS-232 port asks for no password when one is set (not documented either way). ([spec](specs/extron-switcher.yaml#L150))
 - [ ] Confirm 8 data bits on the IN1606/IN1608 and IN1604 Remote port (not stated) and which stop bits the IN1806/IN1808 Esc...CP command accepts (1 assumed). ([spec](specs/extron-switcher.yaml#L126))
 - [ ] Drive a unit on its rear Remote port (link serial) and confirm the same replies and change reports as over Telnet; check whether the front USB port appears as a serial port. ([spec](specs/extron-switcher.yaml#L2499))
+
+## ezcoo-matrix — Ezcoo HDMI matrices
+
+- [ ] Record the RS-232 line settings (57600 8N1 assumed). ([specs/ezcoo-matrix.yaml:54](specs/ezcoo-matrix.yaml#L54))
+- [ ] Record what each command answers and the lines EZSTA prints (the OUT1 VS IN1 form is assumed from a community module). ([specs/ezcoo-matrix.yaml:50](specs/ezcoo-matrix.yaml#L50))
+- [ ] Confirm the matrix sends a status line unasked after a front-panel or remote change. ([specs/ezcoo-matrix.yaml:13](specs/ezcoo-matrix.yaml#L13))
+- [ ] Record the full EZH command list and the MX42HS and other models it applies to. ([specs/ezcoo-matrix.yaml:69](specs/ezcoo-matrix.yaml#L69))
 
 ## facebook-account — Facebook account (a user's Pages and Page access tokens)
 
@@ -2654,23 +2715,26 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## probel-swp02 — Probel / Grass Valley SW-P-02 routers
 
-- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:131](specs/probel-swp02.yaml#L131))
-- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:106](specs/probel-swp02.yaml#L106))
-- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:127](specs/probel-swp02.yaml#L127))
+- [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:139](specs/probel-swp02.yaml#L139))
+- [ ] Check that a router answers within the 1 s timeout, and what a router that does not implement a command (the salvo) sends. ([specs/probel-swp02.yaml:114](specs/probel-swp02.yaml#L114))
+- [ ] Record what multiplier bit 3 means on each router tested (bad source, crosspoint updates disabled, or unused). ([specs/probel-swp02.yaml:135](specs/probel-swp02.yaml#L135))
+- [ ] On an NK-3RD, confirm odd parity is needed and that CONNECTED is broadcast after a take. ([specs/probel-swp02.yaml:62](specs/probel-swp02.yaml#L62))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
-- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:463](specs/probel-swp08.yaml#L463))
-- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:404](specs/probel-swp08.yaml#L404))
-- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:419](specs/probel-swp08.yaml#L419))
-- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:435](specs/probel-swp08.yaml#L435))
-- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:446](specs/probel-swp08.yaml#L446))
-- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:476](specs/probel-swp08.yaml#L476))
-- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
-- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:524](specs/probel-swp08.yaml#L524))
-- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:497](specs/probel-swp08.yaml#L497))
-- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:469](specs/probel-swp08.yaml#L469))
-- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:515](specs/probel-swp08.yaml#L515))
+- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:489](specs/probel-swp08.yaml#L489))
+- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:430](specs/probel-swp08.yaml#L430))
+- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:445](specs/probel-swp08.yaml#L445))
+- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:461](specs/probel-swp08.yaml#L461))
+- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:472](specs/probel-swp08.yaml#L472))
+- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:502](specs/probel-swp08.yaml#L502))
+- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
+- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:550](specs/probel-swp08.yaml#L550))
+- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:523](specs/probel-swp08.yaml#L523))
+- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:495](specs/probel-swp08.yaml#L495))
+- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:541](specs/probel-swp08.yaml#L541))
+- [ ] On Ultrix, confirm the SW-P-08 server port (8910) and how the Protocol Variant setting answers general and extended commands. ([specs/probel-swp08.yaml:198](specs/probel-swp08.yaml#L198))
+- [ ] On an NK-3RD, confirm matrix 0 and level 0 on the wire address NK level 1, and that no tally dump is answered. ([specs/probel-swp08.yaml:213](specs/probel-swp08.yaml#L213))
 
 ## propresenter — ProPresenter
 
@@ -2890,6 +2954,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether a setting enables LAN control and whether a password applies. ([specs/roland-xs80h.yaml:584](specs/roland-xs80h.yaml#L584))
 - [ ] Drive an XS-8xH on RS-232C (link serial, FUNCTION RECEIVER) with no CR after the ";" and confirm the same replies as over LAN, with XON/XOFF. ([specs/roland-xs80h.yaml:48](specs/roland-xs80h.yaml#L48))
 - [ ] Confirm an XS-82H or XS-83H answers ITS and OTS for the inputs and outputs it lacks with an error, as for CTS. ([specs/roland-xs80h.yaml:510](specs/roland-xs80h.yaml#L510))
+
+## ross-ultrix — Ross Ultrix (RossTalk)
+
+- [ ] Confirm GPI takes the salvo number unpadded (GPI 4 as well as GPI 04). ([specs/ross-ultrix.yaml:91](specs/ross-ultrix.yaml#L91))
+- [ ] Check the TIMER SET value format: two-digit fields and one digit of tenths. ([specs/ross-ultrix.yaml:133](specs/ross-ultrix.yaml#L133))
+- [ ] Confirm a TXTLABEL with text and no color fields, ending TEXT:text;, sets the text and keeps the colors. ([specs/ross-ultrix.yaml:196](specs/ross-ultrix.yaml#L196))
+- [ ] Confirm decimal R,G,B colors in TXTLABEL (255,255,255) as well as 0x hex. ([specs/ross-ultrix.yaml:216](specs/ross-ultrix.yaml#L216))
+- [ ] Record the largest salvo, timer, user, label, source, destination and level IDs accepted. ([specs/ross-ultrix.yaml:245](specs/ross-ultrix.yaml#L245))
+- [ ] Confirm Ultrix sends nothing back on the RossTalk connection, not even an error for a bad command. ([specs/ross-ultrix.yaml:229](specs/ross-ultrix.yaml#L229))
 
 ## ross-xpression — Ross XPression (TCP)
 
@@ -3457,6 +3530,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the replay activators: ReplayPlaying, ReplayLive, ReplayRecording, ReplayQuadMode, ReplayPlayForward, ReplayPlayBackward, ReplayChannelAB/A/B, ReplayCameraN (current channel), ReplayACameraN and ReplayBCameraN. ([specs/vmix.yaml:5208](specs/vmix.yaml#L5208))
 - [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5196](specs/vmix.yaml#L5196))
 - [ ] Confirm the video call attributes (callPassword, callConnected, callVideoSource, callAudioSource) and the VideoCallAudioSourceX and VideoCallSourceOutputN activators. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
+
+## wyrestorm-matrix — WyreStorm matrix switchers
+
+- [ ] Confirm SET CEC_PWR takes a space before the port on H2A and MXV matrices (the syntax line has none, the example one). ([specs/wyrestorm-matrix.yaml:497](specs/wyrestorm-matrix.yaml#L497))
+- [ ] Record the answer to GET MP: MP GET hdmiinN outN (syntax line) or MP hdmiinN outN (example), and hdmiout or out on H2A units. ([specs/wyrestorm-matrix.yaml:209](specs/wyrestorm-matrix.yaml#L209))
+- [ ] Record what GET MP all answers (assumed a line per output). ([specs/wyrestorm-matrix.yaml:884](specs/wyrestorm-matrix.yaml#L884))
+- [ ] Confirm the AUTOCEC_FN and AUTOCEC_D port names (out1 in the examples, hdmiout1 and hdbtout1 in the syntax lines). ([specs/wyrestorm-matrix.yaml:517](specs/wyrestorm-matrix.yaml#L517))
+- [ ] Confirm GET AUDIOMP takes the audio output alone on H2A and MXV units (its syntax line also names an input). ([specs/wyrestorm-matrix.yaml:273](specs/wyrestorm-matrix.yaml#L273))
+- [ ] Confirm HDCP_S takes in5 or 5 (syntax line and example differ) and record its answer. ([specs/wyrestorm-matrix.yaml:552](specs/wyrestorm-matrix.yaml#L552))
+- [ ] Record what a refused command or a parameter a model lacks answers, if anything (WyreStorm warns it can lock the unit up). ([specs/wyrestorm-matrix.yaml:15](specs/wyrestorm-matrix.yaml#L15))
+- [ ] Confirm the EXP-SW answers GET AUTOSW_FN, which its document lists under the heading Save a Scene. ([specs/wyrestorm-matrix.yaml:256](specs/wyrestorm-matrix.yaml#L256))
+- [ ] Record changes the matrix sends on its own after a front-panel or web UI change, if any. ([specs/wyrestorm-matrix.yaml:832](specs/wyrestorm-matrix.yaml#L832))
 
 ## yamaha-cl-ql — Yamaha CL / QL
 

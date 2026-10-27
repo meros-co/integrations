@@ -44,8 +44,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-anomes", &["millumin"]),
+    ("vendor-atlona", &["atlona-matrix"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
+    ("vendor-avproedge", &["avproedge-matrix"]),
     ("vendor-axis", &["axis-ptz"]),
     (
         "vendor-barco",
@@ -80,6 +82,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-bluenviron", &["mediamtx"]),
+    ("vendor-blustream", &["blustream-matrix"]),
     ("vendor-boinx", &["boinx-mimolive"]),
     ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-canon", &["canon-ptz"]),
@@ -122,6 +125,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-extron",
         &["extron-ipl", "extron-matrix", "extron-switcher"],
     ),
+    ("vendor-ezcoo", &["ezcoo-matrix"]),
     ("vendor-faithlife", &["logos-proclaim"]),
     ("vendor-figure53", &["figure53-go-button", "qlab"]),
     (
@@ -250,7 +254,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     (
         "vendor-ross",
-        &["ross-xpression", "ross-xpression-udp", "rosstalk"],
+        &[
+            "ross-ultrix",
+            "ross-xpression",
+            "ross-xpression-udp",
+            "rosstalk",
+        ],
     ),
     ("vendor-rundownstudio", &["rundown-studio"]),
     ("vendor-samsung", &["samsung-mdc"]),
@@ -316,6 +325,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-vaddio", &["vaddio-roboshot"]),
     ("vendor-videolan", &["videolan-vlc"]),
     ("vendor-vimeo", &["vimeo-live"]),
+    ("vendor-wyrestorm", &["wyrestorm-matrix"]),
     (
         "vendor-yamaha",
         &[

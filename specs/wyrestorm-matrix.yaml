@@ -1,0 +1,997 @@
+spec: 1
+id: wyrestorm-matrix
+name: WyreStorm matrix switchers and switchers (H2A, MXV, H2X/H2XC, EXP-SW)
+vendor: WyreStorm
+category: router
+
+# WyreStorm's ASCII API as its H2A and MXV matrices, its modular H2X/H2XC
+# matrices and its EXP-SW switcher speak it on Telnet (TCP 23) and RS-232:
+# SET and GET with case-sensitive keywords, CR LF after each command, and an
+# answer that repeats the command without SET or GET (SET SW in2 out6 is
+# answered SW in2 out6). Ports are named in the commands: hdmiin and hdmiout
+# on the H2A, hdmiin and out on the MXV, in and out on the H2X, in and the
+# single out on the EXP-SW. Each model supports only what its own API
+# document lists, and WyreStorm warns that a parameter a model does not have
+# can lock the unit up.
+#
+# Not here: the H2X's routing of raw hex commands to remote HDBaseT devices
+# (a binary frame, 05 55 55 57 then card, baud, parity, length and bytes,
+# which the line format cannot carry), and NetworkHD and the SW-0501/1001
+# presentation switchers (other command sets).
+source:
+  - title: "H2A (Non Kit) and MXV Series Matrix Switchers API, revision v2.0 (July 2019), 190703"
+    author: WyreStorm Technologies
+    url: https://service.digis.ru/upload/iblock/958/49783_WyreStorm_H2A_MXV_Series_Matrix_API_190703_EN.pdf
+    note: >
+      Manufacturer document (a distributor's copy of WyreStorm's PDF, since
+      WyreStorm's own document host needs a partner login). Models and
+      versions p.3; RS-232 9600 8N1, no flow control p.4; IP port 23 p.5;
+      ASCII, case-sensitive keywords, SET/GET, CR LF p.6; SET SW, GET MP
+      (H2A: hdmiin0-8, hdmiout1-8 or all; MXV: hdmiin0-8, out1-8 or all;
+      hdmiin0 powers the output down) p.7; SET/GET AUDIOSW and AUDIOMP,
+      SET/GET MUTE, SET/GET AUDIOSW_M (followvm or independent) p.7-8;
+      SAVE/RESTORE PRESET 1-3 p.9; CEC_PWR (RS-232 only), AUTOCEC_FN,
+      AUTOCEC_D (1-30 minutes) p.9-10; IR_SC (all, mode1, mode2) p.11;
+      IRBACK_FN (MXV only) p.12; STANDBY, WAKE, GET STANDBY p.13; GET IPADDR,
+      GET VER, REBOOT, RESET p.17.
+  - title: "H2X/H2XC Matrix Switcher API, revision v3.0 (October 2018)"
+    author: WyreStorm Technologies
+    url: https://service.digis.ru/upload/iblock/b37/40421_WyreStorm_MX_xxxx_HDBT_H2X_H2XC_API.pdf
+    note: >
+      Manufacturer document (distributor's copy). Models MX-1010-HDBT-H2X,
+      MX-1616-HDBT-H2X, MX-1010-H2XC, MX-1616-H2XC, main board firmware
+      v1.3/v1.4 p.1; RS-232 57600 8N1, IP port 23 p.4; command elements p.5;
+      SW, MP, AUDIOSW_M (on, off), AUDIOSW, AUDIOMP (hdmi, spdif, arc
+      sources), VOLGAIN_DATA (-80 to 0 dB in 2 dB steps on current
+      firmware), MUTE, VOLGAIN_FIX, MUTE_M, VOLGAIN_INC/DEC, VOLGAIN_STEP,
+      AUDIO_D (0-500 ms), EQ_FN, AUDIO_EQ (31 Hz-16 kHz, -10 to 10 dB),
+      PRESET_V and PRESET_A (1-20) p.6-9; CEC_PWR and AUTOCEC_D (0-30
+      minutes) p.10; HDCP_S, EDID_DIP, EDID (table 00-31) p.11-12;
+      IRBACK_FN, LR_FN, IR_SYSCODE (00, 4E, all), SW_M (normal, quick),
+      ZONE_LOCK, ZONE_R (hex source masks) p.13-15; remote HDBaseT command
+      frames p.16-18; CABLEC_IN, HDBTL_IN, HDBTL_OUT, CARD_C, CARD_T,
+      CARD_COM, CARD_S, FANS, REBOOT target, RESET p.19-20.
+  - title: "EXP-SW-0401-8K API, revision V1.0 (January 2022), 220929"
+    author: WyreStorm Technologies
+    url: https://www.ambertech.com.au/Documents/Manuals/Wyrestorm/WY-EXPSW04018K_API.pdf
+    note: >
+      Manufacturer document (distributor's copy). RS-232 115200 8N1 p.3; LF
+      or CR LF, the last character LF, on Telnet and RS-232 p.4; SET SW
+      in1-4 out, GET MP out p.5; CEC_PWR out p.6; AUTOSW_M, GET AUTOSW_FN,
+      GET VER, REBOOT, RESET p.7.
+  - title: Bitfocus Companion module companion-module-wyrestorm-matrix (MIT), src/api.ts
+    author: Joseph Adams and contributors
+    url: https://github.com/bitfocus/companion-module-wyrestorm-matrix
+    note: >
+      Community code, read for corroboration only (top-level LICENSE is MIT;
+      no code copied). It targets the MX-H2A, MXV and MX-KIT series on TCP
+      23 and splits answers at line feeds.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # The same API on the RS-232 port: H2A and MXV 9600, H2X 57600, EXP-SW
+  # 115200, each 8N1 with no flow control.
+  serial:
+    baud_rate:
+      default: 9600
+      values: [9600, 57600, 115200]
+      by_model:
+        - { models: [mx-1010-h2x, mx-1616-h2x], default: 57600 }
+        - { models: [exp-sw-0401-8k], default: 115200 }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+maps:
+  onoff: { "true": "on", "false": "off" }
+  standby_word: { "true": "STANDBY", "false": "WAKE" }
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The unit's RS-232 port" }
+
+models:
+  - id: mx-0404-h2a
+    name: WyreStorm MX-0404-H2A (4x4 HDMI matrix)
+    supports: &h2a
+      [route, route_all, get_route, set_audio_route, get_audio_route, set_audio_mute, get_audio_mute,
+       set_audio_switch_mode, get_audio_switch_mode, save_preset, recall_preset,
+       set_cec_power, set_auto_cec, get_auto_cec, set_auto_cec_delay, get_auto_cec_delay,
+       set_ir_system_code, get_ir_system_code, set_standby, get_standby, get_ip_address, get_firmware,
+       reboot, factory_reset]
+    verification: none
+    notes: >
+      Inputs hdmiin1-4, outputs hdmiout1-4; presets 1-3. CEC power works
+      over RS-232 only (p.9).
+  - id: mx-0606-h2a
+    name: WyreStorm MX-0606-H2A (6x6 HDMI matrix)
+    supports: *h2a
+    verification: none
+    notes: Inputs hdmiin1-6, outputs hdmiout1-6; presets 1-3.
+  - id: mx-0808-h2a
+    name: WyreStorm MX-0808-H2A (8x8 HDMI matrix)
+    supports: *h2a
+    verification: none
+    notes: Inputs hdmiin1-8, outputs hdmiout1-8; presets 1-3.
+  - id: mxv-0404-h2a-kit
+    name: WyreStorm MXV-0404-H2A-KIT (4x4 HDBaseT matrix kit)
+    supports: &mxv
+      [route, route_all, get_route, set_audio_route, get_audio_route, set_audio_mute, get_audio_mute,
+       set_audio_switch_mode, get_audio_switch_mode, save_preset, recall_preset,
+       set_cec_power, set_auto_cec, get_auto_cec, set_auto_cec_delay, get_auto_cec_delay,
+       set_ir_system_code, get_ir_system_code, set_ir_callback, get_ir_callback,
+       set_standby, get_standby, get_ip_address, get_firmware, reboot, factory_reset]
+    verification: none
+    notes: >
+      Inputs hdmiin1-4, outputs out1-4 (HDMI and HDBaseT, hdmiout and
+      hdbtout for CEC). Standby is documented for version 2 MXV units; the
+      kit is not in that list (p.13).
+  - id: mxv-0408-h2a
+    name: WyreStorm MXV-0408-H2A (4x8 HDBaseT matrix)
+    supports: *mxv
+    verification: none
+    notes: Inputs hdmiin1-4, outputs out1-8. IR callback and standby need version 2.
+  - id: mxv-0606-h2a
+    name: WyreStorm MXV-0606-H2A and MXV-0606-H2A-70 (6x6 HDBaseT matrices)
+    supports: *mxv
+    verification: none
+    notes: Inputs hdmiin1-6, outputs out1-6. IR callback and standby need version 2 (any -70).
+  - id: mxv-0808-h2a
+    name: WyreStorm MXV-0808-H2A and MXV-0808-H2A-70 (8x8 HDBaseT matrices)
+    supports: *mxv
+    verification: none
+    notes: Inputs hdmiin1-8, outputs out1-8. IR callback and standby need version 2 (any -70).
+  - id: mx-1010-h2x
+    name: WyreStorm MX-1010-HDBT-H2X and MX-1010-H2XC (10x10 modular matrices)
+    supports: &h2x
+      [route, route_all, get_route, set_audio_route, get_audio_route, set_audio_mute, get_audio_mute,
+       set_audio_switch_mode, get_audio_switch_mode, save_video_preset, recall_video_preset,
+       save_audio_preset, recall_audio_preset, set_volume, get_volume, volume_up, volume_down,
+       set_volume_fixed, get_volume_fixed, set_volume_step, get_volume_step, set_mute_method, get_mute_method,
+       set_audio_delay, get_audio_delay, set_eq, get_eq, set_eq_band, get_eq_band,
+       set_cec_power, get_cec_power, set_auto_cec_delay, get_auto_cec_delay,
+       set_input_hdcp, get_input_hdcp, get_edid_dip, set_input_edid, get_input_edid,
+       set_ir_callback, get_ir_callback, set_long_reach, get_long_reach, set_ir_syscode, get_ir_syscode,
+       set_switch_mode, get_switch_mode, set_zone_lock, get_zone_lock, set_zone_sources, get_zone_sources,
+       get_input_cable, get_hdbt_input_link, get_hdbt_output_link, get_card_connection, get_card_type,
+       get_card_communication, get_card_status, get_fans, reboot_part, factory_reset]
+    verification: none
+    notes: >
+      Inputs in1-10, outputs out1-10 (HDMI and HDBaseT ports hdmiout and
+      hdbtout), audio outputs audioout1-10 and spdifout1-10. Volume, mute
+      method, step and audio presets need main board firmware 1.3 or later.
+  - id: mx-1616-h2x
+    name: WyreStorm MX-1616-HDBT-H2X and MX-1616-H2XC (16x16 modular matrices)
+    supports: *h2x
+    verification: none
+    notes: >
+      Inputs in1-16, outputs out1-16. Volume, mute method, step and audio
+      presets need main board firmware 1.4 or later.
+  - id: exp-sw-0401-8k
+    name: WyreStorm EXP-SW-0401-8K (4-input 8K HDMI switcher)
+    supports: [select_input, get_selected_input, set_cec_power_exp, set_auto_switch, get_auto_switch,
+               get_firmware, reboot, factory_reset]
+    verification: none
+    notes: Inputs in1-4 to its one output, named out.
+
+commands:
+  # ── Video routing ────────────────────────────────────────────────────────
+  route:
+    summary: Route an input to an output (SET SW in out); input 0 powers the output down on H2A and MXV
+    params:
+      input: { type: int, min: 0, max: 16, required: true, label: Input,
+               description: "The input from 1; on H2A and MXV matrices 0 (hdmiin0) powers the output down." }
+      output: &output { type: int, min: 1, max: 16, required: true, label: Output, description: "The output from 1." }
+    send:
+      - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a], message: "SET SW hdmiin{input} hdmiout{output}" }
+      - { models: [mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a], message: "SET SW hdmiin{input} out{output}" }
+      - { models: [mx-1010-h2x, mx-1616-h2x], message: "SET SW in{input} out{output}" }
+    expect: { reply_contains: "SW " }
+    returns: ack
+
+  route_all:
+    summary: Route an input to every output (SET SW in all)
+    params:
+      input: { type: int, min: 0, max: 16, required: true, label: Input, description: "The input from 1, or 0 to power every output down (H2A, MXV)." }
+    send:
+      - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a], message: "SET SW hdmiin{input} all" }
+      - { models: [mx-1010-h2x, mx-1616-h2x], message: "SET SW in{input} all" }
+    expect: { reply_contains: "SW " }
+    returns: ack
+
+  get_route:
+    summary: Read the input routed to an output (GET MP out); returns the input number
+    params: { output: *output }
+    send:
+      - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a], message: "GET MP hdmiout{output}" }
+      - { models: [mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET MP out{output}" }
+    expect: { reply_contains: "MP ", matches: '^MP (?:GET )?(?:hdmi)?in(\d+) ' }
+    returns: value
+
+  select_input:
+    summary: Select the switcher's input (SET SW in out)
+    params:
+      input: { type: int, min: 1, max: 4, required: true, label: Input, description: "Input 1-4." }
+    send:
+      - { models: [exp-sw-0401-8k], message: "SET SW in{input} out" }
+    expect: { reply_contains: "SW " }
+    returns: ack
+
+  get_selected_input:
+    summary: Read the switcher's selected input (GET MP out); returns the input number
+    send:
+      - { models: [exp-sw-0401-8k], message: "GET MP out" }
+    expect: { reply_contains: "MP ", matches: '^MP (?:GET )?in(\d+) out$' }
+    returns: value
+
+  set_switch_mode:
+    summary: Set the matrix's switching speed, normal or quick (SET SW_M mode)
+    params:
+      mode: { type: enum, values: [normal, quick], required: true, label: Switching mode, description: "normal, or quick for a shorter delay before the image appears." }
+    send: "SET SW_M {mode}"
+    expect: { reply_contains: "SW_M " }
+    returns: ack
+
+  get_switch_mode:
+    summary: Read the switching mode (GET SW_M)
+    send: "GET SW_M"
+    expect: { reply_contains: "SW_M ", matches: 'SW_M (\S+)' }
+    returns: value
+
+  set_auto_switch:
+    summary: Turn the switcher's auto-switching on or off (SET AUTOSW_M on|off)
+    params:
+      enabled: { type: bool, required: true, label: Auto-switch, description: "On switches to a newly active input." }
+    send: "SET AUTOSW_M {enabled:map.onoff}"
+    expect: { reply_contains: "AUTOSW_M " }
+    returns: ack
+
+  get_auto_switch:
+    summary: Read the auto-switching setting (GET AUTOSW_FN)
+    send: "GET AUTOSW_FN"
+    expect: { reply_contains: "AUTOSW_FN ", matches: 'AUTOSW_FN (on|off)' }
+    returns: value
+
+  # ── Audio ────────────────────────────────────────────────────────────────
+  set_audio_route:
+    summary: Route an audio source to an audio output (SET AUDIOSW source audioout)
+    params:
+      source: { type: string, pattern: '^(hdmiin([1-9]|1[0-6])|hdmi([1-9]|1[0-6])|spdif([1-9]|1[0-6])|arc([1-9]|1[0-6]))$', required: true, label: Source,
+                description: "H2A and MXV: hdmiin1-8; H2X: hdmi1-16, spdif1-16 or arc1-16." }
+      output: { type: int, min: 1, max: 16, required: true, label: Audio output, description: "The audio output from 1." }
+    send: "SET AUDIOSW {source} audioout{output}"
+    expect: { reply_contains: "AUDIOSW " }
+    returns: ack
+
+  get_audio_route:
+    summary: Read the source of an audio output (GET AUDIOMP audioout); returns the source
+    params:
+      output: { type: int, min: 1, max: 16, required: true, label: Audio output, description: "The audio output from 1." }
+    send: "GET AUDIOMP audioout{output}"
+    expect: { reply_contains: "AUDIO", matches: '^AUDIO(?:MP|SW) (\S+) ' }
+    returns: value
+
+  set_audio_mute:
+    summary: Mute or unmute an audio output (SET MUTE port on|off)
+    params:
+      port: &audio_port { type: string, pattern: '^((audioout|spdifout)([1-9]|1[0-6])|all)$', required: true, label: Audio output,
+                          description: "audioout1-16, spdifout1-16 (H2X), or all." }
+      muted: { type: bool, required: true, label: Muted, description: "On mutes; off unmutes." }
+    send: "SET MUTE {port} {muted:map.onoff}"
+    expect: { reply_contains: "MUTE " }
+    returns: ack
+
+  get_audio_mute:
+    summary: Read whether an audio output is muted (GET MUTE port)
+    params: { port: *audio_port }
+    send: "GET MUTE {port}"
+    expect: { reply_contains: "MUTE ", matches: ' (on|off)$' }
+    returns: value
+
+  set_audio_switch_mode:
+    summary: Make audio follow video or switch on its own (SET AUDIOSW_M mode)
+    params:
+      mode: { type: enum, values: [followvm, independent, "on", "off"], required: true, label: Audio switching,
+              description: "H2A and MXV: followvm or independent; H2X: on for independent audio, off to follow video." }
+    send: "SET AUDIOSW_M {mode}"
+    expect: { reply_contains: "AUDIOSW_M " }
+    returns: ack
+
+  get_audio_switch_mode:
+    summary: Read the audio switching mode (GET AUDIOSW_M)
+    send: "GET AUDIOSW_M"
+    expect: { reply_contains: "AUDIOSW_M ", matches: 'AUDIOSW_M (\S+)' }
+    returns: value
+
+  set_volume:
+    summary: Set an audio output's gain in dB (SET VOLGAIN_DATA audioout gain)
+    params:
+      port: { type: string, pattern: '^(audioout([1-9]|1[0-6])|all)$', required: true, label: Audio output, description: "audioout1-16 or all." }
+      gain: { type: int, min: -80, max: 10, required: true, label: Gain,
+              description: "dB: -80 to 0 in 2 dB steps on main board firmware 1.3/1.4 or later, -10 to 10 before." }
+    send: "SET VOLGAIN_DATA {port} {gain}"
+    expect: { reply_contains: "VOLGAIN_DATA " }
+    returns: ack
+
+  get_volume:
+    summary: Read an audio output's gain in dB (GET VOLGAIN_DATA audioout)
+    params:
+      port: &analog_port { type: string, pattern: '^(audioout([1-9]|1[0-6])|all)$', required: true, label: Audio output, description: "audioout1-16 or all." }
+    send: "GET VOLGAIN_DATA {port}"
+    expect: { reply_contains: "VOLGAIN_DATA ", matches: ' (-?\d+)$' }
+    returns: value
+
+  volume_up:
+    summary: Raise an audio output's gain one step (SET VOLGAIN_INC audioout)
+    params: { port: *analog_port }
+    send: "SET VOLGAIN_INC {port}"
+    expect: { reply_contains: "VOLGAIN_INC " }
+    returns: ack
+
+  volume_down:
+    summary: Lower an audio output's gain one step (SET VOLGAIN_DEC audioout)
+    params: { port: *analog_port }
+    send: "SET VOLGAIN_DEC {port}"
+    expect: { reply_contains: "VOLGAIN_DEC " }
+    returns: ack
+
+  set_volume_fixed:
+    summary: Make an audio output's level fixed or variable (SET VOLGAIN_FIX audioout on|off)
+    params:
+      port: *analog_port
+      fixed: { type: bool, required: true, label: Fixed, description: "On fixes the output level; off makes it variable." }
+    send: "SET VOLGAIN_FIX {port} {fixed:map.onoff}"
+    expect: { reply_contains: "VOLGAIN_FIX " }
+    returns: ack
+
+  get_volume_fixed:
+    summary: Read whether an audio output's level is fixed (GET VOLGAIN_FIX audioout)
+    params: { port: *analog_port }
+    send: "GET VOLGAIN_FIX {port}"
+    expect: { reply_contains: "VOLGAIN_FIX ", matches: ' (on|off)$' }
+    returns: value
+
+  set_volume_step:
+    summary: Set the gain step of volume up and down (SET VOLGAIN_STEP audioout step)
+    params:
+      port: *analog_port
+      step: { type: enum, values: ["2", "4", "8"], required: true, label: Step, description: "dB per step." }
+    send: "SET VOLGAIN_STEP {port} {step}"
+    expect: { reply_contains: "VOLGAIN_STEP " }
+    returns: ack
+
+  get_volume_step:
+    summary: Read the volume step (GET VOLGAIN_STEP audioout)
+    params: { port: *analog_port }
+    send: "GET VOLGAIN_STEP {port}"
+    expect: { reply_contains: "VOLGAIN_STEP ", matches: ' ([248])$' }
+    returns: value
+
+  set_mute_method:
+    summary: Set how an audio output mutes, cut or ramp (SET MUTE_M audioout cut|ramp)
+    params:
+      port: *analog_port
+      method: { type: enum, values: [cut, ramp], required: true, label: Mute method, description: "cut goes straight to mute; ramp fades down to it." }
+    send: "SET MUTE_M {port} {method}"
+    expect: { reply_contains: "MUTE_M " }
+    returns: ack
+
+  get_mute_method:
+    summary: Read the mute method (GET MUTE_M audioout)
+    params: { port: *analog_port }
+    send: "GET MUTE_M {port}"
+    expect: { reply_contains: "MUTE_M ", matches: ' (cut|ramp)$' }
+    returns: value
+
+  set_audio_delay:
+    summary: Delay an audio output (SET AUDIO_D audioout ms)
+    params:
+      port: *analog_port
+      milliseconds: { type: int, min: 0, max: 500, required: true, label: Delay, description: "Delay in milliseconds, 0-500; 0 for none." }
+    send: "SET AUDIO_D {port} {milliseconds}"
+    expect: { reply_contains: "AUDIO_D " }
+    returns: ack
+
+  get_audio_delay:
+    summary: Read an audio output's delay (GET AUDIO_D audioout)
+    params: { port: *analog_port }
+    send: "GET AUDIO_D {port}"
+    expect: { reply_contains: "AUDIO_D ", matches: ' (\d+)$' }
+    returns: value
+
+  set_eq:
+    summary: Enable or bypass an audio output's EQ (SET EQ_FN audioout on|off)
+    params:
+      port: *analog_port
+      enabled: { type: bool, required: true, label: EQ, description: "On enables the EQ; off bypasses it." }
+    send: "SET EQ_FN {port} {enabled:map.onoff}"
+    expect: { reply_contains: "EQ_FN " }
+    returns: ack
+
+  get_eq:
+    summary: Read whether an audio output's EQ is on (GET EQ_FN audioout)
+    params: { port: *analog_port }
+    send: "GET EQ_FN {port}"
+    expect: { reply_contains: "EQ_FN ", matches: ' (on|off)$' }
+    returns: value
+
+  set_eq_band:
+    summary: Set one EQ band's gain on an audio output (SET AUDIO_EQ audioout frequency gain)
+    params:
+      port: *analog_port
+      frequency: &eq_freq { type: enum, values: ["31", "62", "125", "250", "500", "2000", "4000", "8000", "16000"], required: true, label: Band, description: "The band's frequency in Hz." }
+      gain: { type: int, min: -10, max: 10, required: true, label: Gain, description: "Band gain in dB, -10 to 10." }
+    send: "SET AUDIO_EQ {port} {frequency} {gain}"
+    expect: { reply_contains: "AUDIO_EQ " }
+    returns: ack
+
+  get_eq_band:
+    summary: Read one EQ band's gain (GET AUDIO_EQ audioout frequency)
+    params:
+      port: *analog_port
+      frequency: *eq_freq
+    send: "GET AUDIO_EQ {port} {frequency}"
+    expect: { reply_contains: "AUDIO_EQ ", matches: ' (-?\d+)$' }
+    returns: value
+
+  # ── Presets ──────────────────────────────────────────────────────────────
+  save_preset:
+    summary: Save the routing as a scene (SAVE PRESET n)
+    params: &scene3
+      preset: { type: int, min: 1, max: 3, required: true, label: Scene, description: "Scene 1-3." }
+    send: "SAVE PRESET {preset}"
+    expect: { reply_contains: "PRESET {preset}" }
+    returns: ack
+
+  recall_preset:
+    summary: Recall a saved scene (RESTORE PRESET n)
+    params: *scene3
+    send: "RESTORE PRESET {preset}"
+    expect: { reply_contains: "PRESET {preset}" }
+    returns: ack
+
+  save_video_preset:
+    summary: Save the video routing as a scene (SAVE PRESET_V n)
+    params: &scene20
+      preset: { type: int, min: 1, max: 20, required: true, label: Scene, description: "Scene 1-20." }
+    send: "SAVE PRESET_V {preset}"
+    expect: { reply_contains: "PRESET_V {preset}" }
+    returns: ack
+
+  recall_video_preset:
+    summary: Recall a video scene (RESTORE PRESET_V n)
+    params: *scene20
+    send: "RESTORE PRESET_V {preset}"
+    expect: { reply_contains: "PRESET_V {preset}" }
+    returns: ack
+
+  save_audio_preset:
+    summary: Save the audio settings as a scene (SAVE PRESET_A n)
+    params: *scene20
+    send: "SAVE PRESET_A {preset}"
+    expect: { reply_contains: "PRESET_A {preset}" }
+    returns: ack
+
+  recall_audio_preset:
+    summary: Recall an audio scene (RESTORE PRESET_A n)
+    params: *scene20
+    send: "RESTORE PRESET_A {preset}"
+    expect: { reply_contains: "PRESET_A {preset}" }
+    returns: ack
+
+  # ── Display power (CEC) ──────────────────────────────────────────────────
+  set_cec_power:
+    summary: Power a display on or off over CEC (SET CEC_PWR port on|off)
+    params:
+      port: &cec_port { type: string, pattern: '^((hdmiout|hdbtout)([1-9]|1[0-6])|all)$', required: true, label: Display port,
+                        description: "hdmiout1-16 or hdbtout1-16 (HDBaseT outputs on MXV and H2X), or all." }
+      powered: { type: bool, required: true, label: Power, description: "On powers the display on; off powers it off." }
+    send:
+      - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a], message: "SET CEC_PWR {port} {powered:map.onoff}" }
+      - { models: [mx-1010-h2x, mx-1616-h2x], message: "SET CEC_PWR {port} {powered:map.onoff}" }
+    expect: { reply_contains: "CEC_PWR" }
+    returns: ack
+
+  set_cec_power_exp:
+    summary: Power the display on or off over CEC (SET CEC_PWR out on|off)
+    params:
+      powered: { type: bool, required: true, label: Power, description: "On powers the display on; off powers it off." }
+    send: "SET CEC_PWR out {powered:map.onoff}"
+    expect: { reply_contains: "CEC_PWR" }
+    returns: ack
+
+  get_cec_power:
+    summary: Read a display's CEC power state (GET CEC_PWR port)
+    params: { port: *cec_port }
+    send: "GET CEC_PWR {port}"
+    expect: { reply_contains: "CEC_PWR ", matches: ' (on|off)$' }
+    returns: value
+
+  set_auto_cec:
+    summary: Turn automatic CEC display power on or off for an output (SET AUTOCEC_FN port on|off)
+    params:
+      port: &auto_port { type: string, pattern: '^((hdmiout|hdbtout|out)([1-9]|1[0-6]))$', required: true, label: Output,
+                         description: "The output as the document names it: hdmiout1-8, hdbtout1-8 (MXV) or out1-8, as in its examples." }
+      enabled: { type: bool, required: true, label: Auto power, description: "On powers the display on and off with the signal." }
+    send: "SET AUTOCEC_FN {port} {enabled:map.onoff}"
+    expect: { reply_contains: "AUTOCEC_FN " }
+    returns: ack
+
+  get_auto_cec:
+    summary: Read the automatic CEC display power setting (GET AUTOCEC_FN port)
+    params: { port: *auto_port }
+    send: "GET AUTOCEC_FN {port}"
+    expect: { reply_contains: "AUTOCEC_FN ", matches: ' (on|off)$' }
+    returns: value
+
+  set_auto_cec_delay:
+    summary: Set how long without a signal before the display is powered off over CEC (SET AUTOCEC_D port minutes)
+    params:
+      port: &delay_port { type: string, pattern: '^((hdmiout|hdbtout|hdbt|out)([1-9]|1[0-6])|all)$', required: true, label: Output,
+                          description: "The output as the documents name it: out2, hdmiout1-16, hdbtout1-16, or hdbt5 (H2X example)." }
+      minutes: { type: int, min: 0, max: 30, required: true, label: Delay, description: "Minutes, 1-30 on H2A and MXV; 0-30 on H2X, where 0 powers off at once." }
+    send: "SET AUTOCEC_D {port} {minutes}"
+    expect: { reply_contains: "AUTOCEC_D " }
+    returns: ack
+
+  get_auto_cec_delay:
+    summary: Read the CEC power-off delay (GET AUTOCEC_D port)
+    params: { port: *delay_port }
+    send: "GET AUTOCEC_D {port}"
+    expect: { reply_contains: "AUTOCEC_D ", matches: ' (\d+)$' }
+    returns: value
+
+  # ── Inputs and EDID (H2X) ────────────────────────────────────────────────
+  set_input_hdcp:
+    summary: Turn HDCP on or off on an input (SET HDCP_S in on|off)
+    params:
+      input: &h2x_input { type: string, pattern: '^(in([1-9]|1[0-6])|all)$', required: true, label: Input, description: "in1-16, or all." }
+      enabled: { type: bool, required: true, label: HDCP, description: "On reports HDCP support to the source." }
+    send: "SET HDCP_S {input} {enabled:map.onoff}"
+    expect: { reply_contains: "HDCP_S " }
+    returns: ack
+
+  get_input_hdcp:
+    summary: Read an input's HDCP setting (GET HDCP_S in)
+    params: { input: *h2x_input }
+    send: "GET HDCP_S {input}"
+    expect: { reply_contains: "HDCP_S ", matches: ' (on|off)$' }
+    returns: value
+
+  get_edid_dip:
+    summary: Read the rear EDID DIP switch setting, 0-15 (GET EDID_DIP)
+    send: "GET EDID_DIP"
+    expect: { reply_contains: "EDID_DIP ", matches: 'EDID_DIP (\d+)' }
+    returns: value
+
+  set_input_edid:
+    summary: Set an input's EDID (SET EDID in code); the DIP switches must be set to 0000
+    params:
+      input: *h2x_input
+      edid: { type: int, min: 0, max: 31, required: true, label: EDID,
+              description: "0-15 copy from output 1-16, 16-29 a fixed EDID (1080p, 4K30, 4K60, 1920x1200 with 2ch, 5.1 or 7.1 audio, HDR), 30 smart EDID, 31 EDID write." }
+    send: "SET EDID {input} {edid}"
+    expect: { reply_contains: "EDID " }
+    returns: ack
+
+  get_input_edid:
+    summary: Read an input's EDID code (GET EDID in); GET EDID all answers a line per input
+    params: { input: *h2x_input }
+    send: "GET EDID {input}"
+    expect: { reply_contains: "EDID in", matches: 'EDID in\d+ (\d+)' }
+    returns: value
+
+  # ── Matrix settings ──────────────────────────────────────────────────────
+  set_ir_system_code:
+    summary: Set the IR code set the matrix answers (SET IR_SC all|mode1|mode2)
+    params:
+      code: { type: enum, values: [all, mode1, mode2], required: true, label: IR code set, description: "mode1 the 0x00 codes, mode2 the 0x4E codes, all both." }
+    send: "SET IR_SC {code}"
+    expect: { reply_contains: "IR_SC " }
+    returns: ack
+
+  get_ir_system_code:
+    summary: Read the IR code set (GET IR_SC)
+    send: "GET IR_SC"
+    expect: { reply_contains: "IR_SC ", matches: 'IR_SC (\S+)' }
+    returns: value
+
+  set_ir_syscode:
+    summary: Set the IR system codes the matrix answers (SET IR_SYSCODE 00|4E|all)
+    params:
+      code: { type: enum, values: ["00", 4E, all], required: true, label: IR system code, description: "00 the standard codes, 4E the alternative set, all both." }
+    send: "SET IR_SYSCODE {code}"
+    expect: { reply_contains: "IR_SYSCODE " }
+    returns: ack
+
+  get_ir_syscode:
+    summary: Read the IR system codes (GET IR_SYSCODE)
+    send: "GET IR_SYSCODE"
+    expect: { reply_contains: "IR_SYSCODE ", matches: 'IR_SYSCODE (\S+)' }
+    returns: value
+
+  set_ir_callback:
+    summary: Allow control from remote HDBaseT receivers' IR, or not (SET IRBACK_FN on|off)
+    params:
+      enabled: { type: bool, required: true, label: IR callback, description: "On lets the matrix be controlled by IR at the HDBaseT receivers." }
+    send: "SET IRBACK_FN {enabled:map.onoff}"
+    expect: { reply_contains: "IRBACK_FN " }
+    returns: ack
+
+  get_ir_callback:
+    summary: Read the IR callback setting (GET IRBACK_FN)
+    send: "GET IRBACK_FN"
+    expect: { reply_contains: "IRBACK_FN ", matches: 'IRBACK_FN (\S+)' }
+    returns: value
+
+  set_long_reach:
+    summary: Turn HDBaseT long-reach mode on or off for every HDBaseT port (SET LR_FN hdbtall on|off)
+    params:
+      enabled: { type: bool, required: true, label: Long reach, description: "On extends HDBaseT reach for long cable runs." }
+    send: "SET LR_FN hdbtall {enabled:map.onoff}"
+    expect: { reply_contains: "LR_FN " }
+    returns: ack
+
+  get_long_reach:
+    summary: Read the long-reach setting (GET LR_FN hdbtall)
+    send: "GET LR_FN hdbtall"
+    expect: { reply_contains: "LR_FN ", matches: ' (on|off)$' }
+    returns: value
+
+  set_zone_lock:
+    summary: Turn AVR priority (theater zone locking) on or off for an output (SET ZONE_LOCK port on|off)
+    params:
+      port: &zone_port { type: string, pattern: '^((hdmiout|hdbtout|hdbt)([1-9]|1[0-6])|all)$', required: true, label: Output,
+                         description: "hdmiout1-16, hdbtout1-16 (hdbt10 in the document's example), or all." }
+      enabled: { type: bool, required: true, label: AVR priority, description: "On locks the zone to the AVR connected to it." }
+    send: "SET ZONE_LOCK {port} {enabled:map.onoff}"
+    expect: { reply_contains: "ZONE_LOCK " }
+    returns: ack
+
+  get_zone_lock:
+    summary: Read an output's AVR priority setting (GET ZONE_LOCK port)
+    params: { port: *zone_port }
+    send: "GET ZONE_LOCK {port}"
+    expect: { reply_contains: "ZONE_LOCK ", matches: ' (on|off)$' }
+    returns: value
+
+  set_zone_sources:
+    summary: Choose the sources a zone may select, as a hex mask (SET ZONE_R out mask)
+    params:
+      output: { type: string, pattern: '^(out([1-9]|1[0-6])|all)$', required: true, label: Output, description: "out1-16 or all." }
+      mask: { type: string, pattern: '^[0-9A-Fa-f]{4}$', required: true, label: Source mask,
+              description: "Four hex digits, a bit per input: 0001 input 1, 8000 input 16, AAAA the odd inputs of a 16x16, FFFF all." }
+    send: "SET ZONE_R {output} {mask}"
+    expect: { reply_contains: "ZONE_R " }
+    returns: ack
+
+  get_zone_sources:
+    summary: Read the sources a zone may select (GET ZONE_R out)
+    params:
+      output: { type: string, pattern: '^(out([1-9]|1[0-6])|all)$', required: true, label: Output, description: "out1-16 or all." }
+    send: "GET ZONE_R {output}"
+    expect: { reply_contains: "ZONE_R ", matches: ' ([0-9A-Fa-f]{4})\s*$' }
+    returns: value
+
+  set_standby:
+    summary: Put the matrix in low-power standby, or wake it (STANDBY, WAKE)
+    params:
+      standby: { type: bool, required: true, label: Standby, description: "On puts the matrix in standby; off wakes it." }
+    send: "{standby:map.standby_word}"
+    expect: { matches: '(STANDBY|WAKE)' }
+    returns: ack
+
+  get_standby:
+    summary: Read whether the matrix is in standby, STANDBY or WAKE (GET STANDBY)
+    send: "GET STANDBY"
+    expect: { matches: '(STANDBY|WAKE)' }
+    returns: value
+
+  # ── Diagnostics (H2X) ────────────────────────────────────────────────────
+  get_input_cable:
+    summary: Read whether an input's or output's cable is connected (GET CABLEC_IN port)
+    params:
+      port: { type: string, pattern: '^((in|hdmiout|hdbtout)([1-9]|1[0-6])|all)$', required: true, label: Port, description: "in1-16, hdmiout1-16, hdbtout1-16, or all." }
+    send: "GET CABLEC_IN {port}"
+    expect: { reply_contains: "CABLEC_IN ", matches: 'CABLEC_IN \S+ (.+)$' }
+    returns: value
+
+  get_hdbt_input_link:
+    summary: Read an HDBaseT input's link quality, 1-10 or no link (GET HDBTL_IN port)
+    params:
+      port: { type: string, pattern: '^(hdbtin([1-9]|1[0-6])|all)$', required: true, label: HDBaseT input, description: "hdbtin1-16 or all." }
+    send: "GET HDBTL_IN {port}"
+    expect: { reply_contains: "HDBTL_IN ", matches: 'HDBTL_IN \S+ (.+)$' }
+    returns: value
+
+  get_hdbt_output_link:
+    summary: Read an HDBaseT output's link quality, 1-10 or no link (GET HDBTL_OUT port)
+    params:
+      port: { type: string, pattern: '^(hdbtout([1-9]|1[0-6])|all)$', required: true, label: HDBaseT output, description: "hdbtout1-16 or all." }
+    send: "GET HDBTL_OUT {port}"
+    expect: { reply_contains: "HDBTL_OUT ", matches: 'HDBTL_OUT \S+ (.+)$' }
+    returns: value
+
+  get_card_connection:
+    summary: Read whether a card slot is connected (GET CARD_C slot)
+    params:
+      slot: &slot { type: int, min: 1, max: 16, required: true, label: Slot, description: "Card slot 1-16." }
+    send: "GET CARD_C {slot}"
+    expect: { reply_contains: "CARD_C ", matches: 'CARD_C \S+ (.+)$' }
+    returns: value
+
+  get_card_type:
+    summary: Read a card slot's card type, hdmi or hdbt (GET CARD_T slot)
+    params: { slot: *slot }
+    send: "GET CARD_T {slot}"
+    expect: { reply_contains: "CARD_T ", matches: 'CARD_T \S+ (.+)$' }
+    returns: value
+
+  get_card_communication:
+    summary: Read whether a card communicates with the main board (GET CARD_COM slot)
+    params: { slot: *slot }
+    send: "GET CARD_COM {slot}"
+    expect: { reply_contains: "CARD_COM ", matches: 'CARD_COM \S+ (.+)$' }
+    returns: value
+
+  get_card_status:
+    summary: Read a card's status, good or none (GET CARD_S slot)
+    params: { slot: *slot }
+    send: "GET CARD_S {slot}"
+    expect: { reply_contains: "CARD_S ", matches: 'CARD_S \S+ (.+)$' }
+    returns: value
+
+  get_fans:
+    summary: Read a fan's status, working or unworking (GET FANS fan)
+    params:
+      fan: { type: string, pattern: '^(fan[1-4]|all)$', required: true, label: Fan, description: "fan1-4 or all." }
+    send: "GET FANS {fan}"
+    expect: { reply_contains: "FANS ", matches: 'FANS \S+ (.+)$' }
+    returns: value
+
+  get_ip_address:
+    summary: Read the IP address (GET IPADDR)
+    send: "GET IPADDR"
+    expect: { reply_contains: "IPADDR ", matches: 'IPADDR (\S+)' }
+    returns: value
+
+  get_firmware:
+    summary: Read the firmware version (GET VER)
+    send: "GET VER"
+    expect: { reply_contains: "VER ", matches: 'VER (\S+)' }
+    returns: value
+
+  reboot:
+    summary: Restart the unit (REBOOT)
+    send: "REBOOT"
+    expect: { reply_contains: "REBOOT" }
+    returns: ack
+
+  reboot_part:
+    summary: Restart the whole matrix or one board (REBOOT target)
+    params:
+      target: { type: string, pattern: '^(all|mainboard|ledboard|card([1-9]|1[0-6]))$', required: true, label: Target,
+                description: "all, mainboard, ledboard, or card1-16." }
+    send: "REBOOT {target}"
+    expect: { reply_contains: "REBOOT" }
+    returns: ack
+
+  factory_reset:
+    summary: Restore factory defaults (RESET)
+    send: "RESET"
+    expect: { reply_contains: "RESET" }
+    returns: ack
+
+state:
+  outputs.*.input:            { type: int, description: "Input routed to the output, from 1, or 0 when the output is powered down (hdmiin0); keyed by output number" }
+  audio_outputs.*.source:     { type: string, description: "Audio source of the audio output, such as hdmiin4 or spdif2 (AUDIOSW, AUDIOMP)" }
+  audio_outputs.*.muted:      { type: bool, description: "Whether the audio output is muted (MUTE audiooutN)" }
+  spdif_outputs.*.muted:      { type: bool, description: "Whether the S/PDIF output is muted (MUTE spdifoutN, H2X)" }
+  audio_outputs.*.gain:       { type: int, unit: dB, description: "Output gain (VOLGAIN_DATA, VOLGAIN_INC, VOLGAIN_DEC)" }
+  audio_outputs.*.fixed:      { type: bool, description: "Whether the output level is fixed (VOLGAIN_FIX)" }
+  audio_outputs.*.step:       { type: int, unit: dB, description: "Volume step (VOLGAIN_STEP)" }
+  audio_outputs.*.mute_method: { type: string, description: "cut or ramp (MUTE_M)" }
+  audio_outputs.*.delay:      { type: int, unit: ms, description: "Audio delay (AUDIO_D)" }
+  audio_outputs.*.eq:         { type: bool, description: "Whether the EQ is on (EQ_FN)" }
+  audio_outputs.*.eq_bands.*: { type: int, unit: dB, description: "EQ band gain by frequency in Hz (AUDIO_EQ)" }
+  audio_switch_mode:          { type: string, description: "followvm or independent (H2A, MXV), on or off (H2X) (AUDIOSW_M)" }
+  preset:                     { type: string, description: "Last scene saved or recalled as the matrix answered, such as PRESET 1 or PRESET_V 5" }
+  displays.*.power:           { type: bool, description: "Display power last set or read over CEC, keyed by port such as hdbtout10 or out (CEC_PWR)" }
+  displays.*.auto_power:      { type: bool, description: "Automatic CEC display power, keyed by port (AUTOCEC_FN)" }
+  displays.*.auto_power_delay: { type: int, unit: min, description: "CEC power-off delay, keyed by port (AUTOCEC_D)" }
+  inputs.*.hdcp:              { type: bool, description: "Whether HDCP is on for the input, keyed by in number (HDCP_S)" }
+  inputs.*.edid:              { type: int, description: "EDID code of the input, keyed by in number (EDID)" }
+  edid_dip:                   { type: int, description: "Rear EDID DIP switch setting, 0-15 (EDID_DIP)" }
+  ir_system_code:             { type: string, description: "IR code set: all, mode1, mode2 (IR_SC) or 00, 4E, all (IR_SYSCODE)" }
+  ir_callback:                { type: string, description: "IR callback setting as answered, on or off (IRBACK_FN)" }
+  long_reach:                 { type: bool, description: "Whether HDBaseT long reach is on (LR_FN)" }
+  switch_mode:                { type: string, description: "normal or quick (SW_M)" }
+  auto_switch:                { type: bool, description: "Whether the EXP-SW auto-switches (AUTOSW_M, AUTOSW_FN)" }
+  zones.*.avr_lock:           { type: bool, description: "AVR priority for the output, keyed by port (ZONE_LOCK)" }
+  zones.*.sources:            { type: string, description: "Hex mask of the sources the zone may select, keyed by out port (ZONE_R)" }
+  standby:                    { type: bool, description: "Whether the matrix is in standby (STANDBY, WAKE)" }
+  ip_address:                 { type: string, description: "IP address (IPADDR)" }
+  firmware:                   { type: string, description: "Firmware version (VER)" }
+  ports.*.cable:              { type: string, description: "Cable status by port, such as connected or good (CABLEC_IN)" }
+  ports.*.link:               { type: string, description: "HDBaseT link quality by port, 1-10 or no link (HDBTL_IN, HDBTL_OUT)" }
+  cards.*.connection:         { type: string, description: "Card slot connection, keyed by slotN (CARD_C)" }
+  cards.*.type:               { type: string, description: "Card type, keyed by slotN (CARD_T)" }
+  cards.*.communication:      { type: string, description: "Card communication with the main board, keyed by slotN (CARD_COM)" }
+  cards.*.status:             { type: string, description: "Card status, keyed by slotN (CARD_S)" }
+  fans.*:                     { type: string, description: "Fan status, keyed by fanN (FANS)" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send:
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a], message: "GET MP hdmiout1" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a], message: "GET MP hdmiout2" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a], message: "GET MP hdmiout3" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a], message: "GET MP hdmiout4" }
+        - { models: [mx-0606-h2a, mx-0808-h2a], message: "GET MP hdmiout5" }
+        - { models: [mx-0606-h2a, mx-0808-h2a], message: "GET MP hdmiout6" }
+        - { models: [mx-0808-h2a], message: "GET MP hdmiout7" }
+        - { models: [mx-0808-h2a], message: "GET MP hdmiout8" }
+        - { models: &mxv_h2x [mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET MP out1" }
+        - { models: *mxv_h2x, message: "GET MP out2" }
+        - { models: *mxv_h2x, message: "GET MP out3" }
+        - { models: *mxv_h2x, message: "GET MP out4" }
+        - { models: [mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET MP out5" }
+        - { models: [mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET MP out6" }
+        - { models: [mxv-0408-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET MP out7" }
+        - { models: [mxv-0408-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET MP out8" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET MP out9" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET MP out10" }
+        - { models: [mx-1616-h2x], message: "GET MP out11" }
+        - { models: [mx-1616-h2x], message: "GET MP out12" }
+        - { models: [mx-1616-h2x], message: "GET MP out13" }
+        - { models: [mx-1616-h2x], message: "GET MP out14" }
+        - { models: [mx-1616-h2x], message: "GET MP out15" }
+        - { models: [mx-1616-h2x], message: "GET MP out16" }
+        - { models: [exp-sw-0401-8k], message: "GET MP out" }
+    - every_ms: 60000
+      send:
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, exp-sw-0401-8k], message: "GET VER" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET AUDIOSW_M" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET MUTE all" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a], message: "GET IR_SC" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a], message: "GET IPADDR" }
+        - { models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a], message: "GET STANDBY" }
+        - { models: [mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a, mx-1010-h2x, mx-1616-h2x], message: "GET IRBACK_FN" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET SW_M" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET IR_SYSCODE" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET LR_FN hdbtall" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET EDID_DIP" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET EDID all" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET HDCP_S all" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET VOLGAIN_DATA all" }
+        - { models: [mx-1010-h2x, mx-1616-h2x], message: "GET CEC_PWR all" }
+        - { models: [exp-sw-0401-8k], message: "GET AUTOSW_FN" }
+  updates:
+    - match: '^(?:SW|MP)(?: GET)? (?:hdmi)?in(\d+) (?:hdmi)?out(\d+)\s*$'
+      state: { "outputs.{2}.input": "{1}" }
+    - match: '^(?:SW|MP)(?: GET)? in(\d+) out\s*$'
+      state: { "outputs.1.input": "{1}" }
+    # A route to every output names no output: read the routing again.
+    - match: '^SW (?:hdmi)?in\d+ all\s*$'
+      then_send: ["GET MP all"]
+    - match: '^(?:AUDIOSW|AUDIOMP) (\S+) audioout(\d+)\s*$'
+      state: { "audio_outputs.{2}.source": "{1}" }
+    - match: '^MUTE audioout(\d+) (on|off)\s*$'
+      state: { "audio_outputs.{1}.muted": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^MUTE spdifout(\d+) (on|off)\s*$'
+      state: { "spdif_outputs.{1}.muted": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^AUDIOSW_M (\S+)\s*$'
+      state: { audio_switch_mode: "{1}" }
+    - match: '^VOLGAIN_(?:DATA|INC|DEC) audioout(\d+) (-?) ?(\d+)\s*$'
+      state: { "audio_outputs.{1}.gain": "{2}{3}" }
+    - match: '^VOLGAIN_FIX audioout(\d+) (on|off)\s*$'
+      state: { "audio_outputs.{1}.fixed": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^VOLGAIN_STEP audioout(\d+) ([248])\s*$'
+      state: { "audio_outputs.{1}.step": "{2}" }
+    - match: '^MUTE_M audioout(\d+) (cut|ramp)\s*$'
+      state: { "audio_outputs.{1}.mute_method": "{2}" }
+    - match: '^AUDIO_D audioout(\d+) (\d+)\s*$'
+      state: { "audio_outputs.{1}.delay": "{2}" }
+    - match: '^EQ_FN audioout(\d+) (on|off)\s*$'
+      state: { "audio_outputs.{1}.eq": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^AUDIO_EQ audioout(\d+) (\d+) (-?\d+)\s*$'
+      state: { "audio_outputs.{1}.eq_bands.{2}": "{3}" }
+    - match: '^(PRESET(?:_[VA])? \d+)\s*$'
+      state: { preset: "{1}" }
+    - match: '^CEC_PWR ?(\w+) (on|off)\s*$'
+      state: { "displays.{1}.power": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^AUTOCEC_FN (\w+) (on|off)\s*$'
+      state: { "displays.{1}.auto_power": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^AUTOCEC_D (\w+) (\d+)\s*$'
+      state: { "displays.{1}.auto_power_delay": "{2}" }
+    - match: '^HDCP_S (?:in)?(\d+) (on|off)\s*$'
+      state: { "inputs.{1}.hdcp": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^EDID in(\d+) (\d+)\s*$'
+      state: { "inputs.{1}.edid": "{2}" }
+    - match: '^EDID_DIP (\d+)\s*$'
+      state: { edid_dip: "{1}" }
+    - match: '^IR_(?:SC|SYSCODE) (\S+)\s*$'
+      state: { ir_system_code: "{1}" }
+    - match: '^IRBACK_FN (\S+)\s*$'
+      state: { ir_callback: "{1}" }
+    - match: '^LR_FN hdbtall (on|off)\s*$'
+      state: { long_reach: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '^SW_M (normal|quick)\s*$'
+      state: { switch_mode: "{1}" }
+    - match: '^AUTOSW_(?:M|FN) (on|off)\s*$'
+      state: { auto_switch: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '^ZONE_LOCK (\w+) (on|off)\s*$'
+      state: { "zones.{1}.avr_lock": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^ZONE_R (\w+) ([0-9A-Fa-f]{4})\s*$'
+      state: { "zones.{1}.sources": "{2}" }
+    - match: '^(STANDBY|WAKE)\s*$'
+      state: { standby: { value: "{1}", map: { "STANDBY": true, "WAKE": false } } }
+    - match: '^IPADDR (\S+)\s*$'
+      state: { ip_address: "{1}" }
+    - match: '^VER (\S+)\s*$'
+      state: { firmware: "{1}" }
+    - match: '^CABLEC_IN (\w+) (.+?)\s*$'
+      state: { "ports.{1}.cable": "{2}" }
+    - match: '^HDBTL_(?:IN|OUT) (\w+) (.+?)\s*$'
+      state: { "ports.{1}.link": "{2}" }
+    - match: '^CARD_C (\w+) (.+?)\s*$'
+      state: { "cards.{1}.connection": "{2}" }
+    - match: '^CARD_T (\w+) (.+?)\s*$'
+      state: { "cards.{1}.type": "{2}" }
+    - match: '^CARD_COM (\w+) (.+?)\s*$'
+      state: { "cards.{1}.communication": "{2}" }
+    - match: '^CARD_S (\w+) (.+?)\s*$'
+      state: { "cards.{1}.status": "{2}" }
+    - match: '^FANS (\w+) (.+?)\s*$'
+      state: { "fans.{1}": "{2}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset, recall_video_preset, recall_audio_preset and route_all
+      change every output at once, on air; factory_reset (RESET) restores
+      factory defaults and cannot be undone from here.
+  - models: [all]
+    severity: warning
+    text: >
+      WyreStorm warns that sending a parameter a model does not have (a port
+      it lacks, a firmware's missing command) can lock the unit up. The
+      ranges here are the widest any model allows; keep to the model notes.
+  - models: [mx-0404-h2a, mx-0606-h2a, mx-0808-h2a, mxv-0404-h2a-kit, mxv-0408-h2a, mxv-0606-h2a, mxv-0808-h2a]
+    severity: warning
+    text: >
+      CEC_PWR works over RS-232 only on H2A and MXV matrices (p.9): use link
+      serial for it. The H2A/MXV document's syntax line writes it with no
+      space before the port (SET CEC_PWR[Output]), its example with one (SET
+      CEC_PWR hdbtout2 on); it is sent as the example and the H2X document
+      write it.
+  - models: [all]
+    severity: info
+    text: >
+      State is kept current by polling every output's routing (GET MP) every
+      5 s and the settings every minute; WyreStorm documents no changes sent
+      on their own. Answers repeat the command, so every set updates state
+      at once.
+  - models: [all]
+    severity: info
+    text: >
+      WyreStorm's documents name ports differently between syntax lines and
+      examples (out1 against hdmiout1, hdbt10 against hdbtout10, HDCP_S 5
+      against in5, MP GET against MP); commands take the port as the
+      document's syntax names it, and the rules accept both forms.
+  - models: [mx-1010-h2x, mx-1616-h2x]
+    severity: info
+    text: >
+      Not covered: routing raw commands to remote HDBaseT devices (p.16-18),
+      a binary frame (05 55 55 57, card, baud, parity, length, bytes) the
+      line format cannot carry; use the receivers' own RS-232 ports or the
+      web UI. SET EDID needs the rear EDID DIP switches at 0000.

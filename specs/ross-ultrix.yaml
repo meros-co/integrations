@@ -1,0 +1,257 @@
+spec: 1
+id: ross-ultrix
+name: Ross Ultrix and Ultricore routers (RossTalk)
+vendor: Ross Video
+category: router
+
+# Ross Ultrix routing platforms (ULTRIX-FR1, FR2, FR5 and the NS frames,
+# Ultricore BCS) take RossTalk, Ross's plain-text command protocol, on TCP
+# 7788: database salvos fired as GPIs, Ultriscape timers and RossTalk text
+# labels, and router takes (XPT) on any set of levels. Transcribed from the
+# Ultrix User Guide's RossTalk table and Ross's RossTalk command guide.
+#
+# RossTalk on Ultrix is one-way: Ross documents no reply, acknowledgement or
+# status query, so this spec keeps no state. The same router answers
+# crosspoint, protect and name requests over Probel SW-P-08 on TCP 8910 (the
+# probel-swp08 spec's ross-ultrix model), which is how a consumer reads
+# routing back.
+#
+# Not here: the GVG Series 7000 Native protocol on TCP 12345 (Ross points to
+# Grass Valley's document for it, which is not published, and its frames
+# carry a checksum the spec format cannot compute), NVISION NP16 and NP0010
+# (licensed options, binary), TSL UMD (tally to displays, not control), Ember+
+# (the emberplus spec), and DashBoard/openGear (OGP) control, whose protocol
+# needs Ross's openGear developer registration.
+source:
+  - title: "Ultrix User Guide, Ross part number 2101DR-004-28 (v28-rev9, 19 August 2025)"
+    author: Ross Video Ltd.
+    url: "https://documentation.rossvideo.com/files/Manuals%20(ARCHIVED%20DO%20NOT%20USE)/Routers/Ultrix/Ultrix%20User%20Guide%20(2101DR-004).pdf"
+    note: >
+      Manufacturer document. Connections > Services: RossTalk is a plain
+      text protocol (p.46-47); Third-Party Protocols: Ethernet servers
+      started automatically, Table 18 default ports (GVG Native 12345,
+      Probel SW-P-08 8910, RossTalk 7788, TSL UMD 5727-5729) p.76-77;
+      RossTalk Commands, Table 31: CR/LF after each command, GPI ## executes
+      the database salvo of that number, TIMER ##:RUN/STOP/PAUSE/END,
+      TIMER id:SET:hh:mm:ss.s, TXTLABEL ID:<id>; TEXT:<text>;
+      BGCLR:<bgcolor>; TXTCLR:<textcolor> (20 characters at most, colors as
+      R,G,B in decimal or 0x hex, messages with only the ID ignored), XPT
+      D:<dest> S:<source> I:<user_id> [L:<levels>] (logical 1-based IDs
+      from the active database, levels as single numbers and ranges, no
+      levels meaning a follow take on every valid level, arguments in any
+      order, invalid numbers ignored) p.83-84. Probel SW-P-08 commands
+      supported (Table 30) p.81-83, which the probel-swp08 ross-ultrix
+      model follows.
+  - title: "RossTalk Commands, Ross part number 4802DR-403-35 (v35, June 2026), Ultrix Commands"
+    author: Ross Video Ltd.
+    url: "https://documentation.rossvideo.com/files/Manuals/Protocol%20Documents/RossTalk-Commands(4802DR-403).pdf"
+    note: >
+      Manufacturer document, the current RossTalk guide. Ultrix accepts
+      RossTalk on port 7788 automatically, CR/LF termination, case
+      sensitive (p.26); Table 5: GPI XX fires salvo XX (example GPI 23),
+      TIMER XX:END, PAUSE, RUN, STOP (examples TIMER 4:END, TIMER 1:PAUSE),
+      XPT D:vid-dest S:vid-source I:user-id L:levels (example XPT D:5 S:16
+      I:7 L:1,6,10-13; levels optional) p.26-27. It lists neither TIMER SET
+      nor TXTLABEL, which the Ultrix User Guide adds.
+  - title: "Carbonite Device Setup (online help), RossTalk > Ultrix Commands"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device/Topics/Protocol/RossTalk/UT/RT-UT-Comm.html
+    note: Manufacturer document; the same table as the RossTalk guide.
+
+transport:
+  type: line-tcp
+  port: 7788
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: none
+
+ports:
+  - { port: 7788, protocol: tcp, role: control }
+
+models:
+  - id: ultrix
+    name: Ross Ultrix (ULTRIX-FR1, FR2, FR5, NS frames) and Ultricore BCS
+    supports: [fire_salvo, timer_run, timer_stop, timer_pause, timer_end, set_timer,
+               take, take_levels, set_text_label, set_text_label_colors]
+    verification: none
+    notes: >
+      One command set for every Ultrix frame and Ultricore. Sources,
+      destinations and levels are the logical IDs of the router's active
+      database, numbered from 1. Read routing back over SW-P-08 (the
+      probel-swp08 spec, model ross-ultrix, TCP 8910).
+
+commands:
+  fire_salvo:
+    summary: Fire a salvo from the router's database by number (GPI n)
+    params:
+      salvo: { type: int, min: 1, max: 9999, required: true, label: Salvo,
+               description: "The salvo's number in the Ultrix database, as GPI 23 fires salvo 23." }
+    send: "GPI {salvo}"
+    returns: none
+
+  timer_run:
+    summary: Start or resume an Ultriscape timer (TIMER n:RUN)
+    params: &timer
+      timer: { type: int, min: 1, max: 9999, required: true, label: Timer,
+               description: "The timer's ID as configured on the router, such as 3 in TIMER 3:RUN." }
+    send: "TIMER {timer}:RUN"
+    returns: none
+
+  timer_stop:
+    summary: Stop an Ultriscape timer (TIMER n:STOP)
+    params: *timer
+    send: "TIMER {timer}:STOP"
+    returns: none
+
+  timer_pause:
+    summary: Pause an Ultriscape timer (TIMER n:PAUSE)
+    params: *timer
+    send: "TIMER {timer}:PAUSE"
+    returns: none
+
+  timer_end:
+    summary: Send the end command to an Ultriscape timer (TIMER n:END)
+    params: *timer
+    send: "TIMER {timer}:END"
+    returns: none
+
+  set_timer:
+    summary: Set an Ultriscape timer's value (TIMER id:SET:hh:mm:ss.s)
+    params:
+      timer:   { type: int, min: 1, max: 9999, required: true, label: Timer,
+                 description: "The timer's ID as configured on the router." }
+      hours:   { type: int, min: 0, max: 99, required: true, label: Hours,
+                 description: "Hours of the new value, sent as two digits." }
+      minutes: { type: int, min: 0, max: 59, required: true, label: Minutes,
+                 description: "Minutes of the new value, sent as two digits." }
+      seconds: { type: int, min: 0, max: 59, required: true, label: Seconds,
+                 description: "Whole seconds of the new value, sent as two digits." }
+      tenths:  { type: int, min: 0, max: 9, default: 0, label: Tenths,
+                 description: "Tenths of a second of the new value, the digit after the point." }
+    send: "TIMER {timer}:SET:{hours:02d}:{minutes:02d}:{seconds:02d}.{tenths}"
+    returns: none
+
+  take:
+    summary: Take a source to a destination on every valid level, a follow take (XPT D:dest S:source I:user)
+    params:
+      destination: &destination
+        type: int
+        min: 1
+        max: 65535
+        required: true
+        label: Destination
+        description: "The destination's logical ID in the router's active database, numbered from 1."
+      source: &source
+        type: int
+        min: 1
+        max: 65535
+        required: true
+        label: Source
+        description: "The source's logical ID in the router's active database, numbered from 1."
+      user: &user
+        type: int
+        min: 0
+        max: 65535
+        default: 1
+        label: User or panel ID
+        description: "The numeric user or panel ID the take is requested as, which the router's protects and rights apply to."
+    send: "XPT D:{destination} S:{source} I:{user}"
+    returns: none
+
+  take_levels:
+    summary: Take a source to a destination on the levels listed, a breakaway (XPT D:dest S:source I:user L:levels)
+    params:
+      destination: *destination
+      source: *source
+      user: *user
+      levels:
+        type: string
+        max_length: 200
+        pattern: '^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$'
+        required: true
+        label: Levels
+        description: "Level IDs numbered from 1, separated by commas without spaces, with ranges as two numbers joined by a dash, such as 1,6,10-13; a range's first number must be the lower."
+    send: "XPT D:{destination} S:{source} I:{user} L:{levels}"
+    returns: none
+
+  set_text_label:
+    summary: Set the text of an Ultriscape RossTalk text label (TXTLABEL ID:id; TEXT:text;)
+    params:
+      id: &label_id
+        type: int
+        min: 0
+        max: 65535
+        required: true
+        label: Label ID
+        description: "The RossTalk ID given to the Ultriscape RossTalk display object."
+      text: &label_text
+        type: string
+        max_length: 20
+        pattern: '^[^;]*$'
+        required: true
+        label: Text
+        description: "The text to show, 20 characters at most and without semicolons."
+    send: "TXTLABEL ID:{id}; TEXT:{text};"
+    returns: none
+
+  set_text_label_colors:
+    summary: Set the text, background color and text color of an Ultriscape RossTalk text label (TXTLABEL ID:id; TEXT:text; BGCLR:r,g,b; TXTCLR:r,g,b)
+    params:
+      id: *label_id
+      text: *label_text
+      background_red:   { type: int, min: 0, max: 255, required: true, label: Background red,
+                                 description: "Red component of the label's background color, 0 to 255." }
+      background_green: { type: int, min: 0, max: 255, required: true, label: Background green,
+                          description: "Green component of the label's background color, 0 to 255." }
+      background_blue:  { type: int, min: 0, max: 255, required: true, label: Background blue,
+                          description: "Blue component of the label's background color, 0 to 255." }
+      text_red:   { type: int, min: 0, max: 255, required: true, label: Text red,
+                    description: "Red component of the label's text color, 0 to 255." }
+      text_green: { type: int, min: 0, max: 255, required: true, label: Text green,
+                    description: "Green component of the label's text color, 0 to 255." }
+      text_blue:  { type: int, min: 0, max: 255, required: true, label: Text blue,
+                    description: "Blue component of the label's text color, 0 to 255." }
+    send: "TXTLABEL ID:{id}; TEXT:{text}; BGCLR:{background_red},{background_green},{background_blue}; TXTCLR:{text_red},{text_green},{text_blue}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      fire_salvo makes every crosspoint stored in the database salvo at once,
+      on air, and cannot be undone from here: there is no RossTalk command
+      to read or restore what the salvo replaced.
+  - models: [all]
+    severity: warning
+    text: >
+      Ultrix never answers RossTalk (Ross documents no reply), so every
+      command reports unverified, and a take the router refuses (a protected
+      destination, a user without rights, an unknown ID, a malformed level
+      list, which Ross says is ignored) fails silently. Read the result back
+      over SW-P-08: the probel-swp08 spec's ross-ultrix model on TCP 8910
+      reports every crosspoint change.
+  - models: [all]
+    severity: info
+    text: >
+      API limit: RossTalk on Ultrix has no queries, so this spec keeps no
+      state. Routing, protects and names are read over SW-P-08 (probel-swp08,
+      model ross-ultrix); timers and text labels cannot be read back by any
+      published protocol.
+  - models: [all]
+    severity: info
+    text: >
+      Sources, destinations and levels are the logical IDs of the active
+      database (1-based), not physical port numbers. Ross gives no upper
+      bound for them, for salvos, timers, user IDs or label IDs, so the
+      ranges here are wide; the router ignores an ID it does not know.
+  - models: [all]
+    severity: info
+    text: >
+      TIMER SET's value is written hh:mm:ss.s, here with two-digit fields and
+      one digit of tenths; Ross gives the format but no example. TXTLABEL's
+      colors are sent as decimal R,G,B triplets, one of the two forms Ross
+      allows (0x hex being the other). A text label without colors is sent
+      ending in "TEXT:text;"; Ross shows the fields' order but no example
+      without the color fields.
