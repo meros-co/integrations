@@ -1,0 +1,464 @@
+spec: 1
+id: modulopi-kinetic
+name: Modulo Pi Modulo Kinetic (WebSocket external control)
+vendor: Modulo Pi
+category: playback
+
+# Modulo Kinetic Designer runs a websocket server, turned on in the project
+# settings' external control tab on a port the operator chooses, optionally
+# with SSL, that takes JSON-RPC 2.0 requests. Objects (tasks, timelines,
+# variables, V-Nodes, computers, the Designer) are read with get.list.* and
+# get.object.*, changed with set.property.* and acted on with doaction.*, each
+# addressed by its uuid. Kinetic pushes nothing documented, so the lists are
+# polled, the timelines most often.
+source:
+  - title: "Modulo Kinetic v6 manual, WebSocket external control protocol"
+    author: Modulo Pi
+    url: "https://support.modulo-pi.com/modulo-kinetic-manual/v6/en/topic/websocket-external-control-protocol"
+    note: >
+      Manufacturer documentation, read 2026-10-27. Designer is the websocket server; JSON-RPC 2.0; enabled in
+      Project > Project settings > external control (WebSocket server enable, the port, SSL); example
+      {"jsonrpc":"2.0","method":"get.list.tasks","id":1}.
+  - title: "Modulo Kinetic v6 manual, WebSocket: Task, Timeline, Variable, V-Node, Computer and Modulo Kinetic pages"
+    author: Modulo Pi
+    url: "https://support.modulo-pi.com/modulo-kinetic-manual/v6/en/topic/websocket-timelines"
+    note: >
+      Manufacturer documentation, read 2026-10-27 (websocket-tasks, websocket-timelines, websocket-variable,
+      websocket-vnode, websocket-computer, kinetic). Tasks: get.list.tasks, get.object.task (uuid or name),
+      set.property.task (keyword, name, taskEnable, triggerEnable, uiColor), doaction.task launch; fields
+      keyword, name, objectType, taskEnable, triggerEnable, triggered, uiColor, uuid. Timelines:
+      get.list.timelines, get.object.timeline, set.property.timeline (name, on, lockToTc, uiColor),
+      doaction.timeline play and locate (optional timecode in ms), grandMasterFader and audioMaster (value in
+      %, timecode the fade in ms); fields name, objectType, uiColor, uuid, timecode, on, play,
+      grandMasterFader, lockToTc, audioMaster. Variables: get.list.variables, get.object.variable,
+      set.property.variable (name, value, uiColor); variableType int, float, double, string, bool, vec2,
+      vec3, vec4, color or folder. V-Nodes: get.list.vnodes, get.object.vnode, set.property.vnode (blind,
+      name, uiColor), doaction.vnode online, offline, halt, reboot, start, stop; fields blind, name,
+      objectType, renderSurfaceUuid, state (0 disconnected or error, 1 connecting, 2 ready), uiColor, uuid,
+      ip, fps, version. Computers: get.list.computers, get.object.computer; fields name, objectType, status,
+      isLockedEmbedded, isEmbedded, uiColor, uuid, cpu, mem, version, fullVersionString. Modulo Kinetic:
+      doaction.kinetic backup, save, online, offline.
+
+transport:
+  type: ws
+  port: null
+  path: /
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  timeout_ms: 5000
+  reply: expected
+  probe: '{"jsonrpc":"2.0","method":"get.list.computers","id":"probe"}'
+
+settings:
+  scheme: { type: enum, values: [ws, wss], default: ws, label: Connection,
+            description: "ws, or wss when SSL is turned on in Kinetic's external control settings (its certificate is not checked)." }
+
+ports:
+  - { port: null, protocol: ws, role: control, note: "no standard port: the port set in Kinetic's project settings, external control tab, is given when the device is opened" }
+
+models:
+  - id: kinetic
+    name: Modulo Pi Modulo Kinetic Designer (v4 to v6)
+    supports: [list_tasks, get_task, get_task_by_name, launch_task, set_task_enabled, set_task_trigger_enabled,
+               rename_task, set_task_keyword, set_task_color, list_timelines, get_timeline, get_timeline_by_name,
+               timeline_play, timeline_play_at, timeline_locate, timeline_locate_at, timeline_grand_master,
+               timeline_audio_master, set_timeline_on, set_timeline_lock_to_tc, rename_timeline,
+               set_timeline_color, list_variables, get_variable, get_variable_by_name, set_variable_value,
+               rename_variable, set_variable_color, list_vnodes, get_vnode, vnode_action, set_vnode_blind,
+               rename_vnode, set_vnode_color, list_computers, get_computer, kinetic_action, call]
+    verification: none
+
+commands:
+  call:
+    summary: "Call any method of the API with its params object and return its result"
+    params:
+      method: { type: string, pattern: '^[a-z]+(\.[a-z]+)+$', max_length: 128, required: true, label: Method,
+                description: "The JSON-RPC method, such as get.object.timeline." }
+      params: { type: json, required: true, label: Params, description: "The method's params object as the manual documents it; {} for none." }
+    send: '{"jsonrpc":"2.0","method":{method:json},"params":{params},"id":"call"}'
+    expect: { reply_json: { "$.id": "call" }, json_path: "$.result" }
+    returns: value
+  # ── Tasks ───────────────────────────────────────────────────────────────
+  list_tasks:
+    summary: "List the tasks (get.list.tasks)"
+    send: '{"jsonrpc":"2.0","method":"get.list.tasks","id":"tasks"}'
+    expect: { reply_json: { "$.id": "tasks" }, json_path: "$.result" }
+    returns: value
+  get_task:
+    summary: "Read one task by uuid (get.object.task)"
+    params:
+      uuid: &uuid { type: string, pattern: '^\{?[0-9A-Fa-f-]{36}\}?$', max_length: 38, required: true, label: UUID,
+                    description: "The object's uuid with its braces, as the lists give it." }
+    send: '{"jsonrpc":"2.0","method":"get.object.task","params":{"uuid":"{uuid}"},"id":"task {uuid}"}'
+    expect: { reply_json: { "$.id": "task {uuid}" }, json_path: "$.result" }
+    returns: value
+  get_task_by_name:
+    summary: "Read one task by name, the first of that name (get.object.task)"
+    params:
+      name: &name { type: string, max_length: 256, required: true, label: Name, description: "The object's name; the first of that name is used." }
+    send: '{"jsonrpc":"2.0","method":"get.object.task","params":{"name":{name:json}},"id":"task by name"}'
+    expect: { reply_json: { "$.id": "task by name" }, json_path: "$.result" }
+    returns: value
+  launch_task:
+    summary: "Launch a task (doaction.task launch)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"doaction.task","params":{"uuid":"{uuid}","action":"launch"},"id":"launch {uuid}"}'
+    expect: { reply_json: { "$.id": "launch {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_task_enabled:
+    summary: "Enable or disable a task (set.property.task taskEnable)"
+    params:
+      uuid: *uuid
+      enabled: &enabled { type: bool, required: true, label: Enabled, description: "On or off." }
+    send: '{"jsonrpc":"2.0","method":"set.property.task","params":{"uuid":"{uuid}","property":"taskEnable","value":{enabled}},"id":"task enable {uuid}"}'
+    expect: { reply_json: { "$.id": "task enable {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_task_trigger_enabled:
+    summary: "Enable or disable a task's trigger (set.property.task triggerEnable)"
+    params: { uuid: *uuid, enabled: *enabled }
+    send: '{"jsonrpc":"2.0","method":"set.property.task","params":{"uuid":"{uuid}","property":"triggerEnable","value":{enabled}},"id":"task trigger {uuid}"}'
+    expect: { reply_json: { "$.id": "task trigger {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  rename_task:
+    summary: "Rename a task (set.property.task name)"
+    params: { uuid: *uuid, name: *name }
+    send: '{"jsonrpc":"2.0","method":"set.property.task","params":{"uuid":"{uuid}","property":"name","value":{name:json}},"id":"task name {uuid}"}'
+    expect: { reply_json: { "$.id": "task name {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_task_keyword:
+    summary: "Set a task's keyword (set.property.task keyword)"
+    params:
+      uuid: *uuid
+      keyword: { type: string, max_length: 256, required: true, label: Keyword, description: "The task's keyword." }
+    send: '{"jsonrpc":"2.0","method":"set.property.task","params":{"uuid":"{uuid}","property":"keyword","value":{keyword:json}},"id":"task keyword {uuid}"}'
+    expect: { reply_json: { "$.id": "task keyword {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_task_color:
+    summary: "Set a task's interface color (set.property.task uiColor)"
+    params:
+      uuid: *uuid
+      color: &color { type: string, pattern: '^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$', max_length: 9, required: true, label: Color, description: "The color as #rrggbb." }
+    send: '{"jsonrpc":"2.0","method":"set.property.task","params":{"uuid":"{uuid}","property":"uiColor","value":"{color}"},"id":"task color {uuid}"}'
+    expect: { reply_json: { "$.id": "task color {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  # ── Timelines ───────────────────────────────────────────────────────────
+  list_timelines:
+    summary: "List the timelines with their timecode, play state and faders (get.list.timelines)"
+    send: '{"jsonrpc":"2.0","method":"get.list.timelines","id":"timelines"}'
+    expect: { reply_json: { "$.id": "timelines" }, json_path: "$.result" }
+    returns: value
+  get_timeline:
+    summary: "Read one timeline by uuid (get.object.timeline)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"get.object.timeline","params":{"uuid":"{uuid}"},"id":"timeline {uuid}"}'
+    expect: { reply_json: { "$.id": "timeline {uuid}" }, json_path: "$.result" }
+    returns: value
+  get_timeline_by_name:
+    summary: "Read one timeline by name (get.object.timeline)"
+    params: { name: *name }
+    send: '{"jsonrpc":"2.0","method":"get.object.timeline","params":{"name":{name:json}},"id":"timeline by name"}'
+    expect: { reply_json: { "$.id": "timeline by name" }, json_path: "$.result" }
+    returns: value
+  timeline_play:
+    summary: "Play a timeline from its current timecode (doaction.timeline play)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"doaction.timeline","params":{"uuid":"{uuid}","action":"play"},"id":"play {uuid}"}'
+    expect: { reply_json: { "$.id": "play {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  timeline_play_at:
+    summary: "Play a timeline from a timecode (doaction.timeline play)"
+    params:
+      uuid: *uuid
+      timecode_ms: &tc { type: int, min: 0, required: true, label: Timecode, description: "The position in milliseconds from the timeline's start." }
+    send: '{"jsonrpc":"2.0","method":"doaction.timeline","params":{"uuid":"{uuid}","action":"play","timecode":{timecode_ms}},"id":"play at {uuid}"}'
+    expect: { reply_json: { "$.id": "play at {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  timeline_locate:
+    summary: "Pause a timeline at its current timecode (doaction.timeline locate)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"doaction.timeline","params":{"uuid":"{uuid}","action":"locate"},"id":"locate {uuid}"}'
+    expect: { reply_json: { "$.id": "locate {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  timeline_locate_at:
+    summary: "Pause a timeline at a timecode (doaction.timeline locate)"
+    params: { uuid: *uuid, timecode_ms: *tc }
+    send: '{"jsonrpc":"2.0","method":"doaction.timeline","params":{"uuid":"{uuid}","action":"locate","timecode":{timecode_ms}},"id":"locate at {uuid}"}'
+    expect: { reply_json: { "$.id": "locate at {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  timeline_grand_master:
+    summary: "Fade a timeline's grand master to a level (doaction.timeline grandMasterFader)"
+    params:
+      uuid: *uuid
+      percent: &percent { type: float, min: 0, max: 100, required: true, label: Level, description: "The level in percent." }
+      fade_ms: &fade { type: int, min: 0, default: 0, label: Fade time, description: "The fade's length in milliseconds; 0 for at once." }
+    send: '{"jsonrpc":"2.0","method":"doaction.timeline","params":{"uuid":"{uuid}","action":"grandMasterFader","value":{percent:.2f},"timecode":{fade_ms}},"id":"grand master {uuid}"}'
+    expect: { reply_json: { "$.id": "grand master {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  timeline_audio_master:
+    summary: "Fade a timeline's audio master to a level (doaction.timeline audioMaster)"
+    params: { uuid: *uuid, percent: *percent, fade_ms: *fade }
+    send: '{"jsonrpc":"2.0","method":"doaction.timeline","params":{"uuid":"{uuid}","action":"audioMaster","value":{percent:.2f},"timecode":{fade_ms}},"id":"audio master {uuid}"}'
+    expect: { reply_json: { "$.id": "audio master {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_timeline_on:
+    summary: "Turn a timeline on or off (set.property.timeline on)"
+    params: { uuid: *uuid, enabled: *enabled }
+    send: '{"jsonrpc":"2.0","method":"set.property.timeline","params":{"uuid":"{uuid}","property":"on","value":{enabled}},"id":"timeline on {uuid}"}'
+    expect: { reply_json: { "$.id": "timeline on {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_timeline_lock_to_tc:
+    summary: "Lock a timeline to timecode or not (set.property.timeline lockToTc)"
+    params: { uuid: *uuid, enabled: *enabled }
+    send: '{"jsonrpc":"2.0","method":"set.property.timeline","params":{"uuid":"{uuid}","property":"lockToTc","value":{enabled}},"id":"timeline lock {uuid}"}'
+    expect: { reply_json: { "$.id": "timeline lock {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  rename_timeline:
+    summary: "Rename a timeline (set.property.timeline name)"
+    params: { uuid: *uuid, name: *name }
+    send: '{"jsonrpc":"2.0","method":"set.property.timeline","params":{"uuid":"{uuid}","property":"name","value":{name:json}},"id":"timeline name {uuid}"}'
+    expect: { reply_json: { "$.id": "timeline name {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_timeline_color:
+    summary: "Set a timeline's interface color (set.property.timeline uiColor)"
+    params: { uuid: *uuid, color: *color }
+    send: '{"jsonrpc":"2.0","method":"set.property.timeline","params":{"uuid":"{uuid}","property":"uiColor","value":"{color}"},"id":"timeline color {uuid}"}'
+    expect: { reply_json: { "$.id": "timeline color {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  # ── Variables ───────────────────────────────────────────────────────────
+  list_variables:
+    summary: "List the variables and folders with their types and values (get.list.variables)"
+    send: '{"jsonrpc":"2.0","method":"get.list.variables","id":"variables"}'
+    expect: { reply_json: { "$.id": "variables" }, json_path: "$.result" }
+    returns: value
+  get_variable:
+    summary: "Read one variable by uuid (get.object.variable)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"get.object.variable","params":{"uuid":"{uuid}"},"id":"variable {uuid}"}'
+    expect: { reply_json: { "$.id": "variable {uuid}" }, json_path: "$.result" }
+    returns: value
+  get_variable_by_name:
+    summary: "Read one variable by name (get.object.variable)"
+    params: { name: *name }
+    send: '{"jsonrpc":"2.0","method":"get.object.variable","params":{"name":{name:json}},"id":"variable by name"}'
+    expect: { reply_json: { "$.id": "variable by name" }, json_path: "$.result" }
+    returns: value
+  set_variable_value:
+    summary: "Set a variable's value: a number, text, a boolean, an array for vec2 to vec4, or #rrggbb for a color (set.property.variable value)"
+    params:
+      uuid: *uuid
+      value: { type: json, required: true, label: Value,
+               description: "The value in the variable's type: 12, 0.5, \"text\", true, [100,200] for a vec2, or \"#55aaff\" for a color." }
+    send: '{"jsonrpc":"2.0","method":"set.property.variable","params":{"uuid":"{uuid}","property":"value","value":{value}},"id":"variable value {uuid}"}'
+    expect: { reply_json: { "$.id": "variable value {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  rename_variable:
+    summary: "Rename a variable (set.property.variable name)"
+    params: { uuid: *uuid, name: *name }
+    send: '{"jsonrpc":"2.0","method":"set.property.variable","params":{"uuid":"{uuid}","property":"name","value":{name:json}},"id":"variable name {uuid}"}'
+    expect: { reply_json: { "$.id": "variable name {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_variable_color:
+    summary: "Set a variable's interface color (set.property.variable uiColor)"
+    params: { uuid: *uuid, color: *color }
+    send: '{"jsonrpc":"2.0","method":"set.property.variable","params":{"uuid":"{uuid}","property":"uiColor","value":"{color}"},"id":"variable color {uuid}"}'
+    expect: { reply_json: { "$.id": "variable color {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  # ── V-Nodes ─────────────────────────────────────────────────────────────
+  list_vnodes:
+    summary: "List the V-Nodes with their state, address, frame rate and version (get.list.vnodes)"
+    send: '{"jsonrpc":"2.0","method":"get.list.vnodes","id":"vnodes"}'
+    expect: { reply_json: { "$.id": "vnodes" }, json_path: "$.result" }
+    returns: value
+  get_vnode:
+    summary: "Read one V-Node by uuid (get.object.vnode)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"get.object.vnode","params":{"uuid":"{uuid}"},"id":"vnode {uuid}"}'
+    expect: { reply_json: { "$.id": "vnode {uuid}" }, json_path: "$.result" }
+    returns: value
+  vnode_action:
+    summary: "Put a V-Node online or offline, halt or reboot its computer, or start or stop it (doaction.vnode)"
+    params:
+      uuid: *uuid
+      action: { type: enum, values: [online, offline, halt, reboot, start, stop], required: true, label: Action,
+                description: "online or offline, halt or reboot the V-Node's computer, start or stop the V-Node." }
+    send: '{"jsonrpc":"2.0","method":"doaction.vnode","params":{"uuid":"{uuid}","action":"{action}"},"id":"vnode {action} {uuid}"}'
+    expect: { reply_json: { "$.id": "vnode {action} {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_vnode_blind:
+    summary: "Blind a V-Node's output or show it (set.property.vnode blind)"
+    params:
+      uuid: *uuid
+      blind: { type: bool, required: true, label: Blind, description: "True blacks out the V-Node's output." }
+    send: '{"jsonrpc":"2.0","method":"set.property.vnode","params":{"uuid":"{uuid}","property":"blind","value":{blind}},"id":"vnode blind {uuid}"}'
+    expect: { reply_json: { "$.id": "vnode blind {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  rename_vnode:
+    summary: "Rename a V-Node (set.property.vnode name)"
+    params: { uuid: *uuid, name: *name }
+    send: '{"jsonrpc":"2.0","method":"set.property.vnode","params":{"uuid":"{uuid}","property":"name","value":{name:json}},"id":"vnode name {uuid}"}'
+    expect: { reply_json: { "$.id": "vnode name {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  set_vnode_color:
+    summary: "Set a V-Node's interface color (set.property.vnode uiColor)"
+    params: { uuid: *uuid, color: *color }
+    send: '{"jsonrpc":"2.0","method":"set.property.vnode","params":{"uuid":"{uuid}","property":"uiColor","value":"{color}"},"id":"vnode color {uuid}"}'
+    expect: { reply_json: { "$.id": "vnode color {uuid}" }, not_contains: '"error"' }
+    returns: ack
+  # ── Computers and Designer ──────────────────────────────────────────────
+  list_computers:
+    summary: "List the computers with their status, CPU, memory and version (get.list.computers)"
+    send: '{"jsonrpc":"2.0","method":"get.list.computers","id":"computers"}'
+    expect: { reply_json: { "$.id": "computers" }, json_path: "$.result" }
+    returns: value
+  get_computer:
+    summary: "Read one computer by uuid (get.object.computer)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"get.object.computer","params":{"uuid":"{uuid}"},"id":"computer {uuid}"}'
+    expect: { reply_json: { "$.id": "computer {uuid}" }, json_path: "$.result" }
+    returns: value
+  kinetic_action:
+    summary: "Save or back up the show, or put every V-Node online or offline (doaction.kinetic)"
+    params:
+      uuid: *uuid
+      action: { type: enum, values: [save, backup, online, offline], required: true, label: Action,
+                description: "save the show, back it up, or bring every V-Node online or offline." }
+    send: '{"jsonrpc":"2.0","method":"doaction.kinetic","params":{"uuid":"{uuid}","action":"{action}"},"id":"kinetic {action}"}'
+    expect: { reply_json: { "$.id": "kinetic {action}" }, not_contains: '"error"' }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The websocket server is off until "WebSocket server enable" is set in Project > Project settings >
+      external control, and it has no standard port: give the port set there when opening the device, and
+      choose wss when SSL is on there (the certificate is not checked).
+  - models: [all]
+    severity: info
+    text: >
+      Kinetic pushes nothing documented: the timelines are polled every 500 ms, the tasks and variables every
+      2 s, and the V-Nodes and computers every 5 s. Objects are addressed by uuid with its braces; a reply
+      carrying an error object fails the command.
+  - models: [all]
+    severity: info
+    text: >
+      doaction.kinetic is addressed by the Designer's uuid, which the documented lists do not give; the
+      manual's computer list may include it. Values the manual names without a unit (timecode, fps, cpu,
+      mem) are kept as Kinetic sends them.
+  - models: [all]
+    severity: critical
+    text: >
+      timeline_play, timeline_locate, the grand and audio masters, launch_task and vnode_action (halt,
+      reboot, stop, offline) change what is on the screens at once; kinetic_action offline takes every
+      V-Node offline.
+
+state:
+  tasks.*.name: { type: string, description: "Each task's name, keyed by uuid" }
+  tasks.*.keyword: { type: string, description: "The task's keyword" }
+  tasks.*.enabled: { type: bool, description: "The task is enabled (taskEnable)" }
+  tasks.*.trigger_enabled: { type: bool, description: "The task's trigger is enabled" }
+  tasks.*.triggered: { type: bool, description: "The task is triggered" }
+  tasks.*.color: { type: string, description: "The task's interface color" }
+  timelines.*.name: { type: string, description: "Each timeline's name, keyed by uuid" }
+  timelines.*.timecode: { type: int, unit: ms, description: "The timeline's current timecode" }
+  timelines.*.on: { type: bool, description: "The timeline is on" }
+  timelines.*.playing: { type: bool, description: "The timeline is playing" }
+  timelines.*.grand_master: { type: float, description: "The grand master fader" }
+  timelines.*.audio_master: { type: float, description: "The audio master fader" }
+  timelines.*.lock_to_tc: { type: bool, description: "The timeline is locked to timecode" }
+  timelines.*.color: { type: string, description: "The timeline's interface color" }
+  variables.*.name: { type: string, description: "Each variable's or folder's name, keyed by uuid" }
+  variables.*.object_type: { type: string, description: "variable or folder" }
+  variables.*.type: { type: string, description: "int, float, double, string, bool, vec2, vec3, vec4, color or folder" }
+  variables.*.value: { type: string, description: "The variable's value, as text: a vector or color as Kinetic sends it, compact JSON" }
+  variables.*.color: { type: string, description: "The variable's interface color" }
+  vnodes.*.name: { type: string, description: "Each V-Node's name, keyed by uuid" }
+  vnodes.*.state: { type: int, description: "0 disconnected or in error, 1 connecting, 2 ready" }
+  vnodes.*.blind: { type: bool, description: "The V-Node's output is blinded" }
+  vnodes.*.ip: { type: string, description: "The V-Node's address" }
+  vnodes.*.fps: { type: float, unit: fps, description: "The V-Node's frame rate" }
+  vnodes.*.version: { type: string, description: "The V-Node's version" }
+  vnodes.*.render_surface: { type: string, description: "The uuid of the V-Node's render surface" }
+  computers.*.name: { type: string, description: "Each computer's name, keyed by uuid" }
+  computers.*.status: { type: string, description: "The computer's status, as Kinetic sends it" }
+  computers.*.cpu: { type: float, description: "The computer's CPU load, as Kinetic sends it" }
+  computers.*.memory: { type: float, description: "The computer's memory use, as Kinetic sends it" }
+  computers.*.version: { type: string, description: "The computer's Kinetic version" }
+  computers.*.full_version: { type: string, description: "The full version string" }
+  computers.*.embedded: { type: bool, description: "The computer is embedded" }
+
+telemetry:
+  poll:
+    - every_ms: 500
+      send: ['{"jsonrpc":"2.0","method":"get.list.timelines","id":"poll timelines"}']
+    - every_ms: 2000
+      send:
+        - '{"jsonrpc":"2.0","method":"get.list.tasks","id":"poll tasks"}'
+        - '{"jsonrpc":"2.0","method":"get.list.variables","id":"poll variables"}'
+    - every_ms: 5000
+      send:
+        - '{"jsonrpc":"2.0","method":"get.list.vnodes","id":"poll vnodes"}'
+        - '{"jsonrpc":"2.0","method":"get.list.computers","id":"poll computers"}'
+  updates:
+    - json_match: { "$.id": "^(poll )?tasks$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", keyword: "$.keyword", enabled: "$.taskEnable", trigger: "$.triggerEnable",
+              triggered: "$.triggered", color: "$.uiColor" }
+      replace: tasks
+      state:
+        "tasks.{uuid:key}.name": "{name}"
+        "tasks.{uuid:key}.keyword": "{keyword}"
+        "tasks.{uuid:key}.enabled": "{enabled}"
+        "tasks.{uuid:key}.trigger_enabled": "{trigger}"
+        "tasks.{uuid:key}.triggered": "{triggered}"
+        "tasks.{uuid:key}.color": "{color}"
+    - json_match: { "$.id": "^(poll )?timelines$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", tc: "$.timecode", is_on: "$.on", play: "$.play", gm: "$.grandMasterFader",
+              am: "$.audioMaster", lock: "$.lockToTc", color: "$.uiColor" }
+      replace: timelines
+      state:
+        "timelines.{uuid:key}.name": "{name}"
+        "timelines.{uuid:key}.timecode": "{tc}"
+        "timelines.{uuid:key}.on": "{is_on}"
+        "timelines.{uuid:key}.playing": "{play}"
+        "timelines.{uuid:key}.grand_master": "{gm}"
+        "timelines.{uuid:key}.audio_master": "{am}"
+        "timelines.{uuid:key}.lock_to_tc": "{lock}"
+        "timelines.{uuid:key}.color": "{color}"
+    - json_match: { "$.id": "^(poll )?variables$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", kind: "$.objectType", type: "$.variableType", value: "$.value", color: "$.uiColor" }
+      replace: variables
+      state:
+        "variables.{uuid:key}.name": "{name}"
+        "variables.{uuid:key}.object_type": "{kind}"
+        "variables.{uuid:key}.type": "{type}"
+        "variables.{uuid:key}.value": "{value}"
+        "variables.{uuid:key}.color": "{color}"
+    - json_match: { "$.id": "^(poll )?vnodes$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", state: "$.state", blind: "$.blind", ip: "$.ip", fps: "$.fps", version: "$.version",
+              surface: "$.renderSurfaceUuid" }
+      replace: vnodes
+      state:
+        "vnodes.{uuid:key}.name": "{name}"
+        "vnodes.{uuid:key}.state": "{state}"
+        "vnodes.{uuid:key}.blind": "{blind}"
+        "vnodes.{uuid:key}.ip": "{ip}"
+        "vnodes.{uuid:key}.fps": "{fps}"
+        "vnodes.{uuid:key}.version": "{version}"
+        "vnodes.{uuid:key}.render_surface": "{surface}"
+    - json_match: { "$.id": "^(poll )?computers$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", status: "$.status", cpu: "$.cpu", mem: "$.mem", version: "$.version",
+              full: "$.fullVersionString", embedded: "$.isEmbedded" }
+      replace: computers
+      state:
+        "computers.{uuid:key}.name": "{name}"
+        "computers.{uuid:key}.status": "{status}"
+        "computers.{uuid:key}.cpu": "{cpu}"
+        "computers.{uuid:key}.memory": "{mem}"
+        "computers.{uuid:key}.version": "{version}"
+        "computers.{uuid:key}.full_version": "{full}"
+        "computers.{uuid:key}.embedded": "{embedded}"

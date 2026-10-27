@@ -2405,6 +2405,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
 
+## modulopi-kinetic — Modulo Pi Modulo Kinetic
+
+- [ ] Confirm the websocket path (/ is used) and whether wss uses a self-signed certificate when SSL is on. ([specs/modulopi-kinetic.yaml:45](specs/modulopi-kinetic.yaml#L45))
+- [ ] Confirm a reply carries an error object (not a result) when a method fails, and that every doaction and set.property answers with a result. ([specs/modulopi-kinetic.yaml:341](specs/modulopi-kinetic.yaml#L341))
+- [ ] Check the units of a timeline's timecode, grandMasterFader and audioMaster in get.list.timelines (ms and percent are assumed), and the fade argument of grandMasterFader and audioMaster (timecode, in ms). ([specs/modulopi-kinetic.yaml:188](specs/modulopi-kinetic.yaml#L188))
+- [ ] Find how the Designer's uuid for doaction.kinetic is obtained. ([specs/modulopi-kinetic.yaml:345](specs/modulopi-kinetic.yaml#L345))
+- [ ] Check the forms of a vec2-vec4 and color variable's value in get.list.variables. ([specs/modulopi-kinetic.yaml:373](specs/modulopi-kinetic.yaml#L373))
+
 ## nec-display — NEC (Sharp NEC) large-format displays
 
 - [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
