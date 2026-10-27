@@ -3281,6 +3281,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On ULX-D, check that a metering interval above 65535 ms (to 99999, as documented) is accepted. ([specs/shure-wireless.yaml:260](specs/shure-wireless.yaml#L260))
 - [ ] On ULX-D, confirm set_encryption, regenerate_encryption_key and set_frequency_diversity_mode need an IR sync before audio returns, and how long a key regeneration takes. ([specs/shure-wireless.yaml:582](specs/shure-wireless.yaml#L582))
 
+## singular-datastream — Singular.live data stream
+
+- [ ] Record the answer to a payload over 60 KB and to an unknown private token. ([specs/singular-datastream.yaml:69](specs/singular-datastream.yaml#L69))
+
+## singular-live — Singular.live control app
+
+- [ ] Record Singular's answer to an unknown app token, an unknown sub-composition and a malformed payload (status and body). ([specs/singular-live.yaml:352](specs/singular-live.yaml#L352))
+- [ ] Check whether a request may name both subCompositionId and subCompositionName (the reference marks both required, the examples send one). ([specs/singular-live.yaml:347](specs/singular-live.yaml#L347))
+- [ ] Confirm the control data carries subCompositionName for each sub-composition (the reference lists it, its example omits it). ([specs/singular-live.yaml:272](specs/singular-live.yaml#L272))
+- [ ] Check that GET requests are not counted against the rate limits (only the POST/PATCH control and command endpoints are listed). ([specs/singular-live.yaml:261](specs/singular-live.yaml#L261))
+
 ## sofie-chef — Sofie Chef
 
 - [ ] Record the REST answers: GET /api/status and /api/list bodies (the list is read as the WebSocket list body) and the PUT routes' status and body. ([specs/sofie-chef.yaml:177](specs/sofie-chef.yaml#L177))

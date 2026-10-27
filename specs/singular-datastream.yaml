@@ -1,0 +1,75 @@
+spec: 1
+id: singular-datastream
+name: Singular.live data stream (Data Stream API)
+vendor: Singular.live
+category: other
+
+# Singular's data streams carry data to compositions over a websocket the
+# composition opens itself; a sender writes them with a PUT of any JSON to
+# https://datastream.singular.live/datastreams/<private token>. The device is
+# opened at the host datastream.singular.live, port 443.
+
+source:
+  - title: Singular Developer Portal, Data Stream API (Introduction, Rate limits, Authorization, How-to guides, API reference)
+    author: Singular.live
+    url: https://developer.singular.live/data-stream-api/introduction
+    note: >
+      Manufacturer document, read 2026-10-27 (the portal's full text,
+      https://developer.singular.live/llms-full.txt). PUT
+      https://datastream.singular.live/datastreams/:datastreamPrivateToken
+      with any JSON body; answers 200. Payloads persist until the next one and
+      reach every composition connected with the public token; latency below
+      300 ms; at most 60 KB per payload and 100 connections per stream; no
+      daily or burst limits. The private token, from the Data Stream Manager,
+      lets anyone write to the stream.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: none
+  timeout_ms: 8000
+
+settings:
+  private_token: { type: string, secret: true, required: true, max_length: 128, pattern: "^[A-Za-z0-9_-]+$",
+                   label: Private token,
+                   description: "The data stream's private token, from the Data Stream Manager in Singular's user menu." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "datastream.singular.live, Singular's cloud" }
+
+models:
+  - id: data-stream
+    name: Singular data stream
+    supports: [send_data]
+    verification: none
+
+commands:
+  send_data:
+    summary: >
+      Send a payload to the data stream, which every composition listening
+      with the stream's public token receives (PUT /datastreams/<private token>)
+    params:
+      data: { type: json, required: true, label: Data,
+              description: "Any JSON the listening compositions' scripts read, at most 60 KB; it stays until the next payload." }
+    send:
+      method: PUT
+      path: "/datastreams/{settings.private_token}"
+      body: "{data}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Write only: the API has no read of the stream for a sender (compositions
+      listen with the public token over a websocket), so there is no state.
+      Singular limits a payload to 60 KB and a stream to 100 connections; the
+      compositions must be scripted to read the data (createDataStream).
+  - models: [all]
+    severity: warning
+    text: >
+      A production cloud service on the public internet. Anyone holding the
+      private token can write to the stream.

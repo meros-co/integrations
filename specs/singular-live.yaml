@@ -1,0 +1,354 @@
+spec: 1
+id: singular-live
+name: Singular.live control app (REST API v2)
+vendor: Singular.live
+category: other
+
+# A Singular control app instance is driven through the cloud REST API v2 at
+# https://app.singular.live/apiv2/controlapps/<app token>/...; the shared app
+# token in the path is the only credential ("Requests using Tokens require no
+# authentication"). The device is opened at the host app.singular.live, port
+# 443. Singular pushes nothing over the REST API, so the control data (each
+# sub-composition's animation state and control node values) is polled.
+
+source:
+  - title: Singular Developer Portal, REST API (Introduction, Rate limits, Authorization, How-to guides, API reference)
+    author: Singular.live
+    url: https://developer.singular.live/rest-api
+    note: >
+      Manufacturer document, read 2026-10-27 (the portal's full text,
+      https://developer.singular.live/llms-full.txt). API reference: GET
+      /apiv2/controlapps/:appToken (metadata, with its response definitions),
+      GET .../model (sub-compositions with id, name, state and model), GET
+      .../control (subCompositionId, subCompositionName, mainComposition,
+      state In/Out1/Out2, payload), PATCH .../control (an array of
+      {subCompositionId or subCompositionName, payload}, or {..., state}, or
+      both; answers {"success": true}), the control node field types (Text,
+      Text Area, Number, NormalizedNumber 0-100, Counter, Selection, Image,
+      Color, Checkbox, Audio, JSON Text, Time Control {"command":
+      play|pause|reset|start}, Button "execute"), the animation states In,
+      Out, Out1 and Out2, and POST .../command {"action":
+      "TakeOutAllOutput"}. Rate limits: the POST/PATCH control and command
+      endpoints are limited per account (free: 5,000 calls a day, 25 a
+      minute, refused with 429; professional and enterprise logged only),
+      with X-Singular-Ratelimit-Burst-Calls, -Daily-Calls, -Burst-Data and
+      -Daily-Data headers holding {"limit", "remaining", "reset"}.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: none
+  timeout_ms: 8000
+  probe: { method: GET, path: "/apiv2/controlapps/{settings.app_token}" }
+
+settings:
+  app_token: { type: string, secret: true, required: true, max_length: 128, pattern: "^[A-Za-z0-9_-]+$",
+               label: App token,
+               description: "The control app's shared app token, from the Dashboard inspector (URLs and Token), UNO's </> button or Studio's Manage Access." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "app.singular.live, Singular's cloud" }
+
+models:
+  - id: control-app
+    name: Singular control app (Studio, UNO or Dashboard app instance)
+    supports: [get_metadata, get_model, get_control, update_control, set_content, set_content_by_name,
+               set_state, set_state_by_name, set_content_and_state, set_content_and_state_by_name,
+               set_control_node, set_control_node_by_name, timer_control, timer_control_by_name,
+               press_button, press_button_by_name, take_out_all]
+    verification: none
+
+commands:
+  get_metadata:
+    summary: Read the app instance's metadata (name, output and control URLs, composition id) (GET /apiv2/controlapps/<token>)
+    send: { method: GET, path: "/apiv2/controlapps/{settings.app_token}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_model:
+    summary: Read the app's model, every sub-composition with its control nodes, their types and defaults (GET .../model)
+    send: { method: GET, path: "/apiv2/controlapps/{settings.app_token}/model" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_control:
+    summary: Read the app's control data, each sub-composition's state and control node values (GET .../control)
+    send: { method: GET, path: "/apiv2/controlapps/{settings.app_token}/control" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_control:
+    summary: >
+      Send a control update as Singular documents it (PATCH .../control): an
+      array of {"subCompositionId" or "subCompositionName", "payload": {node:
+      value}, "state": "In"|"Out"|"Out1"|"Out2"}, payload and state each optional
+    params:
+      body: { type: json, required: true, label: Update,
+              description: "JSON array of sub-composition updates, each naming a subCompositionId or subCompositionName with a payload, a state or both." }
+    send: { method: PATCH, path: "/apiv2/controlapps/{settings.app_token}/control", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_content:
+    summary: Update control nodes of a sub-composition by id (PATCH .../control with [{subCompositionId, payload}])
+    params:
+      subcomposition: &subid { type: string, max_length: 128, required: true, label: Sub-composition,
+                               description: "Sub-composition id, from the control data or Composer's wrench pop-up." }
+      payload: &payload { type: json, required: true, label: Payload,
+                          description: "JSON object of control node ids to their new content, in each node's field type." }
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionId":{subcomposition:json},"payload":{payload}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_content_by_name:
+    summary: Update control nodes of a sub-composition by name (PATCH .../control with [{subCompositionName, payload}])
+    params:
+      subcomposition: &subname { type: string, max_length: 256, required: true, label: Sub-composition,
+                                 description: "Sub-composition name, as in the composition tree." }
+      payload: *payload
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionName":{subcomposition:json},"payload":{payload}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_state:
+    summary: Animate a sub-composition In or Out, by id (PATCH .../control with [{subCompositionId, state}])
+    params:
+      subcomposition: *subid
+      state: &state { type: enum, values: [In, Out, Out1, Out2], required: true, label: State,
+                      description: "In; Out (the default out animation); Out1 (reverse of In, with several timelines); Out2 (the independent out animation)." }
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionId":{subcomposition:json},"state":"{state}"}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_state_by_name:
+    summary: Animate a sub-composition In or Out, by name (PATCH .../control with [{subCompositionName, state}])
+    params:
+      subcomposition: *subname
+      state: *state
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionName":{subcomposition:json},"state":"{state}"}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_content_and_state:
+    summary: Update a sub-composition's control nodes and animate it in one call, by id
+    params:
+      subcomposition: *subid
+      payload: *payload
+      state: *state
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionId":{subcomposition:json},"payload":{payload},"state":"{state}"}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_content_and_state_by_name:
+    summary: Update a sub-composition's control nodes and animate it in one call, by name
+    params:
+      subcomposition: *subname
+      payload: *payload
+      state: *state
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionName":{subcomposition:json},"payload":{payload},"state":"{state}"}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_control_node:
+    summary: Set one control node of a sub-composition by id, to a value of the node's field type
+    params:
+      subcomposition: *subid
+      node: &node { type: string, max_length: 256, required: true, label: Control node,
+                    description: "Control node id, as the payload names it." }
+      value: { type: json, required: true, label: Value,
+               description: "The node's content in its field type: text, a number, true/false, a colour string, an image URL, stringified JSON." }
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionId":{subcomposition:json},"payload":{{node:json}:{value}}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  set_control_node_by_name:
+    summary: Set one control node of a sub-composition by name, to a value of the node's field type
+    params:
+      subcomposition: *subname
+      node: *node
+      value: { type: json, required: true, label: Value,
+               description: "The node's content in its field type: text, a number, true/false, a colour string, an image URL, stringified JSON." }
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionName":{subcomposition:json},"payload":{{node:json}:{value}}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  timer_control:
+    summary: Play, pause, start or reset a Time Control node, by sub-composition id
+    params:
+      subcomposition: *subid
+      node: *node
+      command: &timer { type: enum, values: [play, pause, start, reset], required: true, label: Timer command,
+                        description: "play runs the timer, pause holds it, start starts it from the beginning, reset sets it back." }
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionId":{subcomposition:json},"payload":{{node:json}:{"command":"{command}"}}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  timer_control_by_name:
+    summary: Play, pause, start or reset a Time Control node, by sub-composition name
+    params:
+      subcomposition: *subname
+      node: *node
+      command: *timer
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionName":{subcomposition:json},"payload":{{node:json}:{"command":"{command}"}}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  press_button:
+    summary: Click a Button control node, by sub-composition id (the node set to "execute")
+    params:
+      subcomposition: *subid
+      node: *node
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionId":{subcomposition:json},"payload":{{node:json}:"execute"}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  press_button_by_name:
+    summary: Click a Button control node, by sub-composition name (the node set to "execute")
+    params:
+      subcomposition: *subname
+      node: *node
+    send:
+      method: PATCH
+      path: "/apiv2/controlapps/{settings.app_token}/control"
+      body: '[{"subCompositionName":{subcomposition:json},"payload":{{node:json}:"execute"}}]'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  take_out_all:
+    summary: Animate every overlay of the app to its Out state (POST .../command {"action":"TakeOutAllOutput"})
+    params:
+      action: { type: enum, values: [TakeOutAllOutput], default: TakeOutAllOutput, label: Action,
+                description: "Always TakeOutAllOutput, the one command the endpoint documents." }
+    send:
+      method: POST
+      path: "/apiv2/controlapps/{settings.app_token}/command"
+      body: '{"action":"{action}"}'
+      content_type: application/json
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+telemetry:
+  # The GET endpoints are not among the rate-limited ones; the control data
+  # is read every 2 s and the metadata every minute.
+  poll:
+    - every_ms: 2000
+      send: [{ method: GET, path: "/apiv2/controlapps/{settings.app_token}/control" }]
+    - every_ms: 60000
+      send: [{ method: GET, path: "/apiv2/controlapps/{settings.app_token}" }]
+  updates:
+    - path: "^/apiv2/controlapps/[^/]+/control$"
+      json_match: { "$": "^\\[" }
+      json_each: "$"
+      json: { id: "$.subCompositionId", name: "$.subCompositionName", main: "$.mainComposition", state: "$.state" }
+      replace: subcompositions
+      state:
+        "subcompositions.{id:key}.name": "{name}"
+        "subcompositions.{id:key}.main": "{main}"
+        "subcompositions.{id:key}.state": "{state}"
+        "subcompositions.{id:key}.on_air": { value: "{state}", map: { In: true, Out: false, Out1: false, Out2: false } }
+    - path: "^/apiv2/controlapps/[^/]+/control$"
+      json_each: "$[*].payload.*"
+      json: { id: "$^.subCompositionId", value: "$" }
+      state: { "subcompositions.{id:key}.payload.{key:key}": "{value}" }
+    - path: "^/apiv2/controlapps/[^/]+$"
+      json: { name: "$.name", type: "$.type", id: "$.id", composition: "$.compositionId",
+              output: "$.outputUrl", broadcast: "$.broadcastOutputUrl", control: "$.publicControlUrl",
+              template: "$.appTemplateId", template_version: "$.appTemplateVersion", updated: "$.updatedAt" }
+      state:
+        app.name: "{name}"
+        app.type: "{type}"
+        app.id: "{id}"
+        app.composition_id: "{composition}"
+        app.output_url: "{output}"
+        app.broadcast_output_url: "{broadcast}"
+        app.control_url: "{control}"
+        app.template_id: "{template}"
+        app.template_version: "{template_version}"
+        app.updated_at: "{updated}"
+    # The rate-limit headers on every control and command answer.
+    - path: "^/apiv2/controlapps/[^/]+/(control|command)$"
+      headers: { burst_calls: X-Singular-Ratelimit-Burst-Calls, daily_calls: X-Singular-Ratelimit-Daily-Calls,
+                 burst_data: X-Singular-Ratelimit-Burst-Data, daily_data: X-Singular-Ratelimit-Daily-Data }
+      state:
+        rate_limit.burst_calls: "{burst_calls}"
+        rate_limit.daily_calls: "{daily_calls}"
+        rate_limit.burst_data: "{burst_data}"
+        rate_limit.daily_data: "{daily_data}"
+
+state:
+  subcompositions.*.name: { type: string, description: "Sub-composition name, keyed by sub-composition id" }
+  subcompositions.*.main: { type: bool, description: "Whether this is the app's main composition" }
+  subcompositions.*.state: { type: string, description: "Animation state: In, Out, Out1 or Out2" }
+  subcompositions.*.on_air: { type: bool, description: "Whether the sub-composition is animated In" }
+  subcompositions.*.payload.*: { type: string, description: "Each control node's content, keyed by node id: text as it is, anything else (numbers, colours, timers, buttons) as compact JSON" }
+  app.name: { type: string, description: "App instance name" }
+  app.type: { type: string, description: "Overlay type, controlapp for a control app" }
+  app.id: { type: int, description: "App's internal id in Singular's database" }
+  app.composition_id: { type: int, description: "Id of the composition linked to the app" }
+  app.output_url: { type: string, description: "App's output URL (16:9)" }
+  app.broadcast_output_url: { type: string, description: "App's broadcast output URL" }
+  app.control_url: { type: string, description: "App's public control URL" }
+  app.template_id: { type: int, description: "App template id" }
+  app.template_version: { type: int, description: "App template version" }
+  app.updated_at: { type: string, description: "When the app was last updated, ISO 8601 UTC" }
+  rate_limit.burst_calls: { type: string, description: "Last X-Singular-Ratelimit-Burst-Calls header: JSON {limit, remaining, reset} for calls per minute" }
+  rate_limit.daily_calls: { type: string, description: "Last X-Singular-Ratelimit-Daily-Calls header: JSON {limit, remaining, reset} for calls per day" }
+  rate_limit.burst_data: { type: string, description: "Last X-Singular-Ratelimit-Burst-Data header: JSON {limit, remaining, reset} in bytes per minute" }
+  rate_limit.daily_data: { type: string, description: "Last X-Singular-Ratelimit-Daily-Data header: JSON {limit, remaining, reset} in bytes per day" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      A production cloud service: every command and read goes over the public
+      internet to app.singular.live (about a second, per Singular), and the
+      writes count against the account's rate limits. A free account is
+      refused with 429 past 25 calls a minute or 5,000 a day; professional and
+      enterprise accounts are logged but served. The limits' state is kept
+      from the headers of each write's answer. For updates at 1 Hz or faster
+      Singular recommends its data streams (the singular-datastream spec).
+  - models: [all]
+    severity: info
+    text: >
+      State comes from polling the control data every 2 s; Singular pushes
+      nothing over the REST API. Control node values are kept as text, with
+      non-text content (numbers, colours, timers, buttons) as compact JSON,
+      since their types depend on each node. The documents say a sub-composition
+      is addressed by id or name; the reference marks both required, the
+      examples send one.
+  - models: [all]
+    severity: info
+    text: >
+      The documents give no error answers beyond 429 (an unknown token or
+      sub-composition is not described); a write succeeds only when Singular
+      answers 200 with {"success": true}.

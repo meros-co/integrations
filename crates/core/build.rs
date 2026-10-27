@@ -299,6 +299,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "shure-wireless",
         ],
     ),
+    ("vendor-singular", &["singular-datastream", "singular-live"]),
     ("vendor-sofie", &["sofie-chef"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
