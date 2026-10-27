@@ -95,7 +95,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     (
         "vendor-christie",
-        &["christie-1dlp", "christie-spyder", "christie-trulife"],
+        &[
+            "christie-1dlp",
+            "christie-pandorasbox",
+            "christie-spyder",
+            "christie-trulife",
+        ],
     ),
     ("vendor-churchapps", &["freeshow"]),
     ("vendor-clock8001", &["clock-8001"]),

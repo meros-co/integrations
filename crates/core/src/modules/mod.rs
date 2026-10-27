@@ -48,6 +48,8 @@ mod barco_projection;
 mod barco_projection_table;
 #[cfg(feature = "bss-london")]
 mod bss_london;
+#[cfg(feature = "christie-pandorasbox")]
+mod christie_pandorasbox;
 #[cfg(feature = "datavideo-switcher")]
 mod datavideo_switcher;
 #[cfg(feature = "datavideo-switcher")]
@@ -131,6 +133,8 @@ mod panasonic_notify;
 mod panasonic_projector;
 #[cfg(feature = "panasonic-projector")]
 mod panasonic_projector_commands;
+#[cfg(feature = "christie-pandorasbox")]
+mod pandorasbox_commands;
 #[cfg(feature = "philips-sicp")]
 mod philips_sicp;
 #[cfg(feature = "pjlink")]
@@ -363,6 +367,8 @@ pub(crate) fn construct(
         "nec-display" => Ok(Box::new(nec_display::NecDisplay::new(context)?)),
         #[cfg(feature = "philips-sicp")]
         "philips-sicp" => Ok(Box::new(philips_sicp::PhilipsSicp::new(context)?)),
+        #[cfg(feature = "christie-pandorasbox")]
+        "christie-pandorasbox" => Ok(Box::new(christie_pandorasbox::PandorasBox::new(context)?)),
         #[cfg(feature = "probel-swp02")]
         "probel-swp02" => Ok(Box::new(swp02::Swp02::new(context)?)),
         #[cfg(feature = "probel-swp08")]

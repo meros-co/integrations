@@ -1023,6 +1023,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the E Series BCL values beyond 0 and 1 (the reference text mentions 1 to 10 as a wish). ([specs/christie-1dlp.yaml:2528](specs/christie-1dlp.yaml#L2528))
 - [ ] Check whether the E Series SKS (marked READ ONLY but with values 0 to 2) accepts a set. ([specs/christie-1dlp.yaml:1724](specs/christie-1dlp.yaml#L1724))
 
+## christie-pandorasbox — Christie Pandoras Box
+
+- [ ] Confirm doubles go little-endian (as the vendor SDKs send them), not in network order as the protocol page says, with set_param_double on a known parameter. ([specs/christie-pandorasbox.yaml:2344](specs/christie-pandorasbox.yaml#L2344))
+- [ ] Confirm functions without return values are never answered, and how a refused one is signalled. ([specs/christie-pandorasbox.yaml:2337](specs/christie-pandorasbox.yaml#L2337))
+- [ ] Confirm a refused function answers a negative code followed by an int error number, and what the numbers mean. ([specs/christie-pandorasbox.yaml:2337](specs/christie-pandorasbox.yaml#L2337))
+- [ ] Check the int buffer of GetSiteIds and GetPlaylistEntryIndices* carries an int count first (the C# SDK reads none). ([specs/christie-pandorasbox.yaml:2321](specs/christie-pandorasbox.yaml#L2321))
+- [ ] Check which Pandoras Box versions answer GetCurrentTimeCueInfo (295); older ones are taken to refuse it. ([specs/christie-pandorasbox.yaml:2352](specs/christie-pandorasbox.yaml#L2352))
+
 ## christie-spyder — Christie Spyder X20 / X80
 
 - [ ] Confirm that answers come back to the sending port with no "spyder" header, the result code first. ([specs/christie-spyder.yaml:46](specs/christie-spyder.yaml#L46))
