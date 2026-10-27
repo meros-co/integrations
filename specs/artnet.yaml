@@ -1,0 +1,441 @@
+spec: 1
+id: artnet
+name: Art-Net 4 network (the core as an Art-Net controller)
+vendor: Artistic Licence (Art-Net protocol; any Art-Net node, gateway or controller)
+category: lighting
+implementation: native
+reason: >
+  Art-Net is binary UDP spoken among every node of a network on one fixed port, not with one device: the core
+  binds the port for itself, polls with broadcasts, keeps a table of the nodes that answer and the universes
+  each subscribes to, holds DMX output per universe and unicasts it to each universe's subscribers at a
+  bounded frame rate with a refresh, answers other controllers' polls, and matches node replies (ArtPollReply,
+  ArtIpProgReply, ArtDataReply, ArtRdm) to the commands that asked for them.
+
+source:
+  - title: "Art-Net 4 Specification for the Art-Net 4 Ethernet Communication Protocol, Protocol Release V1.4, Document Revision 1.4dp (23/10/2025)"
+    author: Artistic Licence
+    url: https://art-net.org.uk/downloads/art-net.pdf
+    note: >
+      Manufacturer document, free to implement without royalty. Port 0x1936 as source and destination;
+      Controller Default Poll to 2.255.255.255 and 10.255.255.255; controllers poll every 2.5 to 3 s and take a
+      node silent 3 s after a poll as disconnected, and reply to their own poll; ArtPoll Flags (reply on change,
+      diagnostics, unicast diagnostics, targeted mode), DiagPriority (Table 5); ArtPollReply fields and their
+      bits (Status1-3, GoodInput, GoodOutputA/B, PortTypes, NodeReport "#xxxx [yyyy] text", Table 3 and 4
+      codes, BindIndex, RefreshRate, BackgroundQueuePolicy), minimum length 207; Port-Address = Net (7 bits),
+      Sub-Net and Universe nibbles; ArtDmx unicast to subscribers only (SwIn or SwOut), never broadcast,
+      sequence 1-255, length 2-512; ArtSync broadcast after the ArtDmx it releases; ArtAddress fields (bit 7 to
+      program, 0 to reset to the physical switch) and Command table (AcCancelMerge to AcBqp15); ArtInput;
+      ArtIpProg and ArtIpProgReply; ArtDataRequest and ArtDataReply (Table 4a); ArtDiagData; ArtTimeCode;
+      ArtCommand (SwoutText, SwinText, EstaMan 0xFFFF); ArtTrigger (Table 7, OEM 0xFFFF); ArtNzs; ArtTodRequest,
+      ArtTodData, ArtTodControl and ArtRdm. The OEM code table it refers to is not part of the document.
+
+settings:
+  bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, label: Bind address, description: "The local IPv4 address of the network interface on the Art-Net network; empty binds where the core binds (every interface unless the core was started with a bind address). It is also the IP address the core's own ArtPollReply gives." }
+  poll_addresses: { type: string, max_length: 1024, default: "2.255.255.255, 10.255.255.255", label: Poll addresses, description: "Comma-separated addresses ArtPoll, ArtSync and broadcast triggers, commands and timecode go to, each an IP address (port 6454) or ip:port: the directed broadcast address of the Art-Net network, such as 192.168.1.255 on a 192.168.1.0/24 network. The default is the specification's Controller Default Poll." }
+  short_name: { type: string, max_length: 17, default: Meros, label: Short name, description: "The short name the core's own ArtPollReply gives, up to 17 characters." }
+  long_name: { type: string, max_length: 63, default: Meros Integrations, label: Long name, description: "The long name the core's own ArtPollReply gives, up to 63 characters." }
+  esta_code: { type: int, min: 0, max: 65535, default: 0, label: ESTA manufacturer code, description: "The ESTA manufacturer code sent in ArtPoll, ArtPollReply and ArtDataRequest." }
+  oem_code: { type: int, min: 0, max: 65535, default: 255, label: OEM code, description: "The Art-Net OEM code sent in ArtPoll, ArtPollReply and ArtDataRequest; 255 (0x00FF) unless the integrator has registered one with Artistic Licence." }
+  diagnostics: { type: bool, default: false, label: Request diagnostics, description: "Ask nodes in every ArtPoll to unicast their ArtDiagData diagnostics to the core." }
+  diagnostics_priority: { type: enum, values: [low, medium, high, critical, volatile], default: low, label: Diagnostics priority, description: "The lowest priority of diagnostics asked for when diagnostics are requested (Table 5)." }
+  refresh_ms: { type: int, min: 0, max: 60000, default: 1000, label: Refresh interval, description: "Milliseconds between sending every held universe again, so a node that missed a frame or restarted gets the output; 0 sends only on change." }
+  sync: { type: bool, default: false, label: Synchronous output, description: "Follow every burst of ArtDmx with an ArtSync to the poll addresses, so nodes output the universes together; nodes leave synchronous mode 4 s after the last ArtSync." }
+  receive: { type: string, max_length: 1024, default: "", pattern: '^(|all|[0-9]+(-[0-9]+)?(\s*,\s*[0-9]+(-[0-9]+)?)*)$', label: Universes received, description: "Universes (Port-Addresses) whose ArtDmx from other devices is kept in state, as all or a list such as 0-3, 16; empty keeps none." }
+  receive_interval_ms: { type: int, min: 0, max: 60000, default: 100, label: Receive interval, description: "The shortest time in milliseconds between two state updates of one received universe; the latest data is reported when it ends." }
+
+ports:
+  - { port: 6454, protocol: udp, role: control, listener: core, note: "Art-Net's one port (0x1936), both source and destination: the core listens on it (shared with other programs on the host) and sends to nodes on it. Opened with no host, or a node's address as host to unicast every universe and poll to it too" }
+
+models:
+  - id: artnet
+    name: Art-Net 4 network (any Art-Net node, gateway, media server or console; the core is a controller)
+    supports: [set_channel, set_channels, set_universe, clear_universe, release_universe, release_all, send_sync, poll, send_nzs, send_trigger, send_command, send_timecode, set_node_names, set_node_port_address, reset_node_port_addresses, set_node_acn_priority, node_command, set_node_background_queue_policy, set_node_input_enabled, get_node_ip_config, set_node_ip, set_node_dhcp, reset_node_ip, get_node_data, request_rdm_tod, rdm_tod_control, send_rdm]
+    verification: none
+
+commands:
+  set_channel:
+    summary: >
+      Set one channel of a universe's held DMX output, and send the universe as ArtDmx to its subscribers.
+      Returns unverified when sent, or {held: true, destinations: 0} when no node subscribes to the universe yet
+      (it is sent once one does)
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address: Net times 256 plus Sub-Net times 16 plus Universe; 0 is deprecated in Art-Net 4." }
+      channel: { type: int, min: 1, max: 512, required: true, label: Channel, description: "DMX channel (slot), numbered from 1." }
+      value: { type: int, min: 0, max: 255, required: true, label: Value, description: "Level, 0 to 255." }
+    returns: value
+  set_channels:
+    summary: >
+      Set consecutive channels of a universe's held output from start, the others kept, and send the universe.
+      values is a JSON array of integers 0-255 that fits within channel 512
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address the output goes to." }
+      start: { type: int, min: 1, max: 512, default: 1, label: Start channel, description: "The first channel the values set, numbered from 1." }
+      values: { type: json, required: true, label: Values, description: "A list of levels 0-255, one per channel from the start channel." }
+    returns: value
+  set_universe:
+    summary: >
+      Replace a universe's whole held output: values (a JSON array of up to 512 integers 0-255) from channel 1,
+      the rest 0. Sent at once
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address the output goes to." }
+      values: { type: json, required: true, label: Values, description: "A list of up to 512 levels 0-255 from channel 1; channels after the list are set to 0." }
+    returns: value
+  clear_universe:
+    summary: Set every channel of a universe's held output to 0, and send it
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address to clear." }
+    returns: value
+  release_universe:
+    summary: >
+      Stop holding and sending a universe. Nodes keep their last frame or apply their failsafe, as each is set
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address to stop sending." }
+    returns: ack
+  release_all:
+    summary: Stop holding and sending every universe
+    returns: ack
+  send_sync:
+    summary: Send an ArtSync to the poll addresses, so nodes output the ArtDmx they hold
+    returns: none
+  poll:
+    summary: Send an ArtPoll to the poll addresses now, besides the one every 3 s
+    returns: none
+  send_nzs:
+    summary: >
+      Send one ArtNzs frame with a non-zero start code to a universe's subscribers (not held or refreshed).
+      values is a JSON array of 1 to 512 integers 0-255
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address the frame goes to." }
+      start_code: { type: int, min: 1, max: 254, required: true, label: Start code, description: "The DMX512 start code; neither 0 (ordinary DMX, use the channel commands) nor 0xCC (RDM) is allowed." }
+      values: { type: json, required: true, label: Values, description: "A list of 1 to 512 data bytes 0-255 after the start code." }
+    returns: none
+  send_trigger:
+    summary: >
+      Send an ArtTrigger to the poll addresses, or to target. With OEM 65535 (0xFFFF) key 0 is a key press of the
+      ASCII character sub_key, 1 runs macro sub_key, 2 presses soft key sub_key and 3 runs show sub_key; with
+      another OEM code the meaning is that manufacturer's
+    params:
+      key: { type: int, min: 0, max: 255, required: true, label: Key, description: "The trigger key: 0 ASCII, 1 macro, 2 soft key, 3 show when the OEM code is 65535." }
+      sub_key: { type: int, min: 0, max: 255, required: true, label: Sub-key, description: "The character, macro, soft key or show number the key names." }
+      oem: { type: int, min: 0, max: 65535, default: 65535, label: OEM code, description: "The OEM code of the products that act on it; 65535 for every product, with the meanings above." }
+      payload: { type: string, max_length: 1024, pattern: '^([0-9A-Fa-f]{2})*$', default: "", label: Payload, description: "Up to 512 bytes of payload as hex, for a manufacturer-specific trigger; unused with OEM 65535." }
+      target: { type: string, max_length: 64, default: "", label: Target, description: "One IP address or ip:port to send to instead of the poll addresses." }
+    returns: none
+  send_command:
+    summary: >
+      Send an ArtCommand text to the poll addresses, or to target, such as SwoutText=Playback& (relabels the
+      output ports) or SwinText=Record& (the input ports), the commands Art-Net defines for ESTA 65535
+    params:
+      text: { type: string, max_length: 511, required: true, label: Command, description: "One or more Command=Data& pairs, case insensitive." }
+      esta: { type: int, min: 0, max: 65535, default: 65535, label: ESTA code, description: "The ESTA manufacturer code the commands belong to; 65535 for those Art-Net defines." }
+      target: { type: string, max_length: 64, default: "", label: Target, description: "One IP address or ip:port to send to instead of the poll addresses." }
+    returns: none
+  send_timecode:
+    summary: Send one ArtTimeCode frame to the poll addresses, or to target
+    params:
+      hours: { type: int, min: 0, max: 23, required: true, label: Hours, description: "Hours, 0-23." }
+      minutes: { type: int, min: 0, max: 59, required: true, label: Minutes, description: "Minutes, 0-59." }
+      seconds: { type: int, min: 0, max: 59, required: true, label: Seconds, description: "Seconds, 0-59." }
+      frames: { type: int, min: 0, max: 29, required: true, label: Frames, description: "Frames, 0 to one less than the rate (23 film, 24 EBU, 29 DF and SMPTE)." }
+      type: { type: enum, values: [film, ebu, df, smpte], default: smpte, label: Rate, description: "film 24 fps, ebu 25 fps, df 29.97 fps drop frame, smpte 30 fps." }
+      stream: { type: int, min: 0, max: 255, default: 0, label: Stream, description: "The time code stream; 0 is the master." }
+      target: { type: string, max_length: 64, default: "", label: Target, description: "One IP address or ip:port to send to instead of the poll addresses." }
+    returns: none
+  set_node_names:
+    summary: >
+      Rename a node (ArtAddress): its port name, its long name, or both. An empty name is left unchanged. Answered
+      by the node's ArtPollReply, which updates its state
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address, as nodes.<ip>/<bind index> shows it." }
+      bind_index: { type: int, min: 1, max: 255, default: 1, label: Bind index, description: "Which bound node at that address, 1 for the root device." }
+      short_name: { type: string, max_length: 17, default: "", label: Port name, description: "The new short (port) name, up to 17 characters; empty leaves it." }
+      long_name: { type: string, max_length: 63, default: "", label: Long name, description: "The new long name, up to 63 characters; empty leaves it." }
+    returns: ack
+  set_node_port_address:
+    summary: >
+      Program one port's Port-Address (ArtAddress): the node's Net and Sub-Net, and the port's Universe nibble.
+      Net and Sub-Net are the node's (per bind index), so its other ports move with them
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+      bind_index: { type: int, min: 1, max: 255, default: 1, label: Bind index, description: "Which bound node at that address, 1 for the root device." }
+      port: { type: int, min: 1, max: 4, default: 1, label: Port, description: "The port within the ArtPollReply of that bind index, 1-4." }
+      direction: { type: enum, values: [output, input], default: output, label: Direction, description: "Program the port's output (SwOut) or input (SwIn) universe." }
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address to give the port." }
+    returns: ack
+  reset_node_port_addresses:
+    summary: Return a node's Net, Sub-Net and every port's universe to its physical switch settings (ArtAddress with 0)
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+      bind_index: { type: int, min: 1, max: 255, default: 1, label: Bind index, description: "Which bound node at that address, 1 for the root device." }
+    returns: ack
+  set_node_acn_priority:
+    summary: Set the sACN priority a node gives the DMX it converts to sACN (ArtAddress AcnPriority)
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+      bind_index: { type: int, min: 1, max: 255, default: 1, label: Bind index, description: "Which bound node at that address, 1 for the root device." }
+      priority: { type: int, min: 0, max: 200, required: true, label: Priority, description: "sACN priority 0-200." }
+    returns: ack
+  node_command:
+    summary: >
+      Send one ArtAddress command to a node: cancel_merge, led_normal, led_mute, led_locate, reset_rx_flags,
+      analysis_on/off, fail_hold/zero/full/scene (what its outputs do when Art-Net stops), fail_record (store the
+      present output as the failsafe scene), and for a port merge_ltp/merge_htp, direction_output/input,
+      select_artnet/select_sacn, clear_output, style_delta/style_constant, rdm_enable/rdm_disable
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+      bind_index: { type: int, min: 1, max: 255, default: 1, label: Bind index, description: "Which bound node at that address, 1 for the root device." }
+      action: { type: enum, values: [cancel_merge, led_normal, led_mute, led_locate, reset_rx_flags, analysis_on, analysis_off, fail_hold, fail_zero, fail_full, fail_scene, fail_record, merge_ltp, merge_htp, direction_output, direction_input, select_artnet, select_sacn, clear_output, style_delta, style_constant, rdm_enable, rdm_disable], required: true, label: Action, description: "The ArtAddress command to send." }
+      port: { type: int, min: 1, max: 4, default: 1, label: Port, description: "For the per-port actions, the port 1-4; Art-Net 4 deprecates ports 2-4 in favour of one port per bind index." }
+    returns: ack
+  set_node_background_queue_policy:
+    summary: >
+      Set how a node collects RDM status messages in the background (ArtAddress AcBqp): 0 STATUS_NONE, 1
+      STATUS_ADVISORY, 2 STATUS_WARNING, 3 STATUS_ERROR, 4 disabled, 5-15 manufacturer defined
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+      bind_index: { type: int, min: 1, max: 255, default: 1, label: Bind index, description: "Which bound node at that address, 1 for the root device." }
+      policy: { type: int, min: 0, max: 15, required: true, label: Policy, description: "The BackgroundQueuePolicy, 0-15." }
+    returns: ack
+  set_node_input_enabled:
+    summary: >
+      Enable or disable one DMX input of a node (ArtInput); the node's other inputs keep the state its last
+      ArtPollReply gave
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+      bind_index: { type: int, min: 1, max: 255, default: 1, label: Bind index, description: "Which bound node at that address, 1 for the root device." }
+      port: { type: int, min: 1, max: 4, default: 1, label: Port, description: "The input port, 1-4." }
+      enabled: { type: bool, required: true, label: Enabled, description: "true enables the input, false disables it." }
+    returns: ack
+  get_node_ip_config:
+    summary: Ask a node for its IP address, subnet mask, gateway and DHCP state (ArtIpProg enquiry); returns {ip, subnet_mask, gateway, dhcp}
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+    returns: value
+  set_node_ip:
+    summary: Program a node's static IP address, subnet mask and default gateway (ArtIpProg); returns the configuration the node answers with
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's present IPv4 address." }
+      ip: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: IP address, description: "The new IPv4 address." }
+      subnet_mask: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Subnet mask, description: "The new subnet mask, such as 255.0.0.0." }
+      gateway: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Gateway, description: "The new default gateway; 0.0.0.0 for none." }
+    returns: value
+  set_node_dhcp:
+    summary: Switch a node to DHCP (ArtIpProg); returns the configuration the node answers with
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's present IPv4 address." }
+    returns: value
+  reset_node_ip:
+    summary: Return a node's IP address, subnet mask and gateway to their defaults (ArtIpProg); returns the configuration the node answers with
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's present IPv4 address." }
+    returns: value
+  get_node_data:
+    summary: >
+      Ask a node for one of its URLs (ArtDataRequest): product page, user guide, support page, UDR or GDTF
+      personality; returns the text, kept in nodes.<node>.data too. poll asks whether it supports the request
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The node's IPv4 address." }
+      request: { type: enum, values: [poll, product_url, user_guide_url, support_url, personality_udr_url, personality_gdtf_url], required: true, label: Request, description: "What to ask for (Table 4a)." }
+    returns: value
+  request_rdm_tod:
+    summary: >
+      Ask the gateways outputting a universe for their table of RDM devices (ArtTodRequest), by broadcast or of
+      one node; the answers are kept in rdm.<universe>
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address whose RDM devices to list." }
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, label: Node, description: "One gateway's IPv4 address; left out, the request goes to the poll addresses." }
+    returns: none
+  rdm_tod_control:
+    summary: >
+      Control RDM discovery on the port outputting a universe (ArtTodControl): flush (empty the table and run full
+      discovery), end (stop discovery, keep the table), incremental_on, incremental_off
+    params:
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address of the port." }
+      action: { type: enum, values: [flush, end, incremental_on, incremental_off], required: true, label: Action, description: "What to do with discovery on that port." }
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, label: Node, description: "One gateway's IPv4 address; left out, the request goes to the poll addresses." }
+    returns: none
+  send_rdm:
+    summary: >
+      Send one RDM message (as the RDM standard encodes it, without the start code) to a gateway for a universe
+      (ArtRdm), and return the first ArtRdm the gateway sends back for that universe as hex. A message with no
+      response (a broadcast set) times out
+    params:
+      node: { type: string, pattern: '^[0-9.]{7,15}$', max_length: 15, required: true, label: Node, description: "The gateway's IPv4 address." }
+      universe: { type: int, min: 0, max: 32767, required: true, label: Universe, description: "The 15-bit Port-Address of the gateway's port." }
+      packet: { type: string, pattern: '^([0-9A-Fa-f]{2})+$', max_length: 1024, required: true, label: RDM packet, description: "The RDM message as hex, from the sub-start code to the checksum." }
+    returns: value
+
+state:
+  port: { type: int, description: "The Art-Net port listened on and sent to" }
+  poll_addresses: { type: array, description: "Where ArtPoll and broadcasts go, as ip:port" }
+  nodes.*.online: { type: bool, description: "Whether the node answered the last poll; false once it misses one (kept, not removed). Keyed by ip/bind index" }
+  nodes.*.ip: { type: string, description: "The node's IP address" }
+  nodes.*.port: { type: int, description: "The UDP port the node is reached on (its ArtPollReply's Port, 6454)" }
+  nodes.*.bind_index: { type: int, description: "BindIndex: 1 for the root device, more for a bound node of a gateway with many ports" }
+  nodes.*.bind_ip: { type: string, description: "BindIp, the root device's address" }
+  nodes.*.short_name: { type: string, description: "PortName, up to 17 characters" }
+  nodes.*.long_name: { type: string, description: "LongName, up to 63 characters" }
+  nodes.*.report.code: { type: int, description: "NodeReport status code (Table 3), -1 when the report is not in the #xxxx [yyyy] form" }
+  nodes.*.report.counter: { type: int, description: "NodeReport counter, 0-9999, counting the node's ArtPollReplies" }
+  nodes.*.report.text: { type: string, description: "NodeReport text" }
+  nodes.*.firmware: { type: int, description: "Firmware revision (VersInfoH, VersInfoL)" }
+  nodes.*.net: { type: int, description: "NetSwitch, bits 14-8 of the Port-Address" }
+  nodes.*.sub_net: { type: int, description: "SubSwitch, bits 7-4 of the Port-Address" }
+  nodes.*.oem: { type: int, description: "OEM code of the product" }
+  nodes.*.esta: { type: int, description: "ESTA manufacturer code" }
+  nodes.*.ubea_version: { type: int, description: "UBEA firmware version, 0 when none" }
+  nodes.*.ubea_present: { type: bool, description: "Status1 bit 0" }
+  nodes.*.rdm_capable: { type: bool, description: "Status1 bit 1" }
+  nodes.*.rom_boot: { type: bool, description: "Status1 bit 2: booted from ROM" }
+  nodes.*.indicators: { type: string, description: "Front panel indicators: unknown, locate, mute or normal" }
+  nodes.*.programming_authority: { type: string, description: "Who set the Port-Address: unknown, front_panel or network" }
+  nodes.*.port_count: { type: int, description: "NumPorts, 0-4" }
+  nodes.*.ports.*.type: { type: string, description: "Port protocol: dmx, midi, avab, cmx, adb, artnet, dali, or the number. Ports keyed 1-4" }
+  nodes.*.ports.*.can_output: { type: bool, description: "The port can output data from the network" }
+  nodes.*.ports.*.can_input: { type: bool, description: "The port can input onto the network" }
+  nodes.*.ports.*.input_universe: { type: int, description: "Port-Address of the port's input (Net, Sub-Net and SwIn)" }
+  nodes.*.ports.*.output_universe: { type: int, description: "Port-Address of the port's output (Net, Sub-Net and SwOut)" }
+  nodes.*.ports.*.input.data_received: { type: bool, description: "GoodInput bit 7" }
+  nodes.*.ports.*.input.test_packets: { type: bool, description: "GoodInput bit 6" }
+  nodes.*.ports.*.input.sip: { type: bool, description: "GoodInput bit 5: DMX512 SIPs" }
+  nodes.*.ports.*.input.text_packets: { type: bool, description: "GoodInput bit 4" }
+  nodes.*.ports.*.input.disabled: { type: bool, description: "GoodInput bit 3: the input is disabled (ArtInput)" }
+  nodes.*.ports.*.input.errors: { type: bool, description: "GoodInput bit 2: receive errors" }
+  nodes.*.ports.*.input.sacn: { type: bool, description: "GoodInput bit 0: converts to sACN rather than Art-Net" }
+  nodes.*.ports.*.output.sending: { type: bool, description: "GoodOutputA bit 7: ArtDmx or sACN is being output" }
+  nodes.*.ports.*.output.test_packets: { type: bool, description: "GoodOutputA bit 6" }
+  nodes.*.ports.*.output.sip: { type: bool, description: "GoodOutputA bit 5" }
+  nodes.*.ports.*.output.text_packets: { type: bool, description: "GoodOutputA bit 4" }
+  nodes.*.ports.*.output.merging: { type: bool, description: "GoodOutputA bit 3: merging Art-Net from two sources" }
+  nodes.*.ports.*.output.short: { type: bool, description: "GoodOutputA bit 2: DMX output short at power on" }
+  nodes.*.ports.*.output.ltp: { type: bool, description: "GoodOutputA bit 1: merge mode is LTP (HTP when false)" }
+  nodes.*.ports.*.output.sacn: { type: bool, description: "GoodOutputA bit 0: outputs sACN rather than Art-Net" }
+  nodes.*.ports.*.output.rdm_disabled: { type: bool, description: "GoodOutputB bit 7" }
+  nodes.*.ports.*.output.continuous: { type: bool, description: "GoodOutputB bit 6: continuous output style (delta when false)" }
+  nodes.*.ports.*.output.discovery_idle: { type: bool, description: "GoodOutputB bit 5: RDM discovery is not running" }
+  nodes.*.ports.*.output.background_discovery_disabled: { type: bool, description: "GoodOutputB bit 4" }
+  nodes.*.acn_priority: { type: int, description: "sACN priority used for DMX converted to sACN" }
+  nodes.*.macros: { type: array, description: "SwMacro: whether macro inputs 1-8 are active, eight booleans" }
+  nodes.*.remotes: { type: array, description: "SwRemote: whether remote trigger inputs 1-8 are active, eight booleans" }
+  nodes.*.style: { type: string, description: "Style (Table 4): node, controller, media, route, backup, config, visual, or the number" }
+  nodes.*.mac: { type: string, description: "MAC address, 00:00:00:00:00:00 when the node cannot give it" }
+  nodes.*.web_config: { type: bool, description: "Status2 bit 0: configurable by web browser" }
+  nodes.*.dhcp: { type: bool, description: "Status2 bit 1: the IP address came from DHCP" }
+  nodes.*.dhcp_capable: { type: bool, description: "Status2 bit 2" }
+  nodes.*.port_address_15bit: { type: bool, description: "Status2 bit 3: 15-bit Port-Addresses (Art-Net 3 or 4)" }
+  nodes.*.sacn_switchable: { type: bool, description: "Status2 bit 4: can switch between Art-Net and sACN" }
+  nodes.*.squawking: { type: bool, description: "Status2 bit 5" }
+  nodes.*.output_style_switchable: { type: bool, description: "Status2 bit 6" }
+  nodes.*.rdm_control: { type: bool, description: "Status2 bit 7: RDM can be controlled with ArtAddress" }
+  nodes.*.failsafe: { type: string, description: "What the outputs do when network data stops: hold, zero, full or scene" }
+  nodes.*.failsafe_programmable: { type: bool, description: "Status3 bit 5" }
+  nodes.*.llrp: { type: bool, description: "Status3 bit 4: supports LLRP" }
+  nodes.*.port_direction_switchable: { type: bool, description: "Status3 bit 3" }
+  nodes.*.rdmnet: { type: bool, description: "Status3 bit 2" }
+  nodes.*.background_queue_supported: { type: bool, description: "Status3 bit 1" }
+  nodes.*.background_discovery_control: { type: bool, description: "Status3 bit 0: background discovery can be switched with ArtAddress" }
+  nodes.*.default_responder_uid: { type: string, description: "RDMnet and LLRP default responder UID, 12 hex digits" }
+  nodes.*.user: { type: int, description: "User-specific data (UserHi, UserLo)" }
+  nodes.*.refresh_rate: { type: int, unit: Hz, description: "Most ArtDmx frames a second the node accepts; 44 for DMX512 (a reply of 0-44)" }
+  nodes.*.background_queue_policy: { type: int, description: "BackgroundQueuePolicy, 0-15, meaningful when background_queue_supported" }
+  nodes.*.ip_config.ip: { type: string, description: "IP address from the node's last ArtIpProgReply" }
+  nodes.*.ip_config.subnet_mask: { type: string, description: "Subnet mask from the last ArtIpProgReply" }
+  nodes.*.ip_config.gateway: { type: string, description: "Default gateway from the last ArtIpProgReply" }
+  nodes.*.ip_config.dhcp: { type: bool, description: "DHCP enabled, from the last ArtIpProgReply" }
+  nodes.*.data.*: { type: string, description: "Text of the node's ArtDataReply, keyed product_url, user_guide_url, support_url, personality_udr_url or personality_gdtf_url" }
+  outputs.*.channels: { type: array, description: "The held output of a universe, 512 levels 0-255 from channel 1, keyed by Port-Address" }
+  outputs.*.destinations: { type: array, description: "Where the universe is sent, as ip:port: its online subscribers and the host" }
+  inputs.*.channels: { type: array, description: "Levels last received for a universe named in receive, from any source, keyed by Port-Address" }
+  inputs.*.source: { type: string, description: "IP address of the last ArtDmx received for the universe" }
+  inputs.*.sequence: { type: int, description: "Its Sequence, 0 when the sender does not number its packets" }
+  rdm.*.available: { type: bool, description: "false when the gateway answered TodNak (no table, or discovery incomplete). Keyed by Port-Address" }
+  rdm.*.total: { type: int, description: "Number of RDM devices the gateway found on the universe" }
+  rdm.*.uids: { type: array, description: "The RDM UIDs found, each 12 hex digits" }
+  rdm.*.gateway: { type: string, description: "IP address of the gateway whose table this is" }
+  diagnostics.*.text: { type: string, description: "The last ArtDiagData text from a device, keyed by its IP address" }
+  diagnostics.*.priority: { type: string, description: "Its priority: low, medium, high, critical, volatile, or the number" }
+  diagnostics.*.port: { type: int, description: "The logical DMX port it relates to, 0 for general" }
+  timecode.hours: { type: int, description: "Hours of the last ArtTimeCode received" }
+  timecode.minutes: { type: int, description: "Minutes of the last ArtTimeCode" }
+  timecode.seconds: { type: int, description: "Seconds of the last ArtTimeCode" }
+  timecode.frames: { type: int, description: "Frames of the last ArtTimeCode" }
+  timecode.type: { type: string, description: "film, ebu, df or smpte" }
+  timecode.stream: { type: int, description: "StreamId, 0 for the master" }
+  timecode.source: { type: string, description: "IP address of the sender" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Opened with no host: the core listens on UDP 6454 (another program can listen there too) and finds nodes by
+      polling the poll addresses every 3 s; each answering node appears under nodes.<ip>/<bind index>. Give a
+      node's address as host to poll it directly and to unicast every universe to it as well. Connected means
+      listening; a port that cannot be bound is reported disconnected and retried after 1 s, doubling to 30 s.
+  - models: [all]
+    severity: warning
+    text: >
+      The default poll addresses are Art-Net's own 2.x.x.x and 10.x.x.x networks. On another network (such as
+      192.168.1.0/24) set poll_addresses to its directed broadcast address (192.168.1.255), or no node is found.
+      A broadcast address of no network of this host may not be sendable; that send is logged and the others go.
+  - models: [all]
+    severity: warning
+    text: >
+      Art-Net 4 sends ArtDmx only by unicast, to the nodes whose last ArtPollReply lists the universe in SwIn or
+      SwOut, and to the host: a universe nobody subscribes to is held and not sent (the command returns
+      {held: true, destinations: 0}) until a node subscribes. A node that misses a poll stops receiving until it
+      answers again. Legacy nodes that only take broadcast ArtDmx are not served.
+  - models: [all]
+    severity: info
+    text: >
+      Output is the full 512 channels of each held universe, sent at once on a change (at most once every 23 ms,
+      44 Hz, later changes in that time going together) and again every refresh_ms. Universes are Port-Addresses
+      0-32767 (Net, Sub-Net, Universe), not the 1-based numbers some consoles display. Commands that send DMX,
+      ArtSync, triggers, commands and timecode return unverified: Art-Net does not acknowledge them.
+  - models: [all]
+    severity: info
+    text: >
+      Node configuration (set_node_*, node_command, reset_node_port_addresses) completes when the node answers
+      with its ArtPollReply, within 3 s, or fails with a timeout; the reply updates the node's state, so it reads
+      the change back. Net and Sub-Net belong to the node (per bind index): changing one port's universe moves the
+      node's other ports into the same Net and Sub-Net. Fields not being changed are sent as 0x7F (bit 7 clear),
+      which nodes ignore; 0 resets a field to the physical switch, as reset_node_port_addresses does.
+  - models: [all]
+    severity: critical
+    text: >
+      set_node_ip, set_node_dhcp and reset_node_ip change a node's network address at once: the node may become
+      unreachable from the core and from every controller that used the old address. fail_record and
+      fail_hold/zero/full/scene change what a node outputs when Art-Net stops, kept across power cycles.
+      direction_input and direction_output change what a port does, and setting a port to input flushes its
+      subscribers.
+  - models: [all]
+    severity: info
+    text: >
+      The core answers every ArtPoll, its own included, with an ArtPollReply of a controller (Style
+      StController) with no ports, from short_name, long_name, esta_code and oem_code; its IP field is
+      bind_address, or 0.0.0.0 when that is empty, since the core does not read its own address. The default OEM
+      code is 255 (0x00FF); Art-Net asks each manufacturer to register one. Its own packets heard back (a
+      broadcast loops to the sender) are ignored.
+  - models: [all]
+    severity: info
+    text: >
+      Received ArtDmx is kept only for the universes in receive, the latest packet's data whichever device sent
+      it (no merging), at most every receive_interval_ms, and not when opened for commands only. ArtNzs, ArtSync,
+      ArtTrigger, ArtCommand, ArtDiagData, ArtTimeCode and ArtRdm are reported as message events (address the
+      packet name, args its fields), as they arrive. Opening for commands only still polls, since sending DMX
+      needs the subscribers polling finds and Art-Net requires controllers to poll.
+  - models: [all]
+    severity: info
+    text: >
+      RDM goes through as the gateways relay it: request_rdm_tod and rdm_tod_control manage the gateway's table
+      of devices, and send_rdm carries a message the caller encodes per the RDM standard (ANSI E1.20), returning
+      the gateway's ArtRdm answer as hex; the core does not decode RDM parameters. Firmware upload
+      (ArtFirmwareMaster), the deprecated ArtMedia, ArtVideo and ArtMac packets and ArtVlc are not used.
+  - models: [all]
+    severity: info
+    text: >
+      Read where the specification leaves room: packets to a node go to the port its ArtPollReply gives (always
+      6454 per the specification); a node's subscriptions are the universes of SwIn and SwOut of its first
+      NumPorts ports, whichever way each port points; ArtPoll is unicast to the host without targeted mode;
+      ArtCommand's ESTA code is sent high byte first, as its field names give it (the field descriptions are
+      ambiguous); and ArtAddress fields not being changed are 0x7F, the specification saying only that values
+      without bit 7 are ignored and that 0 resets.

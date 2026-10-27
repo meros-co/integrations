@@ -40,6 +40,8 @@ mod allenheath_sq;
     feature = "analogway-midra4k"
 ))]
 mod analogway;
+#[cfg(feature = "artnet")]
+mod artnet;
 #[cfg(feature = "blackmagic-atem")]
 mod atem;
 #[cfg(feature = "barco-projection-protocol")]
@@ -298,6 +300,8 @@ pub(crate) fn construct(
             Some(port) => Ok(Box::new(tsl::Listener::new(port, &context.model))),
             None => Err("TSL UMD has no standard port: give the port to listen on".into()),
         },
+        #[cfg(feature = "artnet")]
+        "artnet" => Ok(Box::new(artnet::ArtNet::new(context)?)),
         #[cfg(feature = "osc-listener")]
         "osc-listener" => Ok(Box::new(osc_listener::OscListener::new(context)?)),
         #[cfg(feature = "tsl-umd-display")]

@@ -243,6 +243,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether the service ever answers (an acknowledgement or an error), and whether the cue player's state can be read in any way. ([specs/arkaos-mediamaster.yaml:12](specs/arkaos-mediamaster.yaml#L12))
 - [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:161](specs/arkaos-mediamaster.yaml#L161))
 
+## artnet — Art-Net 4 network
+
+- [ ] Check that nodes ignore ArtAddress fields sent as 0x7F (no change) and act on those with bit 7 set, and that 0 resets a field to the physical switch. ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
+- [ ] Check which universes a node expects ArtDmx for when a port's SwIn and SwOut differ, and that nodes answer an ArtPoll unicast to them without targeted mode. ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
+- [ ] Check that ArtCommand receivers read the ESTA code high byte first (SwoutText, SwinText with 0xFFFF are unaffected). ([specs/artnet.yaml:433](specs/artnet.yaml#L433))
+- [ ] Check that consoles and DMX-Workshop list the core's own ArtPollReply (OEM 0x00FF, IP 0.0.0.0 without a bind address) without complaint. ([specs/artnet.yaml:410](specs/artnet.yaml#L410))
+- [ ] On a node, check that set_node_input_enabled, node_command and the set_node_* commands are each answered with an ArtPollReply within 3 s. ([specs/artnet.yaml:394](specs/artnet.yaml#L394))
+
 ## atlona-matrix — Atlona matrix switchers and switchers
 
 - [ ] Record the Telnet login prompts (Username:, Password:) and what a wrong login answers. ([specs/atlona-matrix.yaml:203](specs/atlona-matrix.yaml#L203))
