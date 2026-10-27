@@ -2413,6 +2413,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find how the Designer's uuid for doaction.kinetic is obtained. ([specs/modulopi-kinetic.yaml:345](specs/modulopi-kinetic.yaml#L345))
 - [ ] Check the forms of a vec2-vec4 and color variable's value in get.list.variables. ([specs/modulopi-kinetic.yaml:373](specs/modulopi-kinetic.yaml#L373))
 
+## modulopi-player — Modulo Pi Modulo Player
+
+- [ ] Confirm the websocket path is / on port 8080 and that connections are refused until a show is loaded. ([specs/modulopi-player.yaml:68](specs/modulopi-player.yaml#L68))
+- [ ] Confirm mixer.state is pushed after get.state alone (the poll), with the same fields as get.state's result. ([specs/modulopi-player.yaml:828](specs/modulopi-player.yaml#L828))
+- [ ] Check that the media list's duration is in seconds and the playlists' timecode in milliseconds. ([specs/modulopi-player.yaml:873](specs/modulopi-player.yaml#L873))
+- [ ] Confirm set.monitoring.zone takes sourcename for an output and a live input, and set.cue.settings takes property name with value. ([specs/modulopi-player.yaml:623](specs/modulopi-player.yaml#L623))
+- [ ] Check what get.list.playlists' playState holds when stopped (only true is documented). ([specs/modulopi-player.yaml:852](specs/modulopi-player.yaml#L852))
+
 ## nec-display — NEC (Sharp NEC) large-format displays
 
 - [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
