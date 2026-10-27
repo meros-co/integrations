@@ -1465,6 +1465,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On each family, drive the matrix on its rear Remote port (link serial) and confirm replies, change reports and the verbose-mode step behave as over Telnet, with the banner only at power-up. ([spec](specs/extron-matrix.yaml#L157))
 - [ ] On DXP HD 4K PLUS, confirm the Remote RS-232 and USB ports ask for no password when one is set (documented for DXP DVI/HDMI, XTP II and SMX only). ([spec](specs/extron-matrix.yaml#L181))
 - [ ] On DXP HD 4K PLUS, confirm the Remote port uses no flow control (not documented). ([spec](specs/extron-matrix.yaml#L2059))
+- [ ] On an MVX 44-88, confirm Esc nVC (the examples) reads a preset's ties, not Esc n1VC (the symbol line). ([specs/extron-matrix.yaml:2049](specs/extron-matrix.yaml#L2049))
+- [ ] On an MVX 44-88, confirm n*40# reads the output level (the example) and record its answer. ([specs/extron-matrix.yaml:2101](specs/extron-matrix.yaml#L2101))
+- [ ] On an MVX 128-1616, record the Esc VM answer (a digit per output assumed, with or without separators). ([specs/extron-matrix.yaml:3477](specs/extron-matrix.yaml#L3477))
+- [ ] On an MVX, confirm front panel ties are reported as Qik only, and record the answer of a bare tie query (12 or In12). ([specs/extron-matrix.yaml:406](specs/extron-matrix.yaml#L406))
+- [ ] On an MTPX Plus in verbose mode 3, record the VC answer (tagged Vgp or bare) for starting outputs 1 and 17. ([specs/extron-matrix.yaml:2842](specs/extron-matrix.yaml#L2842))
+- [ ] On an MTPX Plus, record the answers of the twisted-pair commands (Typ, Lrpt, Ipek, Iseq, Oseq, Opek, Opol) in verbose mode 3. ([specs/extron-matrix.yaml:2202](specs/extron-matrix.yaml#L2202))
+- [ ] On an MTPX Plus, confirm the input grouping answer (GrI in the example, Gri in the syntax). ([specs/extron-matrix.yaml:2373](specs/extron-matrix.yaml#L2373))
+- [ ] On an MMX 32 VGA A, confirm the capitalized answers (OUT02 IN01 ALL, VMT2*1, AMT1) and the I answer. ([specs/extron-matrix.yaml:443](specs/extron-matrix.yaml#L443))
 
 ## extron-switcher — Extron IN-series scaling presentation switchers
 
