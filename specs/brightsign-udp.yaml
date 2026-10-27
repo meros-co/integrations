@@ -1,0 +1,156 @@
+spec: 1
+id: brightsign-udp
+name: BrightSign players (UDP commands)
+vendor: BrightSign
+category: playback
+
+# A BrightSign presentation reacts to UDP messages it defines itself: each UDP
+# Input event in BrightSign Author names the string that triggers it, on the
+# presentation's UDP Receiver Port, and can set user variables from the
+# message. BrightSign's sample control script (autorun.brs) gives a fixed set
+# of playback commands instead. Each command is one datagram with no line
+# ending; the player answers nothing to the sender, so commands are reported
+# unverified. The player's state is read over the Local DWS (brightsign-dws).
+source:
+  - title: "UDP Event (BrightSign Author documentation)"
+    author: BrightSign
+    url: "https://docs.brightsign.biz/author/udp-event"
+    note: >
+      Manufacturer documentation, read 2026-10-27. The UDP Input event triggers on a UDP message string,
+      <any> as a wildcard; Input specifies variable: the message <variable name>:<variable value>, several as
+      <name>:<value>!!<name>:<value>; Specify fixed variable: the message is the value.
+  - title: "Presentation Settings, Networking, UDP (BrightSign Author documentation)"
+    author: BrightSign
+    url: "https://docs.brightsign.biz/author/presentation-settings"
+    note: >
+      Read 2026-10-27: the UDP Receiver Port the player listens on for UDP events, and the UDP destination
+      address and port for messages the presentation sends.
+  - title: "Use Serial / UDP commands and Reboot Locally Networked Players via UDP (BrightSign documentation)"
+    author: BrightSign
+    url: "https://docs.brightsign.biz/hardware/use-serial-udp-commands"
+    note: >
+      Read 2026-10-27: unlimited UDP commands defined in BrightSign Author; a sample control script
+      (control_script_latest.zip) defining Play, Stop, Search, Loop, Pause, Resume and other commands; a UDP
+      Input event with a Reboot command answering a message such as Reboot_Me, also sent to a subnet's
+      broadcast address.
+  - title: "companion-module-brightsign-player (MIT)"
+    url: "https://github.com/bitfocus/companion-module-brightsign-player"
+    note: >
+      Read 2026-10-27 to fill the gap the documentation leaves (the sample script's command texts and port):
+      PAUSE, RESUME, REBOOT, STOP, STOPCL, PLAY <file>, PLAYCL <file>, LOOP <file>, LOOPS <file>, SEARCH
+      <file>, VOLUME <percent>, one per UDP datagram; the script it ships receives on UDP 5000 and sends its
+      own messages to UDP 5001.
+
+transport:
+  type: line-udp
+  port: 5000
+  terminator: none
+  reply: none
+
+ports:
+  - { port: 5000, protocol: udp, role: control, note: "the presentation's UDP Receiver Port, or the sample control script's receive port; 5000 unless changed" }
+
+models:
+  - id: presentation
+    name: BrightSign player running a BrightSign Author presentation
+    supports: [send_message, set_variable, set_variables]
+    verification: none
+  - id: control-script
+    name: BrightSign player running BrightSign's sample control script
+    supports: [send_message, play, play_clear, loop, loop_seamless, stop, stop_clear, pause, resume, search,
+               set_volume, reboot]
+    verification: none
+
+commands:
+  send_message:
+    summary: "Send a UDP message, such as one a presentation's UDP Input event waits for"
+    params:
+      message: { type: string, max_length: 1400, required: true, label: Message,
+                 description: "The exact string a UDP Input event of the presentation is set to, such as Reboot_Me." }
+    send: "{message}"
+    returns: none
+  set_variable:
+    summary: "Set a presentation user variable with an Input-specifies-variable UDP event (name:value)"
+    params:
+      name: &var_name { type: string, pattern: '^[^:!]+$', max_length: 256, required: true, label: Variable, description: "The user variable's name." }
+      value: { type: string, pattern: '^([^!]|![^!])*!?$', max_length: 1024, required: true, label: Value, description: "The value to give it." }
+    send: "{name}:{value}"
+    returns: none
+  set_variables:
+    summary: "Set several presentation user variables in one message (name:value!!name:value)"
+    params:
+      assignments: { type: string, pattern: '^[^:!]+:[^!]*(!![^:!]+:[^!]*)*$', max_length: 1400, required: true, label: Assignments,
+                     description: "The assignments as the presentation takes them, name:value pairs separated by !!, such as Score:3!!Team:Home." }
+    send: "{assignments}"
+    returns: none
+  play:
+    summary: "Play a file and hold its last frame (PLAY)"
+    params:
+      file: &file { type: string, pattern: '^[^ ]+$', max_length: 255, required: true, label: File, description: "The file's name on the player's storage." }
+    send: "PLAY {file}"
+    returns: none
+  play_clear:
+    summary: "Play a file and clear the screen when it ends (PLAYCL)"
+    params: { file: *file }
+    send: "PLAYCL {file}"
+    returns: none
+  loop:
+    summary: "Play a file in a loop (LOOP)"
+    params: { file: *file }
+    send: "LOOP {file}"
+    returns: none
+  loop_seamless:
+    summary: "Loop a video seamlessly, without its audio (LOOPS)"
+    params: { file: *file }
+    send: "LOOPS {file}"
+    returns: none
+  stop:
+    summary: "Stop and hold the last frame (STOP)"
+    send: "STOP"
+    returns: none
+  stop_clear:
+    summary: "Stop and clear the screen (STOPCL)"
+    send: "STOPCL"
+    returns: none
+  pause:
+    summary: "Pause playback (PAUSE)"
+    send: "PAUSE"
+    returns: none
+  resume:
+    summary: "Resume playback (RESUME)"
+    send: "RESUME"
+    returns: none
+  search:
+    summary: "Check whether a file is on the player (SEARCH)"
+    params: { file: *file }
+    send: "SEARCH {file}"
+    returns: none
+  set_volume:
+    summary: "Set the volume (VOLUME)"
+    params:
+      percent: { type: int, min: 0, max: 100, required: true, label: Volume, description: "The volume in percent." }
+    send: "VOLUME {percent}"
+    returns: none
+  reboot:
+    summary: "Reboot the player (REBOOT)"
+    send: "REBOOT"
+    returns: none
+
+quirks:
+  - models: [presentation]
+    severity: warning
+    text: >
+      A presentation does only what its UDP Input events define: send_message sends the event's exact
+      string, and variables are set only by events set to take them. Messages go to the presentation's UDP
+      Receiver Port, set in its Networking settings; 5000 is assumed here as the usual value.
+  - models: [control-script]
+    severity: warning
+    text: >
+      The command texts and ports are those of BrightSign's sample control script as the Companion module
+      describes it (receive on UDP 5000, its own messages to UDP 5001); the script's settings can change both.
+      Its answers go to its configured destination, not back to the sender, and are not read here.
+  - models: [all]
+    severity: info
+    text: >
+      UDP gives no acknowledgement: every command is reported unverified, and the player's state is read
+      with the brightsign-dws integration over its Local DWS.

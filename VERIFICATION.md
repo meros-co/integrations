@@ -861,6 +861,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that input-descriptions comes in list replies, sideloaded objects and websocket pushes of layers, variants, sources and filters, not only in a GET of one object, and in the shape the Data Types page gives (type, label, hidden, index, value-min, value-max, value-step, value-unit, value-list). ([specs/boinx-mimolive.yaml:1483](specs/boinx-mimolive.yaml#L1483))
 - [ ] Check whether a camera or device source's GET, list entry, sideloaded object or websocket push reports video-device-id, video-device-name, audio-device-id, audio-device-name or channel-map (none is documented as reported, so state does not hold them); if they are, add them to the source state. ([specs/boinx-mimolive.yaml:2164](specs/boinx-mimolive.yaml#L2164))
 
+## brightsign-dws — BrightSign players (Local DWS)
+
+- [ ] Confirm a path with slashes in /api/v1/files/<path>/ (each segment percent-encoded) lists, reads, renames and deletes nested files. ([specs/brightsign-dws.yaml:671](specs/brightsign-dws.yaml#L671))
+- [ ] Confirm an upload as one multipart part named file, with the file's name as its filename, lands in the folder given in the path. ([specs/brightsign-dws.yaml:244](specs/brightsign-dws.yaml#L244))
+- [ ] Check whether the telnet and ssh answers come wrapped in data.result or bare, as the documentation shows them. ([specs/brightsign-dws.yaml:684](specs/brightsign-dws.yaml#L684))
+- [ ] Check the display power setting values beyond on and standby, the video output names, and the brightness, contrast, volume and white-balance ranges on a Moka display. ([specs/brightsign-dws.yaml:607](specs/brightsign-dws.yaml#L607))
+- [ ] Confirm the file systems format_storage takes (exfat by default) and the supervisor logging level range. ([specs/brightsign-dws.yaml:264](specs/brightsign-dws.yaml#L264))
+
+## brightsign-udp — BrightSign players (UDP)
+
+- [ ] Confirm the default UDP Receiver Port of a new BrightSign Author presentation (5000 is assumed). ([specs/brightsign-udp.yaml:46](specs/brightsign-udp.yaml#L46))
+- [ ] Confirm the sample control script's command texts (PLAY, PLAYCL, LOOP, LOOPS, STOP, STOPCL, PAUSE, RESUME, SEARCH, VOLUME, REBOOT) on its current version. ([specs/brightsign-udp.yaml:86](specs/brightsign-udp.yaml#L86))
+- [ ] Confirm name:value and name:value!!name:value set user variables through an Input-specifies-variable UDP event. ([specs/brightsign-udp.yaml:79](specs/brightsign-udp.yaml#L79))
+
 ## brompton-tessera — Brompton Tessera
 
 - [ ] Confirm that GET /api/ answers the whole tree under an "api" key, with groups, input ports, cable loops and frame remapping frames keyed "1", "2", ... (ports and frames numbered from 1), as the poll reads it. ([specs/brompton-tessera.yaml:3315](specs/brompton-tessera.yaml#L3315))

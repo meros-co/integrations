@@ -1,0 +1,850 @@
+spec: 1
+id: brightsign-dws
+name: BrightSign players (Local DWS REST API)
+vendor: BrightSign
+category: playback
+
+# BrightSign players serve the Local Diagnostic Web Server (DWS) REST API under
+# /api/v1 on the player's address, with digest authentication as admin and the
+# DWS password (the player's serial number unless changed). Since BOS 9.0.218
+# and 9.1.52 the Local DWS is HTTPS by default with a self-signed certificate,
+# and since BOS 9.0.218 / 9.1.75 local access is off until enabled. Every
+# answer is {"data": {"result": ...}}. The player pushes nothing: its
+# information, health, clock, video mode, display power save, access settings
+# and (on displays with a built-in player) the display's settings are polled.
+# What a presentation plays is driven by its own UDP commands (brightsign-udp).
+source:
+  - title: "Local DWS APIs (BrightSign developer documentation)"
+    author: BrightSign
+    url: "https://docs.brightsign.biz/develop/local-dws-apis"
+    note: >
+      Manufacturer documentation, read 2026-10-27 (with the markdown pages listed in docs.brightsign.biz's
+      llms.txt). Local access off by default from BOS 9.0.218 / 9.1.75; digest authentication, user admin,
+      password the serial number by default or set by a setup package or script, BOS 8.4.6 or newer; URL
+      prefix https://player_ip/api, APIs under /v1; HTTPS by default with a self-signed certificate from
+      BOS 9.0.218 and 9.1.52, HTTPS enforced.
+  - title: "LDWS General, Info, Control, Video, Remote Snapshot, Storage, Registry, Logs, Diagnostics, Advanced, sendCecX and Display Control Endpoints"
+    author: BrightSign
+    url: "https://docs.brightsign.biz/develop/ldws-info-endpoints"
+    note: >
+      Manufacturer documentation, read 2026-10-27 (ldws-*-endpoints pages). GET /v1/health (status
+      active, statusTime), GET /v1/download-firmware?url=; GET /v1/info (serial, model, FWVersion,
+      bootVersion, family, upTime, upTimeSeconds, power, poe, networking name and description,
+      connectionType...); GET and PUT /v1/time (date YYYY-MM-DD, time HH:mm, applyTimezone); GET
+      /v1/video-mode; GET /v1/video/hdmi/output/:device/ (0, or 0-3 on the XC4055, 0-1 on the XC2055 and
+      XT2145), its edid, power-save (is_connected, is_powered, enabled; PUT enabled), modes, mode (?best=1,
+      ?active=1, ?configured=1; PUT modeName); POST /v1/snapshot (width, height,
+      shouldCaptureFullResolution; filename under remote_snapshots); GET, POST (rename with name), PUT
+      (multipart upload, or a folder), DELETE /v1/files/:path; PUT /v1/storage/encryption; GET /v1/registry,
+      GET, PUT ({"value"}) and DELETE /v1/registry/:section/:key, DELETE /v1/registry/:section, GET and PUT
+      /v1/registry/recovery_url, PUT /v1/registry/flush; GET /v1/logs; DELETE /v1/storage/:device (fs,
+      exfat by default); GET /v1/diagnostics, dns-lookup, ping, trace-route (resolveAddress),
+      network-neighborhood, network-configuration (GET and PUT), interfaces, packet-capture (GET, POST
+      filename, net_interface, duration, maxpackets, snaplen, filter; DELETE), telnet and ssh (GET, PUT
+      enabled, portNumber, password, reboot), chromium-debug (enableWebInspector); GET and PUT
+      /v1/advanced/property-lock (forceRegistrySettings, registryEnableSettings), /v1/system/supervisor/
+      logging (level); POST /v1/sendCecX (hexCommand); PUT /v1/control/reboot (crash_report,
+      factory_reset, autorun disable), GET and PUT /v1/control/dws-password, GET and PUT
+      /v1/control/local-dws (enable), PUT /v1/control/ssh-host-keys/reset, PUT
+      /v1/control/dws-default-certs/reset; display control on Moka displays with a built-in player, BOS
+      9.0.189 and later: GET /v1/display-control and brightness, contrast, always-connected (enable),
+      always-on (enable), firmware (filepath or url), info, power-settings (setting), standby-timeout
+      (seconds), sd-connection (connection), video-output (output), volume, white-balance (redBalance,
+      greenBalance, blueBalance).
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: digest
+  refusal_status: [401]
+  timeout_ms: 10000
+  probe: { method: GET, path: /api/v1/health/ }
+
+settings:
+  username: { type: string, default: admin, max_length: 64, label: Username, description: "The Local DWS user, which is always admin." }
+  password: { type: string, secret: true, default: "", max_length: 256, label: Password,
+              description: "The Local DWS password: the player's serial number unless a setup package or script changed it; empty when the DWS has no password." }
+  scheme:
+    type: enum
+    values: [https, http]
+    default: https
+    label: Scheme
+    description: "https, the Local DWS default from BOS 9.0.218 and 9.1.52 (a self-signed certificate, not checked), or http for older BOS."
+
+ports:
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+  - { port: 80, protocol: http, role: control, setting: scheme, when: "scheme http", note: "BOS before 9.0.218 and 9.1.52, or with HTTP redirection turned off" }
+
+models:
+  - id: player
+    name: BrightSign player (BOS 8.4.6 and later)
+    supports: &player [get_info, get_health, get_time, set_time, get_video_mode, get_video_output, get_edid, get_power_save,
+                       set_power_save, get_video_modes, get_output_mode, set_output_mode, take_snapshot, list_files,
+                       read_file, rename_file, create_folder, upload_file, delete_file, format_storage, encrypt_storage,
+                       get_registry, get_registry_key, set_registry_key, delete_registry_key, delete_registry_section,
+                       get_recovery_url, set_recovery_url, flush_registry, get_logs, get_diagnostics, dns_lookup, ping,
+                       trace_route, get_network_neighborhood, get_network_configuration, set_network_configuration,
+                       get_network_interfaces, get_packet_capture, start_packet_capture, stop_packet_capture, get_telnet,
+                       set_telnet, get_ssh, set_ssh, get_chromium_debug, set_chromium_debug, get_property_lock,
+                       set_property_lock, get_supervisor_logging, set_supervisor_logging, send_cec, reboot,
+                       reboot_with_crash_report, reboot_disable_autorun, factory_reset, get_dws_password, set_dws_password,
+                       get_local_dws, set_local_dws, reset_ssh_host_keys, reset_dws_certificates, update_firmware]
+    verification: none
+  - id: display
+    name: Moka display with a built-in BrightSign player (BOS 9.0.189 and later)
+    supports: [get_info, get_health, get_time, set_time, get_video_mode, get_video_output, get_edid, get_power_save,
+               set_power_save, get_video_modes, get_output_mode, set_output_mode, take_snapshot, list_files,
+               read_file, rename_file, create_folder, upload_file, delete_file, format_storage, encrypt_storage,
+               get_registry, get_registry_key, set_registry_key, delete_registry_key, delete_registry_section,
+               get_recovery_url, set_recovery_url, flush_registry, get_logs, get_diagnostics, dns_lookup, ping,
+               trace_route, get_network_neighborhood, get_network_configuration, set_network_configuration,
+               get_network_interfaces, get_packet_capture, start_packet_capture, stop_packet_capture, get_telnet,
+               set_telnet, get_ssh, set_ssh, get_chromium_debug, set_chromium_debug, get_property_lock,
+               set_property_lock, get_supervisor_logging, set_supervisor_logging, send_cec, reboot,
+               reboot_with_crash_report, reboot_disable_autorun, factory_reset, get_dws_password, set_dws_password,
+               get_local_dws, set_local_dws, reset_ssh_host_keys, reset_dws_certificates, update_firmware,
+               get_display_settings, get_display_info, set_display_brightness, set_display_contrast,
+               set_display_volume, set_display_always_connected, set_display_always_on, set_display_power,
+               set_display_standby_timeout, set_display_sd_connection, set_display_video_output,
+               set_display_white_balance, update_display_firmware_url, update_display_firmware_file]
+    verification: none
+
+commands:
+  # ── Information ─────────────────────────────────────────────────────────
+  get_info:
+    summary: "Read the player's information: serial, model, firmware, uptime, network, power and features (GET /v1/info)"
+    send: { method: GET, path: /api/v1/info/ }
+    expect: &result { status: 200, json_path: "$.data.result" }
+    returns: value
+  get_health:
+    summary: "Read the player's health: active, and the time it answered (GET /v1/health)"
+    send: { method: GET, path: /api/v1/health/ }
+    expect: *result
+    returns: value
+  get_time:
+    summary: "Read the player's date, time and time zone (GET /v1/time)"
+    send: { method: GET, path: /api/v1/time/ }
+    expect: *result
+    returns: value
+  set_time:
+    summary: "Set the player's date and time (PUT /v1/time)"
+    params:
+      date: { type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', max_length: 10, required: true, label: Date, description: "The date as YYYY-MM-DD." }
+      time: { type: string, pattern: '^[0-9]{2}:[0-9]{2}(:[0-9]{2})?$', max_length: 8, required: true, label: Time, description: "The time as HH:mm." }
+      local: { type: bool, default: false, label: Local time,
+               description: "True when the date and time are in the player's time zone (applyTimezone); false for UTC." }
+    send: { method: PUT, path: /api/v1/time/, content_type: application/json,
+            body: '{"date":"{date}","time":"{time}","applyTimezone":{local}}' }
+    expect: *result
+    returns: value
+
+  # ── Video ───────────────────────────────────────────────────────────────
+  get_video_mode:
+    summary: "Read the video mode in use (GET /v1/video-mode)"
+    send: { method: GET, path: /api/v1/video-mode/ }
+    expect: *result
+    returns: value
+  get_video_output:
+    summary: "Read an HDMI output's resolutions, EDID, audio and signal status, modes and power save (GET /v1/video/hdmi/output/:device)"
+    params:
+      output: &output { type: int, min: 0, max: 3, default: 0, label: Output,
+                        description: "The HDMI output: 0 on single-output players, 0-3 on the XC4055, 0-1 on the XC2055 and XT2145." }
+    send: { method: GET, path: "/api/v1/video/hdmi/output/{output}/" }
+    expect: *result
+    returns: value
+  get_edid:
+    summary: "Read the EDID of the display on an HDMI output (GET .../edid)"
+    params: { output: *output }
+    send: { method: GET, path: "/api/v1/video/hdmi/output/{output}/edid/" }
+    expect: *result
+    returns: value
+  get_power_save:
+    summary: "Read whether a display is connected and powered, and whether power save is on (GET .../power-save)"
+    params: { output: *output }
+    send: { method: GET, path: "/api/v1/video/hdmi/output/{output}/power-save/" }
+    expect: *result
+    returns: value
+  set_power_save:
+    summary: "Turn an HDMI output's power-save mode on or off (PUT .../power-save)"
+    params:
+      output: *output
+      enabled: { type: bool, required: true, label: Power save, description: "On to put the display in power save." }
+    send: { method: PUT, path: "/api/v1/video/hdmi/output/{output}/power-save/", content_type: application/json,
+            body: '{"enabled":{enabled}}' }
+    expect: *result
+    returns: value
+  get_video_modes:
+    summary: "List the video modes an HDMI output offers (GET .../modes)"
+    params: { output: *output }
+    send: { method: GET, path: "/api/v1/video/hdmi/output/{output}/modes/" }
+    expect: *result
+    returns: value
+  get_output_mode:
+    summary: "Read an HDMI output's best, active or configured video mode (GET .../mode)"
+    params:
+      output: *output
+      which: { type: enum, values: [active, best, configured], default: active, label: Mode,
+               description: "The active mode, the best mode the display's EDID offers, or the configured mode." }
+    send: { method: GET, path: "/api/v1/video/hdmi/output/{output}/mode/", raw_query: "{which}=1" }
+    expect: *result
+    returns: value
+  set_output_mode:
+    summary: "Set an HDMI output's video mode by name, such as 1920x1080x60p (PUT .../mode)"
+    params:
+      output: *output
+      mode: { type: string, pattern: '^[0-9A-Za-z:_.-]+$', max_length: 64, required: true, label: Video mode,
+              description: "The video mode's name from BrightSign's supported modes, such as 1920x1080x60p or 3840x2160x30p." }
+    send: { method: PUT, path: "/api/v1/video/hdmi/output/{output}/mode/", content_type: application/json,
+            body: '{"modeName":"{mode}"}' }
+    expect: *result
+    returns: value
+  take_snapshot:
+    summary: "Capture what the player shows; answers the file under remote_snapshots and a thumbnail (POST /v1/snapshot)"
+    params:
+      width: { type: int, min: 1, max: 7680, default: 1920, label: Width, description: "The snapshot's width in pixels." }
+      height: { type: int, min: 1, max: 4320, default: 1080, label: Height, description: "The snapshot's height in pixels." }
+      full_resolution: { type: bool, default: false, label: Full resolution, description: "Capture at the output's full resolution." }
+    send: { method: POST, path: /api/v1/snapshot/, content_type: application/json,
+            body: '{"width":{width},"height":{height},"shouldCaptureFullResolution":{full_resolution}}' }
+    expect: *result
+    returns: value
+
+  # ── Files and storage ───────────────────────────────────────────────────
+  list_files:
+    summary: "Read a folder's or file's metadata on the player's storage (GET /v1/files/:path)"
+    params:
+      path: &file_path { type: string, pattern: '^[A-Za-z0-9_.-]+(/[^/]+)*$', max_length: 1024, required: true, label: Path,
+                         description: "The path on the player, starting with the storage: sd, usb1 or ssd, then folders and file, such as sd/autorun.brs." }
+    send: { method: GET, path: "/api/v1/files/{path:path}/" }
+    expect: *result
+    returns: value
+  read_file:
+    summary: "Read a file's contents, base64-encoded (GET /v1/files/:path?contents)"
+    params: { path: *file_path }
+    send: { method: GET, path: "/api/v1/files/{path:path}/", raw_query: contents }
+    expect: *result
+    returns: value
+  rename_file:
+    summary: "Rename a file (POST /v1/files/:path)"
+    params:
+      path: *file_path
+      name: { type: string, pattern: '^[^/]+$', max_length: 255, required: true, label: New name, description: "The file's new name, without a folder." }
+    send: { method: POST, path: "/api/v1/files/{path:path}/", content_type: application/json, body: '{"name":{name:json}}' }
+    expect: *result
+    returns: value
+  create_folder:
+    summary: "Create a folder (PUT /v1/files/:path)"
+    params: { path: *file_path }
+    send: { method: PUT, path: "/api/v1/files/{path:path}/" }
+    expect: *result
+    returns: value
+  upload_file:
+    summary: "Upload a file into a folder of the player's storage (PUT /v1/files/:path, multipart)"
+    params:
+      folder: { type: string, pattern: '^[A-Za-z0-9_.-]+(/[^/]+)*$', max_length: 1024, required: true, label: Folder,
+                description: "The folder on the player to upload into, starting with the storage, such as sd or sd/media." }
+      file: { type: binary, required: true, label: File, description: "The file's bytes, or a file on the host." }
+      name: { type: string, pattern: '^[^/"\\]+$', max_length: 255, required: true, label: File name, description: "The name the file gets on the player." }
+    send:
+      method: PUT
+      path: "/api/v1/files/{folder:path}/"
+      multipart:
+        - { name: file, binary: file, filename: "{name}", content_type: application/octet-stream }
+    expect: *result
+    returns: value
+  delete_file:
+    summary: "Delete a file or folder (DELETE /v1/files/:path)"
+    params: { path: *file_path }
+    send: { method: DELETE, path: "/api/v1/files/{path:path}/" }
+    expect: *result
+    returns: value
+  format_storage:
+    summary: "Reformat a storage device, erasing it (DELETE /v1/storage/:device)"
+    params:
+      device: &device { type: string, pattern: '^[A-Za-z0-9_-]+$', max_length: 32, required: true, label: Storage, description: "The storage device: sd, usb1 or ssd." }
+      fs: { type: enum, values: [exfat, fat32, ext3, ext4], default: exfat, label: File system, description: "The file system to format with." }
+    send: { method: DELETE, path: "/api/v1/storage/{device}/", content_type: application/json, body: '{"fs":"{fs}"}' }
+    expect: *result
+    returns: value
+  encrypt_storage:
+    summary: "Encrypt a storage device, reformatting it by default (PUT /v1/storage/encryption, BOS 9.0.197 and later)"
+    params:
+      path: { type: string, pattern: '^/[A-Za-z0-9_-]+$', max_length: 32, required: true, label: Storage, description: "The storage's path, such as /sd." }
+      type: { type: enum, values: [brightsign-key, unique-key, password, none], required: true, label: Encryption,
+              description: "The encryption method: BrightSign's key, a key unique to the player, a password, or none." }
+      password: { type: string, secret: true, max_length: 256, default: "", label: Password, description: "The password, for the password method; empty otherwise." }
+      format: { type: bool, default: true, label: Reformat, description: "Reformat the storage, erasing it." }
+      provision: { type: bool, default: false, label: Provision, description: "Provision the player with BSN.Cloud afterwards." }
+    send: { method: PUT, path: /api/v1/storage/encryption/, content_type: application/json,
+            body: '{"filePath":"{path}","settings":{"type":"{type}","password":{password:json}},"format":{format},"doProvision":{provision}}' }
+    expect: *result
+    returns: value
+
+  # ── Registry ────────────────────────────────────────────────────────────
+  get_registry:
+    summary: "Read the whole registry, by section (GET /v1/registry)"
+    send: { method: GET, path: /api/v1/registry/ }
+    expect: *result
+    returns: value
+  get_registry_key:
+    summary: "Read a registry key (GET /v1/registry/:section/:key)"
+    params:
+      section: &section { type: string, pattern: '^[A-Za-z0-9_-]+$', max_length: 64, required: true, label: Section, description: "The registry section, such as networking or html." }
+      key: &key { type: string, pattern: '^[A-Za-z0-9_.-]+$', max_length: 128, required: true, label: Key, description: "The key in the section." }
+    send: { method: GET, path: "/api/v1/registry/{section}/{key}/" }
+    expect: *result
+    returns: value
+  set_registry_key:
+    summary: "Write a registry key (PUT /v1/registry/:section/:key)"
+    params:
+      section: *section
+      key: *key
+      value: { type: string, max_length: 4096, required: true, label: Value, description: "The value, as text." }
+    send: { method: PUT, path: "/api/v1/registry/{section}/{key}/", content_type: application/json, body: '{"value":{value:json}}' }
+    expect: *result
+    returns: value
+  delete_registry_key:
+    summary: "Delete a registry key (DELETE /v1/registry/:section/:key)"
+    params: { section: *section, key: *key }
+    send: { method: DELETE, path: "/api/v1/registry/{section}/{key}/" }
+    expect: *result
+    returns: value
+  delete_registry_section:
+    summary: "Delete a whole registry section (DELETE /v1/registry/:section)"
+    params: { section: *section }
+    send: { method: DELETE, path: "/api/v1/registry/{section}/" }
+    expect: *result
+    returns: value
+  get_recovery_url:
+    summary: "Read the recovery URL (GET /v1/registry/recovery_url)"
+    send: { method: GET, path: /api/v1/registry/recovery_url/ }
+    expect: *result
+    returns: value
+  set_recovery_url:
+    summary: "Set the recovery URL (PUT /v1/registry/recovery_url)"
+    params:
+      url: { type: string, max_length: 2048, required: true, label: URL, description: "The recovery URL." }
+    send: { method: PUT, path: /api/v1/registry/recovery_url/, content_type: application/json, body: '{"url":{url:json}}' }
+    expect: *result
+    returns: value
+  flush_registry:
+    summary: "Write the registry to storage (PUT /v1/registry/flush)"
+    send: { method: PUT, path: /api/v1/registry/flush/ }
+    expect: *result
+    returns: value
+
+  # ── Logs and diagnostics ────────────────────────────────────────────────
+  get_logs:
+    summary: "Read the player's log, lines separated by newlines (GET /v1/logs)"
+    send: { method: GET, path: /api/v1/logs/ }
+    expect: *result
+    returns: value
+  get_diagnostics:
+    summary: "Run the network diagnostics on each interface (GET /v1/diagnostics)"
+    send: { method: GET, path: /api/v1/diagnostics/ }
+    expect: *result
+    returns: value
+  dns_lookup:
+    summary: "Look a name up in DNS from the player (GET /v1/diagnostics/dns-lookup/:address)"
+    params:
+      address: &address { type: string, pattern: '^[A-Za-z0-9.:_-]+$', max_length: 253, required: true, label: Address, description: "A host name or IP address." }
+    send: { method: GET, path: "/api/v1/diagnostics/dns-lookup/{address}/" }
+    expect: *result
+    returns: value
+  ping:
+    summary: "Ping an address from the player (GET /v1/diagnostics/ping/:ipAddress)"
+    params: { address: *address }
+    send: { method: GET, path: "/api/v1/diagnostics/ping/{address}/" }
+    expect: *result
+    returns: value
+  trace_route:
+    summary: "Trace the route to an address from the player (GET /v1/diagnostics/trace-route/:address)"
+    params:
+      address: *address
+      resolve: { type: bool, default: false, label: Resolve, description: "Resolve the addresses on the route to names." }
+    send: { method: GET, path: "/api/v1/diagnostics/trace-route/{address}/", query: { resolveAddress: "{resolve}" } }
+    expect: *result
+    returns: value
+  get_network_neighborhood:
+    summary: "List the BrightSign players in the network neighbourhood (GET /v1/diagnostics/network-neighborhood)"
+    send: { method: GET, path: /api/v1/diagnostics/network-neighborhood/ }
+    expect: *result
+    returns: value
+  get_network_configuration:
+    summary: "Read a network interface's configuration (GET /v1/diagnostics/network-configuration/:interfaceName)"
+    params:
+      interface: &interface { type: string, pattern: '^[A-Za-z0-9_.-]+$', max_length: 32, default: eth0, label: Interface, description: "The interface, such as eth0 or wlan0." }
+    send: { method: GET, path: "/api/v1/diagnostics/network-configuration/{interface}/" }
+    expect: *result
+    returns: value
+  set_network_configuration:
+    summary: "Change a network interface's configuration with the documented object (dnsServerList, ipAddressList, domain, mtu, vlanIdList, metric, inboundShaperRate, 802.1X fields...) (PUT .../network-configuration/:interfaceName)"
+    params:
+      interface: *interface
+      config: { type: json, required: true, label: Configuration,
+                description: "The configuration object as the Diagnostics Endpoints page documents it, such as {\"dnsServerList\":[\"8.8.8.8\"]}." }
+    send: { method: PUT, path: "/api/v1/diagnostics/network-configuration/{interface}/", content_type: application/json, body: "{config}" }
+    expect: *result
+    returns: value
+  get_network_interfaces:
+    summary: "List the player's network interfaces (GET /v1/diagnostics/interfaces)"
+    send: { method: GET, path: /api/v1/diagnostics/interfaces/ }
+    expect: *result
+    returns: value
+  get_packet_capture:
+    summary: "Read whether a packet capture is running (GET /v1/diagnostics/packet-capture)"
+    send: { method: GET, path: /api/v1/diagnostics/packet-capture/ }
+    expect: *result
+    returns: value
+  start_packet_capture:
+    summary: "Start a packet capture on the player (POST /v1/diagnostics/packet-capture)"
+    params:
+      filename: { type: string, pattern: '^[^/"\\]+$', max_length: 255, default: capture.pcap, label: File name, description: "The capture file's name." }
+      interface: *interface
+      duration: { type: int, min: 1, default: 300, label: Duration, description: "How long the capture runs, in seconds." }
+      max_packets: { type: int, min: 0, default: 0, label: Packet limit, description: "Stop after this many packets; 0 for no limit." }
+      snaplen: { type: int, min: 0, default: 0, label: Snap length, description: "The most bytes kept of each packet; 0 for whole packets." }
+      filter: { type: string, max_length: 1024, default: "", label: Filter, description: "A pcap filter expression; empty for every packet." }
+    send: { method: POST, path: /api/v1/diagnostics/packet-capture/, content_type: application/json,
+            body: '{"filename":{filename:json},"net_interface":"{interface}","duration":{duration},"maxpackets":{max_packets},"snaplen":{snaplen},"filter":{filter:json}}' }
+    expect: *result
+    returns: value
+  stop_packet_capture:
+    summary: "Stop the running packet capture (DELETE /v1/diagnostics/packet-capture)"
+    send: { method: DELETE, path: /api/v1/diagnostics/packet-capture/ }
+    expect: *result
+    returns: value
+  get_telnet:
+    summary: "Read whether Telnet is on and its port (GET /v1/diagnostics/telnet, BOS 9.0.110 / 8.5.46 and later)"
+    send: { method: GET, path: /api/v1/diagnostics/telnet/ }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_telnet:
+    summary: "Turn Telnet on or off (PUT /v1/diagnostics/telnet)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "Turn Telnet on, or off." }
+      port: { type: int, min: 1, max: 65535, default: 23, label: Port, description: "The Telnet port." }
+      reboot: &reboot_after { type: bool, default: true, label: Reboot, description: "Reboot the player at once to apply it." }
+    send: { method: PUT, path: /api/v1/diagnostics/telnet/, content_type: application/json,
+            body: '{"enabled":{enabled},"portNumber":{port},"reboot":{reboot}}' }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_ssh:
+    summary: "Read whether SSH is on, its port and whether a password is set (GET /v1/diagnostics/ssh)"
+    send: { method: GET, path: /api/v1/diagnostics/ssh/ }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ssh:
+    summary: "Turn SSH on or off and set its password (PUT /v1/diagnostics/ssh)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "Turn SSH on, or off." }
+      port: { type: int, min: 1, max: 65535, default: 22, label: Port, description: "The SSH port." }
+      password: { type: string, secret: true, max_length: 256, required: true, label: Password, description: "The SSH login password." }
+      reboot: *reboot_after
+    send: { method: PUT, path: /api/v1/diagnostics/ssh/, content_type: application/json,
+            body: '{"enabled":{enabled},"portNumber":{port},"password":{password:json},"reboot":{reboot}}' }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_chromium_debug:
+    summary: "Read whether the Chromium web inspector is on (GET /v1/diagnostics/chromium-debug)"
+    send: { method: GET, path: /api/v1/diagnostics/chromium-debug/ }
+    expect: *result
+    returns: value
+  set_chromium_debug:
+    summary: "Turn the Chromium web inspector for HTML widgets on or off; takes effect after a reboot (PUT /v1/diagnostics/chromium-debug)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "Turn the web inspector on, or off." }
+    send: { method: PUT, path: /api/v1/diagnostics/chromium-debug/, content_type: application/json, body: '{"enableWebInspector":{enabled}}' }
+    expect: *result
+    returns: value
+  get_property_lock:
+    summary: "Read the settings handler and registry priority (GET /v1/advanced/property-lock)"
+    send: { method: GET, path: /api/v1/advanced/property-lock/ }
+    expect: *result
+    returns: value
+  set_property_lock:
+    summary: "Set whether registry settings take priority and the settings handler's registry value (PUT /v1/advanced/property-lock)"
+    params:
+      force_registry: { type: bool, required: true, label: Registry first, description: "Registry settings take priority." }
+      registry_enable: { type: bool, required: true, label: Settings handler, description: "The registry value enabling the settings handler." }
+    send: { method: PUT, path: /api/v1/advanced/property-lock/, content_type: application/json,
+            body: '{"forceRegistrySettings":{force_registry},"registryEnableSettings":{registry_enable}}' }
+    expect: *result
+    returns: value
+  get_supervisor_logging:
+    summary: "Read the supervisor's logging level (GET /v1/system/supervisor/logging)"
+    send: { method: GET, path: /api/v1/system/supervisor/logging/ }
+    expect: *result
+    returns: value
+  set_supervisor_logging:
+    summary: "Set the supervisor's logging level (PUT /v1/system/supervisor/logging)"
+    params:
+      level: { type: int, min: 0, max: 10, required: true, label: Level, description: "The logging level; higher numbers log more detail." }
+    send: { method: PUT, path: /api/v1/system/supervisor/logging/, content_type: application/json, body: '{"level":{level}}' }
+    expect: *result
+    returns: value
+  send_cec:
+    summary: "Send a CEC command to the connected display (POST /v1/sendCecX)"
+    params:
+      hex: { type: string, pattern: '^[0-9A-Fa-f]{2,64}$', max_length: 64, required: true, label: CEC command, description: "The CEC message in hexadecimal, such as 4004 (image view on)." }
+    send: { method: POST, path: /api/v1/sendCecX/, content_type: application/json, body: '{"hexCommand":"{hex}"}' }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Control ─────────────────────────────────────────────────────────────
+  reboot:
+    summary: "Reboot the player (PUT /v1/control/reboot)"
+    send: { method: PUT, path: /api/v1/control/reboot/ }
+    expect: *result
+    returns: value
+  reboot_with_crash_report:
+    summary: "Reboot the player and save a crash report, for BrightSign support (PUT /v1/control/reboot)"
+    send: { method: PUT, path: /api/v1/control/reboot/, content_type: application/json, body: '{"crash_report":true}' }
+    expect: *result
+    returns: value
+  reboot_disable_autorun:
+    summary: "Reboot the player with its autorun script disabled, for debugging (PUT /v1/control/reboot)"
+    send: { method: PUT, path: /api/v1/control/reboot/, content_type: application/json, body: '{"autorun":"disable"}' }
+    expect: *result
+    returns: value
+  factory_reset:
+    summary: "Reset the player to factory defaults, erasing its registry, and reboot (PUT /v1/control/reboot)"
+    send: { method: PUT, path: /api/v1/control/reboot/, content_type: application/json, body: '{"factory_reset":true}' }
+    expect: *result
+    returns: value
+  get_dws_password:
+    summary: "Read whether the DWS password is valid or blank, not the password (GET /v1/control/dws-password)"
+    send: { method: GET, path: /api/v1/control/dws-password/ }
+    expect: *result
+    returns: value
+  set_dws_password:
+    summary: "Change the DWS password (PUT /v1/control/dws-password)"
+    params:
+      password: { type: string, secret: true, max_length: 256, required: true, label: New password, description: "The new password; empty for none." }
+      previous: { type: string, secret: true, max_length: 256, default: "", label: Current password, description: "The current password." }
+    send: { method: PUT, path: /api/v1/control/dws-password/, content_type: application/json,
+            body: '{"password":{password:json},"previous_password":{previous:json}}' }
+    expect: *result
+    returns: value
+  get_local_dws:
+    summary: "Read whether the Local DWS is enabled (GET /v1/control/local-dws)"
+    send: { method: GET, path: /api/v1/control/local-dws/ }
+    expect: *result
+    returns: value
+  set_local_dws:
+    summary: "Enable or disable the Local DWS; disabling it ends this connection (PUT /v1/control/local-dws)"
+    params:
+      enabled: { type: bool, required: true, label: Enabled, description: "Keep the Local DWS on, or turn it off." }
+    send: { method: PUT, path: /api/v1/control/local-dws/, content_type: application/json, body: '{"enable":{enabled}}' }
+    expect: *result
+    returns: value
+  reset_ssh_host_keys:
+    summary: "Make new SSH host keys (PUT /v1/control/ssh-host-keys/reset)"
+    send: { method: PUT, path: /api/v1/control/ssh-host-keys/reset/ }
+    expect: *result
+    returns: value
+  reset_dws_certificates:
+    summary: "Go back to the DWS's default certificates (PUT /v1/control/dws-default-certs/reset)"
+    send: { method: PUT, path: /api/v1/control/dws-default-certs/reset/ }
+    expect: *result
+    returns: value
+  update_firmware:
+    summary: "Download and apply a firmware update from a URL; the player reboots (GET /v1/download-firmware)"
+    params:
+      url: { type: string, pattern: '^https?://\S+$', max_length: 2048, required: true, label: Firmware URL, description: "The public URL of the firmware update file for the player's model." }
+    send: { method: GET, path: /api/v1/download-firmware/, query: { url: "{url}" } }
+    expect: *result
+    returns: value
+
+  # ── Display control (built-in player displays) ──────────────────────────
+  get_display_settings:
+    summary: "Read every display setting (GET /v1/display-control)"
+    send: { method: GET, path: /api/v1/display-control/ }
+    expect: *result
+    returns: value
+  get_display_info:
+    summary: "Read the display's MAC addresses, serial, OS version and hardware revision (GET /v1/display-control/info)"
+    send: { method: GET, path: /api/v1/display-control/info/ }
+    expect: *result
+    returns: value
+  set_display_brightness:
+    summary: "Set the display's brightness (PUT /v1/display-control/brightness)"
+    params:
+      brightness: { type: int, min: 0, max: 100, required: true, label: Brightness, description: "The brightness, 0 to 100." }
+    send: { method: PUT, path: /api/v1/display-control/brightness/, content_type: application/json, body: '{"brightness":{brightness}}' }
+    expect: *result
+    returns: value
+  set_display_contrast:
+    summary: "Set the display's contrast (PUT /v1/display-control/contrast)"
+    params:
+      contrast: { type: int, min: 0, max: 100, required: true, label: Contrast, description: "The contrast, 0 to 100." }
+    send: { method: PUT, path: /api/v1/display-control/contrast/, content_type: application/json, body: '{"contrast":{contrast}}' }
+    expect: *result
+    returns: value
+  set_display_volume:
+    summary: "Set the display's volume (PUT /v1/display-control/volume)"
+    params:
+      volume: { type: int, min: 0, max: 100, required: true, label: Volume, description: "The volume, 0 to 100." }
+    send: { method: PUT, path: /api/v1/display-control/volume/, content_type: application/json, body: '{"volume":{volume}}' }
+    expect: *result
+    returns: value
+  set_display_always_connected:
+    summary: "Keep the display's connection to the player always on, or not (PUT /v1/display-control/always-connected)"
+    params:
+      enabled: &enable { type: bool, required: true, label: Enabled, description: "On or off." }
+    send: { method: PUT, path: /api/v1/display-control/always-connected/, content_type: application/json, body: '{"enable":{enabled}}' }
+    expect: *result
+    returns: value
+  set_display_always_on:
+    summary: "Keep the display always on, or not (PUT /v1/display-control/always-on)"
+    params: { enabled: *enable }
+    send: { method: PUT, path: /api/v1/display-control/always-on/, content_type: application/json, body: '{"enable":{enabled}}' }
+    expect: *result
+    returns: value
+  set_display_power:
+    summary: "Set the display's power setting, such as on or standby (PUT /v1/display-control/power-settings)"
+    params:
+      setting: { type: string, pattern: '^[a-z_-]+$', max_length: 32, required: true, label: Power, description: "The power setting: on or standby." }
+    send: { method: PUT, path: /api/v1/display-control/power-settings/, content_type: application/json, body: '{"setting":"{setting}"}' }
+    expect: *result
+    returns: value
+  set_display_standby_timeout:
+    summary: "Set how long the display idles before standby (PUT /v1/display-control/standby-timeout)"
+    params:
+      seconds: { type: int, min: 0, required: true, label: Timeout, description: "The idle time before standby, in seconds." }
+    send: { method: PUT, path: /api/v1/display-control/standby-timeout/, content_type: application/json, body: '{"seconds":{seconds}}' }
+    expect: *result
+    returns: value
+  set_display_sd_connection:
+    summary: "Connect the display's SD card to the player or to the display (PUT /v1/display-control/sd-connection)"
+    params:
+      connection: { type: enum, values: [brightsign, display], required: true, label: SD card, description: "brightsign to give the SD card to the player, display to the display." }
+    send: { method: PUT, path: /api/v1/display-control/sd-connection/, content_type: application/json, body: '{"connection":"{connection}"}' }
+    expect: *result
+    returns: value
+  set_display_video_output:
+    summary: "Choose the display's video input, such as HDMI1 (PUT /v1/display-control/video-output)"
+    params:
+      output: { type: string, pattern: '^[A-Za-z0-9_-]+$', max_length: 32, required: true, label: Input, description: "The display's input, such as HDMI1 or HDMI2." }
+    send: { method: PUT, path: /api/v1/display-control/video-output/, content_type: application/json, body: '{"output":"{output}"}' }
+    expect: *result
+    returns: value
+  set_display_white_balance:
+    summary: "Set the display's white balance (PUT /v1/display-control/white-balance)"
+    params:
+      red: { type: int, min: 0, max: 255, required: true, label: Red, description: "The red balance." }
+      green: { type: int, min: 0, max: 255, required: true, label: Green, description: "The green balance." }
+      blue: { type: int, min: 0, max: 255, required: true, label: Blue, description: "The blue balance." }
+    send: { method: PUT, path: /api/v1/display-control/white-balance/, content_type: application/json,
+            body: '{"redBalance":{red},"greenBalance":{green},"blueBalance":{blue}}' }
+    expect: *result
+    returns: value
+  update_display_firmware_url:
+    summary: "Update the display's firmware from a URL (PUT /v1/display-control/firmware)"
+    params:
+      url: { type: string, pattern: '^https?://\S+$', max_length: 2048, required: true, label: Firmware URL, description: "The URL of the display firmware file." }
+    send: { method: PUT, path: /api/v1/display-control/firmware/, content_type: application/json, body: '{"url":{url:json}}' }
+    expect: *result
+    returns: value
+  update_display_firmware_file:
+    summary: "Update the display's firmware from a file on the player's SD card (PUT /v1/display-control/firmware)"
+    params:
+      path: { type: string, max_length: 1024, required: true, label: File, description: "The firmware file's path relative to the SD card." }
+    send: { method: PUT, path: /api/v1/display-control/firmware/, content_type: application/json, body: '{"filepath":{path:json}}' }
+    expect: *result
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Local access to the DWS is off by default from BOS 9.0.218 (9.0 branch) and 9.1.75 (9.1 branch); it is
+      turned on with a setup package or in BSN.Cloud. Those versions also serve the Local DWS over HTTPS
+      only, with a self-signed certificate: keep the scheme https. The password is the player's serial
+      number unless a setup package or script changed it.
+  - models: [all]
+    severity: info
+    text: >
+      Paths on the player start with the storage (sd, usb1, ssd) and are sent with their slashes, each part
+      percent-encoded. read_file answers the contents base64-encoded, which suits small files; snapshots
+      are written under sd/remote_snapshots and read back with read_file.
+  - models: [all]
+    severity: critical
+    text: >
+      reboot, factory_reset, format_storage, encrypt_storage (which reformats by default), update_firmware,
+      update_display_firmware_*, set_output_mode (which may reboot), set_local_dws false and the telnet, ssh
+      and DWS password changes (which may reboot) interrupt playback or cut this connection, and cannot be
+      undone from here.
+  - models: [all]
+    severity: info
+    text: >
+      The telnet and ssh endpoints' answers are documented without the data.result wrapper the others have;
+      both forms are read. Display control works only on Moka displays with a built-in player, BOS 9.0.189
+      and later; the display model polls it, the player model does not.
+
+state:
+  info.serial: { type: string, description: "The player's serial number" }
+  info.model: { type: string, description: "The player's model, such as XD1035" }
+  info.family: { type: string, description: "The player's hardware family" }
+  info.firmware: { type: string, description: "The installed BrightSignOS version" }
+  info.boot_version: { type: string, description: "The boot loader's version" }
+  info.uptime_s: { type: int, unit: s, description: "How long the player has been up" }
+  info.connection_type: { type: string, description: "The active network interface" }
+  info.name: { type: string, description: "The player's name" }
+  info.description: { type: string, description: "The player's description" }
+  info.power_source: { type: string, description: "The power source, such as AC or PoE" }
+  info.poe_status: { type: string, description: "The PoE status" }
+  health.status: { type: string, description: "active while the player answers" }
+  health.time: { type: string, description: "The player's time when it last answered the health check" }
+  time.now: { type: string, description: "The player's date, time and zone abbreviation, as yyyy-mm-dd hh:mm:ss zone" }
+  time.timezone: { type: string, description: "The player's time zone name, such as America/Los_Angeles" }
+  video.mode: { type: string, description: "The video mode in use, such as 1920x1080x60p" }
+  video.width: { type: int, unit: px, description: "The output width" }
+  video.height: { type: int, unit: px, description: "The output height" }
+  video.frame_rate: { type: int, unit: Hz, description: "The output frame rate" }
+  video.auto: { type: bool, description: "The mode was chosen automatically" }
+  video.color_space: { type: string, description: "rgb, yuv420 or yuv422" }
+  video.color_depth: { type: string, description: "8bit, 10bit or 12bit" }
+  outputs.*.connected: { type: bool, description: "A display is connected to the HDMI output, keyed by output number" }
+  outputs.*.powered: { type: bool, description: "The display on the output is on" }
+  outputs.*.power_save: { type: bool, description: "Power save is on for the output" }
+  access.local_dws: { type: bool, description: "The Local DWS is enabled" }
+  access.telnet: { type: bool, description: "Telnet is on" }
+  access.telnet_port: { type: int, description: "The Telnet port" }
+  access.ssh: { type: bool, description: "SSH is on" }
+  access.ssh_port: { type: int, description: "The SSH port" }
+  access.web_inspector: { type: bool, description: "The Chromium web inspector is on" }
+  display.brightness: { type: int, description: "The display's brightness, 0-100" }
+  display.contrast: { type: int, description: "The display's contrast, 0-100" }
+  display.volume: { type: int, description: "The display's volume, 0-100" }
+  display.power: { type: string, description: "The display's power setting, such as on or standby" }
+  display.standby_timeout_s: { type: int, unit: s, description: "The idle time before standby" }
+  display.video_output: { type: string, description: "The display's input, such as HDMI1" }
+  display.sd_connection: { type: string, description: "brightsign or display: which side the SD card is connected to" }
+  display.always_connected: { type: bool, description: "The display's connection to the player stays on" }
+  display.white_balance.red: { type: int, description: "Red balance" }
+  display.white_balance.green: { type: int, description: "Green balance" }
+  display.white_balance.blue: { type: int, description: "Blue balance" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send:
+        - { method: GET, path: /api/v1/health/ }
+        - { method: GET, path: /api/v1/video/hdmi/output/0/power-save/ }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/v1/time/ }
+        - { method: GET, path: /api/v1/video-mode/ }
+        - { models: [display], method: GET, path: /api/v1/display-control/ }
+    - every_ms: 120000
+      send:
+        - { method: GET, path: /api/v1/info/ }
+        - { method: GET, path: /api/v1/control/local-dws/ }
+        - { method: GET, path: /api/v1/diagnostics/telnet/ }
+        - { method: GET, path: /api/v1/diagnostics/ssh/ }
+        - { method: GET, path: /api/v1/diagnostics/chromium-debug/ }
+  updates:
+    - path: "^/api/v1/info/$"
+      json: { serial: "$.data.result.serial", model: "$.data.result.model", family: "$.data.result.family",
+              fw: "$.data.result.FWVersion", boot: "$.data.result.bootVersion", up: "$.data.result.upTimeSeconds",
+              conn: "$.data.result.connectionType", name: "$.data.result.networking.result.name",
+              description: "$.data.result.networking.result.description", power: "$.data.result.power.result.source",
+              poe: "$.data.result.poe.result.status" }
+      state:
+        info.serial: "{serial}"
+        info.model: "{model}"
+        info.family: "{family}"
+        info.firmware: "{fw}"
+        info.boot_version: "{boot}"
+        info.uptime_s: "{up}"
+        info.connection_type: "{conn}"
+        info.name: "{name}"
+        info.description: "{description}"
+        info.power_source: "{power}"
+        info.poe_status: "{poe}"
+    - path: "^/api/v1/health/$"
+      json: { status: "$.data.result.status", time: "$.data.result.statusTime" }
+      state: { health.status: "{status}", health.time: "{time}" }
+    - path: "^/api/v1/time/$"
+      json: { now: "$.data.result.time", zone: "$.data.result.timezone_name" }
+      state: { time.now: "{now}", time.timezone: "{zone}" }
+    - path: "^/api/v1/video-mode/$"
+      json: { name: "$.data.result.name", width: "$.data.result.mode.width", height: "$.data.result.mode.height",
+              rate: "$.data.result.mode.frequency", auto: "$.data.result.isAutoMode", space: "$.data.result.mode.colorSpace",
+              depth: "$.data.result.mode.colorDepth" }
+      state:
+        video.mode: "{name}"
+        video.width: "{width}"
+        video.height: "{height}"
+        video.frame_rate: "{rate}"
+        video.auto: "{auto}"
+        video.color_space: "{space}"
+        video.color_depth: "{depth}"
+    - path: "^/api/v1/video/hdmi/output/([0-3])/power-save/$"
+      json: { connected: "$.data.result.is_connected", powered: "$.data.result.is_powered", enabled: "$.data.result.enabled" }
+      state: { "outputs.{1}.connected": "{connected}", "outputs.{1}.powered": "{powered}", "outputs.{1}.power_save": "{enabled}" }
+    - path: "^/api/v1/control/local-dws/$"
+      json: { value: "$.data.result.value" }
+      state: { access.local_dws: "{value}" }
+    - path: "^/api/v1/diagnostics/telnet/$"
+      json: { enabled: "$.data.result.enabled", port: "$.data.result.portNumber" }
+      state: { access.telnet: "{enabled}", access.telnet_port: "{port}" }
+    - path: "^/api/v1/diagnostics/telnet/$"
+      json: { enabled: "$.enabled", port: "$.portNumber" }
+      state: { access.telnet: "{enabled}", access.telnet_port: "{port}" }
+    - path: "^/api/v1/diagnostics/ssh/$"
+      json: { enabled: "$.data.result.enabled", port: "$.data.result.portNumber" }
+      state: { access.ssh: "{enabled}", access.ssh_port: "{port}" }
+    - path: "^/api/v1/diagnostics/ssh/$"
+      json: { enabled: "$.enabled", port: "$.portNumber" }
+      state: { access.ssh: "{enabled}", access.ssh_port: "{port}" }
+    - path: "^/api/v1/diagnostics/chromium-debug/$"
+      json: { enabled: "$.data.result.enableWebInspector" }
+      state: { access.web_inspector: "{enabled}" }
+    - path: "^/api/v1/display-control/$"
+      json: { brightness: "$.data.result.brightness", contrast: "$.data.result.contrast", volume: "$.data.result.volume",
+              power: "$.data.result.powerSetting", standby: "$.data.result.idleStandbyTimeout",
+              output: "$.data.result.videoOutput", sd: "$.data.result.sdConnection",
+              connected: "$.data.result.alwaysConnectedEnabled", red: "$.data.result.whiteBalance.redBalance",
+              green: "$.data.result.whiteBalance.greenBalance", blue: "$.data.result.whiteBalance.blueBalance" }
+      state:
+        display.brightness: "{brightness}"
+        display.contrast: "{contrast}"
+        display.volume: "{volume}"
+        display.power: "{power}"
+        display.standby_timeout_s: "{standby}"
+        display.video_output: "{output}"
+        display.sd_connection: "{sd}"
+        display.always_connected: "{connected}"
+        display.white_balance.red: "{red}"
+        display.white_balance.green: "{green}"
+        display.white_balance.blue: "{blue}"
+    # Each display setting's own answer (GET or the PUT's read-back).
+    - path: "^/api/v1/display-control/brightness/$"
+      json: { v: "$.data.result.brightness" }
+      state: { display.brightness: "{v}" }
+    - path: "^/api/v1/display-control/contrast/$"
+      json: { v: "$.data.result.contrast" }
+      state: { display.contrast: "{v}" }
+    - path: "^/api/v1/display-control/volume/$"
+      json: { v: "$.data.result.volume" }
+      state: { display.volume: "{v}" }
+    - path: "^/api/v1/display-control/power-settings/$"
+      json: { v: "$.data.result.setting" }
+      state: { display.power: "{v}" }
+    - path: "^/api/v1/display-control/standby-timeout/$"
+      json: { v: "$.data.result.seconds" }
+      state: { display.standby_timeout_s: "{v}" }
+    - path: "^/api/v1/display-control/video-output/$"
+      json: { v: "$.data.result.output" }
+      state: { display.video_output: "{v}" }
+    - path: "^/api/v1/display-control/sd-connection/$"
+      json: { v: "$.data.result.connection" }
+      state: { display.sd_connection: "{v}" }
+    - path: "^/api/v1/display-control/white-balance/$"
+      json: { r: "$.data.result.redBalance", g: "$.data.result.greenBalance", b: "$.data.result.blueBalance" }
+      state: { display.white_balance.red: "{r}", display.white_balance.green: "{g}", display.white_balance.blue: "{b}" }
