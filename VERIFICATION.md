@@ -228,6 +228,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
 - [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
 
+## atlona-matrix — Atlona matrix switchers and switchers
+
+- [ ] Record the Telnet login prompts (Username:, Password:) and what a wrong login answers. ([specs/atlona-matrix.yaml:203](specs/atlona-matrix.yaml#L203))
+- [ ] Confirm the RS-232 factory default of PRO3 matrices and the AT-HDR-H2H-88MA (115200 8N1 assumed from the CSpara example). ([specs/atlona-matrix.yaml:183](specs/atlona-matrix.yaml#L183))
+- [ ] Confirm CSpara and RS232para write parity as 0 none, 1 odd, 2 even. ([specs/atlona-matrix.yaml:214](specs/atlona-matrix.yaml#L214))
+- [ ] Check whether PRO3 matrices and the H2H need a gap between commands (none is documented; Omega asks for 500 ms). ([specs/atlona-matrix.yaml:174](specs/atlona-matrix.yaml#L174))
+- [ ] Confirm the PS62 sets the repeat count with RepeatCmd n, as its document writes RepCmdTime. ([specs/atlona-matrix.yaml:1063](specs/atlona-matrix.yaml#L1063))
+- [ ] Record Status on the PS62 and SW32: xINAVxOUT or xINVxOUT as their examples show. ([specs/atlona-matrix.yaml:1640](specs/atlona-matrix.yaml#L1640))
+- [ ] Record what a PRO3 answers to VOUTn + and VOUTn - (the new level, or the command echoed). ([specs/atlona-matrix.yaml:511](specs/atlona-matrix.yaml#L511))
+- [ ] Record the MH21 InputFormat answer: the format alone or prefixed with InputFormatN. ([specs/atlona-matrix.yaml:623](specs/atlona-matrix.yaml#L623))
+- [ ] Confirm the MH21 takes HDCPSet with a space before the input (HDCPSet 1 on). ([specs/atlona-matrix.yaml:671](specs/atlona-matrix.yaml#L671))
+- [ ] Confirm Unlock is answered Unlock (the PRO3 document shows Lock for both). ([specs/atlona-matrix.yaml:738](specs/atlona-matrix.yaml#L738))
+- [ ] Confirm show_host_name answers the bare host name. ([specs/atlona-matrix.yaml:1247](specs/atlona-matrix.yaml#L1247))
+- [ ] Record what Broadcast on sends when routing changes in the web GUI (assumed the same text as the echoes). ([specs/atlona-matrix.yaml:999](specs/atlona-matrix.yaml#L999))
+- [ ] Confirm IPChangePass takes user, old and new password (the document lists a fourth, the confirmation, but its example has three). ([specs/atlona-matrix.yaml:1220](specs/atlona-matrix.yaml#L1220))
+- [ ] Check whether TCP 9000 on Omega switchers needs a login and answers like Telnet. ([specs/atlona-matrix.yaml:85](specs/atlona-matrix.yaml#L85))
+- [ ] Confirm All# is answered All# on PRO3 matrices and with the new routes on the H2H and PS62. ([specs/atlona-matrix.yaml:407](specs/atlona-matrix.yaml#L407))
+
 ## avolites-titan — Avolites Titan
 
 - [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1779](specs/avolites-titan.yaml#L1779))
