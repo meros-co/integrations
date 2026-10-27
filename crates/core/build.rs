@@ -223,6 +223,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-probel", &["probel-swp02", "probel-swp08"]),
     ("vendor-ptzoptics", &["ptzoptics"]),
     ("vendor-qsc", &["qsys", "qsys-ecp"]),
+    ("vendor-red", &["red-rcp2"]),
     (
         "vendor-renewedvision",
         &["propresenter", "renewedvision-pvp"],

@@ -1,0 +1,389 @@
+spec: 1
+id: red-rcp2
+name: RED DSMC3 cameras (RCP2 over WebSocket)
+vendor: RED Digital Cinema
+category: camera
+
+# RED's DSMC3 cameras (KOMODO, KOMODO-X, V-RAPTOR, V-RAPTOR XL) take RCP2,
+# JSON messages over a WebSocket on port 9998. RED's RCP2 parameter
+# documents are downloads behind a RED account login, so this spec is built
+# from public material only: an MIT-licensed integration's use of the
+# protocol. Every parameter is addressed by its RCP2 id (ISO, RECORD_STATE,
+# COLOR_TEMPERATURE...): rcp_set changes it, rcp_get reads it, rcp_subscribe
+# has the camera push its changes, and the camera answers with rcp_cur_int
+# or rcp_cur_str messages carrying the value and its display text.
+
+source:
+  - title: RCP2 documentation (KOMODO, KOMODO-X, V-RAPTOR) — not used
+    author: RED Digital Cinema
+    url: https://www.red.com/download/rcp2-documentation
+    note: >
+      The manufacturer's RCP2 parameter documents (for example 910-0276, RED KOMODO RCP2
+      Parameters) are downloads behind a RED account login, so they were not read. Everything here
+      comes from the public source below and is listed for checking in VERIFICATION.md.
+  - title: companion-module-red-rcp2 (MIT licence), version 1.5.0
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-red-rcp2
+    note: >
+      Read for its use of the protocol (src/main.js, src/actions.js, companion/HELP.md), retrieved
+      2026-10-27; no code taken. WebSocket ws://<camera>:9998, at most 8 connections per camera;
+      on opening rcp_config (strings_decoded, json_minified, include_cacheable_flags, encoding_type
+      legacy, client name and version) then rcp_get_types; rcp_get with an id (CAMERA_INFO answered
+      by rcp_cur_cam_info with name, serial_number, camera_type str and num, version str);
+      rcp_get_parameters answered by rcp_cur_parameters; rcp_subscribe with id and on_off; rcp_set
+      with id and an integer or text value; rcp_cur_int with cur.val and display.str; rcp_cur_str
+      with display.str; rcp_cur_cdl; rcp_session with status open and data, which the client
+      echoes back to keep the connection. Values: RECORD_STATE 0 stop, 1 start, 2 toggle (read
+      back 0 idle, 1 recording, 2 finalizing, 3 pre-recording, 4 encoding); SHUTDOWN 1 restarts, 2
+      powers off; SENSOR_FRAME_RATE in thousandths of a frame per second; EXPOSURE_ADJUST in
+      thousandths of a stop; tally colors as 24-bit RGB numbers; tally opacity, style and thickness
+      as small enumerations; MAGNIFY_ENABLE_<output> and ENABLE_CAMERA_LUT_SDI_<n> as 0 or 1;
+      record format numbers; camera type numbers 50 KOMODO, 51 V-RAPTOR, 52 V-RAPTOR XL, 53 KOMODO-X.
+
+transport:
+  type: ws
+  port: 9998
+  path: /
+  scheme: ws
+  timeout_ms: 3000
+  reply: expected
+
+on_connect:
+  - '{"type":"rcp_config","strings_decoded":1,"json_minified":1,"include_cacheable_flags":0,"encoding_type":"legacy","client":{"name":"meros-integrations","version":"1"}}'
+  - '{"type":"rcp_get_types"}'
+
+ports:
+  - { port: 9998, protocol: ws, role: control, note: "RCP2; the camera takes up to 8 connections" }
+
+models:
+  - id: komodo
+    name: RED KOMODO 6K / KOMODO-X
+    supports: &all [set_parameter, set_parameter_text, get_parameter, subscribe_parameter, unsubscribe_parameter,
+                    get_parameters, get_camera_info, start_recording, stop_recording, toggle_recording, set_iso,
+                    set_color_temperature, set_exposure_adjust, set_sensor_frame_rate, set_record_format,
+                    set_camera_id, set_reel_number, set_camera_position, set_lut_sdi_1, set_magnify,
+                    set_external_tally_state, set_external_tally_color, set_external_tally_opacity,
+                    set_external_tally_style, set_external_tally_thickness, set_tally_led, restart, shutdown]
+    verification: none
+  - id: v-raptor
+    name: RED V-RAPTOR / V-RAPTOR XL (8K VV, 8K S35, X)
+    supports: [set_parameter, set_parameter_text, get_parameter, subscribe_parameter, unsubscribe_parameter,
+               get_parameters, get_camera_info, start_recording, stop_recording, toggle_recording, set_iso,
+               set_color_temperature, set_exposure_adjust, set_sensor_frame_rate, set_record_format, set_camera_id,
+               set_reel_number, set_camera_position, set_lut_sdi_1, set_lut_sdi_2, set_magnify,
+               set_external_tally_state, set_external_tally_color, set_external_tally_opacity,
+               set_external_tally_style, set_external_tally_thickness, set_tally_led, restart, shutdown]
+    verification: none
+    notes: >
+      V-RAPTOR has a second SDI output (LUT, record format rectangle and monitor frequency on SDI 2).
+
+commands:
+  # ── Any parameter ────────────────────────────────────────────────────────
+  set_parameter:
+    summary: Set an RCP2 parameter to a number (its read-back arrives as rcp_cur_int while subscribed)
+    params:
+      id: &pid { type: string, max_length: 64, pattern: "^[A-Z0-9_]+$", required: true, label: Parameter,
+                 description: "RCP2 parameter id without its RCP_PARAM_ prefix, such as ISO or RECORD_STATE." }
+      value: { type: int, min: -2147483648, max: 2147483647, required: true, label: Value,
+               description: "New value in the parameter's own units, as the camera reports it in parameters.<id>.value." }
+    send: '{"type":"rcp_set","id":"{id}","value":{value}}'
+    returns: none
+  set_parameter_text:
+    summary: Set an RCP2 text parameter (slate fields, camera ID)
+    params:
+      id: *pid
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New text value." }
+    send: '{"type":"rcp_set","id":"{id}","value":{value:json}}'
+    returns: none
+  get_parameter:
+    summary: Read an RCP2 parameter; the answer also updates state
+    params: { id: *pid }
+    send: '{"type":"rcp_get","id":"{id}"}'
+    expect: { reply_json: { "$.id": "{id}" }, json_path: "$" }
+    returns: value
+  subscribe_parameter:
+    summary: Have the camera push an RCP2 parameter's changes
+    params: { id: *pid }
+    send: '{"type":"rcp_subscribe","id":"{id}","on_off":true}'
+    returns: none
+  unsubscribe_parameter:
+    summary: Stop the camera pushing an RCP2 parameter's changes
+    params: { id: *pid }
+    send: '{"type":"rcp_subscribe","id":"{id}","on_off":false}'
+    returns: none
+  get_parameters:
+    summary: List the RCP2 parameters this camera supports
+    send: '{"type":"rcp_get_parameters"}'
+    expect: { reply_json: { "$.type": "rcp_cur_parameters" }, json_path: "$.parameters" }
+    returns: value
+  get_camera_info:
+    summary: Read the camera's name, serial number, type and firmware version
+    send: '{"type":"rcp_get","id":"CAMERA_INFO"}'
+    expect: { reply_json: { "$.type": "rcp_cur_cam_info" }, json_path: "$" }
+    returns: value
+
+  # ── Recording ────────────────────────────────────────────────────────────
+  start_recording:
+    summary: Start recording (RECORD_STATE 1)
+    send: '{"type":"rcp_set","id":"RECORD_STATE","value":1}'
+    returns: none
+  stop_recording:
+    summary: Stop recording (RECORD_STATE 0)
+    send: '{"type":"rcp_set","id":"RECORD_STATE","value":0}'
+    returns: none
+  toggle_recording:
+    summary: Start or stop recording (RECORD_STATE 2)
+    send: '{"type":"rcp_set","id":"RECORD_STATE","value":2}'
+    returns: none
+
+  # ── Image ────────────────────────────────────────────────────────────────
+  set_iso:
+    summary: Set the ISO
+    params:
+      iso: { type: int, min: 100, max: 25600, required: true, label: ISO,
+             description: "ISO, such as 800; the camera takes its own list of values (100 to 25600 in third stops)." }
+    send: '{"type":"rcp_set","id":"ISO","value":{iso}}'
+    returns: none
+  set_color_temperature:
+    summary: Set the white balance color temperature in kelvin
+    params:
+      kelvin: { type: int, min: 1700, max: 10000, required: true, label: Color temperature,
+                description: "White balance color temperature in kelvin, such as 5600." }
+    send: '{"type":"rcp_set","id":"COLOR_TEMPERATURE","value":{kelvin}}'
+    returns: none
+  set_exposure_adjust:
+    summary: Set the exposure adjustment in thousandths of a stop
+    params:
+      millistops: { type: int, min: -8000, max: 8000, required: true, label: Exposure adjust,
+                    description: "Exposure adjustment in thousandths of a stop: 1000 is +1 stop, -8000 to 8000." }
+    send: '{"type":"rcp_set","id":"EXPOSURE_ADJUST","value":{millistops}}'
+    returns: none
+  set_sensor_frame_rate:
+    summary: Set the sensor frame rate in thousandths of a frame per second
+    params:
+      millifps: { type: int, min: 1000, max: 300000, required: true, label: Frame rate,
+                  description: "Sensor frame rate in thousandths of a frame per second: 23976 is 23.976 fps, 24000 is 24, 60000 is 60." }
+    send: '{"type":"rcp_set","id":"SENSOR_FRAME_RATE","value":{millifps}}'
+    returns: none
+  set_record_format:
+    summary: Set the record format (resolution and crop)
+    params:
+      format: { type: enum, values: ["6K 17:9", "5K 17:9", "4K 17:9", "6K 16:9", "2K 17:9", "6K 2.4:1", "8K 17:9", "8K 16:9", "8K 2:1", "8K 2.4:1", "7K 17:9", "7K 16:9", "7K 2:1", "7K 2.4:1", "6K 2:1", "4K 16:9", "6K 16:9 1.5x", "6K 17:9 1.3x", "6K 17:9 1.25x", "6K 4:3 2x", "6K 6:5 2x", "6K 3:2 1.8x", "6K 4:3 1.8x", "6K 3:2 1.6x"],
+                required: true, label: Record format,
+                description: "Recording resolution and aspect ratio; 4K 16:9 is UHD 3840x2160, the 17:9 formats are RED's full-width crops, and the x formats are anamorphic." }
+    send: '{"type":"rcp_set","id":"RECORD_FORMAT","value":{format:map.record_format}}'
+    returns: none
+
+  # ── Metadata ─────────────────────────────────────────────────────────────
+  set_camera_id:
+    summary: Set the camera ID written into clips
+    params:
+      camera_id: { type: string, max_length: 63, required: true, label: Camera ID, description: "Camera ID, at most 63 characters." }
+    send: '{"type":"rcp_set","id":"CAMERA_ID","value":{camera_id:json}}'
+    returns: none
+  set_reel_number:
+    summary: Set the reel number
+    params:
+      reel: { type: int, min: 1, max: 999, required: true, label: Reel, description: "Reel number, 1 to 999." }
+    send: '{"type":"rcp_set","id":"REEL_NUMBER","value":{reel}}'
+    returns: none
+  set_camera_position:
+    summary: Set the camera position letter (A to Z)
+    params:
+      letter: { type: int, min: 0, max: 25, required: true, label: Camera position, description: "Camera position letter: 0 is A, 25 is Z." }
+    send: '{"type":"rcp_set","id":"CAMERA_POSITION","value":{letter}}'
+    returns: none
+
+  # ── Monitoring ───────────────────────────────────────────────────────────
+  set_lut_sdi_1:
+    summary: Apply the camera LUT on SDI 1 or not
+    params:
+      enabled: &lut { type: bool, required: true, label: LUT, description: "On applies the camera LUT on the output." }
+    send: '{"type":"rcp_set","id":"ENABLE_CAMERA_LUT_SDI_1","value":{enabled:bool01}}'
+    returns: none
+  set_lut_sdi_2:
+    summary: Apply the camera LUT on SDI 2 or not (V-RAPTOR)
+    params: { enabled: *lut }
+    send: '{"type":"rcp_set","id":"ENABLE_CAMERA_LUT_SDI_2","value":{enabled:bool01}}'
+    returns: none
+  set_magnify:
+    summary: Magnify one output or not
+    params:
+      output: { type: enum, values: [SDI_1, SDI_2, DSI_1, BUILT_IN_LCD], required: true, label: Output,
+                description: "Output to magnify: SDI 1, SDI 2, the top LCD (DSI 1) or the built-in LCD; outputs a camera lacks ignore it." }
+      enabled: { type: bool, required: true, label: Magnify, description: "On magnifies the output's picture." }
+    send: '{"type":"rcp_set","id":"MAGNIFY_ENABLE_{output}","value":{enabled:bool01}}'
+    returns: none
+  set_external_tally_state:
+    summary: Set the tally shown on an external USB-C monitor
+    params:
+      state: { type: int, min: 0, max: 3, required: true, label: Tally state,
+               description: "Tally state number of the external monitor: 0 is off, 1 to 3 tally 1 to 3." }
+    send: '{"type":"rcp_set","id":"EXTERNAL_TALLY_STATE","value":{state}}'
+    returns: none
+  set_external_tally_color:
+    summary: Set the color of one external monitor tally
+    params:
+      tally: { type: int, min: 1, max: 3, required: true, label: Tally, description: "Tally 1, 2 or 3." }
+      color: { type: int, min: 0, max: 16777215, required: true, label: Color,
+               description: "Color as a 24-bit RGB number: 12517376 red, 48896 green, 191 blue, 16776960 yellow, 16777215 white." }
+    send: '{"type":"rcp_set","id":"EXTERNAL_TALLY_{tally}_COLOR","value":{color}}'
+    returns: none
+  set_external_tally_opacity:
+    summary: Set the external monitor tally opacity
+    params:
+      opacity: { type: enum, values: ["25", "50", "75", "100"], required: true, label: Opacity, description: "Opacity in percent." }
+    send: '{"type":"rcp_set","id":"EXTERNAL_TALLY_OPACITY","value":{opacity:map.tally_opacity}}'
+    returns: none
+  set_external_tally_style:
+    summary: Set the external monitor tally style
+    params:
+      style: { type: enum, values: [solid, dashed, bracket], required: true, label: Style, description: "Border style of the tally." }
+    send: '{"type":"rcp_set","id":"EXTERNAL_TALLY_STYLE","value":{style:map.tally_style}}'
+    returns: none
+  set_external_tally_thickness:
+    summary: Set the external monitor tally thickness
+    params:
+      thickness: { type: enum, values: [small, medium, large], required: true, label: Thickness, description: "Border thickness of the tally." }
+    send: '{"type":"rcp_set","id":"EXTERNAL_TALLY_THICKNESS","value":{thickness:map.tally_thickness}}'
+    returns: none
+  set_tally_led:
+    summary: Use the camera body's tally LED or not
+    params:
+      enabled: { type: bool, required: true, label: Tally LED, description: "On lets the body's tally LED light." }
+    send: '{"type":"rcp_set","id":"TALLY_LED_ENABLE","value":{enabled:bool01}}'
+    returns: none
+
+  # ── Power ────────────────────────────────────────────────────────────────
+  restart:
+    summary: Restart the camera (SHUTDOWN 1)
+    send: '{"type":"rcp_set","id":"SHUTDOWN","value":1}'
+    returns: none
+  shutdown:
+    summary: Power the camera off (SHUTDOWN 2)
+    send: '{"type":"rcp_set","id":"SHUTDOWN","value":2}'
+    returns: none
+
+maps:
+  record_format: { "6K 17:9": "0", "5K 17:9": "1", "4K 17:9": "2", "6K 16:9": "3", "2K 17:9": "4", "6K 2.4:1": "5",
+                   "8K 17:9": "6", "8K 16:9": "7", "8K 2:1": "8", "8K 2.4:1": "9", "7K 17:9": "10", "7K 16:9": "11",
+                   "7K 2:1": "12", "7K 2.4:1": "13", "6K 2:1": "14", "4K 16:9": "18", "6K 16:9 1.5x": "42",
+                   "6K 17:9 1.3x": "43", "6K 17:9 1.25x": "45", "6K 4:3 2x": "55", "6K 6:5 2x": "56",
+                   "6K 3:2 1.8x": "57", "6K 4:3 1.8x": "58", "6K 3:2 1.6x": "59" }
+  tally_opacity: { "25": "0", "50": "1", "75": "2", "100": "3" }
+  tally_style: { solid: "0", dashed: "1", bracket: "2" }
+  tally_thickness: { small: "0", medium: "1", large: "2" }
+
+telemetry:
+  # Subscriptions for the parameters an operator watches, re-sent every 30 s
+  # with a read of each; the camera information and the supported parameter
+  # list on opening and every minute.
+  subscribe:
+    every_ms: 30000
+    send:
+      - '{"type":"rcp_subscribe","id":"RECORD_STATE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"RECORD_FORMAT","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"RECORD_CODEC","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"RECORD_MODE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"CLIP_DURATION","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"CLIP_NAME","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"SENSOR_FRAME_RATE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"ISO","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"APERTURE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"ND","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"COLOR_TEMPERATURE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"TINT","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"EXPOSURE_ADJUST","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"EXPOSURE_DISPLAY","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"COLOR_SPACE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"ROLL_OFF","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"TIMECODE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"TIMECODE_STATE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"EXTERNAL_TALLY_STATE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"TALLY_LED_ENABLE","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"ENABLE_CAMERA_LUT_SDI_1","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"ENABLE_CAMERA_LUT_SDI_2","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"MEDIA_PERCENTAGE_REMAINING","on_off":true}'
+      - '{"type":"rcp_subscribe","id":"MEDIA_TIME_REMAINING","on_off":true}'
+      - '{"type":"rcp_get","id":"RECORD_STATE"}'
+      - '{"type":"rcp_get","id":"RECORD_FORMAT"}'
+      - '{"type":"rcp_get","id":"SENSOR_FRAME_RATE"}'
+      - '{"type":"rcp_get","id":"ISO"}'
+      - '{"type":"rcp_get","id":"COLOR_TEMPERATURE"}'
+      - '{"type":"rcp_get","id":"EXPOSURE_ADJUST"}'
+      - '{"type":"rcp_get","id":"TIMECODE"}'
+  poll:
+    every_ms: 60000
+    send:
+      - '{"type":"rcp_get","id":"CAMERA_INFO"}'
+      - '{"type":"rcp_get_parameters"}'
+  updates:
+    - json_match: { "$.type": "^rcp_cur_int$", "$.id": "^([A-Z0-9_]+)$" }
+      json: { val: "$.cur.val", str: "$.display.str" }
+      state:
+        "parameters.{1}.value": "{val}"
+        "parameters.{1}.display": "{str}"
+    - json_match: { "$.type": "^rcp_cur_str$", "$.id": "^([A-Z0-9_]+)$" }
+      json: { str: "$.display.str" }
+      state: { "parameters.{1}.display": "{str}" }
+    - json_match: { "$.type": "^rcp_cur_int$", "$.id": "^RECORD_STATE$" }
+      json: { val: "$.cur.val" }
+      state:
+        recording: { value: "{val}", map: { "0": idle, "1": recording, "2": finalizing, "3": pre_recording, "4": encoding } }
+    - json_match: { "$.type": "^rcp_cur_cam_info$" }
+      json: { name: "$.name", serial: "$.serial_number", type: "$.camera_type.str", type_number: "$.camera_type.num", version: "$.version.str" }
+      state:
+        camera.name: "{name}"
+        camera.serial: "{serial}"
+        camera.type: "{type}"
+        camera.type_number: "{type_number}"
+        camera.firmware: "{version}"
+    - json_match: { "$.type": "^rcp_cur_parameters$" }
+      json: { list: "$.parameters" }
+      state: { supported_parameters: "{list}" }
+    - json_match: { "$.type": "^rcp_cur_cdl$" }
+      json: { all: "$" }
+      state: { cdl: "{all}" }
+    # The session keep-alive: the camera's rcp_session data is echoed back.
+    - json_match: { "$.type": "^rcp_session$", "$.status": "^open$" }
+      json: { data: "$.data" }
+      then_send:
+        - '{"type":"rcp_session","data":{data}}'
+
+state:
+  parameters.*.value: { type: int, description: "Value of the RCP2 parameter with this id, in its own units (RECORD_STATE, ISO, SENSOR_FRAME_RATE in thousandths of a fps...)" }
+  parameters.*.display: { type: string, description: "The parameter's value as the camera displays it" }
+  recording: { type: string, description: "Recording state: idle, recording, finalizing, pre_recording or encoding" }
+  camera.name: { type: string, description: "Camera name" }
+  camera.serial: { type: string, description: "Serial number" }
+  camera.type: { type: string, description: "Camera type name" }
+  camera.type_number: { type: int, description: "Camera type number: 50 KOMODO, 51 V-RAPTOR, 52 V-RAPTOR XL, 53 KOMODO-X" }
+  camera.firmware: { type: string, description: "Firmware version" }
+  supported_parameters: { type: string, description: "The RCP2 parameter ids the camera supports, as a JSON array" }
+  cdl: { type: string, description: "The camera's last CDL message (slope, offset, power and saturation in hundred-thousandths), as JSON text" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      RED's RCP2 documents are behind a RED account login and were not read: the message forms,
+      parameter ids, value scales and enumerations here come from a public integration's use of
+      the protocol and need checking against the camera (see VERIFICATION.md). Any other
+      parameter is reached with set_parameter, set_parameter_text and get_parameter by its id.
+  - models: [all]
+    severity: info
+    text: >
+      Sets are not acknowledged; their read-back is the rcp_cur_int or rcp_cur_str the camera
+      pushes for a subscribed parameter, kept in parameters.<id>. The camera keeps the connection
+      only while its rcp_session messages are echoed back, which telemetry does; a device opened
+      for commands only sends no echo, and the camera may drop it.
+  - models: [all]
+    severity: info
+    text: >
+      A camera takes up to 8 RCP2 connections; the integration this spec follows recommends one
+      per application.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_recording and toggle_recording end a take; shutdown powers the camera off and restart
+      reboots it.

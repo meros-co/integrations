@@ -2744,6 +2744,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that a choice control's cmvv aspect 2 lists its choices as the strings, with zero values and positions, as the document's slope example shows, and note any vector control longer than 16 elements (its values and positions are not kept). ([specs/qsys-ecp.yaml:582](specs/qsys-ecp.yaml#L582))
 - [ ] Check that an sg every 30 s keeps the connection open while a scheduled change group is pushing. ([specs/qsys-ecp.yaml:385](specs/qsys-ecp.yaml#L385))
 
+## red-rcp2 — RED DSMC3 cameras (RCP2 over WebSocket)
+
+- [ ] Check every message form, parameter id, value scale and enumeration in this spec against RED's RCP2 documents (behind a RED account login) or a camera; none comes from RED's own documentation. ([specs/red-rcp2.yaml:367](specs/red-rcp2.yaml#L367))
+- [ ] Record the camera's answers to rcp_config and rcp_get_types on connecting, and whether the WebSocket path is / on port 9998. ([specs/red-rcp2.yaml:51](specs/red-rcp2.yaml#L51))
+- [ ] Record an rcp_session message, to confirm its data is echoed back as it is (a number assumed), and how long the camera waits for the echo before dropping the connection. ([specs/red-rcp2.yaml:351](specs/red-rcp2.yaml#L351))
+- [ ] Confirm the RECORD_FORMAT numbers, the EXTERNAL_TALLY state, opacity, style and thickness numbers, the ISO and color temperature ranges, and the units of SENSOR_FRAME_RATE and EXPOSURE_ADJUST. ([specs/red-rcp2.yaml:268](specs/red-rcp2.yaml#L268))
+
 ## renewedvision-pvp — Renewed Vision PVP
 
 - [ ] Confirm the API port in use (8080 assumed). ([specs/renewedvision-pvp.yaml:874](specs/renewedvision-pvp.yaml#L874))
