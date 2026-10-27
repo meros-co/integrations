@@ -982,6 +982,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Whether LAS+EBLU/EGRN/ERED (and LAS+EPOW on Mirage SST) are safe on the 4K40-RGB and Mirage SST, where they are still documented (not offered). ([specs/christie-trulife.yaml:2724](specs/christie-trulife.yaml#L2724))
 - [ ] The RS232 IN data bits, parity, stop bits and connector (not in these references). ([specs/christie-trulife.yaml:2731](specs/christie-trulife.yaml#L2731))
 
+## clock-8001 — Clock-8001
+
+- [ ] Confirm the default command and feedback port 1245 and that feedback is broadcast as one bundle on every change. ([specs/clock-8001.yaml:57](specs/clock-8001.yaml#L57))
+- [ ] Record the source mode numbers and the icon names the state messages carry. ([specs/clock-8001.yaml:399](specs/clock-8001.yaml#L399))
+- [ ] Confirm the cue commands take an empty UUID string from an external sender. ([specs/clock-8001.yaml:405](specs/clock-8001.yaml#L405))
+- [ ] Check whether /clock/automation and /clock/cue/blank take OSC T/F booleans, as sent. ([specs/clock-8001.yaml:314](specs/clock-8001.yaml#L314))
+
 ## cockos-reaper — Cockos REAPER (OSC)
 
 - [ ] Confirm REAPER's default Local listen port (8000) and Device port (9000) when a new OSC control surface is added. ([specs/cockos-reaper.yaml:59](specs/cockos-reaper.yaml#L59))
@@ -1026,6 +1033,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record a SEND reply's flags, volume and pan formats, and its first two fields for a receive (the track and the negative index asked for). ([spec](specs/cockos-reaper-web.yaml#L865))
 - [ ] Record a LYRICS reply: beat and lyric pairs after the track number. ([spec](specs/cockos-reaper-web.yaml#L871))
 - [ ] Check that the EXTSTATE and PROJEXTSTATE replies give the section and key decoded, as sent before encoding. ([spec](specs/cockos-reaper-web.yaml#L878))
+
+## cuetimer — CueTimer
+
+- [ ] Confirm CueTimer sends its state document on connecting and every 200 ms, each ended by $ with nothing between documents. ([specs/cuetimer.yaml:49](specs/cuetimer.yaml#L49))
+- [ ] Record what Pause does (pause, or toggle pause and resume) and whether Undo$ (sent by the Companion module) exists. ([specs/cuetimer.yaml:347](specs/cuetimer.yaml#L347))
+- [ ] Check whether CueTimer answers a command or a malformed command at all. ([specs/cuetimer.yaml:51](specs/cuetimer.yaml#L51))
+- [ ] Confirm h, m and s are the running timer's remaining time and how overtime is shown in them. ([specs/cuetimer.yaml:265](specs/cuetimer.yaml#L265))
+
+## cuez-automator — Cuez Automator
+
+- [ ] Record the bodies the triggering and timer endpoints answer (documented only as 200 OK) and whether an unknown id answers an error status. ([specs/cuez-automator.yaml:431](specs/cuez-automator.yaml#L431))
+- [ ] Record the device-state socket (/ws/device-state) and the Automator's WebSocket messages, so state can be pushed instead of polled. ([specs/cuez-automator.yaml:437](specs/cuez-automator.yaml#L437))
+- [ ] Confirm a step index counts the trigger itself as 0, and what /api/trigger/step/<n> answers past the last step. ([specs/cuez-automator.yaml:104](specs/cuez-automator.yaml#L104))
+- [ ] Record the shapes of /api/timer, /api/macro/ and /api/trigger/current so timers, macros and the current trigger can be kept in state. ([specs/cuez-automator.yaml:241](specs/cuez-automator.yaml#L241))
 
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
@@ -1208,6 +1229,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what SF answers for an unnamed show and VU/GU for a clip with no number (nothing, an empty line, or N/A). ([specs/dtvideolabs-playbackpro-plus.yaml:431](specs/dtvideolabs-playbackpro-plus.yaml#L431))
 - [ ] Check that GO, GT, SI and TI take a number without leading zeros (GO7) and the largest number they accept. ([specs/dtvideolabs-playbackpro-plus.yaml:437](specs/dtvideolabs-playbackpro-plus.yaml#L437))
 - [ ] Record the ID inquiry's answer, to read each clip's number and file name apart. ([specs/dtvideolabs-playbackpro-plus.yaml:453](specs/dtvideolabs-playbackpro-plus.yaml#L453))
+
+## dsan-limitimer — DSAN Limitimer
+
+- [ ] Confirm the TP-2000XLT takes commands ended by a carriage return alone and sends its messages with the > prefix and a CR (the PDF writes /x0D and \x0D). ([specs/dsan-limitimer.yaml:195](specs/dsan-limitimer.yaml#L195))
+- [ ] Record the time strings in hours mode and over 99 minutes, and in overtime. ([specs/dsan-limitimer.yaml:199](specs/dsan-limitimer.yaml#L199))
+- [ ] Check whether the TP-2000XLT sends the LED states on connecting or only on change, and whether flow control is needed. ([specs/dsan-limitimer.yaml:188](specs/dsan-limitimer.yaml#L188))
+- [ ] Confirm INCMIN and INCHOUR (struck through in the PDF) are no longer taken. ([specs/dsan-limitimer.yaml:203](specs/dsan-limitimer.yaml#L203))
+- [ ] Record what a Global Cache iTach (or other gateway) adds between messages (the Companion module skips a byte after each CR). ([specs/dsan-limitimer.yaml:41](specs/dsan-limitimer.yaml#L41))
+
+## dsan-perfectcue — DSAN PerfectCue
+
+- [ ] Confirm the TP-2000X-PC takes commands ended by a carriage return alone and sends its LED messages with the > prefix and a CR. ([specs/dsan-perfectcue.yaml:103](specs/dsan-perfectcue.yaml#L103))
+- [ ] Check whether the LED states are sent on connecting or only on change, and whether flow control is needed. ([specs/dsan-perfectcue.yaml:96](specs/dsan-perfectcue.yaml#L96))
 
 ## emberplus — Ember+
 
@@ -1546,6 +1580,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
 - [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
 
+## irisdown-countdown-timer — Irisdown Countdown Timer
+
+- [ ] Confirm that UPDATEMODE and UPDATES apply per connection and that UPDATEMODE 2 answers OK before UPDATES ON turns other answers off. ([specs/irisdown-countdown-timer.yaml:180](specs/irisdown-countdown-timer.yaml#L180))
+- [ ] Record the mode 2 update line in overtime and past 99 minutes (the sign, the hour digits), and how often updates come while running. ([specs/irisdown-countdown-timer.yaml:132](specs/irisdown-countdown-timer.yaml#L132))
+- [ ] Check whether a command line ended with CRLF is taken once (the document allows CR, LF or CRLF). ([specs/irisdown-countdown-timer.yaml:46](specs/irisdown-countdown-timer.yaml#L46))
+- [ ] Check how MESSAGE treats a quote or a character outside ASCII in the text. ([specs/irisdown-countdown-timer.yaml:187](specs/irisdown-countdown-timer.yaml#L187))
+- [ ] Confirm JOG takes negative minutes while stopped or paused as well as while running. ([specs/irisdown-countdown-timer.yaml:98](specs/irisdown-countdown-timer.yaml#L98))
+
+## irisdown-remote-show-control — Irisdown Remote Show Control
+
+- [ ] Confirm the add-in takes each command as a single UDP datagram with no line ending, and plain ASCII double quotes around names. ([specs/irisdown-remote-show-control.yaml:138](specs/irisdown-remote-show-control.yaml#L138))
+- [ ] Record how FIND answers (over UDP and over TCP 61001) and how the end of the list is marked. ([specs/irisdown-remote-show-control.yaml:135](specs/irisdown-remote-show-control.yaml#L135))
+- [ ] Check whether GO takes a slide number with the space (GO 23), as the manual's syntax shows, as well as without (GO2 in the Spyder example). ([specs/irisdown-remote-show-control.yaml:102](specs/irisdown-remote-show-control.yaml#L102))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))
@@ -1576,6 +1624,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that the queries added to the poll on connecting are answered ERR 002, not ignored, on products without them. ([specs/kramer-p3000.yaml:4084](specs/kramer-p3000.yaml#L4084))
 - [ ] On each product, confirm the RS-232 control port runs 115200 8N1 with no flow control and takes the same commands and handshake as TCP 5000, and that #BAUD? 0 lists the rates link serial offers. ([specs/kramer-p3000.yaml:110](specs/kramer-p3000.yaml#L110))
 - [ ] Check whether the RS-232 port needs LOGIN when security is on (product-specific, guide p.49). ([specs/kramer-p3000.yaml:3931](specs/kramer-p3000.yaml#L3931))
+
+## kuma-timer — KUMA Timer
+
+- [ ] Confirm the actions the API page does not list (add_seconds, cut_nudge, prev_cue, recall_layout, set_mode, count_up, warp_time, warp_duration, cancel_warp, cancel_jump, the QLab, OMT, LTC and Blackmagic switches) and send_sms's fullscreen flag on the current KUMA. ([specs/kuma-timer.yaml:485](specs/kuma-timer.yaml#L485))
+- [ ] Confirm an empty key is accepted when no web control password is set, and record the answer to a wrong key. ([specs/kuma-timer.yaml:62](specs/kuma-timer.yaml#L62))
+- [ ] Record the status fields beyond the documented ones (cues, preset_seconds, layout_presets, ppt, the QLab, OMT, LTC and Blackmagic flags) and their types. ([specs/kuma-timer.yaml:340](specs/kuma-timer.yaml#L340))
+- [ ] Check whether recall_layout's slot counts from 1 and how a name that does not exist is answered. ([specs/kuma-timer.yaml:224](specs/kuma-timer.yaml#L224))
 
 ## labgruppen-lake — Lab.gruppen Lake (DLM)
 
@@ -1973,6 +2028,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check whether a newly connected client receives the current registrations, or only later changes (the server sends them before the subscription can arrive). ([specs/omt-discovery.yaml:56](specs/omt-discovery.yaml#L56))
 
+## ontime — Ontime
+
+- [ ] Record the WebSocket pushes of Ontime 4 as sent (tag or type, and payload shape): whole runtime objects, section patches or per-section messages, and whether each section arrives whole. ([specs/ontime.yaml:1048](specs/ontime.yaml#L1048))
+- [ ] Confirm that every client gets a runtime snapshot on connecting to /ws, and that {"tag":"poll"} and {"tag":"version"} are answered as the WebSocket page shows. ([specs/ontime.yaml:540](specs/ontime.yaml#L540))
+- [ ] Record Ontime's WebSocket notice that the rundown or custom fields changed (Companion reads a refetch tag), so the 15-second rundown poll can follow it instead. ([specs/ontime.yaml:1052](specs/ontime.yaml#L1052))
+- [ ] Confirm GET /data/rundowns/current and the entry writes on /data/rundowns/<id>/entry and /data/rundowns/<id>/<entry> (the Project data page writes /data/rundown/...), and record what POST, PUT and DELETE answer. ([specs/ontime.yaml:1059](specs/ontime.yaml#L1059))
+- [ ] Check whether event indexes in /api/start/index and /api/load/index count from 0 or 1. ([specs/ontime.yaml:1071](specs/ontime.yaml#L1071))
+- [ ] Confirm /api/load/cue/<cue> loads by cue (the HTTP page writes /api/load/index/<event-cue>). ([specs/ontime.yaml:1073](specs/ontime.yaml#L1073))
+- [ ] Confirm auxiliary timers 2 and 3 answer /api/auxtimer/2/... and /3/... like timer 1, and that secondarySource takes aux1 to aux3 (and aux). ([specs/ontime.yaml:1074](specs/ontime.yaml#L1074))
+- [ ] Confirm /api/message/timer takes text, visible and blink as query parameters, as it takes secondarySource and blackout. ([specs/ontime.yaml:1081](specs/ontime.yaml#L1081))
+- [ ] Check whether the HTTP API and /ws take the session password's hashed token as Authorization: Bearer, and what they answer without it. ([specs/ontime.yaml:1036](specs/ontime.yaml#L1036))
+- [ ] Record the shape of GET /data/custom-fields (label, type and colour per key are assumed). ([specs/ontime.yaml:1026](specs/ontime.yaml#L1026))
+- [ ] Record the status and body of a refused playback command (an unknown event id or cue). ([specs/ontime.yaml:190](specs/ontime.yaml#L190))
+
+## ontime-osc — Ontime (OSC API)
+
+- [ ] Check whether the boolean arguments (blackout, skip, visible, blink) are taken as the strings true and false, or need OSC T/F or an int. ([specs/ontime-osc.yaml:351](specs/ontime-osc.yaml#L351))
+- [ ] Confirm /ontime/message/timer/text, /visible and /blink exist beside the documented blackout and secondarySource. ([specs/ontime-osc.yaml:352](specs/ontime-osc.yaml#L352))
+- [ ] Confirm /ontime/auxtimer/2/... and /3/... act on auxiliary timers 2 and 3. ([specs/ontime-osc.yaml:355](specs/ontime-osc.yaml#L355))
+- [ ] Check whether integer arguments sent as OSC int32 are taken for millisecond values and indexes, or must be floats or strings. ([specs/ontime-osc.yaml:78](specs/ontime-osc.yaml#L78))
+
 ## openlp — OpenLP
 
 - [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:91](specs/openlp.yaml#L91))
@@ -2362,6 +2438,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
 - [ ] Capture, on a Carbonite-family and an Acuity-family switcher with Cmd Response on and off, the bytes each documented query answers (XPT, MS, MNEM, TRANSRATE, TRANSTYPE, TRANSINCL, MVBOX, USERVAR and KEYSHAPED with ?, KEYSTATE, ACTIVEID, VERSION, HELP, MEM ?), the answer to an unknown source or ME, the answer to a set, the order of answers to queries sent together, and any unasked messages, so state can be kept. ([specs/rosstalk.yaml:1469](specs/rosstalk.yaml#L1469))
 
+## rundown-studio — Rundown Studio
+
+- [ ] Confirm the event stream takes the bearer token and ?events=rundown:fat,cue:fat,column:fat,cell:fat, and sends status first on each connection. ([specs/rundown-studio.yaml:596](specs/rundown-studio.yaml#L596))
+- [ ] Confirm the include query is taken percent-encoded (include=cues%2Ccolumns) and answers cues and columns in included. ([specs/rundown-studio.yaml:288](specs/rundown-studio.yaml#L288))
+- [ ] Record what a delete answers (status and body) and whether the event stream reports deletions of mentions and text variables (it is read every minute). ([specs/rundown-studio.yaml:910](specs/rundown-studio.yaml#L910))
+- [ ] Check how often a restricted-tier token is refused with 429 at the core's pacing and polls. ([specs/rundown-studio.yaml:64](specs/rundown-studio.yaml#L64))
+- [ ] Confirm the cue order's children carry {id} as the shallow rundown example shows (the reorder body names them cue_id). ([specs/rundown-studio.yaml:720](specs/rundown-studio.yaml#L720))
+
 ## samsung-mdc — Samsung displays (MDC)
 
 - [ ] Check the secured mode handshake on a display with the secured protocol on: the plain-text MDCSTART<<TLS>> greeting, a TLS handshake on the same connection, the 4-digit PIN sent bare, and MDCAUTH<<PASS>> or MDCAUTH<<FAIL:xxxx>> (taken from a third-party library, not Ver. 15.0). ([specs/samsung-mdc.yaml:2884](specs/samsung-mdc.yaml#L2884))
@@ -2574,6 +2658,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On ULX-D, check that a metering interval above 65535 ms (to 99999, as documented) is accepted. ([specs/shure-wireless.yaml:260](specs/shure-wireless.yaml#L260))
 - [ ] On ULX-D, confirm set_encryption, regenerate_encryption_key and set_frequency_diversity_mode need an IR sync before audio returns, and how long a key regeneration takes. ([specs/shure-wireless.yaml:582](specs/shure-wireless.yaml#L582))
 
+## sofie-chef — Sofie Chef
+
+- [ ] Record the REST answers: GET /api/status and /api/list bodies (the list is read as the WebSocket list body) and the PUT routes' status and body. ([specs/sofie-chef.yaml:177](specs/sofie-chef.yaml#L177))
+- [ ] Confirm an empty apiKey query parameter is accepted when no apiKey is configured. ([specs/sofie-chef.yaml:175](specs/sofie-chef.yaml#L175))
+- [ ] Confirm the WebSocket API on apiPort + 1 (path /) pushes status on connecting and on each change without a request or the apiKey. ([specs/sofie-chef.yaml:186](specs/sofie-chef.yaml#L186))
+
 ## softouch-easyworship — Softouch EasyWorship
 
 - [ ] Confirm the whole exchange against EasyWorship 7.3 or later: the pairing request and its paired and notPaired answers, a heartbeat after each message, and status messages. ([specs/softouch-easyworship.yaml:130](specs/softouch-easyworship.yaml#L130))
@@ -2622,6 +2712,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Opened for commands only, confirm the camera tolerates GetDeviceInfo once a second as the liveness check. ([crates/core/src/modules/sony_camera.rs:48](crates/core/src/modules/sony_camera.rs#L48))
 - [ ] Record the unit of Recording Duration (0xD120) while a movie records (seconds, frames or another count), so recording.duration can state it; the reference gives none. ([specs/sony-camera.yaml:2717](specs/sony-camera.yaml#L2717))
 - [ ] Check what the range of Custom WB Capture Frame Size (0xD26C) holds (the frame's width and height as the maximum, or something else), since the property has no current value and the reference describes only the packing. ([specs/sony-camera.yaml:2685](specs/sony-camera.yaml#L2685))
+
+## stagetimer — Stagetimer
+
+- [ ] Confirm the desktop app serves the API and Socket.IO under /v1/ on its own port, as the cloud's API URL has it, and record the API URL its Menu > API shows. ([specs/stagetimer.yaml:971](specs/stagetimer.yaml#L971))
+- [ ] Confirm the Socket.IO endpoint takes Engine.IO 4 and the handshake auth {room_id, api_key}, and sends room, playback_status, current_timer, next_timer and the message on connecting. ([specs/stagetimer.yaml:683](specs/stagetimer.yaml#L683))
+- [ ] Confirm a single labels[0][name] and labels[0][color] pair replaces a timer's labels rather than adding to them. ([specs/stagetimer.yaml:998](specs/stagetimer.yaml#L998))
+- [ ] Confirm boolean query values are taken as true and false (autostart, from_memory, focus, bold, uppercase, start_time_uses_date). ([specs/stagetimer.yaml:162](specs/stagetimer.yaml#L162))
+- [ ] Check whether the rate limit answers 429 and how RateLimit-* headers report it with the 600 ms pacing. ([specs/stagetimer.yaml:72](specs/stagetimer.yaml#L72))
+- [ ] Check whether create_timer accepts every documented field at once with its documented default (including an empty speaker and notes). ([specs/stagetimer.yaml:376](specs/stagetimer.yaml#L376))
 
 ## symetrix-composer — Symetrix Composer DSPs
 

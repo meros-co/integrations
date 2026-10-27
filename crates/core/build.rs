@@ -88,6 +88,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["christie-1dlp", "christie-spyder", "christie-trulife"],
     ),
     ("vendor-churchapps", &["freeshow"]),
+    ("vendor-clock8001", &["clock-8001"]),
     ("vendor-cockos", &["cockos-reaper", "cockos-reaper-web"]),
     ("vendor-digico", &["digico-sd"]),
     (
@@ -105,6 +106,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-disguise", &["disguise"]),
+    ("vendor-dsan", &["dsan-limitimer", "dsan-perfectcue"]),
     ("vendor-dtvideolabs", &["dtvideolabs-playbackpro-plus"]),
     ("vendor-epson", &["epson-projector"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
@@ -139,6 +141,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
+    (
+        "vendor-irisdown",
+        &["irisdown-countdown-timer", "irisdown-remote-show-control"],
+    ),
     ("vendor-imimot", &["imimot-mitti"]),
     ("vendor-kramer", &["kramer-p3000"]),
     (
@@ -164,6 +170,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-obs", &["obs-studio"]),
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
+    ("vendor-ontime", &["ontime", "ontime-osc"]),
     ("vendor-openlp", &["openlp"]),
     ("vendor-omt", &["omt", "omt-discovery"]),
     (
@@ -177,6 +184,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-philips", &["philips-sicp"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
+    ("vendor-pltech", &["kuma-timer"]),
+    ("vendor-presentationtools", &["cuetimer"]),
     ("vendor-probel", &["probel-swp02", "probel-swp08"]),
     ("vendor-ptzoptics", &["ptzoptics"]),
     ("vendor-qsc", &["qsys", "qsys-ecp"]),
@@ -207,6 +216,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-ross",
         &["ross-xpression", "ross-xpression-udp", "rosstalk"],
     ),
+    ("vendor-rundownstudio", &["rundown-studio"]),
     ("vendor-samsung", &["samsung-mdc"]),
     (
         "vendor-sennheiser",
@@ -232,6 +242,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "shure-wireless",
         ],
     ),
+    ("vendor-sofie", &["sofie-chef"]),
     ("vendor-softouch", &["softouch-easyworship"]),
     (
         "vendor-sony",
@@ -243,12 +254,14 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "visca",
         ],
     ),
+    ("vendor-stagetimer", &["stagetimer"]),
     ("vendor-studiocoast", &["vmix"]),
     (
         "vendor-symetrix",
         &["symetrix-composer", "symetrix-jupiter"],
     ),
     ("vendor-tallyarbiter", &["tally-arbiter"]),
+    ("vendor-tinkerlist", &["cuez-automator"]),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
     (
         "vendor-turtleav",

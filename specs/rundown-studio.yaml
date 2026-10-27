@@ -1,0 +1,934 @@
+spec: 1
+id: rundown-studio
+name: Rundown Studio (API v1)
+vendor: Rundown Studio
+category: other
+
+# Rundown Studio is a cloud rundown and show-calling tool. Its API v1 on
+# api-v1.rundownstudio.app has a control plane (show status, countdown,
+# start, pause, next, jump, the output message, sub-timers) and a data plane
+# (rundowns, cues, columns, cells, mentions, text variables), with a
+# Server-Sent Events stream of live changes per rundown. One device here is
+# one rundown, reached with an API token.
+
+source:
+  - title: Rundown Studio API v1 (OpenAPI 3.1, version 1.1.0)
+    author: Rundown Studio
+    url: https://api-v1.rundownstudio.app/openapi.yml
+    note: >
+      Vendor document, retrieved 2026-10-23 (the API's only server is
+      Production, https://api-v1.rundownstudio.app). Bearer tokens (a token
+      query parameter only on the control plane); roles VIEW, SHOWCALL, EDIT,
+      OWNER. Success envelope {ok, message, data, meta}; errors as RFC 9457
+      problem+json with 401, 403, 404, 409 (runner.not_running and others),
+      422, 429 with Retry-After. Every path and body used here:
+      GET /ping, /auth, /auth/probe; GET /rundowns/{id}/status (the
+      ApiV1Status snapshot every control verb also returns as data),
+      /countdown; POST /rundowns/{id}/action:start, :pause, :end,
+      :reset-rundown, :next, :previous, :jump {cue_id},
+      :adjust-duration {delta_ms within +-86400000}, :start-sub-timer,
+      :pause-sub-timer, :reset-sub-timer {cue_id, sub_timer_id}; GET and
+      PATCH /rundowns/{id}/output-message {text <= 1000, visible, color,
+      bold, underline}; GET and POST /rundowns (cursor, limit 1-100); GET,
+      PATCH and DELETE /rundowns/{id} (include=cues,columns,cells; soft
+      delete), POST /rundowns/{id}:duplicate, GET /rundowns/{id}/export
+      (csv|pdf); cues (list, create, :bulk, :reorder, get, PATCH, DELETE),
+      columns (list, create, :reorder, get, PATCH, DELETE), cells (list by
+      cue_id and column_id, PATCH, :bulk), mentions (list, create, :bulk,
+      get, PATCH, DELETE), text variables (list, create, :bulk with mode
+      merge|replace, get, PATCH, DELETE), GET sub-timers; the Rundown, Cue,
+      Column, Cell, Mention, TextVariable, SubTimer, ApiV1Status and
+      ApiV1OutputMessage schemas. GET /rundowns/{id}/events: an SSE stream
+      opening with event ready {disconnect_at, heartbeat_interval_ms}, then
+      status (the bare snapshot) and, per ?events=, rundown, cue, column and
+      cell change envelopes {change added|modified|removed, id} carrying the
+      resource at :fat, heartbeat every 15 s, disconnect {reason lifetime |
+      auth_expired | auth_revoked}; 2 (restricted) or 6 concurrent streams.
+  - title: Rundown Studio API v1 documentation (getting started, live updates, advanced, errors)
+    author: Rundown Studio
+    url: https://rundownstudio.app/docs/api-v1/
+    note: >
+      Vendor documents, retrieved 2026-10-23. Tokens are created by team
+      admins, scoped to a team or one rundown; 20 requests a minute on the
+      restricted tier and 120 on paid plans with API access.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: bearer
+  refusal_status: [401]
+  timeout_ms: 8000
+  # 120 requests a minute on plans with API access.
+  pacing:
+    min_interval_ms: 500
+  probe: { method: GET, path: /ping }
+
+settings:
+  token: { type: string, secret: true, required: true, max_length: 4096,
+    label: API token,
+    description: "A Rundown Studio API token, scoped to the team or to this rundown, sent as a bearer token." }
+  rundown_id: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z0-9_-]+$",
+    label: Rundown ID,
+    description: "ID of the rundown this device controls, as in its URL in Rundown Studio." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "api-v1.rundownstudio.app, opened by host name" }
+  - { port: 443, protocol: https, role: push, note: "the rundown's Server-Sent Events stream on the same host" }
+
+models:
+  - id: rundown-studio
+    name: Rundown Studio rundown (API v1)
+    supports: [ping, get_token_info, check_access, get_status, get_countdown,
+               start, pause, end, reset_rundown, next, previous, jump, adjust_duration,
+               get_output_message, set_output_message_text, set_output_message_visible,
+               set_output_message_color, set_output_message_bold, set_output_message_underline,
+               start_sub_timer, pause_sub_timer, reset_sub_timer, list_sub_timers,
+               list_rundowns, list_rundowns_page, create_rundown, get_rundown, update_rundown,
+               delete_rundown, duplicate_rundown, export_rundown,
+               list_cues, list_cues_page, create_cue, create_cues, reorder_cues, get_cue, update_cue,
+               delete_cue, list_columns, create_column, reorder_columns, get_column, update_column,
+               delete_column, list_cells, list_cue_cells, list_column_cells, set_cell, set_cell_html,
+               set_cells, list_mentions, create_mention, update_mentions, get_mention, update_mention,
+               delete_mention, list_text_variables, create_text_variable, set_text_variables,
+               get_text_variable, set_text_variable, delete_text_variable]
+    verification: none
+
+commands:
+  # ── Account ──────────────────────────────────────────────────────────────
+  ping:
+    summary: Check the API and read its version (GET /ping)
+    send: { method: GET, path: /ping }
+    expect: { status: 200, json_path: "$.data.version" }
+    returns: value
+  get_token_info:
+    summary: Read what the token is (scope, team, rundowns, role, expiry) (GET /auth)
+    send: { method: GET, path: /auth }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  check_access:
+    summary: Check the token's access to this rundown (GET /auth/probe)
+    send: { method: GET, path: /auth/probe, query: { rundown_id: "{settings.rundown_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  # ── Show control ─────────────────────────────────────────────────────────
+  get_status:
+    summary: Read the live show status (GET /rundowns/{id}/status); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/status" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_countdown:
+    summary: Read the active cue's and sub-timers' countdown, pre-formatted (GET /rundowns/{id}/countdown); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/countdown" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  start:
+    summary: Start the show (POST action:start)
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:start" }
+    expect: { status: 200 }
+    returns: ack
+  pause:
+    summary: Pause the show (POST action:pause)
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:pause" }
+    expect: { status: 200 }
+    returns: ack
+  end:
+    summary: End the show (POST action:end)
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:end" }
+    expect: { status: 200 }
+    returns: ack
+  reset_rundown:
+    summary: Reset the rundown's timing (POST action:reset-rundown)
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:reset-rundown" }
+    expect: { status: 200 }
+    returns: ack
+  next:
+    summary: Advance to the next cue (POST action:next)
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:next" }
+    expect: { status: 200 }
+    returns: ack
+  previous:
+    summary: Step back to the previous cue (POST action:previous)
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:previous" }
+    expect: { status: 200 }
+    returns: ack
+  jump:
+    summary: Make a cue the active cue, starting the show on it before the show (POST action:jump)
+    params:
+      cue_id: &cue_id { type: string, max_length: 64, required: true,
+                        label: Cue, description: "ID of the cue, as the cues in state list it; a cue of type cue." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:jump",
+            body: '{"cue_id":{cue_id:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  adjust_duration:
+    summary: Lengthen or shorten the active cue (POST action:adjust-duration)
+    params:
+      delta_ms: { type: int, min: -86400000, max: 86400000, required: true,
+                  label: Change, description: "Milliseconds to add to the active cue's duration; negative shortens it." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:adjust-duration",
+            body: '{"delta_ms":{delta_ms}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Output message ───────────────────────────────────────────────────────
+  get_output_message:
+    summary: Read the output message (GET output-message); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/output-message" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  set_output_message_text:
+    summary: Set the output message's text (PATCH output-message)
+    params:
+      text: { type: string, max_length: 1000, required: true,
+              label: Text, description: "The message's text." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/output-message",
+            body: '{"text":{text:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  set_output_message_visible:
+    summary: Show or hide the output message (PATCH output-message)
+    params:
+      visible: { type: bool, required: true,
+                 label: Visible, description: "True shows the message on the output; false hides it." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/output-message",
+            body: '{"visible":{visible}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  set_output_message_color:
+    summary: Set the output message's color (PATCH output-message)
+    params:
+      color: { type: string, max_length: 50, required: true,
+               label: Color, description: "Text color, such as #ffffff." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/output-message",
+            body: '{"color":{color:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  set_output_message_bold:
+    summary: Make the output message bold or not (PATCH output-message)
+    params:
+      bold: { type: bool, required: true, label: Bold, description: "True shows the text bold." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/output-message",
+            body: '{"bold":{bold}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  set_output_message_underline:
+    summary: Underline the output message or not (PATCH output-message)
+    params:
+      underline: { type: bool, required: true, label: Underline, description: "True underlines the text." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/output-message",
+            body: '{"underline":{underline}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Sub-timers ───────────────────────────────────────────────────────────
+  start_sub_timer:
+    summary: Start a cue's sub-timer (POST action:start-sub-timer)
+    params:
+      cue_id: *cue_id
+      sub_timer_id: &sub_timer_id { type: string, max_length: 64, required: true,
+                                    label: Sub-timer, description: "ID of the sub-timer, as the sub-timers in state list it." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:start-sub-timer",
+            body: '{"cue_id":{cue_id:json},"sub_timer_id":{sub_timer_id:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  pause_sub_timer:
+    summary: Pause a cue's sub-timer (POST action:pause-sub-timer)
+    params: { cue_id: *cue_id, sub_timer_id: *sub_timer_id }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:pause-sub-timer",
+            body: '{"cue_id":{cue_id:json},"sub_timer_id":{sub_timer_id:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  reset_sub_timer:
+    summary: Reset a cue's sub-timer (POST action:reset-sub-timer)
+    params: { cue_id: *cue_id, sub_timer_id: *sub_timer_id }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/action:reset-sub-timer",
+            body: '{"cue_id":{cue_id:json},"sub_timer_id":{sub_timer_id:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  list_sub_timers:
+    summary: List the rundown's sub-timers and their settings (GET sub-timers); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/sub-timers" }
+    expect: { status: 200, json_path: "$.data.items" }
+    returns: value
+
+  # ── Rundowns ─────────────────────────────────────────────────────────────
+  list_rundowns:
+    summary: List the team's rundowns, first page (GET /rundowns); returns items, next_cursor and has_more
+    params:
+      limit: &limit { type: int, min: 1, max: 100, default: 100,
+                      label: Page size, description: "Items per page, up to 100." }
+    send: { method: GET, path: /rundowns, query: { limit: "{limit}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  list_rundowns_page:
+    summary: List the next page of the team's rundowns (GET /rundowns?cursor=)
+    params:
+      cursor: &cursor { type: string, max_length: 1024, required: true,
+                        label: Cursor, description: "The previous page's next_cursor." }
+      limit: *limit
+    send: { method: GET, path: /rundowns, query: { cursor: "{cursor}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  create_rundown:
+    summary: >
+      Create a rundown (POST /rundowns), returning its ID. The body is the
+      API's documented object: title, timezone, start_time, status, settings
+      (cue_numbering, tod_display_format), and optionally columns and cues
+    params:
+      body: &rundown_body { type: json, required: true,
+                            label: Rundown,
+                            description: "JSON object as Rundown Studio documents it: title, timezone, start_time (epoch ms), status, settings, and for a new rundown optionally columns and cues." }
+    send: { method: POST, path: /rundowns, body: "{body}", content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.data.id" }
+    returns: value
+  get_rundown:
+    summary: Read this rundown with its cues and columns (GET /rundowns/{id}?include=cues,columns); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}", query: { include: "cues,columns" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  update_rundown:
+    summary: Update this rundown's title, timezone, start time, status or settings (PATCH /rundowns/{id})
+    params:
+      body: { type: json, required: true,
+              label: Changes,
+              description: "JSON object of the fields to change: title, timezone, start_time, status, settings." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  delete_rundown:
+    summary: Soft-delete this rundown (DELETE /rundowns/{id})
+    send: { method: DELETE, path: "/rundowns/{settings.rundown_id}" }
+    expect: { status: 200 }
+    returns: ack
+  duplicate_rundown:
+    summary: Duplicate this rundown (POST /rundowns/{id}:duplicate), returning the copy's ID
+    params:
+      body: { type: json, required: true,
+              label: Overrides,
+              description: "JSON object of fields the copy takes instead (title, timezone, start_time, status, settings); {} copies as it is." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}:duplicate", body: "{body}", content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.data.id" }
+    returns: value
+  export_rundown:
+    summary: Export this rundown as CSV or PDF (GET export), returning a download link
+    params:
+      format: { type: enum, values: [csv, pdf], required: true,
+                label: Format, description: "CSV or PDF." }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/export", query: { format: "{format}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  # ── Cues ─────────────────────────────────────────────────────────────────
+  list_cues:
+    summary: List the rundown's cues, first page, in ID order (GET cues)
+    params: { limit: *limit }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cues", query: { limit: "{limit}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  list_cues_page:
+    summary: List the next page of the rundown's cues (GET cues?cursor=)
+    params: { cursor: *cursor, limit: *limit }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cues", query: { cursor: "{cursor}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  create_cue:
+    summary: >
+      Create a cue, heading or group (POST cues), returning its ID. The body
+      takes type, title, subtitle, duration_ms, background_color,
+      start_time and position ("start", "end", {after_cue_id} or
+      {before_cue_id})
+    params:
+      body: &cue_body { type: json, required: true,
+                        label: Cue,
+                        description: "JSON object as Rundown Studio documents a cue: type (cue, heading or group), title, subtitle, duration_ms, background_color, start_time, position." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/cues", body: "{body}", content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.data.id" }
+    returns: value
+  create_cues:
+    summary: Create many cues at once (POST cues:bulk with {cues, position})
+    params:
+      body: { type: json, required: true,
+              label: Cues,
+              description: "JSON object {\"cues\": [...], \"position\": ...} as Rundown Studio documents it." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/cues:bulk", body: "{body}", content_type: application/json }
+    expect: { status: [200, 201] }
+    returns: ack
+  reorder_cues:
+    summary: Reorder the cues (POST cues:reorder with the whole cue_order tree)
+    params:
+      body: { type: json, required: true,
+              label: Cue order,
+              description: "JSON object {\"cue_order\": [{\"cue_id\": ..., \"children\": [{\"cue_id\": ...}]}]} giving the whole order." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/cues:reorder", body: "{body}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  get_cue:
+    summary: Read one cue (GET cues/{cue_id})
+    params: { cue_id: *cue_id }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cues/{cue_id}" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  update_cue:
+    summary: Update a cue's fields or move it (PATCH cues/{cue_id})
+    params:
+      cue_id: *cue_id
+      body: { type: json, required: true,
+              label: Changes,
+              description: "JSON object of the fields to change: type, title, subtitle, duration_ms, background_color, start_time, position." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/cues/{cue_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  delete_cue:
+    summary: Soft-delete a cue (DELETE cues/{cue_id})
+    params: { cue_id: *cue_id }
+    send: { method: DELETE, path: "/rundowns/{settings.rundown_id}/cues/{cue_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Columns ──────────────────────────────────────────────────────────────
+  list_columns:
+    summary: List the rundown's columns (GET columns); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/columns" }
+    expect: { status: 200, json_path: "$.data.items" }
+    returns: value
+  create_column:
+    summary: Create a column (POST columns {name, type, width, position}), returning its ID
+    params:
+      body: { type: json, required: true,
+              label: Column,
+              description: "JSON object as Rundown Studio documents a column: name, type, width (100-800), position." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/columns", body: "{body}", content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.data.id" }
+    returns: value
+  reorder_columns:
+    summary: Reorder the columns (POST columns:reorder with the whole column_order)
+    params:
+      body: { type: json, required: true,
+              label: Column order,
+              description: "JSON object {\"column_order\": [{\"column_id\": ...}]} giving the whole order." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/columns:reorder", body: "{body}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  get_column:
+    summary: Read one column (GET columns/{column_id})
+    params:
+      column_id: &column_id { type: string, max_length: 64, required: true,
+                              label: Column, description: "ID of the column." }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/columns/{column_id}" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  update_column:
+    summary: Rename or resize a column (PATCH columns/{column_id})
+    params:
+      column_id: *column_id
+      name: { type: string, max_length: 200, required: true, label: Name, description: "The column's name." }
+      width: { type: int, min: 100, max: 800, required: true, label: Width, description: "The column's width in pixels." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/columns/{column_id}",
+            body: '{"name":{name:json},"width":{width}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  delete_column:
+    summary: Soft-delete a column (DELETE columns/{column_id})
+    params: { column_id: *column_id }
+    send: { method: DELETE, path: "/rundowns/{settings.rundown_id}/columns/{column_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Cells ────────────────────────────────────────────────────────────────
+  list_cells:
+    summary: List the rundown's cells, up to 1000 (GET cells); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { limit: "1000" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  list_cue_cells:
+    summary: List one cue's cells (GET cells?cue_id=)
+    params: { cue_id: *cue_id }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { cue_id: "{cue_id}", limit: "1000" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  list_column_cells:
+    summary: List one column's cells (GET cells?column_id=)
+    params: { column_id: *column_id }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { column_id: "{column_id}", limit: "1000" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  set_cell:
+    summary: Write a cell's plain text (PATCH cells)
+    params:
+      cue_id: *cue_id
+      column_id: *column_id
+      content: { type: string, multiline: true, max_length: 50000, required: true,
+                 label: Content, description: "The cell's text." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/cells",
+            body: '{"cue_id":{cue_id:json},"column_id":{column_id:json},"content":{content:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  set_cell_html:
+    summary: Write a cell's rich text as HTML (PATCH cells)
+    params:
+      cue_id: *cue_id
+      column_id: *column_id
+      content_html: { type: string, multiline: true, max_length: 100000, required: true,
+                      label: HTML, description: "The cell's content as HTML." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/cells",
+            body: '{"cue_id":{cue_id:json},"column_id":{column_id:json},"content_html":{content_html:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  set_cells:
+    summary: Write many cells at once (PATCH cells:bulk with {cells})
+    params:
+      body: { type: json, required: true,
+              label: Cells,
+              description: "JSON object {\"cells\": [{\"cue_id\", \"column_id\", \"content\" or \"content_html\"}]}." }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/cells:bulk", body: "{body}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Mentions ─────────────────────────────────────────────────────────────
+  list_mentions:
+    summary: List the rundown's mentions (GET mentions); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/mentions" }
+    expect: { status: 200, json_path: "$.data.items" }
+    returns: value
+  create_mention:
+    summary: Create a mention (POST mentions), returning its ID
+    params:
+      name: &mention_name { type: string, max_length: 50, required: true, label: Name, description: "The mention's name." }
+      color: &mention_color { type: string, max_length: 50, required: true, label: Color, description: "The mention's color, such as #2196F3." }
+      description: &mention_description { type: string, multiline: true, max_length: 5000, default: "",
+                                           label: Description, description: "Notes about the mention." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/mentions",
+            body: '{"name":{name:json},"color":{color:json},"description":{description:json}}', content_type: application/json }
+    expect: { status: [200, 201], json_path: "$.data.id" }
+    returns: value
+  update_mentions:
+    summary: Update many mentions at once (POST mentions:bulk with {mentions})
+    params:
+      body: { type: json, required: true,
+              label: Mentions,
+              description: "JSON object {\"mentions\": [{\"id\", \"name\", \"color\", \"description\"}]}." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/mentions:bulk", body: "{body}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  get_mention:
+    summary: Read one mention (GET mentions/{mention_id})
+    params:
+      mention_id: &mention_id { type: string, max_length: 64, required: true,
+                                label: Mention, description: "ID of the mention." }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/mentions/{mention_id}" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  update_mention:
+    summary: Update a mention (PATCH mentions/{mention_id})
+    params:
+      mention_id: *mention_id
+      name: *mention_name
+      color: *mention_color
+      description: *mention_description
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/mentions/{mention_id}",
+            body: '{"name":{name:json},"color":{color:json},"description":{description:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  delete_mention:
+    summary: Delete a mention (DELETE mentions/{mention_id})
+    params: { mention_id: *mention_id }
+    send: { method: DELETE, path: "/rundowns/{settings.rundown_id}/mentions/{mention_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Text variables ───────────────────────────────────────────────────────
+  list_text_variables:
+    summary: List the rundown's text variables (GET text-variables); kept in state
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/text-variables" }
+    expect: { status: 200, json_path: "$.data.items" }
+    returns: value
+  create_text_variable:
+    summary: Create a text variable (POST text-variables)
+    params:
+      key: &var_key { type: string, max_length: 50, required: true,
+                      label: Key, description: "The variable's key." }
+      value: &var_value { type: string, max_length: 1000, required: true,
+                          label: Value, description: "The variable's value." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/text-variables",
+            body: '{"key":{key:json},"value":{value:json}}', content_type: application/json }
+    expect: { status: [200, 201] }
+    returns: ack
+  set_text_variables:
+    summary: Write many text variables at once, merged with or replacing the others (POST text-variables:bulk)
+    params:
+      variables: { type: json, required: true,
+                   label: Variables,
+                   description: "JSON array of {\"key\", \"value\"} objects." }
+      mode: { type: enum, values: [merge, replace], required: true,
+              label: Mode, description: "merge keeps the other variables; replace removes them." }
+    send: { method: POST, path: "/rundowns/{settings.rundown_id}/text-variables:bulk",
+            body: '{"text_variables":{variables},"mode":{mode:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  get_text_variable:
+    summary: Read one text variable (GET text-variables/{key})
+    params: { key: *var_key }
+    send: { method: GET, path: "/rundowns/{settings.rundown_id}/text-variables/{key}" }
+    expect: { status: 200, json_path: "$.data.value" }
+    returns: value
+  set_text_variable:
+    summary: Change a text variable's value (PATCH text-variables/{key})
+    params: { key: *var_key, value: *var_value }
+    send: { method: PATCH, path: "/rundowns/{settings.rundown_id}/text-variables/{key}",
+            body: '{"value":{value:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  delete_text_variable:
+    summary: Delete a text variable (DELETE text-variables/{key})
+    params: { key: *var_key }
+    send: { method: DELETE, path: "/rundowns/{settings.rundown_id}/text-variables/{key}" }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # The rundown's event stream: the status snapshot on connecting and on
+  # every change, and each rundown, cue, column and cell change with its
+  # body. What it does not carry (the output message, mentions, text
+  # variables, sub-timer settings) is read on connecting and now and then.
+  sse:
+    path: "/rundowns/{settings.rundown_id}/events?events=rundown:fat,cue:fat,column:fat,cell:fat"
+  poll:
+    - send:
+        - { method: GET, path: "/rundowns/{settings.rundown_id}", query: { include: "cues,columns" } }
+        - { method: GET, path: "/rundowns/{settings.rundown_id}/cells", query: { limit: "1000" } }
+    - every_ms: 10000
+      send:
+        - { method: GET, path: "/rundowns/{settings.rundown_id}/output-message" }
+    - every_ms: 60000
+      send:
+        - { method: GET, path: "/rundowns/{settings.rundown_id}/text-variables" }
+        - { method: GET, path: "/rundowns/{settings.rundown_id}/mentions" }
+        - { method: GET, path: "/rundowns/{settings.rundown_id}/sub-timers" }
+  updates:
+    # ── The status snapshot: on the stream, and as every control verb's data
+    - json_match: { "$.event": "^status$", "$.data.state": "" }
+      json: &status_fields
+        state: "$.data.state"
+        server_time: "$.data.server_time"
+        active_id: "$.data.active_cue.id"
+        active_title: "$.data.active_cue.title"
+        active_started: "$.data.active_cue.started_at"
+        active_paused: "$.data.active_cue.paused_at"
+        active_duration: "$.data.active_cue.duration_ms"
+        next_id: "$.data.next_cue.id"
+        next_title: "$.data.next_cue.title"
+      replace: [status.active_cue, status.next_cue]
+      state: &status_state
+        status.state: "{state}"
+        status.server_time: "{server_time}"
+        status.active_cue.id: "{active_id}"
+        status.active_cue.title: "{active_title}"
+        status.active_cue.started_at: "{active_started}"
+        status.active_cue.paused_at: "{active_paused}"
+        status.active_cue.duration_ms: "{active_duration}"
+        status.next_cue.id: "{next_id}"
+        status.next_cue.title: "{next_title}"
+    - json_match: { "$.event": "^status$", "$.data.state": "" }
+      json_each: "$.data.sub_timers"
+      json: &running_fields { id: "$.id", name: "$.name", cue_id: "$.cue_id", cue_title: "$.cue_title",
+                              started_at: "$.started_at", paused_at: "$.paused_at", duration_ms: "$.duration_ms" }
+      replace: status.sub_timers
+      state: &running_state
+        "status.sub_timers.{id}.name": "{name}"
+        "status.sub_timers.{id}.cue_id": "{cue_id}"
+        "status.sub_timers.{id}.cue_title": "{cue_title}"
+        "status.sub_timers.{id}.started_at": "{started_at}"
+        "status.sub_timers.{id}.paused_at": "{paused_at}"
+        "status.sub_timers.{id}.duration_ms": "{duration_ms}"
+    - path: "^/rundowns/[^/]+/(status$|action:)"
+      json_match: { "$.data.state": "" }
+      json: *status_fields
+      replace: [status.active_cue, status.next_cue]
+      state: *status_state
+    - path: "^/rundowns/[^/]+/(status$|action:)"
+      json_match: { "$.data.state": "" }
+      json_each: "$.data.sub_timers"
+      json: *running_fields
+      replace: status.sub_timers
+      state: *running_state
+    - path: "^/rundowns/[^/]+/countdown$"
+      json:
+        remaining_ms: "$.data.active_cue.remaining_ms"
+        formatted: "$.data.active_cue.remaining.formatted"
+        overtime: "$.data.active_cue.remaining.is_overtime"
+      replace: countdown
+      state:
+        countdown.remaining_ms: "{remaining_ms}"
+        countdown.formatted: "{formatted}"
+        countdown.overtime: "{overtime}"
+
+    # ── The output message ────────────────────────────────────────────────
+    - path: "^/rundowns/[^/]+/output-message$"
+      json:
+        text: "$.data.text"
+        visible: "$.data.visible"
+        color: "$.data.color"
+        bold: "$.data.bold"
+        underline: "$.data.underline"
+      state:
+        output_message.text: "{text}"
+        output_message.visible: "{visible}"
+        output_message.color: "{color}"
+        output_message.bold: "{bold}"
+        output_message.underline: "{underline}"
+
+    # ── The rundown, its cues and columns ─────────────────────────────────
+    - path: "^/rundowns/[^/?]+\\?include="
+      json: &rundown_fields
+        title: "$.data.title"
+        timezone: "$.data.timezone"
+        start_time: "$.data.start_time"
+        end_time: "$.data.end_time"
+        status: "$.data.status"
+        updated_at: "$.data.updated_at"
+      state: &rundown_state
+        rundown.title: "{title}"
+        rundown.timezone: "{timezone}"
+        rundown.start_time: "{start_time}"
+        rundown.end_time: "{end_time}"
+        rundown.status: "{status}"
+        rundown.updated_at: "{updated_at}"
+    - path: "^/rundowns/[^/?]+\\?include="
+      json_each: "$.included.cues"
+      json: &cue_fields
+        id: "$.id"
+        type: "$.type"
+        title: "$.title"
+        subtitle: "$.subtitle"
+        duration_ms: "$.duration_ms"
+        background_color: "$.background_color"
+        prevent_edits: "$.prevent_edits"
+        skipped_by: "$.skipped_by"
+        start_time: "$.start_time"
+      replace: cues
+      state: &cue_state
+        "cues.{id}.type": "{type}"
+        "cues.{id}.title": "{title}"
+        "cues.{id}.subtitle": "{subtitle}"
+        "cues.{id}.duration_ms": "{duration_ms}"
+        "cues.{id}.background_color": "{background_color}"
+        "cues.{id}.prevent_edits": "{prevent_edits}"
+        "cues.{id}.skipped_by": "{skipped_by}"
+        "cues.{id}.start_time": "{start_time}"
+    # Show order: top-level cues and the children of groups.
+    - path: "^/rundowns/[^/?]+\\?include="
+      json_each: "$.data.cue_order"
+      json: { id: "$.id" }
+      state: { "cues.{id}.position": "{index}" }
+    - path: "^/rundowns/[^/?]+\\?include="
+      json_each: "$.data.cue_order[*].children"
+      json: { id: "$.id", parent: "$^.id" }
+      state:
+        "cues.{id}.position": "{index}"
+        "cues.{id}.parent": "{parent}"
+    - path: "^/rundowns/[^/?]+\\?include="
+      json_each: "$.included.columns"
+      json: &column_fields { id: "$.id", name: "$.name", width: "$.width" }
+      replace: columns
+      state: &column_state
+        "columns.{id}.name": "{name}"
+        "columns.{id}.width": "{width}"
+    - path: "^/rundowns/[^/?]+\\?include="
+      json_each: "$.data.column_order"
+      json: { id: "$" }
+      state: { "columns.{id}.position": "{index}" }
+    - path: "^/rundowns/[^/]+/cells\\?limit="
+      json_each: "$.data.items"
+      json: &cell_fields { cue: "$.cue_id", column: "$.column_id", content: "$.content", html: "$.content_html" }
+      replace: cells
+      state: &cell_state
+        "cells.{cue}.{column}.content": "{content}"
+        "cells.{cue}.{column}.html": "{html}"
+    - path: "^/rundowns/[^/]+/columns$"
+      json_each: "$.data.items"
+      json: *column_fields
+      state: *column_state
+    - path: "^/rundowns/[^/]+/sub-timers$"
+      json_each: "$.data.items"
+      json:
+        id: "$.id"
+        name: "$.name"
+        cue_id: "$.cue_id"
+        direction: "$.direction"
+        duration_ms: "$.duration_ms"
+        end_action: "$.end_action"
+        auto_start: "$.auto_start"
+        show_on_output: "$.show_on_output"
+      replace: sub_timers
+      state:
+        "sub_timers.{id}.name": "{name}"
+        "sub_timers.{id}.cue_id": "{cue_id}"
+        "sub_timers.{id}.direction": "{direction}"
+        "sub_timers.{id}.duration_ms": "{duration_ms}"
+        "sub_timers.{id}.end_action": "{end_action}"
+        "sub_timers.{id}.auto_start": "{auto_start}"
+        "sub_timers.{id}.show_on_output": "{show_on_output}"
+    - path: "^/rundowns/[^/]+/mentions$"
+      json_each: "$.data.items"
+      json: { id: "$.id", name: "$.name", color: "$.color", description: "$.description" }
+      replace: mentions
+      state:
+        "mentions.{id}.name": "{name}"
+        "mentions.{id}.color": "{color}"
+        "mentions.{id}.description": "{description}"
+    - path: "^/rundowns/[^/]+/text-variables$"
+      json_each: "$.data.items"
+      json: { key: "$.key", value: "$.value" }
+      replace: text_variables
+      state: { "text_variables.{key:key}": "{value}" }
+
+    # ── Changes on the stream ─────────────────────────────────────────────
+    - json_match: { "$.event": "^rundown$", "$.data.change": "^(added|modified)$" }
+      json:
+        title: "$.data.rundown.title"
+        timezone: "$.data.rundown.timezone"
+        start_time: "$.data.rundown.start_time"
+        end_time: "$.data.rundown.end_time"
+        status: "$.data.rundown.status"
+        updated_at: "$.data.rundown.updated_at"
+      state: *rundown_state
+    # A rundown change may reorder cues: the rundown is read again.
+      then_send:
+        - { method: GET, path: "/rundowns/{settings.rundown_id}", query: { include: "cues,columns" } }
+    - json_match: { "$.event": "^cue$", "$.data.change": "^(added|modified)$" }
+      json:
+        id: "$.data.cue.id"
+        type: "$.data.cue.type"
+        title: "$.data.cue.title"
+        subtitle: "$.data.cue.subtitle"
+        duration_ms: "$.data.cue.duration_ms"
+        background_color: "$.data.cue.background_color"
+        prevent_edits: "$.data.cue.prevent_edits"
+        skipped_by: "$.data.cue.skipped_by"
+        start_time: "$.data.cue.start_time"
+      state: *cue_state
+    - json_match: { "$.event": "^cue$", "$.data.change": "^removed$", "$.data.id": "^([^.]+)$" }
+      json: {}
+      state: { "cues.{1}": { delete: true } }
+    - json_match: { "$.event": "^column$", "$.data.change": "^(added|modified)$" }
+      json: { id: "$.data.column.id", name: "$.data.column.name", width: "$.data.column.width" }
+      state: *column_state
+    - json_match: { "$.event": "^column$", "$.data.change": "^removed$", "$.data.id": "^([^.]+)$" }
+      json: {}
+      state: { "columns.{1}": { delete: true } }
+    - json_match: { "$.event": "^cell$", "$.data.change": "^(added|modified)$" }
+      json: { cue: "$.data.cell.cue_id", column: "$.data.cell.column_id", content: "$.data.cell.content",
+              html: "$.data.cell.content_html" }
+      state: *cell_state
+    - json_match: { "$.event": "^cell$", "$.data.change": "^removed$", "$.data.cue_id": "^([^.]+)$",
+                    "$.data.column_id": "^([^.]+)$" }
+      json: {}
+      state: { "cells.{1}.{2}": { delete: true } }
+    - json_match: { "$.event": "^disconnect$" }
+      json: { reason: "$.data.reason" }
+      state: { stream.last_disconnect: "{reason}" }
+
+state:
+  status.state: { type: string, description: "Show state: running, paused or stopped (before and after the show)" }
+  status.server_time: { type: int, unit: ms, description: "Rundown Studio's clock when the status was taken, in milliseconds since 1970-01-01 UTC" }
+  status.active_cue.id: { type: string, description: "ID of the active cue; the section is absent when none is active" }
+  status.active_cue.title: { type: string, description: "Title of the active cue" }
+  status.active_cue.started_at: { type: int, unit: ms, description: "When the active cue started, ms since 1970; remaining is started_at + duration_ms - server_time while running" }
+  status.active_cue.paused_at: { type: int, unit: ms, description: "When the active cue was paused, ms since 1970; absent while running" }
+  status.active_cue.duration_ms: { type: int, unit: ms, description: "Active cue's duration" }
+  status.next_cue.id: { type: string, description: "ID of the next cue; absent when there is none" }
+  status.next_cue.title: { type: string, description: "Title of the next cue" }
+  status.sub_timers.*.name: { type: string, description: "Running or paused sub-timer's name, keyed by sub-timer ID" }
+  status.sub_timers.*.cue_id: { type: string, description: "Cue the sub-timer belongs to" }
+  status.sub_timers.*.cue_title: { type: string, description: "Title of that cue" }
+  status.sub_timers.*.started_at: { type: int, unit: ms, description: "When the sub-timer started, ms since 1970" }
+  status.sub_timers.*.paused_at: { type: int, unit: ms, description: "When the sub-timer was paused, ms since 1970; absent while running" }
+  status.sub_timers.*.duration_ms: { type: int, unit: ms, description: "Sub-timer's duration" }
+  countdown.remaining_ms: { type: int, unit: ms, description: "Active cue's remaining time when get_countdown last read it; negative in overtime" }
+  countdown.formatted: { type: string, description: "That time as Rundown Studio formats it, + in overtime" }
+  countdown.overtime: { type: bool, description: "Whether the active cue was in overtime" }
+  output_message.text: { type: string, description: "Output message text" }
+  output_message.visible: { type: bool, description: "Whether the output message is shown" }
+  output_message.color: { type: string, description: "Output message color" }
+  output_message.bold: { type: bool, description: "Whether the output message is bold" }
+  output_message.underline: { type: bool, description: "Whether the output message is underlined" }
+  rundown.title: { type: string, description: "Rundown title" }
+  rundown.timezone: { type: string, description: "Rundown's time zone, an IANA name" }
+  rundown.start_time: { type: int, unit: ms, description: "Planned start, ms since 1970" }
+  rundown.end_time: { type: int, unit: ms, description: "Planned end, ms since 1970" }
+  rundown.status: { type: string, description: "Rundown status: imported, draft, awaiting-data, approved, finalized, rejected or template" }
+  rundown.updated_at: { type: string, description: "When the rundown last changed, ISO 8601" }
+  cues.*.type: { type: string, description: "Cue type: cue, heading or group; keyed by cue ID" }
+  cues.*.title: { type: string, description: "Cue title" }
+  cues.*.subtitle: { type: string, description: "Cue subtitle" }
+  cues.*.duration_ms: { type: int, unit: ms, description: "Cue duration" }
+  cues.*.background_color: { type: string, description: "Cue background color" }
+  cues.*.prevent_edits: { type: bool, description: "Whether the cue is locked against edits" }
+  cues.*.skipped_by: { type: string, description: "self when the cue is skipped, group when its group is; absent when not skipped" }
+  cues.*.start_time: { type: int, unit: ms, description: "Cue's hard start time, ms since 1970" }
+  cues.*.position: { type: int, description: "Place in show order, from 0, among the top level or within its group" }
+  cues.*.parent: { type: string, description: "ID of the group the cue is in; absent at the top level" }
+  columns.*.name: { type: string, description: "Column name, keyed by column ID" }
+  columns.*.width: { type: int, unit: px, description: "Column width" }
+  columns.*.position: { type: int, description: "Column's place in the column order, from 0" }
+  cells.*.*.content: { type: string, description: "Cell text, by cue ID then column ID" }
+  cells.*.*.html: { type: string, description: "Cell content as HTML" }
+  sub_timers.*.name: { type: string, description: "Sub-timer's name, keyed by sub-timer ID" }
+  sub_timers.*.cue_id: { type: string, description: "Cue the sub-timer belongs to" }
+  sub_timers.*.direction: { type: string, description: "Counting direction: down or up" }
+  sub_timers.*.duration_ms: { type: int, unit: ms, description: "Sub-timer's duration" }
+  sub_timers.*.end_action: { type: string, description: "At its end: stop or continue" }
+  sub_timers.*.auto_start: { type: bool, description: "Whether it starts with its cue" }
+  sub_timers.*.show_on_output: { type: bool, description: "Whether it shows on the output" }
+  mentions.*.name: { type: string, description: "Mention name, keyed by mention ID" }
+  mentions.*.color: { type: string, description: "Mention color" }
+  mentions.*.description: { type: string, description: "Mention description" }
+  text_variables.*: { type: string, description: "Text variable's value, keyed by its key" }
+  stream.last_disconnect: { type: string, description: "Why the event stream was last closed: lifetime, auth_expired or auth_revoked" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Rundown Studio is a cloud service with one server, api-v1.rundownstudio.app
+      (port 443, opened by host name). API access needs a token created by a
+      team admin, scoped to the team or one rundown; its role (VIEW,
+      SHOWCALL, EDIT, OWNER) limits what it may do, and a command beyond it
+      answers 403. A token that stops validating is refused (401), and the
+      event stream sends disconnect auth_expired or auth_revoked before
+      closing.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Requests are limited to 120 a minute on plans with API access and 20 on
+      the restricted tier, answered 429 with Retry-After beyond it; the core
+      sends one request every 500 ms at most, which a restricted token can
+      still exceed. Event streams are limited to 2 (restricted) or 6 open at
+      once per team. Changes arrive on the event stream; the output
+      message is read every 10 seconds and the text variables, mentions and
+      sub-timer settings every minute, as the stream does not carry them.
+
+  - models: [all]
+    severity: info
+    text: >
+      The status gives timestamps, not a ticking countdown: remaining time is
+      started_at + duration_ms - server_time while running, and paused_at in
+      place of server_time while paused. get_countdown reads Rundown
+      Studio's own countdown once. The event stream closes on its own after
+      a while (disconnect lifetime) and the core opens it again, which sends
+      the status again. The rundown is read with its cues and columns once on
+      connecting and again after a rundown change; cells are read up to the
+      API's 1,000, and more than that leaves the rest to the stream's
+      changes. Lists are cursor-paged (list_rundowns_page, list_cues_page)
+      and return next_cursor and has_more.
+
+  - models: [all]
+    severity: critical
+    text: >
+      end ends the show and reset_rundown resets its timing during a live
+      show. Deletions are soft deletes in Rundown Studio, but the API offers
+      no restore; set_text_variables with mode replace removes every other
+      variable.

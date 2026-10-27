@@ -1,0 +1,203 @@
+spec: 1
+id: dsan-limitimer
+name: DSAN Limitimer (TP-2000XLT serial interface)
+vendor: DSAN
+category: other
+
+# DSAN's Limitimer speaker timers (PRO-2000 controller, ASL signal lights)
+# take a touch panel's commands through the TP-2000XLT, an RS-485 to RS-232
+# adapter, in DSAN's ASCII protocol: ">" + command + space + two hex
+# checksum digits + CR, at 9600 8N1. The Limitimer sends its LED states
+# and its time strings (about 4 per second) the same way. Every command is
+# a button press with a fixed checksum, written out here as DSAN lists it.
+
+source:
+  - title: Limitimer — Connections for Touch Panel Controllers TP-2000XLT; Speaker Timer Serial Control Protocol, Limitimer ASCII API
+    author: DSAN Corporation
+    url: https://www.dsan.com/wp-content/uploads/2021/11/TouchPanelIntegrationTimers.pdf
+    note: >
+      Vendor document (3 pages; also at /2020/08/), retrieved 2026-10-23.
+      Page 1: the TP-2000XLT between the RS-485 Limitimer bus and a touch
+      panel controller's RS-232 port (pins 2 TXD-RXD, 3 RXD-TXD, 5 GND),
+      9600 baud, 8 bits, 1 stop bit, no parity. Page 2: message format
+      > + command string + space + checksum high + checksum low + CR, the
+      checksum being the low byte of the sum of the command string and the
+      space (worked example PRG1 = 0x13A, message >PRG1 3A); the buttons
+      PRG1, PRG2, PRG3, SESS (program 4), TTUP, TTDN, STUP, STDN, SSEC, CLR,
+      BEEP, BLNK, REPT, STOP (start/stop), ENTIME and DISTIME (the timer on
+      the large signal light; when off it shows the time of day or blank by
+      its DIP switch 9), with INCMIN and INCHOUR struck through. Page 3: the
+      LED indicators P1LED to P3LED and SESLED (ON, DM dim, OF), BPLED,
+      BKLED, GRNLED, YELLED, REDLED (ON, OF), SMON/SMOF (seconds mode) and
+      BEEP; the time strings TTSTR (total), STSTR (sum-up), RTSTR
+      (remaining) and RTSTRSZ (remaining, held at 0:00), about 4 Hz, shown as
+      >TTSTR= 0:00 E8.
+
+transport:
+  type: line-tcp
+  # A serial-to-Ethernet gateway's port (Global Cache's iTach, as the
+  # Companion modules for this adapter use); the Limitimer itself has no
+  # network port.
+  port: 4999
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  # The Limitimer acknowledges nothing; it reports LEDs and times instead.
+  reply: none
+  serial:
+    link: serial
+    baud_rate: 9600
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial",
+      note: "the TP-2000XLT's DB-9 (RS-232: pin 2 TXD-RXD, 3 RXD-TXD, 5 GND)" }
+  - { port: 4999, protocol: tcp, role: control, when: "link tcp",
+      note: "a serial-to-Ethernet gateway carrying the TP-2000XLT's RS-232, such as a Global Cache iTach" }
+
+models:
+  - id: limitimer
+    name: Limitimer PRO-2000 system with TP-2000XLT
+    supports: [program_1, program_2, program_3, session, total_time_up, total_time_down,
+               sum_up_time_up, sum_up_time_down, set_seconds, clear, beep, blink, repeat,
+               start_stop, enable_signal_light_timer, disable_signal_light_timer]
+    verification: none
+
+commands:
+  program_1:
+    summary: Press the Program 1 button (>PRG1 3A)
+    send: ">PRG1 3A"
+    returns: none
+  program_2:
+    summary: Press the Program 2 button (>PRG2 3B)
+    send: ">PRG2 3B"
+    returns: none
+  program_3:
+    summary: Press the Program 3 button (>PRG3 3C)
+    send: ">PRG3 3C"
+    returns: none
+  session:
+    summary: Press the Program 4 (Session) button (>SESS 5E)
+    send: ">SESS 5E"
+    returns: none
+  total_time_up:
+    summary: Press Total Time Up (>TTUP 6D)
+    send: ">TTUP 6D"
+    returns: none
+  total_time_down:
+    summary: Press Total Time Down (>TTDN 5A)
+    send: ">TTDN 5A"
+    returns: none
+  sum_up_time_up:
+    summary: Press Sum-Up Time Up (>STUP 6C)
+    send: ">STUP 6C"
+    returns: none
+  sum_up_time_down:
+    summary: Press Sum-Up Time Down (>STDN 59)
+    send: ">STDN 59"
+    returns: none
+  set_seconds:
+    summary: Press Set Seconds (>SSEC 4E)
+    send: ">SSEC 4E"
+    returns: none
+  clear:
+    summary: Press Clear (>CLR 01)
+    send: ">CLR 01"
+    returns: none
+  beep:
+    summary: Press Beep (>BEEP 3C)
+    send: ">BEEP 3C"
+    returns: none
+  blink:
+    summary: Press Blink (>BLNK 47)
+    send: ">BLNK 47"
+    returns: none
+  repeat:
+    summary: Press Repeat (>REPT 5B)
+    send: ">REPT 5B"
+    returns: none
+  start_stop:
+    summary: Press Start/Stop (>STOP 66)
+    send: ">STOP 66"
+    returns: none
+  enable_signal_light_timer:
+    summary: Show the timer on the large signal light (>ENTIME E2)
+    send: ">ENTIME E2"
+    returns: none
+  disable_signal_light_timer:
+    summary: Stop showing the timer on the large signal light, which then shows the time of day or blank (>DISTIME 2F)
+    send: ">DISTIME 2F"
+    returns: none
+
+telemetry:
+  updates:
+    - match: "^>?P([123])LED(ON|DM|OF) [0-9A-F]{2}$"
+      state:
+        "leds.program_{1}": { value: "{2}", map: { "ON": "on", "DM": "dim", "OF": "off" } }
+    - match: "^>?SESLED(ON|DM|OF) [0-9A-F]{2}$"
+      state:
+        leds.session: { value: "{1}", map: { "ON": "on", "DM": "dim", "OF": "off" } }
+    - match: "^>?BPLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.beep: { value: "{1}", map: { "ON": true, "OF": false } } }
+    - match: "^>?BKLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.blink: { value: "{1}", map: { "ON": true, "OF": false } } }
+    - match: "^>?GRNLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.green: { value: "{1}", map: { "ON": true, "OF": false } } }
+    - match: "^>?YELLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.yellow: { value: "{1}", map: { "ON": true, "OF": false } } }
+    - match: "^>?REDLED(ON|OF) [0-9A-F]{2}$"
+      state: { leds.red: { value: "{1}", map: { "ON": true, "OF": false } } }
+    - match: "^>?SM(ON|OF) [0-9A-F]{2}$"
+      state:
+        leds.seconds_mode: { value: "{1}", map: { "ON": true, "OF": false } }
+    - match: "^>?TTSTR=\\s*(\\S+) [0-9A-F]{2}$"
+      state: { times.total: "{1}" }
+    - match: "^>?STSTR=\\s*(\\S+) [0-9A-F]{2}$"
+      state: { times.sum_up: "{1}" }
+    - match: "^>?RTSTR=\\s*(\\S+) [0-9A-F]{2}$"
+      state: { times.remaining: "{1}" }
+    - match: "^>?RTSTRSZ=\\s*(\\S+) [0-9A-F]{2}$"
+      state: { times.remaining_held: "{1}" }
+
+state:
+  leds.program_1: { type: string, description: "Program 1 LED: on, dim or off" }
+  leds.program_2: { type: string, description: "Program 2 LED: on, dim or off" }
+  leds.program_3: { type: string, description: "Program 3 LED: on, dim or off" }
+  leds.session: { type: string, description: "Session (program 4) LED: on, dim or off" }
+  leds.beep: { type: bool, description: "Beep LED" }
+  leds.blink: { type: bool, description: "Blink LED" }
+  leds.green: { type: bool, description: "Green signal light" }
+  leds.yellow: { type: bool, description: "Yellow signal light" }
+  leds.red: { type: bool, description: "Red signal light" }
+  leds.seconds_mode: { type: bool, description: "Seconds mode indicator" }
+  times.total: { type: string, description: "Total time as the Limitimer shows it, such as 0:00 (minutes:seconds)" }
+  times.sum_up: { type: string, description: "Sum-up time as shown" }
+  times.remaining: { type: string, description: "Remaining time as shown" }
+  times.remaining_held: { type: string, description: "Remaining time held at 0:00 once it runs out (the timer itself counts on until stopped)" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The Limitimer has no network port: the TP-2000XLT gives it an RS-232
+      port at 9600 8N1, reached on a serial port of the host (link serial,
+      the default) or through a serial-to-Ethernet gateway (link tcp, port
+      4999 on a Global Cache iTach). Flow control is not documented; none is
+      used. The commands are button presses with no acknowledgement: their
+      effect shows in the LED and time strings the Limitimer sends.
+
+  - models: [all]
+    severity: info
+    text: >
+      DSAN writes the line ending as "/x0D" for commands and "\x0D" for
+      replies; both are taken as a carriage return. The Limitimer sends its
+      LEDs as they change and its time strings about four times a second;
+      nothing reports the whole state on connecting, so an LED shows in
+      state from its first change. The time strings' format with hours
+      (Limitimer hours mode) is not documented: they are kept as text. The
+      received checksums are not checked. DSAN lists INCMIN and INCHOUR
+      (increment the signal light's minutes and hours) struck through, so
+      they are not offered.

@@ -1460,9 +1460,12 @@ commands:
     returns: none
 ```
 
-OSC argument types: `int`, `float`, `string`, `blob`. A `blob` carries its
+OSC argument types: `int`, `float`, `string`, `blob`, `bool`. A `blob` carries its
 rendered template's text as UTF-8 bytes, for a device that takes text beyond
-ASCII that way (OSCPoint's section and file names).
+ASCII that way (OSCPoint's section and file names). A `bool` is OSC 1.1's
+`T` or `F` type tag, which carries no data; its template renders `true` or
+`false` (a `bool` parameter as it is), for a device that takes an OSC
+boolean (Clock-8001's `/clock/automation`).
 
 A query is a message carrying no arguments. For a device that answers on the
 same address, the spec declares the reply address, and the value is the
@@ -2507,7 +2510,12 @@ telemetry:
     as_reply: { path: "$.url", body: "$.data" }
 ```
 
-A path without a leading `/` is given one.
+A path without a leading `/` is given one. The path may name settings as
+`{settings.name}`, each value percent-encoded as one path segment, as a
+websocket's path does (§2, `ws`): Rundown Studio streams one rundown's
+events from `/rundowns/{settings.rundown_id}/events`. While a setting it
+names has no value the stream is not opened, so the path never loses a
+segment.
 
 A telemetry vector for an event stream gives `inbound_sse: { event, data }`,
 one event as the stream would deliver it (`event` defaults to `message`);

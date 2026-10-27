@@ -1,0 +1,196 @@
+spec: 1
+id: sofie-chef
+name: Sofie Chef (REST and WebSocket API)
+vendor: Sofie TV Automation
+category: playback
+
+# Sofie Chef is the Sofie TV automation system's web page player: an
+# Electron app showing web pages (HTML graphics, video, camera inputs) in
+# fullscreen or borderless windows. With apiPort set in its config.json it
+# serves a REST API on that port (5270 by default) and a WebSocket API on
+# the next port, which pushes the app's and each window's status.
+
+source:
+  - title: Sofie Chef README (APIs, Rest API, Usage)
+    author: Sofie TV Automation (NRK and contributors)
+    url: https://github.com/Sofie-Automation/sofie-chef/blob/HEAD/README.md
+    note: >
+      Vendor document (MIT-licensed repository, latest release v0.7.0 of
+      2026-09-29), retrieved 2026-10-23. REST API on apiPort,
+      http://localhost:5270 by default; with apiKey set in config.json,
+      every request includes ?apiKey=API_KEY. GET /api/status (current
+      status), PUT /api/playURL/:windowId {url, jsCode?} (display a web
+      page), PUT /api/restart/:windowId (reload), PUT /api/stop/:windowId
+      (stop and clear), PUT /api/execute/:windowId {jsCode}, GET /api/list
+      (list windows), GET /api (list API calls). The WebSocket API on
+      apiPort + 1. Pages report good, warning or error with a message.
+  - title: Sofie Chef src/lib/api.ts (the WebSocket API's message types)
+    author: Sofie TV Automation
+    url: https://github.com/Sofie-Automation/sofie-chef/blob/HEAD/src/lib/api.ts
+    note: >
+      The file the README names as the WebSocket API's description (MIT),
+      retrieved 2026-10-23. Messages to Chef {type: playurl | restart | stop
+      | execute | list, msgId, apiKey?, windowId, url, jsCode}; from Chef
+      {type: "reply", replyTo, error, result {code, body}} and {type:
+      "status", status {version, app {statusCode good|warning|error,
+      message}, windows {<id>: {statusCode, message}}}}; the list body
+      [{id, url, actualUrl, statusCode, statusMessage}].
+
+transport:
+  type: http
+  port: 5270
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/status, query: { apiKey: "{settings.api_key}" } }
+
+settings:
+  api_key: { type: string, secret: true, default: "", max_length: 256,
+    label: API key,
+    description: "The apiKey set in Sofie Chef's config.json, sent with every request; leave empty when none is set." }
+  websocket_port: { type: int, min: 1, max: 65535, default: 5271,
+    label: WebSocket port,
+    description: "Sofie Chef's WebSocket API port, its apiPort plus one (5271 with the default 5270)." }
+
+ports:
+  - { port: 5270, protocol: http, role: control, note: "apiPort in config.json" }
+  - { port: 5271, protocol: ws, role: push, setting: websocket_port, note: "apiPort + 1" }
+
+models:
+  - id: sofie-chef
+    name: Sofie Chef
+    supports: [get_status, list_windows, list_api, play_url, play_url_with_script, restart, stop, execute]
+    verification: none
+
+commands:
+  get_status:
+    summary: Read Sofie Chef's current status (GET /api/status)
+    send: { method: GET, path: /api/status, query: { apiKey: "{settings.api_key}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_windows:
+    summary: List the windows and what they show (GET /api/list); kept in state
+    send: { method: GET, path: /api/list, query: { apiKey: "{settings.api_key}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  list_api:
+    summary: List the API's calls (GET /api)
+    send: { method: GET, path: /api, query: { apiKey: "{settings.api_key}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  play_url:
+    summary: Show a web page in a window (PUT /api/playURL/<window>)
+    params:
+      window: &window { type: string, max_length: 256, required: true,
+                        label: Window, description: "Id of the window, as config.json and the windows in state name it." }
+      url: &url { type: string, max_length: 8192, required: true,
+                  label: URL, description: "Address of the web page to load." }
+    send: { method: PUT, path: "/api/playURL/{window}", query: { apiKey: "{settings.api_key}" },
+            body: '{"url":{url:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  play_url_with_script:
+    summary: Show a web page in a window and run JavaScript in it once loaded (PUT /api/playURL/<window>)
+    params:
+      window: *window
+      url: *url
+      js_code: &js_code { type: string, multiline: true, max_length: 1048576, required: true,
+                          label: JavaScript, description: "JavaScript code to run in the page." }
+    send: { method: PUT, path: "/api/playURL/{window}", query: { apiKey: "{settings.api_key}" },
+            body: '{"url":{url:json},"jsCode":{js_code:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  restart:
+    summary: Reload a window's web page (PUT /api/restart/<window>)
+    params: { window: *window }
+    send: { method: PUT, path: "/api/restart/{window}", query: { apiKey: "{settings.api_key}" } }
+    expect: { status: 200 }
+    returns: ack
+  stop:
+    summary: Stop and clear a window's web page (PUT /api/stop/<window>)
+    params: { window: *window }
+    send: { method: PUT, path: "/api/stop/{window}", query: { apiKey: "{settings.api_key}" } }
+    expect: { status: 200 }
+    returns: ack
+  execute:
+    summary: Run JavaScript in a window's web page (PUT /api/execute/<window>)
+    params: { window: *window, js_code: *js_code }
+    send: { method: PUT, path: "/api/execute/{window}", query: { apiKey: "{settings.api_key}" },
+            body: '{"jsCode":{js_code:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  websocket:
+    path: /
+    port: { setting: websocket_port }
+  poll:
+    every_ms: 10000
+    send: [{ method: GET, path: /api/list, query: { apiKey: "{settings.api_key}" } }]
+  updates:
+    - json_match: { "$.type": "^status$" }
+      json: { version: "$.status.version", code: "$.status.app.statusCode", message: "$.status.app.message" }
+      state:
+        app.version: "{version}"
+        app.status: "{code}"
+        app.message: "{message}"
+    - json_match: { "$.type": "^status$" }
+      json_each: "$.status.windows.*"
+      json: { code: "$.statusCode", message: "$.message" }
+      replace: window_status
+      state:
+        "window_status.{key:key}.status": "{code}"
+        "window_status.{key:key}.message": "{message}"
+    - path: "^/api/list\\?"
+      json_each: "$"
+      json: { id: "$.id", url: "$.url", actual_url: "$.actualUrl", code: "$.statusCode", message: "$.statusMessage" }
+      replace: windows
+      state:
+        "windows.{id:key}.url": "{url}"
+        "windows.{id:key}.actual_url": "{actual_url}"
+        "windows.{id:key}.status": "{code}"
+        "windows.{id:key}.message": "{message}"
+    # A window's page is read again after each change made through the API.
+    - path: "^/api/(playURL|restart|stop|execute)/"
+      headers: {}
+      then_send:
+        - { method: GET, path: /api/list, query: { apiKey: "{settings.api_key}" } }
+
+state:
+  app.version: { type: string, description: "Sofie Chef's version" }
+  app.status: { type: string, description: "The app's status: good, warning or error" }
+  app.message: { type: string, description: "The app's status message" }
+  window_status.*.status: { type: string, description: "A window's status as its page reports it: good, warning or error; keyed by window id" }
+  window_status.*.message: { type: string, description: "The window's status message" }
+  windows.*.url: { type: string, description: "URL a window was told to load, keyed by window id; absent when stopped" }
+  windows.*.actual_url: { type: string, description: "URL the window actually shows" }
+  windows.*.status: { type: string, description: "The window's status code" }
+  windows.*.message: { type: string, description: "The window's status message" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The APIs exist only when apiPort is set in Sofie Chef's config.json.
+      With apiKey set there, every request must carry it as ?apiKey=; the
+      spec always sends the setting, empty when none is set, which the
+      README does not say Chef accepts. The README documents the REST
+      routes without their answers; the window list is read as the
+      WebSocket API's list body ([{id, url, actualUrl, statusCode,
+      statusMessage}]), and get_status's answer is returned as it is.
+
+  - models: [all]
+    severity: info
+    text: >
+      The WebSocket API on apiPort + 1 pushes {type: "status"} with the
+      app's and each window's status; when it pushes (on connecting, on each
+      change) is not documented, and its commands (each with a msgId and the
+      apiKey) are the REST API's, which the spec uses. The window list is
+      read every 10 seconds and after each command. Windows are created and
+      configured in config.json (or with the keyboard), not through the API.
+
+  - models: [all]
+    severity: critical
+    text: >
+      play_url, restart and stop change what a window shows on air at once.
+      execute and play_url_with_script run arbitrary JavaScript in the page.

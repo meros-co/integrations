@@ -1,0 +1,357 @@
+spec: 1
+id: ontime-osc
+name: Ontime (OSC API)
+vendor: Ontime
+category: other
+
+# Ontime's OSC API: the HTTP API's control surface as OSC messages to
+# Ontime's OSC input (UDP 8888 by default), once OSC is set up in Editor >
+# Settings > Automation. OSC carries no answers: feedback needs an OSC
+# output configured in Ontime's automations, which this integration does
+# not depend on. For state, use the ontime integration (HTTP and
+# WebSocket), which takes the same commands with acknowledgement.
+
+source:
+  - title: Ontime documentation, API > Protocols > OSC API
+    author: Ontime (Carlos Valente)
+    url: https://docs.getontime.no/api/protocols/osc/
+    note: >
+      Vendor document (docs source cpvalente/ontime-docs, main branch of
+      2026-09-13, src/content/docs/api/protocols/osc.mdx), retrieved
+      2026-10-23. OSC is configured in Editor > Settings > Automation;
+      feedback needs a loop configured in both Ontime and the other
+      software. The messages /ontime/change/<event-id>/<field> <value>
+      (title, note, cue, skip, colour, custom:<field>, timeWarning,
+      timeDanger, endAction, timerType, duration, timeStart, timeEnd),
+      /ontime/message/secondary <text>,
+      /ontime/message/timer/secondarySource 'aux'|'secondary'|'off',
+      /ontime/message/timer/blackout true|false, /ontime/start,
+      /ontime/start/index|id|cue <value>, /ontime/start/next|previous,
+      /ontime/pause, /ontime/load/index|id|cue <value>,
+      /ontime/load/next|previous, /ontime/reload, /ontime/stop,
+      /ontime/roll, /ontime/addtime/add|remove <ms>,
+      /ontime/auxtimer/1/duration <ms>, /direction count-up|count-down,
+      /start, /pause, /stop, /addtime <ms>.
+  - title: Ontime documentation, Quick tips > Headless Ontime (Docker); Runtime data
+    author: Ontime
+    url: https://docs.getontime.no/quick-tips/headless-ontime/
+    note: >
+      Vendor documents. UDP 8888 is the default OSC input into Ontime and
+      9999 the default OSC output from it; the runtime data holds auxiliary
+      timers 1 to 3 and the message state's text, visible and blink.
+
+transport:
+  type: osc-udp
+  port: 8888
+  reply: none
+
+ports:
+  - { port: 8888, protocol: udp, role: control, note: "Ontime's OSC input, set in Editor > Settings > Automation" }
+
+models:
+  - id: ontime
+    name: Ontime 4 (OSC input enabled)
+    supports: [start, start_index, start_id, start_cue, start_next, start_previous, pause,
+               load_index, load_id, load_cue, load_next, load_previous, reload, stop, roll,
+               add_time, remove_time,
+               aux_set_duration, aux_set_direction, aux_start, aux_pause, aux_stop, aux_add_time,
+               set_secondary_message, set_secondary_source, set_blackout,
+               set_timer_message_text, set_timer_message_visible, set_timer_message_blink,
+               set_event_title, set_event_note, set_event_cue, set_event_colour, set_event_skip,
+               set_event_end_action, set_event_timer_type, set_event_time_warning,
+               set_event_time_danger, set_event_duration, set_event_time_start, set_event_time_end,
+               set_event_custom_field]
+    verification: none
+
+commands:
+  # ── Playback ─────────────────────────────────────────────────────────────
+  start:
+    summary: Start the loaded event (/ontime/start)
+    send: { address: /ontime/start }
+    returns: none
+  start_index:
+    summary: Start the event at an index of the rundown (/ontime/start/index <index>)
+    params:
+      index: &event_index { type: int, min: 0, required: true,
+                            label: Event index,
+                            description: "Place of the event in the rundown, as Ontime's API counts it." }
+    send: { address: /ontime/start/index, args: [ { value: "{index}", type: int } ] }
+    returns: none
+  start_id:
+    summary: Start the event with an id (/ontime/start/id <id>)
+    params:
+      id: &event_id { type: string, max_length: 256, required: true,
+                      label: Event id,
+                      description: "Id of the event, as Ontime's rundown lists it." }
+    send: { address: /ontime/start/id, args: [ { value: "{id}", type: string } ] }
+    returns: none
+  start_cue:
+    summary: Start the event with a cue (/ontime/start/cue <cue>)
+    params:
+      cue: &event_cue { type: string, max_length: 256, required: true,
+                        label: Cue, description: "The event's cue, as entered in Ontime's rundown." }
+    send: { address: /ontime/start/cue, args: [ { value: "{cue}", type: string } ] }
+    returns: none
+  start_next:
+    summary: Start the next event (/ontime/start/next)
+    send: { address: /ontime/start/next }
+    returns: none
+  start_previous:
+    summary: Start the previous event (/ontime/start/previous)
+    send: { address: /ontime/start/previous }
+    returns: none
+  pause:
+    summary: Pause the running timer (/ontime/pause)
+    send: { address: /ontime/pause }
+    returns: none
+  load_index:
+    summary: Load the event at an index without starting it (/ontime/load/index <index>)
+    params: { index: *event_index }
+    send: { address: /ontime/load/index, args: [ { value: "{index}", type: int } ] }
+    returns: none
+  load_id:
+    summary: Load the event with an id (/ontime/load/id <id>)
+    params: { id: *event_id }
+    send: { address: /ontime/load/id, args: [ { value: "{id}", type: string } ] }
+    returns: none
+  load_cue:
+    summary: Load the event with a cue (/ontime/load/cue <cue>)
+    params: { cue: *event_cue }
+    send: { address: /ontime/load/cue, args: [ { value: "{cue}", type: string } ] }
+    returns: none
+  load_next:
+    summary: Load the next event (/ontime/load/next)
+    send: { address: /ontime/load/next }
+    returns: none
+  load_previous:
+    summary: Load the previous event (/ontime/load/previous)
+    send: { address: /ontime/load/previous }
+    returns: none
+  reload:
+    summary: Reload the current event, resetting its timer (/ontime/reload)
+    send: { address: /ontime/reload }
+    returns: none
+  stop:
+    summary: Stop playback (/ontime/stop)
+    send: { address: /ontime/stop }
+    returns: none
+  roll:
+    summary: Activate Roll mode (/ontime/roll)
+    send: { address: /ontime/roll }
+    returns: none
+  add_time:
+    summary: Add time to the running timer (/ontime/addtime/add <ms>)
+    params:
+      ms: &added_ms { type: int, min: 0, max: 2147483647, required: true,
+                      label: Time, description: "Time to add or remove, in milliseconds." }
+    send: { address: /ontime/addtime/add, args: [ { value: "{ms}", type: int } ] }
+    returns: none
+  remove_time:
+    summary: Remove time from the running timer (/ontime/addtime/remove <ms>)
+    params: { ms: *added_ms }
+    send: { address: /ontime/addtime/remove, args: [ { value: "{ms}", type: int } ] }
+    returns: none
+
+  # ── Auxiliary timers ─────────────────────────────────────────────────────
+  aux_set_duration:
+    summary: Set an auxiliary timer's duration (/ontime/auxtimer/<n>/duration <ms>)
+    params:
+      aux: &aux { type: int, min: 1, max: 3, default: 1,
+                  label: Auxiliary timer, description: "Auxiliary timer 1, 2 or 3." }
+      ms: { type: int, min: 0, max: 2147483647, required: true,
+            label: Duration, description: "The timer's duration, in milliseconds." }
+    send: { address: "/ontime/auxtimer/{aux}/duration", args: [ { value: "{ms}", type: int } ] }
+    returns: none
+  aux_set_direction:
+    summary: Set whether an auxiliary timer counts down or up (/ontime/auxtimer/<n>/direction <direction>)
+    params:
+      aux: *aux
+      direction: { type: enum, values: [count-down, count-up], required: true,
+                   label: Direction, description: "Count down from the duration, or count up from zero." }
+    send: { address: "/ontime/auxtimer/{aux}/direction", args: [ { value: "{direction}", type: string } ] }
+    returns: none
+  aux_start:
+    summary: Start an auxiliary timer (/ontime/auxtimer/<n>/start)
+    params: { aux: *aux }
+    send: { address: "/ontime/auxtimer/{aux}/start" }
+    returns: none
+  aux_pause:
+    summary: Pause an auxiliary timer (/ontime/auxtimer/<n>/pause)
+    params: { aux: *aux }
+    send: { address: "/ontime/auxtimer/{aux}/pause" }
+    returns: none
+  aux_stop:
+    summary: Stop an auxiliary timer (/ontime/auxtimer/<n>/stop)
+    params: { aux: *aux }
+    send: { address: "/ontime/auxtimer/{aux}/stop" }
+    returns: none
+  aux_add_time:
+    summary: Add time to an auxiliary timer, or remove it with a negative value (/ontime/auxtimer/<n>/addtime <ms>)
+    params:
+      aux: *aux
+      ms: { type: int, min: -2147483648, max: 2147483647, required: true,
+            label: Time, description: "Time to add in milliseconds; a negative value removes time." }
+    send: { address: "/ontime/auxtimer/{aux}/addtime", args: [ { value: "{ms}", type: int } ] }
+    returns: none
+
+  # ── Messages ─────────────────────────────────────────────────────────────
+  set_secondary_message:
+    summary: Set the secondary message's text (/ontime/message/secondary <text>); showing it is set_secondary_source
+    params:
+      text: { type: string, max_length: 1024, required: true,
+              label: Text, description: "The secondary message's text; empty clears it." }
+    send: { address: /ontime/message/secondary, args: [ { value: "{text}", type: string } ] }
+    returns: none
+  set_secondary_source:
+    summary: Choose the stage timer view's secondary field (/ontime/message/timer/secondarySource <source>)
+    params:
+      source: { type: enum, values: [secondary, aux1, aux2, aux3, aux, "off"], required: true,
+                label: Secondary source,
+                description: "The secondary message, auxiliary timer 1 to 3 (aux is the documents' older name for timer 1), or off to hide the field." }
+    send: { address: /ontime/message/timer/secondarySource, args: [ { value: "{source}", type: string } ] }
+    returns: none
+  set_blackout:
+    summary: Black out, or show again, the stage timer screens (/ontime/message/timer/blackout true|false)
+    params:
+      blackout: { type: bool, required: true,
+                  label: Blackout, description: "True blacks the stage timer screens out; false shows them again." }
+    send: { address: /ontime/message/timer/blackout, args: [ { value: "{blackout}", type: string } ] }
+    returns: none
+  set_timer_message_text:
+    summary: Set the timer message's text (/ontime/message/timer/text <text>)
+    params:
+      text: { type: string, max_length: 1024, required: true,
+              label: Text, description: "Text of the message shown over the stage timer; empty clears it." }
+    send: { address: /ontime/message/timer/text, args: [ { value: "{text}", type: string } ] }
+    returns: none
+  set_timer_message_visible:
+    summary: Show or hide the timer message (/ontime/message/timer/visible true|false)
+    params:
+      visible: { type: bool, required: true,
+                 label: Visible, description: "True shows the timer message on the stage timer; false hides it." }
+    send: { address: /ontime/message/timer/visible, args: [ { value: "{visible}", type: string } ] }
+    returns: none
+  set_timer_message_blink:
+    summary: Make the stage timer blink, or stop it (/ontime/message/timer/blink true|false)
+    params:
+      blink: { type: bool, required: true,
+               label: Blink, description: "True makes the stage timer blink; false stops it." }
+    send: { address: /ontime/message/timer/blink, args: [ { value: "{blink}", type: string } ] }
+    returns: none
+
+  # ── Change an event (/ontime/change/<id>/<field> <value>) ────────────────
+  set_event_title:
+    summary: Change an event's title
+    params:
+      id: *event_id
+      title: { type: string, max_length: 1024, required: true, label: Title, description: "The event's new title." }
+    send: { address: "/ontime/change/{id}/title", args: [ { value: "{title}", type: string } ] }
+    returns: none
+  set_event_note:
+    summary: Change an event's note
+    params:
+      id: *event_id
+      note: { type: string, max_length: 4096, required: true, label: Note, description: "The event's new note." }
+    send: { address: "/ontime/change/{id}/note", args: [ { value: "{note}", type: string } ] }
+    returns: none
+  set_event_cue:
+    summary: Change an event's cue
+    params:
+      id: *event_id
+      cue: { type: string, max_length: 256, required: true,
+             label: Cue, description: "The event's new cue; Ontime asks to keep it under 8 characters." }
+    send: { address: "/ontime/change/{id}/cue", args: [ { value: "{cue}", type: string } ] }
+    returns: none
+  set_event_colour:
+    summary: Change an event's colour
+    params:
+      id: *event_id
+      colour: { type: string, max_length: 64, required: true,
+                label: Colour, description: "A # hex colour or a named CSS colour; empty for none." }
+    send: { address: "/ontime/change/{id}/colour", args: [ { value: "{colour}", type: string } ] }
+    returns: none
+  set_event_skip:
+    summary: Skip an event, or stop skipping it
+    params:
+      id: *event_id
+      skip: { type: bool, required: true, label: Skip, description: "True makes playback ignore the event." }
+    send: { address: "/ontime/change/{id}/skip", args: [ { value: "{skip}", type: string } ] }
+    returns: none
+  set_event_end_action:
+    summary: Change what happens when an event's timer reaches zero
+    params:
+      id: *event_id
+      end_action: { type: enum, values: [none, load-next, play-next], required: true,
+                    label: End action,
+                    description: "None runs on into overtime; load-next loads the next event; play-next loads and starts it." }
+    send: { address: "/ontime/change/{id}/endAction", args: [ { value: "{end_action}", type: string } ] }
+    returns: none
+  set_event_timer_type:
+    summary: Change how an event's timer is shown
+    params:
+      id: *event_id
+      timer_type: { type: enum, values: [count-down, count-up, clock, none], required: true,
+                    label: Timer type,
+                    description: "Count down the duration, count up from the start, show the clock, or a placeholder." }
+    send: { address: "/ontime/change/{id}/timerType", args: [ { value: "{timer_type}", type: string } ] }
+    returns: none
+  set_event_time_warning:
+    summary: Change an event's warning threshold
+    params:
+      id: *event_id
+      ms: &event_ms { type: int, min: 0, max: 2147483647, required: true,
+                      label: Time, description: "The time, in milliseconds (times of day from midnight)." }
+    send: { address: "/ontime/change/{id}/timeWarning", args: [ { value: "{ms}", type: int } ] }
+    returns: none
+  set_event_time_danger:
+    summary: Change an event's danger threshold
+    params: { id: *event_id, ms: *event_ms }
+    send: { address: "/ontime/change/{id}/timeDanger", args: [ { value: "{ms}", type: int } ] }
+    returns: none
+  set_event_duration:
+    summary: Change an event's duration (recalculates the rundown; throttled)
+    params: { id: *event_id, ms: *event_ms }
+    send: { address: "/ontime/change/{id}/duration", args: [ { value: "{ms}", type: int } ] }
+    returns: none
+  set_event_time_start:
+    summary: Change an event's scheduled start, in milliseconds from midnight (throttled)
+    params: { id: *event_id, ms: *event_ms }
+    send: { address: "/ontime/change/{id}/timeStart", args: [ { value: "{ms}", type: int } ] }
+    returns: none
+  set_event_time_end:
+    summary: Change an event's scheduled end, in milliseconds from midnight (throttled)
+    params: { id: *event_id, ms: *event_ms }
+    send: { address: "/ontime/change/{id}/timeEnd", args: [ { value: "{ms}", type: int } ] }
+    returns: none
+  set_event_custom_field:
+    summary: Change one of an event's custom fields (/ontime/change/<id>/custom:<field> <value>)
+    params:
+      id: *event_id
+      field: { type: string, max_length: 256, required: true, pattern: "^[^/#*,?\\[\\]{} ]+$",
+               label: Custom field, description: "Key of the custom field, as Ontime's custom fields list it." }
+      value: { type: string, max_length: 4096, required: true, label: Value, description: "The field's new value." }
+    send: { address: "/ontime/change/{id}/custom:{field}", args: [ { value: "{value}", type: string } ] }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Ontime takes OSC only once it is set up in Editor > Settings >
+      Automation, on the input port set there (8888 by default). OSC carries
+      no acknowledgement, so every command is unverified; the ontime
+      integration sends the same commands over HTTP with an answer and keeps
+      Ontime's state, and can run beside this one. Any sender on the network
+      reaches the OSC input.
+
+  - models: [all]
+    severity: info
+    text: >
+      The OSC page writes the boolean arguments as true and false without
+      naming an OSC type; the spec sends them as the strings true and false.
+      The timer message's text, visible and blink (on
+      /ontime/message/timer/text, /visible and /blink) follow the documented
+      blackout and secondarySource addresses for the message state's other
+      fields; only those two are documented. Auxiliary timers are documented
+      on number 1 only; the runtime data holds three. An event id or cue
+      that holds an OSC special character cannot be named in an address.

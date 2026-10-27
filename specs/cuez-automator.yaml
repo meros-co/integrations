@@ -1,0 +1,457 @@
+spec: 1
+id: cuez-automator
+name: Cuez Automator (Automator API)
+vendor: TinkerList
+category: other
+
+# Cuez Automator runs a Cuez episode's rundown in the studio: triggers,
+# steps, CuezDeck buttons, macros, timers and the prompter. Its Automator
+# API is HTTP on the Automator's machine (port 7070), nearly every call a
+# GET, documented as an OpenAPI 3.0 file. The Cuez rundown (cloud) API is
+# not public.
+
+source:
+  - title: Cuez Automator API (OpenAPI 3.0, version 1.0.0)
+    author: TinkerList
+    url: https://download.cuez.app/automator-openapi.yaml
+    note: >
+      Vendor document, served by the Swagger UI at
+      https://download.cuez.app/automator/docs, retrieved 2026-10-23. Server
+      http://{host}:{port}, port 7070 by default. Paths (written with
+      example ids in place of parameters): /api/trigger/next, /previous,
+      /nextTrigger, /previousTrigger, /firstTrigger, /step/<n>,
+      /button/ (the CuezDeck buttons, with id, title, type, color,
+      enabled, parentId, parentTitle), /button/<id>, /button/<id>/on,
+      /off, /click, /button-states (switch states on|off by id),
+      /shortcut/ and /shortcut/<id>, /block/<id>, /current,
+      /blockcontent; /api/prompter/start, /goto/<id>, /black/on, /off;
+      /api/configuration (GET, and PATCH ?id=, both marked work in
+      progress); /api/project/episodes; GET /api/projects/<id>/config
+      (secrets included) and PUT /api/projects/<id> (200 {message}, 400,
+      403, 404); PATCH /api/episode/<id>/select; GET and DELETE
+      /api/episode; /api/episode/items, /items/<id>, /script; POST
+      /api/episode/block/<instanceId>/column {columnId, value}; GET
+      /api/macro/ and GET /api/macro/<id> with variables in the query, POST
+      /api/macro/<id> and /api/macro/<name> with a JSON body, 400
+      {"response": "unknown macro"} or {"error": "missing-parameters" |
+      "invalid-value"}; /api/system/variables (variables with id, name,
+      description, kind, dataType, default, value, isSet, updatedAt);
+      /api/timer, /api/timer/start/<id>, /api/timer/stop/<id>,
+      /api/timer/stop; /api/app/webconnection.
+  - title: How can I use the Automator API? (Cuez Help Center)
+    author: TinkerList
+    url: https://help.cuez.app/en/articles/10320001-how-can-i-use-the-automator-api
+    note: >
+      Vendor article, updated 2026-06-08, retrieved 2026-10-23. Next steps
+      through a trigger's Step buttons before the next element, Next Trigger
+      skips them; the trigger itself is step 0, so /api/trigger/step/0
+      triggers the current element again; switch buttons take /on and /off;
+      the Cuez API is non-public.
+
+transport:
+  type: http
+  port: 7070
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/app/webconnection }
+
+ports:
+  - { port: 7070, protocol: http, role: control }
+
+models:
+  - id: cuez-automator
+    name: Cuez Automator
+    supports: [next, previous, next_trigger, previous_trigger, first_trigger, step, trigger_block,
+               get_current, get_block_content, get_buttons, trigger_button, button_on, button_off,
+               button_click, get_button_states, get_shortcuts, trigger_shortcut, prompter_start,
+               prompter_goto, prompter_black_on, prompter_black_off, get_macros, fire_macro,
+               fire_macro_with_values, fire_macro_by_name, get_timers, start_timer, stop_timer,
+               stop_all_timers, get_episodes, select_episode, unload_episode, get_episode,
+               get_episode_items, get_episode_item, get_script, set_block_column, get_variables,
+               get_configurations, select_configuration, get_project_config, set_project_config,
+               get_web_connection]
+    verification: none
+
+commands:
+  # ── Triggering ───────────────────────────────────────────────────────────
+  next:
+    summary: Go to the next command, stepping through the trigger's Step buttons first (SYSTEM > NEXT)
+    send: { method: GET, path: /api/trigger/next }
+    expect: { status: 200 }
+    returns: ack
+  previous:
+    summary: Go to the previous command, stepping back through Step buttons first (SYSTEM > PREVIOUS)
+    send: { method: GET, path: /api/trigger/previous }
+    expect: { status: 200 }
+    returns: ack
+  next_trigger:
+    summary: Go to the next trigger, skipping Step buttons (SYSTEM > NEXT TRIGGER)
+    send: { method: GET, path: /api/trigger/nextTrigger }
+    expect: { status: 200 }
+    returns: ack
+  previous_trigger:
+    summary: Go back to the previous trigger, skipping Step buttons (SYSTEM > PREVIOUS TRIGGER)
+    send: { method: GET, path: /api/trigger/previousTrigger }
+    expect: { status: 200 }
+    returns: ack
+  first_trigger:
+    summary: Trigger the very first block in the rundown
+    send: { method: GET, path: /api/trigger/firstTrigger }
+    expect: { status: 200 }
+    returns: ack
+  step:
+    summary: Go to a step of the selected trigger by index; step 0 triggers the current element again
+    params:
+      step: { type: int, min: 0, required: true,
+              label: Step, description: "Step button by index; 0 is the trigger itself." }
+    send: { method: GET, path: "/api/trigger/step/{step}" }
+    expect: { status: 200 }
+    returns: ack
+  trigger_block:
+    summary: Trigger a block by id
+    params:
+      block: { type: string, max_length: 128, required: true,
+               label: Block, description: "Id of the block, as get_block_content lists it." }
+    send: { method: GET, path: "/api/trigger/block/{block}" }
+    expect: { status: 200 }
+    returns: ack
+  get_current:
+    summary: Read what is currently triggered, as the Automator returns it
+    send: { method: GET, path: /api/trigger/current }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_block_content:
+    summary: Read every trigger (block) of the loaded rundown, as the Automator returns it
+    send: { method: GET, path: /api/trigger/blockcontent }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── CuezDeck buttons and shortcuts ───────────────────────────────────────
+  get_buttons:
+    summary: Read every CuezDeck button, nested ones included; kept in state
+    send: { method: GET, path: /api/trigger/button/ }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  trigger_button:
+    summary: Trigger a CuezDeck button by id
+    params:
+      button: &button { type: string, max_length: 128, required: true,
+                        label: Button, description: "Id of the CuezDeck button, as the buttons in state list it." }
+    send: { method: GET, path: "/api/trigger/button/{button}" }
+    expect: { status: 200 }
+    returns: ack
+  button_on:
+    summary: Turn a CuezDeck switch button on
+    params: { button: *button }
+    send: { method: GET, path: "/api/trigger/button/{button}/on" }
+    expect: { status: 200 }
+    returns: ack
+  button_off:
+    summary: Turn a CuezDeck switch button off
+    params: { button: *button }
+    send: { method: GET, path: "/api/trigger/button/{button}/off" }
+    expect: { status: 200 }
+    returns: ack
+  button_click:
+    summary: Click a CuezDeck switch button, toggling it
+    params: { button: *button }
+    send: { method: GET, path: "/api/trigger/button/{button}/click" }
+    expect: { status: 200 }
+    returns: ack
+  get_button_states:
+    summary: Read the on/off state of every CuezDeck switch button; kept in state
+    send: { method: GET, path: /api/trigger/button-states }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_shortcuts:
+    summary: Read every keyboard shortcut, as the Automator returns them
+    send: { method: GET, path: /api/trigger/shortcut/ }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  trigger_shortcut:
+    summary: Trigger a keyboard shortcut by id
+    params:
+      shortcut: { type: string, max_length: 128, required: true,
+                  label: Shortcut, description: "Id of the shortcut, as get_shortcuts lists it." }
+    send: { method: GET, path: "/api/trigger/shortcut/{shortcut}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Prompter ─────────────────────────────────────────────────────────────
+  prompter_start:
+    summary: Send the prompter to its start
+    send: { method: GET, path: /api/prompter/start }
+    expect: { status: 200 }
+    returns: ack
+  prompter_goto:
+    summary: Send the prompter to a trigger
+    params:
+      trigger: { type: string, max_length: 128, required: true,
+                 label: Trigger, description: "Id of the trigger to go to." }
+    send: { method: GET, path: "/api/prompter/goto/{trigger}" }
+    expect: { status: 200 }
+    returns: ack
+  prompter_black_on:
+    summary: Black the prompter out
+    send: { method: GET, path: /api/prompter/black/on }
+    expect: { status: 200 }
+    returns: ack
+  prompter_black_off:
+    summary: Show the prompter again
+    send: { method: GET, path: /api/prompter/black/off }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Macros ───────────────────────────────────────────────────────────────
+  get_macros:
+    summary: Read every macro with its variables (type, required flag, default)
+    send: { method: GET, path: /api/macro/ }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  fire_macro:
+    summary: Fire a macro by id, its variables taking their defaults
+    params:
+      macro: &macro { type: string, max_length: 128, required: true,
+                      label: Macro, description: "Id of the macro, as get_macros lists it." }
+    send: { method: GET, path: "/api/macro/{macro}" }
+    expect: { status: 200 }
+    returns: ack
+  fire_macro_with_values:
+    summary: Fire a macro by id with values for its variables (POST, a JSON object keyed by variable id or name)
+    params:
+      macro: *macro
+      values: &macro_values { type: json, required: true,
+                              label: Values,
+                              description: "JSON object of variable values keyed by variable id or name; typed variables are validated, and absent ones take their defaults." }
+    send: { method: POST, path: "/api/macro/{macro}", body: "{values}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  fire_macro_by_name:
+    summary: Fire a macro by name with values for its variables (POST)
+    params:
+      name: { type: string, max_length: 256, required: true,
+              label: Macro name, description: "Name of the macro." }
+      values: *macro_values
+    send: { method: POST, path: "/api/macro/{name}", body: "{values}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Timers ───────────────────────────────────────────────────────────────
+  get_timers:
+    summary: Read every timer, as the Automator returns them
+    send: { method: GET, path: /api/timer }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  start_timer:
+    summary: Start a timer by id
+    params:
+      timer: &timer { type: string, max_length: 128, required: true,
+                      label: Timer, description: "Id of the timer, as get_timers lists it." }
+    send: { method: GET, path: "/api/timer/start/{timer}" }
+    expect: { status: 200 }
+    returns: ack
+  stop_timer:
+    summary: Stop a timer by id
+    params: { timer: *timer }
+    send: { method: GET, path: "/api/timer/stop/{timer}" }
+    expect: { status: 200 }
+    returns: ack
+  stop_all_timers:
+    summary: Stop every running timer
+    send: { method: GET, path: /api/timer/stop }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Episodes and rundown ─────────────────────────────────────────────────
+  get_episodes:
+    summary: Read the project's recent episodes
+    send: { method: GET, path: /api/project/episodes }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  select_episode:
+    summary: Load an episode
+    params:
+      episode: { type: string, max_length: 128, required: true,
+                 label: Episode, description: "Id of the episode, as get_episodes lists it." }
+    send: { method: PATCH, path: "/api/episode/{episode}/select" }
+    expect: { status: 200 }
+    returns: ack
+  unload_episode:
+    summary: Unload the episode
+    send: { method: DELETE, path: /api/episode }
+    expect: { status: 200 }
+    returns: ack
+  get_episode:
+    summary: Read the whole loaded rundown
+    send: { method: GET, path: /api/episode }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_episode_items:
+    summary: Read every item of the loaded rundown
+    send: { method: GET, path: /api/episode/items }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_episode_item:
+    summary: Read one item of the loaded rundown
+    params:
+      item: { type: string, max_length: 128, required: true,
+              label: Item, description: "Id of the item." }
+    send: { method: GET, path: "/api/episode/items/{item}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_script:
+    summary: Read the loaded rundown's script
+    send: { method: GET, path: /api/episode/script }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_block_column:
+    summary: Write a rundown column value back to Cuez for a block instance (POST /api/episode/block/<instanceId>/column)
+    params:
+      instance: { type: string, max_length: 128, required: true,
+                  label: Block instance, description: "The block's instanceId." }
+      column: { type: string, max_length: 128, required: true,
+                label: Column, description: "Id of the rundown column." }
+      value: { type: json, required: true,
+               label: Value, description: "The column value: a string, an object such as {\"html\": \"Hello world\"}, or an array, as the column takes it." }
+    send: { method: POST, path: "/api/episode/block/{instance}/column",
+            body: '{"columnId":{column:json},"value":{value}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+  get_variables:
+    summary: Read the loaded episode's system variables with their definitions and values; kept in state
+    send: { method: GET, path: /api/system/variables }
+    expect: { status: 200, json_path: "$.variables" }
+    returns: value
+
+  # ── Configuration and projects ───────────────────────────────────────────
+  get_configurations:
+    summary: Read the stored Automator configurations (marked work in progress)
+    send: { method: GET, path: /api/configuration }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  select_configuration:
+    summary: Select a stored Automator configuration (marked work in progress)
+    params:
+      id: { type: string, max_length: 128, required: true,
+            label: Configuration, description: "Id of the stored configuration, such as default." }
+    send: { method: PATCH, path: /api/configuration, query: { id: "{id}" } }
+    expect: { status: 200 }
+    returns: ack
+  get_project_config:
+    summary: Read a paired project's full configuration, its secrets included (never kept in state)
+    params:
+      project: &project { type: string, max_length: 128, required: true,
+                          label: Project, description: "Id of the paired project." }
+    send: { method: GET, path: "/api/projects/{project}/config" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_project_config:
+    summary: Edit a paired project's connection (nrcs mos, cuez or standalone, MOS and Blockz fields) and reconnect it
+    params:
+      project: *project
+      config: { type: json, required: true,
+                label: Configuration,
+                description: "JSON object as the API documents for PUT /api/projects/{id}: nrcs, title, token, the mos_ fields and the blockz_ fields." }
+    send: { method: PUT, path: "/api/projects/{project}", body: "{config}", content_type: application/json }
+    expect: { status: 200, json_path: "$.message" }
+    returns: value
+  get_web_connection:
+    summary: Check the Automator's online connection and list the services it uses
+    send: { method: GET, path: /api/app/webconnection }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+telemetry:
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /api/trigger/button-states }
+        - { method: GET, path: /api/system/variables }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /api/trigger/button/ }
+  updates:
+    - path: "^/api/trigger/button/$"
+      json_each: "$"
+      json: { id: "$.id", title: "$.title", type: "$.type", color: "$.color", enabled: "$.enabled",
+              parent: "$.parentId" }
+      replace: buttons
+      state:
+        "buttons.{id:key}.index": "{index}"
+        "buttons.{id:key}.title": "{title}"
+        "buttons.{id:key}.type": "{type}"
+        "buttons.{id:key}.color": "{color}"
+        "buttons.{id:key}.enabled": "{enabled}"
+        "buttons.{id:key}.parent": "{parent}"
+    - path: "^/api/trigger/button-states$"
+      json_each: "$.*"
+      json: { state: "$" }
+      replace: switches
+      state:
+        "switches.{key:key}": { value: "{state}", map: { "on": true, "off": false } }
+    - path: "^/api/system/variables$"
+      json_each: "$.variables"
+      json: { id: "$.id", name: "$.name", kind: "$.kind", data_type: "$.dataType", value: "$.value",
+              is_set: "$.isSet", updated_at: "$.updatedAt" }
+      replace: variables
+      state:
+        "variables.{id:key}.name": "{name}"
+        "variables.{id:key}.kind": "{kind}"
+        "variables.{id:key}.data_type": "{data_type}"
+        "variables.{id:key}.value": "{value}"
+        "variables.{id:key}.is_set": "{is_set}"
+        "variables.{id:key}.updated_at": "{updated_at}"
+    # A switch's state is read again after it is set.
+    - path: "^/api/trigger/button/[^/]+/(on|off|click)$"
+      headers: {}
+      then_send:
+        - { method: GET, path: /api/trigger/button-states }
+
+state:
+  buttons.*.index: { type: int, description: "Button's place in deck order, from 0; keyed by button id" }
+  buttons.*.title: { type: string, description: "Button title" }
+  buttons.*.type: { type: string, description: "Button kind: button, switch, status, listbutton or buttonpane" }
+  buttons.*.color: { type: string, description: "Button color" }
+  buttons.*.enabled: { type: bool, description: "Whether the button is enabled (shown to the operator)" }
+  buttons.*.parent: { type: string, description: "Id of the pane button it is nested in; absent at top level" }
+  switches.*: { type: bool, description: "Whether a switch button is on, keyed by button id" }
+  variables.*.name: { type: string, description: "System variable's name, keyed by variable id" }
+  variables.*.kind: { type: string, description: "Variable kind, such as variable or alternator" }
+  variables.*.data_type: { type: string, description: "Variable's data type, such as string" }
+  variables.*.value: { type: string, description: "Current value: the last written, or the default when never set" }
+  variables.*.is_set: { type: bool, description: "Whether the variable was written since the episode loaded" }
+  variables.*.updated_at: { type: string, description: "When the variable was last written, ISO 8601" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The Automator API has no authentication: any client reaching port
+      7070 can run the show. Most answers are documented only as 200 OK,
+      so the rundown, the current trigger, macros, timers, shortcuts,
+      episodes and configurations are returned whole to the caller and not
+      kept in state; the CuezDeck buttons, switch states and system
+      variables, whose shapes are documented, are kept, the switch states
+      and variables read every 2 seconds and the buttons every 30. The
+      Automator's device-state socket (/ws/device-state) is mentioned but
+      not documented, so it is not used.
+
+  - models: [all]
+    severity: info
+    text: >
+      The API file writes its paths with example ids in place of
+      parameters (/api/trigger/step/2, /api/trigger/button/<uuid>); the spec
+      takes the id or index there. Step 0 is the trigger itself, so step 0
+      triggers the current element again. get_project_config answers with
+      the project's secrets (pairing token, Blockz API key), which the
+      spec never keeps. The configuration endpoints are marked work in
+      progress. A macro fired with missing or wrong typed values answers
+      400.
+
+  - models: [all]
+    severity: critical
+    text: >
+      select_episode loads another episode and unload_episode unloads it,
+      during a show; set_project_config reconnects the project.
+      set_block_column writes back to the Cuez rundown.

@@ -8,6 +8,8 @@ pub(crate) enum Arg {
     Float(f32),
     Str(String),
     Blob(Vec<u8>),
+    /// OSC 1.1's `T` or `F`: a boolean carried by its type tag alone.
+    Bool(bool),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,6 +41,8 @@ pub(crate) fn encode(address: &str, args: &[Arg]) -> Vec<u8> {
             Arg::Float(_) => 'f',
             Arg::Str(_) => 's',
             Arg::Blob(_) => 'b',
+            Arg::Bool(true) => 'T',
+            Arg::Bool(false) => 'F',
         }))
         .collect();
     push_str(&mut out, &tags);
@@ -52,6 +56,7 @@ pub(crate) fn encode(address: &str, args: &[Arg]) -> Vec<u8> {
                 out.extend_from_slice(b);
                 pad(&mut out);
             }
+            Arg::Bool(_) => {}
         }
     }
     out
@@ -176,6 +181,16 @@ mod tests {
         assert_eq!(m.address, "/x");
         assert_eq!(m.args, vec![json!("Vox"), json!(0.75), json!(-2)]);
         assert_eq!(m.types, "sfi");
+    }
+
+    #[test]
+    fn booleans_are_type_tags_alone() {
+        let bytes = encode("/b", &[Arg::Bool(true), Arg::Int(1), Arg::Bool(false)]);
+        let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(hex, "2f6200002c5469460000000000000001");
+        let m = &decode(&bytes)[0];
+        assert_eq!(m.types, "TiF");
+        assert_eq!(m.args, vec![json!(true), json!(1), json!(false)]);
     }
 
     #[test]
