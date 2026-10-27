@@ -3814,6 +3814,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a camera answers commands right after Address Set and IF_Clear broadcast on opening, and whether one that already has its address needs them. ([specs/visca.yaml:130](specs/visca.yaml#L130))
 - [ ] On Sony, confirm the 200 ms before a cancel counts from the pan/tilt drive's ACK (the core's reading of "after executing"); on the other vendors' cameras, which document no such gap and get none, check whether a cancel sent within 200 ms of a drive starting still stops it. ([specs/visca.yaml:1194](specs/visca.yaml#L1194))
 
+## visualproductions-cuecore — Visual Productions CueCore, QuadCore, B-Station2, IoCore2, TimeCore and KioscTouch2 (UDP API)
+
+- [ ] Record the UDP feedback messages with their values (playback intensity, rate, active, cue; master intensity, rate, fade; action list enable; buttons), and check the "=value" form and the on/off words. ([specs/visualproductions-cuecore.yaml:499](specs/visualproductions-cuecore.yaml#L499))
+- [ ] Confirm hello makes the session a feedback client and that the unit echoes "<prefix>-hello". ([specs/visualproductions-cuecore.yaml:490](specs/visualproductions-cuecore.yaml#L490))
+- [ ] Check the cue range (1-32 per the HTTP tables), the DMX channel range on units other than the IoCore2, and the float precision accepted. ([specs/visualproductions-cuecore.yaml:516](specs/visualproductions-cuecore.yaml#L516))
+- [ ] On a B-Station2, check the button and LED numbering (1-8 assumed). ([specs/visualproductions-cuecore.yaml:536](specs/visualproductions-cuecore.yaml#L536))
+- [ ] On a KioscTouch2, check whether page select counts from 0 or 1. ([specs/visualproductions-cuecore.yaml:542](specs/visualproductions-cuecore.yaml#L542))
+
 ## vmix — vMix
 
 - [ ] Capture a full XML state from vMix 27 or later (with a replay, a GT title, a list, a video call and layered inputs) so the parsing can be checked against the real shape; the shapes used here are inferred from vMix's old documented example and the MIT-licensed Companion module. ([specs/vmix.yaml:87](specs/vmix.yaml#L87))
