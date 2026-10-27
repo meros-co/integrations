@@ -1,0 +1,162 @@
+spec: 1
+id: arkaos-mediamaster
+name: ArKaos MediaMaster (Remote Player Telnet control)
+vendor: ArKaos
+category: playback
+
+# MediaMaster 6 in Player mode takes Telnet/TCP commands for its remote cue
+# player once the Remote Command Service is enabled in its preferences. Each
+# control's command text is shown in the preferences' TELNET tab, where a click
+# copies it; the user guide does not print the texts. The texts and port here
+# are those of the Companion module ArKaos points to from that same section,
+# each sent as a line ended by CR LF. The service answers nothing, so commands
+# are reported unverified and the player's state cannot be read.
+source:
+  - title: "MediaMaster 6 User Guide, Remote Player and Control Mapping (pp.85-92)"
+    author: ArKaos
+    url: "https://cdn.inmusicbrands.com/arkaos/downloads/ArKaos_MediaMaster_6_User_Guide.pdf"
+    note: >
+      Manufacturer document, read 2026-10-27. p.86: MediaMaster set to Player mode in the preferences;
+      external control in player mode from MIDI, ArtNet, Telnet / TCP and UDP. p.92, Control Mapping: the
+      remote player's controls mapped to ArtNet, the keyboard or Telnet commands; the Remote Command Service
+      configured in File > Preferences, enabled with the Enable Telnet checkbox and the IP address to
+      listen on; in the TELNET tab, clicking a control's command copies it; a dedicated Companion plugin is
+      pointed to on the Companion website or the ArKaos download page. pp.88-92: cue list transport
+      (play, next...), cue numbers as buttons, the visual, position and mixing tabs of a layer, cue
+      actions (follow, pause, stop, jump to cue, hold).
+  - title: "companion-module-arkaos-mediamaster (MIT)"
+    author: Information Systems Technology, Las Vegas
+    url: "https://github.com/bitfocus/companion-module-arkaos-mediamaster"
+    note: >
+      Read 2026-10-27; the plugin the user guide points to. Fills the gap the guide leaves (the command texts
+      and port): a TCP connection to port 45678, each command followed by CR LF, the texts Orientation,
+      Fullscreen:On, Fullscreen:Off, Controller:First, Controller:Previous, Controller:Play,
+      Controller:Pause, Controller:Stop, Controller:Next, Controller:Last, Controller:Final15,
+      Controller:Final30, Properties:Visual, Properties:Loop, Properties:Effect, Properties:Colors,
+      Properties:Position, Properties:Mixing, Properties:Output, Properties:Audio, View:Transfer,
+      View:Remote Player, View:Saga Encoder, and Cue:<n> for cues 1 to 4095.
+  - title: "Ctrl Suite, ArKaos MediaHub module"
+    author: ONLX
+    url: "https://docs.onlx.ltd/ctrl-suite/ctrl-designer/nodes/modules/arkaos-mediahub"
+    note: >
+      Read 2026-10-27 as corroboration: the same controls (orientation, fullscreen, trigger cue, the
+      controller's play, pause, stop, first, last, next, previous, final 15 and final 30, properties
+      position and mixing, the three views) over ArKaos's Telnet API, one-way, MediaMaster in Player mode
+      with the Telnet remote control enabled.
+
+transport:
+  type: line-tcp
+  port: 45678
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 2000
+  reply: none
+
+ports:
+  - { port: 45678, protocol: tcp, role: control, note: "MediaMaster's Remote Command Service (Telnet), enabled in its preferences" }
+
+models:
+  - id: mediamaster-6
+    name: ArKaos MediaMaster 6 (Player mode)
+    supports: [run_cue, controller_play, controller_pause, controller_stop, controller_first, controller_previous,
+               controller_next, controller_last, controller_final_15, controller_final_30, fullscreen,
+               orientation, properties_tab, view, send_command]
+    verification: none
+
+commands:
+  run_cue:
+    summary: "Trigger a cue of the remote cue player by its number (Cue:<n>)"
+    params:
+      cue: { type: int, min: 1, max: 4095, required: true, label: Cue, description: "The cue's number in the cue list, 1 to 4095." }
+    send: "Cue:{cue}"
+    returns: none
+  controller_play:
+    summary: "Play the cue list (Controller:Play)"
+    send: "Controller:Play"
+    returns: none
+  controller_pause:
+    summary: "Pause the cue list (Controller:Pause)"
+    send: "Controller:Pause"
+    returns: none
+  controller_stop:
+    summary: "Stop the cue list (Controller:Stop)"
+    send: "Controller:Stop"
+    returns: none
+  controller_first:
+    summary: "Go to the first cue (Controller:First)"
+    send: "Controller:First"
+    returns: none
+  controller_previous:
+    summary: "Go to the previous cue (Controller:Previous)"
+    send: "Controller:Previous"
+    returns: none
+  controller_next:
+    summary: "Go to the next cue (Controller:Next)"
+    send: "Controller:Next"
+    returns: none
+  controller_last:
+    summary: "Go to the last cue (Controller:Last)"
+    send: "Controller:Last"
+    returns: none
+  controller_final_15:
+    summary: "Move the playhead to the cue's final 15 seconds (Controller:Final15)"
+    send: "Controller:Final15"
+    returns: none
+  controller_final_30:
+    summary: "Move the playhead to the cue's final 30 seconds (Controller:Final30)"
+    send: "Controller:Final30"
+    returns: none
+  fullscreen:
+    summary: "Turn MediaMaster's fullscreen output on or off (Fullscreen:On / Fullscreen:Off)"
+    params:
+      enabled: { type: bool, required: true, label: Fullscreen, description: "On for fullscreen output, off for windowed." }
+    send: "Fullscreen:{enabled:map.on_off}"
+    returns: none
+  orientation:
+    summary: "Toggle the remote player's orientation (Orientation)"
+    send: "Orientation"
+    returns: none
+  properties_tab:
+    summary: "Show one of the remote player's property tabs (Properties:<tab>)"
+    params:
+      tab: { type: enum, values: [Visual, Loop, Effect, Colors, Position, Mixing, Output, Audio], required: true,
+             label: Tab, description: "The property tab to show." }
+    send: "Properties:{tab}"
+    returns: none
+  view:
+    summary: "Switch the MediaHub to one of its views (View:<view>)"
+    params:
+      view: { type: enum, values: [Transfer, Remote Player, Saga Encoder], required: true,
+              label: View, description: "The MediaHub view to show: content transfer, the remote cue player or the Saga encoder." }
+    send: "View:{view}"
+    returns: none
+  send_command:
+    summary: "Send any command text shown in MediaMaster's TELNET mapping tab"
+    params:
+      command: { type: string, max_length: 1024, required: true, label: Command,
+                 description: "The command text exactly as MediaMaster's preferences show it in the TELNET tab, without the line ending." }
+    send: "{command}"
+    returns: none
+
+maps:
+  on_off: { "true": "On", "false": "Off" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Commands work only with MediaMaster in Player mode and the Remote Command Service's Telnet enabled in
+      File > Preferences, listening on the right network address. The user guide does not print the command
+      texts or the port; they come from the Companion module the guide points to, and MediaMaster's TELNET
+      tab shows the text of each control on the installed version.
+  - models: [all]
+    severity: info
+    text: >
+      The service answers nothing: commands are reported unverified, and the cue player's state (current
+      cue, playing or not) cannot be read over this connection.
+  - models: [all]
+    severity: info
+    text: >
+      Final15 is taken to jump to the cue's final 15 seconds and Final30 to its final 30, from their names;
+      neither the user guide nor the Companion module says what they do.
