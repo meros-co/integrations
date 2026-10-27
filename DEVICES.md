@@ -268,15 +268,11 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | Ross Carbonite / openGear parameters (state and tally beyond RossTalk) | openGear / DashBoard protocol, TCP 5253 | Public |
-| Vizrt Vectar | TriCaster shortcut API | Public |
 | Panasonic AV-HS410, AV-UHS500, AV-HLC100, AV-HSW10, AV-HS6000 | Panasonic switcher TCP protocol | On request |
-| Panasonic KAIROS | KAIROS REST / WebSocket API | Public |
-| Magewell Director Mini / Director One | HTTP REST | Public |
 | OSEE GoStream Deck / Duet | TCP / UDP protocol | On request |
 | Livestream Studio | TCP 9923 text API | Public |
 | Telestream Wirecast | Local scripting (AppleScript / COM) | Community |
 | Ecamm Live | Local HTTP API | Community |
-| Streamlabs Desktop | WebSocket JSON-RPC | Public |
 | Meld Studio | WebSocket JSON | Public |
 | Grass Valley K-Frame / Kayenne / Korona | Proprietary | Closed |
 | Snell Kahuna | Proprietary TCP | Reverse-engineered |
@@ -288,7 +284,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| Evertz MAGNUM / VIP-X / DreamCatcher / Symphony | REST / proprietary | On request |
+| Evertz VIP-X / DreamCatcher / Symphony, and MAGNUM beyond router control (routing through MAGNUM is built) | REST / proprietary | On request |
 | Ross NK / Ultrix routers | NK-IPS / RossTalk / openGear | Public |
 | Extron SIS: MMX VGA and MTP models, IPL T SFI244 / PCS4 / CR48 flex I/O and power (their guides are not on Extron's site); IPL Pro / IPCP Pro (Extron documents no SIS for them) | SIS over Telnet, TCP 23 | Public |
 | Atlona (Omega, matrices) | Telnet text API | Public |
@@ -366,7 +362,6 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | AES67 stream discovery | SAP and SDP | Public |
-| d&b audiotechnik amplifiers and DS processors: models and named controls (generic control already through `aes70`) | AES70 | Public |
 | L-Acoustics amplified controllers (through `aes70` where they speak OCP.1) | OSC / AES70 | Unknown |
 | Powersoft amplifiers (through `aes70` where they speak OCP.1) | Armonia UDP / AES70 | Unknown |
 | Meyer Sound GALAXY | OSC / Compass | Public |
@@ -398,14 +393,8 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Microsoft PowerPoint without the OSCPoint add-in (`oscpoint`) | Local automation through a helper | Closed |
 | Apple Keynote | AppleScript through a helper | Public |
 | MediaShout | TCP / HTTP | Unknown |
-| Logos Proclaim | Local HTTP remote API | Community |
 | SongBeamer | OSC | Public |
-| PlaybackPro Plus | TCP text API | Public |
-| Mitti | OSC | Public |
-| CasparCG Server | AMCP over TCP 5250 | Public |
-| Ableton Live | AbletonOSC | Community |
-| VLC | HTTP / RC interface | Public |
-| Farrago, SCS, Go Button, MultiPlay | OSC / TCP | Public |
+| MultiPlay | OSC / TCP | Public |
 | Softron OnTheAir Video | HTTP API | Public |
 
 ### Media servers
@@ -423,7 +412,6 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| Vizrt 3Play | TriCaster shortcut API | Public |
 | Sony 9-pin / VDCP decks and servers | 9-pin (BVW-75) / VDCP over TCP bridges | Public |
 | Grass Valley K2 / T2 | AMP over TCP 3811 | Public |
 | Ross video servers (Tria, Abekas) | RossTalk / AMP | Public |
@@ -475,7 +463,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | NovaStar VX and NovaPro all-in-one controllers | Binary protocol over TCP 5200 | On request (confidential) |
-| Barco Event Master: Telnet and XML, legacy Encore | Telnet 9878, XML 9876 | Public |
+| Barco Event Master XML protocol (JSON-RPC, Telnet and legacy Encore are built) | XML, TCP 9876 | Public |
 | Pixelhue, Colorlight, RGBlink, Magnimage, FORA, Datapath, VDWALL | TCP / HTTP | Unknown |
 
 ### Tally and GPI
@@ -507,28 +495,21 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 | Devices | Protocol | Documentation |
 |---|---|---|
 | Digital Projection INSIGHT 4K Laser, HIGHlite 660 / Titan / Lightning, dVision (the other DP series are built) | Binary on TCP 43728 and TCP 30000 (External Control Protocol), ASCII on TCP 1025 | Public |
-| Samsung commercial displays | MDC, TCP 1515 | Public |
-| Sony BRAVIA Professional | Simple IP Control, TCP 20060, and REST | Public |
-| LG, Philips (SICP), Sharp displays | Vendor TCP | Public |
 | Sony Crystal LED | Unknown | Unknown |
 
 ### Timers, clocks and rundowns
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| Ontime | WebSocket / REST / OSC | Public |
-| Stagetimer.io | HTTP API (cloud) | Public |
-| Irisdown Countdown Timer / Remote Show Control | TCP / HTTP | Public |
-| PiClock, Clock-8001, TimeMachines and NTP clocks | OSC / UDP / HTTP | Public |
-| CueTimer, ProTimer, Kuma, Limitimer, PerfectCue | Vendor | Unknown |
-| Rundown Studio, Cuez, Sofie | REST / WebSocket | Public |
-| Timecode: LTC, and an MTC generator running in the core (generic-midi reads MTC and sends its messages) | Audio / MIDI | Public |
+| PiClock, TimeMachines and NTP clocks | OSC / UDP / HTTP | Public |
+| ProTimer | Vendor | Unknown |
+| Sofie Core (Sofie Chef is built) | REST / WebSocket | Public |
+| Timecode: LTC (MTC is read and generated by `generic-midi`) | Audio | Public |
 
 ### Generic protocols
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| Generic WebSocket device | WebSocket | Public |
 | MQTT | MQTT 3.1.1 / 5 | Public |
 | Modbus TCP | Modbus | Public |
 | PTP v2 monitoring | IEEE 1588 | Public |
