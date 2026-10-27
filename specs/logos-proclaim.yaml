@@ -1,0 +1,348 @@
+spec: 1
+id: logos-proclaim
+name: Logos Proclaim
+vendor: Faithlife
+category: playback
+
+source:
+  - title: Proclaim App Command API (Proclaim support article 19864456647053)
+    url: https://support.proclaim.logos.com/hc/en-us/articles/19864456647053-Proclaim-App-Command-API
+    note: >
+      Faithlife's own reference for controlling Proclaim on its local HTTP
+      server: enabling it (Settings > Remote > Enable), port 52195 (not
+      changeable), requests from the same computer taking no
+      authentication, POST /appCommand/authenticate with {"Password": ...}
+      (default "proclaim", Settings > Remote > Network Control Password)
+      answering {"proclaimAuthToken": ...}, the ProclaimAuthToken header on
+      later requests, GET /appCommand/perform with appCommandName
+      (case-insensitive) and index (1 to 254 for the commands marked *), the
+      list of app commands by group, and GET /onair/session (no
+      authentication) answering the On Air session id, or nothing when off
+      air. Read through the help center's article API, as its pages are not
+      served to scripts
+  - title: Proclaim Local Server (Proclaim support article 19864221470605)
+    url: https://support.proclaim.logos.com/hc/en-us/articles/19864221470605-Proclaim-Local-Server
+    note: >
+      The internal web server serves Proclaim Remote and third-party apps on
+      the local network
+  - title: companion-module-logos-proclaim (MIT)
+    url: https://github.com/bitfocus/companion-module-logos-proclaim
+    note: >
+      MIT licence (top-level LICENSE). Read, not copied, as corroboration:
+      the app command names as sent, including "PreviousPreviousAudioItem"
+      and "ShowHeIsRisenWhiteQuickScreen" marked "(sic.)" as the article
+      lists them; the perform answer read as the text "success"; 401 or 403
+      to a perform taken as a lost token; /onair/session read as plain text,
+      empty when off air, polled every second (src/api.ts, src/refdata.ts,
+      src/actions.ts)
+
+transport:
+  type: http
+  port: 52195
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /onair/session }
+  # Remote clients log in with the network control password and send the
+  # token back in a header of its own; a client on the same computer needs
+  # none, so with the password left empty nothing logs in.
+  session:
+    when_set: password
+    login:
+      method: POST
+      path: /appCommand/authenticate
+      body: '{"Password":{settings.password:json}}'
+      content_type: application/json
+    capture: { json: "$.proclaimAuthToken", header: ProclaimAuthToken }
+    relogin: { status: [401, 403] }
+    refused: { status: [401, 403] }
+
+settings:
+  password: { type: string, max_length: 255, secret: true, default: proclaim, label: Network control password, description: "Proclaim's Network Control Password (Settings > Remote), proclaim unless changed; leave empty when the core runs on the Proclaim computer itself." }
+
+ports:
+  - { port: 52195, protocol: http, role: control, note: "Proclaim's local server (Settings > Remote > Enable); the port cannot be changed" }
+
+models:
+  - id: proclaim
+    name: Proclaim (desktop app with its local server)
+    supports:
+      [go_on_air, go_off_air, next_slide, previous_slide, next_service_item, previous_service_item,
+       start_pre_service, start_warm_up, start_service, start_post_service, go_to_service_item,
+       go_to_slide, next_audio_item, previous_audio_item, video_restart, video_rewind,
+       video_fast_forward, video_play, video_pause, show_blank_quick_screen, show_logo_quick_screen,
+       show_no_text_quick_screen, show_floating_hearts_quick_screen, show_floating_amens_quick_screen,
+       show_amen_quick_screen, show_hallelujah_quick_screen, show_praise_the_lord_quick_screen,
+       show_he_is_risen_quick_screen, show_he_is_risen_indeed_quick_screen, show_custom_quick_screen,
+       show_text, show_last_slide, show_song_part, show_song_part_unnumbered, app_command,
+       app_command_with_index, get_on_air_session]
+    verification: none
+    notes: >
+      Proclaim 4.0 and later, with Settings > Remote enabled; written from
+      Faithlife's App Command API article.
+
+commands:
+  go_on_air:
+    summary: Take the presentation on air (GoOnAir)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: GoOnAir } }
+    expect: { status: 200 }
+    returns: ack
+  go_off_air:
+    summary: Take the presentation off air (GoOffAir)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: GoOffAir } }
+    expect: { status: 200 }
+    returns: ack
+  next_slide:
+    summary: Go to the next slide (NextSlide)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: NextSlide } }
+    expect: { status: 200 }
+    returns: ack
+  previous_slide:
+    summary: Go to the previous slide (PreviousSlide)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: PreviousSlide } }
+    expect: { status: 200 }
+    returns: ack
+  next_service_item:
+    summary: Go to the next service item (NextServiceItem)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: NextServiceItem } }
+    expect: { status: 200 }
+    returns: ack
+  previous_service_item:
+    summary: Go to the previous service item (PreviousServiceItem)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: PreviousServiceItem } }
+    expect: { status: 200 }
+    returns: ack
+  start_pre_service:
+    summary: Start the pre-service section (StartPreService)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: StartPreService } }
+    expect: { status: 200 }
+    returns: ack
+  start_warm_up:
+    summary: Start the warm-up section (StartWarmUp)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: StartWarmUp } }
+    expect: { status: 200 }
+    returns: ack
+  start_service:
+    summary: Start the service section (StartService)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: StartService } }
+    expect: { status: 200 }
+    returns: ack
+  start_post_service:
+    summary: Start the post-service section (StartPostService)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: StartPostService } }
+    expect: { status: 200 }
+    returns: ack
+  go_to_service_item:
+    summary: Go to a service item by its number (GoToServiceItem)
+    params:
+      item: { type: int, min: 1, max: 254, required: true, label: Service item, description: "Service item to show, numbered from 1 in the service's order." }
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: GoToServiceItem, index: "{item}" } }
+    expect: { status: 200 }
+    returns: ack
+  go_to_slide:
+    summary: Go to a slide of the current service item by its number (GoToSlide)
+    params:
+      slide: { type: int, min: 1, max: 254, required: true, label: Slide, description: "Slide of the current service item to show, numbered from 1." }
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: GoToSlide, index: "{slide}" } }
+    expect: { status: 200 }
+    returns: ack
+  next_audio_item:
+    summary: Go to the next audio item (NextAudioItem)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: NextAudioItem } }
+    expect: { status: 200 }
+    returns: ack
+  previous_audio_item:
+    summary: Go to the previous audio item (PreviousPreviousAudioItem, as Proclaim names it)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: PreviousPreviousAudioItem } }
+    expect: { status: 200 }
+    returns: ack
+  video_restart:
+    summary: Restart the video playing from its start (VideoRestart)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: VideoRestart } }
+    expect: { status: 200 }
+    returns: ack
+  video_rewind:
+    summary: Rewind the video playing (VideoRewind)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: VideoRewind } }
+    expect: { status: 200 }
+    returns: ack
+  video_fast_forward:
+    summary: Fast-forward the video playing (VideoFastForward)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: VideoFastForward } }
+    expect: { status: 200 }
+    returns: ack
+  video_play:
+    summary: Play the video (VideoPlay)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: VideoPlay } }
+    expect: { status: 200 }
+    returns: ack
+  video_pause:
+    summary: Pause the video (VideoPause)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: VideoPause } }
+    expect: { status: 200 }
+    returns: ack
+  show_blank_quick_screen:
+    summary: Show the blank quick screen (ShowBlankQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowBlankQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_logo_quick_screen:
+    summary: Show the logo quick screen (ShowLogoQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowLogoQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_no_text_quick_screen:
+    summary: Hide the text of the slide, keeping its background (ShowNoTextQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowNoTextQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_floating_hearts_quick_screen:
+    summary: Show the floating hearts quick screen (ShowFloatingHeartsQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowFloatingHeartsQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_floating_amens_quick_screen:
+    summary: Show the floating amens quick screen (ShowFloatingAmensQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowFloatingAmensQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_amen_quick_screen:
+    summary: Show the Amen quick screen (ShowAmenQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowAmenQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_hallelujah_quick_screen:
+    summary: Show the Hallelujah quick screen (ShowHallelujahQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowHallelujahQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_praise_the_lord_quick_screen:
+    summary: Show the Praise the Lord quick screen (ShowPraiseTheLordQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowPraiseTheLordQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_he_is_risen_quick_screen:
+    summary: Show the He is Risen quick screen (ShowHeIsRisenQuickScreen)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowHeIsRisenQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_he_is_risen_indeed_quick_screen:
+    summary: Show the He is Risen Indeed quick screen (ShowHeIsRisenWhiteQuickScreen, as Proclaim names it)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowHeIsRisenWhiteQuickScreen } }
+    expect: { status: 200 }
+    returns: ack
+  show_custom_quick_screen:
+    summary: Show one of the custom quick screens (ShowCustomQuickScreen)
+    params:
+      screen: { type: int, min: 1, max: 254, required: true, label: Custom quick screen, description: "Custom quick screen to show, numbered from 1 as Proclaim lists them." }
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowCustomQuickScreen, index: "{screen}" } }
+    expect: { status: 200 }
+    returns: ack
+  show_text:
+    summary: Show the slide's text again after hiding it (ShowText)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowText } }
+    expect: { status: 200 }
+    returns: ack
+  show_last_slide:
+    summary: Return from a quick screen to the last slide shown (ShowLastSlide)
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: ShowLastSlide } }
+    expect: { status: 200 }
+    returns: ack
+  show_song_part:
+    summary: Show a numbered part of the current song's lyrics (ShowSongLyrics<part>ByIndex)
+    params:
+      part: { type: enum, values: [Verse, Chorus, PreChorus, Bridge, Ending, Interlude, Tag], required: true, label: Song part, description: "Kind of song part to show." }
+      number: { type: int, min: 1, max: 254, required: true, label: Number, description: "Which of that kind, from 1: Verse 2 is 2, Chorus 2 is 2." }
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: "ShowSongLyrics{part}ByIndex", index: "{number}" } }
+    expect: { status: 200 }
+    returns: ack
+  show_song_part_unnumbered:
+    summary: Show a part of the current song that has no number, such as the chorus (ShowSongLyrics<part>ByIndex)
+    params:
+      part: { type: enum, values: [Verse, Chorus, PreChorus, Bridge, Ending, Interlude, Tag], required: true, label: Song part, description: "Kind of song part to show; the song's only one of that kind." }
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: "ShowSongLyrics{part}ByIndex" } }
+    expect: { status: 200 }
+    returns: ack
+  app_command:
+    summary: Perform an app command by its name, as Proclaim's MIDI input lists them
+    params:
+      name: { type: string, required: true, pattern: "^[A-Za-z]+$", label: App command, description: "Name of the app command, case-insensitive (NextSlide)." }
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+  app_command_with_index:
+    summary: Perform an app command that takes an index, by its name
+    params:
+      name: { type: string, required: true, pattern: "^[A-Za-z]+$", label: App command, description: "Name of the app command, case-insensitive (GoToServiceItem)." }
+      index: { type: int, min: 1, max: 254, required: true, label: Index, description: "The command's index, 1 to 254." }
+    send: { method: GET, path: /appCommand/perform, query: { appCommandName: "{name}", index: "{index}" } }
+    expect: { status: 200 }
+    returns: ack
+  get_on_air_session:
+    summary: Read the On Air session id, empty when Proclaim is off air
+    send: { method: GET, path: /onair/session }
+    expect: { status: 200 }
+    returns: text
+
+state:
+  on_air: { type: bool, description: "Whether Proclaim is On Air" }
+  on_air_session: { type: string, description: "Id of the current On Air session, the same for the whole session and new each time Proclaim goes on air again; absent off air" }
+
+telemetry:
+  # The only state the API reads; nothing is pushed.
+  poll:
+    send: [{ method: GET, path: /onair/session }]
+    every_ms: 2000
+  updates:
+    - path: "^/onair/session$"
+      match: "^\\s*([^\\s\"]+)\\s*$"
+      state: { on_air: "true", on_air_session: "{1}" }
+    - path: "^/onair/session$"
+      match: "^\\s*$"
+      state: { on_air: "false", on_air_session: { delete: true } }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Proclaim's local server is off until Settings > Remote > Enable is
+      pressed, and on Windows Proclaim may ask to open its port in the
+      firewall. The port, 52195, cannot be changed.
+  - models: [all]
+    severity: warning
+    text: >
+      A client on another computer logs in with the network control
+      password, which crosses the network as plain text, and sends the token
+      it gets back with every request; a client on the Proclaim computer
+      needs none, so with the password empty nothing logs in. The article
+      gives the login's answer but not what a wrong password or an expired
+      token answers: 401 or 403 is taken as a refused password at login,
+      and as a token to renew (by logging in again) on any other request.
+  - models: [all]
+    severity: info
+    text: >
+      The API performs app commands and reads the On Air session, nothing
+      else: the service, its items and slides, the current slide, media
+      positions and quick screens cannot be read, so only On Air is kept in
+      state, polled every 2 s (Proclaim pushes nothing). A command's answer
+      is not documented beyond success being the HTTP status; 200 is taken
+      as done.
+  - models: [all]
+    severity: info
+    text: >
+      Two app command names are spelled as Proclaim lists them:
+      PreviousPreviousAudioItem goes to the previous audio item, and
+      ShowHeIsRisenWhiteQuickScreen shows the "He is Risen Indeed" quick
+      screen.
+  - models: [all]
+    severity: info
+    text: >
+      Song parts are numbered within their kind (Verse 1 is 1, Chorus 2 is
+      2); a part with no number (the chorus of a song with one) is shown
+      without an index. The article does not say what an index past the
+      song's parts does.
+  - models: [all]
+    severity: warning
+    text: >
+      /onair/session is read as plain text: an id when on air, nothing when
+      off air. Its exact form (quoted or not) is not documented.

@@ -52,6 +52,9 @@ const PUSH_RENEW: Key = "push-renew";
 const PUSH_IDLE: Key = "push-idle";
 /// The server-sent event stream (`telemetry.sse`).
 const EVENTS: Key = "events";
+/// `telemetry.osc`: the fixed UDP port the device sends OSC feedback to,
+/// beside a transport of another kind.
+const OSC_LISTEN: Key = "osc-listen";
 const EVENTS_RECONNECT: Key = "events-reconnect";
 const REPLY: Key = "reply";
 const PROBE: Key = "probe";
@@ -310,6 +313,10 @@ enum Capture {
     Cookie(Option<String>),
     /// A response header's value, sent back in a header of the same name.
     Header(String),
+    /// A string in the answer's JSON body, at this JSON path, sent back in
+    /// the header named: Logos Proclaim answers its login with
+    /// `{"proclaimAuthToken": "..."}`, sent back as `ProclaimAuthToken`.
+    Json { path: String, header: String },
 }
 
 impl SessionSpec {
@@ -321,13 +328,18 @@ impl SessionSpec {
         }
         .ok_or(format!("transport.session has no login for model {model}"))?;
         let capture = match v.get("capture") {
-            Some(c) => match (c.get("cookie"), c.get("header")) {
-                (Some(Value::String(name)), None) if name == "*" => Capture::Cookie(None),
-                (Some(Value::String(name)), None) => Capture::Cookie(Some(name.clone())),
-                (None, Some(Value::String(h))) => Capture::Header(h.clone()),
+            Some(c) => match (c.get("cookie"), c.get("header"), c.get("json")) {
+                (Some(Value::String(name)), None, None) if name == "*" => Capture::Cookie(None),
+                (Some(Value::String(name)), None, None) => Capture::Cookie(Some(name.clone())),
+                (None, Some(Value::String(h)), None) => Capture::Header(h.clone()),
+                (None, Some(Value::String(h)), Some(Value::String(path))) => Capture::Json {
+                    path: path.clone(),
+                    header: h.clone(),
+                },
                 _ => {
                     return Err(
-                        "transport.session.capture is {cookie: name} or {header: name}".into(),
+                        "transport.session.capture is {cookie: name}, {header: name} or {json: path, header: name}"
+                            .into(),
                     )
                 }
             },
@@ -394,6 +406,15 @@ impl SessionSpec {
                 .next()
                 .filter(|v| !v.is_empty())
                 .map(|v| (h.clone(), v.to_string())),
+            Capture::Json { path, header } => {
+                let doc = serde_json::from_slice::<Value>(&response.body).ok()?;
+                match expect::json_path(&doc, path) {
+                    Some(Value::String(token)) if !token.is_empty() => {
+                        Some((header.clone(), token.clone()))
+                    }
+                    _ => None,
+                }
+            }
         }
     }
 }
@@ -819,6 +840,10 @@ pub(crate) struct SpecEngine {
     /// part is offered under, as that GET's reply would be.
     events_reply: Option<AsReply>,
     events_backoff: Millis,
+    /// `telemetry.osc.listen_port`: the shared UDP port the device's OSC
+    /// feedback arrives on, beside a transport of another kind (CasparCG's
+    /// OSC beside its AMCP line protocol).
+    osc_listen: Option<u16>,
     /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
     /// opened: no subscription, poll or push websocket. Replies and anything
     /// the device sends unasked still go to the rules.
@@ -1341,13 +1366,22 @@ impl SpecEngine {
     pub(crate) fn new(spec: Arc<DeviceSpec>, ctx: OpenContext) -> Result<SpecEngine, String> {
         let t = spec.transport.clone().ok_or("spec has no transport")?;
         let kind = str_field(&t, "type").ok_or("transport has no type")?;
-        // A serial port has no number: it is named in the settings.
-        let spec_port = if kind == "line-serial" {
-            0
-        } else {
-            t.get("port")
+        // A serial port has no number: it is named in the settings. A
+        // device with no standard port (`port: null`, a program whose port
+        // the operator chooses) is opened with the port given.
+        let spec_port = match t.get("port") {
+            _ if kind == "line-serial" => 0,
+            Some(Value::Null) => match ctx.port {
+                Some(p) => p,
+                None => {
+                    return Err(
+                        "this device has no standard port: give its port when opening it".into(),
+                    )
+                }
+            },
+            port => port
                 .and_then(Value::as_u64)
-                .ok_or("transport has no port")? as u16
+                .ok_or("transport has no port")? as u16,
         };
         if kind == "line-serial" && t.get("endpoints").is_some() {
             return Err("transport.endpoints needs a network transport, not line-serial".into());
@@ -1453,7 +1487,21 @@ impl SpecEngine {
                 let reply = match (str_field(&t, "reply_framing"), framing) {
                     (Some("line"), _) => ReplyFraming::Line,
                     (Some("block"), _) => ReplyFraming::Block,
-                    (Some("headed-block"), _) => ReplyFraming::HeadedBlock,
+                    (Some("headed-block"), _) => {
+                        let header = |key: &str| -> Result<Option<String>, String> {
+                            match str_field(&t, key) {
+                                Some(p) => {
+                                    Regex::new(p).map_err(|e| format!("{key}: {e}"))?;
+                                    Ok(Some(p.to_string()))
+                                }
+                                None => Ok(None),
+                            }
+                        };
+                        ReplyFraming::HeadedBlock(framing::Headers {
+                            block: header("reply_block_header")?,
+                            line: header("reply_line_header")?,
+                        })
+                    }
                     (Some("terminated"), _) => ReplyFraming::Terminated(
                         t.get("reply_terminators")
                             .and_then(Value::as_array)
@@ -1665,6 +1713,16 @@ impl SpecEngine {
                 )?
             }
             _ => Vec::new(),
+        };
+        let osc_listen = match spec.telemetry.as_ref().and_then(|t| t.get("osc")) {
+            None => None,
+            Some(_) if matches!(transport, Transport::OscUdp { .. } | Transport::LineUdp { .. }) => {
+                return Err(
+                    "telemetry.osc is for a stream or HTTP transport: a UDP transport has listen_port"
+                        .into(),
+                )
+            }
+            Some(o) => listen_port(o.get("listen_port"), &ctx.settings)?,
         };
         let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
             None => None,
@@ -1972,6 +2030,7 @@ impl SpecEngine {
             events_json,
             events_reply,
             events_backoff: RECONNECT_MIN,
+            osc_listen,
             pacer,
             outbox: VecDeque::new(),
             pace_pass: false,
@@ -2922,7 +2981,7 @@ impl SpecEngine {
         let headed = matches!(
             self.transport,
             Transport::LineTcp {
-                reply: ReplyFraming::HeadedBlock,
+                reply: ReplyFraming::HeadedBlock(_),
                 ..
             }
         ) && matches!(reply, Reply::Text(_));
@@ -3676,6 +3735,14 @@ impl SpecEngine {
     }
 
     /// The push channel (`telemetry.websocket`).
+    /// `telemetry.osc`: listen on the shared port for the device's OSC
+    /// feedback, while monitored.
+    fn open_osc_listen(&mut self, cx: &mut Cx) {
+        if let (true, Some(port)) = (self.monitor, self.osc_listen) {
+            cx.udp_open(OSC_LISTEN, Bind::Shared(port));
+        }
+    }
+
     fn open_push(&mut self, cx: &mut Cx) {
         if !self.monitor {
             return;
@@ -4112,6 +4179,7 @@ impl Module for SpecEngine {
     fn start(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         self.connect(cx);
+        self.open_osc_listen(cx);
         self.open_push(cx);
         self.open_events(cx);
         self.validate_token(cx);
@@ -4219,7 +4287,22 @@ impl Module for SpecEngine {
         }
     }
 
-    fn datagram(&mut self, cx: &mut Cx, _socket: Key, _from: SocketAddr, data: &[u8]) {
+    fn datagram(&mut self, cx: &mut Cx, socket: Key, _from: SocketAddr, data: &[u8]) {
+        if socket == OSC_LISTEN {
+            // Feedback beside the transport: offered to the rules only, never
+            // a reply to anything sent on the transport.
+            for message in osc::decode(data) {
+                self.offer(
+                    cx,
+                    &telemetry::Inbound::Osc {
+                        address: &message.address,
+                        types: &message.types,
+                        args: &message.args,
+                    },
+                );
+            }
+            return;
+        }
         if matches!(self.transport, Transport::LineUdp { .. }) {
             // One message per datagram; its line ending is not part of it.
             let text = String::from_utf8_lossy(data);
@@ -4495,6 +4578,9 @@ impl Module for SpecEngine {
         if self.events.is_some() {
             cx.sse_close(EVENTS);
         }
+        if self.osc_listen.is_some() {
+            cx.udp_close(OSC_LISTEN);
+        }
     }
 
     fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
@@ -4530,6 +4616,14 @@ impl Module for SpecEngine {
         self.transport = fresh.transport;
         self.endpoints = fresh.endpoints;
         self.events = fresh.events;
+        // Another OSC feedback port: listen there instead.
+        if self.osc_listen != fresh.osc_listen {
+            if self.osc_listen.is_some() {
+                cx.udp_close(OSC_LISTEN);
+            }
+            self.osc_listen = fresh.osc_listen;
+            self.open_osc_listen(cx);
+        }
         // A session was opened with the old credential: the next request
         // logs in with the new one.
         self.session = fresh.session;
@@ -5151,6 +5245,171 @@ mod tests {
             Some(Bind::Shared(9000))
         );
         assert_eq!(open(by_setting, json!({})), Some(Bind::Ephemeral));
+    }
+
+    /// A line-tcp spec with `telemetry.osc`: HyperDeck's, given an OSC
+    /// listener and a rule for what arrives on it.
+    fn osc_beside_tcp(settings: Value, monitor: bool) -> SpecEngine {
+        let mut spec = Catalog::source_tree()
+            .device("blackmagic-hyperdeck")
+            .unwrap()
+            .clone();
+        spec.settings.insert(
+            "osc_port".into(),
+            serde_json::from_value(json!({"type": "int", "min": 1, "max": 65535, "default": 6250}))
+                .unwrap(),
+        );
+        let telemetry = spec.telemetry.as_mut().unwrap();
+        telemetry["osc"] = json!({"listen_port": {"setting": "osc_port"}});
+        telemetry["updates"].as_array_mut().unwrap().push(
+            json!({"address": "^/channel/(\\d+)/format$", "state": {"device.model": "{arg0}"}}),
+        );
+        let settings =
+            crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+        let model = spec.models[0].id.clone();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model,
+                channels: None,
+                settings,
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn osc_feedback_beside_a_line_transport_goes_to_the_rules() {
+        let mut e = osc_beside_tcp(json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let opened: Vec<_> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::UdpOpen { socket, bind } => Some((socket, bind)),
+                Action::TcpOpen { socket, .. } => Some((socket, Bind::Ephemeral)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            opened,
+            [(SOCKET, Bind::Ephemeral), (OSC_LISTEN, Bind::Shared(6250))]
+        );
+        // A datagram on the listener is offered to the rules, and is no reply.
+        let mut cx = Cx::new(1);
+        let packet = osc::encode("/channel/1/format", &[osc::Arg::Str("1080i5000".into())]);
+        e.datagram(
+            &mut cx,
+            OSC_LISTEN,
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6250),
+            &packet,
+        );
+        let state: Vec<_> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::State(p) => Some(p),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(state, [json!({"device": {"model": "1080i5000"}})]);
+        // Another port: the listener moves.
+        let mut cx = Cx::new(2);
+        let new = json!({"osc_port": 6251});
+        let new = crate::catalog::validate(&e.spec.settings, new.as_object().unwrap()).unwrap();
+        let result = e.update_settings(&mut cx, &new);
+        assert!(matches!(result, SettingsUpdate::Applied), "{result:?}");
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|a| matches!(a, Action::UdpClose { socket } if *socket == OSC_LISTEN)));
+        assert!(a.iter().any(|a| matches!(a, Action::UdpOpen { socket, bind: Bind::Shared(6251) } if *socket == OSC_LISTEN)));
+        // Closing stops listening.
+        let mut cx = Cx::new(3);
+        e.stop(&mut cx);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::UdpClose { socket } if *socket == OSC_LISTEN)));
+    }
+
+    #[test]
+    fn a_device_with_no_standard_port_opens_only_on_the_port_given() {
+        let open = |port: Option<u16>| {
+            let mut spec = Catalog::source_tree()
+                .device("behringer-x32")
+                .unwrap()
+                .clone();
+            spec.transport.as_mut().unwrap()["port"] = Value::Null;
+            SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port,
+                    model: "x32".into(),
+                    channels: Some(32),
+                    settings: Params::new(),
+                    monitor: false,
+                },
+            )
+        };
+        let refused = open(None).err().unwrap();
+        assert!(refused.contains("no standard port"), "{refused}");
+        assert_eq!(open(Some(58000)).unwrap().port(), 58000);
+    }
+
+    #[test]
+    fn osc_feedback_is_not_listened_for_commands_only() {
+        let mut e = osc_beside_tcp(json!({}), false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        assert!(!cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::UdpOpen { .. })));
+    }
+
+    #[test]
+    fn a_session_can_be_a_json_value_sent_in_a_header() {
+        let session = SessionSpec::parse(
+            &json!({
+                "login": {"method": "POST", "path": "/appCommand/authenticate"},
+                "capture": {"json": "$.proclaimAuthToken", "header": "ProclaimAuthToken"},
+            }),
+            "any",
+        )
+        .unwrap();
+        let answer = |body: &str| HttpResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: body.as_bytes().to_vec(),
+        };
+        assert_eq!(
+            session.captured(&answer(r#"{"proclaimAuthToken":"oxdBKO0NkEyMGj4-UqYVGQ"}"#)),
+            Some((
+                "ProclaimAuthToken".to_string(),
+                "oxdBKO0NkEyMGj4-UqYVGQ".to_string()
+            ))
+        );
+        // No token, an empty one, or not JSON: no session.
+        assert_eq!(session.captured(&answer("{}")), None);
+        assert_eq!(
+            session.captured(&answer(r#"{"proclaimAuthToken":""}"#)),
+            None
+        );
+        assert_eq!(session.captured(&answer("denied")), None);
+        // A JSON path needs the header to send it in.
+        assert!(SessionSpec::parse(
+            &json!({"login": {"method": "POST", "path": "/"}, "capture": {"json": "$.t"}}),
+            "any"
+        )
+        .is_err());
     }
 
     #[test]

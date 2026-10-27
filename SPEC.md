@@ -128,6 +128,29 @@ several lines is still one message. Whatever arrives between values
 (whitespace, stray bytes) is no message. Each message is JSON, so it goes to
 the `json_match` rules (§8) as well as the text rules.
 
+A `headed-block` reply whose first line says what follows by other means
+than a closing `:` names the first lines that do: `reply_block_header`, a
+regex, for a first line opening a block that a blank line ends (in place of
+the line ending in `:`), and `reply_line_header` for a first line followed by
+exactly one more line, whatever it holds, even an empty one. CasparCG's AMCP
+answers `200 CLS OK` with a line per media file and a blank line, `201
+VERSION OK` with one line of data, and `202 PLAY OK` alone:
+
+```yaml
+transport:
+  type: line-tcp
+  port: 5250
+  framing: terminated
+  terminator: crlf
+  reply_framing: headed-block
+  reply_block_header: "^200 "
+  reply_line_header: "^(101|201|400|500) "
+  reply_match: "^[2-5][0-9][0-9] "
+```
+
+The message is the first line and what follows it, joined by line breaks,
+so `returns: text` is the lines after the first, as for HyperDeck's.
+
 With `fenced`, a fence line opens a block and the next fence line after any
 other text closes it, so two fences in a row open one block; the fences, and
 the blank lines at the block's start and end, are not part of the message.
@@ -711,8 +734,12 @@ request like a command's, a template over settings) and takes the session
 from its answer: with `capture: { cookie: name }` the named cookie of its
 `Set-Cookie` headers, with `"*"` (the default) every cookie, sent back as
 `Cookie: name=value; ...`; with `capture: { header: name }` that header's
-value, sent back in a header of the same name. Every later request carries
-it, except the probe and a request marked `session: false` (Magewell's ping),
+value, sent back in a header of the same name; with `capture: { json: path,
+header: name }` the string at that JSON path of the answer's body, sent back
+in the header named (Logos Proclaim answers its login with
+`{"proclaimAuthToken": "..."}` and takes it back as `ProclaimAuthToken`). An
+answer without it, or with it empty, holds no session. Every later request
+carries it, except the probe and a request marked `session: false` (Magewell's ping),
 which need none and never log in. Requests go one at a time, so nothing is
 sent while the login is answered.
 
@@ -915,6 +942,12 @@ ports:
 | `listener` | Who listens: `device` (the default) or `core` |
 | `setting` | The setting that changes this port, if any |
 | `when` | When the entry applies, if not always: a setting's value or a model |
+
+A program whose port the operator chooses, with no standard one (Show Cue
+Systems' network cue control listens on whatever port it is given), sets the
+transport's `port` to `null`: the port is then given when the device is
+opened, and opening it without one fails, saying so. Its control entry is
+`port: null` with a `note`.
 
 There is always at least one `control` entry. For a spec-driven device the
 transport's `port` must be one of them, each HTTP endpoint (§2, Endpoints)
@@ -2332,6 +2365,37 @@ over settings. Its messages go through the rules like any other.
 
 A telemetry vector for a websocket gives `inbound_ws` (the message text), and
 optionally `expect_connect_ws`, the messages sent when it opens.
+
+#### OSC feedback beside the transport
+
+A device controlled over a line protocol, a websocket or HTTP may send its
+state as OSC over UDP, to a port of the controller's: CasparCG Server
+starts an OSC client for each AMCP connection, aimed at the client's
+address on its configured `default-port` (6250). `telemetry.osc` names the
+local port to listen on, a number or `{setting: name}`:
+
+```yaml
+telemetry:
+  osc:
+    listen_port: { setting: osc_port }
+  updates:
+    - address: "^/channel/(\\d+)/stage/layer/(\\d+)/foreground/file/name$"
+      state: { "channels.{1}.layers.{2}.file": "{arg0}" }
+ports:
+  - { port: 6250, protocol: udp, role: feedback, listener: core, setting: osc_port }
+```
+
+The port is shared, as `listen_port` on `osc-udp` is: each datagram goes to
+the device whose address it came from. Each OSC message (or each message of
+a bundle) goes to the `address` rules; it is never taken as a command's
+reply, whatever the transport waits for. The port is listened on while the
+device is open and monitored (never for commands only), kept across
+reconnections of the transport, and moved at once when `update_settings`
+changes it. A setting left empty means no listener. A UDP transport has its
+own `listen_port` and takes no `telemetry.osc`; `tools/validate.py` checks
+that, and that `ports` has a `udp` `feedback` entry listened on by the core
+for it. A telemetry vector gives the datagram as `inbound_hex`, as for an OSC
+transport.
 
 #### A status dump that ends in silence
 

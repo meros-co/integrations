@@ -1,0 +1,1568 @@
+spec: 1
+id: casparcg
+name: CasparCG Server
+vendor: CasparCG
+category: playback
+
+source:
+  - title: AMCP Protocol (CasparCG documentation, casparcg.com/docs/wiki, protocols/amcp-protocol)
+    url: https://casparcg.com/docs/wiki/protocols/amcp-protocol
+    note: >
+      The project's own protocol reference, moved from the GitHub wiki
+      (github.com/CasparCG/help/wiki/AMCP-Protocol, now unmaintained; the same
+      content). Documentation of a GPL-licensed server, read for its facts
+      only; no server code was read. Communication (UTF-8, CRLF after each
+      command, case-insensitive, quoted parameters), special sequences (\",
+      \\, \n), return codes 100-503, every command's syntax and examples:
+      LOADBG, LOAD, PLAY, PAUSE, RESUME, STOP, CLEAR, CALL, SWAP, ADD,
+      REMOVE, PRINT, LOG LEVEL and CATEGORY, SET, LOCK, PING, DATA, CG, MIXER
+      (each property's set and get form and reply), CHANNEL_GRID, THUMBNAIL,
+      CINF, CLS, FLS, TLS, VERSION, INFO and its forms, DIAG, GL, BYE, KILL,
+      RESTART, HELP, and batching (BEGIN, COMMIT, DISCARD with REQ/RES)
+  - title: OSC Protocol (CasparCG documentation, protocols/osc-protocol)
+    url: https://casparcg.com/docs/wiki/protocols/osc-protocol
+    note: >
+      The OSC client the server starts for each AMCP connection, aimed at the
+      client's address on the configured default-port (6250 in the example
+      configuration), predefined clients, and the channel, output, stage
+      (layer), Flash host and mixer audio addresses with their example
+      arguments
+  - title: FFmpeg Producer (CasparCG documentation, server/producers/ffmpeg-producer)
+    url: https://casparcg.com/docs/wiki/server/producers/ffmpeg-producer
+    note: >
+      LOOP, SEEK, START, LENGTH and FILTER parameters; the CALL functions
+      LOOP (answering its value), SEEK with REL, IN, OUT and END, START and
+      LENGTH; the producer's OSC data for 2.2 onwards and for 2.1 and earlier
+  - title: Mixer and Configuration (CasparCG documentation, server/mixer, server/configuration)
+    url: https://casparcg.com/docs/wiki/server/mixer
+    note: >
+      The blend modes and the animation types (tweens) the MIXER commands
+      take; the configuration page's video format table (the values of SET
+      MODE) and the OSC and controller configuration; layers 0 to 9999 from
+      the Channels page
+  - title: companion-module-casparcg-server (MIT)
+    url: https://github.com/bitfocus/companion-module-casparcg-server
+    note: >
+      MIT licence (top-level LICENSE). Read, not copied, as corroboration of
+      the reply framing the documentation states (101, 201 and 400 followed
+      by one line, 200 by lines up to a blank line), of the quoted clip name
+      first on each CLS line, and of TLS lines being bare template names from
+      2.2 and quoted names with more fields before (index.js)
+  - title: casparcg-connection (SuperFlyTV, MIT)
+    url: https://github.com/SuperFlyTV/casparcg-connection
+    note: >
+      MIT licence (top-level LICENSE). Read, not copied, for corroboration:
+      the reply line form "[RES id ]code [command ]OK|ERROR|FAILED", the CLS
+      line fields (quoted name, MOVIE|STILL|AUDIO, size, date, frames, frame
+      rate as a fraction), the INFO line form "1 720p5000 PLAYING", and that
+      PING takes no REQ wrapper (src/connection.ts, src/deserializers)
+
+transport:
+  type: line-tcp
+  port: 5250
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 5000
+  reply: expected
+  # 200 is followed by lines up to a blank line, 101, 201, 400 and 500 by
+  # one line of data; 100, 202 and the other errors are one line (Return
+  # Codes). 1xx tell of events and are no reply; PING answers PONG.
+  reply_framing: headed-block
+  reply_block_header: "^200 "
+  reply_line_header: "^(101|201|400|500) "
+  reply_match: "^([2-5][0-9][0-9] |PONG)"
+  probe: "VERSION"
+
+settings:
+  osc_port: { type: int, min: 1, max: 65535, default: 6250, label: OSC port, description: "Local UDP port the server sends its OSC state to: the default-port in the osc section of casparcg.config (6250 unless changed); leave empty for no OSC state." }
+
+ports:
+  - { port: 5250, protocol: tcp, role: control, note: "AMCP, the tcp controller of casparcg.config (5250 by default)" }
+  - { port: 6250, protocol: udp, role: feedback, listener: core, setting: osc_port, note: "OSC state the server sends to each AMCP client's address" }
+
+models:
+  - id: server-2
+    name: CasparCG Server 2.x
+    supports:
+      [load_background, load_background_with_parameters, load, load_with_parameters,
+       play, play_clip, play_clip_with_parameters, pause,
+       resume, stop, clear_layer, clear_channel,
+       call, set_loop, get_loop, seek,
+       seek_relative, set_start, set_length, swap_layers,
+       swap_channels, add_consumer, add_consumer_at_index, remove_consumer,
+       remove_consumer_at_index, print, set_log_level, set_log_category,
+       set_video_mode, set_channel_layout, lock_channel, unlock_channel,
+       clear_channel_lock, ping, data_store, data_retrieve,
+       data_list, data_list_folder, data_remove, cg_add,
+       cg_add_without_data, cg_play, cg_stop, cg_next,
+       cg_remove, cg_clear, cg_update, cg_invoke,
+       cg_info, cg_info_host, set_keyer, get_keyer,
+       set_blend_mode, get_blend_mode, set_opacity, get_opacity,
+       set_brightness, get_brightness, set_saturation, get_saturation,
+       set_contrast, get_contrast, set_levels, get_levels,
+       set_fill, get_fill, set_clip, get_clip,
+       set_anchor, get_anchor, set_crop, get_crop,
+       set_rotation, get_rotation, set_perspective, get_perspective,
+       set_mipmap, get_mipmap, set_volume, get_volume,
+       set_master_volume, get_master_volume, set_straight_alpha_output, get_straight_alpha_output,
+       set_chroma_key, disable_chroma_key, get_chroma_key, set_invert,
+       set_grid, mixer_commit, mixer_clear_layer, mixer_clear_channel,
+       channel_grid, thumbnail_list, thumbnail_list_folder, thumbnail_retrieve,
+       thumbnail_generate, thumbnail_generate_all, media_info, list_media,
+       list_media_folder, list_fonts, list_templates, list_templates_folder,
+       version, component_version, info, info_channel,
+       info_layer, info_template, info_config, info_paths,
+       info_system, info_server, info_queues, info_threads,
+       info_channel_delay, info_layer_delay, open_diagnostics, gl_info,
+       gl_gc, bye, kill, restart,
+       help, help_command, help_producers, help_producer,
+       help_consumers, help_consumer]
+    verification: none
+    notes: >
+      Written from the AMCP and OSC documentation, which covers the 2.0 to
+      2.1 servers and notes OSC changes from 2.2; the commands are the same
+      on current servers. Some commands answer only with the producers and
+      consumers a server is built with (Flash on Windows only).
+
+maps:
+  loop: { "true": " LOOP", "false": "" }
+  auto: { "true": " AUTO", "false": "" }
+  transforms: { "true": " TRANSFORMS", "false": "" }
+  defer: { "true": " DEFER", "false": "" }
+
+commands:
+  load_background:
+    summary: "Load a clip into a layer's background, ready to play (LOADBG)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      clip: { type: "string", required: true, label: "Clip", description: "Media file name without its extension, relative to the media folder (folders separated by /), or a producer resource such as a color or a route://." }
+      loop: { type: "bool", default: false, label: "Loop", description: "Loop the clip when it reaches its end." }
+      transition: { type: "enum", values: ["CUT", "MIX", "PUSH", "WIPE", "SLIDE"], default: "CUT", label: "Transition", description: "Transition from what plays on the layer to the clip: CUT is immediate." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      direction: { type: "enum", values: ["LEFT", "RIGHT"], default: "RIGHT", label: "Direction", description: "Direction a PUSH, WIPE or SLIDE transition moves in." }
+      seek: { type: "int", min: 0, default: 0, label: "Start frame", description: "Frame of the file to start playing from, 0 for its first." }
+      auto: { type: "bool", default: false, label: "Play automatically", description: "Start the clip by itself when the clip playing on the layer ends, rather than waiting for PLAY." }
+    send: "LOADBG {channel}-{layer} {clip:json}{loop:map.loop} {transition} {duration} {tween} {direction} SEEK {seek}{auto:map.auto}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  load_background_with_parameters:
+    summary: "Load a clip into a layer's background with parameters as AMCP takes them (LOADBG)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      clip: { type: "string", required: true, label: "Clip", description: "Media file name without its extension, relative to the media folder (folders separated by /), or a producer resource such as a color or a route://." }
+      parameters: { type: "string", required: true, label: "Parameters", description: "The rest of the command as AMCP takes it (LOOP, a transition, SEEK, START, LENGTH, FILTER, AUTO, STING ...), sent as written." }
+    send: "LOADBG {channel}-{layer} {clip:json} {parameters}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  load:
+    summary: "Load a clip into a layer's foreground, showing its first frame paused (LOAD)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      clip: { type: "string", required: true, label: "Clip", description: "Media file name without its extension, relative to the media folder (folders separated by /), or a producer resource such as a color or a route://." }
+      loop: { type: "bool", default: false, label: "Loop", description: "Loop the clip when it reaches its end." }
+      seek: { type: "int", min: 0, default: 0, label: "Start frame", description: "Frame of the file to start playing from, 0 for its first." }
+    send: "LOAD {channel}-{layer} {clip:json}{loop:map.loop} SEEK {seek}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  load_with_parameters:
+    summary: "Load a clip into a layer's foreground with parameters as AMCP takes them (LOAD)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      clip: { type: "string", required: true, label: "Clip", description: "Media file name without its extension, relative to the media folder (folders separated by /), or a producer resource such as a color or a route://." }
+      parameters: { type: "string", required: true, label: "Parameters", description: "The rest of the command as AMCP takes it (LOOP, a transition, SEEK, START, LENGTH, FILTER, AUTO, STING ...), sent as written." }
+    send: "LOAD {channel}-{layer} {clip:json} {parameters}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  play:
+    summary: "Play what is loaded on a layer: the background clip, with its transition, or the paused foreground (PLAY)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "PLAY {channel}-{layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  play_clip:
+    summary: "Load a clip into a layer and play it at once (PLAY with a clip)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      clip: { type: "string", required: true, label: "Clip", description: "Media file name without its extension, relative to the media folder (folders separated by /), or a producer resource such as a color or a route://." }
+      loop: { type: "bool", default: false, label: "Loop", description: "Loop the clip when it reaches its end." }
+      transition: { type: "enum", values: ["CUT", "MIX", "PUSH", "WIPE", "SLIDE"], default: "CUT", label: "Transition", description: "Transition from what plays on the layer to the clip: CUT is immediate." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      direction: { type: "enum", values: ["LEFT", "RIGHT"], default: "RIGHT", label: "Direction", description: "Direction a PUSH, WIPE or SLIDE transition moves in." }
+      seek: { type: "int", min: 0, default: 0, label: "Start frame", description: "Frame of the file to start playing from, 0 for its first." }
+    send: "PLAY {channel}-{layer} {clip:json}{loop:map.loop} {transition} {duration} {tween} {direction} SEEK {seek}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  play_clip_with_parameters:
+    summary: "Load a clip into a layer and play it, with parameters as AMCP takes them (PLAY)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      clip: { type: "string", required: true, label: "Clip", description: "Media file name without its extension, relative to the media folder (folders separated by /), or a producer resource such as a color or a route://." }
+      parameters: { type: "string", required: true, label: "Parameters", description: "The rest of the command as AMCP takes it (LOOP, a transition, SEEK, START, LENGTH, FILTER, AUTO, STING ...), sent as written." }
+    send: "PLAY {channel}-{layer} {clip:json} {parameters}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  pause:
+    summary: "Pause the clip playing on a layer (PAUSE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "PAUSE {channel}-{layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  resume:
+    summary: "Resume a clip paused with PAUSE (RESUME)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "RESUME {channel}-{layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  stop:
+    summary: "Remove the clip playing on a layer, leaving its background (STOP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "STOP {channel}-{layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  clear_layer:
+    summary: "Remove everything on a layer, foreground and background (CLEAR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most.", required: true }
+    send: "CLEAR {channel}-{layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  clear_channel:
+    summary: "Remove everything on every layer of a channel (CLEAR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "CLEAR {channel}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  call:
+    summary: "Call a function of the producer on a layer with its parameters as written (CALL)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      parameters: { type: "string", required: true, label: "Parameters", description: "The function and its parameters as the producer takes them (LOOP 1, SEEK 25, START 100, an HTML template's function), sent as written." }
+    send: "CALL {channel}-{layer} {parameters}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_loop:
+    summary: "Turn looping of the file playing on a layer on or off, and read it back (CALL LOOP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      loop: { type: "bool", default: true, label: "Loop", description: "Loop the clip when it reaches its end." }
+    send: "CALL {channel}-{layer} LOOP {loop:bool01}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_loop:
+    summary: "Read whether the file playing on a layer loops (CALL LOOP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "CALL {channel}-{layer} LOOP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  seek:
+    summary: "Jump the file playing on a layer to a frame (CALL SEEK)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      frame: { type: "int", min: 0, required: true, label: "Frame", description: "Frame of the file to jump to, counted from its first." }
+    send: "CALL {channel}-{layer} SEEK {frame}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  seek_relative:
+    summary: "Jump the file playing on a layer by frames from a reference point (CALL SEEK REL|IN|OUT|END)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      from: { type: "enum", values: ["REL", "IN", "OUT", "END"], required: true, label: "From", description: "REL the current position, IN the start (0 or START), OUT start plus length, END the end of the file." }
+      frames: { type: "int", required: true, label: "Frames", description: "Frames from that point, negative to go back." }
+    send: "CALL {channel}-{layer} SEEK {from} {frames}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_start:
+    summary: "Set the frame a file loops back to (CALL START)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      frame: { type: "int", min: 0, required: true, label: "Frame", description: "Frame of the file that starts it, and where it loops back to." }
+    send: "CALL {channel}-{layer} START {frame}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_length:
+    summary: "Set the last frame a file plays, or loops at (CALL LENGTH)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      frames: { type: "int", min: 0, required: true, label: "Length", description: "Frames played from the start point before the file ends or loops." }
+    send: "CALL {channel}-{layer} LENGTH {frames}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  swap_layers:
+    summary: "Swap two layers, foreground and background, on one channel or two (SWAP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most.", required: true }
+      other_channel: { type: "int", min: 1, required: true, label: "Other channel", description: "Channel of the second layer, numbered from 1." }
+      other_layer: { type: "int", min: 0, max: 9999, label: "Other layer", description: "The second layer, 0 to 9999.", required: true }
+      transforms: { type: "bool", default: false, label: "Swap transforms", description: "Swap the layers' mixer transforms too." }
+    send: "SWAP {channel}-{layer} {other_channel}-{other_layer}{transforms:map.transforms}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  swap_channels:
+    summary: "Swap every layer of two channels (SWAP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      other_channel: { type: "int", min: 1, required: true, label: "Other channel", description: "The second channel, numbered from 1." }
+      transforms: { type: "bool", default: false, label: "Swap transforms", description: "Swap the layers' mixer transforms too." }
+    send: "SWAP {channel} {other_channel}{transforms:map.transforms}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  add_consumer:
+    summary: "Add an output (consumer) to a channel (ADD)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      consumer: { type: "string", required: true, label: "Consumer", description: "The consumer and its parameters as AMCP takes them: DECKLINK 1, SCREEN, AUDIO, FILE name.mov SEPARATE_KEY, STREAM udp://... with FFmpeg options." }
+    send: "ADD {channel} {consumer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  add_consumer_at_index:
+    summary: "Add an output (consumer) to a channel under an index of your choosing (ADD)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      index: { type: "int", min: 0, required: true, label: "Consumer index", description: "Index that names the consumer on the channel, to remove it by later." }
+      consumer: { type: "string", required: true, label: "Consumer", description: "The consumer and its parameters as AMCP takes them: DECKLINK 1, SCREEN, AUDIO, FILE name.mov SEPARATE_KEY, STREAM udp://... with FFmpeg options." }
+    send: "ADD {channel}-{index} {consumer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  remove_consumer:
+    summary: "Remove the output (consumer) matching these parameters from a channel (REMOVE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      consumer: { type: "string", required: true, label: "Consumer", description: "The consumer and its parameters as it was added: DECKLINK 1, SCREEN, AUDIO." }
+    send: "REMOVE {channel} {consumer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  remove_consumer_at_index:
+    summary: "Remove the output (consumer) with this index from a channel (REMOVE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      index: { type: "int", min: 0, required: true, label: "Consumer index", description: "Index of the consumer on the channel." }
+    send: "REMOVE {channel}-{index}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  print:
+    summary: "Save a still of a channel as a PNG in the media folder (PRINT)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "PRINT {channel}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  set_log_level:
+    summary: "Change the server's log level (LOG LEVEL)"
+    params:
+      level: { type: "enum", values: ["trace", "debug", "info", "warning", "error", "fatal"], required: true, label: "Log level", description: "Least severe kind of message the server logs." }
+    send: "LOG LEVEL {level}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  set_log_category:
+    summary: "Turn a logging category on or off (LOG CATEGORY)"
+    params:
+      category: { type: "enum", values: ["calltrace", "communication"], required: true, label: "Category", description: "calltrace logs calls inside the server, communication the AMCP traffic." }
+      enabled: { type: "bool", default: true, label: "Enabled", description: "Log the category, or stop." }
+    send: "LOG CATEGORY {category} {enabled:bool01}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  set_video_mode:
+    summary: "Change a channel's video format (SET MODE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      mode: { type: "enum", values: ["PAL", "NTSC", "576p2500", "720p2398", "720p2400", "720p2500", "720p2997", "720p3000", "720p5000", "720p5994", "720p6000", "1080p2398", "1080p2400", "1080p2500", "1080p2997", "1080p3000", "1080p5000", "1080i5000", "1080p5994", "1080i5994", "1080p6000", "1080i6000", "2160p2398", "2160p2400", "2160p2500", "2160p2997", "2160p3000", "2160p5000", "2160p5994", "2160p6000"], required: true, label: "Video format", description: "One of the video formats the server's configuration page lists." }
+    send: "SET {channel} MODE {mode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  set_channel_layout:
+    summary: "Change a channel's audio channel layout (SET CHANNEL_LAYOUT)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layout: { type: "string", required: true, pattern: "^[A-Za-z0-9_.-]+$", label: "Channel layout", description: "Name of an audio channel layout the server knows, such as smpte." }
+    send: "SET {channel} CHANNEL_LAYOUT {layout}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  lock_channel:
+    summary: "Take exclusive access to a channel (LOCK ACQUIRE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      phrase: { type: "string", required: true, secret: true, label: "Lock phrase", description: "Phrase that other clients must give to use the channel while it is locked." }
+    send: "LOCK {channel} ACQUIRE {phrase:json}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  unlock_channel:
+    summary: "Give up exclusive access to a channel (LOCK RELEASE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "LOCK {channel} RELEASE"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  clear_channel_lock:
+    summary: "Remove every lock on a channel (LOCK CLEAR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "LOCK {channel} CLEAR"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  ping:
+    summary: "Check that the connection and the AMCP parser answer (PING)"
+    send: "PING"
+    expect: { matches: "^(?:PONG|20[0-9] PING)" }
+    returns: ack
+  data_store:
+    summary: "Store data under a name on the server (DATA STORE)"
+    params:
+      name: { type: "string", required: true, label: "Dataset", description: "Name of the dataset, folders separated by /." }
+      data: { type: "string", required: true, multiline: true, label: "Data", description: "The data: a template's XML or JSON, or any text; line breaks are sent as \\n." }
+    send: "DATA STORE {name:json} {data:json}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  data_retrieve:
+    summary: "Read the data stored under a name (DATA RETRIEVE)"
+    params:
+      name: { type: "string", required: true, label: "Dataset", description: "Name of the dataset, folders separated by /." }
+    send: "DATA RETRIEVE {name:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  data_list:
+    summary: "List the stored datasets (DATA LIST)"
+    send: "DATA LIST"
+    expect: { code_range: [200, 299] }
+    returns: text
+  data_list_folder:
+    summary: "List the stored datasets in a folder (DATA LIST)"
+    params:
+      folder: { type: "string", required: true, label: "Folder", description: "Folder of the data folder to list, folders separated by /." }
+    send: "DATA LIST {folder:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  data_remove:
+    summary: "Delete the data stored under a name (DATA REMOVE)"
+    params:
+      name: { type: "string", required: true, label: "Dataset", description: "Name of the dataset, folders separated by /." }
+    send: "DATA REMOVE {name:json}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_add:
+    summary: "Add a template to a template host layer, with data (CG ADD)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+      template: { type: "string", required: true, label: "Template", description: "Template file name without its extension, relative to the template folder." }
+      play_on_load: { type: "bool", default: false, label: "Play on load", description: "Play the template as soon as it is added, rather than waiting for CG PLAY." }
+      data: { type: "string", required: true, multiline: true, label: "Data", description: "Data for the template: inline XML or JSON, or the name of a stored dataset." }
+    send: "CG {channel}-{layer} ADD {cg_layer} {template:json} {play_on_load:bool01} {data:json}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_add_without_data:
+    summary: "Add a template to a template host layer (CG ADD)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+      template: { type: "string", required: true, label: "Template", description: "Template file name without its extension, relative to the template folder." }
+      play_on_load: { type: "bool", default: false, label: "Play on load", description: "Play the template as soon as it is added, rather than waiting for CG PLAY." }
+    send: "CG {channel}-{layer} ADD {cg_layer} {template:json} {play_on_load:bool01}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_play:
+    summary: "Play and show the template on a template layer (CG PLAY)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+    send: "CG {channel}-{layer} PLAY {cg_layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_stop:
+    summary: "Stop the template on a template layer, letting it animate out, and remove it (CG STOP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+    send: "CG {channel}-{layer} STOP {cg_layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_next:
+    summary: "Step the template on a template layer to its next animation (CG NEXT)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+    send: "CG {channel}-{layer} NEXT {cg_layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_remove:
+    summary: "Remove the template from a template layer at once (CG REMOVE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+    send: "CG {channel}-{layer} REMOVE {cg_layer}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_clear:
+    summary: "Remove every template from a layer, and its template host (CG CLEAR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+    send: "CG {channel}-{layer} CLEAR"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_update:
+    summary: "Send new data to the template on a template layer (CG UPDATE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+      data: { type: "string", required: true, multiline: true, label: "Data", description: "Data for the template: inline XML or JSON, or the name of a stored dataset." }
+    send: "CG {channel}-{layer} UPDATE {cg_layer} {data:json}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_invoke:
+    summary: "Call a method of the template on a template layer, or jump to a label (CG INVOKE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+      method: { type: "string", required: true, label: "Method", description: "Name of the template's method or label to call." }
+    send: "CG {channel}-{layer} INVOKE {cg_layer} {method:json}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  cg_info:
+    summary: "Read information about the template on a template layer (CG INFO)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+      cg_layer: { type: "int", min: 0, required: true, label: "Template layer", description: "Layer inside the template host (the cg layer), numbered from 0." }
+    send: "CG {channel}-{layer} INFO {cg_layer}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  cg_info_host:
+    summary: "Read information about a layer's template host (CG INFO)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 9999, label: "Layer", description: "Layer the template host is on, 9999 (the top-most) unless given, as AMCP defaults it." }
+    send: "CG {channel}-{layer} INFO"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_keyer:
+    summary: "Set the keyer of a layer, and read it back (MIXER KEYER)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      keyer: { type: "bool", required: true, label: "Keyer", description: "Use this layer as the key (alpha) of the layer above, and hide it." }
+    send:
+      - "MIXER {channel}-{layer} KEYER {keyer:bool01}"
+      - "MIXER {channel}-{layer} KEYER"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_keyer:
+    summary: "Read the keyer of a layer (MIXER KEYER)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} KEYER"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_blend_mode:
+    summary: "Set the blend mode of a layer, and read it back (MIXER BLEND)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      mode: { type: "enum", values: ["Normal", "Lighten", "Darken", "Multiply", "Average", "Add", "Subtract", "Difference", "Negation", "Exclusion", "Screen", "Overlay", "Soft_Light", "Hard_Light", "Color_Dodge", "Color_Burn", "Linear_Dodge", "Linear_Burn", "Linear_Light", "Vivid_Light", "Pin_Light", "Hard_Mix", "Reflect", "Glow", "Phoenix", "Contrast", "Saturation", "Color", "Luminosity"], required: true, label: "Blend mode", description: "How the layer is composited over what lies below it." }
+    send:
+      - "MIXER {channel}-{layer} BLEND {mode}"
+      - "MIXER {channel}-{layer} BLEND"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_blend_mode:
+    summary: "Read the blend mode of a layer (MIXER BLEND)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} BLEND"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_opacity:
+    summary: "Set the opacity of a layer, and read it back (MIXER OPACITY)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      opacity: { type: "float", required: true, label: "Opacity", description: "0 transparent to 1 opaque.", min: 0.0, max: 1.0 }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} OPACITY {opacity:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} OPACITY"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_opacity:
+    summary: "Read the opacity of a layer (MIXER OPACITY)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} OPACITY"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_brightness:
+    summary: "Set the brightness of a layer, and read it back (MIXER BRIGHTNESS)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      brightness: { type: "float", required: true, label: "Brightness", description: "0 to 1, 1 unchanged.", min: 0.0, max: 1.0 }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} BRIGHTNESS {brightness:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} BRIGHTNESS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_brightness:
+    summary: "Read the brightness of a layer (MIXER BRIGHTNESS)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} BRIGHTNESS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_saturation:
+    summary: "Set the saturation of a layer, and read it back (MIXER SATURATION)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      saturation: { type: "float", required: true, label: "Saturation", description: "0 to 1, 1 unchanged.", min: 0.0, max: 1.0 }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} SATURATION {saturation:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} SATURATION"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_saturation:
+    summary: "Read the saturation of a layer (MIXER SATURATION)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} SATURATION"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_contrast:
+    summary: "Set the contrast of a layer, and read it back (MIXER CONTRAST)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      contrast: { type: "float", required: true, label: "Contrast", description: "0 to 1, 1 unchanged.", min: 0.0, max: 1.0 }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} CONTRAST {contrast:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} CONTRAST"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_contrast:
+    summary: "Read the contrast of a layer (MIXER CONTRAST)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} CONTRAST"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_levels:
+    summary: "Set the levels of a layer, and read it back (MIXER LEVELS)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      min_input: { type: "float", required: true, label: "Minimum input", description: "Lowest RGB value accepted, 0 to 1.", min: 0.0, max: 1.0 }
+      max_input: { type: "float", required: true, label: "Maximum input", description: "Highest RGB value accepted, 0 to 1.", min: 0.0, max: 1.0 }
+      gamma: { type: "float", required: true, label: "Gamma", description: "Gamma applied, 1 unchanged.", min: 0.0 }
+      min_output: { type: "float", required: true, label: "Minimum output", description: "Lowest RGB value output, 0 to 1.", min: 0.0, max: 1.0 }
+      max_output: { type: "float", required: true, label: "Maximum output", description: "Highest RGB value output, 0 to 1.", min: 0.0, max: 1.0 }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} LEVELS {min_input:.4f} {max_input:.4f} {gamma:.4f} {min_output:.4f} {max_output:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} LEVELS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_levels:
+    summary: "Read the levels of a layer (MIXER LEVELS)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} LEVELS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_fill:
+    summary: "Set the fill of a layer, and read it back (MIXER FILL)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      x: { type: "float", required: true, label: "X", description: "Left edge, 0 the screen's left, 1 its right; outside 0-1 allowed." }
+      y: { type: "float", required: true, label: "Y", description: "Top edge, 0 the screen's top, 1 its bottom; outside 0-1 allowed." }
+      x_scale: { type: "float", required: true, label: "Horizontal scale", description: "1 the screen's width; negative flips the layer." }
+      y_scale: { type: "float", required: true, label: "Vertical scale", description: "1 the screen's height; negative flips the layer." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} FILL {x:.4f} {y:.4f} {x_scale:.4f} {y_scale:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} FILL"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_fill:
+    summary: "Read the fill of a layer (MIXER FILL)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} FILL"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_clip:
+    summary: "Set the clip of a layer, and read it back (MIXER CLIP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      x: { type: "float", required: true, label: "X", description: "Left edge of the viewport, 0 the screen's left, 1 its right." }
+      y: { type: "float", required: true, label: "Y", description: "Top edge of the viewport, 0 the screen's top, 1 its bottom." }
+      width: { type: "float", required: true, label: "Width", description: "Width of the viewport, 1 the screen's width." }
+      height: { type: "float", required: true, label: "Height", description: "Height of the viewport, 1 the screen's height." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} CLIP {x:.4f} {y:.4f} {width:.4f} {height:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} CLIP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_clip:
+    summary: "Read the clip of a layer (MIXER CLIP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} CLIP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_anchor:
+    summary: "Set the anchor of a layer, and read it back (MIXER ANCHOR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      x: { type: "float", required: true, label: "X", description: "Anchor across the layer, 0 its left edge, 1 its right." }
+      y: { type: "float", required: true, label: "Y", description: "Anchor down the layer, 0 its top edge, 1 its bottom." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} ANCHOR {x:.4f} {y:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} ANCHOR"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_anchor:
+    summary: "Read the anchor of a layer (MIXER ANCHOR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} ANCHOR"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_crop:
+    summary: "Set the crop of a layer, and read it back (MIXER CROP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      left: { type: "float", required: true, label: "Left", description: "How far in from the left edge the layer is cropped, 0 to 1.", min: 0.0, max: 1.0 }
+      top: { type: "float", required: true, label: "Top", description: "How far in from the top edge the layer is cropped, 0 to 1.", min: 0.0, max: 1.0 }
+      right: { type: "float", required: true, label: "Right", description: "Where the right edge is cropped to, 1 not at all.", min: 0.0, max: 1.0 }
+      bottom: { type: "float", required: true, label: "Bottom", description: "Where the bottom edge is cropped to, 1 not at all.", min: 0.0, max: 1.0 }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} CROP {left:.4f} {top:.4f} {right:.4f} {bottom:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} CROP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_crop:
+    summary: "Read the crop of a layer (MIXER CROP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} CROP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_rotation:
+    summary: "Set the rotation of a layer, and read it back (MIXER ROTATION)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      degrees: { type: "float", required: true, label: "Angle", description: "Clockwise rotation around the anchor point, in degrees." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} ROTATION {degrees:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} ROTATION"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_rotation:
+    summary: "Read the rotation of a layer (MIXER ROTATION)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} ROTATION"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_perspective:
+    summary: "Set the perspective of a layer, and read it back (MIXER PERSPECTIVE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      top_left_x: { type: "float", required: true, label: "Top left X", description: "X of the top left corner, 0 the screen's left, 1 its right." }
+      top_left_y: { type: "float", required: true, label: "Top left Y", description: "Y of the top left corner, 0 the screen's top, 1 its bottom." }
+      top_right_x: { type: "float", required: true, label: "Top right X", description: "X of the top right corner." }
+      top_right_y: { type: "float", required: true, label: "Top right Y", description: "Y of the top right corner." }
+      bottom_right_x: { type: "float", required: true, label: "Bottom right X", description: "X of the bottom right corner." }
+      bottom_right_y: { type: "float", required: true, label: "Bottom right Y", description: "Y of the bottom right corner." }
+      bottom_left_x: { type: "float", required: true, label: "Bottom left X", description: "X of the bottom left corner." }
+      bottom_left_y: { type: "float", required: true, label: "Bottom left Y", description: "Y of the bottom left corner." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} PERSPECTIVE {top_left_x:.4f} {top_left_y:.4f} {top_right_x:.4f} {top_right_y:.4f} {bottom_right_x:.4f} {bottom_right_y:.4f} {bottom_left_x:.4f} {bottom_left_y:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} PERSPECTIVE"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_perspective:
+    summary: "Read the perspective of a layer (MIXER PERSPECTIVE)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} PERSPECTIVE"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_mipmap:
+    summary: "Set the mipmap of a layer, and read it back (MIXER MIPMAP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      mipmap: { type: "bool", required: true, label: "Mipmapping", description: "Filter the layer with mipmaps, reducing aliasing when it is scaled down or distorted." }
+    send:
+      - "MIXER {channel}-{layer} MIPMAP {mipmap:bool01}"
+      - "MIXER {channel}-{layer} MIPMAP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_mipmap:
+    summary: "Read the mipmap of a layer (MIXER MIPMAP)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} MIPMAP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_volume:
+    summary: "Set the volume of a layer, and read it back (MIXER VOLUME)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      volume: { type: "float", required: true, label: "Volume", description: "Gain of the layer's audio, 1 its original level; above 1 amplifies.", min: 0.0 }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} VOLUME {volume:.4f} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} VOLUME"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_volume:
+    summary: "Read the volume of a layer (MIXER VOLUME)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} VOLUME"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_master_volume:
+    summary: "Set the master volume of a channel, and read it back (MIXER MASTERVOLUME)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      volume: { type: "float", required: true, label: "Volume", description: "Gain of the channel's audio, 1 its original level.", min: 0.0 }
+    send:
+      - "MIXER {channel} MASTERVOLUME {volume:.4f}"
+      - "MIXER {channel} MASTERVOLUME"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_master_volume:
+    summary: "Read the master volume of a channel (MIXER MASTERVOLUME)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "MIXER {channel} MASTERVOLUME"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_straight_alpha_output:
+    summary: "Set the straight alpha output of a channel, and read it back (MIXER STRAIGHT_ALPHA_OUTPUT)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      straight: { type: "bool", required: true, label: "Straight alpha", description: "Output straight rather than premultiplied alpha; the server's configuration must allow it." }
+    send:
+      - "MIXER {channel} STRAIGHT_ALPHA_OUTPUT {straight:bool01}"
+      - "MIXER {channel} STRAIGHT_ALPHA_OUTPUT"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_straight_alpha_output:
+    summary: "Read the straight alpha output of a channel (MIXER STRAIGHT_ALPHA_OUTPUT)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "MIXER {channel} STRAIGHT_ALPHA_OUTPUT"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_chroma_key:
+    summary: "Key out a color of a layer (chroma key), and read it back (MIXER CHROMA)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      target_hue: { type: "float", required: true, label: "Target hue", description: "Hue at the center of the keyed range, in degrees.", min: 0.0, max: 360.0 }
+      hue_width: { type: "float", required: true, label: "Hue width", description: "Width of the keyed hue range, 1 the whole 360 degrees.", min: 0.0, max: 1.0 }
+      min_saturation: { type: "float", required: true, label: "Minimum saturation", description: "Least saturation a color needs to be keyed, 0 to 1.", min: 0.0, max: 1.0 }
+      min_brightness: { type: "float", required: true, label: "Minimum brightness", description: "Least brightness a color needs to be keyed, 0 to 1.", min: 0.0, max: 1.0 }
+      softness: { type: "float", required: true, label: "Softness", description: "Softness of the key's edges.", min: 0.0 }
+      spill_suppress: { type: "float", required: true, label: "Spill suppression", description: "Hue range around the target pulled to its edges, in degrees, 0 to 180.", min: 0.0, max: 180.0 }
+      spill_suppress_saturation: { type: "float", required: true, label: "Spill saturation", description: "Saturation kept on colors whose spill was suppressed, 0 to 1.", min: 0.0, max: 1.0 }
+      show_mask: { type: "bool", default: false, label: "Show mask", description: "Show only the key's mask, for setting it up." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+      defer: { type: "bool", default: false, label: "Defer", description: "Hold the change until MIXER COMMIT on the channel, so several start on the same frame." }
+    send:
+      - "MIXER {channel}-{layer} CHROMA 1 {target_hue:.4f} {hue_width:.4f} {min_saturation:.4f} {min_brightness:.4f} {softness:.4f} {spill_suppress:.4f} {spill_suppress_saturation:.4f} {show_mask:bool01} {duration} {tween}{defer:map.defer}"
+      - "MIXER {channel}-{layer} CHROMA"
+    expect: { code_range: [200, 299] }
+    returns: text
+  disable_chroma_key:
+    summary: "Turn a layer's chroma key off, and read it back (MIXER CHROMA 0)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send:
+      - "MIXER {channel}-{layer} CHROMA 0"
+      - "MIXER {channel}-{layer} CHROMA"
+    expect: { code_range: [200, 299] }
+    returns: text
+  get_chroma_key:
+    summary: "Read a layer's chroma key settings (MIXER CHROMA)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+    send: "MIXER {channel}-{layer} CHROMA"
+    expect: { code_range: [200, 299] }
+    returns: text
+  set_invert:
+    summary: "Invert the colors of a layer, or stop (MIXER INVERT)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, default: 0, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most." }
+      invert: { type: "bool", default: true, label: "Invert", description: "Invert the layer's colors, or show them as they are." }
+    send: "MIXER {channel}-{layer} INVERT {invert:bool01}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  set_grid:
+    summary: "Lay the channel's layers out in a grid of n by n, starting from layer 1 (MIXER GRID)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      resolution: { type: "int", min: 1, required: true, label: "Grid size", description: "Number of layers across and down: 2 makes a 2 by 2 grid of layers 1 to 4." }
+      duration: { type: "int", min: 0, default: 0, label: "Duration", description: "Length of the transition or animation in frames of the channel; 0 for none." }
+      tween: { type: "enum", values: ["linear", "easenone", "easeinquad", "easeoutquad", "easeinoutquad", "easeoutinquad", "easeincubic", "easeoutcubic", "easeinoutcubic", "easeoutincubic", "easeinquart", "easeoutquart", "easeinoutquart", "easeoutinquart", "easeinquint", "easeoutquint", "easeinoutquint", "easeoutinquint", "easeinsine", "easeoutsine", "easeinoutsine", "easeoutinsine", "easeinexpo", "easeoutexpo", "easeinoutexpo", "easeoutinexpo", "easeincirc", "easeoutcirc", "easeinoutcirc", "easeoutincirc", "easeinelastic", "easeoutelastic", "easeinoutelastic", "easeoutinelastic", "easeinback", "easeoutback", "easeinoutback", "easeoutintback", "easeoutbounce", "easeinbounce", "easeinoutbounce", "easeoutinbounce"], default: "linear", label: "Tween", description: "Easing curve of the transition or animation, from the Mixer page's animation types." }
+    send: "MIXER {channel} GRID {resolution} {duration} {tween}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  mixer_commit:
+    summary: "Start every deferred mixer change of a channel on the same frame (MIXER COMMIT)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "MIXER {channel} COMMIT"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  mixer_clear_layer:
+    summary: "Clear every mixer transform of a layer (MIXER CLEAR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most.", required: true }
+    send: "MIXER {channel}-{layer} CLEAR"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  mixer_clear_channel:
+    summary: "Clear every mixer transform of a channel (MIXER CLEAR)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "MIXER {channel} CLEAR"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  channel_grid:
+    summary: "Open a channel showing every other channel in a grid (CHANNEL_GRID)"
+    send: "CHANNEL_GRID"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  thumbnail_list:
+    summary: "List the thumbnails (THUMBNAIL LIST)"
+    send: "THUMBNAIL LIST"
+    expect: { code_range: [200, 299] }
+    returns: text
+  thumbnail_list_folder:
+    summary: "List the thumbnails in a folder (THUMBNAIL LIST)"
+    params:
+      folder: { type: "string", required: true, label: "Folder", description: "Folder under the media folder, folders separated by /." }
+    send: "THUMBNAIL LIST {folder:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  thumbnail_retrieve:
+    summary: "Read a media file's thumbnail, a base64-encoded PNG (THUMBNAIL RETRIEVE)"
+    params:
+      file: { type: "string", required: true, label: "File", description: "Media file name without its extension, relative to the media folder." }
+    send: "THUMBNAIL RETRIEVE {file:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  thumbnail_generate:
+    summary: "Make a media file's thumbnail again (THUMBNAIL GENERATE)"
+    params:
+      file: { type: "string", required: true, label: "File", description: "Media file name without its extension, relative to the media folder." }
+    send: "THUMBNAIL GENERATE {file:json}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  thumbnail_generate_all:
+    summary: "Make every thumbnail again (THUMBNAIL GENERATE_ALL)"
+    send: "THUMBNAIL GENERATE_ALL"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  media_info:
+    summary: "Read a media file's type, size, date, frames and frame rate (CINF)"
+    params:
+      file: { type: "string", required: true, label: "File", description: "Media file name without its extension, relative to the media folder." }
+    send: "CINF {file:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  list_media:
+    summary: "List the media files (CLS)"
+    send: "CLS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  list_media_folder:
+    summary: "List the media files in a folder (CLS)"
+    params:
+      folder: { type: "string", required: true, label: "Folder", description: "Folder under the media folder, folders separated by /." }
+    send: "CLS {folder:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  list_fonts:
+    summary: "List the fonts in the fonts folder (FLS)"
+    send: "FLS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  list_templates:
+    summary: "List the templates (TLS)"
+    send: "TLS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  list_templates_folder:
+    summary: "List the templates in a folder (TLS)"
+    params:
+      folder: { type: "string", required: true, label: "Folder", description: "Folder under the template folder, folders separated by /." }
+    send: "TLS {folder:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  version:
+    summary: "Read the server's version (VERSION)"
+    send: "VERSION"
+    expect: { code_range: [200, 299] }
+    returns: text
+  component_version:
+    summary: "Read the version of a component of the server (VERSION)"
+    params:
+      component: { type: "enum", values: ["SERVER", "FLASH", "TEMPLATEHOST", "CEF"], required: true, label: "Component", description: "SERVER, the Flash player, the Flash template host, or CEF (the HTML producer's browser)." }
+    send: "VERSION {component}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info:
+    summary: "List the channels, each with its video format and status (INFO)"
+    send: "INFO"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_channel:
+    summary: "Read information about a channel (INFO)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "INFO {channel}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_layer:
+    summary: "Read information about a layer (INFO)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most.", required: true }
+    send: "INFO {channel}-{layer}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_template:
+    summary: "Read information about a template (INFO TEMPLATE)"
+    params:
+      template: { type: "string", required: true, label: "Template", description: "Template file name without its extension, relative to the template folder." }
+    send: "INFO TEMPLATE {template:json}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_config:
+    summary: "Read the configuration the server runs with (INFO CONFIG)"
+    send: "INFO CONFIG"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_paths:
+    summary: "Read the folders the server uses (INFO PATHS)"
+    send: "INFO PATHS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_system:
+    summary: "Read the operating system, CPU and library versions (INFO SYSTEM)"
+    send: "INFO SYSTEM"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_server:
+    summary: "Read detailed information about every channel (INFO SERVER)"
+    send: "INFO SERVER"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_queues:
+    summary: "Read the AMCP command queues (INFO QUEUES)"
+    send: "INFO QUEUES"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_threads:
+    summary: "Read the server's threads (INFO THREADS)"
+    send: "INFO THREADS"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_channel_delay:
+    summary: "Read a channel's current delay (INFO DELAY)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+    send: "INFO {channel} DELAY"
+    expect: { code_range: [200, 299] }
+    returns: text
+  info_layer_delay:
+    summary: "Read a layer's current delay (INFO DELAY)"
+    params:
+      channel: { type: "int", min: 1, required: true, label: "Channel", description: "Video channel, numbered from 1 in the order the server's configuration lists them." }
+      layer: { type: "int", min: 0, max: 9999, label: "Layer", description: "Layer of the channel, 0 the bottom-most and 9999 the top-most.", required: true }
+    send: "INFO {channel}-{layer} DELAY"
+    expect: { code_range: [200, 299] }
+    returns: text
+  open_diagnostics:
+    summary: "Open the diagnostics window on the server's screen (DIAG)"
+    send: "DIAG"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  gl_info:
+    summary: "Read the allocated and pooled OpenGL resources (GL INFO)"
+    send: "GL INFO"
+    expect: { code_range: [200, 299] }
+    returns: text
+  gl_gc:
+    summary: "Release the pooled OpenGL resources (GL GC)"
+    send: "GL GC"
+    expect: { code_range: [200, 299] }
+    returns: ack
+  bye:
+    summary: "End this AMCP connection (BYE)"
+    send: "BYE"
+    returns: none
+  kill:
+    summary: "Shut the server down (KILL)"
+    send: "KILL"
+    returns: none
+  restart:
+    summary: "Shut the server down with exit code 5, for a script that restarts it (RESTART)"
+    send: "RESTART"
+    returns: none
+  help:
+    summary: "List the AMCP commands (HELP)"
+    send: "HELP"
+    expect: { code_range: [200, 299] }
+    returns: text
+  help_command:
+    summary: "Read the help for an AMCP command (HELP)"
+    params:
+      command: { type: "string", required: true, pattern: "^[A-Za-z_ ]+$", label: "Command", description: "The command to describe, such as PLAY or MIXER FILL." }
+    send: "HELP {command}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  help_producers:
+    summary: "List the producers (HELP PRODUCER)"
+    send: "HELP PRODUCER"
+    expect: { code_range: [200, 299] }
+    returns: text
+  help_producer:
+    summary: "Read the help for a producer (HELP PRODUCER)"
+    params:
+      producer: { type: "string", required: true, pattern: "^[A-Za-z0-9_ ]+$", label: "Producer", description: "The producer to describe, such as FFmpeg Producer." }
+    send: "HELP PRODUCER {producer}"
+    expect: { code_range: [200, 299] }
+    returns: text
+  help_consumers:
+    summary: "List the consumers (HELP CONSUMER)"
+    send: "HELP CONSUMER"
+    expect: { code_range: [200, 299] }
+    returns: text
+  help_consumer:
+    summary: "Read the help for a consumer (HELP CONSUMER)"
+    params:
+      consumer: { type: "string", required: true, pattern: "^[A-Za-z0-9_ ]+$", label: "Consumer", description: "The consumer to describe, such as Decklink Consumer." }
+    send: "HELP CONSUMER {consumer}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+codes:
+  "400": command not understood
+  "401": illegal video channel
+  "402": parameter missing
+  "403": illegal parameter
+  "404": media file not found
+  "500": internal server error
+  "501": internal server error
+  "502": media file unreadable
+  "503": access error
+
+state:
+  server.version: { type: string, description: "The server's version, as VERSION answers it" }
+  server.components.*: { type: string, description: "Version of a component, keyed server, flash, templatehost or cef, as VERSION <component> answers it" }
+  channels.*.format: { type: string, description: "The channel's video format (PAL, 1080i5000 ...), from INFO and the OSC format message" }
+  channels.*.status: { type: string, description: "The channel's status as INFO lists it (PLAYING)" }
+  channels.*.profiler.actual: { type: float, description: "Seconds the channel took to render its last frame (OSC profiler/time)" }
+  channels.*.profiler.expected: { type: float, description: "Seconds the channel has to render each frame (OSC profiler/time)" }
+  channels.*.outputs.*.type: { type: string, description: "Type of the consumer on this output port: screen, system-audio, decklink, bluefish, file" }
+  channels.*.outputs.*.frames: { type: int, description: "Frames the consumer on this port has produced" }
+  channels.*.outputs.*.max_frames: { type: int, description: "Most frames the consumer on this port can produce" }
+  channels.*.audio.channels: { type: int, description: "Audio channels in use on the channel (OSC mixer/audio/nb_channels)" }
+  channels.*.audio.levels.*: { type: float, description: "Level of an audio channel, numbered from 1, in dBFS" }
+  channels.*.mixer.master_volume: { type: float, description: "The channel's master volume, 1 its original level (MIXER MASTERVOLUME, read back)" }
+  channels.*.mixer.straight_alpha_output: { type: bool, description: "Whether the channel outputs straight alpha (MIXER STRAIGHT_ALPHA_OUTPUT, read back)" }
+  channels.*.layers.*.time: { type: float, description: "Seconds the layer has been active" }
+  channels.*.layers.*.frame: { type: int, description: "Frames the layer has been active" }
+  channels.*.layers.*.type: { type: string, description: "Type of what plays on the layer (transition, or the producer's)" }
+  channels.*.layers.*.background_type: { type: string, description: "Type of what is loaded in the layer's background (empty when nothing is)" }
+  channels.*.layers.*.profiler.actual: { type: float, description: "Seconds the layer took for its last frame" }
+  channels.*.layers.*.profiler.expected: { type: float, description: "Seconds the layer has for each frame" }
+  channels.*.layers.*.paused: { type: bool, description: "Whether the layer is paused" }
+  channels.*.layers.*.loop: { type: bool, description: "Whether the file on the layer loops (OSC on 2.1 and earlier, and CALL LOOP's answer)" }
+  channels.*.layers.*.host.path: { type: string, description: "File of the Flash template host on the layer" }
+  channels.*.layers.*.host.width: { type: int, description: "Width of the Flash template host in pixels" }
+  channels.*.layers.*.host.height: { type: int, description: "Height of the Flash template host in pixels" }
+  channels.*.layers.*.host.fps: { type: float, description: "Frame rate of the Flash template host" }
+  channels.*.layers.*.file.name: { type: string, description: "Name of the media file playing (2.2 onwards)" }
+  channels.*.layers.*.file.path: { type: string, description: "Path of the media file playing: absolute from 2.2, relative to the media folder before" }
+  channels.*.layers.*.file.elapsed: { type: float, description: "Seconds of the file played, in seconds" }
+  channels.*.layers.*.file.duration: { type: float, description: "Length of the file, in seconds" }
+  channels.*.layers.*.file.frame: { type: int, description: "Frames of the file played (2.1 and earlier)" }
+  channels.*.layers.*.file.frames: { type: int, description: "Frames in the file (2.1 and earlier)" }
+  channels.*.layers.*.file.fps: { type: float, description: "Frame rate of the file (2.1 and earlier)" }
+  channels.*.layers.*.file.streams.*.fps: { type: float, description: "Frame rate of one of the file's streams, by stream id (2.2 onwards)" }
+  channels.*.layers.*.file.video.width: { type: int, description: "Frame width of the video, in pixels" }
+  channels.*.layers.*.file.video.height: { type: int, description: "Frame height of the video, in pixels" }
+  channels.*.layers.*.file.video.field: { type: string, description: "Scan of the video: progressive or interlaced" }
+  channels.*.layers.*.file.video.codec: { type: string, description: "Codec of the video" }
+  channels.*.layers.*.file.audio.sample_rate: { type: int, description: "Sample rate of the audio, in hertz" }
+  channels.*.layers.*.file.audio.channels: { type: int, description: "Channels in the audio track" }
+  channels.*.layers.*.file.audio.format: { type: string, description: "Sample format of the audio (s16)" }
+  channels.*.layers.*.file.audio.codec: { type: string, description: "Codec of the audio" }
+  channels.*.layers.*.mixer.keyer: { type: bool, description: "Keyer of the layer (MIXER KEYER, read back): use this layer as the key (alpha) of the layer above, and hide it" }
+  channels.*.layers.*.mixer.blend: { type: string, description: "Blend mode of the layer (MIXER BLEND, read back): how the layer is composited over what lies below it" }
+  channels.*.layers.*.mixer.opacity: { type: float, description: "Opacity of the layer (MIXER OPACITY, read back): 0 transparent to 1 opaque" }
+  channels.*.layers.*.mixer.brightness: { type: float, description: "Brightness of the layer (MIXER BRIGHTNESS, read back): 0 to 1, 1 unchanged" }
+  channels.*.layers.*.mixer.saturation: { type: float, description: "Saturation of the layer (MIXER SATURATION, read back): 0 to 1, 1 unchanged" }
+  channels.*.layers.*.mixer.contrast: { type: float, description: "Contrast of the layer (MIXER CONTRAST, read back): 0 to 1, 1 unchanged" }
+  channels.*.layers.*.mixer.levels.min_input: { type: float, description: "Minimum input of the layer (MIXER LEVELS, read back): lowest RGB value accepted, 0 to 1" }
+  channels.*.layers.*.mixer.levels.max_input: { type: float, description: "Maximum input of the layer (MIXER LEVELS, read back): highest RGB value accepted, 0 to 1" }
+  channels.*.layers.*.mixer.levels.gamma: { type: float, description: "Gamma of the layer (MIXER LEVELS, read back): gamma applied, 1 unchanged" }
+  channels.*.layers.*.mixer.levels.min_output: { type: float, description: "Minimum output of the layer (MIXER LEVELS, read back): lowest RGB value output, 0 to 1" }
+  channels.*.layers.*.mixer.levels.max_output: { type: float, description: "Maximum output of the layer (MIXER LEVELS, read back): highest RGB value output, 0 to 1" }
+  channels.*.layers.*.mixer.fill.x: { type: float, description: "X of the layer (MIXER FILL, read back): left edge, 0 the screen's left, 1 its right; outside 0-1 allowed" }
+  channels.*.layers.*.mixer.fill.y: { type: float, description: "Y of the layer (MIXER FILL, read back): top edge, 0 the screen's top, 1 its bottom; outside 0-1 allowed" }
+  channels.*.layers.*.mixer.fill.x_scale: { type: float, description: "Horizontal scale of the layer (MIXER FILL, read back): 1 the screen's width; negative flips the layer" }
+  channels.*.layers.*.mixer.fill.y_scale: { type: float, description: "Vertical scale of the layer (MIXER FILL, read back): 1 the screen's height; negative flips the layer" }
+  channels.*.layers.*.mixer.clip.x: { type: float, description: "X of the layer (MIXER CLIP, read back): left edge of the viewport, 0 the screen's left, 1 its right" }
+  channels.*.layers.*.mixer.clip.y: { type: float, description: "Y of the layer (MIXER CLIP, read back): top edge of the viewport, 0 the screen's top, 1 its bottom" }
+  channels.*.layers.*.mixer.clip.width: { type: float, description: "Width of the layer (MIXER CLIP, read back): width of the viewport, 1 the screen's width" }
+  channels.*.layers.*.mixer.clip.height: { type: float, description: "Height of the layer (MIXER CLIP, read back): height of the viewport, 1 the screen's height" }
+  channels.*.layers.*.mixer.anchor.x: { type: float, description: "X of the layer (MIXER ANCHOR, read back): anchor across the layer, 0 its left edge, 1 its right" }
+  channels.*.layers.*.mixer.anchor.y: { type: float, description: "Y of the layer (MIXER ANCHOR, read back): anchor down the layer, 0 its top edge, 1 its bottom" }
+  channels.*.layers.*.mixer.crop.left: { type: float, description: "Left of the layer (MIXER CROP, read back): how far in from the left edge the layer is cropped, 0 to 1" }
+  channels.*.layers.*.mixer.crop.top: { type: float, description: "Top of the layer (MIXER CROP, read back): how far in from the top edge the layer is cropped, 0 to 1" }
+  channels.*.layers.*.mixer.crop.right: { type: float, description: "Right of the layer (MIXER CROP, read back): where the right edge is cropped to, 1 not at all" }
+  channels.*.layers.*.mixer.crop.bottom: { type: float, description: "Bottom of the layer (MIXER CROP, read back): where the bottom edge is cropped to, 1 not at all" }
+  channels.*.layers.*.mixer.rotation: { type: float, description: "Angle of the layer (MIXER ROTATION, read back): clockwise rotation around the anchor point, in degrees" }
+  channels.*.layers.*.mixer.perspective.top_left_x: { type: float, description: "Top left X of the layer (MIXER PERSPECTIVE, read back): x of the top left corner, 0 the screen's left, 1 its right" }
+  channels.*.layers.*.mixer.perspective.top_left_y: { type: float, description: "Top left Y of the layer (MIXER PERSPECTIVE, read back): y of the top left corner, 0 the screen's top, 1 its bottom" }
+  channels.*.layers.*.mixer.perspective.top_right_x: { type: float, description: "Top right X of the layer (MIXER PERSPECTIVE, read back): x of the top right corner" }
+  channels.*.layers.*.mixer.perspective.top_right_y: { type: float, description: "Top right Y of the layer (MIXER PERSPECTIVE, read back): y of the top right corner" }
+  channels.*.layers.*.mixer.perspective.bottom_right_x: { type: float, description: "Bottom right X of the layer (MIXER PERSPECTIVE, read back): x of the bottom right corner" }
+  channels.*.layers.*.mixer.perspective.bottom_right_y: { type: float, description: "Bottom right Y of the layer (MIXER PERSPECTIVE, read back): y of the bottom right corner" }
+  channels.*.layers.*.mixer.perspective.bottom_left_x: { type: float, description: "Bottom left X of the layer (MIXER PERSPECTIVE, read back): x of the bottom left corner" }
+  channels.*.layers.*.mixer.perspective.bottom_left_y: { type: float, description: "Bottom left Y of the layer (MIXER PERSPECTIVE, read back): y of the bottom left corner" }
+  channels.*.layers.*.mixer.mipmap: { type: bool, description: "Mipmapping of the layer (MIXER MIPMAP, read back): filter the layer with mipmaps, reducing aliasing when it is scaled down or distorted" }
+  channels.*.layers.*.mixer.volume: { type: float, description: "Volume of the layer (MIXER VOLUME, read back): gain of the layer's audio, 1 its original level; above 1 amplifies" }
+  channels.*.layers.*.mixer.chroma.enabled: { type: bool, description: "Whether the layer's chroma key is on (MIXER CHROMA, read back)" }
+  channels.*.layers.*.mixer.chroma.target_hue: { type: float, description: "Chroma key target hue: hue at the center of the keyed range, in degrees" }
+  channels.*.layers.*.mixer.chroma.hue_width: { type: float, description: "Chroma key hue width: width of the keyed hue range, 1 the whole 360 degrees" }
+  channels.*.layers.*.mixer.chroma.min_saturation: { type: float, description: "Chroma key minimum saturation: least saturation a color needs to be keyed, 0 to 1" }
+  channels.*.layers.*.mixer.chroma.min_brightness: { type: float, description: "Chroma key minimum brightness: least brightness a color needs to be keyed, 0 to 1" }
+  channels.*.layers.*.mixer.chroma.softness: { type: float, description: "Chroma key softness: softness of the key's edges" }
+  channels.*.layers.*.mixer.chroma.spill_suppress: { type: float, description: "Chroma key spill suppression: hue range around the target pulled to its edges, in degrees, 0 to 180" }
+  channels.*.layers.*.mixer.chroma.spill_suppress_saturation: { type: float, description: "Chroma key spill saturation: saturation kept on colors whose spill was suppressed, 0 to 1" }
+  channels.*.layers.*.mixer.chroma.show_mask: { type: bool, description: "Whether the chroma key shows its mask only" }
+  media.*.type: { type: string, description: "Kind of media file, keyed by name: MOVIE, STILL or AUDIO (CLS)" }
+  media.*.size: { type: int, description: "Size of the media file in bytes" }
+  media.*.modified: { type: string, description: "When the media file was last changed, YYYYMMDDHHmmss" }
+  media.*.frames: { type: int, description: "Frames in the media file" }
+  media.*.frame_rate: { type: string, description: "Frame duration of the media file as a fraction of a second, 1/25 for 25 frames a second" }
+  templates.*.listed: { type: bool, description: "A template, keyed by its name, is listed by TLS" }
+  fonts.*: { type: string, description: "A font as FLS lists it (its name and path), in list order from 0" }
+  datasets.*: { type: string, description: "A stored dataset as DATA LIST lists it, in list order from 0" }
+  thumbnails.*.modified: { type: string, description: "When the thumbnail was made, YYYYMMDDTHHmmss, keyed by media name" }
+  thumbnails.*.size: { type: int, description: "Size of the thumbnail in bytes" }
+
+telemetry:
+  # The OSC state the server sends this connection's address (OSC Protocol,
+  # Connection): every active channel, output and layer, each frame.
+  osc:
+    listen_port: { setting: osc_port }
+  # What OSC does not carry is read over AMCP: the channel list often, and
+  # the media, template, font, dataset and thumbnail lists and the version
+  # now and then (a library can hold thousands of files).
+  poll:
+    - every_ms: 10000
+      send: ["INFO"]
+    - every_ms: 60000
+      send: ["VERSION", "CLS", "TLS", "FLS", "DATA LIST", "THUMBNAIL LIST"]
+  updates:
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) KEYER$", state: { "channels.{2}.layers.{3}.mixer.keyer": { value: "{1}", map: { "0": false, "1": true } } } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) BLEND$", state: { "channels.{2}.layers.{3}.mixer.blend": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) OPACITY$", state: { "channels.{2}.layers.{3}.mixer.opacity": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) BRIGHTNESS$", state: { "channels.{2}.layers.{3}.mixer.brightness": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) SATURATION$", state: { "channels.{2}.layers.{3}.mixer.saturation": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) CONTRAST$", state: { "channels.{2}.layers.{3}.mixer.contrast": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+) (\\S+) (\\S+) (\\S+) (\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) LEVELS$", state: { "channels.{6}.layers.{7}.mixer.levels.min_input": "{1}", "channels.{6}.layers.{7}.mixer.levels.max_input": "{2}", "channels.{6}.layers.{7}.mixer.levels.gamma": "{3}", "channels.{6}.layers.{7}.mixer.levels.min_output": "{4}", "channels.{6}.layers.{7}.mixer.levels.max_output": "{5}" } }
+    - { match: "^201 MIXER OK\\n(\\S+) (\\S+) (\\S+) (\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) FILL$", state: { "channels.{5}.layers.{6}.mixer.fill.x": "{1}", "channels.{5}.layers.{6}.mixer.fill.y": "{2}", "channels.{5}.layers.{6}.mixer.fill.x_scale": "{3}", "channels.{5}.layers.{6}.mixer.fill.y_scale": "{4}" } }
+    - { match: "^201 MIXER OK\\n(\\S+) (\\S+) (\\S+) (\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) CLIP$", state: { "channels.{5}.layers.{6}.mixer.clip.x": "{1}", "channels.{5}.layers.{6}.mixer.clip.y": "{2}", "channels.{5}.layers.{6}.mixer.clip.width": "{3}", "channels.{5}.layers.{6}.mixer.clip.height": "{4}" } }
+    - { match: "^201 MIXER OK\\n(\\S+) (\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) ANCHOR$", state: { "channels.{3}.layers.{4}.mixer.anchor.x": "{1}", "channels.{3}.layers.{4}.mixer.anchor.y": "{2}" } }
+    - { match: "^201 MIXER OK\\n(\\S+) (\\S+) (\\S+) (\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) CROP$", state: { "channels.{5}.layers.{6}.mixer.crop.left": "{1}", "channels.{5}.layers.{6}.mixer.crop.top": "{2}", "channels.{5}.layers.{6}.mixer.crop.right": "{3}", "channels.{5}.layers.{6}.mixer.crop.bottom": "{4}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) ROTATION$", state: { "channels.{2}.layers.{3}.mixer.rotation": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) PERSPECTIVE$", state: { "channels.{9}.layers.{10}.mixer.perspective.top_left_x": "{1}", "channels.{9}.layers.{10}.mixer.perspective.top_left_y": "{2}", "channels.{9}.layers.{10}.mixer.perspective.top_right_x": "{3}", "channels.{9}.layers.{10}.mixer.perspective.top_right_y": "{4}", "channels.{9}.layers.{10}.mixer.perspective.bottom_right_x": "{5}", "channels.{9}.layers.{10}.mixer.perspective.bottom_right_y": "{6}", "channels.{9}.layers.{10}.mixer.perspective.bottom_left_x": "{7}", "channels.{9}.layers.{10}.mixer.perspective.bottom_left_y": "{8}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) MIPMAP$", state: { "channels.{2}.layers.{3}.mixer.mipmap": { value: "{1}", map: { "0": false, "1": true } } } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) VOLUME$", state: { "channels.{2}.layers.{3}.mixer.volume": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+) MASTERVOLUME$", state: { "channels.{2}.mixer.master_volume": "{1}" } }
+    - { match: "^201 MIXER OK\\n(\\S+)$", request_match: "^MIXER (\\d+) STRAIGHT_ALPHA_OUTPUT$", state: { "channels.{2}.mixer.straight_alpha_output": { value: "{1}", map: { "0": false, "1": true } } } }
+    - { match: "^20[12] MIXER OK\\n(\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+)$", request_match: "^MIXER (\\d+)-(\\d+) CHROMA$", state: { "channels.{10}.layers.{11}.mixer.chroma.enabled": { value: "{1}", map: { "0": false, "1": true } }, "channels.{10}.layers.{11}.mixer.chroma.target_hue": "{2}", "channels.{10}.layers.{11}.mixer.chroma.hue_width": "{3}", "channels.{10}.layers.{11}.mixer.chroma.min_saturation": "{4}", "channels.{10}.layers.{11}.mixer.chroma.min_brightness": "{5}", "channels.{10}.layers.{11}.mixer.chroma.softness": "{6}", "channels.{10}.layers.{11}.mixer.chroma.spill_suppress": "{7}", "channels.{10}.layers.{11}.mixer.chroma.spill_suppress_saturation": "{8}", "channels.{10}.layers.{11}.mixer.chroma.show_mask": { value: "{9}", map: { "0": false, "1": true } } } }
+    - { match: "^200 INFO OK", request_match: "^INFO$", match_each: "(?m)^(\\d+) (\\S+) (\\S+)$", state: { "channels.{1}.format": "{2}", "channels.{1}.status": "{3}" } }
+    - { match: "^200 CLS OK", request_match: "^CLS$", match_each: "(?m)^\"([^\"]+)\" +(MOVIE|STILL|AUDIO) +(\\d+) +(\\d+) +(\\d+) +(\\S+)", replace: "media", state: { "media.{1:key}.type": "{2}", "media.{1:key}.size": "{3}", "media.{1:key}.modified": "{4}", "media.{1:key}.frames": "{5}", "media.{1:key}.frame_rate": "{6}" } }
+    - { match: "^200 TLS OK", request_match: "^TLS$", match_each: "(?m)^\"([^\"]+)\"", replace: "templates", state: { "templates.{1:key}.listed": "true" } }
+    - { match: "^200 TLS OK", request_match: "^TLS$", match_each: "(?m)^([^\"\\n]+)$", replace: "templates", state: { "templates.{1:key}.listed": "true" } }
+    - { match: "^200 FLS OK", request_match: "^FLS$", match_each: "(?m)^(.+)$", replace: "fonts", state: { "fonts.{index}": "{1}" } }
+    - { match: "^200 DATA LIST OK", request_match: "^DATA LIST$", match_each: "(?m)^(.+)$", replace: "datasets", state: { "datasets.{index}": "{1}" } }
+    - { match: "^200 THUMBNAIL LIST OK", request_match: "^THUMBNAIL LIST$", match_each: "(?m)^\"([^\"]+)\" +(\\S+) +(\\d+)", replace: "thumbnails", state: { "thumbnails.{1:key}.modified": "{2}", "thumbnails.{1:key}.size": "{3}" } }
+    - { match: "^201 VERSION OK\\n(.+)$", request_match: "^VERSION$", state: { "server.version": "{1}" } }
+    - { match: "^201 VERSION OK\\n(.+)$", request_match: "^VERSION (SERVER|FLASH|TEMPLATEHOST|CEF)$", state: { "server.components.{2:lower}": "{1}" } }
+    - { match: "^201 CALL OK\\n([01])$", request_match: "^CALL (\\d+)-(\\d+) LOOP(?: [01])?$", state: { "channels.{2}.layers.{3}.loop": { value: "{1}", map: { "0": false, "1": true } } } }
+    - { match: "^202 CLEAR OK$", request_match: "^CLEAR (\\d+)-(\\d+)$", state: { "channels.{1}.layers.{2}": { delete: true } } }
+    - { match: "^202 CLEAR OK$", request_match: "^CLEAR (\\d+)$", state: { "channels.{1}.layers": { delete: true } } }
+    - { match: "^202 STOP OK$", request_match: "^STOP (\\d+)-(\\d+)$", state: { "channels.{1}.layers.{2}.file": { delete: true } } }
+    - { match: "^202 MIXER OK$", request_match: "^MIXER (\\d+)-(\\d+) CLEAR$", state: { "channels.{1}.layers.{2}.mixer": { delete: true } } }
+    - { match: "^202 MIXER OK$", request_match: "^MIXER (\\d+) CLEAR$", state: { "channels.{1}.mixer": { delete: true } } }
+    - { address: "^/channel/(\\d+)/format$", state: { "channels.{1}.format": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/profiler/time$", state: { "channels.{1}.profiler.actual": "{arg0}", "channels.{1}.profiler.expected": "{arg1}" } }
+    - { address: "^/channel/(\\d+)/output/port/(\\d+)/type$", state: { "channels.{1}.outputs.{2}.type": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/output/port/(\\d+)/frame$", state: { "channels.{1}.outputs.{2}.frames": "{arg0}", "channels.{1}.outputs.{2}.max_frames": "{arg1}" } }
+    - { address: "^/channel/(\\d+)/mixer/audio/nb_channels$", state: { "channels.{1}.audio.channels": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/mixer/audio/(\\d+)/dBFS$", state: { "channels.{1}.audio.levels.{2}": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?time$", state: { "channels.{1}.layers.{2}.time": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?frame$", state: { "channels.{1}.layers.{2}.frame": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?type$", state: { "channels.{1}.layers.{2}.type": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/background/type$", state: { "channels.{1}.layers.{2}.background_type": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?profiler/time$", state: { "channels.{1}.layers.{2}.profiler.actual": "{arg0}", "channels.{1}.layers.{2}.profiler.expected": "{arg1}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?paused$", state: { "channels.{1}.layers.{2}.paused": { value: "{arg0}", map: { "true": true, "false": false, "1": true, "0": false } } } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?loop$", state: { "channels.{1}.layers.{2}.loop": { value: "{arg0}", map: { "true": true, "false": false, "1": true, "0": false } } } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?host/path$", state: { "channels.{1}.layers.{2}.host.path": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?host/width$", state: { "channels.{1}.layers.{2}.host.width": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?host/height$", state: { "channels.{1}.layers.{2}.host.height": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?host/fps$", state: { "channels.{1}.layers.{2}.host.fps": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/name$", state: { "channels.{1}.layers.{2}.file.name": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/path$", state: { "channels.{1}.layers.{2}.file.path": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/time$", state: { "channels.{1}.layers.{2}.file.elapsed": "{arg0}", "channels.{1}.layers.{2}.file.duration": "{arg1}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/frame$", state: { "channels.{1}.layers.{2}.file.frame": "{arg0}", "channels.{1}.layers.{2}.file.frames": "{arg1}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/fps$", state: { "channels.{1}.layers.{2}.file.fps": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/(\\d+)/fps$", state: { "channels.{1}.layers.{2}.file.streams.{3}.fps": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/video/width$", state: { "channels.{1}.layers.{2}.file.video.width": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/video/height$", state: { "channels.{1}.layers.{2}.file.video.height": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/video/field$", state: { "channels.{1}.layers.{2}.file.video.field": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/video/codec$", state: { "channels.{1}.layers.{2}.file.video.codec": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/audio/sample-rate$", state: { "channels.{1}.layers.{2}.file.audio.sample_rate": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/audio/channels$", state: { "channels.{1}.layers.{2}.file.audio.channels": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/audio/format$", state: { "channels.{1}.layers.{2}.file.audio.format": "{arg0}" } }
+    - { address: "^/channel/(\\d+)/stage/layer/(\\d+)/(?:foreground/)?file/audio/codec$", state: { "channels.{1}.layers.{2}.file.audio.codec": "{arg0}" } }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every command answers with a code: 202 done, 201 one line of data, 200
+      lines of data ended by a blank line, 4xx a client error (400 with a
+      line naming the command not understood), 5xx a server error. The
+      commands that read something return the data lines as text.
+  - models: [all]
+    severity: info
+    text: >
+      Clip, template, dataset and folder names go out quoted, with \" and \\
+      escaped as AMCP's special sequences ask, so names may hold spaces; a
+      dataset's line breaks go out as \n. The "parameters" of the
+      *_with_parameters, call and consumer commands go out as written, for
+      AMCP's own words (LOOP, SEEK 100, START, LENGTH, FILTER hflip, AUTO,
+      STING mask 0 overlay, DECKLINK 1, FILE name.mov SEPARATE_KEY).
+  - models: [all]
+    severity: warning
+    text: >
+      load_background, load and play_clip always send the transition (CUT 0
+      linear RIGHT by default) and SEEK (0 by default), as the documented
+      defaults, and LOOP and AUTO only when asked for. That a server accepts
+      CUT 0 with a tween and direction after it is read from the syntax, not
+      an example.
+  - models: [all]
+    severity: info
+    text: >
+      State is OSC's first. The server sends it to the address of each AMCP
+      client on its default-port (6250), set in casparcg.config's osc
+      section, which osc_port must match; OSC clients defined in the
+      configuration also receive it. OSC reports only what is active, every
+      frame: a layer that empties stops being reported rather than being
+      reported empty, so its last values stay in state. What this connection
+      clears or stops (CLEAR, STOP, MIXER CLEAR) leaves state at once;
+      something cleared by another client stays until the device is opened
+      again.
+  - models: [all]
+    severity: warning
+    text: >
+      The OSC addresses are those documented for 2.0 to 2.1 and the FFmpeg
+      producer's for 2.2 onwards. Layer addresses are read with or without a
+      foreground/ segment after the layer number, in case a server puts
+      producers' values under it; the documentation shows none.
+  - models: [all]
+    severity: info
+    text: >
+      The time, frame and profiler values change every frame (25 to 60 times
+      a second for each channel and layer), so their state changes as often.
+  - models: [all]
+    severity: info
+    text: >
+      Mixer settings are kept in state from the read-back each set_ command
+      does (the MIXER get form after the set) and from the get_ commands;
+      AMCP does not push them and OSC carries only the audio levels, so a
+      change made by another client shows only after a get_. MIXER INVERT and
+      MIXER GRID have no documented read form. A deferred change (defer) is
+      applied at mixer_commit; what its read-back returns before then is not
+      documented.
+  - models: [all]
+    severity: warning
+    text: >
+      DEFER is documented only by the MIXER COMMIT example (FILL 0 0 0.5 0.5
+      25 DEFER); it is sent after the tween here.
+  - models: [all]
+    severity: warning
+    text: >
+      The documentation's example answers MIXER CHROMA's read with "202 MIXER
+      OK" and a line of values, where every other read answers 201. The
+      read-back takes the values after 201 (and after 202 only if the line
+      arrives as part of the reply); a 202 followed by a separate line would
+      leave the line unread.
+  - models: [all]
+    severity: info
+    text: >
+      The channel list (INFO) is read every 10 s and the media, template,
+      font, dataset and thumbnail lists and the version every minute. TLS
+      lines are read both as 2.2 and later give them (bare names) and as
+      earlier servers do (a quoted name and more fields). FLS and DATA LIST
+      lines are kept as the server sends them, their columns not being
+      documented beyond FLS's "font name and font path".
+  - models: [all]
+    severity: info
+    text: >
+      INFO for a channel or layer, INFO TEMPLATE, CONFIG, PATHS, SYSTEM,
+      SERVER, QUEUES, THREADS and DELAY, CG INFO, HELP and GL INFO return
+      their data as text; their XML layout differs by version and is not
+      documented, so it is not read into state.
+  - models: [all]
+    severity: warning
+    text: >
+      Batching (BEGIN, COMMIT, DISCARD) is not offered: commands inside a
+      batch are answered only at COMMIT, all together, which a client
+      sending one command at a time and waiting for its answer cannot
+      follow. REQ/RES tagging is not used, as answers come in order.
+  - models: [all]
+    severity: critical
+    text: >
+      clear_channel and clear_layer remove what is on air at once, stop does
+      on its layer, swap_channels and swap_layers move it, kill and restart
+      stop the server (every channel goes black), set_video_mode restarts a
+      channel's outputs, and remove_consumer stops an output. None can be
+      undone live.
+  - models: [all]
+    severity: warning
+    text: >
+      bye ends the AMCP connection; the core then connects again, which
+      starts a new OSC client on the server. kill and restart get no answer.
+  - models: [all]
+    severity: warning
+    text: >
+      The CALL functions (LOOP, SEEK, START, LENGTH) are documented to return
+      a value (LOOP its state, SEEK the frame it went to) but not how; their
+      answer is taken as 201 CALL OK and a line, as other reads answer, and
+      LOOP's 0 or 1 is kept in state.
+  - models: [all]
+    severity: info
+    text: >
+      PING is answered PONG, as the documentation's example shows, with no
+      code; an answer of 20x PING is taken as well. The probe uses VERSION,
+      which answers with a code.
+  - models: [all]
+    severity: info
+    text: >
+      The tween list is the Mixer page's, including its spelling
+      "easeoutintback".
+  - models: [all]
+    severity: info
+    text: >
+      Channels count from 1 and layers from 0 to 9999 (the Channels page).
+      AMCP takes signed layer numbers, but the documentation gives no meaning
+      to a negative one, so none is offered.

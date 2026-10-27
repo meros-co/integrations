@@ -256,7 +256,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     let ctx = OpenContext {
         host: HOST,
         host_name: None,
-        port: None,
+        port: vector_port(spec),
         model: model.id.clone(),
         channels: model.channels,
         settings,
@@ -362,7 +362,15 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     } else if let Some(text) = v.get("inbound").and_then(Value::as_str) {
         engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
     } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
-        engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &unhex(h));
+        // Beside a stream or HTTP transport, a datagram is OSC feedback on
+        // `telemetry.osc`'s port.
+        let socket = match engine.transport {
+            super::Transport::OscUdp { .. }
+            | super::Transport::LineUdp { .. }
+            | super::Transport::OscTcp { .. } => "device",
+            _ => super::OSC_LISTEN,
+        };
+        engine.datagram(&mut cx, socket, SocketAddr::new(HOST, 1), &unhex(h));
     } else if let Some(text) = v.get("inbound_ws").and_then(Value::as_str) {
         let socket = match engine.transport {
             super::Transport::Ws { .. } => "device",
@@ -466,6 +474,20 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     Ok(())
 }
 
+/// The port a vector opens a device on: none (the spec's default), or for a
+/// device with no standard port (`port: null`) one standing for the port the
+/// operator gives.
+fn vector_port(spec: &crate::catalog::DeviceSpec) -> Option<u16> {
+    spec.transport
+        .as_ref()
+        .and_then(|t| t.get("port"))
+        .is_some_and(Value::is_null)
+        .then_some(VECTOR_PORT)
+}
+
+/// The port a vector gives a device with no standard port.
+const VECTOR_PORT: u16 = 53000;
+
 /// Answer the internal job in flight (probe, subscription or telemetry
 /// query) with a plain success: on its OSC address, or as a text line.
 fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
@@ -567,7 +589,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let ctx = OpenContext {
         host: HOST,
         host_name: None,
-        port: None,
+        port: vector_port(spec),
         model: model.id.clone(),
         channels: model.channels,
         settings,
@@ -704,6 +726,26 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             reply: super::ReplyFraming::Block,
             ..
         } => format!("{line}\r\n\r\n"),
+        // A headed block whose headers say this first line has more after
+        // it (CasparCG's `200 ...` lines up to a blank line, `201 ...` one
+        // line of data).
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::HeadedBlock(headers),
+            ..
+        } => {
+            let matches = |re: &Option<String>| {
+                re.as_deref()
+                    .and_then(|re| regex::Regex::new(re).ok())
+                    .is_some_and(|re| re.is_match(line))
+            };
+            if matches(&headers.block) {
+                format!("{line}\r\n\r\n")
+            } else if matches(&headers.line) {
+                format!("{line}\r\nok\r\n")
+            } else {
+                format!("{line}\r\n")
+            }
+        }
         // A JSON stream's messages are JSON values (Barco Pulse).
         super::Transport::LineTcp {
             reply: super::ReplyFraming::Json,
@@ -984,7 +1026,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
         let ctx = OpenContext {
             host: HOST,
             host_name: None,
-            port: None,
+            port: vector_port(spec),
             model: model.id.clone(),
             channels: model.channels,
             // With no value for a required setting (a token), the defaults

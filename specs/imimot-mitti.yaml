@@ -1,0 +1,677 @@
+spec: 1
+id: imimot-mitti
+name: Mitti (OSC control)
+vendor: Imimot
+category: playback
+
+# Mitti's OSC control, over UDP to port 51000 once OSC Controls is enabled in
+# Mitti's Preferences. Every address starts with /mitti/: master-level
+# commands are /mitti/<command>, cue-level ones /mitti/<cue>/<command>, where
+# <cue> is a cue number or ID, or one of all, selected, current, previous and
+# next. Mitti never answers the sender: its OSC feedback goes to the target
+# chosen in Mitti's OSC Feedback setting, so it is received on a fixed local
+# port, the feedback_port setting. Commands report unverified; state follows
+# the feedback Mitti sends for every change, wherever it came from.
+#
+# The help page documents the addressing, /mitti/play, /mitti/togglePlay with
+# an int, /mitti/resendOSCFeedback and the read-only feedback messages; the
+# full command list is only browsable from a running Mitti through its OSC
+# Query server, so the other command names and their argument types come from
+# the MIT-licensed Bitfocus Companion module (see the quirks).
+
+source:
+  - title: Mitti Help, "OSC/UDP Controls"
+    author: Imimot
+    url: https://imimot.com/help/mitti/external-controls/osc-udp-controls
+    note: >
+      Manufacturer document, dated 2026-08-09, retrieved 2026-10-23. OSC
+      Controls enabled in Preferences, listening on UDP 51000, an OSC Query
+      server on the same port; commands without a value (/mitti/play) are
+      also accepted as UDP string commands; master-level /mitti/<command> and
+      cue-level /mitti/<cuenumber>/<command> (example /mitti/1/opacity); the
+      all, selected, current, previous and next keywords; /mitti/play and
+      /mitti/togglePlay with an int 1; OSC Feedback to a selected target,
+      always the value-carrying form, cue commands followed by their
+      cue-relative copies (/mitti/current/...); the read-only /mitti/time,
+      cueTimeLeft, cueTimeElapsed (hh:mm:ss:ff), previousCueName,
+      nextCueName, currentCueName and currentCueTRT; /mitti/resendOSCFeedback.
+  - title: Mitti Help, "MIDI Controls"
+    author: Imimot
+    url: https://imimot.com/help/mitti/external-controls/midi-controls
+    note: >
+      Manufacturer document, dated 2026-08-09. Transport functions (play,
+      stop, rewind, locate) and that external control is ignored while Mitti
+      follows timecode; read for corroboration, the OSC names are not given.
+  - title: companion-module-imimot-mitti (Bitfocus Companion module, MIT licence)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-imimot-mitti
+    note: >
+      Gap fill only, licence checked (MIT), read 2026-10-23 (actions.js,
+      index.js, feedbacks.js); no code taken. Command names: stop, panic,
+      rewind, jumpToPrevCue, jumpToNextCue, jumpToSelectedCue, selectPrevCue,
+      selectNextCue, goto30/20/10, playSelectedCue(ForceCut),
+      playCueWithCueID(ForceCut), playCueAtIndex(ForceCut) with an int,
+      playCueWithName(ForceCut), jumpToCueWithName, fullscreen, playlist loop
+      and transition-on-play toggles and switches, autoFade, mainFader,
+      playhead, playheadScrub, locateCurrentCue, video and audio outputs,
+      set in/out from playhead, ping, and the cue-level jump, select, audio,
+      fade in/out, goto, setGotoToCueID, loop, pause at beginning/end,
+      transition, video FX, scale, position, crop, rotation, hue, saturation,
+      vibrance, brightness, contrast, opacity, volume and playback speed
+      commands. Values sent as OSC strings (except the cue index); feedback
+      read from currentCueID, selectedCueName, selectedCueID, playhead,
+      toggleVideoOutputs, toggleAudio, in/outFromPlayheadEnabled, pong, and
+      per-cue cueName, deleted and toggle values; default feedback port 51001.
+
+transport:
+  type: osc-udp
+  port: 51000
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 51001, label: Feedback port, description: "Local UDP port that receives Mitti's OSC feedback; set Mitti's OSC Feedback target to this host and port. Empty for no feedback." }
+
+ports:
+  - { port: 51000, protocol: udp, role: control, note: "Mitti's OSC input; its OSC Query server (HTTP) shares the number" }
+  - { port: 51001, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "where Mitti sends its OSC feedback, as set in Mitti" }
+
+maps:
+  on_off: { "true": "On", "false": "Off" }
+  force_cut: { "true": "ForceCut", "false": "" }
+  video_outputs: { "true": "videoOutputsOn", "false": "videoOutputsOff" }
+  audio_outputs: { "true": "unmuteAudio", "false": "muteAudio" }
+  cue_toggle: { audio: toggleAudio, fadeIn: toggleFadeIn, fadeOut: toggleFadeOut, goto: toggleGoto,
+                loop: toggleLoop, pauseAtBeginning: togglePauseAtBeginning, pauseAtEnd: togglePauseAtEnd,
+                transition: toggleTransition, videoFx: toggleVideoFx }
+  crop_edge: { left: cropLeftAsPixels, right: cropRightAsPixels, top: cropTopAsPixels, bottom: cropBottomAsPixels }
+  color_property: { saturation: saturationAsPercent, vibrance: vibranceAsPercent, brightness: brightnessAsPercent,
+                    contrast: contrastAsPercent }
+
+models:
+  - id: mitti-2
+    name: Mitti 2
+    supports: [play, set_playing, stop, panic, rewind, previous_cue, next_cue, jump_to_selected_cue,
+               select_previous_cue, select_next_cue, goto_before_end, play_selected_cue, play_cue,
+               play_cue_named, play_cue_at_index, jump_to_cue_named, set_fullscreen, toggle_fullscreen,
+               set_playlist_loop, toggle_playlist_loop, set_transition_on_play, toggle_transition_on_play,
+               resend_feedback, auto_fade, set_main_fader, set_playhead, scrub_playhead, locate_playhead,
+               set_video_outputs, toggle_video_outputs, set_audio_outputs, toggle_audio_outputs,
+               set_in_from_playhead, set_out_from_playhead, ping,
+               jump_to_cue, select_cue, set_cue_option, toggle_cue_option, set_cue_goto_target,
+               set_cue_scale, set_cue_scale_horizontal, set_cue_scale_vertical, set_cue_position_x,
+               set_cue_position_y, set_cue_crop, set_cue_rotation, set_cue_hue, set_cue_color,
+               set_cue_opacity, set_cue_volume, set_cue_playback_speed]
+    verification: none
+    notes: >
+      Some commands need a later Mitti 2 release (the Companion module's
+      notes): main fader 2.2.0, goto target 2.2.8, video outputs 2.8.0, set in
+      and out from playhead 2.8.7, audio outputs and playhead scrub 2.8.9.
+
+commands:
+  # ── Playlist transport (master level) ────────────────────────────────────
+  play:
+    summary: Start playback of the playlist (/mitti/play)
+    send: { address: /mitti/play }
+    returns: none
+
+  set_playing:
+    summary: Play or pause the playlist (/mitti/togglePlay with 1 or 0)
+    params:
+      playing: { type: bool, default: true, label: Playing, description: "True to play, false to pause, sent as the int 1 or 0." }
+    send: { address: /mitti/togglePlay, args: [ { value: "{playing:bool01}", type: int } ] }
+    returns: none
+
+  stop:
+    summary: Stop playback (/mitti/stop)
+    send: { address: /mitti/stop }
+    returns: none
+
+  panic:
+    summary: Panic, stopping all output at once (/mitti/panic)
+    send: { address: /mitti/panic }
+    returns: none
+
+  rewind:
+    summary: Rewind the playlist to its beginning (/mitti/rewind)
+    send: { address: /mitti/rewind }
+    returns: none
+
+  previous_cue:
+    summary: Jump to the previous cue (/mitti/jumpToPrevCue)
+    send: { address: /mitti/jumpToPrevCue }
+    returns: none
+
+  next_cue:
+    summary: Jump to the next cue (/mitti/jumpToNextCue)
+    send: { address: /mitti/jumpToNextCue }
+    returns: none
+
+  jump_to_selected_cue:
+    summary: Jump to the selected cue (/mitti/jumpToSelectedCue)
+    send: { address: /mitti/jumpToSelectedCue }
+    returns: none
+
+  select_previous_cue:
+    summary: Select the previous cue without jumping (/mitti/selectPrevCue)
+    send: { address: /mitti/selectPrevCue }
+    returns: none
+
+  select_next_cue:
+    summary: Select the next cue without jumping (/mitti/selectNextCue)
+    send: { address: /mitti/selectNextCue }
+    returns: none
+
+  goto_before_end:
+    summary: Move the playhead to 10, 20 or 30 seconds before the current cue's end (/mitti/goto10, goto20, goto30)
+    params:
+      seconds: { type: enum, values: ["10", "20", "30"], required: true, label: Seconds before end, description: "How many seconds before the current cue's end the playhead moves to." }
+    send: { address: "/mitti/goto{seconds}" }
+    returns: none
+
+  play_selected_cue:
+    summary: Play the selected cue (/mitti/playSelectedCue, or playSelectedCueForceCut)
+    params:
+      force_cut: { type: bool, default: false, label: Force cut, description: "True to play with an instant cut, whatever transition the cue has." }
+    send: { address: "/mitti/playSelectedCue{force_cut:map.force_cut}" }
+    returns: none
+
+  play_cue:
+    summary: Play a cue by its number or ID (/mitti/playCueWithCueID string, or ...ForceCut)
+    params:
+      cue:       { type: string, pattern: "^[A-Za-z0-9]{1,6}$", required: true, label: Cue, description: "Cue number or cue ID as shown in Mitti, up to six letters or digits." }
+      force_cut: { type: bool, default: false, label: Force cut, description: "True to play with an instant cut, whatever transition the cue has." }
+    send: { address: "/mitti/playCueWithCueID{force_cut:map.force_cut}", args: [ { value: "{cue}", type: string } ] }
+    returns: none
+
+  play_cue_named:
+    summary: Play a cue by its name (/mitti/playCueWithName string, or ...ForceCut)
+    params:
+      name:      { type: string, max_length: 256, required: true, label: Cue name, description: "The cue's name as shown in Mitti." }
+      force_cut: { type: bool, default: false, label: Force cut, description: "True to play with an instant cut, whatever transition the cue has." }
+    send: { address: "/mitti/playCueWithName{force_cut:map.force_cut}", args: [ { value: "{name}", type: string } ] }
+    returns: none
+
+  play_cue_at_index:
+    summary: Play the cue at a position in the playlist (/mitti/playCueAtIndex int, or ...ForceCut)
+    params:
+      index:     { type: int, min: 1, max: 999, required: true, label: Index, description: "Position of the cue in the playlist, numbered from 1." }
+      force_cut: { type: bool, default: false, label: Force cut, description: "True to play with an instant cut, whatever transition the cue has." }
+    send: { address: "/mitti/playCueAtIndex{force_cut:map.force_cut}", args: [ { value: "{index}", type: int } ] }
+    returns: none
+
+  jump_to_cue_named:
+    summary: Jump to a cue by its name without playing it (/mitti/jumpToCueWithName string)
+    params:
+      name: { type: string, max_length: 256, required: true, label: Cue name, description: "The cue's name as shown in Mitti." }
+    send: { address: /mitti/jumpToCueWithName, args: [ { value: "{name}", type: string } ] }
+    returns: none
+
+  # ── Playlist settings, outputs and fader ────────────────────────────────
+  set_fullscreen:
+    summary: Turn fullscreen output on or off (/mitti/fullscreenOn, fullscreenOff)
+    params:
+      enabled: { type: bool, required: true, label: Fullscreen, description: "True for fullscreen output, false to leave it." }
+    send: { address: "/mitti/fullscreen{enabled:map.on_off}" }
+    returns: none
+
+  toggle_fullscreen:
+    summary: Toggle fullscreen output (/mitti/toggleFullscreen)
+    send: { address: /mitti/toggleFullscreen }
+    returns: none
+
+  set_playlist_loop:
+    summary: Turn playlist looping on or off (/mitti/loopOn, loopOff)
+    params:
+      enabled: { type: bool, required: true, label: Loop, description: "True to loop the playlist, false to stop at its end." }
+    send: { address: "/mitti/loop{enabled:map.on_off}" }
+    returns: none
+
+  toggle_playlist_loop:
+    summary: Toggle playlist looping (/mitti/toggleLoop)
+    send: { address: /mitti/toggleLoop }
+    returns: none
+
+  set_transition_on_play:
+    summary: Turn the playlist's transition on play on or off (/mitti/transitionOnPlayOn, transitionOnPlayOff)
+    params:
+      enabled: { type: bool, required: true, label: Transition on play, description: "True to play cues with their transition, false to cut." }
+    send: { address: "/mitti/transitionOnPlay{enabled:map.on_off}" }
+    returns: none
+
+  toggle_transition_on_play:
+    summary: Toggle the playlist's transition on play (/mitti/toggleTransitionOnPlay)
+    send: { address: /mitti/toggleTransitionOnPlay }
+    returns: none
+
+  resend_feedback:
+    summary: Ask Mitti to send all its OSC feedback again (/mitti/resendOSCFeedback)
+    send: { address: /mitti/resendOSCFeedback }
+    returns: none
+
+  auto_fade:
+    summary: Run the main fader's automatic fade (/mitti/autoFade)
+    send: { address: /mitti/autoFade }
+    returns: none
+
+  set_main_fader:
+    summary: Set the main fader, 0.0 to 1.0 (/mitti/mainFader)
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Level, description: "Main fader position, 0.0 (faded out) to 1.0 (full), sent as text with two decimals." }
+    send: { address: /mitti/mainFader, args: [ { value: "{level:.2f}", type: string } ] }
+    returns: none
+
+  set_playhead:
+    summary: Move the current cue's playhead to a fraction of its length (/mitti/playhead)
+    params:
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Playhead position in the current cue, 0.0 (start) to 1.0 (end), sent as text with three decimals." }
+    send: { address: /mitti/playhead, args: [ { value: "{position:.3f}", type: string } ] }
+    returns: none
+
+  scrub_playhead:
+    summary: Move the playhead forward or back by a timecode amount (/mitti/playheadScrub)
+    params:
+      amount: { type: string, pattern: "^[+-][0-9]{1,2}(:[0-9]{1,2}){0,3}$", required: true, label: Amount, description: "Signed amount in hh:mm:ss:ff, shortened from the left: +01:00 moves one second forward, -00:10 ten frames back." }
+    send: { address: /mitti/playheadScrub, args: [ { value: "{amount}", type: string } ] }
+    returns: none
+
+  locate_playhead:
+    summary: Move the playhead to a timecode in the current cue (/mitti/locateCurrentCue)
+    params:
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true, label: Timecode, description: "SMPTE time hh:mm:ss:ff within the current cue." }
+    send: { address: /mitti/locateCurrentCue, args: [ { value: "{timecode}", type: string } ] }
+    returns: none
+
+  set_video_outputs:
+    summary: Turn the video outputs on or off (/mitti/videoOutputsOn, videoOutputsOff)
+    params:
+      enabled: { type: bool, required: true, label: Video outputs, description: "True for video output, false to turn every video output off." }
+    send: { address: "/mitti/{enabled:map.video_outputs}" }
+    returns: none
+
+  toggle_video_outputs:
+    summary: Toggle the video outputs (/mitti/toggleVideoOutputs)
+    send: { address: /mitti/toggleVideoOutputs }
+    returns: none
+
+  set_audio_outputs:
+    summary: Unmute or mute the audio outputs (/mitti/unmuteAudio, muteAudio)
+    params:
+      enabled: { type: bool, required: true, label: Audio outputs, description: "True to unmute the audio outputs, false to mute them." }
+    send: { address: "/mitti/{enabled:map.audio_outputs}" }
+    returns: none
+
+  toggle_audio_outputs:
+    summary: Toggle the audio outputs between muted and unmuted (/mitti/toggleAudio)
+    send: { address: /mitti/toggleAudio }
+    returns: none
+
+  set_in_from_playhead:
+    summary: Set the current cue's in point at the playhead (/mitti/setInFromPlayhead)
+    send: { address: /mitti/setInFromPlayhead }
+    returns: none
+
+  set_out_from_playhead:
+    summary: Set the current cue's out point at the playhead (/mitti/setOutFromPlayhead)
+    send: { address: /mitti/setOutFromPlayhead }
+    returns: none
+
+  ping:
+    summary: Ask Mitti for a pong on the feedback target (/mitti/ping)
+    send: { address: /mitti/ping }
+    returns: none
+
+  # ── Cue level: /mitti/<cue>/<command> ───────────────────────────────────
+  jump_to_cue:
+    summary: Jump to a cue without playing it (/mitti/<cue>/jump)
+    params:
+      cue: { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or current, selected, previous or next." }
+    send: { address: "/mitti/{cue}/jump" }
+    returns: none
+
+  select_cue:
+    summary: Select a cue (/mitti/<cue>/select)
+    params:
+      cue: { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or current, selected, previous or next." }
+    send: { address: "/mitti/{cue}/select" }
+    returns: none
+
+  set_cue_option:
+    summary: Turn one of a cue's options on or off (/mitti/<cue>/<option>On or <option>Off)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      option:  { type: enum, values: [audio, fadeIn, fadeOut, goto, loop, pauseAtBeginning, pauseAtEnd, transition, videoFx], required: true, label: Option, description: "The cue option: audio, fade in, fade out, goto after end, loop, pause at beginning, pause at end, transition or video effects." }
+      enabled: { type: bool, required: true, label: Enabled, description: "True to turn the option on, false to turn it off." }
+    send: { address: "/mitti/{cue}/{option}{enabled:map.on_off}" }
+    returns: none
+
+  toggle_cue_option:
+    summary: Toggle one of a cue's options (/mitti/<cue>/toggle<Option>)
+    params:
+      cue:    { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      option: { type: enum, values: [audio, fadeIn, fadeOut, goto, loop, pauseAtBeginning, pauseAtEnd, transition, videoFx], required: true, label: Option, description: "The cue option: audio, fade in, fade out, goto after end, loop, pause at beginning, pause at end, transition or video effects." }
+    send: { address: "/mitti/{cue}/{option:map.cue_toggle}" }
+    returns: none
+
+  set_cue_goto_target:
+    summary: Set the cue a cue goes to after its end (/mitti/<cue>/setGotoToCueID string)
+    params:
+      cue:    { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      target: { type: string, pattern: "^(current|selected|previous|next|[A-Za-z0-9]{1,6})$", required: true, label: Goto cue, description: "Number or ID of the cue to go to after the cue ends, or current, selected, previous or next." }
+    send: { address: "/mitti/{cue}/setGotoToCueID", args: [ { value: "{target}", type: string } ] }
+    returns: none
+
+  set_cue_scale:
+    summary: Set a cue's scale in percent (/mitti/<cue>/scaleAsPercent)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      percent: { type: int, min: 0, max: 200, required: true, label: Scale, description: "Scale in percent, 100 for the original size." }
+    send: { address: "/mitti/{cue}/scaleAsPercent", args: [ { value: "{percent}", type: string } ] }
+    returns: none
+
+  set_cue_scale_horizontal:
+    summary: Set a cue's horizontal scale in percent (/mitti/<cue>/scaleHAsPercent)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      percent: { type: int, min: 0, max: 200, required: true, label: Horizontal scale, description: "Horizontal scale in percent, 100 for the original width." }
+    send: { address: "/mitti/{cue}/scaleHAsPercent", args: [ { value: "{percent}", type: string } ] }
+    returns: none
+
+  set_cue_scale_vertical:
+    summary: Set a cue's vertical scale in percent (/mitti/<cue>/scaleVAsPercent)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      percent: { type: int, min: 0, max: 200, required: true, label: Vertical scale, description: "Vertical scale in percent, 100 for the original height." }
+    send: { address: "/mitti/{cue}/scaleVAsPercent", args: [ { value: "{percent}", type: string } ] }
+    returns: none
+
+  set_cue_position_x:
+    summary: Set a cue's horizontal position in pixels (/mitti/<cue>/posXAsPixels)
+    params:
+      cue:    { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      pixels: { type: int, required: true, label: X position, description: "Horizontal position of the cue's picture, in output pixels." }
+    send: { address: "/mitti/{cue}/posXAsPixels", args: [ { value: "{pixels}", type: string } ] }
+    returns: none
+
+  set_cue_position_y:
+    summary: Set a cue's vertical position in pixels (/mitti/<cue>/posYAsPixels)
+    params:
+      cue:    { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      pixels: { type: int, required: true, label: Y position, description: "Vertical position of the cue's picture, in output pixels." }
+    send: { address: "/mitti/{cue}/posYAsPixels", args: [ { value: "{pixels}", type: string } ] }
+    returns: none
+
+  set_cue_crop:
+    summary: Crop one edge of a cue's picture in pixels (/mitti/<cue>/cropLeftAsPixels and the other edges)
+    params:
+      cue:    { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      edge:   { type: enum, values: [left, right, top, bottom], required: true, label: Edge, description: "The edge of the picture to crop." }
+      pixels: { type: int, min: 0, required: true, label: Crop, description: "How far the edge is cropped, in source pixels." }
+    send: { address: "/mitti/{cue}/{edge:map.crop_edge}", args: [ { value: "{pixels}", type: string } ] }
+    returns: none
+
+  set_cue_rotation:
+    summary: Set a cue's rotation in degrees (/mitti/<cue>/rotateAsDegrees)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      degrees: { type: int, min: -180, max: 180, required: true, label: Rotation, description: "Rotation of the cue's picture in degrees, -180 to 180." }
+    send: { address: "/mitti/{cue}/rotateAsDegrees", args: [ { value: "{degrees}", type: string } ] }
+    returns: none
+
+  set_cue_hue:
+    summary: Set a cue's hue shift in degrees (/mitti/<cue>/hueAsDegrees)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      degrees: { type: int, min: -180, max: 180, required: true, label: Hue, description: "Hue shift of the cue's picture in degrees, -180 to 180, 0 for none." }
+    send: { address: "/mitti/{cue}/hueAsDegrees", args: [ { value: "{degrees}", type: string } ] }
+    returns: none
+
+  set_cue_color:
+    summary: Set a cue's saturation, vibrance, brightness or contrast in percent (/mitti/<cue>/<property>AsPercent)
+    params:
+      cue:      { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      property: { type: enum, values: [saturation, vibrance, brightness, contrast], required: true, label: Property, description: "The color adjustment to set." }
+      percent:  { type: int, min: -100, max: 100, required: true, label: Amount, description: "Adjustment in percent, -100 to 100, 0 for none." }
+    send: { address: "/mitti/{cue}/{property:map.color_property}", args: [ { value: "{percent}", type: string } ] }
+    returns: none
+
+  set_cue_opacity:
+    summary: Set a cue's opacity in percent (/mitti/<cue>/opacityAsPercent)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      percent: { type: int, min: 0, max: 100, required: true, label: Opacity, description: "Opacity in percent, 0 (transparent) to 100 (opaque)." }
+    send: { address: "/mitti/{cue}/opacityAsPercent", args: [ { value: "{percent}", type: string } ] }
+    returns: none
+
+  set_cue_volume:
+    summary: Set a cue's volume in decibels (/mitti/<cue>/volumeAsDecibels)
+    params:
+      cue: { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      db:  { type: float, min: -60.0, max: 12.0, required: true, label: Volume, description: "Cue volume in dB, -60 to +12, 0 for unity, sent as text with one decimal." }
+    send: { address: "/mitti/{cue}/volumeAsDecibels", args: [ { value: "{db:.1f}", type: string } ] }
+    returns: none
+
+  set_cue_playback_speed:
+    summary: Set a cue's playback speed in percent (/mitti/<cue>/playbackSpeed)
+    params:
+      cue:     { type: string, pattern: "^(current|selected|previous|next|all|[A-Za-z0-9]{1,6})$", required: true, label: Cue, description: "Cue number or ID (up to six letters or digits), or all, current, selected, previous or next." }
+      percent: { type: int, min: 1, max: 1200, required: true, label: Speed, description: "Playback speed in percent, 100 for normal speed, 1 to 1200." }
+    send: { address: "/mitti/{cue}/playbackSpeed", args: [ { value: "{percent}", type: string } ] }
+    returns: none
+
+telemetry:
+  # Asked for whole once the feedback port is open: Mitti resends every
+  # feedback value to its target.
+  subscribe:
+    send: [ { address: /mitti/resendOSCFeedback } ]
+  updates:
+    # Master level: one address segment after /mitti.
+    - address: "^/mitti/togglePlay$"
+      state: { playing: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/time$"
+      state: { time: "{arg0}" }
+    - address: "^/mitti/cueTimeLeft$"
+      state: { current_cue.time_left: "{arg0}" }
+    - address: "^/mitti/cueTimeElapsed$"
+      state: { current_cue.time_elapsed: "{arg0}" }
+    - address: "^/mitti/currentCueTRT$"
+      state: { current_cue.trt: "{arg0}" }
+    - address: "^/mitti/currentCueName$"
+      state: { current_cue.name: "{arg0}" }
+    - address: "^/mitti/currentCueID$"
+      state: { current_cue.id: "{arg0}" }
+    - address: "^/mitti/previousCueName$"
+      state: { previous_cue.name: "{arg0}" }
+    - address: "^/mitti/nextCueName$"
+      state: { next_cue.name: "{arg0}" }
+    - address: "^/mitti/selectedCueName$"
+      state: { selected_cue.name: "{arg0}" }
+    - address: "^/mitti/selectedCueID$"
+      state: { selected_cue.id: "{arg0}" }
+    - address: "^/mitti/playhead$"
+      state: { playhead: "{arg0}" }
+    - address: "^/mitti/mainFader$"
+      state: { main_fader: "{arg0}" }
+    - address: "^/mitti/toggleVideoOutputs$"
+      state: { video_outputs: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/toggleAudio$"
+      state: { audio_outputs: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/toggleFullscreen$"
+      state: { fullscreen: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/toggleLoop$"
+      state: { playlist_loop: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/toggleTransitionOnPlay$"
+      state: { transition_on_play: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/inFromPlayheadEnabled$"
+      state: { in_from_playhead_enabled: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/outFromPlayheadEnabled$"
+      state: { out_from_playhead_enabled: { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    # Cue level: /mitti/<cue>/<property>, the cue a number or ID, or the
+    # cue-relative copies (current, previous, next) Mitti sends after each.
+    - address: "^/mitti/([A-Za-z0-9]+)/cueName$"
+      state: { "cues.{1}.name": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/deleted$"
+      state: { "cues.{1}": { delete: true } }
+    - address: "^/mitti/([A-Za-z0-9]+)/toggleAudio$"
+      state: { "cues.{1}.audio": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/toggleFadeIn$"
+      state: { "cues.{1}.fade_in": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/toggleFadeOut$"
+      state: { "cues.{1}.fade_out": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/toggleGoto$"
+      state: { "cues.{1}.goto": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/toggleLoop$"
+      state: { "cues.{1}.loop": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/togglePauseAtBeginning$"
+      state: { "cues.{1}.pause_at_beginning": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/togglePauseAtEnd$"
+      state: { "cues.{1}.pause_at_end": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/toggleTransition$"
+      state: { "cues.{1}.transition": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/toggleVideoFx$"
+      state: { "cues.{1}.video_fx": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true, "false": false, "true": true } } }
+    - address: "^/mitti/([A-Za-z0-9]+)/scaleAsPercent$"
+      state: { "cues.{1}.scale": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/scaleHAsPercent$"
+      state: { "cues.{1}.scale_horizontal": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/scaleVAsPercent$"
+      state: { "cues.{1}.scale_vertical": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/posXAsPixels$"
+      state: { "cues.{1}.position_x": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/posYAsPixels$"
+      state: { "cues.{1}.position_y": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/cropLeftAsPixels$"
+      state: { "cues.{1}.crop_left": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/cropRightAsPixels$"
+      state: { "cues.{1}.crop_right": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/cropTopAsPixels$"
+      state: { "cues.{1}.crop_top": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/cropBottomAsPixels$"
+      state: { "cues.{1}.crop_bottom": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/rotateAsDegrees$"
+      state: { "cues.{1}.rotation": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/hueAsDegrees$"
+      state: { "cues.{1}.hue": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/(saturation|vibrance|brightness|contrast|opacity)AsPercent$"
+      state: { "cues.{1}.{2}": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/volumeAsDecibels$"
+      state: { "cues.{1}.volume_db": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/playbackSpeed$"
+      state: { "cues.{1}.playback_speed": "{arg0}" }
+    - address: "^/mitti/([A-Za-z0-9]+)/setGotoToCueID$"
+      state: { "cues.{1}.goto_target": "{arg0}" }
+
+state:
+  playing:                 { type: bool, description: "The playlist is playing (true) or paused or stopped (false), from /mitti/togglePlay feedback" }
+  time:                    { type: string, description: "Current time of the playlist, hh:mm:ss:ff" }
+  playhead:                { type: float, description: "Playhead in the current cue, 0.0 (start) to 1.0 (end)" }
+  main_fader:              { type: float, description: "Main fader position, 0.0 (faded out) to 1.0 (full)" }
+  video_outputs:           { type: bool, description: "The video outputs are on" }
+  audio_outputs:           { type: bool, description: "The audio outputs are unmuted" }
+  fullscreen:              { type: bool, description: "Fullscreen output is on" }
+  playlist_loop:           { type: bool, description: "The playlist loops" }
+  transition_on_play:      { type: bool, description: "Cues play with their transition (false: they cut)" }
+  in_from_playhead_enabled:  { type: bool, description: "Setting the current cue's in point from the playhead is possible now" }
+  out_from_playhead_enabled: { type: bool, description: "Setting the current cue's out point from the playhead is possible now" }
+  current_cue.name:        { type: string, description: "Name of the current cue; '-' when there is none" }
+  current_cue.id:          { type: string, description: "Number or ID of the current cue; '-' when there is none" }
+  current_cue.trt:         { type: string, description: "Total running time of the current cue, hh:mm:ss:ff" }
+  current_cue.time_left:   { type: string, description: "Time left in the current cue, -hh:mm:ss:ff" }
+  current_cue.time_elapsed: { type: string, description: "Time elapsed in the current cue, hh:mm:ss:ff" }
+  previous_cue.name:       { type: string, description: "Name of the previous cue; '-' when there is none" }
+  next_cue.name:           { type: string, description: "Name of the next cue; '-' when there is none" }
+  selected_cue.name:       { type: string, description: "Name of the selected cue; '-' when there is none" }
+  selected_cue.id:         { type: string, description: "Number or ID of the selected cue; '-' when there is none" }
+  cues.*.name:             { type: string, description: "The cue's name, keyed by cue number or ID as Mitti's feedback names it, or current, previous or next for the cue-relative copies; a deleted cue is removed" }
+  cues.*.audio:            { type: bool, description: "The cue's audio is on" }
+  cues.*.fade_in:           { type: bool, description: "The cue fades in" }
+  cues.*.fade_out:          { type: bool, description: "The cue fades out" }
+  cues.*.goto:             { type: bool, description: "The cue goes to another cue after its end" }
+  cues.*.loop:             { type: bool, description: "The cue loops" }
+  cues.*.pause_at_beginning: { type: bool, description: "The cue pauses at its beginning" }
+  cues.*.pause_at_end:       { type: bool, description: "The cue pauses at its end" }
+  cues.*.transition:       { type: bool, description: "The cue plays with its transition" }
+  cues.*.video_fx:          { type: bool, description: "The cue's video effects are on" }
+  cues.*.goto_target:      { type: string, description: "Number or ID of the cue the cue goes to after its end" }
+  cues.*.scale:            { type: float, unit: "%", description: "The cue's scale, 100 for the original size" }
+  cues.*.scale_horizontal: { type: float, unit: "%", description: "The cue's horizontal scale" }
+  cues.*.scale_vertical:   { type: float, unit: "%", description: "The cue's vertical scale" }
+  cues.*.position_x:       { type: float, unit: px, description: "The cue's horizontal position" }
+  cues.*.position_y:       { type: float, unit: px, description: "The cue's vertical position" }
+  cues.*.crop_left:         { type: float, unit: px, description: "Crop of the cue's left edge" }
+  cues.*.crop_right:        { type: float, unit: px, description: "Crop of the cue's right edge" }
+  cues.*.crop_top:          { type: float, unit: px, description: "Crop of the cue's top edge" }
+  cues.*.crop_bottom:       { type: float, unit: px, description: "Crop of the cue's bottom edge" }
+  cues.*.rotation:         { type: float, unit: deg, description: "The cue's rotation" }
+  cues.*.hue:              { type: float, unit: deg, description: "The cue's hue shift" }
+  cues.*.saturation:       { type: float, unit: "%", description: "The cue's saturation adjustment, -100 to 100" }
+  cues.*.vibrance:         { type: float, unit: "%", description: "The cue's vibrance adjustment, -100 to 100" }
+  cues.*.brightness:       { type: float, unit: "%", description: "The cue's brightness adjustment, -100 to 100" }
+  cues.*.contrast:         { type: float, unit: "%", description: "The cue's contrast adjustment, -100 to 100" }
+  cues.*.opacity:          { type: float, unit: "%", description: "The cue's opacity, 0 to 100" }
+  cues.*.volume_db:        { type: float, unit: dB, description: "The cue's volume, -60 to +12" }
+  cues.*.playback_speed:   { type: float, unit: "%", description: "The cue's playback speed, 100 for normal" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Mitti listens only once OSC Controls is enabled in its Preferences, and
+      sends feedback only to the target chosen in its OSC Feedback setting:
+      choose Custom with this host's address and the feedback_port setting
+      (51001 here, the Companion module's default; Mitti documents no default
+      target port). Nothing can set either up over OSC, and without feedback
+      the state stays empty while every command still works.
+  - models: [all]
+    severity: info
+    text: >
+      Mitti never answers the sender and documents no error message: every
+      command reports unverified. Mitti sends feedback for every change,
+      whatever made it, in the value-carrying form of each control (a
+      togglePlay value, never /mitti/play), so state follows the playlist as
+      it plays. On connecting, resend_feedback is sent once so state starts
+      complete; the button in Mitti's OSC preferences does the same.
+  - models: [all]
+    severity: info
+    text: >
+      The help page documents the addressing, play, togglePlay, opacity as an
+      example, resendOSCFeedback and the read-only feedback; Mitti lists the
+      rest only through its OSC Query server on port 51000 (open
+      http://<host>:51000 in a browser), which this integration does not read.
+      Every other command name, and the read of currentCueID, selectedCueName,
+      selectedCueID, playhead, mainFader, the output, fullscreen, loop and
+      transition toggles, in/outFromPlayheadEnabled and the per-cue cueName,
+      deleted and property feedback, come from the MIT-licensed Bitfocus
+      Companion module, as do the version notes on the model.
+  - models: [all]
+    severity: info
+    text: >
+      Command values other than the togglePlay and cue index ints are sent as
+      OSC strings ("75", "-3.5"), as the Companion module sends them; the
+      types Mitti's OSC Query server advertises (likely floats or ints) are not
+      documented. The feedback values are read as numbers whatever their tag.
+  - models: [all]
+    severity: info
+    text: >
+      A cue is addressed by its number or ID (the Companion module uppercases
+      an ID and keeps six characters), or by all, selected, current, previous
+      or next. Which of number and ID Mitti's feedback uses as the cue key is
+      not documented; cues.* is keyed as the feedback names it, plus the
+      current, previous and next copies. The documented /mitti/<cue>/opacity
+      (the help page's example) has no documented value range, so the
+      percentage form is used.
+  - models: [all]
+    severity: info
+    text: >
+      Commands without a value are also accepted as plain UDP string commands
+      (the address as text) on the same port; this integration sends OSC
+      only. External control is ignored while Mitti follows MTC or LTC
+      timecode (documented for MIDI, MMC and MSC), and Mitti's OSC Query and
+      NMC transport sync are not covered.
+  - models: [all]
+    severity: critical
+    text: >
+      panic and stop end the running output at once; set_video_outputs false
+      blacks every video output and set_audio_outputs false mutes the audio,
+      until turned back on. set_in_from_playhead and set_out_from_playhead
+      change the current cue's in or out point in the project.

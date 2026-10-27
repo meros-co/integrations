@@ -1044,6 +1044,19 @@
               "pattern": "^/"
             }
           }
+        },
+        "osc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "listen_port"
+          ],
+          "description": "OSC feedback beside a stream or HTTP transport: the device sends OSC over UDP to a fixed local port (CasparCG's OSC beside its AMCP line protocol). Each message goes to the address rules; it is never a command's reply. Listened on only while the device is monitored.",
+          "properties": {
+            "listen_port": {
+              "$ref": "#/$defs/transport/oneOf/3/properties/listen_port"
+            }
+          }
         }
       }
     },
@@ -1141,9 +1154,13 @@
               "const": "line-tcp"
             },
             "port": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The default port; null for a program with no standard port, whose port is given when the device is opened."
             },
             "scheme": {
               "description": "tcp (the default) or tls, or {setting: name} naming an enum setting whose values are tcp and tls: the TCP link as it is, or wrapped in TLS 1.2 or later.",
@@ -1233,6 +1250,16 @@
               "type": "string",
               "minLength": 1,
               "description": "With reply_framing: fenced. A regex over a line: such a line opens a block, the next one after its first other line closes it, and the lines between are one message (Turtle AV's status between lines of = signs)."
+            },
+            "reply_block_header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With reply_framing: headed-block. A regex over a reply's first line: such a line opens a block ended by a blank line, in place of a line ending in ':' (CasparCG's AMCP '200 ... OK')."
+            },
+            "reply_line_header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With reply_framing: headed-block. A regex over a reply's first line: such a line is followed by exactly one more line of the same message, whatever it holds (CasparCG's AMCP '201 ... OK' and its line of data)."
             },
             "reply_terminators": {
               "type": "array",
@@ -1613,6 +1640,16 @@
               "minLength": 1,
               "description": "With reply_framing: fenced. A regex over a line: such a line opens a block, the next one after its first other line closes it, and the lines between are one message (Turtle AV's status between lines of = signs)."
             },
+            "reply_block_header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With reply_framing: headed-block. A regex over a reply's first line: such a line opens a block ended by a blank line, in place of a line ending in ':' (CasparCG's AMCP '200 ... OK')."
+            },
+            "reply_line_header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With reply_framing: headed-block. A regex over a reply's first line: such a line is followed by exactly one more line of the same message, whatever it holds (CasparCG's AMCP '201 ... OK' and its line of data)."
+            },
             "reply_terminators": {
               "type": "array",
               "minItems": 1,
@@ -1648,9 +1685,13 @@
               "const": "line-udp"
             },
             "port": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The default port; null for a program with no standard port, whose port is given when the device is opened."
             },
             "terminator": {
               "enum": [
@@ -1725,9 +1766,13 @@
               "const": "osc-udp"
             },
             "port": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The default port; null for a program with no standard port, whose port is given when the device is opened."
             },
             "timeout_ms": {
               "type": "integer",
@@ -1783,9 +1828,13 @@
               "const": "osc-tcp"
             },
             "port": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The default port; null for a program with no standard port, whose port is given when the device is opened."
             },
             "framing": {
               "enum": [
@@ -1819,9 +1868,13 @@
               "const": "http"
             },
             "port": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The default port; null for a program with no standard port, whose port is given when the device is opened."
             },
             "https_port": {
               "type": "integer",
@@ -2050,7 +2103,7 @@
                   ]
                 },
                 "capture": {
-                  "description": "What of the login's answer is the session: {cookie: name} the named Set-Cookie, or every one with \"*\" (the default), sent back as Cookie; {header: name} a response header, sent back in a header of that name.",
+                  "description": "What of the login's answer is the session: {cookie: name} the named Set-Cookie, or every one with \"*\" (the default), sent back as Cookie; {header: name} a response header, sent back in a header of that name; {json: path, header: name} a string at that JSON path of the answer's body, sent back in the header named.",
                   "oneOf": [
                     {
                       "type": "object",
@@ -2072,6 +2125,24 @@
                         "header"
                       ],
                       "properties": {
+                        "header": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9-]+$"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "json",
+                        "header"
+                      ],
+                      "properties": {
+                        "json": {
+                          "type": "string",
+                          "pattern": "^\\$"
+                        },
                         "header": {
                           "type": "string",
                           "pattern": "^[A-Za-z0-9-]+$"
@@ -2105,9 +2176,13 @@
               "const": "ws"
             },
             "port": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The default port; null for a program with no standard port, whose port is given when the device is opened."
             },
             "path": {
               "type": "string",

@@ -32,6 +32,21 @@ commands, odd replies.
 Line links point to where each note was when this list was written, so they
 can drift as specs change. The quirk text in the spec is the reference.
 
+## ableton-live — Ableton Live (AbletonOSC)
+
+- [ ] Confirm that AbletonOSC sends replies and listener updates to the last sender's address on UDP 11001, so commands sent from local port 11001 get their replies, and that a second client moves the updates away. ([specs/ableton-live.yaml:3007](specs/ableton-live.yaml#L3007))
+- [ ] Check what happens to registered listeners when a track or scene is inserted or deleted, and that resync registers them again under the new indexes. ([specs/ableton-live.yaml:3015](specs/ableton-live.yaml#L3015))
+- [ ] Check which properties Live really lets AbletonOSC listen to (start_listen) on tracks, clip slots, clips, scenes and devices, and which answer /live/error instead (the spec follows the Live Object Model's observe flags). ([specs/ableton-live.yaml:3027](specs/ableton-live.yaml#L3027))
+- [ ] Confirm each walk ends with a /live/error reply past the last index (is_foldable, is_empty, is_group_slot, class_name, send), and how long a walk of a large Set takes. ([specs/ableton-live.yaml:3037](specs/ableton-live.yaml#L3037))
+- [ ] Check the "*" track index on start_listen for color, color_index, fired_slot_index, mute, name, panning, playing_slot_index, solo and volume covers every track, including group tracks, without one track's error stopping the rest. ([specs/ableton-live.yaml:3037](specs/ableton-live.yaml#L3037))
+- [ ] Check watch_device_parameters on a large device (a rack, a plug-in) and the load listening to every parameter puts on Live. ([specs/ableton-live.yaml:3046](specs/ableton-live.yaml#L3046))
+- [ ] Confirm Live accepts integer 1 and 0 for boolean properties (mute, solo, arm, loop, warping...) and for a note's mute in /live/clip/add/notes, and that it reports booleans as OSC true and false. ([specs/ableton-live.yaml:3065](specs/ableton-live.yaml#L3065))
+- [ ] Confirm fired_slot_index reports -2 when the track's stop button is fired and -1 when nothing is fired, and that playing_slot_index follows clips started from Live. ([specs/ableton-live.yaml:3071](specs/ableton-live.yaml#L3071))
+- [ ] Check that arm and current_monitoring_state are readable on every track that can be armed, and fold_state on every group track, and that they answer /live/error elsewhere. ([specs/ableton-live.yaml:3078](specs/ableton-live.yaml#L3078))
+- [ ] Check current_monitoring_state's values (0 In, 1 Auto, 2 Off) and the device type values (1, 2, 4 in the README; 0, 1, 2 in a source comment). ([specs/ableton-live.yaml:3104](specs/ableton-live.yaml#L3104))
+- [ ] Check the value ranges Live accepts for tempo, song and scene signatures, clip transposition and detune, groove amount (the Live Object Model says 0 to 1), and what Live does with a value outside them. ([specs/ableton-live.yaml:3097](specs/ableton-live.yaml#L3097))
+- [ ] Confirm /live/startup is sent when Live loads another Set, so the rule registering everything again runs then. ([specs/ableton-live.yaml:3112](specs/ableton-live.yaml#L3112))
+
 ## aes70 — AES70 / OCA devices
 
 - [ ] Check the device's OCP.1 port (AES70 assigns none) and which transports it accepts: TCP, UDP, WebSocket (and its path), or only secure OCP.1. ([specs/aes70.yaml:401](specs/aes70.yaml#L401))
@@ -799,6 +814,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check Digest authentication with an administrator account and with guest access, on firmware with HTTPS enabled. ([specs/canon-ptz.yaml:57](specs/canon-ptz.yaml#L57))
 - [ ] On the EOS C80 and XF605, confirm the XC protocol is enabled over the network the same way, and which commands they accept. ([specs/canon-ptz.yaml:305](specs/canon-ptz.yaml#L305))
 
+## casparcg — CasparCG Server
+
+- [ ] Confirm the reply framing on 2.3 and later: 200 followed by lines and a blank line, 201 and 400 by exactly one line, 202 and the other errors alone, including for a 200 that lists nothing. ([specs/casparcg.yaml:1441](specs/casparcg.yaml#L1441))
+- [ ] Check that LOADBG, LOAD and PLAY accept the transition sent in full when none is wanted (CUT 0 linear RIGHT) and SEEK 0, and that LOOP and AUTO may sit where they are sent. ([specs/casparcg.yaml:1457](specs/casparcg.yaml#L1457))
+- [ ] Confirm that 2.3 and later send OSC to each AMCP client's address on the configured default-port (6250), with no predefined client needed. ([specs/casparcg.yaml:1465](specs/casparcg.yaml#L1465))
+- [ ] Record the OSC addresses a 2.3 or later server sends for a layer playing a file, an image and an HTML template (with or without a foreground/ segment, and whether background, paused, loop, host and profiler messages still exist), and fix the rules to match. ([specs/casparcg.yaml:1477](specs/casparcg.yaml#L1477))
+- [ ] Check where DEFER goes in a MIXER command with a tween (after the tween, as sent here) and what a read answers for a deferred change before MIXER COMMIT. ([specs/casparcg.yaml:1499](specs/casparcg.yaml#L1499))
+- [ ] Check the code and layout of MIXER CHROMA's read answer (201 and nine values, or the example's 202) and of the other MIXER reads. ([specs/casparcg.yaml:1504](specs/casparcg.yaml#L1504))
+- [ ] Check what CALL LOOP, CALL SEEK, START and LENGTH answer (201 CALL OK and a value, or 202). ([specs/casparcg.yaml:1548](specs/casparcg.yaml#L1548))
+- [ ] Check PING's answer on 2.3 and later (PONG alone, or with a code). ([specs/casparcg.yaml:1555](specs/casparcg.yaml#L1555))
+- [ ] Record TLS, FLS and DATA LIST answers on 2.3 and later, so their lines can be read into fields. ([specs/casparcg.yaml:1514](specs/casparcg.yaml#L1514))
+
 ## castr — Castr
 
 - [ ] Confirm HTTP Basic with the access token's ID and secret key is accepted, and that a wrong key answers 401 (not 403). ([specs/castr.yaml:98](specs/castr.yaml#L98))
@@ -1174,6 +1201,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the size, creationDate and lastWriteDate units of media/list (uint64 strings; the epoch of the dates is not documented), and whether provision overwrites a file already at the destination. ([specs/disguise.yaml:2413](specs/disguise.yaml#L2413))
 - [ ] Confirm the proof of play subscription to one dictionary of subsystem:ProofOfPlaySubsystem (getRecords, called if it is a method, and getRecentRecords(n)), that it is available without enabling anything, and which release added it. ([specs/disguise.yaml:1350](specs/disguise.yaml#L1350))
 
+## dtvideolabs-playbackpro-plus — PlaybackPro Plus
+
+- [ ] Check the TCP port on PlaybackPro Plus 3.8 (7000 in its guide) and on Plus X (4647), and whether the UDP port takes the same commands. ([specs/dtvideolabs-playbackpro-plus.yaml:416](specs/dtvideolabs-playbackpro-plus.yaml#L416))
+- [ ] Record what PlaybackPro Plus sends back for an inquiry (PS, TE, AN) and for a command that changes something: the line ending, if any, and whether commands are answered at all; and whether a command sent with a CR or CRLF after it is still accepted. ([specs/dtvideolabs-playbackpro-plus.yaml:425](specs/dtvideolabs-playbackpro-plus.yaml#L425))
+- [ ] Check what SF answers for an unnamed show and VU/GU for a clip with no number (nothing, an empty line, or N/A). ([specs/dtvideolabs-playbackpro-plus.yaml:431](specs/dtvideolabs-playbackpro-plus.yaml#L431))
+- [ ] Check that GO, GT, SI and TI take a number without leading zeros (GO7) and the largest number they accept. ([specs/dtvideolabs-playbackpro-plus.yaml:437](specs/dtvideolabs-playbackpro-plus.yaml#L437))
+- [ ] Record the ID inquiry's answer, to read each clip's number and file name apart. ([specs/dtvideolabs-playbackpro-plus.yaml:453](specs/dtvideolabs-playbackpro-plus.yaml#L453))
+
 ## emberplus — Ember+
 
 - [ ] Check the device's Ember+ port, since the module's default of 9000 is a common choice, not a standard. ([specs/emberplus.yaml:199](specs/emberplus.yaml#L199))
@@ -1358,6 +1393,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm begin_crossposting_handshake and accept_crossposting_handshake are accepted in a JSON body as arrays of objects, and answer success true. ([specs/facebook-live.yaml:782](specs/facebook-live.yaml#L782))
 - [ ] Confirm crossposting_actions in a JSON body answers the live video with crosspost_shared_pages and crossposted_broadcasts as edges, when asked for in fields on the POST. ([specs/facebook-live.yaml:747](specs/facebook-live.yaml#L747))
 
+## figure53-go-button — Figure 53 Go Button
+
+- [ ] Check the address a rootless query is answered on: /reply/<the address sent> (assumed, so query commands wait for it exactly), or with a show prefix as the dictionary's /reply/show_id/{id}/volumePercent example has it; and whether a hit read by /hit_id/{id} is answered on /reply/hit_id/{id}/... ([specs/figure53-go-button.yaml:1448](specs/figure53-go-button.yaml#L1448))
+- [ ] Check that a wrong passcode answers /reply/connect with badpass over TCP and that later show and cue queries then go unanswered rather than answered with an error. ([specs/figure53-go-button.yaml:1467](specs/figure53-go-button.yaml#L1467))
+- [ ] Check whether percentActionElapsed and percentPreWaitElapsed are fractions from 0 to 1 or percentages from 0 to 100. ([specs/figure53-go-button.yaml:1478](specs/figure53-go-button.yaml#L1478))
+- [ ] Check the update Go Button sends when cues are added, deleted or moved: an update for the root group ("[root group of cue lists]" per a third-party client, or __root__), or /update/show/{id} alone. ([specs/figure53-go-button.yaml:1487](specs/figure53-go-button.yaml#L1487))
+- [ ] Check that the * and ? wildcards work in an action address such as /hit/1*/start, and that cue and hit messages sent to /hit/{number} count hits in display order from the top left. ([specs/figure53-go-button.yaml:1496](specs/figure53-go-button.yaml#L1496))
+- [ ] Check that Go Button 3.0 to 3.2 take the integers 0 and 1 as booleans (the dictionary marks OSC True and False as 3.3.0 and later). ([specs/figure53-go-button.yaml:1507](specs/figure53-go-button.yaml#L1507))
+- [ ] Check the arguments of /update/show/{id}/volume (dB alone, or dB and a percentage) and whether a second update message carries the percentage. ([specs/figure53-go-button.yaml:1521](specs/figure53-go-button.yaml#L1521))
+- [ ] Check what Go Button answers to show and cue queries with no show open (a third-party client reads data ignoring_show_methods) and with which status. ([specs/figure53-go-button.yaml:1529](specs/figure53-go-button.yaml#L1529))
+- [ ] Check that /show/{displayName}/open opens a show by display name, and that rootless show messages reach the open show. ([specs/figure53-go-button.yaml:1536](specs/figure53-go-button.yaml#L1536))
+
 ## focusrite-rednet — Focusrite RedNet (AES70)
 
 - [ ] Note the OCP.1 port a RedNet unit advertises as _oca._tcp once AES70 is enabled in RedNet Control, and check it accepts OCP.1 on plain TCP. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
@@ -1489,6 +1536,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
 - [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
+## imimot-mitti — Mitti
+
+- [ ] Check that a Custom OSC Feedback target (this host and the feedback_port setting) receives every feedback message, and which port Mitti suggests by default. ([specs/imimot-mitti.yaml:617](specs/imimot-mitti.yaml#L617))
+- [ ] Confirm that /mitti/resendOSCFeedback sends every feedback value again, including each cue's properties, and that changes made over OSC are fed back too. ([specs/imimot-mitti.yaml:626](specs/imimot-mitti.yaml#L626))
+- [ ] Compare the command names taken from the Companion module (stop, panic, jumpToPrevCue, playCueWithCueID, playCueAtIndex, the ForceCut forms, fullscreenOn, loopOn, transitionOnPlayOn, autoFade, mainFader, playhead, playheadScrub, locateCurrentCue, videoOutputsOn, unmuteAudio, setInFromPlayhead, the cue-level On/Off/toggle forms, setGotoToCueID and the AsPercent/AsPixels/AsDegrees/AsDecibels properties) with the address space Mitti's OSC Query server lists at http://<host>:51000. ([specs/imimot-mitti.yaml:635](specs/imimot-mitti.yaml#L635))
+- [ ] Check the feedback addresses read into state that only the Companion module names: currentCueID, selectedCueName, selectedCueID, playhead, mainFader, toggleVideoOutputs, toggleAudio, toggleFullscreen, toggleLoop, toggleTransitionOnPlay, in/outFromPlayheadEnabled, and the per-cue cueName, deleted and property messages (and whether they use the AsPercent names). ([specs/imimot-mitti.yaml:635](specs/imimot-mitti.yaml#L635))
+- [ ] Check the argument types Mitti accepts: values are sent as OSC strings ("75", "-3.5", "0.50") as the Companion module does; check whether floats or ints are what the OSC Query server advertises, and the types Mitti's feedback carries. ([specs/imimot-mitti.yaml:647](specs/imimot-mitti.yaml#L647))
+- [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
+- [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check that the KDS-EN7/DEC7, DSP-62 and MV-4X accept a space after the command name, which their manuals leave out. ([specs/kramer-p3000.yaml:4103](specs/kramer-p3000.yaml#L4103))
@@ -1609,6 +1666,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On MX2, confirm that port names cannot be set over LW3 (no property in the manual's LW3 chapter). ([specs/lightware-lw3.yaml:4523](specs/lightware-lw3.yaml#L4523))
 - [ ] Drive an MX2 and a UMX-HDMI-140 (Control mode, LW3) on RS-232 (link serial) and confirm the same answers and CHG notifications as over TCP 6107, with no flow control. ([specs/lightware-lw3.yaml:161](specs/lightware-lw3.yaml#L161))
 - [ ] Check when a Cleartext login on the RS-232 port ends (not documented) and that the login step works there. ([specs/lightware-lw3.yaml:4333](specs/lightware-lw3.yaml#L4333))
+
+## logos-proclaim — Logos Proclaim
+
+- [ ] Check what /appCommand/authenticate answers a wrong password with, and what /appCommand/perform answers an expired or wrong token with (401 or 403 is assumed for both), and whether a token expires. ([specs/logos-proclaim.yaml:314](specs/logos-proclaim.yaml#L314))
+- [ ] Record /onair/session's answer on air and off air (an id as plain text, and an empty body, are assumed). ([specs/logos-proclaim.yaml:347](specs/logos-proclaim.yaml#L347))
+- [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
+- [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
 
 ## magewell-proconvert — Magewell Pro Convert
 
@@ -2187,6 +2251,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record real streaming updates: that suid is stable for one encoder session, channelId matches the channel list's id, and deleteIncoming and deleteOutgoing arrive when the encoder and destinations stop. ([specs/restream.yaml:1034](specs/restream.yaml#L1034))
 - [ ] Record which updateStatuses fields each platform fills (viewers, followers, streamViews), and how often they arrive. ([specs/restream.yaml:1082](specs/restream.yaml#L1082))
 
+## rogueamoeba-farrago — Farrago
+
+- [ ] Check Farrago's default OSC Input and Output ports (8090 and 8091 here, the Companion module's defaults; the manual gives none). ([specs/rogueamoeba-farrago.yaml:492](specs/rogueamoeba-farrago.yaml#L492))
+- [ ] Check that /ping sends every current value to the OSC Output, that changes are sent there as they happen (from the app, from MIDI and from OSC), and whether feedback also comes by tile UUID or name and for the /inspector and /list addresses. ([specs/rogueamoeba-farrago.yaml:500](specs/rogueamoeba-farrago.yaml#L500))
+- [ ] Check the argument types and ranges: an int 1 for actions, an int 1 or 0 for switches, 0/1 for A/B, layout and playback mode, floats 0.0 to 1.0 for volume and color, and the units of currentPosition (assumed a fraction) and crossfadeDuration (assumed seconds); and the types of the feedback values (play as an OSC boolean, the meters' scale). ([specs/rogueamoeba-farrago.yaml:509](specs/rogueamoeba-farrago.yaml#L509))
+- [ ] Check that play on a playing tile stops it (or pauses it with pausing allowed), and what /set/<set>/position does with its value. ([specs/rogueamoeba-farrago.yaml:520](specs/rogueamoeba-farrago.yaml#L520))
+
 ## roland-p20hd — Roland P-20HD
 
 - [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:588](specs/roland-p20hd.yaml#L588))
@@ -2426,6 +2497,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the PN-LC, PN-HW2 and PN-ME2 take commands their short tables leave out (for example `MPOS`, `CONT`). ([specs/sharp-display.yaml:5698](specs/sharp-display.yaml#L5698))
 - [ ] Drive a Sharp display on its RS-232C terminal (link serial): confirm no login is asked for and the replies are those of the LAN, each ended CR LF. ([specs/sharp-display.yaml:5736](specs/sharp-display.yaml#L5736))
 - [ ] Confirm the minute Sharp asks for after a power or reset command counts from the final OK (after any WAIT), and that RSET (all reset) is the reset command meant; ARST and CRST are not held. ([specs/sharp-display.yaml:80](specs/sharp-display.yaml#L80))
+
+## showcuesystems-scs — SCS (Show Cue System)
+
+- [ ] Check that OSC over UDP is accepted with SCS as a Network Server on the Listen on Port No. given, and whether SCS offers a port of its own when none is set. ([specs/showcuesystems-scs.yaml:187](specs/showcuesystems-scs.yaml#L187))
+- [ ] Confirm that SCS sends nothing back to the sender for network cue control messages. ([specs/showcuesystems-scs.yaml:195](specs/showcuesystems-scs.yaml#L195))
+- [ ] Check the master and device fader range SCS caps at (the help page gives -75 dB to 0 dB as an example). ([specs/showcuesystems-scs.yaml:210](specs/showcuesystems-scs.yaml#L210))
+- [ ] Check that /ctrl/fadeall (from the Companion module, not in SCS's table) fades all cues. ([specs/showcuesystems-scs.yaml:212](specs/showcuesystems-scs.yaml#L212))
 
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 
@@ -2691,6 +2769,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm Create Channel Stream Schedule Segment takes duration as a string, and that segment ids hold only base64 characters (letters, digits, +, /, =). ([specs/twitch.yaml:1024](specs/twitch.yaml#L1024))
 - [ ] Confirm Update Channel Stream Schedule takes its vacation fields as query parameters, not a body, and answers 204. ([specs/twitch.yaml:1073](specs/twitch.yaml#L1073))
 - [ ] Confirm Delete Videos answers 200 with the deleted ids, and what it answers for a video that is not the channel's. ([specs/twitch.yaml:1160](specs/twitch.yaml#L1160))
+
+## videolan-vlc — VLC media player
+
+- [ ] Confirm the .json pages take the same commands as the .xml ones, the status and playlist field names read here, and the rate and audiodelay commands. ([specs/videolan-vlc.yaml:315](specs/videolan-vlc.yaml#L315))
+- [ ] Check that the playlist tree's first child is the Playlist (not the Media Library) in a localized VLC, and how nested folders appear. ([specs/videolan-vlc.yaml:332](specs/videolan-vlc.yaml#L332))
+- [ ] Check the largest volume value VLC accepts on the web interface. ([specs/videolan-vlc.yaml:325](specs/videolan-vlc.yaml#L325))
 
 ## vimeo-live — Vimeo Live
 

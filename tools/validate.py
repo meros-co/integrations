@@ -576,6 +576,22 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             re.compile(transport["reply_fence"])
         except re.error as e:
             errors.append(f"transport.reply_fence does not compile: {e}")
+    for key in ("reply_block_header", "reply_line_header"):
+        if key not in transport:
+            continue
+        if transport.get("reply_framing") != "headed-block":
+            errors.append(f"transport.{key} goes with reply_framing headed-block")
+        try:
+            re.compile(transport[key])
+        except re.error as e:
+            errors.append(f"transport.{key} does not compile: {e}")
+    osc_listen = (doc.get("telemetry") or {}).get("osc")
+    if osc_listen is not None:
+        if transport_type in ("osc-udp", "line-udp"):
+            errors.append("telemetry.osc is for a stream or HTTP transport: a UDP transport has listen_port")
+        listen = osc_listen.get("listen_port")
+        if isinstance(listen, dict) and listen.get("setting") not in settings:
+            errors.append(f"telemetry.osc.listen_port names unknown setting '{listen.get('setting')}'")
     for path, pattern in (transport.get("refusal_json") or {}).items():
         try:
             re.compile(pattern)
@@ -1046,6 +1062,16 @@ def port_checks(doc: dict) -> list[str]:
             elif not any(e["port"] == port for e in control):
                 errors.append(f"ports: endpoint '{name}''s port {port} is not a control port")
         tel = doc.get("telemetry") or {}
+        osc_listen = (tel.get("osc") or {}).get("listen_port")
+        if isinstance(osc_listen, dict) and not any(
+                e.get("setting") == osc_listen["setting"] and e["role"] == "feedback"
+                and e.get("listener") == "core" and e["protocol"] == "udp" for e in ports):
+            errors.append(f"ports: no core-listener udp feedback entry for the OSC port setting "
+                          f"'{osc_listen['setting']}'")
+        if isinstance(osc_listen, int) and not any(
+                e["port"] == osc_listen and e.get("listener") == "core" and e["protocol"] == "udp"
+                for e in ports):
+            errors.append(f"ports: no core-listener udp entry for telemetry.osc.listen_port {osc_listen}")
         if ("websocket" in tel or "sse" in tel) and not any(e["role"] == "push" for e in ports):
             errors.append("ports: the push channel has no push entry")
     return errors

@@ -16,6 +16,7 @@ use std::{collections::BTreeSet, env, fs, path::PathBuf};
 /// feature (`src/modules/mod.rs`). `crates/core/Cargo.toml` has one feature
 /// per spec id and one per group listing exactly these; a test checks it.
 const VENDOR_GROUPS: &[(&str, &[&str])] = &[
+    ("vendor-ableton", &["ableton-live"]),
     ("vendor-aes70", &["aes70"]),
     ("vendor-aja", &["aja-kipro", "aja-kumo"]),
     (
@@ -78,6 +79,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-boinx", &["boinx-mimolive"]),
     ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-canon", &["canon-ptz"]),
+    ("vendor-casparcg", &["casparcg"]),
     ("vendor-castr", &["castr"]),
     ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
@@ -103,6 +105,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-disguise", &["disguise"]),
+    ("vendor-dtvideolabs", &["dtvideolabs-playbackpro-plus"]),
     ("vendor-epson", &["epson-projector"]),
     ("vendor-etc", &["etc-echo", "etc-eos", "etc-paradigm"]),
     ("vendor-evertz", &["evertz-quartz"]),
@@ -110,7 +113,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-extron",
         &["extron-ipl", "extron-matrix", "extron-switcher"],
     ),
-    ("vendor-figure53", &["qlab"]),
+    ("vendor-faithlife", &["logos-proclaim"]),
+    ("vendor-figure53", &["figure53-go-button", "qlab"]),
     (
         "vendor-focusrite",
         &["focusrite-rednet", "focusrite-rednet-rcp"],
@@ -135,6 +139,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
+    ("vendor-imimot", &["imimot-mitti"]),
     ("vendor-kramer", &["kramer-p3000"]),
     (
         "vendor-labgruppen",
@@ -181,6 +186,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-resolume", &["resolume"]),
     ("vendor-restream", &["restream"]),
+    ("vendor-rogueamoeba", &["rogueamoeba-farrago"]),
     (
         "vendor-roland",
         &[
@@ -214,6 +220,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-sharp", &["sharp-display"]),
+    ("vendor-showcuesystems", &["showcuesystems-scs"]),
     (
         "vendor-shure",
         &[
@@ -255,6 +262,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-tvone", &["tvone-coriomaster"]),
     ("vendor-twitch", &["twitch"]),
+    ("vendor-videolan", &["videolan-vlc"]),
     ("vendor-vimeo", &["vimeo-live"]),
     (
         "vendor-yamaha",
