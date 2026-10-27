@@ -1054,6 +1054,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Whether LAS+EBLU/EGRN/ERED (and LAS+EPOW on Mirage SST) are safe on the 4K40-RGB and Mirage SST, where they are still documented (not offered). ([specs/christie-trulife.yaml:2724](specs/christie-trulife.yaml#L2724))
 - [ ] The RS232 IN data bits, parity, stop bits and connector (not in these references). ([specs/christie-trulife.yaml:2731](specs/christie-trulife.yaml#L2731))
 
+## chyron-prime — Chyron PRIME (Intelligent Interface)
+
+- [ ] Record the default serial line settings of an Intelligent Interface COM connection (9600 8N1, no flow control assumed). ([specs/chyron-prime.yaml:764](specs/chyron-prime.yaml#L764))
+- [ ] Confirm each reply ends with CR LF, and record the replies to the B commands (AN, AV, QS, QL, TH, SL, SA, SX, MX, CO, CS, SI, QE); the spec takes a reply to start with * or an eight-digit error code. ([specs/chyron-prime.yaml:62](specs/chyron-prime.yaml#L62))
+- [ ] Record what PRIME answers to the default heartbeat (two backslashes). ([specs/chyron-prime.yaml:39](specs/chyron-prime.yaml#L39))
+- [ ] Check that a buffer of * and a layer expression of * are accepted wherever the spec sends them (play_all with channel *, clear with layer *). ([specs/chyron-prime.yaml:189](specs/chyron-prime.yaml#L189))
+- [ ] Record the External Update X command PRIME sends, so it can be read into state. ([specs/chyron-prime.yaml:63](specs/chyron-prime.yaml#L63))
+- [ ] Check that the UTF-8 encoding setting of the connection carries non-ASCII text correctly. ([specs/chyron-prime.yaml:761](specs/chyron-prime.yaml#L761))
+
 ## clock-8001 — Clock-8001
 
 - [ ] Confirm the default command and feedback port 1245 and that feedback is broadcast as one bundle on every change. ([specs/clock-8001.yaml:57](specs/clock-8001.yaml#L57))
