@@ -1,6 +1,6 @@
 spec: 1
 id: newtek-tricaster
-name: NewTek / Vizrt TriCaster
+name: NewTek / Vizrt TriCaster and Vectar
 vendor: NewTek (Vizrt)
 category: switcher
 
@@ -24,7 +24,20 @@ source:
       switcher dictionary's T-bar and overlays (p.69 / p.169), the macro shortcuts and the
       macros_list dictionary (p.59-60 / p.158-159), and the change notification websocket
       /v1/change_notifications, which sends only the name of the dictionary that changed (p.71-72 /
-      p.170-172).
+      p.170-172). From the Vizrt edition only: the Viz 3Play channel commands sent to the system
+      on an NDI input with the net shortcut (clip_store, clip_restore, clip_select, clip_move,
+      clip_play, clip_scrub, p.152-155), the XML command format with extra keys and its POST to
+      /v1/shortcut as text/xml (p.159-160, p.163-164), the DataLink list at GET /v1/datalink
+      (p.163), file transfer by POST to /v1/file with the Filename and Overwrite headers and its
+      content types (p.165), the session color fields of the product information (p.168-169),
+      /v1/live answering TRUE or FALSE (p.162), and the full list of dictionary keys (p.171).
+  - title: Viz Vectar Plus User Guide 1.3, Macros and Automation, and LivePanel (November 2022)
+    author: Vizrt
+    url: https://docs.vizrt.com/viz-vectar-plus-user-guide/1.3/Macros_and_Automation.html
+    note: >
+      Manufacturer document. Viz Vectar Plus runs the same live production software and points
+      to the NewTek Automation and Integration Guide for network control; its LivePanel
+      password is set under System Utilities and is admin / admin by default.
   - title: TriCaster User Guides 8-4 and 8-5 (Vizion, Mini, TriCaster), section 4.1
     author: Vizrt
     note: The Live Panel password covers web pages and network control, on by default as admin/admin.
@@ -71,7 +84,8 @@ models:
                dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
                stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
                shortcut, shortcut_with_value, trigger, set_datalink,
-               play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser]
+               play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser,
+               net_shortcut, net_clip_store, net_clip_restore, net_clip_select, net_clip_move, net_clip_play, net_clip_play_from, net_clip_scrub, post_shortcut_xml, upload_file]
     verification: none
   - id: tricaster-8
     name: TriCaster TC1, TC2 Elite, Mini 4K / X and Vizion (software 7 and 8)
@@ -79,7 +93,17 @@ models:
                dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
                stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
                shortcut, shortcut_with_value, trigger, set_datalink,
-               play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser]
+               play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser,
+               net_shortcut, net_clip_store, net_clip_restore, net_clip_select, net_clip_move, net_clip_play, net_clip_play_from, net_clip_scrub, post_shortcut_xml, upload_file]
+    verification: none
+  - id: vectar
+    name: Vizrt Vectar, TriCaster Vectar and Viz Vectar Plus
+    supports: [take, auto, background_take, background_auto, set_program, set_preview,
+               dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
+               stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
+               shortcut, shortcut_with_value, trigger, set_datalink,
+               play_macro_by_id, stop_macro, stop_macro_by_id, record_macro, stop_recording_macro, continue_paused_macro, media_play_toggle, media_previous_clip, media_next_clip, media_select_clip, media_select_preset, media_next_preset, media_previous_preset, media_set_speed, media_mark_in, media_mark_out, media_clear_marks, media_set_mode, media_show_on_switcher, set_source_volume, mute_source, refresh_file_browser,
+               net_shortcut, net_clip_store, net_clip_restore, net_clip_select, net_clip_move, net_clip_play, net_clip_play_from, net_clip_scrub, post_shortcut_xml, upload_file]
     verification: none
 
 commands:
@@ -420,6 +444,151 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  net_shortcut:
+    summary: >
+      Send a shortcut to the Vizrt system feeding an NDI input, as a macro row
+      netN | shortcut_name | <shortcut> does (guide p.152-153)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      shortcut: { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true, label: Shortcut, description: "The shortcut the system at the other end of the NDI input runs, such as main_auto." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="" shortcut_name="{shortcut}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  net_clip_store:
+    summary: Have a Viz 3Play on an NDI input remember its current clip under an id (clip_store, guide p.153)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      id: { type: string, pattern: '^[^"<>&]*$', max_length: 64, required: true, label: Clip id, description: "The name the clip is remembered by, shared across the 3Play's outputs; empty is a valid id." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="clip_store" index="{id}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  net_clip_restore:
+    summary: Cue a clip remembered with net_clip_store on the 3Play output feeding an NDI input, from its start (clip_restore, guide p.153-154)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      id: { type: string, pattern: '^[^"<>&]*$', max_length: 64, required: true, label: Clip id, description: "The id the clip was stored under; nothing happens when no clip has it." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="clip_restore" index="{id}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  net_clip_select:
+    summary: Select a page, play list tab or clip on the 3Play output feeding an NDI input (clip_select, guide p.154)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      index: { type: string, pattern: '^[^"<>&]*$', max_length: 32, required: true, label: Index, description: "A play list tab number in Play List mode, or a clip number such as 0-023 in Clip List mode." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="clip_select" index="{index}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  net_clip_move:
+    summary: Move pages forward or back on the 3Play output feeding an NDI input (clip_move, guide p.154)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      distance: { type: int, min: -9999, max: 9999, required: true, label: Distance, description: "Pages to move from the current one: positive moves forward, negative back, -1 is the previous clip." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="clip_move" distance="{distance}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  net_clip_play:
+    summary: Play the clip on the 3Play output feeding an NDI input from its current frame (clip_play with speed, guide p.155)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      speed: { type: float, min: -10.0, max: 10.0, required: true, label: Speed, description: "Playback rate, 1.0 for normal speed; negative plays backwards." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="clip_play" speed="{speed:.3f}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  net_clip_play_from:
+    summary: Play the clip on the 3Play output feeding an NDI input from a position (clip_play with speed and position, guide p.155)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      speed: { type: float, min: -10.0, max: 10.0, required: true, label: Speed, description: "Playback rate, 1.0 for normal speed; negative plays backwards." }
+      position: { type: float, min: 0.0, max: 86400.0, required: true, label: Position, description: "Where play starts, in seconds into the clip." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="clip_play" speed="{speed:.3f}" position="{position:.3f}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  net_clip_scrub:
+    summary: Move the playhead of the 3Play output feeding an NDI input by a number of seconds (clip_scrub, guide p.155)
+    params:
+      net: { type: int, min: 1, max: 44, required: true, label: Network input, description: "The switcher input, numbered from 1, whose NDI source (a Viz 3Play output or another Vizrt system) the command goes to, as the net1, net2 ... shortcut names it." }
+      distance: { type: float, min: -86400.0, max: 86400.0, required: true, label: Distance, description: "Seconds to move the playhead: positive forward, negative back." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: '<shortcut name="net{net}" value="clip_scrub" distance="{distance:.3f}"/>'
+    expect: { status: 200 }
+    returns: ack
+
+  post_shortcut_xml:
+    summary: >
+      Post one shortcut, or several in a <shortcuts> list, in the XML command
+      format, for shortcuts that take more keys than a value (guide p.159-160,
+      p.163-164)
+    params:
+      xml: { type: string, pattern: '^\s*<shortcuts?[\s>/]', max_length: 65536, required: true, label: Shortcut XML, description: "One <shortcut name=\"...\" value=\"...\" key1=\"...\"/> element, or a <shortcuts> element holding several, XML-escaped." }
+    send:
+      method: POST
+      path: /v1/shortcut
+      content_type: text/xml
+      body: "{xml}"
+    expect: { status: 200 }
+    returns: ack
+
+  upload_file:
+    summary: >
+      Send a media file to the system, which answers with the file name it
+      stored it under, for titles, DDRs and other players (guide p.165)
+    params:
+      file: { type: binary, required: true, label: File, description: "The media file's bytes: audio, an image or video of one of the listed types." }
+      content_type:
+        type: enum
+        values: [audio/mpeg, audio/basic, audio/x-wav, audio/x-aiff, image/gif, image/jpeg, image/png, image/tiff, image/bmp, video/x-msvideo, video/quicktime, video/mp4, video/mpeg]
+        required: true
+        label: Type
+        description: "The file's media type, one the system lists as supported."
+      name: { type: string, pattern: '^[^\/:*?"<>|]+$', max_length: 255, required: true, label: File name, description: "The name the system should give the file; it may choose another, which the reply gives." }
+      overwrite: { type: bool, default: false, label: Overwrite, description: "True replaces a file of that name; false lets the system choose another name." }
+    send:
+      method: POST
+      path: /v1/file
+      body: { binary: file }
+      content_type: "{content_type}"
+      headers: { Filename: "{name}", Overwrite: "{overwrite}" }
+    expect: { status: 200 }
+    returns: text
+
 telemetry:
   # The change notification websocket (guide p.71-72) sends only the name of
   # the dictionary whose content changed; each name has that dictionary read
@@ -440,11 +609,18 @@ telemetry:
         - { method: GET, path: /v1/dictionary, query: { key: buffer } }
         - { method: GET, path: /v1/dictionary, query: { key: ddr_playlist } }
         - { method: GET, path: /v1/dictionary, query: { key: macros_list } }
+        - { method: GET, path: /v1/dictionary, query: { key: switcher_ui_effects } }
+        - { method: GET, path: /v1/dictionary, query: { key: audiomixer } }
+        - { method: GET, path: /v1/dictionary, query: { key: audio_bins } }
+        - { method: GET, path: /v1/dictionary, query: { key: ndi_sources } }
+        - { method: GET, path: /v1/datalink }
+        - { method: GET, path: /v1/live }
     - send:
         - { method: GET, path: /version }
         - { method: GET, path: /v1/version }
+        - { method: GET, path: /v1/dictionary, query: { key: filebrowser } }
   updates:
-    - match: "^(shortcut_states|tally|ddr_playlist|buffer|switcher|macros_list)$"
+    - match: "^(shortcut_states|tally|ddr_playlist|buffer|switcher|macros_list|switcher_ui_effects|audiomixer|audio_bins|ndi_sources|filebrowser)$"
       then_send:
         - { method: GET, path: /v1/dictionary, query: { key: "{1}" } }
     # The tally dictionary (Automation and Integration Guide p.67-68): one
@@ -500,6 +676,21 @@ telemetry:
     - path: "^/v1/dictionary\\?key=ddr_timecode$"
       match: '(?s)^\s*(<.*>)\s*$'
       state: { ddr.timecode_xml: "{1}" }
+    # The other dictionaries the guide lists (p.170-171), whose content it
+    # shows only in part (switcher_ui_effects) or not at all: each kept whole.
+    - path: "^/v1/dictionary\\?key=(switcher_ui_effects|audiomixer|audio_bins|ndi_sources|filebrowser)$"
+      match: '(?s)^\s*(<.*>)\s*$'
+      state: { "dictionaries.{1}": "{2}" }
+    # The DataLink keys and values (guide p.163): <data><key/><value/></data>,
+    # the list replaced whole.
+    - path: "^/v1/datalink$"
+      xml_each: data
+      replace: datalink
+      state: { "datalink.{key:key}": "{value}" }
+    # TRUE in a session, FALSE in the control panel (guide p.162).
+    - path: "^/v1/live$"
+      match: '(?i)^\s*(true|false)\s*$'
+      state: { session.live: { value: "{1:lower}", map: { "true": true, "false": false } } }
     # Macros (guide p.59-60): each macro element's name, the list replaced
     # whole.
     - path: "^/v1/dictionary\\?key=macros_list$"
@@ -526,6 +717,8 @@ telemetry:
         session.frame_rate: "{session_frame_rate}"
         session.aspect_ratio: "{session_aspect_ratio}"
         session.fielded: { value: "{session_fielded}", map: { "true": true, "false": false } }
+        session.color_format: "{session_color_format}"
+        session.color_coding: "{session_color_coding}"
 
 state:
   tally.*.program: { type: bool, description: "Source visible on program (through any layer), keyed by internal source name such as input1 or ddr1" }
@@ -557,6 +750,11 @@ state:
   session.frame_rate: { type: float, unit: Hz, description: "Session frame rate, such as 29.970030" }
   session.fielded: { type: bool, description: "The session is interlaced" }
   session.aspect_ratio: { type: float, description: "Session picture aspect ratio, such as 1.777778" }
+  session.color_format: { type: string, description: "Session color format, such as CCIR709" }
+  session.color_coding: { type: string, description: "Session color coding, such as NTSC" }
+  session.live: { type: bool, description: "A session is open (true) rather than the control panel (false), from /v1/live" }
+  dictionaries.*: { type: string, description: "Each dictionary whose content the guide does not document, kept whole as the XML the system sends, keyed by its name: switcher_ui_effects (the effects loaded in each switcher's bins), audiomixer, audio_bins, ndi_sources and filebrowser" }
+  datalink.*: { type: string, description: "Each DataLink key's current value, keyed by the key's name, as GET /v1/datalink lists them" }
 
 quirks:
   - models: [all]
@@ -621,3 +819,42 @@ quirks:
       moves, set duration), adding or removing clips by file path, and
       set_global_var, which take values whose units or syntax the file states
       only loosely.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The net commands reach a Viz 3Play (or another Vizrt system) feeding an
+      NDI input through this system. The guide gives them as macro rows (the
+      netN shortcut, the channel command as its value, then keys and values);
+      they are sent here in its XML command format, <shortcut name="netN"
+      value="clip_play" speed="1.000"/>, posted to /v1/shortcut, which the guide
+      documents for shortcuts with keys but never shows for net. net_shortcut
+      sends value="" with the shortcut in a shortcut_name key, as the macro row
+      leaves the value column empty. Only the target's own reaction shows
+      whether a command arrived.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not kept in state: the JPEG previews of sources and outputs (/v1/image)
+      and file icons (/v1/icon), which are pictures rather than values, and
+      the audio, VU, shortcut and timecode websockets, which carry media or
+      messages the guide does not document. macro_is_enabled_byname and
+      get_macroid_byname answer in the system's Notifications panel, not over
+      the network, so they are not commands here; the macros_list dictionary
+      gives the same. Dictionaries the guide lists without their content
+      (switcher_ui_effects in part, audiomixer, audio_bins, ndi_sources,
+      filebrowser) are kept whole as XML under dictionaries; filebrowser is
+      read on connecting and when the system names it, after
+      refresh_file_browser for instance, since a large media folder makes it
+      long.
+
+  - models: [vectar]
+    severity: info
+    text: >
+      Vizrt Vectar and Viz Vectar Plus run the same live production software
+      on a host computer and take the same shortcuts, dictionaries and
+      websocket; their user guide points to the Automation and Integration
+      Guide for network control, and their LivePanel password is admin /
+      admin by default as on a TriCaster. Inputs run to 44 there (the guide's
+      input tables), which bounds the net commands.

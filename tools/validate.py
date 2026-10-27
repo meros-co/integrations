@@ -695,7 +695,7 @@ def endpoint_checks(doc: dict) -> list[str]:
     for name, e in endpoints.items():
         where = f"transport.endpoints.{name}"
         for key, kind, values in (("port", "int", None), ("scheme", "enum", {"http", "https"}),
-                                  ("auth", "enum", {"inherit", "none"})):
+                                  ("auth", "enum", {"inherit", "none", "basic"})):
             ref = e.get(key)
             if not isinstance(ref, dict):
                 continue
@@ -706,9 +706,16 @@ def endpoint_checks(doc: dict) -> list[str]:
                 errors.append(f"{where}.{key}'s setting must be "
                               + ("an int" if kind == "int" else f"an enum of {' and '.join(sorted(values))}"))
         # Beside a transport that is not HTTP there is no credential to
-        # inherit: the endpoint's requests go without one.
-        if transport.get("type") != "http" and ("auth" in e and e.get("auth") != "none"):
-            errors.append(f"{where}.auth is none beside a {transport.get('type')} transport")
+        # inherit: the endpoint's requests go without one, or with its own
+        # Basic credential.
+        auth = e.get("auth")
+        choices = set(settings.get(auth["setting"], {}).get("values", [])) if isinstance(auth, dict) else {auth}
+        if transport.get("type") != "http" and "auth" in e and choices - {"none", "basic"}:
+            errors.append(f"{where}.auth is none or basic beside a {transport.get('type')} transport")
+        if "basic" in choices:
+            for needed in ("username", "password"):
+                if needed not in settings:
+                    errors.append(f"{where}.auth basic needs a '{needed}' setting")
         if "accept_invalid_certs" in e and not isinstance(e["accept_invalid_certs"], bool):
             errors.append(f"{where}.accept_invalid_certs is true or false")
     telemetry = doc.get("telemetry") or {}

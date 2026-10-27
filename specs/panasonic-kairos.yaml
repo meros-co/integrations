@@ -1,0 +1,329 @@
+spec: 1
+id: panasonic-kairos
+name: Panasonic KAIROS
+vendor: Panasonic
+category: switcher
+
+source:
+  - title: "Panasonic KAIROS API Specifications V1.0 (Kairos Core 100, AT-KC100), 2020-12-16"
+    author: Panasonic Corporation
+    url: "https://github.com/bitfocus/companion-module-requests/files/7729522/KAIROS_REST_API_Specification_E_V1.0.pdf"
+    note: >
+      Manufacturer document, as attached to the public Companion module request #669. The REST
+      API at http(s)://<ip>:<port>/<json-pointer>, port 1234 by default, no trailing slash;
+      Basic authentication (default) with user Kairos and the system ID as password, or none;
+      GET /inputs, /macros, /aux, /multiviewers (and /<index>/sdp) and /scenes, each list or one
+      object by name, index or uuid, with their example replies; PATCH as
+      application/merge-patch+json on /scenes/<scene>/<layer> (sourceA, sourceB), /macros/<macro>
+      (state play), /aux/<aux> (source) and /multiviewers/<multiviewer> (preset); 400 for a source
+      or preset not in its list, for unknown arguments and malformed JSON; PUT, POST and DELETE
+      not supported.
+  - title: "Simple Panasonic Kairos Control Protocol Definition (2020-10-06 to 2022-03-07)"
+    author: Panasonic Corporation
+    url: "https://github.com/bitfocus/companion-module-panasonic-kairos/blob/main/SimpleControl.md"
+    note: >
+      Panasonic's own protocol definition, republished in the MIT-licensed Companion module
+      Panasonic commissioned. TCP port 3005 by default; commands ending in CR LF (LF accepted);
+      objects and attributes joined by dots from the root or a script name (SCENES, AUX1, IN1,
+      MV1); assignment with =, a query with the bare name answered as name=value; functions such
+      as MV1.recall_layout=1 and MV1.clear_layout; OK, Error, Permission Error and Enum Error
+      answers; subscribe: and unsubscribe: per attribute; list: and info: answered with lines
+      ended by an empty line; the escapes &#58; &#46; &#61; &#92; &#13; &#10;; the mandatory
+      keep-alive (an empty line) since v1.2, the client dropped after 10 s without a message;
+      APPLICATION:NEW when a production is loaded; the scene attributes tally, cut and auto in
+      the info example.
+  - title: "Panasonic KAIROS operating guide DVQP2366YA, section 3.4 KAIROS Rest API"
+    author: Panasonic Corporation
+    url: "https://pro-av.panasonic.net/manual/pdf/Kairos_guide(DVQP2366YA)_E.pdf"
+    note: The REST API's browser pages, user Kairos and the system ID as password.
+
+transport:
+  type: line-tcp
+  port: 3005
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 3000
+  error_match: "^(Error|Permission Error|Enum Error)$"
+  keepalive: { send: "", every_ms: 5000 }
+  endpoints:
+    rest: { port: { setting: rest_port }, auth: { setting: rest_auth } }
+
+settings:
+  rest_port: { type: int, min: 1, max: 65535, default: 1234, label: REST port, description: "The REST API's port, as set in the KAIROS protocol settings." }
+  rest_auth: { type: enum, values: [basic, none], default: basic, label: REST login, description: "basic when the REST API asks for a login (the default), none when it is set to no authentication." }
+  username: { type: string, default: Kairos, label: User, description: "The REST API's user, Kairos." }
+  password: { type: string, secret: true, default: "", label: System ID, description: "The REST API's password: the KAIROS server's system ID, shown in the GUI's Help." }
+
+ports:
+  - { port: 3005, protocol: tcp, role: control }
+  - { port: 1234, protocol: http, role: control, setting: rest_port }
+
+models:
+  - id: kairos
+    name: Panasonic KAIROS Core 100 and 1000 (AT-KC100, AT-KC1000) and Kairos Cloud
+    supports: [set_attribute, get_attribute, call_function, call_function_with, subscribe, unsubscribe,
+               scene_cut, scene_auto, set_aux_source, recall_multiviewer_layout, clear_multiviewer_layout,
+               set_layer_source_a, set_layer_source_b, play_macro, set_multiviewer_preset]
+    verification: none
+
+commands:
+  set_attribute:
+    summary: Set any attribute by its path, as path=value (Simple Control Protocol)
+    params:
+      path: &path { type: string, pattern: "^[^=:\\s][^=]*$", max_length: 512, required: true, label: Path, description: "The attribute's path from the root or a script name, such as AUX1.source or SCENES.Main.Layers.Background.sourceA, with . : = and backslash in names written as the protocol's &#46; style escapes." }
+      value: { type: string, max_length: 1024, required: true, label: Value, description: "The value, such as a source's path or name (IN1) or a number; names escaped as in path." }
+    send: "{path}={value}"
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  get_attribute:
+    summary: Read any attribute by its path; the KAIROS answers path=value
+    params:
+      path: *path
+    send: "{path}"
+    expect: { reply_contains: "{path}=", matches: "^[^=]*=(.*)$" }
+    returns: value
+
+  call_function:
+    summary: Run a function that takes no argument, such as a scene's cut or auto or MV1.clear_layout
+    params:
+      path: *path
+    send: "{path}="
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  call_function_with:
+    summary: Run a function with its argument, such as MV1.recall_layout with a layout number
+    params:
+      path: *path
+      argument: { type: string, max_length: 1024, required: true, label: Argument, description: "The function's argument." }
+    send: "{path}={argument}"
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  subscribe:
+    summary: Have the KAIROS send an attribute whenever it changes, into state under attributes
+    params:
+      path: *path
+    send: "subscribe:{path}"
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  unsubscribe:
+    summary: Stop an attribute's change messages
+    params:
+      path: *path
+    send: "unsubscribe:{path}"
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  scene_cut:
+    summary: Cut the scene's next transition (the scene's cut function)
+    params:
+      scene: &scene { type: string, pattern: "^[^=:\\s][^=]*$", max_length: 512, required: true, label: Scene, description: "The scene's path, such as SCENES.Main or SCENES.Templates.2Box." }
+    send: "{scene}.cut="
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  scene_auto:
+    summary: Run the scene's next transition automatically (the scene's auto function)
+    params:
+      scene: *scene
+    send: "{scene}.auto="
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  set_aux_source:
+    summary: Route a source to an AUX output (AUX1.source=IN1)
+    params:
+      aux: { type: string, pattern: "^[^=:\\s][^=]*$", max_length: 256, required: true, label: AUX, description: "The AUX's path or script name, such as AUX1." }
+      source: &source { type: string, pattern: "^[^=\\s][^=]*$", max_length: 512, required: true, label: Source, description: "The source's path or script name, such as IN1, ColA or a scene." }
+    send: "{aux}.source={source}"
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  recall_multiviewer_layout:
+    summary: Recall a layout on a multiviewer (MV1.recall_layout=1)
+    params:
+      multiviewer: &mv { type: string, pattern: "^[^=:\\s][^=]*$", max_length: 256, required: true, label: Multiviewer, description: "The multiviewer's path or script name, such as MV1." }
+      layout: { type: int, min: 0, max: 9999, required: true, label: Layout, description: "The layout's number, as the KAIROS lists it." }
+    send: "{multiviewer}.recall_layout={layout}"
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  clear_multiviewer_layout:
+    summary: Clear a multiviewer's layout (MV1.clear_layout)
+    params:
+      multiviewer: *mv
+    send: "{multiviewer}.clear_layout="
+    expect: { reply_contains: "OK", matches: "^OK$" }
+    returns: ack
+
+  set_layer_source_a:
+    summary: Set a scene layer's A (program) source over the REST API (PATCH sourceA)
+    params:
+      scene: &rest_scene { type: string, max_length: 256, required: true, label: Scene, description: "The scene's name or uuid, as GET /scenes gives it." }
+      layer: &rest_layer { type: string, max_length: 256, required: true, label: Layer, description: "The layer's name or uuid, such as Background." }
+      source: &rest_source { type: string, max_length: 256, required: true, label: Source, description: "A source from the layer's sources list, such as IN1 or Black." }
+    send: { endpoint: rest, method: PATCH, path: "/scenes/{scene}/{layer}", body: '{"sourceA":{source:json}}', content_type: application/merge-patch+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_source_b:
+    summary: Set a scene layer's B (preset) source over the REST API (PATCH sourceB)
+    params:
+      scene: *rest_scene
+      layer: *rest_layer
+      source: *rest_source
+    send: { endpoint: rest, method: PATCH, path: "/scenes/{scene}/{layer}", body: '{"sourceB":{source:json}}', content_type: application/merge-patch+json }
+    expect: { status: 200 }
+    returns: ack
+
+  play_macro:
+    summary: Play a macro over the REST API (PATCH state play)
+    params:
+      macro: { type: string, max_length: 256, required: true, label: Macro, description: "The macro's name or uuid, as GET /macros gives it." }
+    send: { endpoint: rest, method: PATCH, path: "/macros/{macro}", body: '{"state":"play"}', content_type: application/merge-patch+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_multiviewer_preset:
+    summary: Apply a multiviewer preset over the REST API (PATCH preset)
+    params:
+      multiviewer: { type: string, max_length: 256, required: true, label: Multiviewer, description: "The multiviewer's index (0 or 1), name or uuid." }
+      preset: { type: int, min: 0, max: 9999, required: true, label: Preset, description: "The preset's id from the multiviewer's presets list." }
+    send: { endpoint: rest, method: PATCH, path: "/multiviewers/{multiviewer}", body: '{"preset":{preset}}', content_type: application/merge-patch+json }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # The REST lists every two seconds (they give every scene's layers and
+  # sources, inputs' tally, AUX, macros and multiviewers); attributes a
+  # consumer subscribes to arrive as path=value and are kept as they come.
+  poll:
+    - every_ms: 2000
+      send:
+        - { endpoint: rest, method: GET, path: /scenes }
+        - { endpoint: rest, method: GET, path: /inputs }
+        - { endpoint: rest, method: GET, path: /aux }
+    - every_ms: 10000
+      send:
+        - { endpoint: rest, method: GET, path: /macros }
+        - { endpoint: rest, method: GET, path: /multiviewers }
+  updates:
+    - match: '^([A-Za-z&][^="{}\[\]]*)=(.*)$'
+      state: { "attributes.{1:key}": "{2}" }
+    # A production loaded: every list read again; subscriptions are gone.
+    - match: "^APPLICATION:NEW$"
+      state: { production.reloads: "1" }
+      then_send:
+        - { endpoint: rest, method: GET, path: /scenes }
+        - { endpoint: rest, method: GET, path: /inputs }
+        - { endpoint: rest, method: GET, path: /aux }
+        - { endpoint: rest, method: GET, path: /macros }
+        - { endpoint: rest, method: GET, path: /multiviewers }
+    - path: "^/scenes$"
+      json_each: "$"
+      json: { id: "$.uuid", name: "$.name", tally: "$.tally" }
+      replace: scenes
+      state: { "scenes.{id:key}.name": "{name}", "scenes.{id:key}.tally": "{tally}" }
+    - path: "^/scenes$"
+      json_each: "$[*].layers"
+      json: { scene: "$^.uuid", id: "$.uuid", name: "$.name", a: "$.sourceA", b: "$.sourceB" }
+      state:
+        "scenes.{scene:key}.layers.{id:key}.name": "{name}"
+        "scenes.{scene:key}.layers.{id:key}.index": "{index}"
+        "scenes.{scene:key}.layers.{id:key}.source_a": "{a}"
+        "scenes.{scene:key}.layers.{id:key}.source_b": "{b}"
+    - path: "^/inputs$"
+      json_each: "$"
+      json: { id: "$.uuid", name: "$.name", index: "$.index", tally: "$.tally" }
+      replace: inputs
+      state: { "inputs.{id:key}.name": "{name}", "inputs.{id:key}.index": "{index}", "inputs.{id:key}.tally": "{tally}" }
+    - path: "^/aux$"
+      json_each: "$"
+      json: { id: "$.uuid", name: "$.name", source: "$.source" }
+      replace: aux
+      state: { "aux.{id:key}.name": "{name}", "aux.{id:key}.source": "{source}" }
+    - path: "^/macros$"
+      json_each: "$"
+      json: { id: "$.uuid", name: "$.name", state: "$.state" }
+      replace: macros
+      state: { "macros.{id:key}.name": "{name}", "macros.{id:key}.state": "{state}" }
+    - path: "^/multiviewers$"
+      json_each: "$"
+      json: { id: "$.uuid", name: "$.name", index: "$.index", preset: "$.preset", sdp: "$.sdp" }
+      replace: multiviewers
+      state:
+        "multiviewers.{id:key}.name": "{name}"
+        "multiviewers.{id:key}.index": "{index}"
+        "multiviewers.{id:key}.preset": "{preset}"
+        "multiviewers.{id:key}.sdp": "{sdp}"
+    - path: "^/multiviewers$"
+      json_each: "$[*].presets"
+      json: { mv: "$^.uuid", id: "$.id", name: "$.name", user: "$.usr" }
+      state:
+        "multiviewers.{mv:key}.presets.{id}.name": "{name}"
+        "multiviewers.{mv:key}.presets.{id}.user": "{user}"
+
+state:
+  attributes.*: { type: string, description: "Each attribute read or subscribed to over the control protocol, keyed by its path as the KAIROS writes it" }
+  production.reloads: { type: int, description: "Set to 1 when the KAIROS reports a production loaded (APPLICATION:NEW); subscriptions must be made again" }
+  scenes.*.name: { type: string, description: "Each scene's name, keyed by its uuid" }
+  scenes.*.tally: { type: int, description: "The scene's tally, as the REST API gives it (1 on air)" }
+  scenes.*.layers.*.name: { type: string, description: "Each layer's name, keyed by scene and layer uuid" }
+  scenes.*.layers.*.index: { type: int, description: "The layer's place in the scene, from 0" }
+  scenes.*.layers.*.source_a: { type: string, description: "The layer's A (program) source" }
+  scenes.*.layers.*.source_b: { type: string, description: "The layer's B (preset) source, for a layer that has one" }
+  inputs.*.name: { type: string, description: "Each input's name, keyed by its uuid" }
+  inputs.*.index: { type: int, description: "The input's index, as the REST API gives it" }
+  inputs.*.tally: { type: int, description: "The input's tally: 0 off, 1 program, other values the other tally colors" }
+  aux.*.name: { type: string, description: "Each AUX's name, keyed by its uuid" }
+  aux.*.source: { type: string, description: "The source on the AUX" }
+  macros.*.name: { type: string, description: "Each macro's name, keyed by its uuid" }
+  macros.*.state: { type: string, description: "The macro's state, when the REST API gives one" }
+  multiviewers.*.name: { type: string, description: "Each multiviewer's name, keyed by its uuid" }
+  multiviewers.*.index: { type: int, description: "The multiviewer's index, 0 or 1" }
+  multiviewers.*.preset: { type: int, description: "The preset applied, when the REST API gives it" }
+  multiviewers.*.sdp: { type: string, description: "The multiviewer stream's SDP" }
+  multiviewers.*.presets.*.name: { type: string, description: "Each multiviewer preset's name, keyed by its id" }
+  multiviewers.*.presets.*.user: { type: bool, description: "The preset is user-defined" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Two interfaces: the control protocol on TCP 3005 for every attribute and
+      function the production exposes, and the REST API on 1234 for the lists
+      (scenes, layers, inputs, AUX, macros, multiviewers), polled every two
+      and ten seconds, and the four documented writes. The protocol names
+      paths but leaves the tree to the production: only SCENES, AUX1, IN1, MV1,
+      a scene's tally, cut and auto and a multiviewer's recall_layout and
+      clear_layout are documented, so transitions beyond a scene's next
+      transition, players, audio and the rest are reached with set_attribute,
+      call_function and subscribe by the paths the KAIROS Creator shows (a
+      query's answer is itself the command). list: and info: answer with
+      several lines ended by an empty line and are not offered. The
+      keep-alive empty line goes every five seconds of silence, as the
+      protocol requires since v1.2.
+
+  - models: [all]
+    severity: info
+    text: >
+      Values the protocol reads back arrive as path=value and are kept under
+      attributes keyed by the path; subscriptions end when a production is
+      loaded (APPLICATION:NEW), which also has the REST lists read again.
+      The protocol answers OK or Error without naming the request, so a change
+      pushed between a command and its OK is taken as a push. Out-of-range
+      integers are clamped by the KAIROS, not refused. Names holding . : = or
+      a backslash are written with the protocol's &#46; style escapes by the
+      caller.
+
+  - models: [all]
+    severity: info
+    text: >
+      The REST API logs in with Basic, user Kairos and the system ID as
+      password, unless set to no authentication (rest_auth none); a refused
+      login stops the device until its settings are corrected. A source or
+      preset not in the object's list is answered 400.

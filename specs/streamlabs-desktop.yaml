@@ -1,0 +1,895 @@
+spec: 1
+id: streamlabs-desktop
+name: Streamlabs Desktop
+vendor: Streamlabs
+category: switcher
+
+source:
+  - title: "Streamlabs Desktop API reference (streamlabs-desktop-api-docs, docs/index.html and the service pages)"
+    author: Streamlabs
+    url: "https://github.com/streamlabs/streamlabs-desktop-api-docs"
+    note: >
+      Manufacturer documentation, read 2026-10-23 (repository updated 2026-09-02). The API
+      reference page: JSON-RPC 2.0 requests {jsonrpc, id, method, params: {resource, args}},
+      one per line; HELPER results carrying a resourceId and the getModel() data unless
+      compactMode is set; event subscriptions by calling the event's name, answered with a
+      SUBSCRIPTION and followed by EVENT messages {result: {_type: EVENT, resourceId, data}};
+      unsubscribe; promises answered as a SUBSCRIPTION with a single PROMISE event; remote
+      connections over websockets powered by SockJS, enabled in Settings > Remote Control,
+      where the token is shown; auth with TcpServerService and the token as the first request
+      of every connection; muting with AudioSource setMuted, item visibility with SceneItem
+      setVisibility and the SceneItem["scene","node","source"] resource form, scene
+      collections with SceneCollectionsService collections and load. The service pages:
+      AudioService and AudioSource (setMuted, setDeflection, IAudioSourceModel and IFader),
+      ScenesService (activeScene, activeSceneId, getScenes, getScene, createScene,
+      makeSceneActive, removeScene, sceneSwitched, sceneAdded, sceneRemoved, itemAdded,
+      itemRemoved, itemUpdated), Scene (addSource, addFile, createAndAddSource, createFolder,
+      removeFolder, removeItem, clear, setName, getModel), SceneItem (setVisibility,
+      setTransform, setSettings, setContentCrop, centerOnScreen, fitToScreen, stretchToScreen,
+      flipX, flipY, resetTransform, rotate, placeAfter, placeBefore, setParent, remove, and
+      ISceneItemModel), SceneItemFolder (setName, ungroup), SourcesService and Source
+      (createSource, addFile, removeSource, sourceAdded, sourceRemoved, sourceUpdated,
+      setName, updateSettings, refresh, duplicate, ISourceModel), StreamingService
+      (toggleStreaming, toggleRecording, startReplayBuffer, stopReplayBuffer, saveReplay,
+      getModel and the three status changes, with the EStreamingState, ERecordingState and
+      EReplayBufferState values), TransitionsService (studio mode), SceneCollectionsService,
+      NotificationsService and PerformanceService.
+  - title: "Streamlabs Desktop API docs, sample web interface (index.html)"
+    author: Streamlabs
+    url: "https://github.com/streamlabs/streamlabs-desktop-api-docs/blob/master/index.html"
+    note: >
+      Manufacturer sample: the SockJS endpoint http://<host>:59650/api and the auth request sent
+      first on each connection.
+  - title: "SockJS protocol 0.3.3, raw WebSocket transport"
+    url: "https://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html"
+    note: >
+      The SockJS server's raw WebSocket URL, <prefix>/websocket, which carries the application's
+      messages without SockJS framing; used here at /api/websocket.
+
+transport:
+  type: ws
+  port: 59650
+  path: /api/websocket
+  scheme: ws
+  timeout_ms: 4000
+  reply: expected
+  probe: '{"jsonrpc":"2.0","id":"probe","method":"activeSceneId","params":{"resource":"ScenesService"}}'
+
+settings:
+  token: { type: string, secret: true, required: true, label: API token, description: "The token shown in Streamlabs Desktop under Settings, Remote Control, after clicking the QR code and Show details; it is sent first on every connection." }
+
+on_connect:
+  - send: '{"jsonrpc":"2.0","id":"auth","method":"auth","params":{"resource":"TcpServerService","args":[{settings.token:json}]}}'
+    await_reply: true
+    refused: '"id"\s*:\s*"auth"\s*,\s*"error"\s*:|"error"\s*:.*"id"\s*:\s*"auth"'
+    accepted: '"id"\s*:\s*"auth"\s*,\s*"result"\s*:|"result"\s*:.*"id"\s*:\s*"auth"'
+
+ports:
+  - { port: 59650, protocol: ws, role: control, note: "Streamlabs Desktop's remote control port, shown with the token" }
+
+models:
+  - id: streamlabs-desktop
+    name: Streamlabs Desktop (Windows and macOS)
+    supports: [call, make_scene_active, create_scene, remove_scene, rename_scene, clear_scene,
+               add_source_to_scene, add_file_to_scene, create_source_in_scene, create_folder, remove_folder,
+               rename_folder, ungroup_folder, set_item_visibility, set_item_locked, set_item_stream_visible,
+               set_item_recording_visible, set_item_position, set_item_scale, set_item_rotation, set_item_crop,
+               rotate_item, center_item, fit_item, stretch_item, flip_item_x, flip_item_y, reset_item_transform,
+               place_item_after, place_item_before, set_item_parent, remove_item, create_source, add_file_source,
+               remove_source, rename_source, update_source_settings, refresh_source, duplicate_source,
+               set_source_muted, set_audio_deflection, toggle_streaming, toggle_recording, start_replay_buffer,
+               stop_replay_buffer, save_replay, enable_studio_mode, disable_studio_mode,
+               execute_studio_mode_transition, load_scene_collection, create_scene_collection,
+               delete_scene_collection, rename_scene_collection, push_notification,
+               mark_all_notifications_read, set_notification_settings]
+    verification: none
+
+commands:
+  call:
+    summary: >
+      Call any method of the API on a resource and return its result, for
+      what the commands below do not cover (JSON-RPC request, docs/index.html)
+    params:
+      resource: { type: string, pattern: '^[A-Za-z]+(\[[^\]\\]*\])?(\.[A-Za-z]+)?$', max_length: 512, required: true, label: Resource, description: "A service name such as ScenesService, or a resourceId such as Scene[\"3efd436e5546\"]." }
+      method: { type: string, pattern: "^[A-Za-z][A-Za-z0-9]*$", max_length: 64, required: true, label: Method, description: "The method or property name, such as getScenes." }
+      args: { type: json, required: true, label: Arguments, description: "The method's arguments as a JSON array, such as [] or [\"d3165bf4\"]." }
+    send: '{"jsonrpc":"2.0","id":"call","method":{method:json},"params":{"resource":{resource:json},"args":{args}}}'
+    expect:
+      reply_json: { "$.id": "call" }
+      json_path: "$.result"
+    returns: value
+
+  # ── Scenes ──────────────────────────────────────────────────────────────
+  make_scene_active:
+    summary: Switch to a scene (ScenesService.makeSceneActive)
+    params:
+      scene_id: &scene_id { type: string, pattern: "^[A-Za-z0-9_.:-]+$", max_length: 128, required: true, label: Scene, description: "The scene's ID, as the scene list gives it." }
+    send: '{"jsonrpc":"2.0","id":"activate {scene_id}","method":"makeSceneActive","params":{"resource":"ScenesService","args":["{scene_id}"]}}'
+    expect: { reply_json: { "$.id": "activate {scene_id}" }, json_equals: { "$.result": true } }
+    returns: ack
+
+  create_scene:
+    summary: Create a scene (ScenesService.createScene)
+    params:
+      name: &name { type: string, max_length: 256, required: true, label: Name, description: "The name to give it." }
+    send: '{"jsonrpc":"2.0","id":"create scene","method":"createScene","params":{"resource":"ScenesService","args":[{name:json}],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "create scene" }, not_contains: '"error":' }
+    returns: ack
+
+  remove_scene:
+    summary: Delete a scene (ScenesService.removeScene)
+    params:
+      scene_id: *scene_id
+    send: '{"jsonrpc":"2.0","id":"remove scene {scene_id}","method":"removeScene","params":{"resource":"ScenesService","args":["{scene_id}"]}}'
+    expect: { reply_json: { "$.id": "remove scene {scene_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  rename_scene:
+    summary: Rename a scene (Scene.setName)
+    params:
+      scene_id: *scene_id
+      name: *name
+    send: '{"jsonrpc":"2.0","id":"rename scene {scene_id}","method":"setName","params":{"resource":"Scene[\"{scene_id}\"]","args":[{name:json}]}}'
+    expect: { reply_json: { "$.id": "rename scene {scene_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  clear_scene:
+    summary: Remove every item and folder from a scene (Scene.clear)
+    params:
+      scene_id: *scene_id
+    send: '{"jsonrpc":"2.0","id":"clear scene {scene_id}","method":"clear","params":{"resource":"Scene[\"{scene_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "clear scene {scene_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  add_source_to_scene:
+    summary: Add an existing source to a scene as a new item (Scene.addSource)
+    params:
+      scene_id: *scene_id
+      source_id: &source_id { type: string, pattern: "^[A-Za-z0-9_.:-]+$", max_length: 256, required: true, label: Source, description: "The source's ID, as the source list gives it." }
+    send: '{"jsonrpc":"2.0","id":"add source {scene_id} {source_id}","method":"addSource","params":{"resource":"Scene[\"{scene_id}\"]","args":["{source_id}"],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "add source {scene_id} {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  add_file_to_scene:
+    summary: Create sources from a file or folder on the streaming computer and add them to a scene, the type chosen by extension (Scene.addFile)
+    params:
+      scene_id: *scene_id
+      path: &path { type: string, max_length: 4096, required: true, label: Path, description: "A file or folder path on the computer running Streamlabs Desktop." }
+    send: '{"jsonrpc":"2.0","id":"add file {scene_id}","method":"addFile","params":{"resource":"Scene[\"{scene_id}\"]","args":[{path:json}],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "add file {scene_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  create_source_in_scene:
+    summary: Create a source and add it to a scene (Scene.createAndAddSource)
+    params:
+      scene_id: *scene_id
+      name: *name
+      type: &source_type { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true, label: Type, description: "The source type, as OBS names it, such as color_source, image_source, ffmpeg_source or browser_source." }
+      source_settings: &source_settings { type: json, required: true, label: Settings, description: "The source's settings as a JSON object, as the type takes them; {} for its defaults." }
+    send: '{"jsonrpc":"2.0","id":"create source in {scene_id}","method":"createAndAddSource","params":{"resource":"Scene[\"{scene_id}\"]","args":[{name:json},"{type}",{source_settings}],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "create source in {scene_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  create_folder:
+    summary: Create a folder in a scene (Scene.createFolder)
+    params:
+      scene_id: *scene_id
+      name: *name
+    send: '{"jsonrpc":"2.0","id":"create folder {scene_id}","method":"createFolder","params":{"resource":"Scene[\"{scene_id}\"]","args":[{name:json}],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "create folder {scene_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  remove_folder:
+    summary: Delete a folder of a scene (Scene.removeFolder)
+    params:
+      scene_id: *scene_id
+      folder_id: &folder_id { type: string, pattern: "^[A-Za-z0-9_.:-]+$", max_length: 128, required: true, label: Folder, description: "The folder's node ID, as the scene's items give it." }
+    send: '{"jsonrpc":"2.0","id":"remove folder {scene_id} {folder_id}","method":"removeFolder","params":{"resource":"Scene[\"{scene_id}\"]","args":["{folder_id}"]}}'
+    expect: { reply_json: { "$.id": "remove folder {scene_id} {folder_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  rename_folder:
+    summary: Rename a folder (SceneItemFolder.setName)
+    params:
+      scene_id: *scene_id
+      folder_id: *folder_id
+      name: *name
+    send: '{"jsonrpc":"2.0","id":"rename folder {scene_id} {folder_id}","method":"setName","params":{"resource":"SceneItemFolder[\"{scene_id}\",\"{folder_id}\"]","args":[{name:json}]}}'
+    expect: { reply_json: { "$.id": "rename folder {scene_id} {folder_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  ungroup_folder:
+    summary: Remove a folder, keeping its items in the scene (SceneItemFolder.ungroup)
+    params:
+      scene_id: *scene_id
+      folder_id: *folder_id
+    send: '{"jsonrpc":"2.0","id":"ungroup {scene_id} {folder_id}","method":"ungroup","params":{"resource":"SceneItemFolder[\"{scene_id}\",\"{folder_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "ungroup {scene_id} {folder_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  # ── Scene items: the SceneItem["scene","node","source"] resource ────────
+  set_item_visibility:
+    summary: Show or hide a scene item (SceneItem.setVisibility)
+    params:
+      scene_id: *scene_id
+      item_id: &item_id { type: string, pattern: "^[A-Za-z0-9_.:-]+$", max_length: 128, required: true, label: Item, description: "The item's node ID, as the scene's items give it." }
+      source_id: &item_source { type: string, pattern: "^[A-Za-z0-9_.:-]+$", max_length: 256, required: true, label: Source, description: "The ID of the item's source, as the scene's items give it." }
+      visible: { type: bool, required: true, label: Visible, description: "True shows the item, false hides it." }
+    send: '{"jsonrpc":"2.0","id":"visibility {scene_id} {item_id}","method":"setVisibility","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{visible}]}}'
+    expect: { reply_json: { "$.id": "visibility {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_locked:
+    summary: Lock or unlock a scene item (SceneItem.setSettings locked)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      locked: { type: bool, required: true, label: Locked, description: "True locks the item against editing, false unlocks it." }
+    send: '{"jsonrpc":"2.0","id":"locked {scene_id} {item_id}","method":"setSettings","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{"locked":{locked}}]}}'
+    expect: { reply_json: { "$.id": "locked {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_stream_visible:
+    summary: Show or hide a scene item in the stream only (SceneItem.setSettings streamVisible)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      visible: { type: bool, required: true, label: Visible in stream, description: "True shows the item in the stream output, false leaves it out." }
+    send: '{"jsonrpc":"2.0","id":"stream visible {scene_id} {item_id}","method":"setSettings","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{"streamVisible":{visible}}]}}'
+    expect: { reply_json: { "$.id": "stream visible {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_recording_visible:
+    summary: Show or hide a scene item in the recording only (SceneItem.setSettings recordingVisible)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      visible: { type: bool, required: true, label: Visible in recording, description: "True shows the item in the recording, false leaves it out." }
+    send: '{"jsonrpc":"2.0","id":"recording visible {scene_id} {item_id}","method":"setSettings","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{"recordingVisible":{visible}}]}}'
+    expect: { reply_json: { "$.id": "recording visible {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_position:
+    summary: Move a scene item (SceneItem.setTransform position)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      x: { type: float, min: -100000.0, max: 100000.0, required: true, label: X, description: "Horizontal position in canvas pixels from the left." }
+      y: { type: float, min: -100000.0, max: 100000.0, required: true, label: Y, description: "Vertical position in canvas pixels from the top." }
+    send: '{"jsonrpc":"2.0","id":"position {scene_id} {item_id}","method":"setTransform","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{"position":{"x":{x:.2f},"y":{y:.2f}}}]}}'
+    expect: { reply_json: { "$.id": "position {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_scale:
+    summary: Scale a scene item (SceneItem.setTransform scale)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      x: { type: float, min: -1000.0, max: 1000.0, required: true, label: Horizontal scale, description: "Horizontal scale, 1 for the source's size; negative flips it." }
+      y: { type: float, min: -1000.0, max: 1000.0, required: true, label: Vertical scale, description: "Vertical scale, 1 for the source's size; negative flips it." }
+    send: '{"jsonrpc":"2.0","id":"scale {scene_id} {item_id}","method":"setTransform","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{"scale":{"x":{x:.4f},"y":{y:.4f}}}]}}'
+    expect: { reply_json: { "$.id": "scale {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_rotation:
+    summary: Set a scene item's rotation (SceneItem.setTransform rotation)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      degrees: { type: float, min: -360.0, max: 360.0, required: true, label: Rotation, description: "Rotation in degrees, clockwise." }
+    send: '{"jsonrpc":"2.0","id":"rotation {scene_id} {item_id}","method":"setTransform","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{"rotation":{degrees:.2f}}]}}'
+    expect: { reply_json: { "$.id": "rotation {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_crop:
+    summary: Crop a scene item (SceneItem.setTransform crop)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      top: { type: int, min: 0, max: 100000, required: true, label: Top, description: "Pixels cropped from the top." }
+      bottom: { type: int, min: 0, max: 100000, required: true, label: Bottom, description: "Pixels cropped from the bottom." }
+      left: { type: int, min: 0, max: 100000, required: true, label: Left, description: "Pixels cropped from the left." }
+      right: { type: int, min: 0, max: 100000, required: true, label: Right, description: "Pixels cropped from the right." }
+    send: '{"jsonrpc":"2.0","id":"crop {scene_id} {item_id}","method":"setTransform","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{"crop":{"top":{top},"bottom":{bottom},"left":{left},"right":{right}}}]}}'
+    expect: { reply_json: { "$.id": "crop {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  rotate_item:
+    summary: Rotate a scene item by an angle (SceneItem.rotate)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      degrees: { type: float, min: -360.0, max: 360.0, required: true, label: Angle, description: "Degrees to rotate by, clockwise." }
+    send: '{"jsonrpc":"2.0","id":"rotate {scene_id} {item_id}","method":"rotate","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[{degrees:.2f}]}}'
+    expect: { reply_json: { "$.id": "rotate {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  center_item:
+    summary: Center a scene item on the canvas (SceneItem.centerOnScreen)
+    params: &item_only
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+    send: '{"jsonrpc":"2.0","id":"center {scene_id} {item_id}","method":"centerOnScreen","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "center {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  fit_item:
+    summary: Fit a scene item to the canvas, keeping its aspect ratio (SceneItem.fitToScreen)
+    params: *item_only
+    send: '{"jsonrpc":"2.0","id":"fit {scene_id} {item_id}","method":"fitToScreen","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "fit {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  stretch_item:
+    summary: Stretch a scene item to fill the canvas (SceneItem.stretchToScreen)
+    params: *item_only
+    send: '{"jsonrpc":"2.0","id":"stretch {scene_id} {item_id}","method":"stretchToScreen","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "stretch {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  flip_item_x:
+    summary: Flip a scene item horizontally (SceneItem.flipX)
+    params: *item_only
+    send: '{"jsonrpc":"2.0","id":"flip x {scene_id} {item_id}","method":"flipX","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "flip x {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  flip_item_y:
+    summary: Flip a scene item vertically (SceneItem.flipY)
+    params: *item_only
+    send: '{"jsonrpc":"2.0","id":"flip y {scene_id} {item_id}","method":"flipY","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "flip y {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  reset_item_transform:
+    summary: Reset a scene item's position, scale, rotation and crop (SceneItem.resetTransform)
+    params: *item_only
+    send: '{"jsonrpc":"2.0","id":"reset transform {scene_id} {item_id}","method":"resetTransform","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "reset transform {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  place_item_after:
+    summary: Move a scene item to just after another node in the scene's order (SceneItem.placeAfter)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      node_id: &node_id { type: string, pattern: "^[A-Za-z0-9_.:-]+$", max_length: 128, required: true, label: Other node, description: "The node ID of the item or folder to place it next to." }
+    send: '{"jsonrpc":"2.0","id":"place after {scene_id} {item_id}","method":"placeAfter","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":["{node_id}"]}}'
+    expect: { reply_json: { "$.id": "place after {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  place_item_before:
+    summary: Move a scene item to just before another node in the scene's order (SceneItem.placeBefore)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      node_id: *node_id
+    send: '{"jsonrpc":"2.0","id":"place before {scene_id} {item_id}","method":"placeBefore","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":["{node_id}"]}}'
+    expect: { reply_json: { "$.id": "place before {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_item_parent:
+    summary: Move a scene item into a folder (SceneItem.setParent)
+    params:
+      scene_id: *scene_id
+      item_id: *item_id
+      source_id: *item_source
+      folder_id: *folder_id
+    send: '{"jsonrpc":"2.0","id":"parent {scene_id} {item_id}","method":"setParent","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":["{folder_id}"]}}'
+    expect: { reply_json: { "$.id": "parent {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  remove_item:
+    summary: Remove an item from its scene; the source remains (SceneItem.remove)
+    params: *item_only
+    send: '{"jsonrpc":"2.0","id":"remove item {scene_id} {item_id}","method":"remove","params":{"resource":"SceneItem[\"{scene_id}\",\"{item_id}\",\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "remove item {scene_id} {item_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  # ── Sources ─────────────────────────────────────────────────────────────
+  create_source:
+    summary: Create a source outside any scene (SourcesService.createSource)
+    params:
+      name: *name
+      type: *source_type
+      source_settings: *source_settings
+    send: '{"jsonrpc":"2.0","id":"create source","method":"createSource","params":{"resource":"SourcesService","args":[{name:json},"{type}",{source_settings}],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "create source" }, not_contains: '"error":' }
+    returns: ack
+
+  add_file_source:
+    summary: Create a source from a file on the streaming computer, the type chosen by extension (SourcesService.addFile)
+    params:
+      path: *path
+    send: '{"jsonrpc":"2.0","id":"add file source","method":"addFile","params":{"resource":"SourcesService","args":[{path:json}],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "add file source" }, not_contains: '"error":' }
+    returns: ack
+
+  remove_source:
+    summary: Delete a source and its items in every scene (SourcesService.removeSource)
+    params:
+      source_id: *source_id
+    send: '{"jsonrpc":"2.0","id":"remove source {source_id}","method":"removeSource","params":{"resource":"SourcesService","args":["{source_id}"]}}'
+    expect: { reply_json: { "$.id": "remove source {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  rename_source:
+    summary: Rename a source (Source.setName)
+    params:
+      source_id: *source_id
+      name: *name
+    send: '{"jsonrpc":"2.0","id":"rename source {source_id}","method":"setName","params":{"resource":"Source[\"{source_id}\"]","args":[{name:json}]}}'
+    expect: { reply_json: { "$.id": "rename source {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  update_source_settings:
+    summary: Change some of a source's settings (Source.updateSettings)
+    params:
+      source_id: *source_id
+      source_settings: { type: json, required: true, label: Settings, description: "The settings to change as a JSON object, as the source's type takes them, such as {\"url\":\"https://example.com\"} for a browser source." }
+    send: '{"jsonrpc":"2.0","id":"update settings {source_id}","method":"updateSettings","params":{"resource":"Source[\"{source_id}\"]","args":[{source_settings}]}}'
+    expect: { reply_json: { "$.id": "update settings {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  refresh_source:
+    summary: Refresh a source, such as reloading a browser source (Source.refresh)
+    params:
+      source_id: *source_id
+    send: '{"jsonrpc":"2.0","id":"refresh {source_id}","method":"refresh","params":{"resource":"Source[\"{source_id}\"]","args":[]}}'
+    expect: { reply_json: { "$.id": "refresh {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  duplicate_source:
+    summary: Make a copy of a source (Source.duplicate)
+    params:
+      source_id: *source_id
+    send: '{"jsonrpc":"2.0","id":"duplicate {source_id}","method":"duplicate","params":{"resource":"Source[\"{source_id}\"]","args":[],"compactMode":true}}'
+    expect: { reply_json: { "$.id": "duplicate {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  # ── Audio ───────────────────────────────────────────────────────────────
+  set_source_muted:
+    summary: Mute or unmute a source's audio (AudioSource.setMuted)
+    params:
+      source_id: *source_id
+      muted: { type: bool, required: true, label: Muted, description: "True mutes the source, false unmutes it." }
+    send: '{"jsonrpc":"2.0","id":"mute {source_id}","method":"setMuted","params":{"resource":"AudioSource[\"{source_id}\"]","args":[{muted}]}}'
+    expect: { reply_json: { "$.id": "mute {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  set_audio_deflection:
+    summary: Set a source's volume fader position (AudioSource.setDeflection)
+    params:
+      source_id: *source_id
+      deflection: { type: float, min: 0.0, max: 1.0, required: true, label: Fader, description: "Fader position from 0 (silent) to 1 (full), as the mixer's slider moves." }
+    send: '{"jsonrpc":"2.0","id":"deflection {source_id}","method":"setDeflection","params":{"resource":"AudioSource[\"{source_id}\"]","args":[{deflection:.4f}]}}'
+    expect: { reply_json: { "$.id": "deflection {source_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  # ── Streaming, recording and replay buffer ──────────────────────────────
+  toggle_streaming:
+    summary: Start streaming if offline, stop it if live (StreamingService.toggleStreaming)
+    send: '{"jsonrpc":"2.0","id":"toggle streaming","method":"toggleStreaming","params":{"resource":"StreamingService","args":[]}}'
+    expect: { reply_json: { "$.id": "toggle streaming" }, not_contains: '"error":' }
+    returns: ack
+
+  toggle_recording:
+    summary: Start recording if stopped, stop it if recording (StreamingService.toggleRecording)
+    send: '{"jsonrpc":"2.0","id":"toggle recording","method":"toggleRecording","params":{"resource":"StreamingService","args":[]}}'
+    expect: { reply_json: { "$.id": "toggle recording" }, not_contains: '"error":' }
+    returns: ack
+
+  start_replay_buffer:
+    summary: Start the replay buffer (StreamingService.startReplayBuffer)
+    send: '{"jsonrpc":"2.0","id":"start replay buffer","method":"startReplayBuffer","params":{"resource":"StreamingService","args":[]}}'
+    expect: { reply_json: { "$.id": "start replay buffer" }, not_contains: '"error":' }
+    returns: ack
+
+  stop_replay_buffer:
+    summary: Stop the replay buffer (StreamingService.stopReplayBuffer)
+    send: '{"jsonrpc":"2.0","id":"stop replay buffer","method":"stopReplayBuffer","params":{"resource":"StreamingService","args":[]}}'
+    expect: { reply_json: { "$.id": "stop replay buffer" }, not_contains: '"error":' }
+    returns: ack
+
+  save_replay:
+    summary: Save the replay buffer to a file (StreamingService.saveReplay)
+    send: '{"jsonrpc":"2.0","id":"save replay","method":"saveReplay","params":{"resource":"StreamingService","args":[]}}'
+    expect: { reply_json: { "$.id": "save replay" }, not_contains: '"error":' }
+    returns: ack
+
+  # ── Studio mode ─────────────────────────────────────────────────────────
+  enable_studio_mode:
+    summary: Turn studio mode on (TransitionsService.enableStudioMode)
+    send: '{"jsonrpc":"2.0","id":"enable studio mode","method":"enableStudioMode","params":{"resource":"TransitionsService","args":[]}}'
+    expect: { reply_json: { "$.id": "enable studio mode" }, not_contains: '"error":' }
+    returns: ack
+
+  disable_studio_mode:
+    summary: Turn studio mode off (TransitionsService.disableStudioMode)
+    send: '{"jsonrpc":"2.0","id":"disable studio mode","method":"disableStudioMode","params":{"resource":"TransitionsService","args":[]}}'
+    expect: { reply_json: { "$.id": "disable studio mode" }, not_contains: '"error":' }
+    returns: ack
+
+  execute_studio_mode_transition:
+    summary: In studio mode, transition the studio scene to live (TransitionsService.executeStudioModeTransition)
+    send: '{"jsonrpc":"2.0","id":"studio transition","method":"executeStudioModeTransition","params":{"resource":"TransitionsService","args":[]}}'
+    expect: { reply_json: { "$.id": "studio transition" }, not_contains: '"error":' }
+    returns: ack
+
+  # ── Scene collections ───────────────────────────────────────────────────
+  load_scene_collection:
+    summary: Load a scene collection, replacing every scene and source (SceneCollectionsService.load)
+    params:
+      collection_id: &collection_id { type: string, pattern: "^[A-Za-z0-9_.:-]+$", max_length: 128, required: true, label: Collection, description: "The scene collection's ID, as the collection list gives it." }
+    send: '{"jsonrpc":"2.0","id":"load collection {collection_id}","method":"load","params":{"resource":"SceneCollectionsService","args":["{collection_id}"]}}'
+    expect: { reply_json: { "$.id": "load collection {collection_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  create_scene_collection:
+    summary: Create a scene collection (SceneCollectionsService.create)
+    params:
+      name: *name
+    send: '{"jsonrpc":"2.0","id":"create collection","method":"create","params":{"resource":"SceneCollectionsService","args":[{"name":{name:json}}]}}'
+    expect: { reply_json: { "$.id": "create collection" }, not_contains: '"error":' }
+    returns: ack
+
+  delete_scene_collection:
+    summary: Delete a scene collection (SceneCollectionsService.delete)
+    params:
+      collection_id: *collection_id
+    send: '{"jsonrpc":"2.0","id":"delete collection {collection_id}","method":"delete","params":{"resource":"SceneCollectionsService","args":["{collection_id}"]}}'
+    expect: { reply_json: { "$.id": "delete collection {collection_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  rename_scene_collection:
+    summary: Rename a scene collection (SceneCollectionsService.rename)
+    params:
+      collection_id: *collection_id
+      name: *name
+    send: '{"jsonrpc":"2.0","id":"rename collection {collection_id}","method":"rename","params":{"resource":"SceneCollectionsService","args":[{name:json},"{collection_id}"]}}'
+    expect: { reply_json: { "$.id": "rename collection {collection_id}" }, not_contains: '"error":' }
+    returns: ack
+
+  # ── Notifications ───────────────────────────────────────────────────────
+  push_notification:
+    summary: Show a notification in Streamlabs Desktop (NotificationsService.push)
+    params:
+      message: { type: string, max_length: 1024, required: true, label: Message, description: "The notification's text." }
+      type: { type: enum, values: [INFO, SUCCESS, WARNING], default: INFO, label: Type, description: "The notification's kind, which sets its color." }
+      lifetime: { type: int, min: -1, max: 86400000, default: -1, label: Lifetime, description: "How long it shows, in milliseconds; -1 keeps it until dismissed." }
+    send: '{"jsonrpc":"2.0","id":"notify","method":"push","params":{"resource":"NotificationsService","args":[{"message":{message:json},"type":"{type}","lifeTime":{lifetime}}]}}'
+    expect: { reply_json: { "$.id": "notify" }, not_contains: '"error":' }
+    returns: ack
+
+  mark_all_notifications_read:
+    summary: Mark every notification read (NotificationsService.markAllAsRead)
+    send: '{"jsonrpc":"2.0","id":"notifications read","method":"markAllAsRead","params":{"resource":"NotificationsService","args":[]}}'
+    expect: { reply_json: { "$.id": "notifications read" }, not_contains: '"error":' }
+    returns: ack
+
+  set_notification_settings:
+    summary: Turn notifications and their sound on or off (NotificationsService.setSettings)
+    params:
+      enabled: { type: bool, required: true, label: Notifications, description: "True shows notifications, false does not." }
+      play_sound: { type: bool, required: true, label: Sound, description: "True plays a sound with each notification." }
+    send: '{"jsonrpc":"2.0","id":"notification settings","method":"setSettings","params":{"resource":"NotificationsService","args":[{"enabled":{enabled},"playSound":{play_sound}}]}}'
+    expect: { reply_json: { "$.id": "notification settings" }, not_contains: '"error":' }
+    returns: ack
+
+telemetry:
+  # Events are subscribed to on connecting; lists are read on connecting and
+  # again whenever an event says they changed; audio levels, which have no
+  # event, and performance are polled.
+  subscribe:
+    send:
+      - '{"jsonrpc":"2.0","id":"sub sceneSwitched","method":"sceneSwitched","params":{"resource":"ScenesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub sceneAdded","method":"sceneAdded","params":{"resource":"ScenesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub sceneRemoved","method":"sceneRemoved","params":{"resource":"ScenesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub itemAdded","method":"itemAdded","params":{"resource":"ScenesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub itemRemoved","method":"itemRemoved","params":{"resource":"ScenesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub itemUpdated","method":"itemUpdated","params":{"resource":"ScenesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub sourceAdded","method":"sourceAdded","params":{"resource":"SourcesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub sourceRemoved","method":"sourceRemoved","params":{"resource":"SourcesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub sourceUpdated","method":"sourceUpdated","params":{"resource":"SourcesService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub streamingStatusChange","method":"streamingStatusChange","params":{"resource":"StreamingService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub recordingStatusChange","method":"recordingStatusChange","params":{"resource":"StreamingService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub replayBufferStatusChange","method":"replayBufferStatusChange","params":{"resource":"StreamingService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub studioModeChanged","method":"studioModeChanged","params":{"resource":"TransitionsService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub collectionSwitched","method":"collectionSwitched","params":{"resource":"SceneCollectionsService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub collectionAdded","method":"collectionAdded","params":{"resource":"SceneCollectionsService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub collectionRemoved","method":"collectionRemoved","params":{"resource":"SceneCollectionsService","args":[]}}'
+      - '{"jsonrpc":"2.0","id":"sub collectionUpdated","method":"collectionUpdated","params":{"resource":"SceneCollectionsService","args":[]}}'
+  poll:
+    - every_ms: 2000
+      send:
+        - '{"jsonrpc":"2.0","id":"audio","method":"getSources","params":{"resource":"AudioService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"performance","method":"getModel","params":{"resource":"PerformanceService","args":[]}}'
+    - every_ms: 30000
+      send:
+        - '{"jsonrpc":"2.0","id":"scenes","method":"getScenes","params":{"resource":"ScenesService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"active scene","method":"activeSceneId","params":{"resource":"ScenesService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"sources","method":"getSources","params":{"resource":"SourcesService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"streaming","method":"getModel","params":{"resource":"StreamingService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"transitions","method":"getModel","params":{"resource":"TransitionsService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"collections","method":"collections","params":{"resource":"SceneCollectionsService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"active collection","method":"activeCollection","params":{"resource":"SceneCollectionsService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"notification settings get","method":"getSettings","params":{"resource":"NotificationsService","args":[]}}'
+  updates:
+    # Scenes (getScenes, each with its getModel data: id, name and nodes).
+    - json_match: { "$.id": "^scenes$" }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name" }
+      replace: scenes
+      state: { "scenes.{id:key}.name": "{name}", "scenes.{id:key}.index": "{index}" }
+    # Each scene's items and folders (ISceneNodeModel, ISceneItemModel).
+    - json_match: { "$.id": "^scenes$" }
+      json_each: "$.result[*].nodes"
+      json: { scene: "$^.id", id: "$.id", type: "$.sceneNodeType", name: "$.name", source: "$.sourceId", parent: "$.parentId",
+              visible: "$.visible", locked: "$.locked", stream: "$.streamVisible", recording: "$.recordingVisible",
+              x: "$.transform.position.x", y: "$.transform.position.y", sx: "$.transform.scale.x", sy: "$.transform.scale.y",
+              rotation: "$.transform.rotation", ct: "$.transform.crop.top", cb: "$.transform.crop.bottom",
+              cl: "$.transform.crop.left", cr: "$.transform.crop.right" }
+      state: &node_state
+        "scenes.{scene:key}.nodes.{id:key}.type": "{type}"
+        "scenes.{scene:key}.nodes.{id:key}.name": "{name}"
+        "scenes.{scene:key}.nodes.{id:key}.source_id": "{source}"
+        "scenes.{scene:key}.nodes.{id:key}.parent_id": "{parent}"
+        "scenes.{scene:key}.nodes.{id:key}.visible": "{visible}"
+        "scenes.{scene:key}.nodes.{id:key}.locked": "{locked}"
+        "scenes.{scene:key}.nodes.{id:key}.stream_visible": "{stream}"
+        "scenes.{scene:key}.nodes.{id:key}.recording_visible": "{recording}"
+        "scenes.{scene:key}.nodes.{id:key}.position.x": "{x}"
+        "scenes.{scene:key}.nodes.{id:key}.position.y": "{y}"
+        "scenes.{scene:key}.nodes.{id:key}.scale.x": "{sx}"
+        "scenes.{scene:key}.nodes.{id:key}.scale.y": "{sy}"
+        "scenes.{scene:key}.nodes.{id:key}.rotation": "{rotation}"
+        "scenes.{scene:key}.nodes.{id:key}.crop.top": "{ct}"
+        "scenes.{scene:key}.nodes.{id:key}.crop.bottom": "{cb}"
+        "scenes.{scene:key}.nodes.{id:key}.crop.left": "{cl}"
+        "scenes.{scene:key}.nodes.{id:key}.crop.right": "{cr}"
+    # An item changed (itemUpdated, an ISceneItemModel): applied at once.
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^ScenesService\\.itemUpdated$" }
+      json: { scene: "$.result.data.sceneId", id: "$.result.data.id", type: "$.result.data.sceneNodeType", name: "$.result.data.name",
+              source: "$.result.data.sourceId", parent: "$.result.data.parentId", visible: "$.result.data.visible",
+              locked: "$.result.data.locked", stream: "$.result.data.streamVisible", recording: "$.result.data.recordingVisible",
+              x: "$.result.data.transform.position.x", y: "$.result.data.transform.position.y",
+              sx: "$.result.data.transform.scale.x", sy: "$.result.data.transform.scale.y",
+              rotation: "$.result.data.transform.rotation", ct: "$.result.data.transform.crop.top",
+              cb: "$.result.data.transform.crop.bottom", cl: "$.result.data.transform.crop.left",
+              cr: "$.result.data.transform.crop.right" }
+      state: *node_state
+    # The active scene: on reading it, and when it switches.
+    - json_match: { "$.id": "^active scene$", "$.result": "^(.+)$" }
+      json: {}
+      state: { scene.active_id: "{1}" }
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^ScenesService\\.sceneSwitched$" }
+      json: { id: "$.result.data.id", name: "$.result.data.name" }
+      state: { scene.active_id: "{id}", scene.active_name: "{name}" }
+    # Structure changes: the lists are read again.
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^ScenesService\\.(sceneAdded|sceneRemoved|itemAdded|itemRemoved)$" }
+      then_send:
+        - '{"jsonrpc":"2.0","id":"scenes","method":"getScenes","params":{"resource":"ScenesService","args":[]}}'
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^SourcesService\\.(sourceAdded|sourceRemoved)$" }
+      then_send:
+        - '{"jsonrpc":"2.0","id":"sources","method":"getSources","params":{"resource":"SourcesService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"audio","method":"getSources","params":{"resource":"AudioService","args":[]}}'
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^SceneCollectionsService\\.(collectionSwitched|collectionAdded|collectionRemoved|collectionUpdated)$" }
+      then_send:
+        - '{"jsonrpc":"2.0","id":"collections","method":"collections","params":{"resource":"SceneCollectionsService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"active collection","method":"activeCollection","params":{"resource":"SceneCollectionsService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"scenes","method":"getScenes","params":{"resource":"ScenesService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"active scene","method":"activeSceneId","params":{"resource":"ScenesService","args":[]}}'
+        - '{"jsonrpc":"2.0","id":"sources","method":"getSources","params":{"resource":"SourcesService","args":[]}}'
+    # Sources (getSources, ISourceModel), and sourceUpdated applied at once.
+    - json_match: { "$.id": "^sources$" }
+      json_each: "$.result"
+      json: { id: "$.sourceId", name: "$.name", type: "$.type", audio: "$.audio", video: "$.video", muted: "$.muted",
+                           width: "$.width", height: "$.height", async: "$.async", channel: "$.channel" }
+      replace: sources
+      state: &source_state
+        "sources.{id:key}.name": "{name}"
+        "sources.{id:key}.type": "{type}"
+        "sources.{id:key}.audio": "{audio}"
+        "sources.{id:key}.video": "{video}"
+        "sources.{id:key}.muted": "{muted}"
+        "sources.{id:key}.width": "{width}"
+        "sources.{id:key}.height": "{height}"
+        "sources.{id:key}.async": "{async}"
+        "sources.{id:key}.channel": "{channel}"
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^SourcesService\\.sourceUpdated$" }
+      json: { id: "$.result.data.sourceId", name: "$.result.data.name", type: "$.result.data.type", audio: "$.result.data.audio",
+              video: "$.result.data.video", muted: "$.result.data.muted", width: "$.result.data.width",
+              height: "$.result.data.height", async: "$.result.data.async", channel: "$.result.data.channel" }
+      state: *source_state
+    # Audio (AudioService.getSources, IAudioSourceModel with its fader).
+    - json_match: { "$.id": "^audio$" }
+      json_each: "$.result"
+      json: { id: "$.sourceId", name: "$.name", muted: "$.muted", db: "$.fader.db", deflection: "$.fader.deflection", mul: "$.fader.mul",
+              mixers: "$.audioMixers", monitoring: "$.monitoringType", mono: "$.forceMono", sync: "$.syncOffset", hidden: "$.mixerHidden" }
+      replace: audio
+      state:
+        "audio.{id:key}.name": "{name}"
+        "audio.{id:key}.muted": "{muted}"
+        "audio.{id:key}.db": "{db}"
+        "audio.{id:key}.deflection": "{deflection}"
+        "audio.{id:key}.mul": "{mul}"
+        "audio.{id:key}.mixers": "{mixers}"
+        "audio.{id:key}.monitoring_type": "{monitoring}"
+        "audio.{id:key}.force_mono": "{mono}"
+        "audio.{id:key}.sync_offset": "{sync}"
+        "audio.{id:key}.mixer_hidden": "{hidden}"
+    # Streaming, recording and replay buffer.
+    - json_match: { "$.id": "^streaming$" }
+      json: { s: "$.result.streamingStatus", st: "$.result.streamingStatusTime", r: "$.result.recordingStatus", rt: "$.result.recordingStatusTime",
+              b: "$.result.replayBufferStatus", bt: "$.result.replayBufferStatusTime" }
+      state:
+        streaming.status: "{s}"
+        streaming.status_time: "{st}"
+        recording.status: "{r}"
+        recording.status_time: "{rt}"
+        replay_buffer.status: "{b}"
+        replay_buffer.status_time: "{bt}"
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^StreamingService\\.streamingStatusChange$", "$.result.data": "^([a-z]+)$" }
+      json: {}
+      state: { streaming.status: "{1}" }
+      then_send:
+        - '{"jsonrpc":"2.0","id":"streaming","method":"getModel","params":{"resource":"StreamingService","args":[]}}'
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^StreamingService\\.recordingStatusChange$", "$.result.data": "^([a-z]+)$" }
+      json: {}
+      state: { recording.status: "{1}" }
+      then_send:
+        - '{"jsonrpc":"2.0","id":"streaming","method":"getModel","params":{"resource":"StreamingService","args":[]}}'
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^StreamingService\\.replayBufferStatusChange$", "$.result.data": "^([a-z]+)$" }
+      json: {}
+      state: { replay_buffer.status: "{1}" }
+      then_send:
+        - '{"jsonrpc":"2.0","id":"streaming","method":"getModel","params":{"resource":"StreamingService","args":[]}}'
+    # Studio mode.
+    - json_match: { "$.id": "^transitions$" }
+      json: { studio: "$.result.studioMode" }
+      state: { studio_mode: "{studio}" }
+    - json_match: { "$.result._type": "^EVENT$", "$.result.resourceId": "^TransitionsService\\.studioModeChanged$", "$.result.data": "^(true|false)$" }
+      json: {}
+      state: { studio_mode: "{1}" }
+    # Scene collections.
+    - json_match: { "$.id": "^collections$" }
+      json_each: "$.result"
+      json: { id: "$.id", name: "$.name" }
+      replace: collections
+      state: { "collections.{id:key}.name": "{name}" }
+    - json_match: { "$.id": "^active collection$" }
+      json: { id: "$.result.id", name: "$.result.name" }
+      state: { collection.active_id: "{id}", collection.active_name: "{name}" }
+    # Performance (PerformanceService.getModel).
+    - json_match: { "$.id": "^performance$" }
+      json: { cpu: "$.result.CPU", fps: "$.result.frameRate", dropped: "$.result.numberDroppedFrames", pct: "$.result.percentageDroppedFrames", bw: "$.result.bandwidth" }
+      state:
+        performance.cpu: "{cpu}"
+        performance.frame_rate: "{fps}"
+        performance.dropped_frames: "{dropped}"
+        performance.dropped_frames_percent: "{pct}"
+        performance.bandwidth: "{bw}"
+    # Notification settings.
+    - json_match: { "$.id": "^notification settings get$" }
+      json: { enabled: "$.result.enabled", sound: "$.result.playSound" }
+      state: { notifications.enabled: "{enabled}", notifications.play_sound: "{sound}" }
+    - json_match: { "$.id": "^notification settings$" }
+      then_send:
+        - '{"jsonrpc":"2.0","id":"notification settings get","method":"getSettings","params":{"resource":"NotificationsService","args":[]}}'
+
+state:
+  scenes.*.name: { type: string, description: "Each scene's name, keyed by its ID" }
+  scenes.*.index: { type: int, description: "The scene's place in the scene list, from 0" }
+  scenes.*.nodes.*.type: { type: string, description: "item or folder, keyed by the scene's ID and the node's ID" }
+  scenes.*.nodes.*.name: { type: string, description: "The item's or folder's name" }
+  scenes.*.nodes.*.source_id: { type: string, description: "The item's source ID, which the item commands take with the scene and node IDs" }
+  scenes.*.nodes.*.parent_id: { type: string, description: "The folder the node is in, if any" }
+  scenes.*.nodes.*.visible: { type: bool, description: "The item is visible" }
+  scenes.*.nodes.*.locked: { type: bool, description: "The item is locked" }
+  scenes.*.nodes.*.stream_visible: { type: bool, description: "The item shows in the stream" }
+  scenes.*.nodes.*.recording_visible: { type: bool, description: "The item shows in the recording" }
+  scenes.*.nodes.*.position.x: { type: float, unit: px, description: "The item's horizontal position" }
+  scenes.*.nodes.*.position.y: { type: float, unit: px, description: "The item's vertical position" }
+  scenes.*.nodes.*.scale.x: { type: float, description: "The item's horizontal scale" }
+  scenes.*.nodes.*.scale.y: { type: float, description: "The item's vertical scale" }
+  scenes.*.nodes.*.rotation: { type: float, unit: deg, description: "The item's rotation" }
+  scenes.*.nodes.*.crop.top: { type: int, unit: px, description: "Pixels cropped from the top" }
+  scenes.*.nodes.*.crop.bottom: { type: int, unit: px, description: "Pixels cropped from the bottom" }
+  scenes.*.nodes.*.crop.left: { type: int, unit: px, description: "Pixels cropped from the left" }
+  scenes.*.nodes.*.crop.right: { type: int, unit: px, description: "Pixels cropped from the right" }
+  scene.active_id: { type: string, description: "The ID of the scene on air" }
+  scene.active_name: { type: string, description: "The name of the scene on air, as the last switch gave it" }
+  sources.*.name: { type: string, description: "Each source's name, keyed by its ID" }
+  sources.*.type: { type: string, description: "The source's type, such as image_source" }
+  sources.*.audio: { type: bool, description: "The source has audio" }
+  sources.*.video: { type: bool, description: "The source has video" }
+  sources.*.muted: { type: bool, description: "The source is muted" }
+  sources.*.width: { type: int, unit: px, description: "The source's width" }
+  sources.*.height: { type: int, unit: px, description: "The source's height" }
+  sources.*.async: { type: bool, description: "The source is asynchronous (a media or capture source)" }
+  sources.*.channel: { type: int, description: "The output channel the source is on, for a global audio source" }
+  audio.*.name: { type: string, description: "Each audio source's name, keyed by its source ID" }
+  audio.*.muted: { type: bool, description: "The audio source is muted" }
+  audio.*.db: { type: float, unit: dB, description: "The fader's level" }
+  audio.*.deflection: { type: float, description: "The fader's position, 0 to 1, as set_audio_deflection takes it" }
+  audio.*.mul: { type: float, description: "The fader's level as a multiplier" }
+  audio.*.mixers: { type: int, description: "The audio tracks the source is mixed to, as a bit mask" }
+  audio.*.monitoring_type: { type: int, description: "Audio monitoring: 0 off, 1 monitor only, 2 monitor and output, as OBS numbers them" }
+  audio.*.force_mono: { type: bool, description: "The source is downmixed to mono" }
+  audio.*.sync_offset: { type: float, description: "The audio sync offset, as the API gives it" }
+  audio.*.mixer_hidden: { type: bool, description: "The source is hidden from the mixer" }
+  streaming.status: { type: string, description: "offline, starting, live, reconnecting or ending" }
+  streaming.status_time: { type: string, description: "When the streaming status last changed, as the API gives it" }
+  recording.status: { type: string, description: "offline, starting, recording or stopping" }
+  recording.status_time: { type: string, description: "When the recording status last changed" }
+  replay_buffer.status: { type: string, description: "offline, running, saving or stopping" }
+  replay_buffer.status_time: { type: string, description: "When the replay buffer status last changed" }
+  studio_mode: { type: bool, description: "Studio mode is on" }
+  collections.*.name: { type: string, description: "Each scene collection's name, keyed by its ID" }
+  collection.active_id: { type: string, description: "The ID of the loaded scene collection" }
+  collection.active_name: { type: string, description: "The name of the loaded scene collection" }
+  performance.cpu: { type: float, unit: "%", description: "CPU use" }
+  performance.frame_rate: { type: float, unit: fps, description: "The rendering frame rate" }
+  performance.dropped_frames: { type: int, description: "Frames dropped by the network" }
+  performance.dropped_frames_percent: { type: float, unit: "%", description: "Share of frames dropped" }
+  performance.bandwidth: { type: float, description: "The output bandwidth, as the API gives it" }
+  notifications.enabled: { type: bool, description: "Notifications are shown" }
+  notifications.play_sound: { type: bool, description: "Notifications play a sound" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Remote connections are off by default: turn on Remote Control in
+      Streamlabs Desktop's settings and copy the token shown under the QR
+      code's details. The API is documented over SockJS (the sample connects
+      to http://<host>:59650/api); this spec opens SockJS's raw websocket at
+      /api/websocket, which carries the JSON-RPC messages without SockJS's
+      framing. The auth request goes first on every connection; an error in
+      reply is taken as a refused token, and nothing more is sent until the
+      settings change.
+
+  - models: [all]
+    severity: info
+    text: >
+      Replies are matched by their JSON-RPC id, which each command derives
+      from what it acts on. An ack means the reply held no error; methods
+      that return a promise (scene collections, toggle_streaming) answer at
+      once with a subscription, and their outcome shows in the events and
+      state. Item commands address an item as the API's
+      SceneItem["scene","node","source"] resource, so they take the scene's,
+      the node's and the source's IDs, which state gives for every item.
+
+  - models: [all]
+    severity: info
+    text: >
+      Events keep the active scene, items, sources, streaming, recording,
+      replay buffer, studio mode and scene collections current; a structural
+      event has its list read again. The API has no event for audio levels or
+      mutes changed in the mixer, so audio and performance are read every two
+      seconds, and every list again every thirty as a safety net. Not used:
+      the SelectionService (the editor's selection, whose operations the item
+      commands perform directly) and the methods that open windows on the
+      streaming computer (showAddSource, showSourceProperties, showShowcase,
+      showNotifications). Anything else the API offers is reachable with
+      call.
+
+  - models: [all]
+    severity: critical
+    text: >
+      load_scene_collection replaces every scene and source on air at once;
+      remove_scene, remove_source, clear_scene and delete_scene_collection
+      cannot be undone; toggle_streaming and toggle_recording change state
+      whichever way it currently is, so check streaming.status and
+      recording.status first.

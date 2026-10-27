@@ -1729,6 +1729,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
 - [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
 
+## magewell-director — Magewell Director Mini, Director One and Director Plus
+
+- [ ] Confirm the API listens on port 8080 (the document's demo port) and takes no authentication. ([specs/magewell-director.yaml:36](specs/magewell-director.yaml#L36))
+- [ ] Confirm the get methods answer GET as the set methods do, and that their replies are the documented JSON. ([specs/magewell-director.yaml:3373](specs/magewell-director.yaml#L3373))
+- [ ] Check the value formats the API accepts: true and false for booleans, decimals with two or three places, and the replay camera list [0,1,2,3] percent-encoded. ([specs/magewell-director.yaml:2017](specs/magewell-director.yaml#L2017))
+- [ ] Confirm a refused action (content missing, action not allowed) answers HTTP 403, and what a 400 answer's body holds. ([specs/magewell-director.yaml:3787](specs/magewell-director.yaml#L3787))
+- [ ] Confirm the scene list's order is the order switch_by_index counts from 1, and that the show list's switch_by_index counts from 0 as documented. ([specs/magewell-director.yaml:3401](specs/magewell-director.yaml#L3401))
+- [ ] Check what a scoreboard command addresses with an ID but no scene ID, and with both, on global and private scoreboards. ([specs/magewell-director.yaml:582](specs/magewell-director.yaml#L582))
+- [ ] Record the units of the BGM duration (documented as ms, 240 in the example), the phone camera's videoBitrate (documented as Mbps, 8192 in the example) and recording duration. ([specs/magewell-director.yaml:3673](specs/magewell-director.yaml#L3673))
+- [ ] Confirm the phone camera's mute parameter and micMute field mean audio is captured when true, as the document says. ([specs/magewell-director.yaml:2683](specs/magewell-director.yaml#L2683))
+- [ ] Confirm the Director Mini and One's USB-C output modes 0 to 5 match the Director Plus's numbering (mirror, program, loop HDMI 1 and 2, multiview, preview). ([specs/magewell-director.yaml:3252](specs/magewell-director.yaml#L3252))
+- [ ] Check the meter levels' unit and refresh, and whether volume is whole dB. ([specs/magewell-director.yaml:3618](specs/magewell-director.yaml#L3618))
+
 ## magewell-proconvert — Magewell Pro Convert
 
 - [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([spec](specs/magewell-proconvert.yaml#L186))
@@ -1924,19 +1937,33 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how negative lens travel times and half-second values are written ("lens focus time -1.5"). ([specs/nec-projector-ascii.yaml:246](specs/nec-projector-ascii.yaml#L246))
 - [ ] Confirm the NORMAL standby mode refuses ASCII commands on the network on other models. ([specs/nec-projector-ascii.yaml:435](specs/nec-projector-ascii.yaml#L435))
 
-## newtek-tricaster — NewTek TriCaster
+## newtek-3play — NewTek / Vizrt 3Play
 
-- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:572](specs/newtek-tricaster.yaml#L572))
-- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:565](specs/newtek-tricaster.yaml#L565))
-- [ ] Confirm the change notification websocket is on the web port (the guide's text says 5951, its example the web port), whether it needs the Live Panel login, and whether it stays open without the client sending anything. ([specs/newtek-tricaster.yaml:430](specs/newtek-tricaster.yaml#L430))
-- [ ] Confirm each notification is the bare dictionary name, one per message, as the guide says. ([specs/newtek-tricaster.yaml:447](specs/newtek-tricaster.yaml#L447))
-- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:497](specs/newtek-tricaster.yaml#L497))
-- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:505](specs/newtek-tricaster.yaml#L505))
-- [ ] Check which of /version (the guide) and /v1/version answers on each software version. ([specs/newtek-tricaster.yaml:444](specs/newtek-tricaster.yaml#L444))
-- [ ] Record the buffer dictionary with several M/Es: check each M/E's index (from 0 as the guide's example shows, or from 1) and whether an M/E has more than one row of buffers. ([specs/newtek-tricaster.yaml:492](specs/newtek-tricaster.yaml#L492))
-- [ ] Check whether media_select_clip counts clips from 0 or 1. ([specs/newtek-tricaster.yaml:313](specs/newtek-tricaster.yaml#L313))
-- [ ] Check that the mode toggles take true or false as a value to set the mode rather than toggle it. ([specs/newtek-tricaster.yaml:380](specs/newtek-tricaster.yaml#L380))
-- [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:399](specs/newtek-tricaster.yaml#L399))
+- [ ] Record the shortcuts a 3Play's macro recorder shows for replay operations (mark in and out, cue, play on outputs A and B, play speed, play lists, recording), so they can become typed commands. ([specs/newtek-3play.yaml:258](specs/newtek-3play.yaml#L258))
+- [ ] Confirm which dictionaries a 3Play serves (shortcut_states, tally, macros_list and others) and record their content. ([specs/newtek-3play.yaml:164](specs/newtek-3play.yaml#L164))
+- [ ] Confirm a 3Play answers /v1/trigger, /v1/datalink and /v1/live as a TriCaster does. ([specs/newtek-3play.yaml:148](specs/newtek-3play.yaml#L148))
+- [ ] Confirm the change notification websocket is on the web port on a 3Play and which dictionary names it sends. ([specs/newtek-3play.yaml:162](specs/newtek-3play.yaml#L162))
+- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-3play.yaml:273](specs/newtek-3play.yaml#L273))
+
+## newtek-tricaster — NewTek / Vizrt TriCaster and Vectar
+
+- [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:770](specs/newtek-tricaster.yaml#L770))
+- [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:763](specs/newtek-tricaster.yaml#L763))
+- [ ] Confirm the change notification websocket is on the web port (the guide's text says 5951, its example the web port), whether it needs the Live Panel login, and whether it stays open without the client sending anything. ([specs/newtek-tricaster.yaml:599](specs/newtek-tricaster.yaml#L599))
+- [ ] Confirm each notification is the bare dictionary name, one per message, as the guide says. ([specs/newtek-tricaster.yaml:623](specs/newtek-tricaster.yaml#L623))
+- [ ] Record the ddr_playlist and ddr_timecode dictionaries, whose content the guide does not show, so clips and remaining times can be read into state rather than kept as XML; and check that polling ddr_timecode every second is safe on current Vizion software. ([specs/newtek-tricaster.yaml:673](specs/newtek-tricaster.yaml#L673))
+- [ ] Record the macros_list dictionary: confirm macro elements with a name attribute and find the id attribute's name. ([specs/newtek-tricaster.yaml:696](specs/newtek-tricaster.yaml#L696))
+- [ ] Check which of /version (the guide) and /v1/version answers on each software version. ([specs/newtek-tricaster.yaml:619](specs/newtek-tricaster.yaml#L619))
+- [ ] Record the buffer dictionary with several M/Es: check each M/E's index (from 0 as the guide's example shows, or from 1) and whether an M/E has more than one row of buffers. ([specs/newtek-tricaster.yaml:668](specs/newtek-tricaster.yaml#L668))
+- [ ] Check whether media_select_clip counts clips from 0 or 1. ([specs/newtek-tricaster.yaml:337](specs/newtek-tricaster.yaml#L337))
+- [ ] Check that the mode toggles take true or false as a value to set the mode rather than toggle it. ([specs/newtek-tricaster.yaml:404](specs/newtek-tricaster.yaml#L404))
+- [ ] Check the volume shortcut's value is dB, with one decimal accepted, and its range. ([specs/newtek-tricaster.yaml:423](specs/newtek-tricaster.yaml#L423))
+- [ ] Confirm the 3Play channel commands posted as XML through the net shortcut (<shortcut name="net1" value="clip_play" speed="1.000"/>) reach the 3Play, and how net_shortcut's shortcut_name key is written. ([specs/newtek-tricaster.yaml:447](specs/newtek-tricaster.yaml#L447))
+- [ ] Confirm the 3Play channel commands' number formats (three decimals sent for speed, position and distance) are accepted. ([specs/newtek-tricaster.yaml:514](specs/newtek-tricaster.yaml#L514))
+- [ ] Confirm POST /v1/file honours the Filename and Overwrite headers and answers with the stored file name as the body. ([specs/newtek-tricaster.yaml:569](specs/newtek-tricaster.yaml#L569))
+- [ ] Record the audiomixer, audio_bins, ndi_sources and filebrowser dictionaries, whose content the guide does not show, so they can be read into state rather than kept as XML. ([specs/newtek-tricaster.yaml:681](specs/newtek-tricaster.yaml#L681))
+- [ ] Confirm GET /v1/datalink lists every DataLink key as <data><key/><value/></data> elements. ([specs/newtek-tricaster.yaml:686](specs/newtek-tricaster.yaml#L686))
+- [ ] Confirm Vizrt Vectar and Viz Vectar Plus answer the same shortcuts, dictionaries and change notification websocket as a TriCaster, and their input count for the net commands. ([specs/newtek-tricaster.yaml:852](specs/newtek-tricaster.yaml#L852))
 
 ## novastar-central-control — NovaStar COEX central control protocol
 
@@ -2082,6 +2109,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what width and height set_wallpaper accepts (the Companion module limits both to 100-10000). ([specs/oscpoint.yaml:208](specs/oscpoint.yaml#L208))
 - [ ] Confirm that /oscpoint/feedbacks/refresh resends every feedback, the v2 presentation and presentations JSON included, and that /oscpoint/files/list is harmless while file access is off. ([specs/oscpoint.yaml:356](specs/oscpoint.yaml#L356))
 - [ ] Check the slide show state values (edit, running, paused from 2.1) and what OSCPoint sends for the slide show, section and media values when a slide show ends or a slide has no media. ([specs/oscpoint.yaml:501](specs/oscpoint.yaml#L501))
+
+## panasonic-kairos — Panasonic KAIROS
+
+- [ ] Confirm the control protocol answers an assignment or function with OK only after any change it pushes, or record the order, since replies name no request. ([specs/panasonic-kairos.yaml:71](specs/panasonic-kairos.yaml#L71))
+- [ ] Record the paths of transitions, players, macros and audio in a typical production, so they can become typed commands. ([specs/panasonic-kairos.yaml:297](specs/panasonic-kairos.yaml#L297))
+- [ ] Confirm the empty-line keep-alive every five seconds keeps the connection on current KAIROS software. ([specs/panasonic-kairos.yaml:48](specs/panasonic-kairos.yaml#L48))
+- [ ] Confirm the REST API on current software answers the V1.0 paths, and record the macro states and the multiviewer preset field when set. ([specs/panasonic-kairos.yaml:191](specs/panasonic-kairos.yaml#L191))
+- [ ] Confirm the REST login: user Kairos with the system ID, and the answer to a wrong one. ([specs/panasonic-kairos.yaml:54](specs/panasonic-kairos.yaml#L54))
+- [ ] Record the tally values of inputs and scenes beyond 0 and 1. ([specs/panasonic-kairos.yaml:281](specs/panasonic-kairos.yaml#L281))
 
 ## panasonic-ptz — Panasonic PTZ
 
@@ -2721,6 +2757,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm boolean query values are taken as true and false (autostart, from_memory, focus, bold, uppercase, start_time_uses_date). ([specs/stagetimer.yaml:162](specs/stagetimer.yaml#L162))
 - [ ] Check whether the rate limit answers 429 and how RateLimit-* headers report it with the 600 ms pacing. ([specs/stagetimer.yaml:72](specs/stagetimer.yaml#L72))
 - [ ] Check whether create_timer accepts every documented field at once with its documented default (including an empty speaker and notes). ([specs/stagetimer.yaml:376](specs/stagetimer.yaml#L376))
+
+## streamlabs-desktop — Streamlabs Desktop
+
+- [ ] Confirm the raw websocket at /api/websocket on port 59650 carries the JSON-RPC messages unframed, and that remote connections reach it from another computer. ([specs/streamlabs-desktop.yaml:52](specs/streamlabs-desktop.yaml#L52))
+- [ ] Record the auth answer for a good and a wrong token, and confirm the refused and accepted patterns. ([specs/streamlabs-desktop.yaml:64](specs/streamlabs-desktop.yaml#L64))
+- [ ] Confirm string request ids are echoed in the replies, and what a void method returns as its result. ([specs/streamlabs-desktop.yaml:103](specs/streamlabs-desktop.yaml#L103))
+- [ ] Record getScenes with getModel data: confirm the nodes' fields (id, sceneNodeType, sourceId, visible, transform, parentId) and that a node's id is the SceneItem resource's second part. ([specs/streamlabs-desktop.yaml:637](specs/streamlabs-desktop.yaml#L637))
+- [ ] Confirm the event payloads: itemUpdated as an ISceneItemModel with sceneId, sourceUpdated as an ISourceModel, and the streaming status events as bare strings. ([specs/streamlabs-desktop.yaml:662](specs/streamlabs-desktop.yaml#L662))
+- [ ] Confirm AudioService.getSources returns each source's IAudioSourceModel (fader db, deflection, mul). ([specs/streamlabs-desktop.yaml:716](specs/streamlabs-desktop.yaml#L716))
+- [ ] Confirm SceneItemFolder resources take the scene and folder IDs as SceneItemFolder["scene","folder"]. ([specs/streamlabs-desktop.yaml:191](specs/streamlabs-desktop.yaml#L191))
 
 ## symetrix-composer — Symetrix Composer DSPs
 

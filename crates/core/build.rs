@@ -155,7 +155,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-lg", &["lg-display"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
-    ("vendor-magewell", &["magewell-proconvert"]),
+    (
+        "vendor-magewell",
+        &["magewell-director", "magewell-proconvert"],
+    ),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-meros", &["meros-camera"]),
     ("vendor-meta", &["facebook-account", "facebook-live"]),
@@ -163,7 +166,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-nec",
         &["nec-display", "nec-projector", "nec-projector-ascii"],
     ),
-    ("vendor-newtek", &["newtek-tricaster"]),
+    ("vendor-newtek", &["newtek-3play", "newtek-tricaster"]),
     (
         "vendor-novastar",
         &["novastar-central-control", "novastar-coex", "novastar-h"],
@@ -176,6 +179,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     (
         "vendor-panasonic",
         &[
+            "panasonic-kairos",
             "panasonic-projector",
             "panasonic-ptz",
             "panasonic-ptz-serial",
@@ -255,6 +259,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-stagetimer", &["stagetimer"]),
+    ("vendor-streamlabs", &["streamlabs-desktop"]),
     ("vendor-studiocoast", &["vmix"]),
     (
         "vendor-symetrix",

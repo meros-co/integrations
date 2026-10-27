@@ -41,8 +41,9 @@ telemetry(TC, "notification-tally", inbound_ws="tally",
           expect_then_send=[{"method": "GET", "target": "/v1/dictionary?key=tally"}], expect_state={})
 telemetry(TC, "notification-macros", inbound_ws="macros_list",
           expect_then_send=[{"method": "GET", "target": "/v1/dictionary?key=macros_list"}], expect_state={})
-# A name it does not send (ddr_timecode is polled) re-reads nothing.
-telemetry(TC, "notification-other", inbound_ws="audiomixer", expect_then_send=[], expect_state={})
+# A name the guide does not list for the websocket (ddr_timecode is polled)
+# re-reads nothing.
+telemetry(TC, "notification-other", inbound_ws="ddr_timecode", expect_then_send=[], expect_state={})
 # The switcher dictionary with its T-bar and overlays (p.69).
 telemetry(TC, "switcher-overlays", inbound_http={
     "path": "/v1/dictionary?key=switcher",
@@ -87,3 +88,52 @@ telemetry(TC, "product", inbound_http={
                               "machine_name": "TC1", "id": "NCWL", "serial_number": ""},
                   "session": {"name": "TC1 Session", "width": 1920, "height": 1080, "frame_rate": 29.97003,
                               "fielded": True, "aspect_ratio": 1.777778}})
+
+# Viz 3Play channel commands sent on through an NDI input (Vizrt guide
+# p.152-155), in the XML command format posted as text/xml (p.159-160, p.163).
+
+
+def _tcx(command, input, body):
+    V.append({"spec": TC, "command": command, "input": input,
+              "expect_request": {"method": "POST", "target": "/v1/shortcut", "body": body}})
+
+
+_tcx("net_shortcut", {"net": 1, "shortcut": "main_auto"},
+     '<shortcut name="net1" value="" shortcut_name="main_auto"/>')
+_tcx("net_clip_store", {"net": 1, "id": "AAA1"}, '<shortcut name="net1" value="clip_store" index="AAA1"/>')
+_tcx("net_clip_restore", {"net": 2, "id": "AAA1"}, '<shortcut name="net2" value="clip_restore" index="AAA1"/>')
+_tcx("net_clip_select", {"net": 1, "index": "0-023"}, '<shortcut name="net1" value="clip_select" index="0-023"/>')
+_tcx("net_clip_move", {"net": 1, "distance": -1}, '<shortcut name="net1" value="clip_move" distance="-1"/>')
+_tcx("net_clip_play", {"net": 1, "speed": 1.0}, '<shortcut name="net1" value="clip_play" speed="1.000"/>')
+_tcx("net_clip_play_from", {"net": 1, "speed": -0.5, "position": 10.0},
+     '<shortcut name="net1" value="clip_play" speed="-0.500" position="10.000"/>')
+_tcx("net_clip_scrub", {"net": 1, "distance": 5.0}, '<shortcut name="net1" value="clip_scrub" distance="5.000"/>')
+_tcx("post_shortcut_xml", {"xml": '<shortcuts><shortcut name="main_background_take"/></shortcuts>'},
+     '<shortcuts><shortcut name="main_background_take"/></shortcuts>')
+# File transfer (p.165): the bytes as the body, the hints in headers.
+V.append({"spec": TC, "command": "upload_file",
+          "input": {"file": "iVBORw0K", "content_type": "image/png", "name": "HelloWorld.png", "overwrite": True},
+          "expect_request": {"method": "POST", "target": "/v1/file", "body_hex": "89504e470d0a",
+                             "content_type": "image/png"},
+          "http_reply": {"status": 200, "body": "HelloWorld.png"},
+          "expect_result": {"ok": {"kind": "value", "value": "HelloWorld.png"}}})
+# The DataLink list (p.163), replaced whole.
+telemetry(TC, "datalink", inbound_http={
+    "path": "/v1/datalink",
+    "body": "<datalink_values><data><key>Time</key><value>5:08:50 PM</value></data>"
+            "<data><key>Hours (short)</key><value>5</value></data></datalink_values>"},
+    state_before={"datalink": {"Gone": "x"}},
+    expect_state={"datalink": {"Time": "5:08:50 PM", "Hours (short)": "5"}})
+telemetry(TC, "live", inbound_http={"path": "/v1/live", "body": "TRUE"},
+          expect_state={"session": {"live": True}})
+_EFX = '<switcher_ui_effects><switcher name="main"><effect_bin><effect0 effect="Fade"/></effect_bin></switcher></switcher_ui_effects>'
+telemetry(TC, "switcher-ui-effects", inbound_http={"path": "/v1/dictionary?key=switcher_ui_effects", "body": _EFX},
+          expect_state={"dictionaries": {"switcher_ui_effects": _EFX}})
+telemetry(TC, "notification-ndi-sources", inbound_ws="ndi_sources",
+          expect_then_send=[{"method": "GET", "target": "/v1/dictionary?key=ndi_sources"}], expect_state={})
+telemetry(TC, "product-color", inbound_http={
+    "path": "/version",
+    "body": '<product_information><product_model>TC1</product_model>'
+            '<session_color_format>CCIR709</session_color_format><session_color_coding>NTSC</session_color_coding>'
+            '</product_information>'},
+    expect_state={"product": {"model": "TC1"}, "session": {"color_format": "CCIR709", "color_coding": "NTSC"}})
