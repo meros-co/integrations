@@ -474,7 +474,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 |---|---|---|
 | Chyron LyricX (PRIME is built) | Intelligent Interface over TCP | Unknown (no public Lyric protocol document found) |
 | Vizrt Viz Engine (Viz Trio is built) | TCP command protocol (port 6100) | Partial (the command reference and message framing ship only with the installation) |
-| LiveOS, Loopic (CharacterWorks and Holographics are built) | HTTP / WebSocket | Unknown |
+| LiveOS (CharacterWorks and Holographics are built; Loopic has no control API of its own, its templates play in CasparCG, SPX or OGraf hosts) | Unknown | Closed (no public protocol document) |
 | Brainstorm InfinitySet / Aston (Zero Density Reality Hub, Aximmetry and Pixotope are built) | WebSocket (undocumented) | Closed (only the vendor's Companion module shows it) |
 | AI-Media iCap Alta, ZipCaptions (EEG encoders and the iCap cloud API are built) | Vendor APIs | Closed (Alta API documents withdrawn; ZipCaptions has no inbound API) |
 
