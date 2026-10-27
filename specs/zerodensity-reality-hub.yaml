@@ -1,0 +1,679 @@
+spec: 1
+id: zerodensity-reality-hub
+name: Zero Density Reality Hub (REST API, Lino rundowns)
+vendor: Zero Density
+category: other
+
+# Reality Hub serves a REST API under /api/rest/v1 on its web address:
+# engines and their node properties and functions, graphs, projects, the
+# launcher's shows, and Lino rundowns (load, play, continue, out, clear,
+# buttons). Requests carry an API key, created in User Management, in the
+# X-API-Key header; the REST API is a licensed feature, and a key reaches
+# only the module resources assigned to it. Nothing is pushed over REST.
+
+source:
+  - title: Reality Hub REST API (OpenAPI), version 2.1.0, Reality 5.8 Reality Hub Developers Guide
+    author: Zero Density
+    url: https://docs.zerodensity.io/reality-5.8/reality-hub-api.yaml
+    note: >
+      Manufacturer document, read 2026-10-27. Server http://127.0.0.1; API key
+      in X-API-Key or ?api_key=; every path used here under /api/rest/v1:
+      engines (with nodes, properties, PATCH of a property with Value,
+      Interpolation Constant|Linear|EaseIn|EaseOut|EaseInOut, Duration and
+      Delay in seconds, functions and POST of a function with Parameters),
+      graphs (load with engineHostId), projects, launcher shows (launch with
+      mode live|config|offline, stop, channels), lino shows, rundowns,
+      templates, rundown items (by id and by item number, create, PATCH,
+      DELETE, buttons and their triggers with subtemplatesIds), rundown
+      delete, load, append, unload, play, playnext, continue, out and clear
+      with preview 0 (program) or 1 (preview), and batch. Schemas Engine
+      (role Broadcast|Preview, status connected|ready|disconnected|reconnecting),
+      Show (running), LinoRundownEngine (started, loadedRundownInfo),
+      LinoRundownItem (status preview and program Available|Playing|Unavailable,
+      online), errors (401 AUTHENTICATION_REQUIRED or INVALID_API_KEY, 403
+      INSUFFICIENT_PERMISSIONS).
+  - title: Reality 5.8 Reality Hub Developers Guide, REST API and Key Authentication
+    author: Zero Density
+    url: https://docs.zerodensity.io/reality-5.8/reality-hub-developers-guide/rest-api
+    note: >
+      Manufacturer documents. Keys from User Management > REST API Keys by
+      users with the Rest API Management right; module resources assigned per
+      key reserve licences; path segments with unsupported URL characters are
+      URL-encoded. The 5.5 Lino REST Endpoints page
+      (https://docs.zerodensity.tv/reality-5.5/user-guide/controlling-lino/lino-rest-endpoints)
+      describes the older engine-based form, not used here.
+
+transport:
+  type: http
+  port: 80
+  scheme: { setting: scheme }
+  https_port: 443
+  auth: header
+  auth_header: X-API-Key
+  refusal_status: [401, 403]
+  refusal_status_body: { json: { "$.code": "^(AUTHENTICATION_REQUIRED|INVALID_API_KEY)$" } }
+  timeout_ms: 8000
+  probe: { method: GET, path: /api/rest/v1/lino/rundowns }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http, label: Scheme,
+            description: "http, or https where Reality Hub is served over TLS." }
+  token: { type: string, secret: true, required: true, max_length: 512, label: API key,
+           description: "A REST API key from Reality Hub's User Management, with the module resources the commands need." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http", note: "Reality Hub's web address; the documents give no port" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+
+models:
+  - id: reality-hub
+    name: Zero Density Reality Hub 2.x (Reality 5.8)
+    supports: [list_engines, get_engine, list_nodes, get_node, list_properties, get_property, set_property,
+               list_functions, get_function, call_function, list_graphs, get_graph, list_graph_channels,
+               load_graph, list_projects, list_project_channels, list_launcher_shows, get_launcher_show,
+               list_engine_channels, launch_show, stop_show, list_lino_shows, get_lino_show, list_rundowns,
+               get_rundown, list_show_rundowns, list_templates, list_items, get_item, get_item_by_number,
+               create_item, create_item_at_end, update_item, update_item_by_number, delete_item, delete_item_by_number,
+               get_item_buttons, get_item_buttons_by_number, press_item_button, press_item_button_by_number,
+               press_combo_item_button, delete_rundown, load_rundown, append_rundown, unload_rundown, play_item,
+               play_item_by_number, play_next, continue_item, continue_item_by_number, take_out_item,
+               take_out_item_by_number, clear_output, batch]
+    verification: none
+
+commands:
+  # ── Engines, nodes, properties, functions ───────────────────────────────
+  list_engines:
+    summary: List the engines with their role, status, disk space and instances (GET /engines)
+    send: { method: GET, path: /api/rest/v1/engines }
+    expect: &value { status: 200, json_path: "$" }
+    returns: value
+  get_engine:
+    summary: Read an engine (GET /engines/<id>)
+    params:
+      engine: &engine { type: int, min: 0, required: true, label: Engine, description: "Engine id, as list_engines gives it." }
+    send: { method: GET, path: "/api/rest/v1/engines/{engine}" }
+    expect: *value
+    returns: value
+  list_nodes:
+    summary: List an engine's nodes (GET /engines/<id>/nodes)
+    params:
+      engine: *engine
+    send: { method: GET, path: "/api/rest/v1/engines/{engine}/nodes" }
+    expect: *value
+    returns: value
+  get_node:
+    summary: Read a node (GET /engines/<id>/nodes/<node path>)
+    params:
+      engine: *engine
+      node: &node { type: string, max_length: 1024, required: true, label: Node, description: "Node path, as list_nodes gives it." }
+    send: { method: GET, path: "/api/rest/v1/engines/{engine}/nodes/{node}" }
+    expect: *value
+    returns: value
+  list_properties:
+    summary: List a node's properties with their values (GET .../nodes/<node>/properties)
+    params:
+      engine: *engine
+      node: *node
+    send: { method: GET, path: "/api/rest/v1/engines/{engine}/nodes/{node}/properties" }
+    expect: *value
+    returns: value
+  get_property:
+    summary: Read one property of a node (GET .../properties/<property path>)
+    params:
+      engine: *engine
+      node: *node
+      property: &property { type: string, max_length: 1024, required: true, label: Property,
+                            description: "Property path, as list_properties gives it; with RE5, part of a value such as Transform.Location.x." }
+    send: { method: GET, path: "/api/rest/v1/engines/{engine}/nodes/{node}/properties/{property}" }
+    expect: *value
+    returns: value
+  set_property:
+    summary: Set a node property's value, optionally interpolated over time (PATCH .../properties/<property path>)
+    params:
+      engine: *engine
+      node: *node
+      property: *property
+      value: { type: json, required: true, label: Value,
+               description: "The property's new value: a number, true/false, text, or an object such as {\"x\": 0.2, \"y\": 0.3}." }
+      interpolation: { type: enum, values: [Constant, Linear, EaseIn, EaseOut, EaseInOut], default: Constant, label: Interpolation,
+                       description: "How the value moves to its target over the duration; Constant jumps." }
+      duration: { type: float, min: 0, max: 3600, default: 0, label: Duration, description: "Interpolation time in seconds." }
+      delay: { type: float, min: 0, max: 3600, default: 0, label: Delay, description: "Wait before the change, in seconds." }
+    send:
+      method: PATCH
+      path: "/api/rest/v1/engines/{engine}/nodes/{node}/properties/{property}"
+      body: '{"Interpolation":"{interpolation}","Duration":{duration:.3f},"Delay":{delay:.3f},"Value":{value}}'
+      content_type: application/json
+    expect: &ok { status: 200 }
+    returns: ack
+  list_functions:
+    summary: List a node's functions (GET .../nodes/<node>/functions)
+    params:
+      engine: *engine
+      node: *node
+    send: { method: GET, path: "/api/rest/v1/engines/{engine}/nodes/{node}/functions" }
+    expect: *value
+    returns: value
+  get_function:
+    summary: Read a node function and its parameters (GET .../functions/<function path>)
+    params:
+      engine: *engine
+      node: *node
+      function: &function { type: string, max_length: 1024, required: true, label: Function, description: "Function path, as list_functions gives it." }
+    send: { method: GET, path: "/api/rest/v1/engines/{engine}/nodes/{node}/functions/{function}" }
+    expect: *value
+    returns: value
+  call_function:
+    summary: Call a node function with its parameters (POST .../functions/<function path>)
+    params:
+      engine: *engine
+      node: *node
+      function: *function
+      parameters: { type: json, required: true, label: Parameters,
+                    description: "JSON array of {PropertyPath, DisplayName, Value}, as get_function lists them; [] for none." }
+    send: { method: POST, path: "/api/rest/v1/engines/{engine}/nodes/{node}/functions/{function}",
+            body: '{"Parameters":{parameters}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  # ── Graphs, projects, launcher ──────────────────────────────────────────
+  list_graphs:
+    summary: List the graphs (GET /graphs)
+    send: { method: GET, path: /api/rest/v1/graphs }
+    expect: *value
+    returns: value
+  get_graph:
+    summary: Read a graph (GET /graphs/<id>)
+    params:
+      graph: &graph { type: int, min: 0, required: true, label: Graph, description: "Graph id." }
+    send: { method: GET, path: "/api/rest/v1/graphs/{graph}" }
+    expect: *value
+    returns: value
+  list_graph_channels:
+    summary: List a graph's channels (GET /graphs/<id>/channels)
+    params:
+      graph: *graph
+    send: { method: GET, path: "/api/rest/v1/graphs/{graph}/channels" }
+    expect: *value
+    returns: value
+  load_graph:
+    summary: Load a graph on an engine host (POST /graphs/<id>/load)
+    params:
+      graph: *graph
+      host: { type: int, min: 0, required: true, label: Engine host, description: "Engine host id the graph loads on." }
+    send: { method: POST, path: "/api/rest/v1/graphs/{graph}/load", body: '{"engineHostId":{host}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+  list_projects:
+    summary: List the projects with their engine version and maps (GET /projects)
+    send: { method: GET, path: /api/rest/v1/projects }
+    expect: *value
+    returns: value
+  list_project_channels:
+    summary: List a project's channels (GET /projects/<id>/channels)
+    params:
+      project: { type: int, min: 0, required: true, label: Project, description: "Project id." }
+    send: { method: GET, path: "/api/rest/v1/projects/{project}/channels" }
+    expect: *value
+    returns: value
+  list_launcher_shows:
+    summary: List the launcher's shows with their channels and engines, and whether each runs (GET /launcher)
+    send: { method: GET, path: /api/rest/v1/launcher }
+    expect: *value
+    returns: value
+  get_launcher_show:
+    summary: Read a launcher show (GET /launcher/<show id>)
+    params:
+      show: &show { type: int, min: 0, required: true, label: Show, description: "Show id." }
+    send: { method: GET, path: "/api/rest/v1/launcher/{show}" }
+    expect: *value
+    returns: value
+  list_engine_channels:
+    summary: List the channels of an engine in a show (GET /launcher/shows/<show>/engines/<renderer>/channels)
+    params:
+      show: *show
+      renderer: { type: int, min: 0, required: true, label: Renderer, description: "Renderer (engine) id." }
+    send: { method: GET, path: "/api/rest/v1/launcher/shows/{show}/engines/{renderer}/channels" }
+    expect: *value
+    returns: value
+  launch_show:
+    summary: Start a show in live, config or offline mode (PUT /launcher/<show id>/launch?mode=); 207 means started with warnings
+    params:
+      show: *show
+      mode: { type: enum, values: [live, config, offline], default: live, label: Mode, description: "Launch mode; live by default." }
+    send: { method: PUT, path: "/api/rest/v1/launcher/{show}/launch", query: { mode: "{mode}" } }
+    expect: { status: [200, 207] }
+    returns: ack
+  stop_show:
+    summary: Stop a show (PUT /launcher/<show id>/stop)
+    params:
+      show: *show
+    send: { method: PUT, path: "/api/rest/v1/launcher/{show}/stop" }
+    expect: *ok
+    returns: ack
+
+  # ── Lino: shows, rundowns, templates, items ─────────────────────────────
+  list_lino_shows:
+    summary: List the Lino shows with whether each is started and its loaded rundowns (GET /lino/shows)
+    send: { method: GET, path: /api/rest/v1/lino/shows }
+    expect: *value
+    returns: value
+  get_lino_show:
+    summary: Read a Lino show (GET /lino/shows/<show id>)
+    params:
+      show: *show
+    send: { method: GET, path: "/api/rest/v1/lino/shows/{show}" }
+    expect: *value
+    returns: value
+  list_rundowns:
+    summary: List every Lino rundown (GET /lino/rundowns)
+    send: { method: GET, path: /api/rest/v1/lino/rundowns }
+    expect: *value
+    returns: value
+  get_rundown:
+    summary: Read a Lino rundown's id and name (GET /lino/rundown/<rundown id>)
+    params:
+      rundown: &rundown { type: int, min: 0, required: true, label: Rundown, description: "Rundown id." }
+    send: { method: GET, path: "/api/rest/v1/lino/rundown/{rundown}" }
+    expect: *value
+    returns: value
+  list_show_rundowns:
+    summary: List a show's rundowns (GET /lino/rundowns/<show id>)
+    params:
+      show: *show
+    send: { method: GET, path: "/api/rest/v1/lino/rundowns/{show}" }
+    expect: *value
+    returns: value
+  list_templates:
+    summary: List the Lino templates with their data fields (GET /lino/templates)
+    send: { method: GET, path: /api/rest/v1/lino/templates }
+    expect: *value
+    returns: value
+  list_items:
+    summary: List a rundown's items with their data, buttons and status (GET /lino/rundown/<show>/<rundown>/items/)
+    params:
+      show: *show
+      rundown: *rundown
+    send: { method: GET, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/" }
+    expect: *value
+    returns: value
+  get_item:
+    summary: Read a rundown item by id (GET .../items/<item id>)
+    params:
+      show: *show
+      rundown: *rundown
+      item: &item { type: int, min: 0, required: true, label: Item, description: "Rundown item id." }
+    send: { method: GET, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/{item}" }
+    expect: *value
+    returns: value
+  get_item_by_number:
+    summary: Read a rundown item by its item number (GET .../items/by-item-no/<number>)
+    params:
+      show: *show
+      rundown: *rundown
+      number: &number { type: int, min: 0, required: true, label: Item number, description: "Item number as the rundown shows it." }
+    send: { method: GET, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/by-item-no/{number}" }
+    expect: *value
+    returns: value
+  create_item:
+    summary: Add an item to a rundown from a template, optionally after another (POST .../items/)
+    params:
+      show: *show
+      rundown: *rundown
+      name: &itemname { type: string, max_length: 256, required: true, label: Name, description: "Item name." }
+      template: &template { type: int, min: 0, required: true, label: Template, description: "Template id, as list_templates gives it." }
+      after: { type: int, min: 0, required: true, label: Insert after, description: "Id of the item the new one goes after." }
+      data: &itemdata { type: json, required: true, label: Data, description: "JSON object of the template's data fields and values." }
+    send: { method: POST, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/",
+            body: '{"name":{name:json},"templateId":{template},"insertAfter":{after},"data":{data}}', content_type: application/json }
+    expect: { status: [200, 201], json_path: "$" }
+    returns: value
+  create_item_at_end:
+    summary: Add an item at the end of a rundown from a template (POST .../items/ without insertAfter)
+    params:
+      show: *show
+      rundown: *rundown
+      name: *itemname
+      template: *template
+      data: *itemdata
+    send: { method: POST, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/",
+            body: '{"name":{name:json},"templateId":{template},"data":{data}}', content_type: application/json }
+    expect: { status: [200, 201], json_path: "$" }
+    returns: value
+  update_item:
+    summary: Change a rundown item's name, template and data (PATCH .../items/<item id>)
+    params:
+      show: *show
+      rundown: *rundown
+      item: *item
+      name: *itemname
+      template: *template
+      data: *itemdata
+    send: { method: PATCH, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/{item}",
+            body: '{"name":{name:json},"templateId":{template},"data":{data}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  update_item_by_number:
+    summary: Change a rundown item's name, template and data, by item number (PATCH .../items/by-item-no/<number>)
+    params:
+      show: *show
+      rundown: *rundown
+      number: *number
+      name: *itemname
+      template: *template
+      data: *itemdata
+    send: { method: PATCH, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/by-item-no/{number}",
+            body: '{"name":{name:json},"templateId":{template},"data":{data}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+  delete_item:
+    summary: Delete a rundown item (DELETE .../items/<item id>)
+    params:
+      show: *show
+      rundown: *rundown
+      item: *item
+    send: { method: DELETE, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/{item}" }
+    expect: *ok
+    returns: ack
+  delete_item_by_number:
+    summary: Delete a rundown item by item number (DELETE .../items/by-item-no/<number>)
+    params:
+      show: *show
+      rundown: *rundown
+      number: *number
+    send: { method: DELETE, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/by-item-no/{number}" }
+    expect: *ok
+    returns: ack
+  get_item_buttons:
+    summary: List a rundown item's buttons; a combo template lists them per subtemplate (GET .../items/<item id>/buttons)
+    params:
+      show: *show
+      rundown: *rundown
+      item: *item
+    send: { method: GET, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/{item}/buttons" }
+    expect: *value
+    returns: value
+  get_item_buttons_by_number:
+    summary: List a rundown item's buttons, by item number (GET .../items/by-item-no/<number>/buttons)
+    params:
+      show: *show
+      rundown: *rundown
+      number: *number
+    send: { method: GET, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/by-item-no/{number}/buttons" }
+    expect: *value
+    returns: value
+  press_item_button:
+    summary: Trigger a rundown item's button (POST .../items/<item id>/buttons/<button key>)
+    params:
+      show: *show
+      rundown: *rundown
+      item: *item
+      button: &button { type: string, max_length: 256, required: true, label: Button, description: "Button key, as get_item_buttons gives it, such as PLAY." }
+    send: { method: POST, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/{item}/buttons/{button}" }
+    expect: *ok
+    returns: ack
+  press_item_button_by_number:
+    summary: Trigger a rundown item's button, by item number (POST .../items/by-item-no/<number>/buttons/<button key>)
+    params:
+      show: *show
+      rundown: *rundown
+      number: *number
+      button: *button
+    send: { method: POST, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/by-item-no/{number}/buttons/{button}" }
+    expect: *ok
+    returns: ack
+  press_combo_item_button:
+    summary: Trigger a combo-template item's button on the subtemplates named (POST .../buttons/<key> with subtemplatesIds)
+    params:
+      show: *show
+      rundown: *rundown
+      item: *item
+      button: *button
+      subtemplates: { type: json, required: true, label: Subtemplates, description: "JSON array of subtemplate ids, [2200]." }
+    send: { method: POST, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/{item}/buttons/{button}",
+            body: '{"subtemplatesIds":{subtemplates}}', content_type: application/json }
+    expect: *ok
+    returns: ack
+
+  # ── Lino: playout ───────────────────────────────────────────────────────
+  delete_rundown:
+    summary: Delete a rundown (DELETE /lino/rundown/<show>/<rundown>)
+    params:
+      show: *show
+      rundown: *rundown
+    send: { method: DELETE, path: "/api/rest/v1/lino/rundown/{show}/{rundown}" }
+    expect: *ok
+    returns: ack
+  load_rundown:
+    summary: Load a rundown on a show (PUT /lino/rundown/<show>/<rundown>/load)
+    params:
+      show: *show
+      rundown: *rundown
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/load" }
+    expect: *ok
+    returns: ack
+  append_rundown:
+    summary: Append another rundown to the loaded one (PUT /lino/rundown/<show>/<rundown>/append/<new rundown>)
+    params:
+      show: *show
+      rundown: *rundown
+      new_rundown: { type: int, min: 0, required: true, label: Rundown to append, description: "Id of the rundown appended." }
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/append/{new_rundown}" }
+    expect: *ok
+    returns: ack
+  unload_rundown:
+    summary: Unload a rundown (PUT /lino/rundown/<show>/<rundown>/unload)
+    params:
+      show: *show
+      rundown: *rundown
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/unload" }
+    expect: *ok
+    returns: ack
+  play_item:
+    summary: Play a rundown item on program or preview (PUT /lino/rundown/<show>/play/<item id>/<0|1>)
+    params:
+      show: *show
+      item: *item
+      output: &output { type: enum, values: [program, preview], required: true, label: Output,
+                        description: "program (0, the on-air output) or preview (1, for preparation)." }
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/play/{item}/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  play_item_by_number:
+    summary: Play a rundown item by item number (PUT /lino/rundown/<show>/play/by-item-no/<rundown>/<number>/<0|1>)
+    params:
+      show: *show
+      rundown: *rundown
+      number: *number
+      output: *output
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/play/by-item-no/{rundown}/{number}/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  play_next:
+    summary: Play the next item of the loaded rundown (PUT /lino/rundown/<show>/playnext/<0|1>)
+    params:
+      show: *show
+      output: *output
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/playnext/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  continue_item:
+    summary: Continue a playing item (PUT /lino/rundown/<show>/continue/<item id>/<0|1>)
+    params:
+      show: *show
+      item: *item
+      output: *output
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/continue/{item}/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  continue_item_by_number:
+    summary: Continue a playing item, by item number (PUT .../continue/by-item-no/<rundown>/<number>/<0|1>)
+    params:
+      show: *show
+      rundown: *rundown
+      number: *number
+      output: *output
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/continue/by-item-no/{rundown}/{number}/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  take_out_item:
+    summary: Take an item out (PUT /lino/rundown/<show>/out/<item id>/<0|1>)
+    params:
+      show: *show
+      item: *item
+      output: *output
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/out/{item}/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  take_out_item_by_number:
+    summary: Take an item out, by item number (PUT .../out/by-item-no/<rundown>/<number>/<0|1>)
+    params:
+      show: *show
+      rundown: *rundown
+      number: *number
+      output: *output
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/out/by-item-no/{rundown}/{number}/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  clear_output:
+    summary: Clear the program or preview output (PUT /lino/rundown/<show>/clear/<0|1>)
+    params:
+      show: *show
+      output: *output
+    send: { method: PUT, path: "/api/rest/v1/lino/rundown/{show}/clear/{output:map.output}" }
+    expect: *ok
+    returns: ack
+  batch:
+    summary: >
+      Send several requests in one (PUT /batch): an array of {id, url, verb
+      GET|PATCH|PUT|POST, body}, each url relative to /api/rest/v1; answers
+      each with its responseCode and responseBody
+    params:
+      requests: { type: json, required: true, label: Requests,
+                  description: "JSON array of {\"id\": 1, \"url\": \"/lino/rundowns\", \"verb\": \"GET\", \"body\": {...}} as Reality Hub documents it." }
+    send: { method: PUT, path: /api/rest/v1/batch, body: "{requests}", content_type: application/json }
+    expect: *value
+    returns: value
+
+maps:
+  output: { program: "0", preview: "1" }
+
+telemetry:
+  # Nothing is pushed over REST. The Lino shows are read every 2 s; each
+  # loaded rundown's items, with their preview and program status, are read
+  # after it. Engines and the launcher's shows every 10 s.
+  poll:
+    - every_ms: 2000
+      send: [{ method: GET, path: /api/rest/v1/lino/shows }]
+    - every_ms: 10000
+      send: [{ method: GET, path: /api/rest/v1/engines }, { method: GET, path: /api/rest/v1/launcher }]
+  updates:
+    - path: "^/api/rest/v1/lino/shows$"
+      json_match: { "$": "^\\[" }
+      json_each: "$"
+      json: { id: "$.id", name: "$.name", started: "$.started" }
+      replace: lino.shows
+      state:
+        "lino.shows.{id}.name": "{name}"
+        "lino.shows.{id}.started": "{started}"
+    - path: "^/api/rest/v1/lino/shows$"
+      json_each: "$[*].loadedRundownInfo"
+      json: { show: "$^.id", rundown: "$.id" }
+      state: { "lino.shows.{show}.loaded_rundowns.{rundown}": "true" }
+      then_send:
+        - { method: GET, path: "/api/rest/v1/lino/rundown/{show}/{rundown}/items/" }
+    - path: "^/api/rest/v1/lino/rundown/(\\d+)/(\\d+)/items/$"
+      json_match: { "$": "^\\[" }
+      json_each: "$"
+      json: { id: "$.id", number: "$.itemNo", name: "$.name", template: "$.template", type: "$.itemType",
+              channel: "$.outputChannel", preview: "$.status.preview", program: "$.status.program", online: "$.status.online" }
+      replace: "lino.rundowns.{2}.items"
+      state:
+        "lino.rundowns.{2}.show": "{1}"
+        "lino.rundowns.{2}.items.{id}.number": "{number}"
+        "lino.rundowns.{2}.items.{id}.name": "{name}"
+        "lino.rundowns.{2}.items.{id}.template": "{template}"
+        "lino.rundowns.{2}.items.{id}.type": "{type}"
+        "lino.rundowns.{2}.items.{id}.channel": "{channel}"
+        "lino.rundowns.{2}.items.{id}.preview": "{preview}"
+        "lino.rundowns.{2}.items.{id}.program": "{program}"
+        "lino.rundowns.{2}.items.{id}.online": "{online}"
+    - path: "^/api/rest/v1/engines$"
+      json_match: { "$": "^\\[" }
+      json_each: "$"
+      json: { id: "$.id", name: "$.displayName", ip: "$.ip", role: "$.role", status: "$.status",
+              used: "$.usedSpace", disk: "$.diskSpace" }
+      replace: engines
+      state:
+        "engines.{id}.name": "{name}"
+        "engines.{id}.ip": "{ip}"
+        "engines.{id}.role": "{role}"
+        "engines.{id}.status": "{status}"
+        "engines.{id}.connected": { value: "{status}", map: { connected: true, ready: true, disconnected: false, reconnecting: false } }
+        "engines.{id}.used_space": "{used}"
+        "engines.{id}.disk_space": "{disk}"
+    - path: "^/api/rest/v1/launcher$"
+      json_match: { "$": "^\\[" }
+      json_each: "$"
+      json: { id: "$.id", name: "$.name", running: "$.running" }
+      replace: launcher.shows
+      state:
+        "launcher.shows.{id}.name": "{name}"
+        "launcher.shows.{id}.running": "{running}"
+
+state:
+  lino.shows.*.name: { type: string, description: "Lino show name, keyed by show id" }
+  lino.shows.*.started: { type: bool, description: "Whether the Lino show is started" }
+  lino.shows.*.loaded_rundowns.*: { type: bool, description: "Each rundown loaded on the show, keyed by rundown id; always true" }
+  lino.rundowns.*.show: { type: int, description: "Show the loaded rundown is on, keyed by rundown id" }
+  lino.rundowns.*.items.*.number: { type: int, description: "Item number as the rundown shows it, keyed by item id" }
+  lino.rundowns.*.items.*.name: { type: string, description: "Item name" }
+  lino.rundowns.*.items.*.template: { type: string, description: "Template the item is built from" }
+  lino.rundowns.*.items.*.type: { type: string, description: "Item type: vs (Nodos/VS) or md (Motion Design)" }
+  lino.rundowns.*.items.*.channel: { type: string, description: "Logical output channel of the item" }
+  lino.rundowns.*.items.*.preview: { type: string, description: "Preview status: Available, Playing or Unavailable" }
+  lino.rundowns.*.items.*.program: { type: string, description: "Program status: Available, Playing or Unavailable" }
+  lino.rundowns.*.items.*.online: { type: bool, description: "Whether the item is online on a program channel" }
+  engines.*.name: { type: string, description: "Engine display name, keyed by engine id" }
+  engines.*.ip: { type: string, description: "Engine IP address" }
+  engines.*.role: { type: string, description: "Engine role: Broadcast or Preview" }
+  engines.*.status: { type: string, description: "Engine status: connected, ready, disconnected or reconnecting" }
+  engines.*.connected: { type: bool, description: "Whether the engine is connected or ready" }
+  engines.*.used_space: { type: int, description: "Cache disk space used, as Reality Hub reports it" }
+  engines.*.disk_space: { type: int, description: "Cache disk size, as Reality Hub reports it" }
+  launcher.shows.*.name: { type: string, description: "Launcher show name, keyed by show id" }
+  launcher.shows.*.running: { type: bool, description: "Whether the show is running" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The REST API is a licensed feature of Reality Hub, and an API key
+      reaches only the module resources assigned to it in User Management
+      (assigning one reserves its licence). A missing or invalid key (401
+      AUTHENTICATION_REQUIRED or INVALID_API_KEY) is a refused credential; a
+      key without a resource's permission answers 403 INSUFFICIENT_PERMISSIONS
+      for that command only. The documents give no port: 80 (or 443 over
+      https) is assumed.
+  - models: [all]
+    severity: info
+    text: >
+      State is polled: the Lino shows every 2 s, then the items of each loaded
+      rundown with their preview and program status; the engines and the
+      launcher's shows every 10 s. A rundown no longer loaded keeps its last
+      items in state until the next read of it. Node property values are read
+      on request only (list_properties, get_property).
+  - models: [all]
+    severity: info
+    text: >
+      Item ids and item numbers differ: ids are Reality Hub's, numbers are the
+      ones the rundown shows. A combo-template item's button can be ambiguous;
+      Reality Hub then answers 400 and asks for subtemplatesIds
+      (press_combo_item_button). Paths are URL-encoded as segments, as the
+      documents ask.
+  - models: [all]
+    severity: critical
+    text: >
+      play_item, play_next and take_out_item with output program act on air;
+      clear_output clears an output; launch_show and stop_show start and stop
+      the engines of a show; delete_rundown and delete_item delete content.

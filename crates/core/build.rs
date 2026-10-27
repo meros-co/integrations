@@ -378,6 +378,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-zcam", &["zcam"]),
+    ("vendor-zerodensity", &["zerodensity-reality-hub"]),
     ("vendor-zinc", &["oscpoint"]),
 ];
 

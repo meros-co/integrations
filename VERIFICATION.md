@@ -3925,3 +3925,11 @@ Nothing specific is listed for these yet, but test results are still welcome: ge
 - [ ] Record the answers of /ctrl/tc, /ctrl/stream_setting?action=query, /ctrl/rtmp, /ctrl/srt, /ctrl/ndi, /ctrl/pt?action=query, /ctrl/network?action=info, /ctrl/card?action=present, /ctrl/preset?action=get_info and /ctrl/framing/all_status, so their fields can be read into state. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
 - [ ] Check the valid ranges of fspeed for /ctrl/lens zoom and focus, the pan/tilt speeds of action=pt, preset and trace numbers, and the framing fov, target_lost and placement values. ([specs/zcam.yaml:3191](specs/zcam.yaml#L3191))
 - [ ] Find out how a client logs in when the camera's user accounts or HTTPS authentication are on, and whether clip downloads need it. ([specs/zcam.yaml:3199](specs/zcam.yaml#L3199))
+
+## zerodensity-reality-hub — Zero Density Reality Hub
+
+- [ ] Record the port Reality Hub serves its REST API on (80 assumed) and whether it is served over https. ([specs/zerodensity-reality-hub.yaml:656](specs/zerodensity-reality-hub.yaml#L656))
+- [ ] Confirm a 403 for a missing module permission carries code INSUFFICIENT_PERMISSIONS, so it is not taken for a refused key. ([specs/zerodensity-reality-hub.yaml:54](specs/zerodensity-reality-hub.yaml#L54))
+- [ ] Check that a node, property or function path holding slashes is accepted percent-encoded (%2F) as one segment. ([specs/zerodensity-reality-hub.yaml:672](specs/zerodensity-reality-hub.yaml#L672))
+- [ ] Record the units of an engine's usedSpace and diskSpace. ([specs/zerodensity-reality-hub.yaml:642](specs/zerodensity-reality-hub.yaml#L642))
+- [ ] Check whether a rundown no longer loaded should be removed from state (the spec keeps its last items). ([specs/zerodensity-reality-hub.yaml:663](specs/zerodensity-reality-hub.yaml#L663))
