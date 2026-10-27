@@ -1,0 +1,1160 @@
+spec: 1
+id: tascam-da6400
+name: TASCAM DA-6400 / DA-6400dp 64-track recorders (TELNET protocol)
+vendor: TASCAM
+category: recorder
+
+# TEAC's TELNET protocol for the DA-6400 family, on the ETHERNET port's Telnet server (TCP 23, a password
+# asked first). Every message is ASCII: the machine ID "0", a two-character command, its data, then LF and
+# CR. Transport and preset commands are not acknowledged; sense commands are answered by a return command
+# (the command with its top bit set, such as 50 MECHA STATUS SENSE answered by D0); the recorder pushes F6
+# CHANGE STATUS when its transport or take changes, F0 and F1 when its error or caution status changes, and
+# FF02F6 when the project changes. Functions of its own are the 7F vendor commands (a category and a
+# sub-command after 7F), answered by FF. Numbers of takes, projects, marks and channels are sent as four
+# digits in the order tens, ones, thousands, hundreds ("2301" is 123).
+#
+# The RS-422 port of the same recorders speaks the Sony 9-pin protocol: that is the sony-9pin spec's.
+source:
+  - title: "TASCAM DA-6400/DA-6400dp CONTROL I/O connector TELNET protocol specifications, Ver. 1.00 (April 2016)"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/da-6400/telnet_protocol_da6400dp_v100_en.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-27), offered for download with a protocol use agreement that
+      grants its use for developing compatible devices and software; nothing of it is copied here. Command
+      format (ID, two-character command, data, LF CR; ID 0; ILLEGAL F2 for an unsupported command), the
+      command and vendor command lists (pp.4-6), the command sequence (no ACK for transport and preset
+      commands, return commands for sense commands, CHANGED STATUS pushes, at least 20 ms between
+      commands, p.7), each command's data (pp.8-30) and the vendor commands by category (project, mark,
+      timecode, recording, media, external control, inputs and outputs, meter, system, take editing,
+      pp.31-68). Take numbers to 999 and project numbers to 99 (p.8).
+  - title: "TASCAM DA-6400/DA-6400dp Owner's Manual"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/old/891/e_da-6400dp_om_va.pdf
+    note: >
+      Manufacturer document. "Remote control (Telnet)" (p.43): port 23, password DA-6400 by default
+      (case-sensitive, set on the PASSWORD screen), press Enter after connecting, "Enter Password", "Login
+      Successful", two Telnet connections at once. Up to 99 marks per take (p.45). LOCK SETUP's EXTERNAL
+      control lock (p.31).
+  - title: "TASCAM DA-6400/DA-6400dp Owner's Manual Addendum V3.20 (2026-03-24)"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/da-6400/e_da-6400_add_vk.pdf
+    note: >
+      Manufacturer document. The corrected Telnet NOTE (firmware 1.21): with EXTERNAL control LOCKed a
+      Telnet connection is still accepted, but it can neither control the unit nor change its settings;
+      STOP and PAUSE from RS-422 or Telnet stop or pause recording whatever the record key lock says.
+  - title: "bitfocus/companion-module-tascam-da-6400 (MIT)"
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-tascam-da-6400
+    note: "Corroboration only, not copied: Telnet on port 23 with the password prompt."
+
+transport:
+  type: line-tcp
+  port: 23
+  # Every message ends with LF then CR: the templates end with "\n", and the terminator adds the CR. The
+  # recorder's own messages end with the same pair; any CR or LF ends a received line.
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 3000
+  reply: expected
+  # A reply is a return command, which has its top bit set (8F to FF): an echo of a command sent (00 to
+  # 7F) is never taken for one.
+  reply_match: "^0[89A-F][0-9A-F]"
+  error_match: "^0F2$"
+  probe: "00F\n"
+  # At least 20 ms between commands (p.7).
+  pacing:
+    min_interval_ms: 20
+
+settings:
+  password: { type: string, secret: true, max_length: 32, default: DA-6400, label: Password,
+    description: "The recorder's Telnet password, set on its PASSWORD screen; DA-6400 by default, case-sensitive." }
+
+# Enter first, then the password at "Enter Password". TEAC documents no answer to a wrong password, so a
+# wrong one goes unnoticed until commands go unanswered.
+on_connect:
+  - send: ""
+  - after_prompt: "Enter Password"
+    send: "{settings.password}"
+
+ports:
+  - { port: 23, protocol: tcp, role: control, note: "the Telnet server on the ETHERNET port; two connections at once" }
+
+models:
+  - id: da-6400
+    name: TASCAM DA-6400
+    supports: &all [stop, play, record, record_pause, take_split, pause, search, skip, locate_take, locate_take_then,
+      locate_time, locate_time_then, set_clock, get_clock, set_repeat, get_repeat, set_remote_local, get_remote_local,
+      set_play_mode, get_play_mode, get_status, get_take_number, get_take_info, get_time, get_take_title, get_totals,
+      get_keyboard_type, get_error, get_caution, get_information, project_skip, select_project, create_project,
+      set_new_project_name, get_new_project_name, rebuild_project, delete_project, get_project_number,
+      get_project_name, get_project_count, add_mark, locate_mark, set_mark_time, set_mark_name, delete_mark,
+      delete_nearest_mark, get_mark_number, get_mark_time, get_mark_name, get_mark_count, set_chase, get_chase,
+      set_tc_start, get_tc_start, set_tc_user_bits, get_tc_user_bits, restart_timecode, set_tc_generator_mode,
+      get_tc_generator_mode, set_tc_frame_type, get_tc_frame_type, set_tc_output, get_tc_output, set_clock_master,
+      get_clock_master, set_word_mode, get_word_mode, set_record_function, set_record_function_all,
+      get_record_function, set_input_monitor, set_input_monitor_all, get_input_monitor, set_bit_length,
+      get_bit_length, set_max_file_size, set_max_file_minutes, get_max_file_size, set_pause_mode, get_pause_mode,
+      set_user_word, get_user_word, set_interval_marker_time, get_interval_marker_time, set_audio_over_marker,
+      get_audio_over_marker, set_time_interval_marker, get_time_interval_marker, set_sync_unlock_marker,
+      get_sync_unlock_marker, set_sample_rate, get_sample_rate, set_file_name_mode, get_file_name_mode,
+      get_media_remaining, get_current_media_remaining, format_media, set_aux_key, get_aux_key, set_aux_tally,
+      get_aux_tally, set_input_route, get_input_routing, set_output_route, get_output_routing, set_peak_hold,
+      get_peak_hold, clear_peaks, set_reference_level, get_reference_level, rename_take, erase_take, copy_take]
+    verification: none
+  - id: da-6400dp
+    name: TASCAM DA-6400dp (dual power supply)
+    supports: *all
+    verification: none
+
+maps:
+  # A take number as the four digits the recorder takes: tens, ones, thousands, hundreds (p.3, "2301" is
+  # take 123). Projects (to 99), marks (to 99) and channels (to 64) are two digits and "00".
+  take: {
+    "1": "0100", "2": "0200", "3": "0300", "4": "0400", "5": "0500", "6": "0600", "7": "0700", "8": "0800", "9": "0900", "10": "1000",
+    "11": "1100", "12": "1200", "13": "1300", "14": "1400", "15": "1500", "16": "1600", "17": "1700", "18": "1800", "19": "1900", "20": "2000",
+    "21": "2100", "22": "2200", "23": "2300", "24": "2400", "25": "2500", "26": "2600", "27": "2700", "28": "2800", "29": "2900", "30": "3000",
+    "31": "3100", "32": "3200", "33": "3300", "34": "3400", "35": "3500", "36": "3600", "37": "3700", "38": "3800", "39": "3900", "40": "4000",
+    "41": "4100", "42": "4200", "43": "4300", "44": "4400", "45": "4500", "46": "4600", "47": "4700", "48": "4800", "49": "4900", "50": "5000",
+    "51": "5100", "52": "5200", "53": "5300", "54": "5400", "55": "5500", "56": "5600", "57": "5700", "58": "5800", "59": "5900", "60": "6000",
+    "61": "6100", "62": "6200", "63": "6300", "64": "6400", "65": "6500", "66": "6600", "67": "6700", "68": "6800", "69": "6900", "70": "7000",
+    "71": "7100", "72": "7200", "73": "7300", "74": "7400", "75": "7500", "76": "7600", "77": "7700", "78": "7800", "79": "7900", "80": "8000",
+    "81": "8100", "82": "8200", "83": "8300", "84": "8400", "85": "8500", "86": "8600", "87": "8700", "88": "8800", "89": "8900", "90": "9000",
+    "91": "9100", "92": "9200", "93": "9300", "94": "9400", "95": "9500", "96": "9600", "97": "9700", "98": "9800", "99": "9900", "100": "0001",
+    "101": "0101", "102": "0201", "103": "0301", "104": "0401", "105": "0501", "106": "0601", "107": "0701", "108": "0801", "109": "0901", "110": "1001",
+    "111": "1101", "112": "1201", "113": "1301", "114": "1401", "115": "1501", "116": "1601", "117": "1701", "118": "1801", "119": "1901", "120": "2001",
+    "121": "2101", "122": "2201", "123": "2301", "124": "2401", "125": "2501", "126": "2601", "127": "2701", "128": "2801", "129": "2901", "130": "3001",
+    "131": "3101", "132": "3201", "133": "3301", "134": "3401", "135": "3501", "136": "3601", "137": "3701", "138": "3801", "139": "3901", "140": "4001",
+    "141": "4101", "142": "4201", "143": "4301", "144": "4401", "145": "4501", "146": "4601", "147": "4701", "148": "4801", "149": "4901", "150": "5001",
+    "151": "5101", "152": "5201", "153": "5301", "154": "5401", "155": "5501", "156": "5601", "157": "5701", "158": "5801", "159": "5901", "160": "6001",
+    "161": "6101", "162": "6201", "163": "6301", "164": "6401", "165": "6501", "166": "6601", "167": "6701", "168": "6801", "169": "6901", "170": "7001",
+    "171": "7101", "172": "7201", "173": "7301", "174": "7401", "175": "7501", "176": "7601", "177": "7701", "178": "7801", "179": "7901", "180": "8001",
+    "181": "8101", "182": "8201", "183": "8301", "184": "8401", "185": "8501", "186": "8601", "187": "8701", "188": "8801", "189": "8901", "190": "9001",
+    "191": "9101", "192": "9201", "193": "9301", "194": "9401", "195": "9501", "196": "9601", "197": "9701", "198": "9801", "199": "9901", "200": "0002",
+    "201": "0102", "202": "0202", "203": "0302", "204": "0402", "205": "0502", "206": "0602", "207": "0702", "208": "0802", "209": "0902", "210": "1002",
+    "211": "1102", "212": "1202", "213": "1302", "214": "1402", "215": "1502", "216": "1602", "217": "1702", "218": "1802", "219": "1902", "220": "2002",
+    "221": "2102", "222": "2202", "223": "2302", "224": "2402", "225": "2502", "226": "2602", "227": "2702", "228": "2802", "229": "2902", "230": "3002",
+    "231": "3102", "232": "3202", "233": "3302", "234": "3402", "235": "3502", "236": "3602", "237": "3702", "238": "3802", "239": "3902", "240": "4002",
+    "241": "4102", "242": "4202", "243": "4302", "244": "4402", "245": "4502", "246": "4602", "247": "4702", "248": "4802", "249": "4902", "250": "5002",
+    "251": "5102", "252": "5202", "253": "5302", "254": "5402", "255": "5502", "256": "5602", "257": "5702", "258": "5802", "259": "5902", "260": "6002",
+    "261": "6102", "262": "6202", "263": "6302", "264": "6402", "265": "6502", "266": "6602", "267": "6702", "268": "6802", "269": "6902", "270": "7002",
+    "271": "7102", "272": "7202", "273": "7302", "274": "7402", "275": "7502", "276": "7602", "277": "7702", "278": "7802", "279": "7902", "280": "8002",
+    "281": "8102", "282": "8202", "283": "8302", "284": "8402", "285": "8502", "286": "8602", "287": "8702", "288": "8802", "289": "8902", "290": "9002",
+    "291": "9102", "292": "9202", "293": "9302", "294": "9402", "295": "9502", "296": "9602", "297": "9702", "298": "9802", "299": "9902", "300": "0003",
+    "301": "0103", "302": "0203", "303": "0303", "304": "0403", "305": "0503", "306": "0603", "307": "0703", "308": "0803", "309": "0903", "310": "1003",
+    "311": "1103", "312": "1203", "313": "1303", "314": "1403", "315": "1503", "316": "1603", "317": "1703", "318": "1803", "319": "1903", "320": "2003",
+    "321": "2103", "322": "2203", "323": "2303", "324": "2403", "325": "2503", "326": "2603", "327": "2703", "328": "2803", "329": "2903", "330": "3003",
+    "331": "3103", "332": "3203", "333": "3303", "334": "3403", "335": "3503", "336": "3603", "337": "3703", "338": "3803", "339": "3903", "340": "4003",
+    "341": "4103", "342": "4203", "343": "4303", "344": "4403", "345": "4503", "346": "4603", "347": "4703", "348": "4803", "349": "4903", "350": "5003",
+    "351": "5103", "352": "5203", "353": "5303", "354": "5403", "355": "5503", "356": "5603", "357": "5703", "358": "5803", "359": "5903", "360": "6003",
+    "361": "6103", "362": "6203", "363": "6303", "364": "6403", "365": "6503", "366": "6603", "367": "6703", "368": "6803", "369": "6903", "370": "7003",
+    "371": "7103", "372": "7203", "373": "7303", "374": "7403", "375": "7503", "376": "7603", "377": "7703", "378": "7803", "379": "7903", "380": "8003",
+    "381": "8103", "382": "8203", "383": "8303", "384": "8403", "385": "8503", "386": "8603", "387": "8703", "388": "8803", "389": "8903", "390": "9003",
+    "391": "9103", "392": "9203", "393": "9303", "394": "9403", "395": "9503", "396": "9603", "397": "9703", "398": "9803", "399": "9903", "400": "0004",
+    "401": "0104", "402": "0204", "403": "0304", "404": "0404", "405": "0504", "406": "0604", "407": "0704", "408": "0804", "409": "0904", "410": "1004",
+    "411": "1104", "412": "1204", "413": "1304", "414": "1404", "415": "1504", "416": "1604", "417": "1704", "418": "1804", "419": "1904", "420": "2004",
+    "421": "2104", "422": "2204", "423": "2304", "424": "2404", "425": "2504", "426": "2604", "427": "2704", "428": "2804", "429": "2904", "430": "3004",
+    "431": "3104", "432": "3204", "433": "3304", "434": "3404", "435": "3504", "436": "3604", "437": "3704", "438": "3804", "439": "3904", "440": "4004",
+    "441": "4104", "442": "4204", "443": "4304", "444": "4404", "445": "4504", "446": "4604", "447": "4704", "448": "4804", "449": "4904", "450": "5004",
+    "451": "5104", "452": "5204", "453": "5304", "454": "5404", "455": "5504", "456": "5604", "457": "5704", "458": "5804", "459": "5904", "460": "6004",
+    "461": "6104", "462": "6204", "463": "6304", "464": "6404", "465": "6504", "466": "6604", "467": "6704", "468": "6804", "469": "6904", "470": "7004",
+    "471": "7104", "472": "7204", "473": "7304", "474": "7404", "475": "7504", "476": "7604", "477": "7704", "478": "7804", "479": "7904", "480": "8004",
+    "481": "8104", "482": "8204", "483": "8304", "484": "8404", "485": "8504", "486": "8604", "487": "8704", "488": "8804", "489": "8904", "490": "9004",
+    "491": "9104", "492": "9204", "493": "9304", "494": "9404", "495": "9504", "496": "9604", "497": "9704", "498": "9804", "499": "9904", "500": "0005",
+    "501": "0105", "502": "0205", "503": "0305", "504": "0405", "505": "0505", "506": "0605", "507": "0705", "508": "0805", "509": "0905", "510": "1005",
+    "511": "1105", "512": "1205", "513": "1305", "514": "1405", "515": "1505", "516": "1605", "517": "1705", "518": "1805", "519": "1905", "520": "2005",
+    "521": "2105", "522": "2205", "523": "2305", "524": "2405", "525": "2505", "526": "2605", "527": "2705", "528": "2805", "529": "2905", "530": "3005",
+    "531": "3105", "532": "3205", "533": "3305", "534": "3405", "535": "3505", "536": "3605", "537": "3705", "538": "3805", "539": "3905", "540": "4005",
+    "541": "4105", "542": "4205", "543": "4305", "544": "4405", "545": "4505", "546": "4605", "547": "4705", "548": "4805", "549": "4905", "550": "5005",
+    "551": "5105", "552": "5205", "553": "5305", "554": "5405", "555": "5505", "556": "5605", "557": "5705", "558": "5805", "559": "5905", "560": "6005",
+    "561": "6105", "562": "6205", "563": "6305", "564": "6405", "565": "6505", "566": "6605", "567": "6705", "568": "6805", "569": "6905", "570": "7005",
+    "571": "7105", "572": "7205", "573": "7305", "574": "7405", "575": "7505", "576": "7605", "577": "7705", "578": "7805", "579": "7905", "580": "8005",
+    "581": "8105", "582": "8205", "583": "8305", "584": "8405", "585": "8505", "586": "8605", "587": "8705", "588": "8805", "589": "8905", "590": "9005",
+    "591": "9105", "592": "9205", "593": "9305", "594": "9405", "595": "9505", "596": "9605", "597": "9705", "598": "9805", "599": "9905", "600": "0006",
+    "601": "0106", "602": "0206", "603": "0306", "604": "0406", "605": "0506", "606": "0606", "607": "0706", "608": "0806", "609": "0906", "610": "1006",
+    "611": "1106", "612": "1206", "613": "1306", "614": "1406", "615": "1506", "616": "1606", "617": "1706", "618": "1806", "619": "1906", "620": "2006",
+    "621": "2106", "622": "2206", "623": "2306", "624": "2406", "625": "2506", "626": "2606", "627": "2706", "628": "2806", "629": "2906", "630": "3006",
+    "631": "3106", "632": "3206", "633": "3306", "634": "3406", "635": "3506", "636": "3606", "637": "3706", "638": "3806", "639": "3906", "640": "4006",
+    "641": "4106", "642": "4206", "643": "4306", "644": "4406", "645": "4506", "646": "4606", "647": "4706", "648": "4806", "649": "4906", "650": "5006",
+    "651": "5106", "652": "5206", "653": "5306", "654": "5406", "655": "5506", "656": "5606", "657": "5706", "658": "5806", "659": "5906", "660": "6006",
+    "661": "6106", "662": "6206", "663": "6306", "664": "6406", "665": "6506", "666": "6606", "667": "6706", "668": "6806", "669": "6906", "670": "7006",
+    "671": "7106", "672": "7206", "673": "7306", "674": "7406", "675": "7506", "676": "7606", "677": "7706", "678": "7806", "679": "7906", "680": "8006",
+    "681": "8106", "682": "8206", "683": "8306", "684": "8406", "685": "8506", "686": "8606", "687": "8706", "688": "8806", "689": "8906", "690": "9006",
+    "691": "9106", "692": "9206", "693": "9306", "694": "9406", "695": "9506", "696": "9606", "697": "9706", "698": "9806", "699": "9906", "700": "0007",
+    "701": "0107", "702": "0207", "703": "0307", "704": "0407", "705": "0507", "706": "0607", "707": "0707", "708": "0807", "709": "0907", "710": "1007",
+    "711": "1107", "712": "1207", "713": "1307", "714": "1407", "715": "1507", "716": "1607", "717": "1707", "718": "1807", "719": "1907", "720": "2007",
+    "721": "2107", "722": "2207", "723": "2307", "724": "2407", "725": "2507", "726": "2607", "727": "2707", "728": "2807", "729": "2907", "730": "3007",
+    "731": "3107", "732": "3207", "733": "3307", "734": "3407", "735": "3507", "736": "3607", "737": "3707", "738": "3807", "739": "3907", "740": "4007",
+    "741": "4107", "742": "4207", "743": "4307", "744": "4407", "745": "4507", "746": "4607", "747": "4707", "748": "4807", "749": "4907", "750": "5007",
+    "751": "5107", "752": "5207", "753": "5307", "754": "5407", "755": "5507", "756": "5607", "757": "5707", "758": "5807", "759": "5907", "760": "6007",
+    "761": "6107", "762": "6207", "763": "6307", "764": "6407", "765": "6507", "766": "6607", "767": "6707", "768": "6807", "769": "6907", "770": "7007",
+    "771": "7107", "772": "7207", "773": "7307", "774": "7407", "775": "7507", "776": "7607", "777": "7707", "778": "7807", "779": "7907", "780": "8007",
+    "781": "8107", "782": "8207", "783": "8307", "784": "8407", "785": "8507", "786": "8607", "787": "8707", "788": "8807", "789": "8907", "790": "9007",
+    "791": "9107", "792": "9207", "793": "9307", "794": "9407", "795": "9507", "796": "9607", "797": "9707", "798": "9807", "799": "9907", "800": "0008",
+    "801": "0108", "802": "0208", "803": "0308", "804": "0408", "805": "0508", "806": "0608", "807": "0708", "808": "0808", "809": "0908", "810": "1008",
+    "811": "1108", "812": "1208", "813": "1308", "814": "1408", "815": "1508", "816": "1608", "817": "1708", "818": "1808", "819": "1908", "820": "2008",
+    "821": "2108", "822": "2208", "823": "2308", "824": "2408", "825": "2508", "826": "2608", "827": "2708", "828": "2808", "829": "2908", "830": "3008",
+    "831": "3108", "832": "3208", "833": "3308", "834": "3408", "835": "3508", "836": "3608", "837": "3708", "838": "3808", "839": "3908", "840": "4008",
+    "841": "4108", "842": "4208", "843": "4308", "844": "4408", "845": "4508", "846": "4608", "847": "4708", "848": "4808", "849": "4908", "850": "5008",
+    "851": "5108", "852": "5208", "853": "5308", "854": "5408", "855": "5508", "856": "5608", "857": "5708", "858": "5808", "859": "5908", "860": "6008",
+    "861": "6108", "862": "6208", "863": "6308", "864": "6408", "865": "6508", "866": "6608", "867": "6708", "868": "6808", "869": "6908", "870": "7008",
+    "871": "7108", "872": "7208", "873": "7308", "874": "7408", "875": "7508", "876": "7608", "877": "7708", "878": "7808", "879": "7908", "880": "8008",
+    "881": "8108", "882": "8208", "883": "8308", "884": "8408", "885": "8508", "886": "8608", "887": "8708", "888": "8808", "889": "8908", "890": "9008",
+    "891": "9108", "892": "9208", "893": "9308", "894": "9408", "895": "9508", "896": "9608", "897": "9708", "898": "9808", "899": "9908", "900": "0009",
+    "901": "0109", "902": "0209", "903": "0309", "904": "0409", "905": "0509", "906": "0609", "907": "0709", "908": "0809", "909": "0909", "910": "1009",
+    "911": "1109", "912": "1209", "913": "1309", "914": "1409", "915": "1509", "916": "1609", "917": "1709", "918": "1809", "919": "1909", "920": "2009",
+    "921": "2109", "922": "2209", "923": "2309", "924": "2409", "925": "2509", "926": "2609", "927": "2709", "928": "2809", "929": "2909", "930": "3009",
+    "931": "3109", "932": "3209", "933": "3309", "934": "3409", "935": "3509", "936": "3609", "937": "3709", "938": "3809", "939": "3909", "940": "4009",
+    "941": "4109", "942": "4209", "943": "4309", "944": "4409", "945": "4509", "946": "4609", "947": "4709", "948": "4809", "949": "4909", "950": "5009",
+    "951": "5109", "952": "5209", "953": "5309", "954": "5409", "955": "5509", "956": "5609", "957": "5709", "958": "5809", "959": "5909", "960": "6009",
+    "961": "6109", "962": "6209", "963": "6309", "964": "6409", "965": "6509", "966": "6609", "967": "6709", "968": "6809", "969": "6909", "970": "7009",
+    "971": "7109", "972": "7209", "973": "7309", "974": "7409", "975": "7509", "976": "7609", "977": "7709", "978": "7809", "979": "7909", "980": "8009",
+    "981": "8109", "982": "8209", "983": "8309", "984": "8409", "985": "8509", "986": "8609", "987": "8709", "988": "8809", "989": "8909", "990": "9009",
+    "991": "9109", "992": "9209", "993": "9309", "994": "9409", "995": "9509", "996": "9609", "997": "9709", "998": "9809", "999": "9909" }
+  next_previous: { next: "00", previous: "01" }
+  after: { stop: "10", play: "12", pause: "14" }
+  search: { forward: "00", reverse: "01", forward_high: "10", reverse_high: "11" }
+  skip: { next_take: "00", previous_take: "01", next_mark: "20", previous_mark: "21" }
+  repeat: { "off": "00", normal: "01", vamping: "21" }
+  remote_local: { remote: "00", local: "01" }
+  play_mode: { all_takes: "00", one_take: "01" }
+  time: { elapsed: "10", remaining: "11", total_elapsed: "12", total_remaining: "13", timecode: "14" }
+  generator: { free_run: "00", free_once: "01", time_of_day: "02", jam_sync: "03", regen: "04", rec_run: "05", tc_sync_rec: "06" }
+  frame_type: { "23.976": "23", "24": "24", "25": "25", "29.97df": "29DF", "29.97ndf": "29", "30df": "30DF", "30ndf": "30" }
+  tc_output: { generator: "00", playback: "01" }
+  clock_master: { internal: "00", word: "01", video: "02", slot1: "03", slot2: "04" }
+  word_mode: { out_terminated: "00", out_unterminated: "01", thru: "11" }
+  bit_length: { "16": "16", "24": "24" }
+  file_size: { 640mb: "4006", 1gb: "2410", 2gb: "4820" }
+  split: { split: "00", no_split: "01" }
+  sample_rate: { "44100": "440000", "48000": "480000", "88200": "880000", "96000": "960000" }
+  file_name: { date_time: "00", folder: "01", user_word: "11" }
+  media: { ssd: "00", usb: "01" }
+  aux_key: { play_pause: "00", pause: "01", rec: "02", fader_rec: "03", fader_start: "04", rew: "05", ffwd: "06",
+    take_skip_back: "07", take_skip_forward: "08", mark_skip_back: "09", mark_skip_forward: "0A",
+    take_mark_skip_back: "0B", take_mark_skip_forward: "0C", mark: "0D" }
+  aux_tally: { stop: "00", play: "01", pause: "02", rec: "03", eom: "04", error: "05", eom_error: "06" }
+  peak_hold: { "0": "00", "1": "01", "2": "02", "3": "03", "4": "04", "5": "05", "6": "06", "7": "07", "8": "08",
+    "9": "09", "10": "10", infinite: "FE" }
+  reference_level: { "-9": "09", "-14": "14", "-16": "16", "-18": "18", "-20": "20" }
+  bool: { "true": "01", "false": "00" }
+
+
+commands:
+  stop:
+    summary: Stop playback or recording (10)
+    send: "010\n"
+    returns: none
+  play:
+    summary: Start playback from stop or playback standby (12)
+    send: "012\n"
+    returns: none
+  record:
+    summary: Start recording from recording standby (13, data 00)
+    send: "01300\n"
+    returns: none
+  record_pause:
+    summary: Enter recording standby, or pause recording (13, data 01)
+    send: "01301\n"
+    returns: none
+  take_split:
+    summary: Start a new take while recording (13, data 02)
+    send: "01302\n"
+    returns: none
+  pause:
+    summary: Pause playback (14, data 01)
+    send: "01401\n"
+    returns: none
+  search:
+    summary: Search forward or backward at normal or high speed until stopped, played or paused (16)
+    params:
+      direction: { type: enum, values: [forward, reverse, forward_high, reverse_high], required: true, label: Direction,
+        description: "forward or reverse at normal search speed, forward_high or reverse_high at high speed." }
+    send: "016{direction:map.search}\n"
+    returns: none
+  skip:
+    summary: Skip to the next or previous take or mark, keeping the transport state (1A)
+    params:
+      to: { type: enum, values: [next_take, previous_take, next_mark, previous_mark], required: true, label: Skip to,
+        description: "next_take, previous_take (the start of the current take when more than a second into it), next_mark or previous_mark." }
+    send: "01A{to:map.skip}\n"
+    returns: none
+  locate_take:
+    summary: Locate a take directly; from stop or playback it then plays, otherwise the state is kept (23)
+    params: { take: &take { type: int, min: 1, max: 999, required: true, label: Take, description: "The take's number in the current project, 1-999." } }
+    send: "023{take:map.take}\n"
+    returns: none
+  locate_take_then:
+    summary: Locate a take directly, then stop, play or wait in playback standby (23 with an operation)
+    params: { take: *take, then: &then { type: enum, values: [stop, play, pause], required: true, label: Then, description: "What the recorder does once located: stop, play, or wait in playback standby (pause)." } }
+    send: "023{take:map.take}{then:map.after}\n"
+    returns: none
+  locate_time:
+    summary: Locate a time in a take; from stop or playback it then plays, otherwise the state is kept (2C)
+    params: { take: *take, hours: &hours { type: int, min: 0, max: 23, required: true, label: Hours, description: "Hours, 0-23." }, minutes: &minutes { type: int, min: 0, max: 59, required: true, label: Minutes, description: "Minutes, 0-59." }, seconds: &seconds { type: int, min: 0, max: 59, required: true, label: Seconds, description: "Seconds, 0-59." }, frames: &frames { type: int, min: 0, max: 29, required: true, label: Frames, description: "Frames, from 0, below the frame rate." } }
+    send: "02C{take:map.take}{hours:02d}{minutes:02d}{seconds:02d}{frames:02d}\n"
+    returns: none
+  locate_time_then:
+    summary: Locate a time in a take, then stop, play or wait in playback standby (2C with an operation)
+    params: { take: *take, hours: *hours, minutes: *minutes, seconds: *seconds, frames: *frames, then: *then }
+    send: "02C{take:map.take}{hours:02d}{minutes:02d}{seconds:02d}{frames:02d}{then:map.after}\n"
+    returns: none
+  set_clock:
+    summary: Set the recorder's date and time (27), then read it back
+    params:
+      year: { type: int, min: 2000, max: 2099, required: true, label: Year, description: "The year, 2000-2099; the recorder keeps its last two digits." }
+      month: { type: int, min: 1, max: 12, required: true, label: Month, description: "The month, 1-12." }
+      day: { type: int, min: 1, max: 31, required: true, label: Day, description: "The day of the month, 1-31; a date that does not exist is refused." }
+      hours: *hours
+      minutes: *minutes
+    send:
+      - "027{year:-2000:02d}{month:02d}{day:02d}{hours:02d}{minutes:02d}\n"
+      - "027FF\n"
+    returns: none
+  get_clock:
+    summary: "Read the recorder's date and time (27 sense, answered A7): YYMMDDhhmmss"
+    send: "027FF\n"
+    expect: { reply_contains: "0A7", matches: "^0A7([0-9]{12})$" }
+    returns: value
+  set_repeat:
+    summary: Set the repeat mode (37), then read it back
+    params:
+      mode: { type: enum, values: ["off", normal, vamping], required: true, label: Repeat, description: "off, normal repeat, or vamping repeat." }
+    send: ["037{mode:map.repeat}\n", "037FF\n"]
+    returns: none
+  get_repeat:
+    summary: "Read the repeat mode (37 sense, answered B7): 00 off, 01 normal, 21 vamping"
+    send: "037FF\n"
+    expect: { reply_contains: "0B7", matches: "^0B7([0-9]{2})$" }
+    returns: value
+  set_remote_local:
+    summary: Allow the recorder's own keys (local) or only remote control (remote) (4C), then read it back
+    params:
+      mode: { type: enum, values: [remote, local], required: true, label: Control, description: "remote disables the recorder's own keys; local allows them beside remote control." }
+    send: ["04C{mode:map.remote_local}\n", "04CFF\n"]
+    returns: none
+  get_remote_local:
+    summary: "Read whether the recorder's keys are enabled (4C sense, answered CC): 00 remote only, 01 local"
+    send: "04CFF\n"
+    expect: { reply_contains: "0CC", matches: "^0CC([0-9]{2})$" }
+    returns: value
+  set_play_mode:
+    summary: Play all takes or only the current one (4D), then read it back; ignored in timeline mode
+    params:
+      mode: { type: enum, values: [all_takes, one_take], required: true, label: Play mode, description: "all_takes plays every take of the project; one_take only the current take." }
+    send: ["04D{mode:map.play_mode}\n", "04E\n"]
+    returns: none
+  get_play_mode:
+    summary: "Read the play mode (4E, answered CE): 00 all takes, 01 one take"
+    send: "04E\n"
+    expect: { reply_contains: "0CE", matches: "^0CE([0-9]{2})$" }
+    returns: value
+  get_status:
+    summary: "Read the transport status (50, answered D0): 00 no media, 10 stop, 11 play, 12 paused, 28 cue, 29 review, 81 record, 82 record ready, 83 writing, FF other"
+    send: "050\n"
+    expect: { reply_contains: "0D0", matches: "^0D0([0-9A-F]{2})$" }
+    returns: value
+  get_take_number:
+    summary: "Read the current take (55, answered D5): 00 and the take number's four digits"
+    send: "055\n"
+    expect: { reply_contains: "0D5", matches: "^0D5([0-9]{6})$" }
+    returns: value
+  get_take_info:
+    summary: "Read the current take's number and time (57, answered D7: four take digits, then HHMMSSFF); refused while recording"
+    send: "057\n"
+    expect: { reply_contains: "0D7", matches: "^0D7([0-9]{12})$" }
+    returns: value
+  get_time:
+    summary: "Read a time of the current take or project (58, answered D8: the kind, then HHMMSSFF)"
+    params:
+      kind: { type: enum, values: [elapsed, remaining, total_elapsed, total_remaining, timecode], required: true, label: Time,
+        description: "elapsed or remaining in the take (while recording, remaining is the time left in the file size), total_elapsed or total_remaining in the project (while recording, the media's remaining capacity), or the timecode." }
+    send: "058{kind:map.time}\n"
+    expect: { reply_contains: "0D8{kind:map.time}", matches: "^0D8[0-9]{2}([0-9]{8})$" }
+    returns: value
+  get_take_title:
+    summary: "Read a take's name (59, answered D9: the take digits, then the name in UTF-8)"
+    params: { take: *take }
+    send: "059{take:map.take}\n"
+    expect: { reply_contains: "0D9{take:map.take}", matches: "^0D9[0-9]{4}(.*)$" }
+    returns: value
+  get_totals:
+    summary: "Read the number of takes and the total time of the playback area (5D, answered DD: four take digits, then HHMMSSFF)"
+    send: "05D\n"
+    expect: { reply_contains: "0DD", matches: "^0DD([0-9]{12})$" }
+    returns: value
+  get_keyboard_type:
+    summary: "Read the type of keyboard connected (5F, answered DF): 00 Japanese, 01 English"
+    send: "05F\n"
+    expect: { reply_contains: "0DF", matches: "^0DF([0-9]{2})$" }
+    returns: value
+  get_error:
+    summary: "Read the last error (78, answered F8): the code N1-N2N3 as four characters N2 N3 0 N1"
+    send: "078\n"
+    expect: { reply_contains: "0F8", matches: "^0F8([0-9A-F]{4})$" }
+    returns: value
+  get_caution:
+    summary: "Read the last caution (79, answered F9): the code N1-N2N3 as four characters N2 N3 0 N1"
+    send: "079\n"
+    expect: { reply_contains: "0F9", matches: "^0F9([0-9A-F]{4})$" }
+    returns: value
+  get_information:
+    summary: "Read the software version (0F, answered 8F): four digits, 0100 being 1.00"
+    send: "00F\n"
+    expect: { reply_contains: "08F", matches: "^08F([0-9]{4})$" }
+    returns: value
+  project_skip:
+    summary: Move to the next or previous project, wrapping at the ends (7F 02 1A)
+    params:
+      direction: { type: enum, values: [next, previous], required: true, label: Direction, description: "next or previous project; from the last, next goes to the first, and from the first, previous to the last." }
+    send: "07F021A{direction:map.next_previous}\n"
+    returns: none
+  select_project:
+    summary: Make a project the current one (7F 02 23); the current project's own number is refused
+    params: { project: &project { type: int, min: 1, max: 99, required: true, label: Project, description: "The project's number on the current media, 1-99." } }
+    send: "07F02230000{project:02d}00\n"
+    returns: none
+  create_project:
+    summary: Create a new project named by set_new_project_name (7F 02 4000); answered when it starts, and again with its result
+    send: "07F024000\n"
+    expect: { reply_contains: "0FF02C000", matches: "^0FF02C000(00)$" }
+    returns: ack
+  set_new_project_name:
+    summary: Set the name a project created next takes (7F 02 4001), then read it back
+    params:
+      name: { type: string, max_length: 115, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Name, description: "The new project's name, up to 115 bytes of UTF-8." }
+    send: ["07F024001{name}\n", "07F024001FF\n"]
+    returns: none
+  get_new_project_name:
+    summary: "Read the name a project created next takes (7F 02 4001 sense, answered FF 02 C001)"
+    send: "07F024001FF\n"
+    expect: { reply_contains: "0FF02C001", matches: "^0FF02C001(.*)$" }
+    returns: value
+  rebuild_project:
+    summary: Rebuild the current project (7F 02 42); answered when it starts, and again with its result
+    send: "07F0242\n"
+    expect: { reply_contains: "0FF02C2", matches: "^0FF02C2(00)$" }
+    returns: ack
+  delete_project:
+    summary: Delete a project from the media (7F 02 44); answered when it starts, and again with its result
+    params: { project: *project }
+    send: "07F02440000{project:02d}00\n"
+    expect: { reply_contains: "0FF02C4", matches: "^0FF02C4(00)$" }
+    returns: ack
+  get_project_number:
+    summary: "Read the current project (7F 02 55, answered FF 02 D5: 0000 and the project digits)"
+    send: "07F0255\n"
+    expect: { reply_contains: "0FF02D5", matches: "^0FF02D5([0-9]{8})$" }
+    returns: value
+  get_project_name:
+    summary: "Read a project's name (7F 02 5A, answered FF 02 DA: the project digits, then the name in UTF-8)"
+    params: { project: *project }
+    send: "07F025A{project:02d}00\n"
+    expect: { reply_contains: "0FF02DA{project:02d}00", matches: "^0FF02DA[0-9]{4}(.*)$" }
+    returns: value
+  get_project_count:
+    summary: "Read the number of projects on the current media (7F 02 5E, answered FF 02 DE)"
+    send: "07F025E\n"
+    expect: { reply_contains: "0FF02DE", matches: "^0FF02DE([0-9]{4})$" }
+    returns: value
+  add_mark:
+    summary: Add a mark at the current position (7F 03 10)
+    send: "07F0310\n"
+    returns: none
+  locate_mark:
+    summary: Locate a mark of the current take, keeping the transport state (7F 03 23)
+    params: { mark: &mark { type: int, min: 1, max: 99, required: true, label: Mark, description: "The mark's number in the current take, counted from its start in time order, 1-99." } }
+    send: "07F0323{mark:02d}00\n"
+    returns: none
+  set_mark_time:
+    summary: Move a mark of the current take to a time (7F 03 24), then read it back
+    params: { mark: *mark, hours: *hours, minutes: *minutes, seconds: *seconds, frames: *frames }
+    send:
+      - "07F0324{mark:02d}00{hours:02d}{minutes:02d}{seconds:02d}{frames:02d}\n"
+      - "07F0358{mark:02d}00\n"
+    returns: none
+  set_mark_name:
+    summary: Name a mark of the current take (7F 03 29), then read it back
+    params:
+      mark: *mark
+      name: { type: string, max_length: 10, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Name, description: "The mark's name, up to 10 bytes." }
+    send: ["07F0329{mark:02d}00{name}\n", "07F0359{mark:02d}00\n"]
+    returns: none
+  delete_mark:
+    summary: Delete a mark of the current take (7F 03 44)
+    params: { mark: *mark }
+    send: "07F0344{mark:02d}00\n"
+    returns: none
+  delete_nearest_mark:
+    summary: Delete the nearest mark before the current position (7F 03 44 without a number)
+    send: "07F0344\n"
+    returns: none
+  get_mark_number:
+    summary: "Read the number of the nearest mark before the current position (7F 03 55, answered FF 03 D5)"
+    send: "07F0355\n"
+    expect: { reply_contains: "0FF03D5", matches: "^0FF03D5([0-9]{4})$" }
+    returns: value
+  get_mark_time:
+    summary: "Read a mark's time (7F 03 58, answered FF 03 D8: the mark digits, then HHMMSSFF)"
+    params: { mark: *mark }
+    send: "07F0358{mark:02d}00\n"
+    expect: { reply_contains: "0FF03D8{mark:02d}00", matches: "^0FF03D8[0-9]{4}([0-9]{8})$" }
+    returns: value
+  get_mark_name:
+    summary: "Read a mark's name (7F 03 59, answered FF 03 D9: the mark digits, then the name)"
+    params: { mark: *mark }
+    send: "07F0359{mark:02d}00\n"
+    expect: { reply_contains: "0FF03D9{mark:02d}00", matches: "^0FF03D9[0-9]{4}(.*)$" }
+    returns: value
+  get_mark_count:
+    summary: "Read the number of marks in the current take (7F 03 5D, answered FF 03 DD)"
+    send: "07F035D\n"
+    expect: { reply_contains: "0FF03DD", matches: "^0FF03DD([0-9]{4})$" }
+    returns: value
+  set_chase:
+    summary: Turn timecode chase on or off (7F 06 00), then read it back
+    params: { enabled: &enabled { type: bool, required: true, label: Enabled, description: "On turns the function on, off turns it off." } }
+    send: ["07F0600{enabled:map.bool}\n", "07F0600FF\n"]
+    returns: none
+  get_chase:
+    summary: "Read timecode chase (7F 06 00 sense, answered FF 06 80): 00 off, 01 on"
+    send: "07F0600FF\n"
+    expect: { reply_contains: "0FF0680", matches: "^0FF0680([0-9]{2})$" }
+    returns: value
+  set_tc_start:
+    summary: Set the timecode generator's start time (7F 06 10), then read it back
+    params: { hours: *hours, minutes: *minutes, seconds: *seconds, frames: *frames }
+    send: ["07F0610{hours:02d}{minutes:02d}{seconds:02d}{frames:02d}\n", "07F0610FF\n"]
+    returns: none
+  get_tc_start:
+    summary: "Read the timecode generator's start time (7F 06 10 sense, answered FF 06 90): HHMMSSFF"
+    send: "07F0610FF\n"
+    expect: { reply_contains: "0FF0690", matches: "^0FF0690([0-9]{8})$" }
+    returns: value
+  set_tc_user_bits:
+    summary: Set the timecode generator's user bits (7F 06 11), then read them back
+    params:
+      user_bits: { type: string, pattern: "^[0-9A-F]{8}$", required: true, label: User bits, description: "Eight hexadecimal digits, upper case, as on the recorder's display." }
+    send: ["07F0611{user_bits}\n", "07F0611FF\n"]
+    returns: none
+  get_tc_user_bits:
+    summary: "Read the timecode generator's user bits (7F 06 11 sense, answered FF 06 91)"
+    send: "07F0611FF\n"
+    expect: { reply_contains: "0FF0691", matches: "^0FF0691([0-9A-F]{8})$" }
+    returns: value
+  restart_timecode:
+    summary: Restart the timecode generator from its start time (7F 06 12); only in FREE RUN and REC RUN modes
+    send: "07F0612\n"
+    returns: none
+  set_tc_generator_mode:
+    summary: Set the timecode generator mode (7F 06 20), then read it back
+    params:
+      mode: { type: enum, values: [free_run, free_once, time_of_day, jam_sync, regen, rec_run, tc_sync_rec], required: true, label: Generator mode,
+        description: "FREE RUN, FREE ONCE, TIME OF DAY, JAM SYNC, REGEN, REC RUN or TC SYNC REC." }
+    send: ["07F0620{mode:map.generator}\n", "07F0620FF\n"]
+    returns: none
+  get_tc_generator_mode:
+    summary: "Read the timecode generator mode (7F 06 20 sense, answered FF 06 A0): 00 free run to 06 TC sync rec"
+    send: "07F0620FF\n"
+    expect: { reply_contains: "0FF06A0", matches: "^0FF06A0([0-9]{2})$" }
+    returns: value
+  set_tc_frame_type:
+    summary: Set the timecode frame rate (7F 06 21), then read it back
+    params:
+      rate: { type: enum, values: ["23.976", "24", "25", "29.97df", "29.97ndf", "30df", "30ndf"], required: true, label: Frame rate,
+        description: "23.976, 24 or 25 frames, 29.97 or 30 frames drop-frame (df) or non-drop (ndf)." }
+    send: ["07F0621{rate:map.frame_type}\n", "07F0621FF\n"]
+    returns: none
+  get_tc_frame_type:
+    summary: "Read the timecode frame rate (7F 06 21 sense, answered FF 06 A1): 23, 24, 25, 29DF, 29, 30DF or 30"
+    send: "07F0621FF\n"
+    expect: { reply_contains: "0FF06A1", matches: "^0FF06A1([0-9]{2}(?:DF)?)$" }
+    returns: value
+  set_tc_output:
+    summary: Output the generator's timecode or the take's playback timecode (7F 06 30), then read it back
+    params:
+      source: { type: enum, values: [generator, playback], required: true, label: Timecode output, description: "generator outputs the generator's timecode; playback the take's playback timecode." }
+    send: ["07F0630{source:map.tc_output}\n", "07F0630FF\n"]
+    returns: none
+  get_tc_output:
+    summary: "Read the timecode output (7F 06 30 sense, answered FF 06 B0): 00 generator, 01 playback"
+    send: "07F0630FF\n"
+    expect: { reply_contains: "0FF06B0", matches: "^0FF06B0([0-9]{2})$" }
+    returns: value
+  set_clock_master:
+    summary: Set the master clock (7F 06 40), then read it back
+    params:
+      source: { type: enum, values: [internal, word, video, slot1, slot2], required: true, label: Master clock, description: "internal, word clock in, video in, or the card in slot 1 or slot 2." }
+    send: ["07F0640{source:map.clock_master}\n", "07F0640FF\n"]
+    returns: none
+  get_clock_master:
+    summary: "Read the master clock (7F 06 40 sense, answered FF 06 C0): 00 internal, 01 word, 02 video, 03 slot 1, 04 slot 2"
+    send: "07F0640FF\n"
+    expect: { reply_contains: "0FF06C0", matches: "^0FF06C0([0-9]{2})$" }
+    returns: value
+  set_word_mode:
+    summary: Set the word clock connector's mode and termination (7F 06 48), then read it back
+    params:
+      mode: { type: enum, values: [out_terminated, out_unterminated, thru], required: true, label: Word clock,
+        description: "out_terminated (word out, termination on), out_unterminated (word out, termination off) or thru (word thru, termination off)." }
+    send: ["07F0648{mode:map.word_mode}\n", "07F0648FF\n"]
+    returns: none
+  get_word_mode:
+    summary: "Read the word clock connector's mode (7F 06 48 sense, answered FF 06 C8): 00 out terminated, 01 out, 11 thru"
+    send: "07F0648FF\n"
+    expect: { reply_contains: "0FF06C8", matches: "^0FF06C8([0-9]{2})$" }
+    returns: value
+  set_record_function:
+    summary: Arm or disarm one track for recording (7F 08 00 from that channel), then read every track back
+    params: { channel: &channel { type: int, min: 1, max: 64, required: true, label: Channel, description: "Recorder track, 1-64." }, enabled: *enabled }
+    send: ["07F0800{channel:02d}00{enabled:bool01}\n", "07F0800FF\n"]
+    returns: none
+  set_record_function_all:
+    summary: Arm or disarm every track for recording (7F 08 00, channel 0000), then read them back
+    params: { enabled: *enabled }
+    send: ["07F08000000{enabled:bool01}\n", "07F0800FF\n"]
+    returns: none
+  get_record_function:
+    summary: "Read every track's record arming (7F 08 00 sense, answered FF 08 80: 0100, then a 0 or 1 for each of the 64 tracks)"
+    send: "07F0800FF\n"
+    expect: { reply_contains: "0FF0880", matches: "^0FF08800100([01]{64})$" }
+    returns: value
+  set_input_monitor:
+    summary: Turn input monitoring on or off for one track (7F 08 01 from that channel), then read every track back
+    params: { channel: *channel, enabled: *enabled }
+    send: ["07F0801{channel:02d}00{enabled:bool01}\n", "07F0801FF\n"]
+    returns: none
+  set_input_monitor_all:
+    summary: Turn input monitoring on or off for every track (7F 08 01, channel 0000), then read them back
+    params: { enabled: *enabled }
+    send: ["07F08010000{enabled:bool01}\n", "07F0801FF\n"]
+    returns: none
+  get_input_monitor:
+    summary: "Read every track's input monitoring (7F 08 01 sense, answered FF 08 81: 0100, then a 0 or 1 for each of the 64 tracks)"
+    send: "07F0801FF\n"
+    expect: { reply_contains: "0FF0881", matches: "^0FF08810100([01]{64})$" }
+    returns: value
+  set_bit_length:
+    summary: Set the recording bit depth (7F 08 22), then read it back
+    params:
+      bits: { type: enum, values: ["16", "24"], required: true, label: Bit depth, description: "16 or 24 bits per sample in the files recorded." }
+    send: ["07F0822{bits:map.bit_length}\n", "07F0822FF\n"]
+    returns: none
+  get_bit_length:
+    summary: "Read the recording bit depth (7F 08 22 sense, answered FF 08 A2): 16 or 24"
+    send: "07F0822FF\n"
+    expect: { reply_contains: "0FF08A2", matches: "^0FF08A2([0-9]{2})$" }
+    returns: value
+  set_max_file_size:
+    summary: Limit recorded files by size (7F 08 23, capacity), then read it back
+    params:
+      size: { type: enum, values: [640mb, 1gb, 2gb], required: true, label: Maximum file size, description: "640 MB, 1 GB (1024 MB) or 2 GB (2048 MB); a file reaching it continues in a new one." }
+    send: ["07F082300{size:map.file_size}\n", "07F0823FF\n"]
+    returns: none
+  set_max_file_minutes:
+    summary: Limit recorded files by duration (7F 08 23, time), then read it back
+    params:
+      minutes: { type: int, min: 1, max: 240, required: true, label: Maximum file length, description: "Minutes per file, 1-240; a file reaching it continues in a new one." }
+    send: ["07F082301{minutes:map.take}\n", "07F0823FF\n"]
+    returns: none
+  get_max_file_size:
+    summary: "Read the file limit (7F 08 23 sense, answered FF 08 A3: 00 and the megabytes, or 01 and the minutes, as four digits)"
+    send: "07F0823FF\n"
+    expect: { reply_contains: "0FF08A3", matches: "^0FF08A3([0-9]{6})$" }
+    returns: value
+  set_pause_mode:
+    summary: Choose whether pausing a recording splits the file (7F 08 24), then read it back
+    params:
+      mode: { type: enum, values: [split, no_split], required: true, label: Pause mode, description: "split starts a new file after a pause; no_split continues the same file." }
+    send: ["07F0824{mode:map.split}\n", "07F0824FF\n"]
+    returns: none
+  get_pause_mode:
+    summary: "Read the pause mode (7F 08 24 sense, answered FF 08 A4): 00 split, 01 no split"
+    send: "07F0824FF\n"
+    expect: { reply_contains: "0FF08A4", matches: "^0FF08A4([0-9]{2})$" }
+    returns: value
+  set_user_word:
+    summary: Set the user word file names can use (7F 08 2A), then read it back
+    params:
+      word: { type: string, max_length: 31, pattern: "^[^\\x00-\\x1F]+$", required: true, label: User word, description: "The file name user word, up to 31 bytes." }
+    send: ["07F082A{word}\n", "07F085A\n"]
+    returns: none
+  get_user_word:
+    summary: "Read the user word (7F 08 5A, answered FF 08 DA)"
+    send: "07F085A\n"
+    expect: { reply_contains: "0FF08DA", matches: "^0FF08DA(.*)$" }
+    returns: value
+  set_interval_marker_time:
+    summary: Set the interval of automatic time-interval marks (7F 08 32), then read it back
+    params:
+      minutes: { type: int, min: 1, max: 240, required: true, label: Interval, description: "Minutes between automatic marks, 1-240." }
+    send: ["07F0832{minutes:map.take}\n", "07F0832FF\n"]
+    returns: none
+  get_interval_marker_time:
+    summary: "Read the interval of automatic marks (7F 08 32 sense, answered FF 08 B2: four digits, minutes)"
+    send: "07F0832FF\n"
+    expect: { reply_contains: "0FF08B2", matches: "^0FF08B2([0-9]{4})$" }
+    returns: value
+  set_audio_over_marker:
+    summary: Turn automatic marks at audio overs on or off (7F 08 41), then read it back
+    params: { enabled: *enabled }
+    send: ["07F0841{enabled:map.bool}\n", "07F0841FF\n"]
+    returns: none
+  get_audio_over_marker:
+    summary: "Read automatic marks at audio overs (7F 08 41 sense, answered FF 08 C1): 00 off, 01 on"
+    send: "07F0841FF\n"
+    expect: { reply_contains: "0FF08C1", matches: "^0FF08C1([0-9]{2})$" }
+    returns: value
+  set_time_interval_marker:
+    summary: Turn automatic time-interval marks on or off (7F 08 42), then read it back
+    params: { enabled: *enabled }
+    send: ["07F0842{enabled:map.bool}\n", "07F0842FF\n"]
+    returns: none
+  get_time_interval_marker:
+    summary: "Read automatic time-interval marks (7F 08 42 sense, answered FF 08 C2): 00 off, 01 on"
+    send: "07F0842FF\n"
+    expect: { reply_contains: "0FF08C2", matches: "^0FF08C2([0-9]{2})$" }
+    returns: value
+  set_sync_unlock_marker:
+    summary: Turn automatic marks at sync unlocks on or off (7F 08 43), then read it back
+    params: { enabled: *enabled }
+    send: ["07F0843{enabled:map.bool}\n", "07F0843FF\n"]
+    returns: none
+  get_sync_unlock_marker:
+    summary: "Read automatic marks at sync unlocks (7F 08 43 sense, answered FF 08 C3): 00 off, 01 on"
+    send: "07F0843FF\n"
+    expect: { reply_contains: "0FF08C3", matches: "^0FF08C3([0-9]{2})$" }
+    returns: value
+  set_sample_rate:
+    summary: Set the recording sample rate (7F 08 50), then read it back
+    params:
+      rate: { type: enum, values: ["44100", "48000", "88200", "96000"], required: true, label: Sample rate, description: "44.1, 48, 88.2 or 96 kHz, in Hz." }
+    send: ["07F0850{rate:map.sample_rate}\n", "07F0850FF\n"]
+    returns: none
+  get_sample_rate:
+    summary: "Read the recording sample rate (7F 08 50 sense, answered FF 08 D0): 440000, 480000, 880000 or 960000"
+    send: "07F0850FF\n"
+    expect: { reply_contains: "0FF08D0", matches: "^0FF08D0([0-9]{6})$" }
+    returns: value
+  set_file_name_mode:
+    summary: Name recorded files by date and time, folder or user word (7F 08 60), then read it back
+    params:
+      mode: { type: enum, values: [date_time, folder, user_word], required: true, label: File names, description: "date_time, the current folder's name (folder), or the user word." }
+    send: ["07F0860{mode:map.file_name}\n", "07F0860FF\n"]
+    returns: none
+  get_file_name_mode:
+    summary: "Read how files are named (7F 08 60 sense, answered FF 08 E0): 00 date and time, 01 folder, 11 user word"
+    send: "07F0860FF\n"
+    expect: { reply_contains: "0FF08E0", matches: "^0FF08E0([0-9]{2})$" }
+    returns: value
+  get_media_remaining:
+    summary: "Read the free space on the SSD or USB media (7F 10 01, answered FF 10 81: the media, then the free space); 0 when not loaded"
+    params:
+      media: { type: enum, values: [ssd, usb], required: true, label: Media, description: "ssd (the SSD or HDD drive) or usb (the USB drive)." }
+    send: "07F1001{media:map.media}\n"
+    expect: { reply_contains: "0FF1081{media:map.media}", matches: "^0FF1081[0-9]{2}([0-9]{8})$" }
+    returns: value
+  get_current_media_remaining:
+    summary: "Read the free space on the current media (7F 10 01 without a media, answered FF 10 81)"
+    send: "07F1001\n"
+    expect: { reply_contains: "0FF1081", matches: "^0FF1081([0-9]{10})$" }
+    returns: value
+  format_media:
+    summary: Format the SSD (7F 10 44), erasing everything on it; answered when it starts, and again with its result
+    params:
+      full: { type: bool, default: false, label: Full format, description: "On runs a full format; off a quick format." }
+    send: "07F10440{full:bool01}00\n"
+    expect: { reply_contains: "0FF10C4", matches: "^0FF10C4(?:[0-9]{2})?(00)$" }
+    returns: ack
+  set_aux_key:
+    summary: Assign a function to an AUX key of the PARALLEL connector (7F 11 10), then read it back
+    params:
+      aux: { type: int, min: 1, max: 6, required: true, label: AUX key, description: "The AUX key, 1-6." }
+      function: { type: enum, values: [play_pause, pause, rec, fader_rec, fader_start, rew, ffwd, take_skip_back, take_skip_forward,
+        mark_skip_back, mark_skip_forward, take_mark_skip_back, take_mark_skip_forward, mark], required: true, label: Function,
+        description: "The function the key performs, as the recorder's AUX KEY ASSIGN menu lists them." }
+    send: ["07F1110{aux:02d}{function:map.aux_key}\n", "07F1110{aux:02d}FF\n"]
+    returns: none
+  get_aux_key:
+    summary: "Read an AUX key's function (7F 11 10 sense, answered FF 11 90: the key, then the function code)"
+    params:
+      aux: { type: int, min: 1, max: 6, required: true, label: AUX key, description: "The AUX key, 1-6." }
+    send: "07F1110{aux:02d}FF\n"
+    expect: { reply_contains: "0FF1190{aux:02d}", matches: "^0FF1190[0-9]{2}([0-9A-F]{2})$" }
+    returns: value
+  set_aux_tally:
+    summary: Assign a status to an AUX tally of the PARALLEL connector (7F 11 11), then read it back
+    params:
+      aux: { type: int, min: 1, max: 5, required: true, label: AUX tally, description: "The AUX tally output, 1-5." }
+      function: { type: enum, values: [stop, play, pause, rec, eom, error, eom_error], required: true, label: Status,
+        description: "The status the tally shows: stop, play, pause, rec, eom (end of media), error, or eom_error (either)." }
+    send: ["07F1111{aux:02d}{function:map.aux_tally}\n", "07F1111{aux:02d}FF\n"]
+    returns: none
+  get_aux_tally:
+    summary: "Read an AUX tally's status (7F 11 11 sense, answered FF 11 91: the tally, then the status code)"
+    params:
+      aux: { type: int, min: 1, max: 5, required: true, label: AUX tally, description: "The AUX tally output, 1-5." }
+    send: "07F1111{aux:02d}FF\n"
+    expect: { reply_contains: "0FF1191{aux:02d}", matches: "^0FF1191[0-9]{2}([0-9]{2})$" }
+    returns: value
+  set_input_route:
+    summary: Route an input card channel to a recorder track (7F 12 50 for one channel), then read every track back
+    params:
+      channel: *channel
+      slot: { type: int, min: 1, max: 2, required: true, label: Slot, description: "The interface card slot the source is on, 1 or 2." }
+      source: { type: int, min: 1, max: 64, required: true, label: Source channel, description: "The card's channel, 1-64." }
+    send: ["07F1250{channel:02d}00{source:02d}{slot:-1}0\n", "07F125000FF\n"]
+    returns: none
+  get_input_routing:
+    summary: "Read every track's input (7F 12 50 sense, answered FF 12 D0: 0100, then for each track the source's digits with its slot)"
+    send: "07F125000FF\n"
+    expect: { reply_contains: "0FF12D0", matches: "^0FF12D00100([0-9]{256})$" }
+    returns: value
+  set_output_route:
+    summary: Route a recorder track to a channel of an output card (7F 12 51 for one channel), then read the slot back
+    params:
+      slot: { type: int, min: 1, max: 2, required: true, label: Slot, description: "The interface card slot, 1 or 2." }
+      channel: { type: int, min: 1, max: 64, required: true, label: Output channel, description: "The card's output channel, 1-64." }
+      source: { type: int, min: 1, max: 64, required: true, label: Track, description: "The recorder track it carries, 1-64." }
+    send: ["07F1251{channel:02d}{slot:-1}0{source:02d}00\n", "07F12510{slot:-1}FF\n"]
+    returns: none
+  get_output_routing:
+    summary: "Read a slot's outputs (7F 12 51 sense, answered FF 12 D1: 01, the slot, 0, then the track feeding each of its 64 channels)"
+    params:
+      slot: { type: int, min: 1, max: 2, required: true, label: Slot, description: "The interface card slot, 1 or 2." }
+    send: "07F12510{slot:-1}FF\n"
+    expect: { reply_contains: "0FF12D101{slot:-1}0", matches: "^0FF12D1[0-9]{4}([0-9]{256})$" }
+    returns: value
+  set_peak_hold:
+    summary: Set the meters' peak hold time (7F 13 21), then read it back
+    params:
+      hold: { type: enum, values: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", infinite], required: true, label: Peak hold,
+        description: "Seconds the meter peaks hold, 0 (none) to 10, or infinite (until cleared)." }
+    send: ["07F1321{hold:map.peak_hold}\n", "07F1321FF\n"]
+    returns: none
+  get_peak_hold:
+    summary: "Read the meters' peak hold time (7F 13 21 sense, answered FF 13 A1): 00-10 seconds, FE until cleared"
+    send: "07F1321FF\n"
+    expect: { reply_contains: "0FF13A1", matches: "^0FF13A1([0-9A-F]{2})$" }
+    returns: value
+  clear_peaks:
+    summary: Clear the meters' held peaks (7F 13 30)
+    send: "07F1330\n"
+    returns: none
+  set_reference_level:
+    summary: Set the digital reference level (7F 14 20), then read it back
+    params:
+      level: { type: enum, values: ["-9", "-14", "-16", "-18", "-20"], required: true, label: Reference level, description: "The digital reference level in dBFS." }
+    send: ["07F1420{level:map.reference_level}\n", "07F1420FF\n"]
+    returns: none
+  get_reference_level:
+    summary: "Read the digital reference level (7F 14 20 sense, answered FF 14 A0): 09, 14, 16, 18 or 20 (dB below full scale)"
+    send: "07F1420FF\n"
+    expect: { reply_contains: "0FF14A0", matches: "^0FF14A0([0-9]{2})$" }
+    returns: value
+  rename_take:
+    summary: Rename a take of the current project (7F 42 00); answered when it starts, and again with its result
+    params:
+      take: *take
+      name: { type: string, max_length: 117, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Name, description: "The take's new name, up to 117 bytes of UTF-8." }
+    send: "07F4200{take:map.take}{name}\n"
+    expect: { reply_contains: "0FF4280", matches: "^0FF4280(?:[0-9]{2})?(00)$" }
+    returns: ack
+  erase_take:
+    summary: Erase a take of the current project (7F 42 30); answered when it starts, and again with its result
+    params: { take: *take }
+    send: "07F4230{take:map.take}\n"
+    expect: { reply_contains: "0FF42B0", matches: "^0FF42B0(?:[0-9]{2})?(00)$" }
+    returns: ack
+  copy_take:
+    summary: Copy a take of the current project to a folder (7F 42 52); answered when it starts, and again with its result
+    params:
+      take: *take
+      destination: { type: string, max_length: 117, pattern: "^[AB]:\\\\[^\\x00-\\x1F]*$", required: true, label: Destination folder,
+        description: "The destination folder's full path, A:\\ for the SSD or B:\\ for the USB drive, then the folder's name." }
+    send: "07F4252{take:map.take}{destination}\n"
+    expect: { reply_contains: "0FF42D2", matches: "^0FF42D2(?:[0-9]{2})?(00)$" }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      erase_take, delete_project and format_media remove recordings from the media and cannot be undone;
+      rebuild_project rebuilds the current project's data. Each is answered when it starts; its result comes
+      later as a second answer, which sets operations.<name> in state (ok or failed).
+  - models: [all]
+    severity: critical
+    text: >
+      record and take_split start recording at once, and stop (or record_pause) ends a take mid-recording; with
+      the recorder's record key lock on, STOP and PAUSE from Telnet still stop or pause a recording (addendum
+      V1.21).
+  - models: [all]
+    severity: warning
+    text: >
+      Transport and preset commands are not acknowledged (the commands report unverified): a set is followed by
+      its sense, whose answer updates state, and a command the recorder refuses is answered ILLEGAL (F2), which
+      sets last_illegal in state. With LOCK SETUP's EXTERNAL control locked, the recorder still takes the Telnet
+      login but ignores every command.
+  - models: [all]
+    severity: info
+    text: >
+      Numbers of takes, projects, marks and channels travel as four digits in the order tens, ones,
+      thousands, hundreds ("2301" for 123); the commands take plain numbers. The Telnet password goes after an
+      Enter at the "Enter Password" prompt; TEAC documents no answer to a wrong password. Two Telnet
+      connections are possible at once.
+  - models: [all]
+    severity: info
+    text: >
+      Error and caution codes are N1-N2N3 as on the recorder's display (1-06 Media Full); they travel as N2 N3
+      0 N1. The recorder pushes F0 or F1 when either changes, which reads them again.
+
+state:
+  transport.status: { type: string, description: "The transport: no_media, stop, play, paused, cue (searching forward), review (searching back), record, record_ready, writing (information being written) or other, from MECHA STATUS (D0)" }
+  take.number: { type: int, description: "The current take, numbered from 1; 0 with no take (D5)" }
+  take.length: { type: string, description: "The current take's time as CURRENT TRACK INFORMATION (D7) gives it, HH:MM:SS:FF (inferred to be its length)" }
+  takes.total: { type: int, description: "Takes in the playback area; 0 with none or no media (DD)" }
+  takes.total_time: { type: string, description: "Total time of the playback area, HH:MM:SS:FF (DD)" }
+  takes.*.title: { type: string, description: "A take's name (D9), keyed by its number" }
+  time.elapsed: { type: string, description: "Elapsed time in the current take, HH:MM:SS:FF (D8 10)" }
+  time.remaining: { type: string, description: "Remaining time in the current take, or while recording the time until the maximum file size, HH:MM:SS:FF (D8 11)" }
+  time.total_elapsed: { type: string, description: "Elapsed time in the project, HH:MM:SS:FF (D8 12)" }
+  time.total_remaining: { type: string, description: "Remaining time in the project, or while recording the media's remaining capacity, HH:MM:SS:FF (D8 13)" }
+  time.timecode: { type: string, description: "The timecode, HH:MM:SS:FF (D8 14)" }
+  clock: { type: string, description: "The recorder's date and time, YYYY-MM-DDThh:mm:ss (A7)" }
+  repeat: { type: string, description: "Repeat mode: off, normal or vamping (B7)" }
+  remote_local: { type: string, description: "remote (the recorder's keys disabled) or local (keys and remote control) (CC)" }
+  play_mode: { type: string, description: "all_takes or one_take (CE)" }
+  keyboard: { type: string, description: "The USB keyboard layout: japanese or english (DF)" }
+  version: { type: string, description: "The recorder's software version, such as 1.00 (8F)" }
+  error.code: { type: string, description: "The last error as N1-N2N3; 0-00 for none (F8)" }
+  error.text: { type: string, description: "The last error: none, rec_error, device_error, information_write_error or other_error (F8)" }
+  caution.code: { type: string, description: "The last caution as N1-N2N3; 0-00 for none (F9)" }
+  caution.text: { type: string, description: "The last caution: none, media_error, media_full, take_full, digital_unlock, cannot_record, write_protected, not_executed, cannot_edit, cannot_select, track_protected, name_full, play_error or other (F9)" }
+  last_illegal: { type: bool, description: "True once the recorder has answered a command ILLEGAL (F2); a command it refuses since sets it again" }
+  project.number: { type: int, description: "The current project, numbered from 1 (FF02D5, and FF02F6 when it changes)" }
+  projects.total: { type: int, description: "Projects on the current media; 0 with none or no media (FF02DE)" }
+  projects.*.name: { type: string, description: "A project's name (FF02DA), keyed by its number" }
+  project.new_name: { type: string, description: "The name a project created next takes (FF02C001)" }
+  mark.number: { type: int, description: "The nearest mark before the current position; 0 with none (FF03D5)" }
+  marks.total: { type: int, description: "Marks in the current take (FF03DD)" }
+  marks.*.time: { type: string, description: "A mark's time in the current take, HH:MM:SS:FF (FF03D8), keyed by its number" }
+  marks.*.name: { type: string, description: "A mark's name (FF03D9), keyed by its number" }
+  timecode.chase: { type: bool, description: "Timecode chase on (FF0680)" }
+  timecode.start: { type: string, description: "Generator start time, HH:MM:SS:FF (FF0690)" }
+  timecode.user_bits: { type: string, description: "Generator user bits, eight hexadecimal digits (FF0691)" }
+  timecode.generator_mode: { type: string, description: "free_run, free_once, time_of_day, jam_sync, regen, rec_run or tc_sync_rec (FF06A0)" }
+  timecode.frame_rate: { type: string, description: "23.976, 24, 25, 29.97df, 29.97ndf, 30df or 30ndf (FF06A1)" }
+  timecode.output: { type: string, description: "What the timecode output carries: generator or playback (FF06B0)" }
+  clock_master: { type: string, description: "internal, word, video, slot1 or slot2 (FF06C0)" }
+  word_mode: { type: string, description: "out_terminated, out_unterminated or thru (FF06C8)" }
+  channels.*.record: { type: bool, description: "Whether the track is armed for recording (FF0880), keyed 1-64" }
+  channels.*.input_monitor: { type: bool, description: "Whether the track monitors its input (FF0881), keyed 1-64" }
+  channels.*.input.slot: { type: int, description: "The card slot (1 or 2) of the track's input (FF12D0)" }
+  channels.*.input.source: { type: int, description: "The card channel feeding the track (FF12D0)" }
+  output_slots.*.channels.*.source: { type: int, description: "The recorder track feeding an output card channel (FF12D1), keyed by slot (1-2) and channel (1-64)" }
+  recording.bit_length: { type: int, description: "Bits per sample, 16 or 24 (FF08A2)" }
+  recording.max_file.kind: { type: string, description: "How files are limited: size or time (FF08A3)" }
+  recording.max_file.value: { type: int, description: "The file limit, in MB for size or minutes for time (FF08A3)" }
+  recording.pause_mode: { type: string, description: "split or no_split (FF08A4)" }
+  recording.user_word: { type: string, description: "The file name user word (FF08DA)" }
+  recording.sample_rate: { type: int, unit: Hz, description: "The recording sample rate (FF08D0)" }
+  recording.file_name: { type: string, description: "date_time, folder or user_word (FF08E0)" }
+  markers.interval_minutes: { type: int, unit: min, description: "Minutes between automatic time-interval marks (FF08B2)" }
+  markers.audio_over: { type: bool, description: "Automatic marks at audio overs (FF08C1)" }
+  markers.time_interval: { type: bool, description: "Automatic time-interval marks (FF08C2)" }
+  markers.sync_unlock: { type: bool, description: "Automatic marks at sync unlocks (FF08C3)" }
+  media.*.remaining_gb: { type: int, unit: GB, description: "Free space in whole gigabytes on the ssd or usb media (FF1081); 0 when not loaded" }
+  media.*.remaining_mb: { type: int, unit: MB, description: "The megabytes the free space has beyond its whole gigabytes, as the recorder splits it (FF1081; inferred)" }
+  aux.keys.*: { type: string, description: "The function of AUX key 1-6 (FF1190)" }
+  aux.tallies.*: { type: string, description: "The status AUX tally 1-5 shows (FF1191)" }
+  meters.peak_hold: { type: string, description: "Peak hold time in seconds, 0-10, or infinite (FF13A1)" }
+  reference_level: { type: int, unit: dBFS, description: "The digital reference level, -9 to -20 (FF14A0)" }
+  operations.*: { type: string, description: "The state of the last long operation of each kind (create_project, rebuild_project, delete_project, format_media, rename_take, erase_take, copy_take): started, ok or failed" }
+
+telemetry:
+  poll:
+    - every_ms: 1000
+      send: ["050\n", "05810\n", "05814\n"]
+    - every_ms: 5000
+      send: ["055\n", "05811\n", "05812\n", "05813\n", "05D\n", "07F0355\n"]
+    - every_ms: 30000
+      send: ["00F\n", "027FF\n", "037FF\n", "04CFF\n", "04E\n", "05F\n", "078\n", "079\n", "07F0255\n", "07F025E\n",
+        "07F024001FF\n", "07F035D\n", "07F0600FF\n", "07F0610FF\n", "07F0611FF\n", "07F0620FF\n", "07F0621FF\n",
+        "07F0630FF\n", "07F0640FF\n", "07F0648FF\n", "07F0800FF\n", "07F0801FF\n", "07F0822FF\n", "07F0823FF\n",
+        "07F0824FF\n", "07F085A\n", "07F0832FF\n", "07F0841FF\n", "07F0842FF\n", "07F0843FF\n", "07F0850FF\n",
+        "07F0860FF\n", "07F100100\n", "07F100101\n", "07F111001FF\n", "07F111002FF\n", "07F111003FF\n",
+        "07F111004FF\n", "07F111005FF\n", "07F111006FF\n", "07F111101FF\n", "07F111102FF\n", "07F111103FF\n",
+        "07F111104FF\n", "07F111105FF\n", "07F125000FF\n", "07F125100FF\n", "07F125101FF\n", "07F1321FF\n",
+        "07F1420FF\n"]
+  updates:
+    # CHANGE STATUS: the transport or the take changed.
+    - match: "^0F600$"
+      then_send: ["050\n"]
+    - match: "^0F603$"
+      then_send: ["055\n", "05D\n"]
+    - match: "^0F0$"
+      then_send: ["078\n"]
+    - match: "^0F1$"
+      then_send: ["079\n"]
+    - match: "^0F2$"
+      state: { last_illegal: "true" }
+    - match: "^0D0([0-9A-F]{2})$"
+      state:
+        transport.status: { value: "{1}", map: { "00": no_media, "10": stop, "11": play, "12": paused, "28": cue, "29": review,
+          "81": record, "82": record_ready, "83": writing, FF: other } }
+    # A take number's digits: tens, ones, thousands, hundreds.
+    - match: "^0D500([0-9])([0-9])([0-9])([0-9])$"
+      state: { take.number: "{3}{4}{1}{2}" }
+      then_send: ["059{1}{2}{3}{4}\n"]
+    - match: "^0D7([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { take.length: "{5:02d}:{6:02d}:{7:02d}:{8:02d}" }
+    - match: "^0D810([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { time.elapsed: "{1:02d}:{2:02d}:{3:02d}:{4:02d}" }
+    - match: "^0D811([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { time.remaining: "{1:02d}:{2:02d}:{3:02d}:{4:02d}" }
+    - match: "^0D812([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { time.total_elapsed: "{1:02d}:{2:02d}:{3:02d}:{4:02d}" }
+    - match: "^0D813([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { time.total_remaining: "{1:02d}:{2:02d}:{3:02d}:{4:02d}" }
+    - match: "^0D814([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { time.timecode: "{1:02d}:{2:02d}:{3:02d}:{4:02d}" }
+    # A take's title, keyed by the take's number: below 100, then 100-999.
+    - match: "^0D9([0-9]{2})00(.*)$"
+      state: { "takes.{1}.title": "{2}" }
+    - match: "^0D9([0-9])([0-9])0([1-9])(.*)$"
+      state: { "takes.{3}{1}{2}.title": "{4}" }
+    - match: "^0DD([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { takes.total: "{3}{4}{1}{2}", takes.total_time: "{5:02d}:{6:02d}:{7:02d}:{8:02d}" }
+    - match: "^0A7([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { clock: "20{1:02d}-{2:02d}-{3:02d}T{4:02d}:{5:02d}:{6:02d}" }
+    - match: "^0B7([0-9]{2})$"
+      state: { repeat: { value: "{1}", map: { "00": "off", "01": normal, "21": vamping } } }
+    - match: "^0CC([0-9]{2})$"
+      state: { remote_local: { value: "{1}", map: { "00": remote, "01": local } } }
+    - match: "^0CE([0-9]{2})$"
+      state: { play_mode: { value: "{1}", map: { "00": all_takes, "01": one_take } } }
+    - match: "^0DF([0-9]{2})$"
+      state: { keyboard: { value: "{1}", map: { "00": japanese, "01": english } } }
+    - match: "^08F([0-9]{2})([0-9])([0-9])$"
+      state: { version: "{1}.{2}{3}" }
+    # Error and caution codes N1-N2N3 arrive as N2 N3 0 N1.
+    - match: "^0F8([0-9A-F])([0-9A-F])0([0-9A-F])$"
+      state:
+        error.code: "{3}-{1}{2}"
+        error.text: { value: "{3}-{1}{2}", map: { "0-00": none, "1-01": rec_error, "1-02": device_error, "1-09": information_write_error, "1-FF": other_error } }
+    - match: "^0F9([0-9A-F])([0-9A-F])0([0-9A-F])$"
+      state:
+        caution.code: "{3}-{1}{2}"
+        caution.text: { value: "{3}-{1}{2}", map: { "0-00": none, "1-02": media_error, "1-06": media_full, "1-07": take_full,
+          "1-09": digital_unlock, "1-0B": cannot_record, "1-0C": write_protected, "1-0D": not_executed, "1-0F": cannot_edit,
+          "1-13": cannot_select, "1-14": track_protected, "1-16": name_full, "1-1E": play_error, "1-FF": other } }
+    # Projects: the current one (asked, or pushed when it changes), with its name asked after.
+    - match: "^0FF02(?:D5|F6)0000([0-9]{2})00$"
+      state: { project.number: "{1}" }
+      then_send: ["07F025A{1:02d}00\n"]
+    - match: "^0FF02DA([0-9]{2})00(.*)$"
+      state: { "projects.{1}.name": "{2}" }
+    - match: "^0FF02DE([0-9]{2})00$"
+      state: { projects.total: "{1}" }
+    - match: "^0FF02C001(.*)$"
+      state: { project.new_name: "{1}" }
+    # Long operations: answered 00 when they start, then 11 (OK) or 12 (NG).
+    - match: "^0FF02C000([0-9]{2})$"
+      state: { operations.create_project: { value: "{1}", map: { "00": started, "11": ok, "12": failed } } }
+    - match: "^0FF02C2([0-9]{2})$"
+      state: { operations.rebuild_project: { value: "{1}", map: { "00": started, "11": ok, "12": failed } } }
+    - match: "^0FF02C4([0-9]{2})$"
+      state: { operations.delete_project: { value: "{1}", map: { "00": started, "11": ok, "12": failed } } }
+    - match: "^0FF10C4(?:[0-9]{2})?([0-9]{2})$"
+      state: { operations.format_media: { value: "{1}", map: { "00": started, "11": ok, "12": failed } } }
+    - match: "^0FF4280(?:[0-9]{2})?([0-9]{2})$"
+      state: { operations.rename_take: { value: "{1}", map: { "00": started, "11": ok, "12": failed } } }
+    - match: "^0FF42B0(?:[0-9]{2})?([0-9]{2})$"
+      state: { operations.erase_take: { value: "{1}", map: { "00": started, "11": ok, "12": failed } } }
+    - match: "^0FF42D2(?:[0-9]{2})?([0-9]{2})$"
+      state: { operations.copy_take: { value: "{1}", map: { "00": started, "11": ok, "12": failed } } }
+    # Marks of the current take.
+    - match: "^0FF03D5([0-9]{2})00$"
+      state: { mark.number: "{1}" }
+    - match: "^0FF03DD([0-9]{2})00$"
+      state: { marks.total: "{1}" }
+    - match: "^0FF03D8([0-9]{2})00([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { "marks.{1}.time": "{2:02d}:{3:02d}:{4:02d}:{5:02d}" }
+    - match: "^0FF03D9([0-9]{2})00(.*)$"
+      state: { "marks.{1}.name": "{2}" }
+    # Timecode, sync and recording settings.
+    - match: "^0FF0680([0-9]{2})$"
+      state: { timecode.chase: { value: "{1}", map: { "00": false, "01": true } } }
+    - match: "^0FF0690([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})$"
+      state: { timecode.start: "{1:02d}:{2:02d}:{3:02d}:{4:02d}" }
+    - match: "^0FF0691([0-9A-F]{8})$"
+      state: { timecode.user_bits: "{1}" }
+    - match: "^0FF06A0([0-9]{2})$"
+      state: { timecode.generator_mode: { value: "{1}", map: { "00": free_run, "01": free_once, "02": time_of_day, "03": jam_sync,
+        "04": regen, "05": rec_run, "06": tc_sync_rec } } }
+    - match: "^0FF06A1([0-9]{2}(?:DF)?)$"
+      state: { timecode.frame_rate: { value: "{1}", map: { "23": "23.976", "24": "24", "25": "25", "29DF": 29.97df, "29": 29.97ndf,
+        "30DF": 30df, "30": 30ndf } } }
+    - match: "^0FF06B0([0-9]{2})$"
+      state: { timecode.output: { value: "{1}", map: { "00": generator, "01": playback } } }
+    - match: "^0FF06C0([0-9]{2})$"
+      state: { clock_master: { value: "{1}", map: { "00": internal, "01": word, "02": video, "03": slot1, "04": slot2 } } }
+    - match: "^0FF06C8([0-9]{2})$"
+      state: { word_mode: { value: "{1}", map: { "00": out_terminated, "01": out_unterminated, "11": thru } } }
+    - match: "^0FF08800100([01]{64})$"
+      match_each: "([01])"
+      match_each_in: 1
+      state: { "channels.{index:+1}.record": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^0FF08810100([01]{64})$"
+      match_each: "([01])"
+      match_each_in: 1
+      state: { "channels.{index:+1}.input_monitor": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^0FF08A2([0-9]{2})$"
+      state: { recording.bit_length: "{1}" }
+    - match: "^0FF08A300([0-9])([0-9])([0-9])([0-9])$"
+      state: { recording.max_file.kind: size, recording.max_file.value: "{3}{4}{1}{2}" }
+    - match: "^0FF08A301([0-9])([0-9])([0-9])([0-9])$"
+      state: { recording.max_file.kind: time, recording.max_file.value: "{3}{4}{1}{2}" }
+    - match: "^0FF08A4([0-9]{2})$"
+      state: { recording.pause_mode: { value: "{1}", map: { "00": split, "01": no_split } } }
+    - match: "^0FF08DA(.*)$"
+      state: { recording.user_word: "{1}" }
+    - match: "^0FF08B2([0-9])([0-9])([0-9])([0-9])$"
+      state: { markers.interval_minutes: "{3}{4}{1}{2}" }
+    - match: "^0FF08C1([0-9]{2})$"
+      state: { markers.audio_over: { value: "{1}", map: { "00": false, "01": true } } }
+    - match: "^0FF08C2([0-9]{2})$"
+      state: { markers.time_interval: { value: "{1}", map: { "00": false, "01": true } } }
+    - match: "^0FF08C3([0-9]{2})$"
+      state: { markers.sync_unlock: { value: "{1}", map: { "00": false, "01": true } } }
+    - match: "^0FF08D0([0-9]{6})$"
+      state: { recording.sample_rate: { value: "{1}", map: { "440000": 44100, "480000": 48000, "880000": 88200, "960000": 96000 } } }
+    - match: "^0FF08E0([0-9]{2})$"
+      state: { recording.file_name: { value: "{1}", map: { "00": date_time, "01": folder, "11": user_word } } }
+    # Free space: the media, then gigabytes and megabytes, each tens, ones, thousands, hundreds.
+    - match: "^0FF108100([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])$"
+      state: { media.ssd.remaining_gb: "{3}{4}{1}{2}", media.ssd.remaining_mb: "{7}{8}{5}{6}" }
+    - match: "^0FF108101([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])$"
+      state: { media.usb.remaining_gb: "{3}{4}{1}{2}", media.usb.remaining_mb: "{7}{8}{5}{6}" }
+    - match: "^0FF1190([0-9]{2})([0-9A-F]{2})$"
+      state: { "aux.keys.{1}": { value: "{2}", map: { "00": play_pause, "01": pause, "02": rec, "03": fader_rec, "04": fader_start,
+        "05": rew, "06": ffwd, "07": take_skip_back, "08": take_skip_forward, "09": mark_skip_back, "0A": mark_skip_forward,
+        "0B": take_mark_skip_back, "0C": take_mark_skip_forward, "0D": mark } } }
+    - match: "^0FF1191([0-9]{2})([0-9]{2})$"
+      state: { "aux.tallies.{1}": { value: "{2}", map: { "00": stop, "01": play, "02": pause, "03": rec, "04": eom, "05": error,
+        "06": eom_error } } }
+    # Routing: for each channel the source's tens, ones, slot (inputs) or 0 (outputs), hundreds.
+    - match: "^0FF12D00100([0-9]{256})$"
+      match_each: "([0-9])([0-9])([0-9])([0-9])"
+      match_each_in: 1
+      state: { "channels.{index:+1}.input.source": "{5}{2}{3}", "channels.{index:+1}.input.slot": "{4:+1}" }
+    - match: "^0FF12D101([0-9])0([0-9]{256})$"
+      match_each: "([0-9])([0-9])([0-9])([0-9])"
+      match_each_in: 2
+      state: { "output_slots.{1:+1}.channels.{index:+1}.source": "{6}{3}{4}" }
+    - match: "^0FF13A1([0-9A-F]{2})$"
+      state: { meters.peak_hold: { value: "{1}", map: { "00": "0", "01": "1", "02": "2", "03": "3", "04": "4", "05": "5", "06": "6",
+        "07": "7", "08": "8", "09": "9", "10": "10", FE: infinite } } }
+    - match: "^0FF14A0([0-9]{2})$"
+      state: { reference_level: "-{1}" }

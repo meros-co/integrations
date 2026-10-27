@@ -298,6 +298,16 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["symetrix-composer", "symetrix-jupiter"],
     ),
     ("vendor-tallyarbiter", &["tally-arbiter"]),
+    (
+        "vendor-tascam",
+        &[
+            "tascam-bd-mp1",
+            "tascam-bd-mp4k",
+            "tascam-cd-400u",
+            "tascam-da6400",
+            "tascam-ss-r250n",
+        ],
+    ),
     ("vendor-teradek", &["teradek-prism"]),
     ("vendor-tinkerlist", &["cuez-automator"]),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),

@@ -3240,6 +3240,71 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a 3.3.0 server, confirm chat_enabled is ignored and a duplicate manage event is answered with no result; on a later one, that set_chat_enabled is echoed to every client and duplicate_device answers the copy's deviceId. ([specs/tally-arbiter.yaml:584](specs/tally-arbiter.yaml#L584))
 - [ ] On a phone, confirm Tally Arbiter's Engine.IO pings are answered so it keeps the connection, that a connection dropped while the app was suspended is reopened by mi_reconnect_all with the listener client registered again, and that two unanswered version requests (10 s) drop a silent connection. ([specs/tally-arbiter.yaml:591](specs/tally-arbiter.yaml#L591))
 
+## tascam-bd-mp1 — TASCAM BD-MP1 / BD-MP1MKII
+
+- [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; TEAC's later document shows them without CR. ([specs/tascam-bd-mp1.yaml:50](specs/tascam-bd-mp1.yaml#L50))
+- [ ] Confirm the player repeats an unacknowledged status notification once and nothing worse follows when the host never answers "ack". ([specs/tascam-bd-mp1.yaml:566](specs/tascam-bd-mp1.yaml#L566))
+- [ ] Confirm no flow control is needed on RS-232C. ([specs/tascam-bd-mp1.yaml:63](specs/tascam-bd-mp1.yaml#L63))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp1.yaml:131](specs/tascam-bd-mp1.yaml#L131))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp1.yaml:644](specs/tascam-bd-mp1.yaml#L644))
+- [ ] Confirm the answer to ?SCN is the direction and speed letters (!7SCNFf). ([specs/tascam-bd-mp1.yaml:670](specs/tascam-bd-mp1.yaml#L670))
+- [ ] Confirm the BD-MP1MKII's color keys are CBCX1-CBCX4 as its document writes them, not CBC1-CBC4. ([specs/tascam-bd-mp1.yaml:284](specs/tascam-bd-mp1.yaml#L284))
+- [ ] Confirm power on works only on RS-232C, and that get_power gets no answer in standby. ([specs/tascam-bd-mp1.yaml:128](specs/tascam-bd-mp1.yaml#L128))
+- [ ] Confirm the speaker setting's level form (a sign and two digits) and the delay's unit (centimeters on the BD-MP1MKII, milliseconds on the BD-MP1) and range. ([specs/tascam-bd-mp1.yaml:470](specs/tascam-bd-mp1.yaml#L470))
+
+## tascam-bd-mp4k — TASCAM BD-MP4K
+
+- [ ] Confirm how the player ends its messages: "ack" and "nack" with or without CR, and statuses (such as !7SSTPL) ended by CR; Ver. 1.01 shows them without CR. ([specs/tascam-bd-mp4k.yaml:48](specs/tascam-bd-mp4k.yaml#L48))
+- [ ] Confirm the player repeats an unacknowledged status notification once and nothing worse follows when the host never answers "ack". ([specs/tascam-bd-mp4k.yaml:679](specs/tascam-bd-mp4k.yaml#L679))
+- [ ] Confirm the RS-232C speed's factory setting (115200 assumed), and that no flow control is needed. ([specs/tascam-bd-mp4k.yaml:57](specs/tascam-bd-mp4k.yaml#L57))
+- [ ] Confirm a status request is answered "ack" first, then the status, and a set with "ack" alone. ([specs/tascam-bd-mp4k.yaml:146](specs/tascam-bd-mp4k.yaml#L146))
+- [ ] Confirm the status notifications of the chapter and chapter count use the short forms TN and TT, the answers TNM and TTN. ([specs/tascam-bd-mp4k.yaml:760](specs/tascam-bd-mp4k.yaml#L760))
+- [ ] Confirm the downmix is read with ?DNM (as the document gives it) and answered DMX. ([specs/tascam-bd-mp4k.yaml:626](specs/tascam-bd-mp4k.yaml#L626))
+- [ ] Confirm the color adjustment answer is the color letter then three signed two-digit values (!7MVCR+01-02+03). ([specs/tascam-bd-mp4k.yaml:825](specs/tascam-bd-mp4k.yaml#L825))
+- [ ] Confirm power on works only on RS-232C at 57600 bit/s, and that get_power gets no answer in standby. ([specs/tascam-bd-mp4k.yaml:143](specs/tascam-bd-mp4k.yaml#L143))
+- [ ] Confirm the speaker level's form, four characters in tenths of a dB rounded to 0 or 5, and the delay in centimeters. ([specs/tascam-bd-mp4k.yaml:482](specs/tascam-bd-mp4k.yaml#L482))
+
+## tascam-cd-400u — TASCAM CD-400U / CD-400UDAB
+
+- [ ] Confirm the RS-232C framing: LF before and CR after each message, and the player's own messages framed the same way; the network framing CR LF (the vendor command page shows LF CR). ([specs/tascam-cd-400u.yaml:68](specs/tascam-cd-400u.yaml#L68))
+- [ ] Confirm no flow control is needed on RS-232C (RTS and CTS are joined inside the player). ([specs/tascam-cd-400u.yaml:73](specs/tascam-cd-400u.yaml#L73))
+- [ ] Confirm the IF-E100's Telnet password is 400 by default, digits only, and what the card answers to a wrong one (TEAC documents nothing). ([specs/tascam-cd-400u.yaml:78](specs/tascam-cd-400u.yaml#L78))
+- [ ] Confirm 100 ms between commands is enough, polls included. ([specs/tascam-cd-400u.yaml:66](specs/tascam-cd-400u.yaml#L66))
+- [ ] Check TRACK No. RETURN's layout: the document lists four digits but gives six bytes; confirm whether two EOM digits come first (as on the SS-R250N) or there are only four. ([specs/tascam-cd-400u.yaml:512](specs/tascam-cd-400u.yaml#L512))
+- [ ] Check how a DAB station travels in CURRENT TRACK INFORMATION RETURN: the channel's three characters (padding of a two-character channel such as 5A) and the service number's two digits. ([specs/tascam-cd-400u.yaml:531](specs/tascam-cd-400u.yaml#L531))
+- [ ] Confirm the AM (kHz, five digits) and FM (MHz to two decimals) frequency digits in CURRENT TRACK INFORMATION RETURN with the FM or AM tuner selected. ([specs/tascam-cd-400u.yaml:529](specs/tascam-cd-400u.yaml#L529))
+- [ ] Confirm the play area sense answers 0F for folder skip mode, and that polls of it on an audio CD only set last_illegal. ([specs/tascam-cd-400u.yaml:402](specs/tascam-cd-400u.yaml#L402))
+- [ ] Confirm which senses answer ILLEGAL in which states (track number in tuner frequency mode, remaining and total times on data CDs, SD and USB), as the polls ask for them. ([specs/tascam-cd-400u.yaml:417](specs/tascam-cd-400u.yaml#L417))
+- [ ] Confirm the CD-400UDAB answers device code 30 for DAB and 31 for FM, and the CD-400U 30 for FM and 31 for AM. ([specs/tascam-cd-400u.yaml:569](specs/tascam-cd-400u.yaml#L569))
+- [ ] Confirm ENTER and BACK take data 01 (and BACK 20 for push and hold), and that no release message is needed after them. ([specs/tascam-cd-400u.yaml:404](specs/tascam-cd-400u.yaml#L404))
+
+## tascam-da6400 — TASCAM DA-6400 / DA-6400dp (TELNET protocol)
+
+- [ ] Confirm the recorder takes and sends LF then CR at the end of each message, as its TELNET document says (TEAC's SS-series document gives CR LF for TELNET), and whether it takes CR LF as well. ([specs/tascam-da6400.yaml:56](specs/tascam-da6400.yaml#L56))
+- [ ] Confirm the login: an Enter, "Enter Password", the password, "Login Successful", and what the recorder answers to a wrong password. ([specs/tascam-da6400.yaml:77](specs/tascam-da6400.yaml#L77))
+- [ ] Check whether the Telnet server echoes the commands it receives (the spec never takes an echo for a reply). ([specs/tascam-da6400.yaml:62](specs/tascam-da6400.yaml#L62))
+- [ ] Check what CURRENT TRACK INFORMATION (D7) returns besides the take number: the take's length (assumed) or the position in it. ([specs/tascam-da6400.yaml:915](specs/tascam-da6400.yaml#L915))
+- [ ] Check where the start and end status sits in the long-operation answers (create, rebuild and delete project, format, take rename, erase and copy): the document puts it at Data 5-6 for some and Data 7-8 for others. ([specs/tascam-da6400.yaml:1063](specs/tascam-da6400.yaml#L1063))
+- [ ] Confirm the output routing sense is 7F1251 with 0, the slot and FF, and its answer's 01, slot, 0 lead-in. ([specs/tascam-da6400.yaml:821](specs/tascam-da6400.yaml#L821))
+- [ ] Check how MEDIA REMAIN splits the free space (whole GB and the MB beyond them, or a total in MB in the last four digits). ([specs/tascam-da6400.yaml:968](specs/tascam-da6400.yaml#L968))
+- [ ] Confirm error and caution codes arrive as N2 N3 0 N1, so 1-06 is sent 0601. ([specs/tascam-da6400.yaml:1042](specs/tascam-da6400.yaml#L1042))
+- [ ] Confirm CLOCK DATA RETURN carries seconds (twelve digits) while the preset takes ten. ([specs/tascam-da6400.yaml:1029](specs/tascam-da6400.yaml#L1029))
+- [ ] Confirm the new project's name follows 7F024001 directly (Data 7 on) and is answered the same way. ([specs/tascam-da6400.yaml:428](specs/tascam-da6400.yaml#L428))
+- [ ] Confirm take numbers above 99 (four digits tens, ones, thousands, hundreds) on a project with that many takes. ([specs/tascam-da6400.yaml:282](specs/tascam-da6400.yaml#L282))
+
+## tascam-ss-r250n — TASCAM SS-CDR250N / SS-R250N / SS-R300N
+
+- [ ] Confirm messages on TELNET end CR LF (the vendor command page shows LF CR), and that the recorder's own messages end the same way. ([specs/tascam-ss-r250n.yaml:44](specs/tascam-ss-r250n.yaml#L44))
+- [ ] Confirm the recorder's RS-232C answers are LF, the message, then CR, as its commands are. ([specs/tascam-ss-r250n.yaml:64](specs/tascam-ss-r250n.yaml#L64))
+- [ ] Confirm the login (Enter, "Enter Password", the password, "Login Successful") and the SS-R300N's default password. ([specs/tascam-ss-r250n.yaml:73](specs/tascam-ss-r250n.yaml#L73))
+- [ ] Check whether the Telnet server echoes commands. ([specs/tascam-ss-r250n.yaml:50](specs/tascam-ss-r250n.yaml#L50))
+- [ ] Check whether CLOCK DATA RETURN carries ten digits (as its example) or twelve (as its byte count says). ([specs/tascam-ss-r250n.yaml:992](specs/tascam-ss-r250n.yaml#L992))
+- [ ] Confirm SPECIFIED DEVICE STATUS is answered D1 (the document prints 51 for the return) on the SS-CDR250N, and refused on the SS-R250N and SS-R300N. ([specs/tascam-ss-r250n.yaml:592](specs/tascam-ss-r250n.yaml#L592))
+- [ ] Check that the SS-R300N takes the SS-R250N's commands (the document adds it to the list of devices without other changes) and whether it has commands of its own. ([specs/tascam-ss-r250n.yaml:118](specs/tascam-ss-r250n.yaml#L118))
+- [ ] Confirm CREATE FOLDER's final answer carries the new folder's number after 11. ([specs/tascam-ss-r250n.yaml:1068](specs/tascam-ss-r250n.yaml#L1068))
+- [ ] Check where MEDIA FORMAT's status sits (the document says Data 7-8). ([specs/tascam-ss-r250n.yaml:1064](specs/tascam-ss-r250n.yaml#L1064))
+- [ ] Confirm TIME SEARCH's minutes are four digits in the tens, ones, thousands, hundreds order and its seconds are seconds and hundredths (the document's example disagrees with its own description); the command takes minutes up to 999. ([specs/tascam-ss-r250n.yaml:440](specs/tascam-ss-r250n.yaml#L440))
+
 ## teradek-prism — Teradek Prism (Jetpack, Flex, Mobile, Rack Unit)
 
 - [ ] Confirm the API answers on HTTPS port 443 with a self-signed certificate the core accepts, and whether plain HTTP is served at all (the SDK has an https: false option; the documents name only HTTPS). ([specs/teradek-prism.yaml:72](specs/teradek-prism.yaml#L72))

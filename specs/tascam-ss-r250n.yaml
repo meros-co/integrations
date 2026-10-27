@@ -1,0 +1,1071 @@
+spec: 1
+id: tascam-ss-r250n
+name: TASCAM SS-CDR250N / SS-R250N / SS-R300N networking recorders (RS-232C / TELNET protocol)
+vendor: TASCAM
+category: recorder
+
+# TEAC's RS-232C/TELNET protocol for the SS-CDR250N, SS-R250N and SS-R300N: the same ASCII commands on the
+# RS-232C port and on the Telnet server (TCP 23, a password asked first). On the network a message is the
+# machine ID "0", a two-character command and its data, ended by CR LF; on RS-232C the same message is
+# preceded by LF and ended by CR. Transport and preset commands are not acknowledged; sense commands are
+# answered by a return command (the command with its top bit set); the recorder pushes F6 CHANGE STATUS
+# when its transport or track changes, F0 and F1 when its error or caution status changes, and F4 when it
+# powers on. Functions of its own are the 7F vendor commands, answered by FF. Track, file and folder
+# numbers, and minutes, are sent as four digits in the order tens, ones, thousands, hundreds ("2301" is 123).
+source:
+  - title: "TASCAM SS-CDR250N/SS-R250N/SS-R300N CONTROL I/O Terminals RS-232C/TELNET Protocol Specifications, Ver. 2.00 (Oct 2026)"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/ss-r300n/rs-232c_protocol_sscdr250n_r330n_v2.00_e.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-27), offered for download with a protocol use agreement that
+      grants its use for developing compatible devices and software; nothing of it is copied here. RS-232C
+      (pp.3-4: 4800-57600 bit/s, 7 or 8 data bits, none/odd/even parity, 1 or 2 stop bits, set on the unit;
+      RTS and CTS joined inside), command format on RS-232C (LF, ID, command, data, CR) and TELNET (ID,
+      command, data, CR LF; the vendor command page shows LF CR) (pp.5-6), ID 0, the command sequence (no
+      ACK, return commands, CHANGED STATUS, 20 ms between commands, p.7), the command and vendor command
+      lists with the firmware each needs (pp.9-11), each command (pp.12-40) and the vendor commands (pp.41-58).
+  - title: "TASCAM SS-CDR250N / SS-R250N Owner's Manual V2.00"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/ss-cdr250n_ss-r250n_rc-ss150/e_ss-cdr250n_om_vf.pdf
+    note: >
+      Manufacturer document. "Remote control" (p.93): Telnet on port 23, password SS-CDR250N or SS-R250N by
+      default (case-sensitive, set on the PASSWORD screen), press Enter after connecting, "Enter Password",
+      "Login Successful", three connections at once; 232C/PARA/NETWORK lock (p.30). RS-232C settings (p.102):
+      57600 bit/s, no parity, 1 stop bit and 8 data bits by default.
+  - title: "bitfocus/companion-module-tascam-cd (MIT)"
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-tascam-cd
+    note: "Corroboration only, not copied: the Telnet login and the 0-prefixed commands."
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 3000
+  reply: expected
+  # A reply is a return command, which has its top bit set (8F to FF): an echo of a command sent (00 to
+  # 7F) is never taken for one.
+  reply_match: "^0[89A-F][0-9A-F]"
+  error_match: "^0F2$"
+  probe: "00F"
+  # At least 20 ms between commands (p.7).
+  pacing:
+    min_interval_ms: 20
+  # RS-232C: LF before each message and CR after it (p.5); every setting is chosen on the unit (p.102).
+  serial:
+    baud_rate: { default: 57600, values: [4800, 9600, 19200, 38400, 57600] }
+    data_bits: { default: 8, values: [7, 8] }
+    parity: { default: none, values: [none, odd, even] }
+    stop_bits: { default: 1, values: [1, 2] }
+    flow_control: none
+    overrides:
+      - { framing: delimited, open: "\n", close: "\r", reply_framing: line }
+
+settings:
+  password: { type: string, secret: true, max_length: 32, default: "", label: Password,
+    description: "The recorder's Telnet password, set on its PASSWORD screen; by default SS-CDR250N or SS-R250N (the model's name), case-sensitive, to be given here." }
+
+# Enter first, then the password at "Enter Password", on the network only. TEAC documents no answer to a
+# wrong password.
+on_connect:
+  - link: tcp
+    send: ""
+  - link: tcp
+    after_prompt: "Enter Password"
+    send: "{settings.password}"
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "the Telnet server; three connections at once" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-sub 9-pin female; pin 9 carries 12 V for the RC-SS150" }
+
+models:
+  - id: ss-cdr250n
+    name: TASCAM SS-CDR250N (CD and SD/USB recorder)
+    supports: &cdr [stop, play, record, record_pause, track_mark, input_monitor, pause, jog, shuttle, flash_load, eject, skip,
+      call, set_auto_cue_level, get_auto_cue_level, set_auto_track_level, get_auto_track_level, locate_track,
+      set_pitch, get_pitch, set_auto_track_time, get_auto_track_time, set_clock, get_clock, set_sync_rec_level,
+      get_sync_rec_level, set_cd_text, locate_time, set_key, get_key, set_auto_cue, get_auto_cue, set_auto_track,
+      get_auto_track, set_eom_track_time, get_eom_track_time, set_eom_media_time, get_eom_media_time,
+      set_pitch_control, get_pitch_control, set_auto_ready, get_auto_ready, set_repeat, get_repeat, set_sync_rec,
+      get_sync_rec, set_incremental_play, get_incremental_play, set_key_control, get_key_control,
+      set_remote_local, get_remote_local, set_play_mode, get_play_mode, get_status, get_device_status,
+      get_track_number, get_media_status, get_track_info, get_time, get_name, get_totals, get_program_totals,
+      get_keyboard_type, power, get_error, get_caution, get_information, select_device, get_device, divide, delete,
+      set_time_skip, get_time_skip, set_play_area, get_play_area, set_auto_track_size, get_auto_track_size,
+      set_user_word, get_user_word, set_file_name_mode, get_file_name_mode, get_recordable_time, format_media,
+      set_input, get_input, rename_file, select_folder, create_folder, rename_folder, get_folder_number,
+      find_folder, get_folder_name, get_file_name, get_folder_count, get_file_count]
+    verification: none
+  - id: ss-r250n
+    name: TASCAM SS-R250N (SD/USB recorder)
+    supports: &ssr [stop, play, record, record_pause, track_mark, input_monitor, pause, jog, shuttle, flash_load, skip,
+      call, set_auto_cue_level, get_auto_cue_level, set_auto_track_level, get_auto_track_level, locate_track,
+      set_pitch, get_pitch, set_auto_track_time, get_auto_track_time, set_clock, get_clock, set_sync_rec_level,
+      get_sync_rec_level, locate_time, set_key, get_key, set_auto_cue, get_auto_cue, set_auto_track,
+      get_auto_track, set_eom_track_time, get_eom_track_time, set_eom_media_time, get_eom_media_time,
+      set_pitch_control, get_pitch_control, set_auto_ready, get_auto_ready, set_repeat, get_repeat, set_sync_rec,
+      get_sync_rec, set_incremental_play, get_incremental_play, set_key_control, get_key_control,
+      set_remote_local, get_remote_local, set_play_mode, get_play_mode, get_status,
+      get_track_number, get_track_info, get_time, get_name, get_totals, get_program_totals,
+      get_keyboard_type, power, get_error, get_caution, get_information, select_device, get_device, divide, delete,
+      set_time_skip, get_time_skip, set_play_area, get_play_area, set_auto_track_size, get_auto_track_size,
+      set_user_word, get_user_word, set_file_name_mode, get_file_name_mode, get_recordable_time, format_media,
+      set_input, get_input, rename_file, select_folder, create_folder, rename_folder, get_folder_number,
+      find_folder, get_folder_name, get_file_name, get_folder_count, get_file_count]
+    verification: none
+  - id: ss-r300n
+    name: TASCAM SS-R300N (SD/USB recorder)
+    supports: *ssr
+    verification: none
+
+maps:
+  # A number as the four digits the recorder takes: tens, ones, thousands, hundreds ("2301" is 123).
+  num: {
+    "0": "0000", "1": "0100", "2": "0200", "3": "0300", "4": "0400", "5": "0500", "6": "0600", "7": "0700", "8": "0800", "9": "0900",
+    "10": "1000", "11": "1100", "12": "1200", "13": "1300", "14": "1400", "15": "1500", "16": "1600", "17": "1700", "18": "1800", "19": "1900",
+    "20": "2000", "21": "2100", "22": "2200", "23": "2300", "24": "2400", "25": "2500", "26": "2600", "27": "2700", "28": "2800", "29": "2900",
+    "30": "3000", "31": "3100", "32": "3200", "33": "3300", "34": "3400", "35": "3500", "36": "3600", "37": "3700", "38": "3800", "39": "3900",
+    "40": "4000", "41": "4100", "42": "4200", "43": "4300", "44": "4400", "45": "4500", "46": "4600", "47": "4700", "48": "4800", "49": "4900",
+    "50": "5000", "51": "5100", "52": "5200", "53": "5300", "54": "5400", "55": "5500", "56": "5600", "57": "5700", "58": "5800", "59": "5900",
+    "60": "6000", "61": "6100", "62": "6200", "63": "6300", "64": "6400", "65": "6500", "66": "6600", "67": "6700", "68": "6800", "69": "6900",
+    "70": "7000", "71": "7100", "72": "7200", "73": "7300", "74": "7400", "75": "7500", "76": "7600", "77": "7700", "78": "7800", "79": "7900",
+    "80": "8000", "81": "8100", "82": "8200", "83": "8300", "84": "8400", "85": "8500", "86": "8600", "87": "8700", "88": "8800", "89": "8900",
+    "90": "9000", "91": "9100", "92": "9200", "93": "9300", "94": "9400", "95": "9500", "96": "9600", "97": "9700", "98": "9800", "99": "9900",
+    "100": "0001", "101": "0101", "102": "0201", "103": "0301", "104": "0401", "105": "0501", "106": "0601", "107": "0701", "108": "0801", "109": "0901",
+    "110": "1001", "111": "1101", "112": "1201", "113": "1301", "114": "1401", "115": "1501", "116": "1601", "117": "1701", "118": "1801", "119": "1901",
+    "120": "2001", "121": "2101", "122": "2201", "123": "2301", "124": "2401", "125": "2501", "126": "2601", "127": "2701", "128": "2801", "129": "2901",
+    "130": "3001", "131": "3101", "132": "3201", "133": "3301", "134": "3401", "135": "3501", "136": "3601", "137": "3701", "138": "3801", "139": "3901",
+    "140": "4001", "141": "4101", "142": "4201", "143": "4301", "144": "4401", "145": "4501", "146": "4601", "147": "4701", "148": "4801", "149": "4901",
+    "150": "5001", "151": "5101", "152": "5201", "153": "5301", "154": "5401", "155": "5501", "156": "5601", "157": "5701", "158": "5801", "159": "5901",
+    "160": "6001", "161": "6101", "162": "6201", "163": "6301", "164": "6401", "165": "6501", "166": "6601", "167": "6701", "168": "6801", "169": "6901",
+    "170": "7001", "171": "7101", "172": "7201", "173": "7301", "174": "7401", "175": "7501", "176": "7601", "177": "7701", "178": "7801", "179": "7901",
+    "180": "8001", "181": "8101", "182": "8201", "183": "8301", "184": "8401", "185": "8501", "186": "8601", "187": "8701", "188": "8801", "189": "8901",
+    "190": "9001", "191": "9101", "192": "9201", "193": "9301", "194": "9401", "195": "9501", "196": "9601", "197": "9701", "198": "9801", "199": "9901",
+    "200": "0002", "201": "0102", "202": "0202", "203": "0302", "204": "0402", "205": "0502", "206": "0602", "207": "0702", "208": "0802", "209": "0902",
+    "210": "1002", "211": "1102", "212": "1202", "213": "1302", "214": "1402", "215": "1502", "216": "1602", "217": "1702", "218": "1802", "219": "1902",
+    "220": "2002", "221": "2102", "222": "2202", "223": "2302", "224": "2402", "225": "2502", "226": "2602", "227": "2702", "228": "2802", "229": "2902",
+    "230": "3002", "231": "3102", "232": "3202", "233": "3302", "234": "3402", "235": "3502", "236": "3602", "237": "3702", "238": "3802", "239": "3902",
+    "240": "4002", "241": "4102", "242": "4202", "243": "4302", "244": "4402", "245": "4502", "246": "4602", "247": "4702", "248": "4802", "249": "4902",
+    "250": "5002", "251": "5102", "252": "5202", "253": "5302", "254": "5402", "255": "5502", "256": "5602", "257": "5702", "258": "5802", "259": "5902",
+    "260": "6002", "261": "6102", "262": "6202", "263": "6302", "264": "6402", "265": "6502", "266": "6602", "267": "6702", "268": "6802", "269": "6902",
+    "270": "7002", "271": "7102", "272": "7202", "273": "7302", "274": "7402", "275": "7502", "276": "7602", "277": "7702", "278": "7802", "279": "7902",
+    "280": "8002", "281": "8102", "282": "8202", "283": "8302", "284": "8402", "285": "8502", "286": "8602", "287": "8702", "288": "8802", "289": "8902",
+    "290": "9002", "291": "9102", "292": "9202", "293": "9302", "294": "9402", "295": "9502", "296": "9602", "297": "9702", "298": "9802", "299": "9902",
+    "300": "0003", "301": "0103", "302": "0203", "303": "0303", "304": "0403", "305": "0503", "306": "0603", "307": "0703", "308": "0803", "309": "0903",
+    "310": "1003", "311": "1103", "312": "1203", "313": "1303", "314": "1403", "315": "1503", "316": "1603", "317": "1703", "318": "1803", "319": "1903",
+    "320": "2003", "321": "2103", "322": "2203", "323": "2303", "324": "2403", "325": "2503", "326": "2603", "327": "2703", "328": "2803", "329": "2903",
+    "330": "3003", "331": "3103", "332": "3203", "333": "3303", "334": "3403", "335": "3503", "336": "3603", "337": "3703", "338": "3803", "339": "3903",
+    "340": "4003", "341": "4103", "342": "4203", "343": "4303", "344": "4403", "345": "4503", "346": "4603", "347": "4703", "348": "4803", "349": "4903",
+    "350": "5003", "351": "5103", "352": "5203", "353": "5303", "354": "5403", "355": "5503", "356": "5603", "357": "5703", "358": "5803", "359": "5903",
+    "360": "6003", "361": "6103", "362": "6203", "363": "6303", "364": "6403", "365": "6503", "366": "6603", "367": "6703", "368": "6803", "369": "6903",
+    "370": "7003", "371": "7103", "372": "7203", "373": "7303", "374": "7403", "375": "7503", "376": "7603", "377": "7703", "378": "7803", "379": "7903",
+    "380": "8003", "381": "8103", "382": "8203", "383": "8303", "384": "8403", "385": "8503", "386": "8603", "387": "8703", "388": "8803", "389": "8903",
+    "390": "9003", "391": "9103", "392": "9203", "393": "9303", "394": "9403", "395": "9503", "396": "9603", "397": "9703", "398": "9803", "399": "9903",
+    "400": "0004", "401": "0104", "402": "0204", "403": "0304", "404": "0404", "405": "0504", "406": "0604", "407": "0704", "408": "0804", "409": "0904",
+    "410": "1004", "411": "1104", "412": "1204", "413": "1304", "414": "1404", "415": "1504", "416": "1604", "417": "1704", "418": "1804", "419": "1904",
+    "420": "2004", "421": "2104", "422": "2204", "423": "2304", "424": "2404", "425": "2504", "426": "2604", "427": "2704", "428": "2804", "429": "2904",
+    "430": "3004", "431": "3104", "432": "3204", "433": "3304", "434": "3404", "435": "3504", "436": "3604", "437": "3704", "438": "3804", "439": "3904",
+    "440": "4004", "441": "4104", "442": "4204", "443": "4304", "444": "4404", "445": "4504", "446": "4604", "447": "4704", "448": "4804", "449": "4904",
+    "450": "5004", "451": "5104", "452": "5204", "453": "5304", "454": "5404", "455": "5504", "456": "5604", "457": "5704", "458": "5804", "459": "5904",
+    "460": "6004", "461": "6104", "462": "6204", "463": "6304", "464": "6404", "465": "6504", "466": "6604", "467": "6704", "468": "6804", "469": "6904",
+    "470": "7004", "471": "7104", "472": "7204", "473": "7304", "474": "7404", "475": "7504", "476": "7604", "477": "7704", "478": "7804", "479": "7904",
+    "480": "8004", "481": "8104", "482": "8204", "483": "8304", "484": "8404", "485": "8504", "486": "8604", "487": "8704", "488": "8804", "489": "8904",
+    "490": "9004", "491": "9104", "492": "9204", "493": "9304", "494": "9404", "495": "9504", "496": "9604", "497": "9704", "498": "9804", "499": "9904",
+    "500": "0005", "501": "0105", "502": "0205", "503": "0305", "504": "0405", "505": "0505", "506": "0605", "507": "0705", "508": "0805", "509": "0905",
+    "510": "1005", "511": "1105", "512": "1205", "513": "1305", "514": "1405", "515": "1505", "516": "1605", "517": "1705", "518": "1805", "519": "1905",
+    "520": "2005", "521": "2105", "522": "2205", "523": "2305", "524": "2405", "525": "2505", "526": "2605", "527": "2705", "528": "2805", "529": "2905",
+    "530": "3005", "531": "3105", "532": "3205", "533": "3305", "534": "3405", "535": "3505", "536": "3605", "537": "3705", "538": "3805", "539": "3905",
+    "540": "4005", "541": "4105", "542": "4205", "543": "4305", "544": "4405", "545": "4505", "546": "4605", "547": "4705", "548": "4805", "549": "4905",
+    "550": "5005", "551": "5105", "552": "5205", "553": "5305", "554": "5405", "555": "5505", "556": "5605", "557": "5705", "558": "5805", "559": "5905",
+    "560": "6005", "561": "6105", "562": "6205", "563": "6305", "564": "6405", "565": "6505", "566": "6605", "567": "6705", "568": "6805", "569": "6905",
+    "570": "7005", "571": "7105", "572": "7205", "573": "7305", "574": "7405", "575": "7505", "576": "7605", "577": "7705", "578": "7805", "579": "7905",
+    "580": "8005", "581": "8105", "582": "8205", "583": "8305", "584": "8405", "585": "8505", "586": "8605", "587": "8705", "588": "8805", "589": "8905",
+    "590": "9005", "591": "9105", "592": "9205", "593": "9305", "594": "9405", "595": "9505", "596": "9605", "597": "9705", "598": "9805", "599": "9905",
+    "600": "0006", "601": "0106", "602": "0206", "603": "0306", "604": "0406", "605": "0506", "606": "0606", "607": "0706", "608": "0806", "609": "0906",
+    "610": "1006", "611": "1106", "612": "1206", "613": "1306", "614": "1406", "615": "1506", "616": "1606", "617": "1706", "618": "1806", "619": "1906",
+    "620": "2006", "621": "2106", "622": "2206", "623": "2306", "624": "2406", "625": "2506", "626": "2606", "627": "2706", "628": "2806", "629": "2906",
+    "630": "3006", "631": "3106", "632": "3206", "633": "3306", "634": "3406", "635": "3506", "636": "3606", "637": "3706", "638": "3806", "639": "3906",
+    "640": "4006", "641": "4106", "642": "4206", "643": "4306", "644": "4406", "645": "4506", "646": "4606", "647": "4706", "648": "4806", "649": "4906",
+    "650": "5006", "651": "5106", "652": "5206", "653": "5306", "654": "5406", "655": "5506", "656": "5606", "657": "5706", "658": "5806", "659": "5906",
+    "660": "6006", "661": "6106", "662": "6206", "663": "6306", "664": "6406", "665": "6506", "666": "6606", "667": "6706", "668": "6806", "669": "6906",
+    "670": "7006", "671": "7106", "672": "7206", "673": "7306", "674": "7406", "675": "7506", "676": "7606", "677": "7706", "678": "7806", "679": "7906",
+    "680": "8006", "681": "8106", "682": "8206", "683": "8306", "684": "8406", "685": "8506", "686": "8606", "687": "8706", "688": "8806", "689": "8906",
+    "690": "9006", "691": "9106", "692": "9206", "693": "9306", "694": "9406", "695": "9506", "696": "9606", "697": "9706", "698": "9806", "699": "9906",
+    "700": "0007", "701": "0107", "702": "0207", "703": "0307", "704": "0407", "705": "0507", "706": "0607", "707": "0707", "708": "0807", "709": "0907",
+    "710": "1007", "711": "1107", "712": "1207", "713": "1307", "714": "1407", "715": "1507", "716": "1607", "717": "1707", "718": "1807", "719": "1907",
+    "720": "2007", "721": "2107", "722": "2207", "723": "2307", "724": "2407", "725": "2507", "726": "2607", "727": "2707", "728": "2807", "729": "2907",
+    "730": "3007", "731": "3107", "732": "3207", "733": "3307", "734": "3407", "735": "3507", "736": "3607", "737": "3707", "738": "3807", "739": "3907",
+    "740": "4007", "741": "4107", "742": "4207", "743": "4307", "744": "4407", "745": "4507", "746": "4607", "747": "4707", "748": "4807", "749": "4907",
+    "750": "5007", "751": "5107", "752": "5207", "753": "5307", "754": "5407", "755": "5507", "756": "5607", "757": "5707", "758": "5807", "759": "5907",
+    "760": "6007", "761": "6107", "762": "6207", "763": "6307", "764": "6407", "765": "6507", "766": "6607", "767": "6707", "768": "6807", "769": "6907",
+    "770": "7007", "771": "7107", "772": "7207", "773": "7307", "774": "7407", "775": "7507", "776": "7607", "777": "7707", "778": "7807", "779": "7907",
+    "780": "8007", "781": "8107", "782": "8207", "783": "8307", "784": "8407", "785": "8507", "786": "8607", "787": "8707", "788": "8807", "789": "8907",
+    "790": "9007", "791": "9107", "792": "9207", "793": "9307", "794": "9407", "795": "9507", "796": "9607", "797": "9707", "798": "9807", "799": "9907",
+    "800": "0008", "801": "0108", "802": "0208", "803": "0308", "804": "0408", "805": "0508", "806": "0608", "807": "0708", "808": "0808", "809": "0908",
+    "810": "1008", "811": "1108", "812": "1208", "813": "1308", "814": "1408", "815": "1508", "816": "1608", "817": "1708", "818": "1808", "819": "1908",
+    "820": "2008", "821": "2108", "822": "2208", "823": "2308", "824": "2408", "825": "2508", "826": "2608", "827": "2708", "828": "2808", "829": "2908",
+    "830": "3008", "831": "3108", "832": "3208", "833": "3308", "834": "3408", "835": "3508", "836": "3608", "837": "3708", "838": "3808", "839": "3908",
+    "840": "4008", "841": "4108", "842": "4208", "843": "4308", "844": "4408", "845": "4508", "846": "4608", "847": "4708", "848": "4808", "849": "4908",
+    "850": "5008", "851": "5108", "852": "5208", "853": "5308", "854": "5408", "855": "5508", "856": "5608", "857": "5708", "858": "5808", "859": "5908",
+    "860": "6008", "861": "6108", "862": "6208", "863": "6308", "864": "6408", "865": "6508", "866": "6608", "867": "6708", "868": "6808", "869": "6908",
+    "870": "7008", "871": "7108", "872": "7208", "873": "7308", "874": "7408", "875": "7508", "876": "7608", "877": "7708", "878": "7808", "879": "7908",
+    "880": "8008", "881": "8108", "882": "8208", "883": "8308", "884": "8408", "885": "8508", "886": "8608", "887": "8708", "888": "8808", "889": "8908",
+    "890": "9008", "891": "9108", "892": "9208", "893": "9308", "894": "9408", "895": "9508", "896": "9608", "897": "9708", "898": "9808", "899": "9908",
+    "900": "0009", "901": "0109", "902": "0209", "903": "0309", "904": "0409", "905": "0509", "906": "0609", "907": "0709", "908": "0809", "909": "0909",
+    "910": "1009", "911": "1109", "912": "1209", "913": "1309", "914": "1409", "915": "1509", "916": "1609", "917": "1709", "918": "1809", "919": "1909",
+    "920": "2009", "921": "2109", "922": "2209", "923": "2309", "924": "2409", "925": "2509", "926": "2609", "927": "2709", "928": "2809", "929": "2909",
+    "930": "3009", "931": "3109", "932": "3209", "933": "3309", "934": "3409", "935": "3509", "936": "3609", "937": "3709", "938": "3809", "939": "3909",
+    "940": "4009", "941": "4109", "942": "4209", "943": "4309", "944": "4409", "945": "4509", "946": "4609", "947": "4709", "948": "4809", "949": "4909",
+    "950": "5009", "951": "5109", "952": "5209", "953": "5309", "954": "5409", "955": "5509", "956": "5609", "957": "5709", "958": "5809", "959": "5909",
+    "960": "6009", "961": "6109", "962": "6209", "963": "6309", "964": "6409", "965": "6509", "966": "6609", "967": "6709", "968": "6809", "969": "6909",
+    "970": "7009", "971": "7109", "972": "7209", "973": "7309", "974": "7409", "975": "7509", "976": "7609", "977": "7709", "978": "7809", "979": "7909",
+    "980": "8009", "981": "8109", "982": "8209", "983": "8309", "984": "8409", "985": "8509", "986": "8609", "987": "8709", "988": "8809", "989": "8909",
+    "990": "9009", "991": "9109", "992": "9209", "993": "9309", "994": "9409", "995": "9509", "996": "9609", "997": "9709", "998": "9809", "999": "9909" }
+  # Pitch in tenths of a percent: ones, tenths, the sign (0 up, 1 down), tens ("2310" is -2.3 %).
+  pitch: {
+    "-160": "6011", "-159": "5911", "-158": "5811", "-157": "5711", "-156": "5611", "-155": "5511", "-154": "5411", "-153": "5311", "-152": "5211", "-151": "5111",
+    "-150": "5011", "-149": "4911", "-148": "4811", "-147": "4711", "-146": "4611", "-145": "4511", "-144": "4411", "-143": "4311", "-142": "4211", "-141": "4111",
+    "-140": "4011", "-139": "3911", "-138": "3811", "-137": "3711", "-136": "3611", "-135": "3511", "-134": "3411", "-133": "3311", "-132": "3211", "-131": "3111",
+    "-130": "3011", "-129": "2911", "-128": "2811", "-127": "2711", "-126": "2611", "-125": "2511", "-124": "2411", "-123": "2311", "-122": "2211", "-121": "2111",
+    "-120": "2011", "-119": "1911", "-118": "1811", "-117": "1711", "-116": "1611", "-115": "1511", "-114": "1411", "-113": "1311", "-112": "1211", "-111": "1111",
+    "-110": "1011", "-109": "0911", "-108": "0811", "-107": "0711", "-106": "0611", "-105": "0511", "-104": "0411", "-103": "0311", "-102": "0211", "-101": "0111",
+    "-100": "0011", "-99": "9910", "-98": "9810", "-97": "9710", "-96": "9610", "-95": "9510", "-94": "9410", "-93": "9310", "-92": "9210", "-91": "9110",
+    "-90": "9010", "-89": "8910", "-88": "8810", "-87": "8710", "-86": "8610", "-85": "8510", "-84": "8410", "-83": "8310", "-82": "8210", "-81": "8110",
+    "-80": "8010", "-79": "7910", "-78": "7810", "-77": "7710", "-76": "7610", "-75": "7510", "-74": "7410", "-73": "7310", "-72": "7210", "-71": "7110",
+    "-70": "7010", "-69": "6910", "-68": "6810", "-67": "6710", "-66": "6610", "-65": "6510", "-64": "6410", "-63": "6310", "-62": "6210", "-61": "6110",
+    "-60": "6010", "-59": "5910", "-58": "5810", "-57": "5710", "-56": "5610", "-55": "5510", "-54": "5410", "-53": "5310", "-52": "5210", "-51": "5110",
+    "-50": "5010", "-49": "4910", "-48": "4810", "-47": "4710", "-46": "4610", "-45": "4510", "-44": "4410", "-43": "4310", "-42": "4210", "-41": "4110",
+    "-40": "4010", "-39": "3910", "-38": "3810", "-37": "3710", "-36": "3610", "-35": "3510", "-34": "3410", "-33": "3310", "-32": "3210", "-31": "3110",
+    "-30": "3010", "-29": "2910", "-28": "2810", "-27": "2710", "-26": "2610", "-25": "2510", "-24": "2410", "-23": "2310", "-22": "2210", "-21": "2110",
+    "-20": "2010", "-19": "1910", "-18": "1810", "-17": "1710", "-16": "1610", "-15": "1510", "-14": "1410", "-13": "1310", "-12": "1210", "-11": "1110",
+    "-10": "1010", "-9": "0910", "-8": "0810", "-7": "0710", "-6": "0610", "-5": "0510", "-4": "0410", "-3": "0310", "-2": "0210", "-1": "0110",
+    "0": "0000", "1": "0100", "2": "0200", "3": "0300", "4": "0400", "5": "0500", "6": "0600", "7": "0700", "8": "0800", "9": "0900",
+    "10": "1000", "11": "1100", "12": "1200", "13": "1300", "14": "1400", "15": "1500", "16": "1600", "17": "1700", "18": "1800", "19": "1900",
+    "20": "2000", "21": "2100", "22": "2200", "23": "2300", "24": "2400", "25": "2500", "26": "2600", "27": "2700", "28": "2800", "29": "2900",
+    "30": "3000", "31": "3100", "32": "3200", "33": "3300", "34": "3400", "35": "3500", "36": "3600", "37": "3700", "38": "3800", "39": "3900",
+    "40": "4000", "41": "4100", "42": "4200", "43": "4300", "44": "4400", "45": "4500", "46": "4600", "47": "4700", "48": "4800", "49": "4900",
+    "50": "5000", "51": "5100", "52": "5200", "53": "5300", "54": "5400", "55": "5500", "56": "5600", "57": "5700", "58": "5800", "59": "5900",
+    "60": "6000", "61": "6100", "62": "6200", "63": "6300", "64": "6400", "65": "6500", "66": "6600", "67": "6700", "68": "6800", "69": "6900",
+    "70": "7000", "71": "7100", "72": "7200", "73": "7300", "74": "7400", "75": "7500", "76": "7600", "77": "7700", "78": "7800", "79": "7900",
+    "80": "8000", "81": "8100", "82": "8200", "83": "8300", "84": "8400", "85": "8500", "86": "8600", "87": "8700", "88": "8800", "89": "8900",
+    "90": "9000", "91": "9100", "92": "9200", "93": "9300", "94": "9400", "95": "9500", "96": "9600", "97": "9700", "98": "9800", "99": "9900",
+    "100": "0001", "101": "0101", "102": "0201", "103": "0301", "104": "0401", "105": "0501", "106": "0601", "107": "0701", "108": "0801", "109": "0901",
+    "110": "1001", "111": "1101", "112": "1201", "113": "1301", "114": "1401", "115": "1501", "116": "1601", "117": "1701", "118": "1801", "119": "1901",
+    "120": "2001", "121": "2101", "122": "2201", "123": "2301", "124": "2401", "125": "2501", "126": "2601", "127": "2701", "128": "2801", "129": "2901",
+    "130": "3001", "131": "3101", "132": "3201", "133": "3301", "134": "3401", "135": "3501", "136": "3601", "137": "3701", "138": "3801", "139": "3901",
+    "140": "4001", "141": "4101", "142": "4201", "143": "4301", "144": "4401", "145": "4501", "146": "4601", "147": "4701", "148": "4801", "149": "4901",
+    "150": "5001", "151": "5101", "152": "5201", "153": "5301", "154": "5401", "155": "5501", "156": "5601", "157": "5701", "158": "5801", "159": "5901",
+    "160": "6001" }
+  eom_track: {
+    "-1": "00", "0": "A0", "1": "01", "2": "02", "3": "03", "4": "04", "5": "05", "6": "06", "7": "07", "8": "08",
+    "9": "09", "10": "10", "11": "11", "12": "12", "13": "13", "14": "14", "15": "15", "16": "16", "17": "17", "18": "18",
+    "19": "19", "20": "20", "21": "21", "22": "22", "23": "23", "24": "24", "25": "25", "26": "26", "27": "27", "28": "28",
+    "29": "29", "30": "30", "31": "31", "32": "32", "33": "33", "34": "34", "35": "35", "36": "36", "37": "37", "38": "38",
+    "39": "39", "40": "40", "41": "41", "42": "42", "43": "43", "44": "44", "45": "45", "46": "46", "47": "47", "48": "48",
+    "49": "49", "50": "50", "51": "51", "52": "52", "53": "53", "54": "54", "55": "55", "56": "56", "57": "57", "58": "58",
+    "59": "59", "60": "60", "61": "61", "62": "62", "63": "63", "64": "64", "65": "65", "66": "66", "67": "67", "68": "68",
+    "69": "69", "70": "70", "71": "71", "72": "72", "73": "73", "74": "74", "75": "75", "76": "76", "77": "77", "78": "78",
+    "79": "79", "80": "80", "81": "81", "82": "82", "83": "83", "84": "84", "85": "85", "86": "86", "87": "87", "88": "88",
+    "89": "89", "90": "90", "91": "91", "92": "92", "93": "93", "94": "94", "95": "95", "96": "96", "97": "97", "98": "98",
+    "99": "99" }
+  level: { "-24": "00", "-30": "01", "-36": "02", "-42": "03", "-48": "04", "-54": "05", "-60": "06", "-66": "07", "-72": "08" }
+  auto_track_time: { 1min: "0001", 2min: "0002", 3min: "0003", 4min: "0004", 5min: "0005", 6min: "0006", 7min: "0007",
+    8min: "0008", 9min: "0009", 10min: "0010", 15min: "0015", 30min: "0030", 1h: "0100", 2h: "0200", 6h: "0600",
+    8h: "0800", 12h: "1200", 24h: "2400" }
+  time_skip: { "off": "0000", "1": "0100", "2": "0200", "3": "0300", "4": "0400", "5": "0500", "6": "0600", "7": "0700",
+    "8": "0800", "9": "0900", "10": "1000", "15": "1500", "20": "2000", "30": "3000", "40": "4000", "50": "5000",
+    "59": "5900", "60": "6000", "300": "0003", "600": "0006" }
+  search: { forward: "00", reverse: "01" }
+  jog: { "off": "00", "on": "01", forward: "10", reverse: "11" }
+  skip: { next_track: "00", previous_track: "01", next_mark: "20", previous_mark: "21", forward_time: "30", back_time: "31" }
+  auto_track: { "off": "00", level: "01", digital_direct: "02", time: "03", size: "04" }
+  play_mode: { continuous: "00", single: "01", program: "04", random: "06" }
+  remote_local: { remote: "00", local: "01" }
+  time: { elapsed: "00", remaining: "01", total_elapsed: "02", total_remaining: "03" }
+  power: { "on": "00", "off": "11", restart: "80" }
+  device: { sd1: "00", sd2: "01", usb: "10", cd: "11" }
+  play_area: { all: "00", folder: "01", playlist: "02" }
+  file_size: { 640mb: "4006", 1gb: "2410", 2gb: "4820" }
+  user_word: { "1": "10", "2": "11", "3": "12", "4": "13", "5": "14" }
+  file_name: { date_time: "00", user1: "10", user2: "11", user3: "12", user4: "13", user5: "14" }
+  input: { analog_balanced: "0000", analog_unbalanced: "0001", digital_xlr: "0100", digital_coaxial: "0101", dante: "0200" }
+  key_direction: { up: "0", down: "1" }
+  bool: { "true": "01", "false": "00" }
+
+commands:
+  stop:
+    summary: Stop, and leave input monitoring (10)
+    send: "010"
+    returns: none
+  play:
+    summary: Start playback, or start recording from record ready (12)
+    send: "012"
+    returns: none
+  record:
+    summary: Start recording (13, data 00)
+    send: "01300"
+    returns: none
+  record_pause:
+    summary: Enter record ready (13, data 01)
+    send: "01301"
+    returns: none
+  track_mark:
+    summary: Start a new track while recording (13, data 02)
+    send: "01302"
+    returns: none
+  input_monitor:
+    summary: Monitor the input with no media loaded (13, data 10)
+    send: "01310"
+    returns: none
+  pause:
+    summary: Enter playback standby, or record ready (14, data 01)
+    send: "01401"
+    returns: none
+  jog:
+    summary: Turn jog playback on or off, or step a frame forward or back (15)
+    params:
+      action: { type: enum, values: ["off", "on", forward, reverse], required: true, label: Jog, description: "off or on for jog playback; forward or reverse to step a frame." }
+    send: "015{action:map.jog}"
+    returns: none
+  shuttle:
+    summary: Shuttle forward or back until stopped, played or paused (16)
+    params:
+      direction: { type: enum, values: [forward, reverse], required: true, label: Direction, description: "forward or reverse." }
+    send: "016{direction:map.search}"
+    returns: none
+  flash_load:
+    summary: Enter Flash Load mode (17), answered when loaded
+    send: "017"
+    expect: { reply_contains: "097" }
+    returns: ack
+  eject:
+    summary: Eject the CD (18); ignored when the current device is not the CD
+    send: "018"
+    returns: none
+  skip:
+    summary: Skip to the next or previous track or mark, or by the time skip (1A)
+    params:
+      to: { type: enum, values: [next_track, previous_track, next_mark, previous_mark, forward_time, back_time], required: true, label: Skip to,
+        description: "next_track, previous_track (the start of the current track when more than a second into it), next_mark, previous_mark, or forward_time or back_time by the time skip setting." }
+    send: "01A{to:map.skip}"
+    returns: none
+  call:
+    summary: Locate the call point and enter playback standby (1D)
+    send: "01D"
+    returns: none
+  set_auto_cue_level:
+    summary: Set the auto cue level (20), then read it back
+    params:
+      level: &level { type: enum, values: ["-24", "-30", "-36", "-42", "-48", "-54", "-60", "-66", "-72"], required: true, label: Level, description: "The threshold in dB." }
+    send: ["020{level:map.level}", "020FF"]
+    returns: none
+  get_auto_cue_level:
+    summary: "Read the auto cue level (20 sense, answered A0): 00 (-24 dB) to 08 (-72 dB)"
+    send: "020FF"
+    expect: { reply_contains: "0A0", matches: "^0A0([0-9]{2})$" }
+    returns: value
+  set_auto_track_level:
+    summary: Set the auto track level (21), then read it back
+    params: { level: *level }
+    send: ["021{level:map.level}", "021FF"]
+    returns: none
+  get_auto_track_level:
+    summary: "Read the auto track level (21 sense, answered A1): 00 (-24 dB) to 08 (-72 dB)"
+    send: "021FF"
+    expect: { reply_contains: "0A1", matches: "^0A1([0-9]{2})$" }
+    returns: value
+  locate_track:
+    summary: Locate a track; from stop or playback it then plays, otherwise the state is kept (23)
+    params:
+      track: &track { type: int, min: 1, max: 999, required: true, label: Track, description: "The track's number, 1-999 (1-99 on an audio CD)." }
+    send: "023{track:map.num}"
+    returns: none
+  set_pitch:
+    summary: Set the playback pitch (25), then read it back; pitch control turns it on or off
+    params:
+      tenths: { type: int, min: -160, max: 160, required: true, label: Pitch, description: "The pitch in tenths of a percent, -160 to 160 (-16.0 % to +16.0 %)." }
+    send: ["025{tenths:map.pitch}", "025FF"]
+    returns: none
+  get_pitch:
+    summary: "Read the playback pitch (25 sense, answered A5: ones, tenths, sign, tens)"
+    send: "025FF"
+    expect: { reply_contains: "0A5", matches: "^0A5([0-9]{4})$" }
+    returns: value
+  set_auto_track_time:
+    summary: Set the time-mode auto track interval (26), then read it back
+    params:
+      interval: { type: enum, values: [1min, 2min, 3min, 4min, 5min, 6min, 7min, 8min, 9min, 10min, 15min, 30min, 1h, 2h, 6h, 8h, 12h, 24h], required: true,
+        label: Interval, description: "The length after which recording continues in a new track." }
+    send: ["026{interval:map.auto_track_time}", "026FF"]
+    returns: none
+  get_auto_track_time:
+    summary: "Read the time-mode auto track interval (26 sense, answered A6): HHMM"
+    send: "026FF"
+    expect: { reply_contains: "0A6", matches: "^0A6([0-9]{4})$" }
+    returns: value
+  set_clock:
+    summary: Set the recorder's date and time (27), then read it back
+    params:
+      year: { type: int, min: 2000, max: 2099, required: true, label: Year, description: "The year, 2000-2099; the recorder keeps its last two digits." }
+      month: { type: int, min: 1, max: 12, required: true, label: Month, description: "The month, 1-12." }
+      day: { type: int, min: 1, max: 31, required: true, label: Day, description: "The day of the month, 1-31; a date that does not exist is refused." }
+      hours: { type: int, min: 0, max: 23, required: true, label: Hours, description: "Hours, 0-23." }
+      minutes: { type: int, min: 0, max: 59, required: true, label: Minutes, description: "Minutes, 0-59." }
+    send: ["027{year:-2000:02d}{month:02d}{day:02d}{hours:02d}{minutes:02d}", "027FF"]
+    returns: none
+  get_clock:
+    summary: "Read the recorder's date and time (27 sense, answered A7): YYMMDDhhmm"
+    send: "027FF"
+    expect: { reply_contains: "0A7", matches: "^0A7([0-9]{10,12})$" }
+    returns: value
+  set_sync_rec_level:
+    summary: Set the sync recording level (28), then read it back
+    params: { level: *level }
+    send: ["028{level:map.level}", "028FF"]
+    returns: none
+  get_sync_rec_level:
+    summary: "Read the sync recording level (28 sense, answered A8): 00 (-24 dB) to 08 (-72 dB)"
+    send: "028FF"
+    expect: { reply_contains: "0A8", matches: "^0A8([0-9]{2})$" }
+    returns: value
+  set_cd_text:
+    summary: Set a CD-TEXT title, of the disc or of a track (29), then read it back
+    params:
+      track: { type: int, min: 0, max: 99, required: true, label: Track, description: "The track whose title to set, 1-99, or 0 for the disc's title." }
+      title: { type: string, max_length: 80, pattern: "^[ -~]*$", required: true, label: Title, description: "The title, up to 80 ASCII characters." }
+    send: ["029{track:02d}00{title}", "059{track:02d}00"]
+    returns: none
+  locate_time:
+    summary: Locate a time in a track; from stop or playback it then plays, otherwise the state is kept (2C)
+    params:
+      track: *track
+      minutes: { type: int, min: 0, max: 999, required: true, label: Minutes, description: "Minutes into the track, 0-999." }
+      seconds: { type: int, min: 0, max: 59, required: true, label: Seconds, description: "Seconds, 0-59." }
+      hundredths: { type: int, min: 0, max: 99, default: 0, label: Hundredths, description: "Hundredths of a second, 0-99." }
+    send: "02C{track:map.num}{minutes:map.num}{seconds:02d}{hundredths:02d}"
+    returns: none
+  set_key:
+    summary: Set the playback key (2D), then read it back; key control turns it on or off
+    params:
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "up or down." }
+      semitones: { type: int, min: 0, max: 6, required: true, label: Semitones, description: "Semitones, 0-6." }
+    send: ["02D{direction:map.key_direction}{semitones}", "02DFF"]
+    returns: none
+  get_key:
+    summary: "Read the playback key (2D sense, answered AD): 0 up or 1 down, then the semitones"
+    send: "02DFF"
+    expect: { reply_contains: "0AD", matches: "^0AD([01][0-6])$" }
+    returns: value
+  set_auto_cue:
+    summary: Turn auto cue on or off (30), then read it back
+    params: { enabled: &enabled { type: bool, required: true, label: Enabled, description: "On turns the function on, off turns it off." } }
+    send: ["030{enabled:map.bool}", "030FF"]
+    returns: none
+  get_auto_cue:
+    summary: "Read auto cue (30 sense, answered B0): 00 off, 01 on"
+    send: "030FF"
+    expect: { reply_contains: "0B0", matches: "^0B0([0-9]{2})$" }
+    returns: value
+  set_auto_track:
+    summary: Set the auto track mode (31), then read it back
+    params:
+      mode: { type: enum, values: ["off", level, digital_direct, time, size], required: true, label: Auto track,
+        description: "off, or a new track by input level, by the digital source's track markers (digital_direct), by time or by file size." }
+    send: ["031{mode:map.auto_track}", "031FF"]
+    returns: none
+  get_auto_track:
+    summary: "Read the auto track mode (31 sense, answered B1): 00 off, 01 level, 02 digital direct, 03 time, 04 size"
+    send: "031FF"
+    expect: { reply_contains: "0B1", matches: "^0B1([0-9]{2})$" }
+    returns: value
+  set_eom_track_time:
+    summary: Set the end-of-track warning (32), then read it back
+    params:
+      seconds: { type: int, min: -1, max: 99, required: true, label: Warning, description: "Seconds before a track's end to warn, 0-99, or -1 to turn the warning off." }
+    send: ["032{seconds:map.eom_track}", "032FF"]
+    returns: none
+  get_eom_track_time:
+    summary: "Read the end-of-track warning (32 sense, answered B2): 00 off, A0 at 0 s, otherwise the seconds"
+    send: "032FF"
+    expect: { reply_contains: "0B2", matches: "^0B2([0-9A]{2})$" }
+    returns: value
+  set_eom_media_time:
+    summary: Set the end-of-media warning (33), then read it back
+    params:
+      seconds: { type: int, min: 0, max: 99, required: true, label: Warning, description: "Seconds before the media's end to warn, 1-99, or 0 to turn the warning off." }
+    send: ["033{seconds:02d}", "033FF"]
+    returns: none
+  get_eom_media_time:
+    summary: "Read the end-of-media warning (33 sense, answered B3): 00 off, otherwise the seconds"
+    send: "033FF"
+    expect: { reply_contains: "0B3", matches: "^0B3([0-9]{2})$" }
+    returns: value
+  set_pitch_control:
+    summary: Turn pitch control on or off (35), then read it back
+    params: { enabled: *enabled }
+    send: ["035{enabled:map.bool}", "035FF"]
+    returns: none
+  get_pitch_control:
+    summary: "Read pitch control (35 sense, answered B5): 00 off, 01 on"
+    send: "035FF"
+    expect: { reply_contains: "0B5", matches: "^0B5([0-9]{2})$" }
+    returns: value
+  set_auto_ready:
+    summary: Turn auto ready on or off (36), then read it back
+    params: { enabled: *enabled }
+    send: ["036{enabled:map.bool}", "036FF"]
+    returns: none
+  get_auto_ready:
+    summary: "Read auto ready (36 sense, answered B6): 00 off, 01 on"
+    send: "036FF"
+    expect: { reply_contains: "0B6", matches: "^0B6([0-9]{2})$" }
+    returns: value
+  set_repeat:
+    summary: Turn repeat on or off (37), then read it back
+    params: { enabled: *enabled }
+    send: ["037{enabled:map.bool}", "037FF"]
+    returns: none
+  get_repeat:
+    summary: "Read repeat (37 sense, answered B7): 00 off, 01 on"
+    send: "037FF"
+    expect: { reply_contains: "0B7", matches: "^0B7([0-9]{2})$" }
+    returns: value
+  set_sync_rec:
+    summary: Turn sync recording on or off (38), then read it back
+    params: { enabled: *enabled }
+    send: ["038{enabled:map.bool}", "038FF"]
+    returns: none
+  get_sync_rec:
+    summary: "Read sync recording (38 sense, answered B8): 00 off, 01 on"
+    send: "038FF"
+    expect: { reply_contains: "0B8", matches: "^0B8([0-9]{2})$" }
+    returns: value
+  set_incremental_play:
+    summary: Turn incremental playback on or off (3A), then read it back
+    params: { enabled: *enabled }
+    send: ["03A{enabled:map.bool}", "03AFF"]
+    returns: none
+  get_incremental_play:
+    summary: "Read incremental playback (3A sense, answered BA): 00 off, 01 on"
+    send: "03AFF"
+    expect: { reply_contains: "0BA", matches: "^0BA([0-9]{2})$" }
+    returns: value
+  set_key_control:
+    summary: Turn key control on or off (3D), then read it back
+    params: { enabled: *enabled }
+    send: ["03D{enabled:map.bool}", "03DFF"]
+    returns: none
+  get_key_control:
+    summary: "Read key control (3D sense, answered BD): 00 off, 01 on"
+    send: "03DFF"
+    expect: { reply_contains: "0BD", matches: "^0BD([0-9]{2})$" }
+    returns: value
+  set_remote_local:
+    summary: Allow the recorder's own keys (local) or only remote control (remote) (4C), then read it back
+    params:
+      mode: { type: enum, values: [remote, local], required: true, label: Control, description: "remote disables the recorder's own keys; local allows them beside remote control." }
+    send: ["04C{mode:map.remote_local}", "04CFF"]
+    returns: none
+  get_remote_local:
+    summary: "Read whether the recorder's keys are enabled (4C sense, answered CC): 00 remote only, 01 local"
+    send: "04CFF"
+    expect: { reply_contains: "0CC", matches: "^0CC([0-9]{2})$" }
+    returns: value
+  set_play_mode:
+    summary: Set the play mode (4D), then read it back
+    params:
+      mode: { type: enum, values: [continuous, single, program, random], required: true, label: Play mode, description: "continuous, single (one track), program or random playback." }
+    send: ["04D{mode:map.play_mode}", "04E"]
+    returns: none
+  get_play_mode:
+    summary: "Read the play mode (4E, answered CE): 00 continuous, 01 single, 04 program (empty), 05 program, 06 random"
+    send: "04E"
+    expect: { reply_contains: "0CE", matches: "^0CE([0-9]{2})$" }
+    returns: value
+  get_status:
+    summary: "Read the transport (50, answered D0): 00 no media, 01 ejecting, 10 stop, 11 play, 12 pause, 28 cue, 29 review, 80 monitor, 81 record, 82 record pause, 83 writing, FF other"
+    send: "050"
+    expect: { reply_contains: "0D0", matches: "^0D0([0-9A-F]{2})$" }
+    returns: value
+  get_device_status:
+    summary: "Read the status of one of the recorder's devices (51, answered D1: the device, then its status as D0's)"
+    params:
+      device: &device { type: enum, values: [sd1, sd2, usb, cd], required: true, label: Device, description: "sd1, sd2, usb or cd (SS-CDR250N)." }
+    send: "051{device:map.device}"
+    expect: { reply_contains: "0D1{device:map.device}", matches: "^0D1[0-9]{2}([0-9A-F]{2})$" }
+    returns: value
+  get_track_number:
+    summary: "Read the current track (55, answered D5): the EOM status, then the track's four digits"
+    send: "055"
+    expect: { reply_contains: "0D5", matches: "^0D5([0-9]{6})$" }
+    returns: value
+  get_media_status:
+    summary: "Read whether a CD is loaded and its type (56, answered D6)"
+    send: "056"
+    expect: { reply_contains: "0D6", matches: "^0D6([0-9]{4})$" }
+    returns: value
+  get_track_info:
+    summary: "Read the current track's (or program step's) number and length (57, answered D7)"
+    send: "057"
+    expect: { reply_contains: "0D7", matches: "^0D7([0-9]{12})$" }
+    returns: value
+  get_time:
+    summary: "Read a time of the current track or the media (58, answered D8: the kind, minutes, seconds, frames)"
+    params:
+      kind: { type: enum, values: [elapsed, remaining, total_elapsed, total_remaining], required: true, label: Time,
+        description: "elapsed or remaining in the track, or total_elapsed or total_remaining on the media." }
+    send: "058{kind:map.time}"
+    expect: { reply_contains: "0D8{kind:map.time}", matches: "^0D8[0-9]{2}([0-9]{8})$" }
+    returns: value
+  get_name:
+    summary: "Read a track's name, or with 0 the CD-TEXT disc title (59, answered D9)"
+    params:
+      track: { type: int, min: 0, max: 999, required: true, label: Track, description: "The track, 1-999, or 0 for the disc title (CD-TEXT)." }
+    send: "059{track:map.num}"
+    expect: { reply_contains: "0D9{track:map.num}", matches: "^0D9[0-9]{4}(.*)$" }
+    returns: value
+  get_totals:
+    summary: "Read the number of tracks and the media's total time (5D, answered DD)"
+    send: "05D"
+    expect: { reply_contains: "0DD", matches: "^0DD([0-9]{12})$" }
+    returns: value
+  get_program_totals:
+    summary: "Read the number of programmed tracks and their total time (5E, answered DE)"
+    send: "05E"
+    expect: { reply_contains: "0DE", matches: "^0DE([0-9]{12})$" }
+    returns: value
+  get_keyboard_type:
+    summary: "Read the USB keyboard layout (5F, answered DF): 00 Japanese, 01 US"
+    send: "05F"
+    expect: { reply_contains: "0DF", matches: "^0DF([0-9]{2})$" }
+    returns: value
+  power:
+    summary: Turn the recorder on or to standby, or restart it (75); turning on needs REMOTE POWER CONTROL on
+    params:
+      action: { type: enum, values: ["on", "off", restart], required: true, label: Power, description: "on from standby, off to standby, or restart (only when stopped)." }
+    send: "075{action:map.power}"
+    expect: { reply_contains: "0F5" }
+    returns: ack
+  get_error:
+    summary: "Read the last error (78, answered F8): the code N1-N2N3 as four characters N2 N3 0 N1"
+    send: "078"
+    expect: { reply_contains: "0F8", matches: "^0F8([0-9A-F]{4})$" }
+    returns: value
+  get_caution:
+    summary: "Read the last caution (79, answered F9): the code N1-N2N3 as four characters N2 N3 0 N1"
+    send: "079"
+    expect: { reply_contains: "0F9", matches: "^0F9([0-9A-F]{4})$" }
+    returns: value
+  get_information:
+    summary: "Read the software version (0F, answered 8F): four digits, 0123 being 1.23"
+    send: "00F"
+    expect: { reply_contains: "08F", matches: "^08F([0-9]{4})$" }
+    returns: value
+  select_device:
+    summary: Make SD1, SD2, USB or the CD the current device (7F 01), then read it back
+    params: { device: *device }
+    send: ["07F01{device:map.device}", "07F01FF"]
+    returns: none
+  get_device:
+    summary: "Read the current device (7F 01 sense, answered FF 01): 00 SD1, 01 SD2, 10 USB, 11 CD"
+    send: "07F01FF"
+    expect: { reply_contains: "0FF01", matches: "^0FF01([0-9]{2})$" }
+    returns: value
+  divide:
+    summary: Divide the file in playback standby at its position into two (7F 02)
+    send: "07F02"
+    returns: none
+  delete:
+    summary: Delete the current track's file (7F 03); only when stopped
+    send: "07F03"
+    returns: none
+  set_time_skip:
+    summary: Set the time skip's step (7F 07 01), then read it back
+    params:
+      step: { type: enum, values: ["off", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "15", "20", "30", "40", "50", "59", "60", "300", "600"],
+        required: true, label: Time skip, description: "Seconds the time skip moves, or off." }
+    send: ["07F0701{step:map.time_skip}", "07F0702"]
+    returns: none
+  get_time_skip:
+    summary: "Read the time skip's step (7F 07 02, answered FF 07 02: four digits, seconds)"
+    send: "07F0702"
+    expect: { reply_contains: "0FF0702", matches: "^0FF0702([0-9]{4})$" }
+    returns: value
+  set_play_area:
+    summary: Play every file, the current folder's or the playlist (7F 07 4F), then read it back
+    params:
+      area: { type: enum, values: [all, folder, playlist], required: true, label: Play area, description: "all files on the media, the folder of the current file, or the playlist." }
+    send: ["07F074F{area:map.play_area}", "07F074FFF"]
+    returns: none
+  get_play_area:
+    summary: "Read the play area (7F 07 4F sense, answered FF 07 CF): 00 all, 01 folder, 02 playlist"
+    send: "07F074FFF"
+    expect: { reply_contains: "0FF07CF", matches: "^0FF07CF([0-9]{2})$" }
+    returns: value
+  set_auto_track_size:
+    summary: Set the size-mode auto track size (7F 08 23), then read it back
+    params:
+      size: { type: enum, values: [640mb, 1gb, 2gb], required: true, label: Size, description: "640 MB, 1 GB (1024 MB) or 2 GB (2048 MB)." }
+    send: ["07F082300{size:map.file_size}", "07F0823FF"]
+    returns: none
+  get_auto_track_size:
+    summary: "Read the auto track size (7F 08 23 sense, answered FF 08 A3: 00 and the megabytes as four digits)"
+    send: "07F0823FF"
+    expect: { reply_contains: "0FF08A3", matches: "^0FF08A3([0-9]{6})$" }
+    returns: value
+  set_user_word:
+    summary: Set one of the five user words file names can use (7F 08 2A), then read it back
+    params:
+      slot: &user { type: int, min: 1, max: 5, required: true, label: User word, description: "USER01 to USER05." }
+      word: { type: string, max_length: 12, pattern: "^[ -~]+$", required: true, label: Word, description: "The word, ASCII: up to 8 characters for USER01-03, 12 for USER04-05." }
+    send: ["07F082A{slot:map.user_word}{word}", "07F085A{slot:map.user_word}"]
+    returns: none
+  get_user_word:
+    summary: "Read a user word (7F 08 5A, answered FF 08 DA: the word's number, then the word)"
+    params: { slot: *user }
+    send: "07F085A{slot:map.user_word}"
+    expect: { reply_contains: "0FF08DA{slot:map.user_word}", matches: "^0FF08DA[0-9]{2}(.*)$" }
+    returns: value
+  set_file_name_mode:
+    summary: Name recorded files by date and time or by a user word (7F 08 60), then read it back
+    params:
+      mode: { type: enum, values: [date_time, user1, user2, user3, user4, user5], required: true, label: File names, description: "date_time, or the user word USER01-05." }
+    send: ["07F0860{mode:map.file_name}", "07F0860FF"]
+    returns: none
+  get_file_name_mode:
+    summary: "Read how files are named (7F 08 60 sense, answered FF 08 E0): 00 date and time, 10-14 USER01-05"
+    send: "07F0860FF"
+    expect: { reply_contains: "0FF08E0", matches: "^0FF08E0([0-9]{2})$" }
+    returns: value
+  get_recordable_time:
+    summary: "Read the current media's recordable time (7F 10 10, answered FF 10 90: minutes, seconds, hundredths)"
+    send: "07F1010"
+    expect: { reply_contains: "0FF1090", matches: "^0FF1090([0-9-]{8})$" }
+    returns: value
+  format_media:
+    summary: Format the current media (7F 10 44), erasing everything on it; answered when it starts, and again with its result
+    params:
+      full: { type: bool, default: false, label: Full format, description: "On runs a full format; off a quick format." }
+    send: "07F10440{full:bool01}"
+    expect: { reply_contains: "0FF10C4", matches: "^0FF10C4(?:[0-9]{2})?(00)$" }
+    returns: ack
+  set_input:
+    summary: Select the recording input (7F 12 10), then read it back
+    params:
+      input: { type: enum, values: [analog_balanced, analog_unbalanced, digital_xlr, digital_coaxial, dante], required: true, label: Input,
+        description: "analog_balanced (MIC/LINE XLR), analog_unbalanced (RCA), digital_xlr (AES/EBU), digital_coaxial (S/PDIF) or dante (with an IF-DA2 card)." }
+    send: ["07F121000{input:map.input}", "07F121000FF"]
+    returns: none
+  get_input:
+    summary: "Read the recording input (7F 12 10 sense, answered FF 12 90: 00, then 0000 balanced, 0001 unbalanced, 0100 AES/EBU, 0101 S/PDIF, 0200 Dante)"
+    send: "07F121000FF"
+    expect: { reply_contains: "0FF1290", matches: "^0FF129000([0-9]{4})$" }
+    returns: value
+  rename_file:
+    summary: Rename a file of the current device (7F 42 00); answered when it starts, and again with its result
+    params:
+      file: &file { type: int, min: 1, max: 999, required: true, label: File, description: "The file's number, 1-999." }
+      name: { type: string, max_length: 117, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Name, description: "The new name, up to 117 bytes of UTF-8." }
+    send: "07F4200{file:map.num}{name}"
+    expect: { reply_contains: "0FF4280", matches: "^0FF4280(00)$" }
+    returns: ack
+  select_folder:
+    summary: Make a folder under the root the current one (7F 4A 23)
+    params:
+      folder: &folder { type: int, min: 1, max: 999, required: true, label: Folder, description: "The folder's number under the root, 1-999." }
+    send: "07F4A23{folder:map.num}"
+    returns: none
+  create_folder:
+    summary: Create a folder under the root (7F 4A 40); answered when it starts, and again with its result and number
+    params:
+      name: &foldername { type: string, max_length: 117, pattern: "^[^\\x00-\\x1F]+$", required: true, label: Name, description: "The folder's name, up to 117 bytes of UTF-8." }
+    send: "07F4A40{name}"
+    expect: { reply_contains: "0FF4AC0", matches: "^0FF4AC0(00)$" }
+    returns: ack
+  rename_folder:
+    summary: Rename a folder under the root (7F 4A 42); answered when it starts, and again with its result
+    params: { folder: *folder, name: *foldername }
+    send: "07F4A42{folder:map.num}{name}"
+    expect: { reply_contains: "0FF4AC2", matches: "^0FF4AC2(00)$" }
+    returns: ack
+  get_folder_number:
+    summary: "Read the current folder (7F 4A 55, answered FF 4A D5)"
+    send: "07F4A55"
+    expect: { reply_contains: "0FF4AD5", matches: "^0FF4AD5([0-9]{4})$" }
+    returns: value
+  find_folder:
+    summary: "Find a folder under the root by name (7F 4A 56, answered FF 4A D6 with its number)"
+    params: { name: *foldername }
+    send: "07F4A56{name}"
+    expect: { reply_contains: "0FF4AD6", matches: "^0FF4AD6([0-9]{4})$" }
+    returns: value
+  get_folder_name:
+    summary: "Read a folder's name (7F 4A 59, answered FF 4A D9)"
+    params: { folder: *folder }
+    send: "07F4A59{folder:map.num}"
+    expect: { reply_contains: "0FF4AD9{folder:map.num}", matches: "^0FF4AD9[0-9]{4}(.*)$" }
+    returns: value
+  get_file_name:
+    summary: "Read a file's name (7F 4A 5A, answered FF 4A DA)"
+    params: { file: *file }
+    send: "07F4A5A{file:map.num}"
+    expect: { reply_contains: "0FF4ADA{file:map.num}", matches: "^0FF4ADA[0-9]{4}(.*)$" }
+    returns: value
+  get_folder_count:
+    summary: "Read the first and last folder numbers and the number of folders under the root (7F 4A 5D, answered FF 4A DD)"
+    send: "07F4A5D"
+    expect: { reply_contains: "0FF4ADD", matches: "^0FF4ADD([0-9]{12})$" }
+    returns: value
+  get_file_count:
+    summary: "Read a folder's first and last file numbers and number of files (7F 4A 5E, answered FF 4A DE)"
+    params:
+      folder: { type: int, min: 0, max: 999, required: true, label: Folder, description: "The folder's number under the root, 1-999, or 0 for the root." }
+    send: "07F4A5E{folder:map.num}"
+    expect: { reply_contains: "0FF4ADE{folder:map.num}", matches: "^0FF4ADE[0-9]{4}([0-9]{12})$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      delete removes the current track's file and format_media erases the current media; neither can be undone.
+      record, play from record ready and track_mark start or split a recording at once; stop ends it.
+  - models: [all]
+    severity: warning
+    text: >
+      Transport and preset commands are not acknowledged (the commands report unverified): a set is followed by
+      its sense, whose answer updates state, and a command the recorder refuses is answered ILLEGAL (F2), which
+      sets last_illegal in state. With 232C/PARA/NETWORK locked on the LOCK SETUP screen the recorder refuses
+      Telnet connections and ignores RS-232C.
+  - models: [ss-r250n, ss-r300n]
+    severity: info
+    text: >
+      These models have no CD drive: eject, CD-TEXT and the CD media status are not available, the device
+      cd and the specified device status are refused (ILLEGAL).
+  - models: [all]
+    severity: info
+    text: >
+      Track, file and folder numbers, and minutes, travel as four digits in the order tens, ones, thousands,
+      hundreds; the commands take plain numbers, minutes up to 999. The network password is the model's name
+      by default; TEAC documents no answer to a wrong one.
+
+state:
+  transport.status: { type: string, description: "The transport: no_media, ejecting, stop, play, pause, cue (searching forward), review (searching back), monitor, record, record_pause, writing or other (D0)" }
+  track.number: { type: int, description: "The current track, numbered from 1; 0 with none (D5)" }
+  track.eom: { type: bool, description: "True while the end-of-track warning shows (D5)" }
+  track.length: { type: string, description: "The current track's (or program step's) length, MMMM:SS:FF (D7)" }
+  tracks.total: { type: int, description: "Tracks on the media (DD)" }
+  tracks.total_time: { type: string, description: "The media's total time, MMMM:SS:FF (DD)" }
+  tracks.*.name: { type: string, description: "A track's name (D9), keyed by its number; 0 is the CD-TEXT disc title" }
+  program.total: { type: int, description: "Programmed tracks (DE)" }
+  program.total_time: { type: string, description: "Their total time, MMMM:SS:FF (DE; not given for MP3 or WAV)" }
+  time.elapsed: { type: string, description: "Elapsed time in the track, MMMM:SS:FF (D8 00)" }
+  time.remaining: { type: string, description: "Remaining time in the track, MMMM:SS:FF (D8 01)" }
+  time.total_elapsed: { type: string, description: "Elapsed time on the media, MMMM:SS:FF (D8 02)" }
+  time.total_remaining: { type: string, description: "Remaining time on the media, MMMM:SS:FF (D8 03)" }
+  devices.*.status: { type: string, description: "The transport of sd1, sd2, usb or cd, as transport.status (D1)" }
+  device: { type: string, description: "The current device: sd1, sd2, usb or cd (FF01)" }
+  cd.loaded: { type: bool, description: "Whether a CD is loaded (D6)" }
+  cd.type: { type: string, description: "cd_da, cd_r_audio, cd_rw_audio, cd_rom, cd_r_data or cd_rw_data (D6)" }
+  clock: { type: string, description: "The recorder's date and time, YYYY-MM-DDThh:mm (A7)" }
+  auto_cue.enabled: { type: bool, description: "Auto cue on (B0)" }
+  auto_cue.level: { type: int, unit: dB, description: "Auto cue level, -24 to -72 (A0)" }
+  auto_track.mode: { type: string, description: "off, level, digital_direct, time or size (B1)" }
+  auto_track.level: { type: int, unit: dB, description: "Auto track level, -24 to -72 (A1)" }
+  auto_track.time: { type: string, description: "The time-mode interval, HH:MM (A6)" }
+  auto_track.size_mb: { type: int, unit: MB, description: "The size-mode file size (FF08A3)" }
+  sync_rec.enabled: { type: bool, description: "Sync recording on (B8)" }
+  sync_rec.level: { type: int, unit: dB, description: "Sync recording level, -24 to -72 (A8)" }
+  pitch.enabled: { type: bool, description: "Pitch control on (B5)" }
+  pitch.percent: { type: float, unit: "%", description: "Playback pitch, -16.0 to 16.0 (A5)" }
+  key.enabled: { type: bool, description: "Key control on (BD)" }
+  key.semitones: { type: int, description: "Playback key in semitones, -6 to 6 (AD)" }
+  eom.track_seconds: { type: int, unit: s, description: "End-of-track warning in seconds; -1 when off (B2)" }
+  eom.media_seconds: { type: int, unit: s, description: "End-of-media warning in seconds; 0 when off (B3)" }
+  auto_ready: { type: bool, description: "Auto ready on (B6)" }
+  repeat: { type: bool, description: "Repeat on (B7)" }
+  incremental_play: { type: bool, description: "Incremental playback on (BA)" }
+  remote_local: { type: string, description: "remote (the recorder's keys disabled) or local (CC)" }
+  play_mode: { type: string, description: "continuous, single, program_empty, program or random (CE)" }
+  keyboard: { type: string, description: "The USB keyboard layout: japanese or us (DF)" }
+  version: { type: string, description: "The software version, such as 1.23 (8F)" }
+  powered_on: { type: bool, description: "Set when the recorder reports it has powered on (F4)" }
+  error.code: { type: string, description: "The last error as N1-N2N3; 0-00 for none (F8)" }
+  caution.code: { type: string, description: "The last caution as N1-N2N3; 0-00 for none (F9)" }
+  last_illegal: { type: bool, description: "True once the recorder has answered a command ILLEGAL (F2)" }
+  time_skip_seconds: { type: int, unit: s, description: "The time skip's step; 0 when off (FF0702)" }
+  play_area: { type: string, description: "all, folder or playlist (FF07CF)" }
+  user_words.*: { type: string, description: "User words USER01-05 (FF08DA), keyed 1-5" }
+  file_name_mode: { type: string, description: "date_time or user1-user5 (FF08E0)" }
+  recordable_time: { type: string, description: "The current media's recordable time, MMMM:SS.hh, or ---- while it changes state (FF1090)" }
+  input: { type: string, description: "analog_balanced, analog_unbalanced, digital_xlr, digital_coaxial or dante (FF1290)" }
+  folder.number: { type: int, description: "The current folder (FF4AD5)" }
+  folders.first: { type: int, description: "The first folder's number under the root (FF4ADD)" }
+  folders.last: { type: int, description: "The last folder's number (FF4ADD)" }
+  folders.total: { type: int, description: "Folders under the root (FF4ADD)" }
+  folders.*.name: { type: string, description: "A folder's name (FF4AD9), keyed by its number" }
+  files.*.name: { type: string, description: "A file's name (FF4ADA), keyed by its number" }
+  operations.*: { type: string, description: "The state of the last long operation of each kind (format_media, rename_file, create_folder, rename_folder): started, ok or failed" }
+
+telemetry:
+  poll:
+    - every_ms: 1000
+      send: ["050", "05800"]
+    - every_ms: 5000
+      send: ["055", "05801", "05802", "05803", "05D", "07F1010"]
+    - every_ms: 30000
+      send: ["00F", "020FF", "021FF", "025FF", "026FF", "027FF", "028FF", "02DFF", "030FF", "031FF", "032FF", "033FF",
+        "035FF", "036FF", "037FF", "038FF", "03AFF", "03DFF", "04CFF", "04E", "05E", "05F", "078", "079", "07F01FF",
+        "07F0702", "07F074FFF", "07F0823FF", "07F085A10", "07F085A11", "07F085A12", "07F085A13", "07F085A14",
+        "07F0860FF", "07F121000FF", "07F4A55", "07F4A5D"]
+  updates:
+    - match: "^0F600$"
+      then_send: ["050"]
+    - match: "^0F603$"
+      then_send: ["055", "05D"]
+    - match: "^0F0$"
+      then_send: ["078"]
+    - match: "^0F1$"
+      then_send: ["079"]
+    - match: "^0F2$"
+      state: { last_illegal: "true" }
+    - match: "^0F4$"
+      state: { powered_on: "true" }
+    - match: "^0D0([0-9A-F]{2})$"
+      state:
+        transport.status: { value: "{1}", map: { "00": no_media, "01": ejecting, "10": stop, "11": play, "12": pause, "28": cue,
+          "29": review, "80": monitor, "81": record, "82": record_pause, "83": writing, FF: other } }
+    - match: "^0D100([0-9A-F]{2})$"
+      state: { devices.sd1.status: { value: "{1}", map: { "00": no_media, "01": ejecting, "10": stop, "11": play, "12": pause, "28": cue, "29": review, "80": monitor, "81": record, "82": record_pause, "83": writing, FF: other } } }
+    - match: "^0D101([0-9A-F]{2})$"
+      state: { devices.sd2.status: { value: "{1}", map: { "00": no_media, "01": ejecting, "10": stop, "11": play, "12": pause, "28": cue, "29": review, "80": monitor, "81": record, "82": record_pause, "83": writing, FF: other } } }
+    - match: "^0D110([0-9A-F]{2})$"
+      state: { devices.usb.status: { value: "{1}", map: { "00": no_media, "01": ejecting, "10": stop, "11": play, "12": pause, "28": cue, "29": review, "80": monitor, "81": record, "82": record_pause, "83": writing, FF: other } } }
+    - match: "^0D111([0-9A-F]{2})$"
+      state: { devices.cd.status: { value: "{1}", map: { "00": no_media, "01": ejecting, "10": stop, "11": play, "12": pause, "28": cue, "29": review, "80": monitor, "81": record, "82": record_pause, "83": writing, FF: other } } }
+    # The track's digits: tens, ones, thousands, hundreds.
+    - match: "^0D5([0-9]{2})([0-9])([0-9])([0-9])([0-9])$"
+      state:
+        track.number: "{4}{5}{2}{3}"
+        track.eom: { value: "{1}", map: { "00": false, "01": true } }
+      then_send: ["059{2}{3}{4}{5}"]
+    - match: "^0D601([0-9]{2})$"
+      state:
+        cd.loaded: "true"
+        cd.type: { value: "{1}", map: { "00": cd_da, "01": cd_r_audio, "02": cd_rw_audio, "10": cd_rom, "11": cd_r_data, "12": cd_rw_data } }
+    - match: "^0D600[0-9]{2}$"
+      state: { cd.loaded: "false" }
+    # Times: minutes (tens, ones, thousands, hundreds), seconds, frames.
+    - match: "^0D7[0-9]{4}([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { track.length: "{3}{4}{1}{2}:{5:02d}:{6:02d}" }
+    - match: "^0D800([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { time.elapsed: "{3}{4}{1}{2}:{5:02d}:{6:02d}" }
+    - match: "^0D801([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { time.remaining: "{3}{4}{1}{2}:{5:02d}:{6:02d}" }
+    - match: "^0D802([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { time.total_elapsed: "{3}{4}{1}{2}:{5:02d}:{6:02d}" }
+    - match: "^0D803([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { time.total_remaining: "{3}{4}{1}{2}:{5:02d}:{6:02d}" }
+    - match: "^0D9([0-9]{2})00(.*)$"
+      state: { "tracks.{1}.name": "{2}" }
+    - match: "^0D9([0-9])([0-9])0([1-9])(.*)$"
+      state: { "tracks.{3}{1}{2}.name": "{4}" }
+    - match: "^0DD([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { tracks.total: "{3}{4}{1}{2}", tracks.total_time: "{7}{8}{5}{6}:{9:02d}:{10:02d}" }
+    - match: "^0DE([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { program.total: "{3}{4}{1}{2}", program.total_time: "{7}{8}{5}{6}:{9:02d}:{10:02d}" }
+    - match: "^0A0(0[0-8])$"
+      state: { auto_cue.level: { value: "{1}", map: &levels { "00": -24, "01": -30, "02": -36, "03": -42, "04": -48, "05": -54, "06": -60, "07": -66, "08": -72 } } }
+    - match: "^0A1(0[0-8])$"
+      state: { auto_track.level: { value: "{1}", map: *levels } }
+    - match: "^0A8(0[0-8])$"
+      state: { sync_rec.level: { value: "{1}", map: *levels } }
+    # Pitch: ones, tenths, the sign (0 up, 1 down), tens.
+    - match: "^0A5([0-9])([0-9])0([0-9])$"
+      state: { pitch.percent: "{3}{1}.{2}" }
+    - match: "^0A5([0-9])([0-9])1([0-9])$"
+      state: { pitch.percent: "-{3}{1}.{2}" }
+    - match: "^0A6([0-9]{2})([0-9]{2})$"
+      state: { auto_track.time: "{1:02d}:{2:02d}" }
+    - match: "^0A7([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})(?:[0-9]{2})?$"
+      state: { clock: "20{1:02d}-{2:02d}-{3:02d}T{4:02d}:{5:02d}" }
+    - match: "^0AD0([0-6])$"
+      state: { key.semitones: "{1}" }
+    - match: "^0AD1([0-6])$"
+      state: { key.semitones: "-{1}" }
+    - match: "^0B0([0-9]{2})$"
+      state: { auto_cue.enabled: { value: "{1}", map: &onoff { "00": false, "01": true } } }
+    - match: "^0B1([0-9]{2})$"
+      state: { auto_track.mode: { value: "{1}", map: { "00": "off", "01": level, "02": digital_direct, "03": time, "04": size } } }
+    - match: "^0B200$"
+      state: { eom.track_seconds: "-1" }
+    - match: "^0B2A0$"
+      state: { eom.track_seconds: "0" }
+    - match: "^0B2(0[1-9]|[1-9][0-9])$"
+      state: { eom.track_seconds: "{1}" }
+    - match: "^0B3([0-9]{2})$"
+      state: { eom.media_seconds: "{1}" }
+    - match: "^0B5([0-9]{2})$"
+      state: { pitch.enabled: { value: "{1}", map: *onoff } }
+    - match: "^0B6([0-9]{2})$"
+      state: { auto_ready: { value: "{1}", map: *onoff } }
+    - match: "^0B7([0-9]{2})$"
+      state: { repeat: { value: "{1}", map: *onoff } }
+    - match: "^0B8([0-9]{2})$"
+      state: { sync_rec.enabled: { value: "{1}", map: *onoff } }
+    - match: "^0BA([0-9]{2})$"
+      state: { incremental_play: { value: "{1}", map: *onoff } }
+    - match: "^0BD([0-9]{2})$"
+      state: { key.enabled: { value: "{1}", map: *onoff } }
+    - match: "^0CC([0-9]{2})$"
+      state: { remote_local: { value: "{1}", map: { "00": remote, "01": local } } }
+    - match: "^0CE([0-9]{2})$"
+      state: { play_mode: { value: "{1}", map: { "00": continuous, "01": single, "04": program_empty, "05": program, "06": random } } }
+    - match: "^0DF([0-9]{2})$"
+      state: { keyboard: { value: "{1}", map: { "00": japanese, "01": us } } }
+    - match: "^08F([0-9]{2})([0-9])([0-9])$"
+      state: { version: "{1}.{2}{3}" }
+    - match: "^0F8([0-9A-F])([0-9A-F])0([0-9A-F])$"
+      state: { error.code: "{3}-{1}{2}" }
+    - match: "^0F9([0-9A-F])([0-9A-F])0([0-9A-F])$"
+      state: { caution.code: "{3}-{1}{2}" }
+    - match: "^0FF01([0-9]{2})$"
+      state: { device: { value: "{1}", map: { "00": sd1, "01": sd2, "10": usb, "11": cd } } }
+    - match: "^0FF0702([0-9])([0-9])([0-9])([0-9])$"
+      state: { time_skip_seconds: "{3}{4}{1}{2}" }
+    - match: "^0FF07CF([0-9]{2})$"
+      state: { play_area: { value: "{1}", map: { "00": all, "01": folder, "02": playlist } } }
+    - match: "^0FF08A300([0-9])([0-9])([0-9])([0-9])$"
+      state: { auto_track.size_mb: "{3}{4}{1}{2}" }
+    - match: "^0FF08DA1([0-4])(.*)$"
+      state: { "user_words.{1:+1}": "{2}" }
+    - match: "^0FF08E0([0-9]{2})$"
+      state: { file_name_mode: { value: "{1}", map: { "00": date_time, "10": user1, "11": user2, "12": user3, "13": user4, "14": user5 } } }
+    - match: "^0FF1090([0-9])([0-9])([0-9])([0-9])([0-9]{2})([0-9]{2})$"
+      state: { recordable_time: "{3}{4}{1}{2}:{5:02d}.{6:02d}" }
+    - match: "^0FF1090--------$"
+      state: { recordable_time: "----" }
+    - match: "^0FF129000([0-9]{4})$"
+      state: { input: { value: "{1}", map: { "0000": analog_balanced, "0001": analog_unbalanced, "0100": digital_xlr, "0101": digital_coaxial, "0200": dante } } }
+    - match: "^0FF4AD5([0-9])([0-9])([0-9])([0-9])$"
+      state: { folder.number: "{3}{4}{1}{2}" }
+    - match: "^0FF4ADD([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])([0-9])$"
+      state: { folders.first: "{3}{4}{1}{2}", folders.last: "{7}{8}{5}{6}", folders.total: "{11}{12}{9}{10}" }
+    - match: "^0FF4AD9([0-9]{2})00(.*)$"
+      state: { "folders.{1}.name": "{2}" }
+    - match: "^0FF4AD9([0-9])([0-9])0([1-9])(.*)$"
+      state: { "folders.{3}{1}{2}.name": "{4}" }
+    - match: "^0FF4ADA([0-9]{2})00(.*)$"
+      state: { "files.{1}.name": "{2}" }
+    - match: "^0FF4ADA([0-9])([0-9])0([1-9])(.*)$"
+      state: { "files.{3}{1}{2}.name": "{4}" }
+    - match: "^0FF10C4(?:[0-9]{2})?([0-9]{2})$"
+      state: { operations.format_media: { value: "{1}", map: &progress { "00": started, "11": ok, "12": failed } } }
+    - match: "^0FF4280([0-9]{2})$"
+      state: { operations.rename_file: { value: "{1}", map: *progress } }
+    - match: "^0FF4AC0([0-9]{2})(?:[0-9]{4})?$"
+      state: { operations.create_folder: { value: "{1}", map: *progress } }
+    - match: "^0FF4AC2([0-9]{2})$"
+      state: { operations.rename_folder: { value: "{1}", map: *progress } }

@@ -1,0 +1,842 @@
+spec: 1
+id: tascam-bd-mp4k
+name: TASCAM BD-MP4K 4K UHD Blu-ray player (RS-232C / Ethernet protocol)
+vendor: TASCAM
+category: playback
+
+# TEAC's RS-232C/ETHERNET protocol for the BD-MP4K: the same ASCII messages on the RS-232C port and on TCP port
+# 9030. A message is "!", the unit type "7" (a Blu-ray player), a three-character command and its parameter, then
+# CR. The player answers every message with "ack", or "nack" when it cannot take it; a status request is answered
+# "ack" and then the status, which is the request's command with its value ("!7?SST" is answered "!7SSTPL"). The
+# player also sends a status by itself whenever it changes (transport, chapter, title, disc), and expects the host
+# to answer it with "ack". "Track" here is a chapter (DVD, BD) or a file; "group" a title (DVD, BD) or an audio CD's
+# track. The BD-MP1 family's protocol is the tascam-bd-mp1 spec's.
+source:
+  - title: "TASCAM BD-MP4K CONTROL I/O Terminals RS-232C/ETHERNET Protocol Specifications, Ver. 1.01 (Sep. 2021)"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/bd-mp4k/rs232c_ethernet_protocol_bd-mp4k_v101_en.pdf
+    note: >
+      Manufacturer document (retrieved 2026-10-27), offered for download with a protocol use agreement that grants
+      its use for developing compatible devices and software; nothing of it is copied here. RS-232C at 115200, 57600
+      or 38400 bit/s (57600 only in standby), 8 data bits, no parity, 1 stop bit (§2.1.2); TCP port 9030, fixed, one
+      client at a time, kept open to receive status notifications (§2.2, §3.2); message format "!7", command,
+      parameter, CR, with the device's messages shown without CR since Ver. 1.01 (§3); ack and nack and when each is
+      sent (§4.2); a new command only after ack or nack, 30 ms (IP) or 300 ms (RS-232C) reply timeout, at least 30 ms
+      between commands, BUSY (@0BDERBUSY) when the buffer is full (§4.3); status notifications answered ack by the
+      host, sent once more without it (§4.4.3); the key control (power on not over Ethernet, Wake-on-LAN instead, and
+      at 57600 bit/s), menu setting (with HDR, Dolby Vision, video and audio processing) and current status tables
+      (§5.1-5.3).
+  - title: "TASCAM BD-MP4K Owner's Manual"
+    author: TEAC Corporation
+    url: https://tascam.com/wp-content/uploads/downloads/products/tascam/bd-mp4k/bd-mp4k_om_efsgi_ve.pdf
+    note: >
+      Manufacturer document. RS-232C settings: 38400, 57600 or 115200 bit/s, 57600 whatever the setting while the
+      power is off, so power on from RS-232C needs 57600 (p.21); remote control over RS-232C or ETHERNET, the protocol
+      on the download page.
+
+transport:
+  type: line-tcp
+  port: 9030
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 1000
+  reply: expected
+  # The player's messages: "ack" or "nack" (no line ending), and statuses from "!7" to CR. Every message the player
+  # sends is one of them, or BUSY.
+  reply_framing: terminated
+  reply_terminators: ["\r", "ack"]
+  reply_match: "^(n?ack|!7|@0BDER)"
+  error_match: "^(nack|@0BDERBUSY)"
+  probe: "!7?PWR"
+  # At least 30 ms between commands (§4.3.6).
+  pacing:
+    min_interval_ms: 30
+  # RS-232C: the same messages; the speed is set on the player (RS-232C settings), 8N1 fixed (§2.1.2).
+  serial:
+    baud_rate: { default: 115200, values: [38400, 57600, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: 9030, protocol: tcp, role: control, when: "link tcp", note: "fixed; one client at a time" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232C, D-sub 9-pin female" }
+
+models:
+  - id: bd-mp4k
+    name: TASCAM BD-MP4K
+    supports: [power_on, power_off, get_power, stop, play, pause, locate_chapter, skip_chapter, locate_title,
+      skip_title, set_time_display, get_time_display, set_osd_hidden, get_osd_hidden, setup_menu, top_menu, option_menu,
+      popup_menu, menu_return, audio_dialog, subtitle, enter, tray, set_resolution, get_resolution, display_info,
+      color_key, home, number_key, search, get_search, set_mute, get_mute, cursor, clear, set_auto_play, get_auto_play,
+      set_pip_mark, get_pip_mark, set_hdmi_3d, get_hdmi_3d, set_aspect, get_aspect, set_tv_system, get_tv_system,
+      set_hdmi_1080p24, get_hdmi_1080p24, set_color_space, get_color_space, set_deep_color, get_deep_color,
+      set_secondary_audio_mark, get_secondary_audio_mark, set_digital_fs, get_digital_fs, set_speaker_config,
+      get_speaker_config, set_speaker, firmware_upgrade, set_hdmi_cec, get_hdmi_cec, factory_reset, set_bd_live,
+      get_bd_live, set_hdr, get_hdr, set_dolby_vision, get_dolby_vision, set_video_mode,
+      set_video_mode_custom, get_video_mode, set_color_adjust, get_color_adjust, set_noise_reduction,
+      get_noise_reduction, set_audio_eq, get_audio_eq, set_downmix, get_downmix, get_disc_status, get_status,
+      get_chapter_count, get_chapter, get_title_count, get_title, get_elapsed, get_remaining]
+    verification: none
+
+maps:
+  next_previous: { next: NX, previous: PV }
+  time_display: { title_elapsed: TL, title_remaining: TR, chapter_elapsed: EL, chapter_remaining: RM }
+  shown: { "true": "00", "false": "01" }
+  on00: { "true": "00", "false": "01" }
+  dialog: { primary: "+", secondary: "-" }
+  tray: { open: OP, close: CL }
+  resolution: { auto: "1", 480i: "2", 480p: "3", 720p: "4", 1080i: "5", 1080p: "6", 2160p: "7" }
+  color: { red: "1", green: "2", blue: "3", yellow: "4" }
+  direction: { forward: F, reverse: R }
+  speed: { fast: f, slow: s }
+  cursor: { left: "1", right: "2", up: "3", down: "4" }
+  auto_play: { "on": "00", "off": "01", on_repeat: "02" }
+  hdmi_3d: { auto: AT, "off": "01" }
+  aspect: { "16_9_full": 9W, "16_9_normal": 9A, "4_3_pan_scan": 3P, "4_3_letterbox": 3L }
+  tv_system: { ntsc: NT, pal: PL, multi: MS }
+  color_space: { rgb_video: RV, rgb_pc: RP, ycbcr444: Y4, ycbcr422: Y2 }
+  deep_color: { "48": "48", "36": "36", "30": "30", "off": OF }
+  digital_fs: { "48": "48", "96": "96", "192": "19" }
+  speaker_config: { "2.1": "21", "3.1": "31", "4.1": "41", "5.1": "51", "6.1": "61", "7.1": "71" }
+  speaker: { center: C, left: L, right: R, surround_left: l, surround_right: r, surround_back_left: B,
+    surround_back_right: b, subwoofer: S }
+  size: { large: "0", small: "1" }
+  level: {
+    "-100": "-100", "-99": "-099", "-98": "-098", "-97": "-097", "-96": "-096", "-95": "-095", "-94": "-094", "-93": "-093", "-92": "-092", "-91": "-091",
+    "-90": "-090", "-89": "-089", "-88": "-088", "-87": "-087", "-86": "-086", "-85": "-085", "-84": "-084", "-83": "-083", "-82": "-082", "-81": "-081",
+    "-80": "-080", "-79": "-079", "-78": "-078", "-77": "-077", "-76": "-076", "-75": "-075", "-74": "-074", "-73": "-073", "-72": "-072", "-71": "-071",
+    "-70": "-070", "-69": "-069", "-68": "-068", "-67": "-067", "-66": "-066", "-65": "-065", "-64": "-064", "-63": "-063", "-62": "-062", "-61": "-061",
+    "-60": "-060", "-59": "-059", "-58": "-058", "-57": "-057", "-56": "-056", "-55": "-055", "-54": "-054", "-53": "-053", "-52": "-052", "-51": "-051",
+    "-50": "-050", "-49": "-049", "-48": "-048", "-47": "-047", "-46": "-046", "-45": "-045", "-44": "-044", "-43": "-043", "-42": "-042", "-41": "-041",
+    "-40": "-040", "-39": "-039", "-38": "-038", "-37": "-037", "-36": "-036", "-35": "-035", "-34": "-034", "-33": "-033", "-32": "-032", "-31": "-031",
+    "-30": "-030", "-29": "-029", "-28": "-028", "-27": "-027", "-26": "-026", "-25": "-025", "-24": "-024", "-23": "-023", "-22": "-022", "-21": "-021",
+    "-20": "-020", "-19": "-019", "-18": "-018", "-17": "-017", "-16": "-016", "-15": "-015", "-14": "-014", "-13": "-013", "-12": "-012", "-11": "-011",
+    "-10": "-010", "-9": "-009", "-8": "-008", "-7": "-007", "-6": "-006", "-5": "-005", "-4": "-004", "-3": "-003", "-2": "-002", "-1": "-001",
+    "0": "+000", "1": "+001", "2": "+002", "3": "+003", "4": "+004", "5": "+005", "6": "+006", "7": "+007", "8": "+008", "9": "+009",
+    "10": "+010", "11": "+011", "12": "+012", "13": "+013", "14": "+014", "15": "+015", "16": "+016", "17": "+017", "18": "+018", "19": "+019",
+    "20": "+020", "21": "+021", "22": "+022", "23": "+023", "24": "+024", "25": "+025", "26": "+026", "27": "+027", "28": "+028", "29": "+029",
+    "30": "+030", "31": "+031", "32": "+032", "33": "+033", "34": "+034", "35": "+035", "36": "+036", "37": "+037", "38": "+038", "39": "+039",
+    "40": "+040", "41": "+041", "42": "+042", "43": "+043", "44": "+044", "45": "+045", "46": "+046", "47": "+047", "48": "+048", "49": "+049",
+    "50": "+050", "51": "+051", "52": "+052", "53": "+053", "54": "+054", "55": "+055", "56": "+056", "57": "+057", "58": "+058", "59": "+059",
+    "60": "+060", "61": "+061", "62": "+062", "63": "+063", "64": "+064", "65": "+065", "66": "+066", "67": "+067", "68": "+068", "69": "+069",
+    "70": "+070", "71": "+071", "72": "+072", "73": "+073", "74": "+074", "75": "+075", "76": "+076", "77": "+077", "78": "+078", "79": "+079",
+    "80": "+080", "81": "+081", "82": "+082", "83": "+083", "84": "+084", "85": "+085", "86": "+086", "87": "+087", "88": "+088", "89": "+089",
+    "90": "+090", "91": "+091", "92": "+092", "93": "+093", "94": "+094", "95": "+095", "96": "+096", "97": "+097", "98": "+098", "99": "+099",
+    "100": "+100" }
+  adjust: { "-10": "-10", "-9": "-09", "-8": "-08", "-7": "-07", "-6": "-06", "-5": "-05", "-4": "-04", "-3": "-03",
+    "-2": "-02", "-1": "-01", "0": "+00", "1": "+01", "2": "+02", "3": "+03", "4": "+04", "5": "+05", "6": "+06",
+    "7": "+07", "8": "+08", "9": "+09", "10": "+10" }
+  firmware: { usb: US, disc: DS }
+  cec: { hdmi1: H1, hdmi2: H2, "off": OF }
+  bd_live: { permitted: "00", limited: LT, prohibited: "01" }
+  hdr: { auto: AT, hdr: HD, sdr: SD }
+  dolby_vision: { auto: AT, low_latency: LO, low_latency_rgb: LR, "off": OF }
+  video_mode: { standard: ST, vivid: VI, cinema: CI }
+  mv_color: { red: R, green: G, blue: B, yellow: Y, cyan: C, magenta: M }
+  eq: { "off": OF, rock: RO, pop: PO, live: LI, dance: DA, classical: CL, soft: SO }
+  downmix: { "off": OF, dh: DH, dvs: DV, mvs: MV }
+
+commands:
+  power_on:
+    summary: Power on from standby (PWR01); on the RS-232C port only, the network port being off in standby
+    send: "!7PWR01"
+    expect: &ack { reply_contains: "ack", matches: "^ack$" }
+    returns: ack
+  power_off:
+    summary: Put the player in standby (PWR00); the network connection drops
+    send: "!7PWR00"
+    expect: *ack
+    returns: ack
+  get_power:
+    summary: "Ask whether the player is on (?PWR): answered ack when on, nothing in standby"
+    send: "!7?PWR"
+    expect: *ack
+    returns: ack
+  stop:
+    summary: Stop (STP)
+    send: "!7STP"
+    expect: *ack
+    returns: ack
+  play:
+    summary: Play (PLY)
+    send: "!7PLY"
+    expect: *ack
+    returns: ack
+  pause:
+    summary: Pause playback (PAS)
+    send: "!7PAS"
+    expect: *ack
+    returns: ack
+  locate_chapter:
+    summary: Go to a chapter (DVD, BD) or a file of the current folder by number (SKP)
+    params:
+      chapter: { type: int, min: 1, max: 2000, required: true, label: Chapter, description: "The chapter's number, or the file's in the current folder, 1-2000." }
+    send: "!7SKP{chapter:04d}"
+    expect: *ack
+    returns: ack
+  skip_chapter:
+    summary: Skip to the next or previous chapter or file (SKPNX, SKPPV)
+    params:
+      to: &to { type: enum, values: [next, previous], required: true, label: Skip to, description: "next or previous." }
+    send: "!7SKP{to:map.next_previous}"
+    expect: *ack
+    returns: ack
+  locate_title:
+    summary: Go to a title (DVD, BD), or an audio CD's track, by number (GSK)
+    params:
+      title: { type: int, min: 1, max: 2000, required: true, label: Title, description: "The title's number, or the audio CD track's, 1-2000." }
+    send: "!7GSK{title:04d}"
+    expect: *ack
+    returns: ack
+  skip_title:
+    summary: Skip to the next or previous title, or audio CD track (GSKNX, GSKPV)
+    params: { to: *to }
+    send: "!7GSK{to:map.next_previous}"
+    expect: *ack
+    returns: ack
+  set_time_display:
+    summary: Choose the time the display shows (TMD), then read it back
+    params:
+      mode: { type: enum, values: [title_elapsed, title_remaining, chapter_elapsed, chapter_remaining], required: true, label: Time display,
+        description: "Elapsed or remaining time of the title, disc or file (title_), or of the chapter, track or file (chapter_)." }
+    send: ["!7TMD{mode:map.time_display}", "!7?TMD"]
+    expect: *ack
+    returns: ack
+  get_time_display:
+    summary: "Read the time display mode (?TMD): TL, TR, EL or RM"
+    send: "!7?TMD"
+    expect: { reply_contains: "!7TMD", matches: "^!7TMD([A-Z]{2})\\r?$" }
+    returns: value
+  set_osd_hidden:
+    summary: Hide or show the home screen's menu and the transport icons on the video output (OSD), then read it back
+    params:
+      hidden: { type: bool, required: true, label: Hidden, description: "On hides the menu and icons on the video output, off shows them." }
+    send: ["!7OSD{hidden:map.shown}", "!7?OSD"]
+    expect: *ack
+    returns: ack
+  get_osd_hidden:
+    summary: "Read whether the menu and icons are hidden (?OSD): 00 hidden, 01 shown"
+    send: "!7?OSD"
+    expect: { reply_contains: "!7OSD", matches: "^!7OSD([0-9]{2})\\r?$" }
+    returns: value
+  setup_menu:
+    summary: Open the setup menu (SMN)
+    send: "!7SMN"
+    expect: *ack
+    returns: ack
+  top_menu:
+    summary: Show a video disc's top menu (TMN)
+    send: "!7TMN"
+    expect: *ack
+    returns: ack
+  option_menu:
+    summary: Open the option menu while playing or paused (OMN)
+    send: "!7OMN"
+    expect: *ack
+    returns: ack
+  popup_menu:
+    summary: Show the disc's pop-up menu (PMN)
+    send: "!7PMN"
+    expect: *ack
+    returns: ack
+  menu_return:
+    summary: Go back to the previous menu screen (RET)
+    send: "!7RET"
+    expect: *ack
+    returns: ack
+  audio_dialog:
+    summary: Change to the next primary or secondary audio stream of a BD or DVD (ADG)
+    params:
+      stream: { type: enum, values: [primary, secondary], required: true, label: Audio stream, description: "primary or secondary audio." }
+    send: "!7ADG{stream:map.dialog}"
+    expect: *ack
+    returns: ack
+  subtitle:
+    summary: Change to the next subtitle language of a BD or DVD (SBT1)
+    send: "!7SBT1"
+    expect: *ack
+    returns: ack
+  enter:
+    summary: Confirm the selected item (ENT)
+    send: "!7ENT"
+    expect: *ack
+    returns: ack
+  tray:
+    summary: Open or close the disc tray (OPC)
+    params:
+      action: { type: enum, values: [open, close], required: true, label: Tray, description: "open or close the disc tray." }
+    send: "!7OPC{action:map.tray}"
+    expect: *ack
+    returns: ack
+  set_resolution:
+    summary: Set the HDMI output resolution (RSC), then read it back
+    params:
+      resolution: { type: enum, values: [auto, 480i, 480p, 720p, 1080i, 1080p, 2160p], required: true, label: Resolution,
+        description: "auto, 480i or 576i, 480p or 576p, 720p, 1080i, 1080p or 2160p." }
+    send: ["!7RSC{resolution:map.resolution}", "!7?RSC"]
+    expect: *ack
+    returns: ack
+  get_resolution:
+    summary: "Read the HDMI output resolution (?RSC): 1 auto, 2 480/576i, 3 480/576p, 4 720p, 5 1080i, 6 1080p, 7 2160p"
+    send: "!7?RSC"
+    expect: { reply_contains: "!7RSC", matches: "^!7RSC([0-9])\\r?$" }
+    returns: value
+  display_info:
+    summary: Show the on-screen information, as the remote's ON SCREEN key (DSP)
+    send: "!7DSP"
+    expect: *ack
+    returns: ack
+  color_key:
+    summary: Press a color key, whose function the disc gives (CBC)
+    params:
+      color: { type: enum, values: [red, green, blue, yellow], required: true, label: Color, description: "red, green, blue or yellow." }
+    send: "!7CBC{color:map.color}"
+    expect: *ack
+    returns: ack
+  home:
+    summary: Show the home menu (HOM)
+    send: "!7HOM"
+    expect: *ack
+    returns: ack
+  number_key:
+    summary: Press a number key (NUM)
+    params:
+      digit: { type: int, min: 0, max: 9, required: true, label: Digit, description: "The number key, 0-9." }
+    send: "!7NUM{digit}"
+    expect: *ack
+    returns: ack
+  search:
+    summary: Search fast forward or back, or play slow forward, each press stepping the speed (SCN), then read it back
+    params:
+      direction: { type: enum, values: [forward, reverse], required: true, label: Direction, description: "forward or reverse; reverse is fast only." }
+      speed: { type: enum, values: [fast, slow], required: true, label: Speed,
+        description: "fast steps through search speeds 1 to 5, slow through 1/16 to 1x; slow reverse is not supported." }
+    send: ["!7SCN{direction:map.direction}{speed:map.speed}", "!7?SCN"]
+    expect: *ack
+    returns: ack
+  get_search:
+    summary: "Read the search or slow play (?SCN): the direction F or R, then f fast or s slow"
+    send: "!7?SCN"
+    expect: { reply_contains: "!7SCN", matches: "^!7SCN([FR][fs])\\r?$" }
+    returns: value
+  set_mute:
+    summary: Mute or unmute the audio (MUT), then read it back
+    params:
+      muted: { type: bool, required: true, label: Muted, description: "On mutes the audio outputs, off unmutes them." }
+    send: ["!7MUT{muted:map.on00}", "!7?MUT"]
+    expect: *ack
+    returns: ack
+  get_mute:
+    summary: "Read the mute (?MUT): 00 muted, 01 not muted"
+    send: "!7?MUT"
+    expect: { reply_contains: "!7MUT", matches: "^!7MUT([0-9]{2})\\r?$" }
+    returns: value
+  cursor:
+    summary: Move the menu cursor (OSD with one digit)
+    params:
+      direction: { type: enum, values: [left, right, up, down], required: true, label: Direction, description: "left, right, up or down." }
+    send: "!7OSD{direction:map.cursor}"
+    expect: *ack
+    returns: ack
+  clear:
+    summary: Clear the field being entered, or delete the bookmark selected in the bookmark list (CLR)
+    send: "!7CLR"
+    expect: *ack
+    returns: ack
+  set_auto_play:
+    summary: Set disc auto playback (APL), then read it back
+    params:
+      mode: { type: enum, values: ["on", "off", on_repeat], required: true, label: Auto playback,
+        description: "on (play a disc when loaded, without repeat), off, or on_repeat (play and repeat)." }
+    send: ["!7APL{mode:map.auto_play}", "!7?APL"]
+    expect: *ack
+    returns: ack
+  get_auto_play:
+    summary: "Read disc auto playback (?APL): 00 on, 01 off, 02 on with repeat"
+    send: "!7?APL"
+    expect: { reply_contains: "!7APL", matches: "^!7APL([0-9]{2})\\r?$" }
+    returns: value
+  set_pip_mark:
+    summary: Show or hide the picture-in-picture mark (PMK), then read it back
+    params:
+      enabled: &enabled { type: bool, required: true, label: Enabled, description: "On turns the setting on, off turns it off." }
+    send: ["!7PMK{enabled:map.on00}", "!7?PMK"]
+    expect: *ack
+    returns: ack
+  get_pip_mark:
+    summary: "Read the picture-in-picture mark (?PMK): 00 on, 01 off"
+    send: "!7?PMK"
+    expect: { reply_contains: "!7PMK", matches: "^!7PMK([0-9]{2})\\r?$" }
+    returns: value
+  set_hdmi_3d:
+    summary: Set HDMI 3D output (3DO), then read it back
+    params:
+      mode: { type: enum, values: [auto, "off"], required: true, label: HDMI 3D, description: "auto outputs 3D to a 3D display; off never." }
+    send: ["!73DO{mode:map.hdmi_3d}", "!7?3DO"]
+    expect: *ack
+    returns: ack
+  get_hdmi_3d:
+    summary: "Read HDMI 3D output (?3DO): AT auto, 01 off"
+    send: "!7?3DO"
+    expect: { reply_contains: "!73DO", matches: "^!73DO([0-9A-Z]{2})\\r?$" }
+    returns: value
+  set_aspect:
+    summary: Set the TV screen's aspect ratio (ASC), then read it back
+    params:
+      aspect: { type: enum, values: ["16_9_full", "16_9_normal", "4_3_pan_scan", "4_3_letterbox"], required: true, label: TV screen,
+        description: "16:9 full (wide), 16:9 normal (wide/auto), 4:3 pan and scan, or 4:3 letterbox." }
+    send: ["!7ASC{aspect:map.aspect}", "!7?ASC"]
+    expect: *ack
+    returns: ack
+  get_aspect:
+    summary: "Read the TV aspect ratio (?ASC): 9W, 9A, 3P or 3L"
+    send: "!7?ASC"
+    expect: { reply_contains: "!7ASC", matches: "^!7ASC([0-9][A-Z])\\r?$" }
+    returns: value
+  set_tv_system:
+    summary: Set the TV system (TVS), then read it back
+    params:
+      system: { type: enum, values: [ntsc, pal, multi], required: true, label: TV system, description: "ntsc, pal or multi (multi-system)." }
+    send: ["!7TVS{system:map.tv_system}", "!7?TVS"]
+    expect: *ack
+    returns: ack
+  get_tv_system:
+    summary: "Read the TV system (?TVS): NT, PL or MS"
+    send: "!7?TVS"
+    expect: { reply_contains: "!7TVS", matches: "^!7TVS([A-Z]{2})\\r?$" }
+    returns: value
+  set_hdmi_1080p24:
+    summary: Turn HDMI 1080p 24 Hz output on or off (R1K), then read it back
+    params: { enabled: *enabled }
+    send: ["!7R1K{enabled:map.on00}", "!7?R1K"]
+    expect: *ack
+    returns: ack
+  get_hdmi_1080p24:
+    summary: "Read HDMI 1080p 24 Hz output (?R1K): 00 on, 01 off"
+    send: "!7?R1K"
+    expect: { reply_contains: "!7R1K", matches: "^!7R1K([0-9]{2})\\r?$" }
+    returns: value
+  set_color_space:
+    summary: Set the HDMI color space (CLS), then read it back
+    params:
+      space: { type: enum, values: [rgb_video, rgb_pc, ycbcr444, ycbcr422], required: true, label: Color space,
+        description: "RGB video level, RGB PC level, YCbCr 4:4:4 or YCbCr 4:2:2." }
+    send: ["!7CLS{space:map.color_space}", "!7?CLS"]
+    expect: *ack
+    returns: ack
+  get_color_space:
+    summary: "Read the HDMI color space (?CLS): RV, RP, Y4 or Y2"
+    send: "!7?CLS"
+    expect: { reply_contains: "!7CLS", matches: "^!7CLS([A-Z][0-9A-Z])\\r?$" }
+    returns: value
+  set_deep_color:
+    summary: Set HDMI deep color (DPC), then read it back
+    params:
+      bits: { type: enum, values: ["48", "36", "30", "off"], required: true, label: Deep color, description: "48, 36 or 30 bits, or off." }
+    send: ["!7DPC{bits:map.deep_color}", "!7?DPC"]
+    expect: *ack
+    returns: ack
+  get_deep_color:
+    summary: "Read HDMI deep color (?DPC): 48, 36, 30 or OF"
+    send: "!7?DPC"
+    expect: { reply_contains: "!7DPC", matches: "^!7DPC([0-9A-Z]{2})\\r?$" }
+    returns: value
+  set_secondary_audio_mark:
+    summary: Show or hide the secondary audio mark (SCA), then read it back
+    params: { enabled: *enabled }
+    send: ["!7SCA{enabled:map.on00}", "!7?SCA"]
+    expect: *ack
+    returns: ack
+  get_secondary_audio_mark:
+    summary: "Read the secondary audio mark (?SCA): 00 on, 01 off"
+    send: "!7?SCA"
+    expect: { reply_contains: "!7SCA", matches: "^!7SCA([0-9]{2})\\r?$" }
+    returns: value
+  set_digital_fs:
+    summary: Set the digital audio output's LPCM sampling rate (COO), then read it back
+    params:
+      rate: { type: enum, values: ["48", "96", "192"], required: true, label: Sampling rate, description: "48, 96 or 192 kHz LPCM." }
+    send: ["!7COO{rate:map.digital_fs}", "!7?COO"]
+    expect: *ack
+    returns: ack
+  get_digital_fs:
+    summary: "Read the LPCM sampling rate (?COO): 48, 96 or 19 (192 kHz)"
+    send: "!7?COO"
+    expect: { reply_contains: "!7COO", matches: "^!7COO([0-9]{2})\\r?$" }
+    returns: value
+  set_speaker_config:
+    summary: Set the speaker configuration (SPC), then read it back
+    params:
+      channels: { type: enum, values: ["2.1", "3.1", "4.1", "5.1", "6.1", "7.1"], required: true, label: Speakers, description: "2.1 to 7.1 channels; one subwoofer." }
+    send: ["!7SPC{channels:map.speaker_config}", "!7?SPC"]
+    expect: *ack
+    returns: ack
+  get_speaker_config:
+    summary: "Read the speaker configuration (?SPC): 21 to 71"
+    send: "!7?SPC"
+    expect: { reply_contains: "!7SPC", matches: "^!7SPC([0-9]{2})\\r?$" }
+    returns: value
+  set_speaker:
+    summary: Set one speaker's size, level and delay (SPS); the player has no request to read it back
+    params:
+      speaker: { type: enum, values: [center, left, right, surround_left, surround_right, surround_back_left, surround_back_right, subwoofer],
+        required: true, label: Speaker, description: "The speaker: center, left, right, the surrounds (Ls/Lss, Rs/Rss), the back surrounds (Lsr, Rsr) or the subwoofer." }
+      size: { type: enum, values: [large, small], required: true, label: Size, description: "large or small." }
+      level: { type: int, min: -100, max: 100, required: true, label: Level,
+        description: "The speaker's trim in tenths of a dB, -100 to +100 (-10 to +10 dB); the player rounds the last digit down to 0 or 5." }
+      delay: { type: int, min: 0, max: 1000, required: true, label: Delay,
+        description: "The delay in centimeters, 0-1000, in steps of 5 (rounded down to a step)." }
+    send: "!7SPS{speaker:map.speaker}{size:map.size}{level:map.level}{delay:04d}"
+    expect: *ack
+    returns: ack
+  firmware_upgrade:
+    summary: Start a firmware upgrade from USB storage or from a disc (FWU)
+    params:
+      source: { type: enum, values: [usb, disc], required: true, label: Source, description: "usb (USB storage) or disc." }
+    send: "!7FWU{source:map.firmware}"
+    expect: *ack
+    returns: ack
+  set_hdmi_cec:
+    summary: Turn HDMI CEC on or off (CCR), then read it back
+    params:
+      mode: { type: enum, values: [hdmi1, hdmi2, "off"], required: true, label: HDMI CEC, description: "hdmi1 or hdmi2 turns CEC on for that output; off turns it off." }
+    send: ["!7CCR{mode:map.cec}", "!7?CCR"]
+    expect: *ack
+    returns: ack
+  get_hdmi_cec:
+    summary: "Read HDMI CEC (?CCR): H1 HDMI 1, H2 HDMI 2, OF off"
+    send: "!7?CCR"
+    expect: { reply_contains: "!7CCR", matches: "^!7CCR([0-9A-Z]{2})\\r?$" }
+    returns: value
+  factory_reset:
+    summary: Restore the factory default settings (INI)
+    send: "!7INI"
+    expect: *ack
+    returns: ack
+  set_bd_live:
+    summary: Set BD-Live network access (LNA), then read it back
+    params:
+      access: { type: enum, values: [permitted, limited, prohibited], required: true, label: BD-Live access, description: "permitted, limited (partly permitted) or prohibited." }
+    send: ["!7LNA{access:map.bd_live}", "!7?LNA"]
+    expect: *ack
+    returns: ack
+  get_bd_live:
+    summary: "Read BD-Live network access (?LNA): 00 permitted, LT limited, 01 prohibited"
+    send: "!7?LNA"
+    expect: { reply_contains: "!7LNA", matches: "^!7LNA([0-9A-Z]{2})\\r?$" }
+    returns: value
+  set_hdr:
+    summary: Set HDR output (HDR), then read it back
+    params:
+      mode: { type: enum, values: [auto, hdr, sdr], required: true, label: HDR, description: "auto, hdr (always HDR) or sdr (always SDR)." }
+    send: ["!7HDR{mode:map.hdr}", "!7?HDR"]
+    expect: *ack
+    returns: ack
+  get_hdr:
+    summary: "Read HDR output (?HDR): AT auto, HD HDR, SD SDR"
+    send: "!7?HDR"
+    expect: { reply_contains: "!7HDR", matches: "^!7HDR([A-Z]{2})\\r?$" }
+    returns: value
+  set_dolby_vision:
+    summary: Set the Dolby Vision mode (DBV), then read it back
+    params:
+      mode: { type: enum, values: [auto, low_latency, low_latency_rgb, "off"], required: true, label: Dolby Vision, description: "auto, low_latency, low_latency_rgb (LL RGB) or off." }
+    send: ["!7DBV{mode:map.dolby_vision}", "!7?DBV"]
+    expect: *ack
+    returns: ack
+  get_dolby_vision:
+    summary: "Read the Dolby Vision mode (?DBV): AT auto, LO low latency, LR LL RGB, OF off"
+    send: "!7?DBV"
+    expect: { reply_contains: "!7DBV", matches: "^!7DBV([A-Z]{2})\\r?$" }
+    returns: value
+  set_video_mode:
+    summary: Choose a preset video mode of the motion video processing (MVM), then read it back
+    params:
+      mode: { type: enum, values: [standard, vivid, cinema], required: true, label: Video mode, description: "standard, vivid or cinema." }
+    send: ["!7MVM{mode:map.video_mode}", "!7?MVM"]
+    expect: *ack
+    returns: ack
+  set_video_mode_custom:
+    summary: Choose the custom video mode with its picture values (MVM), then read the mode back; the values cannot be read
+    params:
+      brightness: { type: int, min: -10, max: 10, required: true, label: Brightness, description: "Brightness, -10 to +10." }
+      saturation: { type: int, min: -10, max: 10, required: true, label: Saturation, description: "Saturation, -10 to +10." }
+      hue: { type: int, min: -10, max: 10, required: true, label: Hue, description: "Hue, -10 to +10." }
+      contrast: { type: int, min: -10, max: 10, required: true, label: Contrast, description: "Contrast, -10 to +10." }
+      sharpness: { type: int, min: 0, max: 5, required: true, label: Sharpness, description: "Sharpness, 0-5." }
+      cti: { type: int, min: 0, max: 3, required: true, label: CTI, description: "Color transient improvement, 0-3." }
+    send: ["!7MVM{brightness:map.adjust}{saturation:map.adjust}{hue:map.adjust}{contrast:map.adjust}{sharpness}{cti}", "!7?MVM"]
+    expect: *ack
+    returns: ack
+  get_video_mode:
+    summary: "Read the video mode (?MVM): CU custom, ST standard, VI vivid, CI cinema"
+    send: "!7?MVM"
+    expect: { reply_contains: "!7MVM", matches: "^!7MVM([A-Z]{2})\\r?$" }
+    returns: value
+  set_color_adjust:
+    summary: Adjust one color of the motion video processing (MVC), then read it back
+    params:
+      color: &mvcolor { type: enum, values: [red, green, blue, yellow, cyan, magenta], required: true, label: Color, description: "red, green, blue, yellow, cyan or magenta." }
+      brightness: { type: int, min: -10, max: 10, required: true, label: Brightness, description: "The color's brightness, -10 to +10." }
+      saturation: { type: int, min: -10, max: 10, required: true, label: Saturation, description: "The color's saturation, -10 to +10." }
+      hue: { type: int, min: -10, max: 10, required: true, label: Hue, description: "The color's hue, -10 to +10." }
+    send: ["!7MVC{color:map.mv_color}{brightness:map.adjust}{saturation:map.adjust}{hue:map.adjust}", "!7?MVC{color:map.mv_color}"]
+    expect: *ack
+    returns: ack
+  get_color_adjust:
+    summary: "Read one color's adjustment (?MVC): brightness, saturation and hue, each a sign and two digits"
+    params: { color: *mvcolor }
+    send: "!7?MVC{color:map.mv_color}"
+    expect: { reply_contains: "!7MVC{color:map.mv_color}", matches: "^!7MVC[A-Z]([-+0-9]{9})\\r?$" }
+    returns: value
+  set_noise_reduction:
+    summary: Set the noise reduction level (MVN), then read it back
+    params:
+      level: { type: int, min: 0, max: 3, required: true, label: Noise reduction, description: "The noise reduction level, 0-3." }
+    send: ["!7MVN{level}", "!7?MVN"]
+    expect: *ack
+    returns: ack
+  get_noise_reduction:
+    summary: "Read the noise reduction level (?MVN): 0-3"
+    send: "!7?MVN"
+    expect: { reply_contains: "!7MVN", matches: "^!7MVN([0-3])\\r?$" }
+    returns: value
+  set_audio_eq:
+    summary: Set the audio post-processing EQ (PEQ), then read it back
+    params:
+      eq: { type: enum, values: ["off", rock, pop, live, dance, classical, soft], required: true, label: EQ, description: "off, or the rock, pop, live, dance, classical or soft curve." }
+    send: ["!7PEQ{eq:map.eq}", "!7?PEQ"]
+    expect: *ack
+    returns: ack
+  get_audio_eq:
+    summary: "Read the audio EQ (?PEQ): OF, RO, PO, LI, DA, CL or SO"
+    send: "!7?PEQ"
+    expect: { reply_contains: "!7PEQ", matches: "^!7PEQ([A-Z]{2})\\r?$" }
+    returns: value
+  set_downmix:
+    summary: Set the audio post-processing downmix (DMX), then read it back
+    params:
+      mode: { type: enum, values: ["off", dh, dvs, mvs], required: true, label: Downmix, description: "off, DH, DVS or MVS." }
+    send: ["!7DMX{mode:map.downmix}", "!7?DNM"]
+    expect: *ack
+    returns: ack
+  get_downmix:
+    summary: "Read the downmix (?DNM, answered DMX): OF, DH, DV or MV"
+    send: "!7?DNM"
+    expect: { reply_contains: "!7DMX", matches: "^!7DMX([A-Z]{2})\\r?$" }
+    returns: value
+  get_disc_status:
+    summary: "Read the disc status (?MST): NC no disc, CI disc, UF unformatted, TO tray open, TC tray closed, TE tray error"
+    send: "!7?MST"
+    expect: { reply_contains: "!7MST", matches: "^!7MST([A-Z]{2})\\r?$" }
+    returns: value
+  get_status:
+    summary: "Read the playback status (?SST): PL play, PP pause, DVSF/DVSR slow, DVFF/DVFR search, DVSU setup, DVMC media, DVTR track menu, DVHM home"
+    send: "!7?SST"
+    expect: { reply_contains: "!7SST", matches: "^!7SST([A-Z]+)\\r?$" }
+    returns: value
+  get_chapter_count:
+    summary: "Read the number of chapters, or of files in the folder (?STT): four digits, or UNKN"
+    send: "!7?STT"
+    expect: { reply_contains: "!7TTN", matches: "^!7TTN([0-9]{4}|UNKN)\\r?$" }
+    returns: value
+  get_chapter:
+    summary: "Read the current chapter, or file in the folder (?STC): four digits, or UNKN"
+    send: "!7?STC"
+    expect: { reply_contains: "!7TNM", matches: "^!7TNM([0-9]{4}|UNKN)\\r?$" }
+    returns: value
+  get_title_count:
+    summary: "Read the number of titles, or audio CD tracks (?STG): four digits, or UNKN"
+    send: "!7?STG"
+    expect: { reply_contains: "!7TGN", matches: "^!7TGN([0-9]{4}|UNKN)\\r?$" }
+    returns: value
+  get_title:
+    summary: "Read the current title, or audio CD track (?SGN): four digits, or UNKN"
+    send: "!7?SGN"
+    expect: { reply_contains: "!7GNM", matches: "^!7GNM([0-9]{4}|UNKN)\\r?$" }
+    returns: value
+  get_elapsed:
+    summary: "Read the elapsed time (?SET): hhhmmss"
+    send: "!7?SET"
+    expect: { reply_contains: "!7SET", matches: "^!7SET([0-9]{7})\\r?$" }
+    returns: value
+  get_remaining:
+    summary: "Read the remaining time (?SRT): hhhmmss"
+    send: "!7?SRT"
+    expect: { reply_contains: "!7SRT", matches: "^!7SRT([0-9]{7})\\r?$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset restores every setting to its default, and firmware_upgrade starts an upgrade from the media;
+      neither can be stopped from here. power_off drops the network connection.
+  - models: [all]
+    severity: warning
+    text: >
+      The player expects the host to answer each status it sends by itself with "ack" within 30 ms; the spec format
+      cannot answer a push without awaiting a reply, so the player sends each such status twice and then stops
+      repeating it. State is unaffected. "nack" (or BUSY when commands come too fast) fails the command.
+  - models: [all]
+    severity: warning
+    text: >
+      TEAC's Ver. 1.01 removed the CR from its example of a message from the player; the spec takes CR as the end of
+      a status, as for the requests it is sent, and treats "ack" itself as a whole message. A player that sends
+      statuses with no ending at all leaves them unread.
+  - models: [all]
+    severity: info
+    text: >
+      power_on works only on the RS-232C port, at 57600 bit/s: in standby the port runs at 57600 whatever its
+      setting, and the network port does not take power on (TEAC names Wake-on-LAN for that, which the spec format
+      cannot send). get_power is answered ack when on and not at all in standby (a timeout). There is no stopped
+      status: get_status names play, pause, slow and search play and the menus only.
+  - models: [all]
+    severity: info
+    text: >
+      The RS-232C speed's factory setting is not documented (115200 is assumed), nor is flow control (3 wires; none
+      is used). Status notifications of the chapter and chapter count use the short forms TN and TT, answers to
+      requests TNM and TTN; both are read. Unknown numbers (UNKN) remove the value from state. The downmix is read
+      with ?DNM and answered DMX, as the document gives it. The custom video mode's picture values and the speaker
+      settings cannot be read back.
+
+state:
+  disc.status: { type: string, description: "no_disc, disc, unformatted, tray_open, tray_closed or tray_error (MST)" }
+  transport.status: { type: string, description: "play, pause, slow_forward, slow_reverse, search_forward, search_reverse, setup, media_center, track_menu or home (SST)" }
+  chapter.number: { type: int, description: "The current chapter (DVD, BD) or file in the folder (TNM, TN)" }
+  chapters.total: { type: int, description: "Chapters, or files in the folder (TTN, TT)" }
+  title.number: { type: int, description: "The current title (DVD, BD) or audio CD track (GNM)" }
+  titles.total: { type: int, description: "Titles, or audio CD tracks (TGN)" }
+  time.elapsed: { type: string, description: "Elapsed time, H:MM:SS (SET)" }
+  time.remaining: { type: string, description: "Remaining time, H:MM:SS (SRT)" }
+  time_display: { type: string, description: "title_elapsed, title_remaining, chapter_elapsed or chapter_remaining (TMD)" }
+  osd_hidden: { type: bool, description: "The menu and transport icons hidden on the video output (OSD)" }
+  resolution: { type: string, description: "auto, 480i, 480p, 720p, 1080i, 1080p or 2160p (RSC)" }
+  search.direction: { type: string, description: "forward or reverse (SCN)" }
+  search.speed: { type: string, description: "fast or slow (SCN)" }
+  mute: { type: bool, description: "Audio muted (MUT)" }
+  auto_play: { type: string, description: "on, off or on_repeat (APL)" }
+  pip_mark: { type: bool, description: "Picture-in-picture mark shown (PMK)" }
+  hdmi_3d: { type: string, description: "auto or off (3DO)" }
+  aspect: { type: string, description: "16_9_full, 16_9_normal, 4_3_pan_scan or 4_3_letterbox (ASC)" }
+  tv_system: { type: string, description: "ntsc, pal or multi (TVS)" }
+  hdmi_1080p24: { type: bool, description: "HDMI 1080p 24 Hz output on (R1K)" }
+  color_space: { type: string, description: "rgb_video, rgb_pc, ycbcr444 or ycbcr422 (CLS)" }
+  deep_color: { type: string, description: "48, 36, 30 or off (DPC)" }
+  secondary_audio_mark: { type: bool, description: "Secondary audio mark shown (SCA)" }
+  digital_fs: { type: int, unit: kHz, description: "LPCM sampling rate of the digital output: 48, 96 or 192 (COO)" }
+  speaker_config: { type: string, description: "2.1 to 7.1 (SPC)" }
+  hdmi_cec: { type: string, description: "hdmi1, hdmi2 or off (CCR)" }
+  bd_live: { type: string, description: "permitted, limited or prohibited (LNA)" }
+  hdr: { type: string, description: "auto, hdr or sdr (HDR)" }
+  dolby_vision: { type: string, description: "auto, low_latency, low_latency_rgb or off (DBV)" }
+  video_mode: { type: string, description: "custom, standard, vivid or cinema (MVM)" }
+  color_adjust.*.brightness: { type: int, description: "A color's brightness, -10 to +10 (MVC), keyed red, green, blue, yellow, cyan or magenta" }
+  color_adjust.*.saturation: { type: int, description: "A color's saturation, -10 to +10 (MVC)" }
+  color_adjust.*.hue: { type: int, description: "A color's hue, -10 to +10 (MVC)" }
+  noise_reduction: { type: int, description: "Noise reduction level, 0-3 (MVN)" }
+  audio_eq: { type: string, description: "off, rock, pop, live, dance, classical or soft (PEQ)" }
+  downmix: { type: string, description: "off, dh, dvs or mvs (DMX)" }
+
+telemetry:
+  poll:
+    - every_ms: 1000
+      send: ["!7?SST", "!7?SET", "!7?SRT"]
+    - every_ms: 5000
+      send: ["!7?MST", "!7?STC", "!7?STT", "!7?SGN", "!7?STG", "!7?SCN", "!7?MUT"]
+    - every_ms: 30000
+      send: ["!7?TMD", "!7?OSD", "!7?RSC", "!7?APL", "!7?PMK", "!7?3DO", "!7?ASC", "!7?TVS", "!7?R1K", "!7?CLS", "!7?DPC",
+        "!7?SCA", "!7?COO", "!7?SPC", "!7?CCR", "!7?LNA", "!7?HDR", "!7?DBV", "!7?MVM", "!7?MVCR", "!7?MVCG", "!7?MVCB",
+        "!7?MVCY", "!7?MVCC", "!7?MVCM", "!7?MVN", "!7?PEQ", "!7?DNM"]
+  updates:
+    - match: "^!7MST([A-Z]{2})\\r?$"
+      state: { disc.status: { value: "{1}", map: { NC: no_disc, CI: disc, UF: unformatted, TO: tray_open, TC: tray_closed, TE: tray_error } } }
+    - match: "^!7SST([A-Z]+)\\r?$"
+      state: { transport.status: { value: "{1}", map: { PL: play, PP: pause, DVSF: slow_forward, DVSR: slow_reverse, DVFF: search_forward,
+        DVFR: search_reverse, DVSU: setup, DVMC: media_center, DVTR: track_menu, DVHM: home } } }
+    - match: "^!7TNM?([0-9]{4})\\r?$"
+      state: { chapter.number: "{1}" }
+    - match: "^!7TNM?UNKN\\r?$"
+      state: { chapter.number: { delete: true } }
+    - match: "^!7TTN?([0-9]{4})\\r?$"
+      state: { chapters.total: "{1}" }
+    - match: "^!7TTN?UNKN\\r?$"
+      state: { chapters.total: { delete: true } }
+    - match: "^!7GNM([0-9]{4})\\r?$"
+      state: { title.number: "{1}" }
+    - match: "^!7GNMUNKN\\r?$"
+      state: { title.number: { delete: true } }
+    - match: "^!7TGN([0-9]{4})\\r?$"
+      state: { titles.total: "{1}" }
+    - match: "^!7TGNUNKN\\r?$"
+      state: { titles.total: { delete: true } }
+    - match: "^!7SET([0-9]{3})([0-9]{2})([0-9]{2})\\r?$"
+      state: { time.elapsed: "{1}:{2:02d}:{3:02d}" }
+    - match: "^!7SRT([0-9]{3})([0-9]{2})([0-9]{2})\\r?$"
+      state: { time.remaining: "{1}:{2:02d}:{3:02d}" }
+    - match: "^!7TMD([A-Z]{2})\\r?$"
+      state: { time_display: { value: "{1}", map: { TL: title_elapsed, TR: title_remaining, EL: chapter_elapsed, RM: chapter_remaining } } }
+    - match: "^!7OSD([0-9]{2})\\r?$"
+      state: { osd_hidden: { value: "{1}", map: &on00 { "00": true, "01": false } } }
+    - match: "^!7RSC([0-9])\\r?$"
+      state: { resolution: { value: "{1}", map: { "1": auto, "2": 480i, "3": 480p, "4": 720p, "5": 1080i, "6": 1080p, "7": 2160p } } }
+    - match: "^!7SCN([FR])([fs])\\r?$"
+      state:
+        search.direction: { value: "{1}", map: { F: forward, R: reverse } }
+        search.speed: { value: "{2}", map: { f: fast, s: slow } }
+    - match: "^!7MUT([0-9]{2})\\r?$"
+      state: { mute: { value: "{1}", map: *on00 } }
+    - match: "^!7APL([0-9]{2})\\r?$"
+      state: { auto_play: { value: "{1}", map: { "00": "on", "01": "off", "02": on_repeat } } }
+    - match: "^!7PMK([0-9]{2})\\r?$"
+      state: { pip_mark: { value: "{1}", map: *on00 } }
+    - match: "^!73DO([0-9A-Z]{2})\\r?$"
+      state: { hdmi_3d: { value: "{1}", map: { AT: auto, "01": "off" } } }
+    - match: "^!7ASC([0-9][A-Z])\\r?$"
+      state: { aspect: { value: "{1}", map: { 9W: "16_9_full", 9A: "16_9_normal", 3P: "4_3_pan_scan", 3L: "4_3_letterbox" } } }
+    - match: "^!7TVS([A-Z]{2})\\r?$"
+      state: { tv_system: { value: "{1}", map: { NT: ntsc, PL: pal, MS: multi } } }
+    - match: "^!7R1K([0-9]{2})\\r?$"
+      state: { hdmi_1080p24: { value: "{1}", map: *on00 } }
+    - match: "^!7CLS([A-Z][0-9A-Z])\\r?$"
+      state: { color_space: { value: "{1}", map: { RV: rgb_video, RP: rgb_pc, Y4: ycbcr444, Y2: ycbcr422 } } }
+    - match: "^!7DPC([0-9A-Z]{2})\\r?$"
+      state: { deep_color: { value: "{1}", map: { "48": "48", "36": "36", "30": "30", OF: "off" } } }
+    - match: "^!7SCA([0-9]{2})\\r?$"
+      state: { secondary_audio_mark: { value: "{1}", map: *on00 } }
+    - match: "^!7COO([0-9]{2})\\r?$"
+      state: { digital_fs: { value: "{1}", map: { "48": 48, "96": 96, "19": 192 } } }
+    - match: "^!7SPC([0-9]{2})\\r?$"
+      state: { speaker_config: { value: "{1}", map: { "21": "2.1", "31": "3.1", "41": "4.1", "51": "5.1", "61": "6.1", "71": "7.1" } } }
+    - match: "^!7CCR([0-9A-Z]{2})\\r?$"
+      state: { hdmi_cec: { value: "{1}", map: { H1: hdmi1, H2: hdmi2, OF: "off" } } }
+    - match: "^!7LNA([0-9A-Z]{2})\\r?$"
+      state: { bd_live: { value: "{1}", map: { "00": permitted, LT: limited, "01": prohibited } } }
+    - match: "^!7HDR([A-Z]{2})\\r?$"
+      state: { hdr: { value: "{1}", map: { AT: auto, HD: hdr, SD: sdr } } }
+    - match: "^!7DBV([A-Z]{2})\\r?$"
+      state: { dolby_vision: { value: "{1}", map: { AT: auto, LO: low_latency, LR: low_latency_rgb, OF: "off" } } }
+    - match: "^!7MVM([A-Z]{2})\\r?$"
+      state: { video_mode: { value: "{1}", map: { CU: custom, ST: standard, VI: vivid, CI: cinema } } }
+    # A color's brightness, saturation and hue, each a sign and two digits.
+    - match: "^!7MVCR([-+][0-9]{2})([-+][0-9]{2})([-+][0-9]{2})\\r?$"
+      state: { color_adjust.red.brightness: "{1}", color_adjust.red.saturation: "{2}", color_adjust.red.hue: "{3}" }
+    - match: "^!7MVCG([-+][0-9]{2})([-+][0-9]{2})([-+][0-9]{2})\\r?$"
+      state: { color_adjust.green.brightness: "{1}", color_adjust.green.saturation: "{2}", color_adjust.green.hue: "{3}" }
+    - match: "^!7MVCB([-+][0-9]{2})([-+][0-9]{2})([-+][0-9]{2})\\r?$"
+      state: { color_adjust.blue.brightness: "{1}", color_adjust.blue.saturation: "{2}", color_adjust.blue.hue: "{3}" }
+    - match: "^!7MVCY([-+][0-9]{2})([-+][0-9]{2})([-+][0-9]{2})\\r?$"
+      state: { color_adjust.yellow.brightness: "{1}", color_adjust.yellow.saturation: "{2}", color_adjust.yellow.hue: "{3}" }
+    - match: "^!7MVCC([-+][0-9]{2})([-+][0-9]{2})([-+][0-9]{2})\\r?$"
+      state: { color_adjust.cyan.brightness: "{1}", color_adjust.cyan.saturation: "{2}", color_adjust.cyan.hue: "{3}" }
+    - match: "^!7MVCM([-+][0-9]{2})([-+][0-9]{2})([-+][0-9]{2})\\r?$"
+      state: { color_adjust.magenta.brightness: "{1}", color_adjust.magenta.saturation: "{2}", color_adjust.magenta.hue: "{3}" }
+    - match: "^!7MVN([0-3])\\r?$"
+      state: { noise_reduction: "{1}" }
+    - match: "^!7PEQ([A-Z]{2})\\r?$"
+      state: { audio_eq: { value: "{1}", map: { OF: "off", RO: rock, PO: pop, LI: live, DA: dance, CL: classical, SO: soft } } }
+    - match: "^!7DMX([A-Z]{2})\\r?$"
+      state: { downmix: { value: "{1}", map: { OF: "off", DH: dh, DV: dvs, MV: mvs } } }
