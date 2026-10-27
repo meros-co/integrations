@@ -269,6 +269,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that replies to polled getters come back compact or spaced as the poll rules read them, with strings escaped as JSON. ([specs/avstumpfl-pixera.yaml:6802](specs/avstumpfl-pixera.yaml#L6802))
 - [ ] Confirm what utility_run_js_script answers for a script that throws, and whether it is subject to the allowlist. ([specs/avstumpfl-pixera.yaml:6743](specs/avstumpfl-pixera.yaml#L6743))
 
+## axis-ptz — Axis PTZ cameras and video encoders (VAPIX PTZ API)
+
+- [ ] Check how ptz.cgi and ptzqueue.cgi behave for a client without the queue cookie when the control queue is on, and what queue_query answers for such a client. ([specs/axis-ptz.yaml:790](specs/axis-ptz.yaml#L790))
+- [ ] Record the reply to ptz.cgi?query=mode on a Panopsis dome (the document does not show its form). ([specs/axis-ptz.yaml:804](specs/axis-ptz.yaml#L804))
+- [ ] Confirm that a ptz.cgi argument the channel's driver does not support is answered 200 with "Error:" rather than 204. ([specs/axis-ptz.yaml:769](specs/axis-ptz.yaml#L769))
+- [ ] Record a query=presetposcam reply with no presets, and one on a multichannel encoder, to confirm the "Preset Positions for camera N" heading and presetposnoN=name lines. ([specs/axis-ptz.yaml:703](specs/axis-ptz.yaml#L703))
+- [ ] Confirm that param.cgi?action=list&group=PTZ answers root.PTZ.<name>=<value> lines, and which UserAdv.U# group number a channel's MoveSpeed and dome settings use. ([specs/axis-ptz.yaml:718](specs/axis-ptz.yaml#L718))
+
 ## barco-encore — Barco Encore Presentation System
 
 - [ ] Confirm the original Encore controller takes ASCII control on TCP port 3000, with commands ended by a line feed, and record whatever it answers. ([specs/barco-encore.yaml:88](specs/barco-encore.yaml#L88))
@@ -2408,6 +2416,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that no event follows set_scene_item_blend_mode, set_input_deinterlace_mode, set_scene_scene_transition_override or set_video_settings, which are read back after the command instead. ([specs/obs-studio.yaml:1217](specs/obs-studio.yaml#L1217))
 - [ ] Check that GetCurrentSceneTransitionCursor follows the studio-mode T-bar while it is dragged in OBS or held part-way by set_t_bar_position with release off, that dragging the T-bar sends SceneTransitionStarted, and that the cursor reads 1.0 once an interrupted transition stops. ([specs/obs-studio.yaml:1128](specs/obs-studio.yaml#L1128))
 
+## obsbot-tail — OBSBOT Tail 2 and Tail Air (OSC)
+
+- [ ] Check whether the camera sends its UDP replies to the sender's port or always to port 57120, and that replies arrive when the core sends from feedback_port 57120. ([specs/obsbot-tail.yaml:405](specs/obsbot-tail.yaml#L405))
+- [ ] Check that a Tail 2 answers GetDeviceInfo, GetZoomInfo and GetGimbalPosInfo, or only answers Connected with its full state (as a third-party integration reports), and which messages that state comes in. ([specs/obsbot-tail.yaml:412](specs/obsbot-tail.yaml#L412))
+- [ ] Check the DeviceInfo device type number a Tail 2 and a Tail Air report, and whether SetShutterSpeed takes 12.5, 6.25 and 2.5 in any form. ([specs/obsbot-tail.yaml:418](specs/obsbot-tail.yaml#L418))
+- [ ] Check that SetGimbalUp and SetGimbalLeft with speed 0 together stop a move in any direction. ([specs/obsbot-tail.yaml:425](specs/obsbot-tail.yaml#L425))
+
 ## obsidian-onyx — Obsidian ONYX (Telnet)
 
 - [ ] Record ONYX's own Telnet server's replies (banner, success, error) for GQL, SQL and an unknown command, which Obsidian does not document. ([specs/obsidian-onyx.yaml:296](specs/obsidian-onyx.yaml#L296))
@@ -2415,13 +2430,6 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether action commands (GQL, RQL) reply with "200 Ok" then ".", or something else, and whether 300 ms is enough to wait for a ".". ([specs/obsidian-onyx.yaml:299](specs/obsidian-onyx.yaml#L299))
 - [ ] Check whether QLActive lines have the same form as QLList lines on ONYX Manager 4.x. ([specs/obsidian-onyx.yaml:304](specs/obsidian-onyx.yaml#L304))
 - [ ] Check whether QLName answers on current versions. ([specs/obsidian-onyx.yaml:322](specs/obsidian-onyx.yaml#L322))
-
-## obsbot-tail — OBSBOT Tail 2 and Tail Air (OSC)
-
-- [ ] Check whether the camera sends its UDP replies to the sender's port or always to port 57120, and that replies arrive when the core sends from feedback_port 57120. ([specs/obsbot-tail.yaml:405](specs/obsbot-tail.yaml#L405))
-- [ ] Check that a Tail 2 answers GetDeviceInfo, GetZoomInfo and GetGimbalPosInfo, or only answers Connected with its full state (as a third-party integration reports), and which messages that state comes in. ([specs/obsbot-tail.yaml:412](specs/obsbot-tail.yaml#L412))
-- [ ] Check the DeviceInfo device type number a Tail 2 and a Tail Air report, and whether SetShutterSpeed takes 12.5, 6.25 and 2.5 in any form. ([specs/obsbot-tail.yaml:418](specs/obsbot-tail.yaml#L418))
-- [ ] Check that SetGimbalUp and SetGimbalLeft with speed 0 together stop a move in any direction. ([specs/obsbot-tail.yaml:425](specs/obsbot-tail.yaml#L425))
 
 ## obsidian-onyx-osc — Obsidian ONYX (OSC)
 

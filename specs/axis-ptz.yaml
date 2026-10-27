@@ -1,0 +1,807 @@
+spec: 1
+id: axis-ptz
+name: Axis PTZ cameras and video encoders (VAPIX PTZ API)
+vendor: Axis Communications
+category: camera
+
+# VAPIX's Pan/tilt/zoom API: /axis-cgi/com/ptz.cgi moves the camera and
+# answers queries in plain text, /axis-cgi/com/ptzconfig.cgi manages server
+# presets and the OSD menu, /axis-cgi/com/ptzqueue.cgi the control queue, and
+# the PTZ parameters (enabled, locked, limits, user settings) are read and
+# written through /axis-cgi/param.cgi. Focus recall memory zones
+# (/axis-cgi/memoryzones/*.cgi) and speed dry belong to the same API. One
+# device here is one video channel (the camera setting): a multi-channel
+# encoder or a camera with view areas is opened once per channel.
+
+source:
+  - title: VAPIX Pan/tilt/zoom API
+    author: Axis Communications AB
+    url: https://developer.axis.com/vapix/network-video/pantiltzoom-api/
+    note: >
+      Manufacturer documentation, retrieved 2026-10-27. Sections used: PTZ parameter groups
+      (PTZ, PTZ.ImageSource.I#.PTZEnabled, PTZ.Support.S#, PTZ.Limit.L#, PTZ.Various.V# with Locked,
+      ReturnToOverview, CtlQueueing, PTZ.UserAdv MoveSpeed and the dome parameters); PTZ control
+      (ptz.cgi arguments camera, whoami, center, areazoom, imagewidth, imageheight, move, pan, tilt,
+      zoom, focus, iris, brightness, rpan, rtilt, rzoom, rfocus, riris, rbrightness, autofocus,
+      autoiris, continuouspantiltmove with proportionalspeed=disabled, continuouszoommove,
+      continuousfocusmove, continuousirismove, continuousbrightnessmove, auxiliary,
+      gotoserverpresetname, gotoserverpresetno, gotodevicepreset, speed, ircutfilter, backlight,
+      query=limits|mode|position|presetposcam|speed|attributes, info=1, with value ranges); PTZ
+      configuration (ptzconfig.cgi osdmenu, setserverpresetname, setserverpresetno,
+      renameserverpresetno with newname, home=yes, removeserverpresetname, removeserverpresetno,
+      removeallserverpresets, setdevicepreset; 31-character names without the characters
+      double quote, less-than, greater-than, tilde and colon); Responses (204 on success, 200 with
+      "Error:" on failure; the query reply formats); Queuing API (ptzqueue.cgi control=request|drop|query
+      and its anchor reply); Focus recall API (memoryzones add.cgi, remove.cgi, list.cgi, goto.cgi);
+      Speed dry API (auxiliary=speeddry).
+  - title: VAPIX Parameter management API
+    author: Axis Communications AB
+    url: https://developer.axis.com/vapix/network-video/parameter-management/
+    note: >
+      Manufacturer documentation, retrieved 2026-10-27: /axis-cgi/param.cgi?action=list&group=...
+      answers one root.<group>.<name>=<value> line per parameter; action=update&<name>=<value>
+      writes parameters and answers OK.
+  - title: VAPIX Authentication
+    author: Axis Communications AB
+    url: https://developer.axis.com/vapix/authentication/
+    note: >
+      Manufacturer documentation, retrieved 2026-10-27: HTTP Basic or Digest; the examples use
+      curl --anyauth. The core answers the Digest challenge.
+
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: digest
+  timeout_ms: 5000
+  probe: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=speed&camera={settings.camera}" }
+
+settings:
+  username: { type: string, default: root, label: Username,
+              description: "An Axis account with PTZ control rights (an operator or an administrator for presets and parameters)." }
+  password: { type: string, secret: true, label: Password, description: "The account's password." }
+  scheme: { type: enum, values: [http, https], default: http, label: Connection,
+            description: "http on port 80, or https on port 443 with the camera's self-signed certificate accepted." }
+  camera: { type: int, min: 1, max: 64, default: 1, label: Video channel,
+            description: "Video channel or view area this device controls, numbered from 1; open one device per channel." }
+
+ports:
+  - { port: 80, protocol: http, role: control, when: "scheme http" }
+  - { port: 443, protocol: https, role: control, when: "scheme https" }
+
+models:
+  - id: axis-ptz
+    name: Axis PTZ camera (mechanical PTZ)
+    supports: &all_commands
+      [move, home, stop, pan_to, tilt_to, zoom_to, focus_to, iris_to, brightness_to, pan_by, tilt_by, zoom_by,
+       focus_by, iris_by, brightness_by, set_autofocus, set_autoiris, continuous_pan_tilt,
+       continuous_pan_tilt_fixed_speed, continuous_zoom, continuous_focus, continuous_iris,
+       continuous_brightness, center, center_in_image, area_zoom, area_zoom_in_image, goto_preset,
+       goto_preset_number, goto_device_preset, set_speed, set_ir_cut_filter, set_backlight, auxiliary, speed_dry,
+       save_preset, save_preset_as_home, save_preset_number, save_preset_number_as_home, rename_preset,
+       remove_preset, remove_preset_number, remove_all_presets, set_device_preset, osd_menu, get_position,
+       get_limits, get_presets, get_speed, get_mode, get_driver, get_commands, get_attributes, queue_request,
+       queue_drop, queue_query, get_ptz_parameters, set_ptz_parameter, set_ptz_enabled, set_locked,
+       set_return_to_overview, add_memory_zone, add_memory_zone_current, remove_memory_zone,
+       remove_all_memory_zones, list_memory_zones, goto_memory_zone]
+    verification: none
+  - id: axis-digital-ptz
+    name: Axis camera with digital PTZ (view areas)
+    supports: [move, home, stop, pan_to, tilt_to, zoom_to, pan_by, tilt_by, zoom_by, continuous_pan_tilt,
+               continuous_zoom, center, center_in_image, area_zoom, area_zoom_in_image, goto_preset,
+               goto_preset_number, set_speed, save_preset, save_preset_as_home, save_preset_number,
+               save_preset_number_as_home, rename_preset, remove_preset, remove_preset_number, remove_all_presets,
+               get_position, get_limits, get_presets, get_speed, get_driver, get_commands, get_attributes,
+               queue_request, queue_drop, queue_query, get_ptz_parameters, set_ptz_parameter, set_ptz_enabled,
+               set_locked, set_return_to_overview]
+    verification: none
+    notes: >
+      Digital PTZ crops the sensor image; focus, iris, brightness and the dome functions have no
+      meaning there (the API's own words: "with some limitations").
+  - id: axis-encoder-ptz
+    name: Axis video encoder driving an external PTZ device (serial PTZ driver)
+    supports: *all_commands
+    verification: none
+    notes: >
+      What a channel offers depends on the PTZ driver installed for it; the camera's PTZ.Support
+      parameters (get_ptz_parameters) and get_commands say which arguments it takes.
+
+commands:
+  # ── Movement (ptz.cgi) ───────────────────────────────────────────────────
+  move:
+    summary: Move one step in a direction (about 25 % of the image, or 50-90 degrees on a driver that moves relatively)
+    params:
+      direction: { type: enum, values: [up, down, left, right, upleft, upright, downleft, downright], required: true,
+                   label: Direction, description: "Direction of the step, including the four diagonals." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "move={direction}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  home:
+    summary: Move to the home position
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "move=home&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  stop:
+    summary: Stop pan and tilt movement
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "move=stop&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  pan_to:
+    summary: Pan to an absolute position in degrees
+    params:
+      pan: { type: float, min: -180, max: 180, required: true, label: Pan, description: "Absolute pan position in degrees, -180 to 180." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "pan={pan:.2f}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  tilt_to:
+    summary: Tilt to an absolute position in degrees
+    params:
+      tilt: { type: float, min: -180, max: 180, required: true, label: Tilt, description: "Absolute tilt position in degrees, -180 to 180." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "tilt={tilt:.2f}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  zoom_to:
+    summary: Zoom to an absolute position, 1 (wide) to 9999 (tele), up to 19999 with digital zoom
+    params:
+      zoom: { type: int, min: 1, max: 19999, required: true, label: Zoom, description: "Absolute zoom position: 1 is wide, 9999 full optical zoom, up to 19999 with digital zoom." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "zoom={zoom}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  focus_to:
+    summary: Focus to an absolute position, 1 (near) to 9999 (far)
+    params:
+      focus: { type: int, min: 1, max: 9999, required: true, label: Focus, description: "Absolute focus position: low is near, high is far." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "focus={focus}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  iris_to:
+    summary: Set the iris to an absolute position, 1 (closed) to 9999 (open)
+    params:
+      iris: { type: int, min: 1, max: 9999, required: true, label: Iris, description: "Absolute iris position: low closes, high opens." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "iris={iris}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  brightness_to:
+    summary: Set the brightness to an absolute position, 1 (dark) to 9999 (bright)
+    params:
+      brightness: { type: int, min: 1, max: 9999, required: true, label: Brightness, description: "Absolute brightness: low is darker, high is brighter." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "brightness={brightness}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  pan_by:
+    summary: Pan by a number of degrees from the current position (positive is right)
+    params:
+      degrees: { type: float, min: -360, max: 360, required: true, label: Pan offset, description: "Degrees to pan, -360 to 360; positive pans right." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "rpan={degrees:.2f}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  tilt_by:
+    summary: Tilt by a number of degrees from the current position (positive is up)
+    params:
+      degrees: { type: float, min: -360, max: 360, required: true, label: Tilt offset, description: "Degrees to tilt, -360 to 360; positive tilts up." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "rtilt={degrees:.2f}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  zoom_by:
+    summary: Zoom by a number of steps from the current position (positive zooms in)
+    params:
+      steps: { type: int, min: -19999, max: 19999, required: true, label: Zoom offset, description: "Zoom steps, -9999 to 9999 (to 19999 with digital zoom); positive zooms in." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "rzoom={steps}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  focus_by:
+    summary: Focus by a number of steps from the current position (positive is far)
+    params:
+      steps: { type: int, min: -9999, max: 9999, required: true, label: Focus offset, description: "Focus steps, -9999 to 9999; positive focuses farther." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "rfocus={steps}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  iris_by:
+    summary: Move the iris by a number of steps (positive opens)
+    params:
+      steps: { type: int, min: -9999, max: 9999, required: true, label: Iris offset, description: "Iris steps, -9999 to 9999; positive opens the iris." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "riris={steps}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  brightness_by:
+    summary: Change the brightness by a number of steps (positive is brighter)
+    params:
+      steps: { type: int, min: -9999, max: 9999, required: true, label: Brightness offset, description: "Brightness steps, -9999 to 9999; positive is brighter." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "rbrightness={steps}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  set_autofocus:
+    summary: Turn autofocus on or off
+    params:
+      enabled: { type: bool, required: true, label: Autofocus, description: "On focuses automatically, off holds the focus where it is." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "autofocus={enabled:map.on_off}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  set_autoiris:
+    summary: Turn auto iris on or off
+    params:
+      enabled: { type: bool, required: true, label: Auto iris, description: "On sets the iris automatically, off holds it where it is." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "autoiris={enabled:map.on_off}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  continuous_pan_tilt:
+    summary: Pan and tilt continuously at the given speeds until both are 0
+    params:
+      pan_speed: &pt_speed_pan { type: int, min: -100, max: 100, required: true, label: Pan speed,
+                                 description: "Pan speed, -100 to 100: positive pans right, negative left, 0 stops." }
+      tilt_speed: &pt_speed_tilt { type: int, min: -100, max: 100, required: true, label: Tilt speed,
+                                   description: "Tilt speed, -100 to 100: positive tilts up, negative down, 0 stops." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "continuouspantiltmove={pan_speed},{tilt_speed}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  continuous_pan_tilt_fixed_speed:
+    summary: Pan and tilt continuously with the zoom-proportional speed turned off for this move
+    params: { pan_speed: *pt_speed_pan, tilt_speed: *pt_speed_tilt }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi,
+            raw_query: "continuouspantiltmove={pan_speed},{tilt_speed}&proportionalspeed=disabled&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  continuous_zoom:
+    summary: Zoom continuously until speed 0 (positive zooms in)
+    params:
+      speed: { type: int, min: -100, max: 100, required: true, label: Zoom speed, description: "Zoom speed, -100 to 100: positive zooms in, negative out, 0 stops." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "continuouszoommove={speed}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  continuous_focus:
+    summary: Focus continuously until speed 0 (positive is far)
+    params:
+      speed: { type: int, min: -100, max: 100, required: true, label: Focus speed, description: "Focus speed, -100 to 100: positive focuses farther, negative nearer, 0 stops." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "continuousfocusmove={speed}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  continuous_iris:
+    summary: Move the iris continuously until speed 0 (positive opens)
+    params:
+      speed: { type: int, min: -100, max: 100, required: true, label: Iris speed, description: "Iris speed, -100 to 100: positive opens, negative closes, 0 stops." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "continuousirismove={speed}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  continuous_brightness:
+    summary: Change the brightness continuously until speed 0 (positive is brighter)
+    params:
+      speed: { type: int, min: -100, max: 100, required: true, label: Brightness speed, description: "Brightness speed, -100 to 100: positive brightens, negative darkens, 0 stops." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "continuousbrightnessmove={speed}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  center:
+    summary: Center the view on a pixel of the camera's default-size image
+    params:
+      x: &px_x { type: int, min: 0, max: 16383, required: true, label: X, description: "Horizontal pixel coordinate in the video image, from the left edge." }
+      y: &px_y { type: int, min: 0, max: 16383, required: true, label: Y, description: "Vertical pixel coordinate in the video image, from the top edge." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "center={x},{y}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  center_in_image:
+    summary: Center the view on a pixel of an image of the given size
+    params:
+      x: *px_x
+      y: *px_y
+      image_width: &img_w { type: int, min: 1, max: 16384, required: true, label: Image width, description: "Width in pixels of the image the coordinates are in." }
+      image_height: &img_h { type: int, min: 1, max: 16384, required: true, label: Image height, description: "Height in pixels of the image the coordinates are in." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi,
+            raw_query: "center={x},{y}&imagewidth={image_width}&imageheight={image_height}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  area_zoom:
+    summary: Center on a pixel and zoom by a factor of z/100 (over 100 zooms in)
+    params:
+      x: *px_x
+      y: *px_y
+      z: &az { type: int, min: 1, max: 100000, required: true, label: Zoom factor,
+               description: "Zoom factor in percent: 300 zooms in to a third of the view, 50 zooms out to twice it." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "areazoom={x},{y},{z}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  area_zoom_in_image:
+    summary: Center on a pixel of an image of the given size and zoom by a factor of z/100
+    params: { x: *px_x, y: *px_y, z: *az, image_width: *img_w, image_height: *img_h }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi,
+            raw_query: "areazoom={x},{y},{z}&imagewidth={image_width}&imageheight={image_height}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  goto_preset:
+    summary: Move to a server preset by name
+    params:
+      name: &preset_name { type: string, max_length: 31, pattern: '^[^"<>~:]+$', required: true, label: Preset name,
+                           description: "Preset name, at most 31 characters, without double quotes, less-than, greater-than, tilde or colon." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "gotoserverpresetname={name:url}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  goto_preset_number:
+    summary: Move to a server preset by number
+    params:
+      number: &preset_no { type: int, min: 1, max: 65535, required: true, label: Preset number, description: "Preset number, from 1." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "gotoserverpresetno={number}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  goto_device_preset:
+    summary: Move to a preset stored in the external PTZ device itself, bypassing server presets
+    params:
+      number: &device_preset { type: int, min: 0, max: 65535, required: true, label: Device preset,
+                               description: "Device-specific preset number, which may also be a special function of the device." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "gotodevicepreset={number}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  set_speed:
+    summary: Set the pan/tilt move speed for absolute and relative moves, 1 to 100
+    params:
+      speed: { type: int, min: 1, max: 100, required: true, label: Speed, description: "Pan/tilt speed, 1 (slowest) to 100 (fastest)." }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "speed={speed}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=speed&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  set_ir_cut_filter:
+    summary: Set the IR cut filter on (day), off (night) or auto
+    params:
+      mode: { type: enum, values: ["on", "off", auto], required: true, label: IR cut filter,
+              description: "on blocks IR light (day), off lets it through (night), auto switches with the light." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "ircutfilter={mode}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  set_backlight:
+    summary: Turn backlight compensation on (bright mode) or off (normal)
+    params:
+      enabled: { type: bool, required: true, label: Backlight compensation, description: "On is bright mode, off is normal mode." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "backlight={enabled:map.on_off}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  auxiliary:
+    summary: Run an auxiliary function of the device or driver (get_commands lists them)
+    params:
+      function: { type: string, max_length: 128, pattern: '^[^\s&]+$', required: true, label: Function,
+                  description: "Name of the device-specific function, such as tt:LightIR|On or speeddry." }
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "auxiliary={function:url}&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  speed_dry:
+    summary: Shake the dome to clear water drops (Speed dry; ignored for about 20 s after each run)
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "auxiliary=speeddry&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+
+  # ── Presets and OSD (ptzconfig.cgi) ──────────────────────────────────────
+  save_preset:
+    summary: Save the current position as a named server preset, then read the preset list back
+    params: { name: *preset_name }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "setserverpresetname={name:url}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  save_preset_as_home:
+    summary: Save the current position as a named server preset that is the home position
+    params: { name: *preset_name }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "setserverpresetname={name:url}&home=yes&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  save_preset_number:
+    summary: Save the current position as a numbered server preset
+    params: { number: *preset_no }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "setserverpresetno={number}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  save_preset_number_as_home:
+    summary: Save the current position as a numbered server preset that is the home position
+    params: { number: *preset_no }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "setserverpresetno={number}&home=yes&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  rename_preset:
+    summary: Give a numbered server preset a new name
+    params: { number: *preset_no, name: *preset_name }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "renameserverpresetno={number}&newname={name:url}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  remove_preset:
+    summary: Remove a server preset by name
+    params: { name: *preset_name }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "removeserverpresetname={name:url}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  remove_preset_number:
+    summary: Remove a server preset by number
+    params: { number: *preset_no }
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "removeserverpresetno={number}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  remove_all_presets:
+    summary: Remove every server preset of this channel
+    send:
+      - { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "removeallserverpresets=yes&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: [200, 204] }
+    returns: ack
+  set_device_preset:
+    summary: Save the current position as a preset in the external PTZ device itself
+    params: { number: *device_preset }
+    send: { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "setdevicepreset={number}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+  osd_menu:
+    summary: Operate the external device's OSD menu
+    params:
+      key: { type: enum, values: [open, close, up, down, left, right, select, back], required: true, label: Key,
+             description: "Menu action: open or close the menu, move, select or go back." }
+    send: { method: GET, path: /axis-cgi/com/ptzconfig.cgi, raw_query: "osdmenu={key}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Queries (ptz.cgi) ────────────────────────────────────────────────────
+  get_position:
+    summary: Read the current position and auto focus/iris state
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=position&camera={settings.camera}" }
+    expect: { status: 200 }
+    returns: text
+  get_limits:
+    summary: Read the pan, tilt, zoom, iris, focus, field angle and brightness limits
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=limits&camera={settings.camera}" }
+    expect: { status: 200 }
+    returns: text
+  get_presets:
+    summary: Read the server presets of this channel
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+    expect: { status: 200 }
+    returns: text
+  get_speed:
+    summary: Read the pan/tilt move speed
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=speed&camera={settings.camera}" }
+    expect: { status: 200 }
+    returns: text
+  get_mode:
+    summary: Read the Panopsis mode (overview or normal)
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=mode&camera={settings.camera}" }
+    expect: { status: 200 }
+    returns: text
+  get_driver:
+    summary: Read the name of the PTZ driver in use
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "whoami=1&camera={settings.camera}" }
+    expect: { status: 200 }
+    returns: text
+  get_commands:
+    summary: List the ptz.cgi arguments this channel accepts (info=1)
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "info=1&camera={settings.camera}" }
+    expect: { status: 200 }
+    returns: text
+  get_attributes:
+    summary: Read the PTZ attributes (speed steps, focus distances, zoom magnifications) as JSON
+    send: { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=attributes&format=json&camera={settings.camera}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Control queue (ptzqueue.cgi) ─────────────────────────────────────────
+  queue_request:
+    summary: Ask for PTZ control in the control queue (or renew it while holding it)
+    send: { method: GET, path: /axis-cgi/com/ptzqueue.cgi, raw_query: "control=request&camera={settings.camera}" }
+    expect: { status: 200, not_contains: "Error:" }
+    returns: ack
+  queue_drop:
+    summary: Give up PTZ control, or leave the control queue
+    send: { method: GET, path: /axis-cgi/com/ptzqueue.cgi, raw_query: "control=drop&camera={settings.camera}" }
+    expect: { status: 200, not_contains: "Error:" }
+    returns: ack
+  queue_query:
+    summary: Read this client's place in the control queue
+    send: { method: GET, path: /axis-cgi/com/ptzqueue.cgi, raw_query: "control=query&camera={settings.camera}" }
+    expect: { status: 200, not_contains: "Error:" }
+    returns: text
+
+  # ── PTZ parameters (param.cgi) ───────────────────────────────────────────
+  get_ptz_parameters:
+    summary: Read every PTZ parameter (support flags, limits, enabled functions, user settings)
+    send: { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=list&group=PTZ" }
+    expect: { status: 200, not_contains: "Error" }
+    returns: text
+  set_ptz_parameter:
+    summary: Write one PTZ parameter by its name under root.PTZ, then read the PTZ parameters back
+    params:
+      name: { type: string, max_length: 128, pattern: '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$', required: true, label: Parameter,
+              description: "Parameter name under PTZ, such as Various.V1.ReturnToOverview or UserAdv.U1.ImageFreeze." }
+      value: { type: string, max_length: 256, required: true, label: Value, description: "New value as the parameter list shows it, such as true, 30 or auto." }
+    send:
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=update&PTZ.{name}={value:url}" }
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=list&group=PTZ" }
+    expect: { status: 200, not_contains: "Error" }
+    returns: ack
+  set_ptz_enabled:
+    summary: Turn PTZ on or off for this channel (PTZ.ImageSource.I#.PTZEnabled)
+    params:
+      enabled: { type: bool, required: true, label: PTZ enabled, description: "On enables PTZ on the channel; off disables it and returns to a default position." }
+    send:
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=update&PTZ.ImageSource.I{settings.camera:-1}.PTZEnabled={enabled}" }
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=list&group=PTZ" }
+    expect: { status: 200, not_contains: "Error" }
+    returns: ack
+  set_locked:
+    summary: Lock or unlock the PTZ position of this channel (PTZ.Various.V#.Locked)
+    params:
+      locked: { type: bool, required: true, label: Locked, description: "On locks the position against PTZ commands, off unlocks it." }
+    send:
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=update&PTZ.Various.V{settings.camera}.Locked={locked}" }
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=list&group=PTZ" }
+    expect: { status: 200, not_contains: "Error" }
+    returns: ack
+  set_return_to_overview:
+    summary: Set the idle time after which the channel returns home (PTZ.Various.V#.ReturnToOverview)
+    params:
+      seconds: { type: int, min: 0, max: 300, required: true, label: Return after, description: "Seconds without PTZ activity before returning home, 0 to 300; 0 turns it off." }
+    send:
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=update&PTZ.Various.V{settings.camera}.ReturnToOverview={seconds}" }
+      - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=list&group=PTZ" }
+    expect: { status: 200, not_contains: "Error" }
+    returns: ack
+
+  # ── Focus recall memory zones (memoryzones/*.cgi) ────────────────────────
+  add_memory_zone:
+    summary: Add a focus recall zone with a focus position for a zoom range
+    params:
+      focus: { type: int, min: 1, max: 9999, required: true, label: Focus, description: "Focus position to recall in the zone, 1 to 9999." }
+      zoom_min: &zmin { type: int, min: 1, max: 19999, default: 1, label: Zoom from, description: "Lowest zoom position the zone applies at, 1 to 19999." }
+      zoom_max: &zmax { type: int, min: 1, max: 19999, default: 19999, label: Zoom to, description: "Highest zoom position the zone applies at, 1 to 19999." }
+    send:
+      - { method: GET, path: /axis-cgi/memoryzones/add.cgi, raw_query: "focus={focus}&zoomrange={zoom_min}:{zoom_max}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/memoryzones/list.cgi, raw_query: "query=list&camera={settings.camera}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+  add_memory_zone_current:
+    summary: Add a focus recall zone holding the current focus position, for a zoom range
+    params: { zoom_min: *zmin, zoom_max: *zmax }
+    send:
+      - { method: GET, path: /axis-cgi/memoryzones/add.cgi, raw_query: "focus=current&zoomrange={zoom_min}:{zoom_max}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/memoryzones/list.cgi, raw_query: "query=list&camera={settings.camera}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+  remove_memory_zone:
+    summary: Remove a focus recall zone by index
+    params:
+      index: &zone { type: int, min: 0, max: 65535, required: true, label: Zone, description: "Index of the memory zone, as the zone list gives it." }
+    send:
+      - { method: GET, path: /axis-cgi/memoryzones/remove.cgi, raw_query: "index={index}&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/memoryzones/list.cgi, raw_query: "query=list&camera={settings.camera}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+  remove_all_memory_zones:
+    summary: Remove every focus recall zone
+    send:
+      - { method: GET, path: /axis-cgi/memoryzones/remove.cgi, raw_query: "removeall=1&camera={settings.camera}" }
+      - { method: GET, path: /axis-cgi/memoryzones/list.cgi, raw_query: "query=list&camera={settings.camera}" }
+    expect: { status: 200, not_contains: '"error"' }
+    returns: ack
+  list_memory_zones:
+    summary: Read the focus recall zones
+    send: { method: GET, path: /axis-cgi/memoryzones/list.cgi, raw_query: "query=list&camera={settings.camera}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  goto_memory_zone:
+    summary: Go to a focus recall zone and focus there
+    params: { index: *zone }
+    send: { method: GET, path: /axis-cgi/memoryzones/goto.cgi, raw_query: "index={index}&camera={settings.camera}" }
+    expect: { status: 204 }
+    returns: ack
+
+maps:
+  on_off: { "true": "on", "false": "off" }
+
+telemetry:
+  # The PTZ API pushes nothing over HTTP (its events go to the event
+  # service), so position is read every 2 s and the configuration every 30 s.
+  poll:
+    - every_ms: 2000
+      send:
+        - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=position&camera={settings.camera}" }
+    - every_ms: 30000
+      send:
+        - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=speed&camera={settings.camera}" }
+        - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=limits&camera={settings.camera}" }
+        - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "query=presetposcam&camera={settings.camera}" }
+        - { method: GET, path: /axis-cgi/com/ptz.cgi, raw_query: "whoami=1&camera={settings.camera}" }
+        - { method: GET, path: /axis-cgi/param.cgi, raw_query: "action=list&group=PTZ" }
+        - { method: GET, path: /axis-cgi/memoryzones/list.cgi, raw_query: "query=list&camera={settings.camera}" }
+  updates:
+    # query=position: key=value lines.
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^pan=(-?[0-9.]+)\s*$'
+      state: { position.pan: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^tilt=(-?[0-9.]+)\s*$'
+      state: { position.tilt: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^zoom=(\d+)\s*$'
+      state: { position.zoom: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^focus=(\d+)\s*$'
+      state: { position.focus: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^iris=(\d+)\s*$'
+      state: { position.iris: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^brightness=(\d+)\s*$'
+      state: { position.brightness: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^autofocus=(on|off)\s*$'
+      state: { autofocus: { value: "{1}", map: { "on": true, "off": false } } }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=position&'
+      match: '(?m)^autoiris=(on|off)\s*$'
+      state: { autoiris: { value: "{1}", map: { "on": true, "off": false } } }
+    # query=speed
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=speed&'
+      match: '(?m)^speed=(\d+)\s*$'
+      state: { speed: "{1}" }
+    # query=limits: Name=value lines.
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MinPan=(-?[0-9.]+)\s*$'
+      state: { limits.pan.min: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MaxPan=(-?[0-9.]+)\s*$'
+      state: { limits.pan.max: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MinTilt=(-?[0-9.]+)\s*$'
+      state: { limits.tilt.min: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MaxTilt=(-?[0-9.]+)\s*$'
+      state: { limits.tilt.max: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MinZoom=(-?\d+)\s*$'
+      state: { limits.zoom.min: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MaxZoom=(-?\d+)\s*$'
+      state: { limits.zoom.max: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MinFocus=(-?\d+)\s*$'
+      state: { limits.focus.min: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MaxFocus=(-?\d+)\s*$'
+      state: { limits.focus.max: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MinIris=(-?\d+)\s*$'
+      state: { limits.iris.min: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MaxIris=(-?\d+)\s*$'
+      state: { limits.iris.max: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MinBrightness=(-?\d+)\s*$'
+      state: { limits.brightness.min: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MaxBrightness=(-?\d+)\s*$'
+      state: { limits.brightness.max: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MinFieldAngle=(-?\d+)\s*$'
+      state: { limits.field_angle.min: "{1}" }
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=limits&'
+      match: '(?m)^MaxFieldAngle=(-?\d+)\s*$'
+      state: { limits.field_angle.max: "{1}" }
+    # query=mode (Panopsis): the mode word alone.
+    - path: '^/axis-cgi/com/ptz\.cgi\?query=mode&'
+      match: '^\s*(?:mode=)?(overview|normal)\s*$'
+      state: { panopsis_mode: "{1}" }
+    # whoami=1: the driver name alone.
+    - path: '^/axis-cgi/com/ptz\.cgi\?whoami=1&'
+      match: '^\s*([^\r\n]+?)\s*$'
+      state: { driver: "{1}" }
+    # query=presetposcam: "Preset Positions for camera N" then presetposnoN=name
+    # lines; the list is read whole.
+    - match: '(?s)^Preset Positions for camera (\d+)\s*(.*)$'
+      match_each_in: 2
+      match_each: '(?m)^presetposno(\d+)=([^\r\n]*)$'
+      replace: presets
+      state: { "presets.{3}.name": "{4}" }
+    # ptzqueue.cgi: <a name="pos"></a><a name="seconds"></a><a name="period"></a>
+    - path: '^/axis-cgi/com/ptzqueue\.cgi\?'
+      match: '<a name="(\d+)"></a>\s*<a name="(-?\d+)"></a>\s*<a name="(\d+)">'
+      state:
+        queue.position: "{1}"
+        queue.seconds: "{2}"
+        queue.poll_period: "{3}"
+    # param.cgi?action=list&group=PTZ: root.PTZ.<name>=<value> lines.
+    - match: '(?s)^(root\.PTZ\..*)$'
+      match_each_in: 1
+      match_each: '(?m)^root\.PTZ\.([A-Za-z0-9_.]+)=([^\r\n]*)$'
+      state: { "parameters.{2:key}": "{3}" }
+    # memoryzones/list.cgi?query=list: a JSON array read whole.
+    - path: '^/axis-cgi/memoryzones/list\.cgi\?query=list&'
+      json_each: "$"
+      json: { index: "$.index", name: "$.name", focus: "$.focus", zoomrange: "$.zoomrange", ptpolygon: "$.ptpolygon" }
+      replace: memory_zones
+      state:
+        "memory_zones.{index}.name": "{name}"
+        "memory_zones.{index}.focus": "{focus}"
+        "memory_zones.{index}.zoom_range": "{zoomrange}"
+        "memory_zones.{index}.pan_tilt_polygon": "{ptpolygon}"
+
+state:
+  position.pan: { type: float, unit: "°", description: "Pan position in degrees" }
+  position.tilt: { type: float, unit: "°", description: "Tilt position in degrees" }
+  position.zoom: { type: int, description: "Zoom position, 1 (wide) to 9999 (full optical zoom), up to 19999 with digital zoom" }
+  position.focus: { type: int, description: "Focus position, 1 (near) to 9999 (far)" }
+  position.iris: { type: int, description: "Iris position, 1 (closed) to 9999 (open)" }
+  position.brightness: { type: int, description: "Brightness position, 1 to 9999" }
+  autofocus: { type: bool, description: "Autofocus is on" }
+  autoiris: { type: bool, description: "Auto iris is on" }
+  speed: { type: int, description: "Pan/tilt move speed for absolute and relative moves, 1 to 100" }
+  limits.pan.min: { type: float, unit: "°", description: "Lowest pan position allowed" }
+  limits.pan.max: { type: float, unit: "°", description: "Highest pan position allowed" }
+  limits.tilt.min: { type: float, unit: "°", description: "Lowest tilt position allowed" }
+  limits.tilt.max: { type: float, unit: "°", description: "Highest tilt position allowed" }
+  limits.zoom.min: { type: int, description: "Lowest zoom position allowed" }
+  limits.zoom.max: { type: int, description: "Highest zoom position allowed" }
+  limits.focus.min: { type: int, description: "Lowest focus position allowed" }
+  limits.focus.max: { type: int, description: "Highest focus position allowed" }
+  limits.iris.min: { type: int, description: "Lowest iris position allowed" }
+  limits.iris.max: { type: int, description: "Highest iris position allowed" }
+  limits.brightness.min: { type: int, description: "Lowest brightness allowed" }
+  limits.brightness.max: { type: int, description: "Highest brightness allowed" }
+  limits.field_angle.min: { type: int, description: "Minimum field angle of the zoom lens, used to calibrate image centering" }
+  limits.field_angle.max: { type: int, description: "Maximum field angle of the zoom lens, used to calibrate image centering" }
+  panopsis_mode: { type: string, description: "Panopsis mode of a dome with a fisheye lens: overview or normal" }
+  driver: { type: string, description: "Name of the PTZ driver in use (whoami)" }
+  presets.*.name: { type: string, description: "Name of the server preset with this number" }
+  queue.position: { type: int, description: "This client's place in the control queue: 0 not queued, 1 in control" }
+  queue.seconds: { type: int, unit: s, description: "Control time left at place 1, else the estimated wait; -1 when it cannot be estimated" }
+  queue.poll_period: { type: int, unit: s, description: "Recommended time before the next queue query, to stay in the queue" }
+  parameters.*: { type: string, description: "Every PTZ parameter by its name under root.PTZ (a key holding dots, such as Various.V1.Locked), as the camera lists it" }
+  memory_zones.*.name: { type: string, description: "Name of the focus recall zone with this index" }
+  memory_zones.*.focus: { type: int, description: "Focus position the zone recalls" }
+  memory_zones.*.zoom_range: { type: string, description: "Zoom range the zone applies at, as min:max" }
+  memory_zones.*.pan_tilt_polygon: { type: string, description: "Pan/tilt corners of the zone, as x,y pairs separated by colons" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      ptz.cgi and ptzconfig.cgi answer 204 No Content on success and 200 with "Error:" and a message
+      on failure, so commands succeed on 204 only; a query answers 200 with its text. Movement
+      arguments a driver does not support are refused that way; get_commands (info=1) and the
+      PTZ.Support parameters say what a channel takes.
+  - models: [all]
+    severity: info
+    text: >
+      Each device is one video channel, chosen by the camera setting and sent as camera= with every
+      request; the preset list, position and parameters in state are that channel's. The parameter
+      group names differ in their numbering: PTZ.ImageSource.I# counts from 0 for channel 1, the
+      other groups (Various.V#, Limit.L#, Support.S#) from 1.
+  - models: [all]
+    severity: warning
+    text: >
+      Position, speed, limits, presets and parameters are polled (every 2 s for the position, 30 s
+      for the rest): the PTZ API pushes nothing over HTTP, and the PTZ preset reached and moving
+      events go through the VAPIX event service, which this spec does not use. A move made from
+      another client shows in state at the next poll.
+  - models: [all]
+    severity: info
+    text: >
+      With the control queue on (PTZ.Various.V#.CtlQueueing true), only the client holding control
+      may move the camera and every ptz.cgi request needs the queue's cookie. The core does not keep
+      the queue's cookie, so queue_request, queue_drop and queue_query report the queue as a
+      cookieless client and a device opened here controls a queued camera only while its user group
+      does not use cookies (UseCookie no).
+  - models: [all]
+    severity: info
+    text: >
+      Images rotated differently from the channel's setup need the imagerotation argument with
+      center and areazoom; these commands send none, so their coordinates are for the image as the
+      channel is set up.
+  - models: [all]
+    severity: info
+    text: >
+      The Panopsis mode reply's form is not shown in the document; the rule takes the mode word on
+      its own or after "mode=".

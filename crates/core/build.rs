@@ -46,6 +46,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-anomes", &["millumin"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
+    ("vendor-axis", &["axis-ptz"]),
     (
         "vendor-barco",
         &[
@@ -196,8 +197,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["novastar-central-control", "novastar-coex", "novastar-h"],
     ),
     ("vendor-obs", &["obs-studio"]),
-    ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
     ("vendor-obsbot", &["obsbot-tail"]),
+    ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
     ("vendor-ontime", &["ontime", "ontime-osc"]),
     ("vendor-openlp", &["openlp"]),
     ("vendor-omt", &["omt", "omt-discovery"]),
