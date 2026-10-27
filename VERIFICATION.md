@@ -32,6 +32,14 @@ commands, odd replies.
 Line links point to where each note was when this list was written, so they
 can drift as specs change. The quirk text in the spec is the reference.
 
+## 7thsense-delta — 7thSense Delta Media Server
+
+- [ ] Confirm names in double quotes are taken where the reference writes 'name' in single quotes (LOAD, GOTOMARKER, SEQUENCE). ([specs/7thsense-delta.yaml:637](specs/7thsense-delta.yaml#L637))
+- [ ] Confirm the OK or BAD line comes after a command's data lines (STATUS, LISTSHOWS, GLOBALVARGET), and how GLOBALVARGET and SEQUENCESTATUS answer. ([specs/7thsense-delta.yaml:618](specs/7thsense-delta.yaml#L618))
+- [ ] Check the play and boolean words GOTOFRAME/GOTOMARKER take (play), CLIPSEARCH and MARKERSEARCH take (play=true/false), and PAUSESEQUENCE, MEDIAENABLE, ARTNET and SETTIMELINEVISIBILITY take (y/n). ([specs/7thsense-delta.yaml:610](specs/7thsense-delta.yaml#L610))
+- [ ] Check the separator spacing of the STATUS lines on current versions (the example shows SERVER  :, FILE   : and CURRENTFRAME:), and whether the label is LICENCE or LICENSE and OTHERDRIVE or OTHERDRIVES. ([specs/7thsense-delta.yaml:661](specs/7thsense-delta.yaml#L661))
+- [ ] Confirm what a follower answers to the leader-only commands (PLAY, CUE, GOTOFRAME...). ([specs/7thsense-delta.yaml:624](specs/7thsense-delta.yaml#L624))
+
 ## ableton-live — Ableton Live (AbletonOSC)
 
 - [ ] Confirm that AbletonOSC sends replies and listener updates to the last sender's address on UDP 11001, so commands sent from local port 11001 get their replies, and that a second client moves the updates away. ([specs/ableton-live.yaml:3007](specs/ableton-live.yaml#L3007))
@@ -234,6 +242,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the object list message ends each entry with a colon (id:name:) as the D.e.e example shows. ([specs/analogway-picturall.yaml:449](specs/analogway-picturall.yaml#L449))
 - [ ] Check that lua with backslash-escaped quotes runs set_pda_value_by_index, connect and send_ui_event as sent, and what the server answers when Lua raises an error. ([specs/analogway-picturall.yaml:554](specs/analogway-picturall.yaml#L554))
 - [ ] Find the parameter names of a layer's transform, colour, crop and draw mode with object_info on a server, to give them typed commands. ([specs/analogway-picturall.yaml:576](specs/analogway-picturall.yaml#L576))
+
+## arkaos-mediamaster — ArKaos MediaMaster
+
+- [ ] Confirm the Remote Command Service listens on TCP 45678 and takes each command as a line ended by CR LF; the user guide does not say. ([specs/arkaos-mediamaster.yaml:49](specs/arkaos-mediamaster.yaml#L49))
+- [ ] Compare the command texts with those MediaMaster's TELNET tab shows (Cue:<n>, Controller:Play, Fullscreen:On, Properties:Mixing, View:Remote Player...), on MediaMaster 6 and later. ([specs/arkaos-mediamaster.yaml:68](specs/arkaos-mediamaster.yaml#L68))
+- [ ] Check whether the service ever answers (an acknowledgement or an error), and whether the cue player's state can be read in any way. ([specs/arkaos-mediamaster.yaml:12](specs/arkaos-mediamaster.yaml#L12))
+- [ ] Check what Controller:Final15 and Controller:Final30 do. ([specs/arkaos-mediamaster.yaml:161](specs/arkaos-mediamaster.yaml#L161))
 
 ## atlona-matrix — Atlona matrix switchers and switchers
 
@@ -860,6 +875,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that input-descriptions comes in list replies, sideloaded objects and websocket pushes of layers, variants, sources and filters, not only in a GET of one object, and in the shape the Data Types page gives (type, label, hidden, index, value-min, value-max, value-step, value-unit, value-list). ([specs/boinx-mimolive.yaml:1483](specs/boinx-mimolive.yaml#L1483))
 - [ ] Check whether a camera or device source's GET, list entry, sideloaded object or websocket push reports video-device-id, video-device-name, audio-device-id, audio-device-name or channel-map (none is documented as reported, so state does not hold them); if they are, add them to the source state. ([specs/boinx-mimolive.yaml:2164](specs/boinx-mimolive.yaml#L2164))
 
+## brightsign-dws — BrightSign players (Local DWS)
+
+- [ ] Confirm a path with slashes in /api/v1/files/<path>/ (each segment percent-encoded) lists, reads, renames and deletes nested files. ([specs/brightsign-dws.yaml:671](specs/brightsign-dws.yaml#L671))
+- [ ] Confirm an upload as one multipart part named file, with the file's name as its filename, lands in the folder given in the path. ([specs/brightsign-dws.yaml:244](specs/brightsign-dws.yaml#L244))
+- [ ] Check whether the telnet and ssh answers come wrapped in data.result or bare, as the documentation shows them. ([specs/brightsign-dws.yaml:684](specs/brightsign-dws.yaml#L684))
+- [ ] Check the display power setting values beyond on and standby, the video output names, and the brightness, contrast, volume and white-balance ranges on a Moka display. ([specs/brightsign-dws.yaml:607](specs/brightsign-dws.yaml#L607))
+- [ ] Confirm the file systems format_storage takes (exfat by default) and the supervisor logging level range. ([specs/brightsign-dws.yaml:264](specs/brightsign-dws.yaml#L264))
+
+## brightsign-udp — BrightSign players (UDP)
+
+- [ ] Confirm the default UDP Receiver Port of a new BrightSign Author presentation (5000 is assumed). ([specs/brightsign-udp.yaml:46](specs/brightsign-udp.yaml#L46))
+- [ ] Confirm the sample control script's command texts (PLAY, PLAYCL, LOOP, LOOPS, STOP, STOPCL, PAUSE, RESUME, SEARCH, VOLUME, REBOOT) on its current version. ([specs/brightsign-udp.yaml:86](specs/brightsign-udp.yaml#L86))
+- [ ] Confirm name:value and name:value!!name:value set user variables through an Input-specifies-variable UDP event. ([specs/brightsign-udp.yaml:79](specs/brightsign-udp.yaml#L79))
+
 ## brompton-tessera — Brompton Tessera
 
 - [ ] Confirm that GET /api/ answers the whole tree under an "api" key, with groups, input ports, cable loops and frame remapping frames keyed "1", "2", ... (ports and frames numbered from 1), as the poll reads it. ([specs/brompton-tessera.yaml:3315](specs/brompton-tessera.yaml#L3315))
@@ -1014,6 +1043,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the inverted E Series ESH (0 = number keys select sources, 1 = off). ([specs/christie-1dlp.yaml:2549](specs/christie-1dlp.yaml#L2549))
 - [ ] Check the E Series BCL values beyond 0 and 1 (the reference text mentions 1 to 10 as a wish). ([specs/christie-1dlp.yaml:2528](specs/christie-1dlp.yaml#L2528))
 - [ ] Check whether the E Series SKS (marked READ ONLY but with values 0 to 2) accepts a set. ([specs/christie-1dlp.yaml:1724](specs/christie-1dlp.yaml#L1724))
+
+## christie-pandorasbox — Christie Pandoras Box
+
+- [ ] Confirm doubles go little-endian (as the vendor SDKs send them), not in network order as the protocol page says, with set_param_double on a known parameter. ([specs/christie-pandorasbox.yaml:2344](specs/christie-pandorasbox.yaml#L2344))
+- [ ] Confirm functions without return values are never answered, and how a refused one is signalled. ([specs/christie-pandorasbox.yaml:2337](specs/christie-pandorasbox.yaml#L2337))
+- [ ] Confirm a refused function answers a negative code followed by an int error number, and what the numbers mean. ([specs/christie-pandorasbox.yaml:2337](specs/christie-pandorasbox.yaml#L2337))
+- [ ] Check the int buffer of GetSiteIds and GetPlaylistEntryIndices* carries an int count first (the C# SDK reads none). ([specs/christie-pandorasbox.yaml:2321](specs/christie-pandorasbox.yaml#L2321))
+- [ ] Check which Pandoras Box versions answer GetCurrentTimeCueInfo (295); older ones are taken to refuse it. ([specs/christie-pandorasbox.yaml:2352](specs/christie-pandorasbox.yaml#L2352))
 
 ## christie-spyder — Christie Spyder X20 / X80
 
@@ -1849,6 +1886,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether cue-level feedback keys a cue by its number or its ID, and the value range of the documented /mitti/<cue>/opacity. ([specs/imimot-mitti.yaml:654](specs/imimot-mitti.yaml#L654))
 - [ ] Confirm the UDP string form of the no-value commands, and that OSC control is ignored while Mitti follows MTC or LTC. ([specs/imimot-mitti.yaml:664](specs/imimot-mitti.yaml#L664))
 
+## ioversal-vertex — ioversal VERTEX
+
+- [ ] Confirm the script server answers nothing to commands without return (a set, a Play), so nothing is taken for a later query's answer. ([specs/ioversal-vertex.yaml:307](specs/ioversal-vertex.yaml#L307))
+- [ ] Confirm what Authenticate:username,password answers, and what an unauthenticated command gets when authentication is on. ([specs/ioversal-vertex.yaml:66](specs/ioversal-vertex.yaml#L66))
+- [ ] Confirm FadeToCue's arguments are the cue, a preload time and a fade time in seconds, and that GotoFrame takes a frame number. ([specs/ioversal-vertex.yaml:181](specs/ioversal-vertex.yaml#L181))
+- [ ] Check the TimeCode value's JSON field order (FPS before TotalFrames) on current versions, and that ListItems.Playback lists every playback by name. ([specs/ioversal-vertex.yaml:350](specs/ioversal-vertex.yaml#L350))
+
 ## irisdown-countdown-timer — Irisdown Countdown Timer
 
 - [ ] Confirm that UPDATEMODE and UPDATES apply per connection and that UPDATEMODE 2 answers OK before UPDATES ON turns other answers off. ([specs/irisdown-countdown-timer.yaml:180](specs/irisdown-countdown-timer.yaml#L180))
@@ -2477,6 +2521,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that a property's /? query sent right after an OSC change is answered with the new value, and which address the position, mapping corner and effect queries answer on. ([specs/millumin.yaml:841](specs/millumin.yaml#L841))
 - [ ] Check which column feedback name Millumin V5 sends (launchedColumn in the Feedback section, columnLaunched in the Summary), and whether launching a column also reports the previous one stopped. ([specs/millumin.yaml:678](specs/millumin.yaml#L678))
 - [ ] Confirm /millumin/info carries the original address (layer:Name/opacity, light:Name/intensity) as its first argument and the message's values after it, for every property read from it (the legacy example shows only selection), and that a setup can send only this form. ([specs/millumin.yaml:764](specs/millumin.yaml#L764))
+
+## modulopi-kinetic — Modulo Pi Modulo Kinetic
+
+- [ ] Confirm the websocket path (/ is used) and whether wss uses a self-signed certificate when SSL is on. ([specs/modulopi-kinetic.yaml:45](specs/modulopi-kinetic.yaml#L45))
+- [ ] Confirm a reply carries an error object (not a result) when a method fails, and that every doaction and set.property answers with a result. ([specs/modulopi-kinetic.yaml:341](specs/modulopi-kinetic.yaml#L341))
+- [ ] Check the units of a timeline's timecode, grandMasterFader and audioMaster in get.list.timelines (ms and percent are assumed), and the fade argument of grandMasterFader and audioMaster (timecode, in ms). ([specs/modulopi-kinetic.yaml:188](specs/modulopi-kinetic.yaml#L188))
+- [ ] Find how the Designer's uuid for doaction.kinetic is obtained. ([specs/modulopi-kinetic.yaml:345](specs/modulopi-kinetic.yaml#L345))
+- [ ] Check the forms of a vec2-vec4 and color variable's value in get.list.variables. ([specs/modulopi-kinetic.yaml:373](specs/modulopi-kinetic.yaml#L373))
+
+## modulopi-player — Modulo Pi Modulo Player
+
+- [ ] Confirm the websocket path is / on port 8080 and that connections are refused until a show is loaded. ([specs/modulopi-player.yaml:68](specs/modulopi-player.yaml#L68))
+- [ ] Confirm mixer.state is pushed after get.state alone (the poll), with the same fields as get.state's result. ([specs/modulopi-player.yaml:828](specs/modulopi-player.yaml#L828))
+- [ ] Check that the media list's duration is in seconds and the playlists' timecode in milliseconds. ([specs/modulopi-player.yaml:873](specs/modulopi-player.yaml#L873))
+- [ ] Confirm set.monitoring.zone takes sourcename for an output and a live input, and set.cue.settings takes property name with value. ([specs/modulopi-player.yaml:623](specs/modulopi-player.yaml#L623))
+- [ ] Check what get.list.playlists' playState holds when stopped (only true is documented). ([specs/modulopi-player.yaml:852](specs/modulopi-player.yaml#L852))
+
+## modulopi-spydog — Modulo Pi Spydog
+
+- [ ] Confirm the websocket path is / on port 8081 and the units of cpuTemperature, motherboardTemperature, upTime and serverTime. ([specs/modulopi-spydog.yaml:31](specs/modulopi-spydog.yaml#L31))
+- [ ] Confirm doaction.computer answers false (not an error) when an action fails. ([specs/modulopi-spydog.yaml:47](specs/modulopi-spydog.yaml#L47))
 
 ## nec-display — NEC (Sharp NEC) large-format displays
 
@@ -3744,6 +3809,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the ID list's first two bytes count the IDs still to come after this message, and that NEXT (3X.02, answered 3X.82) continues it ten at a time. ([specs/vdcp.yaml:344](specs/vdcp.yaml#L344))
 - [ ] Check which VDCP commands Ross Tria, Mira and Kiva servers take and on which port. ([specs/vdcp.yaml:72](specs/vdcp.yaml#L72))
 
+## ventuz-director — Ventuz Director (Director Remoting)
+
+- [ ] Confirm Director Remoting's websocket answers on port 22404 (the documentation's port; the vendor's Companion module defaults to 21404). ([specs/ventuz-director.yaml:50](specs/ventuz-director.yaml#L50))
+- [ ] Confirm a numeric RequestID is echoed as sent (the documentation writes it as an integer in quotes) and that each reply carries it. ([specs/ventuz-director.yaml:618](specs/ventuz-director.yaml#L618))
+- [ ] Check whether channel and playlist item indexes count from 0 or from 1, and what show.cue and show.take do without a ChannelIndex. ([specs/ventuz-director.yaml:620](specs/ventuz-director.yaml#L620))
+- [ ] Check the shape of show.getchannels, macro.get and playlist.get results (arrays of ChannelIndex/Name, Id/Name and ChannelIndex/ChannelName/Items) and of remoteplaylist.get's PublishContexts. ([specs/ventuz-director.yaml:707](specs/ventuz-director.yaml#L707))
+- [ ] Confirm show.setprojectdata takes a boolean's ValueToSet as the text true or false, and a relative number as text. ([specs/ventuz-director.yaml:382](specs/ventuz-director.yaml#L382))
+- [ ] Check that the can_* commands return Code 0 when the action is possible and another code (5, ErrorInvalidOperation) when not. ([specs/ventuz-director.yaml:286](specs/ventuz-director.yaml#L286))
+
 ## videolan-vlc — VLC media player
 
 - [ ] Confirm the .json pages take the same commands as the .xml ones, the status and playlist field names read here, and the rate and audiodelay commands. ([specs/videolan-vlc.yaml:315](specs/videolan-vlc.yaml#L315))
@@ -3769,6 +3843,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what Get an M3U8 playback URL answers (the reference gives no schema). ([specs/vimeo-live.yaml:401](specs/vimeo-live.yaml#L401))
 - [ ] Record which ingest.status values occur in practice through a stream's life (0 to 5 documented). ([specs/vimeo-live.yaml:578](specs/vimeo-live.yaml#L578))
 - [ ] Record whether GET /me/live_events/{id}/destinations answers a bare array or a page {total, page, per_page, data}: a bare array, or a first page of 25 whose total fits on it, replaces the event's destinations. ([specs/vimeo-live.yaml:664](specs/vimeo-live.yaml#L664))
+
+## vioso-exaplay — VIOSO EXAPLAY
+
+- [ ] Confirm what EXAPLAY answers to a command it refuses or does not know (the documentation gives no error reply). ([specs/vioso-exaplay.yaml:118](specs/vioso-exaplay.yaml#L118))
+- [ ] Confirm hello's reply text (documented as hallo) and that get cue answers without the argument the documentation's example shows (get cue 012345). ([specs/vioso-exaplay.yaml:51](specs/vioso-exaplay.yaml#L51))
+- [ ] Check whether the composition-addressed commands of later versions (get:status,comp1 and the like on port 8100) replace the documented ones, and on which versions each works. ([specs/vioso-exaplay.yaml:124](specs/vioso-exaplay.yaml#L124))
+- [ ] Confirm get cue's fields and their order (status, cue, frame, time, duration, fps) and the volume range 0-100. ([specs/vioso-exaplay.yaml:144](specs/vioso-exaplay.yaml#L144))
 
 ## visca — VISCA over IP
 

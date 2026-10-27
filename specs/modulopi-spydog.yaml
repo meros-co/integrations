@@ -1,0 +1,147 @@
+spec: 1
+id: modulopi-spydog
+name: Modulo Pi Spydog (server monitoring and power)
+vendor: Modulo Pi
+category: other
+
+# Spydog runs on Modulo Pi servers beside Modulo Player and answers JSON-RPC
+# 2.0 on its own websocket, port 8081: it starts and stops Modulo Player,
+# reboots or powers off the server, and reports the server's hardware and its
+# load, temperatures and frame rate, which are polled.
+source:
+  - title: "Modulo Player manual, WebSocket Spydog methods"
+    author: Modulo Pi
+    url: "https://support.modulo-pi.com/modulo-player-manual/1/en/topic/websocket-spydog"
+    note: >
+      Manufacturer documentation, read 2026-10-27 (marked as under maintenance). Port 8081.
+      doaction.computer with action startModuloPlayer, stopModuloPlayer, rebootComputer, powerOffComputer,
+      installDeltacastDrivers, answering true or false; get.computer.static.info (CPU, GpuBrand, GpuDriver,
+      GpuName, ModuloPlayer, OS, processorCount, totalMemory in GB); get.computer.dynamic.info (clusterId,
+      color, cpuTemperature, cpuUse %, detacastTemperature, fps, fpsOk, master, maxAutocalibOutputs,
+      maxOutputs, memoryUse %, motherboardTemperature, serverIp, serverName, serverTime, status 0 offline /
+      1 launching / 2 online, upTime).
+  - title: "Modulo Player manual, WebSocket external control protocol"
+    author: Modulo Pi
+    url: "https://support.modulo-pi.com/modulo-player-manual/1/en/topic/websocket-external-control-protocol"
+    note: "Read 2026-10-27: the Spydog methods on port 8081 of the same JSON-RPC 2.0 protocol as Modulo Player's port 8080."
+
+transport:
+  type: ws
+  port: 8081
+  path: /
+  scheme: ws
+  timeout_ms: 10000
+  reply: expected
+  probe: '{"jsonrpc":"2.0","method":"get.computer.dynamic.info","id":"probe"}'
+
+ports:
+  - { port: 8081, protocol: ws, role: control, note: "Spydog's websocket on a Modulo Pi server" }
+
+models:
+  - id: spydog
+    name: Modulo Pi Spydog
+    supports: [computer_action, get_static_info, get_dynamic_info]
+    verification: none
+
+commands:
+  computer_action:
+    summary: "Start or stop Modulo Player, reboot or power off the server, or update its Deltacast drivers (doaction.computer)"
+    params:
+      action: { type: enum, values: [startModuloPlayer, stopModuloPlayer, rebootComputer, powerOffComputer, installDeltacastDrivers],
+                required: true, label: Action, description: "The action: start or stop Modulo Player, reboot or power off the server, or install the Deltacast drivers." }
+    send: '{"jsonrpc":"2.0","method":"doaction.computer","params":{"action":"{action}"},"id":"computer {action}"}'
+    expect: { reply_json: { "$.id": "computer {action}" }, json_equals: { "$.result": true } }
+    returns: ack
+  get_static_info:
+    summary: "Read the server's hardware and software: CPU, GPU and driver, Modulo Player and OS versions, cores, memory (get.computer.static.info)"
+    send: '{"jsonrpc":"2.0","method":"get.computer.static.info","id":"static"}'
+    expect: { reply_json: { "$.id": "static" }, json_path: "$.result" }
+    returns: value
+  get_dynamic_info:
+    summary: "Read the server's state: status, load, temperatures, frame rate, master, licence outputs, address and time (get.computer.dynamic.info)"
+    send: '{"jsonrpc":"2.0","method":"get.computer.dynamic.info","id":"dynamic"}'
+    expect: { reply_json: { "$.id": "dynamic" }, json_path: "$.result" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      rebootComputer, powerOffComputer and stopModuloPlayer stop the server's output at once;
+      installDeltacastDrivers updates the capture card drivers.
+  - models: [all]
+    severity: info
+    text: >
+      The documentation gives no units for the temperatures, upTime or serverTime; they are kept as Spydog
+      sends them. Several Deltacast card temperatures come as one text separated by =.
+
+state:
+  server.status: { type: int, description: "0 offline, 1 launching, 2 online (Modulo Player's status)" }
+  server.name: { type: string, description: "The server's name in the project" }
+  server.ip: { type: string, description: "The server's address" }
+  server.time: { type: string, description: "The server's clock" }
+  server.uptime: { type: string, description: "The time since the server booted, as Spydog sends it" }
+  server.master: { type: bool, description: "The server is the master" }
+  server.cluster_id: { type: int, description: "The server's cluster id in the project" }
+  server.color: { type: string, description: "The server's color, in hexadecimal" }
+  load.cpu: { type: float, unit: "%", description: "The average CPU use across logical cores" }
+  load.memory: { type: float, unit: "%", description: "The memory use" }
+  load.fps: { type: float, unit: fps, description: "The output frame rate" }
+  load.fps_ok: { type: bool, description: "The output frame rate is right" }
+  temperatures.cpu: { type: float, description: "The CPU temperature, as Spydog sends it" }
+  temperatures.motherboard: { type: float, description: "The motherboard temperature, as Spydog sends it" }
+  temperatures.deltacast: { type: string, description: "The Deltacast cards' temperatures, separated by = when there are several" }
+  licence.max_outputs: { type: int, description: "The outputs the licence allows" }
+  licence.max_autocalib_outputs: { type: int, description: "The outputs the licence allows for autocalibration" }
+  hardware.cpu: { type: string, description: "The processor model" }
+  hardware.gpu: { type: string, description: "The graphics card" }
+  hardware.gpu_brand: { type: string, description: "The graphics card's maker" }
+  hardware.gpu_driver: { type: string, description: "The graphics driver's version" }
+  hardware.os: { type: string, description: "The Windows version" }
+  hardware.processors: { type: int, description: "The logical cores" }
+  hardware.memory_gb: { type: float, unit: GB, description: "The installed memory" }
+  hardware.player_version: { type: string, description: "Modulo Player's version" }
+
+telemetry:
+  poll:
+    - every_ms: 2000
+      send: ['{"jsonrpc":"2.0","method":"get.computer.dynamic.info","id":"poll dynamic"}']
+    - every_ms: 60000
+      send: ['{"jsonrpc":"2.0","method":"get.computer.static.info","id":"poll static"}']
+  updates:
+    - json_match: { "$.id": "^(poll )?dynamic$" }
+      json: { status: "$.result.status", name: "$.result.serverName", ip: "$.result.serverIp", time: "$.result.serverTime",
+              up: "$.result.upTime", master: "$.result.master", cluster: "$.result.clusterId", color: "$.result.color",
+              cpu: "$.result.cpuUse", mem: "$.result.memoryUse", fps: "$.result.fps", fps_ok: "$.result.fpsOk",
+              cpu_t: "$.result.cpuTemperature", mb_t: "$.result.motherboardTemperature", dc_t: "$.result.detacastTemperature",
+              outputs: "$.result.maxOutputs", autocalib: "$.result.maxAutocalibOutputs" }
+      state:
+        server.status: "{status}"
+        server.name: "{name}"
+        server.ip: "{ip}"
+        server.time: "{time}"
+        server.uptime: "{up}"
+        server.master: "{master}"
+        server.cluster_id: "{cluster}"
+        server.color: "{color}"
+        load.cpu: "{cpu}"
+        load.memory: "{mem}"
+        load.fps: "{fps}"
+        load.fps_ok: "{fps_ok}"
+        temperatures.cpu: "{cpu_t}"
+        temperatures.motherboard: "{mb_t}"
+        temperatures.deltacast: "{dc_t}"
+        licence.max_outputs: "{outputs}"
+        licence.max_autocalib_outputs: "{autocalib}"
+    - json_match: { "$.id": "^(poll )?static$" }
+      json: { cpu: "$.result.CPU", gpu: "$.result.GpuName", brand: "$.result.GpuBrand", driver: "$.result.GpuDriver", os: "$.result.OS",
+              cores: "$.result.processorCount", mem: "$.result.totalMemory", player: "$.result.ModuloPlayer" }
+      state:
+        hardware.cpu: "{cpu}"
+        hardware.gpu: "{gpu}"
+        hardware.gpu_brand: "{brand}"
+        hardware.gpu_driver: "{driver}"
+        hardware.os: "{os}"
+        hardware.processors: "{cores}"
+        hardware.memory_gb: "{mem}"
+        hardware.player_version: "{player}"

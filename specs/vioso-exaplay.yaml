@@ -1,0 +1,157 @@
+spec: 1
+id: vioso-exaplay
+name: VIOSO EXAPLAY (TCP control)
+vendor: VIOSO
+category: playback
+
+# EXAPLAY takes text commands on a TCP port configured in its config.xml
+# (<tcp_control>), one per line ended by CR LF, and answers each with one line
+# ended the same way: OK for an action, the value for a query. The cue state
+# (play status, cue, frame, time, duration, frame rate) and the volume are
+# polled; EXAPLAY pushes its state only as OSC to targets set in config.xml.
+source:
+  - title: "EXAPLAY Remote Control (VIOSO helpdesk, EXAPLAY documentation)"
+    author: VIOSO GmbH
+    url: "https://helpdesk.vioso.com/documentation/exaplay-overview/exaplay-remote-control/"
+    note: >
+      Manufacturer documentation, read 2026-10-27 (the page says the documentation has moved to
+      docs.exaplay.one, which did not answer). TCP control enabled in config.xml under <tcp_control> with
+      <addr ip="*" port="5000"/>; command lines end with CR LF and so do the replies; a persistent thread
+      per connection. Commands: hello (echo test), ver (Exaplay,1.1.0.0), play %1 (cue index from 1, or the
+      selected cue without one), stop, pause, seek %1 (seconds), get cue (play status, cue index, frame,
+      time, cue duration, cue fps: play,1,562,18.733,50.000,30.00), get vol (0-100), set vol %1, answering
+      OK. OSC in (/exaplay/play with an int cue index, /exaplay/stop, /exaplay/pause) and OSC out
+      (status, cueindex, cueframe, cuetime, cueduration) to targets configured in config.xml.
+  - title: "companion-module-vioso-exaplay (MIT)"
+    url: "https://github.com/bitfocus/companion-module-vioso-exaplay"
+    note: >
+      Read 2026-10-27 as corroboration only. It speaks a later, composition-addressed dialect (get:status
+      and set:vol with a composition id such as comp1, on port 8100) that VIOSO's public documentation
+      does not describe; it is not used here.
+
+transport:
+  type: line-tcp
+  port: 5000
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 2000
+  probe: "ver"
+
+ports:
+  - { port: 5000, protocol: tcp, role: control, note: "the port set in EXAPLAY's config.xml under <tcp_control>; 5000 in the documentation's example" }
+
+models:
+  - id: exaplay
+    name: VIOSO EXAPLAY
+    supports: [hello, get_version, play, play_cue, pause, stop, seek, get_cue, get_volume, set_volume]
+    verification: none
+
+commands:
+  hello:
+    summary: "Echo test: EXAPLAY answers with a greeting (hello)"
+    send: "hello"
+    expect: { matches: "^(.+)$" }
+    returns: value
+  get_version:
+    summary: "Read EXAPLAY's name and version, such as Exaplay,1.1.0.0 (ver)"
+    send: "ver"
+    expect: { matches: "^(.+)$" }
+    returns: value
+  play:
+    summary: "Play the selected cue (play)"
+    send: "play"
+    expect: { matches: "^OK$" }
+    returns: ack
+  play_cue:
+    summary: "Play a cue by its index (play %1)"
+    params:
+      cue: { type: int, min: 1, required: true, label: Cue, description: "The cue's index in the cue list, from 1." }
+    send: "play {cue}"
+    expect: { matches: "^OK$" }
+    returns: ack
+  pause:
+    summary: "Pause the current cue (pause)"
+    send: "pause"
+    expect: { matches: "^OK$" }
+    returns: ack
+  stop:
+    summary: "Stop playback (stop)"
+    send: "stop"
+    expect: { matches: "^OK$" }
+    returns: ack
+  seek:
+    summary: "Seek the current cue to a time (seek %1)"
+    params:
+      seconds: { type: float, min: 0, required: true, label: Time, description: "The time to seek to, in seconds from the cue's start." }
+    send: "seek {seconds:.3f}"
+    expect: { matches: "^OK$" }
+    returns: ack
+  get_cue:
+    summary: "Read the cue state: play status, cue index, frame, time, cue duration and frame rate, comma-separated (get cue)"
+    send: "get cue"
+    expect: { matches: "^((?:play|stop|pause),.*)$" }
+    returns: value
+  get_volume:
+    summary: "Read the volume, 0 to 100 (get vol)"
+    send: "get vol"
+    expect: { matches: "^([0-9]+)$" }
+    returns: value
+  set_volume:
+    summary: "Set the volume (set vol %1)"
+    params:
+      volume: { type: int, min: 0, max: 100, required: true, label: Volume, description: "The volume, 0 (silent) to 100 (full)." }
+    send: "set vol {volume}"
+    expect: { matches: "^OK$" }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      TCP control is off until a <tcp_control> section with an address and port is added to EXAPLAY's
+      config.xml and EXAPLAY is restarted. The documentation gives no default port; its example, 5000, is
+      the default here.
+  - models: [all]
+    severity: info
+    text: >
+      The documentation gives no error replies. A command EXAPLAY refuses is reported as failed by the
+      reply not being OK; what the reply then says is not documented. The documentation also shows the
+      hello reply as "hallo", which is taken as written.
+  - models: [all]
+    severity: info
+    text: >
+      Later EXAPLAY versions address several compositions (comp1, comp2...) in a dialect the public
+      documentation does not cover; this spec drives the documented single-composition commands.
+
+state:
+  playback.status: { type: string, description: "play, stop or pause (get cue)" }
+  playback.cue: { type: int, description: "The current cue's index, from 1" }
+  playback.frame: { type: int, description: "The current frame of the playing cue" }
+  playback.time: { type: float, unit: s, description: "The current time in the cue" }
+  playback.duration: { type: float, unit: s, description: "The current cue's duration" }
+  playback.fps: { type: float, unit: fps, description: "The current cue's frame rate" }
+  audio.volume: { type: int, description: "The volume, 0 to 100" }
+  device.version: { type: string, description: "EXAPLAY's name and version, as ver answers" }
+
+telemetry:
+  poll:
+    - every_ms: 500
+      send: ["get cue", "get vol"]
+    - every_ms: 60000
+      send: ["ver"]
+  updates:
+    - match: "^(play|stop|pause),([0-9]+),([0-9]+),([0-9.]+),([0-9.]+),([0-9.]+)$"
+      state:
+        playback.status: "{1}"
+        playback.cue: "{2}"
+        playback.frame: "{3}"
+        playback.time: "{4}"
+        playback.duration: "{5}"
+        playback.fps: "{6}"
+    - match: "^([0-9]+)$"
+      request_match: "^get vol$"
+      state: { audio.volume: "{1}" }
+    - match: "^(.+)$"
+      request_match: "^ver$"
+      state: { device.version: "{1}" }

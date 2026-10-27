@@ -1,0 +1,1056 @@
+spec: 1
+id: modulopi-player
+name: Modulo Pi Modulo Player (WebSocket external control)
+vendor: Modulo Pi
+category: playback
+
+# Modulo Player accepts websocket connections on port 8080 once a show is
+# loaded and takes JSON-RPC 2.0 requests, one per message, answered with the
+# same id (replies may come out of order). The commands here cover the show,
+# playlists, cues, layers and effects, tasks, media, outputs, monitoring,
+# DigiMaps and the Live Mixer; call, get_object and set_properties reach every
+# other method and property the API offers. Player pushes event.show.loaded
+# when a show is ready (the lists are then read again) and mixer.state to a
+# client that has used the Live Mixer; the player status, playlists, tasks,
+# media, outputs and the mixer's lists are polled.
+source:
+  - title: "Modulo Player manual, WebSocket external control protocol"
+    author: Modulo Pi
+    url: "https://support.modulo-pi.com/modulo-player-manual/1/en/topic/websocket-external-control-protocol"
+    note: >
+      Manufacturer documentation, read 2026-10-27 (marked as under maintenance). ws://<ip>:8080 once a show
+      is loaded, Spydog methods on 8081; no password; several clients; requests {jsonrpc, method (not
+      case-sensitive), params (case-sensitive), id}, one per message, replies matched by id; errors -32600,
+      -32601, -32602 (invalid parameter, no object, no show), -32603, -32000 (action not possible), -32001
+      (Live Mixer not ready), -32003; notifications event.show.loaded {name} and mixer.state.
+  - title: "Modulo Player manual, WebSocket method pages"
+    author: Modulo Pi
+    url: "https://support.modulo-pi.com/modulo-player-manual/1/en/topic/websocket-playlists"
+    note: >
+      Manufacturer documentation, read 2026-10-27: websocket-generic-methods (get.list.methods, get.object
+      with depth 0-8, get.tree, set.property with a properties object, all validated before any write),
+      websocket-show (doaction.show save, backup, rescanmedia, removemissingmedia, rescanmediaforce, ping,
+      sendshowtoremote, load with name; get.status.player version, apiVersion, showName, documentState 0-2,
+      frameCounter, displayFrequency, maxOutputs, playlistCount, master, mediaToCache, mediaCaching,
+      clientConnected; get.list.shows, new.show, saveas.show, saveincrement.show, backup.show,
+      get.list.backups, restore.show, get.list.import, import.show, get.object.computer,
+      set.property.computer), websocket-playlists (get.list.playlists level playlist / cue / layer;
+      doaction.playlist prev, next, goto and preload with a cue from 1, play, pause, grandMasterFader and
+      audioMaster with value 0-100 % and duration in ms; get.playlist.settings, set.playlist.settings,
+      new.playlist, delete.playlist, set.property.playlist name / uiColor; playlist fields activeLayers,
+      audioMaster, cueCount, currentCueUuid, currentcuename, grandMasterFader 0-1, index, name, play,
+      playState, preloadCueUuid, timecode, timecodeLocked, uiColor, uuid), websocket-cues-layers
+      (get.list.cues with offset and limit, add.cues, delete.cues, duplicate.cue, set.cue.settings with
+      trigger go / follow / wait / timecode and triggerTime, set.cue.index, get.property.cue,
+      set.property.cue), websocket-layers-fx (get.object.layer, set.layer.media with slot media / audio /
+      stereo / mask, clear.layer.media, set.layer.settings, get.list.fx.types, add.fx, set.fx.settings,
+      delete.fx), websocket-tasks (get.list.tasks, run.task, set.task, create.task, duplicate.task,
+      remove.task), websocket-media (get.list.media with mediaState 0, 2, 3, 4; get.object.media,
+      get.tree.media, add.media, set.media.settings, delete.media, delete.media.missing, rescan.media),
+      websocket-outputs (get.list.outputs, get.object.output, set.property.output, add.output,
+      delete.output), websocket-monitoring (get.list.monitoring, set.property.monitoring active,
+      set.monitoring.zone), websocket-digimap (get.list.digimaps, doaction.digimap), and the Live Mixer
+      pages (get.state and mixer.state fields, mixer.set.option, mixer.take, mixer.cut,
+      mixer.transition.begin / position / commit / cancel / type, mixer.pgmtopvw, mixer.clear,
+      mixer.source.set, mixer.source.freeze, get.list.sources, get.list.destinations, get.list.renders,
+      mixer.destination.active, mixer.destination.all, mixer.set.property, get.list.presets,
+      mixer.preset.recall / save / add / delete, mixer.show.save).
+  - title: "Modulo Player manual, TCP/IP external control protocol"
+    author: Modulo Pi
+    url: "https://support.modulo-pi.com/modulo-player-manual/1/en/topic/tcp-ip-external-control-protocol"
+    note: >
+      Read 2026-10-27: the older text protocol on TCP 28686 (show) and 28670 (computer); the websocket API
+      covers everything it does, so it is not used here.
+
+transport:
+  type: ws
+  port: 8080
+  path: /
+  scheme: ws
+  timeout_ms: 10000
+  reply: expected
+  probe: '{"jsonrpc":"2.0","method":"get.status.player","id":"probe"}'
+
+ports:
+  - { port: 8080, protocol: ws, role: control, note: "Modulo Player's websocket API, open once a show is loaded" }
+
+models:
+  - id: player
+    name: Modulo Pi Modulo Player
+    supports: [call, get_methods, get_object, get_tree, set_properties, get_player_status, show_action, load_show,
+               list_shows, new_show, save_show_as, save_show_increment, backup_show, list_backups, restore_show,
+               list_import, import_show_all, get_computer, set_computer_properties, list_playlists, get_playlist,
+               playlist_next, playlist_previous, playlist_goto, playlist_preload, playlist_play, playlist_pause,
+               playlist_grand_master, playlist_audio_master, get_playlist_settings, set_playlist_settings,
+               rename_playlist, new_playlist, delete_playlist, list_cues, get_cue_property, set_cue_settings,
+               set_cue_trigger, rename_cue, add_cues, delete_cue, duplicate_cue, move_cue, get_layer,
+               set_layer_media, clear_layer_media, set_layer_settings, list_fx_types, add_fx, set_fx_settings,
+               delete_fx, list_tasks, run_task, set_task_enabled, create_task, duplicate_task, remove_task,
+               list_media, get_media, get_media_tree, add_media, set_media_settings, delete_media,
+               delete_missing_media, rescan_media, list_outputs, get_output, set_output_properties, add_output,
+               delete_output, list_monitoring, activate_monitoring, set_monitoring_zone, list_digimaps,
+               digimap_action, get_mixer_state, mixer_set_options, mixer_take, mixer_cut, mixer_transition_begin,
+               mixer_transition_position, mixer_transition_commit, mixer_transition_cancel, mixer_transition_type,
+               mixer_pgm_to_pvw, mixer_clear, mixer_source_set, mixer_source_freeze, list_mixer_sources,
+               list_mixer_destinations, list_mixer_renders, mixer_destination_active, mixer_destination_all,
+               mixer_set_property, list_mixer_presets, mixer_preset_recall, mixer_preset_save, mixer_preset_add,
+               mixer_preset_delete, mixer_show_save]
+    verification: none
+
+commands:
+  # ── Any method ──────────────────────────────────────────────────────────
+  call:
+    summary: "Call any method of the API with its params object and return its result (get.list.methods lists them)"
+    params:
+      method: { type: string, pattern: '^[a-z]+(\.[a-z]+)+$', max_length: 128, required: true, label: Method, description: "The JSON-RPC method, such as set.playlist.fader." }
+      params: { type: json, required: true, label: Params, description: "The method's params object as the manual documents it; {} for none." }
+    send: '{"jsonrpc":"2.0","method":{method:json},"params":{params},"id":"call"}'
+    expect: { reply_json: { "$.id": "call" }, json_path: "$.result" }
+    returns: value
+  get_methods:
+    summary: "List the API's methods with their parameters, optionally those starting with a prefix (get.list.methods)"
+    params:
+      prefix: { type: string, pattern: '^[a-z.]*$', max_length: 64, default: "", label: Prefix, description: "Only methods starting with this, such as mixer.; empty for all." }
+    send: '{"jsonrpc":"2.0","method":"get.list.methods","params":{"prefix":"{prefix}"},"id":"methods"}'
+    expect: { reply_json: { "$.id": "methods" }, json_path: "$.result" }
+    returns: value
+  get_object:
+    summary: "Read any object by uuid with its properties and children to a depth (get.object)"
+    params:
+      uuid: &uuid { type: string, pattern: '^\{[0-9A-Fa-f-]{36}\}$', max_length: 38, required: true, label: UUID, description: "The object's uuid, braces included." }
+      depth: { type: int, min: 0, max: 8, default: 0, label: Depth, description: "How many levels of children to give in full." }
+    send: '{"jsonrpc":"2.0","method":"get.object","params":{"uuid":"{uuid}","depth":{depth}},"id":"object {uuid}"}'
+    expect: { reply_json: { "$.id": "object {uuid}" }, json_path: "$.result" }
+    returns: value
+  get_tree:
+    summary: "Read the show's object tree to a depth (get.tree)"
+    params:
+      depth: { type: int, min: 0, max: 64, default: 1, label: Depth, description: "How many levels to give." }
+    send: '{"jsonrpc":"2.0","method":"get.tree","params":{"depth":{depth}},"id":"tree"}'
+    expect: { reply_json: { "$.id": "tree" }, json_path: "$.result" }
+    returns: value
+  set_properties:
+    summary: "Set any object's settable properties, all validated before any is written; answers those that changed (set.property)"
+    params:
+      uuid: *uuid
+      properties: { type: json, required: true, label: Properties, description: "An object of property names (as get.object gives them) and values, such as {\"name\":\"Intro\"}." }
+    send: '{"jsonrpc":"2.0","method":"set.property","params":{"uuid":"{uuid}","properties":{properties}},"id":"set {uuid}"}'
+    expect: { reply_json: { "$.id": "set {uuid}" }, json_path: "$.result" }
+    returns: value
+
+  # ── Show and computer ───────────────────────────────────────────────────
+  get_player_status:
+    summary: "Read the player's version, show, document state, outputs and clients (get.status.player)"
+    send: '{"jsonrpc":"2.0","method":"get.status.player","id":"status"}'
+    expect: { reply_json: { "$.id": "status" }, json_path: "$.result" }
+    returns: value
+  show_action:
+    summary: "Save, back up, rescan media, remove missing media, ping, or send the show to the Remotes (doaction.show)"
+    params:
+      action: { type: enum, values: [save, backup, rescanmedia, rescanmediaforce, removemissingmedia, ping, sendshowtoremote], required: true,
+                label: Action, description: "save, backup, rescanmedia, rescanmediaforce, removemissingmedia, ping or sendshowtoremote." }
+    send: '{"jsonrpc":"2.0","method":"doaction.show","params":{"action":"{action}"},"id":"show {action}"}'
+    expect: { reply_json: { "$.id": "show {action}" }, json_equals: { "$.result": true } }
+    returns: ack
+  load_show:
+    summary: "Load a show file (doaction.show load)"
+    params:
+      name: &show_name { type: string, pattern: '^[^/\\]+$', max_length: 255, required: true, label: Show, description: "The show's file name, .xml included, such as MyShow.xml." }
+    send: '{"jsonrpc":"2.0","method":"doaction.show","params":{"action":"load","name":{name:json}},"id":"load show"}'
+    expect: { reply_json: { "$.id": "load show" }, json_equals: { "$.result": true } }
+    returns: ack
+  list_shows:
+    summary: "List the show files, optionally filtered (get.list.shows)"
+    params:
+      filter: &filter { type: string, max_length: 256, default: "", label: Filter, description: "Only names containing this, any case; empty for all." }
+    send: '{"jsonrpc":"2.0","method":"get.list.shows","params":{"filter":{filter:json}},"id":"shows"}'
+    expect: { reply_json: { "$.id": "shows" }, json_path: "$.result" }
+    returns: value
+  new_show:
+    summary: "Create a new show and load it (new.show)"
+    params:
+      name: *show_name
+      overwrite: &overwrite { type: bool, default: false, label: Overwrite, description: "Replace a file of that name." }
+    send: '{"jsonrpc":"2.0","method":"new.show","params":{"name":{name:json},"overwrite":{overwrite}},"id":"new show"}'
+    expect: { reply_json: { "$.id": "new show" }, json_path: "$.result" }
+    returns: value
+  save_show_as:
+    summary: "Save the show under another name (saveas.show)"
+    params: { name: *show_name, overwrite: *overwrite }
+    send: '{"jsonrpc":"2.0","method":"saveas.show","params":{"name":{name:json},"overwrite":{overwrite}},"id":"save as"}'
+    expect: { reply_json: { "$.id": "save as" }, json_path: "$.result" }
+    returns: value
+  save_show_increment:
+    summary: "Save the show under its name with the next number (saveincrement.show)"
+    params: { overwrite: *overwrite }
+    send: '{"jsonrpc":"2.0","method":"saveincrement.show","params":{"overwrite":{overwrite}},"id":"save increment"}'
+    expect: { reply_json: { "$.id": "save increment" }, json_path: "$.result" }
+    returns: value
+  backup_show:
+    summary: "Make a backup archive of the show; answers its name (backup.show)"
+    send: '{"jsonrpc":"2.0","method":"backup.show","id":"backup"}'
+    expect: { reply_json: { "$.id": "backup" }, json_path: "$.result" }
+    returns: value
+  list_backups:
+    summary: "List the backups, newest first (get.list.backups)"
+    params: { filter: *filter }
+    send: '{"jsonrpc":"2.0","method":"get.list.backups","params":{"filter":{filter:json}},"id":"backups"}'
+    expect: { reply_json: { "$.id": "backups" }, json_path: "$.result" }
+    returns: value
+  restore_show:
+    summary: "Restore a backup and load it (restore.show)"
+    params:
+      backup: { type: string, max_length: 255, required: true, label: Backup, description: "The backup's name, as backup_show or list_backups gives it." }
+      force: { type: bool, default: false, label: Force, description: "Restore a backup of another or an unknown show too." }
+    send: '{"jsonrpc":"2.0","method":"restore.show","params":{"backup":{backup:json},"force":{force}},"id":"restore"}'
+    expect: { reply_json: { "$.id": "restore" }, json_path: "$.result" }
+    returns: value
+  list_import:
+    summary: "List what another show file holds to import: outputs, playlists, devices, tasks, DigiMaps, UI panels (get.list.import)"
+    params: { name: *show_name }
+    send: '{"jsonrpc":"2.0","method":"get.list.import","params":{"name":{name:json}},"id":"import list"}'
+    expect: { reply_json: { "$.id": "import list" }, json_path: "$.result" }
+    returns: value
+  import_show_all:
+    summary: "Import everything from another show file (import.show with all of each kind)"
+    params: { name: *show_name }
+    send: '{"jsonrpc":"2.0","method":"import.show","params":{"name":{name:json},"outputs":"all","playlists":"all","devices":"all","tasks":"all","digimaps":"all","uipanels":"all"},"id":"import"}'
+    expect: { reply_json: { "$.id": "import" }, json_path: "$.result" }
+    returns: value
+  get_computer:
+    summary: "Read the computer's settings (desktop, master, cluster, faders, HDR, autosave) and information (get.object.computer)"
+    send: '{"jsonrpc":"2.0","method":"get.object.computer","id":"computer"}'
+    expect: { reply_json: { "$.id": "computer" }, json_path: "$.result" }
+    returns: value
+  set_computer_properties:
+    summary: "Change computer settings such as audioMaster, gammaFader, gainFader, master, clusterId, autoSave or autoBackup (set.property.computer)"
+    params:
+      properties: { type: json, required: true, label: Settings, description: "An object of setting names and values as get.object.computer gives them, such as {\"audioMaster\":0.8}." }
+    send: '{"jsonrpc":"2.0","method":"set.property.computer","params":{"properties":{properties}},"id":"set computer"}'
+    expect: { reply_json: { "$.id": "set computer" }, json_path: "$.result" }
+    returns: value
+
+  # ── Playlists ───────────────────────────────────────────────────────────
+  list_playlists:
+    summary: "List the playlists, with their cues or their cues' layers if asked (get.list.playlists)"
+    params:
+      level: { type: enum, values: [playlist, cue, layer], default: playlist, label: Detail, description: "playlist alone, with each playlist's cues, or with the cues' layers too." }
+    send: '{"jsonrpc":"2.0","method":"get.list.playlists","params":{"level":"{level}"},"id":"playlists {level}"}'
+    expect: { reply_json: { "$.id": "playlists {level}" }, json_path: "$.result" }
+    returns: value
+  get_playlist:
+    summary: "Read one playlist by name (get.object.playlist)"
+    params:
+      playlist: &playlist { type: string, max_length: 256, required: true, label: Playlist, description: "The playlist's name." }
+    send: '{"jsonrpc":"2.0","method":"get.object.playlist","params":{"name":{playlist:json}},"id":"playlist"}'
+    expect: { reply_json: { "$.id": "playlist" }, json_path: "$.result" }
+    returns: value
+  playlist_next:
+    summary: "Go to a playlist's next cue (doaction.playlist next)"
+    params: { playlist: *playlist }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"next"},"id":"next"}'
+    expect: { reply_json: { "$.id": "next" }, json_equals: { "$.result": true } }
+    returns: ack
+  playlist_previous:
+    summary: "Go to a playlist's previous cue (doaction.playlist prev)"
+    params: { playlist: *playlist }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"prev"},"id":"prev"}'
+    expect: { reply_json: { "$.id": "prev" }, json_equals: { "$.result": true } }
+    returns: ack
+  playlist_goto:
+    summary: "Go to a cue of a playlist, by its number (doaction.playlist goto)"
+    params:
+      playlist: *playlist
+      cue: &cue_number { type: int, min: 1, required: true, label: Cue, description: "The cue's number in the playlist, from 1." }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"goto","cue":{cue}},"id":"goto"}'
+    expect: { reply_json: { "$.id": "goto" }, json_equals: { "$.result": true } }
+    returns: ack
+  playlist_preload:
+    summary: "Preload a cue of a playlist, by its number (doaction.playlist preload)"
+    params: { playlist: *playlist, cue: *cue_number }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"preload","cue":{cue}},"id":"preload"}'
+    expect: { reply_json: { "$.id": "preload" }, json_equals: { "$.result": true } }
+    returns: ack
+  playlist_play:
+    summary: "Play a playlist (doaction.playlist play)"
+    params: { playlist: *playlist }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"play"},"id":"play"}'
+    expect: { reply_json: { "$.id": "play" }, json_equals: { "$.result": true } }
+    returns: ack
+  playlist_pause:
+    summary: "Pause a playlist (doaction.playlist pause)"
+    params: { playlist: *playlist }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"pause"},"id":"pause"}'
+    expect: { reply_json: { "$.id": "pause" }, json_equals: { "$.result": true } }
+    returns: ack
+  playlist_grand_master:
+    summary: "Fade a playlist's grand master to a level (doaction.playlist grandMasterFader)"
+    params:
+      playlist: *playlist
+      percent: &percent { type: int, min: 0, max: 100, required: true, label: Level, description: "The level in percent; 0 is black or mute." }
+      duration_ms: &duration { type: int, min: 0, max: 600000, default: 0, label: Fade time, description: "The fade in milliseconds; 0 for at once." }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"grandMasterFader","value":{percent},"duration":{duration_ms}},"id":"grand master"}'
+    expect: { reply_json: { "$.id": "grand master" }, json_equals: { "$.result": true } }
+    returns: ack
+  playlist_audio_master:
+    summary: "Fade a playlist's audio master to a level (doaction.playlist audioMaster)"
+    params: { playlist: *playlist, percent: *percent, duration_ms: *duration }
+    send: '{"jsonrpc":"2.0","method":"doaction.playlist","params":{"name":{playlist:json},"action":"audioMaster","value":{percent},"duration":{duration_ms}},"id":"audio master"}'
+    expect: { reply_json: { "$.id": "audio master" }, json_equals: { "$.result": true } }
+    returns: ack
+  get_playlist_settings:
+    summary: "Read a playlist's settings: autostart, step by step, timecode sync and source, faders (get.playlist.settings)"
+    params: { playlist: *playlist }
+    send: '{"jsonrpc":"2.0","method":"get.playlist.settings","params":{"playlistname":{playlist:json}},"id":"playlist settings"}'
+    expect: { reply_json: { "$.id": "playlist settings" }, json_path: "$.result" }
+    returns: value
+  set_playlist_settings:
+    summary: "Change a playlist's settings such as autoStart, stepByStepEnable, synchroToTimecode, freerunMode or the timecode ones (set.playlist.settings)"
+    params:
+      playlist: *playlist
+      settings: { type: json, required: true, label: Settings, description: "An object of setting names and values as get.playlist.settings gives them, such as {\"autoStart\":true}." }
+    send: '{"jsonrpc":"2.0","method":"set.playlist.settings","params":{"playlistname":{playlist:json},"settings":{settings}},"id":"set playlist settings"}'
+    expect: { reply_json: { "$.id": "set playlist settings" }, json_path: "$.result" }
+    returns: value
+  rename_playlist:
+    summary: "Rename a playlist (set.property.playlist name)"
+    params:
+      playlist: *playlist
+      name: &new_name { type: string, max_length: 256, required: true, label: New name, description: "The new name, on one line." }
+    send: '{"jsonrpc":"2.0","method":"set.property.playlist","params":{"name":{playlist:json},"property":"name","value":{name:json}},"id":"rename playlist"}'
+    expect: { reply_json: { "$.id": "rename playlist" }, json_equals: { "$.result": true } }
+    returns: ack
+  new_playlist:
+    summary: "Create a playlist at the end of the list (new.playlist)"
+    params: { name: *new_name }
+    send: '{"jsonrpc":"2.0","method":"new.playlist","params":{"name":{name:json}},"id":"new playlist"}'
+    expect: { reply_json: { "$.id": "new playlist" }, json_path: "$.result" }
+    returns: value
+  delete_playlist:
+    summary: "Delete a playlist (delete.playlist)"
+    params: { playlist: *playlist }
+    send: '{"jsonrpc":"2.0","method":"delete.playlist","params":{"name":{playlist:json}},"id":"delete playlist"}'
+    expect: { reply_json: { "$.id": "delete playlist" }, json_equals: { "$.result": true } }
+    returns: ack
+
+  # ── Cues ────────────────────────────────────────────────────────────────
+  list_cues:
+    summary: "List a playlist's cues with their used layers, a page at a time (get.list.cues)"
+    params:
+      playlist: *playlist
+      offset: { type: int, min: 0, default: 0, label: From, description: "The first cue to give, counted from 0." }
+      limit: { type: int, min: 1, max: 1000, default: 200, label: Count, description: "At most this many cues." }
+    send: '{"jsonrpc":"2.0","method":"get.list.cues","params":{"playlistname":{playlist:json},"offset":{offset},"limit":{limit}},"id":"cues"}'
+    expect: { reply_json: { "$.id": "cues" }, json_path: "$.result" }
+    returns: value
+  get_cue_property:
+    summary: "Read one property of a cue, by the cue's name (get.property.cue)"
+    params:
+      playlist: *playlist
+      cue: &cue_name { type: string, max_length: 256, required: true, label: Cue, description: "The cue's name." }
+      property: { type: enum, values: [enableLoop, loopItemUuid, name, tag, taskUuid, triggerMode, triggerParam, uiColor, uuid, objectType],
+                  required: true, label: Property, description: "The property to read." }
+    send: '{"jsonrpc":"2.0","method":"get.property.cue","params":{"playlistname":{playlist:json},"name":{cue:json},"property":"{property}"},"id":"cue property"}'
+    expect: { reply_json: { "$.id": "cue property" }, json_path: "$.result" }
+    returns: value
+  set_cue_settings:
+    summary: "Change a cue's settings: name, color, trigger, followLayer, triggerTime, tag, task, loopTo, enableLoop (set.cue.settings)"
+    params:
+      playlist: *playlist
+      cue: &cue_index { type: int, min: 1, required: true, label: Cue, description: "The cue's number in the playlist, from 1." }
+      settings: { type: json, required: true, label: Settings, description: "An object of settings as the manual lists them, such as {\"trigger\":\"wait\",\"triggerTime\":1500}." }
+    send: '{"jsonrpc":"2.0","method":"set.cue.settings","params":{"playlistname":{playlist:json},"cueindex":{cue},"settings":{settings}},"id":"cue settings"}'
+    expect: { reply_json: { "$.id": "cue settings" }, json_path: "$.result" }
+    returns: value
+  set_cue_trigger:
+    summary: "Set how a cue starts: on go, following the cue before, after a wait, or at a timecode (set.cue.settings)"
+    params:
+      playlist: *playlist
+      cue: *cue_index
+      trigger: { type: enum, values: [go, follow, wait, timecode], required: true, label: Trigger, description: "go, follow, wait or timecode." }
+      time_ms: { type: int, min: 0, max: 86400000, default: 0, label: Time, description: "For wait, the delay; for timecode, the start time; in milliseconds." }
+    send: '{"jsonrpc":"2.0","method":"set.cue.settings","params":{"playlistname":{playlist:json},"cueindex":{cue},"settings":{"trigger":"{trigger}","triggerTime":{time_ms}}},"id":"cue trigger"}'
+    expect: { reply_json: { "$.id": "cue trigger" }, json_path: "$.result" }
+    returns: value
+  rename_cue:
+    summary: "Rename a cue (set.cue.settings name)"
+    params: { playlist: *playlist, cue: *cue_index, name: *new_name }
+    send: '{"jsonrpc":"2.0","method":"set.cue.settings","params":{"playlistname":{playlist:json},"cueindex":{cue},"property":"name","value":{name:json}},"id":"rename cue"}'
+    expect: { reply_json: { "$.id": "rename cue" }, json_path: "$.result" }
+    returns: value
+  add_cues:
+    summary: "Add empty cues after a cue (add.cues)"
+    params:
+      playlist: *playlist
+      after: { type: int, min: 0, required: true, label: After, description: "The cue number to add after; 0 for the top." }
+      count: { type: int, min: 1, max: 100, default: 1, label: Count, description: "How many cues to add." }
+    send: '{"jsonrpc":"2.0","method":"add.cues","params":{"playlistname":{playlist:json},"aftercueindex":{after},"count":{count}},"id":"add cues"}'
+    expect: { reply_json: { "$.id": "add cues" }, json_path: "$.result" }
+    returns: value
+  delete_cue:
+    summary: "Delete a cue (delete.cues)"
+    params: { playlist: *playlist, cue: *cue_index }
+    send: '{"jsonrpc":"2.0","method":"delete.cues","params":{"playlistname":{playlist:json},"cueindex":{cue}},"id":"delete cue"}'
+    expect: { reply_json: { "$.id": "delete cue" }, json_path: "$.result" }
+    returns: value
+  duplicate_cue:
+    summary: "Duplicate a cue right after it (duplicate.cue)"
+    params:
+      cue: { type: string, pattern: '^\{[0-9A-Fa-f-]{36}\}$', max_length: 38, required: true, label: Cue, description: "The cue's uuid, braces included." }
+      count: { type: int, min: 1, max: 50, default: 1, label: Copies, description: "How many copies." }
+    send: '{"jsonrpc":"2.0","method":"duplicate.cue","params":{"cueuuid":"{cue}","count":{count}},"id":"duplicate cue"}'
+    expect: { reply_json: { "$.id": "duplicate cue" }, json_path: "$.result" }
+    returns: value
+  move_cue:
+    summary: "Move a cue to another place in its playlist (set.cue.index)"
+    params:
+      playlist: *playlist
+      cue: *cue_index
+      to: { type: int, min: 1, required: true, label: New place, description: "The cue's new number, from 1." }
+    send: '{"jsonrpc":"2.0","method":"set.cue.index","params":{"playlistname":{playlist:json},"cueindex":{cue},"newindex":{to}},"id":"move cue"}'
+    expect: { reply_json: { "$.id": "move cue" }, json_path: "$.result" }
+    returns: value
+
+  # ── Layers and effects ──────────────────────────────────────────────────
+  get_layer:
+    summary: "Read a cue's layer: its media, settings and effects (get.object.layer)"
+    params:
+      playlist: *playlist
+      cue: *cue_index
+      layer: &layer { type: int, min: 1, max: 10, required: true, label: Layer, description: "The layer of the cue, 1 to 10." }
+    send: '{"jsonrpc":"2.0","method":"get.object.layer","params":{"playlistname":{playlist:json},"cueindex":{cue},"layerindex":{layer}},"id":"layer"}'
+    expect: { reply_json: { "$.id": "layer" }, json_path: "$.result" }
+    returns: value
+  set_layer_media:
+    summary: "Put a media in a layer's media, audio, stereo or mask slot (set.layer.media)"
+    params:
+      playlist: *playlist
+      cue: *cue_index
+      layer: *layer
+      media: &media_ref { type: string, max_length: 1024, required: true, label: Media, description: "The media: its file name, a path's end, its uuid or its name in the Media tab." }
+      slot: &slot { type: enum, values: [media, audio, stereo, mask], default: media, label: Slot, description: "The layer's slot to fill." }
+    send: '{"jsonrpc":"2.0","method":"set.layer.media","params":{"playlistname":{playlist:json},"cueindex":{cue},"layerindex":{layer},"media":{media:json},"slot":"{slot}"},"id":"layer media"}'
+    expect: { reply_json: { "$.id": "layer media" }, json_path: "$.result" }
+    returns: value
+  clear_layer_media:
+    summary: "Empty a layer's slot (clear.layer.media)"
+    params: { playlist: *playlist, cue: *cue_index, layer: *layer, slot: *slot }
+    send: '{"jsonrpc":"2.0","method":"clear.layer.media","params":{"playlistname":{playlist:json},"cueindex":{cue},"layerindex":{layer},"slot":"{slot}"},"id":"clear layer"}'
+    expect: { reply_json: { "$.id": "clear layer" }, json_path: "$.result" }
+    returns: value
+  set_layer_settings:
+    summary: "Change a layer's settings: active, fades, in/out points, end mode, position, scale, rotation, opacity, color, blending, levels, crop, border, shadow, speed, transitions (set.layer.settings)"
+    params:
+      playlist: *playlist
+      cue: *cue_index
+      layer: *layer
+      settings: { type: json, required: true, label: Settings, description: "An object of settings as the Layers & FX page lists them, such as {\"opacity\":0.5,\"position\":[100,0]}." }
+    send: '{"jsonrpc":"2.0","method":"set.layer.settings","params":{"playlistname":{playlist:json},"cueindex":{cue},"layerindex":{layer},"settings":{settings}},"id":"layer settings"}'
+    expect: { reply_json: { "$.id": "layer settings" }, json_path: "$.result" }
+    returns: value
+  list_fx_types:
+    summary: "List the effect types with their parameters, and the ISF shader files (get.list.fx.types)"
+    send: '{"jsonrpc":"2.0","method":"get.list.fx.types","id":"fx types"}'
+    expect: { reply_json: { "$.id": "fx types" }, json_path: "$.result" }
+    returns: value
+  add_fx:
+    summary: "Add an effect at the end of a layer's effects (add.fx)"
+    params:
+      playlist: *playlist
+      cue: *cue_index
+      layer: *layer
+      type: { type: string, pattern: '^[A-Za-z0-9_]+$', max_length: 64, required: true, label: Effect, description: "The effect type, as list_fx_types names it, such as HueRotate." }
+    send: '{"jsonrpc":"2.0","method":"add.fx","params":{"playlistname":{playlist:json},"cueindex":{cue},"layerindex":{layer},"type":"{type}"},"id":"add fx"}'
+    expect: { reply_json: { "$.id": "add fx" }, json_path: "$.result" }
+    returns: value
+  set_fx_settings:
+    summary: "Change an effect's parameters or bypass it (set.fx.settings)"
+    params:
+      fx: &fx { type: string, pattern: '^\{[0-9A-Fa-f-]{36}\}$', max_length: 38, required: true, label: Effect, description: "The effect's uuid, braces included." }
+      settings: { type: json, required: true, label: Settings, description: "An object of the effect's parameters, and bypass, such as {\"bypass\":true}." }
+    send: '{"jsonrpc":"2.0","method":"set.fx.settings","params":{"fxuuid":"{fx}","settings":{settings}},"id":"fx settings"}'
+    expect: { reply_json: { "$.id": "fx settings" }, json_path: "$.result" }
+    returns: value
+  delete_fx:
+    summary: "Remove an effect (delete.fx)"
+    params: { fx: *fx }
+    send: '{"jsonrpc":"2.0","method":"delete.fx","params":{"fxuuid":"{fx}"},"id":"delete fx"}'
+    expect: { reply_json: { "$.id": "delete fx" }, json_path: "$.result" }
+    returns: value
+
+  # ── Tasks ───────────────────────────────────────────────────────────────
+  list_tasks:
+    summary: "List the tasks (get.list.tasks)"
+    send: '{"jsonrpc":"2.0","method":"get.list.tasks","id":"tasks"}'
+    expect: { reply_json: { "$.id": "tasks" }, json_path: "$.result" }
+    returns: value
+  run_task:
+    summary: "Run a task by name (run.task)"
+    params:
+      task: &task { type: string, max_length: 256, required: true, label: Task, description: "The task's name, any case." }
+    send: '{"jsonrpc":"2.0","method":"run.task","params":{"name":{task:json}},"id":"run task"}'
+    expect: { reply_json: { "$.id": "run task" }, json_path: "$.result" }
+    returns: value
+  set_task_enabled:
+    summary: "Enable or disable a task (set.task taskEnable)"
+    params:
+      task: *task
+      enabled: { type: bool, required: true, label: Enabled, description: "Enable the task, or disable it." }
+    send: '{"jsonrpc":"2.0","method":"set.task","params":{"name":{task:json},"taskEnable":{enabled}},"id":"set task"}'
+    expect: { reply_json: { "$.id": "set task" }, json_path: "$.result" }
+    returns: value
+  create_task:
+    summary: "Create an empty task at the end of the list (create.task)"
+    params: { name: *new_name }
+    send: '{"jsonrpc":"2.0","method":"create.task","params":{"name":{name:json}},"id":"create task"}'
+    expect: { reply_json: { "$.id": "create task" }, json_path: "$.result" }
+    returns: value
+  duplicate_task:
+    summary: "Duplicate a task under a new name (duplicate.task)"
+    params: { task: *task, name: *new_name }
+    send: '{"jsonrpc":"2.0","method":"duplicate.task","params":{"name":{task:json},"newName":{name:json}},"id":"duplicate task"}'
+    expect: { reply_json: { "$.id": "duplicate task" }, json_path: "$.result" }
+    returns: value
+  remove_task:
+    summary: "Delete a task (remove.task)"
+    params: { task: *task }
+    send: '{"jsonrpc":"2.0","method":"remove.task","params":{"name":{task:json}},"id":"remove task"}'
+    expect: { reply_json: { "$.id": "remove task" }, json_path: "$.result" }
+    returns: value
+
+  # ── Media ───────────────────────────────────────────────────────────────
+  list_media:
+    summary: "List the media with their state, size, duration and codec (get.list.media)"
+    send: '{"jsonrpc":"2.0","method":"get.list.media","id":"media"}'
+    expect: { reply_json: { "$.id": "media" }, json_path: "$.result" }
+    returns: value
+  get_media:
+    summary: "Read one media in full by uuid (get.object.media)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"get.object.media","params":{"uuid":"{uuid}"},"id":"media {uuid}"}'
+    expect: { reply_json: { "$.id": "media {uuid}" }, json_path: "$.result" }
+    returns: value
+  get_media_tree:
+    summary: "List the media by folder, optionally searched (get.tree.media)"
+    params:
+      search: { type: string, max_length: 256, default: "", label: Search, description: "Only media whose names contain this, any case; empty for all." }
+      max: { type: int, min: 1, max: 5000, default: 500, label: Most, description: "At most this many media." }
+    send: '{"jsonrpc":"2.0","method":"get.tree.media","params":{"search":{search:json},"max":{max}},"id":"media tree"}'
+    expect: { reply_json: { "$.id": "media tree" }, json_path: "$.result" }
+    returns: value
+  add_media:
+    summary: "Create an internal media: text, counter, timecode, solid, gradient, test pattern, web, NDI, capture or desktop input (add.media)"
+    params:
+      type: { type: enum, values: [text, scrolling_text, alternate_text, simple_text, counter, playlist_timecode, solid, ten_bit_gradient,
+                                   test_pattern, checksync, web, ndi, deltacast, decklink, desktop, spout], required: true,
+              label: Type, description: "The kind of media to create." }
+      name: *new_name
+      settings: { type: json, required: true, label: Settings, description: "The media's settings as the Media Settings page lists them for its type; {} for the defaults." }
+    send: '{"jsonrpc":"2.0","method":"add.media","params":{"type":"{type}","name":{name:json},"settings":{settings}},"id":"add media"}'
+    expect: { reply_json: { "$.id": "add media" }, json_path: "$.result" }
+    returns: value
+  set_media_settings:
+    summary: "Change a media's settings, such as a text's text or a solid's color (set.media.settings)"
+    params:
+      uuid: *uuid
+      settings: { type: json, required: true, label: Settings, description: "An object of settings for the media's type, such as {\"text\":\"Welcome\"}." }
+    send: '{"jsonrpc":"2.0","method":"set.media.settings","params":{"uuid":"{uuid}","settings":{settings}},"id":"media settings"}'
+    expect: { reply_json: { "$.id": "media settings" }, json_path: "$.result" }
+    returns: value
+  delete_media:
+    summary: "Remove a media from the show; its file stays in the project folder (delete.media)"
+    params: { uuid: *uuid }
+    send: '{"jsonrpc":"2.0","method":"delete.media","params":{"uuid":"{uuid}"},"id":"delete media"}'
+    expect: { reply_json: { "$.id": "delete media" }, json_path: "$.result" }
+    returns: value
+  delete_missing_media:
+    summary: "Remove every media whose file is missing (delete.media.missing)"
+    send: '{"jsonrpc":"2.0","method":"delete.media.missing","id":"delete missing"}'
+    expect: { reply_json: { "$.id": "delete missing" }, json_path: "$.result" }
+    returns: value
+  rescan_media:
+    summary: "Scan the project folder for new media (rescan.media)"
+    send: '{"jsonrpc":"2.0","method":"rescan.media","params":{},"id":"rescan"}'
+    expect: { reply_json: { "$.id": "rescan" }, json_path: "$.result" }
+    returns: value
+
+  # ── Outputs and monitoring ──────────────────────────────────────────────
+  list_outputs:
+    summary: "List the outputs with their placement, mapping and NDI stream (get.list.outputs)"
+    send: '{"jsonrpc":"2.0","method":"get.list.outputs","id":"outputs"}'
+    expect: { reply_json: { "$.id": "outputs" }, json_path: "$.result" }
+    returns: value
+  get_output:
+    summary: "Read one output with its shapes (get.object.output)"
+    params:
+      output: &output { type: int, min: 1, required: true, label: Output, description: "The output's number, from 1." }
+    send: '{"jsonrpc":"2.0","method":"get.object.output","params":{"index":{output}},"id":"output"}'
+    expect: { reply_json: { "$.id": "output" }, json_path: "$.result" }
+    returns: value
+  set_output_properties:
+    summary: "Change an output's settings: name, placement, UV map, X-Map, NDI stream, background, GPU (set.property.output)"
+    params:
+      output: *output
+      properties: { type: json, required: true, label: Settings, description: "An object of settings as the Outputs page lists them, such as {\"ndiStreamEnable\":1}." }
+    send: '{"jsonrpc":"2.0","method":"set.property.output","params":{"index":{output},"properties":{properties}},"id":"set output"}'
+    expect: { reply_json: { "$.id": "set output" }, json_path: "$.result" }
+    returns: value
+  add_output:
+    summary: "Add an output with its settings, at the end (add.output)"
+    params:
+      settings: { type: json, required: true, label: Settings, description: "The new output's settings as set_output_properties takes them; {} for the defaults." }
+    send: '{"jsonrpc":"2.0","method":"add.output","params":{"data":{settings}},"id":"add output"}'
+    expect: { reply_json: { "$.id": "add output" }, json_path: "$.result" }
+    returns: value
+  delete_output:
+    summary: "Delete an output, without confirmation (delete.output)"
+    params: { output: *output }
+    send: '{"jsonrpc":"2.0","method":"delete.output","params":{"index":{output}},"id":"delete output"}'
+    expect: { reply_json: { "$.id": "delete output" }, json_path: "$.result" }
+    returns: value
+  list_monitoring:
+    summary: "List the monitoring presets, their zones and sources (get.list.monitoring)"
+    send: '{"jsonrpc":"2.0","method":"get.list.monitoring","id":"monitoring"}'
+    expect: { reply_json: { "$.id": "monitoring" }, json_path: "$.result" }
+    returns: value
+  activate_monitoring:
+    summary: "Show a monitoring preset, turning the others off (set.property.monitoring active)"
+    params:
+      preset: &mon { type: int, min: 1, required: true, label: Preset, description: "The monitoring preset's number, from 1." }
+    send: '{"jsonrpc":"2.0","method":"set.property.monitoring","params":{"index":{preset},"property":"active","value":true},"id":"monitoring active"}'
+    expect: { reply_json: { "$.id": "monitoring active" }, json_path: "$.result" }
+    returns: value
+  set_monitoring_zone:
+    summary: "Show the program, an output or a live input in a monitoring zone, or nothing (set.monitoring.zone)"
+    params:
+      preset: *mon
+      zone: { type: int, min: 1, max: 90, required: true, label: Zone, description: "The zone, from 1, row by row." }
+      source: { type: enum, values: [program, output, live, none], required: true, label: Source, description: "What the zone shows." }
+      source_name: { type: string, max_length: 256, default: "", label: Source name, description: "For output or live, the output's or live input's name; empty otherwise." }
+    send: '{"jsonrpc":"2.0","method":"set.monitoring.zone","params":{"index":{preset},"zone":{zone},"source":"{source}","sourcename":{source_name:json}},"id":"monitoring zone"}'
+    expect: { reply_json: { "$.id": "monitoring zone" }, json_path: "$.result" }
+    returns: value
+
+  # ── DigiMaps ────────────────────────────────────────────────────────────
+  list_digimaps:
+    summary: "List the DigiMaps with their inputs, scaling and patches (get.list.digimaps)"
+    send: '{"jsonrpc":"2.0","method":"get.list.digimaps","id":"digimaps"}'
+    expect: { reply_json: { "$.id": "digimaps" }, json_path: "$.result" }
+    returns: value
+  digimap_action:
+    summary: "Evaluate a DigiMap, capture its A or B input, force it, or reset its values or offsets (doaction.digimap)"
+    params:
+      digimap: { type: string, max_length: 256, required: true, label: DigiMap, description: "The DigiMap's name." }
+      action: { type: enum, values: [evaluate, captureina, captureinb, force, resetvalues, resetoffsets], required: true,
+                label: Action, description: "The action to run." }
+    send: '{"jsonrpc":"2.0","method":"doaction.digimap","params":{"name":{digimap:json},"action":"{action}"},"id":"digimap {action}"}'
+    expect: { reply_json: { "$.id": "digimap {action}" }, json_path: "$.result" }
+    returns: value
+
+  # ── Live Mixer ──────────────────────────────────────────────────────────
+  get_mixer_state:
+    summary: "Read the Live Mixer's state: options, transition, destinations, tally and renders; afterwards Player pushes its changes (get.state)"
+    send: '{"jsonrpc":"2.0","method":"get.state","id":"mixer state"}'
+    expect: { reply_json: { "$.id": "mixer state" }, json_path: "$.result" }
+    returns: value
+  mixer_set_options:
+    summary: "Set the Live Mixer's options: work on preview, relative mode, take duration (mixer.set.option)"
+    params:
+      work_on_preview: { type: bool, default: true, label: Work on preview, description: "Sources and presets go to the preview, not the program." }
+      relative_mode: { type: bool, default: false, label: Relative mode, description: "The relative mode." }
+      take_ms: { type: int, min: 0, default: 3000, label: Take duration, description: "The take's length in milliseconds." }
+    send: '{"jsonrpc":"2.0","method":"mixer.set.option","params":{"workOnPreview":{work_on_preview},"relativeMode":{relative_mode},"takeDuration":{take_ms}},"id":"mixer options"}'
+    expect: { reply_json: { "$.id": "mixer options" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_take:
+    summary: "Take the preview to the program over a duration, on the active destinations (mixer.take)"
+    params:
+      duration_ms: { type: int, min: 0, required: true, label: Duration, description: "The transition's length in milliseconds." }
+    send: '{"jsonrpc":"2.0","method":"mixer.take","params":{"duration":{duration_ms}},"id":"take"}'
+    expect: { reply_json: { "$.id": "take" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_cut:
+    summary: "Cut the preview to the program on the active destinations (mixer.cut)"
+    send: '{"jsonrpc":"2.0","method":"mixer.cut","params":{},"id":"cut"}'
+    expect: { reply_json: { "$.id": "cut" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_transition_begin:
+    summary: "Start a manual transition (mixer.transition.begin)"
+    send: '{"jsonrpc":"2.0","method":"mixer.transition.begin","id":"transition begin"}'
+    expect: { reply_json: { "$.id": "transition begin" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_transition_position:
+    summary: "Move a manual transition, starting it if needed (mixer.transition.position)"
+    params:
+      position: { type: float, min: 0, max: 1, required: true, label: Position, description: "0 is the preview, 1 the program; kept between 0.001 and 0.999." }
+    send: '{"jsonrpc":"2.0","method":"mixer.transition.position","params":{"position":{position:.3f}},"id":"transition position"}'
+    expect: { reply_json: { "$.id": "transition position" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_transition_commit:
+    summary: "End a manual transition on the program (mixer.transition.commit)"
+    send: '{"jsonrpc":"2.0","method":"mixer.transition.commit","id":"transition commit"}'
+    expect: { reply_json: { "$.id": "transition commit" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_transition_cancel:
+    summary: "Cancel a manual transition back to the preview (mixer.transition.cancel)"
+    send: '{"jsonrpc":"2.0","method":"mixer.transition.cancel","id":"transition cancel"}'
+    expect: { reply_json: { "$.id": "transition cancel" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_transition_type:
+    summary: "Set the transition of the preview layers of the active destinations (mixer.transition.type)"
+    params:
+      type: { type: enum, values: [cut, fade, flying], required: true, label: Transition, description: "cut, fade or flying." }
+    send: '{"jsonrpc":"2.0","method":"mixer.transition.type","params":{"type":"{type}"},"id":"transition type"}'
+    expect: { reply_json: { "$.id": "transition type" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_pgm_to_pvw:
+    summary: "Copy the program to the preview (mixer.pgmtopvw)"
+    send: '{"jsonrpc":"2.0","method":"mixer.pgmtopvw","id":"pgmtopvw"}'
+    expect: { reply_json: { "$.id": "pgmtopvw" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_clear:
+    summary: "Clear the preview layers of the active destinations (mixer.clear)"
+    send: '{"jsonrpc":"2.0","method":"mixer.clear","params":{},"id":"clear"}'
+    expect: { reply_json: { "$.id": "clear" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_source_set:
+    summary: "Put a source in the preview or the program of a mix engine of the active destinations (mixer.source.set)"
+    params:
+      source: { type: string, max_length: 256, required: true, label: Source, description: "The source's name, any case, or its uuid." }
+      target: { type: enum, values: [preview, program], default: preview, label: Target, description: "preview or program." }
+      mix_engine: { type: int, min: 1, default: 1, label: Mix engine, description: "The mix engine, 1 being the bottom one." }
+    send: '{"jsonrpc":"2.0","method":"mixer.source.set","params":{"source":{source:json},"target":"{target}","mixEngine":{mix_engine}},"id":"source set"}'
+    expect: { reply_json: { "$.id": "source set" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_source_freeze:
+    summary: "Freeze or unfreeze a source (mixer.source.freeze)"
+    params:
+      source: { type: string, max_length: 256, required: true, label: Source, description: "The source's name, any case." }
+      freeze: { type: bool, required: true, label: Frozen, description: "Freeze the source, or let it run." }
+    send: '{"jsonrpc":"2.0","method":"mixer.source.freeze","params":{"name":{source:json},"freeze":{freeze}},"id":"freeze"}'
+    expect: { reply_json: { "$.id": "freeze" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  list_mixer_sources:
+    summary: "List the Live Mixer's sources with their tally and freeze (get.list.sources)"
+    send: '{"jsonrpc":"2.0","method":"get.list.sources","id":"sources"}'
+    expect: { reply_json: { "$.id": "sources" }, json_path: "$.result" }
+    returns: value
+  list_mixer_destinations:
+    summary: "List the destinations with their mix engines and layers (get.list.destinations)"
+    send: '{"jsonrpc":"2.0","method":"get.list.destinations","id":"destinations"}'
+    expect: { reply_json: { "$.id": "destinations" }, json_path: "$.result" }
+    returns: value
+  list_mixer_renders:
+    summary: "List the renders (get.list.renders)"
+    send: '{"jsonrpc":"2.0","method":"get.list.renders","id":"renders"}'
+    expect: { reply_json: { "$.id": "renders" }, json_path: "$.result" }
+    returns: value
+  mixer_destination_active:
+    summary: "Make a destination active or not (mixer.destination.active)"
+    params:
+      destination: { type: string, max_length: 256, required: true, label: Destination, description: "The destination's name, any case." }
+      active: { type: bool, required: true, label: Active, description: "Active, or not." }
+    send: '{"jsonrpc":"2.0","method":"mixer.destination.active","params":{"name":{destination:json},"active":{active}},"id":"destination active"}'
+    expect: { reply_json: { "$.id": "destination active" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_destination_all:
+    summary: "Make every destination active or not (mixer.destination.all)"
+    params:
+      active: { type: bool, required: true, label: Active, description: "Active, or not." }
+    send: '{"jsonrpc":"2.0","method":"mixer.destination.all","params":{"active":{active}},"id":"destinations all"}'
+    expect: { reply_json: { "$.id": "destinations all" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_set_property:
+    summary: "Set a property of a destination, mix engine, layer, source, render, preset or quickset (mixer.set.property)"
+    params:
+      kind: { type: enum, values: [destination, mixEngine, layer, source, render, preset, quickset], required: true, label: Kind, description: "The kind of object." }
+      uuid: *uuid
+      property: { type: string, pattern: '^[A-Za-z]+$', max_length: 64, required: true, label: Property, description: "The property, as the Destinations & Layers page names it, such as opacity or programLocked." }
+      value: { type: json, required: true, label: Value, description: "The value in the property's type: a number, true or false, text, a color or an [x, y] array." }
+    send: '{"jsonrpc":"2.0","method":"mixer.set.property","params":{"kind":"{kind}","uuid":"{uuid}","property":"{property}","value":{value}},"id":"mixer property"}'
+    expect: { reply_json: { "$.id": "mixer property" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  list_mixer_presets:
+    summary: "List the Live Mixer's presets (get.list.presets)"
+    send: '{"jsonrpc":"2.0","method":"get.list.presets","id":"presets"}'
+    expect: { reply_json: { "$.id": "presets" }, json_path: "$.result" }
+    returns: value
+  mixer_preset_recall:
+    summary: "Recall a preset to the preview or the program (mixer.preset.recall)"
+    params:
+      preset: &preset { type: string, max_length: 256, required: true, label: Preset, description: "The preset's name, any case." }
+      target: { type: enum, values: [preview, program], default: preview, label: Target, description: "preview or program." }
+    send: '{"jsonrpc":"2.0","method":"mixer.preset.recall","params":{"name":{preset:json},"target":"{target}"},"id":"preset recall"}'
+    expect: { reply_json: { "$.id": "preset recall" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_preset_save:
+    summary: "Save the program or the preview into a preset (mixer.preset.save)"
+    params:
+      preset: *preset
+      from: &from { type: enum, values: [program, preview], required: true, label: From, description: "Save the program or the preview." }
+    send: '{"jsonrpc":"2.0","method":"mixer.preset.save","params":{"name":{preset:json},"from":"{from}"},"id":"preset save"}'
+    expect: { reply_json: { "$.id": "preset save" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_preset_add:
+    summary: "Add a preset from the program or the preview; answers its uuid (mixer.preset.add)"
+    params: { from: *from }
+    send: '{"jsonrpc":"2.0","method":"mixer.preset.add","params":{"from":"{from}"},"id":"preset add"}'
+    expect: { reply_json: { "$.id": "preset add" }, json_path: "$.result" }
+    returns: value
+  mixer_preset_delete:
+    summary: "Delete a preset (mixer.preset.delete)"
+    params: { preset: *preset }
+    send: '{"jsonrpc":"2.0","method":"mixer.preset.delete","params":{"name":{preset:json}},"id":"preset delete"}'
+    expect: { reply_json: { "$.id": "preset delete" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+  mixer_show_save:
+    summary: "Save the show from the Live Mixer (mixer.show.save)"
+    send: '{"jsonrpc":"2.0","method":"mixer.show.save","id":"mixer save"}'
+    expect: { reply_json: { "$.id": "mixer save" }, json_equals: { "$.result.ok": true } }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Player accepts websocket connections only once a show is loaded. After event.show.loaded (a show
+      loaded, created or restored) every earlier uuid is void: the lists are read again at once.
+  - models: [all]
+    severity: info
+    text: >
+      Playlists, cues and other objects are addressed here by name or number, as the manual's examples do;
+      call, get_object and set_properties take uuids for everything else. A reply with an error object
+      (-32602 for a bad parameter or no show, -32000 for an action refused, -32001 while the Live Mixer is
+      not ready) fails the command. The manual marks these pages as under maintenance.
+  - models: [all]
+    severity: info
+    text: >
+      Player sends mixer.state only to a client that has used a Live Mixer method; get.state is polled
+      every 10 s, which starts it, and the pushes keep the mixer's state current between polls. The
+      playlists are polled every 500 ms, the status every 2 s, the tasks, presets and sources every 10 s,
+      and the media and outputs every 30 s.
+  - models: [all]
+    severity: critical
+    text: >
+      load_show, new_show, restore_show, playlist_goto, playlist_play, mixer_take, mixer_cut, the faders and
+      the delete commands change what is on air at once; delete_output asks for no confirmation.
+
+state:
+  player.version: { type: string, description: "Modulo Player's version" }
+  player.api_version: { type: int, description: "The API's version" }
+  player.show: { type: string, description: "The loaded show's file name; empty when none" }
+  player.document_state: { type: int, description: "0 no show, 1 preparing, 2 ready" }
+  player.display_frequency: { type: float, unit: Hz, description: "The display frequency" }
+  player.max_outputs: { type: int, description: "The outputs the licence allows" }
+  player.playlist_count: { type: int, description: "The number of playlists" }
+  player.master: { type: bool, description: "This server is the master" }
+  player.media_to_cache: { type: int, description: "Media waiting to be cached" }
+  player.media_caching: { type: int, description: "Media being cached" }
+  player.clients: { type: int, description: "Connected clients" }
+  playlists.*.name: { type: string, description: "Each playlist's name, keyed by uuid" }
+  playlists.*.index: { type: int, description: "The cue on air, numbered as in the cue list; 0 before the first" }
+  playlists.*.playing: { type: bool, description: "The playlist is playing (play)" }
+  playlists.*.current_cue: { type: string, description: "The uuid of the cue on air" }
+  playlists.*.current_cue_name: { type: string, description: "The name of the cue on air" }
+  playlists.*.preload_cue: { type: string, description: "The uuid of the preloaded cue" }
+  playlists.*.timecode: { type: int, unit: ms, description: "The playlist's timecode" }
+  playlists.*.grand_master: { type: float, description: "The grand master, 0 to 1" }
+  playlists.*.audio_master: { type: float, description: "The audio master, 0 to 1" }
+  playlists.*.cue_count: { type: int, description: "The number of cues" }
+  playlists.*.step_by_step: { type: bool, description: "Step by step is on" }
+  playlists.*.synchro_to_timecode: { type: bool, description: "The playlist follows timecode" }
+  playlists.*.timecode_locked: { type: bool, description: "The timecode is locked" }
+  playlists.*.color: { type: string, description: "The playlist's interface color" }
+  tasks.*.name: { type: string, description: "Each task's name, keyed by uuid" }
+  tasks.*.index: { type: int, description: "The task's number, from 1" }
+  tasks.*.keyword: { type: string, description: "The task's keyword" }
+  tasks.*.enabled: { type: bool, description: "The task is enabled" }
+  tasks.*.trigger_enabled: { type: bool, description: "The task's trigger is enabled" }
+  tasks.*.triggered: { type: bool, description: "The task is triggered" }
+  media.*.name: { type: string, description: "Each media's name, keyed by uuid" }
+  media.*.type: { type: string, description: "The media's type" }
+  media.*.state: { type: int, description: "0 not analysed, 2 ready, 3 missing, 4 error" }
+  media.*.duration: { type: float, description: "The media's duration, as Player gives it" }
+  media.*.width: { type: int, unit: px, description: "The media's width" }
+  media.*.height: { type: int, unit: px, description: "The media's height" }
+  outputs.*.name: { type: string, description: "Each output's name, keyed by uuid" }
+  outputs.*.index: { type: int, description: "The output's number, from 1" }
+  outputs.*.type: { type: string, description: "standard or ledMapping" }
+  mixer.ready: { type: bool, description: "The Live Mixer is ready" }
+  mixer.work_on_preview: { type: bool, description: "Sources and presets go to the preview" }
+  mixer.relative_mode: { type: bool, description: "Relative mode is on" }
+  mixer.take_duration: { type: int, unit: ms, description: "The take duration" }
+  mixer.current_layout: { type: int, description: "The layout in use, from 1" }
+  mixer.transition_active: { type: bool, description: "A manual transition is running" }
+  mixer.transition_position: { type: float, description: "The manual transition's position, 0 to 1" }
+  mixer.last_preset: { type: string, description: "The uuid of the last preset recalled, or empty" }
+  mixer.destinations.*.active: { type: bool, description: "The destination is active, keyed by uuid" }
+  mixer.destinations.*.program_locked: { type: bool, description: "The destination's program is locked" }
+  mixer.destinations.*.take_in_progress: { type: bool, description: "A take is in progress" }
+  mixer.destinations.*.freeze: { type: bool, description: "The destination is frozen" }
+  mixer.tally.*.program: { type: bool, description: "The source is on the program, keyed by source uuid" }
+  mixer.tally.*.preview: { type: bool, description: "The source is on the preview" }
+  mixer.tally.*.freeze: { type: bool, description: "The source is frozen" }
+  mixer.presets.*.name: { type: string, description: "Each preset's name, keyed by uuid" }
+  mixer.presets.*.index: { type: int, description: "The preset's number, from 1" }
+  mixer.presets.*.locked: { type: bool, description: "The preset is locked" }
+  mixer.sources.*.name: { type: string, description: "Each source's name, keyed by uuid" }
+  mixer.sources.*.index: { type: int, description: "The source's number, from 1" }
+
+telemetry:
+  poll:
+    - every_ms: 500
+      send: ['{"jsonrpc":"2.0","method":"get.list.playlists","params":{"level":"playlist"},"id":"poll playlists"}']
+    - every_ms: 2000
+      send: ['{"jsonrpc":"2.0","method":"get.status.player","id":"poll status"}']
+    - every_ms: 10000
+      send:
+        - '{"jsonrpc":"2.0","method":"get.list.tasks","id":"poll tasks"}'
+        - '{"jsonrpc":"2.0","method":"get.state","id":"poll mixer"}'
+        - '{"jsonrpc":"2.0","method":"get.list.presets","id":"poll presets"}'
+        - '{"jsonrpc":"2.0","method":"get.list.sources","id":"poll sources"}'
+    - every_ms: 30000
+      send:
+        - '{"jsonrpc":"2.0","method":"get.list.media","id":"poll media"}'
+        - '{"jsonrpc":"2.0","method":"get.list.outputs","id":"poll outputs"}'
+  updates:
+    - json_match: { "$.method": "^event\\.show\\.loaded$" }
+      json: { name: "$.params.name" }
+      state: { player.show: "{name}" }
+      then_send:
+        - '{"jsonrpc":"2.0","method":"get.list.playlists","params":{"level":"playlist"},"id":"poll playlists"}'
+        - '{"jsonrpc":"2.0","method":"get.list.tasks","id":"poll tasks"}'
+        - '{"jsonrpc":"2.0","method":"get.list.media","id":"poll media"}'
+        - '{"jsonrpc":"2.0","method":"get.list.outputs","id":"poll outputs"}'
+        - '{"jsonrpc":"2.0","method":"get.state","id":"poll mixer"}'
+    - json_match: { "$.id": "^(poll )?status$" }
+      json: { version: "$.result.version", api: "$.result.apiVersion", show: "$.result.showName", doc: "$.result.documentState",
+              freq: "$.result.displayFrequency", outputs: "$.result.maxOutputs", playlists: "$.result.playlistCount",
+              master: "$.result.master", to_cache: "$.result.mediaToCache", caching: "$.result.mediaCaching",
+              clients: "$.result.clientConnected" }
+      state:
+        player.version: "{version}"
+        player.api_version: "{api}"
+        player.show: "{show}"
+        player.document_state: "{doc}"
+        player.display_frequency: "{freq}"
+        player.max_outputs: "{outputs}"
+        player.playlist_count: "{playlists}"
+        player.master: "{master}"
+        player.media_to_cache: "{to_cache}"
+        player.media_caching: "{caching}"
+        player.clients: "{clients}"
+    - json_match: { "$.id": "^(poll playlists|playlists playlist)$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", index: "$.index", play: "$.play", cue: "$.currentCueUuid", cue_name: "$.currentcuename",
+              preload: "$.preloadCueUuid", tc: "$.timecode", gm: "$.grandMasterFader", am: "$.audioMaster", count: "$.cueCount",
+              step: "$.stepByStepEnable", sync: "$.synchroToTimecode", locked: "$.timecodeLocked", color: "$.uiColor" }
+      replace: playlists
+      state:
+        "playlists.{uuid:key}.name": "{name}"
+        "playlists.{uuid:key}.index": "{index}"
+        "playlists.{uuid:key}.playing": "{play}"
+        "playlists.{uuid:key}.current_cue": "{cue}"
+        "playlists.{uuid:key}.current_cue_name": "{cue_name}"
+        "playlists.{uuid:key}.preload_cue": "{preload}"
+        "playlists.{uuid:key}.timecode": "{tc}"
+        "playlists.{uuid:key}.grand_master": "{gm}"
+        "playlists.{uuid:key}.audio_master": "{am}"
+        "playlists.{uuid:key}.cue_count": "{count}"
+        "playlists.{uuid:key}.step_by_step": "{step}"
+        "playlists.{uuid:key}.synchro_to_timecode": "{sync}"
+        "playlists.{uuid:key}.timecode_locked": "{locked}"
+        "playlists.{uuid:key}.color": "{color}"
+    - json_match: { "$.id": "^(poll )?tasks$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", index: "$.index", keyword: "$.keyword", enabled: "$.taskEnable",
+              trigger: "$.triggerEnable", triggered: "$.triggered" }
+      replace: tasks
+      state:
+        "tasks.{uuid:key}.name": "{name}"
+        "tasks.{uuid:key}.index": "{index}"
+        "tasks.{uuid:key}.keyword": "{keyword}"
+        "tasks.{uuid:key}.enabled": "{enabled}"
+        "tasks.{uuid:key}.trigger_enabled": "{trigger}"
+        "tasks.{uuid:key}.triggered": "{triggered}"
+    - json_match: { "$.id": "^(poll )?media$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", type: "$.type", state: "$.mediaState", duration: "$.duration", width: "$.width",
+              height: "$.height" }
+      replace: media
+      state:
+        "media.{uuid:key}.name": "{name}"
+        "media.{uuid:key}.type": "{type}"
+        "media.{uuid:key}.state": "{state}"
+        "media.{uuid:key}.duration": "{duration}"
+        "media.{uuid:key}.width": "{width}"
+        "media.{uuid:key}.height": "{height}"
+    - json_match: { "$.id": "^(poll )?outputs$" }
+      json_each: "$.result.outputs"
+      json: { uuid: "$.uuid", name: "$.name", index: "$.index", type: "$.type" }
+      replace: outputs
+      state:
+        "outputs.{uuid:key}.name": "{name}"
+        "outputs.{uuid:key}.index": "{index}"
+        "outputs.{uuid:key}.type": "{type}"
+    # The mixer's state: a get.state reply's result, or a mixer.state push's params.
+    - json_match: { "$.id": "^(poll mixer|mixer state)$" }
+      json: { ready: "$.result.ready", wop: "$.result.workOnPreview", rel: "$.result.relativeMode",
+                          take: "$.result.takeDuration", layout: "$.result.currentLayout", ta: "$.result.transition.active",
+                          tp: "$.result.transition.position", preset: "$.result.lastPreset" }
+      state: &mixer_state
+        mixer.ready: "{ready}"
+        mixer.work_on_preview: "{wop}"
+        mixer.relative_mode: "{rel}"
+        mixer.take_duration: "{take}"
+        mixer.current_layout: "{layout}"
+        mixer.transition_active: "{ta}"
+        mixer.transition_position: "{tp}"
+        mixer.last_preset: "{preset}"
+    - json_match: { "$.method": "^mixer\\.state$" }
+      json: { ready: "$.params.ready", wop: "$.params.workOnPreview", rel: "$.params.relativeMode",
+              take: "$.params.takeDuration", layout: "$.params.currentLayout", ta: "$.params.transition.active",
+              tp: "$.params.transition.position", preset: "$.params.lastPreset" }
+      state: *mixer_state
+    - json_match: { "$.id": "^(poll mixer|mixer state)$" }
+      json_each: "$.result.destinations"
+      json: &dest_json { uuid: "$.uuid", active: "$.active", locked: "$.programLocked", take: "$.takeInProgress", freeze: "$.freeze" }
+      replace: mixer.destinations
+      state: &dest_state
+        "mixer.destinations.{uuid:key}.active": "{active}"
+        "mixer.destinations.{uuid:key}.program_locked": "{locked}"
+        "mixer.destinations.{uuid:key}.take_in_progress": "{take}"
+        "mixer.destinations.{uuid:key}.freeze": "{freeze}"
+    - json_match: { "$.method": "^mixer\\.state$" }
+      json_each: "$.params.destinations"
+      json: *dest_json
+      replace: mixer.destinations
+      state: *dest_state
+    - json_match: { "$.id": "^(poll mixer|mixer state)$" }
+      json_each: "$.result.tally"
+      json: &tally_json { uuid: "$.uuid", program: "$.program", preview: "$.preview", freeze: "$.freeze" }
+      replace: mixer.tally
+      state: &tally_state
+        "mixer.tally.{uuid:key}.program": "{program}"
+        "mixer.tally.{uuid:key}.preview": "{preview}"
+        "mixer.tally.{uuid:key}.freeze": "{freeze}"
+    - json_match: { "$.method": "^mixer\\.state$" }
+      json_each: "$.params.tally"
+      json: *tally_json
+      replace: mixer.tally
+      state: *tally_state
+    - json_match: { "$.id": "^(poll )?presets$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", index: "$.index", locked: "$.locked" }
+      replace: mixer.presets
+      state:
+        "mixer.presets.{uuid:key}.name": "{name}"
+        "mixer.presets.{uuid:key}.index": "{index}"
+        "mixer.presets.{uuid:key}.locked": "{locked}"
+    - json_match: { "$.id": "^(poll )?sources$" }
+      json_each: "$.result"
+      json: { uuid: "$.uuid", name: "$.name", index: "$.index" }
+      replace: mixer.sources
+      state:
+        "mixer.sources.{uuid:key}.name": "{name}"
+        "mixer.sources.{uuid:key}.index": "{index}"

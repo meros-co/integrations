@@ -1,0 +1,352 @@
+spec: 1
+id: ioversal-vertex
+name: ioversal VERTEX (Remote Script API)
+vendor: ioversal
+category: playback
+
+# Every VERTEX system runs a script server on TCP 50009 that takes VERTEX
+# script commands, one per line ended by a carriage return. A command prefixed
+# with "return" is answered with its value on one line (JSON for structured
+# values, ended by CR); other commands are not answered, so they are reported
+# unverified. Playbacks are listed with "return ListItems.Playback" every second
+# and each playback's timecode is then read.
+source:
+  - title: "VERTEX manual, Advanced Features > Vertex Remote Script API (api.html)"
+    author: ioversal (Ross Video)
+    url: "https://ioversal.com/ManualContent/api.html"
+    note: >
+      Manufacturer documentation, read 2026-10-27. Each system's script server: TCP 50009, UDP 50019; any
+      VERTEX script command, ended by a carriage return, VERTEX ending its replies with one too; examples
+      ClipContainer1.Opacity.Value = 1, PME1.Playback1.MixLevel.FadeValue 1,5,
+      System1.Settings.ArtNetAdapter.Value = ETHERNET2, System2.ResetVideoInputs, Playback1.Play,
+      Playback2.Stop, Playback3.Pause, Script1; values read with return, as return Playback1.TimeCode.Value
+      answering {"TimeSpan":"00:00:00","Days":0,"Hours":0,"Minutes":0,"Seconds":0,"Frames":0,"FPS":25.0,
+      "TotalFrames":0} and return ListItems.Playback answering ["Playback1","Playback2"]; Authenticate:
+      username,password, without spaces, when authentication is enabled for the system in the Inspector.
+  - title: "VERTEX manual, Vertex Scripting (vertexscripting.html) and Vertex Script Examples (vertex-script-examples.html)"
+    author: ioversal (Ross Video)
+    url: "https://ioversal.com/ManualContent/vertex-script-examples.html"
+    note: >
+      Manufacturer documentation, read 2026-10-27. Syntax: levels separated by dots, Path.Value = x to set,
+      Path.FadeValue value,seconds to fade, ProgValue and FadeProgValue in the programmer, items by type-id
+      or custom name. Commands: ProjectSave, ProjectSaveBackup, ProjectClose, MainWindowMinimize,
+      MainWindowMaximize, Cancel, ListItems, PopupNotification; System EnterFullScreen, LeaveFullScreen,
+      WindowsShutdown, WindowsRestart, ResetVideoInputs, ForceResync, StartVertex, StopVertex; PME /
+      Playback GotoCue (cue number), GotoCuePlay, GotoFrame, GotoPrevCue, GotoNextCue, GotoFirstCue,
+      GotoLastCue, GotoPreviousFrame, GotoNextFrame, IgnoreNextCue, EnableAllCues, Pause, Play, Stop,
+      TogglePlay, FadeToCue; Control View GotoPage (page path, optional transition seconds),
+      ControlView1.Controls.ClickButton1.Click; ClipContainer TempPreload, TempUnload.
+  - title: "Vertex TCP/UDP Remote Control (ioversal forum, post 13)"
+    author: ioversal
+    url: "https://www.ioversal.com/Forum/Post/13"
+    note: "Read 2026-10-27: TCP 50009 or UDP 50019 on all adapters, one ASCII line per command ended by CR, Playback1.Play{CR}."
+  - title: "companion-module-ioversal-vertex (MIT)"
+    url: "https://github.com/bitfocus/companion-module-ioversal-vertex"
+    note: >
+      Read 2026-10-27 to fill gaps: Playback<n>.FadeToCue taking the cue, a preload time and a fade time
+      separated by commas, and GotoPrevCue / GotoNextCue.
+
+transport:
+  type: line-tcp
+  port: 50009
+  framing: terminated
+  terminator: cr
+  encoding: utf-8
+  timeout_ms: 3000
+  probe: "return ListItems.Playback"
+
+settings:
+  username: { type: string, max_length: 128, default: "", label: Username,
+              description: "The script server's user, when authentication is enabled for the system in VERTEX's Inspector; empty for none." }
+  password: { type: string, secret: true, max_length: 128, default: "", label: Password,
+              description: "The script server's password, sent with the username on connecting; empty when authentication is off." }
+
+on_connect:
+  - when_set: password
+    send: "Authenticate:{settings.username},{settings.password}"
+
+ports:
+  - { port: 50009, protocol: tcp, role: control, note: "VERTEX's script server (ScriptServerPort), on each system" }
+
+models:
+  - id: vertex
+    name: ioversal VERTEX
+    supports: [run_script, query, playback_play, playback_pause, playback_stop, playback_toggle_play,
+               playback_goto_cue, playback_goto_cue_play, playback_goto_frame, playback_next_cue,
+               playback_previous_cue, playback_first_cue, playback_last_cue, playback_next_frame,
+               playback_previous_frame, playback_ignore_next_cue, playback_enable_all_cues, playback_fade_to_cue,
+               set_value, fade_value, set_prog_value, fade_prog_value, system_enter_fullscreen,
+               system_leave_fullscreen, system_reset_video_inputs, system_force_resync, system_windows_restart,
+               system_windows_shutdown, system_start_vertex, system_stop_vertex, project_save, project_save_backup,
+               cancel_scripts, popup_notification, control_view_goto_page, control_click, list_items]
+    verification: none
+
+commands:
+  run_script:
+    summary: "Run any VERTEX script command or script by name, as written in VERTEX's script language"
+    params:
+      command: { type: string, max_length: 8192, required: true, label: Command,
+                 description: "One line of VERTEX script, such as Playback1.Play or Script1, without the carriage return." }
+    send: "{command}"
+    returns: none
+  query:
+    summary: "Read any value with return; VERTEX answers on one line, JSON for structured values"
+    params:
+      expression: { type: string, max_length: 8192, required: true, label: Expression,
+                    description: "What to read, such as Playback1.TimeCode.Value or ListItems.Playback." }
+    send: "return {expression}"
+    expect: { matches: "^(.*)$" }
+    returns: value
+  playback_play:
+    summary: "Play a playback (Playback<n>.Play)"
+    params:
+      playback: &playback { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)?$', max_length: 128, required: true,
+                            label: Playback, description: "The playback's type-id or custom name, such as Playback1, or PME1.Playback1 for one engine's." }
+    send: "{playback}.Play"
+    returns: none
+  playback_pause:
+    summary: "Pause a playback (Playback<n>.Pause)"
+    params: { playback: *playback }
+    send: "{playback}.Pause"
+    returns: none
+  playback_stop:
+    summary: "Stop a playback (Playback<n>.Stop)"
+    params: { playback: *playback }
+    send: "{playback}.Stop"
+    returns: none
+  playback_toggle_play:
+    summary: "Toggle a playback between play and pause (Playback<n>.TogglePlay)"
+    params: { playback: *playback }
+    send: "{playback}.TogglePlay"
+    returns: none
+  playback_goto_cue:
+    summary: "Jump a playback to a cue (Playback<n>.GotoCue)"
+    params:
+      playback: *playback
+      cue: &cue { type: int, min: 0, required: true, label: Cue, description: "The cue's number." }
+    send: "{playback}.GotoCue {cue}"
+    returns: none
+  playback_goto_cue_play:
+    summary: "Jump a playback to a cue and play, for pause cues (Playback<n>.GotoCuePlay)"
+    params: { playback: *playback, cue: *cue }
+    send: "{playback}.GotoCuePlay {cue}"
+    returns: none
+  playback_goto_frame:
+    summary: "Set a playback to a frame (Playback<n>.GotoFrame)"
+    params:
+      playback: *playback
+      frame: { type: int, min: 0, required: true, label: Frame, description: "The frame to go to." }
+    send: "{playback}.GotoFrame {frame}"
+    returns: none
+  playback_next_cue:
+    summary: "Go to a playback's next cue (Playback<n>.GotoNextCue)"
+    params: { playback: *playback }
+    send: "{playback}.GotoNextCue"
+    returns: none
+  playback_previous_cue:
+    summary: "Go to a playback's previous cue (Playback<n>.GotoPrevCue)"
+    params: { playback: *playback }
+    send: "{playback}.GotoPrevCue"
+    returns: none
+  playback_first_cue:
+    summary: "Go to a playback's first cue (Playback<n>.GotoFirstCue)"
+    params: { playback: *playback }
+    send: "{playback}.GotoFirstCue"
+    returns: none
+  playback_last_cue:
+    summary: "Go to a playback's last cue (Playback<n>.GotoLastCue)"
+    params: { playback: *playback }
+    send: "{playback}.GotoLastCue"
+    returns: none
+  playback_next_frame:
+    summary: "Step a playback one frame forward (Playback<n>.GotoNextFrame)"
+    params: { playback: *playback }
+    send: "{playback}.GotoNextFrame"
+    returns: none
+  playback_previous_frame:
+    summary: "Step a playback one frame back (Playback<n>.GotoPreviousFrame)"
+    params: { playback: *playback }
+    send: "{playback}.GotoPreviousFrame"
+    returns: none
+  playback_ignore_next_cue:
+    summary: "Make a playback ignore its next cue (Playback<n>.IgnoreNextCue)"
+    params: { playback: *playback }
+    send: "{playback}.IgnoreNextCue"
+    returns: none
+  playback_enable_all_cues:
+    summary: "Enable every cue of a playback again (Playback<n>.EnableAllCues)"
+    params: { playback: *playback }
+    send: "{playback}.EnableAllCues"
+    returns: none
+  playback_fade_to_cue:
+    summary: "Fade a playback to a cue with a preload and a fade time (Playback<n>.FadeToCue cue,preload,fade)"
+    params:
+      playback: *playback
+      cue: *cue
+      preload: { type: float, min: 0, required: true, label: Preload time, description: "The preload time, in seconds." }
+      fade: { type: float, min: 0, required: true, label: Fade time, description: "The fade time, in seconds." }
+    send: "{playback}.FadeToCue {cue},{preload:.3f},{fade:.3f}"
+    returns: none
+  set_value:
+    summary: "Set any property's value (Path.Value = value)"
+    params:
+      path: &path { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*$', max_length: 1024, required: true,
+                    label: Property, description: "The property's path without .Value, such as ClipContainer1.Opacity or PME1.Playback1.MixLevel." }
+      value: { type: string, max_length: 4096, required: true, label: Value,
+               description: "The value as VERTEX script writes it: a number, comma-separated parts (0,1,0.1), a color (#FFFFFF), true or false, a settings name or text." }
+    send: "{path}.Value = {value}"
+    returns: none
+  fade_value:
+    summary: "Fade a numeric property to a value over a time (Path.FadeValue value,seconds)"
+    params:
+      path: *path
+      value: &number { type: float, required: true, label: Value, description: "The value to fade to." }
+      seconds: &seconds { type: float, min: 0, required: true, label: Fade time, description: "The fade's length in seconds." }
+    send: "{path}.FadeValue {value:.4f},{seconds:.3f}"
+    returns: none
+  set_prog_value:
+    summary: "Set a property's value in the current programmer (Path.ProgValue = value)"
+    params:
+      path: *path
+      value: { type: string, max_length: 4096, required: true, label: Value, description: "The value as VERTEX script writes it." }
+    send: "{path}.ProgValue = {value}"
+    returns: none
+  fade_prog_value:
+    summary: "Fade a property's programmer value over a time (Path.FadeProgValue value,seconds)"
+    params: { path: *path, value: *number, seconds: *seconds }
+    send: "{path}.FadeProgValue {value:.4f},{seconds:.3f}"
+    returns: none
+  system_enter_fullscreen:
+    summary: "Put a system's outputs fullscreen (System<n>.EnterFullScreen)"
+    params:
+      system: &system { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]*$', max_length: 128, default: System1,
+                        label: System, description: "The system's type-id or custom name, such as System1." }
+    send: "{system}.EnterFullScreen"
+    returns: none
+  system_leave_fullscreen:
+    summary: "Take a system's outputs out of fullscreen (System<n>.LeaveFullScreen)"
+    params: { system: *system }
+    send: "{system}.LeaveFullScreen"
+    returns: none
+  system_reset_video_inputs:
+    summary: "Reset a system's video inputs (System<n>.ResetVideoInputs)"
+    params: { system: *system }
+    send: "{system}.ResetVideoInputs"
+    returns: none
+  system_force_resync:
+    summary: "Force a system to resynchronise (System<n>.ForceResync)"
+    params: { system: *system }
+    send: "{system}.ForceResync"
+    returns: none
+  system_windows_restart:
+    summary: "Restart a system's computer (System<n>.WindowsRestart)"
+    params: { system: *system }
+    send: "{system}.WindowsRestart"
+    returns: none
+  system_windows_shutdown:
+    summary: "Shut down a system's computer (System<n>.WindowsShutdown)"
+    params: { system: *system }
+    send: "{system}.WindowsShutdown"
+    returns: none
+  system_start_vertex:
+    summary: "Start VERTEX on a system (System<n>.StartVertex)"
+    params: { system: *system }
+    send: "{system}.StartVertex"
+    returns: none
+  system_stop_vertex:
+    summary: "Stop VERTEX on a system (System<n>.StopVertex)"
+    params: { system: *system }
+    send: "{system}.StopVertex"
+    returns: none
+  project_save:
+    summary: "Save the project (ProjectSave)"
+    send: "ProjectSave"
+    returns: none
+  project_save_backup:
+    summary: "Save a backup of the project (ProjectSaveBackup)"
+    send: "ProjectSaveBackup"
+    returns: none
+  cancel_scripts:
+    summary: "Cancel every running script (Cancel)"
+    send: "Cancel"
+    returns: none
+  popup_notification:
+    summary: "Show a pop-up notification in VERTEX (PopupNotification)"
+    params:
+      message: { type: string, max_length: 1024, required: true, label: Message, description: "The text to show." }
+    send: "PopupNotification {message}"
+    returns: none
+  control_view_goto_page:
+    summary: "Show a page of a control view, with an optional transition (ControlView<n>.GotoPage page,seconds)"
+    params:
+      view: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]*$', max_length: 128, default: ControlView1,
+              label: Control view, description: "The control view's type-id or name, such as ControlView1." }
+      page: { type: string, pattern: '^[^,\r\n]+$', max_length: 512, required: true, label: Page, description: "The page's full path, such as Page2." }
+      transition: { type: float, min: 0, default: 0, label: Transition, description: "The transition's length in seconds; 0 for none." }
+    send: "{view}.GotoPage {page},{transition:.2f}"
+    returns: none
+  control_click:
+    summary: "Click a button of a control view (ControlView<n>.Controls.<button>.Click)"
+    params:
+      control: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*$', max_length: 512, required: true,
+                 label: Button, description: "The button's path, such as ControlView1.Controls.ClickButton1." }
+    send: "{control}.Click"
+    returns: none
+  list_items:
+    summary: "List the items of a type, such as Playback, Script or System (return ListItems.<type>)"
+    params:
+      type: { type: string, pattern: '^[A-Za-z][A-Za-z0-9_]*$', max_length: 128, required: true, label: Type, description: "The item type, such as Playback." }
+    send: "return ListItems.{type}"
+    expect: { matches: "^(\\[.*\\])$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Only commands prefixed with return are answered; everything else is sent and reported unverified,
+      and a command VERTEX refuses gives no sign over this connection. If a VERTEX version answered other
+      commands too, its replies would be taken for the next query's answer.
+  - models: [all]
+    severity: info
+    text: >
+      With authentication enabled for the system in VERTEX's Inspector, the script server runs commands
+      only after Authenticate:username,password; it is sent on connecting when a password is set. The
+      documentation gives no reply to it.
+  - models: [all]
+    severity: info
+    text: >
+      Each system runs its own script server: commands to a system's items (System2.ResetVideoInputs) can
+      go to any system of the project, but connect to the system whose state is wanted. FadeToCue's
+      arguments (cue, preload time, fade time) follow the Companion module, the documentation not listing
+      them.
+  - models: [all]
+    severity: critical
+    text: >
+      run_script runs any script line, including ProjectLoad, ProjectClose, MainWindowExit and
+      WindowsShutdown, which end the show at once; system_windows_restart, system_windows_shutdown and
+      system_stop_vertex do the same.
+
+state:
+  playback_list.*: { type: string, description: "The playbacks of the project in ListItems order, keyed from 0" }
+  playbacks.*.timecode: { type: string, description: "The playback's position as VERTEX's TimeSpan text, such as 00:01:20, keyed by the playback's name" }
+  playbacks.*.frames: { type: int, description: "The playback's position in frames (TotalFrames)" }
+  playbacks.*.fps: { type: float, unit: fps, description: "The playback's frame rate" }
+
+telemetry:
+  poll:
+    send: ["return ListItems.Playback"]
+    every_ms: 1000
+  updates:
+    - match: "^\\["
+      request_match: "^return ListItems\\.Playback$"
+      match_each: '"([^"]*)"'
+      replace: playback_list
+      state: { "playback_list.{index}": "{1}" }
+      then_send: ["return {1}.TimeCode.Value"]
+    - match: '^\{"TimeSpan":"([^"]*)".*"FPS":([0-9.]+),"TotalFrames":([0-9]+)\}$'
+      request_match: '^return ([A-Za-z][A-Za-z0-9_]*)\.TimeCode\.Value$'
+      state:
+        "playbacks.{4}.timecode": "{1}"
+        "playbacks.{4}.fps": "{2}"
+        "playbacks.{4}.frames": "{3}"
