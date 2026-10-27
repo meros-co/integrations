@@ -1101,6 +1101,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:407](specs/dataton-watchout7.yaml#L407))
 - [ ] Confirm POST /v0/showfile takes the .watch file as the raw request body with Content-Type application/octet-stream, answers 200, and that showName names the loaded show; and record whether WATCHOUT 7 before 7.8 has it. ([specs/dataton-watchout7.yaml:318](specs/dataton-watchout7.yaml#L318))
 
+## datavideo-switcher — Datavideo switchers (DVIP and RS-232)
+
+- [ ] Confirm port 5009's answer (a real-time port, 0xaa55ffff when none is free) and that the pair it names is held while connected; check which pair the RMC-260 panel takes on the SE-1200MU. ([specs/datavideo-switcher.yaml:859](specs/datavideo-switcher.yaml#L859))
+- [ ] Confirm the real-time port's first packet: whether it lists every control or only the non-zero ones (state is rebuilt against zeros), that later packets carry only changes, and that answering each with a null packet keeps it flowing. ([specs/datavideo-switcher.yaml:867](specs/datavideo-switcher.yaml#L867))
+- [ ] Confirm a GET_CONTROL reply on the command port: pairs in the order asked, and the two trailing zero words of 5.3's example; and that SET_CONTROL is answered OK even for a read-only control. ([specs/datavideo-switcher.yaml:867](specs/datavideo-switcher.yaml#L867))
+- [ ] Record the source codes each bus takes on each model (program, keyers, aux, multiviewer), the SE-4000's inputs (8) and the SE-1200MU's (the document's tables list 1-4), against the documents' conflicting tables. ([specs/datavideo-switcher.yaml:877](specs/datavideo-switcher.yaml#L877))
+- [ ] Confirm the SE-3200/SE-4000 bus tally numbering 30-43 and free space 44 (the documents repeat 23-30), and the Ethernet input numbering (freeze mode 6) over the RS-232 supplement's (5). ([specs/datavideo-switcher.yaml:884](specs/datavideo-switcher.yaml#L884))
+- [ ] Record the types and values of the audio section, GPI, output mode and system preference controls, which the documents leave undescribed, and how memory.flags reads. ([specs/datavideo-switcher.yaml:890](specs/datavideo-switcher.yaml#L890))
+- [ ] Confirm names are UTF-16LE, GET_INPUT_NAME's input numbering (from 0 assumed), and the file transfer: GET_FILE_DATA chunk size and end, STORE_FILE_DATA's chunk numbering and size word, FILE_EVENT; and the mini picture's layout. ([specs/datavideo-switcher.yaml:900](specs/datavideo-switcher.yaml#L900))
+- [ ] Confirm the RS-232 70/F0 control IDs and values are little-endian, the SE-1200MU's speed (19200 in 2019, 57600 in 2017) and the SE-4000's status byte bits. ([specs/datavideo-switcher.yaml:908](specs/datavideo-switcher.yaml#L908))
+- [ ] Confirm the HS-1300 takes the SE-1200MU's Ethernet protocol and the HS-4000 the SE-4000's, and their control tables. ([specs/datavideo-switcher.yaml:920](specs/datavideo-switcher.yaml#L920))
+- [ ] Confirm the SE-2200's DVIP board takes the serial blocks over TCP 5002 inside DVIP's length header and answers the same way; the T-bar's range; status byte 4 bit 4 as PinP 2 preview; and the 'ignored' status outside PC CTRL mode. ([specs/datavideo-switcher.yaml:925](specs/datavideo-switcher.yaml#L925))
+- [ ] Confirm DVIP UDP packets' length counts the whole packet (or leaves out the type byte), replies come back to the sender's port, vendor and product IDs are big-endian, and which switchers answer the UDP management commands and presets. ([specs/datavideo-switcher.yaml:934](specs/datavideo-switcher.yaml#L934))
+- [ ] Check whether the SE-650 (and the HS-1300 over DVIP TCP) takes switching commands over DVIP and where Datavideo documents them. ([specs/datavideo-switcher.yaml:941](specs/datavideo-switcher.yaml#L941))
+
 ## dbaudio — d&b audiotechnik amplifiers
 
 - [ ] On each model (especially the D25, 25D, D90 and 5DM, which d&b's Q-SYS plug-in added last), confirm the named objects answer at the numbers built from the plug-in's tables, and record the class GetClassIdentification reports for each. ([specs/dbaudio.yaml:638](specs/dbaudio.yaml#L638))

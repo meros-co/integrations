@@ -1,0 +1,943 @@
+spec: 1
+id: datavideo-switcher
+name: Datavideo switchers (DVIP and RS-232)
+vendor: Datavideo
+category: switcher
+implementation: native
+reason: >
+  Datavideo's processor-unit switchers speak binary: every packet is its size, a command and 32-bit little-endian
+  ints or floats, control IDs packing a section, sub-section, input and control number, read and written with
+  GET_CONTROL and SET_CONTROL on a command port, while a second, real-time port sends the whole state in its
+  first packet and every change after it, one packet a video field, each of which the controller must answer. A
+  free pair of the four controller port pairs is asked for on a third port first. Their RS-232 ports wrap the
+  same control IDs in GVG100-style messages (a count, an effects address, a command). The SE-2200 takes
+  checksummed blocks of panel buttons and returns a status bit field, and every DVIP device answers binary UDP
+  management packets of a length, a type and a command.
+
+source:
+  - title: "Datavideo DVIP Control Operation Guide, Version 1.92 (2024-01-24)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/192/datavideo-se-650-dvip-control-protocol"
+    note: >
+      Datavideo's own document, the 'DVIP Ethernet Control Operation Guide V1.92_20240124' download of the
+      SE-650, SE-1200MU, SE-3200, HS-3200 and HS-1300 DVIP protocol pages. Nothing here is quoted from it.
+      TCP and UDP port 5002, DHCP by default (§2); the TCP packet, a 2-byte big-endian length counting the whole
+      packet and up to 512 bytes of product-specific command data (§3.1, §3.2); broadcast (type 80H) and UDP
+      (type 81H) packets of a length, type, command and parameters (§3.3, §3.5); the UDP commands: network
+      information ETH_REQ 00H (DHCP, host name, MAC, address, mask, gateway, DNS, connections), firmware
+      revision FWVER_REQ 01H, DHCP mode SET_DHCPMODE 02H, address and gateway SET_IPADR 03H, reboot RESET 04H,
+      host name SET_DHCPNAME 09H, mask SET_NETMASK 0BH, gateway SET_GATEWAY 0CH, DNS SET_PRIDNS 0DH and
+      SET_SECDNS 0EH, vendor and product ID GET_MODEL 40H, model name GET_MODEL_NAME 41H, versions GET_VERSION
+      42H, preset count GET_PRESET_COUNT 43H, preset names GET_PRESET_NAME 44H and RECALL_PRESET 45H, each
+      answered ACK 06H or NACK 15H (§3.6, Appendix B); the revision history's product IDs (HS-1300, SE-500MU-4K,
+      SE-4000 and HS-4000).
+  - title: "Datavideo DVIP Protocol Short Overview, Version E1 (2026-08-17)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/195/datavideo-hs-1300-dvip-control-protocol"
+    note: >
+      The packet length counts the 2 header bytes; some SE switchers also take control on 5004, 5006 and 5008
+      and a real-time port, described per product; keep the TCP connection open and reconnect when it drops.
+  - title: "Datavideo SE-3200 & HS-3200 Ethernet Control Protocol, E2 (2023-07-04)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/47/datavideo-hs-3200-ethernet-control-protocol"
+    note: >
+      The command and real-time channels, ports 5001-5008 and the request channel 5009 (§1.4, §1.5, §2.1.1);
+      packets of 32-bit words, size first (§2.1.2.1); OK and ERROR replies (§2.1.2.2); the commands GET_CONTROL
+      0 to CHROMA_KEYER_AUTO 20 (§2.2, §2.3); the real-time protocol: null packets, parameter/value packets, the
+      first packet holding the whole state, every packet answered (§3); the control sections and every control
+      with its type and range (§4.1.1-§4.1.16); worked byte examples, little-endian (§5.2, §5.3).
+  - title: "Datavideo SE-1200 Ethernet Control Protocol, E1 (2019-07-10)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/57/datavideo-se-1200-ethernet-control-protocol"
+    note: >
+      The SE-1200MU's document, the same protocol with its own control numbers: two keyers, a single DVE tile on
+      the flex source's DVE 1 controls, HD standards, DVI and analog outputs, a streamer size (§4.1). Port pair 1
+      is the RMC-260 control panel's (§1.4). Datavideo's support article 'SE-1200MU Ethernet Control Protocol
+      Document' (https://datavideo.com/us/faq/360058611993) files it under 'SE-1200MU & HS-1300'.
+  - title: "Datavideo SE-4000 Ethernet Control Protocol, E1 (2023-05-23)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/18/datavideo-se-4000-ethernet-control-protocol"
+    note: >
+      The SE-3200 document's protocol and numbering with 4K and HD standards (§4.1.2.1), inputs 1-8 on the
+      buses, no flex source and no DVE transition, PinP borders off or normal only, more aux sources (§4.1.9.1).
+  - title: "Datavideo SE-1200 RS-232 Control Protocol, E1 (2019-07-10)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/58/datavideo-se-1200-rs-232-control-protocol"
+    note: >
+      RS-232, 19200 bit/s, 8 data bits, odd parity, 1 stop bit, no break character needed; GVG100-style
+      messages of a byte count, an effects address and a command; writes answered 01 80 (accepted) or 01 40
+      (error); Get & Set Control Commands 70/F0 wrapping the Ethernet protocol's control IDs, the get answered
+      by an F0 message of the values only; pushbutton/lamp C6/C7 and select FB, menu select DE, all stop F2.
+  - title: "Datavideo SE-4000 RS-232 Control Protocol, E1 (2023-05-02)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/19/datavideo-se-4000-rs-232-control-protocol"
+    note: >
+      The same serial protocol for the SE-4000 at 19200 8O1, the status byte's accepted, protocol error and
+      ignored bits (§3.3), messages of at most 127 bytes; its test script (in the download) confirms 19200 and
+      odd parity.
+  - title: "Datavideo SE-3200 RS-232 Control Protocol, E1 (2019-07-09)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/51/datavideo-se-3200-rs-232-control-protocol"
+    note: >
+      States that the SE-3200's RS-232 port is taken by its keyboard and the HS-3200 has none, so both are
+      controlled over Ethernet only; its supplement numbers the input controls as the SE-1200 does.
+  - title: "SE-2200 DVIP Serial (RS-232/422) Control Protocol, Rev. 1.0 (2015-03-01)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/faq/360056727974"
+    note: >
+      Linked from Datavideo's support article 'SE-2200 DVIP RS-232/RS-422 Document' (a Dropbox file Datavideo
+      shares). 115200 bit/s 8N1, RS-232 or RS-422 on a 9-pin D-sub (§1.1, §1.3); blocks of AAH, a byte count,
+      effect address FFH, command 20H with a parameter, and a checksum, answered by a count and a status
+      (20H ignored, 40H protocol error, 80H OK) (§1.4); the button table (Table 6); T-bar 21H (§1.4.3); status
+      22H answered by seven status bytes (§1.4.4, §1.4.5); the menu settings and PC CTRL remote mode (§2).
+  - title: "SE-1200 MU RS-232 Commands Protocol Guide for the RMC-260 (2017-12-04)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/faq/360058612373"
+    note: "An earlier SE-1200MU serial document giving 57600 bit/s, where the 2019 document gives 19200."
+
+settings:
+  link: { type: enum, values: [tcp, serial], default: tcp, label: Link,
+    description: "tcp reaches the switcher over Ethernet; serial uses an RS-232 port of the host (SE-1200MU and SE-4000 RS-232, SE-2200 RS-232/422)." }
+  controller: { type: enum, values: [auto, "1", "2", "3", "4"], default: auto, label: Controller ports,
+    description: "Which of the four controller port pairs to use (1: real-time 5001 and command 5002, up to 4: 5007 and 5008); auto asks port 5009 for a free pair. On the SE-1200MU pair 1 is the RMC-260 panel's." }
+  poll_ms: { type: int, min: 100, max: 3600000, default: 1000, label: Read interval,
+    description: "Milliseconds between status reads where nothing is pushed: over RS-232, on the SE-2200, and DVIP network reads on the SE-650." }
+  dvip_port: { type: int, min: 1, max: 65535, default: 5002, label: DVIP UDP port,
+    description: "The UDP port of DVIP's management commands (network settings, identity, presets), 5002." }
+  serial_port: { type: string, max_length: 256, label: Serial port,
+    description: "With link serial, the host's serial port wired to the switcher: COM3 on Windows, /dev/ttyUSB0 on Linux, /dev/cu.usbserial-1420 on macOS." }
+  baud_rate: { type: enum, values: ["19200", "57600", "115200"], default: "19200", label: Baud rate,
+    description: "With link serial, the speed: 19200 for the SE-1200MU and SE-4000, 115200 for the SE-2200." }
+  data_bits: { type: int, min: 8, max: 8, default: 8, label: Data bits, description: "With link serial, 8 data bits." }
+  parity: { type: enum, values: [odd, none], default: odd, label: Parity,
+    description: "With link serial, odd for the SE-1200MU and SE-4000, none for the SE-2200." }
+  stop_bits: { type: int, min: 1, max: 1, default: 1, label: Stop bits, description: "With link serial, one stop bit." }
+  flow_control: { type: enum, values: [none], default: none, label: Flow control, description: "With link serial, no flow control." }
+
+ports:
+  - { port: 5009, protocol: tcp, role: control, when: "processor-unit models, controller auto", note: "connection request channel: answers with a free real-time port" }
+  - { port: 5002, protocol: tcp, role: control, when: "processor-unit models, controller 1; the SE-2200's DVIP board", note: "command port 1 (and the real-time port 5001); on the SE-2200 the DVIP serial protocol with DVIP's length header" }
+  - { port: 5001, protocol: tcp, role: control, when: "processor-unit models, controller 1", note: "real-time port 1: the state pushed every field" }
+  - { port: 5004, protocol: tcp, role: control, when: "processor-unit models, controller 2", note: "command port 2 (real-time 5003)" }
+  - { port: 5003, protocol: tcp, role: control, when: "processor-unit models, controller 2", note: "real-time port 2" }
+  - { port: 5006, protocol: tcp, role: control, when: "processor-unit models, controller 3", note: "command port 3 (real-time 5005)" }
+  - { port: 5005, protocol: tcp, role: control, when: "processor-unit models, controller 3", note: "real-time port 3" }
+  - { port: 5008, protocol: tcp, role: control, when: "processor-unit models, controller 4", note: "command port 4 (real-time 5007)" }
+  - { port: 5007, protocol: tcp, role: control, when: "processor-unit models, controller 4", note: "real-time port 4" }
+  - { port: 5002, protocol: udp, role: control, setting: dvip_port, when: "DVIP management commands, every model", note: "DVIP UDP packets (type 81H) to the switcher" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "SE-1200MU or SE-4000 RS-232 (19200 8O1), SE-2200 RS-232/422 (115200 8N1)" }
+
+models:
+  - id: se-1200mu
+    name: Datavideo SE-1200MU
+    supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
+      set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
+      fade_to_black, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still, grab_still,
+      delete_still, get_input_name, get_file_name, set_file_name, get_mini_pic, export_file, import_file, press_button,
+      set_lamp, menu_select, all_stop, get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address,
+      set_netmask, set_gateway, set_dns, set_host_name, reboot]
+    verification: none
+    notes: "SE-1200 Ethernet Control Protocol E1 and RS-232 Control Protocol E1: two keyers, two DSKs, a DVE tile."
+  - id: hs-1300
+    name: Datavideo HS-1300
+    supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
+      set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
+      fade_to_black, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still, grab_still,
+      delete_still, get_input_name, get_file_name, set_file_name, get_mini_pic, export_file, import_file, get_network,
+      get_identity, get_presets, recall_preset, set_dhcp, set_ip_address, set_netmask, set_gateway, set_dns,
+      set_host_name, reboot]
+    verification: none
+    notes: "Datavideo files the SE-1200MU Ethernet document under the HS-1300 too; Ethernet only."
+  - id: se-3200
+    name: Datavideo SE-3200
+    supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
+      set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
+      fade_to_black, set_aux, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still,
+      grab_still, delete_still, chroma_key_auto, get_input_name, get_file_name, set_file_name, get_mini_pic,
+      export_file, import_file, get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address,
+      set_netmask, set_gateway, set_dns, set_host_name, reboot]
+    verification: none
+    notes: "SE-3200 & HS-3200 Ethernet Control Protocol E2: 12 inputs, four keyers with PinPs, flex source; Ethernet only."
+  - id: hs-3200
+    name: Datavideo HS-3200
+    supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
+      set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
+      fade_to_black, set_aux, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still,
+      grab_still, delete_still, chroma_key_auto, get_input_name, get_file_name, set_file_name, get_mini_pic,
+      export_file, import_file, get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address,
+      set_netmask, set_gateway, set_dns, set_host_name, reboot]
+    verification: none
+    notes: "The SE-3200's protocol (one document covers both); Ethernet only."
+  - id: se-4000
+    name: Datavideo SE-4000
+    supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
+      set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
+      fade_to_black, set_aux, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still,
+      grab_still, delete_still, chroma_key_auto, get_input_name, get_file_name, set_file_name, get_mini_pic,
+      export_file, import_file, press_button, set_lamp, menu_select, all_stop, get_network, get_identity, get_presets,
+      recall_preset, set_dhcp, set_ip_address, set_netmask, set_gateway, set_dns, set_host_name, reboot]
+    verification: none
+    notes: "SE-4000 Ethernet Control Protocol E1 and RS-232 Control Protocol E1: 8 inputs, four keyers with PinPs."
+  - id: hs-4000
+    name: Datavideo HS-4000
+    supports: [set_control, get_control, set_program, set_preview, cut, auto, set_transition, set_transition_duration,
+      set_wipe_pattern, set_transition_position, set_next_transition, set_keyer, set_keyer_sources, set_dsk, dsk_auto,
+      fade_to_black, set_aux, set_input_freeze, load_memory, store_memory, delete_memory, load_still, store_still,
+      grab_still, delete_still, chroma_key_auto, get_input_name, get_file_name, set_file_name, get_mini_pic,
+      export_file, import_file, get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address,
+      set_netmask, set_gateway, set_dns, set_host_name, reboot]
+    verification: none
+    notes: "Assumed to take the SE-4000's protocol, as the HS-3200 takes the SE-3200's; Ethernet only."
+  - id: se-2200
+    name: Datavideo SE-2200 (with its DVIP board)
+    supports: [get_status, press, set_program, set_preview, cut, auto, fade_to_black, set_transition, set_wipe_pattern,
+      set_transition_speed, set_t_bar, set_feature, get_network, get_identity, get_presets, recall_preset, set_dhcp,
+      set_ip_address, set_netmask, set_gateway, set_dns, set_host_name, reboot]
+    verification: none
+    notes: "SE-2200 DVIP Serial Control Protocol 1.0, over RS-232/422 or the DVIP board's TCP 5002."
+  - id: se-650
+    name: Datavideo SE-650
+    supports: [get_network, get_identity, get_presets, recall_preset, set_dhcp, set_ip_address, set_netmask, set_gateway,
+      set_dns, set_host_name, reboot]
+    verification: none
+    notes: "Only DVIP's management commands are documented for it: network settings, identity and presets."
+
+commands:
+  set_control:
+    summary: "Set any writable control by its state path, such as keyers.1.opacity, then read it back (SET_CONTROL 1, or F0 over RS-232)"
+    params:
+      control: { type: string, max_length: 64, pattern: "^[a-z0-9_]+(\\.[a-z0-9_]+)*$", required: true, label: Control,
+        description: "The control's state path, as the state lists it for this model, such as program, wipe.level, keyers.2.chroma.hue or inputs.3.freeze." }
+      value: { type: string, max_length: 32, required: true, label: Value,
+        description: "The value as text: a number within the control's range, true or false for an on/off control, or one of an enumerated control's names (or its number)." }
+    returns: ack
+  get_control:
+    summary: "Read one control by its state path (GET_CONTROL 0, or 70 over RS-232)"
+    params:
+      control: { type: string, max_length: 64, pattern: "^[a-z0-9_]+(\\.[a-z0-9_]+)*$", required: true, label: Control,
+        description: "The control's state path, such as status.software_version or memory.state." }
+    returns: value
+  set_program:
+    summary: "Set the program (background) bus source and read it back"
+    params:
+      source: { type: int, min: 0, max: 30, required: true, label: Source,
+        description: "The source code of the model's document: processor units 0 black, 1-12 inputs (1-4 on the SE-1200, 1-8 on the SE-4000), 17 matte, 18 pattern, 19 and 20 stills, 21 flex source (SE-3200); SE-2200 1-6 channels, 7 black, 8 background." }
+    returns: ack
+  set_preview:
+    summary: "Set the preset (preview) bus source and read it back"
+    params:
+      source: { type: int, min: 0, max: 30, required: true, label: Source,
+        description: "The source code, as for set_program." }
+    returns: ack
+  cut:
+    summary: "Cut the preset source to program (M/E transition command 'goto end'; the SE-2200's CUT button)"
+    returns: ack
+  auto:
+    summary: "Run the M/E transition at its duration (M/E transition command 'run'; the SE-2200's AUTO button)"
+    returns: ack
+  set_transition:
+    summary: "Set the transition type and read it back"
+    params:
+      type: { type: enum, values: [mix, wipe, clip, dve], required: true, label: Type,
+        description: "mix or wipe on every model; clip on the SE-3200 and SE-4000; dve (the transition DVE) on the SE-3200 only." }
+    returns: ack
+  set_transition_duration:
+    summary: "Set a transition engine's duration in frames and read it back"
+    params:
+      engine: { type: enum, values: [me, dsk, ftb], default: me, label: Engine,
+        description: "The M/E transition (auto), the DSK transition or fade to black." }
+      frames: { type: int, min: 0, max: 9999, required: true, label: Frames, description: "The duration in frames." }
+    returns: ack
+  set_wipe_pattern:
+    summary: "Select the wipe pattern and read it back (the SE-2200's wipe buttons)"
+    params:
+      pattern: { type: int, min: 1, max: 32, required: true, label: Pattern,
+        description: "Wipe 1-32 on processor units, 1-17 on the SE-2200." }
+    returns: ack
+  set_transition_position:
+    summary: "Move the transition like the T-bar: the wipe level 0-100, the transition completing at 100"
+    params:
+      position: { type: float, min: 0.0, max: 100.0, required: true, label: Position,
+        description: "The transition's position in percent; at 100 the switcher completes it and sets the level back to 0." }
+    returns: ack
+  set_next_transition:
+    summary: "Choose what the next transition takes: the background and each keyer"
+    params:
+      background: { type: bool, label: Background, description: "Whether the background is in the next transition." }
+      key1: { type: bool, label: Key 1, description: "Whether keyer 1 is in the next transition." }
+      key2: { type: bool, label: Key 2, description: "Whether keyer 2 is in the next transition." }
+      key3: { type: bool, label: Key 3, description: "Whether keyer 3 is in the next transition (SE-3200, SE-4000)." }
+      key4: { type: bool, label: Key 4, description: "Whether keyer 4 is in the next transition (SE-3200, SE-4000)." }
+    returns: ack
+  set_keyer:
+    summary: "Put a keyer on program or take it off"
+    params:
+      keyer: { type: int, min: 1, max: 4, required: true, label: Keyer, description: "The keyer, 1-2 on the SE-1200, 1-4 otherwise." }
+      'on': { type: bool, required: true, label: On air, description: "On keys it onto program." }
+    returns: ack
+  set_keyer_sources:
+    summary: "Set a keyer's key source and split (fill) source"
+    params:
+      keyer: { type: int, min: 1, max: 4, required: true, label: Keyer, description: "The keyer, 1-2 on the SE-1200, 1-4 otherwise." }
+      key_source: { type: int, min: 0, max: 30, label: Key source, description: "The key source (and video in luma mode), a source code as for set_program." }
+      split_source: { type: int, min: 0, max: 30, label: Split source, description: "The video source in split mode, a source code as for set_program." }
+    returns: ack
+  set_dsk:
+    summary: "Put a downstream keyer on program or take it off, at once"
+    params:
+      dsk: { type: int, min: 1, max: 2, required: true, label: DSK, description: "DSK 1 or 2." }
+      'on': { type: bool, required: true, label: On air, description: "On keys it onto program." }
+    returns: ack
+  dsk_auto:
+    summary: "Run the DSK transition for the DSKs it takes (dsks.N.in_transition)"
+    returns: ack
+  fade_to_black:
+    summary: "Run fade to black, or back from black (FTB enabled, then the FTB transition 'run'; the SE-2200's FTB button)"
+    returns: ack
+  set_aux:
+    summary: "Route a source to an SDI aux output and read it back"
+    params:
+      aux: { type: int, min: 1, max: 4, required: true, label: Aux, description: "The aux output, 1-4." }
+      source: { type: int, min: 0, max: 30, required: true, label: Source,
+        description: "0 black, 1-12 inputs, 17 matte, then the model's table: SE-3200 18 flex source, 19-20 stills, 21 program, 22 preview, 23-24 program and preview with DSK 1; SE-4000 18 pattern, 21 flex source to 30 (multiviews, clean feeds)." }
+    returns: ack
+  set_input_freeze:
+    summary: "Freeze an input, or switch it to a still or clip, and read it back"
+    params:
+      input: { type: int, min: 1, max: 12, required: true, label: Input, description: "The physical input, from 1." }
+      mode: { type: enum, values: [live, freeze, still, clip, capture], required: true, label: Mode,
+        description: "live, freeze, still or clip (capture as the documents list it)." }
+    returns: ack
+  load_memory:
+    summary: "Load a user memory (memory select, then the load command)"
+    params:
+      memory: { type: int, min: 0, max: 1000, required: true, label: Memory,
+        description: "User memory 0-999 (0 also loads at power-up); 1000 is the system memory." }
+    returns: ack
+  store_memory:
+    summary: "Store the current state to a user memory"
+    params:
+      memory: { type: int, min: 0, max: 1000, required: true, label: Memory, description: "User memory 0-999." }
+    returns: ack
+  delete_memory:
+    summary: "Delete a user memory"
+    params:
+      memory: { type: int, min: 0, max: 1000, required: true, label: Memory, description: "User memory 0-999." }
+    returns: ack
+  load_still:
+    summary: "Load a still from the flash disk into a still buffer"
+    params:
+      still: { type: int, min: 0, max: 999, required: true, label: Still, description: "The still on the flash disk (0-100 on the SE-1200)." }
+      buffer: { type: int, min: 0, max: 7, required: true, label: Buffer, description: "The still buffer, 0-7." }
+    returns: ack
+  store_still:
+    summary: "Store a still buffer to the flash disk"
+    params:
+      still: { type: int, min: 0, max: 999, required: true, label: Still, description: "The still number to store as." }
+      buffer: { type: int, min: 0, max: 7, required: true, label: Buffer, description: "The still buffer, 0-7." }
+    returns: ack
+  grab_still:
+    summary: "Grab the program output into a still buffer"
+    params:
+      buffer: { type: int, min: 0, max: 7, required: true, label: Buffer, description: "The still buffer, 0-7." }
+    returns: ack
+  delete_still:
+    summary: "Delete a still from the flash disk"
+    params:
+      still: { type: int, min: 0, max: 999, required: true, label: Still, description: "The still number." }
+    returns: ack
+  chroma_key_auto:
+    summary: "Run a keyer's automatic chroma key setup (CHROMA_KEYER_AUTO 20), then read its chroma controls"
+    params:
+      keyer: { type: int, min: 1, max: 4, required: true, label: Keyer, description: "The keyer, 1-4." }
+    returns: ack
+  get_input_name:
+    summary: "Read an input's multiviewer name (GET_INPUT_NAME 9) into inputs.N.name"
+    params:
+      input: { type: int, min: 1, max: 12, required: true, label: Input, description: "The input, from 1." }
+    returns: value
+  get_file_name:
+    summary: "Read the name of a stored user memory, still, clip, logo or animated logo (GET_FILE_NAME 11)"
+    params:
+      type: { type: enum, values: [memory, still, clip, logo, animated_logo], required: true, label: Type,
+        description: "The kind of file (the SE-1200 has memories and stills)." }
+      number: { type: int, min: 0, max: 1000, required: true, label: Number, description: "The file's number." }
+    returns: value
+  set_file_name:
+    summary: "Name a stored user memory, still, clip, logo or animated logo (SET_FILE_NAME 12) and read it back"
+    params:
+      type: { type: enum, values: [memory, still, clip, logo, animated_logo], required: true, label: Type,
+        description: "The kind of file (the SE-1200 has memories and stills)." }
+      number: { type: int, min: 0, max: 1000, required: true, label: Number, description: "The file's number." }
+      name: { type: string, max_length: 15, required: true, label: Name, description: "The new name, up to 15 characters." }
+    returns: ack
+  get_mini_pic:
+    summary: "Read a mini picture (thumbnail) of a stored file (GET_MINI_PIC 8): 96 x 54 pixels, 32 bits each"
+    params:
+      number: { type: int, min: 0, max: 1000, required: true, label: Number, description: "The mini picture's number." }
+    returns: value
+  export_file:
+    summary: "Copy a stored user memory, still, clip frame, logo or animated logo frame from the switcher to a host file"
+    params:
+      type: { type: enum, values: [memory, still, clip, logo, animated_logo], required: true, label: Type,
+        description: "The kind of file." }
+      number: { type: int, min: 0, max: 16777215, required: true, label: Number,
+        description: "The file's number; for clips and animated logos, bits 9-0 the clip or logo and bits 23-16 the frame." }
+      path: { type: string, max_length: 1024, required: true, label: Host file, description: "The file to write on the host running the core." }
+    returns: value
+  import_file:
+    summary: "Copy a host file to a user memory, still, clip frame, logo or animated logo frame on the switcher"
+    params:
+      type: { type: enum, values: [memory, still, clip, logo, animated_logo], required: true, label: Type,
+        description: "The kind of file." }
+      number: { type: int, min: 0, max: 16777215, required: true, label: Number,
+        description: "The file's number; for clips and animated logos, bits 9-0 the clip or logo and bits 23-16 the frame." }
+      path: { type: string, max_length: 1024, required: true, label: Host file, description: "A file on the host, as export_file writes it." }
+    returns: value
+  press_button:
+    summary: "Press a control panel button as if pressed on the panel (RS-232 pushbutton select FB)"
+    params:
+      button: { type: int, min: 0, max: 127, required: true, label: Button,
+        description: "The button's number from Table 5 of the model's RS-232 document, such as 4A cut, 0B auto trans, 1F fade to black, 60-66 the menu keys." }
+    returns: ack
+  set_lamp:
+    summary: "Turn a panel button's function on or off (RS-232 pushbutton/lamp C6 on, C7 off)"
+    params:
+      button: { type: int, min: 0, max: 127, required: true, label: Button, description: "The button's number from Table 5 of the model's RS-232 document." }
+      'on': { type: bool, required: true, label: 'On', description: "On selects the function; off clears a toggle (it does nothing to one-shot and group buttons)." }
+    returns: ack
+  menu_select:
+    summary: "Show a menu page on the multiviewer (RS-232 menu select DE)"
+    params:
+      menu: { type: int, min: 0, max: 15, required: true, label: Menu,
+        description: "0 start, 1 keyer, 2 chroma, 3 PinP, 4 flex source, 5 inputs, 6 outputs, 7 audio, 8 files, 9 setup (SE-3200 and SE-4000 numbering)." }
+      sub_menu: { type: int, min: 0, max: 15, default: 0, label: Sub-menu,
+        description: "For keyer, chroma and PinP: 1-4 keys, 5-6 DSKs; for files: 1 user, 2 still, 3 clip, 4 logo, 5 animated logo." }
+    returns: ack
+  all_stop:
+    summary: "Stop every transition, return control to the T-bar, select mix and come out of black (RS-232 all stop F2)"
+    returns: ack
+  get_status:
+    summary: "Read the SE-2200's status (22H): buses, wipe, speed, toggles and T-bar"
+    returns: value
+  press:
+    summary: "Press one of the SE-2200's panel buttons (20H)"
+    params:
+      button:
+        type: enum
+        values: [wipe_1, wipe_2, wipe_3, wipe_4, wipe_5, wipe_6, wipe_7, wipe_8, wipe_9, wipe_10, wipe_11, wipe_12, wipe_13,
+          wipe_14, wipe_15, wipe_16, wipe_17, f1, f2, f3, f4, pip_1_program, pip_2_program, dsk_program, pip_1_preview,
+          pip_2_preview, dsk_preview, multiscreen, program_black, program_1, program_2, program_3, program_4, program_5,
+          program_6, program_background, preset_black, preset_1, preset_2, preset_3, preset_4, preset_5, preset_6,
+          preset_background, freeze, mix, wipe, cut, ftb, auto, timer, audio_fixed, audio_follow_video, border, logo_1,
+          logo_2, clock, speed_1, speed_2, speed_3]
+        required: true
+        label: Button
+        description: "The button, as Table 6 names it; toggles (logos, clock, timer, functions, PinPs, DSK, freeze, multiscreen) change state on each press."
+    returns: ack
+  set_transition_speed:
+    summary: "Select the SE-2200's transition speed 1-3 (5EH-60H)"
+    params:
+      speed: { type: int, min: 1, max: 3, required: true, label: Speed, description: "Speed 1, 2 or 3, the AUTO transition's rate." }
+    returns: ack
+  set_t_bar:
+    summary: "Set the SE-2200's T-bar position (21H)"
+    params:
+      position: { type: int, min: 0, max: 65535, required: true, label: Position,
+        description: "The T-bar position as the status reports it (a 16-bit value; Datavideo gives no range)." }
+    returns: ack
+  set_feature:
+    summary: "Turn an SE-2200 toggle on or off: read the status, press its button only if it differs, read again"
+    params:
+      feature:
+        type: enum
+        values: [logo_1, logo_2, border, f1, f2, f3, f4, pip_1_program, pip_2_program, dsk_program, pip_1_preview, pip_2_preview,
+          dsk_preview, clock, timer, audio_fixed, audio_follow_video]
+        required: true
+        label: Feature
+        description: "A toggle the status reports."
+      'on': { type: bool, required: true, label: 'On', description: "Whether the feature should be on." }
+    returns: ack
+  get_network:
+    summary: "Read the DVIP network settings (UDP ETH_REQ 00H) into dvip.network"
+    returns: value
+  get_identity:
+    summary: "Read the DVIP firmware revision, vendor and product IDs, model name and versions (UDP 01H, 40H-42H)"
+    returns: value
+  get_presets:
+    summary: "Read the DVIP preset count and every preset's name (UDP 43H, 44H)"
+    returns: value
+  recall_preset:
+    summary: "Recall a DVIP preset (UDP RECALL_PRESET 45H)"
+    params:
+      preset: { type: int, min: 1, max: 255, required: true, label: Preset, description: "The preset, from 1 to the count get_presets reads." }
+    returns: ack
+  set_dhcp:
+    summary: "Turn DHCP on or off (UDP SET_DHCPMODE 02H)"
+    params:
+      enabled: { type: bool, required: true, label: DHCP, description: "On takes an address from DHCP; off keeps the fixed address." }
+    returns: ack
+  set_ip_address:
+    summary: "Set the fixed address and gateway (UDP SET_IPADR 03H)"
+    params:
+      address: { type: string, max_length: 15, pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", required: true, label: Address, description: "The new IPv4 address." }
+      gateway: { type: string, max_length: 15, pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", required: true, label: Gateway, description: "The gateway's IPv4 address." }
+    returns: ack
+  set_netmask:
+    summary: "Set the network mask (UDP SET_NETMASK 0BH)"
+    params:
+      netmask: { type: string, max_length: 15, pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", required: true, label: Netmask, description: "The mask, such as 255.255.255.0." }
+    returns: ack
+  set_gateway:
+    summary: "Set the gateway (UDP SET_GATEWAY 0CH)"
+    params:
+      gateway: { type: string, max_length: 15, pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", required: true, label: Gateway, description: "The gateway's IPv4 address." }
+    returns: ack
+  set_dns:
+    summary: "Set the primary and/or secondary DNS server (UDP SET_PRIDNS 0DH, SET_SECDNS 0EH)"
+    params:
+      primary: { type: string, max_length: 15, pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", label: Primary DNS, description: "The primary DNS server's IPv4 address." }
+      secondary: { type: string, max_length: 15, pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", label: Secondary DNS, description: "The secondary DNS server's IPv4 address." }
+    returns: ack
+  set_host_name:
+    summary: "Set the DHCP host name (UDP SET_DHCPNAME 09H)"
+    params:
+      name: { type: string, max_length: 15, pattern: "^[!-~]{1,15}$", required: true, label: Host name, description: "Up to 15 printable ASCII characters." }
+    returns: ack
+  reboot:
+    summary: "Restart the DVIP device (UDP RESET 04H)"
+    returns: ack
+
+state:
+  # Processor units, from the real-time port (pushed) or polled over RS-232. Enumerated values are names;
+  # a value the documents do not name arrives as its number.
+  status.connection: { type: string, description: "The processor's connection status: none, pending or connected (read only)" }
+  status.system_version: { type: int, description: "System header version (read only)" }
+  status.main_version: { type: int, description: "Main header version (read only)" }
+  status.software_version: { type: int, description: "Software version: bits 31-24 major, 23-16 minor, 15-0 build (read only)" }
+  status.fpga_version: { type: int, description: "SE-1200 FPGA version: bit 31 SD mode, then year, month and day in hex digits (read only)" }
+  status.firmware_version: { type: int, description: "Switcher firmware date: year, month and day in hex digits, such as 0x20181125 (read only)" }
+  status.keyboard_version: { type: int, description: "Keyboard version (read only)" }
+  status.board_version: { type: int, description: "Production board ID (read only)" }
+  status.product_version: { type: int, description: "Product version (read only)" }
+  status.product_subversion: { type: int, description: "Product subversion (read only)" }
+  status.boot_status: { type: int, description: "Boot status (read only)" }
+  status.free_space: { type: int, description: "Free space (read only)" }
+  tally.sources.*: { type: int, description: "Tally of input N (source N-1 in the document), 0 when off air; values undescribed (read only)" }
+  tally.program: { type: int, description: "Tally of the program bus (read only)" }
+  tally.preview: { type: int, description: "Tally of the preset bus (read only)" }
+  tally.keyers.*.fill: { type: int, description: "Tally of keyer N's fill bus (read only)" }
+  tally.keyers.*.key: { type: int, description: "Tally of keyer N's key bus (read only)" }
+  tally.dsks.*.fill: { type: int, description: "Tally of DSK N's fill bus (read only)" }
+  tally.dsks.*.key: { type: int, description: "Tally of DSK N's key bus (read only)" }
+  system.standard: { type: string, description: "System video standard, such as 1080i59.94 (the model's own list)" }
+  system.aspect: { type: bool, description: "SD aspect: on 16:9, off 4:3" }
+  system.genlock: { type: bool, description: "Genlock on" }
+  system.genlock_source: { type: int, description: "Genlock source" }
+  system.ip_mode: { type: int, description: "IP mode, static or DHCP" }
+  system.ip_address: { type: int, description: "IP address as one 32-bit word" }
+  system.netmask: { type: int, description: "Network mask as one 32-bit word" }
+  system.gateway: { type: int, description: "Gateway as one 32-bit word" }
+  system.mac_address_0: { type: int, description: "MAC address, first word (read only)" }
+  system.mac_address_1: { type: int, description: "MAC address, second word (read only)" }
+  system.menu_color: { type: int, description: "Menu colour preference" }
+  system.menu_position: { type: int, description: "Menu position preference" }
+  system.transparent_menus: { type: int, description: "Transparent menus preference" }
+  system.small_menus: { type: int, description: "Small menus preference" }
+  system.auto_save: { type: int, description: "Auto save" }
+  system.language: { type: int, description: "Menu language" }
+  system.menu_mode: { type: int, description: "Menu mode preference" }
+  system.keyboard_brightness: { type: int, description: "Keyboard brightness" }
+  system.serial_mode: { type: bool, description: "Serial mode" }
+  system.audio_analog_level: { type: bool, description: "Analog audio level" }
+  wipe.pattern: { type: int, description: "Wipe pattern, 1-32 (SE-2200: 1-17)" }
+  wipe.level: { type: float, description: "Wipe level: the M/E transition's position, back to 0 when it completes", unit: "%" }
+  wipe.position_x: { type: float, description: "Wipe centre X, circle and ellipse wipes 29-31, in screen widths" }
+  wipe.position_y: { type: float, description: "Wipe centre Y, circle and ellipse wipes 29-31" }
+  wipe.rotation: { type: float, description: "Wipe rotation, circle and ellipse wipes, in turns" }
+  wipe.softness: { type: float, description: "Wipe softness", unit: "%" }
+  wipe.soft_balance: { type: float, description: "Leading against trailing edge softness of a bordered wipe, -100 to 100" }
+  wipe.border_width: { type: float, description: "Wipe border width", unit: "%" }
+  wipe.border: { type: bool, description: "Wipe border on, set by the switcher for any border width" }
+  wipe.border_hue: { type: float, description: "Wipe border hue", unit: "°" }
+  wipe.border_saturation: { type: float, description: "Wipe border saturation", unit: "%" }
+  wipe.border_luma: { type: float, description: "Wipe border luma", unit: "%" }
+  keyers.*.on: { type: bool, description: "Keyer N on program" }
+  keyers.*.key_source: { type: int, description: "Keyer N's key source (and video in luma mode), a source code" }
+  keyers.*.split_source: { type: int, description: "Keyer N's video source in split mode, a source code" }
+  keyers.*.opacity: { type: float, description: "Keyer N's opacity", unit: "%" }
+  keyers.*.lift: { type: float, description: "Keyer N's linear key lift", unit: "%" }
+  keyers.*.gain: { type: float, description: "Keyer N's linear key gain, 1 unity, up to 16" }
+  keyers.*.mode: { type: string, description: "Keyer N's mode: luma, linear, chroma or full" }
+  keyers.*.invert: { type: bool, description: "Keyer N's key inverted" }
+  keyers.*.select_mode: { type: string, description: "Keyer N's key select: self, split or pip" }
+  keyers.*.fill_mode: { type: string, description: "Keyer N's fill: video or matte" }
+  keyers.*.matte_hue: { type: float, description: "Keyer N's fill matte hue", unit: "°" }
+  keyers.*.matte_saturation: { type: float, description: "Keyer N's fill matte saturation", unit: "%" }
+  keyers.*.matte_luma: { type: float, description: "Keyer N's fill matte luma", unit: "%" }
+  keyers.*.chroma.enabled: { type: bool, description: "Keyer N's chroma keyer on (deprecated on the SE-3200 and SE-4000, where mode chroma selects it)" }
+  keyers.*.chroma.hue: { type: float, description: "Keyer N's chroma background hue", unit: "°" }
+  keyers.*.chroma.saturation: { type: float, description: "Keyer N's chroma background saturation", unit: "%" }
+  keyers.*.chroma.luma: { type: float, description: "Keyer N's chroma background luma (the luma suppression)", unit: "%" }
+  keyers.*.chroma.key_acceptance: { type: float, description: "Keyer N's key acceptance angle", unit: "°" }
+  keyers.*.chroma.key_gain: { type: float, description: "Keyer N's chroma key gain, up to 16" }
+  keyers.*.chroma.key_lift: { type: float, description: "Keyer N's chroma key lift", unit: "%" }
+  keyers.*.chroma.chroma_acceptance: { type: float, description: "Keyer N's chroma acceptance angle", unit: "°" }
+  keyers.*.chroma.suppression: { type: float, description: "Keyer N's chroma suppression angle, in percent of the acceptance angle", unit: "%" }
+  keyers.*.chroma.background_suppress: { type: bool, description: "Keyer N fully suppresses the background where the key is zero" }
+  keyers.*.mask.left: { type: float, description: "Keyer N's mask left edge", unit: "%" }
+  keyers.*.mask.right: { type: float, description: "Keyer N's mask right edge", unit: "%" }
+  keyers.*.mask.top: { type: float, description: "Keyer N's mask top edge", unit: "%" }
+  keyers.*.mask.bottom: { type: float, description: "Keyer N's mask bottom edge", unit: "%" }
+  keyers.*.mask.enabled: { type: bool, description: "Keyer N's mask on" }
+  keyers.*.pinp.enabled: { type: bool, description: "Keyer N's PinP on (SE-3200, SE-4000)" }
+  keyers.*.pinp.position_x: { type: float, description: "PinP centre X in screen widths, 0 centred, -16 to 16" }
+  keyers.*.pinp.position_y: { type: float, description: "PinP centre Y, 0 centred, -16 to 16" }
+  keyers.*.pinp.position_z: { type: float, description: "PinP centre Z, 0 the screen plane, -16 to 16" }
+  keyers.*.pinp.size_x: { type: float, description: "PinP X size, 1 unity, up to 16" }
+  keyers.*.pinp.size_y: { type: float, description: "PinP Y size, 1 unity, up to 16" }
+  keyers.*.pinp.size_z: { type: float, description: "PinP overall size, scaling X and Y, 1 unity" }
+  keyers.*.pinp.crop_size: { type: float, description: "PinP crop on every edge", unit: "%" }
+  keyers.*.pinp.crop_left: { type: float, description: "PinP left crop, added to crop_size", unit: "%" }
+  keyers.*.pinp.crop_right: { type: float, description: "PinP right crop, added to crop_size", unit: "%" }
+  keyers.*.pinp.crop_top: { type: float, description: "PinP top crop, added to crop_size", unit: "%" }
+  keyers.*.pinp.crop_bottom: { type: float, description: "PinP bottom crop, added to crop_size", unit: "%" }
+  keyers.*.pinp.crop_soft: { type: float, description: "PinP crop edge softness", unit: "%" }
+  keyers.*.pinp.border_style: { type: string, description: "PinP border style: off, normal, shaded, bevel, bevel_shaded, bevel_double, bevel_flat, flat_bevel, glass, glass_shaded, glass_double, glass_flat, flat_glass (SE-4000: off or normal)" }
+  keyers.*.pinp.border_opacity: { type: float, description: "PinP border opacity (SE-3200)", unit: "%" }
+  keyers.*.pinp.border_size: { type: float, description: "PinP border size on every edge", unit: "%" }
+  keyers.*.pinp.border_left: { type: float, description: "PinP left border, added to border_size", unit: "%" }
+  keyers.*.pinp.border_right: { type: float, description: "PinP right border, added to border_size", unit: "%" }
+  keyers.*.pinp.border_top: { type: float, description: "PinP top border, added to border_size", unit: "%" }
+  keyers.*.pinp.border_bottom: { type: float, description: "PinP bottom border, added to border_size", unit: "%" }
+  keyers.*.pinp.border_soft: { type: float, description: "PinP border edge softness", unit: "%" }
+  keyers.*.pinp.border_hue: { type: float, description: "PinP border hue", unit: "°" }
+  keyers.*.pinp.border_saturation: { type: float, description: "PinP border saturation", unit: "%" }
+  keyers.*.pinp.border_luma: { type: float, description: "PinP border luma", unit: "%" }
+  keyers.*.pinp.shade_hue: { type: float, description: "PinP border shade hue (SE-3200)", unit: "°" }
+  keyers.*.pinp.shade_saturation: { type: float, description: "PinP border shade saturation (SE-3200)", unit: "%" }
+  keyers.*.pinp.shade_luma: { type: float, description: "PinP border shade luma (SE-3200)", unit: "%" }
+  keyers.*.pinp.shade_soft: { type: float, description: "PinP border shade softness (SE-3200)", unit: "%" }
+  keyers.*.pinp.shade_position: { type: float, description: "PinP border shade position (SE-3200)" }
+  keyers.*.pinp.shade_corner_soft: { type: float, description: "PinP border shade corner softness (SE-3200)" }
+  keyers.*.pinp.border_direction: { type: int, description: "PinP border light direction (SE-3200)" }
+  keyers.*.pinp.highlight_hue: { type: float, description: "PinP border highlight hue (SE-3200)", unit: "°" }
+  keyers.*.pinp.highlight_saturation: { type: float, description: "PinP border highlight saturation (SE-3200)", unit: "%" }
+  keyers.*.pinp.highlight_luma: { type: float, description: "PinP border highlight luma (SE-3200)", unit: "%" }
+  keyers.*.pinp.highlight_opacity: { type: float, description: "PinP border highlight opacity (SE-3200)", unit: "%" }
+  keyers.*.pinp.lowlight_opacity: { type: float, description: "PinP border lowlight opacity (SE-3200)", unit: "%" }
+  next_transition.background: { type: bool, description: "The background is in the next transition" }
+  next_transition.key1: { type: bool, description: "Keyer 1 is in the next transition" }
+  next_transition.key2: { type: bool, description: "Keyer 2 is in the next transition" }
+  next_transition.key3: { type: bool, description: "Keyer 3 is in the next transition" }
+  next_transition.key4: { type: bool, description: "Keyer 4 is in the next transition" }
+  next_transition.swap_priority: { type: bool, description: "The next transition swaps keyer 1 and 2's priority (SE-1200)" }
+  transition.preview: { type: bool, description: "Transition preview: transitions shown on the preview output, not program" }
+  transition.reverse: { type: bool, description: "Wipes run in reverse" }
+  transition.normal_reverse: { type: bool, description: "Wipe direction alternates after each transition" }
+  transition.type: { type: string, description: "Transition type: mix, wipe, clip or dve (SE-2200: mix or wipe, from its lamps)" }
+  transition.dve_number: { type: int, description: "Transition DVE number (SE-3200)" }
+  transition.speed: { type: int, description: "SE-2200 transition speed, 1-3" }
+  program: { type: int, description: "Program bus source code (SE-2200: 1-6, 7 black, 8 background)" }
+  preview: { type: int, description: "Preset bus source code (SE-2200: 1-6, 7 black, 8 background)" }
+  key_priority: { type: string, description: "SE-1200 keyer order: key2_top or key1_top" }
+  dsks.*.on: { type: bool, description: "DSK N on program" }
+  dsks.*.key_source: { type: int, description: "DSK N's key source, a source code" }
+  dsks.*.split_source: { type: int, description: "DSK N's video source in split mode, a source code" }
+  dsks.*.opacity: { type: float, description: "DSK N's opacity", unit: "%" }
+  dsks.*.lift: { type: float, description: "DSK N's key lift", unit: "%" }
+  dsks.*.gain: { type: float, description: "DSK N's key gain, 1 unity, up to 16" }
+  dsks.*.mode: { type: string, description: "DSK N's mode: luma or linear" }
+  dsks.*.invert: { type: bool, description: "DSK N's key inverted" }
+  dsks.*.select_mode: { type: string, description: "DSK N's key select: self, split or pip" }
+  dsks.*.fill_mode: { type: string, description: "DSK N's fill: video or matte" }
+  dsks.*.matte_hue: { type: float, description: "DSK N's fill matte hue", unit: "°" }
+  dsks.*.matte_saturation: { type: float, description: "DSK N's fill matte saturation", unit: "%" }
+  dsks.*.matte_luma: { type: float, description: "DSK N's fill matte luma", unit: "%" }
+  dsks.*.mask.left: { type: float, description: "DSK N's mask left edge", unit: "%" }
+  dsks.*.mask.right: { type: float, description: "DSK N's mask right edge", unit: "%" }
+  dsks.*.mask.top: { type: float, description: "DSK N's mask top edge", unit: "%" }
+  dsks.*.mask.bottom: { type: float, description: "DSK N's mask bottom edge", unit: "%" }
+  dsks.*.mask.enabled: { type: bool, description: "DSK N's mask on" }
+  dsks.*.in_transition: { type: bool, description: "DSK N is in the DSK transition (dsk_auto)" }
+  dsk_transition_level: { type: float, description: "The DSK transition's progress (read only)", unit: "%" }
+  bus_matte.hue: { type: float, description: "Bus matte hue", unit: "°" }
+  bus_matte.saturation: { type: float, description: "Bus matte saturation", unit: "%" }
+  bus_matte.luma: { type: float, description: "Bus matte luma", unit: "%" }
+  ftb.enabled: { type: bool, description: "Fade to black enabled" }
+  ftb.direction: { type: string, description: "Fade to black direction: down or up" }
+  ftb.level: { type: float, description: "Fade to black progress, 100 fully black (read only)", unit: "%" }
+  ftb.active: { type: bool, description: "SE-2200: faded to black" }
+  flex.background: { type: int, description: "SE-3200 flex source background, a source code" }
+  flex.foreground: { type: int, description: "SE-3200 flex source foreground keyer video, a source code" }
+  flex.foreground_key: { type: int, description: "SE-3200 flex source foreground keyer key, a source code" }
+  flex.foreground_enabled: { type: bool, description: "SE-3200 flex source foreground keyer on" }
+  flex.pinps.*.source: { type: int, description: "SE-3200 flex source PinP N's source, a source code" }
+  flex.pinps.*.enabled: { type: bool, description: "Flex source PinP N on (SE-3200)" }
+  flex.pinps.*.position_x: { type: float, description: "Flex PinP centre X in screen widths" }
+  flex.pinps.*.position_y: { type: float, description: "Flex PinP centre Y" }
+  flex.pinps.*.position_z: { type: float, description: "Flex PinP centre Z" }
+  flex.pinps.*.size_x: { type: float, description: "Flex PinP X size, 1 unity" }
+  flex.pinps.*.size_y: { type: float, description: "Flex PinP Y size, 1 unity" }
+  flex.pinps.*.size_z: { type: float, description: "Flex PinP overall size, 1 unity" }
+  flex.pinps.*.crop_size: { type: float, description: "Flex PinP crop on every edge", unit: "%" }
+  flex.pinps.*.crop_left: { type: float, description: "Flex PinP left crop", unit: "%" }
+  flex.pinps.*.crop_right: { type: float, description: "Flex PinP right crop", unit: "%" }
+  flex.pinps.*.crop_top: { type: float, description: "Flex PinP top crop", unit: "%" }
+  flex.pinps.*.crop_bottom: { type: float, description: "Flex PinP bottom crop", unit: "%" }
+  flex.pinps.*.crop_soft: { type: float, description: "Flex PinP crop softness", unit: "%" }
+  flex.pinps.*.border_style: { type: string, description: "Flex PinP border style (off or normal in current software)" }
+  flex.pinps.*.border_opacity: { type: float, description: "Flex PinP border opacity", unit: "%" }
+  flex.pinps.*.border_size: { type: float, description: "Flex PinP border size", unit: "%" }
+  flex.pinps.*.border_left: { type: float, description: "Flex PinP left border", unit: "%" }
+  flex.pinps.*.border_right: { type: float, description: "Flex PinP right border", unit: "%" }
+  flex.pinps.*.border_top: { type: float, description: "Flex PinP top border", unit: "%" }
+  flex.pinps.*.border_bottom: { type: float, description: "Flex PinP bottom border", unit: "%" }
+  flex.pinps.*.border_soft: { type: float, description: "Flex PinP border softness", unit: "%" }
+  flex.pinps.*.border_hue: { type: float, description: "Flex PinP border hue", unit: "°" }
+  flex.pinps.*.border_saturation: { type: float, description: "Flex PinP border saturation", unit: "%" }
+  flex.pinps.*.border_luma: { type: float, description: "Flex PinP border luma", unit: "%" }
+  flex.pinps.*.shade_hue: { type: float, description: "Flex PinP border shade hue", unit: "°" }
+  flex.pinps.*.shade_saturation: { type: float, description: "Flex PinP border shade saturation", unit: "%" }
+  flex.pinps.*.shade_luma: { type: float, description: "Flex PinP border shade luma", unit: "%" }
+  flex.pinps.*.shade_soft: { type: float, description: "Flex PinP border shade softness", unit: "%" }
+  flex.pinps.*.shade_position: { type: float, description: "Flex PinP border shade position" }
+  flex.pinps.*.shade_corner_soft: { type: float, description: "Flex PinP border shade corner softness" }
+  flex.pinps.*.border_direction: { type: int, description: "Flex PinP border light direction" }
+  flex.pinps.*.highlight_hue: { type: float, description: "Flex PinP border highlight hue", unit: "°" }
+  flex.pinps.*.highlight_saturation: { type: float, description: "Flex PinP border highlight saturation", unit: "%" }
+  flex.pinps.*.highlight_luma: { type: float, description: "Flex PinP border highlight luma", unit: "%" }
+  flex.pinps.*.highlight_opacity: { type: float, description: "Flex PinP border highlight opacity", unit: "%" }
+  flex.pinps.*.lowlight_opacity: { type: float, description: "Flex PinP border lowlight opacity", unit: "%" }
+  dve.position_x: { type: float, description: "SE-1200 DVE tile centre X in screen widths" }
+  dve.position_y: { type: float, description: "SE-1200 DVE tile centre Y" }
+  dve.position_z: { type: float, description: "SE-1200 DVE tile centre Z" }
+  dve.size_x: { type: float, description: "SE-1200 DVE tile X size, 1 unity" }
+  dve.size_y: { type: float, description: "SE-1200 DVE tile Y size, 1 unity" }
+  dve.size_z: { type: float, description: "SE-1200 DVE tile overall size, 1 unity" }
+  dve.crop_size: { type: float, description: "SE-1200 DVE tile crop on every edge", unit: "%" }
+  dve.crop_left: { type: float, description: "SE-1200 DVE tile left crop", unit: "%" }
+  dve.crop_right: { type: float, description: "SE-1200 DVE tile right crop", unit: "%" }
+  dve.crop_top: { type: float, description: "SE-1200 DVE tile top crop", unit: "%" }
+  dve.crop_bottom: { type: float, description: "SE-1200 DVE tile bottom crop", unit: "%" }
+  dve.crop_soft: { type: float, description: "SE-1200 DVE tile crop softness", unit: "%" }
+  dve.border_size: { type: float, description: "SE-1200 DVE tile border size", unit: "%" }
+  dve.border_left: { type: float, description: "SE-1200 DVE tile left border", unit: "%" }
+  dve.border_right: { type: float, description: "SE-1200 DVE tile right border", unit: "%" }
+  dve.border_top: { type: float, description: "SE-1200 DVE tile top border", unit: "%" }
+  dve.border_bottom: { type: float, description: "SE-1200 DVE tile bottom border", unit: "%" }
+  dve.border_soft: { type: float, description: "SE-1200 DVE tile border softness", unit: "%" }
+  dve.border_style: { type: bool, description: "SE-1200 DVE tile border on (style normal), driven by the switcher" }
+  dve.border_hue: { type: float, description: "SE-1200 DVE tile border hue", unit: "°" }
+  dve.border_saturation: { type: float, description: "SE-1200 DVE tile border saturation", unit: "%" }
+  dve.border_luma: { type: float, description: "SE-1200 DVE tile border luma", unit: "%" }
+  inputs.*.name: { type: string, description: "Input N's multiviewer name (read on connecting, and by get_input_name)" }
+  inputs.*.black_level: { type: float, description: "Input N's proc amp black level", unit: "%" }
+  inputs.*.chroma_gain: { type: float, description: "Input N's proc amp chroma gain, up to 16" }
+  inputs.*.white_clip: { type: float, description: "Input N's proc amp white clip", unit: "%" }
+  inputs.*.valid: { type: bool, description: "Input N has a valid signal (read only)" }
+  inputs.*.standard: { type: int, description: "Input N's standard (read only; SE-3200, SE-4000)" }
+  inputs.*.freeze: { type: string, description: "Input N's freeze mode: live, freeze, still, clip or capture" }
+  inputs.*.frame_mode: { type: string, description: "Input N's frame mode for interlaced input: frame, field or video_and_key" }
+  inputs.*.remap: { type: int, description: "The crosspoint input N is remapped to, 0 unused" }
+  inputs.*.still_load: { type: bool, description: "Input N loads a still when a user memory is loaded" }
+  inputs.*.still_number: { type: int, description: "The still input N loads in still mode" }
+  inputs.*.audio_gain: { type: float, description: "Input N's audio gain, -60 to +24", unit: dB }
+  inputs.*.audio_delay: { type: int, description: "Input N's audio delay, 0-340", unit: ms }
+  inputs.*.audio_remap: { type: int, description: "Input N's audio source, 0 unused, 1-12 a physical input" }
+  input_ctrl.dvi_input: { type: bool, description: "SE-1200: the DVI input on input 7" }
+  input_ctrl.remap: { type: bool, description: "SE-1200: input remapping on" }
+  media.clip.valid: { type: bool, description: "A clip is loaded (read only)" }
+  media.clip.number: { type: int, description: "The loaded clip's number" }
+  media.clip.yck: { type: string, description: "The clip's format: yc or yck (with key)" }
+  media.clip.frames: { type: int, description: "The clip's length in frames, up to 120 (read only)" }
+  media.clip.state: { type: string, description: "The clip's run state: stopped, at_start, running, at_end or paused" }
+  media.clip.frame: { type: int, description: "The clip's current frame" }
+  media.stills.*.valid: { type: bool, description: "Still N holds a picture (read only)" }
+  media.stills.*.number: { type: int, description: "Still N's still number" }
+  media.logos.*.valid: { type: bool, description: "Logo N is loaded (read only)" }
+  media.logos.*.animated: { type: bool, description: "Logo N is an animated logo" }
+  media.logos.*.number: { type: int, description: "Logo N's logo number" }
+  aux.*.source: { type: int, description: "SDI aux N's source code" }
+  multiviewer.mode: { type: int, description: "Multiviewer mode" }
+  multiviewer.main_1: { type: int, description: "Multiviewer main tile 1 source: 0-16 black, 17 matte, 18 flex source, 19-20 stills, 21 program, 22 preview, 23-24 with DSK 1" }
+  multiviewer.main_2: { type: int, description: "Multiviewer main tile 2 source, as main_1" }
+  multiviewer.transparent_labels: { type: bool, description: "Multiviewer labels on transparent backgrounds" }
+  multiviewer.auto_number: { type: bool, description: "Multiviewer labels numbered automatically" }
+  multiviewer.label_info: { type: bool, description: "Multiviewer labels show input status" }
+  outputs.analog.source: { type: int, description: "SE-1200 analog output source" }
+  outputs.analog.mode: { type: int, description: "SE-1200 analog output mode" }
+  outputs.analog.sync_mode: { type: int, description: "SE-1200 analog output sync mode" }
+  outputs.dvi.source: { type: string, description: "SE-1200 HDMI (DVI) output: program, preview, program_dsk1, preview_dsk1 or multiviewer" }
+  outputs.multi_1.source: { type: string, description: "SE-1200 multi output 1, as the HDMI output" }
+  outputs.hdmi.*.source: { type: int, description: "HDMI output N's source, an aux source code" }
+  outputs.hdmi.*.mode_1080: { type: int, description: "HDMI output N's 1080 mode" }
+  outputs.sdi.*.source: { type: int, description: "SDI output N's source, an aux source code" }
+  gpi_out.enabled: { type: bool, description: "GPI output on" }
+  gpi_out.mode: { type: int, description: "GPI output mode" }
+  gpi_out.source: { type: int, description: "GPI output source" }
+  gpi_out.delay: { type: int, description: "GPI output delay" }
+  gpi_out.width: { type: int, description: "GPI output pulse width" }
+  tally_mode: { type: int, description: "Tally mode" }
+  audio.source: { type: int, description: "Program audio source: SE-3200/SE-4000 0 external, 1 audio follows video, 2-13 inputs 1-12; SE-1200 0 audio follows video, 1-4 inputs" }
+  audio.channels: { type: string, description: "SE-1200 analog audio channel pair: 1_2 to 15_16" }
+  audio.mode: { type: string, description: "Audio mode: off or on (SE-1200: off, digital, analog or test)" }
+  audio.analog_level: { type: int, description: "Analog audio level" }
+  audio.out_source: { type: int, description: "Audio output source" }
+  audio.in_mode: { type: int, description: "Audio input mode" }
+  audio.out_mode: { type: int, description: "Audio output mode" }
+  audio.mixer_mode: { type: int, description: "Audio mixer mode" }
+  audio.master_gain: { type: float, description: "Master audio gain", unit: dB }
+  audio.master_delay: { type: int, description: "Master audio delay", unit: ms }
+  audio.out_gain: { type: float, description: "Audio output gain", unit: dB }
+  audio.out_delay: { type: int, description: "Audio output delay", unit: ms }
+  audio.sdi.*: { type: bool, description: "Audio on SDI N" }
+  audio.hdmi.*: { type: bool, description: "Audio on HDMI N" }
+  audio.inputs.*.gain: { type: float, description: "Audio input N's gain in the audio section", unit: dB }
+  audio.inputs.*.delay: { type: int, description: "Audio input N's delay in the audio section", unit: ms }
+  transitions.*.command: { type: string, description: "Transition engine me, dsk or ftb: its last command, ready once processed (stop, run, pause, continue, goto_start, goto_end, restart, stop_and_clear, ready)" }
+  transitions.*.type: { type: string, description: "Transition engine run type: one_shot, loop or ping_pong" }
+  transitions.*.state: { type: string, description: "Transition engine state: stopped, at_start, running, at_end or paused (read only)" }
+  transitions.*.duration: { type: int, description: "Transition engine duration", unit: frames }
+  transitions.*.direction: { type: string, description: "Transition engine direction: forward or reverse" }
+  memory.select: { type: int, description: "The user memory to load, store or delete; 1000 the system memory" }
+  memory.command: { type: string, description: "The memory command: ready once processed, load, store or delete" }
+  memory.state: { type: string, description: "Memory command processor: ready, busy or error (read only)" }
+  memory.result: { type: string, description: "Last memory command's result: ok, fail, not_found, illegal_command or illegal_value (read only)" }
+  memory.event: { type: int, description: "Counts memory stores and deletes, by any controller (read only)" }
+  memory.flags: { type: int, description: "The sections a user memory loads, as the switcher stores them" }
+  memory.load_all_sections: { type: bool, description: "The next load takes every section, whatever the memory's flags; cleared after use" }
+  memory.stored: { type: array, description: "Numbers of the user memories stored (read only)" }
+  stills.select: { type: int, description: "The still to load, store or delete" }
+  stills.buffer: { type: int, description: "The still buffer to load, store or grab into, 0-7" }
+  stills.command: { type: string, description: "The still command: ready once processed, load, store, grab or delete" }
+  stills.state: { type: string, description: "Still command processor: ready, busy or error (read only)" }
+  stills.result: { type: string, description: "Last still command's result (read only)" }
+  stills.event: { type: int, description: "Counts still stores and deletes, by any controller (read only)" }
+  stills.stored: { type: array, description: "Numbers of the stills stored on the flash disk (read only)" }
+  streamer.size: { type: string, description: "SE-1200 streamer picture size: full, half, quarter or sixth" }
+  # SE-2200, from its status (22H).
+  features.*: { type: bool, description: "SE-2200 toggle on: logo_1, logo_2, border, f1-f4, pip_1_program, pip_2_program, dsk_program, pip_1_preview, pip_2_preview, dsk_preview, clock, timer, audio_fixed, audio_follow_video" }
+  multiscreen: { type: bool, description: "SE-2200 showing the multi-screen view rather than program" }
+  t_bar: { type: int, description: "SE-2200 T-bar position (16-bit)" }
+  # Every DVIP device, from UDP management replies.
+  dvip.network.dhcp: { type: bool, description: "DHCP on" }
+  dvip.network.host_name: { type: string, description: "DHCP host name" }
+  dvip.network.mac_address: { type: string, description: "MAC address" }
+  dvip.network.ip_address: { type: string, description: "IPv4 address" }
+  dvip.network.netmask: { type: string, description: "Network mask" }
+  dvip.network.gateway: { type: string, description: "Gateway" }
+  dvip.network.dns_primary: { type: string, description: "Primary DNS server" }
+  dvip.network.dns_secondary: { type: string, description: "Secondary DNS server" }
+  dvip.network.connections: { type: int, description: "Active TCP and RS connections" }
+  dvip.firmware: { type: string, description: "DVIP firmware revision, major.minor" }
+  dvip.vendor_id: { type: int, description: "DVIP vendor ID" }
+  dvip.product_id: { type: int, description: "DVIP product ID" }
+  dvip.model_name: { type: string, description: "Model name" }
+  dvip.versions.firmware_a: { type: string, description: "Firmware A version, 4 bytes in hex" }
+  dvip.versions.firmware_b: { type: string, description: "Firmware B version, 4 bytes in hex" }
+  dvip.versions.firmware_c: { type: string, description: "Firmware C version, 4 bytes in hex" }
+  dvip.versions.firmware_d: { type: string, description: "Hardware or firmware D version, 4 bytes in hex" }
+  dvip.preset_count: { type: int, description: "Number of DVIP presets" }
+  dvip.presets.*.name: { type: string, description: "DVIP preset N's name" }
+
+quirks:
+  - models: [se-1200mu, hs-1300, se-3200, hs-3200, se-4000, hs-4000, se-2200]
+    severity: critical
+    text: >
+      load_memory replaces the switcher's whole state (user memory 1000 is the system memory, standard included),
+      recall_preset recalls a DVIP preset, store_memory, store_still and import_file overwrite what is stored, and
+      delete_memory and delete_still remove it; none can be undone live.
+  - models: [all]
+    severity: critical
+    text: >
+      set_ip_address, set_netmask, set_gateway, set_dhcp and reboot change or drop the switcher's network
+      connection; the device must then be opened at its new address.
+  - models: [se-1200mu, hs-1300, se-3200, hs-3200, se-4000, hs-4000]
+    severity: warning
+    text: >
+      The switcher takes four controllers, each on a pair of ports (real-time 5001/5003/5005/5007, command one
+      higher). With controller auto, port 5009 is asked for a free pair; when none is free the device is
+      reported disconnected and tried again. On the SE-1200MU pair 1 is normally the RMC-260 panel's. Using a
+      real-time port for commands works at first and then falls out of step, so commands always go to the even
+      port.
+  - models: [se-1200mu, hs-1300, se-3200, hs-3200, se-4000, hs-4000]
+    severity: info
+    text: >
+      Over Ethernet the real-time port pushes the state: its first packet is the whole state against all zeros
+      (a control not in it is zero) and later packets carry changes, one packet a field, each answered with a
+      null packet as the protocol requires. Every control is in state under the path set_control and get_control
+      take; controls the documents mark unused or without function, and the SE-3200's undescribed streamer, clip,
+      logo and animated logo sections (12-18), are left out. Over RS-232 nothing is pushed: program, preview,
+      keyers, DSKs, FTB, transition states and tallies are read every poll_ms, and the other controls 30 at a
+      time in turn. Opened for commands only, the real-time port is not opened and nothing is polled.
+  - models: [se-1200mu, hs-1300, se-3200, hs-3200, se-4000, hs-4000]
+    severity: info
+    text: >
+      Sources are the documents' codes, which differ by model and by bus (program, keyers, aux, multiviewer),
+      and the documents' own tables disagree in places (the SE-4000's keyer table lists inputs 1-8 and no
+      stills; its aux table adds pattern, clean feeds and multiviews from 18), so they are passed through as
+      numbers rather than named.
+  - models: [se-3200, hs-3200, se-4000, hs-4000]
+    severity: info
+    text: >
+      The documents number the bus tallies 30-36 and then 23-30 again; they are taken as running on from 30 to 44
+      (free space). The SE-3200 RS-232 document's input numbering (freeze mode 5) is the SE-1200's; the Ethernet
+      document's (freeze mode 6, input standard 4), which its own worked example confirms, is used.
+  - models: [se-1200mu, hs-1300, se-3200, hs-3200, se-4000, hs-4000]
+    severity: info
+    text: >
+      Not offered: software upgrade (OPEN_SOFTWARE_FILE, INSTALL_SOFTWARE), which Datavideo's tools do;
+      SET_INPUT_NAME, whose documented packet carries no input number; STREAMER_CONTROL and RECORDER_CONTROL,
+      which the documents give no commands for; the menu command 21, undescribed. The documents give no types or
+      ranges for most audio section, GPI, output mode and system preference controls, so those are plain numbers
+      (gains in dB and delays in ms as for the input section's). Key invert is typed float in the documents and
+      written as 1.0 or 0.0. memory.flags is passed as one number, though the documents also describe ten flags
+      'one bit per word'.
+  - models: [se-1200mu, hs-1300, se-3200, hs-3200, se-4000, hs-4000]
+    severity: info
+    text: >
+      Names are read and written as UTF-16 little-endian, which the documents call Unicode; input names are
+      asked for by input number from 0. export_file reads the file in 1024-byte chunks until a shorter one
+      arrives and import_file writes 1024-byte chunks numbered from 0, sizing each STORE_FILE_DATA packet by its
+      true length (the document's size formula is 4 bytes short), then signals FILE_EVENT; the documents do not
+      describe the files' contents. These, get_mini_pic, chroma_key_auto and the file names are Ethernet only.
+  - models: [se-1200mu, se-4000]
+    severity: info
+    text: >
+      Over RS-232 (19200 bit/s, 8 data bits, odd parity, 1 stop bit) the 70/F0 control commands carry control
+      IDs and values little-endian, as on Ethernet (the serial documents do not say), at most 30 reads or 15
+      writes a message. press_button, set_lamp, menu_select and all_stop exist only there. Datavideo's 2017
+      SE-1200MU guide for the RMC-260 gives 57600 bit/s; the 2019 document's 19200 is the default.
+  - models: [se-3200, hs-3200, hs-1300, hs-4000]
+    severity: info
+    text: >
+      Ethernet only: the SE-3200's RS-232 port serves its keyboard and the HS-3200 has none (SE-3200 RS-232
+      document); no serial document covers the HS-1300 or HS-4000.
+  - models: [hs-1300, hs-4000]
+    severity: warning
+    text: >
+      Inferred: Datavideo files the SE-1200MU Ethernet document under the HS-1300, and the HS-4000 is assumed to
+      take the SE-4000's protocol as the HS-3200 takes the SE-3200's; neither document names them.
+  - models: [se-2200]
+    severity: warning
+    text: >
+      The SE-2200 obeys only in remote mode: enable the DVIP board under MENU > REMOTE CONTROL and press PC CTRL;
+      otherwise commands are answered 'ignored' (20H). Over TCP 5002 each block is sent with DVIP's 2-byte length
+      header and replies are read the same way, which Datavideo's serial document does not describe. Its status
+      lists PinP 1 preview twice; the second (byte 4 bit 4) is taken as PinP 2 preview. The T-bar position's
+      range is not given. Wipe and speed buttons select at once, the toggles change on each press; set_feature
+      reads the status and presses only when needed.
+  - models: [all]
+    severity: info
+    text: >
+      DVIP management packets are sent with a length counting the whole packet, as the guide's replies do (its
+      formula can be read as leaving out the type byte); vendor and product IDs are read big-endian. With the
+      device opened for state, its network settings, identity and presets are read on starting; replies come to
+      the sender's port.
+  - models: [se-650]
+    severity: info
+    text: >
+      Only DVIP's management commands are documented for the SE-650 (and the HS-1300's DVIP page gives the same
+      guide): network settings, identity and presets. Its switching commands over DVIP TCP are not public, so
+      they are not offered; liveness is the network read every poll_ms.

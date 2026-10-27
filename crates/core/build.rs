@@ -98,6 +98,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-dataton",
         &["dataton-watchout6", "dataton-watchout7"],
     ),
+    ("vendor-datavideo", &["datavideo-switcher"]),
     ("vendor-dbaudio", &["dbaudio"]),
     ("vendor-dhd", &["dhd-aes67", "dhd-control-api", "dhd-ecp"]),
     (

@@ -41,6 +41,7 @@ NATIVE = {
     "biamp-tesira": "Tesira Text Protocol over Telnet, TCP 23",
     "blackmagic-atem": "Proprietary UDP 9910",
     "bss-london": "London Direct Inject over TCP 1023",
+    "datavideo-switcher": "Binary command and real-time ports over TCP 5001-5009, RS-232, the SE-2200's serial blocks; DVIP UDP 5002 management",
     "dbaudio": "OCP.1 over TCP 30013 or 50014 by model",
     "dhd-ecp": "ECP 16-byte blocks over TCP 2008",
     "emberplus": "Ember+ (S101) over TCP",
