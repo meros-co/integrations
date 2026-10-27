@@ -2228,6 +2228,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what /appCommand/perform answers for a command done, an unknown command name and an index out of range (status and body; the text success is assumed for done). ([specs/logos-proclaim.yaml:327](specs/logos-proclaim.yaml#L327))
 - [ ] Check what a song part command does with an index past the song's parts, and that a part without a number is shown when the index is left out. ([specs/logos-proclaim.yaml:340](specs/logos-proclaim.yaml#L340))
 
+## madrix — MADRIX 5 (OSC and HTTP Remote)
+
+- [ ] Record the OSC feedback MADRIX sends: its addresses, argument types, and that it goes to the sender's address on the Destination Network Port. ([specs/madrix.yaml:1491](specs/madrix.yaml#L1491))
+- [ ] Check whether /Main/FeedbackAll resends every value when sent by a client, and whether methods with no listed argument (Up, Down, Automatic, ToLeft, ToRight, ToCenter, Defaults, FeedbackAll) need one. ([specs/madrix.yaml:1500](specs/madrix.yaml#L1500))
+- [ ] Check that layer, group, fader and trigger port indexes are written as plain decimals in the address (/DeckA/StoragePlace/Layers/0/Opacity). ([specs/madrix.yaml:1500](specs/madrix.yaml#L1500))
+- [ ] Check the index bases (OSC 0-based, HTTP 1-based) and the bounds chosen where the help is silent (indexes, offsets, BPM). ([specs/madrix.yaml:1509](specs/madrix.yaml#L1509))
+- [ ] Confirm an HTTP Remote Get function answers the value alone as the body (GET /RemoteCommands/?GetMaster), and what a Set function answers. ([specs/madrix.yaml:1516](specs/madrix.yaml#L1516))
+
 ## magewell-director — Magewell Director Mini, Director One and Director Plus
 
 - [ ] Confirm the API listens on port 8080 (the document's demo port) and takes no authentication. ([specs/magewell-director.yaml:36](specs/magewell-director.yaml#L36))
