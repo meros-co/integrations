@@ -3848,6 +3848,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5196](specs/vmix.yaml#L5196))
 - [ ] Confirm the video call attributes (callPassword, callConnected, callVideoSource, callAudioSource) and the VideoCallAudioSourceX and VideoCallSourceOutputN activators. ([specs/vmix.yaml:5141](specs/vmix.yaml#L5141))
 
+## workpro-lightshark — Work Pro LightShark LS-1 / LS-Core (OSC)
+
+- [ ] Check the default OSC input and output ports (8000 and 9000 per Companion) and where the console sends its output. ([specs/workpro-lightshark.yaml:265](specs/workpro-lightshark.yaml#L265))
+- [ ] Record the console's feedback after /LS/Sync (grand master, master levels, playback levels, executors) and the executor value format. ([specs/workpro-lightshark.yaml:272](specs/workpro-lightshark.yaml#L272))
+- [ ] Check that a release-only message (0.0) triggers keys, playbacks and executors as the manual's hexadecimal table shows. ([specs/workpro-lightshark.yaml:279](specs/workpro-lightshark.yaml#L279))
+- [ ] Check /LS/Color against /LS/Colour, /LS/Fx, the /LS/ExecutorLine form, and the Companion-only addresses (Tap, FxTap, TAP/PB, ChaseValue/PB, Level/Sm*, Reset/Sm*). ([specs/workpro-lightshark.yaml:286](specs/workpro-lightshark.yaml#L286))
+
 ## wyrestorm-matrix — WyreStorm matrix switchers
 
 - [ ] Confirm SET CEC_PWR takes a space before the port on H2A and MXV matrices (the syntax line has none, the example one). ([specs/wyrestorm-matrix.yaml:497](specs/wyrestorm-matrix.yaml#L497))

@@ -1,0 +1,298 @@
+spec: 1
+id: workpro-lightshark
+name: Work Pro LightShark LS-1 / LS-Core (OSC)
+vendor: Work Pro
+category: lighting
+
+# Written from the OSC chapter of the LightShark user manual: every control is
+# an OSC address under /LS with one float argument, 1 for a press and 0 for a
+# release, actions happening on the release; faders take 0-255 and encoders
+# -1 to 1. The console's feedback addresses and default ports are not in the
+# manual; they are taken from Bitfocus Companion's LightShark module (MIT).
+source:
+  - title: LightShark User Manual v1.4 (English), 7.2 OSC
+    author: Equipson S.A. (Work Pro)
+    url: https://media.equipson.es/Docs/Manuales/LightShark_v1_4_EN.pdf
+    note: >
+      Section 6.1 Preferences, MIDI & OSC ("You can enable or disable OSC control. In addition,
+      the user can define the input & output port"); 7.2 OSC, pp. 128-140: the command table
+      (/LS/Page/Up, /LS/Page/Down, /LS/DBO, /LS/Edit, /LS/Update, /LS/Delete, /LS/Copy, /LS/Move,
+      /LS/Set, /LS/Fan, /LS/Find, /LS/Clear, /LS/Rec, /LS/Select|Go|Flash|Stop|Prev|Next|Pause|
+      Level/PB/[x] with x 1-30, /LS/Go|Stop|Prev|Next|Pause/Main, /LS/Level/GM 0-255,
+      /LS/Encoder/[x] x 1-4 value -1 to 1, /LS/SelectFixture, /LS/SelectGroup,
+      /LS/SelectionNext, /LS/SelectionPrevious, /LS/Intensity, /LS/Position, /LS/Color,
+      /LS/Beam, /LS/Advance, /LS/Gobo, Fx, /LS/Executor/[x]/[y]/[z] page 1-2, X 1-8, Y 1-6,
+      /LS/ExecutorLine/[x] row 1-6, /LS/Sync, /LS/Sync/Playbacks, /LS/Sync/Executors,
+      /LS/StopAll); "The commands in this table only need one parameter, floating type";
+      Vezér and Millumin examples "/LS/Go/PB/1 <0>" and "actions in LightShark are performed by
+      releasing the button, so the message is sent on <0> value instead of <1>"; the hexadecimal
+      table of the same messages (push 3f800000, release 00000000, fader levels as floats).
+  - title: companion-module-equipson-lightshark v2.0.0
+    author: Bitfocus Companion contributors (MIT)
+    url: https://github.com/bitfocus/companion-module-equipson-lightshark
+    note: >
+      Read for corroboration and the gaps only (MIT, checked LICENSE). config.js: console input
+      port 8000 and feedback port 9000 by default; index.js parseOscInput: the console's
+      feedback on /LS/Level/GM, /LS/Level/PB/<n>, /LS/Level/SmSize, /LS/Level/SmSpeed,
+      /LS/Level/SmChase and /LS/Executor/<page>/<x>/<y>, refreshed by /LS/Sync; actions.js:
+      /LS/Level/SmChase|SmSize|SmSpeed 0-255, /LS/Reset/SmChase|SmSize|SmSpeed, /LS/Tap,
+      /LS/FxTap, /LS/TAP/PB/<n>, /LS/ChaseValue/PB/<n> 5-200.
+
+transport:
+  type: osc-udp
+  port: 8000
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port:
+    type: int
+    min: 1
+    max: 65535
+    default: 9000
+    label: Feedback port
+    description: "Local UDP port this host listens on for the console's OSC output; set the console's OSC output port (Preferences, MIDI & OSC) to it, or leave it empty to read nothing back."
+
+ports:
+  - { port: 8000, protocol: udp, role: control, note: "The console's OSC input port (Preferences, MIDI & OSC)" }
+  - { port: 9000, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "The console's OSC output port" }
+
+maps:
+  key:
+    page_up: Page/Up
+    page_down: Page/Down
+    dbo: DBO
+    edit: Edit
+    update: Update
+    delete: Delete
+    copy: Copy
+    move: Move
+    set: Set
+    fan: Fan
+    find: Find
+    clear: Clear
+    rec: Rec
+    select_fixture: SelectFixture
+    select_group: SelectGroup
+    selection_next: SelectionNext
+    selection_previous: SelectionPrevious
+    intensity: Intensity
+    position: Position
+    color: Color
+    beam: Beam
+    advanced: Advance
+    gobo: Gobo
+    fx: Fx
+    tap: Tap
+    fx_tap: FxTap
+    main_go: Go/Main
+    main_stop: Stop/Main
+    main_prev: Prev/Main
+    main_next: Next/Main
+    main_pause: Pause/Main
+    stop_all: StopAll
+    sync: Sync
+    sync_playbacks: Sync/Playbacks
+    sync_executors: Sync/Executors
+  playback_key: { select: Select, go: Go, flash: Flash, stop: Stop, prev: Prev, next: Next, pause: Pause, tap: TAP }
+  master: { chase_speed: SmChase, fx_size: SmSize, fx_speed: SmSpeed }
+
+models:
+  - id: ls-1
+    name: LightShark LS-1
+    supports: &all [press_key, key_down, key_up, playback_key, playback_key_down, playback_key_up,
+      set_playback_level, set_playback_chase_speed, set_grand_master, set_master_level,
+      reset_master_level, encoder, executor, executor_down, executor_up, executor_row]
+    verification: none
+  - id: ls-core
+    name: LightShark LS-Core
+    supports: *all
+    verification: none
+
+commands:
+  press_key:
+    summary: "Press and release a console key; the action happens on the release (\"/LS/<key> 0.0\")"
+    params:
+      key: &key
+        type: enum
+        values: [page_up, page_down, dbo, edit, update, delete, copy, move, set, fan, find, clear,
+          rec, select_fixture, select_group, selection_next, selection_previous, intensity,
+          position, color, beam, advanced, gobo, fx, tap, fx_tap, main_go, main_stop, main_prev,
+          main_next, main_pause, stop_all, sync, sync_playbacks, sync_executors]
+        required: true
+        label: Key
+        description: "The console key or function, such as page_up, dbo (blackout), main_go, stop_all (release all) or sync (resend the console's state)."
+    send: { address: "/LS/{key:map.key}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  key_down:
+    summary: "Hold a console key down (\"/LS/<key> 1.0\")"
+    params: { key: *key }
+    send: { address: "/LS/{key:map.key}", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  key_up:
+    summary: "Release a held console key (\"/LS/<key> 0.0\")"
+    params: { key: *key }
+    send: { address: "/LS/{key:map.key}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  playback_key:
+    summary: "Press a playback's key: select, go, flash, stop, prev, next, pause or tap (\"/LS/<Key>/PB/<n> 0.0\")"
+    params:
+      action: &pbkey { type: enum, values: [select, go, flash, stop, prev, next, pause, tap], required: true, label: Key, description: "The playback key: select, go, flash, stop, prev, next, pause, or tap for the chase speed." }
+      playback: &playback { type: int, min: 1, max: 30, required: true, label: Playback, description: "Playback number, 1 to 30." }
+    send: { address: "/LS/{action:map.playback_key}/PB/{playback}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  playback_key_down:
+    summary: "Hold a playback key down, such as flash (\"/LS/<Key>/PB/<n> 1.0\")"
+    params: { action: *pbkey, playback: *playback }
+    send: { address: "/LS/{action:map.playback_key}/PB/{playback}", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  playback_key_up:
+    summary: "Release a held playback key (\"/LS/<Key>/PB/<n> 0.0\")"
+    params: { action: *pbkey, playback: *playback }
+    send: { address: "/LS/{action:map.playback_key}/PB/{playback}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  set_playback_level:
+    summary: "Set a playback fader level, 0-255 (\"/LS/Level/PB/<n> <float>\")"
+    params:
+      playback: *playback
+      level: &level255 { type: float, min: 0, max: 255, required: true, label: Level, description: "Fader level from 0 (bottom) to 255 (full)." }
+    send: { address: "/LS/Level/PB/{playback}", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  set_playback_chase_speed:
+    summary: "Set a playback's chase speed, 5-200 (\"/LS/ChaseValue/PB/<n> <float>\")"
+    params:
+      playback: *playback
+      speed: { type: float, min: 5, max: 200, required: true, label: Speed, description: "Chase speed from 5 to 200, the range Companion's module offers." }
+    send: { address: "/LS/ChaseValue/PB/{playback}", args: [ { value: "{speed}", type: float } ] }
+    returns: none
+
+  set_grand_master:
+    summary: "Set the grand master level, 0-255 (\"/LS/Level/GM <float>\")"
+    params: { level: *level255 }
+    send: { address: /LS/Level/GM, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  set_master_level:
+    summary: "Set the master chase speed, FX size or FX speed, 0-255 (\"/LS/Level/SmChase|SmSize|SmSpeed <float>\")"
+    params:
+      master: &master { type: enum, values: [chase_speed, fx_size, fx_speed], required: true, label: Master, description: "Which master: chase_speed, fx_size or fx_speed." }
+      level: *level255
+    send: { address: "/LS/Level/{master:map.master}", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  reset_master_level:
+    summary: "Reset the master chase speed, FX size or FX speed (\"/LS/Reset/SmChase|SmSize|SmSpeed 0.0\")"
+    params: { master: *master }
+    send: { address: "/LS/Reset/{master:map.master}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  encoder:
+    summary: "Turn an encoder A-D by -1 to 1 (\"/LS/Encoder/<n> <float>\")"
+    params:
+      encoder: { type: int, min: 1, max: 4, required: true, label: Encoder, description: "Encoder 1 to 4 (A to D)." }
+      value: { type: float, min: -1, max: 1, required: true, label: Movement, description: "Movement from -1 to 1; negative turns down, positive up." }
+    send: { address: "/LS/Encoder/{encoder}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  executor:
+    summary: "Trigger an executor in toggle mode (\"/LS/Executor/<page>/<x>/<y> 0.0\")"
+    params:
+      page: &xpage { type: int, min: 1, max: 2, required: true, label: Executor page, description: "Executor page, 1 or 2." }
+      x: &xx { type: int, min: 1, max: 8, required: true, label: Column, description: "Executor X position (column), 1 to 8." }
+      y: &xy { type: int, min: 1, max: 6, required: true, label: Row, description: "Executor Y position (row), 1 to 6." }
+    send: { address: "/LS/Executor/{page}/{x}/{y}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  executor_down:
+    summary: "Push an executor in push mode (\"/LS/Executor/<page>/<x>/<y> 1.0\")"
+    params: { page: *xpage, x: *xx, y: *xy }
+    send: { address: "/LS/Executor/{page}/{x}/{y}", args: [ { value: "1.0", type: float } ] }
+    returns: none
+
+  executor_up:
+    summary: "Release an executor in push mode (\"/LS/Executor/<page>/<x>/<y> 0.0\")"
+    params: { page: *xpage, x: *xx, y: *xy }
+    send: { address: "/LS/Executor/{page}/{x}/{y}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  executor_row:
+    summary: "Trigger a row of executors (\"/LS/ExecutorLine/<row> 1.0\", then 0.0)"
+    params:
+      row: { type: int, min: 1, max: 6, required: true, label: Row, description: "Executor row, 1 to 6." }
+    send:
+      - { address: "/LS/ExecutorLine/{row}", args: [ { value: "1.0", type: float } ] }
+      - { address: "/LS/ExecutorLine/{row}", args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+state:
+  grand_master: { type: float, description: "Grand master level, 0 to 255" }
+  masters.chase_speed: { type: float, description: "Master chase speed, 0 to 255" }
+  masters.fx_size: { type: float, description: "Master FX size, 0 to 255" }
+  masters.fx_speed: { type: float, description: "Master FX speed, 0 to 255" }
+  playbacks.*.level: { type: float, description: "Playback fader level, 0 to 255" }
+  executors.*.*.*.active: { type: bool, description: "Whether the executor at page, X and Y is on" }
+
+telemetry:
+  # The console sends its OSC output to the feedback port; /LS/Sync asks it
+  # to send everything again.
+  subscribe:
+    send: [ { address: /LS/Sync, args: [ { value: "0.0", type: float } ] } ]
+    every_ms: 30000
+  updates:
+    - address: "^/LS/Level/GM$"
+      state: { grand_master: "{arg0}" }
+    - address: "^/LS/Level/SmChase$"
+      state: { masters.chase_speed: "{arg0}" }
+    - address: "^/LS/Level/SmSize$"
+      state: { masters.fx_size: "{arg0}" }
+    - address: "^/LS/Level/SmSpeed$"
+      state: { masters.fx_speed: "{arg0}" }
+    - address: "^/LS/Level/PB/(\\d+)$"
+      state: { "playbacks.{1}.level": "{arg0}" }
+    - address: "^/LS/Executor/(\\d+)/(\\d+)/(\\d+)$"
+      arg_match: { "0": "^(0|1)(\\.0+)?$" }
+      state:
+        "executors.{1}.{2}.{3}.active": { value: "{4}", map: { "0": false, "1": true } }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      OSC must be enabled in Preferences, MIDI & OSC, where the input and output ports are set.
+      The manual gives neither default nor where the console sends its output; 8000 in and 9000
+      out are Companion's defaults, and the console is assumed to send to the address that sends
+      to it. Nothing is acknowledged, so every command reports unverified.
+  - models: [all]
+    severity: warning
+    text: >
+      The feedback messages are not in the manual: grand master, master chase and FX levels,
+      playback fader levels and executor states are read from the addresses Companion's module
+      parses, refreshed by /LS/Sync every 30 s. The executor value is read as 0 or 1. Playback
+      cue position, paused state and page are not reported.
+  - models: [all]
+    severity: info
+    text: >
+      Actions happen when a key is released, so press_key, playback_key and executor send only
+      the release (0.0), as the manual's hexadecimal table does; key_down and key_up (and their
+      playback and executor forms) hold a key, for flash and push-mode executors. executor_row
+      sends a press and a release, as the manual's hexadecimal table gives both.
+  - models: [all]
+    severity: info
+    text: >
+      The manual's table names the colour key /LS/Color and the Fx key's address is printed as
+      /LS/Gobo (a misprint); Companion uses /LS/Colour and /LS/Fx. This spec follows the manual
+      for Color and uses /LS/Fx. /LS/ExecutorLine takes the row alone in the manual and a page
+      and row in Companion; the manual's form is used. /LS/Tap, /LS/FxTap, /LS/TAP/PB/<n>,
+      /LS/ChaseValue/PB/<n>, /LS/Level/Sm* and /LS/Reset/Sm* come from Companion only.
+  - models: [all]
+    severity: critical
+    text: >
+      dbo blacks out the output, and stop_all releases every playback, at once; delete, rec,
+      update and move change the show file and cannot be undone from OSC.

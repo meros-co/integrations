@@ -377,6 +377,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-vimeo", &["vimeo-live"]),
     ("vendor-vioso", &["vioso-exaplay"]),
     ("vendor-visualproductions", &["visualproductions-cuecore"]),
+    ("vendor-workpro", &["workpro-lightshark"]),
     ("vendor-wyrestorm", &["wyrestorm-matrix"]),
     (
         "vendor-yamaha",
