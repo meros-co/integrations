@@ -47,6 +47,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-atlona", &["atlona-matrix"]),
     ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-avolites", &["avolites-titan"]),
+    ("vendor-avproedge", &["avproedge-matrix"]),
     (
         "vendor-barco",
         &[
@@ -122,6 +123,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-extron",
         &["extron-ipl", "extron-matrix", "extron-switcher"],
     ),
+    ("vendor-ezcoo", &["ezcoo-matrix"]),
     ("vendor-faithlife", &["logos-proclaim"]),
     ("vendor-figure53", &["figure53-go-button", "qlab"]),
     (

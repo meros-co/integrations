@@ -266,6 +266,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a property set takes its value as the POST body text (the introduction's False), for set_palette_number, set_palette_name and the other set_ commands, and the record types set_record_type takes. ([specs/avolites-titan.yaml:1429](specs/avolites-titan.yaml#L1429))
 - [ ] Check that store_cue's group and index are a handle's group and handleLocation.index, and what the Int32 it returns is. ([specs/avolites-titan.yaml:1857](specs/avolites-titan.yaml#L1857))
 
+## avproedge-matrix — AVPro Edge AUHD matrices
+
+- [ ] Record the answers to SET and GET commands (assumed to be the command without SET or GET, as GET DHCP answers DHCP 0). ([specs/avproedge-matrix.yaml:74](specs/avproedge-matrix.yaml#L74))
+- [ ] Record the lines GET STA prints and confirm it starts with ADDR. ([specs/avproedge-matrix.yaml:130](specs/avproedge-matrix.yaml#L130))
+- [ ] Record what GET OUT0 VS and GET IN0 SIG STA answer (assumed a line per output or input). ([specs/avproedge-matrix.yaml:619](specs/avproedge-matrix.yaml#L619))
+- [ ] Confirm the CR terminator alone is accepted on Telnet (the manual says to add a return; its examples show CR LF). ([specs/avproedge-matrix.yaml:71](specs/avproedge-matrix.yaml#L71))
+- [ ] Check whether the matrix sends status lines unasked after a front-panel change. ([specs/avproedge-matrix.yaml:703](specs/avproedge-matrix.yaml#L703))
+- [ ] Confirm the 4x4 GEN2 matrix takes the same command list as the 88. ([specs/avproedge-matrix.yaml:94](specs/avproedge-matrix.yaml#L94))
+
 ## avstumpfl-pixera — AV Stumpfl PIXERA
 
 - [ ] Confirm that replies and pushed monEvent messages on a JSON/TCP (dl) access point end with 0xPX, and what setMonitoringHasDelimiter changes (26.1 lists it without a description). ([specs/avstumpfl-pixera.yaml:6725](specs/avstumpfl-pixera.yaml#L6725))
@@ -1488,6 +1497,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On IN1806/IN1808 and IN1606/IN1608, confirm the Remote RS-232 port asks for no password when one is set (not documented either way). ([spec](specs/extron-switcher.yaml#L150))
 - [ ] Confirm 8 data bits on the IN1606/IN1608 and IN1604 Remote port (not stated) and which stop bits the IN1806/IN1808 Esc...CP command accepts (1 assumed). ([spec](specs/extron-switcher.yaml#L126))
 - [ ] Drive a unit on its rear Remote port (link serial) and confirm the same replies and change reports as over Telnet; check whether the front USB port appears as a serial port. ([spec](specs/extron-switcher.yaml#L2499))
+
+## ezcoo-matrix — Ezcoo HDMI matrices
+
+- [ ] Record the RS-232 line settings (57600 8N1 assumed). ([specs/ezcoo-matrix.yaml:54](specs/ezcoo-matrix.yaml#L54))
+- [ ] Record what each command answers and the lines EZSTA prints (the OUT1 VS IN1 form is assumed from a community module). ([specs/ezcoo-matrix.yaml:50](specs/ezcoo-matrix.yaml#L50))
+- [ ] Confirm the matrix sends a status line unasked after a front-panel or remote change. ([specs/ezcoo-matrix.yaml:13](specs/ezcoo-matrix.yaml#L13))
+- [ ] Record the full EZH command list and the MX42HS and other models it applies to. ([specs/ezcoo-matrix.yaml:69](specs/ezcoo-matrix.yaml#L69))
 
 ## facebook-account — Facebook account (a user's Pages and Page access tokens)
 
