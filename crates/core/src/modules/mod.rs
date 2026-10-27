@@ -141,6 +141,8 @@ mod pandorasbox_commands;
 mod philips_sicp;
 #[cfg(feature = "pjlink")]
 mod pjlink;
+#[cfg(feature = "posistagenet")]
+mod posistagenet;
 #[cfg(feature = "qsys")]
 mod qsys;
 #[cfg(feature = "resolume")]
@@ -306,6 +308,8 @@ pub(crate) fn construct(
         "artnet" => Ok(Box::new(artnet::ArtNet::new(context)?)),
         #[cfg(feature = "sacn")]
         "sacn" => Ok(Box::new(sacn::Sacn::new(context)?)),
+        #[cfg(feature = "posistagenet")]
+        "posistagenet" => Ok(Box::new(posistagenet::Psn::new(context)?)),
         #[cfg(feature = "osc-listener")]
         "osc-listener" => Ok(Box::new(osc_listener::OscListener::new(context)?)),
         #[cfg(feature = "tsl-umd-display")]
@@ -540,9 +544,10 @@ mod tests {
                     // These send nothing until asked (a request, a watched
                     // stream), so there is nothing to compare on starting.
                     // An sACN source sends nothing before it holds a
-                    // universe.
+                    // universe, nor a PSN server before it has a tracker.
                     if used.is_none()
-                        && ["generic-http", "http-snapshot", "sacn"].contains(&spec.id.as_str())
+                        && ["generic-http", "http-snapshot", "posistagenet", "sacn"]
+                            .contains(&spec.id.as_str())
                     {
                         continue;
                     }

@@ -74,6 +74,7 @@ NATIVE = {
     "panasonic-projector": "NTCONTROL over TCP 1024, or RS-232C",
     "philips-sicp": "SICP binary messages over TCP 5000, or an RS-232 port",
     "pjlink": "PJLink over TCP 4352",
+    "posistagenet": "PosiStageNet over UDP multicast 236.10.10.10:56565; receives and sends",
     "probel-swp02": "SW-P-02 binary messages on a serial port, or over TCP",
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default) or a serial port",
     "qsys": "QRC JSON-RPC over TCP 1710",

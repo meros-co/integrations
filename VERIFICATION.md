@@ -2871,6 +2871,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the where[title] query on songs matches part of a title or only the whole of it. ([specs/planningcenter-services.yaml:686](specs/planningcenter-services.yaml#L686))
 - [ ] Confirm Attachment open works under an item's attachments path as under media's, and how long the attachment_url lasts. ([specs/planningcenter-services.yaml:823](specs/planningcenter-services.yaml#L823))
 
+## posistagenet — PosiStageNet
+
+- [ ] Check that consoles and media servers take the core's trackers with version 2.03 (high 2, low 3) in the packet header, and with every tracker's position sent even when only other fields were set. ([specs/posistagenet.yaml:139](specs/posistagenet.yaml#L139))
+- [ ] With a tracking server, check that its trackers appear under its address, that a tracker removed on the server leaves state after the next PSN_INFO, and that frames split over several packets are read whole. ([specs/posistagenet.yaml:131](specs/posistagenet.yaml#L131))
+
 ## probel-swp02 — Probel / Grass Valley SW-P-02 routers
 
 - [ ] Confirm SW-P-02 over TCP carries the same messages as the serial line, with nothing added, and find the port routers and gateways use. ([specs/probel-swp02.yaml:139](specs/probel-swp02.yaml#L139))

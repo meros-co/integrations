@@ -253,6 +253,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
     ("vendor-pltech", &["kuma-timer"]),
+    ("vendor-posistagenet", &["posistagenet"]),
     ("vendor-presentationtools", &["cuetimer"]),
     ("vendor-probel", &["probel-swp02", "probel-swp08"]),
     ("vendor-ptzoptics", &["ptzoptics"]),
