@@ -16,6 +16,7 @@ use std::{collections::BTreeSet, env, fs, path::PathBuf};
 /// feature (`src/modules/mod.rs`). `crates/core/Cargo.toml` has one feature
 /// per spec id and one per group listing exactly these; a test checks it.
 const VENDOR_GROUPS: &[(&str, &[&str])] = &[
+    ("vendor-7thsense", &["7thsense-delta"]),
     ("vendor-ableton", &["ableton-live"]),
     ("vendor-aes70", &["aes70"]),
     (
