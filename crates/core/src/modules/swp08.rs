@@ -84,6 +84,7 @@ const GENERAL_ONLY: &[&str] = &[
     "probel-system3-8400",
     "probel-system3-6000",
     "probel-freeway",
+    "ross-nk-3rd",
 ];
 
 // ── Framing ─────────────────────────────────────────────────────────────────

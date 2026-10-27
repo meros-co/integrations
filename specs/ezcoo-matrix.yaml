@@ -1,0 +1,204 @@
+spec: 1
+id: ezcoo-matrix
+name: Ezcoo HDMI matrix switchers (RS-232 and IP API)
+vendor: Ezcoo
+category: router
+
+# Ezcoo's HDMI matrices take an ASCII command set over RS-232 and the network
+# (TCP 23): EZS to set, EZG to get, outputs and inputs numbered with 0 for all
+# (EZS OUT1 VS IN2), and an Enter after each command. Ezcoo's manual lists the
+# main commands and points to EZH for the full list; only the listed ones are
+# here.
+#
+# The matrix sends a status line for each change, of the form OUT1 VS IN2,
+# also when the change comes from the front panel or the remote; these lines,
+# and the answer to EZSTA, are as the community module for these matrices
+# reads them (Ezcoo documents no answer), see the quirks.
+source:
+  - title: "EZ-MX44HAS2 User Manual V1.1 (July 2024)"
+    author: Ezcoo (EasyCoolAV)
+    url: https://easycoolav.com/u_file/2407/23/file/EZ-MX44HAS2UMV11.pdf
+    note: >
+      Manufacturer document, one sheet. RS-232 and IP control, "All commands
+      need typing enter at the end", EZH for the full help list; the command
+      table: EZH, EZSTA (system status), EZS RST (factory defaults), EZS DEBUG
+      MODE1 EN/DIS (cascade mode, turning HDCP off or on), EZS OUTx VS INy
+      (x 0-4, 0 all; y 1-4), EZS OUTx EXA EN/DIS (audio breakout), EZS OUTx
+      STREAM ON/OFF, EZS INx EDID y (y 0-32), EZS HIP (host IP), EZG HIP;
+      the web UI at the address EZG HIP gives.
+  - title: Bitfocus Companion module companion-module-ezcoo-matrix (MIT), index.js and HELP.md
+    author: Jan Bubik and contributors
+    url: https://github.com/bitfocus/companion-module-ezcoo-matrix
+    note: >
+      Community code, read for corroboration only (top-level LICENSE is MIT;
+      no code copied). For the EZ-MX44HAS2 and MX42HS: TCP 23, CR LF after
+      each command, no authentication, EZG STA polled on connecting, changes
+      sent by the matrix unasked; the answer lines it lists (ADDR 00, OUT1 VS
+      IN1, OUT1 STREAM ON, OUT1 EXA EN, OUT1 VIDEO1, IN1 EDID 0, RIP, HIP,
+      NMK, TIP, DHCP 0, MAC, IN1 SIG STA 0) are the status format the rules
+      read.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 3000
+  # Ezcoo documents no answers; the matrix's status lines are read by the
+  # rules whenever they come.
+  reply: none
+  # The manual gives no serial line settings; 57600 8N1 is the rate of the
+  # command family (see the quirks).
+  serial:
+    baud_rate: 57600
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+maps:
+  en_dis: { "true": EN, "false": DIS }
+  on_off: { "true": "ON", "false": "OFF" }
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "The matrix's RS-232 terminal (TX, GND, RX) or USB port" }
+
+models:
+  - id: ez-mx44has2
+    name: Ezcoo EZ-MX44HAS2 (4x4 HDMI 2.0 matrix with audio breakout)
+    supports: [route, set_extracted_audio, set_stream, set_input_edid, set_cascade_mode, set_ip_address,
+               get_ip_address, get_status, factory_reset]
+    verification: none
+    notes: Inputs and outputs 1-4, coaxial audio breakout per output, 4K to 1080p scaling set on the front panel.
+
+commands:
+  route:
+    summary: Route an input to an output, or to every output (EZS OUTx VS INy)
+    params:
+      output: &output_all { type: int, min: 0, max: 4, required: true, label: Output, description: "The output from 1, or 0 for every output." }
+      input: { type: int, min: 1, max: 4, required: true, label: Input, description: "The input from 1." }
+    send: "EZS OUT{output} VS IN{input}"
+    returns: none
+
+  set_extracted_audio:
+    summary: Enable or disable an output's audio breakout (EZS OUTx EXA EN/DIS)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Audio breakout, description: "On sends the output's audio to its coaxial port." }
+    send: "EZS OUT{output} EXA {enabled:map.en_dis}"
+    returns: none
+
+  set_stream:
+    summary: Turn an output's signal on or off (EZS OUTx STREAM ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Stream, description: "On sends the output's signal; off stops it." }
+    send: "EZS OUT{output} STREAM {enabled:map.on_off}"
+    returns: none
+
+  set_input_edid:
+    summary: Give an input one of the EDIDs (EZS INx EDID y)
+    params:
+      input: { type: int, min: 0, max: 4, required: true, label: Input, description: "The input from 1, or 0 for every input." }
+      edid: { type: int, min: 0, max: 32, required: true, label: EDID, description: "EDID 0-32 from the matrix's list (EZH shows it)." }
+    send: "EZS IN{input} EDID {edid}"
+    returns: none
+
+  set_cascade_mode:
+    summary: Turn cascade mode on (HDCP off) or off (HDCP on) (EZS DEBUG MODE1 EN/DIS)
+    params:
+      enabled: { type: bool, required: true, label: Cascade mode, description: "On enables cascade mode and turns HDCP off; off turns HDCP back on." }
+    send: "EZS DEBUG MODE1 {enabled:map.en_dis}"
+    returns: none
+
+  set_ip_address:
+    summary: Set the matrix's IP address (EZS HIP a.b.c.d)
+    params:
+      address: { type: string, pattern: '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$', required: true, label: IP address, description: "Dot-decimal, each part 0-255." }
+    send: "EZS HIP {address}"
+    returns: none
+
+  get_ip_address:
+    summary: Ask for the matrix's IP address; the answer updates state (EZG HIP)
+    send: "EZG HIP"
+    returns: none
+
+  get_status:
+    summary: Ask for the system status; its lines update state (EZSTA)
+    send: "EZSTA"
+    returns: none
+
+  factory_reset:
+    summary: Reset the matrix to factory defaults (EZS RST)
+    send: "EZS RST"
+    returns: none
+
+state:
+  address:                   { type: int, description: "Cascade address, 0 for a single unit (ADDR)" }
+  inputs.*.signal:           { type: bool, description: "Whether the input has a signal (SIG STA)" }
+  inputs.*.edid:             { type: int, description: "EDID index of the input (EDID)" }
+  outputs.*.input:           { type: int, description: "Input routed to the output (VS)" }
+  outputs.*.extracted_audio: { type: bool, description: "Whether the output's audio breakout is on (EXA)" }
+  outputs.*.stream:          { type: bool, description: "Whether the output sends its signal (STREAM)" }
+  outputs.*.video_mode:      { type: int, description: "Output video (scaler) mode as the status reports it (VIDEO)" }
+  network.gateway:           { type: string, description: "Gateway address (RIP)" }
+  network.ip_address:        { type: string, description: "IP address (HIP)" }
+  network.netmask:           { type: string, description: "Subnet mask (NMK)" }
+  network.tcp_port:          { type: int, description: "Control port (TIP)" }
+  network.dhcp:              { type: bool, description: "Whether DHCP is on (DHCP)" }
+  network.mac_address:       { type: string, description: "MAC address (MAC)" }
+
+telemetry:
+  poll:
+    every_ms: 60000
+    send: ["EZSTA"]
+  updates:
+    - match: '^ADDR (\d+)\s*$'
+      state: { address: "{1}" }
+    - match: '^IN(\d+) SIG STA (\d)\s*$'
+      state: { "inputs.{1}.signal": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^IN(\d+) EDID (\d+)\s*$'
+      state: { "inputs.{1}.edid": "{2}" }
+    - match: '^OUT(\d+) VS IN(\d+)\s*$'
+      state: { "outputs.{1}.input": "{2}" }
+    - match: '^OUT(\d+) EXA (EN|DIS)\s*$'
+      state: { "outputs.{1}.extracted_audio": { value: "{2}", map: { "EN": true, "DIS": false } } }
+    - match: '^OUT(\d+) STREAM (ON|OFF)\s*$'
+      state: { "outputs.{1}.stream": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^OUT(\d+) VIDEO ?(\d)\s*$'
+      state: { "outputs.{1}.video_mode": "{2}" }
+    - match: '^RIP (\S+)\s*$'
+      state: { network.gateway: "{1}" }
+    - match: '^HIP (\S+)\s*$'
+      state: { network.ip_address: "{1}" }
+    - match: '^NMK (\S+)\s*$'
+      state: { network.netmask: "{1}" }
+    - match: '^TIP (\d+)\s*$'
+      state: { network.tcp_port: "{1}" }
+    - match: '^DHCP ([01])\s*$'
+      state: { network.dhcp: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^MAC (\S+)\s*$'
+      state: { network.mac_address: "{1}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset (EZS RST) restores factory defaults at once and cannot be
+      undone from here; a route to output 0 changes every output.
+  - models: [all]
+    severity: warning
+    text: >
+      Ezcoo documents no answers, so commands report unverified. State comes
+      from the status lines the matrix sends when something changes and from
+      EZSTA every minute, in the form the community module reads (OUT1 VS IN1);
+      that form is not Ezcoo's own document.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the manual lists only these commands; EZH prints the
+      matrix's full list, which Ezcoo does not publish. The RS-232 line
+      settings are not documented: 57600 8N1, the rate of the same command
+      family on AVPro Edge's matrices, is assumed.

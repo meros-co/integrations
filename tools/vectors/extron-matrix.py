@@ -458,3 +458,198 @@ telemetry(K, "mmx-reset-audio-mutes", inbound="Zpz\r\n", model="mmx-42-62",
           expect_state={"outputs": {"1": {"audio_mute": False}, "2": {"audio_mute": False}}})
 telemetry(K, "mmx-reset-levels", inbound="Zpa\r\n", model="mmx-42-62",
           expect_state={"inputs": {str(n): {"audio_level": 0} for n in range(1, 7)}})
+
+# ── MTPX Plus (68-1383-01 Rev. B), MVX VGA A (68-877-01 Rev. E, 68-521-31
+# Rev. C) and MMX 32 VGA A (68-789-01 Rev. D): commands written from the
+# guides' syntax lines and examples ──
+XM_MT = {"model": "mtpx-plus"}
+XM_MV = {"model": "mvx-vga-a"}
+XM_ML = {"model": "mvx-vga-a-large"}
+XM_M3 = {"model": "mmx-32-vga-a"}
+_seen_xm = {}
+
+
+def _xm(command, *args, **extra):
+    # A second file per command and model, so earlier vectors are kept.
+    tag = extra.get("model", "x")
+    key = (command, tag)
+    n = _seen_xm.get(key, 0) + 1
+    _seen_xm[key] = n
+    text(K, command, *args, file=f"{command}.{tag}" if n == 1 else f"{command}.{tag}-{n}", **extra)
+
+
+# New commands (their own files).
+text(K, "get_preset_ties", {"preset": 4}, E + "4VC\r", device_reply="6 5 6 8 3 3 1 0 Vid 8 1 1 1 8 8 8 8 Aud\r\n",
+     expect_result=val("6 5 6 8 3 3 1 0 Vid 8 1 1 1 8 8 8 8 Aud"))
+text(K, "write_global_preset", {"preset": 27, "ties": "12*5!10*09%3*2$3*8&"}, E + "+27P12*5!10*09%3*2$3*8&\r",
+     device_reply="Spr27\r\n", expect_result=ACK)
+text(K, "write_global_preset", {"preset": 16, "ties": "8*5!07*04%3*6$3*8&"}, E + "*16P8*5!07*04%3*6$3*8&\r",
+     device_reply="Spr16\r\n", expect_result=ACK, file="write_global_preset-mvx", **XM_MV)
+text(K, "write_room_preset", {"room": 7, "preset": 3, "ties": "12*7&11*5$4*5%6*6!"}, E + "+7*3P12*7&11*5$4*5%6*6!\r",
+     device_reply="Rmm07 Spr03\r\n", expect_result=ACK)
+text(K, "get_room_preset_ties", {"room": 3, "preset": 2, "plane": "1"}, E + "3*2*1*1VC\r")
+text(K, "set_output_audio_level", {"output": 3, "level": "consumer"}, "3*0*40#\r", device_reply="Out3 Lvl0\r\n",
+     expect_result=ACK)
+text(K, "get_output_audio_level", {"output": 3}, "3*40#\r", device_reply="1\r\n", expect_result=val("1"))
+text(K, "set_rgb_delay", {"output": 5, "steps": 7}, E + "5*7D\r", device_reply="Out5 Dly07\r\n", expect_result=ACK)
+text(K, "get_rgb_delay", {"output": 6}, E + "6D\r", device_reply="05\r\n", expect_result=val("05"))
+text(K, "get_firmware_verbose", {}, "0Q\r", device_reply="1.23-1.00(1.06-16x16 Series -Tue, 04 Dec 2007 00:00:00 GMT)\r\n",
+     expect_result=val("1.23-1.00(1.06-16x16 Series -Tue, 04 Dec 2007 00:00:00 GMT)"))
+text(K, "clear_global_presets", {}, E + "ZG\r", device_reply="Zpg\r\n", expect_result=ACK)
+text(K, "clear_global_preset", {"preset": 5}, E + "5ZG\r", device_reply="Zpg05\r\n", expect_result=ACK)
+text(K, "reset_output_volumes", {}, E + "ZV\r", device_reply="Zpv\r\n", expect_result=ACK)
+text(K, "reset_all_mutes", {}, E + "ZZ\r", device_reply="Zpz\r\n", expect_result=ACK)
+text(K, "reset_rgb_delays", {}, E + "ZD\r", device_reply="Zpd\r\n", expect_result=ACK)
+text(K, "reset_level_peaking", {}, E + "ZT\r", device_reply="Zpt\r\n", expect_result=ACK)
+text(K, "reset_skew", {}, E + "ZK\r", device_reply="Zpk\r\n", expect_result=ACK)
+text(K, "clear_rooms", {}, E + "ZR\r", device_reply="Zpr\r\n", expect_result=ACK)
+text(K, "clear_room", {"room": 4}, E + "4ZR\r", device_reply="Zpr04\r\n", expect_result=ACK)
+text(K, "clear_room_presets", {}, E + "ZP\r", device_reply="Zpp\r\n", expect_result=ACK)
+text(K, "clear_room_preset", {"room": 2, "preset": 3}, E + "2*3ZP\r", device_reply="Zpp02*03\r\n", expect_result=ACK)
+text(K, "set_tp_input_type", {"input": 4, "type": "rs232"}, "4*1\\\r", device_reply="Typ04*1\r\n", expect_result=ACK)
+text(K, "get_tp_input_type", {"input": 4}, "4\\\r", device_reply="1\r\n", expect_result=val("1"))
+text(K, "set_serial_insert", {"port": 2, "enabled": True}, E + "2*1Lrpt\r", device_reply="Lrpt02*1\r\n", expect_result=ACK)
+text(K, "get_serial_insert", {"port": 2}, E + "2Lrpt\r", device_reply="0\r\n", expect_result=val("0"))
+text(K, "set_input_peaking", {"input": 3, "level": 128}, E + "3*128Ipek\r", device_reply="Ipek03*128\r\n",
+     expect_result=ACK)
+text(K, "increase_input_peaking", {"input": 3}, E + "3+Ipek\r", device_reply="Ipek03*129\r\n", expect_result=ACK)
+text(K, "decrease_input_peaking", {"input": 3}, E + "3-Ipek\r", device_reply="Ipek03*127\r\n", expect_result=ACK)
+text(K, "get_input_peaking", {"input": 3}, E + "3Ipek\r", device_reply="127\r\n", expect_result=val("127"))
+text(K, "auto_calibrate_input", {"input": 2}, E + "2*0AADJ\r", device_reply="Aadj02*2\r\n", expect_result=ACK)
+text(K, "set_input_skew", {"input": 2, "red": 0, "green": 0, "blue": 4}, E + "2*0*0*4Iseq\r",
+     device_reply="Iseq02*00*00*04\r\n", expect_result=ACK)
+text(K, "adjust_input_skew", {"input": 2, "plane": "2", "direction": "+"}, E + "2*2+Iseq\r",
+     device_reply="Iseq02*00*00*05\r\n", expect_result=ACK)
+text(K, "get_input_skew", {"input": 2}, E + "2Iseq\r", device_reply="00*00*05\r\n", expect_result=val("00*00*05"))
+text(K, "set_output_skew", {"output": 2, "red": 0, "green": 0, "blue": 4}, E + "2*0*0*4Oseq\r",
+     device_reply="Oseq02*0*0*4\r\n", expect_result=ACK)
+text(K, "adjust_output_skew", {"output": 2, "plane": "2", "direction": "-"}, E + "2*2-Oseq\r",
+     device_reply="Oseq02*0*0*3\r\n", expect_result=ACK)
+text(K, "get_output_skew", {"output": 2}, E + "2Oseq\r", device_reply="0*0*3\r\n", expect_result=val("0*0*3"))
+text(K, "set_output_prepeak", {"output": 4, "enabled": True}, E + "4*1Opek\r", device_reply="Opek04*1\r\n",
+     expect_result=ACK)
+text(K, "get_output_prepeak", {"output": 4}, E + "4Opek\r", device_reply="1\r\n", expect_result=val("1"))
+text(K, "set_local_sync_polarity", {"polarity": 0}, E + "0Opol\r", device_reply="Opol00\r\n", expect_result=ACK)
+text(K, "set_local_output_sync_polarity", {"output": 2, "polarity": 0}, E + "2*0Opol\r", device_reply="Opol2*0\r\n",
+     expect_result=ACK)
+text(K, "get_local_sync_polarity", {}, E + "Opol\r", device_reply="3\r\n", expect_result=val("3"))
+text(K, "get_local_output_sync_polarity", {"output": 2}, E + "2Opol\r", device_reply="4\r\n", expect_result=val("4"))
+text(K, "set_input_groups", {"groups": "4013300004440443"}, E + "4013300004440443I\r",
+     device_reply="GrI 4 0 1 3 3 0 0 0 0 4 4 4 0 4 4 3\r\n", expect_result=ACK)
+text(K, "set_output_groups", {"groups": "1111222200000000"}, E + "1111222200000000O\r",
+     device_reply="Gro1111222200000000\r\n", expect_result=ACK)
+text(K, "get_input_groups", {}, E + "I\r", device_reply="1 1 1 3 3 0 0 0 0 4 4 4 0 4 4 4\r\n",
+     expect_result=val("1 1 1 3 3 0 0 0 0 4 4 4 0 4 4 4"))
+text(K, "get_output_groups", {}, E + "O\r", device_reply="0000000000000000\r\n", expect_result=val("0000000000000000"))
+text(K, "get_input_select_switches", {}, E + "Stat\r", device_reply="001*1\r\n", expect_result=val("001*1"))
+
+# Existing commands on the new models.
+_xm("tie", {"input": 1, "output": 3}, "1*3!\r", device_reply="Out03 In01 All\r\n", expect_result=ACK, **XM_MT)
+_xm("tie", {"input": 1, "output": 3}, "1*3!\r", device_reply="Out3 In1 All\r\n", expect_result=ACK, **XM_MV)
+_xm("tie", {"input": 1, "output": 2}, "1*2!\r", device_reply="OUT02 IN01 ALL\r\n", expect_result=ACK, **XM_M3)
+_xm("tie_video", {"input": 3, "output": 1}, "3*1%\r", device_reply="OUT01 IN3 RGB\r\n", expect_result=ACK, **XM_M3)
+_xm("tie_audio", {"input": 1, "output": 2}, "1*2$\r", device_reply="OUT02 IN1 AUD\r\n", expect_result=ACK, **XM_M3)
+_xm("set_video_mute", {"output": 2, "muted": True}, "2*1B\r", device_reply="VMT2*1\r\n", expect_result=ACK, **XM_M3)
+_xm("set_audio_mute_all", {"muted": True}, "1*Z\r", device_reply="AMT1\r\n", expect_result=ACK, **XM_M3)
+_xm("get_video_tie", {"output": 7}, "7%\r", device_reply="02\r\n", expect_result=val("02"), **XM_ML)
+_xm("get_mutes", {}, E + "VM\r", device_reply="0132Mut\r\n", expect_result=val("0132"), **XM_MV)
+_xm("set_output_volume", {"output": 1, "level": 50}, "1*50V\r", device_reply="Out01 Vol50\r\n", expect_result=ACK, **XM_ML)
+_xm("set_input_gain", {"input": 1, "gain": 2}, "1*2G\r", device_reply="In1 Aud+02\r\n", expect_result=ACK, **XM_MV)
+_xm("recall_room_preset", {"room": 3, "preset": 2}, "3*2.\r", device_reply="Rmm03 Rpr02\r\n", expect_result=ACK, **XM_MT)
+
+# Telemetry.
+telemetry(K, "mvx-ties", inbound="6 5 6 8 3 3 1 0 Vid 8 1 1 1 8 8 8 8 Aud\r\n", request=E + "0VC", model="mvx-vga-a",
+          expect_state={"outputs": {"1": {"video_input": 6, "audio_input": 8}, "2": {"video_input": 5, "audio_input": 1},
+                                    "3": {"video_input": 6, "audio_input": 1}, "4": {"video_input": 8, "audio_input": 1},
+                                    "5": {"video_input": 3, "audio_input": 8}, "6": {"video_input": 3, "audio_input": 8},
+                                    "7": {"video_input": 1, "audio_input": 8}, "8": {"video_input": 0, "audio_input": 8}}})
+telemetry(K, "mvx-large-video-ties", inbound="08 08 12 08 08 11 00 00 -- -- -- -- -- -- -- -- Vid\r\n",
+          request=E + "0*1*1VC", model="mvx-vga-a-large",
+          expect_state={"outputs": {"1": {"video_input": 8}, "2": {"video_input": 8}, "3": {"video_input": 12},
+                                    "4": {"video_input": 8}, "5": {"video_input": 8}, "6": {"video_input": 11},
+                                    "7": {"video_input": 0}, "8": {"video_input": 0}}})
+telemetry(K, "mtpx-upper-audio-ties", inbound="01 01 01 01 02 12 12 00 00 00 00 00 01 08 15 16 Aud\r\n",
+          request=E + "0*17*2VC", model="mtpx-plus",
+          expect_state={"outputs": {str(17 + i): {"audio_input": v} for i, v in
+                                    enumerate([1, 1, 1, 1, 2, 12, 12, 0, 0, 0, 0, 0, 1, 8, 15, 16])}})
+telemetry(K, "mvx-mutes", inbound="0132Mut\r\n", model="mvx-vga-a",
+          expect_state={"outputs": {"1": {"video_mute": False, "audio_mute": False},
+                                    "2": {"video_mute": True, "audio_mute": False},
+                                    "3": {"video_mute": True, "audio_mute": True},
+                                    "4": {"video_mute": False, "audio_mute": True}}})
+telemetry(K, "mvx-large-mutes", inbound="0 2 3 0\r\n", request=E + "VM", model="mvx-vga-a-large",
+          expect_state={"outputs": {"1": {"video_mute": False, "audio_mute": False},
+                                    "2": {"video_mute": False, "audio_mute": True},
+                                    "3": {"video_mute": True, "audio_mute": True},
+                                    "4": {"video_mute": False, "audio_mute": False}}})
+telemetry(K, "mvx-front-panel-tie", inbound="Qik\r\n", model="mvx-vga-a", expect_state={},
+          expect_then_send=[E + "0VC\r"])
+telemetry(K, "mvx-large-front-panel-tie", inbound="Qik\r\n", model="mvx-vga-a-large", expect_state={},
+          expect_then_send=[E + "0*1*1VC\r", E + "0*1*2VC\r"])
+telemetry(K, "mtpx-front-panel-tie", inbound="Qik\r\n", model="mtpx-plus", expect_state={},
+          expect_then_send=[E + "0*1*1VC\r", E + "0*1*2VC\r", E + "0*17*1VC\r", E + "0*17*2VC\r"])
+telemetry(K, "mvx-recall", inbound="Rpr05\r\n", model="mvx-vga-a", expect_state={"presets": {"last_recalled": 5}},
+          expect_then_send=[E + "0VC\r"])
+telemetry(K, "mvx-reset-mutes", inbound="Zpz\r\n", model="mvx-vga-a", expect_state={},
+          expect_then_send=[E + "VM\r"])
+telemetry(K, "mmx32-reset-mutes", inbound="Zpz\r\n", model="mmx-32-vga-a", expect_state={},
+          expect_then_send=["I\r"])
+telemetry(K, "mmx32-tie", inbound="OUT02 IN01 ALL\r\n", model="mmx-32-vga-a",
+          expect_state={"outputs": {"2": {"video_input": 1, "audio_input": 1}}})
+telemetry(K, "mmx32-info", inbound="V1*2 A1*2 V2*3 A2*1 Vmt1*0 Amt1*1 Vmt2*0 Amt2*0\r\n", model="mmx-32-vga-a",
+          expect_state={"outputs": {"1": {"video_input": 2, "audio_input": 2, "video_mute": False, "audio_mute": True},
+                                    "2": {"video_input": 3, "audio_input": 1, "video_mute": False, "audio_mute": False}}})
+telemetry(K, "mvx-level", inbound="Out3 Lvl1\r\n", model="mvx-vga-a", expect_state={"outputs": {"3": {"audio_output_level": 1}}})
+telemetry(K, "mvx-bare-level", inbound="0\r\n", request="2*40#", model="mvx-vga-a",
+          expect_state={"outputs": {"2": {"audio_output_level": 0}}})
+telemetry(K, "mvx-delay", inbound="Out5 Dly07\r\n", model="mvx-vga-a", expect_state={"outputs": {"5": {"rgb_delay": 7}}})
+telemetry(K, "mvx-bare-delay", inbound="05\r\n", request=E + "6D", model="mvx-vga-a",
+          expect_state={"outputs": {"6": {"rgb_delay": 5}}})
+telemetry(K, "mvx-bare-video-tie", inbound="12\r\n", request="5&", model="mvx-vga-a-large",
+          expect_state={"outputs": {"5": {"video_input": 12}}})
+telemetry(K, "mvx-bare-audio-tie", inbound="06\r\n", request="3$", model="mvx-vga-a-large",
+          expect_state={"outputs": {"3": {"audio_input": 6}}})
+telemetry(K, "mvx-bare-gain", inbound="-02\r\n", request="4G", model="mvx-vga-a-large",
+          expect_state={"inputs": {"4": {"audio_level": -2}}})
+telemetry(K, "mvx-bare-volume", inbound="55\r\n", request="7V", model="mvx-vga-a-large",
+          expect_state={"outputs": {"7": {"volume": 55}}})
+telemetry(K, "mtpx-tp-type", inbound="Typ04*1\r\n", model="mtpx-plus", expect_state={"inputs": {"4": {"tp_type": 1}}})
+telemetry(K, "mtpx-bare-tp-type", inbound="0\r\n", request="4\\", model="mtpx-plus",
+          expect_state={"inputs": {"4": {"tp_type": 0}}})
+telemetry(K, "mtpx-insert", inbound="Lrpt02*1\r\n", model="mtpx-plus", expect_state={"serial_inserts": {"2": {"enabled": True}}})
+telemetry(K, "mtpx-bare-insert", inbound="0\r\n", request=E + "2Lrpt", model="mtpx-plus",
+          expect_state={"serial_inserts": {"2": {"enabled": False}}})
+telemetry(K, "mtpx-peaking", inbound="Ipek03*128\r\n", model="mtpx-plus", expect_state={"inputs": {"3": {"peaking": 128}}})
+telemetry(K, "mtpx-bare-peaking", inbound="127\r\n", request=E + "3Ipek", model="mtpx-plus",
+          expect_state={"inputs": {"3": {"peaking": 127}}})
+telemetry(K, "mtpx-calibration", inbound="Aadj02*1\r\n", model="mtpx-plus", expect_state={"inputs": {"2": {"calibration": 1}}})
+telemetry(K, "mtpx-input-skew", inbound="Iseq02*00*00*04\r\n", model="mtpx-plus",
+          expect_state={"inputs": {"2": {"skew": "00*00*04"}}})
+telemetry(K, "mtpx-bare-input-skew", inbound="00*00*05\r\n", request=E + "2Iseq", model="mtpx-plus",
+          expect_state={"inputs": {"2": {"skew": "00*00*05"}}})
+telemetry(K, "mtpx-output-skew", inbound="Oseq02*0*0*4\r\n", model="mtpx-plus",
+          expect_state={"outputs": {"2": {"skew": "0*0*4"}}})
+telemetry(K, "mtpx-bare-output-skew", inbound="0*0*3\r\n", request=E + "2Oseq", model="mtpx-plus",
+          expect_state={"outputs": {"2": {"skew": "0*0*3"}}})
+telemetry(K, "mtpx-prepeak", inbound="Opek04*1\r\n", model="mtpx-plus", expect_state={"outputs": {"4": {"prepeak": True}}})
+telemetry(K, "mtpx-bare-prepeak", inbound="0\r\n", request=E + "4Opek", model="mtpx-plus",
+          expect_state={"outputs": {"4": {"prepeak": False}}})
+telemetry(K, "mtpx-polarity", inbound="Opol00\r\n", model="mtpx-plus", expect_state={"local_outputs": {"1": {"sync_polarity": 0}}})
+telemetry(K, "mtpx-polarity-2", inbound="Opol2*3\r\n", model="mtpx-plus", expect_state={"local_outputs": {"2": {"sync_polarity": 3}}})
+telemetry(K, "mtpx-bare-polarity", inbound="3\r\n", request=E + "Opol", model="mtpx-plus",
+          expect_state={"local_outputs": {"1": {"sync_polarity": 3}}})
+telemetry(K, "mtpx-bare-polarity-2", inbound="4\r\n", request=E + "2Opol", model="mtpx-plus",
+          expect_state={"local_outputs": {"2": {"sync_polarity": 4}}})
+telemetry(K, "mtpx-input-groups", inbound="Gri4013300004440443\r\n", model="mtpx-plus",
+          expect_state={"groups": {"inputs": "4013300004440443"}})
+telemetry(K, "mtpx-output-groups", inbound="Gro1111222200000000\r\n", model="mtpx-plus",
+          expect_state={"groups": {"outputs": "1111222200000000"}})
+telemetry(K, "mtpx-bare-input-groups", inbound="1 1 1 3\r\n", request=E + "I", model="mtpx-plus",
+          expect_state={"groups": {"inputs": "1 1 1 3"}})
+telemetry(K, "mtpx-bare-output-groups", inbound="0000\r\n", request=E + "O", model="mtpx-plus",
+          expect_state={"groups": {"outputs": "0000"}})
+telemetry(K, "mtpx-switches", inbound="001*1\r\n", request=E + "Stat", model="mtpx-plus",
+          expect_state={"input_select_switches": "001"})
+telemetry(K, "mtpx-room-recall", inbound="Rmm03 Rpr02\r\n", model="mtpx-plus",
+          expect_state={"rooms": {"3": {"last_recalled": 2}}},
+          expect_then_send=[E + "0*1*1VC\r", E + "0*1*2VC\r", E + "0*17*1VC\r", E + "0*17*2VC\r"])

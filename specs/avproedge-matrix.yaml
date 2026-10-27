@@ -1,0 +1,711 @@
+spec: 1
+id: avproedge-matrix
+name: AVPro Edge AUHD matrix switchers (Telnet and RS-232 API)
+vendor: AVPro Edge
+category: router
+
+# AVPro Edge's AUHD HDMI and HDBaseT matrices take one ASCII command list on
+# Telnet (TCP 23) and their RS-232 port: SET and GET with a CR after each,
+# outputs and inputs numbered with 0 for all (SET OUT1 VS IN2). The GEN2 HDMI
+# matrices and the HDBaseT matrices differ where the HDBaseT models have a
+# separate HDMI (HP) and HDBaseT (TP) port per output. Each model supports
+# only what its manual's command list shows.
+#
+# The manuals document one answer, "DHCP 0" to GET DHCP and "DHCP 1" to SET
+# DHCP 1: the command without SET or GET. The other answers are taken to have
+# that form, as the status lines a consumer's community module shows do
+# (OUT1 VS IN1, OUT1 STREAM ON, IN1 EDID 0); see the quirks.
+#
+# Not here: the HDBaseT models' RS-232 pass-through (SET RS PTH OUTx LENy BRz
+# followed by exactly y raw bytes, whose count the format cannot tie to the
+# data), the serial cascade address prefix (Azz, A00 by default and optional
+# for a single unit on RS-232, never used over IP), and the help command.
+source:
+  - title: "AC-MX88-AUHD-GEN2 User Manual (PDF dated 2022-04-14), RS-232 and TCP/IP Commands p.26-28"
+    author: AVPro Edge (AVPro Global Holdings)
+    url: https://avproglobal.egnyte.com/dl/UiOwvFQ5Wb
+    note: >
+      Manufacturer document, linked from AVPro's support article "Matrix
+      Switcher Manuals and Quick Start Guides"
+      (https://support.avproglobal.com/kb/16563655/). Telnet port 23,
+      RS-232 57600 8N1 without handshaking, a return after each command, GET
+      DHCP answered "DHCP 0" and SET DHCP 1 "DHCP 1" (with the IP settings)
+      p.26; the command list (an image in the PDF, read from it): H, STA, SET
+      RST, SET/GET ADDR, SET/GET LCD ON T (0 always on, 1-3 15/30/60 s),
+      SET/GET KEY LOCK, GET STA, GET INx SIG STA, SET/GET OUTx VS INy, SET/GET
+      OUTx VIDEO (0 auto, 1 bypass, 2 4K to 2K, 3 2K to 4K, 4 HDBT C mode),
+      SET/GET OUTx IMAGE ENH (0-3), SET/GET OUTx EXA EN/DIS, SET/GET OUTx
+      EXADL PH (0 bypass, 1-7 90-630 ms), SET/GET EXAMX MODE (0 bind to
+      output, 1 bind to input, 2 matrix), SET/GET OUTx AS INy, SET/GET OUTx
+      SGM EN/DIS, SET/GET OUTx STREAM ON/OFF, GET OUTx EDID DATA p.27; SET/GET
+      INx EDID (table 0-32), SET INx EDID CY OUTy, SET INx EDID Uy DATAz, GET
+      INx EDID y DATA, SET/GET RIP, HIP, NMK, TIP (1-9999), DHCP, GET MAC,
+      SET/GET IR SYS xx.yy, SET/GET IR OUTx INy CODE zz p.28.
+  - title: "AC-MX44-AUHD-HDBT / AC-MX88-AUHD-HDBT (and -GEN2, -PLUS, -AVDM) User Manual (PDF dated 2020-10-12), RS-232 Commands p.22-28"
+    author: AVPro Edge (AVPro Global Holdings)
+    url: https://avproglobal.egnyte.com/dl/P4lemwoLj2
+    note: >
+      Manufacturer document from the same support article. Telnet port 23,
+      RS-232 57600 8N1 (SET BAUDR 0-5: 9600, 14400, 19200, 38400, 57600,
+      115200), device addresses on serial only; the command list (an image,
+      for the 44, the 88 using 1-8): the GEN2 list without VIDEO, IMAGE ENH,
+      SGM and STREAM, with HP and TP forms instead (HP VIDEO 1 bypass or 3
+      2K to 4K, TP VIDEO 2 4K to 2K or 5 ICT mode, HP/TP SGM, HP/TP STREAM,
+      HP/TP EDID DATA, EDID CY OUTy HP/TP), SET/GET BAUDR, SET/GET IR EXT SW
+      x1.x2.x3.x4, SET RS PTH p.22-23.
+  - title: Bitfocus Companion modules companion-module-ezcoo-matrix and companion-module-avproconnect-acmx1616-auhd (MIT)
+    author: Jan Bubik; Bitfocus AS and Andreas H. Thomsen
+    url: https://github.com/bitfocus/companion-module-ezcoo-matrix
+    note: >
+      Community code, read for corroboration only (top-level LICENSEs are
+      MIT; no code copied). The Ezcoo module, for the same command family,
+      lists the status lines a matrix sends (ADDR 00, OUT1 VS IN1, OUT1
+      STREAM ON, OUT1 EXA EN, OUT1 VIDEO1, IN1 EDID 0, RIP, HIP, NMK, TIP,
+      DHCP 0, MAC, IN1 SIG STA 0) and sends CR LF on TCP 23; the AVPro Connect
+      module sends SET OUT, SET IN and SET EXAMX MODE commands on TCP 23.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  probe: "GET ADDR"
+  serial:
+    baud_rate: { default: 57600, values: [9600, 14400, 19200, 38400, 57600, 115200] }
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    flow_control: none
+
+maps:
+  en_dis: { "true": EN, "false": DIS }
+  on_off: { "true": "ON", "false": "OFF" }
+  bool01: { "true": "1", "false": "0" }
+  baud_code: { "9600": "0", "14400": "1", "19200": "2", "38400": "3", "57600": "4", "115200": "5" }
+
+ports:
+  - { port: 23, protocol: tcp, role: control, when: "link tcp", note: "Telnet, changeable with SET TIP" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial", note: "RS-232 (3-pin terminal) or the micro USB port, through a null-modem adapter" }
+
+models:
+  - id: ac-mx88-auhd-gen2
+    name: AVPro Edge AC-MX88-AUHD-GEN2 (8x8 HDMI matrix)
+    supports:
+      [get_status, factory_reset, set_address, get_address, set_lcd_time, get_lcd_time, set_key_lock, get_key_lock,
+       get_input_signal, route, get_route, set_video_mode, get_video_mode, set_image_enhancement, get_image_enhancement,
+       set_extracted_audio, get_extracted_audio, set_audio_delay, get_audio_delay, set_audio_matrix_mode, get_audio_matrix_mode,
+       route_audio, get_audio_route, set_signal_generator, get_signal_generator, set_stream, get_stream, get_output_edid,
+       set_input_edid, get_input_edid, copy_edid, write_user_edid, get_edid_data,
+       set_gateway, get_gateway, set_ip_address, get_ip_address, set_netmask, get_netmask, set_tcp_port, get_tcp_port,
+       set_dhcp, get_dhcp, get_mac, set_ir_system_code, get_ir_system_code, set_ir_code, get_ir_code]
+    verification: none
+    notes: >
+      Inputs and outputs 1-8, extracted (de-embedded) audio per output; the
+      same list with 1-4 serves the 4x4 GEN2 model. GET OUTx AS IN and GET
+      OUTx SGM are printed with outputs 0-4 in the manual.
+  - id: ac-mx44-auhd-hdbt
+    name: AVPro Edge AC-MX44-AUHD-HDBT (4x4 HDMI/HDBaseT matrix)
+    supports: &hdbt
+      [get_status, factory_reset, set_address, get_address, set_baud, get_baud, set_lcd_time, get_lcd_time,
+       set_key_lock, get_key_lock, get_input_signal, route, get_route, set_port_video_mode, get_port_video_mode,
+       set_extracted_audio, get_extracted_audio, set_audio_delay, get_audio_delay, set_audio_matrix_mode, get_audio_matrix_mode,
+       route_audio, get_audio_route, set_port_signal_generator, get_port_signal_generator, set_port_stream, get_port_stream,
+       get_port_output_edid, set_input_edid, get_input_edid, copy_port_edid, write_user_edid, get_edid_data,
+       set_gateway, get_gateway, set_ip_address, get_ip_address, set_netmask, get_netmask, set_tcp_port, get_tcp_port,
+       set_dhcp, get_dhcp, get_mac, set_ir_extenders, get_ir_extenders, set_ir_system_code, get_ir_system_code, set_ir_code, get_ir_code]
+    verification: none
+    notes: Inputs and outputs 1-4, each output with an HDMI (HP) and an HDBaseT (TP) port.
+  - id: ac-mx88-auhd-hdbt
+    name: AVPro Edge AC-MX88-AUHD-HDBT (and -GEN2, -PLUS, -AVDM) (8x8 HDMI/HDBaseT matrices)
+    supports: *hdbt
+    verification: none
+    notes: Inputs and outputs 1-8, each output with an HDMI (HP) and an HDBaseT (TP) port.
+
+commands:
+  get_status:
+    summary: Print the whole status, a line per setting; the lines update state (GET STA)
+    send: "GET STA"
+    expect: { reply_contains: "ADDR" }
+    returns: ack
+
+  factory_reset:
+    summary: Reset the matrix to factory defaults (SET RST)
+    send: "SET RST"
+    expect: { reply_contains: "RST" }
+    returns: ack
+
+  set_address:
+    summary: Set the matrix's serial cascade address (SET ADDR xx)
+    params:
+      address: { type: int, min: 0, max: 99, required: true, label: Address, description: "00 for a single unit, 01-99 for cascaded units on RS-232." }
+    send: "SET ADDR {address:02d}"
+    expect: { reply_contains: "ADDR" }
+    returns: ack
+
+  get_address:
+    summary: Read the cascade address (GET ADDR)
+    send: "GET ADDR"
+    expect: { reply_contains: "ADDR", matches: 'ADDR (\d+)' }
+    returns: value
+
+  set_baud:
+    summary: Set the RS-232 baud rate (SET BAUDR x)
+    params:
+      baud: { type: enum, values: ["9600", "14400", "19200", "38400", "57600", "115200"], required: true, label: Baud rate, description: "Bits per second." }
+    send: "SET BAUDR {baud:map.baud_code}"
+    expect: { reply_contains: "BAUDR" }
+    returns: ack
+
+  get_baud:
+    summary: Read the RS-232 baud rate code, 0-5 (GET BAUDR)
+    send: "GET BAUDR"
+    expect: { reply_contains: "BAUDR", matches: 'BAUDR (\d)' }
+    returns: value
+
+  set_lcd_time:
+    summary: Set how long the front-panel display stays on (SET LCD ON Tx)
+    params:
+      time: { type: int, min: 0, max: 3, required: true, label: LCD time, description: "0 always on, 1 15 s, 2 30 s, 3 60 s." }
+    send: "SET LCD ON T{time}"
+    expect: { reply_contains: "LCD" }
+    returns: ack
+
+  get_lcd_time:
+    summary: Read the display on-time code (GET LCD ON T)
+    send: "GET LCD ON T"
+    expect: { reply_contains: "LCD", matches: 'T(\d)' }
+    returns: value
+
+  set_key_lock:
+    summary: Lock or unlock the front-panel buttons (SET KEY LOCK ON/OFF)
+    params:
+      locked: { type: bool, required: true, label: Locked, description: "On locks the buttons; off unlocks them." }
+    send: "SET KEY LOCK {locked:map.on_off}"
+    expect: { reply_contains: "KEY LOCK" }
+    returns: ack
+
+  get_key_lock:
+    summary: Read whether the buttons are locked (GET KEY LOCK)
+    send: "GET KEY LOCK"
+    expect: { reply_contains: "KEY LOCK", matches: 'KEY LOCK (ON|OFF)' }
+    returns: value
+
+  get_input_signal:
+    summary: Read whether an input has a signal, 1 or 0; input 0 reads every input (GET INx SIG STA)
+    params:
+      input: &input_all { type: int, min: 0, max: 8, required: true, label: Input, description: "The input from 1, or 0 for every input." }
+    send: "GET IN{input} SIG STA"
+    expect: { reply_contains: "SIG STA", matches: 'SIG STA (\d)' }
+    returns: value
+
+  route:
+    summary: Route an input to an output, or to every output (SET OUTx VS INy)
+    params:
+      output: &output_all { type: int, min: 0, max: 8, required: true, label: Output, description: "The output from 1, or 0 for every output." }
+      input: &input_one { type: int, min: 1, max: 8, required: true, label: Input, description: "The input from 1." }
+    send: "SET OUT{output} VS IN{input}"
+    expect: { reply_contains: "VS IN" }
+    returns: ack
+
+  get_route:
+    summary: Read the input routed to an output; output 0 reads every output (GET OUTx VS)
+    params: { output: *output_all }
+    send: "GET OUT{output} VS"
+    expect: { reply_contains: "VS IN", matches: 'VS IN(\d+)' }
+    returns: value
+
+  set_video_mode:
+    summary: Set an output's video mode (SET OUTx VIDEOy)
+    params:
+      output: *output_all
+      mode: { type: int, min: 0, max: 4, required: true, label: Video mode, description: "0 auto, 1 bypass, 2 4K to 2K, 3 2K to 4K, 4 HDBT C mode." }
+    send: "SET OUT{output} VIDEO{mode}"
+    expect: { reply_contains: "VIDEO" }
+    returns: ack
+
+  get_video_mode:
+    summary: Read an output's video mode (GET OUTx VIDEO)
+    params: { output: *output_all }
+    send: "GET OUT{output} VIDEO"
+    expect: { reply_contains: "VIDEO", matches: 'VIDEO ?(\d)' }
+    returns: value
+
+  set_port_video_mode:
+    summary: Set the video mode of an output's HDMI or HDBaseT port (SET OUTx HP/TP VIDEOy)
+    params:
+      output: *output_all
+      port: &port { type: enum, values: [HP, TP], required: true, label: Port, description: "HP the HDMI port, TP the HDBaseT port." }
+      mode: { type: int, min: 1, max: 5, required: true, label: Video mode, description: "HDMI port: 1 bypass, 3 2K to 4K; HDBaseT port: 2 4K to 2K, 5 ICT mode." }
+    send: "SET OUT{output} {port} VIDEO{mode}"
+    expect: { reply_contains: "VIDEO" }
+    returns: ack
+
+  get_port_video_mode:
+    summary: Read the video mode of an output's HDMI or HDBaseT port (GET OUTx HP/TP VIDEO)
+    params: { output: *output_all, port: *port }
+    send: "GET OUT{output} {port} VIDEO"
+    expect: { reply_contains: "VIDEO", matches: 'VIDEO ?(\d)' }
+    returns: value
+
+  set_image_enhancement:
+    summary: Set an output's image enhancement (SET OUTx IMAGE ENH y)
+    params:
+      output: *output_all
+      level: { type: int, min: 0, max: 3, required: true, label: Enhancement, description: "0 off, 1 weak, 2 medium, 3 strong." }
+    send: "SET OUT{output} IMAGE ENH {level}"
+    expect: { reply_contains: "IMAGE ENH" }
+    returns: ack
+
+  get_image_enhancement:
+    summary: Read an output's image enhancement (GET OUTx IMAGE ENH)
+    params: { output: *output_all }
+    send: "GET OUT{output} IMAGE ENH"
+    expect: { reply_contains: "IMAGE ENH", matches: 'IMAGE ENH (\d)' }
+    returns: value
+
+  set_extracted_audio:
+    summary: Enable or disable an output's extracted (de-embedded) audio (SET OUTx EXA EN/DIS)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Extracted audio, description: "On enables the output's audio breakout." }
+    send: "SET OUT{output} EXA {enabled:map.en_dis}"
+    expect: { reply_contains: "EXA" }
+    returns: ack
+
+  get_extracted_audio:
+    summary: Read whether an output's extracted audio is enabled (GET OUTx EXA)
+    params: { output: *output_all }
+    send: "GET OUT{output} EXA"
+    expect: { reply_contains: "EXA", matches: 'EXA (EN|DIS)' }
+    returns: value
+
+  set_audio_delay:
+    summary: Delay an output's extracted audio (SET OUTx EXADL PHy)
+    params:
+      output: *output_all
+      step: { type: int, min: 0, max: 7, required: true, label: Delay, description: "0 bypass, 1-7 90, 180, 270, 360, 450, 540 or 630 ms." }
+    send: "SET OUT{output} EXADL PH{step}"
+    expect: { reply_contains: "EXADL" }
+    returns: ack
+
+  get_audio_delay:
+    summary: Read an output's extracted-audio delay step (GET OUTx EXADL PH)
+    params: { output: *output_all }
+    send: "GET OUT{output} EXADL PH"
+    expect: { reply_contains: "EXADL", matches: 'PH ?(\d)' }
+    returns: value
+
+  set_audio_matrix_mode:
+    summary: Set how extracted audio is routed (SET EXAMX MODEx)
+    params:
+      mode: { type: int, min: 0, max: 2, required: true, label: Audio mode, description: "0 bound to the output, 1 bound to the input, 2 its own matrix." }
+    send: "SET EXAMX MODE{mode}"
+    expect: { reply_contains: "EXAMX" }
+    returns: ack
+
+  get_audio_matrix_mode:
+    summary: Read the extracted-audio routing mode (GET EXAMX MODE)
+    send: "GET EXAMX MODE"
+    expect: { reply_contains: "EXAMX", matches: 'MODE ?(\d)' }
+    returns: value
+
+  route_audio:
+    summary: Route an input's audio to an extracted-audio output (SET OUTx AS INy)
+    params: { output: *output_all, input: *input_one }
+    send: "SET OUT{output} AS IN{input}"
+    expect: { reply_contains: "AS IN" }
+    returns: ack
+
+  get_audio_route:
+    summary: Read the input an extracted-audio output carries (GET OUTx AS IN)
+    params: { output: *output_all }
+    send: "GET OUT{output} AS IN"
+    expect: { reply_contains: "AS IN", matches: 'AS IN(\d+)' }
+    returns: value
+
+  set_signal_generator:
+    summary: Enable or disable an output's test signal generator (SET OUTx SGM EN/DIS)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Signal generator, description: "On sends the built-in test signal." }
+    send: "SET OUT{output} SGM {enabled:map.en_dis}"
+    expect: { reply_contains: "SGM" }
+    returns: ack
+
+  get_signal_generator:
+    summary: Read whether an output's signal generator is on (GET OUTx SGM)
+    params: { output: *output_all }
+    send: "GET OUT{output} SGM"
+    expect: { reply_contains: "SGM", matches: 'SGM (EN|DIS)' }
+    returns: value
+
+  set_port_signal_generator:
+    summary: Enable or disable the test signal on an output's HDMI or HDBaseT port (SET OUTx HP/TP SGM EN/DIS)
+    params:
+      output: *output_all
+      port: *port
+      enabled: { type: bool, required: true, label: Signal generator, description: "On sends the built-in test signal." }
+    send: "SET OUT{output} {port} SGM {enabled:map.en_dis}"
+    expect: { reply_contains: "SGM" }
+    returns: ack
+
+  get_port_signal_generator:
+    summary: Read whether a port's signal generator is on (GET OUTx HP/TP SGM)
+    params: { output: *output_all, port: *port }
+    send: "GET OUT{output} {port} SGM"
+    expect: { reply_contains: "SGM", matches: 'SGM (EN|DIS)' }
+    returns: value
+
+  set_stream:
+    summary: Turn an output's signal on or off (SET OUTx STREAM ON/OFF)
+    params:
+      output: *output_all
+      enabled: { type: bool, required: true, label: Stream, description: "On sends the output's signal; off stops it." }
+    send: "SET OUT{output} STREAM {enabled:map.on_off}"
+    expect: { reply_contains: "STREAM" }
+    returns: ack
+
+  get_stream:
+    summary: Read whether an output's signal is on (GET OUTx STREAM)
+    params: { output: *output_all }
+    send: "GET OUT{output} STREAM"
+    expect: { reply_contains: "STREAM", matches: 'STREAM (ON|OFF)' }
+    returns: value
+
+  set_port_stream:
+    summary: Turn an output's HDMI or HDBaseT port on or off (SET OUTx HP/TP STREAM ON/OFF)
+    params:
+      output: *output_all
+      port: *port
+      enabled: { type: bool, required: true, label: Stream, description: "On sends the port's signal; off stops it." }
+    send: "SET OUT{output} {port} STREAM {enabled:map.on_off}"
+    expect: { reply_contains: "STREAM" }
+    returns: ack
+
+  get_port_stream:
+    summary: Read whether a port's signal is on (GET OUTx HP/TP STREAM)
+    params: { output: *output_all, port: *port }
+    send: "GET OUT{output} {port} STREAM"
+    expect: { reply_contains: "STREAM", matches: 'STREAM (ON|OFF)' }
+    returns: value
+
+  get_output_edid:
+    summary: Read the EDID of the display on an output, as hex (GET OUTx EDID DATA)
+    params:
+      output: &output_one { type: int, min: 1, max: 8, required: true, label: Output, description: "The output from 1." }
+    send: "GET OUT{output} EDID DATA"
+    expect: { reply_contains: "EDID" }
+    returns: text
+
+  get_port_output_edid:
+    summary: Read the EDID of the display on an output's HDMI or HDBaseT port, as hex (GET OUTx HP/TP EDID DATA)
+    params: { output: *output_one, port: *port }
+    send: "GET OUT{output} {port} EDID DATA"
+    expect: { reply_contains: "EDID" }
+    returns: text
+
+  set_input_edid:
+    summary: Give an input a built-in or user EDID (SET INx EDID y)
+    params:
+      input: *input_all
+      edid: { type: int, min: 0, max: 32, required: true, label: EDID,
+              description: "0-29 built-in (0 1080p 2ch PCM to 29 4K60 3D 8ch HDR), 30-32 user EDIDs 1-3." }
+    send: "SET IN{input} EDID {edid}"
+    expect: { reply_contains: "EDID" }
+    returns: ack
+
+  get_input_edid:
+    summary: Read an input's EDID index (GET INx EDID)
+    params: { input: *input_all }
+    send: "GET IN{input} EDID"
+    expect: { reply_contains: "EDID", matches: 'EDID (\d+)' }
+    returns: value
+
+  copy_edid:
+    summary: Copy an output display's EDID to an input's user 1 buffer (SET INx EDID CY OUTy)
+    params:
+      input: *input_all
+      output: *output_one
+    send: "SET IN{input} EDID CY OUT{output}"
+    expect: { reply_contains: "EDID" }
+    returns: ack
+
+  copy_port_edid:
+    summary: Copy the EDID of the display on an output's HDMI or HDBaseT port to an input (SET INx EDID CY OUTy HP/TP)
+    params:
+      input: *input_all
+      output: *output_one
+      port: *port
+    send: "SET IN{input} EDID CY OUT{output} {port}"
+    expect: { reply_contains: "EDID" }
+    returns: ack
+
+  write_user_edid:
+    summary: Write EDID data to one of an input's three user buffers (SET INx EDID Uy DATAz)
+    params:
+      input: *input_all
+      buffer: { type: int, min: 1, max: 3, required: true, label: User buffer, description: "User EDID buffer 1-3." }
+      data: { type: string, pattern: '^[0-9A-Fa-f]{2,1024}$', required: true, label: EDID data, description: "The EDID as hex digits, 128 or 256 bytes." }
+    send: "SET IN{input} EDID U{buffer} DATA{data}"
+    expect: { reply_contains: "EDID" }
+    returns: ack
+
+  get_edid_data:
+    summary: Read the data of one of an input's EDIDs, as hex (GET INx EDID y DATA)
+    params:
+      input: { type: int, min: 1, max: 8, required: true, label: Input, description: "The input from 1." }
+      edid: { type: int, min: 0, max: 32, required: true, label: EDID, description: "The EDID index, 0-32." }
+    send: "GET IN{input} EDID {edid} DATA"
+    expect: { reply_contains: "EDID" }
+    returns: text
+
+  set_gateway:
+    summary: Set the gateway (route) address (SET RIP a.b.c.d)
+    params:
+      address: &ipv4 { type: string, pattern: '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$', required: true, label: Address,
+                       description: "Dot-decimal, each part 0-255 (the manual writes three digits, such as 192.168.001.001)." }
+    send: "SET RIP {address}"
+    expect: { reply_contains: "RIP" }
+    returns: ack
+
+  get_gateway:
+    summary: Read the gateway address (GET RIP)
+    send: "GET RIP"
+    expect: { reply_contains: "RIP", matches: 'RIP (\S+)' }
+    returns: value
+
+  set_ip_address:
+    summary: Set the matrix's IP address (SET HIP a.b.c.d)
+    params: { address: *ipv4 }
+    send: "SET HIP {address}"
+    expect: { reply_contains: "HIP" }
+    returns: ack
+
+  get_ip_address:
+    summary: Read the matrix's IP address (GET HIP)
+    send: "GET HIP"
+    expect: { reply_contains: "HIP", matches: 'HIP (\S+)' }
+    returns: value
+
+  set_netmask:
+    summary: Set the subnet mask (SET NMK a.b.c.d)
+    params: { address: *ipv4 }
+    send: "SET NMK {address}"
+    expect: { reply_contains: "NMK" }
+    returns: ack
+
+  get_netmask:
+    summary: Read the subnet mask (GET NMK)
+    send: "GET NMK"
+    expect: { reply_contains: "NMK", matches: 'NMK (\S+)' }
+    returns: value
+
+  set_tcp_port:
+    summary: Set the Telnet port (SET TIP zzzz)
+    params:
+      port: { type: int, min: 1, max: 9999, required: true, label: Port, description: "The control port, 1-9999; 23 by default." }
+    send: "SET TIP {port}"
+    expect: { reply_contains: "TIP" }
+    returns: ack
+
+  get_tcp_port:
+    summary: Read the Telnet port (GET TIP)
+    send: "GET TIP"
+    expect: { reply_contains: "TIP", matches: 'TIP (\d+)' }
+    returns: value
+
+  set_dhcp:
+    summary: Turn DHCP on or off (SET DHCP 0/1)
+    params:
+      enabled: { type: bool, required: true, label: DHCP, description: "On takes an address from DHCP; off uses the static address." }
+    send: "SET DHCP {enabled:map.bool01}"
+    expect: { reply_contains: "DHCP" }
+    returns: ack
+
+  get_dhcp:
+    summary: Read whether DHCP is on, 1 or 0 (GET DHCP)
+    send: "GET DHCP"
+    expect: { reply_contains: "DHCP", matches: 'DHCP ([01])' }
+    returns: value
+
+  get_mac:
+    summary: Read the MAC address (GET MAC)
+    send: "GET MAC"
+    expect: { reply_contains: "MAC", matches: 'MAC (\S+)' }
+    returns: value
+
+  set_ir_extenders:
+    summary: Enable or disable the four IR extenders (SET IR EXT SW x1.x2.x3.x4)
+    params:
+      switches: { type: string, pattern: '^[01]\.[01]\.[01]\.[01]$', required: true, label: IR extenders, description: "1 enables and 0 disables each of the four, such as 1.1.0.1." }
+    send: "SET IR EXT SW {switches}"
+    expect: { reply_contains: "IR EXT SW" }
+    returns: ack
+
+  get_ir_extenders:
+    summary: Read the IR extender switches (GET IR EXT SW)
+    send: "GET IR EXT SW"
+    expect: { reply_contains: "IR EXT SW", matches: 'SW ([01.]+)' }
+    returns: value
+
+  set_ir_system_code:
+    summary: Set the IR system (custom) code (SET IR SYS xx.yy)
+    params:
+      code: { type: string, pattern: '^[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}$', required: true, label: System code, description: "Two hex bytes joined by a dot, such as 00.FF." }
+    send: "SET IR SYS {code}"
+    expect: { reply_contains: "IR SYS" }
+    returns: ack
+
+  get_ir_system_code:
+    summary: Read the IR system code (GET IR SYS)
+    send: "GET IR SYS"
+    expect: { reply_contains: "IR SYS", matches: 'SYS (\S+)' }
+    returns: value
+
+  set_ir_code:
+    summary: Set the IR data code that routes an input to an output (SET IR OUTx INy CODE zz)
+    params:
+      output: *output_one
+      input: *input_one
+      code: { type: string, pattern: '^[0-9A-Fa-f]{2}$', required: true, label: Data code, description: "One hex byte, 00-FF." }
+    send: "SET IR OUT{output} IN{input} CODE {code}"
+    expect: { reply_contains: "CODE" }
+    returns: ack
+
+  get_ir_code:
+    summary: Read the IR data code for an input and output (GET IR OUTx INy CODE)
+    params: { output: *output_one, input: *input_one }
+    send: "GET IR OUT{output} IN{input} CODE"
+    expect: { reply_contains: "CODE", matches: 'CODE ([0-9A-Fa-f]{2})' }
+    returns: value
+
+state:
+  address:                     { type: int, description: "Serial cascade address, 0 for a single unit (ADDR)" }
+  baud_code:                   { type: int, description: "RS-232 baud code 0-5: 9600, 14400, 19200, 38400, 57600, 115200 (BAUDR)" }
+  lcd_time:                    { type: int, description: "Display on-time code: 0 always, 1 15 s, 2 30 s, 3 60 s (LCD ON T)" }
+  key_lock:                    { type: bool, description: "Whether the buttons are locked (KEY LOCK)" }
+  audio_matrix_mode:           { type: int, description: "0 bound to output, 1 bound to input, 2 matrix (EXAMX MODE)" }
+  inputs.*.signal:             { type: bool, description: "Whether the input has a signal (SIG STA)" }
+  inputs.*.edid:               { type: int, description: "EDID index of the input, 0-32 (EDID)" }
+  outputs.*.input:             { type: int, description: "Input routed to the output (VS)" }
+  outputs.*.video_mode:        { type: int, description: "Video mode: 0 auto, 1 bypass, 2 4K to 2K, 3 2K to 4K, 4 HDBT C (VIDEO)" }
+  outputs.*.image_enhancement: { type: int, description: "Image enhancement 0-3 (IMAGE ENH)" }
+  outputs.*.extracted_audio:   { type: bool, description: "Whether the output's audio breakout is enabled (EXA)" }
+  outputs.*.audio_delay:       { type: int, description: "Extracted-audio delay step 0-7, 90 ms each (EXADL PH)" }
+  outputs.*.audio_input:       { type: int, description: "Input the extracted-audio output carries (AS)" }
+  outputs.*.signal_generator:  { type: bool, description: "Whether the test signal is on (SGM)" }
+  outputs.*.stream:            { type: bool, description: "Whether the output sends its signal (STREAM)" }
+  outputs.*.hdmi.video_mode:   { type: int, description: "HDMI port video mode: 1 bypass, 3 2K to 4K (HP VIDEO)" }
+  outputs.*.hdbt.video_mode:   { type: int, description: "HDBaseT port video mode: 2 4K to 2K, 5 ICT (TP VIDEO)" }
+  outputs.*.hdmi.signal_generator: { type: bool, description: "Whether the HDMI port's test signal is on (HP SGM)" }
+  outputs.*.hdbt.signal_generator: { type: bool, description: "Whether the HDBaseT port's test signal is on (TP SGM)" }
+  outputs.*.hdmi.stream:       { type: bool, description: "Whether the HDMI port sends its signal (HP STREAM)" }
+  outputs.*.hdbt.stream:       { type: bool, description: "Whether the HDBaseT port sends its signal (TP STREAM)" }
+  network.gateway:             { type: string, description: "Gateway address (RIP)" }
+  network.ip_address:          { type: string, description: "IP address (HIP)" }
+  network.netmask:             { type: string, description: "Subnet mask (NMK)" }
+  network.tcp_port:            { type: int, description: "Telnet port (TIP)" }
+  network.dhcp:                { type: bool, description: "Whether DHCP is on (DHCP)" }
+  network.mac_address:         { type: string, description: "MAC address (MAC)" }
+  ir.extenders:                { type: string, description: "IR extender switches as x1.x2.x3.x4 (IR EXT SW)" }
+  ir.system_code:              { type: string, description: "IR system code as xx.yy (IR SYS)" }
+  ir.codes.*.*:                { type: string, description: "IR data code by output and input (IR OUTx INy CODE)" }
+
+telemetry:
+  poll:
+    - every_ms: 5000
+      send: ["GET OUT0 VS", "GET IN0 SIG STA"]
+    - every_ms: 60000
+      send: ["GET STA"]
+  updates:
+    - match: '^ADDR (\d+)\s*$'
+      state: { address: "{1}" }
+    - match: '^BAUDR (\d)\s*$'
+      state: { baud_code: "{1}" }
+    - match: '^LCD ON T(\d)\s*$'
+      state: { lcd_time: "{1}" }
+    - match: '^KEY LOCK (ON|OFF)\s*$'
+      state: { key_lock: { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^EXAMX MODE ?(\d)\s*$'
+      state: { audio_matrix_mode: "{1}" }
+    - match: '^IN(\d+) SIG STA (\d)\s*$'
+      state: { "inputs.{1}.signal": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^IN(\d+) EDID (\d+)\s*$'
+      state: { "inputs.{1}.edid": "{2}" }
+    - match: '^OUT(\d+) VS IN(\d+)\s*$'
+      state: { "outputs.{1}.input": "{2}" }
+    - match: '^OUT(\d+) VIDEO ?(\d)\s*$'
+      state: { "outputs.{1}.video_mode": "{2}" }
+    - match: '^OUT(\d+) IMAGE ENH (\d)\s*$'
+      state: { "outputs.{1}.image_enhancement": "{2}" }
+    - match: '^OUT(\d+) EXA (EN|DIS)\s*$'
+      state: { "outputs.{1}.extracted_audio": { value: "{2}", map: { "EN": true, "DIS": false } } }
+    - match: '^OUT(\d+) EXADL PH ?(\d)\s*$'
+      state: { "outputs.{1}.audio_delay": "{2}" }
+    - match: '^OUT(\d+) AS IN(\d+)\s*$'
+      state: { "outputs.{1}.audio_input": "{2}" }
+    - match: '^OUT(\d+) SGM (EN|DIS)\s*$'
+      state: { "outputs.{1}.signal_generator": { value: "{2}", map: { "EN": true, "DIS": false } } }
+    - match: '^OUT(\d+) STREAM (ON|OFF)\s*$'
+      state: { "outputs.{1}.stream": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^OUT(\d+) HP VIDEO ?(\d)\s*$'
+      state: { "outputs.{1}.hdmi.video_mode": "{2}" }
+    - match: '^OUT(\d+) TP VIDEO ?(\d)\s*$'
+      state: { "outputs.{1}.hdbt.video_mode": "{2}" }
+    - match: '^OUT(\d+) HP SGM (EN|DIS)\s*$'
+      state: { "outputs.{1}.hdmi.signal_generator": { value: "{2}", map: { "EN": true, "DIS": false } } }
+    - match: '^OUT(\d+) TP SGM (EN|DIS)\s*$'
+      state: { "outputs.{1}.hdbt.signal_generator": { value: "{2}", map: { "EN": true, "DIS": false } } }
+    - match: '^OUT(\d+) HP STREAM (ON|OFF)\s*$'
+      state: { "outputs.{1}.hdmi.stream": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^OUT(\d+) TP STREAM (ON|OFF)\s*$'
+      state: { "outputs.{1}.hdbt.stream": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^RIP (\S+)\s*$'
+      state: { network.gateway: "{1}" }
+    - match: '^HIP (\S+)\s*$'
+      state: { network.ip_address: "{1}" }
+    - match: '^NMK (\S+)\s*$'
+      state: { network.netmask: "{1}" }
+    - match: '^TIP (\d+)\s*$'
+      state: { network.tcp_port: "{1}" }
+    - match: '^DHCP ([01])\s*$'
+      state: { network.dhcp: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^MAC (\S+)\s*$'
+      state: { network.mac_address: "{1}" }
+    - match: '^IR EXT SW ([01.]+)\s*$'
+      state: { ir.extenders: "{1}" }
+    - match: '^IR SYS (\S+)\s*$'
+      state: { ir.system_code: "{1}" }
+    - match: '^IR OUT(\d+) IN(\d+) CODE ([0-9A-Fa-f]{2})\s*$'
+      state: { "ir.codes.{1}.{2}": "{3}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      factory_reset (SET RST) restores factory defaults at once, network
+      settings included, and cannot be undone from here. A route to output 0
+      changes every output.
+  - models: [all]
+    severity: warning
+    text: >
+      AVPro documents one answer only (DHCP 0 to GET DHCP); every other
+      answer is taken to be the command without SET or GET, as the status
+      lines the same family sends show (OUT1 VS IN1). If a firmware answers
+      otherwise, commands time out while the rules still read what it sends.
+  - models: [all]
+    severity: info
+    text: >
+      State is kept current by polling the routing and input signals every 5
+      s and the whole status (GET STA) every minute; AVPro documents no
+      changes sent on their own.
+  - models: [ac-mx44-auhd-hdbt, ac-mx88-auhd-hdbt]
+    severity: info
+    text: >
+      Not covered: RS-232 pass-through to an HDBaseT receiver (SET RS PTH
+      OUTx LENy BRz, followed by exactly y raw bytes); its byte count cannot
+      be tied to the data in this format. On RS-232, AVPro's serial address
+      prefix (A00 by default) is optional for a single unit and is not sent.
