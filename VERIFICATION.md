@@ -2421,6 +2421,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm set.monitoring.zone takes sourcename for an output and a live input, and set.cue.settings takes property name with value. ([specs/modulopi-player.yaml:623](specs/modulopi-player.yaml#L623))
 - [ ] Check what get.list.playlists' playState holds when stopped (only true is documented). ([specs/modulopi-player.yaml:852](specs/modulopi-player.yaml#L852))
 
+## modulopi-spydog — Modulo Pi Spydog
+
+- [ ] Confirm the websocket path is / on port 8081 and the units of cpuTemperature, motherboardTemperature, upTime and serverTime. ([specs/modulopi-spydog.yaml:31](specs/modulopi-spydog.yaml#L31))
+- [ ] Confirm doaction.computer answers false (not an error) when an action fails. ([specs/modulopi-spydog.yaml:47](specs/modulopi-spydog.yaml#L47))
+
 ## nec-display — NEC (Sharp NEC) large-format displays
 
 - [ ] Confirm a reply timeout of 5 s suits every command (NEC gives none for the controller; the display's own is 10 s), and that a display answers the power status in standby. ([specs/nec-display.yaml:670](specs/nec-display.yaml#L670))
