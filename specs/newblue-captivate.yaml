@@ -1,0 +1,951 @@
+spec: 1
+id: newblue-captivate
+name: NewBlue Captivate / Titler Live (Advanced API over TCP)
+vendor: NewBlue
+category: other
+
+# NewBlue Captivate (and Titler Live, its earlier name) offers its scheduler
+# API over a TCP socket on port 9025: JSON messages ending in CR LF, each
+# answered with {"result": ...} or {"error": ...}, and, while the client is
+# subscribed, notifications {"notification": ...} pushed on the same socket.
+# A client that sends at once after connecting gets no welcome text and no
+# notifications until it sends subscribe, which this spec does on connecting.
+# The title XML is served over HTTP on port 9022.
+
+source:
+  - title: NewBlue Developer Site, Captivate API (External API Reference, All Commands Reference)
+    author: NewBlue
+    url: https://developers.newbluefx.com/captivate-api/advanced-api-reference/tcp-udp-and-http-connections
+    note: >
+      Manufacturer documents, read 2026-10-27 (the site's full text,
+      https://developers.newbluefx.com/llms-full.txt). "TCP, UDP, and HTTP
+      Connections": TCP port 9025, CR LF-ended JSON both ways, the welcome text
+      ending in BEGIN DATA, no welcome or notifications for a client that sends
+      at once until it sends subscribe; HTTP on 9022 (/api, /api/subscribe);
+      UDP 9026; mDNS names. "API Communication": the scheduleCommand form
+      {command, parameters, variables}, the scheduleAction form {action, input,
+      title, variables}, updateInputDefinition {redefine, definition},
+      saveSettings/loadSettings {input, settings}; results wrapped in
+      {"result": ...}, failures {"error": "scheduleCommand failed", "data":
+      ...}; notifications wrapped in {"notification": {channel, command:
+      notify, event: play, id, input, play: Running, sender, title, to}}.
+      "Additional HTTP Endpoints": GET /api/title/<id> (the title's XML),
+      /api/tunnel, the httpPort and webSocketPort registry settings.
+      "scheduleAction Method": the actions animateIn, animateOut, alert, cutIn,
+      cutOut, render, update, still, hide/show, automatic, smart; title ids
+      from getTitleControlInfo, whose titles carry channel, id, input, inputs,
+      name, playStatus, renderProgress, status, type and variables.
+      "Understanding Signals": subscribe with events play and data.
+  - title: NewBlue Captivate REST API Commands (OpenAPI), API_VERSION 250721
+    author: NewBlue (Jeff Mikels)
+    url: https://developers.newbluefx.com/captivate-api/all-commands-reference
+    note: >
+      Manufacturer document, licence CC0 (api-spec.yaml linked from the All
+      Commands Reference). Every command used here with its parameters and
+      example replies: macro (events auto, in, out, stop, cut, update, still,
+      play, setvars, show, hide, take, takein, link, unlink, activate,
+      deactivate), customMessage, joinMeeting, meetingStatus, leaveMeeting,
+      subscribe, getSubscriptions, getTimelineDuration, selectTitle,
+      setTitleInput, removeTitleInput, setTitleName, setTitlePosition,
+      newTitle, duplicateTitle, loadTitle, saveTitle, deleteTitle,
+      openDesigner, closeDesigner, setOutputDevice, getOutputDevice,
+      getStreamHostServer, startStreaming, stopStreaming, setPngOutPath,
+      getVideoFormat, setVideoFormat, loadProject, saveProject, closeProject,
+      checkProjectEdited, getCurrentProject, getRecentProjects, loadPlaylist,
+      clearPlaylist, savePlaylist, attachProfile, changeInputName, setDynamic,
+      assignVariable, the video and audio input commands, the replay_*
+      commands, listCommands, getTime, getStats, getProductInfo, getReport,
+      getAppGlobalSettings, readProject, readPlaylist, getProfileList,
+      getProfile, readTitle, getRenderStatus, getPlayStatus,
+      getTitlesPlayStatus, getInputsPlayStatus, isTitleConnected,
+      getTitlesConnected, getTitleControlInfo, getTitleIcon, getMonitorFrame,
+      setMaxCacheCount, rebuildCache, getCachePath, setCachePath,
+      saveTitleCache. Channels are numbered from 0, -1 for all.
+
+transport:
+  type: line-tcp
+  port: 9025
+  framing: terminated
+  terminator: crlf
+  reply_framing: json
+  encoding: utf-8
+  timeout_ms: 8000
+  # A reply is {"result": ...} or {"error": ...}; a notification is not.
+  reply_match: '^\s*\{\s*"(result|error)"'
+  probe: '{"command":"getTime","parameters":{},"variables":{}}'
+  endpoints:
+    http:
+      port: { setting: http_port }
+
+settings:
+  http_port: { type: int, min: 1, max: 65535, default: 9022, label: HTTP port,
+               description: "Captivate's HTTP API port (Generic HTML.httpPort), where the title XML is served; 9022 by default." }
+
+ports:
+  - { port: 9025, protocol: tcp, role: control, note: "Advanced API over TCP: commands, replies and notifications" }
+  - { port: 9022, protocol: http, role: control, setting: http_port, note: "HTTP API: the title XML" }
+
+models:
+  - id: captivate
+    name: NewBlue Captivate (Broadcast, Sport, Producer) and Titler Live 5
+    supports: [schedule_action, schedule_input_action, custom_message, update_input_definition,
+               save_input_settings, load_input_settings, get_title_xml, macro, select_title, set_title_input,
+               remove_title_input, set_title_name, set_title_position, new_title, duplicate_title, load_title,
+               save_title, delete_title, open_designer, close_designer, set_dynamic, assign_variable,
+               attach_profile, rename_input, rebuild_cache, save_title_cache, get_cache_path, set_cache_path,
+               set_max_cache_count, set_output_device, get_output_device, get_video_format, set_video_format,
+               start_streaming, stop_streaming, get_stream_server, set_png_output_folder, load_project,
+               save_project, close_project, check_project_edited, get_current_project, get_recent_projects,
+               read_project, load_playlist, clear_playlist, save_playlist, read_playlist, get_all_video_inputs,
+               get_video_input_info, get_opened_video_inputs, open_video_input, close_video_input,
+               switch_video_input, get_all_audio_inputs, get_opened_audio_inputs, replay_is_trial,
+               replay_enter_playback, replay_exit_playback, replay_get_settings, replay_set_settings,
+               replay_set_speed, replay_get_speed, replay_enable, replay_get_inputs, replay_arm_inputs,
+               replay_disarm_inputs, replay_get_play_info, replay_enable_scrubbing, replay_play_pause,
+               replay_set_scrub_position, replay_set_in_point, replay_set_out_point, join_meeting,
+               meeting_status, leave_meeting, get_time, get_stats, get_product_info, get_app_global_settings,
+               get_profile_list, get_profile, read_title, read_all_titles, get_render_status, get_play_status,
+               get_titles_play_status, get_inputs_play_status, is_title_connected, get_titles_connected,
+               get_title_control_info, get_all_title_control_info, get_timeline_duration, get_subscriptions,
+               list_commands, get_title_icon, get_monitor_frame]
+    verification: none
+
+commands:
+  # ── Playback and data (scheduleAction) ──────────────────────────────────
+  schedule_action:
+    summary: >
+      Run an action on a title with new variable values (scheduleAction):
+      animate in or out, alert, cut in or out, render, update, still, hide or
+      show, automatic or smart
+    params:
+      action: &action { type: enum, values: [animateIn, animateOut, alert, cutIn, cutOut, render, update, still,
+                                              hide, show, automatic, smart],
+                        required: true, label: Action,
+                        description: "animateIn plays to the pause point, animateOut plays out, alert plays in, holds and out, cutIn and cutOut cut, render prepares, update animates new values, still sets them at once, hide and show toggle the named variables, automatic and smart choose for you." }
+      title: { type: string, max_length: 256, required: true, label: Title,
+               description: "Title (graphic layer) by its name in the project list or its id in braces." }
+      variables: &variables { type: json, required: true, label: Variables,
+                              description: "JSON object of variable names to values, {} for none." }
+    send: '{"action":"{action}","input":"","title":{title:json},"variables":{variables}}'
+    expect: &success { json_equals: { "$.result.success": true } }
+    returns: ack
+  schedule_input_action:
+    summary: Run an action on every title connected to an input, with new variable values (scheduleAction)
+    params:
+      action: *action
+      input: { type: string, max_length: 256, required: true, label: Input,
+               description: "Full name of the input (data controller); empty for every title in the project." }
+      variables: *variables
+    send: '{"action":"{action}","input":{input:json},"title":"","variables":{variables}}'
+    expect: *success
+    returns: ack
+  custom_message:
+    summary: >
+      Pass a message to the data controllers as a notification; it succeeds
+      when the to field names a listening controller (customMessage)
+    params:
+      to: { type: string, max_length: 256, required: true, label: To,
+            description: "Usually the name of the input (data controller) the message is for." }
+      sender: { type: string, max_length: 256, default: "", label: Sender,
+                description: "Sender name controllers can filter on; empty for the default sender." }
+      data: { type: json, required: true, label: Data,
+              description: "Any JSON value, passed to the controllers in the parameters' data field." }
+    send: '{"command":"customMessage","parameters":{"to":{to:json},"sender":{sender:json},"data":{data}},"variables":{}}'
+    expect: *success
+    returns: ack
+  update_input_definition:
+    summary: Change an input's variable definitions (updateInputDefinition, {redefine, definition})
+    params:
+      input: { type: string, max_length: 256, required: true, label: Input,
+               description: "Full name of the input (data controller) to redefine." }
+      definition: { type: json, required: true, label: Definition,
+                    description: "The definition object Captivate documents for updateInputDefinition, such as {\"method\": \"merge\", \"variables\": {...}}." }
+    send: '{"redefine":{input:json},"definition":{definition}}'
+    expect: &answered { json_path: "$.result" }
+    returns: ack
+  save_input_settings:
+    summary: Save a controller's settings into the project (saveSettings, {input, settings})
+    params:
+      input: { type: string, max_length: 256, required: true, label: Input,
+               description: "Full name of the input (data controller) whose settings are saved." }
+      settings: { type: json, required: true, label: Settings,
+                  description: "JSON object of settings to save." }
+    send: '{"input":{input:json},"settings":{settings}}'
+    expect: *answered
+    returns: ack
+  load_input_settings:
+    summary: Read a controller's saved settings (loadSettings, {input, settings:"load"})
+    params:
+      input: { type: string, max_length: 256, required: true, label: Input,
+               description: "Full name of the input (data controller) whose settings are read." }
+    send: '{"input":{input:json},"settings":"load"}'
+    expect: &result { json_path: "$.result" }
+    returns: value
+  get_title_xml:
+    summary: Read a title's XML definition over HTTP (GET /api/title/<id> on port 9022)
+    params:
+      id: { type: string, max_length: 64, required: true, pattern: '^\{[0-9A-Fa-f-]+\}$', label: Title id,
+            description: "Title id with its braces, {b960a28b-e583-4f3f-b54b-851ef481314d}." }
+    send: { endpoint: http, method: GET, path: "/api/title/{id}" }
+    expect: { status: 200 }
+    returns: text
+
+  # ── Commands (scheduleCommand) ──────────────────────────────────────────
+  macro:
+    summary: "High-level playback of titles: in, out, take, cut, update and more (macro)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      event: { type: "enum", values: ["auto", "in", "out", "stop", "cut", "update", "still", "play", "setvars", "show", "hide", "take", "takein", "link", "unlink", "activate", "deactivate"], required: true, label: "Event", description: "Playback event: auto toggles, in and out animate, cut cuts, take and takein take, update and still update." }
+    send: '{"command":"macro","parameters":{"title":{title:json},"event":"{event}"},"variables":{}}'
+    expect: *success
+    returns: ack
+  select_title:
+    summary: "Select a title, as a click on it in the interface does (selectTitle)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"selectTitle","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  set_title_input:
+    summary: "Connect an input to a title, replacing or joining its inputs (setTitleInput)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      input: { type: "string", max_length: 256, required: true, label: "Input", description: "Full name of an input (data controller), as Captivate lists it." }
+      merge: { type: "bool", default: false, label: "Merge", description: "true adds the input to the title's inputs; false replaces them." }
+    send: '{"command":"setTitleInput","parameters":{"title":{title:json},"input":{input:json},"merge":"{merge:bool01}"},"variables":{}}'
+    expect: *success
+    returns: ack
+  remove_title_input:
+    summary: "Disconnect an input from a title (removeTitleInput)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      input: { type: "string", max_length: 256, required: true, label: "Input", description: "Full name of an input (data controller), as Captivate lists it." }
+    send: '{"command":"removeTitleInput","parameters":{"title":{title:json},"input":{input:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  set_title_name:
+    summary: "Rename a title (setTitleName)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      name: { type: "string", max_length: 256, required: true, label: "New name", description: "New name of the title." }
+    send: '{"command":"setTitleName","parameters":{"title":{title:json},"newName":{name:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  set_title_position:
+    summary: "Move a title in the list (setTitlePosition)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      position: { type: "int", min: 0, required: true, label: "Position", description: "Place in the layer list." }
+    send: '{"command":"setTitlePosition","parameters":{"title":{title:json},"position":{position}},"variables":{}}'
+    expect: *success
+    returns: ack
+  new_title:
+    summary: "Create a new title on a channel (newTitle)"
+    params:
+      name: { type: "string", max_length: 256, required: true, label: "Name", description: "Name of the new title." }
+      position: { type: "int", min: 0, required: true, label: "Position", description: "Place in the layer list." }
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+    send: '{"command":"newTitle","parameters":{"newName":{name:json},"newPosition":{position},"channel":{channel}},"variables":{}}'
+    expect: *success
+    returns: ack
+  duplicate_title:
+    summary: "Copy a title under a new name (duplicateTitle)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      name: { type: "string", max_length: 256, required: true, label: "Name", description: "Name of the copy." }
+      position: { type: "int", min: 0, required: true, label: "Position", description: "Place of the copy in the layer list." }
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+    send: '{"command":"duplicateTitle","parameters":{"title":{title:json},"newName":{name:json},"newPosition":{position},"channel":{channel}},"variables":{}}'
+    expect: *success
+    returns: ack
+  load_title:
+    summary: "Load a title from an .nbtitle file onto a channel (loadTitle)"
+    params:
+      file: { type: "string", max_length: 1024, required: true, label: "File", description: "Full path of the .nbtitle file on the Captivate computer." }
+      name: { type: "string", max_length: 256, required: true, label: "Name", description: "Name to give the title." }
+      position: { type: "int", min: 0, required: true, label: "Position", description: "Place in the layer list." }
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+    send: '{"command":"loadTitle","parameters":{"file":{file:json},"newName":{name:json},"newPosition":{position},"channel":{channel}},"variables":{}}'
+    expect: *success
+    returns: ack
+  save_title:
+    summary: "Save a title to an .nbtitle file (saveTitle)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      file: { type: "string", max_length: 1024, required: true, label: "File", description: "Full path of the .nbtitle file to write." }
+    send: '{"command":"saveTitle","parameters":{"title":{title:json},"file":{file:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  delete_title:
+    summary: "Delete a title from the project (deleteTitle)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"deleteTitle","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  open_designer:
+    summary: "Open the title designer on a title (openDesigner)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"openDesigner","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  close_designer:
+    summary: "Close the title designer (closeDesigner)"
+    send: '{"command":"closeDesigner","parameters":{},"variables":{}}'
+    expect: *success
+    returns: ack
+  set_dynamic:
+    summary: "Make a title variable dynamic (changeable) or static (setDynamic)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      variable: { type: "string", max_length: 256, required: true, label: "Variable", description: "Name of the title variable." }
+      dynamic: { type: "bool", required: true, label: "Dynamic", description: "true lets the variable change; false holds it." }
+    send: '{"command":"setDynamic","parameters":{"title":{title:json},"variable":{variable:json},"dynamic":{dynamic:bool01}},"variables":{}}'
+    expect: *success
+    returns: ack
+  assign_variable:
+    summary: "Connect an input variable to a title variable (assignVariable)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      input: { type: "string", max_length: 256, required: true, label: "Input", description: "Full name of an input (data controller), as Captivate lists it." }
+      input_variable: { type: "string", max_length: 256, required: true, label: "Input variable", description: "Name of the input's variable." }
+      title_variable: { type: "string", max_length: 256, required: true, label: "Title variable", description: "Name of the title's variable." }
+    send: '{"command":"assignVariable","parameters":{"title":{title:json},"input":{input:json},"inputVar":{input_variable:json},"titleVar":{title_variable:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  attach_profile:
+    summary: "Connect an input profile (data controller) to a title (attachProfile)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      profile: { type: "string", max_length: 256, required: true, label: "Profile", description: "Name of the profile (data controller)." }
+      merge: { type: "bool", default: false, label: "Merge", description: "true adds the profile to the title's inputs; false replaces them." }
+    send: '{"command":"attachProfile","parameters":{"title":{title:json},"profile":{profile:json},"merge":"{merge:bool01}"},"variables":{}}'
+    expect: *success
+    returns: ack
+  rename_input:
+    summary: "Rename an input (data controller) (changeInputName)"
+    params:
+      input: { type: "string", max_length: 256, required: true, label: "Input", description: "Full name of an input (data controller), as Captivate lists it." }
+      name: { type: "string", max_length: 256, required: true, label: "New name", description: "New name of the input." }
+    send: '{"command":"changeInputName","parameters":{"input":{input:json},"newName":{name:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  rebuild_cache:
+    summary: "Rebuild a title's cache completely (rebuildCache)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"rebuildCache","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  save_title_cache:
+    summary: "Save a title's cache now (saveTitleCache)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"saveTitleCache","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  get_cache_path:
+    summary: "Read where a title's cache is kept (getCachePath)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"getCachePath","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  set_cache_path:
+    summary: "Set where a title's cache is built (setCachePath)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      file: { type: "string", max_length: 1024, required: true, label: "Path", description: "Path for the title's cache on the Captivate computer." }
+    send: '{"command":"setCachePath","parameters":{"title":{title:json},"file":{file:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  set_max_cache_count:
+    summary: "Set how many variable variations are kept in memory and saved (setMaxCacheCount)"
+    params:
+      cache: { type: "int", min: 0, required: true, label: "In memory", description: "Variations kept in memory." }
+      save: { type: "int", min: 0, required: true, label: "Saved", description: "Variations saved to file." }
+    send: '{"command":"setMaxCacheCount","parameters":{"maxCacheCount":{cache},"maxSaveCount":{save}},"variables":{}}'
+    expect: *success
+    returns: ack
+  set_output_device:
+    summary: "Choose the output device for channels, such as NDI (setOutputDevice)"
+    params:
+      device: { type: "string", max_length: 256, required: true, label: "Device", description: "Output device name, such as NDI." }
+      channels: { type: "string", max_length: 256, pattern: "^[0-9]+(,[0-9]+)*$", required: true, label: "Channels", description: "Comma-separated channel indexes from 0 to connect to the device; only some products allow a device per channel." }
+    send: '{"command":"setOutputDevice","parameters":{"device":{device:json},"channels":{channels:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  get_output_device:
+    summary: "Read the output device (getOutputDevice)"
+    send: '{"command":"getOutputDevice","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_video_format:
+    summary: "Read the project's video format (getVideoFormat)"
+    send: '{"command":"getVideoFormat","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  set_video_format:
+    summary: "Set the project's video format (setVideoFormat)"
+    params:
+      width: { type: "int", min: 16, max: 7680, required: true, label: "Width", description: "Frame width in pixels." }
+      height: { type: "int", min: 16, max: 4320, required: true, label: "Height", description: "Frame height in pixels." }
+      frame_rate: { type: "float", min: 1, max: 120, required: true, label: "Frame rate", description: "Frames per second, such as 29.97." }
+    send: '{"command":"setVideoFormat","parameters":{"width":{width},"height":{height},"frameRate":{frame_rate:.3f}},"variables":{}}'
+    expect: *success
+    returns: ack
+  start_streaming:
+    summary: "Start an RTMP stream (startStreaming)"
+    params:
+      service: { type: "string", max_length: 128, required: true, label: "Service", description: "Service name, such as Facebook." }
+      url: { type: "string", max_length: 1024, required: true, label: "Server URL", description: "RTMP or RTMPS server URL." }
+      key: { type: "string", max_length: 1024, required: true, secret: true, label: "Stream key", description: "Stream key for the server." }
+    send: '{"command":"startStreaming","parameters":{"choice":{service:json},"serverUrl":{url:json},"streamKey":{key:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  stop_streaming:
+    summary: "Stop the RTMP stream (stopStreaming)"
+    send: '{"command":"stopStreaming","parameters":{},"variables":{}}'
+    expect: *success
+    returns: ack
+  get_stream_server:
+    summary: "Read the current stream's information (getStreamHostServer)"
+    send: '{"command":"getStreamHostServer","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  set_png_output_folder:
+    summary: "Set the folder PNG renders are saved to, and a subfolder of it (setPngOutPath)"
+    params:
+      folder: { type: "string", max_length: 1024, required: true, label: "Folder", description: "Main folder for PNG output files." }
+      subfolder: { type: "string", max_length: 1024, default: "", label: "Subfolder", description: "Subfolder under the main folder, for the current renders." }
+    send: '{"command":"setPngOutPath","parameters":{"folder":{folder:json},"subfolder":{subfolder:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  load_project:
+    summary: "Load a project (.nbtlproj or .zip), replacing the current one (loadProject)"
+    params:
+      file: { type: "string", max_length: 1024, required: true, label: "File", description: "Full path of the file on the Captivate computer." }
+      auto_cache: { type: "bool", default: false, label: "Auto-cache", description: "Whether auto-cache is turned on." }
+      video_source: { type: "string", max_length: 256, default: "", label: "Video source", description: "Video source the project uses, by name; empty for none." }
+    send: '{"command":"loadProject","parameters":{"file":{file:json},"autoCache":"{auto_cache:bool01}","videoSource":{video_source:json}},"variables":{}}'
+    expect: *answered
+    returns: ack
+  save_project:
+    summary: "Save the current project (.nbtlproj, or .nbtlpkg for a zipped package) (saveProject)"
+    params:
+      file: { type: "string", max_length: 1024, required: true, label: "File", description: "Full path of the file on the Captivate computer." }
+    send: '{"command":"saveProject","parameters":{"file":{file:json}},"variables":{}}'
+    expect: *answered
+    returns: ack
+  close_project:
+    summary: "Close the current project, saving it first if asked (closeProject)"
+    params:
+      save: { type: "bool", default: false, label: "Save first", description: "Save the project before closing it." }
+      confirm: { type: "enum", values: ["1"], default: "1", label: "Confirm", description: "Always 1, which confirms the close." }
+    send: '{"command":"closeProject","parameters":{"saveProject":{save:bool01},"closeProject":"{confirm}"},"variables":{}}'
+    expect: *success
+    returns: ack
+  check_project_edited:
+    summary: "Read whether the project changed, is cached or customised, and its path (checkProjectEdited)"
+    send: '{"command":"checkProjectEdited","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_current_project:
+    summary: "Read the current project's path and icon (getCurrentProject)"
+    send: '{"command":"getCurrentProject","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_recent_projects:
+    summary: "List recently opened projects with their details (getRecentProjects)"
+    send: '{"command":"getRecentProjects","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  read_project:
+    summary: "Read details of the current project, its channels and titles (readProject)"
+    send: '{"command":"readProject","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  load_playlist:
+    summary: "Load a layer list (.nbplist) onto a channel (loadPlaylist)"
+    params:
+      file: { type: "string", max_length: 1024, required: true, label: "File", description: "Full path of the file on the Captivate computer." }
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+    send: '{"command":"loadPlaylist","parameters":{"file":{file:json},"channel":{channel}},"variables":{}}'
+    expect: *success
+    returns: ack
+  clear_playlist:
+    summary: "Remove every title from a channel (clearPlaylist)"
+    params:
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+    send: '{"command":"clearPlaylist","parameters":{"channel":{channel}},"variables":{}}'
+    expect: *success
+    returns: ack
+  save_playlist:
+    summary: "Save a channel's layer list to an .nbplist file (savePlaylist)"
+    params:
+      file: { type: "string", max_length: 1024, required: true, label: "File", description: "Full path of the file on the Captivate computer." }
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+    send: '{"command":"savePlaylist","parameters":{"file":{file:json},"channel":{channel}},"variables":{}}'
+    expect: *success
+    returns: ack
+  read_playlist:
+    summary: "Read details of a channel's layer list (readPlaylist)"
+    params:
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+    send: '{"command":"readPlaylist","parameters":{"channel":{channel}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_all_video_inputs:
+    summary: "List every video device available as an input (getAllVideoIns)"
+    send: '{"command":"getAllVideoIns","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_video_input_info:
+    summary: "Read a video input's status (getVideoInInfo)"
+    params:
+      video: { type: "string", max_length: 256, required: true, label: "Video input", description: "Name of the video device, as getAllVideoIns lists it." }
+    send: '{"command":"getVideoInInfo","parameters":{"videoIn":{video:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_opened_video_inputs:
+    summary: "List the opened video devices (getOpenedVideoIns)"
+    send: '{"command":"getOpenedVideoIns","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  open_video_input:
+    summary: "Open a video device (openVideoIn)"
+    params:
+      video: { type: "string", max_length: 256, required: true, label: "Video input", description: "Name of the video device, as getAllVideoIns lists it." }
+    send: '{"command":"openVideoIn","parameters":{"video":{video:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  close_video_input:
+    summary: "Close a video device (closeVideoIn)"
+    params:
+      video: { type: "string", max_length: 256, required: true, label: "Video input", description: "Name of the video device, as getAllVideoIns lists it." }
+    send: '{"command":"closeVideoIn","parameters":{"video":{video:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  switch_video_input:
+    summary: "Make a video device active in a channel's switcher (switchVideoIn)"
+    params:
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+      video: { type: "string", max_length: 256, required: true, label: "Video input", description: "Name of the video device, as getAllVideoIns lists it." }
+    send: '{"command":"switchVideoIn","parameters":{"channel":{channel},"video":{video:json}},"variables":{}}'
+    expect: *success
+    returns: ack
+  get_all_audio_inputs:
+    summary: "List every audio device available as an input (getAllAudioIns)"
+    send: '{"command":"getAllAudioIns","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_opened_audio_inputs:
+    summary: "List the opened audio devices and the left and right levels (getOpenedAudioIns)"
+    send: '{"command":"getOpenedAudioIns","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  replay_is_trial:
+    summary: "Read whether Instant Replay runs unlicensed (trial) (replay_is_trial_mode)"
+    send: '{"command":"replay_is_trial_mode","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  replay_enter_playback:
+    summary: "Enter Instant Replay playback mode (replay_enter_playback)"
+    send: '{"command":"replay_enter_playback","parameters":{},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_exit_playback:
+    summary: "Leave Instant Replay playback mode (replay_exit_playback)"
+    send: '{"command":"replay_exit_playback","parameters":{},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_get_settings:
+    summary: "Read the Instant Replay settings (replay_get_settings)"
+    send: '{"command":"replay_get_settings","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  replay_set_settings:
+    summary: "Set the Instant Replay settings (replay_set_settings)"
+    params:
+      settings: { type: "json", required: true, label: "Settings", description: "Settings object as replay_get_settings returns it: armedPortList, bufferLength, muteGraphicsOnReplay, playSpeed, transIn, transOut, usesExternalSwitcher." }
+    send: '{"command":"replay_set_settings","parameters":{"settings":{settings}},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_set_speed:
+    summary: "Set the replay speed (replay_set_replay_speed)"
+    params:
+      speed: { type: "float", min: 0.05, max: 4, required: true, label: "Speed", description: "Replay speed, 1 for real time, 0.5 for half speed." }
+    send: '{"command":"replay_set_replay_speed","parameters":{"speed":{speed:.3f}},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_get_speed:
+    summary: "Read the replay speed (replay_get_replay_speed)"
+    send: '{"command":"replay_get_replay_speed","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  replay_enable:
+    summary: "Start Instant Replay when inputs are armed (replay_enable)"
+    send: '{"command":"replay_enable","parameters":{},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_get_inputs:
+    summary: "List the inputs Instant Replay can use (replay_get_inputs)"
+    send: '{"command":"replay_get_inputs","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  replay_arm_inputs:
+    summary: "Arm inputs and start the replay buffer (replay_arm_inputs)"
+    params:
+      inputs: { type: "json", required: true, label: "Inputs", description: "JSON array of input names, as replay_get_inputs lists them." }
+    send: '{"command":"replay_arm_inputs","parameters":{"inputs":{inputs}},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_disarm_inputs:
+    summary: "Disarm inputs; with none armed Instant Replay stops (replay_disarm_inputs)"
+    params:
+      inputs: { type: "json", required: true, label: "Inputs", description: "JSON array of input names to disarm." }
+    send: '{"command":"replay_disarm_inputs","parameters":{"inputs":{inputs}},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_get_play_info:
+    summary: "Read the replay playback statistics (replay_get_play_info)"
+    send: '{"command":"replay_get_play_info","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  replay_enable_scrubbing:
+    summary: "Turn scrubbing on (leaving recording for replay) or off (replay_enable_scrubbing)"
+    params:
+      enable: { type: "bool", required: true, label: "Scrubbing", description: "true turns scrubbing on and leaves recording mode." }
+    send: '{"command":"replay_enable_scrubbing","parameters":{"enable":{enable}},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_play_pause:
+    summary: "Press the replay play button, in replay mode (replay_play_pause)"
+    send: '{"command":"replay_play_pause","parameters":{},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_set_scrub_position:
+    summary: "Move the scrub position, in replay mode (replay_set_scrub_position)"
+    params:
+      position: { type: "float", min: 0, required: true, label: "Position", description: "Seconds into the replay buffer: 10 is the middle of a 20 s buffer." }
+    send: '{"command":"replay_set_scrub_position","parameters":{"position":{position:.3f}},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_set_in_point:
+    summary: "Set the replay in point (replay_set_in_point)"
+    params:
+      position: { type: "float", min: 0, required: true, label: "Position", description: "Seconds into the replay buffer: 10 is the middle of a 20 s buffer." }
+    send: '{"command":"replay_set_in_point","parameters":{"position":{position:.3f}},"variables":{}}'
+    expect: *success
+    returns: ack
+  replay_set_out_point:
+    summary: "Set the replay out point (replay_set_out_point)"
+    params:
+      position: { type: "float", min: 0, required: true, label: "Position", description: "Seconds into the replay buffer: 10 is the middle of a 20 s buffer." }
+    send: '{"command":"replay_set_out_point","parameters":{"position":{position:.3f}},"variables":{}}'
+    expect: *success
+    returns: ack
+  join_meeting:
+    summary: "Join a Zoom or Teams meeting (joinMeeting)"
+    params:
+      provider: { type: "enum", values: ["zoom", "ms-teams"], required: true, label: "Provider", description: "Meeting service." }
+      meeting: { type: "string", max_length: 256, required: true, label: "Meeting id", description: "Id of the meeting to join." }
+      name: { type: "string", max_length: 256, required: true, label: "Name", description: "Participant name to join as." }
+      password: { type: "string", max_length: 256, default: "", secret: true, label: "Password", description: "Meeting password; empty for none." }
+      show_ui: { type: "bool", default: false, label: "Show UI", description: "Open the meeting application's window." }
+      send_video: { type: "bool", default: false, label: "Send video", description: "Send Captivate's video and audio to the meeting as a virtual camera." }
+    send: '{"command":"joinMeeting","parameters":{"meetingProvider":"{provider}","meetingId":{meeting:json},"name":{name:json},"password":{password:json},"showUI":{show_ui:bool01},"sendVideo":{send_video:bool01}},"variables":{}}'
+    expect: *success
+    returns: ack
+  meeting_status:
+    summary: "Read the current meeting's status (meetingStatus)"
+    send: '{"command":"meetingStatus","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  leave_meeting:
+    summary: "Leave the current meeting (leaveMeeting)"
+    send: '{"command":"leaveMeeting","parameters":{},"variables":{}}'
+    expect: *success
+    returns: ack
+  get_time:
+    summary: "Read the seconds since Captivate started, the clock schedule times use (getTime)"
+    send: '{"command":"getTime","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_stats:
+    summary: "Read statistics of the running instance (getStats)"
+    send: '{"command":"getStats","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_product_info:
+    summary: "Read the product, version, build, licence and API version (getProductInfo)"
+    send: '{"command":"getProductInfo","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_app_global_settings:
+    summary: "Read the global settings, output and registered Live Objects (getAppGlobalSettings)"
+    send: '{"command":"getAppGlobalSettings","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_profile_list:
+    summary: "List every input and profile (getProfileList)"
+    send: '{"command":"getProfileList","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_profile:
+    summary: "Read an input's profile (getProfile)"
+    params:
+      input: { type: "string", max_length: 256, required: true, label: "Input", description: "Full name of an input (data controller), as Captivate lists it." }
+    send: '{"command":"getProfile","parameters":{"input":{input:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  read_title:
+    summary: "Read details of a title and its variables (readTitle)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      verbose: { type: "bool", default: false, label: "Verbose", description: "Extensive information rather than the streamlined result." }
+    send: '{"command":"readTitle","parameters":{"title":{title:json},"verbose":{verbose:bool01}},"variables":{}}'
+    expect: *result
+    returns: value
+  read_all_titles:
+    summary: "Read details of every title on a channel, or every channel (readTitle)"
+    params:
+      channel: { type: "int", min: -1, max: 63, default: -1, label: "Channel", description: "Channel tab numbered from 0 (Channel 1 is 0), or -1 for every channel." }
+    send: '{"command":"readTitle","parameters":{"channel":{channel}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_render_status:
+    summary: "Read a title's render status (getRenderStatus)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"getRenderStatus","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_play_status:
+    summary: "Read a title's play status (getPlayStatus)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"getPlayStatus","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_titles_play_status:
+    summary: "List every title with its input and play status (getTitlesPlayStatus)"
+    params:
+      channel: { type: "int", min: -1, max: 63, default: -1, label: "Channel", description: "Channel tab numbered from 0 (Channel 1 is 0), or -1 for every channel." }
+    send: '{"command":"getTitlesPlayStatus","parameters":{"channel":{channel}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_inputs_play_status:
+    summary: "List every input with its play status (getInputsPlayStatus)"
+    params:
+      channel: { type: "int", min: -1, max: 63, default: -1, label: "Channel", description: "Channel tab numbered from 0 (Channel 1 is 0), or -1 for every channel." }
+    send: '{"command":"getInputsPlayStatus","parameters":{"channel":{channel}},"variables":{}}'
+    expect: *result
+    returns: value
+  is_title_connected:
+    summary: "Read whether any title is connected to one of the inputs (isTitleConnected)"
+    params:
+      channel: { type: "int", min: -1, max: 63, default: -1, label: "Channel", description: "Channel tab numbered from 0 (Channel 1 is 0), or -1 for every channel." }
+      inputs: { type: "string", max_length: 4096, required: true, label: "Inputs", description: "Comma-separated input names." }
+    send: '{"command":"isTitleConnected","parameters":{"channel":{channel},"input":{inputs:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_titles_connected:
+    summary: "List the titles connected to an input (getTitlesConnected)"
+    params:
+      channel: { type: "int", min: -1, max: 63, default: -1, label: "Channel", description: "Channel tab numbered from 0 (Channel 1 is 0), or -1 for every channel." }
+      input: { type: "string", max_length: 256, required: true, label: "Input", description: "Full name of an input (data controller), as Captivate lists it." }
+    send: '{"command":"getTitlesConnected","parameters":{"channel":{channel},"input":{input:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_title_control_info:
+    summary: "Read a title's details, inputs and variables (getTitleControlInfo)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"getTitleControlInfo","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_all_title_control_info:
+    summary: "Read every title's details, inputs and variables (getTitleControlInfo)"
+    send: '{"command":"getTitleControlInfo","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_timeline_duration:
+    summary: "Read the duration of a title's graphic timeline (getTimelineDuration)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+    send: '{"command":"getTimelineDuration","parameters":{"title":{title:json}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_subscriptions:
+    summary: "List the notification subscriptions (getSubscriptions)"
+    send: '{"command":"getSubscriptions","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  list_commands:
+    summary: "List every command Captivate offers (listCommands)"
+    send: '{"command":"listCommands","parameters":{},"variables":{}}'
+    expect: *result
+    returns: value
+  get_title_icon:
+    summary: "Render a title to a PNG icon of the size asked (getTitleIcon)"
+    params:
+      title: { type: "string", max_length: 256, required: true, label: "Title", description: "Title (graphic layer) by its name in the project list or its id in braces, {218f46f9-...}." }
+      width: { type: "int", min: 1, max: 7680, required: true, label: "Width", description: "Image width in pixels." }
+      height: { type: "int", min: 1, max: 4320, required: true, label: "Height", description: "Image height in pixels." }
+    send: '{"command":"getTitleIcon","parameters":{"title":{title:json},"width":{width},"height":{height}},"variables":{}}'
+    expect: *result
+    returns: value
+  get_monitor_frame:
+    summary: "Render a channel's program output to a JPEG, base64 in image (getMonitorFrame)"
+    params:
+      channel: { type: "int", min: 0, max: 63, required: true, label: "Channel", description: "Channel tab, numbered from 0 left to right (the tab labelled Channel 1 is 0)." }
+      width: { type: "int", min: 1, max: 7680, required: true, label: "Width", description: "Image width in pixels." }
+      height: { type: "int", min: 1, max: 4320, required: true, label: "Height", description: "Image height in pixels." }
+    send: '{"command":"getMonitorFrame","parameters":{"channel":{channel},"width":{width},"height":{height}},"variables":{}}'
+    expect: *result
+    returns: value
+
+telemetry:
+  # Sent at once on connecting: a client that sends first is not subscribed
+  # to notifications until it sends subscribe (with empty parameters).
+  subscribe:
+    send: ['{"command":"subscribe","parameters":{},"variables":{}}']
+  poll:
+    - every_ms: 5000
+      send: ['{"command":"getTitleControlInfo","parameters":{},"variables":{}}']
+    - every_ms: 30000
+      send:
+        - '{"command":"getProductInfo","parameters":{},"variables":{}}'
+        - '{"command":"getVideoFormat","parameters":{},"variables":{}}'
+        - '{"command":"getOutputDevice","parameters":{},"variables":{}}'
+        - '{"command":"checkProjectEdited","parameters":{},"variables":{}}'
+        - '{"command":"readProject","parameters":{},"variables":{}}'
+  updates:
+    # Every title, with its variables (getTitleControlInfo).
+    - json_match: { "$.result.command": "^getTitleControlInfo$", "$.result.titles": "^\\[" }
+      json_each: "$.result.titles"
+      json: { id: "$.id", name: "$.name", channel: "$.channel", input: "$.input", play: "$.playStatus",
+              status: "$.status", progress: "$.renderProgress", type: "$.type" }
+      replace: titles
+      state:
+        "titles.{id:key}.name": "{name}"
+        "titles.{id:key}.channel": "{channel}"
+        "titles.{id:key}.input": "{input}"
+        "titles.{id:key}.play_status": "{play}"
+        "titles.{id:key}.render_status": "{status}"
+        "titles.{id:key}.render_progress": "{progress}"
+        "titles.{id:key}.type": "{type}"
+    - json_match: { "$.result.command": "^getTitleControlInfo$" }
+      json_each: "$.result.titles[*].variables"
+      json: { id: "$^.id", variable: "$.variable", value: "$.value" }
+      state: { "titles.{id:key}.variables.{variable:key}": "{value}" }
+    # A title's play state, pushed as it changes.
+    - json_match: { "$.notification.event": "^play$", "$.notification.id": "^\\{" }
+      json: { id: "$.notification.id", play: "$.notification.play" }
+      state: { "titles.{id:key}.play_status": "{play}" }
+    - json_match: { "$.result.command": "^getProductInfo$" }
+      json: { product: "$.result.product", version: "$.result.version", api: "$.result.api_version",
+              licensed: "$.result.licensed", sku: "$.result.sku", build: "$.result.buildDate" }
+      state:
+        system.product: "{product}"
+        system.version: "{version}"
+        system.api_version: "{api}"
+        system.licensed: "{licensed}"
+        system.sku: "{sku}"
+        system.build_date: "{build}"
+    - json_match: { "$.result.command": "^getVideoFormat$" }
+      json: { width: "$.result.width", height: "$.result.height", rate: "$.result.frameRate", interlaced: "$.result.interlaced" }
+      state:
+        video_format.width: "{width}"
+        video_format.height: "{height}"
+        video_format.frame_rate: "{rate}"
+        video_format.interlaced: { value: "{interlaced}", map: { "0": false, "1": true } }
+    - json_match: { "$.result.command": "^getOutputDevice$" }
+      json: { device: "$.result.device" }
+      state: { output.device: "{device}" }
+    - json_match: { "$.result.command": "^checkProjectEdited$" }
+      json: { path: "$.result.filePath", changed: "$.result.hasChanged", cached: "$.result.isCached",
+              customized: "$.result.isCustomized", library: "$.result.isLibraryScene" }
+      state:
+        project.file: "{path}"
+        project.changed: { value: "{changed}", map: { "0": false, "1": true } }
+        project.cached: { value: "{cached}", map: { "0": false, "1": true } }
+        project.customized: { value: "{customized}", map: { "0": false, "1": true } }
+        project.library_scene: { value: "{library}", map: { "0": false, "1": true } }
+    - json_match: { "$.result.command": "^readProject$" }
+      json_each: "$.result.project[*].playlist"
+      json: { channel: "$.channel", name: "$.name" }
+      replace: channels
+      state: { "channels.{channel}.name": "{name}" }
+
+state:
+  titles.*.name: { type: string, description: "Title (graphic layer) name, keyed by title id with its braces" }
+  titles.*.channel: { type: int, description: "Channel the title is on, numbered from 0" }
+  titles.*.input: { type: string, description: "Input (data controller) connected to the title; empty for none" }
+  titles.*.play_status: { type: string, description: "Play status in Captivate's words, such as Off or Running" }
+  titles.*.render_status: { type: string, description: "Render status in Captivate's words, such as Done" }
+  titles.*.render_progress: { type: float, description: "Render progress, 0 to 1" }
+  titles.*.type: { type: string, description: "Layer type, such as title" }
+  titles.*.variables.*: { type: string, description: "Each title variable's value, keyed by variable name" }
+  system.product: { type: string, description: "Product name, such as Captivate" }
+  system.version: { type: string, description: "Product version" }
+  system.api_version: { type: string, description: "API version, a date such as 250721" }
+  system.licensed: { type: bool, description: "Whether the product is licensed" }
+  system.sku: { type: string, description: "Product SKU" }
+  system.build_date: { type: string, description: "Build date, such as Feb 21 2025" }
+  video_format.width: { type: int, unit: px, description: "Project frame width" }
+  video_format.height: { type: int, unit: px, description: "Project frame height" }
+  video_format.frame_rate: { type: float, unit: fps, description: "Project frame rate" }
+  video_format.interlaced: { type: bool, description: "Whether the project format is interlaced" }
+  output.device: { type: string, description: "Output device, such as NDI" }
+  project.file: { type: string, description: "Path of the current project file; empty when never saved" }
+  project.changed: { type: bool, description: "Whether the project has unsaved changes" }
+  project.cached: { type: bool, description: "Whether the project is cached" }
+  project.customized: { type: bool, description: "Whether the project was customised" }
+  project.library_scene: { type: bool, description: "Whether the project came from the library" }
+  channels.*.name: { type: string, description: "Name of each channel tab, keyed by channel index from 0" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Channels are numbered from 0 left to right whatever their names: the tab
+      labelled Channel 1 is channel 0, as the API counts them; state keys
+      channels the same way. Titles are named by their name in the project
+      list or their id in braces; ids are steadier, and state is keyed by id.
+  - models: [all]
+    severity: info
+    text: >
+      State comes from the play notifications Captivate pushes on the socket
+      after subscribe, and from polls: the titles with their variables every
+      5 s, the product, video format, output device, project and channels
+      every 30 s. Data notifications are received but their shape is not
+      documented, so variable changes are read from the poll. A command
+      succeeds when the reply's result has success true; the reply's error
+      field explains a failure.
+  - models: [all]
+    severity: info
+    text: >
+      Left out: the helper commands Captivate offers to data controllers
+      running beside it, which act on the Captivate computer rather than on
+      graphics (fetchUrl, getFileContent, setFileContent, getDirectoryContent,
+      runDbQuery, convertToJson, encodeImage, downloadImage, openUrl,
+      openFileDialog, openDirectoryDialog), getReport (user e-mail and machine
+      id), getSnapShot, getPreviewFrame and getVideoFrame (images delivered
+      as files or notifications), the deprecated XML command form and
+      setProfile, which is XML-only.
+  - models: [all]
+    severity: critical
+    text: >
+      load_project and close_project replace or close the open project;
+      clear_playlist and delete_title remove titles; set_video_format changes
+      the project's format live.
+  - models: [all]
+    severity: info
+    text: >
+      The HTTP port (9022) and websocket port can be moved with the httpPort
+      and webSocketPort registry or preference settings; the TCP port 9025 is
+      fixed in the documents. Captivate must not find a port in use when it
+      starts, or that API does not start.

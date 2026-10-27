@@ -2479,6 +2479,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how negative lens travel times and half-second values are written ("lens focus time -1.5"). ([specs/nec-projector-ascii.yaml:246](specs/nec-projector-ascii.yaml#L246))
 - [ ] Confirm the NORMAL standby mode refuses ASCII commands on the network on other models. ([specs/nec-projector-ascii.yaml:435](specs/nec-projector-ascii.yaml#L435))
 
+## newblue-captivate — NewBlue Captivate / Titler Live
+
+- [ ] Check that subscribe with empty parameters, sent at once on connecting, starts the notification stream on the TCP socket. ([specs/newblue-captivate.yaml:811](specs/newblue-captivate.yaml#L811))
+- [ ] Record a data notification (event data) so variable changes can be read from the push instead of the poll. ([specs/newblue-captivate.yaml:924](specs/newblue-captivate.yaml#L924))
+- [ ] Confirm a failed command answers with result.success false (and an error field) rather than an error reply, for macro and setTitleName with an unknown title. ([specs/newblue-captivate.yaml:926](specs/newblue-captivate.yaml#L926))
+- [ ] Check whether boolean-like flags (merge, autoCache) are accepted as the text "1" and setDynamic, verbose, showUI and sendVideo as the number 1, as the document types them. ([specs/newblue-captivate.yaml:214](specs/newblue-captivate.yaml#L214))
+- [ ] Confirm getTitleControlInfo with empty parameters lists every title, and that its reply carries result.command. ([specs/newblue-captivate.yaml:826](specs/newblue-captivate.yaml#L826))
+- [ ] Confirm saveSettings answers {"result": null} on success and what it answers on failure. ([specs/newblue-captivate.yaml:166](specs/newblue-captivate.yaml#L166))
+
 ## newtek-3play — NewTek / Vizrt 3Play
 
 - [ ] Record the shortcuts a 3Play's macro recorder shows for replay operations (mark in and out, cue, play on outputs A and B, play speed, play lists, recording), so they can become typed commands. ([specs/newtek-3play.yaml:258](specs/newtek-3play.yaml#L258))
