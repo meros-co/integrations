@@ -1,0 +1,913 @@
+spec: 1
+id: vaddio-roboshot
+name: Vaddio RoboSHOT PTZ cameras (Telnet API)
+vendor: Vaddio
+category: camera
+
+# Vaddio's RoboSHOT cameras take a text command line over Telnet on TCP 23:
+# the administrator logs in at the login: and Password: prompts, each command
+# is a line, and the camera answers with any data lines, OK, and its ">"
+# prompt. Each answer is read up to that prompt. Telnet is off by default on
+# firmware from mid-December 2019 on and is turned on on the Security page of
+# the camera's web interface.
+
+source:
+  - title: Complete Manual for RoboSHOT 12E NDI and RoboSHOT 30E NDI High-Performance PTZ Cameras (411-0038-30 Rev. B)
+    author: Legrand AV (Vaddio)
+    url: https://inquirecontent2.ingrammicro.com/User-Manual/1064158385.pdf
+    note: >
+      Manufacturer manual, November 2020 (a distributor's copy of the document Vaddio publishes at
+      legrandav.com), read 2026-10-27. Telnet Command Reference p.49-63: port 23, administrator
+      login, Telnet off by default after mid-December 2019, ">" prompt; camera home, pan and tilt
+      (left/right/up/down with speed 1-24 and 1-20, stop, get, set in degrees, with a speed), zoom
+      (in/out speed 1-7, stop, get, set as a float with a speed), ptz-position with no_wait, focus
+      (near/far speed 1-8, stop, mode get/auto/manual), preset recall/store 1-16 with tri-sync 1-24
+      and save-ccu, ccu scene, ccu get (iris 0-13, gain 1-11) and ccu set, led, standby, network
+      settings get, network ping, system reboot, system factory-reset, version, history, help, exit.
+  - title: Complete Manual for RoboSHOT 20 UHD and RoboSHOT 40 UHD Professional PTZ Cameras (411-0028-30 Rev. C)
+    author: Legrand AV (Vaddio)
+    url: https://zoro.com/static/cms/enhanced_pdf/AB%20Distributing%20Inc_247e51a69d544e9d6c99ee32ed6639e7xxc73b5e.pdf
+    note: >
+      Manufacturer manual, January 2019 (a distributor's copy), read 2026-10-27. Telnet Command
+      Reference p.56-71: as above without ptz-position and with zoom set as an integer, iris and gain
+      0-11, wide_dynamic_range not on the 20 UHD; video mute get/on/off/toggle (answer "mute: off");
+      streaming settings get (IP Custom_Frame_Rate, Custom_Resolution, Enabled, MTU, Port,
+      Preset_Quality, Preset_Resolution, Protocol, URL, Video_Mode); streaming ip enable
+      get/on/off/toggle on the 40 UHD only (answer "enabled: true", the prompt shown before OK).
+  - title: Complete Manual for RoboSHOT HD-SDI and RoboSHOT SDI cameras (411-0027-30 Rev. C)
+    author: Legrand AV (Vaddio)
+    url: https://zoro.com/static/cms/enhanced_pdf/AB%20Distributing%20Inc_fb676dc8721454e1b060f336dd04ccfbxx569bdf.pdf
+    note: >
+      Manufacturer manual, May 2019 (a distributor's copy), read 2026-10-27, covering the RoboSHOT 12
+      and 30 HD-SDI and 12E and 30E SDI. Telnet Command Reference p.61-75: the base commands with zoom
+      set as a float, iris and gain 0-11, gamma -64 to 64, streaming ip enable and streaming settings
+      get.
+  - title: Complete Manual for RoboSHOT CAT-5 Professional PTZ Camera Systems (411-0025-30 Rev. D)
+    author: Legrand AV (Vaddio)
+    url: https://inquirecontent2.ingrammicro.com/User-Manual/1062675940.pdf
+    note: >
+      Manufacturer manual, May 2019 (a distributor's copy), read 2026-10-27, covering the RoboSHOT
+      QCCU, QUSB, QMini, QDVI, QSR and AVBMP systems. Telnet Command Reference p.89-101: the base
+      commands with zoom set as a float, iris and gain 0-11, no gamma; with an AV Bridge MATRIX PRO
+      the session is with the bridge, whose commands name camera 1-3.
+  - title: Complete Manual for the RoboSHOT IW Architectural PTZ Conferencing Camera (411-0016-30 Rev. B)
+    author: Legrand AV (Vaddio)
+    url: https://inquirecontent2.ingrammicro.com/User-Manual/1062713017.pdf
+    note: >
+      Manufacturer manual, September 2018 (a distributor's copy), read 2026-10-27. Telnet Command
+      Reference p.39-55: the base commands with zoom set as an integer, preset store without tri-sync,
+      no gamma; camera glass mode get/set/toggle and glass state get/set/toggle (answer "frosted"),
+      camera resolution get/set (answer "720p/59.94" in quotes) with the eleven listed formats,
+      camera recalibrate, streaming settings get.
+  - title: companion-module-vaddio-ptz (MIT licence)
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-vaddio-ptz
+    note: >
+      Read for corroboration only (src/index.js), retrieved 2026-10-27: the login answers a
+      "login:" prompt (either case) with the user name and a "Password:" prompt with the password,
+      the camera then greets "Welcome <user>" and shows ">", and the default account is admin.
+      No code taken.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  # An answer is everything up to the ">" prompt: the echoed command, any
+  # data lines and OK.
+  reply_framing: terminated
+  reply_terminators: [">"]
+  reply_match: '>$'
+  timeout_ms: 15000
+  probe: "version"
+
+on_connect:
+  - { after_prompt: "ogin:", send: "{settings.username}" }
+  - { after_prompt: "assword:", send: "{settings.password}", await_reply: true }
+
+settings:
+  username: { type: string, default: admin, label: Username,
+              description: "The camera's administrator account, which Telnet sessions need." }
+  password: { type: string, secret: true, default: password, label: Password,
+              description: "The administrator password set on the camera's web interface." }
+
+ports:
+  - { port: 23, protocol: tcp, role: control, note: "Telnet; turned on on the camera's Security page" }
+
+models:
+  - id: roboshot-ndi
+    name: Vaddio RoboSHOT 12E NDI / 30E NDI
+    supports: [home, pan_left, pan_right, pan_stop, pan_to, pan_to_at_speed, get_pan, tilt_up, tilt_down, tilt_stop,
+               tilt_to, tilt_to_at_speed, get_tilt, zoom_in, zoom_out, zoom_stop, zoom_to, zoom_to_at_speed, get_zoom,
+               move_to, move_to_no_wait, focus_near, focus_far, focus_stop, focus_auto, focus_manual, get_focus_mode,
+               recall_preset, store_preset, store_preset_tri_sync, store_preset_with_ccu,
+               store_preset_tri_sync_with_ccu, recall_factory_scene, recall_custom_scene, store_custom_scene,
+               get_ccu, get_ccu_all, set_auto_white_balance, set_red_gain, set_blue_gain, set_backlight_compensation,
+               set_auto_iris, set_iris_ndi, set_gain_ndi, set_detail, set_chroma, set_gamma, set_wide_dynamic_range,
+               set_led, get_led, standby_on, standby_off, standby_toggle, get_standby, get_network_settings, ping,
+               reboot, reboot_in, get_factory_reset, set_factory_reset, get_version]
+    verification: none
+  - id: roboshot-40-uhd
+    name: Vaddio RoboSHOT 40 UHD
+    supports: &uhd [home, pan_left, pan_right, pan_stop, pan_to, get_pan, tilt_up, tilt_down, tilt_stop, tilt_to, get_tilt,
+               zoom_in, zoom_out, zoom_stop, zoom_to_step, get_zoom, focus_near, focus_far, focus_stop, focus_auto,
+               focus_manual, get_focus_mode, recall_preset, store_preset, store_preset_tri_sync, store_preset_with_ccu,
+               store_preset_tri_sync_with_ccu, recall_factory_scene, recall_custom_scene, store_custom_scene, get_ccu,
+               get_ccu_all, set_auto_white_balance, set_red_gain, set_blue_gain, set_backlight_compensation,
+               set_auto_iris, set_iris, set_gain, set_detail, set_chroma, set_gamma, set_wide_dynamic_range, set_led,
+               get_led, standby_on, standby_off, standby_toggle, get_standby, video_mute_on, video_mute_off,
+               video_mute_toggle, get_video_mute, get_streaming_settings, streaming_on, streaming_off,
+               streaming_toggle, get_streaming, get_network_settings, ping, reboot, reboot_in, get_factory_reset,
+               set_factory_reset, get_version]
+    verification: none
+  - id: roboshot-20-uhd
+    name: Vaddio RoboSHOT 20 UHD
+    supports: [home, pan_left, pan_right, pan_stop, pan_to, get_pan, tilt_up, tilt_down, tilt_stop, tilt_to, get_tilt,
+               zoom_in, zoom_out, zoom_stop, zoom_to_step, get_zoom, focus_near, focus_far, focus_stop, focus_auto,
+               focus_manual, get_focus_mode, recall_preset, store_preset, store_preset_tri_sync, store_preset_with_ccu,
+               store_preset_tri_sync_with_ccu, recall_factory_scene, recall_custom_scene, store_custom_scene, get_ccu,
+               get_ccu_all, set_auto_white_balance, set_red_gain, set_blue_gain, set_backlight_compensation,
+               set_auto_iris, set_iris, set_gain, set_detail, set_chroma, set_gamma, set_led, get_led, standby_on,
+               standby_off, standby_toggle, get_standby, video_mute_on, video_mute_off, video_mute_toggle,
+               get_video_mute, get_streaming_settings, get_network_settings, ping, reboot, reboot_in,
+               get_factory_reset, set_factory_reset, get_version]
+    verification: none
+    notes: >
+      No wide dynamic range; streaming ip enable is documented for the 40 UHD only.
+  - id: roboshot-sdi
+    name: Vaddio RoboSHOT 12/30 HD-SDI and 12E/30E SDI
+    supports: [home, pan_left, pan_right, pan_stop, pan_to, get_pan, tilt_up, tilt_down, tilt_stop, tilt_to, get_tilt,
+               zoom_in, zoom_out, zoom_stop, zoom_to, get_zoom, focus_near, focus_far, focus_stop, focus_auto,
+               focus_manual, get_focus_mode, recall_preset, store_preset, store_preset_tri_sync, store_preset_with_ccu,
+               store_preset_tri_sync_with_ccu, recall_factory_scene, recall_custom_scene, store_custom_scene, get_ccu,
+               get_ccu_all, set_auto_white_balance, set_red_gain, set_blue_gain, set_backlight_compensation,
+               set_auto_iris, set_iris, set_gain, set_detail, set_chroma, set_gamma, set_wide_dynamic_range, set_led,
+               get_led, standby_on, standby_off, standby_toggle, get_standby, get_streaming_settings, streaming_on,
+               streaming_off, streaming_toggle, get_streaming, get_network_settings, ping, reboot, reboot_in,
+               get_factory_reset, set_factory_reset, get_version]
+    verification: none
+  - id: roboshot-cat5
+    name: Vaddio RoboSHOT CAT-5 systems (QCCU, QUSB, QMini, QDVI, QSR)
+    supports: [home, pan_left, pan_right, pan_stop, pan_to, get_pan, tilt_up, tilt_down, tilt_stop, tilt_to, get_tilt,
+               zoom_in, zoom_out, zoom_stop, zoom_to, get_zoom, focus_near, focus_far, focus_stop, focus_auto,
+               focus_manual, get_focus_mode, recall_preset, store_preset, store_preset_tri_sync, store_preset_with_ccu,
+               store_preset_tri_sync_with_ccu, recall_factory_scene, recall_custom_scene, store_custom_scene, get_ccu,
+               get_ccu_all, set_auto_white_balance, set_red_gain, set_blue_gain, set_backlight_compensation,
+               set_auto_iris, set_iris, set_gain, set_detail, set_chroma, set_wide_dynamic_range, set_led, get_led,
+               standby_on, standby_off, standby_toggle, get_standby, get_network_settings, ping, reboot, reboot_in,
+               get_factory_reset, set_factory_reset, get_version]
+    verification: none
+    notes: >
+      The AVBMP system's Telnet session is with its AV Bridge MATRIX PRO, whose camera commands name
+      camera 1-3; it is not covered here.
+  - id: roboshot-iw
+    name: Vaddio RoboSHOT IW
+    supports: [home, pan_left, pan_right, pan_stop, pan_to, get_pan, tilt_up, tilt_down, tilt_stop, tilt_to, get_tilt,
+               zoom_in, zoom_out, zoom_stop, zoom_to_step, get_zoom, focus_near, focus_far, focus_stop, focus_auto,
+               focus_manual, get_focus_mode, recall_preset, store_preset, store_preset_with_ccu, recall_factory_scene,
+               recall_custom_scene, store_custom_scene, get_ccu, get_ccu_all, set_auto_white_balance, set_red_gain,
+               set_blue_gain, set_backlight_compensation, set_auto_iris, set_iris, set_gain, set_detail, set_chroma,
+               set_wide_dynamic_range, set_led, get_led, standby_on, standby_off, standby_toggle, get_standby,
+               set_glass_mode, toggle_glass_mode, get_glass_mode, set_glass_state, toggle_glass_state,
+               get_glass_state, set_resolution, get_resolution, recalibrate, get_streaming_settings,
+               get_network_settings, ping, reboot, reboot_in, get_factory_reset, set_factory_reset, get_version]
+    verification: none
+
+commands:
+  # ── Movement ─────────────────────────────────────────────────────────────
+  home:
+    summary: Move to the home position
+    send: "camera home"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  pan_left:
+    summary: Pan left until pan_stop
+    params:
+      speed: &pan_speed { type: int, min: 1, max: 24, default: 12, label: Pan speed, description: "Pan speed, 1 (slowest) to 24 (fastest); 12 is the camera's default." }
+    send: "camera pan left {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  pan_right:
+    summary: Pan right until pan_stop
+    params: { speed: *pan_speed }
+    send: "camera pan right {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  pan_stop:
+    summary: Stop panning
+    send: "camera pan stop"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  pan_to:
+    summary: Pan to an angle in degrees (the camera answers when it gets there)
+    params:
+      degrees: &pan_deg { type: float, min: -170, max: 170, required: true, label: Pan,
+                          description: "Pan angle in degrees, about -150 (left) to 150 (right); a camera may travel a degree or two further." }
+    send: "camera pan set {degrees:.2f}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  pan_to_at_speed:
+    summary: Pan to an angle at a speed
+    params: { degrees: *pan_deg, speed: *pan_speed }
+    send: "camera pan set {degrees:.2f} {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  get_pan:
+    summary: Read the pan angle in degrees
+    send: "camera pan get"
+    expect: { matches: '(?m)^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*$' }
+    returns: value
+  tilt_up:
+    summary: Tilt up until tilt_stop
+    params:
+      speed: &tilt_speed { type: int, min: 1, max: 20, default: 10, label: Tilt speed, description: "Tilt speed, 1 (slowest) to 20 (fastest); 10 is the camera's default." }
+    send: "camera tilt up {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  tilt_down:
+    summary: Tilt down until tilt_stop
+    params: { speed: *tilt_speed }
+    send: "camera tilt down {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  tilt_stop:
+    summary: Stop tilting
+    send: "camera tilt stop"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  tilt_to:
+    summary: Tilt to an angle in degrees (the camera answers when it gets there)
+    params:
+      degrees: &tilt_deg { type: float, min: -92, max: 92, required: true, label: Tilt,
+                           description: "Tilt angle in degrees, about -30 (down) to 90 (up), or -90 to 30 with the image flipped." }
+    send: "camera tilt set {degrees:.2f}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  tilt_to_at_speed:
+    summary: Tilt to an angle at a speed
+    params: { degrees: *tilt_deg, speed: *tilt_speed }
+    send: "camera tilt set {degrees:.2f} {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  get_tilt:
+    summary: Read the tilt angle in degrees
+    send: "camera tilt get"
+    expect: { matches: '(?m)^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*$' }
+    returns: value
+  zoom_in:
+    summary: Zoom in until zoom_stop
+    params:
+      speed: &zoom_speed { type: int, min: 1, max: 7, default: 3, label: Zoom speed, description: "Zoom speed, 1 (slowest) to 7 (fastest); 3 is the camera's default." }
+    send: "camera zoom in {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  zoom_out:
+    summary: Zoom out until zoom_stop
+    params: { speed: *zoom_speed }
+    send: "camera zoom out {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  zoom_stop:
+    summary: Stop zooming
+    send: "camera zoom stop"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  zoom_to:
+    summary: Zoom to a magnification, 1.00 up to the lens's maximum (the camera answers when it gets there)
+    params:
+      zoom: &zoom_float { type: float, min: 1, max: 40, required: true, label: Zoom,
+                          description: "Zoom magnification from 1.00 to the camera's maximum: 12 for a 12x camera, 30 for a 30x." }
+    send: "camera zoom set {zoom:.2f}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  zoom_to_at_speed:
+    summary: Zoom to a magnification at a speed
+    params: { zoom: *zoom_float, speed: *zoom_speed }
+    send: "camera zoom set {zoom:.2f} {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  zoom_to_step:
+    summary: Zoom to a whole-number magnification, 1 up to the lens's maximum
+    params:
+      zoom: { type: int, min: 1, max: 40, required: true, label: Zoom,
+              description: "Zoom magnification as a whole number from 1 to the camera's maximum: 12 for a 12x camera." }
+    send: "camera zoom set {zoom}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  get_zoom:
+    summary: Read the zoom magnification
+    send: "camera zoom get"
+    expect: { matches: '(?m)^\s*([0-9]+(?:\.[0-9]+)?)\s*$' }
+    returns: value
+  move_to:
+    summary: Move pan, tilt and zoom to a position together (the camera answers when it gets there)
+    params:
+      pan: &ptz_pan { type: float, min: -170, max: 170, required: true, label: Pan, description: "Pan angle in degrees, about -160 to 160." }
+      tilt: &ptz_tilt { type: float, min: -92, max: 92, required: true, label: Tilt, description: "Tilt angle in degrees, about -30 to 90." }
+      zoom: &ptz_zoom { type: float, min: 1, max: 30, required: true, label: Zoom, description: "Zoom magnification, 1.0 to 12.0 on a 12x camera or 30.0 on a 30x." }
+    send: "camera ptz-position pan {pan:.2f} tilt {tilt:.2f} zoom {zoom:.2f}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  move_to_no_wait:
+    summary: Move pan, tilt and zoom to a position together, answering at once
+    params: { pan: *ptz_pan, tilt: *ptz_tilt, zoom: *ptz_zoom }
+    send: "camera ptz-position pan {pan:.2f} tilt {tilt:.2f} zoom {zoom:.2f} no_wait"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+
+  # ── Focus ────────────────────────────────────────────────────────────────
+  focus_near:
+    summary: Focus nearer until focus_stop (manual focus only)
+    params:
+      speed: &focus_speed { type: int, min: 1, max: 8, default: 4, label: Focus speed, description: "Focus speed, 1 (slowest) to 8 (fastest)." }
+    send: "camera focus near {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  focus_far:
+    summary: Focus farther until focus_stop (manual focus only)
+    params: { speed: *focus_speed }
+    send: "camera focus far {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  focus_stop:
+    summary: Stop focusing
+    send: "camera focus stop"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  focus_auto:
+    summary: Use auto focus
+    send: ["camera focus mode auto", "camera focus mode get"]
+    expect: { matches: '(?m)^\s*(?:OK|auto_focus:.*)\s*$' }
+    returns: ack
+  focus_manual:
+    summary: Use manual focus
+    send: ["camera focus mode manual", "camera focus mode get"]
+    expect: { matches: '(?m)^\s*(?:OK|auto_focus:.*)\s*$' }
+    returns: ack
+  get_focus_mode:
+    summary: Read whether auto focus is on
+    send: "camera focus mode get"
+    expect: { matches: '(?m)^\s*auto_focus:\s*(on|off)\s*$' }
+    returns: value
+
+  # ── Presets and CCU scenes ───────────────────────────────────────────────
+  recall_preset:
+    summary: Move to a preset, with its tri-sync speed and CCU settings when stored with them
+    params:
+      preset: &preset { type: int, min: 1, max: 16, required: true, label: Preset, description: "Preset number, 1 to 16." }
+    send: "camera preset recall {preset}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  store_preset:
+    summary: Store the current position as a preset
+    params: { preset: *preset }
+    send: "camera preset store {preset}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  store_preset_tri_sync:
+    summary: Store the current position as a preset recalled with Tri-Synchronous Motion at a speed
+    params:
+      preset: *preset
+      speed: &tri_sync { type: int, min: 1, max: 24, required: true, label: Tri-sync speed, description: "Tri-Synchronous Motion speed for the recall, 1 to 24." }
+    send: "camera preset store {preset} tri-sync {speed}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  store_preset_with_ccu:
+    summary: Store the current position and CCU settings as a preset
+    params: { preset: *preset }
+    send: "camera preset store {preset} save-ccu"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  store_preset_tri_sync_with_ccu:
+    summary: Store the current position and CCU settings as a preset recalled with Tri-Synchronous Motion
+    params: { preset: *preset, speed: *tri_sync }
+    send: "camera preset store {preset} tri-sync {speed} save-ccu"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  recall_factory_scene:
+    summary: Recall a factory CCU scene, then read the CCU settings back
+    params:
+      scene: { type: int, min: 1, max: 6, required: true, label: Factory scene, description: "Factory CCU scene, 1 to 6." }
+    send: ["camera ccu scene recall factory {scene}", "camera ccu get all"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  recall_custom_scene:
+    summary: Recall a custom CCU scene, then read the CCU settings back
+    params:
+      scene: &custom_scene { type: int, min: 1, max: 3, required: true, label: Custom scene, description: "Custom CCU scene, 1 to 3." }
+    send: ["camera ccu scene recall custom {scene}", "camera ccu get all"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  store_custom_scene:
+    summary: Store the current CCU settings as a custom scene
+    params: { scene: *custom_scene }
+    send: "camera ccu scene store custom {scene}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+
+  # ── CCU (lighting and color) ─────────────────────────────────────────────
+  get_ccu:
+    summary: Read one CCU setting
+    params:
+      setting: { type: enum, values: [auto_white_balance, red_gain, blue_gain, backlight_compensation, auto_iris, iris, gain, detail, chroma, gamma, wide_dynamic_range],
+                 required: true, label: Setting, description: "CCU setting to read." }
+    send: "camera ccu get {setting}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: text
+  get_ccu_all:
+    summary: Read every CCU setting
+    send: "camera ccu get all"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: text
+  set_auto_white_balance:
+    summary: Turn auto white balance on or off (on overrides the red and blue gains)
+    params:
+      enabled: { type: bool, required: true, label: Auto white balance, description: "On balances white automatically, off uses the red and blue gains." }
+    send: ["camera ccu set auto_white_balance {enabled:map.on_off}", "camera ccu get auto_white_balance"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_red_gain:
+    summary: Set the red gain, 0 to 255 (auto white balance off)
+    params:
+      gain: { type: int, min: 0, max: 255, required: true, label: Red gain, description: "Red gain, 0 to 255." }
+    send: ["camera ccu set red_gain {gain}", "camera ccu get red_gain"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_blue_gain:
+    summary: Set the blue gain, 0 to 255 (auto white balance off)
+    params:
+      gain: { type: int, min: 0, max: 255, required: true, label: Blue gain, description: "Blue gain, 0 to 255." }
+    send: ["camera ccu set blue_gain {gain}", "camera ccu get blue_gain"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_backlight_compensation:
+    summary: Turn backlight compensation on or off (wide dynamic range off)
+    params:
+      enabled: { type: bool, required: true, label: Backlight compensation, description: "On compensates for a bright background." }
+    send: ["camera ccu set backlight_compensation {enabled:map.on_off}", "camera ccu get backlight_compensation"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_auto_iris:
+    summary: Turn auto iris on or off (on also sets the gain automatically)
+    params:
+      enabled: { type: bool, required: true, label: Auto iris, description: "On sets iris and gain automatically, off uses the iris and gain settings." }
+    send: ["camera ccu set auto_iris {enabled:map.on_off}", "camera ccu get auto_iris"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_iris:
+    summary: Set the iris, 0 to 11 (auto iris off)
+    params:
+      iris: { type: int, min: 0, max: 11, required: true, label: Iris, description: "Iris setting, 0 to 11." }
+    send: ["camera ccu set iris {iris}", "camera ccu get iris"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_iris_ndi:
+    summary: Set the iris, 0 to 13 (auto iris off)
+    params:
+      iris: { type: int, min: 0, max: 13, required: true, label: Iris, description: "Iris setting, 0 to 13." }
+    send: ["camera ccu set iris {iris}", "camera ccu get iris"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_gain:
+    summary: Set the gain, 0 to 11 (auto iris off)
+    params:
+      gain: { type: int, min: 0, max: 11, required: true, label: Gain, description: "Gain setting, 0 to 11." }
+    send: ["camera ccu set gain {gain}", "camera ccu get gain"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_gain_ndi:
+    summary: Set the gain, 1 to 11 (auto iris off)
+    params:
+      gain: { type: int, min: 1, max: 11, required: true, label: Gain, description: "Gain setting, 1 to 11." }
+    send: ["camera ccu set gain {gain}", "camera ccu get gain"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_detail:
+    summary: Set the detail (sharpness), 0 to 15
+    params:
+      detail: { type: int, min: 0, max: 15, required: true, label: Detail, description: "Detail setting, 0 to 15." }
+    send: ["camera ccu set detail {detail}", "camera ccu get detail"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_chroma:
+    summary: Set the chroma (color saturation), 0 to 14
+    params:
+      chroma: { type: int, min: 0, max: 14, required: true, label: Chroma, description: "Chroma setting, 0 to 14." }
+    send: ["camera ccu set chroma {chroma}", "camera ccu get chroma"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_gamma:
+    summary: Set the gamma, -64 to 64
+    params:
+      gamma: { type: int, min: -64, max: 64, required: true, label: Gamma, description: "Gamma setting, -64 to 64." }
+    send: ["camera ccu set gamma {gamma}", "camera ccu get gamma"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  set_wide_dynamic_range:
+    summary: Turn wide dynamic range on or off (backlight compensation off)
+    params:
+      enabled: { type: bool, required: true, label: Wide dynamic range, description: "On turns wide dynamic range on." }
+    send: ["camera ccu set wide_dynamic_range {enabled:map.on_off}", "camera ccu get wide_dynamic_range"]
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+
+  # ── Indicator, standby, video mute ───────────────────────────────────────
+  set_led:
+    summary: Turn the indicator light on or off
+    params:
+      enabled: { type: bool, required: true, label: Indicator light, description: "On lights the indicator, off keeps it dark." }
+    send: ["camera led {enabled:map.on_off}", "camera led get"]
+    expect: { matches: '(?m)^\s*(?:OK|led:.*)\s*$' }
+    returns: ack
+  get_led:
+    summary: Read whether the indicator light is on
+    send: "camera led get"
+    expect: { matches: '(?m)^\s*led:\s*(on|off)\s*$' }
+    returns: value
+  standby_on:
+    summary: Stop video and put the camera in standby
+    send: ["camera standby on", "camera standby get"]
+    expect: { matches: '(?m)^\s*(?:OK|standby:.*)\s*$' }
+    returns: ack
+  standby_off:
+    summary: Bring the camera out of standby
+    send: ["camera standby off", "camera standby get"]
+    expect: { matches: '(?m)^\s*(?:OK|standby:.*)\s*$' }
+    returns: ack
+  standby_toggle:
+    summary: Toggle standby
+    send: ["camera standby toggle", "camera standby get"]
+    expect: { matches: '(?m)^\s*(?:OK|standby:.*)\s*$' }
+    returns: ack
+  get_standby:
+    summary: Read whether the camera is in standby
+    send: "camera standby get"
+    expect: { matches: '(?m)^\s*standby:\s*(on|off)\s*$' }
+    returns: value
+  video_mute_on:
+    summary: Mute the video (black with a message, or color bars on a 40 UHD set to them)
+    send: ["video mute on", "video mute get"]
+    expect: { matches: '(?m)^\s*(?:OK|mute:.*)\s*$' }
+    returns: ack
+  video_mute_off:
+    summary: Unmute the video
+    send: ["video mute off", "video mute get"]
+    expect: { matches: '(?m)^\s*(?:OK|mute:.*)\s*$' }
+    returns: ack
+  video_mute_toggle:
+    summary: Toggle video mute
+    send: ["video mute toggle", "video mute get"]
+    expect: { matches: '(?m)^\s*(?:OK|mute:.*)\s*$' }
+    returns: ack
+  get_video_mute:
+    summary: Read whether video is muted
+    send: "video mute get"
+    expect: { matches: '(?m)^\s*mute:\s*(on|off)\s*$' }
+    returns: value
+
+  # ── RoboSHOT IW ──────────────────────────────────────────────────────────
+  set_glass_mode:
+    summary: Set the smart glass cover's control to auto (follows standby) or manual
+    params:
+      mode: { type: enum, values: [auto, manual], required: true, label: Glass mode,
+              description: "auto clears the glass while video is sent and frosts it in standby; manual lets the glass state commands set it." }
+    send: ["camera glass mode set {mode}", "camera glass mode get"]
+    expect: { matches: '(?m)^\s*(?:OK|auto|manual)\s*$' }
+    returns: ack
+  toggle_glass_mode:
+    summary: Toggle the smart glass mode between auto and manual
+    send: ["camera glass mode toggle", "camera glass mode get"]
+    expect: { matches: '(?m)^\s*(?:OK|auto|manual)\s*$' }
+    returns: ack
+  get_glass_mode:
+    summary: Read the smart glass mode
+    send: "camera glass mode get"
+    expect: { matches: '(?m)^\s*(auto|manual)\s*$' }
+    returns: value
+  set_glass_state:
+    summary: Make the smart glass cover clear or frosted (glass mode manual)
+    params:
+      state: { type: enum, values: [clear, frosted], required: true, label: Glass state,
+               description: "clear makes the cover transparent, frosted makes it opaque; video is still sent." }
+    send: ["camera glass state set {state}", "camera glass state get"]
+    expect: { matches: '(?m)^\s*(?:OK|clear|frosted)\s*$' }
+    returns: ack
+  toggle_glass_state:
+    summary: Toggle the smart glass cover between clear and frosted (glass mode manual)
+    send: ["camera glass state toggle", "camera glass state get"]
+    expect: { matches: '(?m)^\s*(?:OK|clear|frosted)\s*$' }
+    returns: ack
+  get_glass_state:
+    summary: Read whether the smart glass cover is clear or frosted
+    send: "camera glass state get"
+    expect: { matches: '(?m)^\s*(clear|frosted)\s*$' }
+    returns: value
+  set_resolution:
+    summary: Set the video output resolution and frame rate (interrupts the IP stream)
+    params:
+      resolution: { type: enum, values: ["1080p/60", "1080p/59.94", "1080p/50", "1080p/30", "1080p/25", "1080i/60", "1080i/59.94", "1080i/50", "720p/60", "720p/59.94", "720p/50"],
+                    required: true, label: Resolution, description: "Output format as resolution/frame rate." }
+    send: ["camera resolution set {resolution}", "camera resolution get"]
+    expect: { matches: '(?m)^\s*(?:OK|"?[0-9]+[pi]/[0-9.]+"?)\s*$' }
+    returns: ack
+  get_resolution:
+    summary: Read the video output resolution and frame rate
+    send: "camera resolution get"
+    expect: { matches: '(?m)^\s*"?([0-9]+[pi]/[0-9.]+)"?\s*$' }
+    returns: value
+  recalibrate:
+    summary: Recalibrate the pan and tilt motors
+    send: "camera recalibrate"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+
+  # ── IP streaming ─────────────────────────────────────────────────────────
+  get_streaming_settings:
+    summary: Read the IP streaming settings (configured on the web interface)
+    send: "streaming settings get"
+    expect: { matches: '(?m)^\s*IP\s+' }
+    returns: text
+  streaming_on:
+    summary: Turn IP streaming on
+    send: "streaming ip enable on"
+    expect: { replies: 2, matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  streaming_off:
+    summary: Turn IP streaming off
+    send: "streaming ip enable off"
+    expect: { replies: 2, matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  streaming_toggle:
+    summary: Toggle IP streaming
+    send: "streaming ip enable toggle"
+    expect: { replies: 2, matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  get_streaming:
+    summary: Read whether IP streaming is on
+    send: "streaming ip enable get"
+    expect: { replies: 2, matches: '(?m)^\s*enabled:\s*(true|false)\s*$' }
+    returns: value
+
+  # ── System ───────────────────────────────────────────────────────────────
+  get_network_settings:
+    summary: Read the network settings (MAC and IP address, netmask, VLAN, gateway)
+    send: "network settings get"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: text
+  ping:
+    summary: Have the camera ping an address five times and return the output
+    params:
+      address: { type: string, max_length: 253, pattern: '^[A-Za-z0-9.:-]+$', required: true, label: Address,
+                 description: "IP address or host name to ping." }
+    send: "network ping {address}"
+    expect: { matches: 'packets transmitted' }
+    returns: text
+  reboot:
+    summary: Restart the camera now
+    send: "system reboot"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  reboot_in:
+    summary: Restart the camera after a delay
+    params:
+      seconds: { type: int, min: 1, max: 86400, required: true, label: Delay, description: "Seconds before the restart." }
+    send: "system reboot {seconds}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  get_factory_reset:
+    summary: Read whether the camera resets to factory defaults on its next restart (software and DIP switches)
+    send: "system factory-reset get"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: text
+  set_factory_reset:
+    summary: Make the next restart reset the camera to factory defaults, or cancel that
+    params:
+      enabled: { type: bool, required: true, label: Factory reset on restart,
+                 description: "On resets every setting to factory defaults at the next restart; off cancels it." }
+    send: "system factory-reset {enabled:map.on_off}"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: ack
+  get_version:
+    summary: Read the firmware versions
+    send: "version"
+    expect: { matches: '(?m)^\s*OK\s*$' }
+    returns: text
+
+maps:
+  on_off: { "true": "on", "false": "off" }
+
+telemetry:
+  # The camera pushes nothing: position every 2 s, the camera settings every
+  # 5 s, the rest every minute. Each answer is tied to its question.
+  poll:
+    - every_ms: 2000
+      send:
+        - "camera pan get"
+        - "camera tilt get"
+        - "camera zoom get"
+    - every_ms: 5000
+      send:
+        - "camera ccu get all"
+        - "camera focus mode get"
+        - "camera led get"
+        - "camera standby get"
+        - { models: [roboshot-40-uhd, roboshot-20-uhd], message: "video mute get" }
+    - every_ms: 60000
+      send:
+        - "version"
+        - "network settings get"
+        - "system factory-reset get"
+        - { models: [roboshot-40-uhd, roboshot-20-uhd, roboshot-sdi, roboshot-iw], message: "streaming settings get" }
+        - { models: [roboshot-iw], message: "camera glass mode get" }
+        - { models: [roboshot-iw], message: "camera glass state get" }
+        - { models: [roboshot-iw], message: "camera resolution get" }
+  updates:
+    - match: '(?m)^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*$'
+      request_match: '^camera pan (?:get|set .*)$'
+      state: { position.pan: "{1}" }
+    - match: '(?m)^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*$'
+      request_match: '^camera tilt (?:get|set .*)$'
+      state: { position.tilt: "{1}" }
+    - match: '(?m)^\s*([0-9]+(?:\.[0-9]+)?)\s*$'
+      request_match: '^camera zoom (?:get|set .*)$'
+      state: { position.zoom: "{1}" }
+    # camera ccu get <name> and get all: "<name>  <value>" lines.
+    - match: '(?m)^\s*auto_white_balance\s+(on|off)\s*$'
+      state: { ccu.auto_white_balance: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*red_gain\s+(\d+)\s*$'
+      state: { ccu.red_gain: "{1}" }
+    - match: '(?m)^\s*blue_gain\s+(\d+)\s*$'
+      state: { ccu.blue_gain: "{1}" }
+    - match: '(?m)^\s*backlight_compensation\s+(on|off)\s*$'
+      state: { ccu.backlight_compensation: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*auto_iris\s+(on|off)\s*$'
+      state: { ccu.auto_iris: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*iris\s+(\d+)\s*$'
+      state: { ccu.iris: "{1}" }
+    - match: '(?m)^\s*gain\s+(\d+)\s*$'
+      state: { ccu.gain: "{1}" }
+    - match: '(?m)^\s*detail\s+(\d+)\s*$'
+      state: { ccu.detail: "{1}" }
+    - match: '(?m)^\s*chroma\s+(\d+)\s*$'
+      state: { ccu.chroma: "{1}" }
+    - match: '(?m)^\s*gamma\s+(-?\d+)\s*$'
+      state: { ccu.gamma: "{1}" }
+    - match: '(?m)^\s*wide_dynamic_range\s+(on|off)\s*$'
+      state: { ccu.wide_dynamic_range: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*auto_focus:\s*(on|off)\s*$'
+      state: { auto_focus: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*led:\s*(on|off)\s*$'
+      state: { led: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*standby:\s*(on|off)\s*$'
+      state: { standby: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*mute:\s*(on|off)\s*$'
+      state: { video_mute: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*enabled:\s*(true|false)\s*$'
+      state: { streaming.enabled: "{1}" }
+    - match: '(?m)^\s*(auto|manual)\s*$'
+      request_match: '^camera glass mode '
+      state: { glass.mode: "{1}" }
+    - match: '(?m)^\s*(clear|frosted)\s*$'
+      request_match: '^camera glass state '
+      state: { glass.state: "{1}" }
+    - match: '(?m)^\s*"?([0-9]+[pi]/[0-9.]+)"?\s*$'
+      request_match: '^camera resolution '
+      state: { resolution: "{1}" }
+    # streaming settings get: "IP <name> <value>" lines.
+    - match: '(?m)^\s*IP\s+Enabled\s+(true|false)\s*$'
+      state: { streaming.enabled: "{1}" }
+    - match: '(?m)^\s*IP\s+Protocol\s+(\S+)\s*$'
+      state: { streaming.protocol: "{1}" }
+    - match: '(?m)^\s*IP\s+Port\s+(\d+)\s*$'
+      state: { streaming.port: "{1}" }
+    - match: '(?m)^\s*IP\s+MTU\s+(\d+)\s*$'
+      state: { streaming.mtu: "{1}" }
+    - match: '(?m)^\s*IP\s+URL\s+(\S+)\s*$'
+      state: { streaming.url: "{1}" }
+    - match: '(?m)^\s*IP\s+Video_Mode\s+(\S+)\s*$'
+      state: { streaming.video_mode: "{1}" }
+    - match: '(?m)^\s*IP\s+Preset_Quality\s+(.+?)\s*$'
+      state: { streaming.preset_quality: "{1}" }
+    - match: '(?m)^\s*IP\s+Preset_Resolution\s+(\S+)\s*$'
+      state: { streaming.preset_resolution: "{1}" }
+    - match: '(?m)^\s*IP\s+Custom_Resolution\s+(\S+)\s*$'
+      state: { streaming.custom_resolution: "{1}" }
+    - match: '(?m)^\s*IP\s+Custom_Frame_Rate\s+(\S+)\s*$'
+      state: { streaming.custom_frame_rate: "{1}" }
+    # network settings get
+    - match: '(?m)^\s*MAC Address\s+(\S+)\s*$'
+      state: { network.mac: "{1}" }
+    - match: '(?m)^\s*IP Address\s+(\S+)\s*$'
+      state: { network.ip: "{1}" }
+    - match: '(?m)^\s*Netmask\s+(\S+)\s*$'
+      state: { network.netmask: "{1}" }
+    - match: '(?m)^\s*Gateway\s+(\S+)\s*$'
+      state: { network.gateway: "{1}" }
+    - match: '(?m)^\s*VLAN\s+(.+?)\s*$'
+      state: { network.vlan: "{1}" }
+    # system factory-reset get
+    - match: '(?m)^\s*factory-reset \(software\):\s*(on|off)\s*$'
+      state: { factory_reset.software: { value: "{1}", map: { "on": true, "off": false } } }
+    - match: '(?m)^\s*factory-reset \(hardware\):\s*(on|off)\s*$'
+      state: { factory_reset.hardware: { value: "{1}", map: { "on": true, "off": false } } }
+    # version
+    - match: '(?m)^\s*System Version\s+(.+?)\s*$'
+      state: { version.system: "{1}" }
+    - match: '(?m)^\s*Sensor Version\s+(.+?)\s*$'
+      state: { version.sensor: "{1}" }
+    - match: '(?m)^\s*Pan Motor Version\s+(.+?)\s*$'
+      state: { version.pan_motor: "{1}" }
+    - match: '(?m)^\s*Tilt Motor Version\s+(.+?)\s*$'
+      state: { version.tilt_motor: "{1}" }
+    - match: '(?m)^\s*HDLink\s+(.+?)\s*$'
+      state: { version.hdlink: "{1}" }
+
+state:
+  position.pan: { type: float, unit: "°", description: "Pan angle in degrees, negative to the left" }
+  position.tilt: { type: float, unit: "°", description: "Tilt angle in degrees, negative downwards" }
+  position.zoom: { type: float, description: "Zoom magnification, 1 at full wide" }
+  ccu.auto_white_balance: { type: bool, description: "Auto white balance is on" }
+  ccu.red_gain: { type: int, description: "Red gain, 0 to 255" }
+  ccu.blue_gain: { type: int, description: "Blue gain, 0 to 255" }
+  ccu.backlight_compensation: { type: bool, description: "Backlight compensation is on" }
+  ccu.auto_iris: { type: bool, description: "Auto iris (and gain) is on" }
+  ccu.iris: { type: int, description: "Iris setting, 0 to 11 (0 to 13 on the 12E and 30E NDI)" }
+  ccu.gain: { type: int, description: "Gain setting, 0 to 11 (1 to 11 on the 12E and 30E NDI)" }
+  ccu.detail: { type: int, description: "Detail setting, 0 to 15" }
+  ccu.chroma: { type: int, description: "Chroma setting, 0 to 14" }
+  ccu.gamma: { type: int, description: "Gamma setting, -64 to 64" }
+  ccu.wide_dynamic_range: { type: bool, description: "Wide dynamic range is on" }
+  auto_focus: { type: bool, description: "Auto focus is on" }
+  led: { type: bool, description: "The indicator light is on" }
+  standby: { type: bool, description: "The camera is in standby" }
+  video_mute: { type: bool, description: "Video is muted" }
+  glass.mode: { type: string, description: "Smart glass control mode of a RoboSHOT IW: auto or manual" }
+  glass.state: { type: string, description: "Smart glass cover of a RoboSHOT IW: clear or frosted" }
+  resolution: { type: string, description: "Video output format of a RoboSHOT IW, as resolution/frame rate" }
+  streaming.enabled: { type: bool, description: "IP streaming is on" }
+  streaming.protocol: { type: string, description: "IP streaming protocol: RTSP or RTMP" }
+  streaming.port: { type: int, description: "IP streaming port" }
+  streaming.mtu: { type: int, description: "IP streaming maximum packet size" }
+  streaming.url: { type: string, description: "Path of the RTSP stream" }
+  streaming.video_mode: { type: string, description: "Video quality mode: preset (easy) or custom" }
+  streaming.preset_quality: { type: string, description: "Video quality chosen in the easy mode" }
+  streaming.preset_resolution: { type: string, description: "Resolution chosen in the easy mode" }
+  streaming.custom_resolution: { type: string, description: "Resolution chosen in the custom mode" }
+  streaming.custom_frame_rate: { type: string, description: "Frame rate chosen in the custom mode" }
+  network.mac: { type: string, description: "MAC address" }
+  network.ip: { type: string, description: "IP address" }
+  network.netmask: { type: string, description: "Subnet mask" }
+  network.gateway: { type: string, description: "Default gateway" }
+  network.vlan: { type: string, description: "VLAN setting, Disabled when none" }
+  factory_reset.software: { type: bool, description: "A factory reset is set to run at the next restart" }
+  factory_reset.hardware: { type: bool, description: "The rear DIP switches call for a factory reset at the next restart" }
+  version.system: { type: string, description: "System (firmware) version, with the model name" }
+  version.sensor: { type: string, description: "Sensor version" }
+  version.pan_motor: { type: string, description: "Pan motor firmware version" }
+  version.tilt_motor: { type: string, description: "Tilt motor firmware version" }
+  version.hdlink: { type: string, description: "HDLink version, on cameras with HDBaseT" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Telnet is off by default on firmware issued after mid-December 2019; turn it on on the Security
+      page of the web interface. Sessions need the administrator account. The login answers the
+      "login:" and "Password:" prompts; a wrong password is not recognised (the manuals document no
+      failure text), so the device then never answers and its commands time out.
+  - models: [all]
+    severity: info
+    text: >
+      An answer is read up to the ">" prompt, so the echoed command, any data lines and OK are one
+      message, tied to the command that asked. The Telnet option negotiation the camera may send
+      when the connection opens is not answered; the manuals do not describe it.
+  - models: [all]
+    severity: info
+    text: >
+      pan_to, tilt_to, zoom_to, zoom_to_step and move_to answer only when the camera reaches the
+      position (move_to_no_wait answers at once), so a long move holds back the next command; the
+      timeout is 15 s. A position out of range is refused with an error message the manuals do not
+      quote, which fails the command because it holds no OK.
+  - models: [roboshot-40-uhd, roboshot-sdi]
+    severity: info
+    text: >
+      The manuals show streaming ip enable answered with the prompt before OK ("> OK"); the streaming
+      commands therefore take two answers each. If the camera answers with one, they time out.
+  - models: [roboshot-iw]
+    severity: info
+    text: >
+      camera resolution get answers the format in quotes with no OK; the glass mode get answer is
+      not shown in the manual (its example repeats the LED's), and is taken as the word auto or
+      manual on its own line.
+  - models: [all]
+    severity: critical
+    text: >
+      set_factory_reset on resets every setting at the next restart; store_preset and
+      store_custom_scene overwrite what was stored; reboot and reboot_in drop the video.
+  - models: [all]
+    severity: info
+    text: >
+      Some settings cannot be read back over Telnet (an API limit): the presets' positions,
+      tri-sync speeds and stored CCU settings, the CCU scenes, and on the RoboSHOT IW the
+      streaming state. The IP streaming settings are changed on the web interface only.

@@ -3348,6 +3348,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm Update Channel Stream Schedule takes its vacation fields as query parameters, not a body, and answers 204. ([specs/twitch.yaml:1073](specs/twitch.yaml#L1073))
 - [ ] Confirm Delete Videos answers 200 with the deleted ids, and what it answers for a video that is not the channel's. ([specs/twitch.yaml:1160](specs/twitch.yaml#L1160))
 
+## vaddio-roboshot — Vaddio RoboSHOT PTZ cameras (Telnet API)
+
+- [ ] Record the login exchange from connection to the first ">" (the exact login and password prompts, any Telnet option bytes, the "Welcome" line) and what a wrong password produces. ([specs/vaddio-roboshot.yaml:86](specs/vaddio-roboshot.yaml#L86))
+- [ ] Confirm that every answer, including the gets and errors, ends with the ">" prompt, and whether the camera echoes the command line before its answer. ([specs/vaddio-roboshot.yaml:80](specs/vaddio-roboshot.yaml#L80))
+- [ ] Record the error message for an out-of-range position (pan, tilt, zoom set) and for an unknown command. ([specs/vaddio-roboshot.yaml:886](specs/vaddio-roboshot.yaml#L886))
+- [ ] Record the answers to streaming ip enable on and get on a RoboSHOT 40 UHD or SDI camera, to settle whether OK comes after a second prompt ("> OK"). ([specs/vaddio-roboshot.yaml:893](specs/vaddio-roboshot.yaml#L893))
+- [ ] Record camera glass mode get on a RoboSHOT IW. ([specs/vaddio-roboshot.yaml:898](specs/vaddio-roboshot.yaml#L898))
+
 ## videolan-vlc — VLC media player
 
 - [ ] Confirm the .json pages take the same commands as the .xml ones, the status and playlist field names read here, and the rate and audiodelay commands. ([specs/videolan-vlc.yaml:315](specs/videolan-vlc.yaml#L315))

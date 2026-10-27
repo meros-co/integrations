@@ -308,6 +308,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-tvone", &["tvone-coriomaster"]),
     ("vendor-twitch", &["twitch"]),
+    ("vendor-vaddio", &["vaddio-roboshot"]),
     ("vendor-videolan", &["videolan-vlc"]),
     ("vendor-vimeo", &["vimeo-live"]),
     (
