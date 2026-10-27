@@ -486,7 +486,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 |---|---|---|
 | Chroma-Q Vista consoles and Vista software | OSC (Vista 3 R5 and later) | On request (address list in the R5 release documents, behind the download registration form) |
 | ShowCAD Artist | Unknown | Unknown |
-| DMXControl | OSC / HTTP / UDP | Public |
+| DMXControl 3 | gRPC over HTTP/2 (network interface, Umbra discovery) | Public protobuf definitions, no protocol documentation; needs a native module |
 | Art-Net | Art-Net 4, UDP 6454 | Public |
 | sACN (E1.31) | UDP multicast 5568 | Public |
 | PosiStageNet | UDP multicast | Public |
