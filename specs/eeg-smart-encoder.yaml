@@ -1,0 +1,273 @@
+spec: 1
+id: eeg-smart-encoder
+name: EEG / AI-Media caption encoders (Smart Encoder command set)
+vendor: EEG Video (AI-Media)
+category: other
+
+# EEG's caption encoders (HD492 iCap Encoder, HD1492 frame card) take the
+# "Smart Encoder" command set on their serial ports, over Telnet on a port
+# the operator enables in the web interface, and on the web Terminal page.
+# Every command starts with CTRL+A (01H) and ends with CR (0DH); caption and
+# message modes run until CTRL+C (03H). The manuals do not give the replies.
+
+source:
+  - title: Manual HD492 iCap Encoder (revision 15 March 2023)
+    author: Access Innovation IP Pty Ltd (AI-Media; EEG Video)
+    url: https://www.ai-media.tv/wp-content/uploads/Manual_HD492.pdf
+    note: >
+      Manufacturer document. Telnet (enabled on the Telnet page of the web
+      interface, port chosen there), the serial ports P1 and P2 (DB-9, P1
+      also RS-422; 1200 baud, 7 data bits, odd parity by default), the
+      Terminal page, Startup Settings (commands without the leading CTRL+A
+      run at boot); the Developer Features command reference: VANC
+      regeneration (!), line 21 channels (6, 7), PassThru (3), RealTime (2),
+      HD VANC insertion (#) and lines (f 334, f vanc), serial outputs (f 333,
+      f ga), XDS (O XDS O, P, w P, e, T), status commands (?, O, +, A, b, S,
+      5) and the message commands (0, 1, 4, 8, 9, B). Read by an earlier
+      research pass; the PDF itself is not kept.
+  - title: Manual HD1492 HD Encoder Frame Card
+    author: Access Innovation IP Pty Ltd (AI-Media; EEG Video)
+    url: https://www.ai-media.tv/wp-content/uploads/Manual_HD1492.pdf
+    note: >
+      Manufacturer document for the sibling frame card sharing the command
+      set, read for the parameters the HD492 table leaves out: ON/OFF and
+      defaults, PassThru's field, RealTime's channel (CC1, CC3), roll-up (2,
+      3, 4) and base row (b2 to b15, at least the roll-up), XDS packet ids
+      (0102 length, 0103 program name, 0105 rating, 0501 network, 0502 call
+      letters, 0504 TSID), durations (-1, a count, hh.mm.ss), content in
+      braces or as hex, priority (115 default), delete all (L -all), active
+      port (O Px XDS O), the P2 serial settings (I P2 baud bits parity), and
+      the 1 stop bit.
+
+transport:
+  type: line-tcp
+  port: null
+  # Each message is sent as it is: commands carry their own CTRL+A and CR,
+  # caption text its CR, and the end of a mode is CTRL+C alone.
+  framing: delimited
+  close: ""
+  reply_framing: line
+  reply: none
+  encoding: ascii
+  timeout_ms: 3000
+  serial:
+    baud_rate: { default: 1200, values: [1200, 2400, 4800, 9600] }
+    data_bits: { default: 7, values: [7, 8] }
+    parity: { default: odd, values: [odd, even, none] }
+    stop_bits: 1
+    flow_control: none
+
+ports:
+  - { port: null, protocol: tcp, role: control, when: "link tcp",
+      note: "Telnet, enabled on the encoder's Telnet page on a port chosen there; no default is documented" }
+  - { port: null, protocol: serial, role: control, setting: serial_port, when: "link serial",
+      note: "Serial port P1 or P2, DB-9 (pin 2 transmit, pin 3 receive, pin 5 ground), a straight cable" }
+
+models:
+  - id: hd492
+    name: EEG HD492 iCap Encoder
+    supports: &all [set_vanc_regeneration, ignore_line21_channel, return_line21_channel, start_passthru,
+                    start_realtime, send_caption_line, end_mode, set_vanc_insertion, set_vanc_line,
+                    set_vanc_line_no333, use_serial_output_333, use_serial_output_ga, enable_xds_entry,
+                    set_xds_active_port, load_xds_text, load_xds_text_priority, load_xds_hex,
+                    load_default_xds_text, store_xds_text, delete_xds_packet, delete_all_xds_packets,
+                    block_xds_class, unblock_xds_class, set_serial_port_p2]
+    verification: none
+  - id: hd1492
+    name: EEG HD1492 HD Encoder frame card
+    supports: *all
+    verification: none
+
+commands:
+  # ── Upstream captions and modes ─────────────────────────────────────────
+  set_vanc_regeneration:
+    summary: Regenerate (on, the default) or ignore the upstream VANC captions (CTRL+A ! ON|OFF)
+    params:
+      enabled: { type: bool, required: true, label: Regenerate, description: "true regenerates upstream VANC captions, false ignores them." }
+    send: "\u0001! {enabled:on_off}\r"
+    returns: none
+  ignore_line21_channel:
+    summary: Stop passing an upstream line 21 channel (CTRL+A 6 channel)
+    params:
+      channel: &l21 { type: enum, values: [CC1, CC2, CC3, CC4, T1, T2, T3, T4], required: true, label: Channel,
+                      description: "Upstream caption or text channel; XDS cannot be turned off." }
+    send: "\u00016 {channel}\r"
+    returns: none
+  return_line21_channel:
+    summary: Pass an upstream line 21 channel again (CTRL+A 7 channel)
+    params:
+      channel: *l21
+    send: "\u00017 {channel}\r"
+    returns: none
+  start_passthru:
+    summary: Enter PassThru mode, raw CEA-608 byte pairs replacing upstream captions on a field, until end_mode (CTRL+A 3 field)
+    params:
+      field: { type: enum, values: [F1, F2], default: F1, label: Field, description: "Line 21 field the byte pairs go to." }
+    send: "\u00013 {field}\r"
+    returns: none
+  start_realtime:
+    summary: Enter RealTime roll-up captioning; text lines follow until end_mode (CTRL+A 2 channel rollup bBase)
+    params:
+      channel: { type: enum, values: [CC1, CC3], default: CC1, label: Channel, description: "Caption channel." }
+      rollup: { type: int, min: 2, max: 4, default: 3, label: Roll-up, description: "Rows of the roll-up." }
+      base: { type: int, min: 2, max: 15, default: 15, label: Base row, description: "Bottom row of the roll-up; at least the roll-up." }
+    send: "\u00012 {channel} {rollup} b{base}\r"
+    returns: none
+  send_caption_line:
+    summary: Send a line of caption text in RealTime mode, ended by CR (wraps at 32 characters)
+    params:
+      text: { type: string, max_length: 256, required: true, pattern: '^[\x20-\x7E]+$', label: Text,
+              description: "Caption text, printable ASCII." }
+    send: "{text}\r"
+    returns: none
+  end_mode:
+    summary: End the current caption or message mode (CTRL+C)
+    send: "\u0003"
+    returns: none
+
+  # ── HD VANC and serial outputs ──────────────────────────────────────────
+  set_vanc_insertion:
+    summary: Turn HD VANC caption insertion on or off (CTRL+A # ON|OFF)
+    params:
+      enabled: { type: bool, required: true, label: Insert, description: "true inserts captions in HD VANC." }
+    send: "\u0001# {enabled:on_off}\r"
+    returns: none
+  set_vanc_line:
+    summary: Set the VANC line captions are inserted on (CTRL+A f 334 line)
+    params:
+      line: &vline { type: int, min: 1, max: 1125, required: true, label: Line, description: "VANC line number." }
+    send: "\u0001f 334 {line}\r"
+    returns: none
+  set_vanc_line_no333:
+    summary: Set the VANC line with 333 detection off (CTRL+A f vanc line)
+    params:
+      line: *vline
+    send: "\u0001f vanc {line}\r"
+    returns: none
+  use_serial_output_333:
+    summary: Use the 333 serial output, configured by hand (CTRL+A f 333)
+    send: "\u0001f 333\r"
+    returns: none
+  use_serial_output_ga:
+    summary: Use the GA serial output (CTRL+A f ga)
+    send: "\u0001f ga\r"
+    returns: none
+
+  # ── XDS ─────────────────────────────────────────────────────────────────
+  enable_xds_entry:
+    summary: Enable XDS entry on this port (CTRL+A O XDS O)
+    send: "\u0001O XDS O\r"
+    returns: none
+  set_xds_active_port:
+    summary: Make a port the active XDS entry port (CTRL+A O port XDS O)
+    params:
+      port: { type: enum, values: [P1, P2], required: true, label: Port, description: "Serial port that enters XDS." }
+    send: "\u0001O {port} XDS O\r"
+    returns: none
+  load_xds_text:
+    summary: Load an XDS packet with ASCII content (CTRL+A P packet duration {content})
+    params:
+      packet: &packet { type: string, max_length: 4, pattern: '^[0-9A-Fa-f]{3,4}$', required: true, label: Packet,
+                        description: "Class and type in hex: 0102 length, 0103 program name, 0105 rating, 0501 network, 0502 call letters, 0504 TSID." }
+      duration: &duration { type: string, max_length: 8, pattern: '^(-1|[0-9]+|[0-9]{2}\.[0-9]{2}\.[0-9]{2})$', default: "-1", label: Duration,
+                            description: "-1 for ever, a repeat count, or an elapsed time hh.mm.ss." }
+      content: &content { type: string, max_length: 32, pattern: '^[\x20-\x7C\x7E]+$', required: true, label: Content,
+                          description: "ASCII content; the checksum is added by the encoder." }
+    send: "\u0001P {packet} {duration} \\{{content}\\}\r"
+    returns: none
+  load_xds_text_priority:
+    summary: Load an XDS packet with ASCII content and a priority (CTRL+A P packet duration {content} priority)
+    params:
+      packet: *packet
+      duration: *duration
+      content: *content
+      priority: { type: int, min: 1, max: 255, required: true, label: Priority,
+                  description: "Lower is sent more often; 115 by default for unknown packets, 30 is typical for high." }
+    send: "\u0001P {packet} {duration} \\{{content}\\} {priority}\r"
+    returns: none
+  load_xds_hex:
+    summary: Load an XDS packet with hexadecimal content (CTRL+A P packet duration hex)
+    params:
+      packet: *packet
+      duration: *duration
+      hex: { type: string, max_length: 64, pattern: '^([2-7][0-9A-Fa-f])+$', required: true, label: Content,
+             description: "Content as hex bytes 20 to 7F, such as 4844." }
+    send: "\u0001P {packet} {duration} {hex}\r"
+    returns: none
+  load_default_xds_text:
+    summary: Load a default packet, sent when the upstream one has been missing for 5 minutes (CTRL+A P Lpacket duration {content})
+    params:
+      packet: *packet
+      duration: *duration
+      content: *content
+    send: "\u0001P L{packet} {duration} \\{{content}\\}\r"
+    returns: none
+  store_xds_text:
+    summary: Load an XDS packet and keep it in non-volatile memory (CTRL+A w CTRL+A P packet -1 {content})
+    params:
+      packet: *packet
+      content: *content
+    send: "\u0001w \u0001P {packet} -1 \\{{content}\\}\r"
+    returns: none
+  delete_xds_packet:
+    summary: Delete an XDS packet from the queue (CTRL+A P packet)
+    params:
+      packet: *packet
+    send: "\u0001P {packet}\r"
+    returns: none
+  delete_all_xds_packets:
+    summary: Delete every XDS packet from the queue (CTRL+A L -all)
+    send: "\u0001L -all\r"
+    returns: none
+  block_xds_class:
+    summary: Block an upstream XDS class (CTRL+A T -class00)
+    params:
+      class: &class { type: string, max_length: 2, pattern: '^0[1-9A-Fa-f]$', required: true, label: Class,
+                      description: "XDS class in hex, 01 to 0F." }
+    send: "\u0001T -{class}00\r"
+    returns: none
+  unblock_xds_class:
+    summary: Pass an upstream XDS class again (CTRL+A T class00)
+    params:
+      class: *class
+    send: "\u0001T {class}00\r"
+    returns: none
+
+  # ── Serial port ─────────────────────────────────────────────────────────
+  set_serial_port_p2:
+    summary: Set serial port P2's line settings, effective at once (CTRL+A I P2 baud bits parity)
+    params:
+      baud: { type: enum, values: ["1200", "2400", "4800", "9600"], required: true, label: Baud rate, description: "Bits per second." }
+      bits: { type: enum, values: ["7", "8"], required: true, label: Data bits, description: "Data bits." }
+      parity: { type: enum, values: [o, e, n], required: true, label: Parity, description: "o odd, e even, n none." }
+    send: "\u0001I P2 {baud} {bits} {parity}\r"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The manuals give no reply format, so every command is sent without
+      waiting and reported unverified, and the status commands
+      (identification ?, port activity O, modem +, recovery A, video
+      presence b, switch S, line 21 monitor 5, XDS queue e) are left out:
+      their answers cannot be read. The message commands (0, 1, 4, 8, 9, B)
+      are left out too, since their parameters are not documented. Commands
+      sent live are not kept across a restart; the Startup Settings page
+      holds those that should be.
+  - models: [all]
+    severity: info
+    text: >
+      Telnet must be enabled on the encoder's Telnet page, on a port chosen
+      there (no default is documented), so the port is given when the device
+      is opened. The serial ports default to 1200 baud, 7 data bits, odd
+      parity; 1 stop bit and no flow control are from the HD1492 manual and
+      assumed for the HD492. The HD492's Production and Locked security
+      modes keep serial and Telnet control as configured.
+  - models: [all]
+    severity: info
+    text: >
+      In RealTime and PassThru modes the encoder takes text until end_mode;
+      send_caption_line sends one line (backspace editing is not offered).
+      The HD492 table adds a pairing argument to PassThru that it does not
+      define; the spec sends the HD1492 form (field only).

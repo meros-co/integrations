@@ -1411,6 +1411,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the TP-2000X-PC takes commands ended by a carriage return alone and sends its LED messages with the > prefix and a CR. ([specs/dsan-perfectcue.yaml:103](specs/dsan-perfectcue.yaml#L103))
 - [ ] Check whether the LED states are sent on connecting or only on change, and whether flow control is needed. ([specs/dsan-perfectcue.yaml:96](specs/dsan-perfectcue.yaml#L96))
 
+## eeg-smart-encoder — EEG / AI-Media caption encoders
+
+- [ ] Record what the encoder answers to a command and to the status commands (?, O, +, A, b, S, e), so replies can be checked and status read into state. ([specs/eeg-smart-encoder.yaml:250](specs/eeg-smart-encoder.yaml#L250))
+- [ ] Record the HD492 serial ports' stop bits and flow control (1 stop bit and none assumed from the HD1492 manual). ([specs/eeg-smart-encoder.yaml:264](specs/eeg-smart-encoder.yaml#L264))
+- [ ] Check whether Telnet needs a login and which port the Telnet page offers by default. ([specs/eeg-smart-encoder.yaml:261](specs/eeg-smart-encoder.yaml#L261))
+- [ ] Check whether a CR after CTRL+C is harmful or needed when ending a mode (the spec sends CTRL+C alone). ([specs/eeg-smart-encoder.yaml:123](specs/eeg-smart-encoder.yaml#L123))
+- [ ] Define the HD492 PassThru pairing argument, and the message command parameters (Title, Channel, Repeat, K/D, O/H, N/L). ([specs/eeg-smart-encoder.yaml:272](specs/eeg-smart-encoder.yaml#L272))
+
 ## emberplus — Ember+
 
 - [ ] Check the device's Ember+ port, since the module's default of 9000 is a common choice, not a standard. ([specs/emberplus.yaml:199](specs/emberplus.yaml#L199))
