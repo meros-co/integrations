@@ -421,7 +421,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| Smode | TCP / HTTP | Public |
+| Smode | HTTP Server API | On request |
 
 ### Recorders and replay
 
