@@ -271,6 +271,21 @@ fn render_unescaped(
                 out.push('+');
                 out.push_str(&escape(digits));
             }
+            // A path of several segments (a file on a player's storage):
+            // each segment is escaped on its own and the slashes are kept.
+            _ if directives.contains(&"path") => {
+                let segments: Vec<&str> = text.split('/').collect();
+                if segments
+                    .iter()
+                    .any(|s| s.is_empty() || *s == "." || *s == "..")
+                {
+                    return Err(format!(
+                        "'{name}' must be segments separated by single slashes, without . or .."
+                    ));
+                }
+                let escaped: Vec<String> = segments.iter().map(|s| escape(s)).collect();
+                out.push_str(&escaped.join("/"));
+            }
             _ => out.push_str(&escape(&text)),
         }
         last = whole.end();
@@ -482,6 +497,9 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                     // Percent-decoded: a name a device sends encoded
                     // (Spyder's `Camera%201`).
                     "url_decode" => percent_decode(&s),
+                    // Kept as it is; its segments are escaped one by one
+                    // where the placeholder lands (render_unescaped).
+                    "path" => s,
                     // A password a device takes hashed (Magewell's login).
                     "md5" => {
                         use md5::Digest;
@@ -668,6 +686,28 @@ mod tests {
     }
 
     #[test]
+    fn a_path_keeps_its_slashes_and_escapes_each_segment() {
+        let s = "f: { type: string }";
+        let path = |f: &str| {
+            go_with(
+                "/api/v1/files/{f:path}/",
+                json!({"f": f}),
+                s,
+                percent_encode,
+            )
+        };
+        assert_eq!(
+            path("sd/My Show/a b.mp4").unwrap(),
+            "/api/v1/files/sd/My%20Show/a%20b.mp4/"
+        );
+        assert_eq!(path("sd").unwrap(), "/api/v1/files/sd/");
+        assert!(path("sd/../x").is_err());
+        assert!(path("sd//x").is_err());
+        assert!(path("/sd").is_err());
+        assert_eq!(go("{f:path}", json!({"f": "sd/a b"}), s).unwrap(), "sd/a b");
+    }
+
+    #[test]
     fn url_decode_reverses_percent_encoding() {
         assert_eq!(percent_decode("Camera%201"), "Camera 1");
         assert_eq!(percent_decode("caf%C3%A9%2Fx"), "café/x");
@@ -715,6 +755,15 @@ mod tests {
     }
 
     fn go(template: &str, params: Value, specs: &str) -> Result<String, String> {
+        go_with(template, params, specs, no_escape)
+    }
+
+    fn go_with(
+        template: &str,
+        params: Value,
+        specs: &str,
+        escape: fn(&str) -> String,
+    ) -> Result<String, String> {
         let (p, s) = values(params, specs);
         let empty = Params::new();
         let empty_specs = BTreeMap::new();
@@ -734,7 +783,7 @@ mod tests {
             .unwrap(),
             session: None,
         };
-        render(template, &v, no_escape)
+        render(template, &v, escape)
     }
 
     #[test]

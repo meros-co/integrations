@@ -1387,7 +1387,7 @@ Encoding depends on where the value lands:
 | Location | Encoding |
 |---|---|
 | Line/TCP payload, OSC address, OSC string argument | None; text encoded per `encoding` |
-| HTTP `path` | Percent-encoded as a path segment (RFC 3986 unreserved characters kept); the `+` of a `signed` number is sent as it is, which RFC 3986 allows in a segment |
+| HTTP `path` | Percent-encoded as a path segment (RFC 3986 unreserved characters kept); the `+` of a `signed` number is sent as it is, which RFC 3986 allows in a segment, and a `path` string keeps its slashes, each segment encoded |
 | HTTP `query` value | Percent-encoded as a query value; pairs are sent in the order the spec lists them |
 | HTTP `raw_query` | None. Only `int`, `float`, `bool`, `enum`, a `string` with a `pattern`, or a `string` with the `url` directive, may appear here |
 
@@ -1411,6 +1411,7 @@ The directive set is closed.
 | `signed` | Number with an explicit leading sign: `7` → `+7`, `-7` → `-7`; with a float's `.Nf`, `{gain:signed:.1f}` → `+1.5`. For a protocol that reads a leading sign as a relative change (REAPER's `+1.5` for 1.5 dB up). A float that rounds to zero is `+0.0` |
 | `bit.0` … `bit.63` | Integer → `true` / `false`, whether that bit is set, numbered from 0 for the value 1 (two's complement for a negative value): `{flags:bit.3}` → `true` for `328`. For a flags word a device sends whole, read into one boolean per bit (§8); offsets apply first, and it is the last directive |
 | `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75`. In a telemetry value, a whole number a device sends where it means a decimal is shown the same way (`60` → `60.00`) |
+| `path` | A string of segments separated by `/`, such as a file on a player's storage: in an HTTP `path` each segment is percent-encoded on its own and the slashes are kept (`{file:path}` → `sd/My%20Show/a.mp4`); an empty, `.` or `..` segment refuses the command. Elsewhere the value is unchanged |
 | `md5`, `sha256` | String hashed, as lowercase hex: `{settings.password:md5}` → `e3afed0047b08059d0fada10f400c1e5` for `Admin`. For a device that takes a password hashed (Magewell's login) |
 | `to.<name>` | A number converted to the wire by the named conversion (below): `{level_db:to.x32_fader}` |
 | `from.<name>` | A wire number converted back to the operator's value: `{arg0:from.x32_fader:.1f}` |
