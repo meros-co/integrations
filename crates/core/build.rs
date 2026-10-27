@@ -237,6 +237,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-philips", &["philips-sicp"]),
+    ("vendor-pixotope", &["pixotope"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
     ("vendor-pltech", &["kuma-timer"]),

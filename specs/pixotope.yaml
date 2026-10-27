@@ -1,0 +1,339 @@
+spec: 1
+id: pixotope
+name: Pixotope (Pixotope Gateway HTTP API)
+vendor: Pixotope
+category: other
+
+# Pixotope's services (Engine, Store, Video IO, Tracking and others) talk over
+# the Data Hub, a ZeroMQ bus. Pixotope Gateway, which runs on every Pixotope
+# machine, relays HTTP to it: a POST of {"Topic": {...}, "Message": {...}}
+# to http://<host>:16208/gateway/<Pixotope version>/publish publishes the
+# message and answers with the first matching reply (an Update for a Get, a
+# CallResult for a Call) or, for Set and Reset, a confirmation of publishing.
+
+source:
+  - title: Pixotope Help Center 26.1, How to use Pixotope Gateway; Pixotope Gateway - API
+    author: Pixotope
+    url: https://help.pixotope.com/phc/26.1/how-to-use-pixotope-gateway
+    note: >
+      Manufacturer documents, read 2026-10-27. Gateway on port 16208
+      (configurable), not available with encryption; POST
+      http://[IP]:[Port]/gateway/[Version]/publish with a JSON body of Topic
+      and Message, an optional Timeout in ms (1000 by default); older version
+      numbers keep working unless the API broke; Source, RespondTo and a
+      Call's ID are filled in by the Gateway; headers may be empty;
+      attachments are not supported; the GET form with Type, Target, Name,
+      Value and Param<name>; replies per type (Set, Reset, Update, Log and
+      Startup confirm publishing; Get resolves with the first matching
+      Update; Identify with Self; Call with CallResult); the Editor's
+      "SetProperty with URL" example with Target ~LOCAL~-Engine.
+  - title: Pixotope Help Center 26.1, Pixotope API - Message Schema, State concept, Services, How to control a Pixotope service
+    author: Pixotope
+    url: https://help.pixotope.com/phc/26.1/pixotope-api-message-schema
+    note: >
+      Manufacturer documents. Message types Get, Set, Reset, Update, Call and
+      CallResult; service names <Machine>-<Service> and singletons (Store);
+      a State per service and per show, held by the Store in .pxshow files;
+      State paths such as State.General.CompositingColorSpace.
+  - title: Pixotope Help Center 26.1, Engine API - Calls; Store API - Calls
+    author: Pixotope
+    url: https://help.pixotope.com/phc/26.1/engine-api-calls
+    note: >
+      Manufacturer documents. The Engine calls used here with their params:
+      SetProperty (ObjectSearch, PropertyPath, Value, ApplyClamp), GetProperty
+      (RecursionDepth), ResetProperty, CallFunction (FunctionName,
+      FunctionArguments), SetVisibility, PlaySequences, StopSequences and
+      ContinueSequences (SequenceAssetPaths, SequenceLabels, SequenceNames,
+      SublevelAssetPath, LoopCount, PlaybackSpeed, StartAtTime, EndAtTime),
+      GetAvailableSequenceAssets, OpenLevel (LevelPath),
+      SetSublevelVisibility, LoadSublevel, UnloadSublevel (AssetPath),
+      AvalancheTakeIn and AvalancheTakeOut (AssetPath, AvalancheChannel,
+      ControllerIds/Values, PropertyIds/Values), AvalancheGetAvailableAssets,
+      AvalancheGetAllChannelDetails, GetVersion, ExecuteConsoleCommand,
+      IsReady; the Store calls ChangeShow (ShowName) and GetAllStates.
+
+transport:
+  type: http
+  port: 16208
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+           body: '{"Topic":{"Type":"Get","Target":"Store","Name":"State.General.FrameRate"},"Message":{}}' }
+
+settings:
+  api_version: { type: string, default: 24.1.0, max_length: 32, pattern: '^[0-9]+(\.[0-9]+)*$', label: API version,
+                 description: "Pixotope version in the Gateway URL, such as 24.1.0; older versions keep working unless the API changed." }
+  machine: { type: string, default: "~LOCAL~", max_length: 128, pattern: '^[^"\\]+$', label: Engine machine,
+             description: "Machine whose Engine the Engine commands address (<machine>-Engine); ~LOCAL~ for the machine the Gateway runs on." }
+
+ports:
+  - { port: 16208, protocol: http, role: control, note: "Pixotope Gateway; the Data Hub itself is ZeroMQ on 16201 and 16202" }
+
+models:
+  - id: pixotope
+    name: Pixotope 2.2 and later (Pixotope Gateway)
+    supports: [get_state_value, set_state_value, reset_state, call, set_property, get_property, reset_property,
+               call_function, set_visibility, play_sequences, stop_sequences, continue_sequences,
+               get_sequence_assets, open_level, set_sublevel_visibility, load_sublevel, unload_sublevel,
+               motion_take_in, motion_take_out, motion_get_assets, motion_get_channels, get_version,
+               execute_console_command, is_ready, change_show, get_all_states]
+    verification: none
+
+commands:
+  # ── Generic messages ────────────────────────────────────────────────────
+  get_state_value:
+    summary: Read a value of a service's state, such as State.General.CompositingColorSpace on Store (Get, answered by the Update)
+    params:
+      target: &target { type: string, max_length: 128, required: true, pattern: '^[^"\\]+$', label: Service,
+                        description: "Service name: Store, or <machine>-<service> such as RenderMachine1-Engine." }
+      name: &name { type: string, max_length: 1024, required: true, pattern: '^[^"\\]+$', label: Name,
+                    description: "Dot-separated state path, such as State.General.CompositingColorSpace." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Get","Target":{target:json},"Name":{name:json}},"Message":{}}' }
+    expect: &answer { status: 200 }
+    returns: text
+  set_state_value:
+    summary: Ask a service to set a value of its state (Set)
+    params:
+      target: *target
+      name: *name
+      value: { type: json, required: true, label: Value,
+               description: "New value: text, a number, true/false, or an object for a whole struct." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Set","Target":{target:json},"Name":{name:json}},"Message":{"Value":{value}}}' }
+    expect: *answer
+    returns: ack
+  reset_state:
+    summary: Ask a service to reset its state (Reset)
+    params:
+      target: *target
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Reset","Target":{target:json}},"Message":{}}' }
+    expect: *answer
+    returns: ack
+  call:
+    summary: Call a service's method with params and return its CallResult (Call), for any documented RPC
+    params:
+      target: *target
+      method: { type: string, max_length: 128, required: true, pattern: '^[A-Za-z0-9_.]+$', label: Method,
+                description: "RPC method name, as the service's API calls page lists it." }
+      params: { type: json, required: true, label: Params, description: "JSON object of the method's params, {} for none." }
+      timeout: &timeout { type: int, min: 1, max: 600000, default: 1000, label: Timeout,
+                          description: "How long the Gateway waits for the reply, in milliseconds." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":{target:json},"Method":{method:json}},"Message":{"Params":{params}},"Timeout":{timeout}}' }
+    expect: *answer
+    returns: text
+
+  # ── Engine ──────────────────────────────────────────────────────────────
+  set_property:
+    summary: Set a property of an actor or component in the Engine (SetProperty)
+    params:
+      object: &object { type: string, max_length: 1024, required: true, pattern: '^[^"\\]+$', label: Object,
+                        description: "ObjectSearch: an actor, Actor.Component, or a special tag such as post_process_handler or level_blueprint." }
+      property: &prop { type: string, max_length: 1024, required: true, pattern: '^[^"\\]+$', label: Property,
+                        description: "Dot-separated property path, such as Intensity or Settings.ColorGamma." }
+      value: { type: json, required: true, label: Value,
+               description: "Value: a number, text parsed to the property's type, or a struct as JSON or Unreal text." }
+      clamp: { type: bool, default: false, label: Clamp, description: "Apply the clamp values of the property's metadata." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"SetProperty"},"Message":{"Params":{"ObjectSearch":{object:json},"PropertyPath":{property:json},"Value":{value},"ApplyClamp":{clamp}}}}' }
+    expect: *answer
+    returns: text
+  get_property:
+    summary: Describe a property of an actor or component with its value (GetProperty)
+    params:
+      object: *object
+      property: *prop
+      depth: { type: int, min: 0, max: 16, default: 1, label: Depth, description: "How deep nested properties are described." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"GetProperty"},"Message":{"Params":{"ObjectSearch":{object:json},"PropertyPath":{property:json},"RecursionDepth":{depth}}}}' }
+    expect: *answer
+    returns: text
+  reset_property:
+    summary: Reset a property to its value in the level (ResetProperty)
+    params:
+      object: *object
+      property: *prop
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"ResetProperty"},"Message":{"Params":{"ObjectSearch":{object:json},"PropertyPath":{property:json}}}}' }
+    expect: *answer
+    returns: text
+  call_function:
+    summary: Call a function of an object, Pixotope's recommended way of driving live input (CallFunction)
+    params:
+      object: *object
+      function: { type: string, max_length: 256, required: true, pattern: '^[^"\\]+$', label: Function, description: "Function name." }
+      arguments: { type: json, required: true, label: Arguments, description: "JSON array of the function's arguments as text, [] for none." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"CallFunction"},"Message":{"Params":{"ObjectSearch":{object:json},"FunctionName":{function:json},"FunctionArguments":{arguments}}}}' }
+    expect: *answer
+    returns: text
+  set_visibility:
+    summary: Show or hide an actor or component (SetVisibility)
+    params:
+      object: *object
+      visible: { type: bool, required: true, label: Visible, description: "true shows the object, false hides it." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"SetVisibility"},"Message":{"Params":{"ObjectSearch":{object:json},"Visibility":{visible}}}}' }
+    expect: *answer
+    returns: text
+  play_sequences:
+    summary: Play level sequences by asset path (PlaySequences)
+    params:
+      sequences: &sequences { type: json, required: true, label: Sequences,
+                              description: "JSON array of sequence asset paths." }
+      loops: { type: int, min: 0, default: 1, label: Loop count, description: "Times the sequences play." }
+      speed: { type: float, min: 0.01, max: 100, default: 1, label: Speed, description: "Playback speed, 1 for normal." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"PlaySequences"},"Message":{"Params":{"SequenceAssetPaths":{sequences},"LoopCount":{loops},"PlaybackSpeed":{speed:.3f}}}}' }
+    expect: *answer
+    returns: text
+  stop_sequences:
+    summary: Stop level sequences by asset path (StopSequences)
+    params:
+      sequences: *sequences
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"StopSequences"},"Message":{"Params":{"SequenceAssetPaths":{sequences}}}}' }
+    expect: *answer
+    returns: text
+  continue_sequences:
+    summary: Continue Motion Design sequences by label (ContinueSequences)
+    params:
+      labels: { type: json, required: true, label: Labels, description: "JSON array of Motion Design sequence labels." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"ContinueSequences"},"Message":{"Params":{"SequenceLabels":{labels}}}}' }
+    expect: *answer
+    returns: text
+  get_sequence_assets:
+    summary: List the available sequence assets (GetAvailableSequenceAssets)
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"GetAvailableSequenceAssets"},"Message":{"Params":{}}}' }
+    expect: *answer
+    returns: text
+  open_level:
+    summary: Load another level without closing the project (OpenLevel)
+    params:
+      level: { type: string, max_length: 1024, required: true, pattern: '^[^"\\]+$', label: Level, description: "Level path, such as Levels/TestMap0." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"OpenLevel"},"Message":{"Params":{"LevelPath":{level:json}}}}' }
+    expect: *answer
+    returns: text
+  set_sublevel_visibility:
+    summary: Show or hide a sublevel (SetSublevelVisibility)
+    params:
+      sublevel: &sublevel { type: string, max_length: 1024, required: true, pattern: '^[^"\\]+$', label: Sublevel, description: "Sublevel asset path." }
+      visible: { type: bool, required: true, label: Visible, description: "true shows the sublevel." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"SetSublevelVisibility"},"Message":{"Params":{"AssetPath":{sublevel:json},"Visibility":{visible}}}}' }
+    expect: *answer
+    returns: text
+  load_sublevel:
+    summary: Load a sublevel (LoadSublevel)
+    params:
+      sublevel: *sublevel
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"LoadSublevel"},"Message":{"Params":{"AssetPath":{sublevel:json}}}}' }
+    expect: *answer
+    returns: text
+  unload_sublevel:
+    summary: Unload a sublevel (UnloadSublevel)
+    params:
+      sublevel: *sublevel
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"UnloadSublevel"},"Message":{"Params":{"AssetPath":{sublevel:json}}}}' }
+    expect: *answer
+    returns: text
+  motion_take_in:
+    summary: Take a Motion Design graphic in on a channel, with controller values (AvalancheTakeIn)
+    params:
+      asset: &asset { type: string, max_length: 1024, required: true, pattern: '^[^"\\]+$', label: Asset, description: "Motion Design asset path." }
+      channel: &mdchannel { type: string, max_length: 128, required: true, pattern: '^[^"\\]+$', label: Channel, description: "Motion Design channel name." }
+      controller_ids: { type: json, required: true, label: Controller ids, description: "JSON array of remote control controller ids, [] for none." }
+      controller_values: { type: json, required: true, label: Controller values, description: "JSON array of values as text, one per controller id." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"AvalancheTakeIn"},"Message":{"Params":{"AssetPath":{asset:json},"AvalancheChannel":{channel:json},"ControllerIds":{controller_ids},"ControllerValues":{controller_values}}}}' }
+    expect: *answer
+    returns: text
+  motion_take_out:
+    summary: Take a Motion Design graphic out of a channel (AvalancheTakeOut)
+    params:
+      asset: *asset
+      channel: *mdchannel
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"AvalancheTakeOut"},"Message":{"Params":{"AssetPath":{asset:json},"AvalancheChannel":{channel:json}}}}' }
+    expect: *answer
+    returns: text
+  motion_get_assets:
+    summary: List the available Motion Design assets (AvalancheGetAvailableAssets)
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"AvalancheGetAvailableAssets"},"Message":{"Params":{"IncludeThumbnails":false}}}' }
+    expect: *answer
+    returns: text
+  motion_get_channels:
+    summary: Read every Motion Design channel's details (AvalancheGetAllChannelDetails)
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"AvalancheGetAllChannelDetails"},"Message":{"Params":{}}}' }
+    expect: *answer
+    returns: text
+  get_version:
+    summary: Read the Pixotope and Unreal Engine versions (GetVersion)
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"GetVersion"},"Message":{"Params":{}}}' }
+    expect: *answer
+    returns: text
+  execute_console_command:
+    summary: Run an Engine console command (ExecuteConsoleCommand)
+    params:
+      command: { type: string, max_length: 4096, required: true, pattern: '^[^"\\]+$', label: Command, description: "Engine console command." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"ExecuteConsoleCommand"},"Message":{"Params":{"Command":{command:json}}}}' }
+    expect: *answer
+    returns: text
+  is_ready:
+    summary: Ask whether the Engine is ready (IsReady)
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"{settings.machine}-Engine","Method":"IsReady"},"Message":{"Params":{}}}' }
+    expect: *answer
+    returns: text
+
+  # ── Store ───────────────────────────────────────────────────────────────
+  change_show:
+    summary: Open another show, or a new one by that name (Store ChangeShow)
+    params:
+      show: { type: string, max_length: 256, required: true, pattern: '^[^"\\]+$', label: Show, description: "Show name." }
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"Store","Method":"ChangeShow"},"Message":{"Params":{"ShowName":{show:json}}}}' }
+    expect: *answer
+    returns: text
+  get_all_states:
+    summary: Read the state of every service in the current show (Store GetAllStates)
+    send: { method: POST, path: "/gateway/{settings.api_version}/publish", content_type: application/json,
+            body: '{"Topic":{"Type":"Call","Target":"Store","Method":"GetAllStates"},"Message":{"Params":{}}}' }
+    expect: *answer
+    returns: text
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The documents do not give the Gateway's HTTP answer body (only which
+      message it resolves with), so queries return the answer as text and
+      nothing is kept in state; Pixotope's push (Update messages) travels on
+      the ZeroMQ Data Hub, which this spec does not open. A Call the target
+      service does not answer within the timeout (1000 ms by default) fails.
+  - models: [all]
+    severity: info
+    text: >
+      Engine commands address <machine>-Engine, with the machine setting
+      (~LOCAL~ for the Gateway's own machine, as Pixotope's Editor examples
+      do). Any other documented message or RPC (Video IO, Tracking, Daemon,
+      the many other Engine calls) goes through call, get_state_value and
+      set_state_value. The Gateway is not available when Pixotope's
+      encryption is on, and takes no authentication.
+  - models: [all]
+    severity: critical
+    text: >
+      change_show and open_level change what the Engine renders;
+      reset_state resets a service's state for the show.
