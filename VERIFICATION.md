@@ -71,6 +71,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a wrong key or identity shows as a refused handshake (and which alert the device sends), and that the device answers the keep-alive sent first inside the secure session as it does over TCP. ([specs/aes70.yaml:427](specs/aes70.yaml#L427))
 - [ ] On a device that speaks secure OCP.1 over DTLS, confirm it takes one OCP.1 PDU per record and datagram and answers the same way, whether it asks for a cookie, and that it sends its flight again when the controller's is lost. ([specs/aes70.yaml:444](specs/aes70.yaml#L444))
 
+## aimedia-icap — AI-Media / EEG iCap
+
+- [ ] Record the JSON replies of the list and get calls (users, access codes, active encoders and captioners, health), so the live encoders and captioners can be kept in state. ([specs/aimedia-icap.yaml:375](specs/aimedia-icap.yaml#L375))
+- [ ] Confirm the path of the access code PUT (the collection, as the spec sends it, or accesscodes/<code>). ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
+- [ ] Record the body of a 401 for wrong credentials and for a CaptionCast without a paid account, so the two can be told apart. ([specs/aimedia-icap.yaml:384](specs/aimedia-icap.yaml#L384))
+- [ ] Record the success statuses of POST and DELETE calls (200, 201 or 204 accepted). ([specs/aimedia-icap.yaml:106](specs/aimedia-icap.yaml#L106))
+
 ## aja-bridge-live — AJA BRIDGE LIVE
 
 - [ ] Confirm the unit's remote API address: https on 443 with a self-signed certificate (as the API document's examples), and whether http on 8080 is reachable from the network or only on the unit (the manual's examples). ([specs/aja-bridge-live.yaml:51](specs/aja-bridge-live.yaml#L51))

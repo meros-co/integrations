@@ -18,6 +18,7 @@ use std::{collections::BTreeSet, env, fs, path::PathBuf};
 const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ableton", &["ableton-live"]),
     ("vendor-aes70", &["aes70"]),
+    ("vendor-aimedia", &["aimedia-icap"]),
     (
         "vendor-aja",
         &["aja-bridge-live", "aja-helo", "aja-kipro", "aja-kumo"],
