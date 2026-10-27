@@ -267,6 +267,29 @@ fn each_path(each: &str, settings: &Params) -> Option<String> {
 
 /// An XML element's own text (its text and CDATA, not its children's),
 /// trimmed.
+/// Whether an element is the one `xml_each` names (SPEC.md §8, "XML
+/// elements"): a local name, or a path of them separated by `/` that ends
+/// with the element and names its enclosing elements outward, so
+/// `Position/PanTilt` is a `PanTilt` directly inside a `Position`. Names are
+/// compared without their namespace prefix.
+fn xml_element_is(node: &roxmltree::Node, path: &str) -> bool {
+    if !node.is_element() {
+        return false;
+    }
+    let mut names = path.rsplit('/');
+    if !names.next().is_some_and(|n| node.has_tag_name(n)) {
+        return false;
+    }
+    let mut at = *node;
+    for name in names {
+        match at.parent_element() {
+            Some(parent) if parent.has_tag_name(name) => at = parent,
+            _ => return false,
+        }
+    }
+    true
+}
+
 fn xml_text(node: roxmltree::Node) -> Value {
     let text: String = node
         .children()
@@ -1256,10 +1279,7 @@ impl Telemetry {
                     };
                     let base = captures(&caps);
                     self.clear(rule, &base, cleared);
-                    for node in doc
-                        .descendants()
-                        .filter(|n| n.has_tag_name(element.as_str()))
-                    {
+                    for node in doc.descendants().filter(|n| xml_element_is(n, element)) {
                         let mut values = base.clone();
                         for a in node.attributes() {
                             values.push((a.name().to_string(), Value::String(a.value().into())));
@@ -2848,6 +2868,51 @@ mod tests {
                 r#"<n><name id="a">Cam &amp; 1</name><name id="b" text="x">y</name></n>"#
             ),
             Some(json!({"names": {"a": "Cam & 1", "b": "x"}}))
+        );
+    }
+
+    #[test]
+    fn an_xml_each_path_names_the_enclosing_elements() {
+        // ONVIF's PTZ status and its presets both hold tt:PanTilt elements:
+        // the path tells the status's position from a preset's.
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/onvif/ptz$", "xml_each": "PTZStatus/Position/PanTilt",
+                 "state": {"position.pan": "{x}"}},
+                {"path": "^/onvif/ptz$", "xml_each": "Preset/PTZPosition/PanTilt",
+                 "state": {"presets.{^^token}.pan": "{x}"}},
+            ]})),
+            &state(json!({
+                "position.pan": {"type": "float", "description": "x"},
+                "presets.*.pan": {"type": "float", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let reply = |body: &'static str| {
+            t.apply(&Inbound::Http {
+                path: "/onvif/ptz",
+                headers: &[],
+                body: body.as_bytes(),
+                request: None,
+            })
+        };
+        assert_eq!(
+            reply(
+                r#"<s:Envelope xmlns:s="s" xmlns:tt="t" xmlns:tptz="p"><s:Body><tptz:GetStatusResponse><tptz:PTZStatus><tt:Position><tt:PanTilt x="0.5" y="0"/></tt:Position><tt:MoveStatus><tt:PanTilt>IDLE</tt:PanTilt></tt:MoveStatus></tptz:PTZStatus></tptz:GetStatusResponse></s:Body></s:Envelope>"#
+            ),
+            Some(json!({"position": {"pan": 0.5}}))
+        );
+        assert_eq!(
+            reply(
+                r#"<s:Envelope xmlns:s="s" xmlns:tt="t" xmlns:tptz="p"><s:Body><tptz:GetPresetsResponse><tptz:Preset token="1"><tt:Name>A</tt:Name><tt:PTZPosition><tt:PanTilt x="-0.25" y="0"/></tt:PTZPosition></tptz:Preset></tptz:GetPresetsResponse></s:Body></s:Envelope>"#
+            ),
+            Some(json!({"presets": {"1": {"pan": -0.25}}}))
+        );
+        // A path that does not fit the element's enclosing elements matches nothing.
+        assert_eq!(
+            reply("<Position><Other><PanTilt x=\"1\"/></Other></Position>"),
+            None
         );
     }
 

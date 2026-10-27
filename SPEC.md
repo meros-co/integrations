@@ -2089,6 +2089,22 @@ A placeholder whose capture an element does not give leaves its path
 unassigned, so the main row's buffer, with no `<me>` around it, writes
 nothing there.
 
+Element names are compared without their namespace prefix (`tt:PanTilt` is
+`PanTilt`). Where one name stands for different things in different places,
+`xml_each` gives the enclosing elements too, outward from the element and
+separated by `/`: `Position/PanTilt` is a `PanTilt` directly inside a
+`Position`, and nothing else. An ONVIF camera's PTZ status and its presets
+both hold `tt:PanTilt` positions:
+
+```yaml
+    - path: "^/onvif/ptz_service$"
+      xml_each: PTZStatus/Position/PanTilt
+      state: { position.pan: "{x}", position.tilt: "{y}" }
+    - path: "^/onvif/ptz_service$"
+      xml_each: Preset/PTZPosition/PanTilt
+      state: { "presets.{^^token}.pan": "{x}" }
+```
+
 #### Keys holding dots
 
 A state path's segments are separated by dots, so a captured value holding
