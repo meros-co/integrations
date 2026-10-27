@@ -321,6 +321,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-sounddevices", &["sounddevices-pixnet"]),
+    ("vendor-spx", &["spx-graphics"]),
     ("vendor-stagetimer", &["stagetimer"]),
     ("vendor-streamlabs", &["streamlabs-desktop"]),
     ("vendor-studiocoast", &["vmix"]),

@@ -3387,6 +3387,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm PIXNET answers 200 to a command, its answer to a refused one, and whether it asks for a login. ([specs/sounddevices-pixnet.yaml:77](specs/sounddevices-pixnet.yaml#L77))
 - [ ] Find the PIXNET status replies (GET /sounddevices/transport and the settings) so the recorder's state can be read. ([specs/sounddevices-pixnet.yaml:172](specs/sounddevices-pixnet.yaml#L172))
 
+## spx-graphics — SPX Graphics Controller
+
+- [ ] Record what SPX Production and SPX Broadcast answer for a wrong or missing API key (SPX Solo's code answers 200 with {"error": ...}). ([specs/spx-graphics.yaml:518](specs/spx-graphics.yaml#L518))
+- [ ] Record the reply of rundown/get on SPX Broadcast and confirm it is the rundown file (templates with itemID, onair as "true"/"false", playserver, playchannel, playlayer, webplayout, relpath, out, DataFields). ([specs/spx-graphics.yaml:534](specs/spx-graphics.yaml#L534))
+- [ ] Record the replies of getprojects, getrundowns, allrundowns, gettemplates, getlayerstate and getFileList, so more of them can be kept in state. ([specs/spx-graphics.yaml:539](specs/spx-graphics.yaml#L539))
+- [ ] Check whether the commercial editions answer the controller commands with 200 and the same JSON as SPX Solo, and the status of an unknown item id. ([specs/spx-graphics.yaml:516](specs/spx-graphics.yaml#L516))
+- [ ] Check that a load_rundown file value with its slash percent-encoded (%2F) is read as project/rundown. ([specs/spx-graphics.yaml:195](specs/spx-graphics.yaml#L195))
+
 ## stagetimer — Stagetimer
 
 - [ ] Confirm the desktop app serves the API and Socket.IO under /v1/ on its own port, as the cloud's API URL has it, and record the API URL its Menu > API shows. ([specs/stagetimer.yaml:971](specs/stagetimer.yaml#L971))
